@@ -10,7 +10,6 @@ from bz2 import BZ2File
 from datetime import datetime, date
 from urllib.parse import quote, unquote
 from wsgiref.util import request_uri
-import difflib
 import logging
 import operator
 import os
@@ -607,65 +606,19 @@ class SwedishLegalSource(DocumentRepository):
         content), return a ferenda.elements.Body object containing a structured
         version of the document text.
         """
-        # this version knows how to use an appropriate analyzer (if available) to
-        # segment documents into subdocs and use the appropritate
-        # parsing method on each subdoc. NOTE: this
-        # requires that sanitize_body has set up a PDFAnalyzer
-        # subclass instance as a property on the sanitized object
-        # (normally a PDFReader or StreamingPDFReader)
         rawbody = self.extract_body(fp, basefile)
         sanitized = self.sanitize_body(rawbody)
-        if not hasattr(sanitized, 'analyzer'):
-            # sanitized is probably just a placeholder document, not a
-            # real PDFReader
-            return Body(sanitized)
-        allbody = Body()
-        initialstate = {'pageno': 1}
-        documents = sanitized.analyzer.documents()
-        if len(documents) > 1:
-            self.log.warning("%s: segmented into docs %s" % (basefile, documents))
-        for (startpage, pagecount, tag) in documents:
-            if tag == 'main':
-                initialstate['pageno'] -= 1  # argh....
-                parser = self.get_parser(basefile, sanitized, initialstate)
-                tokenstream = sanitized.textboxes(offtryck_gluefunc,
-                                                  pageobjects=True,
-                                                  startpage=startpage,
-                                                  pagecount=pagecount)
-                body = parser(tokenstream)
-                for func, initialstate in self.visitor_functions(basefile):
-                    # could be functions for assigning URIs to particular
-                    # nodes, extracting keywords from text etc. Note: finding
-                    # references in text with LegalRef is done afterwards
-                    self.visit_node(body, func, initialstate)
-                # print("%s: self.config.parserefs: %s, self.parse_types: %s" % (basefile, self.config.parserefs, self.parse_types))
-                if self.config.parserefs and self.parse_types:
-                    body = self.refparser.parse_recursive(body)
-            else:
-                # copy pages verbatim -- make no attempt to glue
-                # textelements together, parse references etc. In
-                # effect, this will yield pages full of absolute
-                # positioned textboxes that don't reflow etc
-                s = VerbatimSection()
-                for relidx, page in enumerate(sanitized[startpage:startpage+pagecount]):
-                    sb = Sidbrytning()
-                    sb.ordinal = initialstate['pageno']+relidx
-                    s.append(sb)
-                    s.append(page)
-                body = Body([s])
-            # regardless of wether we used real parsing or verbatim
-            # copying, we need to update the current page number
-            lastpagebreak = self._find_subnode(body, Sidbrytning)
-            initialstate['pageno'] = lastpagebreak.ordinal + 1
-            allbody += body[:]
-        return allbody
+        parser = self.get_parser(basefile, sanitized, initialstate)
+        tokenstream = self.tokenize(sanitized)
+        body = parser(tokenstream)
+        for func, initialstate in self.visitor_functions(basefile):
+            self.visit_node(body, func, initialstate)
 
     def parse_body(self, fp, basefile):
         rawbody = self.extract_body(fp, basefile)
         sanitized = self.sanitize_body(rawbody)
         parser = self.get_parser(basefile, sanitized)
         tokenstream = self.tokenize(sanitized)
-        # for PDFs, pdfreader.textboxes(gluefunc) is a tokenizer
         body = parser(tokenstream)
         for func, initialstate in self.visitor_functions(basefile):
             # could be functions for assigning URIs to particular
@@ -714,68 +667,16 @@ class SwedishLegalSource(DocumentRepository):
         """should return a function that gets any iterable (the output
         from tokenize) and returns a ferenda.elements.Body object.
         
-        The default implementation calls :py:func:`offtryck_parser` to
-        create a function/closure which is returned IF the sanitized
-        body data is a PDFReader object. Otherwise, returns a function that
-        justs packs every item in a recieved iterable into a Body object.
+        The default implementation returns a function that justs packs
+        every item in a recieved iterable into a Body object.
         
         If your docrepo requires a FSMParser-created parser, you should
         instantiate and return it here.
+
         """
-        if isinstance(sanitized, PDFReader):
-            # If our sanitized body is a PDFReader, it's most likely
-            # something that can be handled by the offtryck_parser.
-            startpage = 0
-            pagecount = len(sanitized)
-            if hasattr(sanitized, 'analyzer'):
-                analyzer = sanitized.analyzer
-                for startpage, pagecount, tag in analyzer.documents():
-                    if tag == 'main':
-                        break
-            else:
-                analyzer = self.get_pdf_analyzer(sanitized)
-            if "hocr" in sanitized.filename:
-                analyzer.scanned_source = True
-            metrics_path = self.store.path(basefile, 'intermediate',
-                                           '.metrics.json')
-
-            if os.environ.get("FERENDA_PLOTANALYSIS"):
-                plot_path = self.store.path(basefile, 'intermediate',
-                                            '.plot.png')
-            else:
-                plot_path = None
-            self.log.debug("%s: Calculating PDF metrics for %s pages "
-                           "starting at %s" % (basefile, pagecount, startpage))
-            metrics = analyzer.metrics(metrics_path, plot_path,
-                                       startpage=startpage,
-                                       pagecount=pagecount,
-                                       force=self.config.force)
-            if os.environ.get("FERENDA_DEBUGANALYSIS"):
-                pdfdebug_path = self.store.path(basefile, 'intermediate',
-                                                '.debug.pdf')
-
-                self.log.debug("Creating debug version of PDF")
-                analyzer.drawboxes(pdfdebug_path, offtryck_gluefunc,
-                                   metrics=metrics)
-            if self.document_type == self.PROPOSITION:
-                preset = 'proposition'
-            elif self.document_type == self.SOU:
-                preset = 'sou'
-            elif self.document_type == self.DS:
-                preset = 'ds'
-            elif self.document_type == self.KOMMITTEDIREKTIV:
-                preset = 'dir'
-            else:
-                preset = 'default'
-            parser = offtryck_parser(basefile, metrics=metrics, preset=preset,
-                                     identifier=self.infer_identifier(basefile),
-                                     debug=os.environ.get('FERENDA_FSMDEBUG', 0),
-                                     initialstate=initialstate)
-            return parser.parse
-        else:
-            def default_parser(iterable):
-                return Body(list(iterable))
-            return default_parser
+        def default_parser(iterable):
+            return Body(list(iterable))
+        return default_parser
     
     def get_pdf_analyzer(self, sanitized):
         return PDFAnalyzer(sanitized)
@@ -789,13 +690,8 @@ class SwedishLegalSource(DocumentRepository):
         with a suitable glue function to create the iterable.
         
         """
-        # this method might recieve a arbitrary object (the superclass
-        # impl returns a BeautifulSoup node) but must return an iterable
-        if isinstance(body, PDFReader):
-            return body.textboxes(offtryck_gluefunc, pageobjects=True)
-        else:
-            # just assume that this is iterable
-            return body
+        # just assume that this is iterable
+        return body
 
     # see SFS.visit_node
     def visit_node(self, node, clbl, state, debug=False):

@@ -24,7 +24,7 @@ from ferenda import CompositeRepository, CompositeStore
 from ferenda import TextReader, PDFAnalyzer
 from ferenda import DocumentEntry
 from . import (Trips, NoMoreLinks, Regeringen, Riksdagen,
-               SwedishLegalSource, SwedishLegalStore, RPUBL)
+               SwedishLegalSource, SwedishLegalStore, RPUBL, Offtryck)
 from .fixedlayoutsource import FixedLayoutStore, FixedLayoutSource
 
 
@@ -48,7 +48,7 @@ class PropAnalyzer(PDFAnalyzer):
                     'pageheight': util.TopCounter()}
         currentappendix = None
         for pageidx, page in enumerate(self.pdf):
-            styles = self.count_styles(pageidx, 1)['rest_styles']
+            styles = self.count_styles(pageidx, 1)
             # find the most dominant style on the page. If it uses the
             # EU font, it's a separate section.
             if styles and styles.most_common(1)[0][0][0].startswith("EUAlbertina"):
@@ -65,6 +65,11 @@ class PropAnalyzer(PDFAnalyzer):
                     styles.most_common(1) and 
                     styles.most_common(1)[0][0] not in [x[0] for x in mainstyles.most_common(3)]):
                     currentdoc = 'appendix'
+                elif ".hocr." in self.pdf.filename:
+                    # scanned sources have fluctuating page sizes,
+                    # plus it's not possible to identify appendicies
+                    # by differing page dimensions
+                    currentdoc = "main"
                 else:
                     if (pagedims['pageheight'] and
                         (abs(pagedims['pageheight'].top() - page.height) > 1 or
@@ -158,7 +163,10 @@ class PropTripsStore(FixedLayoutStore):
             return super(PropTripsStore, self).intermediate_path(basefile)
 
 
-class PropTrips(Trips, FixedLayoutSource):
+# We derive from Trips for downloading, from FixedLayoutSource for
+# downloaded_to_intermediate, extract_{head,metadata,body}, and from
+# Offtryck for most everything else. FIXME: This is not manageble.
+class PropTrips(Trips, Offtryck, FixedLayoutSource):
     alias = "proptrips"
     ar = ""
     start_url = "http://rkrattsbaser.gov.se/prop/adv?dok=P&sort=asc&ar={c.lastyear}"
@@ -500,11 +508,11 @@ class PropTrips(Trips, FixedLayoutSource):
             b.append(Preformatted([p]))
         return b
 
-    def get_parser(self, basefile, sanitized):
+    def get_parser(self, basefile, sanitized, initialstate=None):
         if isinstance(sanitized, TextReader):
             return self.textparser
         else:
-            return super(PropTrips, self).get_parser(basefile, sanitized)
+            return super(PropTrips, self).get_parser(basefile, sanitized, initialstate)
 
     def tokenize(self, reader):
         if isinstance(reader, TextReader):

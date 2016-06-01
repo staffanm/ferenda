@@ -22,6 +22,7 @@ from ferenda.decorators import downloadmax, recordlastdownload
 from ferenda.elements import Body, Paragraph, Preformatted
 from ferenda.pdfreader import StreamingPDFReader
 from .fixedlayoutsource import FixedLayoutSource, FixedLayoutStore
+from . import Offtryck
 
 
 class RiksdagenStore(FixedLayoutStore):
@@ -41,7 +42,7 @@ class RiksdagenStore(FixedLayoutStore):
         else:
             return candidate.replace(".bz2", "")
 
-class Riksdagen(FixedLayoutSource):
+class Riksdagen(Offtryck, FixedLayoutSource):
     BILAGA = "bilaga"
     DS = "ds"
     DIREKTIV = "dir"
@@ -483,13 +484,14 @@ class Riksdagen(FixedLayoutSource):
                 b.append(tagtype([t]))
         return b
 
-    def get_parser(self, basefile, sanitized):
+    def get_parser(self, basefile, sanitized, initialstate=None):
         if isinstance(sanitized, BeautifulSoup):
             return self.htmlparser
         else:
-            return super(Riksdagen, self).get_parser(basefile, sanitized)
+            return super(Riksdagen, self).get_parser(basefile, sanitized, initialstate)
 
     def sanitize_body(self, rawbody):
+        sanitized = super(Riksdagen, self).sanitize_body(rawbody)
         if isinstance(rawbody, BeautifulSoup):
             return rawbody
         if ".hocr." in rawbody.filename:

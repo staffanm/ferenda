@@ -24,7 +24,7 @@ from ferenda import util
 from ferenda.decorators import recordlastdownload, downloadmax
 from ferenda.elements import Section, Link, Body, CompoundElement
 from ferenda.pdfreader import PDFReader, Textbox, Textelement, Page, BaseTextDecoder
-from ferenda.errors import DocumentRemovedError
+from ferenda.errors import DocumentRemovedError, DownloadError
 from . import SwedishLegalSource, Offtryck, RPUBL
 from .legalref import LegalRef
 from .elements import PreambleSection, UnorderedSection, Forfattningskommentar, Sidbrytning, VerbatimSection
@@ -43,7 +43,6 @@ class Regeringen(Offtryck):
     SO = 1332
     
     document_type = None  # subclasses must override
-    start_url = "http://www.regeringen.se/Filter/GetFilteredItems"
     start_url = "http://www.regeringen.se/Filter/RssFeed"
     downloaded_suffix = ".html"  # override PDFDocumentRepository
     storage_policy = "dir"
@@ -68,6 +67,9 @@ class Regeringen(Offtryck):
 
     @recordlastdownload
     def download(self, basefile=None):
+        if basefile:
+            raise DownloadError("%s doesn't support downloading single basefiles" %
+                                self.__class__.__name__)
         params = {'filterType': 'Taxonomy',
                   'filterByType': 'FilterablePageBase',
                   'preFilteredCategories': '1324',
@@ -239,6 +241,34 @@ class Regeringen(Offtryck):
 
         return updated or pdfupdated
 
+    def sanitize_metadata(self, a, basefile):
+        # trim space
+        for k in ("dcterms:title", "dcterms:abstract"):
+            if k in a:
+                a[k] = util.normalize_space(a[k])
+        # trim identifier
+        a["dcterms:identifier"] = self.sanitize_identifier(
+            a["dcterms:identifier"].replace("ID-nummer: ", ""))
+        # FIXME call sanitize_identifier
+        # save for later
+        self._identifier = a["dcterms:identifier"]
+        # it's rare, but in some cases a document can be published by
+        # two different departments (eg dir. 2011:80). Convert string
+        # to a list in these cases (SwedishLegalSource.polish_metadata
+        # will handle that)
+        if a["rpubl:departement"] and ", " in a["rpubl:departement"]:
+            a["rpubl:departement"] = a["rpubl:departement"].split(", ")
+        # remove empty utgarFran list
+        if a["rpubl:utgarFran"]:
+            a["rpubl:utgarFran"] = [URIRef(x) for x in a["rpubl:utgarFran"]]
+        else:
+            del a["rpubl:utgarFran"]
+
+        # FIXME: possibly derive utrSerie from self.document_type?
+        if self.rdf_type == RPUBL.Utredningsbetankande:
+            altlabel = "SOU" if self.document_type == Regeringen.SOU else "Ds"
+            a["rpubl:utrSerie"] = self.lookup_resource(altlabel, SKOS.altLabel)
+        return a
 
     blacklist = set([(SOU, "2008:35"),  # very atypical report
                      (DS, "2002:34"),   # 2-column report, uninteresting

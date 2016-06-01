@@ -32,26 +32,20 @@ class DirAnalyzer(PDFAnalyzer):
     # direktiv has no footers
     footer_significance_threshold = 0
 
-    def analyze_styles(self, frontmatter_styles, rest_styles):
+    def analyze_styles(self, styles):
         styledefs = {}
-        all_styles = frontmatter_styles + rest_styles
-        ds = all_styles.most_common(1)[0][0]
+        ds = styles.most_common(1)[0][0]
         styledefs['default'] = self.fontdict(ds)
-
-        # title style: the 2nd largest style on the frontpage
-        if frontmatter_styles:
-            ts = sorted(frontmatter_styles.keys(), key=self.fontsize_key,
-                        reverse=True)[1]
-            styledefs['title'] = self.fontdict(ts)
-
-        # h1 - h2: the two styles just larger than ds (normally set in the
-        # same size but different weight)
-        sortedstyles = sorted(rest_styles, key=self.fontsize_key)
-        largestyles = [x for x in sortedstyles if
-                       self.fontsize_key(x) > self.fontsize_key(ds)]
-        for style in ('h2', 'h1'):
-            if largestyles:  # any left?
-                styledefs[style] = self.fontdict(largestyles.pop(0))
+        # Largest style: used for the text "Kommittédirektiv" on the frontpage
+        # 2nd largest: used for the title
+        # 3rd largest: used for the id (eg "Dir. 2014:158") on the frontpage.
+        # 4th largest (same size as body text but bold): h1
+        # 5th largest (same size as body text but italic): h2
+        (ts, dummy, h1, h2) = sorted(styles.keys(), key=self.fontsize_key,
+                                     reverse=True)[1:5]
+        styledefs['title'] = self.fontdict(ts)
+        styledefs['h1'] = self.fontdict(h1)
+        styledefs['h2'] = self.fontdict(h2)
         return styledefs
 
 

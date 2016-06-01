@@ -54,7 +54,7 @@ class DsAnalyzer(PDFAnalyzer):
 
 
 # See SOU.py for discussion about possible other sources
-class Ds(Offtryck):
+class Ds(Regeringen):
     alias = "ds"
     re_basefile_strict = re.compile(r'Ds (\d{4}:\d+)')
     # Like with re_urlbasefile_*, we must insist on a leading Ds, or

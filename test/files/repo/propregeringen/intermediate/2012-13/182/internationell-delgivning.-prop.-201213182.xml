@@ -8,6 +8,14 @@
 	<fontspec id="2" size="11" family="Times" color="#000000"/>
 	<fontspec id="3" size="20" family="Times" color="#000000"/>
 	<fontspec id="4" size="12" family="Times" color="#000000"/>
+	<fontspec id="5" size="-1" family="Times" color="#000000"/>
+	<fontspec id="6" size="14" family="Times" color="#000000"/>
+	<fontspec id="7" size="18" family="Times" color="#000000"/>
+	<fontspec id="8" size="17" family="Times" color="#000000"/>
+	<fontspec id="9" size="12" family="Times" color="#000000"/>
+	<fontspec id="10" size="7" family="Times" color="#000000"/>
+	<fontspec id="11" size="5" family="Times" color="#000000"/>
+	<fontspec id="12" size="10" family="Times" color="#000000"/>
 <text top="0" left="77" width="8" height="17" font="0">  </text>
 <text top="959" left="77" width="4" height="17" font="0"> </text>
 <text top="924" left="637" width="11" height="17" font="0">1 </text>
@@ -46,6 +54,57 @@
 <text top="701" left="76" width="72" height="17" font="0">delgivning. </text>
 <text top="718" left="89" width="342" height="17" font="0">Lagändringarna föreslås träda i kraft den 1 januari 2014. </text>
 <text top="735" left="76" width="4" height="17" font="0"> </text>
+</page>
+<page number="9" position="absolute" top="0" left="0" height="1029" width="701">
+<text top="3" left="77" width="4" height="13" font="0"> </text>
+<text top="962" left="77" width="4" height="13" font="0"> </text>
+<text top="63" left="533" width="115" height="13" font="0">Prop. 2012/13:182 </text>
+<text top="927" left="637" width="11" height="13" font="0">9 </text>
+<text top="65" left="77" width="18" height="20" font="3">3 </text>
+<text top="65" left="145" width="256" height="20" font="3">Ärendet och dess beredning </text>
+<text top="107" left="77" width="448" height="13" font="0">Internationell delgivning i Sverige och utomlands regleras i huvudsak i </text>
+<text top="124" left="77" width="447" height="13" font="0">två äldre kungörelser. En från 1909 och en annan från 1933. Regeringen </text>
+<text top="141" left="77" width="453" height="13" font="0">konstaterade i samband med införandet av lagen (2000:562) om </text>
+<text top="158" left="77" width="447" height="13" font="0">internationell rättslig hjälp i brottmål att bestämmelserna i kungörelserna </text>
+<text top="176" left="77" width="458" height="13" font="0">var föråldrade och i behov av en genomgripande översyn </text>
+<text top="193" left="77" width="447" height="13" font="0">(prop.1999/2000:61 s. 73–74). Detta behov upprepades i förarbetena till </text>
+<text top="210" left="77" width="451" height="13" font="0">den nya delgivningslag som trädde i kraft den 1 april 2011 (prop. </text>
+<text top="227" left="77" width="124" height="13" font="0">2009/10:237 s. 96).  </text>
+<text top="245" left="89" width="437" height="13" font="0">Nya internationella överenskommelser om delgivningssamarbete har </text>
+<text top="262" left="77" width="453" height="13" font="0">utvecklat nya former för delgivning över gränserna. Bistånd med </text>
+<text top="279" left="77" width="454" height="13" font="0">delgivning söks genom direktkontakter mellan ländernas behöriga </text>
+<text top="297" left="77" width="447" height="13" font="0">myndigheter i stället för att använda sig av centrala organ, vilket är det </text>
+<text top="314" left="77" width="447" height="13" font="0">sätt som nämnda kungörelser huvudsakligen föreskriver. Mot bl.a. denna </text>
+<text top="331" left="77" width="452" height="13" font="0">bakgrund och med en målsättning att modernisera regelverket för </text>
+<text top="348" left="77" width="446" height="13" font="0">internationell delgivning har en utredare fått i uppdrag att biträda </text>
+<text top="366" left="77" width="455" height="13" font="0">Justitiedepartementet med att göra en översyn av reglerna om </text>
+<text top="383" left="77" width="159" height="13" font="0">internationell delgivning.  </text>
+<text top="400" left="89" width="434" height="13" font="0">I promemorian Internationell delgivning (Ds 2011:46) föreslås ett nytt </text>
+<text top="417" left="77" width="448" height="13" font="0">regelverk för internationell delgivning. Huvudparten av regelverket kan </text>
+<text top="435" left="77" width="447" height="13" font="0">enligt utredaren regleras i förordning. I promemorian föreslås dock vissa </text>
+<text top="452" left="76" width="446" height="13" font="0">ändringar i delgivningslagen (2010:1932) och offentlighets-  och </text>
+<text top="469" left="76" width="447" height="13" font="0">sekretesslagen (2009:400). En sammanfattning av promemorians förslag </text>
+<text top="486" left="76" width="443" height="13" font="0">återfinns i <i>bilaga 1</i>.  Promemorians lagförslag finns i <i>bilaga 2</i>.  Pro-</text>
+<text top="504" left="76" width="448" height="13" font="0">memorian har remissbehandlats. En förteckning över remissinstanserna </text>
+<text top="521" left="76" width="454" height="13" font="0">finns i <i>bilaga 3</i>. En sammanställning av remissyttrandena finns </text>
+<text top="538" left="76" width="365" height="13" font="0">tillgänglig i Justitiedepartementet (dnr Ju2011/7600/BIRS).  </text>
+<text top="572" left="76" width="59" height="13" font="4"><i>Lagrådet </i></text>
+<text top="595" left="76" width="428" height="13" font="0">Regeringen beslutade den 30 maj 2013 att inhämta Lagrådets yttrande. </text>
+<text top="612" left="76" width="447" height="13" font="0">Lagrådet lämnade förslagen utan erinran. Remissens lagförslag stämmer </text>
+<text top="630" left="76" width="390" height="13" font="0">överens med propositionens. Lagrådets yttrande finns i <i>bilaga 4.</i> </text>
+<text top="702" left="77" width="18" height="20" font="3">4 </text>
+<text top="702" left="145" width="180" height="20" font="3">Nuvarande ordning </text>
+<text top="746" left="77" width="30" height="17" font="8">4.1 </text>
+<text top="746" left="145" width="304" height="17" font="8">Internationell delgivning – en översikt </text>
+<text top="779" left="77" width="447" height="13" font="0">Internationell delgivning innebär att den som ska delges finns i ett annat </text>
+<text top="796" left="77" width="446" height="13" font="0">land än avsändaren. Det internationella delgivningssamarbetet baserar sig </text>
+<text top="813" left="77" width="450" height="13" font="0">huvudsakligen på internationella överenskommelser. Avtalen omfattar </text>
+<text top="831" left="77" width="452" height="13" font="0">delgivning i straff-  och civilrättsliga  mål och ärenden, men även </text>
+<text top="848" left="77" width="447" height="13" font="0">delgivning inom det förvaltningsrättsliga området. Överenskommelserna </text>
+<text top="865" left="77" width="448" height="13" font="0">har förhandlats fram i olika fora, bl.a. inom Europeiska unionen (EU). </text>
+<text top="882" left="77" width="448" height="13" font="0">Avtalen behandlar främst förutsättningar och formkrav vid bistånd med </text>
+<text top="900" left="77" width="449" height="13" font="0">delgivning, men även att myndigheter i ett land själva kan ombesörja </text>
+<text top="917" left="77" width="451" height="13" font="0">delgivning i ett annat land. Sveriges åtaganden i det internationella </text>
 </page>
 <outline>
 <item page="1">1 Förslag till riksdagsbeslut</item>

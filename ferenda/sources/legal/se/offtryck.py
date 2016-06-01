@@ -3,16 +3,28 @@ from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 from builtins import *
 
+# stdlib
+import os
 import re
+import json
+import difflib
 
+# 3rd party
+from layeredconfig import LayeredConfig, Defaults
+from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
+
+# own
 from ferenda import util
-from ferenda import PDFReader
+from ferenda import PDFReader, FSMParser, Describer
 from ferenda.elements import Section, Link, Body, CompoundElement
-from ferenda.pdfreader import BaseTextDecoder
+from ferenda.elements.html import P
+from ferenda.pdfreader import BaseTextDecoder, Page, Textbox
+from ferenda.decorators import newstate
 
 from . import SwedishLegalSource, RPUBL
 from .legalref import Link, LegalRef, RefParseError
 from .decoders import OffsetDecoder1d, OffsetDecoder20
+from .elements import *
 
 class Offtryck(SwedishLegalSource):
     DS = "ds"
@@ -83,42 +95,95 @@ class Offtryck(SwedishLegalSource):
                      # (DS, "2004:46"),   # -""-            in swedish
                     ])
 
-
-    def sanitize_metadata(self, a, basefile):
-        # trim space
-        for k in ("dcterms:title", "dcterms:abstract"):
-            if k in a:
-                a[k] = util.normalize_space(a[k])
-        # trim identifier
-        a["dcterms:identifier"] = self.sanitize_identifier(
-            a["dcterms:identifier"].replace("ID-nummer: ", ""))
-        # FIXME call sanitize_identifier
-        # save for later
-        self._identifier = a["dcterms:identifier"]
-        # it's rare, but in some cases a document can be published by
-        # two different departments (eg dir. 2011:80). Convert string
-        # to a list in these cases (SwedishLegalSource.polish_metadata
-        # will handle that)
-        if a["rpubl:departement"] and ", " in a["rpubl:departement"]:
-            a["rpubl:departement"] = a["rpubl:departement"].split(", ")
-        # remove empty utgarFran list
-        if a["rpubl:utgarFran"]:
-            a["rpubl:utgarFran"] = [URIRef(x) for x in a["rpubl:utgarFran"]]
-        else:
-            del a["rpubl:utgarFran"]
-
-        # FIXME: possibly derive utrSerie from self.document_type?
-        if self.rdf_type == RPUBL.Utredningsbetankande:
-            altlabel = "SOU" if self.document_type == Regeringen.SOU else "Ds"
-            a["rpubl:utrSerie"] = self.lookup_resource(altlabel, SKOS.altLabel)
-        return a
-
-
     parse_types = (LegalRef.RATTSFALL,
                    LegalRef.LAGRUM,
                    LegalRef.KORTLAGRUM,
                    LegalRef.FORARBETEN,
     )
+
+    def sanitize_body(self, rawbody):
+        sanitized = super(Offtryck, self).sanitize_body(rawbody)
+        try:
+            sanitized.analyzer = self.get_pdf_analyzer(sanitized)
+        except AttributeError:
+            if isinstance(sanitized, list):
+                pass  # means that we use a placeholder text instead
+                      # of a real document
+            else:
+                raise
+        return sanitized
+
+
+    def get_parser(self, basefile, sanitized, initialstate=None):
+        """should return a function that gets any iterable (the output
+        from tokenize) and returns a ferenda.elements.Body object.
+        
+        The default implementation calls :py:func:`offtryck_parser` to
+        create a function/closure which is returned IF the sanitized
+        body data is a PDFReader object. Otherwise, returns a function that
+        justs packs every item in a recieved iterable into a Body object.
+        
+        If your docrepo requires a FSMParser-created parser, you should
+        instantiate and return it here.
+        """
+
+        # most of this method is just calculating metrics and enabling
+        # plot/debuganalysis
+        if self.document_type == self.PROPOSITION:
+            # the first page of a prop has a document-unique title
+            # font, larger than h1. To avoid counting that as h1, and
+            # subsequently counting h1 as h2, etc, we skip the first
+            # page.
+            startpage = 1
+        else:
+            startpage = 0
+        pagecount = len(sanitized)
+        if hasattr(sanitized, 'analyzer'):
+            analyzer = sanitized.analyzer
+            for _, pagecount, tag in analyzer.documents():
+                if tag == 'main':
+                    break
+        else:
+            analyzer = self.get_pdf_analyzer(sanitized)
+        if "hocr" in sanitized.filename:
+            analyzer.scanned_source = True
+        metrics_path = self.store.path(basefile, 'intermediate',
+                                       '.metrics.json')
+
+        if os.environ.get("FERENDA_PLOTANALYSIS"):
+            plot_path = self.store.path(basefile, 'intermediate',
+                                        '.plot.png')
+        else:
+            plot_path = None
+        self.log.debug("%s: Calculating PDF metrics for %s pages "
+                       "starting at %s" % (basefile, pagecount, startpage))
+        metrics = analyzer.metrics(metrics_path, plot_path,
+                                   startpage=startpage,
+                                   pagecount=pagecount,
+                                   force=self.config.force)
+        if os.environ.get("FERENDA_DEBUGANALYSIS"):
+            pdfdebug_path = self.store.path(basefile, 'intermediate',
+                                            '.debug.pdf')
+
+            self.log.debug("Creating debug version of PDF")
+            analyzer.drawboxes(pdfdebug_path, offtryck_gluefunc,
+                               metrics=metrics)
+        if self.document_type == self.PROPOSITION:
+            preset = 'proposition'
+        elif self.document_type == self.SOU:
+            preset = 'sou'
+        elif self.document_type == self.DS:
+            preset = 'ds'
+        elif self.document_type == self.KOMMITTEDIREKTIV:
+            preset = 'dir'
+        else:
+            preset = 'default'
+        parser = offtryck_parser(basefile, metrics=metrics, preset=preset,
+                                 identifier=self.infer_identifier(basefile),
+                                 debug=os.environ.get('FERENDA_FSMDEBUG', 0),
+                                 initialstate=initialstate)
+        return parser.parse
+
 
     def parse_body(self, fp, basefile):
         # this version knows how to use an appropriate analyzer to
@@ -183,17 +248,22 @@ class Offtryck(SwedishLegalSource):
         # in doc.meta, but the values in the actual document should take
         # precendence
         def _check_differing(describer, predicate, newval):
-            if describer.getvalue(predicate) != newval:
-                self.log.debug("%s: HTML page: %s is %r, document: it's %r" %
-                               (doc.basefile,
-                                doc.meta.qname(predicate),
-                                describer.getvalue(predicate),
-                                newval))
-                # remove old val
-                d.graph.remove((d._current(),
-                                predicate,
-                                d.graph.value(d._current(), predicate)))
-                d.value(predicate, newval)
+            try:
+                describer.getvalue(predicate)
+                if describer.getvalue(predicate) != newval:
+                    self.log.debug("%s: HTML page: %s is %r, document: it's %r" %
+                                   (doc.basefile,
+                                    doc.meta.qname(predicate),
+                                    describer.getvalue(predicate),
+                                    newval))
+                    # remove old val
+                    d.graph.remove((d._current(),
+                                    predicate,
+                                    d.graph.value(d._current(), predicate)))
+            except KeyError:
+                # old val didn't exist
+                pass
+            d.value(predicate, newval)
 
         def helper(node, meta):
             for subnode in list(node):
@@ -216,7 +286,7 @@ class Offtryck(SwedishLegalSource):
             str_element = str(element).strip()
 
             # dcterms:identifier
-            if not identifier_found:
+            if not identifier_found and hasattr(self, 're_basefile_lax'):
                 m = self.re_basefile_lax.search(str_element)
                 if m:
                     _check_differing(
@@ -287,12 +357,6 @@ class Offtryck(SwedishLegalSource):
             return identifier
 
 
-    DEFAULT_DECODER = (OffsetDecoder1d, None)
-    # This just just a list of known different encoding
-    # schemes. FIXME: try to find out whether all Ds documents should
-    # use the (non-decoding) BaseTextDecoder
-    ALTERNATE_DECODERS = {(PROPOSITION, "1997/98:44"): (OffsetDecoder20, "Datalagskommittén"),
-                          (DS, "2004:46"): (BaseTextDecoder, None)}
     
 
     def parse_pdf(self, pdffile, intermediatedir, basefile):
@@ -303,7 +367,14 @@ class Offtryck(SwedishLegalSource):
         else:
             keep_xml = True
         tup = (self.document_type, basefile)
-        decoding_class, decoder_arg = self.ALTERNATE_DECODERS.get(tup, self.DEFAULT_DECODER)
+        default_decoder = (OffsetDecoder1d, None)
+        # This just just a list of known different encoding
+        # schemes. FIXME: try to find out whether all Ds documents should
+        # use the (non-decoding) BaseTextDecoder
+        alternate_decoders = {(self.PROPOSITION, "1997/98:44"): (OffsetDecoder20, "Datalagskommittén"),
+                              (self.DS, "2004:46"): (BaseTextDecoder, None)}
+
+        decoding_class, decoder_arg = alternate_decoders.get(tup, default_decoder)
         pdf = PDFReader(filename=pdffile,
                         workdir=intermediatedir,
                         images=self.config.pdfimages,
