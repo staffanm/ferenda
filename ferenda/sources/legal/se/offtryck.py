@@ -197,9 +197,17 @@ class Offtryck(SwedishLegalSource):
         rawbody = self.extract_body(fp, basefile)
         sanitized = self.sanitize_body(rawbody)
         if not hasattr(sanitized, 'analyzer'):
-            # sanitized is probably just a placeholder document, not a
-            # real PDFReader
-            return Body(sanitized)
+            # fall back into the same logic as
+            # SwedishLegalSource.parse_body at this point
+            parser = self.get_parser(basefile, sanitized)
+            tokenstream = self.tokenize(sanitized)
+            body = parser(tokenstream)
+            for func, initialstate in self.visitor_functions(basefile):
+                self.visit_node(body, func, initialstate)
+            if self.config.parserefs and self.parse_types:
+                body = self.refparser.parse_recursive(body)
+            return body
+
         allbody = Body()
         initialstate = {'pageno': 1}
         documents = sanitized.analyzer.documents()
@@ -300,7 +308,7 @@ class Offtryck(SwedishLegalSource):
             # done with respect to the resulting metrics (which we
             # don't have a reference to here, since they were
             # calculated in parse_pdf....)
-            if not title_found and element.font.size == 20:
+            if not title_found and isinstance(element, PropRubrik):
                 # sometimes part of the the dcterms:identifier (eg " Prop."
                 # or " 2013/14:51") gets mixed up in the title
                 # textbox. Remove those parts if we can find them.
@@ -320,7 +328,8 @@ class Offtryck(SwedishLegalSource):
                 _check_differing(d, self.ns['dcterms'].issued, pubdate)
                 issued_found = True
 
-            if title_found and identifier_found and issued_found:
+            if (isinstance(element, Sidbrytning) or
+                (title_found and identifier_found and issued_found)):
                 break
 
     def visitor_functions(self, basefile):
@@ -889,7 +898,8 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             # match "Prop 2013/14:34\nBilaga 2" as nonessential as
             # well
             textmatch = lambda a, b: a.startswith(b)
-        
+
+
         if (chunk.font.size <= metrics.default.size + tolerance and
             (chunk.right < metrics_leftmargin() or
              chunk.left > metrics_rightmargin()) and

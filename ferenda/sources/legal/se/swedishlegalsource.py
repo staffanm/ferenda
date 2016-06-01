@@ -602,19 +602,6 @@ class SwedishLegalSource(DocumentRepository):
 
 
     def parse_body(self, fp, basefile):
-        """Given a open file containing raw document content (or intermediate
-        content), return a ferenda.elements.Body object containing a structured
-        version of the document text.
-        """
-        rawbody = self.extract_body(fp, basefile)
-        sanitized = self.sanitize_body(rawbody)
-        parser = self.get_parser(basefile, sanitized, initialstate)
-        tokenstream = self.tokenize(sanitized)
-        body = parser(tokenstream)
-        for func, initialstate in self.visitor_functions(basefile):
-            self.visit_node(body, func, initialstate)
-
-    def parse_body(self, fp, basefile):
         rawbody = self.extract_body(fp, basefile)
         sanitized = self.sanitize_body(rawbody)
         parser = self.get_parser(basefile, sanitized)

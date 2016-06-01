@@ -657,7 +657,6 @@ class DV(SwedishLegalSource):
     def extract_body(self, fp, basefile):
         return self._rawbody
 
-#     # smth like this
     def sanitize_body(self, rawbody):
         for x in rawbody:
             if isinstance(x, str):
@@ -671,14 +670,7 @@ class DV(SwedishLegalSource):
                     x = [x]
             for p in x:
                 yield(Paragraph([p]))
-            
-#         for section in rawbody:
-#             # are all sections strings? or what can they be?
-#             if section.endswith(".II"):
-#                 yield one
-#                 yield two
-#             else:
-#                 yield section
+
 
     def parse_not(self, text, basefile, filetype):
         basefile_regex = re.compile("(?P<type>\w+)/(?P<year>\d+)_not_(?P<ordinal>\d+)")
