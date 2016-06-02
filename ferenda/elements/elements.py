@@ -591,21 +591,23 @@ class SectionalElement(CompoundElement):
             element.set('property', 'dcterms:title')
             element.set('content', self.title)
             element.set('typeof', 'bibo:DocumentPart')
-            element.set('about', newuri)
+            if newuri:  # we might have defined the self.uri
+                        # attribute, but set it to None
+                element.set('about', newuri)
             # NOTE: we don't set xml:lang for either the main @content
             # or the @content in the below <span> -- the data does not
             # originate from RDF and so isn't typed like that.
-            if hasattr(self, 'ordinal'):
+            if hasattr(self, 'ordinal') and newuri:
                 attrs = {'about': newuri,
                          'property': 'bibo:chapter',
                          'content': self.ordinal}
                 element.insert(0, E('span', attrs))
-            if hasattr(self, 'identifier'):
+            if hasattr(self, 'identifier') and newuri:
                 attrs = {'about': newuri,
                          'property': 'dcterms:identifier',
                          'content': self.identifier}
                 element.insert(0, E('span', attrs))
-            if self.partrelation:
+            if self.partrelation and newuri:
                 attrs = {'rel': self._qname(self.partrelation),
                          'href': parent_uri}
                 element.insert(0, E('span', attrs))

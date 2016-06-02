@@ -410,6 +410,37 @@ class Appendix(SectionalElement):
         return super(Appendix, self).as_xhtml(uri, parent_uri)
 
 
+# in older propositioner, the document is typically structured as
+# PreambleSection("Propositionens huvudsakliga innehåll")
+# PreambleSection("Propositionens lagförslag")
+# ProtokollsUtdrag("Justitiedepartementet")
+#   Section("1 Inledning")
+#   Section("2 Allmän motivering")
+#     Section("2.1 Allmänna utgångspunkter")
+#  ...
+# ProtokollsUtdrag("Lagrådet")
+# ProtokollsUtdrag("Justitiedepartementet")
+#
+# meaning this is three protocol excerpts after another: the first
+# (the main one) being the proposition to lagrådet, the second
+# (shorter) being lagrådets suggestions on the given prop, and the
+# third (very short, mostly formal) is amendments to the first prop,
+# after taking lagrådets suggestions into account. The third might be
+# divided into sections, but we should take care not to mint URIs for
+# them as they'll clash with sections in the first. 
+class Protokollsutdrag(CompoundElement):
+    tagname = "div"
+    classname = "protokollsutdrag"
+    def as_xhtml(self, uri, parent_uri=None):
+        element = super(Protokollsutdrag, self).as_xhtml(uri, parent_uri)
+        # do not add @property='dcterms:title' as we don't want to
+        # create a RDF triple out of this
+        element.set('content', self.title)
+        return element
+
+# FIXME: This ought to be not needed anymore now that we use
+# PDFAnalyzer to segment pdfs into subdocs (the coverpages should be a
+# separate document apart from main)
 class Coverpage(CompoundElement):
     tagname = "div"
     classname = "coverpage"
@@ -419,6 +450,7 @@ class PropHuvudrubrik(UnicodeElement):
     # this is always something like "Regeringens proposition 2005/06:173"
     tagname = "h1"
     classname = "prophuvudrubrik"
+
     
 class PropRubrik(UnicodeElement):
     # This is the actual dcterms:title of the document

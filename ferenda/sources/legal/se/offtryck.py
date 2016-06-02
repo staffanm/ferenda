@@ -251,10 +251,11 @@ class Offtryck(SwedishLegalSource):
 
 
     def postprocess_doc(self, doc):
-        # loop through leading  textboxes and try to find dcterms:identifier,
-        # dcterms:title and dcterms:issued (these should already be present
-        # in doc.meta, but the values in the actual document should take
-        # precendence
+        # loop through the textboxes on page 1 try to find
+        # dcterms:identifier, dcterms:title and dcterms:issued (then
+        # compare them to what's present in doc.meta, ie data that has
+        # been picked up from index.html or some other non-PDF source.
+
         def _check_differing(describer, predicate, newval):
             try:
                 describer.getvalue(predicate)
@@ -331,6 +332,32 @@ class Offtryck(SwedishLegalSource):
             if (isinstance(element, Sidbrytning) or
                 (title_found and identifier_found and issued_found)):
                 break
+
+        # For old-style structured props, make sure we don't
+        # accidentally create duplicate URIs
+        protokollsutdrag_found = False
+        for toplevelnode in doc.body:
+            if isinstance(toplevelnode, Protokollsutdrag):
+               if protokollsutdrag_found:
+                   # this is the 2nd or 3rd node of this type. The 1st
+                   # is the main one and the one where sections need
+                   # to be referrable. For latter, we should make sure
+                   # that no URIs are created for contained sections.
+                   for subnode in toplevelnode:
+                       if isinstance(subnode, Section):
+                           # first remove the safety feature that
+                           # keeps us from adding new attributes to
+                           # initialized elements. FIXME: it's not a
+                           # good smell that we need to do this.
+                           setattr(subnode, '__initialized', False)
+                           subnode.uri = None  # this'll keep as_xhtml from generating an URI
+                           setattr(subnode, '__initialized', True)
+                        # note: we should really recurse to process
+                        # subsections et al, but in practice they
+                        # don't seem to occur in the 2nd/3rd
+                        # protokollsutdrag
+               else:
+                   protokollsutdrag_found = True
 
     def visitor_functions(self, basefile):
         # the .metrics.json file must exist at this point, but just in
@@ -918,6 +945,15 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                 strchunk == parser.current_identifier):
             return True
 
+    def is_protokollsutdrag(parser):
+        chunk = parser.reader.peek()
+        return (chunk.font.size > metrics.default.size and
+                chunk.top < metrics.pageheight / 5 and
+                (str(chunk).strip().endswith("departementet") or
+                 str(chunk).strip().startswith("Lagrådet")) and
+                str(parser.reader.peek(2)).startswith("Utdrag ur protokoll vid"))
+        
+        
     def is_prophuvudrubrik(parser):
         if state.pageno != 1:
             return False
@@ -1118,6 +1154,11 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     @newstate('body')
     def make_body(parser):
         return p.make_children(Body())
+
+    @newstate("protokollsutdrag")
+    def make_protokollsutdrag(parser):
+        title = str(parser.reader.next()).strip()
+        return p.make_children(Protokollsutdrag(title=title))
 
     def make_prophuvudrubrik(parser):
         return PropHuvudrubrik(str(parser.reader.next()).strip())
@@ -1332,10 +1373,12 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     if preset == "proposition":
         recognizers.insert(0, is_proprubrik)
         recognizers.insert(0, is_prophuvudrubrik)
-        
+        # for older props, using the Protokollsutdrag structure (see
+        # comment for that class). Insert after is_nonessential
+        recognizers.insert(5, is_protokollsutdrag)
     p.set_recognizers(*recognizers)
 
-    commonstates = ("body", "preamblesection", "section", "subsection",
+    commonstates = ("body", "preamblesection", "protokollsutdrag", "section", "subsection",
                     "unorderedsection", "unorderedsubsection", "subsubsection",
                     "appendix")
     commonbodystates = commonstates[1:]
@@ -1346,11 +1389,16 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                        ("body", is_preamblesection): (make_preamblesection, "preamblesection"),
                        ("body", is_prophuvudrubrik): (make_prophuvudrubrik, None),
                        ("body", is_proprubrik): (make_proprubrik, None),
+                       ("body", is_protokollsutdrag): (make_protokollsutdrag, "protokollsutdrag"),
                        ("body", is_section): (make_section, "section"),
                        ("body", is_unorderedsection): (make_unorderedsection, "unorderedsection"),
                        ("preamblesection", is_preamblesection): (False, None),
                        ("preamblesection", is_section): (False, None),
                        ("preamblesection", is_appendix): (False, None),
+
+                       ("protokollsutdrag", is_protokollsutdrag): (False, None),
+                       ("protokollsutdrag", is_section): (make_section, "section"),
+                       
                        ("section", is_section): (False, None),
                        ("section", is_subsection): (make_section, "subsection"),
                        ("section", is_unorderedsection): (make_unorderedsection, "unorderedsection"),
@@ -1372,6 +1420,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                        ("unorderedsubsection", is_unorderedsection): (False, None),
                        ("unorderedsubsection", is_unorderedsubsection): (False, None),
                        (("subsubsection", "subsection", "section"), is_preamblesection): (False, None),
+                       (("subsubsection", "subsection", "section"), is_protokollsutdrag): (False, None),
                        (("appendix", "subsubsection", "subsection", "section"), is_appendix): (False, None)
                        })
 
