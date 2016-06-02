@@ -1,30 +1,27 @@
 {
     "default": {
         "family": "unknown", 
-        "size": 7
+        "size": 9
     }, 
     "h1": {
         "family": "unknown", 
-        "size": 11
+        "size": 12
     }, 
     "h2": {
         "family": "unknown", 
-        "size": 10
+        "size": 11
     }, 
     "h3": {
         "family": "unknown", 
-        "size": 9
+        "size": 10
     }, 
-    "title": {
-        "family": "unknown", 
-        "size": 18
-    }, 
-    "bottommargin": 626, 
-    "leftmargin": 20, 
-    "leftmargin_even": 30, 
-    "pagewidth": 447, 
-    "rightmargin": 330, 
-    "rightmargin_even": 330, 
+    "bottommargin": 750, 
+    "leftmargin": 30, 
+    "leftmargin_even": 40, 
+    "pageheight": 842, 
+    "pagewidth": 548, 
+    "rightmargin": 400, 
+    "rightmargin_even": 410, 
     "scanned_source": true, 
-    "topmargin": 36
+    "topmargin": 45
 }

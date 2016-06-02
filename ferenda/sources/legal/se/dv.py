@@ -668,8 +668,10 @@ class DV(SwedishLegalSource):
                     x = [m.group(1), m.group(2)]
                 else:
                     x = [x]
-            for p in x:
-                yield(Paragraph([p]))
+                for p in x:
+                    yield(Paragraph([p]))
+            else:
+                yield(Paragraph(x))
 
 
     def parse_not(self, text, basefile, filetype):
