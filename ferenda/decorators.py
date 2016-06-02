@@ -133,7 +133,13 @@ def updateentry(f):
                 entry = DocumentEntry(self.store.documententry_path(basefile))
                 entry.parse['success'] = success
                 entry.parse['date'] = start
-                entry.parse['duration'] = (datetime.now()-start).total_seconds()
+                delta = datetime.now()-start
+                try:
+                    duration = delta.total_seconds()
+                except AttributeError:
+                    # probably on py26, wich lack total_seconds()
+                    duration = delta.seconds + (delta.microseconds / 1000000.0)
+                entry.parse['duration'] = duration
                 if warnings:
                     entry.parse['warnings'] = warnings
                 else:
