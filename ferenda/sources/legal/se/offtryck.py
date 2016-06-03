@@ -1095,8 +1095,9 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
 
         chunk = parser.reader.peek()
         txtchunk = util.normalize_space(str(chunk))
-        
         if ".." in txtchunk:  # probably a line in a TOC
+            return False
+        if len(txtchunk) > 100:  # sanity check -- should normally be a lot less
             return False
         if not state.appendixstarted:
             if is_appendix_header(chunk):
@@ -1421,7 +1422,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                        ("unorderedsubsection", is_section): (False, None),
                        ("unorderedsubsection", is_unorderedsection): (False, None),
                        ("unorderedsubsection", is_unorderedsubsection): (False, None),
-                       (("subsubsection", "subsection", "section"), is_preamblesection): (False, None),
+                       (("subsubsection", "subsection", "section", "appendix"), is_preamblesection): (False, None),
                        (("subsubsection", "subsection", "section"), is_protokollsutdrag): (False, None),
                        (("appendix", "subsubsection", "subsection", "section"), is_appendix): (False, None)
                        })
