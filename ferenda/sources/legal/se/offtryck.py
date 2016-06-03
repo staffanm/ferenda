@@ -901,6 +901,16 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             if (chunk.top > metrics.pageheight * 0.8 and
                 re.match("\d+ riksdagen \d+\. ?\d saml. nr \d", strchunk, flags=re.IGNORECASE)):
                 return True
+            # very old props (only up till about 1971:20) have
+            # something like "Kungl. Maj:ts proposition nr 4 år 1971"
+            # at the top. When setting up the parser, the attribute
+            # current_long_identifier might have been created. We use
+            # get_close_matches instead of straight comparison because
+            # OCR (and also because page numbers might be mixed in).
+            if (hasattr(parser, 'current_long_identifier') and
+                (chunk.bottom < metrics.pageheight * 0.2) and
+                (difflib.get_close_matches(strchunk, [parser.current_long_identifier]))):
+                return True
         
         if metrics.scanned_source:
             digitmatch = lambda s: s.replace("l", "1").isdigit()
@@ -982,18 +992,10 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         if isinstance(chunk, Page):
             return False
         txt = str(chunk).strip()
-        # Current pdfanalyzer yields a too small metrics.h2 size for
-        # propositioner (metrics.h2.size = 17, but should be 23, at
-        # least for prop. 2005/06:173. FIXME: check if that's still
-        # true
-        #
-        # And since this is hardcoded to recognize a fixed set of
-        # headings we could just make sure the font is bigger than
-        # defalt
-        # 
-        # if not metrics.h2.size <= fontsize <= metrics.h1.size:
-        #     return False
-        if chunk.font.size <= metrics.default.size:
+        # Since this recognizer is hardcoded to recognize a fixed set
+        # of headings we could just make sure the font is bigger than
+        # defalt. For old material (scanned) we don't even look at size. 
+        if not metrics.scanned_source and chunk.font.size <= metrics.default.size:
             return False
         if "...." in txt:  # probably a line in a TOC
             return False
@@ -1427,6 +1429,10 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     p.initial_state = "body"
     p.initial_constructor = make_body
     p.current_identifier = identifier
+    # for reallly old props we set a attribute used by is_nonessential
+    if identifier.startswith("Prop.") and basefile < "1972":
+        year, number = basefile.split(":")
+        p.current_long_identifier = "Kungl. Maj:ts proposition nr %s år %s" % (number, year)
     p.debug = bool(debug)
     return p
 
