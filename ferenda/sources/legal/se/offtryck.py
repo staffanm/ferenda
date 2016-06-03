@@ -209,7 +209,8 @@ class Offtryck(SwedishLegalSource):
             return body
 
         allbody = Body()
-        initialstate = {'pageno': 1}
+        initialstate = {'pageno': 1,
+                        'sectioncache': True}
         documents = sanitized.analyzer.documents()
         if len(documents) > 1:
             self.log.warning("%s: segmented into docs %s" % (basefile, documents))
@@ -881,6 +882,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     if initialstate:
         defaultstate.update(initialstate)
     state = LayeredConfig(Defaults(defaultstate))
+    state.sectioncache = {}
 
     def is_pagebreak(parser):
         return isinstance(parser.reader.peek(), Page)
@@ -1251,6 +1253,10 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         ordinal, headingtype, title = analyze_sectionstart(parser, parser.reader.next())
         if ordinal:
             identifier = "Prop. %s, avsnitt %s" % (basefile, ordinal)
+            if ordinal in state.sectioncache:
+                print("WARNING: dupe for sec %s %s, previous %s" % (ordinal, title, state.sectioncache[ordinal]))
+            else:
+                state.sectioncache[ordinal] = "p %s: %s %s" % (state.pageno, ordinal, title)
             s = Section(ordinal=ordinal, title=title)
         else:
             s = Section(title=str(title))
