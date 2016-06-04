@@ -8,6 +8,7 @@ from builtins import *
 from difflib import unified_diff
 from io import BytesIO
 import codecs
+import logging
 import filecmp
 import inspect
 import json
@@ -645,7 +646,34 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         """
         basefile = self.filename_to_basefile(downloaded_file)
         def runtest():
+            if "FERENDA_LOG_TEST" in os.environ:
+                loglevel = {
+                    "DEBUG": logging.DEBUG,
+                    "INFO": logging.INFO,
+                    "WARNING": logging.WARNING,
+                    "ERROR": logging.ERROR,
+                    "CRITICAL": logging.CRITICAL
+                    }.get(os.environ["FERENDA_LOG_TEST"], logging.INFO)
+                logformat = "%(asctime)s %(name)s %(levelname)s %(message)s"
+                datefmt = "%H:%M:%S"
+                handler = logging.StreamHandler()
+                handler.setLevel(loglevel)
+                handler.setFormatter(logging.Formatter(logformat, datefmt=datefmt))
+                logger = logging.getLogger()
+                logger.setLevel(loglevel)
+                # shut some non-core loggers up
+                for logname in ['requests.packages.urllib3.connectionpool',
+                                'rdflib.plugins.sleepycat',
+                                'rdflib.plugins.parsers.pyRdfa',
+                                'ferenda.thirdparty.patch']:
+                    log = logging.getLogger(logname)
+                    log.propagate = False
+                logger.addHandler(handler)
+                
             self.repo.parse(basefile)
+            if "FERENDA_LOG_TEST" in os.environ:
+                logger.removeHandler(handler)
+            
 
         if "FERENDA_PROFILE_TEST" in os.environ:
             print("Profiling test")

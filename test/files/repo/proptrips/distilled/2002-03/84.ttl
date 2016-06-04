@@ -12,16 +12,11 @@
     dcterms:isPartOf <https://lagen.nu/prop/2002/03:84> ;
     dcterms:title "Propositionens huvudsakliga innehåll"@sv .
 
-<https://lagen.nu/prop/2002/03:84#PS2> a bibo:DocumentPart ;
-    dcterms:isPartOf <https://lagen.nu/prop/2002/03:84> ;
-    dcterms:title "Utrikesdepartementet"@sv .
-
 <http://rkrattsbaser.gov.se/prop?ar=2002/03&dok=P&dokid=84> rdfs:label "Källa"@sv .
-
-<https://lagen.nu/prop/2002/03:84?attachment=index.doc&repo=proptrips&dir=downloaded> rdfs:label "Prop. 2002/03:84"@sv .
 
 <https://lagen.nu/prop/2002/03:84> a rpubl:Proposition ;
     dcterms:identifier "Prop. 2002/03:84" ;
+    dcterms:issued "2003-03-13"^^xsd:date ;
     dcterms:title "Ändring i avtalet om Sveriges exportråd"@sv ;
     rpubl:arsutgava "2002/03" ;
     rpubl:departement <https://lagen.nu/org/2008/utrikesdepartementet> ;
@@ -30,4 +25,6 @@
     prov:alternateOf <http://rkrattsbaser.gov.se/prop?ar=2002/03&dok=P&dokid=84> ;
     prov:wasDerivedFrom <https://lagen.nu/prop/2002/03:84?attachment=index.doc&repo=proptrips&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.propositioner.PropTrips" .
+
+<https://lagen.nu/prop/2002/03:84?attachment=index.doc&repo=proptrips&dir=downloaded> rdfs:label "Prop. 2002/03:84"@sv .
 
