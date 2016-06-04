@@ -1413,6 +1413,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                        ("preamblesection", is_appendix): (False, None),
 
                        ("protokollsutdrag", is_protokollsutdrag): (False, None),
+                       ("protokollsutdrag", is_appendix): (False, None),
                        ("protokollsutdrag", is_section): (make_section, "section"),
                        
                        ("section", is_section): (False, None),

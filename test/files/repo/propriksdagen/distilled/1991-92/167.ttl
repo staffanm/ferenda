@@ -15,7 +15,6 @@
 
 <https://lagen.nu/prop/1991/92:167#B3> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
-    dcterms:references <https://lagen.nu/sfs/1981:1361> ;
     dcterms:title "Prop. 1991/922167       Bilaga 3"@sv ;
     bibo:chapter "3"@sv .
 
@@ -59,7 +58,16 @@
 <https://lagen.nu/prop/1991/92:167#PS3> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
     dcterms:references <https://lagen.nu/sfs/1981:1361> ;
-    dcterms:title "Justitiedepartementet"@sv .
+    dcterms:title "Sammanfattning av promemorian (Ds 1991:68)"@sv .
+
+<https://lagen.nu/prop/1991/92:167#PS4> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:title "Propositionens huvudsakliga innehåll"@sv .
+
+<https://lagen.nu/prop/1991/92:167#PS5> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:references <https://lagen.nu/sfs/1981:1361> ;
+    dcterms:title "Propositionens lagförslag . . . . . . . . . . . . . . . . . . . . . . . .       Utdrag ur protokoll vid regeringssammanträde       den 9 april 1992 . . . . . . . . . . . . . . . . . . . . . . . . . . . . ."@sv .
 
 <https://lagen.nu/prop/1991/92:167#S1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
@@ -171,6 +179,7 @@
 <https://lagen.nu/prop/1991/92:167> a rpubl:Proposition ;
     dcterms:identifier "Prop. 1991/92:167" ;
     dcterms:issued "1992-01-01"^^xsd:date ;
+    dcterms:references <https://lagen.nu/sfs/1981:1361> ;
     dcterms:title "om den svenska hemförsäljningslagens anpassning till EG:s regelverk "@sv ;
     rpubl:arsutgava "1991/92" ;
     rpubl:lopnummer "167" ;
