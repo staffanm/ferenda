@@ -329,6 +329,21 @@ class PreambleSection(CompoundElement):
         return element
 
 
+class PseudoSection(CompoundElement):
+    # used when we really want to use a Section, but can't since we
+    # don't have an ordinal (or the ordinal is invalid/duplicate)
+    tagname = "div"
+    classname = "pseudosection"
+
+    def as_xhtml(self, uri, parent_uri=None):
+        element = super(PseudoSection, self).as_xhtml(uri, parent_uri)
+        # do not add @property='dcterms:title' as we don't want to
+        # create a RDF triple out of this
+        element.set('content', self.title)
+        return element
+    
+
+
 class UnorderedSection(CompoundElement):
     # FIXME: It'd be nice with some way of ordering nested unordered
     # sections, like:

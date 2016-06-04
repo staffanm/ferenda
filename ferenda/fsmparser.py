@@ -5,6 +5,7 @@ from builtins import *
 
 import builtins
 from collections import deque
+import logging
 import inspect
 
 from ferenda.errors import FSMStateError
@@ -31,6 +32,7 @@ class FSMParser():
         self.initial_constructor = None
         # pseudo-internal
         self._state_stack = []
+        self.log = logging.getLogger(__name__)
 
     def _debug(self, msg):
         """Prints a debug message, indented to show how far down in the nested structure we are"""

@@ -212,7 +212,7 @@ class Offtryck(SwedishLegalSource):
         initialstate = {'pageno': 1}
         documents = sanitized.analyzer.documents()
         if len(documents) > 1:
-            self.log.warning("%s: segmented into docs %s" % (basefile, documents))
+            self.log.debug("%s: segmented into docs %s" % (basefile, documents))
         for (startpage, pagecount, tag) in documents:
             if tag == 'main':
                 initialstate['pageno'] -= 1  # argh....
@@ -684,7 +684,7 @@ class Offtryck(SwedishLegalSource):
                         textnodes.append(current_comment)
                         state['commented_paras'][comment_on] = pageno
                 else:
-                    self.log.warning("Found another comment on %s at p %s (previous at %s), ignoring" % (comment_on, pageno, state['commented_paras'][comment_on]))
+                    self.log.warning("Dupe comment on %s at p %s (previous at %s), ignoring" % (comment_on, pageno, state['commented_paras'][comment_on]))
                 comment_on = None
                 comment_start = False
 
@@ -1251,15 +1251,22 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     @newstate('section')
     def make_section(parser):
         ordinal, headingtype, title = analyze_sectionstart(parser, parser.reader.next())
+        # make sure the ordinal hasn't been used before
         if ordinal:
-            identifier = "Prop. %s, avsnitt %s" % (basefile, ordinal)
+            short = lambda x: x if len(x) < 50 else x[:50] + "..."
+            # FIXME: where were we planning to use this dcterms:identifier label?
+            # identifier = "Prop. %s, avsnitt %s" % (basefile, ordinal)
             if ordinal in state.sectioncache:
-                print("WARNING: dupe for sec %s %s, previous %s" % (ordinal, title, state.sectioncache[ordinal]))
+                parser.log.warning("Dupe section %s '%s' at p %s, previous at %s. Ignoring." %
+                                   (ordinal, short(title), state.pageno,
+                                    state.sectioncache[ordinal]))
+                ordinal = None
             else:
-                state.sectioncache[ordinal] = "p %s: %s %s" % (state.pageno, ordinal, title)
+                state.sectioncache[ordinal] = "'%s' at p %s" % (short(title), state.pageno)
+        if ordinal:
             s = Section(ordinal=ordinal, title=title)
         else:
-            s = Section(title=str(title))
+            s = PseudoSection(title=str(title))
         return parser.make_children(s)
 
     def skip_nonessential(parser):
