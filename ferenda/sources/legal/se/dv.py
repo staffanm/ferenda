@@ -1972,10 +1972,11 @@ class DV(SwedishLegalSource):
                 data = data.replace(b"\xc2\x81", b"\xc3\x85")
             intree = etree.parse(BytesIO(data))
             # intree = etree.parse(fp)
-        fp = self.resourceloader.openfp("xsl/simplify-ooxml.xsl")
-        transform = etree.XSLT(etree.parse(fp))
+        if not hasattr(self, 'ooxml_transform'):
+            fp = self.resourceloader.openfp("xsl/simplify-ooxml.xsl")
+            self.ooxml_transform = etree.XSLT(etree.parse(fp))
         fp.close()
-        resulttree = transform(intree)
+        resulttree = self.ooxml_transform(intree)
         with open(filename, "wb") as fp:
             fp.write(
                 etree.tostring(
