@@ -209,8 +209,7 @@ class Offtryck(SwedishLegalSource):
             return body
 
         allbody = Body()
-        initialstate = {'pageno': 1,
-                        'sectioncache': True}
+        initialstate = {'pageno': 1}
         documents = sanitized.analyzer.documents()
         if len(documents) > 1:
             self.log.warning("%s: segmented into docs %s" % (basefile, documents))
@@ -878,7 +877,8 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                                                # set to True once
                                                # "Bilaga (\n)" found
                                                # in margin
-                    'preset': preset}
+                    'preset': preset,
+                    'sectioncache': True}
     if initialstate:
         defaultstate.update(initialstate)
     state = LayeredConfig(Defaults(defaultstate))

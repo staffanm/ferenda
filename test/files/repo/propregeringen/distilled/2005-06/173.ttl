@@ -46,8 +46,7 @@
 
 <https://lagen.nu/prop/2005/06:173#B5> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
-    dcterms:references <https://lagen.nu/ext/celex/31995L0046>,
-        <https://lagen.nu/prop/1997/98:44#s36>,
+    dcterms:references <https://lagen.nu/prop/1997/98:44#s36>,
         <https://lagen.nu/sfs/1998:204> ;
     dcterms:title "Lagrådets yttrande"@sv ;
     bibo:chapter "5"@sv .
@@ -427,7 +426,8 @@
     dcterms:abstract "I propositionen föreslår regeringen reformer som syftar till att underlätta behandlingen av personuppgifter. Personuppgiftslagen utformas i viss utsträckning enligt en missbruksmodell. Den innebär att regleringen inte tar sikte på själva hanteringen av personuppgifterna utan på att uppgifterna inte får missbrukas till skada för någons personliga integritet. Behandling av personuppgifter i ostrukturerat material, t.ex. löpande text och enstaka ljud- och bildupptagningar, ska undantas från de flesta av personuppgiftslagens detaljerade hanteringsregler. Sådan behandling ska vara tilllåten utan andra restriktioner än att den registrerades personliga integritet inte får kränkas. Personuppgiftslagens bestämmelser om skadestånd ska gälla även för förfaranden i strid med den föreslagna missbruksregeln. Vidare ska det vara straffbart att i strid med missbruksregeln uppsåtligen eller av grov oaktsamhet behandla känsliga personuppgifter och uppgifter om lagöverträdelser m.m. på ett sätt som kränker den registrerades personliga integritet. Detsamma ska gälla för den som i strid med missbruksregeln för över personuppgifter till tredje land som saknar en adekvat nivå för skyddet av personuppgifter. Straffskalan ska vara densamma som för övriga brott enligt personuppgiftslagen. Gärningar som begås av oaktsamhet av normalgraden ska inte längre vara straffbara. I personuppgiftslagen införs en bestämmelse om att vissa beslut enligt lagen som fattats av myndigheter ska kunna överklagas till allmän förvaltningsdomstol. Prövningstillstånd ska krävas vid överklagande till kammarrätt. Vidare införs ett bemyndigande för regeringen att meddela föreskrifter om sådana undantag som är tillåtna enligt artikel 13.1 i EG-direktivet om personuppgifter. I propositionen görs bedömningen att förslagen är förenliga med EG-direktivet om personuppgifter (95/46/EG). Lagändringarna ska enligt förslaget träda i kraft den 1 januari 2007."@sv ;
     dcterms:identifier "Prop. 2005/06:173" ;
     dcterms:issued "2006-03-16"^^xsd:date ;
-    dcterms:references <https://lagen.nu/sfs/1998:204> ;
+    dcterms:references <https://lagen.nu/ext/celex/31995L0046>,
+        <https://lagen.nu/sfs/1998:204> ;
     dcterms:title "Översyn av personuppgiftslagen"@sv ;
     rpubl:arsutgava "2005/06" ;
     rpubl:departement <https://lagen.nu/org/2008/justitiedepartementet> ;
