@@ -256,7 +256,7 @@ def render(f):
                 huge_graph = True
                 break
         if huge_graph:
-            self.log.debug("%s: Graph seems huge, skipping validation" % doc.basefile)
+            self.log.warning("%s: Graph seems huge, skipping validation" % doc.basefile)
         else:
             # self.log.debug("%s: diffing graphs" % doc.basefile)
             (in_both, in_first, in_second) = graph_diff(doc.meta, distilled_graph)
