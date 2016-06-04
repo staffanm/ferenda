@@ -1464,7 +1464,10 @@ class SFS(Trips):
 
         # 7. all forfattnigskommentar
         canonical_uri = self.canonical_uri(basefile)
-        tempuri = self.temp_sfs_uri("Personuppgiftslag (1998:204)")
+        from pudb import set_trace; set_trace()
+        g = Graph().parse(self.store.distilled_path(basefile))
+        title = str(g.value(URIRef(self.canonical_uri(basefile)), DCTERMS.title))
+        tempuri = self.temp_sfs_uri(title)
         extra = {'tempuri': tempuri}
         forf_kommentar = self.time_store_select(store,
                                                 "sparql/sfs_forfattningskommentar.rq",
