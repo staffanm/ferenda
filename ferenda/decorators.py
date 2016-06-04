@@ -247,12 +247,12 @@ def render(f):
         # Validate that all triples specified in doc.meta and any
         # .meta property on any body object is present in the
         # XHTML+RDFa file.  NOTE: graph_diff has suddenly become
-        # glacial on large graphs (~10000 triples). Maybe we don't
-        # have to validate them?
+        # glacial on medium-large graphs (> ~1000 triples). Maybe we
+        # don't have to validate them?
         huge_graph = False
         for g in iterate_graphs(doc.body):
             doc.meta += g
-            if len(doc.meta) > 3000:
+            if len(doc.meta) > 1000:
                 huge_graph = True
                 break
         if huge_graph:
