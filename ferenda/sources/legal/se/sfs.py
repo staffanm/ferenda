@@ -822,6 +822,8 @@ class SFS(Trips):
                   re_sfs(val)):
                 s = re_sfs(val).group(1)
                 d["rinfoex:upphavdAv"] = self.canonical_uri(s)
+            elif key == 'Ikraft':
+                d["rpubl:ikrafttradandedatum"] = val[:10]
             else:
                 self.log.warning(
                     '%s: Obekant nyckel [\'%s\']' % (basefile, key))
@@ -1464,7 +1466,6 @@ class SFS(Trips):
 
         # 7. all forfattnigskommentar
         canonical_uri = self.canonical_uri(basefile)
-        from pudb import set_trace; set_trace()
         g = Graph().parse(self.store.distilled_path(basefile))
         title = str(g.value(URIRef(self.canonical_uri(basefile)), DCTERMS.title))
         tempuri = self.temp_sfs_uri(title)
