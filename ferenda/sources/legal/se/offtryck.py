@@ -674,9 +674,9 @@ class Offtryck(SwedishLegalSource):
                                                                 comment_on=comment_on,
                                                                 uri=None)
                         if parsestate != "commenttext":
-                            self.log.warning("%s, comment on %s, parsestate was '%s', "
-                                             "setting to 'commenttext'" %
-                                             (state['basefile'], comment_on, parsestate))
+                            self.log.debug("%s, comment on %s, parsestate was '%s', "
+                                           "setting to 'commenttext'" %
+                                           (state['basefile'], comment_on, parsestate))
                             parsestate = "commenttext"
                         # the URI to the above Forfattningskommentar is
                         # dynamically constructed in

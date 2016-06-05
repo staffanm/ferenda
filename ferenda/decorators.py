@@ -117,6 +117,9 @@ def updateentry(f):
         try:
             ret = f(self, basefile)
             success = True
+        except DocumentRemovedError as e:
+            success = "removed"
+            raise
         except Exception as e:
             success = False
             errortype, errorval, errortb = sys.exc_info()

@@ -6,6 +6,7 @@ from builtins import *
 
 import re
 import os
+import logging
 from datetime import datetime
 from urllib.parse import urljoin
 
@@ -33,7 +34,6 @@ class SOUAnalyzer(PDFAnalyzer):
     
 
     def documents(self):
-        from pudb import set_trace; set_trace()
         def titleish(page):
             for textelement in page:
                 if textelement.font.size >= 18: # Ds 2009:55 uses size 18. The normal is 26.
@@ -60,15 +60,6 @@ class SOUAnalyzer(PDFAnalyzer):
             else:
                 documents.append([pageidx, 1, currentdoc])
         return documents
-
-    # don't count anything in the frontmatter - these margins are all off
-    def count_vertical_textbox(self, pagenumber, textbox, counters):
-        if pagenumber >= self.frontmatter:
-            super(SOUAnalyzer, self).count_vertical_textbox(pagenumber, textbox, counters)
-
-    def count_horizontal_textbox(self, pagenumber, textbox, counters):
-        if pagenumber >= self.frontmatter:
-            super(SOUAnalyzer, self).count_horizontal_textbox(pagenumber, textbox, counters)
 
 
 class SOURegeringen(Regeringen):

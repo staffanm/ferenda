@@ -660,35 +660,54 @@ class Devel(object):
                 continue
             repo_el = etree.SubElement(root, "repo", {"alias": repo.alias})
             action_el = etree.SubElement(repo_el, "action", {"id": "parse"})
+            successcnt = warncnt = failcnt = removecnt = errcnt = 0
             for basefile in basefiles:
                 # sys.stdout.write(".")
                 # print("%s/%s" % (repo.alias, basefile))
                 entrypath = repo.store.documententry_path(basefile)
                 if not os.path.exists(entrypath):
                     log.warning("%s/%s: file %s doesn't exist" % (repo.alias, basefile, entrypath))
+                    errcnt += 1
                     continue
                 elif os.path.getsize(entrypath) == 0:
                     log.warning("%s/%s: file %s is 0 bytes" % (repo.alias, basefile, entrypath))
+                    errcnt += 1
                     continue
                 try:
                     entry = DocumentEntry(entrypath)
                 except JSONDecodeError as e:
                     log.error("%s/%s: %s %s" % (repo.alias, basefile, e.__class__.__name__, e))
+                    errcnt += 1
                     continue
                 if not entry.parse:  # an empty dict
                     log.warning("%s/%s: file %s has no parse sub-dict" % (repo.alias, basefile, entrypath))
+                    errcnt += 1
                     continue
-                    
+                if entry.parse["success"] == "removed":
+                    # this special truthy value indicates that
+                    # everything went as OK as it could, but the
+                    # actual document doesn't exist (anymore) so we
+                    # don't feature it in our overview
+                    removecnt += 1
+                    continue
                 doc_el = etree.SubElement(action_el, "basefile",
                                        {"id": basefile,
                                         "success": str(entry.parse["success"]),
                                         "duration": str(entry.parse["duration"]),
                                         "date": entry.parse["date"]})
+                if entry.parse["success"]:
+                    successcnt += 1
+                else:
+                    failcnt += 1
+                if "warnings" in entry.parse:
+                    warncnt += 1
+
                 # add additional (optional) text data if present
                 for optional in ("warnings", "error", "traceback"):
                     if optional in entry.parse:
                         opt_el = etree.SubElement(doc_el, optional)
                         opt_el.text = entry.parse[optional]
+            log.info("%s: %s processed, %s ok (%s w/ warnings), %s failed, %s removed. %s corrupted entries." % (repo.alias, len(basefiles), successcnt, warncnt, failcnt, removecnt, errcnt))
         conffile = os.path.abspath(
             os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
         transformer = Transformer('XSLT', "xsl/statusreport.xsl", "xsl",
