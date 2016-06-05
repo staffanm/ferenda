@@ -10,6 +10,7 @@ from difflib import unified_diff
 from itertools import islice
 from tempfile import mkstemp
 from operator import attrgetter
+from json.decoder import JSONDecodeError
 import codecs
 import inspect
 import logging
@@ -660,6 +661,7 @@ class Devel(object):
             repo_el = etree.SubElement(root, "repo", {"alias": repo.alias})
             action_el = etree.SubElement(repo_el, "action", {"id": "parse"})
             for basefile in basefiles:
+                # sys.stdout.write(".")
                 # print("%s/%s" % (repo.alias, basefile))
                 entrypath = repo.store.documententry_path(basefile)
                 if not os.path.exists(entrypath):
@@ -668,7 +670,11 @@ class Devel(object):
                 elif os.path.getsize(entrypath) == 0:
                     log.warning("%s/%s: file %s is 0 bytes" % (repo.alias, basefile, entrypath))
                     continue
-                entry = DocumentEntry(entrypath)
+                try:
+                    entry = DocumentEntry(entrypath)
+                except JSONDecodeError as e:
+                    log.error("%s/%s: %s %s" % (repo.alias, basefile, e.__class__.__name__, e))
+                    continue
                 if not entry.parse:  # an empty dict
                     log.warning("%s/%s: file %s has no parse sub-dict" % (repo.alias, basefile, entrypath))
                     continue

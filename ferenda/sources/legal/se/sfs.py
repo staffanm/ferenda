@@ -1476,7 +1476,13 @@ class SFS(Trips):
                                                 None,  # need both prop and sfs contexts
                                                 "forfattningskommentarer",
                                                 extra)
+        seen_comments = {}
         for row in forf_kommentar:
+            if row['kommentar'] in seen_comments:
+                self.log.warning("Recieved duplicate comment for %s ('%s', previously '%s')" % (
+                    row['kommentar'], row['prop'], seen_comments[row['kommentar']]))
+                continue
+            seen_comments[row['kommentar']] = row['prop']
             if not 'lagrum' in row:
                 lagrum = baseuri
             else:

@@ -1,5 +1,7 @@
 PREFIX dcterms: <http://purl.org/dc/terms/>
 PREFIX rinfoex: <http://lagen.nu/terms#>
+PREFIX rpubl:<http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
+PREFIX rdf:<http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 
 SELECT DISTINCT ?lagrum ?kommentar ?prop ?desc
 WHERE  {
@@ -7,13 +9,15 @@ WHERE  {
     ?kommentar rinfoex:kommentarTill ?lagrum;
                dcterms:description ?desc;
                dcterms:isPartOf+ ?propuri .
-    ?propuri dcterms:identifier ?prop .
+    ?propuri dcterms:identifier ?prop ;
+             rdf:type rpubl:Proposition .
     FILTER(STRSTARTS(STR(?lagrum), "%(uri)s"))
   } UNION {
     ?kommentar rinfoex:kommentarTill ?lagrum;
                dcterms:description ?desc;
                dcterms:isPartOf+ ?propuri .
-    ?propuri dcterms:identifier ?prop .
+    ?propuri dcterms:identifier ?prop ;
+             rdf:type rpubl:Proposition .
     FILTER(STRSTARTS(STR(?lagrum), "%(tempuri)s"))
   }
 } 
