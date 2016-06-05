@@ -1518,9 +1518,10 @@ class DV(SwedishLegalSource):
 
         def is_delmal(parser):
             # should handle "IV", "I (UM1001-08)" and "I." etc
-            strchunk = str(parser.reader.peek())
+            # but not "I DEFINITION" or "Inledning"...
+            strchunk = str(parser.reader.peek()).strip()
             if len(strchunk) < 20:
-                m = re.match("(I{1,3}|IV)\.?", strchunk.split(" ", 1)[0])
+                m = re.match("(I{1,3}|IV)\.?(|\(\w+\-\d+\))$", strchunk)
                 if m:
                     return {'id': m.group(1)}
             return {}
@@ -2102,6 +2103,8 @@ class DV(SwedishLegalSource):
             if node.court:
                 state = dict(state)
                 courtslug = self.courtslugs.get(node.court, "XXX")
+                if courtslug == "XXX":
+                    self.log.warning("%s No slug defined for court %s" % (state["basefile"], node.court))
                 if "#" not in state['uri']:
                     state['uri'] += "#"
                 else:
@@ -2119,7 +2122,8 @@ class DV(SwedishLegalSource):
     
     def visitor_functions(self, basefile):
         return (
-            (self.construct_id, {'uri': self._canonical_uri}),
+            (self.construct_id, {'uri': self._canonical_uri,
+                                 'basefile': basefile}),
         )
 
     def facets(self):
