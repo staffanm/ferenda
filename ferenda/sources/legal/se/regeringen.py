@@ -490,6 +490,12 @@ class Regeringen(Offtryck):
         """
         cleanfiles = []
 
+        # FIXME: For some documents, the split into different document
+        # parts is just too difficult to determine automatically. Eg
+        # SOU 2016:32, which has 3 docs but only the first one (which
+        # contains the second one in it's entirety, even though you
+        # can't tell) should be selected...
+
         # 1. Simplest case: One file obviously contains all of the text
         for pdffile, linktext in pdffiles:
             if "hela dokumentet" in linktext or "hela betänkandet" in linktext:
