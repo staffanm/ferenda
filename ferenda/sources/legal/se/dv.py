@@ -444,21 +444,30 @@ class DV(SwedishLegalSource):
             tmpfunc = lambda x: str(int(x.group(0)) - 1)
             prev_basefile = re.sub('\d+$', tmpfunc, basefile)
             prev_path = self.store.intermediate_path(prev_basefile)
+            if self.config.compress == "bz2":
+                prev_path += ".bz2"
+                opener = BZ2File
+            else:
+                opener = open
             avd_p = None
             if os.path.exists(prev_path):
-                soup = BeautifulSoup(util.readfile(prev_path), "lxml")
+                with opener(prev_path, "rb") as fp:
+                    soup = BeautifulSoup(fp.read(), "lxml")
                 tmp = soup.find(["w:p", "para"])
                 if re_avdstart.match(tmp.get_text().strip()):
                     avd_p = tmp
             if not avd_p:
                 raise errors.ParseError(
-                    "Cannot find value for month in %s (looked in %s" %
+                    "Cannot find value for month in %s (looked in %s)" %
                     (basefile, prev_path))
             return avd_p
 
         # Given a word document containing a set of "notisfall" from
-        # either HD or HFD (earlier RegR), spit out a intermediate XML
-        # file for each notis.
+        # either HD or HFD (earlier RegR), spit out a constructed
+        # intermediate XML file for each notis and create a empty
+        # placeholder downloaded file. The empty file should never be
+        # opened since parse_open will prefer the constructed
+        # intermediate file.
         if coll == "HDO":
             re_notisstart = re.compile(
                 "(?P<day>Den \d+:[ae]. |)(?P<ordinal>\d+)\s*\.\s*\((?P<malnr>\w\s\d+-\d+)\)",
@@ -489,6 +498,7 @@ class DV(SwedishLegalSource):
         fp = None
         avd_p = None
         day = None
+        intermediate_path = None
         for p in iterator:
             t = p.get_text().strip()
             if re_avdstart:
@@ -517,40 +527,50 @@ class DV(SwedishLegalSource):
                 except IndexError:
                     pass
 
-                previous_basefile = basefile
+                if intermediate_path:
+                    previous_intermediate_path = intermediate_path
                 basefile = "%(coll)s/%(year)s_not_%(ordinal)s" % locals()
                 self.log.info("%s: Extracting from %s file" % (basefile, filetype))
                 created += 1
                 downloaded_path = self.store.path(basefile, 'downloaded', '.' + filetype)
                 with self.store._open(downloaded_path, "w"):
-                    pass  # just create an empty placeholder file
+                    pass  # just create an empty placeholder file --
+                          # parse_open will load the intermediate file
+                          # anyway.
                 if fp:
-                    fp.write("</body>\n")
+                    fp.write(b"</body>\n")
                     fp.close()
+                    # FIXME: do we even need to run _simplify_ooxml on
+                    # the constructed intermediate file, seeming as
+                    # we've already run it on the main file?
                     if filetype == "docx":
-                        self._simplify_ooxml(
-                            self.store.intermediate_path(previous_basefile))
+                        self._simplify_ooxml(previous_intermediate_path)
                 util.ensure_dir(self.store.intermediate_path(basefile))
-                fp = codecs.open(
-                    self.store.intermediate_path(basefile),
-                    "w",
-                    encoding="utf-8")
-                fp.write('<body%s>' % xmlns)
+
+                intermediate_path = self.store.intermediate_path(basefile)
+                if self.config.compress == "bz2":
+                    intermediate_path += ".bz2"
+                    fp = BZ2File(intermediate_path, "wb")
+                else: 
+                    fp = open(intermediate_path, "wb")
+                bodytag = '<body%s>' % xmlns 
+                fp.write(bodytag.encode("utf-8"))
                 if filetype != "docx":
-                    fp.write("\n")
+                    fp.write(b"\n")
                 if coll == "HDO" and not avd_p:
                     avd_p = find_month_in_previous(basefile)
                 if avd_p:
-                    fp.write(str(avd_p))
+                    fp.write(str(avd_p).encode("utf-8"))
             if fp:
-                fp.write(str(p))
+                fp.write(str(p).encode("utf-8"))
                 if filetype != "docx":
-                    fp.write("\n")
+                    fp.write(b"\n")
         if fp:  # should always be the case
-            fp.write("</body>\n")
+            fp.write(b"</body>\n")
             fp.close()
+            # FIXME: see above abt the need for running _simplify_ooxml
             if filetype == "docx":
-                self._simplify_ooxml(self.store.intermediate_path(basefile))
+                self._simplify_ooxml(intermediate_path)
         else:
             self.log.error("%s/%s: No notis were extracted (%s)" %
                            (coll, year, docfile))
@@ -599,6 +619,7 @@ class DV(SwedishLegalSource):
         return self.patch_if_needed(fp, basefile)
 
     def downloaded_to_intermediate(self, basefile):
+        assert "_not_" not in basefile, "downloaded_to_intermediate can't handle Notisfall %s" % basefile
         docfile = self.store.downloaded_path(basefile)
         intermediatefile = self.store.intermediate_path(basefile)
         if os.path.getsize(docfile) == 0:
@@ -1962,11 +1983,15 @@ class DV(SwedishLegalSource):
 
     def _simplify_ooxml(self, filename, pretty_print=True):
         # simplify the horrendous mess that is OOXML through simplify-ooxml.xsl
-        with open(filename, "rb") as fp:
+        if filename.endswith(".bz2"):
+            opener = BZ2File
+        else:
+            opener = open
+        with opener(filename, "rb") as fp:
             data = fp.read()
             # in some rare cases, the value \xc2\x81 (utf-8 for
             # control char) is used where "Å" (\xc3\x85) should be
-            # used.
+            # used. 
             if b"\xc2\x81" in data:
                 self.log.warning("Working around control char x81 in text data")
                 data = data.replace(b"\xc2\x81", b"\xc3\x85")
@@ -1977,7 +2002,7 @@ class DV(SwedishLegalSource):
             self.ooxml_transform = etree.XSLT(etree.parse(fp))
         fp.close()
         resulttree = self.ooxml_transform(intree)
-        with open(filename, "wb") as fp:
+        with opener(filename, "wb") as fp:
             fp.write(
                 etree.tostring(
                     resulttree,
