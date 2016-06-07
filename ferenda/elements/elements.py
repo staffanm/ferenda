@@ -782,6 +782,11 @@ def __deserialize_json(node):
     elif issubclass(cls, bytes):
         # assume only ascii
         o = cls(content.encode(), **attribs)
+    elif issubclass(cls, datetime.datetime):
+        m = re.match(r'[\w\.]+\((\d+), (\d+), (\d+), (\d+), (\d+)(|, (\d+)\))', content)
+        seconds = m.group(6) or '0'
+        o = cls(int(m.group(1)), int(m.group(2)), int(m.group(3)),
+                int(m.group(4)), int(m.group(5)), int(seconds), **attribs)
     elif issubclass(cls, datetime.date):
         m = re.match(r'[\w\.]+\((\d+), (\d+), (\d+)\)', content)
         o = cls(int(m.group(1)), int(m.group(2)), int(m.group(3)), **attribs)
@@ -884,6 +889,12 @@ def __deserialize_xml(elem, caller_globals):
 
     elif dict == cls or dict in cls.__bases__:
         c = cls(ast.literal_eval(elem.text), **elem.attrib)
+
+    elif datetime.datetime == cls or datetime.datetime in cls.__bases__:
+        m = re.match(r'[\w\.]+\((\d+), (\d+), (\d+), (\d+), (\d+)(|, (\d+)\))', elem.text)
+        seconds = m.group(6) or '0'
+        c = cls(int(m.group(1)), int(m.group(2)), int(m.group(3)),
+                int(m.group(4)), int(m.group(5)), int(seconds), **elem.attrib)
 
     elif datetime.date == cls or datetime.date in cls.__bases__:
         m = re.match(r'[\w\.]+\((\d+), (\d+), (\d+)\)', elem.text)

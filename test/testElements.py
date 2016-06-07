@@ -4,7 +4,7 @@ from __future__ import (absolute_import, division,
 from builtins import *
 
 from bs4 import BeautifulSoup
-from datetime import date
+from datetime import date, datetime
 from ferenda.compat import unittest
 from lxml import etree
 from lxml.builder import ElementMaker
@@ -33,6 +33,7 @@ class Main(unittest.TestCase):
                              title="Main section"),
                      Section([42,
                               date(2013,11,27),
+                              datetime(2013,11,27,12,0,0),
                               b'bytestring',
                               {'foo': 'bar',
                                'x': 'y'}],
