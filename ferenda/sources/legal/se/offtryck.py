@@ -210,6 +210,7 @@ class Offtryck(SwedishLegalSource):
 
         allbody = Body()
         initialstate = {'pageno': 1}
+        serialized = False
         documents = sanitized.analyzer.documents()
         if len(documents) > 1:
             self.log.debug("%s: segmented into docs %s" % (basefile, documents))
@@ -227,6 +228,12 @@ class Offtryck(SwedishLegalSource):
                     # nodes, extracting keywords from text etc. Note: finding
                     # references in text with LegalRef is done afterwards
                     self.visit_node(body, func, initialstate)
+                # For documents with more than one subdocument, only
+                # serialize the first (presumably most important) part
+                if not serialized:
+                    self._serialize_unparsed(body, basefile)
+                    serialized = True
+
                 # print("%s: self.config.parserefs: %s, self.parse_types: %s" % (basefile, self.config.parserefs, self.parse_types))
                 if self.config.parserefs and self.parse_types:
                     body = self.refparser.parse_recursive(body)

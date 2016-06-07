@@ -32,6 +32,7 @@ import argparse
 import builtins
 import codecs
 import configparser
+import copy
 import inspect
 import importlib
 import logging
@@ -62,6 +63,30 @@ from ferenda import DocumentRepository  # needed for a doctest
 from ferenda import Transformer, TripleStore, ResourceLoader, WSGIApp, Resources
 from ferenda import errors, util
 from ferenda.compat import MagicMock
+
+
+DEFAULT_CONFIG = {'loglevel': 'DEBUG',
+                  'logfile': True,
+                  'processes': 1,
+                  'datadir': 'data',
+                  'force': False,
+                  'downloadmax': nativeint,
+                  'combineresources': False,
+                  'staticsite': False,
+                  'all': False,
+                  'relate': True,
+                  'download': True,
+                  'tabs': True,
+                  'sitename': 'MySite',
+                  'sitedescription': 'Just another Ferenda site',
+                  'cssfiles': ['css/ferenda.css'],
+                  'jsfiles': ['js/ferenda.js'],
+                  'imgfiles': [],
+                  'legacyapi': False,
+                  'fulltextindex': True,
+                  'serverport': 5555,
+                  'authkey': b'secret'}
+
 
 def makeresources(repos,
                   resourcedir="data/rsrc",
@@ -649,28 +674,7 @@ def _load_config(filename=None, argv=None, defaults=None):
         getlog().critical("load_config called more than once!")
     
     if not defaults:
-        defaults = {'loglevel': 'DEBUG',
-                    'logfile': True,
-                    'processes': 1,
-                    'datadir': 'data',
-                    'force': False,
-                    'downloadmax': nativeint,
-                    'combineresources': False,
-                    'staticsite': False,
-                    'all': False,
-                    'relate': True,
-                    'download': True,
-                    'tabs': True,
-                    'sitename': 'MySite',
-                    'sitedescription': 'Just another Ferenda site',
-                    'cssfiles': ['css/ferenda.css'],
-                    'jsfiles': ['js/ferenda.js'],
-                    'imgfiles': [],
-                    'legacyapi': False,
-                    'fulltextindex': True,
-                    'serverport': 5555,
-                    'authkey': b'secret'}
-
+        defaults = copy.deepcopy(DEFAULT_CONFIG)
         for alias, classname in _enabled_classes(inifile=filename).items():
             assert alias not in defaults, "Collision on key %s" % alias
             defaults[alias] = _load_class(classname).get_default_options()

@@ -30,7 +30,7 @@ from ferenda import (DocumentRepository, DocumentStore, FSMParser,
 from ferenda import util, fulltextindex
 from ferenda.sources.legal.se.legalref import Link, LegalRef, RefParseError
 from ferenda.elements.html import A, H1, H2, H3, P
-from ferenda.elements import Section, Body, CompoundElement
+from ferenda.elements import serialize, Section, Body, CompoundElement
 from ferenda.pdfreader import Page, BaseTextDecoder, Textelement
 from ferenda.pdfreader import PDFReader
 from ferenda.pdfanalyze import PDFAnalyzer
@@ -612,9 +612,20 @@ class SwedishLegalSource(DocumentRepository):
             # nodes, extracting keywords from text etc. Note: finding
             # references in text with LegalRef is done afterwards
             self.visit_node(body, func, initialstate)
+        self._serialize_unparsed(body, basefile)
         if self.config.parserefs and self.parse_types:
             body = self.refparser.parse_recursive(body)
         return body
+
+    def _serialize_unparsed(self, body, basefile):
+        # FIXME: special hack depending on undocument config
+        # variable. This is needed for parse-bench.py and its
+        # createtestsuite() function.
+        if 'serializeunparsed' in self.config and self.config.serializeunparsed:
+            serialized_path = self.store.serialized_path(basefile) + ".unparsed"
+            with self.store._open(serialized_path, "wb") as fp:
+                r = serialize(body, format="json")
+                fp.write(r.encode('utf-8'))
 
     def extract_body(self, fp, basefile):
         """Given a open file containing raw document content (or intermediate

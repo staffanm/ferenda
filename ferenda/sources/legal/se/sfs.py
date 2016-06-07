@@ -554,7 +554,8 @@ class SFS(Trips):
         filename = self.store.downloaded_path(basefile)
         if not os.path.exists(filename):
             self.log.warning("%s: Fulltext is missing" % basefile)
-            # FIXME: This code needs to be rewritten
+            # FIXME: This code (which only runs when fulltext is
+            # missong) needs to be rewritten
             baseuri = self.canonical_uri(basefile)
             if baseuri in registry:
                 title = registry[baseuri].value(URIRef(baseuri),
