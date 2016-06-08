@@ -114,7 +114,8 @@ class DirTrips(Trips):
             key, val = header.split(":")
             d[predicates[key.strip()]] = val.strip()
         d["dcterms:publisher"] = self.lookup_resource("Regeringskansliet")
-        d["dcterms:issued"] = d["rpubl:beslutsdatum"]  # best we can do
+        if "rpubl:beslutsdatum" in d:
+            d["dcterms:issued"] = d["rpubl:beslutsdatum"]  # best we can do
         return d
     
     def sanitize_rubrik(self, rubrik):

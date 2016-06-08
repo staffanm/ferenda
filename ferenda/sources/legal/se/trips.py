@@ -16,6 +16,7 @@ import lxml.html
 from bs4 import BeautifulSoup
 
 from ferenda.decorators import downloadmax
+from ferenda.errors import DocumentRemovedError
 from ferenda import util
 from . import SwedishLegalSource
 
@@ -143,6 +144,9 @@ class Trips(SwedishLegalSource):
             basefile, attachment=attachment)), "lxml")
         content = soup.find("div", "search-results-content")
         body = content.find("div", "body-text")
+        if not body or not body.string:
+            raise DocumentRemovedError("%s has no body-text" % basefile,
+                                       dummyfile=self.store.parsed_path(basefile))
         body.string = "----------------------------------------------------------------\n\n" + body.string
         txt = content.text
         # the body of the text uses CRLF, but the header uses only
