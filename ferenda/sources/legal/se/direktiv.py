@@ -133,71 +133,67 @@ class DirTrips(Trips):
         return Literal(identifier)
 
 
-    def parse_body(self, fp, basefile):
-        current_type = None
+    def extract_body(self, fp, basefile):
         rawtext = fp.read().decode(self.source_encoding)
         # remove whitespace on otherwise empty lines
         rawtext = re.sub("\n\t\n", "\n\n", rawtext)
         reader = TextReader(string=rawtext,
                             linesep=TextReader.UNIX)
-        body = Body()
-        for p in reader.getiterator(reader.readparagraph):
-            new_type = self.guess_type(p, current_type)
-            # if not new_type == None:
-            #    print "Guessed %s for %r" % (new_type.__name__,p[:20])
-            if new_type is None:
-                pass
-            elif new_type == Continuation and len(body) > 0:
-                # Don't create a new text node, add this text to the last
-                # text node created
-                para = body.pop()
-                para.append(p)
-                body.append(para)
+        return reader
+    
+
+    def get_parser(self, basefile, sanitized):
+
+        def guess_type(p, current_type):
+            if not p:  # empty string
+                return None
+            # complex heading detection heuristics: Starts with a capital
+            # or a number, and doesn't end with a period (except in some
+            # cases).
+            elif ((re.match("^\d+", p)
+                   or p[0].lower() != p[0])
+                  and not (p.endswith(".") and
+                           not (p.endswith("m.m.") or
+                                p.endswith("m. m.") or
+                                p.endswith("m.fl.") or
+                                p.endswith("m. fl.")))):
+                return Heading
+            elif p.startswith("--"):
+                return ListItem
+            elif (p[0].upper() != p[0]):
+                return Continuation  # magic value, used to glue together
+                # paragraphs that have been
+                # inadvertently divided.
             else:
-                if new_type == Continuation:
-                    new_type = Paragraph
-                body.append(new_type([p]))
-                current_type = new_type
+                return Paragraph
 
-        # LegalRef needs to be a little smarter and not parse refs
-        # like "dir. 2004:55" and "(N2004:13)" as SFS references
-        # before we enable it.
-#         parser = SwedishCitationParser(LegalRef(*self.parse_types),
-#                                        self.minter,
-#                                        self.commondata)
-#        body = parser.parse_recursive(body)
-        return body
+        def parse(tokenstream):
+            current_type = None
+            body = Body()
+            for p in tokenstream:
+                new_type = guess_type(p, current_type)
+                # if not new_type == None:
+                #    print "Guessed %s for %r" % (new_type.__name__,p[:20])
+                if new_type is None:
+                    pass
+                elif new_type == Continuation and len(body) > 0:
+                    # Don't create a new text node, add this text to the last
+                    # text node created
+                    para = body.pop()
+                    para.append(p)
+                    body.append(para)
+                else:
+                    if new_type == Continuation:
+                        new_type = Paragraph
+                    body.append(new_type([p]))
+                    current_type = new_type
+            return body
+        return parse
 
-    def guess_type(self, p, current_type):
-        if not p:  # empty string
-            return None
-        # complex heading detection heuristics: Starts with a capital
-        # or a number, and doesn't end with a period (except in some
-        # cases).
-        elif ((re.match("^\d+", p)
-               or p[0].lower() != p[0])
-              and not (p.endswith(".") and
-                       not (p.endswith("m.m.") or
-                            p.endswith("m. m.") or
-                            p.endswith("m.fl.") or
-                            p.endswith("m. fl.")))):
-            return Heading
-        elif p.startswith("--"):
-            return ListItem
-        elif (p[0].upper() != p[0]):
-            return Continuation  # magic value, used to glue together
-            # paragraphs that have been
-            # inadvertently divided.
-        else:
-            return Paragraph
 
-    def process_body(self, element, prefix, baseuri):
-        if isinstance(element, str):
-            return
-        fragment = prefix
-        uri = baseuri
-        for p in element:
-            self.process_body(p, fragment, baseuri)
+    def tokenize(self, reader):
+        return reader.getiterator(reader.readparagraph)
+
 
     def canonical_uri(self, basefile):
         return self.config.url + "res/dir/" + basefile
