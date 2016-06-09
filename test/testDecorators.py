@@ -106,6 +106,7 @@ class Decorators(unittest.TestCase):
         mockrepo.store.distilled_path.return_value = "distilled_path.xhtml"
         mockrepo.get_globals.return_value = {'symbol table':'fake'}
         mockrepo.required_predicates = []
+        mockrepo.config = MagicMock()
         mockdoc.meta = MagicMock() # need Magicmock which supports magic funcs like __iter__
         bodypart = MagicMock()
         bodypart.meta  = MagicMock()
