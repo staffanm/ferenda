@@ -11,7 +11,7 @@ import codecs
 import json
 
 # 2 third party
-from rdflib import Graph
+from rdflib import Graph, Namespace
 from rdflib.namespace import DCTERMS
 
 # 3 own code
@@ -21,9 +21,8 @@ sys.path.append(os.path.normpath(os.getcwd() + os.sep + os.pardir))
 from ferenda.manager import _load_class, _load_config, _find_config_file, DEFAULT_CONFIG
 from ferenda.elements import deserialize, Link
 from ferenda import util
+from ferenda.thirdparty.coin import URIMinter
   
-from test.functionalLegalRef import TestLegalRef
-
 class LegalRefTest(object):
     def __init__(self, alias):
         # setup 
@@ -33,35 +32,68 @@ class LegalRefTest(object):
                                 'DV': LegalRef.RATTSFALL,
                                 'Regpubl': LegalRef.FORARBETEN,
                                 'EGLag': LegalRef.EULAGSTIFTNING,
-                                'ECJ': LegalRef.EGRATTSFALL}[parsetype]
-        # attempt to run a classmethod for one class and 
-        # have it modifying another. This can't possibly 
-        # work for a bound method?
-        TestLegalRef.setUpClass(self.__class__)
+                                'ECJ': LegalRef.EGRATTSFALL}[parsetype])
+
+        # this particular test method is set up to use lagen.nu style
+        # URIs because the canonical URIs are significantly different.
+        space = "lagen/nu/res/uri/swedishlegalsource.space.ttl"
+        slugs = "lagen/nu/res/uri/swedishlegalsource.slugs.ttl"
+        extra = ["lagen/nu/res/extra/swedishlegalsource.ttl",
+                 "lagen/nu/res/extra/sfs.ttl"]
+        cfg = Graph().parse(space,
+                            format="turtle").parse(slugs, format="turtle")
+        self.metadata = Graph()
+        for ttl in extra:
+            self.metadata.parse(ttl, format="turtle")
+        COIN = Namespace("http://purl.org/court/def/2009/coin#")
+        # select correct URI for the URISpace definition by
+        # finding a single coin:URISpace object
+        spaceuri = cfg.value(predicate=RDF.type, object=COIN.URISpace)
+        self.minter = URIMinter(cfg, spaceuri)
        
-    def createtest(basefile, basedir):
-        # FIXME: TestLegalRef._parse should be MOST of ._test_parser, without 
-        # the ending assertEqual (and preferably w/o serialize as well)
+    def createtest(self, basefile, basedir):
+        # FIXME: This is mostly a cut'n paste of integrationLegalRef._test_parser
         testfile = basedir + basefile + ".txt"
+        encoding = 'windows-1252'
+        with codecs.open(testfile,encoding=encoding) as fp:
+            testdata = fp.read()
+
+        parts = re.split('\r?\n\r?\n',testdata,1)
+        if len(parts) == 1:
+            want = ''
+        else:
+            (testdata, want) = parts
+        want = want.replace("\r\n", "\n").strip()
+        test_paras = re.split('\r?\n---\r?\n',testdata)
+        body = []
+
         start = time.time()
-        nodes = TestLegalRef._parse(self, testfile, self.parser)
+        for para in test_paras:
+            if para.startswith("RESET:"):
+                self.parser.currentlynamedlaws.clear()
+            if para.startswith("NOBASE:"):
+                baseuri_attributes = {}
+            else:
+                baseuri_attributes = {'law': '9999:999'}
+            nodes = self.parser.parse(para, self.minter, self.metadata,
+                                      baseuri_attributes)
+            body.append(nodes)
         elapsed = time.time() - start
-        return elapsed, extractrefs(nodes)
+        return elapsed, extractrefs(body)
 
     timetest = createtest
 
 
 class RepoTest(object):
 
-    def __init__(config, alias):
+    def __init__(self, config, alias):
         repoconfig = getattr(config, alias)
         classname = getattr(repoconfig, 'class')
         repocls = _load_class(classname)
         self.repo = repocls()
         self.repo.config = repoconfig
 
-
-    def timetest(basefile, basedir):
+    def timetest(self, basefile, basedir):
         serialized_path = self.repo.store.serialized_path(basefile) + ".unparsed"
         serialized_path.replace(self.repo.store.datadir, basedir)
         with codecs.open(serialized_path, "r", encoding="utf-8") as fp:
@@ -72,12 +104,12 @@ class RepoTest(object):
         elapsed = time.time() - start
         return elapsed, extractrefs(doc)
 
-    def createtest(basefile, basedir):
+    def createtest(self, basefile, basedir):
         print("parsing %s/%s" % (self.repo.alias, basefile))
         self.repo.config.force = True # make this dependent on whether 
         self.repo.parse(basefile)
         # refs = refs_from_graph(Graph().parse(repo.store.distilled_path(basefile)))
-        elapsed, refs = timetest(repo, basefile, basedir)
+        elapsed, refs = self.timetest(basefile, basedir)
         return elapsed, refs
 
 def extractrefs(node):
@@ -99,16 +131,6 @@ def getconfig(basedir):
     os.environ['FERENDA_SERIALIZEUNPARSED'] = basedir
     return _load_config(_find_config_file())
 
-
-def time_legalref_test(alias, test) # 
-    # leverage the setUpClass and _test_parser methods from test/integrationLegalRef somehow
-    parser = integrationLegalRef.setUpClass()
-    start = time.time()
-    nodes = integrationLegalRef._testParse(test, parser)
-    elapsed = time.time() - start
-    return elapsed, refs_from_graph(nodes)
-
-    
 def createtestsuite(testsuitefile):
     with open(testsuitefile) as fp:
         testsuite = json.load(fp)
@@ -130,7 +152,7 @@ def createtestsuite(testsuitefile):
                                     'refgraph': refgraph})
 
     baselinefile = testsuitefile.replace(".json", ".baseline.json")
-    if os.path.exists(baseline):
+    if os.path.exists(baselinefile):
         with open(baselinefile) as fp:
             existingbaseline = json.load(fp)
         # TODO: copy elapsed values from existingbaseline to baseline
@@ -146,7 +168,7 @@ def evaltestsuite(testsuitefile):
     for alias, basefiles in testsuite.items():
         if alias.startswith("legalref/"):
             tester = LegalRefTest(alias)
-	else:
+        else:
             tester = RepoTest(config, alias)
         results[alias] = []
         for basefile in basefiles:
@@ -157,7 +179,7 @@ def evaltestsuite(testsuitefile):
                                    'refgraph': refgraph})
     baselinefile = testsuitefile.replace(".json", ".baseline.json")
     with open(baselinefile) as fp:
-        baselinefile = json.load(fp)
+        baseline = json.load(fp)
     compare(baseline, results)
 
 
@@ -204,7 +226,7 @@ if __name__ == '__main__':
         sys.exit(1)
     testsuite = sys.argv[1]
     assert testsuite.endswith(".json")
-    if len(sys.argv) > 2 and sys.argv[1] == "--createtest":
+    if len(sys.argv) > 2 and sys.argv[2] == "--createtest":
         createtestsuite(testsuite)
     else:
         evaltestsuite(testsuite)
