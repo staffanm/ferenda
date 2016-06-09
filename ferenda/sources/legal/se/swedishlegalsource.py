@@ -620,10 +620,10 @@ class SwedishLegalSource(DocumentRepository):
     def _serialize_unparsed(self, body, basefile):
         # FIXME: special hack depending on undocument config
         # variable. This is needed for parse-bench.py and its
-        # createtestsuite() function.
+        # RepoTest.createtest() method.
         if 'serializeunparsed' in self.config and self.config.serializeunparsed:
             serialized_path = self.store.serialized_path(basefile) + ".unparsed"
-            serialized_path = serialized_path.replace(self.store.datadir, self.config.serializeunparsed)
+            serialized_path = serialized_path.replace(self.store.datadir + "/serialized", self.config.serializeunparsed + "/serialized/" + self.alias)
             with self.store._open(serialized_path, "wb") as fp:
                 r = serialize(body, format="json")
                 fp.write(r.encode('utf-8'))

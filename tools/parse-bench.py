@@ -5,14 +5,18 @@ from __future__ import (absolute_import, division,
 from builtins import *
 # 1 stdlib
 import sys
+import re
 import os
 import time
 import codecs
 import json
+import functools
+from timeit import timeit
 
 # 2 third party
 from rdflib import Graph, Namespace
-from rdflib.namespace import DCTERMS
+from rdflib.namespace import DCTERMS, RDF
+COIN = Namespace("http://purl.org/court/def/2009/coin#")
 
 # 3 own code
 sys.path.append(os.path.normpath(os.getcwd() + os.sep + os.pardir))
@@ -22,24 +26,29 @@ from ferenda.manager import _load_class, _load_config, _find_config_file, DEFAUL
 from ferenda.elements import deserialize, Link
 from ferenda import util
 from ferenda.thirdparty.coin import URIMinter
-  
+from ferenda.sources.legal.se.legalref import LegalRef
+
+
 class LegalRefTest(object):
     def __init__(self, alias):
-        # setup 
+        # setup
+        self.alias = alias
         parsetype = alias.split("/")[1]
         self.parser = LegalRef({'SFS': LegalRef.LAGRUM,
                                 'Short': LegalRef.KORTLAGRUM,
                                 'DV': LegalRef.RATTSFALL,
                                 'Regpubl': LegalRef.FORARBETEN,
                                 'EGLag': LegalRef.EULAGSTIFTNING,
-                                'ECJ': LegalRef.EGRATTSFALL}[parsetype])
+                                'ECJ': LegalRef.EURATTSFALL}[parsetype])
 
         # this particular test method is set up to use lagen.nu style
         # URIs because the canonical URIs are significantly different.
-        space = "lagen/nu/res/uri/swedishlegalsource.space.ttl"
-        slugs = "lagen/nu/res/uri/swedishlegalsource.slugs.ttl"
-        extra = ["lagen/nu/res/extra/swedishlegalsource.ttl",
-                 "lagen/nu/res/extra/sfs.ttl"]
+        dirname = os.path.dirname(__file__)
+        basedir = dirname + "/../"
+        space = basedir + "lagen/nu/res/uri/swedishlegalsource.space.ttl"
+        slugs = basedir + "lagen/nu/res/uri/swedishlegalsource.slugs.ttl"
+        extra = [basedir + "lagen/nu/res/extra/swedishlegalsource.ttl",
+                 basedir + "lagen/nu/res/extra/sfs.ttl"]
         cfg = Graph().parse(space,
                             format="turtle").parse(slugs, format="turtle")
         self.metadata = Graph()
@@ -53,21 +62,22 @@ class LegalRefTest(object):
        
     def createtest(self, basefile, basedir):
         # FIXME: This is mostly a cut'n paste of integrationLegalRef._test_parser
-        testfile = basedir + basefile + ".txt"
+        testfile = os.path.dirname(__file__) + "/../test/files/" + self.alias + "/" + basefile + ".txt"
         encoding = 'windows-1252'
         with codecs.open(testfile,encoding=encoding) as fp:
             testdata = fp.read()
-
         parts = re.split('\r?\n\r?\n',testdata,1)
-        if len(parts) == 1:
-            want = ''
-        else:
-            (testdata, want) = parts
-        want = want.replace("\r\n", "\n").strip()
+        testdata = parts[0]
         test_paras = re.split('\r?\n---\r?\n',testdata)
-        body = []
 
-        start = time.time()
+        # first: run it five times with timeit to get a good average exec time
+        elapsed = timeit(functools.partial(self.run_with_timeit, test_paras), number=5, globals=globals())
+        # then: run it a sixth time to get at the return value
+        body = self.run_with_timeit(test_paras)
+        return elapsed, extractrefs(body)
+
+    def run_with_timeit(self, test_paras):
+        body = []
         for para in test_paras:
             if para.startswith("RESET:"):
                 self.parser.currentlynamedlaws.clear()
@@ -78,9 +88,7 @@ class LegalRefTest(object):
             nodes = self.parser.parse(para, self.minter, self.metadata,
                                       baseuri_attributes)
             body.append(nodes)
-        elapsed = time.time() - start
-        return elapsed, extractrefs(body)
-
+        return body
     timetest = createtest
 
 
@@ -92,20 +100,23 @@ class RepoTest(object):
         repocls = _load_class(classname)
         self.repo = repocls()
         self.repo.config = repoconfig
+        self.alias = alias
 
     def timetest(self, basefile, basedir):
         serialized_path = self.repo.store.serialized_path(basefile) + ".unparsed"
-        serialized_path.replace(self.repo.store.datadir, basedir)
+        serialized_path = serialized_path.replace(self.repo.store.datadir+"/serialized/", basedir+"/serialized/" + self.alias + "/")
         with codecs.open(serialized_path, "r", encoding="utf-8") as fp:
             doc = deserialize(fp.read(), format="json")
         refparser = self.repo.refparser
+        # FIXME: we should use timeit here as well to get more stable
+        # timings. Problem is that these tests take a long time as it
+        # is...
         start = time.time()
         refparser.parse_recursive(doc)
         elapsed = time.time() - start
         return elapsed, extractrefs(doc)
 
     def createtest(self, basefile, basedir):
-        print("parsing %s/%s" % (self.repo.alias, basefile))
         self.repo.config.force = True # make this dependent on whether 
         self.repo.parse(basefile)
         # refs = refs_from_graph(Graph().parse(repo.store.distilled_path(basefile)))
@@ -141,11 +152,13 @@ def createtestsuite(testsuitefile):
         if alias.startswith("legalref/"):
             tester = LegalRefTest(alias)
             if not basefiles:
-                basefiles = (x[11+len(alias):-4] for x in util.listdir("test/files/" + alias, suffix=".txt"))
+                testfiledir = os.path.dirname(__file__)+ "/../test/files/"
+                basefiles = [x[:-4] for x in os.listdir(testfiledir + alias) if x.endswith(".txt")]
         else:
             tester = RepoTest(config, alias)
         baseline[alias] = []
         for basefile in basefiles:
+            print("Creating test data for %s/%s" % (alias, basefile))
             elapsed, refgraph = tester.createtest(basefile, basedir)
             baseline[alias].append({'basefile': basefile,
                                     'elapsed': elapsed,
@@ -155,7 +168,17 @@ def createtestsuite(testsuitefile):
     if os.path.exists(baselinefile):
         with open(baselinefile) as fp:
             existingbaseline = json.load(fp)
-        # TODO: copy elapsed values from existingbaseline to baseline
+        # when running createtest to create a baseline.json that
+        # already exists, we copy the elapsed timing values from the
+        # old baseline while resetting the refgraph. The idea is that
+        # during optimization, we might change our minds about which
+        # references should be found, but we'd like to keep our old
+        # timings so that we get an idea on how optimization has
+        # progressed compared to the initial state.
+        for alias, basefiles in existingbaseline.items():
+            for idx, basefile in enumerate(basefiles):
+                baseline[alias][idx]['elapsed'] = basefile['elapsed']
+
     with open(baselinefile, "w") as fp:
         json.dump(baseline, fp, indent=2)
 
@@ -168,11 +191,14 @@ def evaltestsuite(testsuitefile):
     for alias, basefiles in testsuite.items():
         if alias.startswith("legalref/"):
             tester = LegalRefTest(alias)
+            if not basefiles:
+                testfiledir = os.path.dirname(__file__)+ "/../test/files/"
+                basefiles = [x[:-4] for x in os.listdir(testfiledir + alias) if x.endswith(".txt")]
         else:
             tester = RepoTest(config, alias)
         results[alias] = []
         for basefile in basefiles:
-            print("testing %s/%s" % (alias, basefile))
+            print("Running test %s/%s" % (alias, basefile))
             elapsed, refgraph = tester.timetest(basefile, basedir)
             results[alias].append({'basefile': basefile,
                                    'elapsed': elapsed,

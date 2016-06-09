@@ -1,0 +1,19 @@
+{
+    "dirtrips": ["1995:91", "2002:31"],
+    "souregeringen": ["2004:6"],
+    "propregeringen": ["1998/99:44", "2005/06:173"],
+    "sfs": ["1998:204", "1998:1191"],
+    "dv": ["HGO/B747-00",
+           "HDO/Ö6229-14",
+           "HFD/4453-10",
+           "ADO/2012-87",
+           "HFD/6894-13",
+           "HDO/T2807-12"],
+    "difs": ["difs/2013:1", "difs/2010:1"],
+    "legalref/SFS": [],
+    "legalref/Short": [],
+    "legalref/Regpubl": [],
+    "legalref/DV": [],
+    "legalref/EGLag": [],
+    "legalref/ECJ": [] 
+}
