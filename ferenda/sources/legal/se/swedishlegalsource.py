@@ -623,6 +623,7 @@ class SwedishLegalSource(DocumentRepository):
         # createtestsuite() function.
         if 'serializeunparsed' in self.config and self.config.serializeunparsed:
             serialized_path = self.store.serialized_path(basefile) + ".unparsed"
+            serialized_path = serialized_path.replace(self.store.datadir, self.config.serializeunparsed)
             with self.store._open(serialized_path, "wb") as fp:
                 r = serialize(body, format="json")
                 fp.write(r.encode('utf-8'))

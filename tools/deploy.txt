@@ -1,5 +1,5 @@
 # instructions on how to deploy the state of the dev machine to the
-  staging machine. This'll go into a script later.
+  staging machine. This is mostly encoded into fabfile.py now
 
 1) Snapshot the ES and restore it on target, see esbackup.txt
 

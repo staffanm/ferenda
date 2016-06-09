@@ -245,6 +245,9 @@ class MyndFskrBase(SwedishLegalSource):
             else:
                 raise
         self.parse_document_from_textreader(reader, doc)
+        self._serialize_unparsed(doc.body, doc.basefile)
+        if self.config.parserefs and self.parse_types:
+            doc.body = self.refparser.parse_recursive(doc.body)
         self.parse_entry_update(doc)
         return True  # Signals that everything is OK
 

@@ -93,7 +93,7 @@ class AbstractElement(object):
     you define new types directly based on python types.
 
     """
-    def __new__(cls):
+    def __new__(cls, *args, **kwargs):
         obj = super(AbstractElement, cls).__new__(cls)
         object.__setattr__(obj, '__initialized', False)
         return obj
@@ -476,6 +476,8 @@ class OrdinalElement(AbstractElement):
     False
 
     """
+
+
 
     def __init__(self, *args, **kwargs):
         self.ordinal = None
