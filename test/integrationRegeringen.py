@@ -42,6 +42,16 @@ class SelectPDFs(unittest.TestCase):
                  ("1c1364c5.pdf", "Ut ur skuldfällan, SOU 2013:72, del 2 av 2, Bilagor (pdf 997 kB)")],
                 ["74a82f1a.pdf"])
 
+    def test_hela_dokumentet_implicit_2(self):
+        self._t([("a", "Bortom fagert tal - om bristande tillgänglighet som diskriminering, Ds 2010:20 (pdf 4 MB)"),
+                 ("b", "Bortom fagert tal - om bristande tillgänglighet som diskriminering, del 1 av 2, Ds 2010:20 (pdf 1 MB)"),
+                 ("c", "Bortom fagert tal - om bristande tillgänglighet som diskriminering, del 2 av 2, Ds 2010:20 (pdf 2 MB)"),
+                 ("d", "Bortom fagert tal - om bristande tillgänglighet som diskriminering, del 1 av 2, Ds 2010:20 (tillgängligt wordformat) (doc 2 MB)"),
+                 ("e", "Bortom fagert tal - om bristande tillgänglighet som diskriminering, del 2 av 2, Ds 2010:20 (tillgängligt wordformat) (doc 1 MB)")],
+                ["a"])
+        
+
+
     def test_delar(self):
         self._t([("4ab56c4e.pdf", "En digital agenda, SOU 2014:13 (del 1 av 2) (pdf 2,3 MB)"),
                  ("e265db7c.pdf", "En digital agenda, SOU 2014:13 (del 2 av 2) (pdf 1,4 MB)")],

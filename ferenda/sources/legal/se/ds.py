@@ -5,6 +5,7 @@ from builtins import *
 
 import re
 import logging
+from collections import OrderedDict, Counter
 
 from rdflib.namespace import SKOS
 
@@ -26,6 +27,7 @@ class DsAnalyzer(PDFAnalyzer):
                 if textelement.font.size >= 18: # Ds 2009:55 uses size 18. The normal is 26.
                     return textelement
         documents = []
+        mainstyles = Counter()
         currentdoc = 'frontmatter'
         for pageidx, page in enumerate(self.pdf):
             # Sanity check: 
@@ -45,6 +47,15 @@ class DsAnalyzer(PDFAnalyzer):
                     currentdoc = "main"
                 elif re.match("Departementsserien \d+", str(pgtitle).strip()):
                     currentdoc = 'endregister'
+            styles = self.count_styles(pageidx, 1)
+            # find the most dominant style on the page. If it uses the
+            # EU font, it's a separate section.
+            if styles and styles.most_common(1)[0][0][0].startswith("EUAlbertina"):
+                currentdoc = 'eudok'
+            elif currentdoc == "eudok":
+                currentdoc == "main" ## CONTINUE
+            if currentdoc == "main":
+                mainstyles += styles
             # update the current document segment tuple or start a new one
             if documents and documents[-1][2] == currentdoc:
                 documents[-1][1] += 1

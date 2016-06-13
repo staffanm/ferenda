@@ -522,7 +522,7 @@ class Regeringen(Offtryck):
             for pdffile, linktext in cleanfiles:
                 # strip away the last filetype + size paranthesis
                 linktext = re.sub(" \(pdf [\d\,]+ [kM]B\)", "", linktext)
-                # and if we remove the commonprefix, do we end up with nothing?
+                # and if we remove the commonprefix (and possibly identifier), do we end up with nothing?
                 if linktext.replace(commonprefix, "") == "":
                     # then this is probably a complete file
                     if labels:

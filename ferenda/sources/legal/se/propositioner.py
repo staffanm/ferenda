@@ -246,8 +246,6 @@ class PropTrips(Trips, Offtryck, FixedLayoutSource):
                 ret = self.download_single(basefile, url)
                 updated = updated or ret
         return updated
-        
-
 
     def sniff_attachment(self, url):
         r = requests.get(url, stream=True)
@@ -267,7 +265,6 @@ class PropTrips(Trips, Offtryck, FixedLayoutSource):
             attachment = None
         return attachment
         
-
     def _next_year(self, year):
         # "1992/93" -> "1993/94"
         # "1998/99" -> "1999/00"

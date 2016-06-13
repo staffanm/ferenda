@@ -585,7 +585,10 @@ class Offtryck(SwedishLegalSource):
                 # self.log.debug("...detecting section header w/o acttext")
                 comment_on = self._parse_uri_from_text(text, state['basefile'], law)
                 skipheader = True
-                if state['defaultsize'] >= section[idx+1].font.size + 2:
+                offset = 1
+                while isinstance(section[idx+offset], Sidbrytning):
+                    offset += 1
+                if state['defaultsize'] >= section[idx+offset].font.size + 2:
                     parsestate = "acttext"
                     comment_start = False
                     skipheader = False
@@ -613,6 +616,7 @@ class Offtryck(SwedishLegalSource):
             # conditions are met). The height of the gap should really
             # be dynamically calculated, but how?
             elif (prevnode and
+                  # hasattr(subnode, 'top'
                   subnode.top - prevnode.bottom >= 20):
                 # self.log.debug("...node spacing is %s, switching from parsestate %s" % (subnode.top - prevnode.bottom, parsestate))
                 if (re.match("\d+(| \w) §$", str(prevnode).strip())):
