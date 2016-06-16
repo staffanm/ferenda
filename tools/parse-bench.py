@@ -183,6 +183,9 @@ def createtestsuite(testsuitefile):
         json.dump(baseline, fp, indent=2)
 
 def evaltestsuite(testsuitefile):
+    baselinefile = testsuitefile.replace(".json", ".baseline.json")
+    with open(baselinefile) as fp:
+        baseline = json.load(fp)
     with open(testsuitefile) as fp:
         testsuite = json.load(fp)
     basedir = os.path.dirname(testsuitefile)
@@ -203,9 +206,6 @@ def evaltestsuite(testsuitefile):
             results[alias].append({'basefile': basefile,
                                    'elapsed': elapsed,
                                    'refgraph': refgraph})
-    baselinefile = testsuitefile.replace(".json", ".baseline.json")
-    with open(baselinefile) as fp:
-        baseline = json.load(fp)
     compare(baseline, results)
 
 
