@@ -38,6 +38,7 @@ class Offtryck(SwedishLegalSource):
     
     storage_policy = "dir"
     alias = "offtryck"
+    parse_types = LegalRef.RATTSFALL, LegalRef.FORARBETEN  # , LegalRef.EULAGSTIFTNING, LegalRef.EURATTSFALL
     xslt_template = "xsl/forarbete.xsl"
 
 
@@ -94,12 +95,6 @@ class Offtryck(SwedishLegalSource):
                      (DS, "2008:82"),   # -""-            in swedish
                      # (DS, "2004:46"),   # -""-            in swedish
                     ])
-
-    parse_types = (LegalRef.RATTSFALL,
-                   LegalRef.LAGRUM,
-                   LegalRef.KORTLAGRUM,
-                   LegalRef.FORARBETEN,
-    )
 
     def sanitize_body(self, rawbody):
         sanitized = super(Offtryck, self).sanitize_body(rawbody)

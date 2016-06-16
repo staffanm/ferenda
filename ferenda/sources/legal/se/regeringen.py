@@ -445,16 +445,6 @@ class Regeringen(Offtryck):
         # object (where do we put metrics? On the PDFReader itself?
         return self.read_pdfs(basefile, pdffiles, self._identifier)
 
-    parse_types = (LegalRef.RATTSFALL,
-                   LegalRef.LAGRUM,
-                   LegalRef.KORTLAGRUM,
-                   LegalRef.FORARBETEN,
-#                   LegalRef.EULAGSTIFTNING,
-#                   LegalRef.EURATTSFALL
-    )
-
-
-
 
     def sourcefiles(self, basefile, resource=None):
         with self.store.open_downloaded(basefile, "rb") as fp:
