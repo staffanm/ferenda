@@ -23,12 +23,14 @@
     rpubl:lopnummer "19" ;
     rpubl:rattsfallspublikation <https://lagen.nu/dataset/nja> ;
     rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/hd/T4459-05/2007-03-22> ;
+    rpubl:referatrubrik "T.A. mot Justitiekanslern angående skadestånd."@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rf/nja/2007/not/19> ;
     prov:wasDerivedFrom <https://lagen.nu/rf/nja/2007/not/19?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
 <https://lagen.nu/dom/hd/T4459-05/2007-03-22> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
+    dcterms:title "T.A. mot Justitiekanslern angående skadestånd."@sv ;
     rpubl:avgorandedatum "2007-03-22"^^xsd:date ;
     rpubl:malnummer "T4459-05" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/t4459-05/2007-03-22> .

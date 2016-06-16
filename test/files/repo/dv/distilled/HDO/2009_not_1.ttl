@@ -16,12 +16,14 @@
     rpubl:lopnummer "1" ;
     rpubl:rattsfallspublikation <https://lagen.nu/dataset/nja> ;
     rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/hd/Ö1242-08/2009-01-27> ;
+    rpubl:referatrubrik "S.O. mot Riksåklagaren angående utdömande av vite."@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rf/nja/2009/not/1> ;
     prov:wasDerivedFrom <https://lagen.nu/rf/nja/2009/not/1?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
 <https://lagen.nu/dom/hd/Ö1242-08/2009-01-27> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
+    dcterms:title "S.O. mot Riksåklagaren angående utdömande av vite."@sv ;
     rpubl:avgorandedatum "2009-01-27"^^xsd:date ;
     rpubl:malnummer "Ö1242-08" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/oe1242-08/2009-01-27> .

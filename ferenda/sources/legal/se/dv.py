@@ -435,8 +435,11 @@ class DV(SwedishLegalSource):
             # The big word file with all notises might not
             # start with a month name -- try to find out
             # current month by examining the previous notis
-            # (belonging to a previous word file)
-
+            # (belonging to a previous word file).
+            #
+            # FIXME: It's possible that the two word files might be
+            # different types (eg docx and doc). In that case the
+            # resulting file will contain both OOXML and DocBook tags.
             self.log.warning(
                 "No month specified in %s, attempting to look in previous file" %
                 basefile)
@@ -710,10 +713,11 @@ class DV(SwedishLegalSource):
 
         soup = BeautifulSoup(text, "lxml")
         if filetype == "docx":
-            ptag = "w:p"
+            ptag = "w:p", "para" # support intermediate files with a
+                                 # mix of OOXML/DocBook
             soup = self._merge_ooxml(soup)
         else:
-            ptag = "para"
+            ptag = "para", "w:p"
 
         iterator = soup.find_all(ptag)
         if coll == "HDO":
@@ -723,13 +727,15 @@ class DV(SwedishLegalSource):
                 flags=re.UNICODE)
             re_avgdatum = re_malnr = re_notisstart
             re_lagrum = re_sokord = None
-            # headers consist of the first two chunks (month, then
+            # headers consist of the first two chunks. (month, then
             # date+ordinal+malnr)
-            header = iterator.pop(0), iterator[0]  # need to re-read
-            # the second chunk
-            # later
+            header = iterator.pop(0), iterator[0]  # need to re-read the second line later
             curryear = m['year']
             currmonth = self.swedish_months[header[0].get_text().strip().lower()]
+            secondline = header[-1].get_text().strip()
+            m = re_notisstart.match(secondline)
+            if m:
+                head["Rubrik"] = secondline[m.end():].strip()
         else:  # "REG", "HFD"
             # keep in sync like above
             re_notisstart = re.compile(
@@ -1063,6 +1069,10 @@ class DV(SwedishLegalSource):
                     head["Referat"] = referat_templ[m.group("type")] % m.groupdict()
                 else:
                     head["Referat"] = referat_templ[None] % m.groupdict()
+            elif basefile.split("/")[0] in ('ADO', 'MDO'):
+                # FIXME: The same logic as under 1, duplicated
+                m = basefile_regex.match(basefile)
+                head["Referat"] = referat_templ[m.group("type")] % (m.groupdict())
             else:
                 raise errors.ParseError("Unparseable ref '%s'" % head["Referat"])
 
@@ -2132,8 +2142,10 @@ class DV(SwedishLegalSource):
         "Svea HovR": "HSV",
         "Svea hovrätt": "HSV",
 
-        "Kammarrätten i Stockholm, Migrationsöverdomstolen": "MIOD",
-        "Migrationsöverdomstolen": "MIOD",
+        # supreme courts generally use abbrevs established by
+        # Vägledande rättsfall.
+        "Kammarrätten i Stockholm, Migrationsöverdomstolen": "MIG",
+        "Migrationsöverdomstolen": "MIG",
         "Högsta förvaltningsdomstolen": "HFD",
         "Regeringsrätten": "REG",
         "Högsta domstolen": "HDO",
