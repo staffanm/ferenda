@@ -682,20 +682,32 @@ class DV(SwedishLegalSource):
         return self._rawbody
 
     def sanitize_body(self, rawbody):
+        result = []
+        seen_delmal = {}
         for x in rawbody:
             if isinstance(x, str):
                 # match smushed-together delmål markers like in "(jfr
                 # 1990 s 772 och s 796)I" and "Domslut HD fastställer
                 # HovR:ns domslut.II"
-                m = re.match("(.*[\.\)])(I+)$", x)
+                m = re.match("(.*[\.\) ])(I+)$", x, re.DOTALL)
                 if m:
                     x = [m.group(1), m.group(2)]
                 else:
                     x = [x]
                 for p in x:
-                    yield(Paragraph([p]))
+                    m = re.match("(I{1,3}|IV)\.?(|\(\w+\-\d+\))$", p)
+                    if m:
+                        seen_delmal[m.group(1)] = True
+                    result.append(Paragraph([p]))
             else:
-                yield(Paragraph(x))
+                result.append(Paragraph(x))
+        # Many referats that are split into delmål lack the first
+        # initial "I" that signifies the start of the first delmål
+        # (but do have "II", "III" and possibly more)
+        if seen_delmal and "I" not in seen_delmal:
+            self.log.warning("Inserting missing 'I' for first delmal")
+            result.insert(0, Paragraph(["I"]))
+        return result
 
 
     def parse_not(self, text, basefile, filetype):
@@ -1503,7 +1515,7 @@ class DV(SwedishLegalSource):
              'method': 'match',
              'type': ('domskal',)},
             {'name': 'domslut-standalone',
-             're': '(Domslut|(?P<court>Hovrätten|HD|Högsta förvaltningsdomstolen):?s avgörande)$',
+             're': '(Domslut|(?P<court>Hovrätten|HD|hd|Högsta förvaltningsdomstolen):?s avgörande)$',
              'method': 'match',
              'type': ('domslut',)},
             {'name': 'domslut-start',
@@ -1542,7 +1554,6 @@ class DV(SwedishLegalSource):
             """
             chunk = parser.reader.peek()
             strchunk = str(chunk)
-
             res = analyze_instans(strchunk)
             if res:
                 # in some referats, two subsequent chunks both matches
@@ -1569,8 +1580,12 @@ class DV(SwedishLegalSource):
             # True
             # >>> is_equivalent_court("HD", "Högsta domstolen")
             # True
-            # >>> is_equivalent_court("Linkäpings tingsrätt", "HovR:n")
+            # >>> is_equivalent_court("Linköpings tingsrätt", "HovR:n")
             # False
+            # >>> is_equivalent_court(True, "Högsta domstolen")
+            # True
+            # if newcourt is True:
+            #     return newcourt
             newcourt = canonicalize_court(newcourt)
             oldcourt = canonicalize_court(oldcourt)
             if newcourt == oldcourt:
@@ -2064,8 +2079,11 @@ class DV(SwedishLegalSource):
 
         "Attunda tingsrätt": "TAT",
         "Blekinge tingsrätt": "TBL",
-        "Borås tingsrätt": "TBO",
+        "Bollnäs TR": "TBOL",
+        "Borås tingsrätt": "TBOR",
         "Eskilstuna tingsrätt": "TES",
+        "Eslövs TR": "TESL",
+        "Eksjö TR": "TEK",
         "Falu tingsrätt": "TFA",
         "Försäkringskassan": "FSK",
         "Förvaltningsrätten i Göteborg": "FGO",
