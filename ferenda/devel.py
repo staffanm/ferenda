@@ -188,6 +188,7 @@ class Devel(object):
                 LayeredConfig.set(repo.config, key, val, "defaults")
         if datadir is None:
             datadir = repo.config.datadir + os.sep + repo.alias
+        repo.store.datadir = datadir
         return repo
 
 
@@ -534,54 +535,54 @@ class Devel(object):
 
 
     def _samplebasefile(self, sourcerepo, destrepo, basefile):
-            print("  %s: copying %s" % (sourcerepo.alias, basefile))
-            src = sourcerepo.store.downloaded_path(basefile)
-            dst = destrepo.store.downloaded_path(basefile)
-            if os.path.splitext(src)[1] != os.path.splitext(dst)[1]:
-                # FIX for DV.py (and possibly other multi-suffix
-                # repos) this will yield an incorrect suffix (eg ".zip")
-                dst = os.path.splitext(dst)[0] + os.path.splitext(src)[1]
-            isrc = sourcerepo.store.intermediate_path(basefile)
-            if sourcerepo.config.compress == "bz2":
-                isrc += ".bz2"
-            idst = destrepo.store.intermediate_path(basefile)
-            if destrepo.config.compress == "bz2":
-                idst += ".bz2"
-            copy = shutil.copy2
-            if sourcerepo.store.storage_policy == "dir":
-                src = os.path.dirname(src)
-                dst = os.path.dirname(dst)
-                isrc = os.path.dirname(isrc)
-                idst = os.path.dirname(idst)
-                if os.path.exists(dst):
-                    shutil.rmtree(dst)
-                if os.path.exists(idst):
-                    shutil.rmtree(idst)
-                copy = shutil.copytree
-            util.ensure_dir(dst)
-            try:
-                copy(src, dst)
-                if os.path.exists(isrc):
-                    util.ensure_dir(idst)
-                    copy(isrc, idst)
-            except FileNotFoundError as e:
-                print("WARNING: %s" % e)
+        print("  %s: copying %s" % (sourcerepo.alias, basefile))
+        src = sourcerepo.store.downloaded_path(basefile)
+        dst = destrepo.store.downloaded_path(basefile)
+        if os.path.splitext(src)[1] != os.path.splitext(dst)[1]:
+            # FIX for DV.py (and possibly other multi-suffix
+            # repos) this will yield an incorrect suffix (eg ".zip")
+            dst = os.path.splitext(dst)[0] + os.path.splitext(src)[1]
+        isrc = sourcerepo.store.intermediate_path(basefile)
+        if sourcerepo.config.compress == "bz2":
+            isrc += ".bz2"
+        idst = destrepo.store.intermediate_path(basefile)
+        if destrepo.config.compress == "bz2":
+            idst += ".bz2"
+        copy = shutil.copy2
+        if sourcerepo.store.storage_policy == "dir":
+            src = os.path.dirname(src)
+            dst = os.path.dirname(dst)
+            isrc = os.path.dirname(isrc)
+            idst = os.path.dirname(idst)
+            if os.path.exists(dst):
+                shutil.rmtree(dst)
+            if os.path.exists(idst):
+                shutil.rmtree(idst)
+            copy = shutil.copytree
+        util.ensure_dir(dst)
+        try:
+            copy(src, dst)
+            if os.path.exists(isrc):
+                util.ensure_dir(idst)
+                copy(isrc, idst)
+        except FileNotFoundError as e:
+            print("WARNING: %s" % e)
 
-            # NOTE: For SFS (and only SFS), there exists separate
-            # register files under
-            # data/sfs/register/1998/204.html. Maybe we should use
-            # storage_policy="dir" and handle those things as
-            # attachments?
-            if os.path.exists(sourcerepo.store.path(basefile, "register", ".html")):
-                dst = destrepo.store.path(basefile, "register", ".html")
-                util.ensure_dir(dst)
-                shutil.copy2(sourcerepo.store.path(basefile, "register", ".html"),
-                             dst)
-            # also copy the docentry json file
-            if os.path.exists(sourcerepo.store.documententry_path(basefile)):
-                util.ensure_dir(destrepo.store.documententry_path(basefile))
-                shutil.copy2(sourcerepo.store.documententry_path(basefile),
-                             destrepo.store.documententry_path(basefile))
+        # NOTE: For SFS (and only SFS), there exists separate
+        # register files under
+        # data/sfs/register/1998/204.html. Maybe we should use
+        # storage_policy="dir" and handle those things as
+        # attachments?
+        if os.path.exists(sourcerepo.store.path(basefile, "register", ".html")):
+            dst = destrepo.store.path(basefile, "register", ".html")
+            util.ensure_dir(dst)
+            shutil.copy2(sourcerepo.store.path(basefile, "register", ".html"),
+                         dst)
+        # also copy the docentry json file
+        if os.path.exists(sourcerepo.store.documententry_path(basefile)):
+            util.ensure_dir(destrepo.store.documententry_path(basefile))
+            shutil.copy2(sourcerepo.store.documententry_path(basefile),
+                         destrepo.store.documententry_path(basefile))
 
 
     def samplerepos(self, sourcedir):
