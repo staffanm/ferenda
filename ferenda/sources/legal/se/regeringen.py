@@ -68,8 +68,12 @@ class Regeringen(Offtryck):
     @recordlastdownload
     def download(self, basefile=None):
         if basefile:
-            raise DownloadError("%s doesn't support downloading single basefiles" %
-                                self.__class__.__name__)
+            entry = DocumentEntry(self.store.documententry_path(basefile))
+            if entry.orig_url:
+                return self.download_single(basefile, entry.orig_url)
+            else:
+                raise DownloadError("%s doesn't support downloading single basefiles" %
+                                    self.__class__.__name__)
         params = {'filterType': 'Taxonomy',
                   'filterByType': 'FilterablePageBase',
                   'preFilteredCategories': '1324',
@@ -438,7 +442,7 @@ class Regeringen(Offtryck):
         pdffiles = [x + ("" if x.lower().endswith(".pdf") else ".pdf") for x in self.find_pdf_links(self._rawbody, basefile)]
         if not pdffiles:
             self.log.error(
-                "%s: No PDF documents found, can't parse anything" % basefile)
+                "%s: No PDF documents found, can't parse anything (returning placeholder)" % basefile)
             return ["[Dokumenttext saknas]"]
         
         # read a list of pdf files and return a contatenated PDFReader
@@ -463,7 +467,7 @@ class Regeringen(Offtryck):
     def find_pdf_links(self, soup, basefile, labels=False):
         pdffiles = []
         docsection = soup.find('ul', 'list--Block--icons')
-        pdflink = re.compile("/contentassets/")
+        pdflink = re.compile("/(contentassets|globalassets)/")
         if docsection:
             for link in docsection.find_all("a", href=pdflink):
                 pdffiles.append((link["href"], link.string))

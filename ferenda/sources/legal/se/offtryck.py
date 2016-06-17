@@ -16,7 +16,7 @@ from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
 # own
 from ferenda import util
 from ferenda import PDFReader, FSMParser, Describer
-from ferenda.elements import Section, Link, Body, CompoundElement
+from ferenda.elements import Section, Link, Body, CompoundElement, Preformatted
 from ferenda.elements.html import P
 from ferenda.pdfreader import BaseTextDecoder, Page, Textbox
 from ferenda.decorators import newstate
@@ -109,6 +109,17 @@ class Offtryck(SwedishLegalSource):
         return sanitized
 
 
+    # This is a fallback "parser" used when we can't get access to the
+    # actual document text and instead conjure up a placeholder in the
+    # form of a list of strings. This converts that to a Body object
+    def textparser(self, chunks):
+        b = Body()
+        for p in chunks:
+            if not p.strip():
+                continue
+            b.append(Preformatted([p.replace("\n"," ")]))
+        return b
+    
     def get_parser(self, basefile, sanitized, initialstate=None):
         """should return a function that gets any iterable (the output
         from tokenize) and returns a ferenda.elements.Body object.
@@ -121,6 +132,9 @@ class Offtryck(SwedishLegalSource):
         If your docrepo requires a FSMParser-created parser, you should
         instantiate and return it here.
         """
+
+        if not isinstance(sanitized, PDFReader):
+            return self.textparser
 
         # most of this method is just calculating metrics and enabling
         # plot/debuganalysis
