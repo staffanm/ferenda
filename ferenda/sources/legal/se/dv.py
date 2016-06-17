@@ -695,7 +695,7 @@ class DV(SwedishLegalSource):
                 else:
                     x = [x]
                 for p in x:
-                    m = re.match("(I{1,3}|IV)\.?(|\(\w+\-\d+\))$", p)
+                    m = re.match("(I{1,3}|IV)\.? ?(|\(\w+\-\d+\))$", p)
                     if m:
                         seen_delmal[m.group(1)] = True
                     result.append(Paragraph([p]))
@@ -752,11 +752,11 @@ class DV(SwedishLegalSource):
             # keep in sync like above
             re_notisstart = re.compile(
                 "[\w\: ]*Lnr:(?P<court>\w+) ?(?P<year>\d+) ?not ?(?P<ordinal>\d+)")
-            re_malnr = re.compile(r"D:(?P<malnr>\d+\-\d+)")
+            re_malnr = re.compile(r"[AD]: ?(?P<malnr>\d+\-\d+)")
             # the avgdatum regex attempts to include valid dates, eg
             # not "2770-71-12"
-            re_avgdatum = re.compile(r"[AD]:(?P<avgdatum>\d{2,4}\-[01]\d\-\d{2})")
-            re_sokord = re.compile("Uppslagsord: (?P<sokord>.*)", flags=re.DOTALL)
+            re_avgdatum = re.compile(r"[AD]: ?(?P<avgdatum>\d{2,4}\-[01]\d\-\d{2})")
+            re_sokord = re.compile("Uppslagsord: ?(?P<sokord>.*)", flags=re.DOTALL)
             re_lagrum = re.compile("Lagrum: ?(?P<lagrum>.*)", flags=re.DOTALL)
             # headers consists of the first five or six
             # chunks. Doesn't end until "^Not \d+."
@@ -1538,14 +1538,18 @@ class DV(SwedishLegalSource):
                             pat['method']))
                     matchersname[t].append(pat['name'])
 
-        def is_delmal(parser):
+        def is_delmal(parser, chunk=None):
             # should handle "IV", "I (UM1001-08)" and "I." etc
             # but not "I DEFINITION" or "Inledning"...
-            strchunk = str(parser.reader.peek()).strip()
+            if chunk:
+                strchunk = str(chunk)
+            else:
+                strchunk = str(parser.reader.peek()).strip()
             if len(strchunk) < 20:
-                m = re.match("(I{1,3}|IV)\.?(|\(\w+\-\d+\))$", strchunk)
+                m = re.match("(I{1,3}|IV)\.? ?(|\(\w+\-\d+\))$", strchunk)
                 if m:
-                    return {'id': m.group(1)}
+                    return {'id': m.group(1),
+                            'malnr': m.group(2)[1:-1] if m.group(2) else None}
             return {}
 
         def is_instans(parser, chunk=None):
@@ -1793,7 +1797,8 @@ class DV(SwedishLegalSource):
 
         @newstate('delmal')
         def make_delmal(parser):
-            d = Delmal(ordinal=str(parser.reader.next()), malnr=None)
+            attrs = is_delmal(parser, parser.reader.next())
+            d = Delmal(ordinal=attrs['id'], malnr=attrs['malnr'])
             return parser.make_children(d)
 
         @newstate('instans')

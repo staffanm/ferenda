@@ -1,0 +1,49 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://lagen.nu/rf/hfd/2014/not/85> a rpubl:Rattsfallsnotis ;
+    dcterms:identifier "HFD 2014 not 85" ;
+    dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
+    dcterms:references <https://lagen.nu/prop/2012/13:1>,
+        <https://lagen.nu/sfs/1998:189>,
+        <https://lagen.nu/sfs/1998:189#P12>,
+        <https://lagen.nu/sfs/1998:189#P5>,
+        <https://lagen.nu/sfs/1999:1229>,
+        <https://lagen.nu/sfs/1999:1229#K16P1>,
+        <https://lagen.nu/sfs/1999:1229#K24P10a>,
+        <https://lagen.nu/sfs/1999:1229#K24P10b>,
+        <https://lagen.nu/sfs/1999:1229#K24P10d>,
+        <https://lagen.nu/sfs/1999:1229#K24P10dS3> ;
+    rpubl:arsutgava "2014" ;
+    rpubl:lopnummer "85" ;
+    rpubl:rattsfallspublikation <https://lagen.nu/dataset/hfd> ;
+    rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/hfd/4217-14/2014-12-23> ;
+    rpubl:referatrubrik "Överklagande av Skatteverket och HeidelbergCement Northern Europe AB av ett förhandsbesked ang. inkomstskatt"@sv ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rf/hfd/2014/not/85> ;
+    prov:wasDerivedFrom <https://lagen.nu/rf/hfd/2014/not/85?repo=dv&dir=downloaded> ;
+    prov:wasGeneratedBy "lagen.nu.dv.DV" .
+
+<https://lagen.nu/dom/hfd/4217-14/2014-12-23> a rpubl:VagledandeDomstolsavgorande ;
+    dcterms:publisher <https://lagen.nu/org/2011/hogsta-forvaltningsdomstolen> ;
+    dcterms:subject <https://lagen.nu/concept/Förhandsbesked>,
+        <https://lagen.nu/concept/Förhandsbesked_undanröjdes_med_hänsyn_till_att>,
+        <https://lagen.nu/concept/Inkomstskatt>,
+        <https://lagen.nu/concept/Skatter>,
+        <https://lagen.nu/concept/Skatter_-_skatter>,
+        <https://lagen.nu/concept/Övriga_frågor> ;
+    dcterms:title "Överklagande av Skatteverket och HeidelbergCement Northern Europe AB av ett förhandsbesked ang. inkomstskatt"@sv ;
+    rpubl:avgorandedatum "2014-12-23"^^xsd:date ;
+    rpubl:lagrum <https://lagen.nu/sfs/1998:189>,
+        <https://lagen.nu/sfs/1998:189#P5>,
+        <https://lagen.nu/sfs/1999:1229#K24P10d> ;
+    rpubl:malnummer "4217-14" ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hfd/4217-14/2014-12-23> .
+
+<https://lagen.nu/rf/hfd/2014/not/85?repo=dv&dir=downloaded> rdfs:label "HFD 2014 not 85"@sv .
+
