@@ -203,9 +203,9 @@ def make_parser(reader, basefile, log, trace):
         return p
 
     def makeParagraf():
-        paragrafnummer = idOfParagraf(reader.peekline())
-        current_section = paragrafnummer
         firstline = reader.peekline()
+        paragrafnummer = idOfParagraf(reader.peekparagraph())
+        current_section = paragrafnummer
         log.debug("      Ny paragraf: '%s...'" % firstline[:30])
         # Läs förbi paragrafnumret:
         reader.read(len(paragrafnummer) + len(' \xa7 '))
@@ -733,7 +733,6 @@ def make_parser(reader, basefile, log, trace):
                 "isParagraf: called w/ '%s' (peek)" % p[:30])
         else:
             trace['paragraf'].debug("isParagraf: called w/ '%s'" % p[:30])
-
         paragrafnummer = idOfParagraf(p)
         if paragrafnummer is None:
             trace['paragraf'].debug(

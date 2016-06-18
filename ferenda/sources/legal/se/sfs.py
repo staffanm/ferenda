@@ -490,11 +490,7 @@ class SFS(Trips):
             # FIXME: this is broken
             fp = self.downloaded_to_intermediate(basefile)
             textheader = fp.read(2048)
-            # see comments in DirTrips.extract_head
-            if textheader[-1] == ord(bytes(b'\xc3')):
-                textheader = textheader[:-1]
-
-            t = TextReader(string=textheader.decode(self.source_encoding))
+            t = TextReader(string=textheader.decode(self.source_encoding, errors="ignore"))
             fp.close()
             uppdaterad_tom = self._find_uppdaterad_tom(basefile, reader=t)
             doc.uri = self.canonical_uri(basefile, uppdaterad_tom)
@@ -568,14 +564,17 @@ class SFS(Trips):
                                            id='S1')])
         rawtext = util.readfile(filename, encoding=self.source_encoding)
         if not self.config.keepexpired:
-            needle = '<span class="bold">Upph\xe4vd:</span> '
-            idx = rawtext.find(needle, 0, 10000)
-            if idx != -1:
-                datestr = rawtext[idx+len(needle):idx+len(needle)+10]
-                if datetime.strptime(datestr, '%Y-%m-%d') < datetime.today():
-                    self.log.debug('%s: Expired' % basefile)
-                    raise UpphavdForfattning("%s is an expired SFS" % basefile,
-                                             dummyfile=self.store.parsed_path(basefile))
+            needles = ('<span class="bold">Upph\xe4vd:</span> ',
+                       '<span class="bold">Övrigt:</span> Utgår genom SFS')
+            for needle in needles:
+                idx = rawtext.find(needle, 0, 10000)
+                if idx != -1:
+                    datestr = rawtext[idx+len(needle):idx+len(needle)+10]
+                    if (not re.match("\d+-\d+-\d+$", datestr) or
+                        (datetime.strptime(datestr, '%Y-%m-%d') < datetime.today())):
+                        self.log.debug('%s: Expired' % basefile)
+                        raise UpphavdForfattning("%s is an expired SFS" % basefile,
+                                                 dummyfile=self.store.parsed_path(basefile))
         return self._extract_text(basefile)
 
     def patch_if_needed(self, fp, basefile):
@@ -604,14 +603,12 @@ class SFS(Trips):
         if notfound:
             raise InteExisterandeSFS(str(notfound))
         textheader = fp.read(2048)
-        if textheader[-1] == ord(bytes(b'\xc3')):
-            textheader = textheader[:-1]
         if not isinstance(textheader, str):
             # Depending on whether the fp is opened through standard
             # open() or bz2.BZ2File() in self.parse_open(), it might
             # return bytes or unicode strings. This seem to be a
             # problem in BZ2File (or how we use it). Just roll with it.
-            textheader = textheader.decode(self.source_encoding)
+            textheader = textheader.decode(self.source_encoding, errors="ignore")
 
         idx = textheader.index("-"*64)
         header = textheader[:idx]
@@ -644,7 +641,7 @@ class SFS(Trips):
         for c in content.findAll('div', 'result-inner-sub-box-container'):
             d = OrderedDict()
             d[u'SFS-nummer'] = c.find('div',
-                                      'result-inner-sub-box-header').text.split("SFS ")[1]
+                                      'result-inner-sub-box-header').text.split("SFS ")[1].strip()
             for row in c.findAll('div', 'result-inner-sub-box'):
                 key, val = row.text.split(":", 1)
                 d[key.strip()] = val.strip()
@@ -685,7 +682,8 @@ class SFS(Trips):
                 elif key == 'Observera':
                     d[docuri]["rdfs:comment"] = val
                 elif key == 'Upphävd':
-                    dateval = datetime.strptime(val, '%Y-%m-%d')
+                    # val is normally "YYYY-MM-DD" but may contain trailing info (1973:638)
+                    dateval = datetime.strptime(val[:10], '%Y-%m-%d')
                     if dateval < datetime.today():
                         raise UpphavdForfattning("%s is an expired SFS"
                                                  % basefile,

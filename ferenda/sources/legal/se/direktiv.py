@@ -84,16 +84,9 @@ class DirTrips(Trips):
             # open() or bz2.BZ2File() in self.parse_open(), it might
             # return bytes or unicode strings. This seem to be a
             # problem in BZ2File (or how we use it). Just roll with it.
-            # 
-            # if the very last byte is the start of a multi-byte UTF-8
-            # character, skip it so that we don't get a unicodedecode
-            # error because of the incomplete character. In py2, wrap
-            # in future.types.newbytes to get a py3 compatible
-            # interface.
+
             textheader = bytes(textheader)
-            if textheader[-1] == ord(bytes(b'\xc3')):
-                textheader = textheader[:-1]
-            textheader = textheader.decode(self.source_encoding)
+            textheader = textheader.decode(self.source_encoding, errors="ignore")
         idx = textheader.index("-"*64)
         header = textheader[:idx]
         fp.seek(len(header.encode("utf-8")) + 66)
