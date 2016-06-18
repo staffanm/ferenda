@@ -14,6 +14,7 @@ import logging
 import operator
 import os
 import re
+import codecs
 
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
@@ -123,8 +124,8 @@ class SwedishLegalSource(DocumentRepository):
         spacefile = filename("uri/swedishlegalsource.space.ttl")
         slugsfile = filename("uri/swedishlegalsource.slugs.ttl")
         self.log.debug("Loading URISpace from %s" % spacefile)
-        with open(spacefile) as space:
-            with open(slugsfile) as slugs:
+        with codecs.open(spacefile, encoding="utf-8") as space:
+            with codecs.open(slugsfile, encoding="utf-8") as slugs:
                 cfg = Graph().parse(space,
                                     format="turtle").parse(slugs,
                                                            format="turtle")
