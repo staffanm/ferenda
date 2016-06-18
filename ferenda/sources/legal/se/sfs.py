@@ -1495,10 +1495,25 @@ class SFS(Trips):
 
             if not lagrum in stuff:
                 stuff[lagrum] = {}
+            shortdesc = util.normalize_space(row['desc'])
+            if len(shortdesc) > 200:
+                # first split the (markup) string at the best word boundary
+                m = re.match('(.{200,}?\S)\s', shortdesc)
+                if m:
+                    shortdesc = m.group()
+                    # then, make sure all tags are ended properly
+                    soup = BeautifulSoup(shortdesc, "html.parser")
+                    # insert an ellipsis in the right place (the very last NavigableString
+                    laststr = list(soup.find_all("p")[-1].strings)[-1]
+                    if laststr:
+                        laststr.replace_with(str(laststr) + "...")
+                    # then convert back to markup
+                    shortdesc = str(soup)
+                    
             link = '<b><a href="%s">%s</a></b>: ' % (row['kommentar'], row['prop'])
             if 'kommentar' not in stuff[lagrum]:
                 stuff[lagrum]['kommentar'] = ""
-            stuff[lagrum]['kommentar'] += row['desc'].replace(">", ">"+link, 1)
+            stuff[lagrum]['kommentar'] += shortdesc.replace("p>", "p>"+link, 1)
 
         # then, construct a single de-normalized rdf/xml dump, sorted
         # by root/chapter/section/paragraph URI:s. We do this using
