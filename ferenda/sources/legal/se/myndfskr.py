@@ -202,6 +202,8 @@ class MyndFskrBase(SwedishLegalSource):
         # this should map https://lagen.nu/sjvfs/2014:9 to basefile sjvfs/2014:9
         # but also https://lagen.nu/dfs/2007:8 -> dfs/2007:8
         basefile = super(MyndFskrBase, self).basefile_from_uri(uri)
+        if basefile is None:
+            return basefile
         # since basefiles are always wihout hyphens, but URIs for
         # författningssamlingar like HSLF-FS will contain a hyphen, we
         # remove it here.
