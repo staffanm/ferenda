@@ -38,7 +38,12 @@ class Offtryck(SwedishLegalSource):
     
     storage_policy = "dir"
     alias = "offtryck"
-    parse_types = LegalRef.RATTSFALL, LegalRef.FORARBETEN  # , LegalRef.EULAGSTIFTNING, LegalRef.EURATTSFALL
+
+    # NOTE: _parse_uri_from_text, used by find_primary_law and
+    # _find_commentary_for_law, requires that LegalRef.LAGRUM is in
+    # parse_types. So don't define a class attribute that lacks this
+    # unless _parse_uri_from_text is adjusted!
+    # parse_types = LegalRef.RATTSFALL, LegalRef.FORARBETEN, LegalRef.EULAGSTIFTNING, LegalRef.EURATTSFALL
     xslt_template = "xsl/forarbete.xsl"
 
 

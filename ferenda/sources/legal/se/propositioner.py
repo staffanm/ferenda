@@ -497,13 +497,6 @@ class PropTrips(Trips, Offtryck, FixedLayoutSource):
             return super(PropTrips, self).extract_body(fp, basefile)
 
     @staticmethod
-    def textparser(chunks):
-        b = Body()
-        for p in chunks:
-            if not p.strip():
-                continue
-            b.append(Preformatted([p.replace("\n"," ")]))
-        return b
 
     def sanitize_body(self, rawbody, initialstate=None):
         if isinstance(rawbody, TextReader):

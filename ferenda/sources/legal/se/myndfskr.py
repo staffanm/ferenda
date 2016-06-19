@@ -19,7 +19,7 @@ from rdflib.namespace import DCTERMS, SKOS
 from . import RPUBL, RINFOEX, SwedishLegalSource
 from .swedishlegalsource import SwedishCitationParser
 from ferenda import TextReader, Describer, Facet, PDFReader
-from ferenda import util, decorators, errors
+from ferenda import util, decorators, errors, fulltextindex
 from ferenda.elements import Body, Page, Preformatted, Link
 from ferenda.sources.legal.se.legalref import LegalRef
 

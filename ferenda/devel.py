@@ -508,8 +508,11 @@ class Devel(object):
                 if line.startswith("("):
                     basefilelist.append(literal_eval(line))
                 else:
+                    # remove comments
+                    line = line.rsplit("#", 1)[0].strip()
+                    if not line:  # remove blank lines
+                        continue
                     basefilelist.append(line.strip().split(" ", 1))
-            
         destrepos = {}
         sourcerepos = {}
         for (alias, basefile) in basefilelist:
