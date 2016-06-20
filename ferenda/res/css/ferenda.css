@@ -20,35 +20,9 @@
 
 
 @media only screen and (min-width: 768px) {
-    /* Tighten the accordion */
-    div.panel-group > div.panel {
-	border-radius: 0;
-    }
-    div.panel-group > div.panel > div.panel-heading {
-	padding: 3px;
-	border-radius: 0;
-    }
-    h4.panel-title {
-	font-size: 10pt;
-    }
-    .panel-group .panel+.panel {
+    /* headers should line up with panels that are aside them (when screen is big enough to have asides on the side) */
+    div.row > section > h1 {
 	margin-top: 0;
-	background: red;
-    }
-
-    div.panel-body {
-	padding: 0;
-    }
-    div.panel-body div.row {
-	margin: 0;
-    }
-    div.panel-body div.row p:first-child {
-	text-indent: 0;
-    }
-    div.panel-body div.row p {
-	text-indent: 1em;
-	margin-bottom: 0;
-	font-size: smaller;
     }
 }
 
@@ -56,7 +30,7 @@
 /* PART 2: The main content area (including document TOC) */
 
 nav[data-toggle='toc'] {
-  margin-top: 30px;
+    margin-top: 0; /* used to be 30px, wonder what i was thinking... */
 }
 
 /* small screens */
@@ -84,6 +58,49 @@ body.statusreport div.basefiles p {
     padding: 1px;
 }
 
+
+/* Tighten the accordion panel headers */
+div.panel-group > div.panel {
+	border-radius: 0;
+}
+div.panel-group > div.panel > div.panel-heading {
+	padding: 3px;
+	border-radius: 0;
+}
+h4.panel-title {
+	font-size: 10pt;
+}
+.panel-group .panel+.panel {
+	margin-top: 0;
+}
+div.panel-body {
+	padding: 0;
+}
+div.panel-body div.row {
+	margin: 1pt 1pt 6pt 1pt;
+}
+div.panel-body div.row p:first-child {
+	text-indent: 0;
+}
+div.panel-body div.row p {
+	text-indent: 1em;
+	margin-bottom: 0;
+	font-size: smaller;
+}
+
+/* grid-framework.less gives all .rows negative left and right margins
+(-15px) for some reason. This causes the row to have more pixels than
+body (eg 1310 when body is 1280). This makes it possible to right
+scroll the content, which leads to content being misaligned (we end up
+with a 15px empty space to the right). Maybe we aren't meant to use
+this grid system directly under body? */
+.row {
+    margin: 0;
+}
+.col-sm-3, .col-sm-5, .col-sm-7, .col-sm-9 {
+    padding: 0;
+}
+
 @media only screen and (min-width: 480px) {
     body.toc nav#toc li {
 	list-style: none;
@@ -104,11 +121,13 @@ body.statusreport div.basefiles p {
 	list-style: none;
     }
 
-    nav[data-toggle='toc'] {
-	width: 23%;
-	/* a little thinner than .col-sm-3, so as to not collide with the
-           left-shifted <span class="platsmarkor> elements in teh main
-           columm */ 
+    nav.affix-top {
+	width: 97%; /* of the .col-sm-3 element */
+    }
+    nav.affix {
+	position: fixed;
+	top: 0;
+	width: 24%;  /* of the entire page width, FOR SOME REASON */
     }
 
     /* FIXME: This should go into

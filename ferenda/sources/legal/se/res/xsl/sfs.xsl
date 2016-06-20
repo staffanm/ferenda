@@ -7,7 +7,7 @@
 		xmlns:rpubl="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
 		xmlns:ext="http://exslt.org/common"
-		exclude-result-prefixes="xhtml rdf rpubl">
+		exclude-result-prefixes="xhtml rdf rpubl ext">
 
   <xsl:import href="uri.xsl"/>
   <xsl:import href="tune-width.xsl"/>
@@ -40,7 +40,7 @@
     <xsl:variable name="kommentar" select="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/dcterms:description/xhtml:div/*"/>
     <xsl:variable name="forfattningskommentar" select="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/rinfoex:forfattningskommentar/xhtml:div/*"/>
     <div class="row">
-      <section id="top" class="col-sm-8">
+      <section id="top" class="col-sm-7">
 	<h1><xsl:value-of select="../xhtml:head/xhtml:title"/></h1>
 	<xsl:call-template name="docmetadata"/>
 	<xsl:if test="../../xhtml:head/xhtml:meta[@rel='rinfoex:upphavdAv']">
@@ -63,7 +63,7 @@
       </section>
       <xsl:if test="$kommentar or $rattsfall">
 	<xsl:variable name="expanded" select="'true'"/>
-	<div class="panel-group col-sm-4" role="tablist" id="panel-top" aria-multiselectable="true">
+	<div class="panel-group col-sm-5" role="tablist" id="panel-top" aria-multiselectable="true">
 	  <xsl:if test="$kommentar">
 	    <xsl:call-template name="aside-annotations-panel">
 	      <xsl:with-param name="title">Kommentar</xsl:with-param>
@@ -132,14 +132,36 @@
   </xsl:template>
 
  
+  <xsl:template match="xhtml:div[@typeof='rpubl:Kapitel']">
+    <div class="row" about="{//html/@about}#{@id}">
+      <section id="{@id}" class="col-sm-7 kapitelrubrik">
+	<xsl:apply-templates select="*[1]"/>
+      </section>
+      <xsl:call-template name="aside-annotations">
+	<xsl:with-param name="uri" select="@about"/>
+      </xsl:call-template>
+    </div>
+    <xsl:apply-templates select="*[position()>1]"/>
+  </xsl:template>
+
   <xsl:template match="xhtml:div[@typeof='rpubl:Paragraf']">
     <div class="row" about="{//html/@about}#{@id}">
-      <section id="{@id}" class="col-sm-8">
+      <section id="{@id}" class="col-sm-7">
 	<xsl:apply-templates mode="in-paragraf"/>
       </section>
       <xsl:call-template name="aside-annotations">
 	<xsl:with-param name="uri" select="@about"/>
       </xsl:call-template>
+    </div>
+  </xsl:template>
+
+
+  <!-- this should only match elements w/o @about -->
+  <xsl:template match="xhtml:h2[not(@about)]|xhtml:h3[not(@about)]">
+    <div class="row">
+      <section id="{@id}" class="col-sm-7">
+	<xsl:element name="{local-name(.)}"><xsl:apply-templates/></xsl:element>
+      </section>
     </div>
   </xsl:template>
 
@@ -156,7 +178,7 @@
     <xsl:variable name="panelid" select="substring-after($uri, '#')"/>
     <xsl:variable name="expanded" select="'true'"/>
     <xsl:if test="$kommentar or $forfattningskommentar or $rattsfall or $inbound or $inford or $andrad or $upphavd">
-      <div class="panel-group col-sm-4" role="tablist" id="panel-{$panelid}" aria-multiselectable="true">
+      <div class="panel-group col-sm-5" role="tablist" id="panel-{$panelid}" aria-multiselectable="true">
 	<xsl:if test="$kommentar">
 	  <xsl:call-template name="aside-annotations-panel">
 	    <xsl:with-param name="title">Kommentar</xsl:with-param>
@@ -255,7 +277,7 @@
   <!-- FIXME: This is identical to the template that matches rpubl:Paragraf, that template should match this one as well. -->
   <xsl:template match="xhtml:p[@typeof='rinfoex:Stycke']">
     <div class="row" about="{//html/@about}#{@id}">
-      <section id="{@id}" class="col-sm-8">
+      <section id="{@id}" class="col-sm-7">
 	<xsl:apply-templates mode="in-paragraf"/>
       </section>
       <xsl:call-template name="aside-annotations">

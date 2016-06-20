@@ -105,27 +105,27 @@
 	  </div><!-- /.navbar-collapse -->
 	</div><!-- /.container-fluid -->
       </nav>
-      <div class="row">
-	<div class="col-sm-3">
-	  <!-- note: importing stylesheet MUST define <xsl:param name="dyntoc" select="false()"/> (or true()) -->
-	  <xsl:comment>dyntoc: <xsl:value-of select="$dyntoc"/></xsl:comment>
-	  <xsl:choose><xsl:when test="$dyntoc">
-	      <nav id="toc" data-spy="affix" data-toggle="toc"></nav>
-	    </xsl:when><xsl:otherwise>
+	<div class="row">
+	  <div class="col-sm-3">
+	    <!-- note: importing stylesheet MUST define <xsl:param name="dyntoc" select="false()"/> (or true()) -->
+	    <xsl:comment>dyntoc: <xsl:value-of select="$dyntoc"/></xsl:comment>
+	    <xsl:choose><xsl:when test="$dyntoc">
+	      <nav id="toc" data-spy="affix" data-toggle="toc" data-offset-top="70"></nav>
+	      </xsl:when><xsl:otherwise>
 	      <nav id="toc">
 		<ul>
 		  <xsl:apply-templates mode="toc"/>
 		</ul>
 	      </nav>
 	    </xsl:otherwise>
-	  </xsl:choose>
+	    </xsl:choose>
+	  </div>
+	  <article class="col-sm-9">
+	    <xsl:call-template name="pagetitle"/>
+	    <xsl:apply-templates/>
+	    <!-- Main document text: header, sections (possibly nested) and footer goes here -->
+	  </article>
 	</div>
-	<article class="col-sm-9">
-	  <xsl:call-template name="pagetitle"/>
-	  <xsl:apply-templates/>
-	  <!-- Main document text: header, sections (possibly nested) and footer goes here -->
-	</article>
-      </div>
       <div class="footer-container">
 	<footer>
 	  <nav>

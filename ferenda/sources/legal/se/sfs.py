@@ -174,7 +174,8 @@ class SFS(Trips):
         opts['keepexpired'] = False
         opts['revisit'] = list
         opts['next_sfsnr'] = str
-        opts['css'] = ['css/sfs.css']
+        opts['shortdesclen'] = 200  # how many (markup) characters of Författningskommentar to include
+        opts['cssfiles'] = ['css/sfs.css']
         return opts
 
     def download(self, basefile=None):
@@ -1496,9 +1497,10 @@ class SFS(Trips):
             if not lagrum in stuff:
                 stuff[lagrum] = {}
             shortdesc = util.normalize_space(row['desc'])
-            if len(shortdesc) > 200:
+            shortdesclen = self.config.shortdesclen
+            if len(shortdesc) > shortdesclen:
                 # first split the (markup) string at the best word boundary
-                m = re.match('(.{200,}?\S)\s', shortdesc)
+                m = re.match('(.{%d,}?\S)\s'%shortdesclen, shortdesc)
                 if m:
                     shortdesc = m.group()
                     # then, make sure all tags are ended properly
