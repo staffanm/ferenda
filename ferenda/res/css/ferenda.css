@@ -20,6 +20,36 @@
 
 
 @media only screen and (min-width: 768px) {
+    /* Tighten the accordion */
+    div.panel-group > div.panel {
+	border-radius: 0;
+    }
+    div.panel-group > div.panel > div.panel-heading {
+	padding: 3px;
+	border-radius: 0;
+    }
+    h4.panel-title {
+	font-size: 10pt;
+    }
+    .panel-group .panel+.panel {
+	margin-top: 0;
+	background: red;
+    }
+
+    div.panel-body {
+	padding: 0;
+    }
+    div.panel-body div.row {
+	margin: 0;
+    }
+    div.panel-body div.row p:first-child {
+	text-indent: 0;
+    }
+    div.panel-body div.row p {
+	text-indent: 1em;
+	margin-bottom: 0;
+	font-size: smaller;
+    }
 }
 
 
@@ -76,10 +106,14 @@ body.statusreport div.basefiles p {
 
     nav[data-toggle='toc'] {
 	width: 23%;
-	/* a little thinner than .col-sm-3, so as to not collide with
-    the left-shifted <span class="platsmarkor> elements in teh main
-    columm */ 
+	/* a little thinner than .col-sm-3, so as to not collide with the
+           left-shifted <span class="platsmarkor> elements in teh main
+           columm */ 
     }
+
+    /* FIXME: This should go into
+       ferenda/sources/legal/se/res/offtryck.css (or possibly
+       pdf.css?) */
     body.forarbete section {
 	border-left: solid 1px black;
 	border-right: solid 1px black;
