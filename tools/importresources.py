@@ -225,6 +225,10 @@ def mapspace(base, dest):
         elif (p == COIN.slugFrom and
               o == rdflib.URIRef("http://rinfo.lagrummet.se/sys/uri/space#abbrSlug")):
             o = rdflib.URIRef("https://lagen.nu/sys/uri/space#abbrSlug")
+        # Wonder why we removed spaces instead of replacing them w/
+        # underscore? It seems like a dumb idea. Actually, it was a
+        # good idea that didn't mess up fragment identifiers like
+        # "#P1a" (without this it becomes "#P1_a")
         elif p == COIN.spaceReplacement:
             o = rdflib.Literal("")
         elif p == COIN.fragmentSeparator:

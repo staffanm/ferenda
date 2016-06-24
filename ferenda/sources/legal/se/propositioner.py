@@ -496,8 +496,6 @@ class PropTrips(Trips, Offtryck, FixedLayoutSource):
         else:
             return super(PropTrips, self).extract_body(fp, basefile)
 
-    @staticmethod
-
     def sanitize_body(self, rawbody, initialstate=None):
         if isinstance(rawbody, TextReader):
             return rawbody

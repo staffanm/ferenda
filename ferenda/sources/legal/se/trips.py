@@ -98,9 +98,12 @@ class Trips(SwedishLegalSource):
             else:
                 self.log.warning("Couldn't find a basefile in this label: %r" % basefile)
                 continue
+            sbasefile = self.sanitize_basefile(basefile)
+            if sbasefile != basefile:
+                self.log.warning("%s: normalized from %s" % (sbasefile, basefile))
             year, ordinal = basefile.split(":")
             docurl = self.document_url_template % locals()
-            yield(basefile, docurl)
+            yield(sbasefile, docurl)
         nextpage = soup.find("div", "search-opt-next").a
         if nextpage:
             nextpage = urljoin(self.start_url,

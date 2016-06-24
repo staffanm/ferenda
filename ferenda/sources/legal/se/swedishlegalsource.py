@@ -342,10 +342,12 @@ class SwedishLegalSource(DocumentRepository):
         # "https://lagen.nu/rf/hfd/2013/not/12" => "hfd/2013/not/12"
         # "https://lagen.nu/sosfs/2015:10" => "2015:10"
         # "https://lagen.nu/sfs/2013:1127/konsolidering/2014:117" => "2013:1127/konsolidering/2014:117"
+        # "https://lagen.nu/sfs/1736:0123_1" => "1736:0123 1"
         # 
         # Subclasses with more specific rules should override, call
         # this through super(), and then sanitize basefile afterwards.
         base = self.urispace_base
+        spacereplacement = str(self.minter.space.slugTransform.spaceRepl)
         # FIXME: This is super hacky.
         if base == "http://rinfo.lagrummet.se":
             base += "/publ"
@@ -354,6 +356,8 @@ class SwedishLegalSource(DocumentRepository):
         if uri.startswith(base) and uri[len(base)+1:].startswith(self.urispace_segment):
             offset = 2 if self.urispace_segment else 1
             basefile = uri[len(base) + len(self.urispace_segment) + offset:]
+            if spacereplacement:
+                basefile = basefile.replace(spacereplacement, " ")
             if "#" in basefile:
                 basefile = basefile.split("#", 1)[0]
             return basefile

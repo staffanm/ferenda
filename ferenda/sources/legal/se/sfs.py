@@ -75,11 +75,11 @@ class SFSDocumentStore(SwedishLegalStore):
     # FIXME: we might just add the quote call to
     # SwedishLegalSource.basefile_to_pathfrag and remove this override
     def basefile_to_pathfrag(self, basefile):
-        return quote(super(SFSDocumentStore, self).basefile_to_pathfrag(basefile))
+        return quote(super(SFSDocumentStore, self).basefile_to_pathfrag(basefile.replace(" ", "_")))
 
     # FIXME: ditto
     def pathfrag_to_basefile(self, pathfrag):
-        return unquote(super(SFSDocumentStore, self).pathfrag_to_basefile(pathfrag))
+        return unquote(super(SFSDocumentStore, self).pathfrag_to_basefile(pathfrag.replace("_", " ")))
 
     # some extra methods for SFSR pages and semi-hidden metadata pages. 
     # FIXME: These should probably be handled as attachments instead of custom methods, even if that 
@@ -123,8 +123,10 @@ class SFS(Trips):
     parse_allow_relative = True
     app = "sfst"  # dir, prop, sfst
     base = "SFSR"  # DIR, THWALLPROP, SFSR
-    basefile_regex = "^(?P<basefile>\d{4}:[\d s\.]+)$"
-    start_url = "http://rkrattsbaser.gov.se/sfsr/adv?sort=asc"
+    # This must be pretty lax, basefile is sanitized later
+    basefile_regex = "(?P<basefile>\d{4}:(bih. ?|)\d+( ?s\. ?\d+| \d|))$"
+    # start_url = "http://rkrattsbaser.gov.se/sfsr/adv?sort=asc"
+    start_url = "http://rkrattsbaser.gov.se/sfsr/adv?upph=false&sort=asc"
     document_url_template = "http://rkrattsbaser.gov.se/sfst?bet=%(basefile)s"
     document_sfsr_url_template = "http://rkrattsbaser.gov.se/sfsr?bet=%(basefile)s"
     document_sfsr_change_url_template = "http://rkrattsbaser.gov.se/sfsr?%%C3%%A4bet=%(basefile)s"
@@ -342,30 +344,25 @@ class SFS(Trips):
         grundf\xf6rfattningen med angivet SFS-nr. Om en tidigare version
         finns p\xe5 disk, arkiveras den. Returnerar det SFS-nummer till
         vilket f\xf6rfattningen uppdaterats."""
-        self.log.debug('Attempting to download %s' % (basefile))
+        sfsr_url = url.replace("sfst?", "sfsr?")
 
-        sfst_url = self.document_url_template % {'basefile': basefile.replace(" ", "%20")}
-        sfsr_url = self.document_sfsr_url_template % {
-            'basefile': basefile.replace(
-                " ",
-                "%20")}
         # FIXME: a lot of code duplication compared to
         # DocumentRepository.download_single. Maybe particularly the
         # DocumentEntry juggling should go into download_if_needed()?
         downloaded_path = self.store.downloaded_path(basefile)
         created = not os.path.exists(downloaded_path)
         updated = False
-        if self.download_if_needed(sfst_url, basefile):
+        if self.download_if_needed(url, basefile):
             if created:
                 text = util.readfile(downloaded_path, encoding=self.source_encoding)
                 if "<div>Inga tr\xe4ffar</div>" in text:
                     self.log.warning("%s: Is not really an base SFS, search results must have contained an invalid entry" % basefile)
                     util.robust_remove(downloaded_path)
                     return False
-                self.log.info("%s: downloaded from %s" % (basefile, sfst_url))
+                self.log.info("%s: downloaded from %s" % (basefile, url))
             else:
                 self.log.info(
-                    "%s: downloaded new version from %s" % (basefile, sfst_url))
+                    "%s: downloaded new version from %s" % (basefile, url))
             updated = True
         # using the attachment functionality makes some sense, but
         # requires that self.store.storage_policy = "dir"
@@ -380,7 +377,7 @@ class SFS(Trips):
         self.download_if_needed(sfsr_url, basefile, archive=False, filename=regfilename)
         entry = DocumentEntry(self.store.documententry_path(basefile))
         now = datetime.now()
-        entry.orig_url = sfst_url
+        entry.orig_url = url
         if created:
             entry.orig_created = now
         if updated:
@@ -428,6 +425,9 @@ class SFS(Trips):
         else:
             util.robust_rename(sfst_tempfile, sfst_file)
 
+        # FIXME: since basefile might be slightly modified from the
+        # actual URL to be used ("bet=1878:bih. 56 s. 1" vs
+        # "1878:bih.56_s.1") it's not really safe to use this template
         sfsr_url = self.document_sfsr_url_template % {'basefile':
                                                       basefile.replace(" ", "%20")}
         sfsr_file = self.store.register_path(basefile)
@@ -499,6 +499,7 @@ class SFS(Trips):
 
     def canonical_uri(self, basefile, konsolidering=False):
         attributes = self.metadata_from_basefile(basefile)
+        basefile = basefile.replace(" ", "_")
         parts = basefile.split(":", 1)
         # add some extra attributes that will enable
         # attributes_to_resource to create a graph that is partly
@@ -532,8 +533,9 @@ class SFS(Trips):
             return
         # remove any possible "/konsolidering/2015:123" trailing info
         basefile = basefile.split("/")[0]
-        # "1874:26 s.11" -> <https://lagen.nu/sfs/1874:26s.11> -> "1874:26 s.11"
-        basefile = basefile.replace("s.", " s.")
+        # "1874:26 s.11" -> <https://lagen.nu/sfs/1874:26_s.11> -> "1874:26 s.11"
+        # NOTE: This is unneccesary now that the URISpace defines spaceReplacement
+        # basefile = basefile.replace("s.", " s.")
         return basefile
 
     def metadata_from_basefile(self, basefile):
@@ -634,7 +636,7 @@ class SFS(Trips):
         innerboxes = content.findAll('div', 'result-inner-box')
         d = OrderedDict()
         d['SFS-nummer'] = util.normalize_space(innerboxes[0].text.split(u"\xb7")[1])
-        d['Rubrik'] = innerboxes[1].text.strip()
+        d['Rubrik'] = util.normalize_space(innerboxes[1].text)
         for innerbox in innerboxes[2:]:
             key, val = innerbox.text.split(":", 1)
             d[key.strip()] = val.strip()
@@ -645,7 +647,7 @@ class SFS(Trips):
                                       'result-inner-sub-box-header').text.split("SFS ")[1].strip()
             for row in c.findAll('div', 'result-inner-sub-box'):
                 key, val = row.text.split(":", 1)
-                d[key.strip()] = val.strip()
+                d[key.strip()] = util.normalize_space(val)
             changes.append(d)
         g = self.make_graph()  # used for qname lookup only
         for rowdict in changes:
@@ -834,6 +836,17 @@ class SFS(Trips):
         d["dcterms:identifier"] = identifier
         return d
 
+    def sanitize_basefile(self, basefile):
+        year, no = basefile.split(":")
+        assert len(year) == 4 and year.isdigit(), "%s does not contain a valid year" % basefile
+        # normalize the "number" (which might be 'bih.40s.1' or '60 s. 1')
+        no = no.replace("bih. ", "bih.").replace(" s.", "s.").replace("s.", " s.").replace("s. ", "s.")
+        # we used to do this in swedishlegalsource.space.ttl by
+        # setting coin:spaceReplacement to "_" but that messed up
+        # fragment identifiers ("#P1_a" instead of "#P1a")
+        no = no.replace(" ", "_")
+        return "%s:%s" % (year, no)
+
     def sanitize_metadata(self, attribs, basefile):
         attribs = super(SFS, self).sanitize_metadata(attribs, basefile)
         for k in attribs:
@@ -867,6 +880,15 @@ class SFS(Trips):
                 if len(attributes[k]) > 1:
                     # get a rdflib.Resource with a coined URI
                     r = super(SFS, self).polish_metadata(attributes[k])
+                    if k != str(r.identifier):
+                        # This happens when lopnummer cointains spaces
+                        # because the URISpace defintion removes
+                        # spaces while we (in this particular case)
+                        # want them replaced with "_"). So just rebase
+                        # the graph
+                        for p, o in r.graph.predicate_objects(r.identifier):
+                            r.graph.remove((r.identifier, p, o))
+                            r.graph.add((URIRef(k), p, o))
                     if "rpubl:konsoliderar" not in attributes:
                         attributes["rpubl:konsoliderar"] = URIRef(k)
                     baseuri = k
@@ -973,7 +995,10 @@ class SFS(Trips):
         doc.body.uri = str(doc.meta.value(URIRef(doc.uri), RPUBL.konsoliderar))
 
     def _forfattningstyp(self, forfattningsrubrik):
-        forfattningsrubrik = re.sub(" *\(\d{4}:\d+\)", "", forfattningsrubrik)
+        forfattningsrubrik = util.normalize_space(
+            # we omit the last char of the regex, as this is the
+            # end-of-line matcher ($) wich we don't want in this case.
+            re.sub(self.basefile_regex[:-1], "", forfattningsrubrik).replace("()", ""))
         if (forfattningsrubrik.startswith('Lag ') or
             (forfattningsrubrik.endswith('lag') and
              not forfattningsrubrik.startswith('F\xf6rordning')) or
