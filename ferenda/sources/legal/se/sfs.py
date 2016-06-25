@@ -72,15 +72,6 @@ class InteExisterandeSFS(DocumentRemovedError):
     
 class SFSDocumentStore(SwedishLegalStore):
 
-    # FIXME: we might just add the quote call to
-    # SwedishLegalSource.basefile_to_pathfrag and remove this override
-    def basefile_to_pathfrag(self, basefile):
-        return quote(super(SFSDocumentStore, self).basefile_to_pathfrag(basefile.replace(" ", "_")))
-
-    # FIXME: ditto
-    def pathfrag_to_basefile(self, pathfrag):
-        return unquote(super(SFSDocumentStore, self).pathfrag_to_basefile(pathfrag.replace("_", " ")))
-
     # some extra methods for SFSR pages and semi-hidden metadata pages. 
     # FIXME: These should probably be handled as attachments instead of custom methods, even if that 
     # means we need to set storage_policy = "dir"
@@ -498,6 +489,7 @@ class SFS(Trips):
         return doc
 
     def canonical_uri(self, basefile, konsolidering=False):
+        basefile = self.sanitize_basefile(basefile)
         attributes = self.metadata_from_basefile(basefile)
         basefile = basefile.replace(" ", "_")
         parts = basefile.split(":", 1)
@@ -838,6 +830,7 @@ class SFS(Trips):
 
     def sanitize_basefile(self, basefile):
         year, no = basefile.split(":")
+        no = no.replace("_", " ") # make this function repeatably callable
         assert len(year) == 4 and year.isdigit(), "%s does not contain a valid year" % basefile
         # normalize the "number" (which might be 'bih.40s.1' or '60 s. 1')
         no = no.replace("bih. ", "bih.").replace(" s.", "s.").replace("s.", " s.").replace("s. ", "s.")
