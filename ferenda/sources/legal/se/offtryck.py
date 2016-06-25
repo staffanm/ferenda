@@ -913,8 +913,9 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         return isinstance(parser.reader.peek(), Page)
 
     # page numbers, headers
-    def is_nonessential(parser):
-        chunk = parser.reader.peek()
+    def is_nonessential(parser, chunk=None):
+        if not chunk:
+            chunk = parser.reader.peek()
         strchunk = str(chunk).strip()
         # everything above or below these margins should be
         # pagenumbers -- always nonessential
@@ -1244,6 +1245,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             if match in ("I", "l"):   # correct for OCR mistake
                 match = "1" 
             state.appendixno = int(match)
+            chunk = None  # make sure this chunk doesn't go into spill below
         else:
             # this probably mean that we have an implicit appendix (se
             # is_appendix for when that's detected)
@@ -1253,22 +1255,26 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                 state.appendixno = 1
 
         # next up, read the page to find the appendix title
+        spill = []  # save everyting we read up until the appendix 
         while not done:
             if isinstance(chunk, Page):
                 title = ""
-                # FIXME: we should log a warning here, since it means
-                # we discarded an entire page without finding the
-                # appendix title
                 done = True
-            if not isinstance(chunk, Page) and int(chunk.font.size) >= metrics.h2.size:
+            if isinstance(chunk, Textbox) and int(chunk.font.size) >= metrics.h2.size:
                 title = str(chunk).strip()
+                chunk = None
                 done = True
             if not done:
+                if chunk and not is_nonessential(parser, chunk):
+                    spill.append(chunk)
                 chunk = parser.reader.next()
-
+        if chunk and not isinstance(chunk, Page):
+            spill.append(chunk)
+                
         s = Appendix(title=title,
                      ordinal=str(state.appendixno),
                      uri=None)
+        s.extend(spill)
         return parser.make_children(s)
 
     # this is used for subsections and subsubsections as well --
