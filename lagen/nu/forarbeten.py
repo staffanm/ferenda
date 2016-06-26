@@ -92,6 +92,7 @@ WHERE {
                       identificator=ident),
                 Facet(RPUBL.arsutgava,
                       indexingtype=fulltextindex.Label(),
+                      selector_descending=True
                       )]
 
     def toc_pagesets(self, data, facets):
@@ -108,7 +109,7 @@ WHERE {
                                                 pages=[])
             selected = facets[1].selector(row, 'rpubl_arsutgava', None)
             selector_values[(pagesetid, selected)] = True
-        for (pagesetid, value) in sorted(list(selector_values.keys())):
+        for (pagesetid, value) in sorted(list(selector_values.keys()), reverse=True):
             pageset = pagesetdict[pagesetid]
             pageset.pages.append(TocPage(linktext=value,
                                          title="%s från %s" % (pageset.label, value),

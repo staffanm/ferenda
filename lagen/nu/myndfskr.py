@@ -151,6 +151,7 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
                       use_for_toc=True),
                 Facet(RPUBL.arsutgava,
                       indexingtype=fulltextindex.Label(),
+                      selector_descending=True,
                       use_for_toc=True),
                 Facet(RDF.type, use_for_toc=False),
                 Facet(DCTERMS.title, use_for_toc=False),
