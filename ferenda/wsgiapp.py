@@ -100,7 +100,7 @@ os.getcwd(): %s
 Environ: %s
 
             """ % (tbstr, url, environ['QUERY_STRING'], environ['PATH_INFO'], sys.path, os.getcwd(), pformat(environ))
-            msg = msg.encode('ascii')
+            msg = msg.encode('ascii', errors='replace')
             return self._return_response(msg, start_response,
                                          status="500 Internal Server Error",
                                          contenttype="text/plain")

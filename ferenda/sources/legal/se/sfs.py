@@ -335,6 +335,8 @@ class SFS(Trips):
         grundf\xf6rfattningen med angivet SFS-nr. Om en tidigare version
         finns p\xe5 disk, arkiveras den. Returnerar det SFS-nummer till
         vilket f\xf6rfattningen uppdaterats."""
+        if not url:
+            url = self.remote_url(basefile)
         sfsr_url = url.replace("sfst?", "sfsr?")
 
         # FIXME: a lot of code duplication compared to
@@ -1722,6 +1724,31 @@ class SFS(Trips):
 
         return title
 
+    def facet_query(self, context):
+        # override the default impl, which is driven by defined
+        # facets, with a hardcoded variant that knows about the
+        # relation between a consolidated document and the document
+        # its consolidating
+        return """PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
+
+SELECT DISTINCT ?uri ?rdf_type ?titel ?utgiven ?label ?creator ?issued
+FROM <https://lagen.nu/dataset/sfs>
+WHERE {
+    ?childuri rdf:type rpubl:KonsolideradGrundforfattning .
+    ?childuri rpubl:konsoliderar ?uri .
+    OPTIONAL { ?uri rdf:type ?rdf_type . }
+    OPTIONAL { ?uri dcterms:title ?titel . }
+    OPTIONAL { ?uri rpubl:arsutgava ?utgiven . }
+    OPTIONAL { ?childuri rdfs:label ?label . }
+    OPTIONAL { ?childuri dcterms:creator ?creator . }
+    OPTIONAL { ?childuri dcterms:issued ?issued . }
+
+}"""
+
+
     def facets(self):
         def forfattningskey(row, binding, resource_graph):
             # "Lag (1994:1920) om allm\xe4n l\xf6neavgift" => "allm\xe4n l\xf6neavgift"
@@ -1729,12 +1756,16 @@ class SFS(Trips):
             return self._forfattningskey(row[binding]).lower()
 
         def forfattningsselector(row, binding, resource_graph):
-            # "Lag (1994:1920) om allm\xe4n l\xf6neavgift" => "a"
-            return forfattningskey(row, binding, resource_graph)[0]
+            # "Lag (1994:1920) om allm\xe4n l\xf6neavgift" => "A"
+            return forfattningskey(row, binding, resource_graph)[0].upper()
 
         return [Facet(RDF.type),
-                # for newsfeeds, do a facet that checks the type of
-                # the rpubl:konsoliderar object of this one
+                Facet(RPUBL.arsutgava,
+                      use_for_toc=True,
+                      label="Ordnade efter utgivnings\xe5r",
+                      pagetitle='F\xf6rfattningar utgivna %(selected)s',
+                      dimension_label="utgiven",
+                      selector_descending=True),
                 Facet(DCTERMS.title,
                       label="Ordnade efter titel",
                       pagetitle='F\xf6rfattningar som b\xf6rjar p\xe5 "%(selected)s"',
@@ -1742,11 +1773,6 @@ class SFS(Trips):
                       identificator=forfattningsselector,
                       key=forfattningskey,
                       dimension_label="titel"),
-                Facet(DCTERMS.issued,
-                      label="Ordnade efter utgivnings\xe5r",
-                      pagetitle='F\xf6rfattningar utgivna %(selected)s',
-                      key=forfattningskey,
-                      dimension_label="utgiven"),
                 ] + self.standardfacets
 
     def _relate_fulltext_resources(self, body):

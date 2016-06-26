@@ -15,6 +15,7 @@ from wsgiref.handlers import format_date_time as format_http_date
 from wsgiref.util import request_uri
 from urllib.parse import quote, parse_qsl
 import builtins
+import locale
 import calendar
 import codecs
 import difflib
@@ -200,6 +201,9 @@ class DocumentRepository(object):
     no validation of the number of resources is done.
 
     """
+
+    collate_locale = None
+    """TBD"""
 
     #
     # download() related class properties
@@ -1917,6 +1921,7 @@ parsed document path to that documents dependency file."""
                 for facet in self.facets():
                     k, v = self._relate_fulltext_value(facet, resource, desc)
                     if v:
+
                         if k is None:
                             k = qname_graph.qname(facet.rdftype).replace(":", "_")
                         kwargs[k] = v
@@ -2629,14 +2634,15 @@ WHERE {
                     # this will happen a lot on simple selector
                     # functions when handed incomplete data
                     pass
-            for value in sorted(
-                    list(selector_values.keys()), reverse=facet.selector_descending):
-                urlfragment = selector_fragments[value]
-                pageset.pages.append(TocPage(linktext=value,
-                                             title=facet.pagetitle % {'term': term,
-                                                                      'selected': value},
-                                             binding=binding,
-                                             value=urlfragment))
+            with util.switch_locale(self.collate_locale, locale.LC_COLLATE):
+                for value in sorted(
+                        list(selector_values.keys()), reverse=facet.selector_descending, key=locale.strxfrm):
+                    urlfragment = selector_fragments[value]
+                    pageset.pages.append(TocPage(linktext=value,
+                                                 title=facet.pagetitle % {'term': term,
+                                                                          'selected': value},
+                                                 binding=binding,
+                                                 value=urlfragment))
             res.append(pageset)
         return res
 
@@ -2956,6 +2962,7 @@ WHERE {
                     # this will happen a lot on simple selector
                     # functions when handed incomplete data
                     pass
+            
             for value in sorted(
                     list(selector_values.keys()), reverse=facet.selector_descending):
                 urlfragment = selector_fragments[value]

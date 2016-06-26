@@ -620,7 +620,7 @@ class RFC(DocumentRepository):
                 desc.value(self.ns['dcterms'].creator, line)
             elif re.match("\w+ \d{4}$", line):
                 # NOTE: this requires english locale!
-                with util.c_locale():
+                with util.switch_locale():
                     # Parses eg "May 2001" - which should not be
                     # converted to a regular date, as we're missing
                     # the date information. Use xsd:gYearMonth.

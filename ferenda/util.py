@@ -501,7 +501,7 @@ def strptime(datestr, format):
     datetime.datetime(1997, 8, 4, 2, 14, 5)
 
     """
-    with c_locale():
+    with switch_locale():
         return datetime.datetime.strptime(datestr, format)
 
 
@@ -666,19 +666,21 @@ def logtime(method, format="The operation took %(elapsed).3f sec", values={}):
 
 
 @contextmanager
-def c_locale(category=locale.LC_TIME):
+def switch_locale(newlocale="C", category=locale.LC_TIME):
     # Python docs recommends against this. Eh, what are you going to do?
     """Temporarily change process locale to the C locale, for use when eg
     parsing English dates on a system that may have non-english
     locale.
 
-    >>> with c_locale():
+    >>> with switch_locale():
     ...     datetime.datetime.strptime("August 2013", "%B %Y")
     datetime.datetime(2013, 8, 1, 0, 0)
     """
-
+    if newlocale is None:
+        newlocale = "C"
     oldlocale = locale.getlocale(category)
-    newlocale = b'C' if sys.version_info[0] < 3 else 'C'
+    if sys.version_info[0] < 3:
+        newlocale = newlocale.encode("ascii")  # please don't have a locale ID containing non-ascii chars
     locale.setlocale(category, newlocale)
     try:
         yield
