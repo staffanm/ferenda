@@ -23,7 +23,7 @@ class MyndPrax(FacadeSource, SwedishLegalSource):
     alias = "myndprax"
     subrepos = ARN, JO, JK
 
-    tablabel = "Myndighetspraxis"
+    tablabel = "Praxis"
 
     def facet_query(self, context):
         # Override the standard query in order to ignore the default

@@ -159,7 +159,7 @@ class DV(OrigDV, SameAs):
         return r
 
     def tabs(self):
-        return [("Domar", self.dataset_uri())]
+        return [("Rättsfall", self.dataset_uri())]
 
     def frontpage_content_body(self):
         c = Counter([row['rdf_type'] for row in self.faceted_data()])

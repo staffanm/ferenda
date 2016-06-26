@@ -94,7 +94,7 @@ class SFS(OrigSFS, SameAs):
 
     def tabs(self):
         if self.config.tabs:
-            return [("SFS", self.dataset_uri())]
+            return [("Lagar", self.dataset_uri())]
         else:
             return []
 

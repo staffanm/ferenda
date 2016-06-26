@@ -221,7 +221,7 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
         return [Link(label, uri=row['uri'])]
 
     def tabs(self):
-        return [("Myndighetsföreskrifter", self.dataset_uri())]
+        return [("Föreskrifter", self.dataset_uri())]
 
     def frontpage_content_body(self):
         c = Counter([row['rpubl_forfattningssamling'] for row in self.faceted_data()])
