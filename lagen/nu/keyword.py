@@ -8,8 +8,9 @@ from urllib.parse import quote, unquote
 from wsgiref.util import request_uri
 
 from lxml import etree
+from rdflib.namespace import DCTERMS
 
-from ferenda import TripleStore
+from ferenda import TripleStore, Facet
 from ferenda.sources.general import keyword
 from ferenda.sources.legal.se import SwedishLegalSource, SFS
 
@@ -19,6 +20,7 @@ class LNKeyword(keyword.Keyword):
     """
     namespaces = SwedishLegalSource.namespaces
     lang = "sv"
+    collate_locale = "sv_SE.ISO8859-15"
 
     def __init__(self, config=None, **kwargs):
         super(LNKeyword, self).__init__(config, **kwargs)
@@ -94,6 +96,13 @@ class LNKeyword(keyword.Keyword):
             id_node = etree.SubElement(rattsfall_node, ns("rdfs:label"))
             # id_node.text = "%s %s" % (l['uri'].split("#")[1], l['label'])
             id_node.text = self.sfsrepo.display_title(l['uri'])
+
+    def facets(self):
+        return [Facet(DCTERMS.title,
+                      label="Ordnade efter titel",
+                      pagetitle='Begrepp som b\xf6rjar p\xe5 "%(selected)s"',
+                      selector=lambda r,b,g: r[b][0].upper())
+        ]
 
     def tabs(self):
         return [("Begrepp", self.dataset_uri())]

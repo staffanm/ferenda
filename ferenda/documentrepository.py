@@ -13,7 +13,7 @@ from operator import itemgetter
 from tempfile import mkstemp
 from wsgiref.handlers import format_date_time as format_http_date
 from wsgiref.util import request_uri
-from urllib.parse import quote, parse_qsl
+from urllib.parse import quote, unquote, parse_qsl
 import builtins
 import locale
 import calendar
@@ -3485,7 +3485,7 @@ WHERE {
             if (alias == self.alias):
                 # we SHOULD be able to handle this -- maybe provide
                 # apologetic message about this if we can't?
-                uri = request_uri(environ)
+                uri = unquote(request_uri(environ)) # we don't want '%C3%A5' in the URI, we want 'å'
                 self.log.info("%s: OK trying to handle this, uri=%s" % (self.alias, uri))
                 path = None
 
