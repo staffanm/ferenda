@@ -984,7 +984,11 @@ class SwedishLegalSource(DocumentRepository):
         return "%s dokument" % len(set([row['uri'] for row in self.faceted_data()]))
 
     def http_handle(self, environ):
-        path_info = environ['PATH_INFO'][1:]
+        # assume that PATH_INFO is interpreted by wsgi as latin-1
+        # (as per PEP 3333), but is really sent as UTF-8. FIXME:
+        # What's the story on Py2, is environ['PATH_INFO'] a
+        # unicode or a str there?
+        path_info = environ['PATH_INFO'][1:].encode("latin-1").decode("utf-8")
         if path_info.startswith(self.urispace_segment + "/"):
             url = unquote(request_uri(environ))
             if 'develurl' in self.config:

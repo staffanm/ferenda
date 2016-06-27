@@ -3,6 +3,10 @@ from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 from builtins import *
 
+import os
+from urllib.parse import quote, unquote
+from wsgiref.util import request_uri
+
 from lxml import etree
 
 from ferenda import TripleStore
@@ -108,3 +112,21 @@ class LNKeyword(keyword.Keyword):
     def frontpage_content_body(self):
         return "%s begrepp" % len(set([row['uri'] for row in self.faceted_data()]))
         
+
+    def http_handle(self, environ):
+        # slightly modified version of SwedishLegalSource.http_handle
+        if environ['PATH_INFO'].startswith("/concept/"):
+            path_info = environ['PATH_INFO'][1:].encode("latin-1").decode("utf-8")
+            url = unquote(request_uri(environ))
+            if 'develurl' in self.config:
+                url = url.replace(self.config.develurl, self.config.url)
+            basefile = self.basefile_from_uri(url)
+            path = self.store.generated_path(basefile)
+            return (open(path, 'rb'),
+                    os.path.getsize(path),
+                    200,
+                    "text/html")
+        elif environ['PATH_INFO'].startswith("/dataset/%s" % self.alias):
+            return super(LNKeyword, self).http_handle(environ)
+        else:
+            return (None, None, None, None)

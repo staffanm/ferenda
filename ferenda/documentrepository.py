@@ -3465,7 +3465,12 @@ WHERE {
         """
         # FIXME: This function ought to be taken out and shot.
         if environ['PATH_INFO'].count("/") >= 2:
-            segments = environ['PATH_INFO'].split("/", 3)
+            # assume that PATH_INFO is interpreted by wsgi as latin-1
+            # (as per PEP 3333), but is really sent as UTF-8. FIXME:
+            # What's the story on Py2, is environ['PATH_INFO'] a
+            # unicode or a str there?
+            path_info = environ['PATH_INFO'].encode("latin-1").decode("utf-8")
+            segments = path_info.split("/", 3)
             if "." in segments[-1]:
                 (segments[-1], suffix) = segments[-1].rsplit(".", 1)
             else:
