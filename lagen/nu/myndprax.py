@@ -13,6 +13,7 @@ from .facadesource import FacadeSource
 from ferenda import Facet, TocPageset, TocPage
 from ferenda import util
 from ferenda.elements import Link
+from ferenda.elements.html import Strong
 from ferenda.sources.legal.se import SwedishLegalSource
 
 
@@ -114,8 +115,8 @@ WHERE {
 
     def toc_item(self, binding, row):
         """Returns a formatted version of row, using Element objects"""
-        return [Link(row['dcterms_identifier'] + ": " + row['dcterms_title'],
-                     uri=row['uri'])]
+        return [Strong([Link(row.get('dcterms_identifier', '(ID saknas)'), uri=row['uri'])]),
+                ": ", row.get('dcterms_title', '(Titel saknas)')]
 
     def frontpage_content_body(self):
         c = Counter([row['dcterms_publisher'] for row in self.faceted_data()])
