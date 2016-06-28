@@ -13,6 +13,7 @@ from wsgiref.util import request_uri
 import logging
 import operator
 import os
+import sys
 import re
 import codecs
 
@@ -84,10 +85,14 @@ class SwedishLegalSource(DocumentRepository):
     # dcterms:identifier
     required_predicates = [RDF.type, DCTERMS.title, DCTERMS.issued,
                            DCTERMS.identifier, PROV.wasGeneratedBy]
-    collate_locale = "sv_SE.ISO8859-15"  # See
-                                         # http://bugs.python.org/issue23195#msg233690
-                                         # why we can't let it be
-                                         # eg. sv_SE.UTF-8
+    if sys.platform == "darwin":
+        collate_locale = "sv_SE.ISO8859-15"  # See
+                                             # http://bugs.python.org/issue23195#msg233690
+                                             # why we can't let it be
+                                             # eg. sv_SE.UTF-8
+    else:
+        collate_locale = "sv_SE.UTF-8"
+
     
     swedish_months = {"januari": 1,
                       "jan": 1,

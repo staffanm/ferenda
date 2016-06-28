@@ -4,6 +4,7 @@ from __future__ import (absolute_import, division,
 from builtins import *
 
 import os
+import sys
 from urllib.parse import quote, unquote
 from wsgiref.util import request_uri
 
@@ -20,7 +21,10 @@ class LNKeyword(keyword.Keyword):
     """
     namespaces = SwedishLegalSource.namespaces
     lang = "sv"
-    collate_locale = "sv_SE.ISO8859-15"
+    if sys.platform == "darwin":
+        collate_locale = "sv_SE.ISO8859-15"
+    else:
+        collate_locale = "sv_SE.UTF-8"
 
     def __init__(self, config=None, **kwargs):
         super(LNKeyword, self).__init__(config, **kwargs)
@@ -98,12 +102,32 @@ class LNKeyword(keyword.Keyword):
             id_node.text = self.sfsrepo.display_title(l['uri'])
 
     def facets(self):
+        def kwselector(row, binding, resource_graph):
+            bucket = row[binding][0]
+            if bucket.isalpha():
+                return bucket.upper()
+            else:
+                return "#"
+
         return [Facet(DCTERMS.title,
                       label="Ordnade efter titel",
                       pagetitle='Begrepp som b\xf6rjar p\xe5 "%(selected)s"',
-                      selector=lambda r,b,g: r[b][0].upper())
+                      selector=kwselector)
         ]
 
+    # override simply to be able to specify that title/A should be first, not title/#
+    def toc_generate_first_page(self, pagecontent, pagesets, otherrepos=[]):
+        """Generate the main page of TOC pages."""
+        for firstpage in pagesets[0].pages:
+            if firstpage.value == "a":
+                break
+        else:
+            firstpage = pagesets[0].pages[0]
+        documents = pagecontent[(firstpage.binding, firstpage.value)]
+        return self.toc_generate_page(firstpage.binding, firstpage.value,
+                                      documents, pagesets, "index", otherrepos)
+
+        
     def tabs(self):
         return [("Begrepp", self.dataset_uri())]
 
