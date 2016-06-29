@@ -136,7 +136,7 @@ class DirTrips(Trips):
     
 
     def get_parser(self, basefile, sanitized):
-
+        # FIXME: this should be rewritten as a FSMParser
         def guess_type(p, current_type):
             if not p:  # empty string
                 return None

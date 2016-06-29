@@ -40,10 +40,11 @@ It's a generic template for any kind of content
   </xsl:template>
   <xsl:param name="dyntoc" select="true()"/>
 
-  <!-- these headings shouldn't be expressed with <h*> tags, but
-       rather with RDFa attribs in <div class="section"> element. Just
-       ignore them for now -->
-  <xsl:template match="xhtml:h1|xhtml:h2"/>
+  <!-- Headings shouldn't be expressed with <h*> tags, but rather with
+       RDFa attribs in <div class="section"> element. However,
+       DirTrips still generates h1 headings, so we can't just ignore
+       these. -->
+  <!-- <xsl:template match="xhtml:h1|xhtml:h2"/> -->
   
   <xsl:template match="xhtml:a">
     <xsl:call-template name="link"/>
