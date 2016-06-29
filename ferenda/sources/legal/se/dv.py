@@ -748,6 +748,16 @@ class DV(SwedishLegalSource):
             m = re_notisstart.match(secondline)
             if m:
                 head["Rubrik"] = secondline[m.end():].strip()
+                if curryear == "2003":  # notisfall in this year lack
+                                        # newline between heading and
+                                        # actual text, so we use a
+                                        # heuristic to just match
+                                        # first sentence
+                    m2 = re.search("\. [A-ZÅÄÖ]", head["Rubrik"])
+                    if m2:
+                        # now we know where the first sentence ends. Only keep that. 
+                        head["Rubrik"] = head["Rubrik"][:m2.start()+1]
+                                      
         else:  # "REG", "HFD"
             # keep in sync like above
             re_notisstart = re.compile(
