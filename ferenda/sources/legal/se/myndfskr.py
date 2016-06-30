@@ -658,22 +658,6 @@ class MyndFskrBase(SwedishLegalSource):
                       indexingtype=fulltextindex.Label(),
                       use_for_toc=True)]
 
-    def toc_item(self, binding, row):
-        """Returns a formatted version of row, using Element objects"""
-        # more defensive version of DocumentRepository.toc_item
-        label = ""
-        if 'dcterms_identifier' in row:
-            label = row['dcterms_identifier']
-        else:
-            self.log.warning("No dcterms:identifier for %s" % row['uri'])
-
-        if 'dcterms_title' in row:
-            label += ": " + row['dcterms_title']
-        else:
-            self.log.warning("No dcterms:title for %s" % row['uri'])
-            label = "URI: " + row['uri']
-        return [Link(label, uri=row['uri'])]
-
     def tabs(self):
         return [(self.__class__.__name__, self.dataset_uri())]
 

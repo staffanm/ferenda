@@ -132,6 +132,8 @@ class DV(OrigDV, SameAs):
                                     value=None)])]
 
     def toc_select_for_pages(self, data, pagesets, facets):
+        def idkey(row):
+            return util.split_numalpha(row['dcterms_identifier'])
         facet = facets[0]
         res = {}
         documents = {}
@@ -145,18 +147,19 @@ class DV(OrigDV, SameAs):
             pagesetdict[util.uri_leaf(pageset.predicate)] = pageset
         for (binding, value) in sorted(documents.keys()):
             pageset = pagesetdict[binding]
-            s = sorted(documents[(binding, value)], key=repr)
+            s = sorted(documents[(binding, value)], key=idkey)
             res[(binding, value)] = [self.toc_item(binding, row)
                                      for row in s]
         return res
 
-    def toc_item(self, binding, row):
-        r = [Strong([Link(row['dcterms_identifier'],
-                          uri=row['uri'])])]
-        if 'rpubl_referatrubrik' in row:
-            r.append(": ")
-            r.append(row['rpubl_referatrubrik'])
-        return r
+    # this is a nicety that limits the sometimes very verbose case reporter titles 
+    def toc_item_title(self, row):
+        if 'rpubl_referatrubrik' not in row:
+            self.log.warning("%s: No referatrubrik" % row['uri'])
+            row['rpubl_referatrubrik'] = "(Referatrubrik saknas)"
+        if len(row['rpubl_referatrubrik']) > 1000:
+            return row['rpubl_referatrubrik'][:1000] + "..."
+        return row['rpubl_referatrubrik']
 
     def tabs(self):
         return [("Rättsfall", self.dataset_uri())]

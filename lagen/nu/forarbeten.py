@@ -143,11 +143,6 @@ WHERE {
                                      for row in s]
         return res
 
-    def toc_item(self, binding, row):
-        """Returns a formatted version of row, using Element objects"""
-        return [Link(row['dcterms_identifier']+": "+row.get('dcterms_title', '(titel saknas)'),
-                     uri=row['uri'])]
-
     def frontpage_content_body(self):
         # we could either count the number of items
         # self.store.list_basefiles_for("_postgenerate") returns or

@@ -31,7 +31,7 @@ from ferenda import (DocumentRepository, DocumentStore, FSMParser,
                      CitationParser, Describer, Facet)
 from ferenda import util, fulltextindex
 from ferenda.sources.legal.se.legalref import Link, LegalRef, RefParseError
-from ferenda.elements.html import A, H1, H2, H3, P
+from ferenda.elements.html import A, H1, H2, H3, P, Strong
 from ferenda.elements import serialize, Section, Body, CompoundElement
 from ferenda.pdfreader import Page, BaseTextDecoder, Textelement
 from ferenda.pdfreader import PDFReader
@@ -969,6 +969,19 @@ class SwedishLegalSource(DocumentRepository):
 
     def facets(self):
         return super(SwedishLegalSource, self).facets() + self.standardfacets
+        
+    def toc_item(self, binding, row):
+        # the default toc listing uses <b>identifier</b>: title, with
+        # only identifier being a link. Should work for most doctypes.
+        return [Strong([Link(self.toc_item_identifier(row), uri=row['uri'])]),
+                ": ", self.toc_item_title(row)]
+
+    def toc_item_identifier(self, row):
+        return row.get('dcterms_identifier', '(ID saknas)')
+
+    def toc_item_title(self, row):
+        return row.get('dcterms_title', '(Titel saknas)')
+
         
     def frontpage_content(self, primary=False):
         if not self.config.tabs:

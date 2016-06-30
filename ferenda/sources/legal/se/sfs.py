@@ -1809,6 +1809,9 @@ WHERE {
 
     def toc_item(self, binding, row):
         """Returns a formatted version of row, using Element objects"""
+        if 'titel' not in row:
+            self.log.warning("%s: titel missing" % row['uri'])
+            row['titel'] = "(Titel saknas)"
         title = self._forfattningskey(row['titel'])
         res = []
         if title in row['titel']:

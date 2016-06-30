@@ -846,11 +846,6 @@ class Offtryck(SwedishLegalSource):
             fp.write("#page%03d { background: url('%s');}\n" %
                      (cnt, os.path.basename(dest)))
 
-    def toc_item(self, binding, row):
-        return [row['dcterms_identifier'] + ": ",
-                Link(row['dcterms_title'],  # yes, ignore binding
-                     uri=row['uri'])]
-
     def tabs(self):
         if self.config.tabs:
             label = {self.DS: "Ds:ar",

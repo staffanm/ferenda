@@ -18,7 +18,7 @@ from ferenda.sources.legal.se import SwedishLegalSource
 
 
 # we inherit from SwedishLegalSource to pick up proper resources in
-# self.commondata
+# self.commondata (and also the toc_item implementation)
 class MyndPrax(FacadeSource, SwedishLegalSource):
     """Wrapper repo like Forarbeten, but for ARN/JO/JK"""
     alias = "myndprax"
@@ -112,11 +112,6 @@ WHERE {
             res[(binding, value)] = [self.toc_item(binding, row)
                                      for row in s]
         return res
-
-    def toc_item(self, binding, row):
-        """Returns a formatted version of row, using Element objects"""
-        return [Strong([Link(row.get('dcterms_identifier', '(ID saknas)'), uri=row['uri'])]),
-                ": ", row.get('dcterms_title', '(Titel saknas)')]
 
     def frontpage_content_body(self):
         c = Counter([row['dcterms_publisher'] for row in self.faceted_data()])
