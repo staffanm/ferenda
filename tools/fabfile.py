@@ -9,6 +9,12 @@ def doccount():
 
 # run from i7 with fab -H colo.tomtebo.org -f tools/fabfile.py copy_elastic
 def copy_elastic():
+    # remove all old snapshots
+    snapshotids = local("curl -s http://localhost:9200/_snapshot/lagen_backup/_all?pretty=true|jq -r '.snapshots[]|.snapshot'", capture=True)
+    for snapshot_id in snapshotids.split("\n"):
+        assert snapshot_id
+        local("curl -XDELETE http://localhost:9200/_snapshot/lagen_backup/%s" % snapshot_id)
+
     snapshot_id = datetime.now().strftime("%y%m%d-%H%M%S")
     # compute new snapshot id YYYYMMDD-HHMMSS
     snapshot_url = "http://localhost:9200/_snapshot/lagen_backup/%s?wait_for_completion=true" % snapshot_id
@@ -18,16 +24,16 @@ def copy_elastic():
 
     # create a new snapshot with the computed id
     local('curl -f -XPUT \'%s\' -d \'{ "indices": "lagen"}\'' % snapshot_url)
-    
+
     # rsync /tmp/elasticsearch/snapshots from local to target (must be
     # same locally and on target)
     snapshotdir = "/tmp/elasticsearch/snapshot/lagen/"
-    sudo("chown -R staffan:staffan %s" % snapshotdir)
+    # sudo("chown -R staffan:staffan %s" % snapshotdir)
     rsync_project(local_dir=snapshotdir,
                   remote_dir=snapshotdir,
                   delete=True,
                   default_opts="-azi")
-    sudo("chown -R elasticsearch:elasticsearch %s" % snapshotdir)
+    # sudo("chown -R elasticsearch:elasticsearch %s" % snapshotdir)
 
     # on target, curl POST to restore snapshot (close index beforehand
     # and open it after)

@@ -14,6 +14,8 @@ echo "updating git sources"
 git pull -q
 echo "building everything"
 ./ferenda-build.py all all --processes=7
+echo "createing statusreport"
+./ferenda-build.py devel statusreport
 echo "deploying to remote"
 cd ..
 fab -H colo.tomtebo.org -f tools/fabfile.py deploy
