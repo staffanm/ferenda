@@ -4,7 +4,7 @@ from __future__ import (absolute_import, division,
 from builtins import *
 
 from collections import Counter
-from operator import attrgetter
+from operator import attrgetter, index
 
 from rdflib import RDF, URIRef, BNode, Graph
 from rdflib.namespace import DCTERMS, OWL, RDFS
@@ -78,8 +78,21 @@ class DV(OrigDV, SameAs):
             domuri_sameas = coin_uri(rtmp)
             resource.graph.add((URIRef(domuri), OWL.sameAs, URIRef(domuri_sameas)))
         return resource
-
     
+    # Note: we only need to map those rattsfallspublikation labels
+    # that differ from the court label (ie not Arbetsdomstolen,
+    # Marknadsdomstolen, Miljööverdomstolen etc)
+
+    _rattsfallspublikation_label = {"https://lagen.nu/dataset/hfd": "Högsta förvaltningsdomstolen",
+                                    "https://lagen.nu/dataset/nja": "Högsta domstolen",
+                                    "https://lagen.nu/dataset/mod": "Mark- och miljööverdomstolen", # FIXME: don't treat MÖD and MMD as identical
+                                    "https://lagen.nu/dataset/ra": "Regeringsrätten",
+                                    "https://lagen.nu/dataset/rh": "Hovrätterna",
+                                    "https://lagen.nu/dataset/rk": "Kammarrätterna"}
+    _rattsfallspublikation_order = ("Högsta domstolen", "Hovrätterna",
+                                    "Högsta förvaltningsdomstolen", "Regeringsrätten",
+                                    "Kammarrätterna", "Arbetsdomstolen", "Marknadsdomstolen", 
+                                    "Mark- och miljööverdomstolen", "Migrationsöverdomstolen")
     def toc_pagesets(self, data, facets):
         # our primary facet is RPUBL.rattsfallspublikation, but we
         # need to create one pageset for each value thereof.
@@ -89,51 +102,34 @@ class DV(OrigDV, SameAs):
         for row in data:
             pagesetid = row['rpubl_rattsfallspublikation']
             if pagesetid not in pagesetdict:
-                label = Facet.resourcelabel(row, 'rpubl_rattsfallspublikation',
-                                            self.commondata)
+                # Get the preferred court label from our own mapping,
+                # fall back to the skos:prefLabel of the publikation
+                label = self._rattsfallspublikation_label.get(
+                    row['rpubl_rattsfallspublikation'],
+                    Facet.resourcelabel(row, 'rpubl_rattsfallspublikation',
+                                        self.commondata))
                 pagesetdict[pagesetid] = TocPageset(label=label,
                                                     predicate=pagesetid,
                                                     pages=[])
             selected = row['rpubl_arsutgava']
             selector_values[(pagesetid, selected)] = True
-        
-        for (pagesetid, value) in sorted(list(selector_values.keys())):
+
+        for (pagesetid, value) in sorted(list(selector_values.keys()), reverse=True):
             pageset = pagesetdict[pagesetid]
             pageset.pages.append(TocPage(linktext=value,
-                                         title="%s från %s" % (pageset.label, value),
+                                         title="Rättsfall från %s under %s" % (pageset.label, value),
                                          binding=util.uri_leaf(pagesetid),
                                          value=value))
-        return list(pagesetdict.values())
 
-    def news_feedsets(self, data, facets):
-        # works pretty much the same as toc_pagesets, but returns ONE
-        # feedset (not several) that has one feed per publisher
-        feeds = {}
-        facet = facets[0]  # should be the RPUBL.rattsfallspublikation one
-        for row in data:
-            feedid = row['rpubl_rattsfallspublikation']
-            if feedid not in feeds:
-                slug = Facet.term(row, 'rpubl_rattsfallspublikation')
-                term = Facet.resourcelabel(row, 'rpubl_rattsfallspublikation',
-                                           self.commondata)
-                title = facet.label % {'term': term}
-                feeds[feedid] = Feed(slug=slug,
-                                     title=title,
-                                     binding='rpubl_rattsfallspublikation',
-                                     value=feedid)
-        feeds = sorted(feeds.values(), key=attrgetter('value'))
-        return [Feedset(label="Rättsfallspublikation",
-                        predicate=facet.rdftype,
-                        feeds=feeds),
-                Feedset(label="All",
-                        feeds=[Feed(slug="main",
-                                    title="All documents",
-                                    binding=None,
-                                    value=None)])]
+        # make sure pagesets are returned in the preferred, arbitrary order specified by _rattsfallspublikation_order
+        return sorted(list(pagesetdict.values()), key=lambda x: self._rattsfallspublikation_order.index(x.label))
 
     def toc_select_for_pages(self, data, pagesets, facets):
         def idkey(row):
-            return util.split_numalpha(row['dcterms_identifier'])
+            k = util.split_numalpha(row['dcterms_identifier'])
+            if " not " in row['dcterms_identifier']:
+                k[0] = "~" + k[0] # ensure notisfall sorts last
+            return k
         facet = facets[0]
         res = {}
         documents = {}
@@ -160,6 +156,32 @@ class DV(OrigDV, SameAs):
         if len(row['rpubl_referatrubrik']) > 1000:
             return row['rpubl_referatrubrik'][:1000] + "..."
         return row['rpubl_referatrubrik']
+
+    def news_feedsets(self, data, facets):
+        # works pretty much the same as toc_pagesets, but returns ONE
+        # feedset (not several) that has one feed per publisher
+        feeds = {}
+        facet = facets[0]  # should be the RPUBL.rattsfallspublikation one
+        for row in data:
+            feedid = row['rpubl_rattsfallspublikation']
+            if feedid not in feeds:
+                slug = Facet.term(row, 'rpubl_rattsfallspublikation')
+                term = Facet.resourcelabel(row, 'rpubl_rattsfallspublikation',
+                                           self.commondata)
+                title = facet.label % {'term': term}
+                feeds[feedid] = Feed(slug=slug,
+                                     title=title,
+                                     binding='rpubl_rattsfallspublikation',
+                                     value=feedid)
+        feeds = sorted(feeds.values(), key=attrgetter('value'))
+        return [Feedset(label="Rättsfallspublikation",
+                        predicate=facet.rdftype,
+                        feeds=feeds),
+                Feedset(label="All",
+                        feeds=[Feed(slug="main",
+                                    title="All documents",
+                                    binding=None,
+                                    value=None)])]
 
     def tabs(self):
         return [("Rättsfall", self.dataset_uri())]
