@@ -120,6 +120,12 @@ this grid system directly under body? */
 	padding: 0;
 	list-style: none;
     }
+    body.toc article ul li {
+	padding: 0;
+	list-style: none;
+	text-indent: -8em;
+	margin-left: 8em;
+    }
 
     nav.affix-top {
 	width: 97%; /* of the .col-sm-3 element */
