@@ -266,7 +266,7 @@ def mapspace(base, dest):
 @prefix rinfoex: <http://lagen.nu/terms#> .
 @prefix space: <https://lagen.nu/sys/uri/space#> .
 
-space: coin:template [
+space: coin:template [ 
         coin:relFromBase rinfoex:stycke;
         coin:fragmentTemplate "S{styckenummer}";
         coin:binding [ coin:property rinfoex:styckenummer ]
@@ -323,6 +323,24 @@ space: coin:template [
                        coin:variable "sidnummer" ],
                      [ coin:property rpubl:arsutgava ;
                        coin:variable "arsutgava" ]
+     ], [
+        coin:uriTemplate "/{rtype}/{arsutgava}:{lopnummer}#S{avsnitt}";
+        coin:binding [ coin:property rinfoex:avsnitt ],
+                     [ coin:property rdf:type ;
+                       coin:slugFrom space:abbrSlug ;
+                       coin:variable "rtype" ],
+                     [ coin:property rpubl:lopnummer ;
+                       coin:variable "lopnummer" ],
+                     [ coin:property rpubl:arsutgava ;
+                       coin:variable "arsutgava" ]
+     ], [
+        coin:uriTemplate "/utr/{serie}/{arsutgava}:{lopnummer}#S{avsnitt}";
+        coin:binding [ coin:property rpubl:utrSerie ;
+                       coin:slugFrom space:abbrSlug ;
+                       coin:variable "serie" ],
+                     [ coin:property rinfoex:avsnitt ],
+                     [ coin:property rpubl:arsutgava ],
+                     [ coin:property rpubl:lopnummer ]
     ] .
 
 """

@@ -709,6 +709,8 @@ class LegalRef:
                     "rattsfallspublikation": RPUBL.rattsfallspublikation,
                     "domstol": RPUBL.rattsfallspublikation,
                     "ar": RPUBL.arsutgava,
+                    "avsnitt": RINFOEX.avsnitt,
+                    "utrSerie": RPUBL.utrSerie
                     }
 
     def attributes_to_resource(self, attributes, rest=()):
@@ -1068,8 +1070,37 @@ class LegalRef:
 
 
     # KOD FÖR FORARBETEN
+    def format_ExternalAvsnittRef(self, root):
+        self.betankanderef = True
+        res = [self.format_generic_link(root, uriformatter=self.forarbete_format_uri)]
+        self.betankanderef = False
+        return res
+
+    def format_ExternalAvsnittRefs(self, root):
+        self.betankanderef = True
+        res = []
+        for node in root.nodes:
+            # FIXME: need to set uriformatter somehow
+            res.extend(self.formatter_dispatch(node))
+        self.betankanderef = False
+        return res
+
     def forarbete_format_uri(self, attributes):
         a = attributes
+        if (hasattr(self, 'kommittensbetankande') and self.kommittensbetankande and
+            hasattr(self, 'betankanderef') and self.betankanderef):
+            # this reference is relative to a (assumed) SOU
+            # document. Let's construct some needed attributes of that
+            # document. FIXME: The proper way to do this would be by
+            # letting the caller provide all these attributes, mapped
+            # to some caller-provided string id (eg "kommitténs
+            # betänkande")
+            a['type'] = RPUBL.Utredningsbetankande
+            a['utrSerie'] = self.metadata_graph.value(predicate=SKOS.altLabel, object=Literal("SOU", lang="sv"))
+            a['year'], a['no'] = self.kommittensbetankande.split(":")
+        else:
+            # this reference is relative to the current document
+            a.update(self.baseuri_attributes)
         for key, val in list(a.items()):
             if key == 'prop':
                 a['type'] = RPUBL.Proposition
@@ -1087,6 +1118,12 @@ class LegalRef:
             elif key == 'celex':
                 if len(val) == 8:  # badly formatted, uses YY instead of YYYY
                     a[key] = val[0] + '19' + val[1:]
+                a.pop('type', None)
+                a.pop('year', None)
+                a.pop('no', None)
+        # for relative refs, we need to fill a['type'], a['year'],
+        # a['no'] from self.baseuri_attributes (and we need to make
+        # sure baseuri_attributes is populated
         res = self.attributes_to_resource(a)
         return self.minter.space.coin_uri(res)
 

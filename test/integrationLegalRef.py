@@ -69,8 +69,17 @@ class TestLegalRef(unittest.TestCase):
             if para.startswith("NOBASE:"):
                 baseuri_attributes = {}
             else:
-                # do we need to set 'chapter' also?
-                baseuri_attributes = {'law': '9999:999'}
+                if "/Regpubl/" in testfile:
+                    from ferenda.sources.legal.se import RPUBL
+                    # pretend we're in Prop. 1996/97:44
+                    baseuri_attributes = {'type': RPUBL.Proposition,
+                                          'year': "1996/97",
+                                          'no': "44"}
+                    # This is a temporary "API" while we gather requirements
+                    parser.kommittensbetankande = "1997:39"  # assume SOU 1997:39
+                else:
+                    # 
+                    baseuri_attributes = {'law': '9999:999'}
             nodes = parser.parse(para, self.minter, self.metadata,
                                  baseuri_attributes)
             got_paras.append(serialize(nodes).strip())

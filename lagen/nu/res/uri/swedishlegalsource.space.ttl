@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2015-09-16T19:38:36.660182
+# Automatically transformed from sources at 2016-07-02T21:49:32.182359
 
 @prefix : <http://rinfo.lagrummet.se/sys/uri/space#> .
 @prefix coin: <http://purl.org/court/def/2009/coin#> .
@@ -185,6 +185,22 @@ space: a coin:URISpace ;
                 [ coin:property rpubl:arsutgava ;
                     coin:variable "arsutgava" ] ;
             coin:uriTemplate "/{rtype}/{arsutgava}:{lopnummer}#s{sidnummer}" ],
+        [ coin:binding [ coin:property rinfoex:avsnitt ],
+                [ coin:property rdf:type ;
+                    coin:slugFrom space:abbrSlug ;
+                    coin:variable "rtype" ],
+                [ coin:property rpubl:lopnummer ;
+                    coin:variable "lopnummer" ],
+                [ coin:property rpubl:arsutgava ;
+                    coin:variable "arsutgava" ] ;
+            coin:uriTemplate "/{rtype}/{arsutgava}:{lopnummer}#S{avsnitt}" ],
+        [ coin:binding [ coin:property rpubl:utrSerie ;
+                    coin:slugFrom space:abbrSlug ;
+                    coin:variable "serie" ],
+                [ coin:property rinfoex:avsnitt ],
+                [ coin:property rpubl:arsutgava ],
+                [ coin:property rpubl:lopnummer ] ;
+            coin:uriTemplate "/utr/{serie}/{arsutgava}:{lopnummer}#S{avsnitt}" ],
         [ coin:binding [ coin:property rinfoex:styckenummer ] ;
             coin:fragmentTemplate "S{styckenummer}" ;
             coin:relFromBase rinfoex:stycke ] .

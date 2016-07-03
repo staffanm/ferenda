@@ -1,0 +1,27 @@
+Paragrafen överensstämmer i huvudsak med Datalagskommitténs förslag
+och har berörts i avsnitt 8.2.2 i kommitténs betänkande.
+Frågan om en teknikoberoende lag har behandlats i avsnitt
+6.1. Paragra-fen överensstämmer i sak med Datalagskommitténs förslag
+och har berörts i avsnitt 7.2.1, 12.2.8 och 12.2.12 i kommitténs
+betänkande.
+
+<list>
+  <str>Paragrafen överensstämmer i huvudsak med Datalagskommitténs förslag
+och har berörts i </str>
+  <Link uri="https://lagen.nu/utr/sou/1997:39#S8.2.2">avsnitt 8.2.2 i kommitténs betänkande</Link>
+  <str>.
+Frågan om en teknikoberoende lag har behandlats i </str>
+  <Link uri="https://lagen.nu/prop/1996/97:44#S6.1">avsnitt
+6.1</Link>
+  <str>. Paragra-fen överensstämmer i sak med Datalagskommitténs förslag
+och har berörts i </str>
+  <Link uri="https://lagen.nu/utr/sou/1997:39#S7.2.1">avsnitt 7.2.1</Link>
+  <str>, </str>
+  <Link uri="https://lagen.nu/utr/sou/1997:39#S12.2.8">12.2.8</Link>
+  <str> och </str>
+  <Link uri="https://lagen.nu/utr/sou/1997:39#S12.2.12">12.2.12</Link>
+  <str> </str>
+  <Link uri="https://lagen.nu/utr/sou/1997:39">i kommitténs
+betänkande</Link>
+  <str>.</str>
+</list>
