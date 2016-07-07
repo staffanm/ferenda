@@ -39,11 +39,7 @@ class Offtryck(SwedishLegalSource):
     storage_policy = "dir"
     alias = "offtryck"
 
-    # NOTE: _parse_uri_from_text, used by find_primary_law and
-    # _find_commentary_for_law, requires that LegalRef.LAGRUM is in
-    # parse_types. So don't define a class attribute that lacks this
-    # unless _parse_uri_from_text is adjusted!
-    # parse_types = LegalRef.RATTSFALL, LegalRef.FORARBETEN, LegalRef.EULAGSTIFTNING, LegalRef.EURATTSFALL
+    parse_types = LegalRef.RATTSFALL, LegalRef.FORARBETEN, LegalRef.LAGRUM, LegalRef.KORTLAGRUM
     xslt_template = "xsl/forarbete.xsl"
 
 
@@ -250,6 +246,21 @@ class Offtryck(SwedishLegalSource):
 
                 # print("%s: self.config.parserefs: %s, self.parse_types: %s" % (basefile, self.config.parserefs, self.parse_types))
                 if self.config.parserefs and self.parse_types:
+                    # FIXME: There should be a cleaner way of telling refparser the base uri (or similar) for the document
+                    if self.document_type == self.PROPOSITION:
+                        self.refparser._currentattribs = {
+                            "type": RPUBL.Proposition,
+                            "year": basefile.split(":")[0],
+                            "no": basefile.split(":")[1]
+                        }
+                        if 'kommittensbetankande' in initialstate:
+                            self.refparser._legalrefparser.kommittensbetankande = initialstate['kommittensbetankande']
+                    if hasattr(self, 'sfsparser'):
+                        # the parsing of section titles by
+                        # find_commentary might have picked up some
+                        # IDs for some named laws. Reuse these when
+                        # parsing the bulk of the text.
+                        self.refparser._legalrefparser.currentlynamedlaws.update(self.sfsparser.currentlynamedlaws)
                     body = self.refparser.parse_recursive(body)
             else:
                 # copy pages verbatim -- make no attempt to glue
@@ -393,8 +404,11 @@ class Offtryck(SwedishLegalSource):
             defaultsize = 16
         sharedstate = {'basefile': basefile,
                        'defaultsize': defaultsize}
-        return [(self.find_primary_law, sharedstate),
-                (self.find_commentary, sharedstate)]
+        functions = [(self.find_primary_law, sharedstate),
+                     (self.find_commentary, sharedstate)]
+        if self.document_type == self.PROPOSITION:
+            functions.append((self.find_kommittebetankande, sharedstate))
+        return functions
 
 
     def sanitize_identifier(self, identifier):
@@ -477,6 +491,20 @@ class Offtryck(SwedishLegalSource):
             state['basefile'], state['primarylaw']))
         return None
 
+    def find_kommittebetankande(self, node, state):
+        if not isinstance(node, Section) or (node.title not in ("Ärendet och dess beredning")):
+            if isinstance(node, Body):
+                return state  
+            else:
+                return None  # visit_node won't call any subnode
+        commentary = []
+        sectiontext = util.normalize_space(str(node))
+        m = re.search("SOU (\d+:\d+)", sectiontext)
+        if m:
+            state['kommittensbetankande'] = m.group(1)
+        else:
+            self.log.warning("Could not find reference to kommmittens betankande")
+        return None
 
     def find_commentary(self, node, state):
         if not isinstance(node, Section) or (node.title not in ("Författningskommentar",
@@ -755,28 +783,47 @@ class Offtryck(SwedishLegalSource):
             return True
         return False
     
-                        
-    def _parse_uri_from_text(self, text, basefile, baseuri=None):
+    re_urisegments = re.compile(r'([\w]+://[^/]+/[^\d]*)(\d+:(bih\.[_ ]|N|)?\d+([_ ]s\.\d+|))#?(K([a-z0-9]+)|)(P([a-z0-9]+)|)(S(\d+)|)(N(\d+)|)')
+    def _parse_uri_from_text(self, text, basefile, baseuri=""):
+        """Given some text, identifies the first reference to a part of a
+        statute (possibly a relative reference) and returns the URI
+        for that part. 
+
+        Emits warning (and returns None) if not exactly one reference
+        was found.
+
+        """
+
         # OCR sources sometimes lack the space between digit and
         # section mark, ie "1§". It should be low-risk to expand this
         # with a space, at least when interpreting a subsection title.
         # FIXME: This doesn't fix "20a§"
         text = re.sub("(\d+)(§)", r"\1 \2", text)
-        if baseuri:
-            prevuri = self.refparser._currenturl
-            self.refparser._currenturl = baseuri
-            prevallow = self.refparser._allow_relative
-            self.refparser._allow_relative = True
-        res = self.refparser.parse_string(text)
+
+
+        if not hasattr(self, 'sfsparser'):
+            self.sfsparser = LegalRef(LegalRef.LAGRUM)
+        
+        m = self.re_urisegments.match(baseuri)
+        if m:
+            attributes = {'law':m.group(2),
+                          'chapter':m.group(6),
+                          'section':m.group(8),
+                          'piece':m.group(10),
+                          'item':m.group(12)}
+        else:
+            attributes = {}  # should we warn here?
+        res = self.sfsparser.parse(text,
+                                   minter=self.minter,
+                                   metadata_graph=self.commondata,
+                                   baseuri_attributes=attributes,
+                                   allow_relative=True)
         links = [n for n in res if isinstance(n, Link)]
         if len(links) != 1:
             self.log.warning("%s: _parse_uri_from_text found %s links in '%s',"
                              "expected single link" %
                              (basefile, len(links), text))
             return None
-        if baseuri:
-            self.refparser._currenturl = prevuri
-            self.refparser._allow_relative = prevallow
         return links[0].uri
 
 
@@ -797,6 +844,7 @@ class Offtryck(SwedishLegalSource):
 
 
     def create_external_resources(self, doc):
+
         """Optionally create external files that go together with the
         parsed file (stylesheets, images, etc). """
         if len(doc.body) == 0:

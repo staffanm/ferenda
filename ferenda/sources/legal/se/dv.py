@@ -210,11 +210,13 @@ class DV(SwedishLegalSource):
             if not hasattr(self, "_basefilemap"):
                 self._basefilemap = {}
                 mapfile = self.store.path("uri", "generated", ".map")
-                with codecs.open(mapfile, encoding="utf-8") as fp:
-                    for line in fp:
-                        uriseg, bf = line.split("\t")
-                        self._basefilemap[uriseg] = bf.strip()
-
+                try:
+                    with codecs.open(mapfile, encoding="utf-8") as fp:
+                        for line in fp:
+                            uriseg, bf = line.split("\t")
+                            self._basefilemap[uriseg] = bf.strip()
+                except FileNotFoundError:
+                    self.log.error("Couldn't find %s, probably need to run ./ferenda-build.py dv relate --all" % mapfile)
             if basefile in self._basefilemap:
                 return self._basefilemap[basefile]
             else:

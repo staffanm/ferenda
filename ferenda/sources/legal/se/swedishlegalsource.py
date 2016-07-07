@@ -1127,6 +1127,7 @@ class SwedishCitationParser(CitationParser):
         self._minter = minter
         self._commondata = commondata
         self._currenturl = None
+        self._currentattribs = None
         self._allow_relative = allow_relative
         self.log = logging.getLogger("scp")
 
@@ -1164,6 +1165,8 @@ class SwedishCitationParser(CitationParser):
                               'item':m.group(12)}
             else:
                 attributes = {}
+        elif self._currentattribs:
+            attributes = dict(self._currentattribs)
         else:
             attributes = {}
         for k in list(attributes):

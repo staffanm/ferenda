@@ -35,8 +35,8 @@ CelexRefID     ::= '3', digit, digit, (digit, digit)?, 'L', digit, digit, digit,
 SidnrRef       ::= Whitespace, 's.', Period?, Whitespace, SidnrRefID
 
 
-# Avsnitt ("3", "3.2" or "3.2.1")
-AvsnittRefID    ::= digit+, (Period, digit+, (Period, digit+)?)?
+# Avsnitt ("3", "3.2",  "3.2.1", or "3.2.1.4")
+AvsnittRefID    ::= digit+, (Period, digit+, (Period, digit+, (Period, digit+)?)?)?
 AvsnittRef      ::= 'avsnitt', Whitespace, AvsnittRefID
 AvsnittRefs     ::= AvsnittRef, (CommaSpace/WAndOrW, AvsnittRefID)*
 ExternalBetRef  ::= 'i', Whitespace, 'kommitténs', Whitespace, 'betänkande'

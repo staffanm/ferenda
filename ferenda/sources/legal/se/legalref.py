@@ -718,9 +718,12 @@ class LegalRef:
         b = BNode()
         current = b
         # firstly first, clean some degenerate attribute values
-        for k in attributes:
+        for k in list(attributes.keys()):
             if not isinstance(attributes[k], URIRef):
                 v = attributes[k]
+                if v is None:
+                    del attributes[k]
+                    continue
                 v = v.replace("\xa0", "") # Non-breakable space
                 v = v.replace("\n", "")
                 v = v.replace("\r", "")
@@ -1087,17 +1090,25 @@ class LegalRef:
 
     def forarbete_format_uri(self, attributes):
         a = attributes
-        if (hasattr(self, 'kommittensbetankande') and self.kommittensbetankande and
-            hasattr(self, 'betankanderef') and self.betankanderef):
+        if (hasattr(self, 'betankanderef') and self.betankanderef):
             # this reference is relative to a (assumed) SOU
-            # document. Let's construct some needed attributes of that
-            # document. FIXME: The proper way to do this would be by
-            # letting the caller provide all these attributes, mapped
-            # to some caller-provided string id (eg "kommitténs
-            # betänkande")
-            a['type'] = RPUBL.Utredningsbetankande
-            a['utrSerie'] = self.metadata_graph.value(predicate=SKOS.altLabel, object=Literal("SOU", lang="sv"))
-            a['year'], a['no'] = self.kommittensbetankande.split(":")
+            # document.
+            if hasattr(self, 'kommittensbetankande') and self.kommittensbetankande:
+                # And we know which SOU document this is! Let's
+                # construct some needed attributes of that
+                # document. FIXME: The proper way to do this would be
+                # by letting the caller provide all these attributes,
+                # mapped to some caller-provided string id (eg
+                # "kommitténs betänkande")
+                a['type'] = RPUBL.Utredningsbetankande
+                a['utrSerie'] = self.metadata_graph.value(predicate=SKOS.altLabel, object=Literal("SOU", lang="sv"))
+                a['year'], a['no'] = self.kommittensbetankande.split(":")
+            else:
+                # We don't know which SOU document this refers to! We
+                # cannot construct an URI, and this reference must
+                # remain unlinked.
+                log.warning("Don't know the ID of 'kommitténs betänkande', leaving reference %s unlinked" %  a)
+                return None
         else:
             # this reference is relative to the current document
             a.update(self.baseuri_attributes)
