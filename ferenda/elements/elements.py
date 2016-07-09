@@ -29,6 +29,8 @@ import re
 import inspect
 import xml.etree.cElementTree as ET
 import sys
+from collections import OrderedDict
+
 
 from lxml.builder import ElementMaker
 from rdflib import Graph, Namespace, Literal, URIRef
@@ -279,7 +281,7 @@ class CompoundElement(AbstractElement, list):
                 children.append(str(subpart))
 
         # Then massage a list of attributes for the main node
-        attrs = {}
+        attrs = OrderedDict()
 
         if self.classname is not None:
             attrs['class'] = self.classname
@@ -318,10 +320,10 @@ class CompoundElement(AbstractElement, list):
                         children.insert(0, self._span(s, p, o, self.meta))
 
             if self.partrelation and parent_uri:
+                childattr = OrderedDict([('rel', self._qname(self.partrelation)),
+                                         ('href', parent_uri)])
                 children.insert(0,
-                                E('span', {'rel':
-                                           self._qname(self.partrelation),
-                                           'href': parent_uri}))
+                                E('span', childattr))
             # parent_uri = self.uri
 
         # for each childen that is a string, make sure it doesn't

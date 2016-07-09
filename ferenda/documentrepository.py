@@ -33,6 +33,7 @@ import time
 # 3rd party
 from layeredconfig import LayeredConfig, Defaults
 from lxml import etree
+from lxml.etree import Element
 from lxml.builder import ElementMaker
 from rdflib import Graph, Literal, Namespace, URIRef, BNode, RDF, RDFS
 from rdflib.namespace import FOAF
@@ -1357,9 +1358,12 @@ with the *config* object as single parameter.
         """
         XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
         XSI_SCHEMALOC = "{http://www.w3.org/2001/XMLSchema-instance}schemaLocation"
+        META = "{http://www.w3.org/1999/xhtml}meta"
+        TITLE = "{http://www.w3.org/1999/xhtml}title"
+        LINK = "{http://www.w3.org/1999/xhtml}link"
+        HEAD = "{http://www.w3.org/1999/xhtml}head"
 
         def render_head(g, uri, children=None):
-            E = ElementMaker(namespace="http://www.w3.org/1999/xhtml")
             if not children:
                 children = []
                 # if revlink == True, we're serializing triples for
@@ -1380,14 +1384,17 @@ with the *config* object as single parameter.
                     continue
 
                 if g.qname(pred) == "dcterms:title" and revlink:
-                    attrs = {'property': 'dcterms:title'}
+                    childattrs = OrderedDict([('property', 'dcterms:title')])
                     if obj.language != doc.lang:
-                        attrs[XML_LANG] = obj.language or ""
-                    children.append(E.title(attrs, str(obj)))
+                        childattrs[XML_LANG] = obj.language or ""
+                    e = Element(TITLE, childattrs)
+                    e.text = str(obj)
+                    children.append(e)
 
                 elif isinstance(obj, URIRef) and str(subj) == uri:
-                    children.append(E.link({'rel': g.qname(pred),
-                                            'href': str(obj)}))
+                    childattrs = OrderedDict([('rel', g.qname(pred)),
+                                              ('href', str(obj))])
+                    children.append(Element(LINK, childattrs))
                     if not revlink:
                         children[-1].set('about', uri)
                     if str(obj) == doc.uri:
@@ -1399,23 +1406,25 @@ with the *config* object as single parameter.
 
                 elif isinstance(obj, URIRef):
                     if revlink:
-                        children.append(E.link({'rev': g.qname(pred),
-                                                'href': str(subj)}))
+                        childattrs = OrderedDict([('rev', g.qname(pred)),
+                                                  ('href', str(subj))])
+                        children.append(Element(LINK, childattrs))
                 elif isinstance(obj, BNode):
                     if g.value(obj, RDF.first):
                         # the BNode is really a RDF list
                         coll = Collection(g, obj)
                         for thing in coll:
                             if isinstance(thing, URIRef):
-                                children.append(E.link({'rel': g.qname(pred),
-                                                        'inlist': '',
-                                                        'href': str(thing)}))
+                                childattrs = OrderedDict([('rel', g.qname(pred)),
+                                                          ('inlist', ''),
+                                                          ('href', str(thing))])
+                                children.append(Element(LINK, childattrs))
                             elif isinstance(thing, Literal):
-                                attrs = {'property': g.qname(pred),
-                                         'inlist': '',
-                                         'content': str(obj)}
+                                childattrs = OrderedDict([('property', g.qname(pred)),
+                                                          ('inlist', ''),
+                                                          ('content', str(obj))])
                                 # FIXME possibly add datatype and/or lang
-                                children.append(E.meta(attrs))
+                                children.append(Element(META, childattrs))
                         for thing in coll:
                             if isinstance(thing, URIRef):
                                 render_head(g, str(thing), children)
@@ -1425,42 +1434,45 @@ with the *config* object as single parameter.
                         # where this BNode is a subject of a triple with a
                         # URIRef or Literal as object (bnodes pointing to
                         # bnodes not supported)
-                        children.append(E.link({'rel': g.qname(pred),
-                                                'resource': obj.n3()}))
+                        childattrs = OrderedDict([('rel', g.qname(pred)),
+                                                  ('resource', obj.n3())])
+                        children.append(Element(LINK, childattrs))
                         if not revlink:
                             children[-1].set('about', uri)
                         for (p, o) in sorted(g.predicate_objects(obj)):
                             if isinstance(o, URIRef):
-                                children.append(E.link({'about': obj.n3(),
-                                                        'rel': g.qname(p),
-                                                        'href': str(o)}))
+                                childattrs = OrderedDict([('about', obj.n3()),
+                                                         ('rel', g.qname(p)),
+                                                         ('href', str(o))])
+                                children.append(Element(LINK, childattrs))
                             elif isinstance(o, Literal):
-                                attr = {'about': obj.n3(),
-                                        'property': g.qname(p),
-                                        'content': str(o)}
+                                childattrs = OrderedDict([('about', obj.n3()),
+                                                          ('property', g.qname(p)),
+                                                          ('content', str(o))])
                                 if o.datatype:
-                                    attr['datatype'] = g.qname(o.datatype)
+                                    childattrs['datatype'] = g.qname(o.datatype)
                                 if o.language:
-                                    attr[XML_LANG] = o.language
-                                children.append(E.meta(attr))
+                                    childattrs[XML_LANG] = o.language
+                                children.append(Element(META, childattrs))
                             else:
                                 raise errors.ParseError("Can't serialize a BNode-%s triple" % o.__class__.__name__)
                 else:  # this must be a literal, ie something to be
                        # rendered as <meta property="..."
                        # content="..."/>
-                    attrs = {'property': g.qname(pred),
-                            'content': str(obj)}
+                    childattrs = OrderedDict([('property', g.qname(pred)),
+                                              ('content', str(obj))])
                     if obj.datatype:
-                        attrs['datatype'] = g.qname(obj.datatype)
+                        childattrs['datatype'] = g.qname(obj.datatype)
                     elif obj.language:
-                        attrs[XML_LANG] = obj.language
+                        childattrs[XML_LANG] = obj.language
                     elif doc.lang:
-                        attrs[XML_LANG] = ""
+                        childattrs[XML_LANG] = ""
                     if not revlink:
-                        attrs['about'] = uri
-                    children.append(E.meta(attrs))
-
-            return E.head({'about': uri}, *children)
+                        childattrs['about'] = uri
+                    children.append(Element(META, childattrs))
+            e = Element(HEAD, {'about': uri})
+            e.extend(children)
+            return e
         bodycontent = doc.body.as_xhtml(doc.uri)
         headcontent = render_head(doc.meta, doc.uri)
 
