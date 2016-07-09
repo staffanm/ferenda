@@ -122,12 +122,14 @@ class Devel(object):
 
     @decorators.action
     def csvinventory(self, alias):
-        """Create an inventory of documents, as a CSV file. Only documents
-        that have been parsed and yielded some minimum amount of RDF
-        metadata will be included.
+        """Create an inventory of documents, as a CSV file. 
+
+        Only documents that have been parsed and yielded some minimum
+        amount of RDF metadata will be included.
 
         :param alias: Docrepo alias
         :type  alias: str
+
         """
         predicates = ['basefile',
                       'subobjects',  # sections that have rdf:type
@@ -363,6 +365,7 @@ class Devel(object):
 
     @decorators.action
     def construct(self, template, uri, format="turtle"):
+        """Run the specified SPARQL CONSTRUCT query."""
         print = builtins.print
         sq = util.readfile(template) % {'uri': uri}
         ts = TripleStore.connect(self.config.storetype,
@@ -383,6 +386,7 @@ class Devel(object):
 
     @decorators.action
     def select(self, template, uri, format="json"):
+        """Run the specified SPARQL SELECT query."""
         sq = util.readfile(template) % {'uri': uri}
         ts = TripleStore.connect(self.config.storetype,
                                  self.config.storelocation,
@@ -408,6 +412,7 @@ class Devel(object):
 
     @decorators.action
     def destroyindex(self):
+        """Clear all data in the fulltext search index."""
         f = FulltextIndex.connect(self.config.indextype,
                                   self.config.indexlocation,
                                   [])
@@ -417,6 +422,7 @@ class Devel(object):
 
     @decorators.action
     def clearstore(self):
+        """Clear all data in the current triplestore."""
         store = TripleStore.connect(self.config.storetype,
                                     self.config.storelocation,
                                     self.config.storerepository)
@@ -464,6 +470,7 @@ class Devel(object):
 
     @decorators.action
     def samplerepo(self, alias, sourcedir, sourcerepo=None, destrepo=None, samplesize=None):
+        """Copy a random selection of documents from an external docrepo to the current datadir.""" 
         if not samplesize:
             if 'samplesize' in self.config:
                 samplesize = int(self.config.samplesize)
@@ -497,11 +504,17 @@ class Devel(object):
             else:
                 self._samplebasefile(sourcerepo, destrepo, basefile)
 
-
+    @decorators.action
     def copyrepos(self, sourcedir, basefilelist):
-        # To be used with the output of analyze-error-log.py, eg
-        # $ ../tools/analyze-error-log.py data/logs/20160522-120204.log --listerrors > errors.txt
-        # $ ./ferenda-build.py devel copyrepos /path/to/big/external/datadir errors.txt
+        """Copy some specified documents to the current datadir.
+
+        The documents are specified in BASEFILELIST, and copied from
+        the external directory SOURCEDIR.
+
+        To be used with the output of analyze-error-log.py, eg
+        $ ../tools/analyze-error-log.py data/logs/20160522-120204.log --listerrors > errors.txt
+        $ ./ferenda-build.py devel copyrepos /path/to/big/external/datadir errors.txt
+        """
         with open(basefilelist) as fp:
             basefilelist = []
             for line in fp:
@@ -588,7 +601,9 @@ class Devel(object):
                          destrepo.store.documententry_path(basefile))
 
 
+    @decorators.action
     def samplerepos(self, sourcedir):
+        """Copy a random selection of external documents to the current datadir - for all docrepos.""" 
         if 'samplesize' in self.config:
             samplesize = int(self.config.samplesize)
         else:
@@ -635,6 +650,7 @@ class Devel(object):
                 print("%s: Copying docs from %s" % (alias, aliasdir))
                 self.samplerepo(alias, aliasdir)
 
+    @decorators.action
     def statusreport(self, alias=None):
         """Generate report on which files parse()d OK, with errors, or failed.
 
