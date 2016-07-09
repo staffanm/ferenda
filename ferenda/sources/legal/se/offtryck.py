@@ -255,6 +255,8 @@ class Offtryck(SwedishLegalSource):
                         }
                         if 'kommittensbetankande' in initialstate:
                             self.refparser._legalrefparser.kommittensbetankande = initialstate['kommittensbetankande']
+                        else:
+                            self.refparser._legalrefparser.kommittensbetankande = None
                     if hasattr(self, 'sfsparser'):
                         # the parsing of section titles by
                         # find_commentary might have picked up some
@@ -406,6 +408,9 @@ class Offtryck(SwedishLegalSource):
                        'defaultsize': defaultsize}
         functions = [(self.find_primary_law, sharedstate),
                      (self.find_commentary, sharedstate)]
+        if not hasattr(self, 'sfsparser'):
+            self.sfsparser = LegalRef(LegalRef.LAGRUM)
+        self.sfsparser.currentlynamedlaws.clear()
         if self.document_type == self.PROPOSITION:
             functions.append((self.find_kommittebetankande, sharedstate))
         return functions
@@ -800,10 +805,6 @@ class Offtryck(SwedishLegalSource):
         # FIXME: This doesn't fix "20a§"
         text = re.sub("(\d+)(§)", r"\1 \2", text)
 
-
-        if not hasattr(self, 'sfsparser'):
-            self.sfsparser = LegalRef(LegalRef.LAGRUM)
-        
         m = self.re_urisegments.match(baseuri)
         if m:
             attributes = {'law':m.group(2),

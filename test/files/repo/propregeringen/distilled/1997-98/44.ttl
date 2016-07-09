@@ -17,20 +17,23 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>Ändringarna i 20, 21, 35, 41 och 50 §§ innebär att regeringen eller den myndighet som regeringen bestämmer från och med ikraftträdandet den 1 januari 1999 av den ändring i <a href="https://lagen.nu/sfs/1974:152" rel="dcterms:references">regeringsformen</a> som berörts i närmast föregående avsnitt bemyndigas att meddela föreskrifter även såvitt avser sådan manuell behandling av personuppgifter som omfattas av person-</p>
               <span id="sid148"/>
-              <p>uppgiftslagen. Frågan om normgivningsdelegation har behandlats i avsnitt 10 och frågan om ikraftträdande har behandlats i avsnitt 15.</p>
+              <p>uppgiftslagen. Frågan om normgivningsdelegation har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S10" rel="dcterms:references">avsnitt 10</a> och frågan om ikraftträdande har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S15" rel="dcterms:references">avsnitt 15</a>.</p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.5> ;
-    dcterms:references <https://lagen.nu/sfs/1974:152> .
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S10>,
+        <https://lagen.nu/prop/1997/98:44#S15>,
+        <https://lagen.nu/sfs/1974:152> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Frågan om lagens namn har behandlats i avsnitt 7 i den allmänna motiveringen.</p>
+              <p>Frågan om lagens namn har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S7" rel="dcterms:references">avsnitt 7</a> i den allmänna motiveringen.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> .
+    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S7> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P1> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P1> ;
@@ -60,7 +63,7 @@
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P11> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Paragrafen reglerar den registrerades rätt att motsätta sig behandling för direkt marknadsföring. Paragrafen överensstämmer med Datalagskom-mitténs förslag och har berörts i avsnitt 12.5.2.3 i kommitténs betänkan-de.</p>
+              <p>Paragrafen reglerar den registrerades rätt att motsätta sig behandling för direkt marknadsföring. Paragrafen överensstämmer med Datalagskom-mitténs förslag och har berörts i <a href="https://lagen.nu/prop/1997/98:44#S12.5.2.3" rel="dcterms:references">avsnitt 12.5.2.3</a> i kommitténs betänkan-de.</p>
               <p>Uttrycket ”behandlas för ändamål som rör direkt marknadsföring” är avsett att ha samma innebörd som enligt artikel 14 första stycket b i EG-direktivet, se bilaga 1.</p>
               <p>Paragrafen medger inte att den personuppgiftsansvarige eller någon annan tar ut någon avgift eller liknande av den registrerade. Den registre-rade kan således utan kostnad utöva sin rätt att motsätta sig att hans eller hennes personuppgifter behandlas för ändamål som rör direkt mark-nadsföring. Däremot finns det inte heller någon reglering som medför att den registrerade kan få ersättning för utlägg för t.ex. portokostnaden för att sända in anmälan.</p>
               <p>Skriftlighetskravet innebär att anmälan måste vara uttryckt i text, men texten kan finnas på papper lika väl som i elektronisk form. Anmälan kan således göras via elektronisk post. Frågan om en insänd text är en sådan anmälan som avses i paragrafen får avgöras enligt sedvanliga regler om tolkning av ensidiga rättshandlingar.</p>
@@ -73,7 +76,8 @@
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
-    dcterms:references <https://lagen.nu/sfs/1942:740#K33P3>,
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S12.5.2.3>,
+        <https://lagen.nu/sfs/1942:740#K33P3>,
         <https://lagen.nu/sfs/1971:291#P44>,
         <https://lagen.nu/sfs/1986:228#P10> .
 
@@ -96,50 +100,54 @@
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>Paragrafen innehåller ett principiellt förbud mot att behandla vad som enligt paragrafen är att beteckna som känsliga personuppgifter. I 14– 20 §§ finns det bestämmelser som för med sig att sådana personuppgifter i vissa fall ändå får behandlas.</p>
-              <p>Behandling av känsliga personuppgifter har behandlats i avsnitt 11.4.1. Paragrafen överensstämmer med Datalagskommitténs förslag och har berörts i avsnitt 12.5.3.2 i kommitténs betänkande.</p>
+              <p>Behandling av känsliga personuppgifter har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S11.4.1" rel="dcterms:references">avsnitt 11.4.1</a>. Paragrafen överensstämmer med Datalagskommitténs förslag och har berörts i avsnitt 12.5.3.2 i kommitténs betänkande.</p>
               <p><i>Första och andra styckena </i>skall ha samma innebörd som artikel 8.1 i EG-direktivet, se bilaga 1.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> .
+    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S11.4.1> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P15> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P15> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Behandling av känsliga personuppgifter har behandlats i avsnitt 11.4. Paragrafen överensstämmer i huvudsak med Datalagskommitténs förslag och har berörts i avsnitt 12.5.3.3 i kommitténs betänkande.</p>
+              <p>Behandling av känsliga personuppgifter har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S11.4" rel="dcterms:references">avsnitt 11.4</a>. Paragrafen överensstämmer i huvudsak med Datalagskommitténs förslag och har berörts i avsnitt 12.5.3.3 i kommitténs betänkande.</p>
               <p>I 12 § andra stycket regleras den situationen att den registrerade åter-kallar ett redan lämnat samtycke.</p>
               <p>Paragrafen skall ha samma innebörd som EG-direktivets artikel 8.2 punkt a och första ledet i punkt e, se bilaga 1.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> .
+    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S11.4> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P16> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P16> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Behandling av känsliga personuppgifter har behandlats i avsnitt 11.4. Paragrafen överensstämmer med Datalagskommitténs förslag och har berörts i avsnitt 12.5.3.3 i kommitténs betänkande.</p>
+              <p>Behandling av känsliga personuppgifter har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S11.4" rel="dcterms:references">avsnitt 11.4</a>. Paragrafen överensstämmer med Datalagskommitténs förslag och har berörts i avsnitt 12.5.3.3 i kommitténs betänkande.</p>
               <p><i>Första stycket </i>skall ha samma innebörd som EG-direktivets artikel 8.2 punkt b och c samt andra ledet i punkt e, se bilaga 1. Punkten a i första stycket i paragrafen är vidare en sådan bestämmelse som – i enlighet med artikel 8.2 punkt b i direktivet – tillåter behandling. Datalagskommittén har som ett exempel på när det är nödvändigt att behandla känsliga uppgifter för att rättsliga anspråk skall kunna fastställas, göras gällande eller försvaras nämnt behandling av personuppgifter om medlemskap i fackförening som behövs till följd av att fackliga organisationer avtalar om individuella eller kollektiva förmåner eller tjänster för sina med-lemmar, t.ex. gruppförsäkring.</p>
               <p><i>Andra stycket </i>innehåller bestämmelser om sådana lämpliga skydds-åtgärder som avses i artikel 8.2 punkt b i direktivet. Uttrycket ”inom arbetsrätten” i andra stycket skall ha samma innebörd som enligt den nyss nämnda punkten. Skyldigheten att lämna ut personuppgifter måste fram-gå av lagstiftning, myndighetsbeslut eller av ett muntligt eller skriftligt avtal, t.ex. ett kollektivavtal. Det skall vara fråga om en rättslig skyldig-het. Det är vid tvist den personuppgiftsansvarige som har bevisbördan för att den registrerade lämnat sitt samtycke till ett utlämnande. Har den registrerade muntligen eller skriftligen återkallat ett nödvändigt sam-tycke, får uppgifterna därefter inte lämnas ut till tredje man.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> .
+    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S11.4> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P17> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P17> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Behandling av känsliga personuppgifter har behandlats i avsnitt 11.4. Paragrafen överensstämmer med Datalagskommitténs förslag och har berörts i avsnitt 12.5.3.3 i kommitténs betänkande.</p>
+              <p>Behandling av känsliga personuppgifter har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S11.4" rel="dcterms:references">avsnitt 11.4</a>. Paragrafen överensstämmer med Datalagskommitténs förslag och har berörts i avsnitt 12.5.3.3 i kommitténs betänkande.</p>
               <p>Paragrafen skall ha samma innebörd som artikel 8.2 punkt d i EG-direktivet, se bilaga 1.</p>
               <p>Det är vid tvist den personuppgiftsansvarige som har bevisbördan för att den registrerade lämnat sitt samtycke till ett utlämnande. Har den registrerade muntligen eller skriftligen återkallat ett nödvändigt sam-tycke, får uppgifterna därefter inte lämnas ut till tredje man.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> .
+    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S11.4> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P18> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P18> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Behandling av känsliga personuppgifter har behandlats i avsnitt 11.4.</p>
+              <p>Behandling av känsliga personuppgifter har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S11.4" rel="dcterms:references">avsnitt 11.4</a>.</p>
               <p>Paragrafen skall ha samma innebörd som artikel 8.3 i EG-direktivet, se bilaga 1.</p>
               <p>Paragrafen har – i enlighet med vad som föreslagits av <i>Stockholms </i></p>
               <p><i>läns landsting </i>– i förhållande till Datalagskommitténs förslag komplette-rats såvitt avser regeln i nyss nämnda artikel om att den som inte är verksam på hälso- och sjukvårdsområdet men som ändå är underkastad en liknande tystnadsplikt får behandla känsliga personuppgifter. Den regeln kan nämligen ha betydelse t.ex. när känsliga personuppgifter från en myndighet inom hälso- och sjukvården lämnas till forskningsverk-samhet eller verksamhet för tillsyn eller revision hos annan myndighet.</p>
@@ -147,7 +155,8 @@
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
-    dcterms:references <https://lagen.nu/sfs/1980:100>,
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S11.4>,
+        <https://lagen.nu/sfs/1980:100>,
         <https://lagen.nu/sfs/1994:953>,
         <https://lagen.nu/sfs/1996:786> .
 
@@ -155,7 +164,7 @@
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P19> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Paragrafen reglerar när känsliga personuppgifter får behandlas för forsk-nings- och statistikändamål utan samtycke. Den frågan har behandlats i avsnitt 11.4.2. Paragrafen överensstämmer i huvudsak med Datalagskom-mitténs förslag och har berörts i avsnitt 11.6.3 i kommitténs betänkande.</p>
+              <p>Paragrafen reglerar när känsliga personuppgifter får behandlas för forsk-nings- och statistikändamål utan samtycke. Den frågan har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S11.4.2" rel="dcterms:references">avsnitt 11.4.2</a>. Paragrafen överensstämmer i huvudsak med Datalagskom-mitténs förslag och har berörts i avsnitt 11.6.3 i kommitténs betänkande.</p>
               <p>Med forskning avses i paragrafen i första hand den verksamhet som bedrivs vid etablerade institutioner, såsom universitet och högskolor eller privata, väletablerade forskningsinstitut. Även sådana epidemiologiska undersökningar som utförs vetenskapligt omfattas. Släktforskning faller utanför, liksom annan forskning eller utredningsverksamhet av mera privat natur. Det måste finnas ett samhällsintresse av att forskningen bedrivs, och den måste vara vetenskaplig i någon mening.</p>
               <p>Med statistik avses i paragrafen numeriska sammanställningar av elementära observationer som kan hänföras till händelser, flöden eller tillstånd och verksamhet för att göra sådana sammanställningar.</p>
               <p><i>Första stycket </i>i paragrafen innehåller en avvägningsnorm. Det krävs för det första att behandlingen av personuppgifter för det aktuella forsk-nings- eller statistikändamålet är nödvändig enligt 10 §. Nödvändig-hetskravet är avsett att ha samma innebörd som enligt artikel 7 i EG-</p>
@@ -172,13 +181,14 @@
               <p>uppgifter för användning i forsknings- och statistikprojekt. Bestämmelsen är en sådan bestämmelse om utlämnande av personuppgifter som avses i</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> .
+    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S11.4.2> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P2> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P2> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Av paragrafen framgår att <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a> är subsidiär i förhållande till andra författningar. Paragrafen har behandlats i avsnitt 6.2. Paragrafen överensstämmer i huvudsak med Datalagskommitténs förslag och har berörts i avsnitt 8.2.2 i kommitténs betänkande.</p>
+              <p>Av paragrafen framgår att <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a> är subsidiär i förhållande till andra författningar. Paragrafen har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S6.2" rel="dcterms:references">avsnitt 6.2</a>. Paragrafen överensstämmer i huvudsak med Datalagskommitténs förslag och har berörts i avsnitt 8.2.2 i kommitténs betänkande.</p>
               <p>Finns det bestämmelser i en annan lag eller i en förordning som avvi-ker från <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a>, skall de bestämmelserna tillämpas i stället. Beslut som riksdagen eller regeringen fattat i annan form än lag eller förordning och föreskrifter som myndigheter har utfärdat tar däremot inte över bestämmelserna i <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a>.</p>
               <p>I den utsträckning en lag eller förordning med avvikande bestämmel-ser inte innehåller bestämmelser om sådant som regleras i person-uppgiftslagen, skall <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagens</a> bestämmelser tillämpas. Frågan om en viss bestämmelse innefattar en avvikelse från vad som skall gälla enligt <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a> får avgöras med tillämpning av sedvanliga metoder för tolkning av författningar.</p>
               <p>Sådana avvikande bestämmelser som avses i paragrafen finns ofta i s.k. registerförfattningar som reglerar inrättandet och förandet av viktigare register på det offentliga området. Även bestämmelser som</p>
@@ -187,7 +197,8 @@
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
-    dcterms:references <https://lagen.nu/sfs/0000:000>,
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S6.2>,
+        <https://lagen.nu/sfs/0000:000>,
         <https://lagen.nu/sfs/1949:105>,
         <https://lagen.nu/sfs/1949:105#K2>,
         <https://lagen.nu/sfs/1991:1469> .
@@ -196,43 +207,49 @@
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P20> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Paragrafen innehåller ett bemyndigande för regeringen eller den myndig-het som regeringen bestämmer att meddela föreskrifter. Frågan om norm-givningsdelegation har behandlats i avsnitt 10. Paragrafen överensstäm-mer med Datalagskommitténs förslag och har berörts i avsnitt 12.5.3.3 i kommitténs betänkande.</p>
-              <p>Av förslaget till lag om ändring i <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a> (avsnitt 15) framgår att paragrafen per den 1 januari 1999 ändras så att det blir möjligt att meddela föreskrifter även såvitt avser sådan manuell behand-ling som omfattas av <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a>.</p>
+              <p>Paragrafen innehåller ett bemyndigande för regeringen eller den myndig-het som regeringen bestämmer att meddela föreskrifter. Frågan om norm-givningsdelegation har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S10" rel="dcterms:references">avsnitt 10</a>. Paragrafen överensstäm-mer med Datalagskommitténs förslag och har berörts i avsnitt 12.5.3.3 i kommitténs betänkande.</p>
+              <p>Av förslaget till lag om ändring i <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a> (<a href="https://lagen.nu/prop/1997/98:44#S15" rel="dcterms:references">avsnitt 15</a>) framgår att paragrafen per den 1 januari 1999 ändras så att det blir möjligt att meddela föreskrifter även såvitt avser sådan manuell behand-ling som omfattas av <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a>.</p>
               <p>Uttrycket viktigt allmänt intresse skall ha samma innebörd som enligt artikel 8.4 i EG-direktivet, se bilaga 1.</p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
-    dcterms:references <https://lagen.nu/sfs/0000:000> .
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S10>,
+        <https://lagen.nu/prop/1997/98:44#S15>,
+        <https://lagen.nu/sfs/0000:000> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P21> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P21> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Frågan om behandling av uppgifter om lagöverträdelser har behandlats i avsnitt 11.4.3. Paragrafens två första stycken överensstämmer i huvudsak med Datalagskommitténs förslag och har berörts i avsnitt 12.5.3.4 i kommitténs betänkande.</p>
+              <p>Frågan om behandling av uppgifter om lagöverträdelser har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S11.4.3" rel="dcterms:references">avsnitt 11.4.3</a>. Paragrafens två första stycken överensstämmer i huvudsak med Datalagskommitténs förslag och har berörts i avsnitt 12.5.3.4 i kommitténs betänkande.</p>
               <p>Uttrycken ”myndighet”, ”lagöverträdelser” och ”domar i brottmål” skall ha samma innebörd som motsvarande uttryck i artikel 8.5 första stycket i EG-direktivet, se bilaga 1. Efter påpekande av <i>Lagrådet</i> har det </p>
-              <p>preciserats att med ”lagöverträdelser” avses sådana lagöverträdelser som innefattar brott. I stället för direktivets begrepp ”säkerhetsåtgärder” som föreslagits av Datalagskommittén används begreppet ”straffprocessuella tvångsmedel” eftersom det tidigare begreppets innehåll är oklart. Som framgår av avsnitt 11.4.3 torde administrativa frihetsberövanden omfattas av regleringen, varför detta uttryckligen lagts till.</p>
-              <p><i>Andra stycket </i>innehåller ett bemyndigande för regeringen eller den myndighet som regeringen bestämmer att meddela föreskrifter om undan-tag. Frågan om normgivningsdelegation har berörts i avsnitt 10.</p>
+              <p>preciserats att med ”lagöverträdelser” avses sådana lagöverträdelser som innefattar brott. I stället för direktivets begrepp ”säkerhetsåtgärder” som föreslagits av Datalagskommittén används begreppet ”straffprocessuella tvångsmedel” eftersom det tidigare begreppets innehåll är oklart. Som framgår av <a href="https://lagen.nu/prop/1997/98:44#S11.4.3" rel="dcterms:references">avsnitt 11.4.3</a> torde administrativa frihetsberövanden omfattas av regleringen, varför detta uttryckligen lagts till.</p>
+              <p><i>Andra stycket </i>innehåller ett bemyndigande för regeringen eller den myndighet som regeringen bestämmer att meddela föreskrifter om undan-tag. Frågan om normgivningsdelegation har berörts i <a href="https://lagen.nu/prop/1997/98:44#S10" rel="dcterms:references">avsnitt 10</a>.</p>
               <p>Genom <i>tredje stycket </i>har förtydligats att regeringen eller, om rege-</p>
               <p>ringen så bestämmer, tillsynsmyndigheten i enskilda fall kan besluta om undantag från förbudet i första stycket.</p>
-              <p>Av förslaget till lag om ändring i <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a> (avsnitt 15) framgår att paragrafen per den 1 januari 1999 ändras så att det blir möjligt att meddela föreskrifter även såvitt avser sådan manuell behand-ling som omfattas av <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a>.</p>
+              <p>Av förslaget till lag om ändring i <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a> (<a href="https://lagen.nu/prop/1997/98:44#S15" rel="dcterms:references">avsnitt 15</a>) framgår att paragrafen per den 1 januari 1999 ändras så att det blir möjligt att meddela föreskrifter även såvitt avser sådan manuell behand-ling som omfattas av <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a>.</p>
               <p>Enligt 50 § a får regeringen eller den myndighet som regeringen be-stämmer meddela närmare föreskrifter om i vilka fall behandling av personuppgifter är tillåten enligt första stycket.</p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
-    dcterms:references <https://lagen.nu/sfs/0000:000> .
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S10>,
+        <https://lagen.nu/prop/1997/98:44#S11.4.3>,
+        <https://lagen.nu/prop/1997/98:44#S15>,
+        <https://lagen.nu/sfs/0000:000> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P22> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P22> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Frågan om behandling av personnummer har behandlats i avsnitt 11.4.4. Paragrafen överensstämmer i stort med Datalagskommitténs förslag och har berörts i avsnitt 12.6 i kommitténs betänkande.</p>
+              <p>Frågan om behandling av personnummer har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S11.4.4" rel="dcterms:references">avsnitt 11.4.4</a>. Paragrafen överensstämmer i stort med Datalagskommitténs förslag och har berörts i avsnitt 12.6 i kommitténs betänkande.</p>
               <p>Till paragrafen har utan någon betydande ändring i sak förts över de bestämmelser som finns i 7 § andra stycket i den nuvarande datalagen. Om någon lämnat sitt samtycke är det självklart att en uppgift om person-nummer skall få behandlas. Den uttryckliga bestämmelsen i den nu-varande datalagen om att personuppgifter får återges på datautskrifter endast när det finns särskilda skäl har inte förts över. Det innebär dock inte någon ändring i sak, eftersom redan den överförda huvudregeln innebär att en uppgift om personnummer får behandlas t.ex. genom att</p>
               <span id="sid128"/>
               <p>fästas på en utskrift eller visas upp på en datorskärm bara när den behandlingen är klart motiverad med hänsyn till något beaktansvärt skäl.</p>
               <p>Enligt 50 § a får regeringen eller den myndighet som regeringen be-stämmer meddela närmare föreskrifter om i vilka fall användning av personnummer är tillåten.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> .
+    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S11.4.4> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P23> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P23> ;
@@ -286,7 +303,7 @@
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P27> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Paragrafen har behandlats i avsnitt 11.5.2. Datalagskommittén har berört frågan i avsnitt 12.7.4 i sitt betänkande.</p>
+              <p>Paragrafen har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S11.5.2" rel="dcterms:references">avsnitt 11.5.2</a>. Datalagskommittén har berört frågan i <a href="https://lagen.nu/prop/1997/98:44#S12.7.4" rel="dcterms:references">avsnitt 12.7.4</a> i sitt betänkande.</p>
               <p><i>Första meningen</i> motsvarar delvis 10 § tredje stycket i den nuvarande datalagen. Meningen överensstämmer med Datalagskommitténs förslag.</p>
               <p><i>Andra meningen</i> innebär att även en personuppgiftsansvarig som inte är en myndighet får använda bestämmelserna i <a href="https://lagen.nu/sfs/1980:100" rel="dcterms:references">sekretesslagen</a> för att</p>
               <span id="sid131"/>
@@ -294,13 +311,15 @@
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
-    dcterms:references <https://lagen.nu/sfs/1980:100> .
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S11.5.2>,
+        <https://lagen.nu/prop/1997/98:44#S12.7.4>,
+        <https://lagen.nu/sfs/1980:100> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P28> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P28> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Frågan om korrigering av personuppgifter har behandlats i avsnitt 11.6. Korrigering av personuppgifter hos myndigheter har berörts i avsnitt 8.1. Paragrafen överensstämmer i huvudsak med Datalagskommitténs förslag och har berörts i avsnitt 12.8 och 11.6.7 i kommitténs betänkande.</p>
+              <p>Frågan om korrigering av personuppgifter har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S11.6" rel="dcterms:references">avsnitt 11.6</a>. Korrigering av personuppgifter hos myndigheter har berörts i <a href="https://lagen.nu/prop/1997/98:44#S8.1" rel="dcterms:references">avsnitt 8.1</a>. Paragrafen överensstämmer i huvudsak med Datalagskommitténs förslag och har berörts i avsnitt 12.8 och 11.6.7 i kommitténs betänkande.</p>
               <p>Paragrafen är avsedd att ha samma innebörd som artikel 12 b och c i EG-direktivet, se bilaga 1.</p>
               <p>Den registrerades begäran om korrigering eller underrättelse till tredje man kan framställas formlöst till den personuppgiftsansvarige eller någon som företräder denne. Det räcker att det av begäran framgår att den registrerade är missnöjd med behandlingen i något visst avseende och vill att korrigering skall vidtas. Framställs en sådan begäran bör den person-uppgiftsansvarige skyndsamt utreda om de framförda anmärkningarna är befogade och, om så skulle vara fallet, snarast vidta korrigering. Omfatt-ningen av utredningen får bero av de anmärkningar den registrerade framställt. Uppkommer oenighet mellan den personuppgiftsansvarige och den registrerade om uppgifterna skall korrigeras eller inte, kan den registrerade anmäla förhållandet till tillsynsmyndigheten, som har möj-lighet att förelägga vite om lagen inte följs och att ansöka om utplånande av uppgifterna, eller själv väcka talan om saken vid allmän domstol.</p>
               <p>Det är i princip den personuppgiftsansvarige som själv väljer korri-geringsmetod, dvs. om de aktuella personuppgifterna skall rättas, blockeras eller utplånas. Av annan lagstiftning eller av sakens natur kan dock följa att vissa korrigeringsmetoder inte kan användas i vissa fall, t.ex. när det gäller korrigering av personuppgifter i bokföring.</p>
@@ -311,13 +330,15 @@
               <p>Det finns inte någon formell skyldighet att självmant underrätta i flera led. En tredje man som fått en underrättelse och som själv är person-uppgiftsansvarig, är således inte rättsligt förpliktad att underrätta de tredje män till vilka han eller hon i sin tur kan ha lämnat ut uppgiften bara på grund av att han eller hon till följd av en underrättelse självmant har rättat uppgiften. Det får dock förutsättas att de person-uppgiftsansvariga frivilligt på lämpligt sätt ser till att mildra skadeverk-ningarna av felaktiga eller ofullständiga uppgifter som självmant rättats.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> .
+    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S11.6>,
+        <https://lagen.nu/prop/1997/98:44#S8.1> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P29> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P29> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Frågan om automatiserade beslut har behandlats i avsnitt 11.7. Paragra-fen överensstämmer i huvudsak med Datalagskommitténs förslag och har berörts i avsnitt 12.9 i kommitténs betänkande.</p>
+              <p>Frågan om automatiserade beslut har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S11.7" rel="dcterms:references">avsnitt 11.7</a>. Paragra-fen överensstämmer i huvudsak med Datalagskommitténs förslag och har berörts i avsnitt 12.9 i kommitténs betänkande.</p>
               <p>Definitionen av de beslut som avses i paragrafen skall ha samma inne-börd som enligt artikel 15.1 i EG-direktivet, se bilaga 1.</p>
               <p><i>Första stycket</i> innebär att det skall finnas en rätt att på begäran få ett automatiserat beslut omprövat. Det finns inget formkrav för den registre-rades begäran om omprövning. Att den registrerade skall ha rätt att på be-gäran få det automatiserade beslutet omprövat innebär en rätt att få beslutet granskat av en människa som har makt att ersätta det auto-matiserade beslutet med ett annat. Rätten till omprövning innebär</p>
               <span id="sid133"/>
@@ -329,7 +350,8 @@
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
-    dcterms:references <https://lagen.nu/sfs/1986:223#P27> .
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S11.7>,
+        <https://lagen.nu/sfs/1986:223#P27> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P3> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P3> ;
@@ -339,16 +361,18 @@
               <span id="sid115"/>
               <p>kommitténs förslag. Definitionerna har berörts i avsnitt 12.2 i kommitténs betänkande.</p>
               <p>Definitionerna av <i>behandling (av personuppgifter)</i>, <i>mottagare</i>, <i>person </i></p>
-              <p><i>uppgifter</i>, <i>personuppgiftsansvarig</i>, <i>personuppgiftsbiträde, den registre rade</i> och <i>tredje man</i> är avsedda att ha samma innebörd som motsvarande uttryck har enligt artikel 2 i EG-direktivet, se bilaga 1. Definitionen av den registrerade innebär att behandling av uppgifter om avlidna eller ännu inte födda personer inte omfattas av lagen. Definitionen av sam-tycke skall ha samma innebörd som definitionen i artikel 2 i direktivet, med tillägget att det direkt i definitionen tas in ett krav på att samtycket skall vara otvetydigt, vilket framgår av andra artiklar i direktivet. I de fall där samtycket dessutom enligt direktivet skall vara uttryckligt anges detta direkt i lagtexten. Begreppen ”otvetydig” och ”uttrycklig” har en EG-gemensam innebörd. Vissa av beteckningarna har behandlats i avsnitt 7.</p>
+              <p><i>uppgifter</i>, <i>personuppgiftsansvarig</i>, <i>personuppgiftsbiträde, den registre rade</i> och <i>tredje man</i> är avsedda att ha samma innebörd som motsvarande uttryck har enligt artikel 2 i EG-direktivet, se bilaga 1. Definitionen av den registrerade innebär att behandling av uppgifter om avlidna eller ännu inte födda personer inte omfattas av lagen. Definitionen av sam-tycke skall ha samma innebörd som definitionen i artikel 2 i direktivet, med tillägget att det direkt i definitionen tas in ett krav på att samtycket skall vara otvetydigt, vilket framgår av andra artiklar i direktivet. I de fall där samtycket dessutom enligt direktivet skall vara uttryckligt anges detta direkt i lagtexten. Begreppen ”otvetydig” och ”uttrycklig” har en EG-gemensam innebörd. Vissa av beteckningarna har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S7" rel="dcterms:references">avsnitt 7</a>.</p>
               <p>I 38–40 §§ finns det närmare bestämmelser om de uppgifter som ett<i>personuppgiftsombud</i> skall ha. </p>
               <p>Av definitionen av <i>blockering (av personuppgifter)</i> framgår att block-</p>
-              <p>erade personuppgifter får användas internt hos den personupp-giftsansvarige och hos ett anlitat personuppgiftsbiträde under förut-sättning att det där uppgifterna förekommer framgår att de är spärrade och anledningen till spärren. Däremot får uppgifterna inte lämnas ut till tredje man, varvid ett uttrycklig undantag gjorts för sådant utlämnande som sker med stöd av <a href="https://lagen.nu/sfs/1949:105#K2" rel="dcterms:references">2 kap.</a> <a href="https://lagen.nu/sfs/1949:105" rel="dcterms:references">tryckfrihetsförordningen</a>. Det undantaget har berörts i avsnitt 8.1. Av det förhållandet att den registrerade själv inte omfattas av definitionen av tredje man följer att även blockerade uppgif-ter jämte information om blockeringen skall tas med i sådan information som efter ansökan skall lämnas till den registrerade enligt 26 §. Det är upp till den personuppgiftsansvarige att bestämma hur det tekniskt skall ses till att de blockerade uppgifterna är förknippade med information om blockeringen.</p>
+              <p>erade personuppgifter får användas internt hos den personupp-giftsansvarige och hos ett anlitat personuppgiftsbiträde under förut-sättning att det där uppgifterna förekommer framgår att de är spärrade och anledningen till spärren. Däremot får uppgifterna inte lämnas ut till tredje man, varvid ett uttrycklig undantag gjorts för sådant utlämnande som sker med stöd av <a href="https://lagen.nu/sfs/1949:105#K2" rel="dcterms:references">2 kap.</a> <a href="https://lagen.nu/sfs/1949:105" rel="dcterms:references">tryckfrihetsförordningen</a>. Det undantaget har berörts i <a href="https://lagen.nu/prop/1997/98:44#S8.1" rel="dcterms:references">avsnitt 8.1</a>. Av det förhållandet att den registrerade själv inte omfattas av definitionen av tredje man följer att även blockerade uppgif-ter jämte information om blockeringen skall tas med i sådan information som efter ansökan skall lämnas till den registrerade enligt 26 §. Det är upp till den personuppgiftsansvarige att bestämma hur det tekniskt skall ses till att de blockerade uppgifterna är förknippade med information om blockeringen.</p>
               <p>Beträffande definitionen av <i>tredje land</i> kan noteras att EES-kommittén </p>
               <p>ännu inte fattat beslut om att direktivet skall omfattas av EES-avtalet. Vi förutsätter dock att ett sådant beslut fattas. I praktiken innebär det ingen större skillnad att inbegripa EES-länderna då definitionen främst har be-tydelse när det gäller överföring av personuppgifter till andra länder och då Norge och Island har anslutit sig till Europarådets dataskydds-konvention. Enligt vårt förslag skall nämligen personuppgifter alltid få överföras till sådana länder trots det allmänna förbudet i 33 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
-    dcterms:references <https://lagen.nu/sfs/1949:105>,
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S7>,
+        <https://lagen.nu/prop/1997/98:44#S8.1>,
+        <https://lagen.nu/sfs/1949:105>,
         <https://lagen.nu/sfs/1949:105#K2> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P30> a rinfoex:Forfattningskommentar ;
@@ -369,11 +393,12 @@
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P31> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Paragrafen överensstämmer med Datalagskommitténs förslag och har berörts i avsnitt 12.10.2–4 i kommitténs betänkande.</p>
+              <p>Paragrafen överensstämmer med Datalagskommitténs förslag och har berörts i <a href="https://lagen.nu/prop/1997/98:44#S12.10.2" rel="dcterms:references">avsnitt 12.10.2</a>–4 i kommitténs betänkande.</p>
               <p>Paragrafen skall ha samma innebörd som artikel 17.1 och 17.2 i EG-direktivet, se bilaga 1.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> .
+    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S12.10.2> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P32> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P32> ;
@@ -416,13 +441,16 @@
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P35> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Frågan om normgivningsdelegation har behandlats i avsnitt 10. Para-grafens två första stycken överensstämmer i huvudsak med Data-lagskommitténs förslag och har berörts i avsnitt 12.11.4 i kommitténs be-tänkande. I tredje stycket har förtydligats att regeringen, eller om rege-ringen så bestämmer, tillsynsmyndigheten, i enskilda fall kan besluta om undantag från förbudet i 33§ .</p>
+              <p>Frågan om normgivningsdelegation har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S10" rel="dcterms:references">avsnitt 10</a>. Para-grafens två första stycken överensstämmer i huvudsak med Data-lagskommitténs förslag och har berörts i <a href="https://lagen.nu/prop/1997/98:44#S12.11.4" rel="dcterms:references">avsnitt 12.11.4</a> i kommitténs be-tänkande. I tredje stycket har förtydligats att regeringen, eller om rege-ringen så bestämmer, tillsynsmyndigheten, i enskilda fall kan besluta om undantag från förbudet i 33§ .</p>
               <span id="sid136"/>
-              <p>Av förslaget till lag om ändring i <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a> (avsnitt 15) framgår att paragrafen per den 1 januari 1999 ändras så att det blir möjligt att meddela föreskrifter även såvitt avser sådan manuell behand-ling som omfattas av <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a>.</p>
+              <p>Av förslaget till lag om ändring i <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a> (<a href="https://lagen.nu/prop/1997/98:44#S15" rel="dcterms:references">avsnitt 15</a>) framgår att paragrafen per den 1 januari 1999 ändras så att det blir möjligt att meddela föreskrifter även såvitt avser sådan manuell behand-ling som omfattas av <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a>.</p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
-    dcterms:references <https://lagen.nu/sfs/0000:000> .
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S10>,
+        <https://lagen.nu/prop/1997/98:44#S12.11.4>,
+        <https://lagen.nu/prop/1997/98:44#S15>,
+        <https://lagen.nu/sfs/0000:000> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P36> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P36> ;
@@ -431,16 +459,17 @@
               <p>Paragrafen överensstämmer i stort med Datalagskommitténs förslag och har berörts i avsnitt 12.12 i kommitténs betänkande.</p>
               <p><i>Första stycket </i>skall ha samma innebörd som artikel 18.1 i EG-direktivet, se bilaga 1. Enligt 50 § f får regeringen eller den myndighet som regeringen bestämmer meddela närmare föreskrifter om anmälan till tillsynsmyndigheten och förfarandet när anmälda uppgifter har ändrats.</p>
               <p><i>Andra stycket</i> anger att ett utseende och ett entledigande av ett person-uppgiftsombud skall anmälas till tillsynsmyndigheten.</p>
-              <p><i>Tredje stycket</i> innehåller ett bemyndigande för regeringen eller den myndighet som regeringen bestämmer att meddela föreskrifter om undantag från anmälningsskyldigheten. Bemyndigandet gäller sådana behandlingar som avses i artikel 18.2 första strecksatsen, 18.3 och 18.4 i EG-direktivet, se bilaga 1. Frågan om normgivningsdelegation har behandlats i avsnitt 10.</p>
+              <p><i>Tredje stycket</i> innehåller ett bemyndigande för regeringen eller den myndighet som regeringen bestämmer att meddela föreskrifter om undantag från anmälningsskyldigheten. Bemyndigandet gäller sådana behandlingar som avses i artikel 18.2 första strecksatsen, 18.3 och 18.4 i EG-direktivet, se bilaga 1. Frågan om normgivningsdelegation har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S10" rel="dcterms:references">avsnitt 10</a>.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> .
+    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S10> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P37> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P37> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Beteckningen personuppgiftsombud har behandlats i avsnitt 12. Para-grafen har berörts i avsnitt 12.12 i Datalagskommitténs betänkande.</p>
+              <p>Beteckningen personuppgiftsombud har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S12" rel="dcterms:references">avsnitt 12</a>. Para-grafen har berörts i <a href="https://lagen.nu/prop/1997/98:44#S12.12" rel="dcterms:references">avsnitt 12.12</a> i Datalagskommitténs betänkande.</p>
               <p>Det är bara behandlingar som påbörjas efter det att personupp-giftsombudet har anmälts till tillsynsmyndigheten som är undantagna från anmälningsskyldigheten.</p>
               <p>Personuppgiftsombudet skall vara en fysisk person. Det finns inget som hindrar att den personuppgiftsansvarige utser flera personupp-giftsombud eller att flera personuppgiftsansvariga, t.ex. inom en viss bransch, utser en och samma person till personuppgiftsombud, t.ex. en</p>
               <span id="sid137"/>
@@ -449,7 +478,9 @@
               <p>Enligt 50 § f får regeringen eller den myndighet som regeringen be-stämmer meddela närmare föreskrifter om anmälan till tillsynsmyndig-heten och förfarandet när anmälda uppgifter har ändrats.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> .
+    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S12>,
+        <https://lagen.nu/prop/1997/98:44#S12.12> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P38> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P38> ;
@@ -486,11 +517,12 @@
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P4> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Paragrafen har behandlats i avsnitt 9. Den överensstämmer med Data-lagskommitténs förslag, dock att en av kommittén föreslagen bestämmel-se om skyldighet att till tillsynsmyndigheten lämna in en anmälan om en utsedd företrädare inte tagits med. Paragrafen har berörts i avsnitt 12.3 i kommitténs betänkande.</p>
+              <p>Paragrafen har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S9" rel="dcterms:references">avsnitt 9</a>. Den överensstämmer med Data-lagskommitténs förslag, dock att en av kommittén föreslagen bestämmel-se om skyldighet att till tillsynsmyndigheten lämna in en anmälan om en utsedd företrädare inte tagits med. Paragrafen har berörts i avsnitt 12.3 i kommitténs betänkande.</p>
               <p>Avsikten är att paragrafen skall ha samma innebörd som artikel 4 i EG-direktivet, se bilaga 1.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> .
+    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S9> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P40> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P40> ;
@@ -506,38 +538,43 @@
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P42> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Frågan om upplysningar till allmänheten om behandlingar har behandlats i avsnitt 12. Paragrafen överensstämmer delvis med Datalagskommitténs förslag och har berörts i avsnitt 12.12.2.6 i kommitténs betänkande.</p>
+              <p>Frågan om upplysningar till allmänheten om behandlingar har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S12" rel="dcterms:references">avsnitt 12</a>. Paragrafen överensstämmer delvis med Datalagskommitténs förslag och har berörts i avsnitt 12.12.2.6 i kommitténs betänkande.</p>
               <p>Paragrafen skall ha samma innebörd som artikel 21.3 första stycket i EG-direktivet, se bilaga 1.</p>
-              <p>Frågor om sekretess har behandlats i avsnitt 11.5.2.</p>
+              <p>Frågor om sekretess har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S11.5.2" rel="dcterms:references">avsnitt 11.5.2</a>.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> .
+    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S11.5.2>,
+        <https://lagen.nu/prop/1997/98:44#S12> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P47> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P47> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Frågan om tillsynsmyndighetens befogenheter har behandlats i avsnitt 13. Bestämmelserna i 43–47 §§ överensstämmer i huvudsak med Data-lagskommitténs förslag och har berörts i avsnitt 12.14.1 i kommitténs betänkande.</p>
+              <p>Frågan om tillsynsmyndighetens befogenheter har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S13" rel="dcterms:references">avsnitt 13</a>. Bestämmelserna i 43–47 §§ överensstämmer i huvudsak med Data-lagskommitténs förslag och har berörts i avsnitt 12.14.1 i kommitténs betänkande.</p>
               <p>Det bör betonas att möjligheten enligt <i>46 §</i> att meddela ett tillfälligt </p>
               <p>beslut om vite är avsedd att utnyttjas bara i undantagsfall när saken är klar och så brådskande att ett yttrande från den personuppgiftsansvarige inte kan avvaktas.</p>
               <p>Möjligheten enligt <i>47 § </i>att ansöka om utplånande av personuppgifter </p>
               <p>bör bara användas i sådana fall där det inte genom andra åtgärder är möjligt att förena behandlingen av uppgifterna med de regler som gäller. Frågan om ett beslut om utplånande är oskäligt får avgöras mot bakgrund av samtliga omständigheter i det aktuella fallet. Vid bedömningen kan beaktas sådana faktorer som att ett utplånande för den personuppgifts-ansvarige skulle innebära stora praktiska svårigheter eller ett svårt ekonomiskt avbräck. Enligt 51 § andra stycket krävs det prövnings-tillstånd vid överklagande till kammarrätten.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> .
+    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S13> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P48> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P48> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Frågan om skadestånd har behandlats i avsnitt 14. Paragrafen överens-stämmer i huvudsak med Datalagskommitténs förslag, dock att kom-mittén föreslog att skadestånd även kunde utgå vid behandling i strid med föreskrifter som meddelats med stöd av lagen, och har även berörts i avsnitt 12.13.2.1–3 i kommitténs betänkande.</p>
+              <p>Frågan om skadestånd har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S14" rel="dcterms:references">avsnitt 14</a>. Paragrafen överens-stämmer i huvudsak med Datalagskommitténs förslag, dock att kom-mittén föreslog att skadestånd även kunde utgå vid behandling i strid med föreskrifter som meddelats med stöd av lagen, och har även berörts i <a href="https://lagen.nu/prop/1997/98:44#S12.13.2.1" rel="dcterms:references">avsnitt 12.13.2.1</a>–3 i kommitténs betänkande.</p>
               <p>Bestämmelserna i paragrafen är sådana specialbestämmelser om ska-destånd som tar över de allmänna skadeståndsreglerna i <a href="https://lagen.nu/sfs/1972:207" rel="dcterms:references">skadeståndslagen (1972:207)</a>, se 1 kap. 1 § i den lagen. I den utsträckning en ersättnings-fråga inte berörs i paragrafen – t.ex. frågan om hur ersättningen för en personskada eller sakskada skall beräknas (<a href="https://lagen.nu/sfs/1972:207#K5" rel="dcterms:references">5 kap.</a> <a href="https://lagen.nu/sfs/1972:207" rel="dcterms:references">skadeståndslagen</a>) eller frågan om ansvaret när det finns flera skadeståndsskyldiga (<a href="https://lagen.nu/sfs/1972:207#K6P3" rel="dcterms:references">6 kap. 3 § skadeståndslagen</a>) – tillämpas de allmänna reglerna i <a href="https://lagen.nu/sfs/1972:207" rel="dcterms:references">skadeståndslagen</a>. I den utsträckning ett förfarande i strid med lagen eller god sed vid behandling av personuppgifter ingår som ett led i ett sådant brott som av-ses i <a href="https://lagen.nu/sfs/1972:207#K1P3" rel="dcterms:references">1 kap. 3 § skadeståndslagen</a>, kan däremot ideellt skadestånd för li-dande respektive ersättning för kränkning utgå enligt såväl den nyss nämnda bestämmelsen som denna paragraf. Som <i>Lagrådet</i> påpekat </p>
               <p>innebär detta inte att kränkningen ersätts med ett högre belopp enbart därför att flera bestämmelser kan vara tillämpliga.</p>
               <span id="sid141"/>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
-    dcterms:references <https://lagen.nu/sfs/1972:207>,
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S12.13.2.1>,
+        <https://lagen.nu/prop/1997/98:44#S14>,
+        <https://lagen.nu/sfs/1972:207>,
         <https://lagen.nu/sfs/1972:207#K1P3>,
         <https://lagen.nu/sfs/1972:207#K5>,
         <https://lagen.nu/sfs/1972:207#K6P3> .
@@ -546,69 +583,77 @@
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P49> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Frågan om straff har behandlats i avsnitt 14. Paragrafen har i förhållande till Datalagskommitténs förslag kompletterats med bestämmelserna i punkt b–d. Datalagskommitténs förslag har berörts i avsnitt 12.13.2.4 i kommitténs betänkande.</p>
+              <p>Frågan om straff har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S14" rel="dcterms:references">avsnitt 14</a>. Paragrafen har i förhållande till Datalagskommitténs förslag kompletterats med bestämmelserna i punkt b–d. Datalagskommitténs förslag har berörts i avsnitt 12.13.2.4 i kommitténs betänkande.</p>
               <p>Vid bedömandet av om brottet är grovt kan beaktas sådana omstän-digheter som att de olagligt behandlade uppgifterna avsett förhållanden av avsevärd betydelse för den registrerade och att gärningsmannen insett detta eller att gärningsmannen lämnat osanna uppgifter för att undkomma påföljd eller vinna någon annan fördel eller att det brottsliga utnyttjandet av uppgifterna annars framstår som hänsynslöst. Bara i undantagsfall torde en gärning som begåtts av oaktsamhet kunna betraktas som ett grovt brott.</p>
               <p>I <i>andra stycket</i>, som lagts till på förslag från <i>Lagrådet</i>, föreskrivs att </p>
               <p>den som överträtt ett vitesföreläggande enligt 44 eller 45 § första stycket inte döms till ansvar för en gärning som omfattas av vitesföreläggandet.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> .
+    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S14> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P5> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P5> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Frågan om en teknikoberoende lag har behandlats i avsnitt 6.1. Paragra-fen överensstämmer i sak med Datalagskommitténs förslag och har berörts i avsnitt 7.2.1, 12.2.8 och 12.2.12 i kommitténs betänkande. Begreppet ”automatiserad” som har valts på förslag av <i>Lagrådet</i> kom-</p>
-              <p>menteras i avsnitt 6.1.</p>
+              <p>Frågan om en teknikoberoende lag har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S6.1" rel="dcterms:references">avsnitt 6.1</a>. Paragra-fen överensstämmer i sak med Datalagskommitténs förslag och har berörts i avsnitt 7.2.1, 12.2.8 och 12.2.12 i kommitténs betänkande. Begreppet ”automatiserad” som har valts på förslag av <i>Lagrådet</i> kom-</p>
+              <p>menteras i <a href="https://lagen.nu/prop/1997/98:44#S6.1" rel="dcterms:references">avsnitt 6.1</a>.</p>
               <p>Paragrafen är avsedd att ha samma innebörd som artikel 3.1 och defi-nitionen av register i artikel 2 c i EG-direktivet, se bilaga 1.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> .
+    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S6.1> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P50> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P50> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Frågan om normgivningsdelegation har behandlats i avsnitt 10. Para-grafen överensstämmer med Datalagskommitténs förslag och har berörts i avsnitt 12.1.2 i kommitténs betänkande.</p>
-              <p>Av förslaget till lag om ändring i <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a> (avsnitt 15) framgår att paragrafen per den 1 januari 1999 ändras så att det blir möjligt att meddela föreskrifter även såvitt avser sådan manuell behand-ling som omfattas av <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a>. Av 8 kap. 13 § regeringsfor-men framgår att regeringen utan särskilt bemyndigande från riksdagen kan meddela föreskrifter om verkställighet av lag och delegera denna föreskriftsrätt till myndighet. I vart fall punkterna d, andra ledet av e och</p>
+              <p>Frågan om normgivningsdelegation har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S10" rel="dcterms:references">avsnitt 10</a>. Para-grafen överensstämmer med Datalagskommitténs förslag och har berörts i avsnitt 12.1.2 i kommitténs betänkande.</p>
+              <p>Av förslaget till lag om ändring i <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a> (<a href="https://lagen.nu/prop/1997/98:44#S15" rel="dcterms:references">avsnitt 15</a>) framgår att paragrafen per den 1 januari 1999 ändras så att det blir möjligt att meddela föreskrifter även såvitt avser sådan manuell behand-ling som omfattas av <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a>. Av 8 kap. 13 § regeringsfor-men framgår att regeringen utan särskilt bemyndigande från riksdagen kan meddela föreskrifter om verkställighet av lag och delegera denna föreskriftsrätt till myndighet. I vart fall punkterna d, andra ledet av e och</p>
               <span id="sid144"/>
               <p>f i paragrafen utgör sådana verkställighetsföreskrifter. Av tydlighetsskäl omfattar bemyndigandet även dessa situationer, trots att regeringen utan bemyndigande ändå hade kunnat meddela sådana föreskrifter. Regering-en kan naturligtvis meddela verkställighetsföreskrifter som inte tagits upp i paragrafen. Det är således möjligt att före den 1 januari 1999 meddela verkställighetsföreskrifter även avseende manuell behandling av person-uppgifter.</p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
-    dcterms:references <https://lagen.nu/sfs/0000:000> .
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S10>,
+        <https://lagen.nu/prop/1997/98:44#S15>,
+        <https://lagen.nu/sfs/0000:000> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P51> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P51> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Frågan om överklagande har behandlats i avsnitt 13. Paragrafen överens-stämmer med Datalagskommitténs förslag och har berörts i avsnitt 12.14.2 i kommitténs betänkande.</p>
+              <p>Frågan om överklagande har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S13" rel="dcterms:references">avsnitt 13</a>. Paragrafen överens-stämmer med Datalagskommitténs förslag och har berörts i avsnitt 12.14.2 i kommitténs betänkande.</p>
               <p>Kravet på prövningstillstånd i andra stycket avser överklagande av länsrättens beslut enligt såväl första stycket som 47 §.</p>
-              <p>Frågan om ikraftträdande och övergångsbestämmelser har behandlats i avsnitt 15. Övergångsbestämmelserna överensstämmer i huvudsak med Datalagskommitténs förslag, dock att kommittén föreslog att lagen skulle</p>
+              <p>Frågan om ikraftträdande och övergångsbestämmelser har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S15" rel="dcterms:references">avsnitt 15</a>. Övergångsbestämmelserna överensstämmer i huvudsak med Datalagskommitténs förslag, dock att kommittén föreslog att lagen skulle</p>
               <span id="sid145"/>
-              <p>träda i kraft den 1 januari 1999. Kommittén har berört förslagen i avsnitt 12.15 i sitt betänkande.</p>
+              <p>träda i kraft den 1 januari 1999. Kommittén har berört förslagen i <a href="https://lagen.nu/prop/1997/98:44#S12.15" rel="dcterms:references">avsnitt 12.15</a> i sitt betänkande.</p>
               <p>Kravet enligt <i>punkt 2 och 3 </i>på att behandlingen påbörjats vid ikraft-</p>
-              <p>trädandet har behandlats i avsnitt 15 och motsvarar artikel 32.2 i EG-direktivet, se bilaga 1.</p>
+              <p>trädandet har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S15" rel="dcterms:references">avsnitt 15</a> och motsvarar artikel 32.2 i EG-direktivet, se bilaga 1.</p>
               <p><i>Punkt 4 </i>skall ha samma innebörd som artikel 32.3 i direktivet.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> .
+    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S12.15>,
+        <https://lagen.nu/prop/1997/98:44#S13>,
+        <https://lagen.nu/prop/1997/98:44#S15> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P6> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P6> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Paragrafen har behandlats i avsnitt 8.3. Den överensstämmer med Data-lagskommitténs förslag och har berörts i avsnitt 7.2.4 i kommitténs betänkande.</p>
+              <p>Paragrafen har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S8.3" rel="dcterms:references">avsnitt 8.3</a>. Den överensstämmer med Data-lagskommitténs förslag och har berörts i avsnitt 7.2.4 i kommitténs betänkande.</p>
               <p>Avsikten är att paragrafen skall ha samma innebörd som artikel 3.2 andra strecksatsen i EG-direktivet, se bilaga 1. Paragrafen för med sig t.ex. att enskilda för rent privat bruk kan föra en elektronisk dagbok eller registrera sina grannar eller släktingar.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> .
+    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S8.3> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P7> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P7> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Frågan om undantag med hänsyn till tryck- och yttrandefriheten har be-handlats i avsnitt 8.2. Paragrafen överensstämmer delvis med Datalags-kommitténs förslag. Paragrafen har berörts i avsnitt 10 i kommitténs betänkande.</p>
+              <p>Frågan om undantag med hänsyn till tryck- och yttrandefriheten har be-handlats i <a href="https://lagen.nu/prop/1997/98:44#S8.2" rel="dcterms:references">avsnitt 8.2</a>. Paragrafen överensstämmer delvis med Datalags-kommitténs förslag. Paragrafen har berörts i avsnitt 10 i kommitténs betänkande.</p>
               <span id="sid117"/>
               <p><i>Första stycket </i>innehåller, i syfte att förtydliga, en upplysning om att bestämmelserna i lagen inte får tillämpas i den utsträckning det skulle strida mot bestämmelserna om tryck- och yttrandefrihet i tryckfrihets-förordningen (TF) eller <a href="https://lagen.nu/sfs/1991:1469" rel="dcterms:references">yttrandefrihetsgrundlagen</a> (YGL). Tillämpningen av av bestämmelserna i TF och YGL skall ske i enlighet med de principer som gäller i dag.</p>
               <p>Genom <i>andra stycket </i>undantas vissa behandlingar helt från de flesta </p>
@@ -618,13 +663,14 @@
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
-    dcterms:references <https://lagen.nu/sfs/1991:1469> .
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S8.2>,
+        <https://lagen.nu/sfs/1991:1469> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923#P8> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P8> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Frågan om hur EG-direktivet förhåller sig till offentlighetsprincipen har behandlats i avsnitt 8.1. Paragrafen överensstämmer i huvudsak med Datalagskommitténs förslag och har berörts i avsnitt 9.2, 9.4 och 12.4.6.3 i kommitténs betänkande.</p>
+              <p>Frågan om hur EG-direktivet förhåller sig till offentlighetsprincipen har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S8.1" rel="dcterms:references">avsnitt 8.1</a>. Paragrafen överensstämmer i huvudsak med Datalagskommitténs förslag och har berörts i avsnitt 9.2, 9.4 och 12.4.6.3 i kommitténs betänkande.</p>
               <p><i>Första stycket </i>innehåller i syfte att förtydliga en upplysning om att lagen inte tillämpas om det skulle strida mot en myndighets skyldigheter enligt <a href="https://lagen.nu/sfs/1949:105#K2" rel="dcterms:references">2 kap.</a> <a href="https://lagen.nu/sfs/1949:105" rel="dcterms:references">tryckfrihetsförordningen</a> (TF).</p>
               <p><i>Andra stycket </i>rör det bevarande av allmänna handlingar som utgör en förutsättning för att offentlighetsprincipen i <a href="https://lagen.nu/sfs/1949:105#K2" rel="dcterms:references">2 kap. TF</a> skall kunna upp-fylla sina syften. För tillämpningen av stycket förutsätts inte i och för sig att bevarandet är föreskrivet i författning. Det räcker att det är fråga om allmänna handlingar. Även bevarande av sådana handlingar som enligt <a href="https://lagen.nu/sfs/1949:105#K2P9" rel="dcterms:references">2 kap. 9 § TF</a> blir allmänna först sedan de tagits om hand för arkivering omfattas.</p>
               <p>Sista meningen i andra stycket innebär att myndigheter trots bestäm-melserna i 9 § fjärde stycket får använda information i allmänna hand-lingar för att vidta åtgärder beträffande enskilda. Övriga bestämmelser i lagen skall däremot följas när en myndighet på detta sätt återanvänder personuppgifter, t.ex. bestämmelsen i 9 § första stycket d om att person-uppgifter inte får behandlas för något ändamål som är oförenligt med det för vilket uppgifterna samlades in. Enligt Datalagskommitténs förslag skulle det genom ändring i <a href="https://lagen.nu/sfs/1990:782" rel="dcterms:references">arkivlagen (1990:782)</a> införas en ordning som innebar att handlingar och databaser som innehåller allmänna uppgifter omedelbart skulle anses tillhöra myndighetens arkiv (kommitténs</p>
@@ -633,7 +679,8 @@
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
-    dcterms:references <https://lagen.nu/sfs/1949:105>,
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S8.1>,
+        <https://lagen.nu/sfs/1949:105>,
         <https://lagen.nu/sfs/1949:105#K2>,
         <https://lagen.nu/sfs/1949:105#K2P9>,
         <https://lagen.nu/sfs/1990:782> .
@@ -642,7 +689,7 @@
     rinfoex:kommentarTill <https://lagen.nu/sfs/0000:1293083526811685308778923#P9> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>I paragrafen läggs det fast vissa grundläggande krav på den person-uppgiftsansvariges behandling av personuppgifter. De grundläggande kraven på behandlingen av personuppgifter har behandlats i avsnitt 11.2. Paragrafen överensstämmer i huvudsak med Datalagskommitténs förslag och har berörts i avsnitt 11.6.5 och 12.4 i kommitténs betänkande.</p>
+              <p>I paragrafen läggs det fast vissa grundläggande krav på den person-uppgiftsansvariges behandling av personuppgifter. De grundläggande kraven på behandlingen av personuppgifter har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S11.2" rel="dcterms:references">avsnitt 11.2</a>. Paragrafen överensstämmer i huvudsak med Datalagskommitténs förslag och har berörts i avsnitt 11.6.5 och 12.4 i kommitténs betänkande.</p>
               <p><i>Första, andra och tredje styckena </i>har samma innebörd som artikel 6 i EG-direktivet, se bilaga 1. På förslag av <i>Lagrådet</i> har i första stycket b </p>
               <p>lagts till vad som i lagrådsremissen framgick av skadeståndsbestämmel-sen i 48 §, nämligen att personuppgifter skall behandlas i enlighet med god sed.</p>
               <p><i>Fjärde stycket </i>innehåller bestämmelser om sådana lämpliga skydds-åtgärder vid behandling av personuppgifter för historiska, statistiska eller vetenskapliga ändamål som avses i den nyss nämnda artikeln och i artikel 8.4. Bestämmelsen gäller inte för en myndighets användning av person-uppgifter i allmänna handlingar, se 8 § andra stycket. En och samma personuppgift kan samtidigt behandlas för flera olika ändamål, varav något kan vara sådant som avses i tredje och fjärde styckena. I sådant fall får personuppgifter som behandlas för administrativa ändamål som har</p>
@@ -652,7 +699,8 @@
               <p>Enligt 50 § b får regeringen eller den myndighet som regeringen be-stämmer meddela närmare föreskrifter om vilka krav som ställs på den personuppgiftsansvarige vid behandling av personuppgifter.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> .
+    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.1> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S11.2> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-1962:700> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/1962:700> ;
@@ -674,11 +722,13 @@
     rinfoex:kommentarTill <https://lagen.nu/sfs/1974:152#K8P7> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Ändringen i första stycket punkt 8 innebär att regeringen och i före-kommande fall, efter s.k. subdelegation, den myndighet som regeringen bestämmer kan ges behörighet att meddela föreskrifter på hela det område som omfattas av <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a>, dvs. avseende även skydd för personlig integritet vid viss icke automatiserad behandling av person-uppgifter. Ändringen, som överensstämmer med Datalagskommitténs förslag, har behandlats i avsnitt 10. Frågan om dagen för ikraftträdandet av ändringen – den 1 januari 1999 – har behandlats i avsnitt 15.</p>
+              <p>Ändringen i första stycket punkt 8 innebär att regeringen och i före-kommande fall, efter s.k. subdelegation, den myndighet som regeringen bestämmer kan ges behörighet att meddela föreskrifter på hela det område som omfattas av <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a>, dvs. avseende även skydd för personlig integritet vid viss icke automatiserad behandling av person-uppgifter. Ändringen, som överensstämmer med Datalagskommitténs förslag, har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S10" rel="dcterms:references">avsnitt 10</a>. Frågan om dagen för ikraftträdandet av ändringen – den 1 januari 1999 – har behandlats i <a href="https://lagen.nu/prop/1997/98:44#S15" rel="dcterms:references">avsnitt 15</a>.</p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.4> ;
-    dcterms:references <https://lagen.nu/sfs/0000:000> .
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S10>,
+        <https://lagen.nu/prop/1997/98:44#S15>,
+        <https://lagen.nu/sfs/0000:000> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-1980:100#K14P3> a rinfoex:Forfattningskommentar ;
     rinfoex:kommentarTill <https://lagen.nu/sfs/1980:100#K14P3> ;
@@ -733,12 +783,13 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>I första stycket finns det två ändringar i sak. Ändringarna överensstäm-mer helt med Datalagskommitténs förslag.</p>
               <p>Den första ändringen – varigenom ordet lag byts ut mot orden lag eller annan författning – innebär att det även i förordning kan anges vilken tillsyn som ankommer på Datainspektionen.</p>
-              <p>Den andra ändringen innebär att bestämmelsen om överföring av nu aktuell sekretess till regeringen har tagits bort. Anledningen till detta är att ärenden som avses i denna paragraf enligt <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a> inte i något fall skall överklagas till regeringen, se avsnitt 13. Då behövs inte längre någon bestämmelse om överföring av sekretess till regeringen. För uppgifter i ärenden som avgjorts av Datainspektionen genom beslut före ikraftträdandet och som överklagats till regeringen enligt den gamla ord-ningen föreslås en särskild övergångsbestämmelse om att de äldre reglerna fortfarande skall tillämpas. Bestämmelsen om överföring av sekretess till Justitiekanslern har däremot behållits trots att Justitie-kanslern inte får överklaga Datainspektionens beslut enligt person-uppgiftslagen, eftersom Justitiekanslern enligt annan lagstiftning kan överklaga Datainspektionens beslut i ärenden som avses i denna paragraf, se t.ex. <a href="https://lagen.nu/sfs/1973:1173#P23" rel="dcterms:references">23 § kreditupplysningslagen (1973:1173)</a>.</p>
+              <p>Den andra ändringen innebär att bestämmelsen om överföring av nu aktuell sekretess till regeringen har tagits bort. Anledningen till detta är att ärenden som avses i denna paragraf enligt <a href="https://lagen.nu/sfs/0000:000" rel="dcterms:references">personuppgiftslagen</a> inte i något fall skall överklagas till regeringen, se <a href="https://lagen.nu/prop/1997/98:44#S13" rel="dcterms:references">avsnitt 13</a>. Då behövs inte längre någon bestämmelse om överföring av sekretess till regeringen. För uppgifter i ärenden som avgjorts av Datainspektionen genom beslut före ikraftträdandet och som överklagats till regeringen enligt den gamla ord-ningen föreslås en särskild övergångsbestämmelse om att de äldre reglerna fortfarande skall tillämpas. Bestämmelsen om överföring av sekretess till Justitiekanslern har däremot behållits trots att Justitie-kanslern inte får överklaga Datainspektionens beslut enligt person-uppgiftslagen, eftersom Justitiekanslern enligt annan lagstiftning kan överklaga Datainspektionens beslut i ärenden som avses i denna paragraf, se t.ex. <a href="https://lagen.nu/sfs/1973:1173#P23" rel="dcterms:references">23 § kreditupplysningslagen (1973:1173)</a>.</p>
               <p>Det bör nämnas att bestämmelser som motsvarar de bestämmelser som finns i denna paragraf, såvitt avser personuppgiftsskyddet, skall finnas enligt artikel 28.7 i EG-direktivet, se bilaga 1. Paragrafen bör således i fortsättningen vid behov tolkas EG-konformt.</p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18.2> ;
-    dcterms:references <https://lagen.nu/sfs/0000:000>,
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S13>,
+        <https://lagen.nu/sfs/0000:000>,
         <https://lagen.nu/sfs/1973:1173#P23> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-1980:100#K9P7> a rinfoex:Forfattningskommentar ;
@@ -794,7 +845,14 @@
 
 <https://lagen.nu/prop/1997/98:44#S18.1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18> ;
-    dcterms:references <https://lagen.nu/sfs/0000:000>,
+    dcterms:references <https://lagen.nu/prop/1997/98:44#S10>,
+        <https://lagen.nu/prop/1997/98:44#S11.3>,
+        <https://lagen.nu/prop/1997/98:44#S11.4>,
+        <https://lagen.nu/prop/1997/98:44#S11.5>,
+        <https://lagen.nu/prop/1997/98:44#S11.8>,
+        <https://lagen.nu/prop/1997/98:44#S11.9>,
+        <https://lagen.nu/prop/1997/98:44#S15>,
+        <https://lagen.nu/sfs/0000:000>,
         <https://lagen.nu/sfs/1942:740#K33P3>,
         <https://lagen.nu/sfs/1949:105>,
         <https://lagen.nu/sfs/1949:105#K2>,
