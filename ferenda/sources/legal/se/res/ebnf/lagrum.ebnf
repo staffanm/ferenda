@@ -1,13 +1,9 @@
 # -*- coding: iso-8859-1  -*-
 # ------------ lagrum.ebnf ----------------
 #
-sfsrefs              ::= (ExternalRefs/MultipleGenericRefs/ChapterSectionRefs/IndividualChapterSectionRefs/SectionPieceItemRefs/SectionPieceRefs/SectionRefs/SectionPieceExternalRefs/ExternalChapterSectionRefs/PieceAndItemRefs/SectionItemRefs)
+sfsrefs              ::= (ExternalRefs/MultipleGenericRefs/IndividualChapterSectionRefs/ExternalChapterSectionRefs/PieceAndItemRefs)
 # this list overlaps with GenericRef
-sfsref               ::= (ChangeRef/ExternalRef/ChapterSectionPieceItemRef/ChapterSectionPieceRef/ChapterSectionRef/SectionPieceItemRef/SectionElementRef/SectionPieceRef/SectionSentenceRef/SectionItemRef/ChapterRef/SectionRef/PieceItemRef/PieceRef/SFSNr/NamedExternalLawRef)
-
-# NB: LawRef used to be in the above list but that yielded false
-# positives in strings like "Tilläggsdirektiv till Utredningen om en
-# översyn av fondregelverket (Fi 2014:15)"
+sfsref               ::= (ChangeRef/ExternalRef/GenericRef/SFSNr/NamedExternalLawRef/PieceItemRef/PieceRef)
 
 # testing SectionItemRefAndSectionItemRefs, a ugly special case for string on the form
 # "6 § 1 eller 7 § 1 eller 2 förmånsrättslagen (1970:979)"
@@ -21,11 +17,11 @@ SectionItemRefAndSectionItemRefs ::= SectionItemRef, WAndOrW, SectionItemRefs
 # formatter, though.
 
 ExternalRefs                ::= SectionItemRefAndSectionItemRefs/MultipleGenericRefs, Whitespace, (In, Whitespace)?, ExternalLaw
-SectionPieceExternalRefs    ::= MultipleGenericRefs, ExternalRef
+# SectionPieceExternalRefs    ::= MultipleGenericRefs, ExternalRef
 
 ExternalChapterSectionRefs ::= MultipleGenericRefs, Whitespace, NamedExternalLawRef
 
-GenericRefs          ::= (SectionPieceItemRefs/SectionPieceRefs/SectionItemRefs/IndividualChapterSectionRefs/ChapterSectionPieceRefs/ChapterSectionRefs/AlternateChapterSectionRefs/SectionRefs/PieceItemRefs/GenericRef)
+GenericRefs          ::= (SectionPieceItemRefs/SectionPieceRefs/IndividualChapterSectionRefs/ChapterSectionPieceRefs/ChapterSectionRefs/AlternateChapterSectionRefs/SectionRefs/PieceItemRefs/GenericRef)
 
 CommaSpaceAndWhitespace ::= Comma, Whitespace, And, Whitespace
 
@@ -39,8 +35,6 @@ ChapterSectionPieceRefs ::= ChapterRef, Whitespace, SectionPieceRefs
 IndividualChapterSectionRefs ::= ChapterSectionRef, (Comma, Whitespace, SectionRef)*, Whitespace, And, Whitespace, SectionRef
 
 # Things like '9 kap. 15 eller 16 §'
-# AlternateChapterSectionRefs ::= ChapterRef, Whitespace, SectionRefID, Whitespace, Or, Whitespace, SectionRef
-
 AlternateChapterSectionRefs  ::= ChapterRef, (IntervalOrSingle,CommaSpace)*, Whitespace, IntervalOrSingle, Whitespace,Or,Whitespace, SectionRef
 
 # is the PieceRef/PieceRefID alternative really neccesary? Won't it do
@@ -60,10 +54,7 @@ IndividualSectionRefs::= (SectionRef, Comma, Whitespace)*, SectionRef, Comma, Wh
 # This is a special-case rule for things like "första stycket och 3"
 PieceAndItemRefs     ::= PieceRef, WAndOrW, ItemRef
 
-# This is a very greedy rule, it could easily match "6 § 1 eller 7" in
-# "6 § 1 eller 7 § 1", which is not what we want. Therefore, it's not
-# included in the list of GenericRefs above. See testcase
-# SectionItems.txt (which we can't handle fully) for example.
+
 SectionItemRefs     ::= SectionRef, Whitespace, ItemRef, WAndOrW, ItemRef, ?-' §'
 PieceItemRefs       ::= PieceRef, Whitespace, ItemRefs
 ItemRefs            ::= (ItemRef, Comma, Whitespace)*, ItemRef, WAndOrW, ItemRef
@@ -83,7 +74,7 @@ LawSynonyms          ::= ('lagens'/'balkens'/'förordningens'/'formens'/'ordninge
 
 # SINGLE REFERENCES
 # dont forget, when adding a new top-level construct, to add it to the
-# 'ref' construct above
+# 'sfsref' construct above
 
 ChangeRef ::= ('Lag'/'lag'/'Förordning'/'förordning'),Whitespace,SFSNr,('.'/?-(' '/','))
 
@@ -117,8 +108,6 @@ SectionRef ::= SectionRefID, Whitespace, '§'
 SectionRefID      ::= number, (Whitespace, SectionRefChar, ?-char)?
 ChapterRef        ::= ChapterRefID, c"kap."/c"kap"
 ChapterRefID      ::= number, Whitespace, (char, Whitespace)?
-
-# PieceRef          ::= (ItemRef, Whitespace, PieceRefID, Whitespace, PieceOrPieces)/(PieceRefID, Whitespace, PieceOrPieces, (Whitespace, ItemRef)?)
 PieceRef          ::= PieceRefID, Whitespace, PieceOrPieces
 PieceRefID        ::= ordinal
 PieceItemRef      ::= (ItemNumericRef, Whitespace, PieceRef)/(PieceRef, Whitespace, ItemRef)

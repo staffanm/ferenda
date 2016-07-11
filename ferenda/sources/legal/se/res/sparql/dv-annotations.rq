@@ -3,9 +3,6 @@ PREFIX rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 PREFIX owl: <http://www.w3.org/2002/07/owl#>
-# PREFIX nja: <http://localhost:8000/res/dv/nja/>
-# PREFIX rh: <http://localhost:8000/res/dv/rh/>
-# SELECT DISTINCT *
 CONSTRUCT {
      ?inboundreferat ?inboundreferatpredicate ?inboundreferatobject .
      ?inboundreferat rpubl:rattsfall ?referat . # note: this flattens the graph -- it should really be:

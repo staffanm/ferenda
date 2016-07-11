@@ -149,9 +149,12 @@ class LegalRef:
         # can construct the LawAbbreviation production (see parse())
         if self.KORTLAGRUM not in self.args:
             # we store this parser object so that it's __del__ method
-            # isn't called prematurely when using _simpleparseFallback
+            # isn't called prematurely when using
+            # _simpleparseFallback. FIXME: Do we still need to do tha,
+            # now that _simpleparseFallback is removed?
             self.spparser = Parser(self.decl, "root")
             self.tagger = self.spparser.buildTagger("root")
+            print("self.tagger relative size: %s" % len(str(self.tagger)))
         self.verbose = False
         self.depth = 0
 
@@ -254,6 +257,7 @@ class LegalRef:
                 self.decl += lawdecl
                 self.spparser = Parser(self.decl, "root")
                 self.tagger = self.spparser.buildTagger("root")
+                print("self.tagger relative size (w/ LawAbbreviation): %s" % len(str(self.tagger)))
         if self.RATTSFALL in self.args and not self.namedseries:
             self.namedseries.update(self.get_relations(SKOS.altLabel,
                                                        self.metadata_graph))
@@ -756,6 +760,7 @@ class LegalRef:
                 # to RDF predicates (as equivalent information must
                 # exist elsewhere)
                 if k not in ("shortsection", "shortchapter"):
+                    from pudb import set_trace; set_trace()
                     log.error("Can't map attribute %s to RDF predicate" % k)
 
         # add any extra stuff
@@ -1132,6 +1137,8 @@ class LegalRef:
                 a.pop('type', None)
                 a.pop('year', None)
                 a.pop('no', None)
+        a.pop('law', None) # we don't need the 'law- attribute if it exists
+
         # for relative refs, we need to fill a['type'], a['year'],
         # a['no'] from self.baseuri_attributes (and we need to make
         # sure baseuri_attributes is populated

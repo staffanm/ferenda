@@ -9,6 +9,7 @@ import re
 import os
 import time
 import codecs
+import difflib
 import json
 import functools
 from timeit import timeit
@@ -27,7 +28,7 @@ from ferenda.elements import deserialize, Link
 from ferenda import util
 from ferenda.thirdparty.coin import URIMinter
 from ferenda.sources.legal.se.legalref import LegalRef
-
+from ferenda.sources.legal.se import RPUBL
 
 class LegalRefTest(object):
     def __init__(self, alias):
@@ -108,6 +109,16 @@ class RepoTest(object):
         with codecs.open(serialized_path, "r", encoding="utf-8") as fp:
             doc = deserialize(fp.read(), format="json")
         refparser = self.repo.refparser
+        # FIXME: These config values must be picked up by createtest,
+        # serialized into json, then restored here from json rather
+        # than be hardcoded.
+        refparser._legalrefparser.kommittensbetankande = "1997:39"
+        refparser._legalrefparser.currentlynamedlaws = {'personuppgiftslagen': '0000:0000',
+                                                        'persondatalagen': '1998:000',
+                                                        'utlänningslagen': '1989:529'}
+        refparser._currentattribs = {'type': RPUBL.Proposition,
+                                     'year': '1997/98',
+                                     'no': '44'}
         # FIXME: we should use timeit here as well to get more stable
         # timings. Problem is that these tests take a long time as it
         # is...
@@ -225,14 +236,11 @@ def compare(baseline, results):
             assert baseline[alias][i]['basefile'] == results[alias][i]['basefile']
             baseline_time += baseline[alias][i]['elapsed']
             results_time += results[alias][i]['elapsed']
-            if baseline[alias][i]['refgraph'] != baseline[alias][i]['refgraph']:
-                #matcher = difflib.SequenceMatcher(a=baseline[alias][i]['refgraph'],
-                #                                  b=baseline[alias][i]['refgraph'])
-                for j in range(len(baseline[alias][i]['refgraph'])):
-                    if baseline[alias][i]['refgraph'][j] != results[alias][i]['refgraph'][j]:
-                        errors.append("   %s: ref %s, expected %s, got %s" % (baseline[alias][i]['basefile'], j,
-                                                                              baseline[alias][i]['refgraph'][j],
-                                                                              results[alias][i]['refgraph'][j]))
+            if baseline[alias][i]['refgraph'] != results[alias][i]['refgraph']:
+                errors.append("\n".join(difflib.unified_diff(baseline[alias][i]['refgraph'],
+                                                             results[alias][i]['refgraph'],
+                                                             fromfile="expected",
+                                                             tofile="got")))
         percent = (results_time / baseline_time) * 100
         print("%s: %s tests in %.2f seconds (%.2f percent of baseline), %s tests had errors" %
               (alias, len(baseline[alias]), results_time, percent, len(errors)))
