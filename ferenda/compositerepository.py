@@ -181,17 +181,10 @@ class CompositeRepository(DocumentRepository):
         start = time.time()
         ret = False
 
-        # We only try those subrepos that have the possibility of
-        # parsing basefile, ie they have the correct downloaded
-        # file. CompositeStore stores a set of existing downloaded
-        # files when its list_basefiles_for method is called, so we
-        # make sure to do that if needed.
-        if not self.store.basefiles:
-            x = list(self.store.list_basefiles_for("parse"))
-
         for c in self.subrepos:
-            if basefile in self.store.basefiles[c]:
-                inst = self.get_instance(c)
+            inst = self.get_instance(c)
+            if (basefile in self.store.basefiles[c] or
+                os.path.exists(inst.store.downloaded_path(basefile))):
                 try:
                     # each parse method should be smart about whether
                     # to re-parse or not (i.e. use the @managedparsing
