@@ -1,0 +1,7 @@
+Lagen ersätter den nuvarande datalagen (1973:289) och genomför
+
+<list>
+  <str>Lagen ersätter den nuvarande </str>
+  <Link uri="https://lagen.nu/sfs/1973:289">datalagen (1973:289)</Link>
+  <str> och genomför</str>
+</list>

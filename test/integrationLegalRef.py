@@ -97,6 +97,12 @@ class KortLagrum(TestLegalRef):
         p = LegalRef(LegalRef.LAGRUM, LegalRef.KORTLAGRUM)
         return self._test_parser(datafile, p)
 
+class EnklaLagrum(TestLegalRef):
+    def parametric_test(self,datafile):
+        p = LegalRef(LegalRef.ENKLALAGRUM)
+        p.verbose=True
+        return self._test_parser(datafile, p)
+
 class Forarbeten(TestLegalRef):
     def parametric_test(self,datafile):
         p = LegalRef(LegalRef.FORARBETEN)
@@ -133,6 +139,7 @@ file_parametrize(Lagrum,"test/files/legalref/SFS",".txt",
                                'sfs-tricky-uppdelat-lagnamn.txt',
                                'sfs-tricky-vvfs.txt']))
 file_parametrize(KortLagrum, "test/files/legalref/Short",".txt")
+file_parametrize(EnklaLagrum, "test/files/legalref/Simple",".txt")
 file_parametrize(Forarbeten, "test/files/legalref/Regpubl",".txt")
 file_parametrize(Rattsfall, "test/files/legalref/DV",".txt")
 file_parametrize(EULaw, "test/files/legalref/EGLag",".txt")

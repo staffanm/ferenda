@@ -58,6 +58,7 @@ class LegalRef:
     # KORTLAGRUM | FORESKRIFTER | EULAGSTIFTNING)
     LAGRUM = 1             # hänvisningar till lagrum i SFS
     KORTLAGRUM = 2         # SFS-hänvisningar på kortform
+    ENKLALAGRUM = 12       # Förenklad grammatik för de vanligaste hänvisningsformerna
     FORESKRIFTER = 3       # hänvisningar till myndigheters författningssamlingar
     EULAGSTIFTNING = 4     # EU-fördrag, förordningar och direktiv
     INTLLAGSTIFTNING = 5   # Fördrag, traktat etc
@@ -107,11 +108,17 @@ class LegalRef:
             self.roots.append("sfsrefs")
             self.roots.append("sfsref")
 
+        if self.ENKLALAGRUM in args:
+            productions = self.load_ebnf(fname("res/ebnf/enklalagrum.ebnf"))
+            for p in productions:
+                self.uriformatter[p] = self.sfs_format_uri
+            self.roots.append("sfsref")
+
         if self.KORTLAGRUM in args:
             # om vi inte redan laddat lagrum.ebnf måste vi göra det
             # nu, eftersom kortlagrum.ebnf beror på produktioner som
             # definerats där
-            if not self.LAGRUM in args:
+            if not (self.LAGRUM in args or self.ENKLALAGRUM in args):
                 self.load_ebnf(fname("res/ebnf/lagrum.ebnf"))
 
             productions = self.load_ebnf(fname("res/ebnf/kortlagrum.ebnf"))
@@ -283,7 +290,7 @@ class LegalRef:
         # suffix. Vi transformerar även 'Radio- och TV-lagen' till
         # 'Radio-_och_TV-lagen'
 
-        if self.LAGRUM in self.args:
+        if self.LAGRUM in self.args or self.ENKLALAGRUM in self.args:
             indata = self.re_escape_compound.sub(
                 r'\1_\2_\3\4', indata)
             indata = self.re_escape_named.sub(r'|\1', indata)
@@ -336,7 +343,7 @@ class LegalRef:
             if not self.re_descape_named.search(result[i]):
                 node = result[i]
             else:
-                if self.LAGRUM in self.args:
+                if self.LAGRUM in self.args or self.ENKLALAGRUM in self.args:
                     text = self.re_descape_named.sub(r'\1', result[i])
                     text = self.re_descape_compound.sub(r'\1 \2 \3\4', text)
                 if isinstance(result[i], Link):

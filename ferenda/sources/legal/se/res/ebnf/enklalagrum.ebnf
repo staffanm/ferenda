@@ -1,0 +1,21 @@
+# -*- coding: iso-8859-1  -*-
+# ------------ lagrum.ebnf ----------------
+#
+#
+# Simplified grammar that only supports absolute references, and only
+#  forms commonly occuring in förarbeten
+
+sfsref ::= NamedExternalLawRef
+
+NamedExternalLawRef     ::= (SectionRef, Whitespace)?, NamedLaw, (Whitespace, SFSNr)?
+
+SectionRef ::= SectionRefID, Whitespace, '§'
+# "21 §", "21 a §"
+SectionRefID      ::= number, (Whitespace, SectionRefChar, ?-char)?
+
+NamedLaw		::= (char/'-'/'_')+, Pipe, LawSynonyms
+LawSynonyms          ::= ('lag'/'balk'/'förordning',('en'/'ens')?)
+
+SFSNr      ::= LeftParen, Whitespace?, LawRef, Whitespace?,RightParen
+LawRef     ::= LawRefID
+LawRefID   ::= LangtAr, Colon, ('bih.',' '?)?, number, ('.',digit)?, (Whitespace, ('s.', Whitespace?)?, digit+)?

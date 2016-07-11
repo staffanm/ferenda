@@ -1,0 +1,8 @@
+Delgivning enligt 12 § delgivningslagen (1970:428), som innebär att
+
+<list>
+  <str>Delgivning enligt </str>
+  <Link uri="https://lagen.nu/sfs/1970:428#P12">12 § delgivningslagen (1970:428)</Link>
+  <str>, som innebär att</str>
+</list>
+
