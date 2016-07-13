@@ -1,0 +1,13 @@
+Patent- och registreringsverket har redan tidigare, med stöd av ett
+bemyndigande i 6 § förordningen (1995:1633) om vissa
+årsredo-visningsfrågor, prövat dessa tillståndsärenden.
+
+<list>
+  <str>Patent- och registreringsverket har redan tidigare, med stöd av ett
+bemyndigande i </str>
+  <Link uri="https://lagen.nu/sfs/1995:1633#P6">6 §</Link>
+  <str> förordningen (</str>
+  <Link uri="https://lagen.nu/sfs/1995:1633">1995:1633</Link>
+  <str>) om vissa
+årsredo-visningsfrågor, prövat dessa tillståndsärenden.</str>
+</list>

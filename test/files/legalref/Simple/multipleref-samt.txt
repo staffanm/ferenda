@@ -1,0 +1,10 @@
+-3 samt 5 §§ offentlighets- och sekretesslagen (2009:400)
+
+<list>
+  <str>-</str>
+  <Link uri="https://lagen.nu/sfs/2009:400#P3">3</Link>
+  <str> samt </str>
+  <Link uri="https://lagen.nu/sfs/2009:400#P5">5 §§</Link>
+  <str> </str>
+  <Link uri="https://lagen.nu/sfs/2009:400">offentlighets- och sekretesslagen (2009:400)</Link>
+</list>

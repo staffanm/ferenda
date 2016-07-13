@@ -1,0 +1,7 @@
+t.ex. bestämmelsen om straff för dataintrång som flyttas till brottsbalken. 
+
+<list>
+  <str>t.ex. bestämmelsen om straff för dataintrång som flyttas till </str>
+  <Link uri="https://lagen.nu/sfs/1962:700">brottsbalken</Link>
+  <str>. </str>
+</list>

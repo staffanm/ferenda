@@ -75,7 +75,7 @@ class LegalRef:
     re_escape_compound = re.compile(
         r'\b(\w+-) (och) (\w+-?)(lagen|förordningen)\b', re.UNICODE)
     re_escape_named = re.compile(
-        r'\B(lagens?|balkens?|förordningens?|formens?|ordningens?|kungörelsens?|stadgans?)\b', re.UNICODE)
+        r'\B(lagens?|balkens?|förordningens?|formens?|(?<!för)ordningens?|kungörelsens?|stadgans?)\b', re.UNICODE)
 
     re_descape_compound = re.compile(
         r'\b(\w+-)_(och)_(\w+-?)(lagen|förordningen)\b', re.UNICODE)
@@ -161,7 +161,7 @@ class LegalRef:
             # now that _simpleparseFallback is removed?
             self.spparser = Parser(self.decl, "root")
             self.tagger = self.spparser.buildTagger("root")
-            print("self.tagger relative size: %s" % len(str(self.tagger)))
+            # print("self.tagger relative size: %s" % len(str(self.tagger)))
         self.verbose = False
         self.depth = 0
 
@@ -243,7 +243,8 @@ class LegalRef:
         self.allow_relative = allow_relative
 
         if ((self.LAGRUM in self.args or
-             self.KORTLAGRUM in self.args) and not self.namedlaws):
+             self.KORTLAGRUM in self.args or
+             self.ENKLALAGRUM in self.args) and not self.namedlaws):
                 self.namedlaws.update(self.get_relations(RDFS.label,
                                                          self.metadata_graph))
 
@@ -264,7 +265,7 @@ class LegalRef:
                 self.decl += lawdecl
                 self.spparser = Parser(self.decl, "root")
                 self.tagger = self.spparser.buildTagger("root")
-                print("self.tagger relative size (w/ LawAbbreviation): %s" % len(str(self.tagger)))
+                # print("self.tagger relative size (w/ LawAbbreviation): %s" % len(str(self.tagger)))
         if self.RATTSFALL in self.args and not self.namedseries:
             self.namedseries.update(self.get_relations(SKOS.altLabel,
                                                        self.metadata_graph))
@@ -289,7 +290,6 @@ class LegalRef:
         # vi indatasträngen och stoppar in ett '|'-tecken innan vissa
         # suffix. Vi transformerar även 'Radio- och TV-lagen' till
         # 'Radio-_och_TV-lagen'
-
         if self.LAGRUM in self.args or self.ENKLALAGRUM in self.args:
             indata = self.re_escape_compound.sub(
                 r'\1_\2_\3\4', indata)
@@ -317,7 +317,7 @@ class LegalRef:
                     if self.failfast:
                         raise e
                     else:
-                        r = part.text
+                        r = [part.text]
                 result.extend(r)
             else:
                 assert part.tag == 'plain', "%s not in self.roots" % part.tag
@@ -335,9 +335,21 @@ class LegalRef:
                 "parsed %s chars of %s (...%s...)" % (taglist[-1], len(indata),
                                                       indata[max(0, taglist[-1] - 4):taglist[-1] + 5]))
 
+
         # Normalisera resultatet, dvs konkatenera intilliggande
-        # textnoder, och ta bort ev '|'-tecken som vi stoppat in
-        # tidigare.
+        # textnoder
+        normres = []
+        for i in range(len(result)):
+            node = result[i]
+            if (len(normres) > 0
+                and not isinstance(normres[-1], Link)
+                    and not isinstance(node, Link)):
+                normres[-1] += node
+            else:
+                normres.append(node)
+
+        # och ta bort ev '|'-tecken som vi stoppat in tidigare.
+        result = normres
         normres = []
         for i in range(len(result)):
             if not self.re_descape_named.search(result[i]):
@@ -356,12 +368,7 @@ class LegalRef:
                         node = Link(text, uri=result[i].uri)
                 else:
                     node = text
-            if (len(normres) > 0
-                and not isinstance(normres[-1], Link)
-                    and not isinstance(node, Link)):
-                normres[-1] += node
-            else:
-                normres.append(node)
+            normres.append(node)
 
         # and finally...
         for i in range(len(normres)):
@@ -767,7 +774,6 @@ class LegalRef:
                 # to RDF predicates (as equivalent information must
                 # exist elsewhere)
                 if k not in ("shortsection", "shortchapter"):
-                    from pudb import set_trace; set_trace()
                     log.error("Can't map attribute %s to RDF predicate" % k)
 
         # add any extra stuff
@@ -903,6 +909,53 @@ class LegalRef:
         self.currentpiece = None
         return res
 
+
+    def format_ExternalRef(self, root):
+        # This is a slimmed down version of format_ExternalRefs, which
+        # takes care to create just a single link for the whole
+        # reference (ie <Link uri="...#P12">12 § delgivningslagen
+        # (1970:428)</Link>, not <Link uri="...#P12">12 §</Link> <Link
+        # uri="...">delgivningslagen (1970:428)</Link>
+        lawrefid_node = self.find_node(root, 'LawRefID')
+        if lawrefid_node is None:
+            namedlaw_node = self.find_node(root, 'NamedLaw')
+            if namedlaw_node is None:
+                samelaw_node = self.find_node(root, 'SameLaw')
+                assert(samelaw_node is not None)
+                assert(self.lastlaw)
+                self.currentlaw = self.lastlaw
+            else:
+                # the NamedLaw case
+                self.currentlaw = self.namedlaw_to_sfsid(namedlaw_node.text)
+                assert(self.currentlaw)
+        else:
+            self.currentlaw = lawrefid_node.text
+            if self.find_node(root, 'NamedLaw'):
+                namedlaw = self.normalize_lawname(
+                    self.find_node(root, 'NamedLaw').text)
+                # print "remember that %s is %s!" % (namedlaw, self.currentlaw)
+                self.currentlynamedlaws[namedlaw] = self.currentlaw
+
+        if self.lastlaw is None:
+            self.lastlaw = self.currentlaw
+
+        if len(self.find_nodes(root, 'AnonymousExternalLaw')) == 0:
+            return [self.format_generic_link(root)]
+        else:
+            # With AnonymousExternalLaw, ie "lagen (1994:953) om
+            # åligganden för personal inom ....", it looks better if
+            # only the SFSid, not the matched string (typically "lagen
+            # (1994:953)") is linked. The main problem is that we have
+            # no way of knowing when the name of the law ends and the
+            # rest of the text begins. This is a fairly involved way
+            # to ensure only that substring gets linked.
+            res = [self.format_tokentree(x) for x in root.nodes[0].nodes]
+            res.extend([self.format_tokentree(x) for x in root.nodes[1:]])
+            # flatten list of lists
+            res = [item for sublist in res for item in sublist]
+            return res
+            
+    
     # This is a special case for things like '17-29 och 32 §§ i lagen
     # (2004:575)', which picks out the LawRefID first and stores it in
     # .currentlaw, so that find_attributes finds it

@@ -1,0 +1,11 @@
+Det föreslås även att regeringsformen justeras så att det blir
+möjligt för riksdagen att delegera rätten att meddela föreskrifter om
+manuell behandling av personuppgifter.
+
+<list>
+  <str>Det föreslås även att </str>
+  <Link uri="https://lagen.nu/sfs/1974:152">regeringsformen</Link>
+  <str> justeras så att det blir
+möjligt för riksdagen att delegera rätten att meddela föreskrifter om
+manuell behandling av personuppgifter.</str>
+</list>

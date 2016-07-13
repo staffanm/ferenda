@@ -39,7 +39,7 @@ class Offtryck(SwedishLegalSource):
     storage_policy = "dir"
     alias = "offtryck"
 
-    parse_types = LegalRef.RATTSFALL, LegalRef.FORARBETEN, LegalRef.ENKLALAGRUM
+    parse_types = LegalRef.RATTSFALL, LegalRef.FORARBETEN, LegalRef.ENKLALAGRUM, LegalRef.KORTLAGRUM
     xslt_template = "xsl/forarbete.xsl"
 
 

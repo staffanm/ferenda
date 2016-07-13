@@ -100,7 +100,6 @@ class KortLagrum(TestLegalRef):
 class EnklaLagrum(TestLegalRef):
     def parametric_test(self,datafile):
         p = LegalRef(LegalRef.ENKLALAGRUM)
-        p.verbose=True
         return self._test_parser(datafile, p)
 
 class Forarbeten(TestLegalRef):

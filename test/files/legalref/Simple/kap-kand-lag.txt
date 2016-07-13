@@ -1,0 +1,10 @@
+inte skall lämnas ut till tredje man annat än med stöd av 2 kap.
+tryckfrihetsförordningen.
+
+<list>
+  <str>inte skall lämnas ut till tredje man annat än med stöd av </str>
+  <Link uri="https://lagen.nu/sfs/1949:105#K2">2 kap.
+tryckfrihetsförordningen</Link>
+  <str>.</str>
+</list>
+

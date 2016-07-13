@@ -1,20 +1,59 @@
 # -*- coding: iso-8859-1  -*-
-# ------------ lagrum.ebnf ----------------
-#
+# ------------ enklalagrum.ebnf ----------------
 #
 # Simplified grammar that only supports absolute references, and only
-#  forms commonly occuring in förarbeten
+# reference forms commonly occuring in förarbeten
 
-sfsref ::= NamedExternalLawRef
+sfsref ::= ExternalRef/ExternalRefs/SFSNr
 
-NamedExternalLawRef     ::= (SectionRef, Whitespace)?, NamedLaw, (Whitespace, SFSNr)?
+ExternalRef ::= (GenericRef, Whitespace)?, ExternalLaw
 
-SectionRef ::= SectionRefID, Whitespace, '§'
+GenericRef ::= ChapterSectionPieceRef/ChapterSectionRef/SectionRef/ChapterRef
+
+ExternalRefs ::= (IndividualChapterSectionRefs/ChapterSectionRefs/SectionRefs/GenericRef, (CommaSpace/WAndOrW)?)+, Whitespace, ExternalLaw
+
+ExternalLaw ::= NamedExternalLawRef/AnonymousExternalLaw
+
+NamedExternalLawRef ::= NamedLaw, (Whitespace, SFSNr)?
+
+AnonymousExternalLaw ::= (In, Whitespace)?, LawSynonyms, Whitespace, SFSNr
+
+# "2 kap. 3 § andra stycket"
+ChapterSectionPieceRef         ::= ChapterSectionRef, Whitespace, PieceRef
+
+
+# Things like '2, 4-6 och 8 §§' 
+SectionRefs           ::= (IntervalOrSingle,CommaSpace/WAndOrW)*, LastIntervalOrSingle
+SingleSectionRef      ::= SectionRefID
+IntervalOrSingle     ::= (IntervalSection/SingleSectionRef)
+SingleSectionRefID   ::= SectionRefID
+IntervalSection      ::= SingleSectionRef, Whitespace?,Hyphen, Hyphen?, Whitespace?, SingleSectionRef
+LastSectionRef       ::= SectionRefID, Whitespace, DoubleSectionMark
+LastIntervalOrSingle ::= (SingleSectionRef, Whitespace?, (Hyphen,Hyphen?)/AndOr, Whitespace?)*, LastSectionRef
+
+# "4 kap. 6 och 7 a-9 §§"
+ChapterSectionRefs    ::= ChapterRef, Whitespace, SectionRefs
+
+# Things like '8 kap. 1 §, 2 § och 6§'
+IndividualChapterSectionRefs ::= ChapterSectionRef, (Comma, Whitespace, SectionRef)*, Whitespace, And, Whitespace, SectionRef
+
+# "2 kap.", "2 a kap"
+ChapterRef        ::= ChapterRefID, c"kap."/c"kap"
+ChapterRefID      ::= number, Whitespace, (char, Whitespace)?
+
 # "21 §", "21 a §"
+SectionRef ::= SectionRefID, Whitespace, '§'
 SectionRefID      ::= number, (Whitespace, SectionRefChar, ?-char)?
 
+# "21 § 2 kap"
+ChapterSectionRef ::= ChapterRef, Whitespace, SectionRef
+
+# "2 st"
+PieceRef          ::= PieceRefID, Whitespace, PieceOrPieces
+PieceRefID        ::= ordinal
+
 NamedLaw		::= (char/'-'/'_')+, Pipe, LawSynonyms
-LawSynonyms          ::= ('lag'/'balk'/'förordning',('en'/'ens')?)
+LawSynonyms          ::= ('lag'/'balk'/'förordning'/'form',('ens'/'en')?)
 
 SFSNr      ::= LeftParen, Whitespace?, LawRef, Whitespace?,RightParen
 LawRef     ::= LawRefID

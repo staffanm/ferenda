@@ -1,0 +1,15 @@
+I övrigt skall bestämmelserna i 4 kap. 6 och 7 a-9 §§ rättegångsbalken tillämpas på nämndeman i fastighetsdomstol.
+
+<list>
+  <str>I övrigt skall bestämmelserna i </str>
+  <Link uri="https://lagen.nu/sfs/1942:740#K4">4 kap.</Link>
+  <str> </str>
+  <Link uri="https://lagen.nu/sfs/1942:740#K4P6">6</Link>
+  <str> och </str>
+  <Link uri="https://lagen.nu/sfs/1942:740#K4P7a">7 a</Link>
+  <str>-</str>
+  <Link uri="https://lagen.nu/sfs/1942:740#K4P9">9 §§</Link>
+  <str> </str>
+  <Link uri="https://lagen.nu/sfs/1942:740">rättegångsbalken</Link>
+  <str> tillämpas på nämndeman i fastighetsdomstol.</str>
+</list>
