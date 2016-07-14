@@ -7,6 +7,7 @@
 		xmlns:dcterms="http://purl.org/dc/terms/"
 		xmlns:rpubl="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
+		xmlns:bibo="http://purl.org/ontology/bibo/"
 		xml:space="preserve"
 		exclude-result-prefixes="xhtml rdf">
 
@@ -71,17 +72,35 @@
 	  <xsl:if test="//xhtml:link[@about=$domuri and @rel='dcterms:subject']">
 	    <dt>Sökord</dt>
 	    <xsl:for-each select="//xhtml:link[@about=$domuri and @rel='dcterms:subject']">
-	      <dd><a href="@href"><xsl:value-of select="@href"/></a></dd>
+	      <dd><a href="{@about}"><xsl:value-of select="substring-after(@href, '/concept/')"/></a></dd>
 	    </xsl:for-each>
 	  </xsl:if>
 	  <dt>Källa</dt>
 	  <dd><a href="http://www.rattsinfosok.dom.se/lagrummet/index.jsp">Domstolsverket</a></dd>
 	</dl>
-	<xsl:if test="$annotations/resource/dcterms:references[@ref=$uri]">
+
+	<pre>
+	  <xsl:copy-of select="$annotations"/>
+	</pre>
+
+	<xsl:if test="$annotations/resource[a/rpubl:Rattsfallsreferat]">
 	  <div class="annotations rattsfall">
 	    <h2>Rättsfall som hänvisar till detta</h2>
-	    <xsl:for-each select="$annotations/resource/dcterms:references[@ref=$uri]">
-	      <li>Data for <xsl:value-of select="../@uri"/> goes here</li>
+	    <xsl:for-each select="$annotations/resource[a/rpubl:Rattsfallsreferat]">
+	      <li><a href="{@uri}"><b><xsl:value-of select="dcterms:identifier"/></b>:</a> <xsl:value-of select="dcterms:identifier"/></li>
+	    </xsl:for-each>
+	  </div>
+	</xsl:if>
+
+	<xsl:if test="$annotations/resource[a/rpubl:Proposition]">
+	  <div class="annotations forarbeten">
+	    <h2>Förarbeten som hänvisar till detta</h2>
+	    <xsl:for-each select="$annotations/resource[a/rpubl:Proposition]">
+	      <li><b><xsl:value-of select="dcterms:identifier"/></b>: <xsl:value-of select="dcterms:identifier"/>
+	      <xsl:for-each select="bibo:chapter">
+		<a href="what"><xsl:value-of select="."/></a>
+	      </xsl:for-each>
+	      </li>
 	    </xsl:for-each>
 	  </div>
 	</xsl:if>

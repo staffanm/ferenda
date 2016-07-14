@@ -3,33 +3,35 @@ PREFIX rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX bibo: <http://purl.org/ontology/bibo/>
 CONSTRUCT {
-     ?inboundreferat ?inboundreferatpredicate ?inboundreferatobject .
-     ?inboundreferat rpubl:rattsfall ?referat . # note: this flattens the graph -- it should really be:
-#     ?inboundavgorande ?inboundavgorandepredicate ?inboundavgorandeobject .
-#     ?inboundavgorande rpubl:rattsfall ?referat .
-     ?referat ?referatpredicate ?referatobject .
-     ?avgorande ?avgorandepredicate ?avgorandeobject .
-
-}
-
-WHERE
+  <%(uri)s> dcterms:isReferencedBy ?inboundreferat . 
+  <%(uri)s> dcterms:isReferencedBy ?inboundforarbete .
+  ?inboundreferat rdf:type ?referattyp ;
+                    dcterms:identifier ?referatid ;
+                    rpubl:referatrubrik ?referattitel .
+  ?inboundforarbete rdf:type rpubl:Proposition ;
+                    dcterms:identifier ?forarbeteid ;
+                    dcterms:title ?forarbetetitel ;
+                    bibo:chapter ?forarbeteavsnitt .
+} WHERE
 {
-  {
-    ?referat ?referatpredicate ?referatobject .
-    FILTER (?referat = <%(uri)s>)
-  } UNION {
-    ?referat rpubl:referatAvDomstolsavgorande ?avgorande . 
-    ?avgorande ?avgorandepredicate ?avgorandeobject .
-    FILTER (?referat = <%(uri)s>)
-#  } UNION {
-#    ?inboundavgorande ?inboundavgorandepredicate ?inboundavgorandeobject . # Right now we don't really need all properties, really only the URI itself
-#    ?inboundavgorande rpubl:rattsfall ?referat .
-#    FILTER (?referat = <%(uri)s>)
-  } UNION {
-    ?inboundreferat rpubl:referatAvDomstolsavgorande ?inboundavgorande .
-    ?inboundavgorande rpubl:rattsfall ?referat .
-    ?inboundreferat  ?inboundreferatpredicate ?inboundreferatobject .
-    FILTER (?referat = <%(uri)s>)
-  }
+   {
+    ?inboundavgorande rpubl:rattsfall <%(uri)s> .
+    ?inboundreferat rpubl:referatAvDomstolsavgorande ?inboundavgorande ;
+                    rdf:type ?referattyp ;
+                    dcterms:identifier ?referatid .
+   } UNION {
+     ?inboundavgorande rpubl:rattsfall <%(uri)s> .
+     ?inboundreferat rpubl:referatAvDomstolsavgorande ?inboundavgorande ;
+                     rpubl:referatrubrik ?referattitel .
+   } UNION {
+     ?inboundforarbeteavsnitt dcterms:references <%(uri)s> ;
+                              dcterms:isPartOf* ?inboundforarbete ;
+                              bibo:chapter ?forarbeteavsnitt .
+     ?inboundforarbete rdf:type rpubl:Proposition ;
+                    rdf:type ?forarbetetyp ;
+                    dcterms:identifier ?forarbeteid ;
+                    dcterms:title ?forarbetetitel .
+   }
 }

@@ -234,6 +234,7 @@ class XSLTTransform(TransformerEngine):
         return filename
 
     def transform(self, indata, config=None, parameters={}):
+        from pudb import set_trace; set_trace()
         strparams = {}
         if config:
             # paths to be used with the document() function
@@ -249,10 +250,16 @@ class XSLTTransform(TransformerEngine):
                 # relativize path of file relative to the XSL file
                 # we'll be using. The mechanism could be clearer...
                 value = os.path.relpath(value, self.templdir)
+                # FIXME: if the filename contains non-ascii
+                # characters, any attempt to eg
+                # "document($annotationfile)" will silently
+                # fail. Seriously, fuck lxml's error handling.
+                value = value.replace("Ö", "O")
                 if os.sep == "\\":
                     value = value.replace(os.sep, "/")
             strparams[key] = XSLT.strparam(value)
         try:
+            from pudb import set_trace; set_trace()
             return self._transformer(indata, **strparams)
         except etree.XSLTApplyError as e:
             raise errors.TransformError(str(e))
