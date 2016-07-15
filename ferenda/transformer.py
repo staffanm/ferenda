@@ -234,7 +234,6 @@ class XSLTTransform(TransformerEngine):
         return filename
 
     def transform(self, indata, config=None, parameters={}):
-        from pudb import set_trace; set_trace()
         strparams = {}
         if config:
             # paths to be used with the document() function
@@ -259,7 +258,6 @@ class XSLTTransform(TransformerEngine):
                     value = value.replace(os.sep, "/")
             strparams[key] = XSLT.strparam(value)
         try:
-            from pudb import set_trace; set_trace()
             return self._transformer(indata, **strparams)
         except etree.XSLTApplyError as e:
             raise errors.TransformError(str(e))
