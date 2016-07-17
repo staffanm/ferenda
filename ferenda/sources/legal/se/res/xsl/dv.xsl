@@ -106,7 +106,7 @@
 	<xsl:with-param name="badgecount"/>
 	<xsl:with-param name="panelid">top</xsl:with-param>
 	<xsl:with-param name="paneltype">metadata</xsl:with-param>
-	<xsl:with-param name="expanded" select="'true'"/>
+	<xsl:with-param name="expanded" select="true()"/>
 	<xsl:with-param name="nodeset" select="ext:node-set($metadata)"/>
       </xsl:call-template>
 
@@ -117,7 +117,7 @@
 	  <xsl:with-param name="nodeset" select="ext:node-set($rattsfall-markup)"/>
 	  <xsl:with-param name="panelid">top</xsl:with-param>
 	  <xsl:with-param name="paneltype">rattsfall</xsl:with-param>
-	  <xsl:with-param name="expanded" select="'true'"/>
+	  <xsl:with-param name="expanded" select="true()"/>
 	</xsl:call-template>
       </xsl:if>
 
@@ -128,7 +128,7 @@
 	  <xsl:with-param name="nodeset" select="ext:node-set($forarbeten-markup)"/>
 	  <xsl:with-param name="panelid">top</xsl:with-param>
 	  <xsl:with-param name="paneltype">forarbeten</xsl:with-param>
-	  <xsl:with-param name="expanded" select="'true'"/>
+	  <xsl:with-param name="expanded" select="true()"/>
 	</xsl:call-template>
       </xsl:if>
     </aside>

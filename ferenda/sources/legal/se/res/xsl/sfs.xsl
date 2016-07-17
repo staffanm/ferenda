@@ -63,7 +63,6 @@
 	</xsl:if>
       </section>
       <xsl:if test="$kommentar or $rattsfall">
-	<xsl:variable name="expanded" select="'true'"/>
 	<div class="panel-group col-sm-5" role="tablist" id="panel-top" aria-multiselectable="true">
 	  <xsl:if test="$kommentar">
 	    <xsl:call-template name="aside-annotations-panel">
@@ -72,7 +71,7 @@
 	      <xsl:with-param name="nodeset" select="$kommentar"/>
 	      <xsl:with-param name="panelid">top</xsl:with-param>
 	      <xsl:with-param name="paneltype">k</xsl:with-param>
-	      <xsl:with-param name="expanded" select="$expanded"/>
+	      <xsl:with-param name="expanded" select="true()"/>
 	    </xsl:call-template>
 	  </xsl:if>
 	  <xsl:if test="$rattsfall">
@@ -82,6 +81,7 @@
 	      <xsl:with-param name="nodeset" select="$rattsfall"/>
 	      <xsl:with-param name="panelid">top</xsl:with-param>
 	      <xsl:with-param name="paneltype">r</xsl:with-param>
+	      <xsl:with-param name="expanded" select="not($kommentar)"/>
 	    </xsl:call-template>
 	  </xsl:if>
 	</div>
@@ -188,7 +188,7 @@
 	    <xsl:with-param name="nodeset" select="$kommentar"/>
 	    <xsl:with-param name="panelid" select="$panelid"/>
 	    <xsl:with-param name="paneltype">k</xsl:with-param>
-	    <xsl:with-param name="expanded" select="$expanded"/>
+	    <xsl:with-param name="expanded" select="true()"/>
 	  </xsl:call-template>
 	</xsl:if>
 	<xsl:if test="$forfattningskommentar">
@@ -198,16 +198,24 @@
 	    <xsl:with-param name="nodeset" select="$forfattningskommentar"/>
 	    <xsl:with-param name="panelid" select="$panelid"/>
 	    <xsl:with-param name="paneltype">f</xsl:with-param>
-	    <xsl:with-param name="expanded" select="$expanded"/>
+	    <xsl:with-param name="expanded" select="not($kommentar)"/>
 	  </xsl:call-template>
 	</xsl:if>
 	<xsl:if test="$rattsfall">
+	  <xsl:variable name="rattsfall-markup">
+	    <ul>
+	      <xsl:for-each select="$rattsfall">
+		<li><a href="{@rdf:about}"><b><xsl:value-of select="dcterms:identifier"/></b>:</a> <xsl:value-of select="dcterms:description"/></li>
+	      </xsl:for-each>
+	    </ul>
+	  </xsl:variable>
 	  <xsl:call-template name="aside-annotations-panel">
 	    <xsl:with-param name="title">Rättsfall</xsl:with-param>
 	    <xsl:with-param name="badgecount" select="count($rattsfall)"/>
-	    <xsl:with-param name="nodeset" select="$rattsfall"/>
+	    <xsl:with-param name="nodeset" select="ext:node-set($rattsfall-markup)"/>
 	    <xsl:with-param name="panelid" select="$panelid"/>
 	    <xsl:with-param name="paneltype">r</xsl:with-param>
+	    <xsl:with-param name="expanded" select="not($kommentar or $forfattningskommentar)"/>
 	  </xsl:call-template>
 	</xsl:if>
 	<xsl:if test="$inbound">
@@ -217,6 +225,7 @@
 	    <xsl:with-param name="nodeset" select="$inbound"/>
 	    <xsl:with-param name="panelid" select="$panelid"/>
 	    <xsl:with-param name="paneltype">l</xsl:with-param>
+	    <xsl:with-param name="expanded" select="not($kommentar or $forfattningskommentar or $rattsfall)"/>
 	  </xsl:call-template>
 	</xsl:if>
 	<xsl:if test="$inford or $andrad or $upphavd">
@@ -240,6 +249,7 @@
 	    <xsl:with-param name="panelid" select="$panelid"/>
 	    <xsl:with-param name="paneltype">a</xsl:with-param>
 	    <xsl:with-param name="nodeset" select="ext:node-set($andringar)"/>
+	    <xsl:with-param name="expanded" select="not($kommentar or $forfattningskommentar or $rattsfall or $inbound)"/>
 	  </xsl:call-template>
 	</xsl:if>
       </div>

@@ -7,7 +7,7 @@
     <xsl:param name="paneltype"/>
     <xsl:param name="panelid"/>
     <xsl:param name="expanded" select="'false'"/>
-    <xsl:variable name="expanded-class"><xsl:if test="$expanded = 'true'">in</xsl:if></xsl:variable>
+    <xsl:variable name="expanded-class"><xsl:if test="$expanded='true'">in</xsl:if></xsl:variable>
     <xsl:message><xsl:value-of select="$paneltype"/>-<xsl:value-of select="$panelid"/>: expanded-class='<xsl:value-of select="$expanded-class"/>'</xsl:message>
     <div class="panel panel-default">
       <div class="panel-heading" role="tab" id="heading-{$paneltype}-{$panelid}">
