@@ -1420,6 +1420,11 @@ class SFS(Trips):
         # "R\xe4ttsinformationsf\xf6rordning (1999:175)"
         specifics = {}
         for row in inboundlinks:
+            if not (row['uri'].startswith("http://") or row['uri'].startswith("http://")):
+                # we once had a condition where some rows were like 
+                # {'lagrum': 'https://lagen.nu/sfs/1998:204#L2015:589', 'uri': 'b0'}
+                # so we make "sure" uri is a URI
+                continue
             if 'lagrum' not in row:
                 lagrum = baseuri
             else:
