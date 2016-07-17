@@ -39,6 +39,7 @@ It's a generic template for any kind of content
     </div>
   </xsl:template>
   <xsl:param name="dyntoc" select="true()"/>
+  <xsl:param name="content-under-pagetitle" select="false()"/>
 
   <!-- Headings shouldn't be expressed with <h*> tags, but rather with
        RDFa attribs in <div class="section"> element. However,

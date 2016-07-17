@@ -3,7 +3,7 @@ from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 from builtins import *
 
-from tempfile import mkdtemp
+from tempfile import mkdtemp, NamedTemporaryFile
 import os
 import shutil
 import re
@@ -234,6 +234,7 @@ class XSLTTransform(TransformerEngine):
         return filename
 
     def transform(self, indata, config=None, parameters={}):
+        
         strparams = {}
         if config:
             # paths to be used with the document() function
@@ -244,16 +245,27 @@ class XSLTTransform(TransformerEngine):
             # print(util.readfile(config))
             config_fullpath = os.path.abspath(config)
             strparams['configurationfile'] = XSLT.strparam(config_fullpath)
+        removefiles = []
         for key, value in parameters.items():
             if key.endswith("file"):
-                # relativize path of file relative to the XSL file
-                # we'll be using. The mechanism could be clearer...
-                value = os.path.relpath(value, self.templdir)
-                # FIXME: if the filename contains non-ascii
-                # characters, any attempt to eg
-                # "document($annotationfile)" will silently
-                # fail. Seriously, fuck lxml's error handling.
-                value = value.replace("Ö", "O")
+                if all(ord(c) < 128 for c in value):
+                    # IF the file name contains ONLY ascii chars, we can
+                    # use it directly. However, we need to relativize path
+                    # of file relative to the XSL file we'll be using. The
+                    # mechanism could be clearer...
+                    value = os.path.relpath(value, self.templdir)
+                else:
+                    # If the filename contains non-ascii characters,
+                    # any attempt to eg "document($annotationfile)" in
+                    # the XSLT document will silently fail. Seriously,
+                    # fuck lxml's error handling. In this case, copy
+                    # it to a temp file (in the temporary templdir,
+                    # with ascii filename) and use that.
+                    contents = util.readfile(value)
+                    value = os.path.basename(value)
+                    value = "".join(c for c in value if ord(c) < 128)
+                    removefiles.append(self.templdir+os.sep+value)
+                    util.writefile(self.templdir+os.sep+value, contents)
                 if os.sep == "\\":
                     value = value.replace(os.sep, "/")
             strparams[key] = XSLT.strparam(value)
@@ -261,6 +273,9 @@ class XSLTTransform(TransformerEngine):
             return self._transformer(indata, **strparams)
         except etree.XSLTApplyError as e:
             raise errors.TransformError(str(e))
+        finally:
+            for f in removefiles:
+                util.robust_remove(f)
         # FIXME: This can never be reached, if _transformer() does not
         # raise an error, the above returns immediately.
         if len(self._transformer.error_log) > 0:

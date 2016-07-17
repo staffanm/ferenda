@@ -122,7 +122,11 @@
 	  </div>
 	  <article class="col-sm-9">
 	    <xsl:call-template name="pagetitle"/>
-	    <xsl:apply-templates/>
+	    <xsl:choose>
+	      <xsl:when test="not($content-under-pagetitle)">
+		<xsl:apply-templates/>
+	      </xsl:when>
+	    </xsl:choose>
 	    <!-- Main document text: header, sections (possibly nested) and footer goes here -->
 	  </article>
 	</div>

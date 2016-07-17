@@ -40,6 +40,7 @@
     <h1>Status report</h1>
   </xsl:template>
   <xsl:param name="dyntoc" select="true()"/>
+  <xsl:param name="content-under-pagetitle" select="false()"/>
 
   <xsl:template match="/">
       <html>

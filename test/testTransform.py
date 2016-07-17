@@ -13,7 +13,7 @@ from ferenda import Transformer
 
 class Transform(RepoTester):
 
-    def test_transform_html(self):
+    def _setup_files(self, paramfile):
         base = self.datadir+os.sep
         util.ensure_dir(base+"teststyle.xslt")
         with open(base+"teststyle.xslt","w") as fp:
@@ -30,21 +30,39 @@ class Transform(RepoTester):
     </xsl:template>
 </xsl:stylesheet>
 """)
-        with open(base+"paramfile.xml","w") as fp:
+        with open(base+paramfile,"w") as fp:
             fp.write("""<root><node key='value'><subnode>textnode</subnode></node></root>""")
 
         with open(base+"infile.xml","w") as fp:
             fp.write("""<doc><title>Document title</title></doc>""")
-        t = Transformer("XSLT", base+"teststyle.xslt", "xsl", None, "")
+        return Transformer("XSLT", base+"teststyle.xslt", "xsl", None, "")
+    
+    def test_transform_html(self):
+        base = self.datadir+os.sep
+        t = self._setup_files(paramfile="paramfile.xml")
         t.transform_file(base+"infile.xml", base+"outfile.xml",
                          {'value':'blahonga',
                           'file':base+'paramfile.xml'})
-        self.assertEqualXML(util.readfile(base+"outfile.xml"),"""
+        self.assertEqualXML("""
         <output>
             <paramvalue>blahonga</paramvalue>
             <paramfile><node key='value'><subnode>textnode</subnode></node></paramfile>
             <infile>Document title</infile>
-        </output>""")
+        </output>""", util.readfile(base+"outfile.xml"))
+
+    def test_transform_nonascii_fileparam(self):
+        base = self.datadir+os.sep
+        t = self._setup_files(paramfile="räksmörgås.xml")
+        t.transform_file(base+"infile.xml", base+"outfile.xml",
+                         {'value':'blahonga',
+                          'file':base+'räksmörgås.xml'})
+        self.assertEqualXML("""
+        <output>
+            <paramvalue>blahonga</paramvalue>
+            <paramfile><node key='value'><subnode>textnode</subnode></node></paramfile>
+            <infile>Document title</infile>
+        </output>""", util.readfile(base+"outfile.xml"))
+
 
     # FIXME: We should isolate parts of the tests in
     # testDocRepo.Generate, testDocRepo.TOC and testWSGI.Search that

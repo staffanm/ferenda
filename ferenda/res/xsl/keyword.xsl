@@ -35,6 +35,7 @@
     </div>
   </xsl:template>
   <xsl:param name="dyntoc" select="true()"/>
+  <xsl:param name="content-under-pagetitle" select="false()"/>
       
 
   <xsl:template match="xhtml:a">
