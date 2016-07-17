@@ -4,7 +4,7 @@ lxml
 rdflib
 rdfextras
 rdflib-jsonld
-html5lib
+html5lib<=0.9999999   # later versions incompatible with current beautifulsoup
 requests
 future
 jsmin
