@@ -1462,6 +1462,7 @@ class Generate(RepoTester):
     <h1><xsl:value-of select="../xhtml:head/xhtml:title"/></h1>
   </xsl:template>
   <xsl:param name="dyntoc" select="false()"/>
+  <xsl:param name="content-under-pagetitle" select="false()"/>
 
   <xsl:template match="xhtml:body/xhtml:div">
      <p class="div">This is not a div</p>            

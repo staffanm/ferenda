@@ -74,7 +74,8 @@ h4.panel-title {
 	margin-top: 0;
 }
 div.panel-body {
-	padding: 0;
+	padding: 3px;
+	font-size: smaller;
 }
 div.panel-body div.row {
 	margin: 1pt 1pt 6pt 1pt;
@@ -85,7 +86,6 @@ div.panel-body div.row p:first-child {
 div.panel-body div.row p {
 	text-indent: 1em;
 	margin-bottom: 0;
-	font-size: smaller;
 }
 
 /* grid-framework.less gives all .rows negative left and right margins

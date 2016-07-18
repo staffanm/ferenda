@@ -23,6 +23,7 @@ It's a generic template for TOC pages (assumes that there exists a <ul role="nav
     <h1><xsl:value-of select="../xhtml:head/xhtml:title"/></h1>
   </xsl:template>
   <xsl:variable name="dyntoc" select="false()"/>
+  <xsl:variable name="content-under-pagetitle" select="false()"/>
 
   <xsl:template match="xhtml:h1"><h1><xsl:apply-templates/></h1></xsl:template>
 
