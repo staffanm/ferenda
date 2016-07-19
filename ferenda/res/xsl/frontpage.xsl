@@ -40,14 +40,8 @@ It's a generic template for any kind of content
   <!-- default template: translate everything from whatever namespace
        it's in (usually the XHTML1.1 NS) into the default namespace
        -->
-  <!-- results in error 'Attribute nodes must be added before any child nodes to an element.' -->
-  <!--
-  <xsl:template match="@*">
-    <xsl:copy><xsl:apply-templates/></xsl:copy>
-  </xsl:template>
-  --> 
   <xsl:template match="*">
-    <xsl:element name="{local-name(.)}"><xsl:apply-templates select="@*|node()"/></xsl:element>
+    <xsl:element name="{local-name(.)}"><xsl:apply-templates select="node()"/></xsl:element>
   </xsl:template>
 
   <!-- default toc handling (do nothing) -->

@@ -503,6 +503,7 @@ class DocumentRepository(object):
             'relate': True,
             'republishsource': False,
             'tabs': True,
+            'primaryfrontpage': False,
             'class': cls.__module__ + "." + cls.__name__,
             # FIXME: These only make sense at a global level, and
             # furthermore are duplicated in manager._load_config. We

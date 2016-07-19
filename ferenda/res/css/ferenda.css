@@ -127,6 +127,10 @@ this grid system directly under body? */
 	margin-left: 8em;
     }
 
+    body.frontpage td {
+	vertical-align: top;
+    }
+
     nav.affix-top {
 	width: 97%; /* of the .col-sm-3 element */
     }

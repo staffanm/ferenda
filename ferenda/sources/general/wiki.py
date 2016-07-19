@@ -173,14 +173,18 @@ class MediaWiki(DocumentRepository):
                          self.ns['dcterms'].identifier,
                          Literal(doc.basefile)))
 
-    def parse_document_from_soup(self, soup, doc):
 
-        wikitext = soup.find("text").text
+    def get_wikitext(self, soup, doc):
+        return soup.find("text").text
+
+
+    def parse_document_from_soup(self, soup, doc):
         parser = self.get_wikiparser()
         settings = self.get_wikisettings()
         semantics = self.get_wikisemantics(parser, settings)
         preprocessor = self.get_wikipreprocessor(settings)
-
+        wikitext = self.get_wikitext(soup, doc)
+        
         # the main responsibility of the preprocessor is to expand templates
         wikitext = preprocessor.expand(doc.basefile, wikitext)
 

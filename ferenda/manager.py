@@ -150,15 +150,21 @@ def frontpage(repos,
         # True, then all other repos should provide their
         # .frontpage_content() into that repos .frontpage impl (and this
         # method should not have any xhtml template like below).
+        xhtml = None
         for inst in repos:
-            content = inst.frontpage_content()
-            if content:
-                blocks += "<div id='%s'>%s</div>" % (inst.alias, content)
-                log.debug("frontpage: repo %s provided %s chars of content" %
-                          (inst.alias, len(content)))
-        vars = {'title': sitename,
-                'blocks': blocks}
-        xhtml = """<?xml version='1.0' encoding='utf-8'?>
+            if inst.config.primaryfrontpage:
+                xhtml = inst.frontpage_content(primary=True)
+                break
+        if not xhtml:
+            for inst in repos:
+                content = inst.frontpage_content()
+                if content:
+                    blocks += "<div id='%s'>%s</div>" % (inst.alias, content)
+                    log.debug("frontpage: repo %s provided %s chars of content" %
+                              (inst.alias, len(content)))
+            vars = {'title': sitename,
+                    'blocks': blocks}
+            xhtml = """<?xml version='1.0' encoding='utf-8'?>
     <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd">
     <html xmlns="http://www.w3.org/1999/xhtml">
       <head>
@@ -168,9 +174,11 @@ def frontpage(repos,
         %(blocks)s
       </body>
     </html>""" % vars
+
         xhtml_path = os.path.splitext(path)[0] + ".xhtml"
         with codecs.open(xhtml_path, "w", encoding="utf-8") as fp:
             fp.write(xhtml)
+
         # FIXME: We don't need to actually store the xhtml file on
         # disk -- we could just keep it in memory as an lxml tree and
         # call .transform(tree) just like

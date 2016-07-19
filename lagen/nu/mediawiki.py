@@ -9,6 +9,7 @@ from builtins import *
 # system
 import unicodedata
 import os
+import re
 
 # 3rdparty
 from lxml import etree
@@ -16,6 +17,7 @@ from rdflib import Graph, Namespace, RDF
 from cached_property import cached_property
 
 # mine
+from ferenda import util
 from ferenda import DocumentStore
 from ferenda.sources.legal.se import SwedishLegalSource, SwedishCitationParser
 from ferenda.sources.legal.se.legalref import LegalRef
@@ -95,6 +97,15 @@ class LNMediaWiki(wiki.MediaWiki):
         # finding a single coin:URISpace object
         spaceuri = cfg.value(predicate=RDF.type, object=COIN.URISpace)
         return URIMinter(cfg, spaceuri)
+
+    def get_wikitext(self, soup, doc):
+        if doc.basefile == "Lagen.nu:Huvudsida":
+            wikitext = soup.find("text").text
+            wikitext = wikitext.split("= Index =")[1].strip()
+            wikitext = re.sub("\n\n", "\n", wikitext, flags=re.MULTILINE)
+            return wikitext
+        else:
+            return super(LNMediaWiki, soup, doc)
 
     def get_wikisettings(self):
         settings = LNSettings(lang=self.lang)
@@ -185,11 +196,37 @@ class LNMediaWiki(wiki.MediaWiki):
         xhtmltree.remove(body)
         xhtmltree.append(newbody)
 
+
+    def frontpage_content(self, primary=False):
+        if primary:
+            return util.readfile(self.store.parsed_path("Lagen.nu:Huvudsida"))
+        else:
+            return super(LNMediaWiki, self).frontpage_content()
+                            
+
 class LNSemantics(wiki.WikiSemantics):
+
     def internal_link(self, ast):
         el = super(LNSemantics, self).internal_link(ast)
         return el
 
+    def heading(self, ast):
+        el = super(LNSemantics, self).heading(ast)
+        # <h2><span class="mw-headline" id="[[:Kategori:Familjerätt|Familjerätt]]">
+        if el[0].text.startswith("[[:Kategori"):
+            # [[:Kategori:Familjerätt|Familjerätt]] -> https://lagen.nu/concept/Familjerätt
+            # 
+            # FIXME: there should be a way of getting mw to do this
+            # for us (by calling settings.make_url like internal_link
+            # does
+            basefile = el[0].text.split("|")[1][:-2]
+            href = self.settings.make_keyword_url(basefile)
+            link = etree.Element("a", **{'href': href,
+                                         'id': basefile})
+            link.text = basefile
+            el[0] = link
+        return el
+    
 
 class LNSettings(wiki.WikiSettings):
     def __init__(self, lang="en"):
