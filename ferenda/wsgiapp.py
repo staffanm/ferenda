@@ -74,7 +74,6 @@ class WSGIApp(object):
         url = request_uri(environ)
         self.log.info("Starting process for %s (path_info=%s, query_string=%s)" % (url, path, environ['QUERY_STRING']))
         # FIXME: routing infrastructure -- could be simplified?
-        from pudb import set_trace; set_trace()
         try:
             if path.startswith(self.config.searchendpoint):
                 return self.search(environ, start_response)

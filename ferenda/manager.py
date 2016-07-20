@@ -82,6 +82,7 @@ DEFAULT_CONFIG = {'loglevel': 'DEBUG',
                   'cssfiles': ['css/ferenda.css'],
                   'jsfiles': ['js/ferenda.js'],
                   'imgfiles': [],
+                  'disallowrobots': False,
                   'legacyapi': False,
                   'fulltextindex': True,
                   'serverport': 5555,
@@ -449,7 +450,25 @@ def run(argv, config=None, subcall=False):
                 for cls in repoclasses:
                     inst = _instantiate_class(cls, config, argv)
                     repos.append(inst)
+                # robots.txt must be placed outside of the
+                # resourcedirectory ("data/robots.txt" not
+                # "data/rsrc/robots.txt"), therefore we do it here.
+                robotstxt = config.datadir + os.sep + "robots.txt"
+                with open(robotstxt, "w") as fp:
+                    if config.disallowrobots:
+                        fp.write("""User-agent: *
+Disallow: /
+""")
+                    else:
+                        fp.write("""User-agent: *
+Disallow: /api/
+Disallow: /search/
+Disallow: /-/
+""")
+                log.info("Wrote %s" % robotstxt)
                 return Resources(repos, **args).make()
+
+            
 
             elif action == 'frontpage':
                 repoclasses = _classes_from_classname(enabled, classname)
@@ -755,7 +774,8 @@ def _setup_makeresources_args(config):
             'sitename':    config.sitename,
             'sitedescription': config.sitedescription,
             'url':         config.url,
-            'legacyapi':   config.legacyapi
+            'legacyapi':   config.legacyapi,
+            'disallowrobots': config.disallowrobots
             }
 
 
