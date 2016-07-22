@@ -14,7 +14,7 @@ It's a generic template for any kind of content
 		xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
 		xml:space="preserve"
-		exclude-result-prefixes="xhtml rdf">
+		exclude-result-prefixes="xhtml rdf rdfs prov">
 
   <xsl:import href="uri.xsl"/>
   <xsl:include href="base.xsl"/>
@@ -64,27 +64,22 @@ It's a generic template for any kind of content
     </xsl:if>
   </xsl:template>
 
-
   <xsl:template match="xhtml:body/xhtml:div">
     <div class="row toplevel">
       <section id="{substring-after(@about,'#')}" class="col-sm-8">
-	<h2><xsl:value-of select="@content"/></h2>
 	<xsl:apply-templates select="*[not(xhtml:div[@about])]"/>
       </section>
+      <!--
       <xsl:call-template name="aside-annotations">
 	<xsl:with-param name="uri" select="../@about"/>
-      </xsl:call-template>
+	</xsl:call-template>
+	-->
     </div>
-    <!--
-    <xsl:comment>top level: docparts start</xsl:comment>
-    <xsl:apply-templates select="xhtml:div[@about]"/>
-    <xsl:comment>top level: docparts end</xsl:comment>
-    -->
   </xsl:template>
-
+    
   <!-- everything that has an @about attribute, i.e. _is_ something
        (with a URI) gets a <section> with an <aside> for inbound links etc -->
-  <xsl:template match="xhtml:div[@about]">
+  <xsl:template match="xhtml:div[@about and @class='section']">
     <div class="row" about="{@about}"><!-- needed? -->
       <section id="{substring-after(@about,'#')}" class="col-sm-8">
 	<xsl:variable name="sectionheading"><xsl:if test="xhtml:span/@content"><xsl:value-of select="xhtml:span/@content"/>. </xsl:if><xsl:value-of select="@content"/></xsl:variable>
@@ -97,34 +92,56 @@ It's a generic template for any kind of content
 	<xsl:if test="count(ancestor::*) = 4">
 	  <h4><xsl:value-of select="$sectionheading"/></h4>
 	</xsl:if>
-       <xsl:apply-templates select="*[not(@about)]"/>
+       <xsl:apply-templates select="*[not(@about and @class!='forfattningskommentar')]"/>
       </section>
       <xsl:call-template name="aside-annotations">
 	<xsl:with-param name="uri" select="@about"/>
       </xsl:call-template>
     </div>
     <!--
+    We handle all @about sections afterwards the rest to flatten out sections, ie from
+    a structure like:
+
+    4
+      4.1
+        4.1.1
+        4.1.2
+
+    we produce
+         
+    4
+    4.1
+    4.1.1
+    4.1.2
+
+
+   This only works when a @about sections only have other @about
+   sections as direct descendents, or it has no @about sections as
+   direct descendents. For forfattningskommentar subsections, this
+   does not hold.
+    -->
+         	 
     <xsl:comment>docpart level: subparts start</xsl:comment>
-    -->
-    <xsl:apply-templates select="xhtml:div[@about]"/>
-    <!--
+    <xsl:apply-templates select="xhtml:div[@about and @class!='forfattningskommentar']"/>
     <xsl:comment>docpart level: subparts end</xsl:comment>
-    -->
   </xsl:template>
 
 
+  <xsl:template match="xhtml:div[@about and @class='forfattningskommentar']">
+    <xsl:if test="string-length(@content) > 0">
+      <h3><xsl:value-of select="@content"/></h3>
+    </xsl:if>
+    <div class="forfattningskommentar">
+       <xsl:apply-templates select="xhtml:div/xhtml:div/*"/>
+    </div>
+  </xsl:template>
+
+  <!-- remove prop{rubrik,huvudrubrik} as they are duplicates of what occurs in pagetitle -->
+  <xsl:template match="xhtml:h1[@class='prophuvudrubrik' or @class='proprubrik']"/>
+  
   <!-- remove spans which only purpose is to contain RDFa data -->
   <xsl:template match="xhtml:span[@property and @content and not(text())]"/>
 
-  
-  <!--
-  <xsl:template match="xhtml:div[@about]" mode="toc">
-    <li><a href="#{substring-after(@about,'#')}"><xsl:if test="xhtml:span/@content"><xsl:value-of select="xhtml:span/@content"/>. </xsl:if><xsl:value-of select="@content"/></a><xsl:if test="xhtml:div[@about]">
-    <ul><xsl:apply-templates mode="toc"/></ul>
-    </xsl:if></li>
-  </xsl:template>
-  -->
-  
   <xsl:template match="xhtml:div[@about]" mode="toc"/>
 
   <xsl:template match="xhtml:span[@class='sidbrytning']">
@@ -147,6 +164,10 @@ It's a generic template for any kind of content
     <xsl:element name="{local-name(.)}"><xsl:apply-templates select="node()"/></xsl:element>
   </xsl:template>
 
+  <xsl:template match="@*">
+    <xsl:attribute name="{local-name(.)}"><xsl:apply-templates select="@*"/></xsl:attribute>
+  </xsl:template>
+
   <!-- alternatively: identity transform (keep source namespace) -->
   <!--
   <xsl:template match="@*|node()">
@@ -159,4 +180,3 @@ It's a generic template for any kind of content
   <xsl:template match="@*|node()" mode="toc"/>
   
 </xsl:stylesheet>
-

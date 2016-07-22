@@ -32,7 +32,7 @@ from ferenda import (DocumentRepository, DocumentStore, FSMParser,
 from ferenda import util, fulltextindex
 from ferenda.sources.legal.se.legalref import Link, LegalRef, RefParseError
 from ferenda.elements.html import A, H1, H2, H3, P, Strong
-from ferenda.elements import serialize, Section, Body, CompoundElement
+from ferenda.elements import serialize, Section, Body, CompoundElement, UnicodeElement
 from ferenda.pdfreader import Page, BaseTextDecoder, Textelement
 from ferenda.pdfreader import PDFReader
 from ferenda.pdfanalyze import PDFAnalyzer
@@ -1136,7 +1136,7 @@ class SwedishCitationParser(CitationParser):
             self._currenturl = part.about
         elif hasattr(part, 'uri') and not isinstance(part, (Link, A)):
             self._currenturl = part.uri
-        if isinstance(part, (Link, A, H1, H2, H3)):
+        if isinstance(part, (Link, A, H1, H2, H3, DokumentRubrik)):
             # don't process text that's already a link (or a heading)
             if isinstance(part, str):  # caller expects a list
                 return [part]

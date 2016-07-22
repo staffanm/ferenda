@@ -244,9 +244,12 @@ class Offtryck(SwedishLegalSource):
                     self._serialize_unparsed(body, basefile)
                     serialized = True
 
-                # print("%s: self.config.parserefs: %s, self.parse_types: %s" % (basefile, self.config.parserefs, self.parse_types))
+                # print("%s: self.config.parserefs: %s, self.parse_types: %s" %
+                #       (basefile, self.config.parserefs, self.parse_types))
                 if self.config.parserefs and self.parse_types:
-                    # FIXME: There should be a cleaner way of telling refparser the base uri (or similar) for the document
+                    # FIXME: There should be a cleaner way of telling
+                    # refparser the base uri (or similar) for the
+                    # document
                     if self.document_type == self.PROPOSITION:
                         self.refparser._currentattribs = {
                             "type": RPUBL.Proposition,
@@ -308,6 +311,7 @@ class Offtryck(SwedishLegalSource):
                 pass
             d.value(predicate, newval)
 
+        # WHAT does this even DO?!
         def helper(node, meta):
             for subnode in list(node):
                 if isinstance(subnode, Textbox):
@@ -315,15 +319,28 @@ class Offtryck(SwedishLegalSource):
                 elif isinstance(subnode, list):
                     helper(subnode, meta)
         helper(doc.body, doc.meta)
+
+        
         # the following postprocessing code is so far only written for
         # Propositioner
         if self.rdf_type != RPUBL.Proposition:
             return doc.body
 
+        # move the first pagebreak into the first pseudo-section
+        if (isinstance(doc.body[0], Sidbrytning) and
+            isinstance(doc.body[1], FrontmatterSection)):
+            doc.body[1].insert(0, doc.body.pop(0))
+
         # d = Describer(self._resource.graph, self._resource.identifier)
         d = Describer(doc.meta, doc.uri)
         title_found = identifier_found = issued_found = False
-        for idx, element in enumerate(doc.body):
+        # look only in frontmatter
+        if isinstance(doc.body[0], FrontmatterSection):
+            frontmatter = doc.body[0]
+        else:
+            # Maybe warn here?
+            frontmatter = []
+        for idx, element in enumerate(frontmatter):
             if not isinstance(element, Textbox):
                 continue
             str_element = str(element).strip()
@@ -402,7 +419,8 @@ class Offtryck(SwedishLegalSource):
                 metrics = json.load(fp)
                 defaultsize = metrics['default']['size']
         else:
-            self.log.warning("%s: visitor_functions: %s doesn't exist" % (basefile, metrics_path))
+            self.log.warning("%s: visitor_functions: %s doesn't exist" %
+                             (basefile, metrics_path))
             defaultsize = 16
         sharedstate = {'basefile': basefile,
                        'defaultsize': defaultsize}
@@ -423,7 +441,6 @@ class Offtryck(SwedishLegalSource):
                    self.SKRIVELSE: "%s. %s/%s:%s",
                    self.SOU: "%s %s:%s",
                    self.SO: "%s %s:%s"}
-
         try:
             parts = re.split("[\.:/ ]+", identifier.strip())
             parts[0] = parts[0][0].upper() + parts[0][1:]
@@ -432,8 +449,6 @@ class Offtryck(SwedishLegalSource):
             self.log.warning("Couldn't sanitize identifier %s" % identifier)
             return identifier
 
-
-    
 
     def parse_pdf(self, pdffile, intermediatedir, basefile):
         # By default, don't create and manage PDF backgrounds files
@@ -1235,6 +1250,10 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         title = str(parser.reader.next()).strip()
         return p.make_children(Protokollsutdrag(title=title))
 
+    @newstate("frontmatter")
+    def make_frontmatter(parser):
+        return p.make_children(FrontmatterSection())
+
     def make_prophuvudrubrik(parser):
         return PropHuvudrubrik(str(parser.reader.next()).strip())
 
@@ -1469,8 +1488,8 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         recognizers.insert(5, is_protokollsutdrag)
     p.set_recognizers(*recognizers)
 
-    commonstates = ("body", "preamblesection", "protokollsutdrag", "section", "subsection",
-                    "unorderedsection", "unorderedsubsection", "subsubsection",
+    commonstates = ("body", "frontmatter", "preamblesection", "protokollsutdrag", "section",
+                    "subsection", "unorderedsection", "unorderedsubsection", "subsubsection",
                     "appendix")
     commonbodystates = commonstates[1:]
     p.set_transitions({(commonstates, is_nonessential): (skip_nonessential, None),
@@ -1478,11 +1497,14 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                        (commonstates, is_paragraph): (make_paragraph, None),
                        ("body", is_appendix): (make_appendix, "appendix"),
                        ("body", is_preamblesection): (make_preamblesection, "preamblesection"),
-                       ("body", is_prophuvudrubrik): (make_prophuvudrubrik, None),
-                       ("body", is_proprubrik): (make_proprubrik, None),
+                       ("body", is_prophuvudrubrik): (make_frontmatter, "frontmatter"),
                        ("body", is_protokollsutdrag): (make_protokollsutdrag, "protokollsutdrag"),
                        ("body", is_section): (make_section, "section"),
                        ("body", is_unorderedsection): (make_unorderedsection, "unorderedsection"),
+                       ("frontmatter", is_prophuvudrubrik): (make_prophuvudrubrik, None),
+                       ("frontmatter", is_proprubrik): (make_proprubrik, None),
+                       ("frontmatter", is_preamblesection): (False, None),
+                       
                        ("preamblesection", is_preamblesection): (False, None),
                        ("preamblesection", is_section): (False, None),
                        ("preamblesection", is_appendix): (False, None),

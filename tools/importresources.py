@@ -312,7 +312,7 @@ space: coin:template [
                      [ coin:property rinfoex:artikelnummer ]
      ], [
         # maybe do this as a general relFromBase rpubl:sida?
-        coin:uriTemplate "/{rtype}/{arsutgava}:{lopnummer}#s{sidnummer}";
+        coin:uriTemplate "/{rtype}/{arsutgava}:{lopnummer}#sid{sidnummer}";
         coin:binding [ coin:property rpubl:sidnummer ],
                      [ coin:property rdf:type ;
                        coin:slugFrom space:abbrSlug ;

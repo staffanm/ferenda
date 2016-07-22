@@ -161,6 +161,11 @@ this grid system directly under body? */
 	padding-top: 12pt;
 	text-align: right;
     }
+    div.forfattningskommentar {
+	border: 1px solid black;
+	padding: 2px;
+	background-color: #d9edf7; // corresponding to the "info" bootstrap color
+    }
 }
 
 

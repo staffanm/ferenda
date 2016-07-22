@@ -460,16 +460,25 @@ class Coverpage(CompoundElement):
     tagname = "div"
     classname = "coverpage"
 
-    
-class PropHuvudrubrik(UnicodeElement):
-    # this is always something like "Regeringens proposition 2005/06:173"
+
+class DokumentRubrik(UnicodeElement):
     tagname = "h1"
+    
+
+class PropHuvudrubrik(DokumentRubrik):
+    # this is always something like "Regeringens proposition 2005/06:173"
     classname = "prophuvudrubrik"
 
     
-class PropRubrik(UnicodeElement):
+class PropRubrik(DokumentRubrik):
     # This is the actual dcterms:title of the document
-    tagname = "h1"  # even though traditionally set in smaller font
     classname = "proprubrik"
     # FIXME: make it output a dcterms:title triple?
 
+
+class FrontmatterSection(CompoundElement):
+    # used for the first few headers (PropHuvudrubrik, PropRubrik) and
+    # lines in a proposition
+    tagname = "div"
+    classname = "frontmatter"
+    
