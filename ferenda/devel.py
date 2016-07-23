@@ -357,11 +357,15 @@ class Devel(object):
         :type querystring: str
         """
         print = builtins.print
+        # from ferenda.sources.legal.se import Propositioner, Direktiv, SOU, Ds, JO, JK, ARN,DV
+        # from lagen.nu import MyndFskr, LNMediaWiki, LNKeyword
+        # repos = [Propositioner(), Direktiv(), SOU(), Ds(), JO(), JK(), ARN(), DV(), LNKeyword(), MyndFskr(), LNMediaWiki()]
+        repos = []
         index = FulltextIndex.connect(self.config.indextype,
-                                      self.config.indexlocation)
-        rows = index.query(querystring)
+                                      self.config.indexlocation, repos)
+        rows, pager = index.query(querystring)
         for row in rows:
-            print("%s (%s): %s" % (row['identifier'], row['about'], row['text']))
+            print("%s (%s): %s" % (row['label'], row['uri'], row['text']))
 
     @decorators.action
     def construct(self, template, uri, format="turtle"):

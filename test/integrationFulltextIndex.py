@@ -185,7 +185,8 @@ class BasicQuery(object):
             self.index.commit()
 
     def test_basic(self):
-        self.assertEqual(self.index.doccount(),0)
+        # an un-initialized fulltext index may throw an exception instead of reporting 0 documents
+        # self.assertEqual(self.index.doccount(),0)
         self.load(basic_dataset)
         self.assertEqual(self.index.doccount(),4)
 

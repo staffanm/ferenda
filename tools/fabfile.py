@@ -11,9 +11,10 @@ def doccount():
 def copy_elastic():
     # remove all old snapshots
     snapshotids = local("curl -s http://localhost:9200/_snapshot/lagen_backup/_all?pretty=true|jq -r '.snapshots[]|.snapshot'", capture=True)
-    for snapshot_id in snapshotids.split("\n"):
-        assert snapshot_id
-        local("curl -XDELETE http://localhost:9200/_snapshot/lagen_backup/%s" % snapshot_id)
+    if snapshotids.strip():
+        for snapshot_id in snapshotids.split("\n"):
+            assert snapshot_id
+            local("curl -XDELETE http://localhost:9200/_snapshot/lagen_backup/%s" % snapshot_id)
 
     snapshot_id = datetime.now().strftime("%y%m%d-%H%M%S")
     # compute new snapshot id YYYYMMDD-HHMMSS

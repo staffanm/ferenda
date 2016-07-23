@@ -19,7 +19,7 @@ import requests.exceptions
 from bs4 import BeautifulSoup
 
 from ferenda import util, errors
-
+import logging
 
 class FulltextIndex(object):
 
@@ -54,6 +54,7 @@ class FulltextIndex(object):
         else:
             assert repos, "Attempt to create a fulltext index, but no repos were provided, index schema would be empty"
             self.index = self.create(repos)
+        self.log = logging.getLogger("ferenda.fulltextindex")
 
     def __del__(self):
         self.close()
@@ -854,7 +855,7 @@ class ElasticSearchIndex(RemoteIndex):
         # (at this stage -- we could look at self.schema() though)
         jsonresp = json.loads(response.text,
                               object_hook=util.make_json_date_object_hook())
-
+        
         res = Results()
         for hit in jsonresp['hits']['hits']:
             h = hit['_source']
@@ -910,11 +911,30 @@ class ElasticSearchIndex(RemoteIndex):
                 try:
                     schema[fieldname] = self.from_native_field(fieldobject)
                 except errors.SchemaMappingError as e:
-                    raise errors.SchemaMappingError("%s: %s" % (fieldname, str(e)))
+                    # raise errors.SchemaMappingError("%s/%s: %s" % (typename, fieldname, str(e)))
+                    # try to recover by using the repo's own definition instead
+                    for repo in self._repos:
+                        if repo.alias == typename:
+                            break
+                    else:
+                        raise errors.SchemaMappingError("%s/%s: %s" % (typename, fieldname, str(e)))
+                    g = repo.make_graph()  # for qname lookup
+                    for facet in repo.facets():
+                        if facet.dimension_label:
+                            fld = facet.dimension_label
+                        else:
+                            fld = g.qname(facet.rdftype).replace(":", "_")
+                        if fld == fieldname:
+                            schema[fld] = facet.indexingtype
+                            self.log.error("%s/%s: native field %s couldn't be mapped, fell back on repo.facet.indexingtype" % (typename, fieldname, str(e)))
+                            break
+                    else:
+                        raise errors.SchemaMappingError("%s/%s: %s (no suitable fallback facet)" % (typename, fieldname, str(e)))
                 schema["repo"] = self.get_default_schema()['repo']
         return schema
 
     def _create_schema_payload(self, repos):
+        
         language = {'en': 'English',
                     'sv': 'Swedish'}.get(repos[0].lang, "English")
         payload = {
