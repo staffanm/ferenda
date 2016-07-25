@@ -8,63 +8,56 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/sfs/1915:218#P10S1> a rinfoex:Stycke ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1915:218#P10> .
+<https://lagen.nu/1915:218#P10S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1915:218#P10> .
 
-<https://lagen.nu/sfs/1915:218#P10S2> a rinfoex:Stycke ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1915:218#P10> .
+<https://lagen.nu/1915:218#P10S2> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1915:218#P10> .
 
-<https://lagen.nu/sfs/1915:218#P1S1> a rinfoex:Stycke ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1915:218#P1> ;
-    dcterms:references <https://lagen.nu/sfs/1915:218#P2>,
-        <https://lagen.nu/sfs/1915:218#P9> .
+<https://lagen.nu/1915:218#P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1915:218#P1> ;
+    dcterms:references <https://lagen.nu/1915:218#P2>,
+        <https://lagen.nu/1915:218#P9> .
 
-<https://lagen.nu/sfs/1915:218#P1S2> a rinfoex:Stycke ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1915:218#P1> .
+<https://lagen.nu/1915:218#P1S2> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1915:218#P1> .
 
-<https://lagen.nu/sfs/1915:218#P1S3> a rinfoex:Stycke ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1915:218#P1> .
+<https://lagen.nu/1915:218#P1S3> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1915:218#P1> .
 
-<https://lagen.nu/sfs/1915:218#P2S1> a rinfoex:Stycke ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1915:218#P2> .
+<https://lagen.nu/1915:218#P2S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1915:218#P2> .
 
-<https://lagen.nu/sfs/1915:218#P2S2> a rinfoex:Stycke ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1915:218#P2> .
+<https://lagen.nu/1915:218#P2S2> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1915:218#P2> .
 
-<https://lagen.nu/sfs/1915:218/konsolidering> owl:sameAs <https://lagen.nu/sfs/1915:218/konsolidering/1994:1513> .
+<https://lagen.nu/1915:218/konsolidering> owl:sameAs <https://lagen.nu/1915:218/konsolidering/1994:1513> .
 
-<https://lagen.nu/bet/1994/95:LU5> dcterms:identifier "bet. 1994/95:LU5" .
+<https://lagen.nu/1915:218#K2> a rpubl:Kapitel .
 
-<https://lagen.nu/prop/1986/87:72> dcterms:identifier "Prop. 1986/87:72" .
-
-<https://lagen.nu/prop/1994/95:17> dcterms:identifier "Prop. 1994/95:17" .
-
-<https://lagen.nu/rskr/1994/95:76> dcterms:identifier "rskr. 1994/95:76" .
-
-<https://lagen.nu/sfs/1915:218#K2> a rpubl:Kapitel .
-
-<https://lagen.nu/sfs/1915:218/konsolidering/1994:1513> a rpubl:KonsolideradGrundforfattning ;
+<https://lagen.nu/1915:218/konsolidering/1994:1513> a rpubl:KonsolideradGrundforfattning ;
     dcterms:creator <https://lagen.nu/org/2008/justitiedepartementet> ;
     dcterms:identifier "SFS 1915:218 i lydelse enligt SFS 1994:1513" ;
     dcterms:issued "1994-12-31"^^xsd:date ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
     dcterms:title "Lag (1915:218) om avtal och andra rättshandlingar på förmögenhetsrättens område"@sv ;
-    rpubl:konsoliderar <https://lagen.nu/sfs/1915:218> ;
-    rpubl:konsolideringsunderlag <https://lagen.nu/sfs/1915:218>,
-        <https://lagen.nu/sfs/1987:329>,
-        <https://lagen.nu/sfs/1994:1513> ;
+    rpubl:ikrafttradandedatum "1916-01-01"^^xsd:date ;
+    rpubl:konsoliderar <https://lagen.nu/1915:218> ;
+    rpubl:konsolideringsunderlag <https://lagen.nu/1915:218>,
+        <https://lagen.nu/1987:329>,
+        <https://lagen.nu/1994:1513> ;
     rpubl:utfardandedatum "1915-06-11"^^xsd:date ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1915:218/konsolidering/1994-12-31> ;
     prov:wasGeneratedBy "lagen.nu.sfs.SFS" .
 
-<https://lagen.nu/sfs/1987:329> a rpubl:Lag ;
+<https://lagen.nu/1987:329> a rpubl:Lag ;
     dcterms:identifier "SFS 1987:329" ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
     dcterms:title "Lag (1987:329) om ändring i lagen (1915:218) om avtal och andra rättshandlingar på förmögenhetsrättens område"@sv ;
     rpubl:andrar "ändr. 31 §" ;
     rpubl:arsutgava "1987" ;
     rpubl:beslutadAv <https://lagen.nu/org/2008/regeringskansliet> ;
-    rpubl:ersatter <https://lagen.nu/sfs/1915:218#P31> ;
+    rpubl:ersatter <https://lagen.nu/1915:218#P31> ;
     rpubl:forarbete <https://lagen.nu/prop/1986/87:72> ;
     rpubl:forfattningssamling <https://lagen.nu/dataset/sfs> ;
     rpubl:ikrafttradandedatum "1987-07-01"^^xsd:date ;
@@ -72,14 +65,14 @@
     rpubl:utfardandedatum "1987-12-31"^^xsd:date ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1987:329> .
 
-<https://lagen.nu/sfs/1994:1513> a rpubl:Lag ;
+<https://lagen.nu/1994:1513> a rpubl:Lag ;
     dcterms:identifier "SFS 1994:1513" ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
     dcterms:title "Lag (1994:1513) om ändring i lagen (1915:218) om avtal och andra rättshandlingar på förmögenhetsrättens område"@sv ;
     rpubl:andrar "ändr. 36 §" ;
     rpubl:arsutgava "1994" ;
     rpubl:beslutadAv <https://lagen.nu/org/2008/regeringskansliet> ;
-    rpubl:ersatter <https://lagen.nu/sfs/1915:218#P36> ;
+    rpubl:ersatter <https://lagen.nu/1915:218#P36> ;
     rpubl:forarbete <https://lagen.nu/bet/1994/95:LU5>,
         <https://lagen.nu/prop/1994/95:17>,
         <https://lagen.nu/rskr/1994/95:76> ;
@@ -89,7 +82,15 @@
     rpubl:utfardandedatum "1994-12-31"^^xsd:date ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1994:1513> .
 
-<https://lagen.nu/sfs/1915:218> a rpubl:Lag ;
+<https://lagen.nu/bet/1994/95:LU5> dcterms:identifier "bet. 1994/95:LU5" .
+
+<https://lagen.nu/prop/1986/87:72> dcterms:identifier "Prop. 1986/87:72" .
+
+<https://lagen.nu/prop/1994/95:17> dcterms:identifier "Prop. 1994/95:17" .
+
+<https://lagen.nu/rskr/1994/95:76> dcterms:identifier "rskr. 1994/95:76" .
+
+<https://lagen.nu/1915:218> a rpubl:Lag ;
     dcterms:identifier "SFS 1915:218" ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
     dcterms:title "Lag (1915:218) om avtal och andra rättshandlingar på förmögenhetsrättens område"@sv ;
@@ -102,14 +103,14 @@
     rpubl:utfardandedatum "1915-12-31"^^xsd:date ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1915:218> .
 
-<https://lagen.nu/sfs/1915:218#K1> a rpubl:Kapitel .
+<https://lagen.nu/1915:218#K1> a rpubl:Kapitel .
 
-<https://lagen.nu/sfs/1915:218#P10> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1915:218#K2> .
+<https://lagen.nu/1915:218#P10> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/1915:218#K2> .
 
-<https://lagen.nu/sfs/1915:218#P1> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1915:218#K1> .
+<https://lagen.nu/1915:218#P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/1915:218#K1> .
 
-<https://lagen.nu/sfs/1915:218#P2> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1915:218#K1> .
+<https://lagen.nu/1915:218#P2> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/1915:218#K1> .
 

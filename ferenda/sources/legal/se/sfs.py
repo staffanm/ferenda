@@ -515,7 +515,6 @@ class SFS(Trips):
         # FIXME: This should be done in CoIN entirely
         if konsolidering is True:
             uri = uri.rsplit("/", 1)[0]
-        # FIXME: temporary code we use while we get basefile_from_uri to work
         computed_basefile = self.basefile_from_uri(uri)
         assert basefile == computed_basefile, "%s -> %s -> %s" % (basefile, uri, computed_basefile)
         # end temporary code

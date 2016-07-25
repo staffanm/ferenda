@@ -200,6 +200,7 @@ class Binding:
         self.p = resource.value(COIN.property).identifier
         self.variable = resource.value(COIN.variable) or uri_leaf(self.p)
         self.slugFrom = resource.value(COIN.slugFrom)
+        self.match = resource.value(COIN.match)
 
     def __repr__(self):
         return "<Binding %s>" % self.template.resource.graph.qname(self.p)
@@ -212,11 +213,14 @@ class Binding:
             if value.value(self.slugFrom.identifier):
                 # the graph from where value is taken might contain only
                 # metadata about the resource, not the database of slugs.
-                return value.value(self.slugFrom.identifier)
+                value = value.value(self.slugFrom.identifier)
             else:
                 # as a fallback, look for the slug in the space graph.
                 space = self.template.resource.graph.resource(value.identifier)
-                return space.value(self.slugFrom.identifier)
+                value = space.value(self.slugFrom.identifier)
+
+        if self.match and value != self.match:
+            return None
         else:
             return value
 

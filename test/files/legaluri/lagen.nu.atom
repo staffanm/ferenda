@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<feed xmlns="http://www.w3.org/2005/Atom"
+      xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+      xmlns:dct="http://purl.org/dc/terms/"
+      xmlns:rpubl="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#">
+
+    <id>https://github.com/staffanm/ferenda/test/files/legaluri/lagen.nu.atom</id>
+
+    <!-- SFS -->
+    <entry>
+        <id>https://lagen.nu/1999:175</id>
+        <summary>Förordning i svensk författningsamling (SFS)</summary>
+        <content type="application/rdf+xml">
+            <rpubl:Forordning>
+                <rpubl:forfattningssamling rdf:resource="https://lagen.nu/dataset/sfs"/>
+                <rpubl:arsutgava>1999</rpubl:arsutgava>
+                <rpubl:lopnummer>175</rpubl:lopnummer>
+            </rpubl:Forordning>
+        </content>
+    </entry>
+
+    <entry>
+        <id>https://lagen.nu/ra-fs/2006:6</id>
+        <summary>Vanlig myndighetsföreskrift (RA-FS)</summary>
+        <content type="application/rdf+xml">
+            <rpubl:Myndighetsforeskrift>
+                <rpubl:forfattningssamling rdf:resource="https://lagen.nu/dataset/ra-fs"/>
+                <rpubl:arsutgava>2006</rpubl:arsutgava>
+                <rpubl:lopnummer>6</rpubl:lopnummer>
+            </rpubl:Myndighetsforeskrift>
+        </content>
+    </entry>
+
+
+</feed>

@@ -23,6 +23,16 @@ from . import SameAs
 
 
 class SFS(OrigSFS, SameAs):
+    def basefile_from_uri(self, uri):
+        if (uri.startswith(self.urispace_base) and
+            re.match("\d{4}\:", uri[len(self.urispace_base)+1:])):
+            basefile = uri[len(self.urispace_base)+1:].replace("_", " ")
+            # remove any possible "/konsolidering/2015:123" trailing info
+            basefile = basefile.split("/")[0]
+            return basefile
+        else:
+            return super(SFS, self).basefile_from_uri(uri)
+
     # consider moving facets() and tabs() from OrigSFS to this
     ordinalpredicates = {
         Kapitel: "rpubl:kapitelnummer",

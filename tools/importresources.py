@@ -341,8 +341,18 @@ space: coin:template [
                      [ coin:property rinfoex:avsnitt ],
                      [ coin:property rpubl:arsutgava ],
                      [ coin:property rpubl:lopnummer ]
+    ], [ 
+       coin:uriTemplate "/{arsutgava}:{lopnummer}";
+       coin:priority 1;
+       coin:binding [ coin:property rpubl:forfattningssamling ;
+                      coin:slugFrom space:abbrSlug ;
+                      coin:match "sfs" ;
+                      coin:variable "fs" ],
+                    [ coin:property rpubl:arsutgava ;
+                      coin:variable "arsutgava" ],
+                    [ coin:property rpubl:lopnummer ;
+                      coin:variable "lopnummer" ] ;
     ] .
-
 """
     graph.parse(data=extra, format="turtle")
     writegraph(graph, dest)

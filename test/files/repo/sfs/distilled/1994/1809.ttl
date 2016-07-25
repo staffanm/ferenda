@@ -8,33 +8,88 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/sfs/1994:1809#K1P1S1> a rinfoex:Stycke ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1994:1809#K1P1> .
+<https://lagen.nu/1994:1809#K1P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1994:1809#K1P1> .
 
-<https://lagen.nu/sfs/1994:1809#K1P2S1> a rinfoex:Stycke ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1994:1809#K1P2> ;
-    dcterms:references <https://lagen.nu/sfs/1994:1809#L2010:447> .
+<https://lagen.nu/1994:1809#K1P2S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1994:1809#K1P2> ;
+    dcterms:references <https://lagen.nu/1994:1809#L2010:447> .
 
-<https://lagen.nu/sfs/1994:1809#K2P1S1> a rinfoex:Stycke ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1994:1809#K2P1> ;
-    dcterms:references <https://lagen.nu/sfs/1994:1809#L2010:448> .
+<https://lagen.nu/1994:1809#K2P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1994:1809#K2P1> ;
+    dcterms:references <https://lagen.nu/1994:1809#L2010:448> .
 
-<https://lagen.nu/sfs/1994:1809#K3P1S1> a rinfoex:Stycke ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1994:1809#K3P1> ;
-    dcterms:references <https://lagen.nu/sfs/1994:1809#L2010:448> .
+<https://lagen.nu/1994:1809#K3P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1994:1809#K3P1> ;
+    dcterms:references <https://lagen.nu/1994:1809#L2010:448> .
 
-<https://lagen.nu/sfs/1994:1809#K3P2S1> a rinfoex:Stycke ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1994:1809#K3P2> .
+<https://lagen.nu/1994:1809#K3P2S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1994:1809#K3P2> .
 
-<https://lagen.nu/sfs/1994:1809#K3P3S1> a rinfoex:Stycke ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1994:1809#K3P3> ;
-    dcterms:references <https://lagen.nu/sfs/1994:1809#L2010:448> .
+<https://lagen.nu/1994:1809#K3P3S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1994:1809#K3P3> ;
+    dcterms:references <https://lagen.nu/1994:1809#L2010:448> .
 
-<https://lagen.nu/sfs/1994:1809#K3P4S1> a rinfoex:Stycke ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1994:1809#K3P4> ;
-    dcterms:references <https://lagen.nu/sfs/1994:1809#L2010:448> .
+<https://lagen.nu/1994:1809#K3P4S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1994:1809#K3P4> ;
+    dcterms:references <https://lagen.nu/1994:1809#L2010:448> .
 
-<https://lagen.nu/sfs/1994:1809/konsolidering> owl:sameAs <https://lagen.nu/sfs/1994:1809/konsolidering/2014:686> .
+<https://lagen.nu/1994:1809/konsolidering> owl:sameAs <https://lagen.nu/1994:1809/konsolidering/2014:686> .
+
+<https://lagen.nu/1994:1809#K1P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/1994:1809#K1> .
+
+<https://lagen.nu/1994:1809#K1P2> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/1994:1809#K1> .
+
+<https://lagen.nu/1994:1809#K2> a rpubl:Kapitel .
+
+<https://lagen.nu/1994:1809#K2P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/1994:1809#K2> .
+
+<https://lagen.nu/1994:1809#K3P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/1994:1809#K3> .
+
+<https://lagen.nu/1994:1809#K3P2> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/1994:1809#K3> .
+
+<https://lagen.nu/1994:1809#K3P3> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/1994:1809#K3> .
+
+<https://lagen.nu/1994:1809#K3P4> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/1994:1809#K3> .
+
+<https://lagen.nu/1994:1809/konsolidering/2014:686> a rpubl:KonsolideradGrundforfattning ;
+    dcterms:creator <https://lagen.nu/org/2008/forsvarsdepartementet> ;
+    dcterms:identifier "SFS 1994:1809 i lydelse enligt SFS 2014:686" ;
+    dcterms:issued "2010-06-08"^^xsd:date ;
+    dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:title "Lag (1994:1809) om totalförsvarsplikt"@sv ;
+    rpubl:ikrafttradandedatum "1995-07-01"^^xsd:date ;
+    rpubl:konsoliderar <https://lagen.nu/1994:1809> ;
+    rpubl:konsolideringsunderlag <https://lagen.nu/1994:1809>,
+        <https://lagen.nu/2010:448>,
+        <https://lagen.nu/2014:686> ;
+    rpubl:utfardandedatum "1994-12-15"^^xsd:date ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1994:1809/konsolidering/2010-06-08> ;
+    prov:wasGeneratedBy "lagen.nu.sfs.SFS" .
+
+<https://lagen.nu/2010:448> a rpubl:Lag ;
+    dcterms:identifier "SFS 2010:448" ;
+    dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:title "Lag (2010:448) om ändring i lagen (1994:1809) om totalförsvarsplikt"@sv ;
+    rpubl:andrar "ändr. 2 kap. 1, 2, 4 §§, 3 kap. 1, 3, 4, 4 a, 9, 15, 15 a, 22 §§, 5 kap. 1, 6, 7, 10, 15, 17 §§, 7 kap. 1 §, 10 kap. 6, 7, 8 §§, p 10, 15 ikrafttr.- och övergångsbest." ;
+    rpubl:arsutgava "2010" ;
+    rpubl:beslutadAv <https://lagen.nu/org/2008/regeringskansliet> ;
+    rpubl:ersatter <https://lagen.nu/1994:1809#K10P8> ;
+    rpubl:forarbete <https://lagen.nu/bet/2009/10:FoeU8>,
+        <https://lagen.nu/prop/2009/10:160>,
+        <https://lagen.nu/rskr/2009/10:269> ;
+    rpubl:forfattningssamling <https://lagen.nu/dataset/sfs> ;
+    rpubl:ikrafttradandedatum "2011-01-01"^^xsd:date ;
+    rpubl:lopnummer "448" ;
+    rpubl:utfardandedatum "2010-06-08"^^xsd:date ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2010:448> .
 
 <https://lagen.nu/bet/1994/95:FoeU1> dcterms:identifier "bet. 1994/95:FöU1" .
 
@@ -48,61 +103,7 @@
 
 <https://lagen.nu/rskr/2009/10:269> dcterms:identifier "rskr. 2009/10:269" .
 
-<https://lagen.nu/sfs/1994:1809#K1P1> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1994:1809#K1> .
-
-<https://lagen.nu/sfs/1994:1809#K1P2> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1994:1809#K1> .
-
-<https://lagen.nu/sfs/1994:1809#K2> a rpubl:Kapitel .
-
-<https://lagen.nu/sfs/1994:1809#K2P1> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1994:1809#K2> .
-
-<https://lagen.nu/sfs/1994:1809#K3P1> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1994:1809#K3> .
-
-<https://lagen.nu/sfs/1994:1809#K3P2> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1994:1809#K3> .
-
-<https://lagen.nu/sfs/1994:1809#K3P3> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1994:1809#K3> .
-
-<https://lagen.nu/sfs/1994:1809#K3P4> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/sfs/1994:1809#K3> .
-
-<https://lagen.nu/sfs/1994:1809/konsolidering/2014:686> a rpubl:KonsolideradGrundforfattning ;
-    dcterms:creator <https://lagen.nu/org/2008/forsvarsdepartementet> ;
-    dcterms:identifier "SFS 1994:1809 i lydelse enligt SFS 2014:686" ;
-    dcterms:issued "2010-06-08"^^xsd:date ;
-    dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
-    dcterms:title "Lag (1994:1809) om totalförsvarsplikt"@sv ;
-    rpubl:konsoliderar <https://lagen.nu/sfs/1994:1809> ;
-    rpubl:konsolideringsunderlag <https://lagen.nu/sfs/1994:1809>,
-        <https://lagen.nu/sfs/2010:448>,
-        <https://lagen.nu/sfs/2014:686> ;
-    rpubl:utfardandedatum "1994-12-15"^^xsd:date ;
-    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1994:1809/konsolidering/2010-06-08> ;
-    prov:wasGeneratedBy "lagen.nu.sfs.SFS" .
-
-<https://lagen.nu/sfs/2010:448> a rpubl:Lag ;
-    dcterms:identifier "SFS 2010:448" ;
-    dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
-    dcterms:title "Lag (2010:448) om ändring i lagen (1994:1809) om totalförsvarsplikt"@sv ;
-    rpubl:andrar "ändr. 2 kap. 1, 2, 4 §§, 3 kap. 1, 3, 4, 4 a, 9, 15, 15 a, 22 §§, 5 kap. 1, 6, 7, 10, 15, 17 §§, 7 kap. 1 §, 10 kap. 6, 7, 8 §§, p 10, 15 ikrafttr.- och övergångsbest." ;
-    rpubl:arsutgava "2010" ;
-    rpubl:beslutadAv <https://lagen.nu/org/2008/regeringskansliet> ;
-    rpubl:ersatter <https://lagen.nu/sfs/1994:1809#K10P8> ;
-    rpubl:forarbete <https://lagen.nu/bet/2009/10:FoeU8>,
-        <https://lagen.nu/prop/2009/10:160>,
-        <https://lagen.nu/rskr/2009/10:269> ;
-    rpubl:forfattningssamling <https://lagen.nu/dataset/sfs> ;
-    rpubl:ikrafttradandedatum "2011-01-01"^^xsd:date ;
-    rpubl:lopnummer "448" ;
-    rpubl:utfardandedatum "2010-06-08"^^xsd:date ;
-    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2010:448> .
-
-<https://lagen.nu/sfs/1994:1809> a rpubl:Lag ;
+<https://lagen.nu/1994:1809> a rpubl:Lag ;
     dcterms:identifier "SFS 1994:1809" ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
     dcterms:title "Lag (1994:1809) om totalförsvarsplikt"@sv ;
@@ -118,7 +119,7 @@
     rpubl:utfardandedatum "1994-12-31"^^xsd:date ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1994:1809> .
 
-<https://lagen.nu/sfs/1994:1809#K1> a rpubl:Kapitel .
+<https://lagen.nu/1994:1809#K1> a rpubl:Kapitel .
 
-<https://lagen.nu/sfs/1994:1809#K3> a rpubl:Kapitel .
+<https://lagen.nu/1994:1809#K3> a rpubl:Kapitel .
 

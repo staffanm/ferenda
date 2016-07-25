@@ -5,6 +5,7 @@ from builtins import *
 
 import sys
 import os
+import codecs
 
 import lxml
 import rdflib
@@ -13,6 +14,7 @@ from ferenda.compat import unittest
 from ferenda.sources.legal.se.legaluri import (construct, parse,
                                                coinstruct_from_graph)
 from ferenda.testutil import file_parametrize, parametrize
+from ferenda.thirdparty.coin import URIMinter
 
 
 class Construct(unittest.TestCase):
@@ -39,19 +41,30 @@ class Construct(unittest.TestCase):
 #        parts = eval(parts_repr,{"__builtins__":None},globals())
 #        self.assertEqual(parse(uri),parts)
 
+
 class Coinstruct(unittest.TestCase):
     atomfile = "test/files/legaluri/publ.atom"
-    space = ["ferenda/res/uri/space.n3", "ferenda/res/uri/slugs.n3"]
+    spacefile = "ferenda/sources/legal/se/res/uri/swedishlegalsource.space.ttl"
+    slugsfile = "ferenda/sources/legal/se/res/uri/swedishlegalsource.slugs.ttl"
 
-    def setUp(self):
-        # load space
-        pass
+    @classmethod
+    def setUpClass(cls):
+        with codecs.open(cls.spacefile, encoding="utf-8") as space:
+            with codecs.open(cls.slugsfile, encoding="utf-8") as slugs:
+                cfg = rdflib.Graph().parse(space,
+                                    format="turtle").parse(slugs,
+                                                           format="turtle")
+        COIN = rdflib.Namespace("http://purl.org/court/def/2009/coin#")
+        # select correct URI for the URISpace definition by
+        # finding a single coin:URISpace object
+        spaceuri = cfg.value(predicate=rdflib.RDF.type, object=COIN.URISpace)
+        cls.minter = URIMinter(cfg, spaceuri)
 
     def coin_test(self, uri, resourcegraph):
         # get the bnode
         subjects = set(resourcegraph.subjects())
         self.assertEqual(len(subjects), 1)
-        coined_uri = coinstruct_from_graph(resourcegraph, subjects.pop())
+        coined_uri = coinstruct_from_graph(resourcegraph, subjects.pop(), self.minter)
         self.assertEqual(uri, coined_uri)
 
 
@@ -65,7 +78,16 @@ def tests_from_atom(cls, atomfile, base):
         name = "test_"+uri.replace(base, "").replace("/", "_").replace(":", "_")
         parametrize(cls, cls.coin_test, name, (uri, resource_graph))
 
+class DefaultCoinstruct(Coinstruct): pass
+
+class CustomCoinstruct(Coinstruct):
+    atomfile = "test/files/legaluri/lagen.nu.atom"
+    spacefile = "lagen/nu/res/uri/swedishlegalsource.space.ttl"
+    slugsfile = "lagen/nu/res/uri/swedishlegalsource.slugs.ttl"
+    
+
 file_parametrize(Construct,"test/files/legaluri",".py")
-# file_parametrize(Parse,"test/files/legaluri",".txt")
-tests_from_atom(Coinstruct, Coinstruct.atomfile,
+tests_from_atom(CustomCoinstruct, CustomCoinstruct.atomfile, 
+               "https://lagen.nu/")
+tests_from_atom(DefaultCoinstruct, DefaultCoinstruct.atomfile,
                 "http://rinfo.lagrummet.se/publ/")
