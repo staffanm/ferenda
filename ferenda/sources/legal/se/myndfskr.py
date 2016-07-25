@@ -645,7 +645,7 @@ class MyndFskrBase(SwedishLegalSource):
         for idx, page in enumerate(reader.getiterator(reader.readpage)):
             text = xml_escape(control_char_re.sub('', page))
             p = Page(ordinal=idx + 1)
-            p.append(Preformatted(text))
+            p.append(Preformatted([text]))
             body.append(p)
         doc.body = body
 
@@ -930,7 +930,13 @@ class FFFS(MyndFskrBase):
         else:
             self.log.warning("%s: No idea!" % basefile)
 
+    def fwdtests(self):
+        t = super(FFFS, self).fwdtests()
+        # This matches old BFFS 1991:15 (basefile fffs/1991:15)
+        t["dcterms:title"].append('^(Upphävande av .*?)\n\n')
+        return t
 
+        
 class FFS(MyndFskrBase):
     alias = "ffs"
     start_url = "http://www.forsvarsmakten.se/sv/om-myndigheten/dokument/lagrum"

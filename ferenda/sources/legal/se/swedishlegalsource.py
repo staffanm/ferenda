@@ -31,8 +31,8 @@ from ferenda import (DocumentRepository, DocumentStore, FSMParser,
                      CitationParser, Describer, Facet)
 from ferenda import util, fulltextindex
 from ferenda.sources.legal.se.legalref import Link, LegalRef, RefParseError
-from ferenda.elements.html import A, H1, H2, H3, P, Strong
-from ferenda.elements import serialize, Section, Body, CompoundElement, UnicodeElement
+from ferenda.elements.html import A, H1, H2, H3, P, Strong, Pre
+from ferenda.elements import serialize, Section, Body, CompoundElement, UnicodeElement, Preformatted
 from ferenda.pdfreader import Page, BaseTextDecoder, Textelement
 from ferenda.pdfreader import PDFReader
 from ferenda.pdfanalyze import PDFAnalyzer
@@ -1136,7 +1136,7 @@ class SwedishCitationParser(CitationParser):
             self._currenturl = part.about
         elif hasattr(part, 'uri') and not isinstance(part, (Link, A)):
             self._currenturl = part.uri
-        if isinstance(part, (Link, A, H1, H2, H3, DokumentRubrik)):
+        if isinstance(part, (Link, A, H1, H2, H3, DokumentRubrik, Preformatted, Pre)):
             # don't process text that's already a link (or a heading)
             if isinstance(part, str):  # caller expects a list
                 return [part]
@@ -1149,8 +1149,9 @@ class SwedishCitationParser(CitationParser):
         from ferenda.sources.legal.se.sfs import UpphavtKapitel, UpphavdParagraf
         if isinstance(string, (UpphavtKapitel, UpphavdParagraf)):
             return [string]
-        # basic normalization without stripping
+        # basic normalization without stripping (NOTE: this messes up Preformatted sections, so parse_recursive avoids calling this for those)
         string = string.replace("\r\n", " ").replace("\n", " ").replace("\x00","")
+
         # transform self._currenturl => attributes.
         # FIXME: we should maintain a self._current_baseuri_attributes
         # instead of this fragile, URI-interpreting, hack.

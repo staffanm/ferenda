@@ -19,6 +19,20 @@
         </content>
     </entry>
 
+    <!-- this really should use rpubl:sidnummer instead of abusing rpubl:lopnummer -->
+    <!-- but a non-numeric lopnummer exposes a problem with using urljoin in Template.build_uri -->
+    <entry>
+        <id>https://lagen.nu/1845:50_s.1</id>
+        <summary>Lag i svensk författningsamling (SFS)</summary>
+        <content type="application/rdf+xml">
+            <rpubl:Lag>
+                <rpubl:forfattningssamling rdf:resource="https://lagen.nu/dataset/sfs"/>
+                <rpubl:arsutgava>1845</rpubl:arsutgava>
+                <rpubl:lopnummer>50_s.1</rpubl:lopnummer>
+            </rpubl:Lag>
+        </content>
+    </entry>
+
     <entry>
         <id>https://lagen.nu/ra-fs/2006:6</id>
         <summary>Vanlig myndighetsföreskrift (RA-FS)</summary>

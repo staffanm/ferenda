@@ -643,8 +643,14 @@ class Paragraph(CompoundElement):
     tagname = 'p'
 
 
+# A preformatted section might contain links, <b> tags etch, which is why it's not derived from UnicodeElement
 class Preformatted(Paragraph):
     tagname = 'pre'
+    def as_plaintext(self):
+        # CompoundElement.as_plaintext does all kinds of string
+        # normalization, which we don't want for a
+        # whitespace-sensitive element
+        return "".join(self)
 
 
 class Heading(CompoundElement, OrdinalElement):

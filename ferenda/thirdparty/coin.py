@@ -167,7 +167,12 @@ class Template:
         # around.
         if expanded[0] == "/":
             expanded = expanded[1:]
-        return urljoin(base, expanded)
+            
+        if expanded.startswith("http://") or expanded.startswith("https://"):
+            return urljoin(base, expanded)
+        else:
+            # see the test integrationLegalURI.CustomCoinstruct.test_1845_50_s.1
+            return "%s/%s" % (base, expanded)
 
     def get_base(self, resource):
         base = self.space.base

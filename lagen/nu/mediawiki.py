@@ -258,7 +258,8 @@ class LNSettings(wiki.WikiSettings):
     def make_url(self, name, **kwargs):
         # uri = super(LNSettings, self).make_url(name, **kwargs)
         if name[1].startswith("SFS/"):
-            uri = self.make_sfs_url(name[1][4:])
+            basefile = name[1][4:]
+            uri = self.make_sfs_url(basefile)
         else:
             if name[0].prefix == "user":
                 uri = "https://lagen.nu/wiki/%s" % self.expand_page_name(*name)

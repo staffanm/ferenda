@@ -493,7 +493,7 @@ class SFS(Trips):
     def canonical_uri(self, basefile, konsolidering=False):
         basefile = self.sanitize_basefile(basefile)
         attributes = self.metadata_from_basefile(basefile)
-        basefile = basefile.replace(" ", "_")
+
         parts = basefile.split(":", 1)
         # add some extra attributes that will enable
         # attributes_to_resource to create a graph that is partly
@@ -516,6 +516,8 @@ class SFS(Trips):
         if konsolidering is True:
             uri = uri.rsplit("/", 1)[0]
         computed_basefile = self.basefile_from_uri(uri)
+
+        basefile = basefile.replace("_", " ") # For reasons
         assert basefile == computed_basefile, "%s -> %s -> %s" % (basefile, uri, computed_basefile)
         # end temporary code
         return uri
