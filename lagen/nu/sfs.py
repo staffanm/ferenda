@@ -7,6 +7,8 @@ import os
 import re
 import shutil
 from datetime import datetime
+from urllib.parse import quote, unquote
+from wsgiref.util import request_uri
 
 from rdflib import URIRef
 from rdflib.namespace import DCTERMS, OWL, RDF
@@ -114,3 +116,18 @@ class SFS(OrigSFS, SameAs):
         # are rpubl:KonsolideradGrundforfattning. Maybe if we tweak
         # the facets we could do better
         return "%s författningar" % len(set([row['uri'] for row in self.faceted_data()]))
+
+
+    def http_handle(self, environ):
+        if re.match("/\d{4}\:", environ['PATH_INFO']):
+            url = unquote(request_uri(environ))
+            if 'develurl' in self.config:
+                url = url.replace(self.config.develurl, self.config.url)
+            basefile = self.basefile_from_uri(url)
+            path = self.store.generated_path(basefile)
+            return (open(path, 'rb'),
+                    os.path.getsize(path),
+                    200,
+                    "text/html")
+        else:
+            return super(SFS, self).http_handle(environ)
