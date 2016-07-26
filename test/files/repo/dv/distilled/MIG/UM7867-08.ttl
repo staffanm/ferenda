@@ -9,13 +9,13 @@
 
 <https://lagen.nu/rf/mig/2009:30#MIG> dcterms:creator "Kammarrätten i Stockholm, Migrationsöverdomstolen"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/mig/2009:30> ;
-    dcterms:references <https://lagen.nu/prop/1971:30>,
-        <https://lagen.nu/prop/2004/05:170#s105>,
-        <https://lagen.nu/prop/2004/05:170#s129>,
-        <https://lagen.nu/rf/mig/2006:9>,
-        <https://lagen.nu/sfs/1971:291#P9>,
-        <https://lagen.nu/sfs/2005:716>,
-        <https://lagen.nu/sfs/2005:716#K16P5S2> .
+    dcterms:references <https://lagen.nu/1971:291#P9>,
+        <https://lagen.nu/2005:716>,
+        <https://lagen.nu/2005:716#K16P5S2>,
+        <https://lagen.nu/prop/1971:30>,
+        <https://lagen.nu/prop/2004/05:170#sid105>,
+        <https://lagen.nu/prop/2004/05:170#sid129>,
+        <https://lagen.nu/rf/mig/2006:9> .
 
 <https://lagen.nu/rf/mig/2009:30#MIV> dcterms:creator "Migrationsverket"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/mig/2009:30> .
@@ -33,9 +33,9 @@
     dcterms:title "Behovet av muntlig förhandling är särskilt framträdande i mål som rör avvisning eller utvisning av en utlänning som ansöker om uppehållstillstånd på grund av uppgivet flyktingskap eller såsom skyddsbehövande i övrigt och där en bedömning av trovärdigheten i den lämnade berättelsen har omedelbar betydelse för frågan om uppehållstillstånd. Är innehållet i de åberopade uppgifterna och utlänningens agerande sådant att det framstår som klart att uppgifterna är oförenliga och inte överensstämmer med verkligheten behöver inte någon muntlig förhandling hållas, trots att utlänningen begärt detta."@sv ;
     rpubl:avdelning "1" ;
     rpubl:avgorandedatum "2009-11-03"^^xsd:date ;
-    rpubl:lagrum <https://lagen.nu/sfs/1971:291#P9>,
-        <https://lagen.nu/sfs/1994:1219>,
-        <https://lagen.nu/sfs/2005:716#K16P5> ;
+    rpubl:lagrum <https://lagen.nu/1971:291#P9>,
+        <https://lagen.nu/1994:1219>,
+        <https://lagen.nu/2005:716#K16P5> ;
     rpubl:malnummer "UM7867-08" ;
     rpubl:rattsfall <https://lagen.nu/rf/mig/2006:9> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/mig/um7867-08/2009-11-03> .

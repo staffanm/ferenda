@@ -7,14 +7,8 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<http://rkrattsbaser.gov.se/prop?ar=1994/95&dok=P&dokid=72> rdfs:label "Källa"@sv .
-
 <https://lagen.nu/prop/1994/95:72> a rpubl:Proposition ;
     dcterms:identifier "Prop. 1994/95:72" ;
-    dcterms:references <https://lagen.nu/bet/1993/94:TU28>,
-        <https://lagen.nu/prop/1993/94:166>,
-        <https://lagen.nu/prop/1994/95:72>,
-        <https://lagen.nu/rskr/1993/94:309> ;
     dcterms:title "Omprövning av beslutet om avreglering av järnvägstrafiken"@sv ;
     rpubl:arsutgava "1994/95" ;
     rpubl:departement <https://lagen.nu/org/2008/kommunikationsdepartementet> ;
@@ -23,6 +17,8 @@
     prov:alternateOf <http://rkrattsbaser.gov.se/prop?ar=1994/95&dok=P&dokid=72> ;
     prov:wasDerivedFrom <https://lagen.nu/prop/1994/95:72?attachment=index.html&repo=proptrips&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.propositioner.PropTrips" .
+
+<http://rkrattsbaser.gov.se/prop?ar=1994/95&dok=P&dokid=72> rdfs:label "Källa"@sv .
 
 <https://lagen.nu/prop/1994/95:72?attachment=index.html&repo=proptrips&dir=downloaded> rdfs:label "Prop. 1994/95:72"@sv .
 

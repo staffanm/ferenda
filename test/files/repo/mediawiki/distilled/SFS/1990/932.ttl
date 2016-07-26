@@ -8,22 +8,22 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix xsi: <http://www.w3.org/2001/XMLSchema-instance> .
 
-<https://lagen.nu/sfs/1990:932> a skos:Concept ;
+<https://lagen.nu/1990:932> a skos:Concept ;
     dcterms:description """
       <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-        <p><a href="https://lagen.nu/sfs/1990:932">Konsumentköplagen</a> (KKöpL) är en skyddslagstiftning. </p>
+        <p><a href="https://lagen.nu/1990:932">Konsumentköplagen</a> (KKöpL) är en skyddslagstiftning. </p>
       </div>
     """^^rdf:XMLLiteral ;
     dcterms:title "SFS/1990:932"@sv ;
     prov:wasGeneratedBy "lagen.nu.mediawiki.LNMediaWiki" .
 
-<https://lagen.nu/sfs/1990:932#P1> dcterms:description """
+<https://lagen.nu/1990:932#P1> dcterms:description """
       <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
         <p><a href="https://lagen.nu/concept/Lös_sak">Lösa saker</a> är till exempel sådana varor som livsmedel, kläder, möbler och bilar. </p>
       </div>
     """^^rdf:XMLLiteral .
 
-<https://lagen.nu/sfs/1990:932#P2> dcterms:description """
+<https://lagen.nu/1990:932#P2> dcterms:description """
       <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
         <p>Vid tillverkningsavtal gäller KKöpL oavsett vem av parterna som tillhandahåller materialet.  </p>
       </div>

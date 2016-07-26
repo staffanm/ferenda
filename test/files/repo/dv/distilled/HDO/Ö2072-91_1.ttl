@@ -9,7 +9,7 @@
 
 <https://lagen.nu/rf/nja/1994s119#HDO> dcterms:creator "HD"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/1994s119> ;
-    dcterms:references <https://lagen.nu/sfs/2005:104> .
+    dcterms:references <https://lagen.nu/2005:104> .
 
 <https://lagen.nu/dom/hd/Ö2072-91/1994-03-10> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
@@ -22,11 +22,11 @@
     dcterms:title "Arvsskattemål. Sedan en person som tecknat en pensionsförsäkring avlidit, har ett återbäringsbelopp tillfallit dödsboet. Återbäringen har ansetts böra tas upp som en fordran bland tillgångarna i bouppteckningen. Inkomstskatten på återbäringen har ansetts böra tas upp som en skuldpost."@sv ;
     rpubl:avgorandedatum "1994-03-10"^^xsd:date ;
     rpubl:domsnummer "SÖ62-94" ;
-    rpubl:lagrum <https://lagen.nu/sfs/1941:416>,
-        <https://lagen.nu/sfs/1941:416#P10>,
-        <https://lagen.nu/sfs/1941:416#P12>,
-        <https://lagen.nu/sfs/1941:416#P13>,
-        <https://lagen.nu/sfs/1941:416#P28> ;
+    rpubl:lagrum <https://lagen.nu/1941:416>,
+        <https://lagen.nu/1941:416#P10>,
+        <https://lagen.nu/1941:416#P12>,
+        <https://lagen.nu/1941:416#P13>,
+        <https://lagen.nu/1941:416#P28> ;
     rpubl:malnummer "Ö2072-91" ;
     rpubl:rattsfall <https://lagen.nu/rf/nja/1970s529>,
         <https://lagen.nu/rf/nja/1975s33> ;

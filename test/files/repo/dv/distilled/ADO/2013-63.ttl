@@ -10,10 +10,10 @@
 <https://lagen.nu/rf/ad/2013:63> a rpubl:Rattsfallsreferat ;
     dcterms:identifier "AD 2013 nr 63" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
-    dcterms:references <https://lagen.nu/sfs/1975:635#P6>,
-        <https://lagen.nu/sfs/1995:584>,
-        <https://lagen.nu/sfs/1995:584#P16>,
-        <https://lagen.nu/sfs/1995:584#P8S1N1> ;
+    dcterms:references <https://lagen.nu/1975:635#P6>,
+        <https://lagen.nu/1995:584>,
+        <https://lagen.nu/1995:584#P16>,
+        <https://lagen.nu/1995:584#P8S1N1> ;
     rpubl:arsutgava "2013" ;
     rpubl:lopnummer "63" ;
     rpubl:rattsfallspublikation <https://lagen.nu/dataset/ad> ;
@@ -31,7 +31,7 @@
     dcterms:title "En arbetsgivare har krävt att en arbetstagare som anmält ledighet med tillfällig föräldrapenning ska uppvisa läkarintyg avseende barnets sjukdom. Sedan arbetstagaren motsatt sig detta och har hon tilldelats en varning, bl.a. för olovlig frånvaro den aktuella dagen. Arbetsdomstolen har funnit att arbetstagaren har missgynnats i strid med 16 § föräldraledighetslagen."@sv ;
     rpubl:avgorandedatum "2013-08-21"^^xsd:date ;
     rpubl:domsnummer "2013-63" ;
-    rpubl:lagrum <https://lagen.nu/sfs/1995:584#P16> ;
+    rpubl:lagrum <https://lagen.nu/1995:584#P16> ;
     rpubl:malnummer "B-114-2012" ;
     rpubl:rattsfall <https://lagen.nu/rf/ad/2009:56>,
         <https://lagen.nu/rf/ad/2011:23>,

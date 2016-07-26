@@ -9,25 +9,25 @@
 
 <https://lagen.nu/rf/nja/2007s323#HDO> dcterms:creator "Högsta domstolen"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/2007s323> ;
-    dcterms:references <https://lagen.nu/prop/1978/79:90#s208>,
-        <https://lagen.nu/prop/1996/97:9#s218>,
-        <https://lagen.nu/sfs/1972:429>,
-        <https://lagen.nu/sfs/1996:1619#P27S2> .
+    dcterms:references <https://lagen.nu/1972:429>,
+        <https://lagen.nu/1996:1619#P27S2>,
+        <https://lagen.nu/prop/1978/79:90#sid208>,
+        <https://lagen.nu/prop/1996/97:9#sid218> .
 
 <https://lagen.nu/rf/nja/2007s323#HON> dcterms:creator "Hovrätten för Övre Norrland"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/2007s323> ;
-    dcterms:references <https://lagen.nu/prop/1978/79:90#s209>,
-        <https://lagen.nu/prop/1996/97:9#s218>,
-        <https://lagen.nu/sfs/1972:429>,
-        <https://lagen.nu/sfs/1972:429#P19>,
-        <https://lagen.nu/sfs/1972:429#P43S2>,
-        <https://lagen.nu/sfs/1996:1619> .
+    dcterms:references <https://lagen.nu/1972:429>,
+        <https://lagen.nu/1972:429#P19>,
+        <https://lagen.nu/1972:429#P43S2>,
+        <https://lagen.nu/1996:1619>,
+        <https://lagen.nu/prop/1978/79:90#sid209>,
+        <https://lagen.nu/prop/1996/97:9#sid218> .
 
 <https://lagen.nu/rf/nja/2007s323#TUM> dcterms:creator "Umeå tingsrätt"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/2007s323> ;
-    dcterms:references <https://lagen.nu/prop/1978/79:90#s209>,
-        <https://lagen.nu/sfs/1996:1619>,
-        <https://lagen.nu/sfs/1996:1619#P27S2> .
+    dcterms:references <https://lagen.nu/1996:1619>,
+        <https://lagen.nu/1996:1619#P27S2>,
+        <https://lagen.nu/prop/1978/79:90#sid209> .
 
 <https://lagen.nu/dom/hd/Ö4503-04/2007-05-16> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
@@ -37,7 +37,7 @@
     dcterms:title "Bestämmelsen i 27 § andra stycket rättshjälpslagen (1996:1619) om ersättning till rättshjälpsbiträde för arbete som utförts före ansökan om rättshjälp har, till skillnad från motsvarande bestämmelse i 1972 års rättshjälpslag, inte ansetts ge stöd för att begränsa ersättningsrätten till att avse arbete som utförts inom den närmaste månaden före ansökan."@sv ;
     rpubl:avdelning "1" ;
     rpubl:avgorandedatum "2007-05-16"^^xsd:date ;
-    rpubl:lagrum <https://lagen.nu/sfs/1990:998#P27S2> ;
+    rpubl:lagrum <https://lagen.nu/1990:998#P27S2> ;
     rpubl:malnummer "Ö4503-04" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/oe4503-04/2007-05-16> .
 
@@ -47,7 +47,7 @@
     dcterms:bibliographicCitation "NJA 2007:42" ;
     dcterms:identifier "NJA 2007 s. 323" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
-    dcterms:references <https://lagen.nu/sfs/1996:1619#P27S2> ;
+    dcterms:references <https://lagen.nu/1996:1619#P27S2> ;
     rpubl:arsutgava "2007" ;
     rpubl:lopnummer "42" ;
     rpubl:rattsfallspublikation <https://lagen.nu/dataset/nja> ;

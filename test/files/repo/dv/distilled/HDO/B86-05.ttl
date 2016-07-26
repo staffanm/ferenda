@@ -9,16 +9,16 @@
 
 <https://lagen.nu/rf/nja/2007s227#HDO> dcterms:creator "Högsta domstolen"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/2007s227> ;
-    dcterms:references <https://lagen.nu/sfs/2000:1225>,
-        <https://lagen.nu/sfs/2000:1225#P8> .
+    dcterms:references <https://lagen.nu/2000:1225>,
+        <https://lagen.nu/2000:1225#P8> .
 
 <https://lagen.nu/rf/nja/2007s227#HSV> dcterms:creator "Svea hovrätt"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/2007s227> .
 
 <https://lagen.nu/rf/nja/2007s227#TST> dcterms:creator "Stockholms tingsrätt"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/2007s227> ;
-    dcterms:references <https://lagen.nu/sfs/2000:1225>,
-        <https://lagen.nu/sfs/2000:1281> .
+    dcterms:references <https://lagen.nu/2000:1225>,
+        <https://lagen.nu/2000:1281> .
 
 <https://lagen.nu/dom/hd/B86-05/2007-04-04> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
@@ -34,14 +34,14 @@
     dcterms:title "Bestämmelsen i 8 § smugglingslagen om \"tull, skatt eller annan avgift\" har befunnits tillämplig i fråga om en i EG-förordningen nr (EEG) 1470/2001 föreskriven antidumpningstull. Det har ansetts förenligt med regeringsformens bestämmelser om normgivning och med legalitetsprincipen att straffbestämmelsen såvitt gäller tullplikten fått sitt innehåll utfyllt av föreskrifter i en EG-förordning. Undandragande av pålagor som avses i den nämnda förordningen har bedömts rikta sig mot \"det allmänna\". Även fråga om EG-förordningen utgör en in casu-lagstiftning."@sv ;
     rpubl:avdelning "2" ;
     rpubl:avgorandedatum "2007-04-04"^^xsd:date ;
-    rpubl:lagrum <https://lagen.nu/sfs/1974:152>,
-        <https://lagen.nu/sfs/1974:152#K10P5>,
-        <https://lagen.nu/sfs/1974:152#K11P8>,
-        <https://lagen.nu/sfs/1974:152#K2P12>,
-        <https://lagen.nu/sfs/1974:152#K2P8>,
-        <https://lagen.nu/sfs/1974:152#K8P19>,
-        <https://lagen.nu/sfs/1976:633>,
-        <https://lagen.nu/sfs/1976:633#P1S3> ;
+    rpubl:lagrum <https://lagen.nu/1974:152>,
+        <https://lagen.nu/1974:152#K10P5>,
+        <https://lagen.nu/1974:152#K11P8>,
+        <https://lagen.nu/1974:152#K2P12>,
+        <https://lagen.nu/1974:152#K2P8>,
+        <https://lagen.nu/1974:152#K8P19>,
+        <https://lagen.nu/1976:633>,
+        <https://lagen.nu/1976:633#P1S3> ;
     rpubl:malnummer "B86-05" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/b86-05/2007-04-04> .
 

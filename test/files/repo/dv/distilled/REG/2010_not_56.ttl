@@ -10,20 +10,20 @@
 <https://lagen.nu/rf/ra/2010/not/56> a rpubl:Rattsfallsnotis ;
     dcterms:identifier "RÅ 2010 not 56" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
-    dcterms:references <https://lagen.nu/sfs/1971:291#P30S1>,
-        <https://lagen.nu/sfs/1971:948>,
-        <https://lagen.nu/sfs/1971:948#P3a>,
-        <https://lagen.nu/sfs/1971:948#P40>,
-        <https://lagen.nu/sfs/1971:948#P77>,
-        <https://lagen.nu/sfs/1974:152>,
-        <https://lagen.nu/sfs/1974:152#K11P14>,
-        <https://lagen.nu/sfs/1986:223>,
-        <https://lagen.nu/sfs/1986:223#P11>,
-        <https://lagen.nu/sfs/1986:223#P12>,
-        <https://lagen.nu/sfs/1998:808>,
-        <https://lagen.nu/sfs/1998:808#K16P5>,
-        <https://lagen.nu/sfs/1998:808#K4>,
-        <https://lagen.nu/sfs/1998:808#K5P3> ;
+    dcterms:references <https://lagen.nu/1971:291#P30S1>,
+        <https://lagen.nu/1971:948>,
+        <https://lagen.nu/1971:948#P3a>,
+        <https://lagen.nu/1971:948#P40>,
+        <https://lagen.nu/1971:948#P77>,
+        <https://lagen.nu/1974:152>,
+        <https://lagen.nu/1974:152#K11P14>,
+        <https://lagen.nu/1986:223>,
+        <https://lagen.nu/1986:223#P11>,
+        <https://lagen.nu/1986:223#P12>,
+        <https://lagen.nu/1998:808>,
+        <https://lagen.nu/1998:808#K16P5>,
+        <https://lagen.nu/1998:808#K4>,
+        <https://lagen.nu/1998:808#K5P3> ;
     rpubl:arsutgava "2010" ;
     rpubl:lopnummer "56" ;
     rpubl:rattsfallspublikation <https://lagen.nu/dataset/ra> ;
@@ -40,9 +40,9 @@
         <https://lagen.nu/concept/Övriga_frågor> ;
     dcterms:title "Ansökan av Sweets Konfektyr i Partille AB (bolaget) om rättsprövning av beslut om spärrning av enskild anslutning till väg"@sv ;
     rpubl:avgorandedatum "2010-06-14"^^xsd:date ;
-    rpubl:lagrum <https://lagen.nu/sfs/1971:948#P40>,
-        <https://lagen.nu/sfs/2006:304>,
-        <https://lagen.nu/sfs/2006:304#P1> ;
+    rpubl:lagrum <https://lagen.nu/1971:948#P40>,
+        <https://lagen.nu/2006:304>,
+        <https://lagen.nu/2006:304#P1> ;
     rpubl:malnummer "1754-10" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/regr/1754-10/2010-06-14> .
 

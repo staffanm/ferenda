@@ -1149,7 +1149,12 @@ class SwedishCitationParser(CitationParser):
         from ferenda.sources.legal.se.sfs import UpphavtKapitel, UpphavdParagraf
         if isinstance(string, (UpphavtKapitel, UpphavdParagraf)):
             return [string]
-        # basic normalization without stripping (NOTE: this messes up Preformatted sections, so parse_recursive avoids calling this for those)
+        # basic normalization without stripping (NOTE: this messes up
+        # Preformatted sections, so parse_recursive avoids calling
+        # this for those). FIXME: We should remove this normalization,
+        # it's not parse_string's place to do this. Unfortunately
+        # other parts rely on this normalization for the time being
+        # (parts of the test suite fails without). We should fix that.
         string = string.replace("\r\n", " ").replace("\n", " ").replace("\x00","")
 
         # transform self._currenturl => attributes.

@@ -10,15 +10,15 @@
 <https://lagen.nu/rf/nja/2007/not/19> a rpubl:Rattsfallsnotis ;
     dcterms:identifier "NJA 2007 not 19" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
-    dcterms:references <https://lagen.nu/prop/1972:5#s518>,
+    dcterms:references <https://lagen.nu/1970:428>,
+        <https://lagen.nu/1970:428#P9>,
+        <https://lagen.nu/1970:428#P9S1>,
+        <https://lagen.nu/1972:207#K3P2>,
+        <https://lagen.nu/prop/1972:5#sid518>,
         <https://lagen.nu/rf/nja/1994s194>,
         <https://lagen.nu/rf/nja/2002s88>,
         <https://lagen.nu/rf/nja/2003s285>,
-        <https://lagen.nu/rf/nja/2005s175>,
-        <https://lagen.nu/sfs/1970:428>,
-        <https://lagen.nu/sfs/1970:428#P9>,
-        <https://lagen.nu/sfs/1970:428#P9S1>,
-        <https://lagen.nu/sfs/1972:207#K3P2> ;
+        <https://lagen.nu/rf/nja/2005s175> ;
     rpubl:arsutgava "2007" ;
     rpubl:lopnummer "19" ;
     rpubl:rattsfallspublikation <https://lagen.nu/dataset/nja> ;

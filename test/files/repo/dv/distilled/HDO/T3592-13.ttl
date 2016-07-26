@@ -10,80 +10,80 @@
 
 <https://lagen.nu/rf/nja/2014s499#I/HDO> dcterms:creator "HD"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/2014s499#I> ;
-    dcterms:references <https://lagen.nu/prop/2007/08:95#s390>,
+    dcterms:references <https://lagen.nu/1962:700#K29P1S2>,
+        <https://lagen.nu/1972:207#K2P3>,
+        <https://lagen.nu/2008:567>,
+        <https://lagen.nu/2008:567#K1P4S1N3>,
+        <https://lagen.nu/2008:567#K2P12>,
+        <https://lagen.nu/2008:567#K5P1S1>,
+        <https://lagen.nu/2008:567#K5P1S3>,
+        <https://lagen.nu/prop/2007/08:95#sid390>,
         <https://lagen.nu/rf/nja/2008s915>,
         <https://lagen.nu/rf/nja/2012s211>,
         <https://lagen.nu/rf/nja/2013s1046>,
-        <https://lagen.nu/rf/nja/2013s842>,
-        <https://lagen.nu/sfs/1962:700#K29P1S2>,
-        <https://lagen.nu/sfs/1972:207#K2P3>,
-        <https://lagen.nu/sfs/2008:567>,
-        <https://lagen.nu/sfs/2008:567#K1P4S1N3>,
-        <https://lagen.nu/sfs/2008:567#K2P12>,
-        <https://lagen.nu/sfs/2008:567#K5P1S1>,
-        <https://lagen.nu/sfs/2008:567#K5P1S3> .
+        <https://lagen.nu/rf/nja/2013s842> .
 
 <https://lagen.nu/rf/nja/2014s499#I/HSV> dcterms:creator "Svea hovrätt"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/2014s499#I> ;
-    dcterms:references <https://lagen.nu/prop/2007/08:95#s398>,
+    dcterms:references <https://lagen.nu/2008:567>,
+        <https://lagen.nu/2008:567#K6P3>,
+        <https://lagen.nu/prop/2007/08:95#sid398>,
         <https://lagen.nu/rf/ad/2010:91>,
         <https://lagen.nu/rf/ad/2011:2>,
-        <https://lagen.nu/rf/nja/2006s170>,
-        <https://lagen.nu/sfs/2008:567>,
-        <https://lagen.nu/sfs/2008:567#K6P3> .
+        <https://lagen.nu/rf/nja/2006s170> .
 
 <https://lagen.nu/rf/nja/2014s499#I/TSO> dcterms:creator "Solna tingsrätt"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/2014s499#I> ;
-    dcterms:references <https://lagen.nu/prop/2007/08:95#s489>,
+    dcterms:references <https://lagen.nu/1972:207>,
+        <https://lagen.nu/1975:635#P6>,
+        <https://lagen.nu/2008:567>,
+        <https://lagen.nu/2008:567#K2P12S2>,
+        <https://lagen.nu/2008:567#K5P1>,
+        <https://lagen.nu/2008:567#K5P1S3>,
+        <https://lagen.nu/prop/2007/08:95#sid489>,
         <https://lagen.nu/rf/ad/2010:91>,
-        <https://lagen.nu/rf/nja/2006s170>,
-        <https://lagen.nu/sfs/1972:207>,
-        <https://lagen.nu/sfs/1975:635#P6>,
-        <https://lagen.nu/sfs/2008:567>,
-        <https://lagen.nu/sfs/2008:567#K2P12S2>,
-        <https://lagen.nu/sfs/2008:567#K5P1>,
-        <https://lagen.nu/sfs/2008:567#K5P1S3> .
+        <https://lagen.nu/rf/nja/2006s170> .
 
 <https://lagen.nu/rf/nja/2014s499#II/HDO> dcterms:creator "HD"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/2014s499#II> ;
-    dcterms:references <https://lagen.nu/prop/2007/08:95#s486>,
+    dcterms:references <https://lagen.nu/1972:207#K2P3>,
+        <https://lagen.nu/1998:204>,
+        <https://lagen.nu/2008:567>,
+        <https://lagen.nu/2008:567#K1P4S1N1>,
+        <https://lagen.nu/2008:567#K2P13S1N1>,
+        <https://lagen.nu/2008:567#K5P1S1>,
+        <https://lagen.nu/2008:567#K5P1S3>,
+        <https://lagen.nu/2008:567#K5P2>,
+        <https://lagen.nu/prop/2007/08:95#sid486>,
         <https://lagen.nu/rf/nja/2013s1046>,
-        <https://lagen.nu/rf/nja/2013s842>,
-        <https://lagen.nu/sfs/1972:207#K2P3>,
-        <https://lagen.nu/sfs/1998:204>,
-        <https://lagen.nu/sfs/2008:567>,
-        <https://lagen.nu/sfs/2008:567#K1P4S1N1>,
-        <https://lagen.nu/sfs/2008:567#K2P13S1N1>,
-        <https://lagen.nu/sfs/2008:567#K5P1S1>,
-        <https://lagen.nu/sfs/2008:567#K5P1S3>,
-        <https://lagen.nu/sfs/2008:567#K5P2> .
+        <https://lagen.nu/rf/nja/2013s842> .
 
 <https://lagen.nu/rf/nja/2014s499#II/HSV> dcterms:creator "Svea hovrätt"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/2014s499#II> ;
-    dcterms:references <https://lagen.nu/prop/2007/08:95#s391>,
-        <https://lagen.nu/rf/nja/2006s170>,
-        <https://lagen.nu/sfs/2008:567#K1P4S1N1>,
-        <https://lagen.nu/sfs/2008:567#K5P1S3> .
+    dcterms:references <https://lagen.nu/2008:567#K1P4S1N1>,
+        <https://lagen.nu/2008:567#K5P1S3>,
+        <https://lagen.nu/prop/2007/08:95#sid391>,
+        <https://lagen.nu/rf/nja/2006s170> .
 
 <https://lagen.nu/rf/nja/2014s499#II/TST> dcterms:creator "Stockholms tingsrätt"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/2014s499#II> ;
-    dcterms:references <https://lagen.nu/prop/2007/08:95#s487>,
-        <https://lagen.nu/prop/2007/08:95#s488>,
-        <https://lagen.nu/prop/2008/08:95#s391>,
+    dcterms:references <https://lagen.nu/1972:207>,
+        <https://lagen.nu/1975:635#P6>,
+        <https://lagen.nu/2006:10>,
+        <https://lagen.nu/2008:567>,
+        <https://lagen.nu/2008:567#K1P4>,
+        <https://lagen.nu/2008:567#K2P13S1>,
+        <https://lagen.nu/2008:567#K5P1>,
+        <https://lagen.nu/2008:567#K5P1S3>,
+        <https://lagen.nu/2008:567#K6P3>,
+        <https://lagen.nu/prop/2007/08:95#sid487>,
+        <https://lagen.nu/prop/2007/08:95#sid488>,
+        <https://lagen.nu/prop/2008/08:95#sid391>,
         <https://lagen.nu/rf/nja/2005s462>,
         <https://lagen.nu/rf/nja/2006s170>,
         <https://lagen.nu/rf/nja/2007s295>,
         <https://lagen.nu/rf/nja/2007s584>,
-        <https://lagen.nu/rf/nja/2010s363>,
-        <https://lagen.nu/sfs/1972:207>,
-        <https://lagen.nu/sfs/1975:635#P6>,
-        <https://lagen.nu/sfs/2006:10>,
-        <https://lagen.nu/sfs/2008:567>,
-        <https://lagen.nu/sfs/2008:567#K1P4>,
-        <https://lagen.nu/sfs/2008:567#K2P13S1>,
-        <https://lagen.nu/sfs/2008:567#K5P1>,
-        <https://lagen.nu/sfs/2008:567#K5P1S3>,
-        <https://lagen.nu/sfs/2008:567#K6P3> .
+        <https://lagen.nu/rf/nja/2010s363> .
 
 <https://lagen.nu/dom/hd/T3592-13/2014-06-26> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
@@ -94,12 +94,12 @@
     dcterms:title "Diskrimineringsersättning (I och II)."@sv ;
     rpubl:avdelning "2" ;
     rpubl:avgorandedatum "2014-06-26"^^xsd:date ;
-    rpubl:lagrum <https://lagen.nu/sfs/2008:567>,
-        <https://lagen.nu/sfs/2008:567#K1P4>,
-        <https://lagen.nu/sfs/2008:567#K2P12>,
-        <https://lagen.nu/sfs/2008:567#K2P13>,
-        <https://lagen.nu/sfs/2008:567#K5P1>,
-        <https://lagen.nu/sfs/2008:567#K5P2> ;
+    rpubl:lagrum <https://lagen.nu/2008:567>,
+        <https://lagen.nu/2008:567#K1P4>,
+        <https://lagen.nu/2008:567#K2P12>,
+        <https://lagen.nu/2008:567#K2P13>,
+        <https://lagen.nu/2008:567#K5P1>,
+        <https://lagen.nu/2008:567#K5P2> ;
     rpubl:malnummer "T3592-13" ;
     rpubl:rattsfall <https://lagen.nu/rf/nja/2008s915>,
         <https://lagen.nu/rf/nja/2012s211>,
@@ -113,18 +113,18 @@
     dcterms:bibliographicCitation "NJA 2014:45" ;
     dcterms:identifier "NJA 2014 s. 499" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
-    dcterms:references <https://lagen.nu/rf/nja/2008s915>,
+    dcterms:references <https://lagen.nu/2008:567>,
+        <https://lagen.nu/2008:567#K1P4>,
+        <https://lagen.nu/2008:567#K2>,
+        <https://lagen.nu/2008:567#K2P12>,
+        <https://lagen.nu/2008:567#K2P13>,
+        <https://lagen.nu/2008:567#K5>,
+        <https://lagen.nu/2008:567#K5P1>,
+        <https://lagen.nu/2008:567#K5P2>,
+        <https://lagen.nu/rf/nja/2008s915>,
         <https://lagen.nu/rf/nja/2012s211>,
         <https://lagen.nu/rf/nja/2013s1046>,
-        <https://lagen.nu/rf/nja/2013s842>,
-        <https://lagen.nu/sfs/2008:567>,
-        <https://lagen.nu/sfs/2008:567#K1P4>,
-        <https://lagen.nu/sfs/2008:567#K2>,
-        <https://lagen.nu/sfs/2008:567#K2P12>,
-        <https://lagen.nu/sfs/2008:567#K2P13>,
-        <https://lagen.nu/sfs/2008:567#K5>,
-        <https://lagen.nu/sfs/2008:567#K5P1>,
-        <https://lagen.nu/sfs/2008:567#K5P2> ;
+        <https://lagen.nu/rf/nja/2013s842> ;
     rpubl:arsutgava "2014" ;
     rpubl:lopnummer "45" ;
     rpubl:rattsfallspublikation <https://lagen.nu/dataset/nja> ;

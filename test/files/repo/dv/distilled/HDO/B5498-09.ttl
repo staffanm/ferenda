@@ -13,12 +13,12 @@
 
 <https://lagen.nu/rf/nja/2010s168#I/HGO> dcterms:creator "Göta hovrätt"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/2010s168#I> ;
-    dcterms:references <https://lagen.nu/sfs/1942:740#K30P9> .
+    dcterms:references <https://lagen.nu/1942:740#K30P9> .
 
 <https://lagen.nu/rf/nja/2010s168#I/TLI> dcterms:creator "Linköpings tingsrätt"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/2010s168#I> ;
-    dcterms:references <https://lagen.nu/sfs/1971:69#P4>,
-        <https://lagen.nu/sfs/1971:69#P5> .
+    dcterms:references <https://lagen.nu/1971:69#P4>,
+        <https://lagen.nu/1971:69#P5> .
 
 <https://lagen.nu/rf/nja/2010s168#II/HDO> dcterms:creator "Högsta domstolen"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/2010s168#II> ;
@@ -30,7 +30,7 @@
 
 <https://lagen.nu/rf/nja/2010s168#II/TLU> dcterms:creator "Lunds tingsrätt"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/2010s168#II> ;
-    dcterms:references <https://lagen.nu/sfs/1971:69#P4> .
+    dcterms:references <https://lagen.nu/1971:69#P4> .
 
 <https://lagen.nu/dom/hd/B5498-09/2010-03-31> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
@@ -42,7 +42,7 @@
     dcterms:title "Fråga om det svenska systemet med dubbla sanktioner (skattetillägg och brottspåföljd) och två förfaranden för oriktiga uppgifter i skatteförfarandet är förenligt med det i artikel 4 i det sjunde tilläggsprotokollet till Europakonventionen upptagna förbudet mot dubbla förfaranden (ne bis in idem). (I=B 5498-09 och II= 2509-09)"@sv ;
     rpubl:avdelning "1" ;
     rpubl:avgorandedatum "2010-03-31"^^xsd:date ;
-    rpubl:lagrum <https://lagen.nu/sfs/1994:1219> ;
+    rpubl:lagrum <https://lagen.nu/1994:1219> ;
     rpubl:malnummer "B5498-09" ;
     rpubl:rattsfall <https://lagen.nu/rf/nja/2000s622>,
         <https://lagen.nu/rf/nja/2004s840>,

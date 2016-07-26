@@ -11,12 +11,12 @@
     dcterms:isPartOf <https://lagen.nu/rf/nja/2007s650> ;
     dcterms:references <https://lagen.nu/rf/nja/1936s605>,
         <https://lagen.nu/rf/nja/2002s129>,
-        <https://lagen.nu/sfs/1942:740>,
-        <https://lagen.nu/sfs/1942:740#K12P2S1> .
+        <https://lagen.nu/1942:740>,
+        <https://lagen.nu/1942:740#K12P2S1> .
 
 <https://lagen.nu/rf/nja/2007s650#HGO> dcterms:creator "Göta hovrätt"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/2007s650> ;
-    dcterms:references <https://lagen.nu/sfs/1942:740#K12P2S1> .
+    dcterms:references <https://lagen.nu/1942:740#K12P2S1> .
 
 <https://lagen.nu/rf/nja/2007s650#TVA> dcterms:creator "Växjö tingsrätt"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/2007s650> .
@@ -29,7 +29,7 @@
     dcterms:title "Fråga om tidigare brottslighet utgjort skäl att avvisa en person som rättegångsombud på grund av bristande redbarhet."@sv ;
     rpubl:avdelning "1" ;
     rpubl:avgorandedatum "2007-10-05"^^xsd:date ;
-    rpubl:lagrum <https://lagen.nu/sfs/1942:740#K12P2> ;
+    rpubl:lagrum <https://lagen.nu/1942:740#K12P2> ;
     rpubl:malnummer "Ö2668-07" ;
     rpubl:rattsfall <https://lagen.nu/rf/nja/1936s605>,
         <https://lagen.nu/rf/nja/2002s129> ;
@@ -43,7 +43,7 @@
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
     dcterms:references <https://lagen.nu/rf/nja/1936s605>,
         <https://lagen.nu/rf/nja/2002s129>,
-        <https://lagen.nu/sfs/1942:740#K12P2> ;
+        <https://lagen.nu/1942:740#K12P2> ;
     rpubl:arsutgava "2007" ;
     rpubl:lopnummer "79" ;
     rpubl:rattsfallspublikation <https://lagen.nu/dataset/nja> ;

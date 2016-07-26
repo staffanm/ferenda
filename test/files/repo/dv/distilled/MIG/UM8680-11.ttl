@@ -12,17 +12,17 @@
 
 <https://lagen.nu/rf/mig/2013:4#MIG> dcterms:creator "Kammarrätten i Stockholm, Migrationsöverdomstolen"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/mig/2013:4> ;
-    dcterms:references <https://lagen.nu/prop/2004/05:170#s227>,
-        <https://lagen.nu/sfs/2005:716>,
-        <https://lagen.nu/sfs/2005:716#K12P19S1>,
-        <https://lagen.nu/sfs/2005:716#K4>,
-        <https://lagen.nu/sfs/2005:716#K5>,
-        <https://lagen.nu/sfs/2005:716#K8P7> .
+    dcterms:references <https://lagen.nu/2005:716>,
+        <https://lagen.nu/2005:716#K12P19S1>,
+        <https://lagen.nu/2005:716#K4>,
+        <https://lagen.nu/2005:716#K5>,
+        <https://lagen.nu/2005:716#K8P7>,
+        <https://lagen.nu/prop/2004/05:170#sid227> .
 
 <https://lagen.nu/rf/mig/2013:4#MIV> dcterms:creator "Migrationsverket"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/mig/2013:4> ;
-    dcterms:references <https://lagen.nu/sfs/2005:716#K5P6>,
-        <https://lagen.nu/sfs/2005:716#K8P7> .
+    dcterms:references <https://lagen.nu/2005:716#K5P6>,
+        <https://lagen.nu/2005:716#K8P7> .
 
 <https://lagen.nu/dom/mig/UM8680-11/2013-03-19> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/migrationsoverdomstolen> ;
@@ -40,11 +40,11 @@
     dcterms:title "En ny prövning enligt 12 kap. 19 § utlänningslagen kan beviljas om det har framkommit uppgifter om att utlänningen är medborgare i annat land än vad den tidigare prövningen har omfattat. En sådan prövning av frågan om uppehållstillstånd kan omfatta skyddsskäl som hänför sig till annat land än det som omfattas av det lagakraftvunna utvisningsbeslutet."@sv ;
     rpubl:avdelning "1" ;
     rpubl:avgorandedatum "2013-03-19"^^xsd:date ;
-    rpubl:lagrum <https://lagen.nu/sfs/2005:716>,
-        <https://lagen.nu/sfs/2005:716#K12P18>,
-        <https://lagen.nu/sfs/2005:716#K12P19>,
-        <https://lagen.nu/sfs/2005:716#K12P22>,
-        <https://lagen.nu/sfs/2005:716#K12P4> ;
+    rpubl:lagrum <https://lagen.nu/2005:716>,
+        <https://lagen.nu/2005:716#K12P18>,
+        <https://lagen.nu/2005:716#K12P19>,
+        <https://lagen.nu/2005:716#K12P22>,
+        <https://lagen.nu/2005:716#K12P4> ;
     rpubl:malnummer "UM8680-11" ;
     rpubl:rattsfall <https://lagen.nu/rf/mig/2007/not/2> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/mig/um8680-11/2013-03-19> .

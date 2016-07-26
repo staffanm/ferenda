@@ -105,7 +105,7 @@ class LNMediaWiki(wiki.MediaWiki):
             wikitext = re.sub("\n\n", "\n", wikitext, flags=re.MULTILINE)
             return wikitext
         else:
-            return super(LNMediaWiki, soup, doc)
+            return super(LNMediaWiki, self).get_wikitext(soup, doc)
 
     def get_wikisettings(self):
         settings = LNSettings(lang=self.lang)

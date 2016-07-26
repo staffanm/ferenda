@@ -13,22 +13,22 @@
 
 <https://lagen.nu/prop/2005/06:173#B1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
-    dcterms:references <https://lagen.nu/sfs/1980:100#K7P16>,
-        <https://lagen.nu/sfs/1998:204>,
-        <https://lagen.nu/sfs/1998:204#P26>,
-        <https://lagen.nu/sfs/1998:204#P33> ;
+    dcterms:references <https://lagen.nu/1980:100#K7P16>,
+        <https://lagen.nu/1998:204>,
+        <https://lagen.nu/1998:204#P26>,
+        <https://lagen.nu/1998:204#P33> ;
     dcterms:title "Sammanfattning av Personuppgiftslagsutredningens betänkande översyn av personuppgiftslagen (SOU 2004:6)"@sv ;
     bibo:chapter "1"@sv .
 
 <https://lagen.nu/prop/2005/06:173#B2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
-    dcterms:references <https://lagen.nu/sfs/1980:100>,
-        <https://lagen.nu/sfs/1980:100#K1>,
-        <https://lagen.nu/sfs/1980:100#K1P8>,
-        <https://lagen.nu/sfs/1980:100#K1P9>,
-        <https://lagen.nu/sfs/1980:100#K7P16>,
-        <https://lagen.nu/sfs/1998:204>,
-        <https://lagen.nu/sfs/1998:204#P33> ;
+    dcterms:references <https://lagen.nu/1980:100>,
+        <https://lagen.nu/1980:100#K1>,
+        <https://lagen.nu/1980:100#K1P8>,
+        <https://lagen.nu/1980:100#K1P9>,
+        <https://lagen.nu/1980:100#K7P16>,
+        <https://lagen.nu/1998:204>,
+        <https://lagen.nu/1998:204#P33> ;
     dcterms:title "Personuppgiftslagsutredningens författningsförslag"@sv ;
     bibo:chapter "2"@sv .
 
@@ -39,53 +39,53 @@
 
 <https://lagen.nu/prop/2005/06:173#B4> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
-    dcterms:references <https://lagen.nu/sfs/1991:1469>,
-        <https://lagen.nu/sfs/1998:204> ;
+    dcterms:references <https://lagen.nu/1991:1469>,
+        <https://lagen.nu/1998:204> ;
     dcterms:title "Lagrådsremissens lagförslag"@sv ;
     bibo:chapter "4"@sv .
 
 <https://lagen.nu/prop/2005/06:173#B5> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#s36>,
-        <https://lagen.nu/sfs/1998:204> ;
+    dcterms:references <https://lagen.nu/1998:204>,
+        <https://lagen.nu/prop/1997/98:44#sid36> ;
     dcterms:title "Lagrådets yttrande"@sv ;
     bibo:chapter "5"@sv .
 
 <https://lagen.nu/prop/2005/06:173#PS1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
-    dcterms:references <https://lagen.nu/sfs/1998:204> ;
+    dcterms:references <https://lagen.nu/1998:204> ;
     dcterms:title "Propositionens huvudsakliga innehåll"@sv .
 
 <https://lagen.nu/prop/2005/06:173#S1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
-    dcterms:references <https://lagen.nu/sfs/1998:204> ;
+    dcterms:references <https://lagen.nu/1998:204> ;
     dcterms:title "Förslag till riksdagsbeslut"@sv ;
     bibo:chapter "1"@sv .
 
 <https://lagen.nu/prop/2005/06:173#S11> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
-    dcterms:references <https://lagen.nu/sfs/1998:204> ;
+    dcterms:references <https://lagen.nu/1998:204> ;
     dcterms:title "Kostnadseffekter"@sv ;
     bibo:chapter "11"@sv .
 
 <https://lagen.nu/prop/2005/06:173#S2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
-    dcterms:references <https://lagen.nu/sfs/1991:1469>,
-        <https://lagen.nu/sfs/1998:204> ;
+    dcterms:references <https://lagen.nu/1991:1469>,
+        <https://lagen.nu/1998:204> ;
     dcterms:title "Förslag till lag om ändring i personuppgifts-lagen (1998:204)"@sv ;
     bibo:chapter "2"@sv .
 
 <https://lagen.nu/prop/2005/06:173#S3> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
-    dcterms:references <https://lagen.nu/prop/2005/06:173#S8>,
-        <https://lagen.nu/sfs/1980:100#K7P16>,
-        <https://lagen.nu/sfs/1998:204> ;
+    dcterms:references <https://lagen.nu/1980:100#K7P16>,
+        <https://lagen.nu/1998:204>,
+        <https://lagen.nu/prop/2005/06:173#S8> ;
     dcterms:title "Ärendet och dess beredning"@sv ;
     bibo:chapter "3"@sv .
 
 <https://lagen.nu/prop/2005/06:173#S4.1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S4> ;
-    dcterms:references <https://lagen.nu/sfs/1998:204> ;
+    dcterms:references <https://lagen.nu/1998:204> ;
     dcterms:title "Regeringsformen"@sv ;
     bibo:chapter "4.1"@sv .
 
@@ -97,12 +97,12 @@
 
 <https://lagen.nu/prop/2005/06:173#S4.4> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S4> ;
-    dcterms:references <https://lagen.nu/bet/1997/98:KU18>,
+    dcterms:references <https://lagen.nu/1973:289>,
+        <https://lagen.nu/1998:204>,
+        <https://lagen.nu/bet/1997/98:KU18>,
         <https://lagen.nu/prop/1997/98:44>,
-        <https://lagen.nu/prop/1997/98:44#s36>,
-        <https://lagen.nu/rskr/1997/98:180>,
-        <https://lagen.nu/sfs/1973:289>,
-        <https://lagen.nu/sfs/1998:204> ;
+        <https://lagen.nu/prop/1997/98:44#sid36>,
+        <https://lagen.nu/rskr/1997/98:180> ;
     dcterms:title "Personuppgiftslagen"@sv ;
     bibo:chapter "4.4"@sv .
 
@@ -113,91 +113,88 @@
 
 <https://lagen.nu/prop/2005/06:173#S5.2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S5> ;
-    dcterms:references <https://lagen.nu/bet/1998/99:KU15>,
+    dcterms:references <https://lagen.nu/1998:204>,
+        <https://lagen.nu/bet/1998/99:KU15>,
         <https://lagen.nu/bet/1999/2000:KU7>,
         <https://lagen.nu/bet/2000/01:KU19>,
         <https://lagen.nu/bet/2001/02:KU22>,
-        <https://lagen.nu/prop/1997/98:44#s37>,
-        <https://lagen.nu/rskr/1998/99:147>,
-        <https://lagen.nu/sfs/1998:204> ;
+        <https://lagen.nu/prop/1997/98:44#sid37>,
+        <https://lagen.nu/rskr/1998/99:147> ;
     dcterms:title "Uttalanden från regeringen och riksdagen i samband med genomförandet av EG-direktivet om personupp-gifter"@sv ;
     bibo:chapter "5.2"@sv .
 
 <https://lagen.nu/prop/2005/06:173#S6.2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S6> ;
-    dcterms:references <https://lagen.nu/sfs/1998:204> ;
+    dcterms:references <https://lagen.nu/1998:204> ;
     dcterms:title "Särskilt om personlig integritet vid automatiserad behandling av personuppgifter"@sv ;
     bibo:chapter "6.2"@sv .
 
 <https://lagen.nu/prop/2005/06:173#S6.3> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S6> ;
-    dcterms:references <https://lagen.nu/prop/1973:33#s89> ;
+    dcterms:references <https://lagen.nu/prop/1973:33#sid89> ;
     dcterms:title "Motstående intressen"@sv ;
     bibo:chapter "6.3"@sv .
 
 <https://lagen.nu/prop/2005/06:173#S6.4> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S6> ;
-    dcterms:references <https://lagen.nu/sfs/1974:152#K2>,
-        <https://lagen.nu/sfs/1974:152#K2P3S2> ;
+    dcterms:references <https://lagen.nu/1974:152#K2>,
+        <https://lagen.nu/1974:152#K2P3S2> ;
     dcterms:title "Integritetsskyddskommittén"@sv ;
     bibo:chapter "6.4"@sv .
 
 <https://lagen.nu/prop/2005/06:173#S7> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
-    dcterms:references <https://lagen.nu/sfs/1998:204>,
-        <https://lagen.nu/sfs/1998:204#P6> ;
+    dcterms:references <https://lagen.nu/1998:204>,
+        <https://lagen.nu/1998:204#P6> ;
     dcterms:title "Några utgångspunkter"@sv ;
     bibo:chapter "7"@sv .
 
 <https://lagen.nu/prop/2005/06:173#S8.3> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S8> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#s49>,
-        <https://lagen.nu/prop/1999/2000:11#s11>,
-        <https://lagen.nu/prop/2005/06:173#S5.3>,
-        <https://lagen.nu/sfs/1949:105>,
-        <https://lagen.nu/sfs/1974:152>,
-        <https://lagen.nu/sfs/1974:152#K2P1S1N2>,
-        <https://lagen.nu/sfs/1998:1191#P4>,
-        <https://lagen.nu/sfs/1998:204>,
-        <https://lagen.nu/sfs/1998:204#P10S1Nf>,
-        <https://lagen.nu/sfs/1998:204#P23>,
-        <https://lagen.nu/sfs/1998:204#P25>,
-        <https://lagen.nu/sfs/1998:204#P29>,
-        <https://lagen.nu/sfs/1998:204#P3>,
-        <https://lagen.nu/sfs/1998:204#P36S1>,
-        <https://lagen.nu/sfs/1998:204#P42>,
-        <https://lagen.nu/sfs/1998:204#P48>,
-        <https://lagen.nu/sfs/1998:204#P49>,
-        <https://lagen.nu/sfs/1998:204#P6>,
-        <https://lagen.nu/sfs/1998:204#P9> ;
+    dcterms:references <https://lagen.nu/1949:105>,
+        <https://lagen.nu/1974:152>,
+        <https://lagen.nu/1998:1191#P4>,
+        <https://lagen.nu/1998:204>,
+        <https://lagen.nu/1998:204#P23>,
+        <https://lagen.nu/1998:204#P25>,
+        <https://lagen.nu/1998:204#P29>,
+        <https://lagen.nu/1998:204#P3>,
+        <https://lagen.nu/1998:204#P42>,
+        <https://lagen.nu/1998:204#P48>,
+        <https://lagen.nu/1998:204#P49>,
+        <https://lagen.nu/1998:204#P6>,
+        <https://lagen.nu/1998:204#P9>,
+        <https://lagen.nu/prop/1997/98:44#sid49>,
+        <https://lagen.nu/prop/1999/2000:11#sid11>,
+        <https://lagen.nu/prop/2005/06:173#S5.3> ;
     dcterms:title "Förslagets förenlighet med EG-direktivet om skydd för personuppgifter"@sv ;
     bibo:chapter "8.3"@sv .
 
 <https://lagen.nu/prop/2005/06:173#S9.1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S9> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#s108>,
-        <https://lagen.nu/prop/1999/2000:11#s18>,
-        <https://lagen.nu/sfs/1998:204> ;
+    dcterms:references <https://lagen.nu/1998:204>,
+        <https://lagen.nu/prop/1997/98:44#sid108>,
+        <https://lagen.nu/prop/1999/2000:11#sid18> ;
     dcterms:title "Avkriminalisering"@sv ;
     bibo:chapter "9.1"@sv .
 
 <https://lagen.nu/prop/2005/06:173#kommentar-1998:204#P49> a rinfoex:Forfattningskommentar ;
-    rinfoex:kommentarTill <https://lagen.nu/sfs/1998:204#P49> ;
+    rinfoex:kommentarTill <https://lagen.nu/1998:204#P49> ;
     dcterms:description """
           <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
             <p>I paragrafen har två nya punkter (e och f) införts. Dessa tillägg har be-handlats i <a href="https://lagen.nu/prop/2005/06:173#S8.5" rel="dcterms:references">avsnitt 8.5</a>. Vidare har paragrafen ändrats så att de i bestäm-melsen angivna gärningarna inte är straffbara om de begås av oaktsamhet av normalgraden. Skälen härtill har redovisats i <a href="https://lagen.nu/prop/2005/06:173#S9.1.2" rel="dcterms:references">avsnitt 9.1.2</a>. </p>
-            <p>Den som uppsåtligen eller av grov oaktsamhet behandlar sådana upp-gifter som avses i 13 och 21 §§, dvs. känsliga personuppgifter och upp-gifter om lagöverträdelser m.m., i strid med 5 a §, dvs. på ett sätt som innebär en kränkning av den registrerades personliga integritet, skall dö-mas för brott mot <a href="https://lagen.nu/sfs/1998:204" rel="dcterms:references">personuppgiftslagen</a> till böter eller fängelse i högst sex månader eller om brottet är grovt till fängelse i högst två år. I ringa fall skall inte dömas till ansvar. Detsamma skall gälla för den som uppsåtli-gen eller av grov oaktsamhet i strid med 5 a § för över personuppgifter till tredje land som inte har en sådan adekvat nivå för skyddet av person-uppgifterna som avses i 33 §. Utgångspunkten för vad som skall bedö-mas som en kränkning av den personliga integriteten har behandlats i <a href="https://lagen.nu/prop/2005/06:173#S8.2" rel="dcterms:references">avsnitt 8.2</a> och i anslutning till 5 a §. </p>
+            <p>Den som uppsåtligen eller av grov oaktsamhet behandlar sådana upp-gifter som avses i 13 och 21 §§, dvs. känsliga personuppgifter och upp-gifter om lagöverträdelser m.m., i strid med 5 a §, dvs. på ett sätt som innebär en kränkning av den registrerades personliga integritet, skall dö-mas för brott mot <a href="https://lagen.nu/1998:204" rel="dcterms:references">personuppgiftslagen</a> till böter eller fängelse i högst sex månader eller om brottet är grovt till fängelse i högst två år. I ringa fall skall inte dömas till ansvar. Detsamma skall gälla för den som uppsåtli-gen eller av grov oaktsamhet i strid med 5 a § för över personuppgifter till tredje land som inte har en sådan adekvat nivå för skyddet av person-uppgifterna som avses i 33 §. Utgångspunkten för vad som skall bedö-mas som en kränkning av den personliga integriteten har behandlats i <a href="https://lagen.nu/prop/2005/06:173#S8.2" rel="dcterms:references">avsnitt 8.2</a> och i anslutning till 5 a §. </p>
             <p>Att oaktsamhet av normalgraden inte längre skall vara straffbar inne-bär bl.a. att sådana fall där överträdelsen i sig är mindre klandervärd, men som p.g.a. att oaktsamheten lett till en skada eller en integritets-kränkning som inte är försumbar ändå inte kan bedömas som ringa och därmed straffri, skall falla utanför det straffbara området. </p>
           </div>
         """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S12> ;
-    dcterms:references <https://lagen.nu/prop/2005/06:173#S8.2>,
+    dcterms:references <https://lagen.nu/1998:204>,
+        <https://lagen.nu/prop/2005/06:173#S8.2>,
         <https://lagen.nu/prop/2005/06:173#S8.5>,
-        <https://lagen.nu/prop/2005/06:173#S9.1.2>,
-        <https://lagen.nu/sfs/1998:204> .
+        <https://lagen.nu/prop/2005/06:173#S9.1.2> .
 
 <https://lagen.nu/prop/2005/06:173#kommentar-1998:204#P51> a rinfoex:Forfattningskommentar ;
-    rinfoex:kommentarTill <https://lagen.nu/sfs/1998:204#P51> ;
+    rinfoex:kommentarTill <https://lagen.nu/1998:204#P51> ;
     dcterms:description """
           <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
             <p>Efter förslag från Lagrådet har andra stycket om att prövningstillstånd krävs vid överklagande till kammarrätt flyttats till en ny paragraf, 53 §. </p>
@@ -206,20 +203,20 @@
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S12> .
 
 <https://lagen.nu/prop/2005/06:173#kommentar-1998:204#P52> a rinfoex:Forfattningskommentar ;
-    rinfoex:kommentarTill <https://lagen.nu/sfs/1998:204#P52> ;
+    rinfoex:kommentarTill <https://lagen.nu/1998:204#P52> ;
     dcterms:description """
           <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-            <p>Paragrafen, som är ny och som har utformats i enlighet med Lagrådets förslag, har behandlats i <a href="https://lagen.nu/prop/2005/06:173#S9.3" rel="dcterms:references">avsnitt 9.3</a> och innebär att sådana beslut enligt <a href="https://lagen.nu/sfs/1998:204" rel="dcterms:references">personuppgiftslagen</a> som fattats av myndighet och som direkt berör den enskilde skall kunna överklagas till allmän förvaltningsdomstol. Av den nya 53 § framgår att prövningstillstånd krävs vid överklagande till kam-marrätt. </p>
+            <p>Paragrafen, som är ny och som har utformats i enlighet med Lagrådets förslag, har behandlats i <a href="https://lagen.nu/prop/2005/06:173#S9.3" rel="dcterms:references">avsnitt 9.3</a> och innebär att sådana beslut enligt <a href="https://lagen.nu/1998:204" rel="dcterms:references">personuppgiftslagen</a> som fattats av myndighet och som direkt berör den enskilde skall kunna överklagas till allmän förvaltningsdomstol. Av den nya 53 § framgår att prövningstillstånd krävs vid överklagande till kam-marrätt. </p>
             <span id="sid61"/>
             <p>Enligt andra stycket kan inte beslut av riksdagen, regeringen och riks-dagens ombudsmän överklagas. </p>
           </div>
         """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S12> ;
-    dcterms:references <https://lagen.nu/prop/2005/06:173#S9.3>,
-        <https://lagen.nu/sfs/1998:204> .
+    dcterms:references <https://lagen.nu/1998:204>,
+        <https://lagen.nu/prop/2005/06:173#S9.3> .
 
 <https://lagen.nu/prop/2005/06:173#kommentar-1998:204#P53> a rinfoex:Forfattningskommentar ;
-    rinfoex:kommentarTill <https://lagen.nu/sfs/1998:204#P53> ;
+    rinfoex:kommentarTill <https://lagen.nu/1998:204#P53> ;
     dcterms:description """
           <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
             <p>Paragrafen, som är ny, har införts på inrådan av Lagrådet. För att det inte skall råda någon tvekan om att inte bara beslut enligt 51 och 52 §§, utan också länsrätts beslut enligt 47 §, kan överklagas har dock regeringen valt en annan formulering av paragrafen än den av Lagrådet föreslagna. Kravet på prövningstillstånd i andra stycket gäller för beslut som avses i såväl 47 § som 51 och 52 §§. </p>
@@ -228,61 +225,60 @@
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S12> .
 
 <https://lagen.nu/prop/2005/06:173#kommentar-1998:204#P5a> a rinfoex:Forfattningskommentar ;
-    rinfoex:kommentarTill <https://lagen.nu/sfs/1998:204#P5a> ;
+    rinfoex:kommentarTill <https://lagen.nu/1998:204#P5a> ;
     dcterms:description """
           <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
             <p>Paragrafen, som är ny och som har utformats i enlighet med Lagrådets förslag, har behandlats i <a href="https://lagen.nu/prop/2005/06:173#S8.1" rel="dcterms:references">avsnitt 8.1</a>–8.4. </p>
             <p>Den syftar till att underlätta sådan behandling av personuppgifter som inte ingår i eller är avsedda att ingå i en samling av personuppgifter som har strukturerats för att påtagligt underlätta sökning efter eller samman-ställning av personuppgifter. Som en sammanfattande benämning på vad som avses med denna formulering har i rubriken till paragrafen begrep-pet ”ostrukturerat material” använts. I <a href="https://lagen.nu/prop/2005/06:173#S8.1" rel="dcterms:references">avsnitt 8.1</a> har utvecklats och ex-emplifierats vad som avses med den i paragrafen valda formuleringen. Det är strukturen på materialet, där personuppgifterna ingår, som avgör om paragrafen är tillämplig eller inte. Vilken typ av personuppgifter som behandlas eller i vilket medium de förekommer, t.ex. i text, ljud eller bild eller annat, inverkar inte på bedömningen. </p>
             <p>Personuppgifter som finns i en sådan samling som avses i 5 § andra stycket (s.k. manuella register) får alltid anses ingå i en sådan strukture-rad samling som avses i förevarande paragraf. Det innebär att undantaget i denna paragraf bara har betydelse för automatiserad behandling av per-sonuppgifter eftersom manuell behandling av personuppgifter omfattas av lagen endast om uppgifterna ingår i en strukturerad samling (register) i enlighet med 5 § andra stycket. </p>
-            <p>Bestämmelsen i första stycket innebär att behandling av personuppgif-ter i ostrukturerat material är undantagen från samtliga hanteringsregler i <a href="https://lagen.nu/sfs/1998:204" rel="dcterms:references">personuppgiftslagen</a> som det har bedömts möjligt att inom ramen för EG-direktivet om personuppgifter göra undantag från. Detta betyder att den som behandlar personuppgifter t.ex. i löpande text i ordbehandlingspro-gram, i e-post eller på Internet samt i enstaka ljud- eller bildupptagningar inte behöver beakta bestämmelserna om grundläggande krav på behand-lingen av personuppgifter (9 §) och om när behandling av personuppgif-ter är tillåten (10 §). Inte heller behöver den personuppgiftsansvarige iaktta förbuden i 13 och 21 §§ mot att behandla känsliga personuppgifter eller uppgifter om lagöverträdelser m.m. eller de särskilda villkor för behandling av personnummer som uppställs i 22 §. Vidare är den per-sonuppgiftsansvarige inte skyldig att tillämpa bestämmelserna om när information till den registrerade skall lämnas (23, 24 och 26 §§). Han eller hon är inte heller skyldig att på begäran av den registrerade rätta m.m. personuppgifter enligt 28 § samt behöver inte iaktta förbudet i 33 § mot överföring av personuppgifter till tredje land som inte har en adekvat nivå för skyddet av personuppgifterna. Slutligen undantas sådan behand-ling från skyldigheten enligt 42 § att lämna upplysningar till allmänheten. </p>
+            <p>Bestämmelsen i första stycket innebär att behandling av personuppgif-ter i ostrukturerat material är undantagen från samtliga hanteringsregler i <a href="https://lagen.nu/1998:204" rel="dcterms:references">personuppgiftslagen</a> som det har bedömts möjligt att inom ramen för EG-direktivet om personuppgifter göra undantag från. Detta betyder att den som behandlar personuppgifter t.ex. i löpande text i ordbehandlingspro-gram, i e-post eller på Internet samt i enstaka ljud- eller bildupptagningar inte behöver beakta bestämmelserna om grundläggande krav på behand-lingen av personuppgifter (9 §) och om när behandling av personuppgif-ter är tillåten (10 §). Inte heller behöver den personuppgiftsansvarige iaktta förbuden i 13 och 21 §§ mot att behandla känsliga personuppgifter eller uppgifter om lagöverträdelser m.m. eller de särskilda villkor för behandling av personnummer som uppställs i 22 §. Vidare är den per-sonuppgiftsansvarige inte skyldig att tillämpa bestämmelserna om när information till den registrerade skall lämnas (23, 24 och 26 §§). Han eller hon är inte heller skyldig att på begäran av den registrerade rätta m.m. personuppgifter enligt 28 § samt behöver inte iaktta förbudet i 33 § mot överföring av personuppgifter till tredje land som inte har en adekvat nivå för skyddet av personuppgifterna. Slutligen undantas sådan behand-ling från skyldigheten enligt 42 § att lämna upplysningar till allmänheten. </p>
             <p>Skall materialet, t.ex. den löpande texten, infogas i en databas med en personuppgiftsanknuten struktur, exempelvis ett ärendehanteringssystem, måste däremot hanteringsreglerna tillämpas. </p>
             <p>Sådan behandling av personuppgifter som undantas från de i första stycket angivna hanteringsreglerna regleras i stället av bestämmelsen i andra stycket. Behandlingen får nämligen inte utföras om den innebär en kränkning av den registrerades personliga integritet. Regeringen har valt att följa Lagrådets förslag till formulering av andra stycket trots att det </p>
             <span id="sid59"/>
             <p>av Statsrådsberedningens riktlinjer för författningsspråket (PM 1994:4) följer att man i normalfallet inte behöver använda sig av så utförliga hän-visningar mellan styckena i en och samma paragraf. </p>
             <p>Vad som kan utgöra en kränkning av den personliga integriteten har utvecklats i <a href="https://lagen.nu/prop/2005/06:173#S8.2" rel="dcterms:references">avsnitt 8.2</a>. Bedömningen av vad som är en kränkning skall inte göras schablonartat enbart utifrån vilka uppgifter som behandlas utan måste ta sin utgångspunkt också i t.ex. vilket sammanhang uppgifterna förekommer i, för vilket syfte de behandlas, vilken spridning de har fått eller riskerat att få samt vad behandlingen kan leda till. Det bör även be-aktas att vad som kan utgöra en kränkning för en viss person eller i ett visst sammanhang inte behöver utgöra det för en annan person eller i ett annat sammanhang. En uppgift om exempelvis en persons politiska åsik-ter kan i ett visst sammanhang – t.ex. rörande en politiker – vara fullstän-digt harmlös medan motsvarande uppgift om en politiskt icke aktiv per-son för denne kan vara väldigt känslig ur integritetssynpunkt. </p>
             <p>Som påpekats i <a href="https://lagen.nu/prop/2005/06:173#S8.1" rel="dcterms:references">avsnitt 8.1</a> innebär inte bestämmelsen att den person-uppgiftsansvarige skulle vara förhindrad att tillämpa de i första stycket uppräknade hanteringsreglerna på ostrukturerat material. Om någon i ett enskilt fall är osäker på om hans eller hennes behandling av personupp-gifter omfattas av undantaget kan han eller hon välja att i stället tillämpa hanteringsreglerna. Har dessa tillämpats kan det inte anses vara fråga om ett missbruk av personuppgifter i den mening som avses i andra stycket. För att det av lagtexten tydligt skall framgå att den personuppgiftsansva-rige har en sådan valmöjlighet anges i första stycket, på inrådan av Lag-rådet, att de angivna hanteringsreglerna inte behöver, i stället för inte skall, tillämpas på behandling av ostrukturerat material. </p>
-            <p>Avsikten med bestämmelsen är inte att behandling av personuppgifter skall bedömas som en kränkning av den personliga integriteten och där-med en överträdelse av <a href="https://lagen.nu/sfs/1998:204" rel="dcterms:references">personuppgiftslagen</a> i större utsträckning än i dag. Bestämmelsens syfte är således inte att, för automatiserad person-uppgiftsbehandling, tillskapa ett generellt skydd mot vad som i dagligt tal kan betecknas som en kränkning av den personliga integriteten. </p>
-            <p>Om sådan behandling som avses i paragrafen har inneburit en kränk-ning av den registrerades personliga integritet har personuppgifterna be-handlats i strid med <a href="https://lagen.nu/sfs/1998:204" rel="dcterms:references">personuppgiftslagen</a> på ett sådant sätt att skades-tåndsskyldighet inträder enligt 48 §. Under vissa förutsättningar är hand-landet även straffbelagt, se nedan i anslutning till 49 §. </p>
+            <p>Avsikten med bestämmelsen är inte att behandling av personuppgifter skall bedömas som en kränkning av den personliga integriteten och där-med en överträdelse av <a href="https://lagen.nu/1998:204" rel="dcterms:references">personuppgiftslagen</a> i större utsträckning än i dag. Bestämmelsens syfte är således inte att, för automatiserad person-uppgiftsbehandling, tillskapa ett generellt skydd mot vad som i dagligt tal kan betecknas som en kränkning av den personliga integriteten. </p>
+            <p>Om sådan behandling som avses i paragrafen har inneburit en kränk-ning av den registrerades personliga integritet har personuppgifterna be-handlats i strid med <a href="https://lagen.nu/1998:204" rel="dcterms:references">personuppgiftslagen</a> på ett sådant sätt att skades-tåndsskyldighet inträder enligt 48 §. Under vissa förutsättningar är hand-landet även straffbelagt, se nedan i anslutning till 49 §. </p>
             <p>Av 12 § andra stycket följer att den registrerade inte har rätt att motsät-ta sig sådan behandling som är tillåten enligt paragrafen. </p>
             <p>Tillämpningen av de till 13, 23, 24 och 33 §§ anslutande bestämmel-serna, 14–19, 25 och 34 §§ på behandling av personuppgifter i ostruktu-rerat material blir inte aktuell redan genom att tillämpningen av de först-nämnda paragraferna undantas såvitt avser sådan behandling. På inrådan av Lagrådet har dock dessa tagits med i uppräkningen av de undantagna paragraferna. </p>
           </div>
         """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S12> ;
-    dcterms:references <https://lagen.nu/prop/2005/06:173#S8.1>,
-        <https://lagen.nu/prop/2005/06:173#S8.2>,
-        <https://lagen.nu/sfs/1998:204> .
+    dcterms:references <https://lagen.nu/1998:204>,
+        <https://lagen.nu/prop/2005/06:173#S8.1>,
+        <https://lagen.nu/prop/2005/06:173#S8.2> .
 
 <https://lagen.nu/prop/2005/06:173#kommentar-1998:204#P7> a rinfoex:Forfattningskommentar ;
-    rinfoex:kommentarTill <https://lagen.nu/sfs/1998:204#P7> ;
+    rinfoex:kommentarTill <https://lagen.nu/1998:204#P7> ;
     dcterms:description """
           <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-            <p>I andra stycket har 5 a § lagts till i uppräkningen. Ändringen är en följd-ändring och innebär att den nya föreslagna paragrafen inte – i likhet med de flesta andra bestämmelser i <a href="https://lagen.nu/sfs/1998:204" rel="dcterms:references">personuppgiftslagen</a> – skall tillämpas på </p>
+            <p>I andra stycket har 5 a § lagts till i uppräkningen. Ändringen är en följd-ändring och innebär att den nya föreslagna paragrafen inte – i likhet med de flesta andra bestämmelser i <a href="https://lagen.nu/1998:204" rel="dcterms:references">personuppgiftslagen</a> – skall tillämpas på </p>
             <span id="sid60"/>
             <p>sådan behandling av personuppgifter som sker uteslutande för journalis-tiska ändamål eller konstnärligt och litterärt skapande. </p>
           </div>
         """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S12> ;
-    dcterms:references <https://lagen.nu/sfs/1998:204> .
+    dcterms:references <https://lagen.nu/1998:204> .
 
 <https://lagen.nu/prop/2005/06:173#kommentar-1998:204#P8a> a rinfoex:Forfattningskommentar ;
-    rinfoex:kommentarTill <https://lagen.nu/sfs/1998:204#P8a> ;
+    rinfoex:kommentarTill <https://lagen.nu/1998:204#P8a> ;
     dcterms:description """
           <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
             <p>Paragrafen, som är ny, har behandlats i <a href="https://lagen.nu/prop/2005/06:173#S9.4" rel="dcterms:references">avsnitt 9.4</a>. </p>
-            <p>I paragrafen bemyndigas regeringen att meddela föreskrifter om un-dantag från vissa bestämmelser i <a href="https://lagen.nu/sfs/1998:204" rel="dcterms:references">personuppgiftslagen</a>. </p>
+            <p>I paragrafen bemyndigas regeringen att meddela föreskrifter om un-dantag från vissa bestämmelser i <a href="https://lagen.nu/1998:204" rel="dcterms:references">personuppgiftslagen</a>. </p>
             <p>I fråga om både vilka bestämmelser som undantag kan medges ifrån och under vilka förutsättningar så kan ske skall paragrafen ha samma innebörd som artikel 13.1 i EG-direktivet om personuppgifter. </p>
           </div>
         """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S12> ;
-    dcterms:references <https://lagen.nu/prop/2005/06:173#S9.4>,
-        <https://lagen.nu/sfs/1998:204> .
+    dcterms:references <https://lagen.nu/1998:204>,
+        <https://lagen.nu/prop/2005/06:173#S9.4> .
 
 <https://lagen.nu/prop/2005/06:173#S10> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
-    dcterms:references <https://lagen.nu/sfs/1962:700>,
-        <https://lagen.nu/sfs/1964:163>,
-        <https://lagen.nu/sfs/1964:163#P5S2>,
-        <https://lagen.nu/sfs/1998:204> ;
+    dcterms:references <https://lagen.nu/1962:700>,
+        <https://lagen.nu/1964:163>,
+        <https://lagen.nu/1998:204> ;
     dcterms:title "Ikraftträdande- och övergångsbestämmelser"@sv ;
     bibo:chapter "10"@sv .
 
@@ -293,64 +289,62 @@
 
 <https://lagen.nu/prop/2005/06:173#S5.1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S5> ;
-    dcterms:references <https://lagen.nu/sfs/1998:204> ;
+    dcterms:references <https://lagen.nu/1998:204> ;
     dcterms:title "Vad avses med en missbruksmodell respektive han-teringsmodell?"@sv ;
     bibo:chapter "5.1"@sv .
 
 <https://lagen.nu/prop/2005/06:173#S5.3> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S5> ;
-    dcterms:references <https://lagen.nu/bet/1999/2000:KU7>,
+    dcterms:references <https://lagen.nu/1998:1191>,
+        <https://lagen.nu/1998:204>,
+        <https://lagen.nu/1998:204#P33>,
+        <https://lagen.nu/bet/1999/2000:KU7>,
         <https://lagen.nu/prop/1999/2000:11>,
-        <https://lagen.nu/rskr/1999/2000:51>,
-        <https://lagen.nu/sfs/1998:1191>,
-        <https://lagen.nu/sfs/1998:204>,
-        <https://lagen.nu/sfs/1998:204#P33> ;
+        <https://lagen.nu/rskr/1999/2000:51> ;
     dcterms:title "Vidtagna åtgärder i syfte att åstadkomma en mer missbruksinriktad regleringsmodell"@sv ;
     bibo:chapter "5.3"@sv .
 
 <https://lagen.nu/prop/2005/06:173#S6.1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S6> ;
-    dcterms:references <https://lagen.nu/sfs/1974:152>,
-        <https://lagen.nu/sfs/1974:152#K2>,
-        <https://lagen.nu/sfs/1998:204> ;
+    dcterms:references <https://lagen.nu/1974:152#K2>,
+        <https://lagen.nu/1998:204> ;
     dcterms:title "Allmänt om begreppet personlig integritet"@sv ;
     bibo:chapter "6.1"@sv .
 
 <https://lagen.nu/prop/2005/06:173#S9.2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S9> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#s82>,
-        <https://lagen.nu/prop/2005/06:173#S8.4>,
-        <https://lagen.nu/sfs/1973:289>,
-        <https://lagen.nu/sfs/1980:100>,
-        <https://lagen.nu/sfs/1998:204>,
-        <https://lagen.nu/sfs/1998:204#P26> ;
+    dcterms:references <https://lagen.nu/1973:289>,
+        <https://lagen.nu/1980:100>,
+        <https://lagen.nu/1998:204>,
+        <https://lagen.nu/1998:204#P26>,
+        <https://lagen.nu/prop/1997/98:44#sid82>,
+        <https://lagen.nu/prop/2005/06:173#S8.4> ;
     dcterms:title "Registerutdrag"@sv ;
     bibo:chapter "9.2"@sv .
 
 <https://lagen.nu/prop/2005/06:173#S9.3> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S9> ;
-    dcterms:references <https://lagen.nu/prop/2000/01:54#s77>,
-        <https://lagen.nu/prop/2002/03:40#s241>,
-        <https://lagen.nu/sfs/1980:100#K15P7S3>,
-        <https://lagen.nu/sfs/1989:186>,
-        <https://lagen.nu/sfs/1989:186#P4S2>,
-        <https://lagen.nu/sfs/1998:204>,
-        <https://lagen.nu/sfs/1998:204#P2>,
-        <https://lagen.nu/sfs/1998:204#P26> ;
+    dcterms:references <https://lagen.nu/1980:100#K15P7S3>,
+        <https://lagen.nu/1989:186>,
+        <https://lagen.nu/1998:204>,
+        <https://lagen.nu/1998:204#P2>,
+        <https://lagen.nu/1998:204#P26>,
+        <https://lagen.nu/prop/2000/01:54#sid77>,
+        <https://lagen.nu/prop/2002/03:40#sid241> ;
     dcterms:title "Överklagande av myndighetsbeslut"@sv ;
     bibo:chapter "9.3"@sv .
 
 <https://lagen.nu/prop/2005/06:173#S9.4> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S9> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#s38>,
-        <https://lagen.nu/prop/1997/98:44#s47>,
-        <https://lagen.nu/prop/2005/06:173#S8.3.2>,
-        <https://lagen.nu/sfs/1998:1191#P7>,
-        <https://lagen.nu/sfs/1998:204>,
-        <https://lagen.nu/sfs/1998:204#P23>,
-        <https://lagen.nu/sfs/1998:204#P25>,
-        <https://lagen.nu/sfs/1998:204#P42>,
-        <https://lagen.nu/sfs/1998:204#P9> ;
+    dcterms:references <https://lagen.nu/1998:1191#P7>,
+        <https://lagen.nu/1998:204>,
+        <https://lagen.nu/1998:204#P23>,
+        <https://lagen.nu/1998:204#P25>,
+        <https://lagen.nu/1998:204#P42>,
+        <https://lagen.nu/1998:204#P9>,
+        <https://lagen.nu/prop/1997/98:44#sid38>,
+        <https://lagen.nu/prop/1997/98:44#sid47>,
+        <https://lagen.nu/prop/2005/06:173#S8.3.2> ;
     dcterms:title "Undantag enligt artikel 13 i EG-direktivet om per-sonuppgifter"@sv ;
     bibo:chapter "9.4"@sv .
 
@@ -358,48 +352,47 @@
 
 <https://lagen.nu/prop/2005/06:173#S8.1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S8> ;
-    dcterms:references <https://lagen.nu/prop/2005/06:173#S8.4>,
-        <https://lagen.nu/prop/2005/06:173#S8.5>,
-        <https://lagen.nu/sfs/1980:100#K15P2>,
-        <https://lagen.nu/sfs/1998:204> ;
+    dcterms:references <https://lagen.nu/1980:100#K15P2>,
+        <https://lagen.nu/1998:204>,
+        <https://lagen.nu/prop/2005/06:173#S8.4>,
+        <https://lagen.nu/prop/2005/06:173#S8.5> ;
     dcterms:title "Missbruksmodell för personuppgiftsbehandling i ostrukturerat material"@sv ;
     bibo:chapter "8.1"@sv .
 
 <https://lagen.nu/prop/2005/06:173#S8.4> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S8> ;
-    dcterms:references <https://lagen.nu/prop/2005/06:173#S8.1>,
+    dcterms:references <https://lagen.nu/1998:204>,
+        <https://lagen.nu/1998:204#P10>,
+        <https://lagen.nu/1998:204#P22>,
+        <https://lagen.nu/1998:204#P26>,
+        <https://lagen.nu/1998:204#P28>,
+        <https://lagen.nu/1998:204#P36>,
+        <https://lagen.nu/1998:204#P42>,
+        <https://lagen.nu/prop/2005/06:173#S8.1>,
         <https://lagen.nu/prop/2005/06:173#S8.2>,
         <https://lagen.nu/prop/2005/06:173#S8.3.2>,
-        <https://lagen.nu/prop/2005/06:173#S9.2>,
-        <https://lagen.nu/sfs/1998:204>,
-        <https://lagen.nu/sfs/1998:204#P10>,
-        <https://lagen.nu/sfs/1998:204#P10S1Nf>,
-        <https://lagen.nu/sfs/1998:204#P22>,
-        <https://lagen.nu/sfs/1998:204#P26>,
-        <https://lagen.nu/sfs/1998:204#P28>,
-        <https://lagen.nu/sfs/1998:204#P36>,
-        <https://lagen.nu/sfs/1998:204#P42> ;
+        <https://lagen.nu/prop/2005/06:173#S9.2> ;
     dcterms:title "Vilka bestämmelser i personuppgiftslagen bör undan-taget omfatta?"@sv ;
     bibo:chapter "8.4"@sv .
 
 <https://lagen.nu/prop/2005/06:173#S8.5> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S8> ;
-    dcterms:references <https://lagen.nu/prop/2005/06:173#S8.2>,
+    dcterms:references <https://lagen.nu/1972:207>,
+        <https://lagen.nu/1972:207#K2P3>,
+        <https://lagen.nu/1998:1191>,
+        <https://lagen.nu/1998:204>,
+        <https://lagen.nu/1998:204#P13>,
+        <https://lagen.nu/1998:204#P21>,
+        <https://lagen.nu/1998:204#P32>,
+        <https://lagen.nu/1998:204#P33>,
+        <https://lagen.nu/1998:204#P35>,
+        <https://lagen.nu/1998:204#P43>,
+        <https://lagen.nu/1998:204#P47>,
+        <https://lagen.nu/1998:204#P48>,
+        <https://lagen.nu/1998:204#P49>,
+        <https://lagen.nu/prop/2005/06:173#S8.2>,
         <https://lagen.nu/prop/2005/06:173#S8.3.2>,
-        <https://lagen.nu/prop/2005/06:173#S9.1.2>,
-        <https://lagen.nu/sfs/1972:207>,
-        <https://lagen.nu/sfs/1972:207#K2P3>,
-        <https://lagen.nu/sfs/1998:1191>,
-        <https://lagen.nu/sfs/1998:204>,
-        <https://lagen.nu/sfs/1998:204#P13>,
-        <https://lagen.nu/sfs/1998:204#P21>,
-        <https://lagen.nu/sfs/1998:204#P32>,
-        <https://lagen.nu/sfs/1998:204#P33>,
-        <https://lagen.nu/sfs/1998:204#P35>,
-        <https://lagen.nu/sfs/1998:204#P43>,
-        <https://lagen.nu/sfs/1998:204#P47>,
-        <https://lagen.nu/sfs/1998:204#P48>,
-        <https://lagen.nu/sfs/1998:204#P49> ;
+        <https://lagen.nu/prop/2005/06:173#S9.1.2> ;
     dcterms:title "Skadestånd, straff och tillsyn"@sv ;
     bibo:chapter "8.5"@sv .
 
@@ -415,13 +408,13 @@
 
 <https://lagen.nu/prop/2005/06:173#S8.2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S8> ;
-    dcterms:references <https://lagen.nu/prop/2005/06:173#S4.2>,
-        <https://lagen.nu/prop/2005/06:173#S6.1>,
-        <https://lagen.nu/sfs/1962:700#K5P1S1>,
-        <https://lagen.nu/sfs/1962:700#K5P3>,
-        <https://lagen.nu/sfs/1998:204>,
-        <https://lagen.nu/sfs/1998:204#P1>,
-        <https://lagen.nu/sfs/1998:204#P10> ;
+    dcterms:references <https://lagen.nu/1962:700#K5P1S1>,
+        <https://lagen.nu/1962:700#K5P3>,
+        <https://lagen.nu/1998:204>,
+        <https://lagen.nu/1998:204#P1>,
+        <https://lagen.nu/1998:204#P10>,
+        <https://lagen.nu/prop/2005/06:173#S4.2>,
+        <https://lagen.nu/prop/2005/06:173#S6.1> ;
     dcterms:title "Behandlingen får inte innebära en kränkning av den registrerades personliga integritet"@sv ;
     bibo:chapter "8.2"@sv .
 
@@ -450,8 +443,8 @@
     dcterms:abstract "I propositionen föreslår regeringen reformer som syftar till att underlätta behandlingen av personuppgifter. Personuppgiftslagen utformas i viss utsträckning enligt en missbruksmodell. Den innebär att regleringen inte tar sikte på själva hanteringen av personuppgifterna utan på att uppgifterna inte får missbrukas till skada för någons personliga integritet. Behandling av personuppgifter i ostrukturerat material, t.ex. löpande text och enstaka ljud- och bildupptagningar, ska undantas från de flesta av personuppgiftslagens detaljerade hanteringsregler. Sådan behandling ska vara tilllåten utan andra restriktioner än att den registrerades personliga integritet inte får kränkas. Personuppgiftslagens bestämmelser om skadestånd ska gälla även för förfaranden i strid med den föreslagna missbruksregeln. Vidare ska det vara straffbart att i strid med missbruksregeln uppsåtligen eller av grov oaktsamhet behandla känsliga personuppgifter och uppgifter om lagöverträdelser m.m. på ett sätt som kränker den registrerades personliga integritet. Detsamma ska gälla för den som i strid med missbruksregeln för över personuppgifter till tredje land som saknar en adekvat nivå för skyddet av personuppgifter. Straffskalan ska vara densamma som för övriga brott enligt personuppgiftslagen. Gärningar som begås av oaktsamhet av normalgraden ska inte längre vara straffbara. I personuppgiftslagen införs en bestämmelse om att vissa beslut enligt lagen som fattats av myndigheter ska kunna överklagas till allmän förvaltningsdomstol. Prövningstillstånd ska krävas vid överklagande till kammarrätt. Vidare införs ett bemyndigande för regeringen att meddela föreskrifter om sådana undantag som är tillåtna enligt artikel 13.1 i EG-direktivet om personuppgifter. I propositionen görs bedömningen att förslagen är förenliga med EG-direktivet om personuppgifter (95/46/EG). Lagändringarna ska enligt förslaget träda i kraft den 1 januari 2007."@sv ;
     dcterms:identifier "Prop. 2005/06:173" ;
     dcterms:issued "2006-03-16"^^xsd:date ;
-    dcterms:references <https://lagen.nu/ext/celex/31995L0046>,
-        <https://lagen.nu/sfs/1998:204> ;
+    dcterms:references <https://lagen.nu/1998:204>,
+        <https://lagen.nu/ext/celex/31995L0046> ;
     dcterms:title "Översyn av personuppgiftslagen"@sv ;
     rpubl:arsutgava "2005/06" ;
     rpubl:departement <https://lagen.nu/org/2008/justitiedepartementet> ;

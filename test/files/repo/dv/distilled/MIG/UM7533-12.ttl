@@ -12,17 +12,17 @@
 
 <https://lagen.nu/rf/mig/2013:6#MIG> dcterms:creator "Kammarrätten i Stockholm, Migrationsöverdomstolen"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/mig/2013:6> ;
-    dcterms:references <https://lagen.nu/prop/2004/05:170#s191>,
+    dcterms:references <https://lagen.nu/2005:716>,
+        <https://lagen.nu/2005:716#K1P10>,
+        <https://lagen.nu/2005:716#K4P1>,
+        <https://lagen.nu/2005:716#K4P2>,
+        <https://lagen.nu/2005:716#K4P2a>,
+        <https://lagen.nu/2005:716#K5P6>,
+        <https://lagen.nu/2005:716#K5P6S1>,
+        <https://lagen.nu/2005:716#K5P9>,
+        <https://lagen.nu/prop/2004/05:170#sid191>,
         <https://lagen.nu/rf/mig/2007:48>,
-        <https://lagen.nu/rf/mig/2010:23>,
-        <https://lagen.nu/sfs/2005:716>,
-        <https://lagen.nu/sfs/2005:716#K1P10>,
-        <https://lagen.nu/sfs/2005:716#K4P1>,
-        <https://lagen.nu/sfs/2005:716#K4P2>,
-        <https://lagen.nu/sfs/2005:716#K4P2a>,
-        <https://lagen.nu/sfs/2005:716#K5P6>,
-        <https://lagen.nu/sfs/2005:716#K5P6S1>,
-        <https://lagen.nu/sfs/2005:716#K5P9> .
+        <https://lagen.nu/rf/mig/2010:23> .
 
 <https://lagen.nu/rf/mig/2013:6#MIV> dcterms:creator "Migrationsverket"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/mig/2013:6> .
@@ -40,10 +40,10 @@
     dcterms:title "Ett barn, som lider av livshotande leukemi, har tillsammans med sin förälder beviljats uppehållstillstånd på grund av synnerligen ömmande omständigheter. Eftersom barnets behov av avancerad vård och behandling har bedömts vara av övergående natur har uppehållstillstånden tidsbegränsats."@sv ;
     rpubl:avdelning "1" ;
     rpubl:avgorandedatum "2013-03-22"^^xsd:date ;
-    rpubl:lagrum <https://lagen.nu/sfs/2005:716>,
-        <https://lagen.nu/sfs/2005:716#K1P10>,
-        <https://lagen.nu/sfs/2005:716#K5P6>,
-        <https://lagen.nu/sfs/2005:716#K5P9> ;
+    rpubl:lagrum <https://lagen.nu/2005:716>,
+        <https://lagen.nu/2005:716#K1P10>,
+        <https://lagen.nu/2005:716#K5P6>,
+        <https://lagen.nu/2005:716#K5P9> ;
     rpubl:malnummer "UM7533-12" ;
     rpubl:rattsfall <https://lagen.nu/rf/mig/2007:48>,
         <https://lagen.nu/rf/mig/2010:23> ;

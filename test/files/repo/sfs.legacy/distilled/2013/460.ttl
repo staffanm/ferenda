@@ -8,16 +8,16 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/sfs/2013:460#P7S1> a rinfoex:Stycke ;
-    dcterms:isPartOf <https://lagen.nu/sfs/2013:460#P7> .
+<https://lagen.nu/2013:460#P7S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2013:460#P7> .
 
-<https://lagen.nu/sfs/2013:460#P8S1> a rinfoex:Stycke ;
-    dcterms:isPartOf <https://lagen.nu/sfs/2013:460#P8> ;
-    dcterms:references <https://lagen.nu/sfs/2013:460#P10>,
-        <https://lagen.nu/sfs/2013:460#P12>,
-        <https://lagen.nu/sfs/2013:460#P15> .
+<https://lagen.nu/2013:460#P8S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2013:460#P8> ;
+    dcterms:references <https://lagen.nu/2013:460#P10>,
+        <https://lagen.nu/2013:460#P12>,
+        <https://lagen.nu/2013:460#P15> .
 
-<https://lagen.nu/sfs/2013:460/konsolidering> owl:sameAs <https://lagen.nu/sfs/2013:460/konsolidering/2013:460> .
+<https://lagen.nu/2013:460/konsolidering> owl:sameAs <https://lagen.nu/2013:460/konsolidering/2013:460> .
 
 <https://lagen.nu/bet/2012/13:JuU22> dcterms:identifier "bet. 2012/13:JuU22" .
 
@@ -25,27 +25,27 @@
 
 <https://lagen.nu/rskr/2012/13:252> dcterms:identifier "rskr. 2012/13:252" .
 
-<https://lagen.nu/sfs/2013:460#P7> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/sfs/2013:460> .
+<https://lagen.nu/2013:460#P7> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2013:460> .
 
-<https://lagen.nu/sfs/2013:460#P8> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/sfs/2013:460> .
+<https://lagen.nu/2013:460#P8> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2013:460> .
 
-<https://lagen.nu/sfs/2013:460/konsolidering/2013:460> a rpubl:KonsolideradGrundforfattning ;
+<https://lagen.nu/2013:460/konsolidering/2013:460> a rpubl:KonsolideradGrundforfattning ;
     dcterms:creator <https://lagen.nu/org/2008/justitiedepartementet> ;
     dcterms:identifier "SFS 2013:460" ;
     dcterms:issued "2013-05-30"^^xsd:date ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
     dcterms:title "Kameraövervakningslag (2013:460)"@sv ;
-    rpubl:konsoliderar <https://lagen.nu/sfs/2013:460> ;
-    rpubl:konsolideringsunderlag <https://lagen.nu/sfs/2013:460> ;
+    rpubl:konsoliderar <https://lagen.nu/2013:460> ;
+    rpubl:konsolideringsunderlag <https://lagen.nu/2013:460> ;
     rpubl:utfardandedatum "2013-05-30"^^xsd:date ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2013:460/konsolidering/2013-05-30> ;
     prov:wasGeneratedBy "lagen.nu.sfs.SFS" .
 
 <https://lagen.nu/ext/celex/31995L0046> rpubl:celexNummer "31995L0046" .
 
-<https://lagen.nu/sfs/2013:460> a rpubl:Lag ;
+<https://lagen.nu/2013:460> a rpubl:Lag ;
     dcterms:identifier "SFS 2013:460" ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
     dcterms:title "Kameraövervakningslag (2013:460)"@sv ;

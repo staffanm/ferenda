@@ -11,7 +11,7 @@
     dcterms:identifier "NJA 2009 not 1" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
     dcterms:references <https://lagen.nu/rf/nja/1999s715>,
-        <https://lagen.nu/sfs/1942:740#K32P6S1> ;
+        <https://lagen.nu/1942:740#K32P6S1> ;
     rpubl:arsutgava "2009" ;
     rpubl:lopnummer "1" ;
     rpubl:rattsfallspublikation <https://lagen.nu/dataset/nja> ;
