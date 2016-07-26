@@ -9,6 +9,7 @@ import re
 import os
 from urllib.parse import unquote
 from wsgiref.util import request_uri
+from itertools import chain
 
 from rdflib import RDF, URIRef
 from rdflib.namespace import DCTERMS, SKOS
@@ -127,7 +128,13 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
             for cls in self.subrepos:
                 if cls.alias == subrepoalias:
                     inst = self.get_instance(cls)
-                    inst.parse(subbasefile)
+                    ret = inst.parse(subbasefile)
+                    if ret:
+                        if ret is not True and ret != subbasefile:
+                            # this is a signal that parse discovered
+                            # that the basefile was wrong
+                            subbasefile = ret
+                        self.copy_parsed(subbasefile, inst)
                     break
         else:
              return super(MyndFskr, self).parse(basefile)   
@@ -214,7 +221,8 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
 
     def http_handle(self, environ):
         segment = environ['PATH_INFO'].split("/")[1]
-        if segment in [cls.alias for cls in self.subrepos]:
+        fs = chain.from_iterable([self.get_instance(cls).forfattningssamlingar() for cls in self.subrepos])
+        if segment in fs:
             url = unquote(request_uri(environ))
             if 'develurl' in self.config:
                 url = url.replace(self.config.develurl, self.config.url)

@@ -237,6 +237,7 @@ class MyndFskrBase(SwedishLegalSource):
 
 
         reader = self.textreader_from_basefile(doc.basefile)
+        orig_basefile = doc.basefile
         try:
             self.parse_metadata_from_textreader(reader, doc)
         except RequiredTextMissing:
@@ -246,12 +247,21 @@ class MyndFskrBase(SwedishLegalSource):
                 self.parse_metadata_from_textreader(reader, doc)
             else:
                 raise
+        # the parse_metadata_from_textreader step might determine that
+        # the assumed basefile was wrong (ie during download we
+        # thought it would be fffs/1991:15, but upon parsing, we
+        # discovered it should be bffs/1991:15
+        if doc.basefile != orig_basefile:
+            assert doc.basefile # it must be truthy, if it's False or None we have a problem 
+            ret = doc.basefile
+        else:
+            ret = True # Signals that everything is OK
         self.parse_document_from_textreader(reader, doc)
         self._serialize_unparsed(doc.body, doc.basefile)
         if self.config.parserefs and self.parse_types:
             doc.body = self.refparser.parse_recursive(doc.body)
         self.parse_entry_update(doc)
-        return True  # Signals that everything is OK
+        return ret 
 
     def textreader_from_basefile(self, basefile, force_ocr=False):
         infile = self.store.downloaded_path(basefile)
@@ -461,6 +471,14 @@ class MyndFskrBase(SwedishLegalSource):
             self.log.warning(
                 "Assumed URI would be %s but it turns out to be %s" %
                 (doc.uri, uri))
+            newbasefile = self.basefile_from_uri(uri)
+            if newbasefile:
+                # change the basefile we're dealing with. Touch
+                # self.store.parsed_path(basefile) first so we don't
+                # regenerate. 
+                with self.store.open_parsed(doc.basefile, "w"):
+                    pass
+                doc.basefile = newbasefile
         doc.uri = uri
         desc = Describer(doc.meta, doc.uri)
 
@@ -855,6 +873,9 @@ class FFFS(MyndFskrBase):
     start_url = "http://www.fi.se/Regler/FIs-forfattningar/Forteckning-FFFS/"
     document_url = "http://www.fi.se/Regler/FIs-forfattningar/Samtliga-forfattningar/%s/"
     storage_policy = "dir"  # must be able to handle attachments
+
+    def forfattningssamlingar(self):
+        return ["fffs", "bffs"]
 
     def download(self, basefile=None):
         self.session = requests.session()

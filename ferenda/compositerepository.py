@@ -180,7 +180,6 @@ class CompositeRepository(DocumentRepository):
 
         start = time.time()
         ret = False
-
         for c in self.subrepos:
             inst = self.get_instance(c)
             if (basefile in self.store.basefiles[c] or
@@ -204,7 +203,14 @@ class CompositeRepository(DocumentRepository):
                         ret = False
                 if ret:
                     break
+
+
         if ret:
+            if ret is not True and ret != basefile:
+                # this is a signal that parse discovered
+                # that the basefile was wrong
+                basefile = ret
+
             self.copy_parsed(basefile, inst)
             self.log.info("%(basefile)s OK (%(elapsed).3f sec)",
                           {'basefile': basefile,
