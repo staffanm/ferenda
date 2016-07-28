@@ -233,14 +233,14 @@ WHERE { <%(uri)s> ?p ?o . }
 
 
     def test_queryindex(self):
-        res = [{'identifier': 'Doc #1',
-                'about': 'http://example.org/doc1',
+        res = [{'label': 'Doc #1',
+                'uri': 'http://example.org/doc1',
                 'text': 'matching doc 1'},
-               {'identifier': 'Doc #2',
-                'about': 'http://example.org/doc2',
+               {'label': 'Doc #2',
+                'uri': 'http://example.org/doc2',
                 'text': 'matching doc 2'}]
-               
-        config = {'connect.return_value': Mock(**{'query.return_value': res})}
+        pager = None
+        config = {'connect.return_value': Mock(**{'query.return_value': (res, pager)})}
         printmock = MagicMock()
         with patch('ferenda.devel.FulltextIndex', **config):
             with patch('builtins.print', printmock):

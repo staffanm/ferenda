@@ -142,7 +142,7 @@ class MockESBasicQuery(BasicQuery, MockESBase):
                      create=CREATE_CANNED, method="post")
         mock_requests.post.side_effect = can
 
-        can = canned((200, "count-0.json"),
+        can = canned(# (200, "count-0.json"),
                      (200, "count-4.json"),
                      (200, "schema.json"),
                      (200, "schema.json"),
