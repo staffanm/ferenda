@@ -25,16 +25,6 @@ class StaticStore(DocumentStore):
     ``[datadir]/static/{parsed,distilled,generated,...}/``
     """
 
-    def __init__(self, datadir, downloaded_suffix=".rst",
-                 storage_policy="file", staticdir="static"):
-        super(StaticStore, self).__init__(datadir, downloaded_suffix, storage_policy)
-        if os.path.exists(staticdir):
-            self.staticdir = staticdir
-        else:
-            # find out the path of our resourcedir
-            p = self.resourceloader.filename('static-content/README')
-            self.staticdir = os.path.dirname(p)
-
     def downloaded_path(self, basefile, version=None, attachment=None):
         segments = [self.staticdir,
                     self.basefile_to_pathfrag(basefile) + self.downloaded_suffix]
@@ -87,7 +77,19 @@ class Static(DocumentRepository):
     alias = "static"
     downloaded_suffix = ".rst"
     documentstore_class = StaticStore
+    sparql_annotations = None
     # urls become on the form "http://localhost:8000/static/about"
+
+    def __init__(self, config=None, **kwargs):
+        super(Static, self).__init__(config, **kwargs)
+        if 'staticdir' in self.config:
+            staticdir = self.config.staticdir
+            assert os.path.exists(staticdir), "%s does not exist" % staticdir
+        else:
+            p = self.resourceloader.filename('static-content/README')
+            staticdir = os.path.dirname(p)
+        self.store.staticdir = staticdir
+        
 
     def download(self):
         pass
@@ -127,6 +129,7 @@ class Static(DocumentRepository):
             for childnode in node:
                 self._transform(childnode, stack)
             return stack.pop()
+
 
     def toc(self, otherrepos=[]):
         pass
