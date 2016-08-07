@@ -1535,9 +1535,8 @@ class SFS(Trips):
                     laststr = list(soup.find_all("p")[-1].strings)[-1]
                     if laststr:
                         laststr.replace_with(str(laststr) + "...")
-                    # then convert back to markup
-                    shortdesc = str(soup)
-                    
+                    # then convert back to markup and strip any default namespacing
+                    shortdesc = str(soup).replace(' xmlns="http://www.w3.org/1999/xhtml"', '')
             link = '<b><a href="%s">%s</a></b>: ' % (row['kommentar'], row['prop'])
             if 'kommentar' not in stuff[lagrum]:
                 stuff[lagrum]['kommentar'] = ""

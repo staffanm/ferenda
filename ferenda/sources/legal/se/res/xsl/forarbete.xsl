@@ -131,7 +131,7 @@ It's a generic template for any kind of content
     <xsl:if test="string-length(@content) > 0">
       <h3><xsl:value-of select="@content"/></h3>
     </xsl:if>
-    <div class="forfattningskommentar">
+    <div class="forfattningskommentar" id="{substring-after(@about, '#')}">
        <xsl:apply-templates select="xhtml:div/xhtml:div/*"/>
     </div>
   </xsl:template>
