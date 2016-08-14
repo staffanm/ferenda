@@ -31,10 +31,13 @@ class FulltextIndex(object):
 
     """
 
+
+    indextypes = {}  # this is repopulated at the very end of this
+                     # module, when the classes we need to specify are
+                     # defined.
     
-    
-    @staticmethod
-    def connect(indextype, location, repos):
+    @classmethod
+    def connect(cls, indextype, location, repos):
         """Open a fulltext index (creating it if it doesn't already exists).
 
         :param location: Type of fulltext index ("WHOOSH" or "ELASTICSEARCH")
@@ -44,8 +47,7 @@ class FulltextIndex(object):
 
         """
         # create correct subclass and return it
-        return {'WHOOSH': WhooshIndex,
-                'ELASTICSEARCH': ElasticSearchIndex}[indextype](location, repos)
+        return cls.indextypes[indextype](location, repos)
 
     def __init__(self, location, repos):
         self.location = location
@@ -709,6 +711,12 @@ class ElasticSearchIndex(RemoteIndex):
             res.raise_for_status()
         except requests.exceptions.HTTPError as e:
             raise errors.IndexingError(str(e) + ": '%s'" % res.text)
+        # if the errors field is set to True, errors might have
+        # occurred even though the status code was 200
+        if res.json()["errors"]:
+            raise errors.IndexingError("%s errors when committing, first was %r" %
+                                       (len(res.json()["items"]),
+                                        res.json()["items"][0]))
         # make sure everything is really comitted (available for
         # search) before continuing? TODO: Check if this slows
         # multi-basefile (and multi-threaded) indexing down noticably,
@@ -731,6 +739,8 @@ class ElasticSearchIndex(RemoteIndex):
         # which uses unicode normalization form NFD). To be safe,
         # encodethe string to utf-8 beforehand (Which is what quote on
         # python 3 does anyways)
+        if "#" in uri:
+            repo = repo + "_child"
         relurl = "%s/%s" % (repo, quote(basefile.encode("utf-8"), safe=safe))  # eg type, id
         if "#" in uri:
             relurl += uri.split("#", 1)[1]
@@ -745,9 +755,12 @@ class ElasticSearchIndex(RemoteIndex):
             self._writer = tempfile.TemporaryFile()
         relurl, payload = self._update_payload(
             uri, repo, basefile, text, **kwargs)
+        metadata = {"index": {"_type": repo, "_id": basefile}}
         if "#" in uri:
-            basefile += uri.split("#", 1)[1]
-        metadata = '{ "index" : { "_type" : "%(repo)s", "_id" : "%(basefile)s" } }\n' % locals()
+            metadata["index"]['_type'] = repo + "_child"
+            metadata["index"]['_id'] += uri.split("#", 1)[1]
+            metadata["index"]['parent'] = basefile
+        metadata = json.dumps(metadata) + "\n"
         assert "\n" not in payload, "payload contains newlines, must be encoded for bulk API"
         self._writer.write(metadata.encode("utf-8"))
         self._writer.write(payload.encode("utf-8"))
@@ -962,6 +975,7 @@ class ElasticSearchIndex(RemoteIndex):
             g = repo.make_graph()  # for qname lookup
             es_fields = {}
             schema = self.get_default_schema()
+            childschema = self.get_default_schema()
             for facet in repo.facets():
                 if facet.dimension_label:
                     fld = facet.dimension_label
@@ -969,17 +983,41 @@ class ElasticSearchIndex(RemoteIndex):
                     fld = g.qname(facet.rdftype).replace(":", "_")
                 idxtype = facet.indexingtype
                 schema[fld] = idxtype
+                if facet.toplevel_only:
+                    childschema[fld] = idxtype
 
             for key, fieldtype in schema.items():
                 if key == "repo":
                     continue  # not really needed for ES, as type == repo.alias
                 es_fields[key] = self.to_native_field(fieldtype)
+
+            es_child_fields = {}
+            for key, fieldtype in childschema.items():
+                if key == "repo": continue
+                es_child_fields[key] = self.to_native_field(fieldtype)
+                
+
             # _source enabled so we can get the text back
             payload["mappings"][repo.alias] = {"_source": {"enabled": True},
                                                "_all": {"analyzer": "my_analyzer",
                                                         "store": True},
                                                "properties": es_fields}
+
+
+            childmapping = {"_source": {"enabled": True},
+                            "_all": {"analyzer": "my_analyzer",
+                                     "store": True},
+                            "_parent": {"type": repo.alias},
+                            "properties": es_child_fields
+                            }
+            
+            payload["mappings"][repo.alias+"_child"] = childmapping
         return "", json.dumps(payload, indent=4)
 
     def _destroy_payload(self):
         return "", None
+
+
+
+FulltextIndex.indextypes = {'WHOOSH': WhooshIndex,
+                            'ELASTICSEARCH': ElasticSearchIndex}
