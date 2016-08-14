@@ -12,6 +12,7 @@ from collections import OrderedDict, Counter
 import codecs
 from urllib.parse import urljoin
 import json
+import tempfile
 
 from bs4 import BeautifulSoup
 from lxml import etree
@@ -547,3 +548,4 @@ class Propositioner(CompositeRepository, SwedishLegalSource):
             return [('Propositioner', self.dataset_uri())]
         else:
             return []
+

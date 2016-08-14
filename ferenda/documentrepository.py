@@ -1735,6 +1735,8 @@ with the *config* object as single parameter.
             reldependencies = newer(self.store.distilled_path(basefile), entry.indexed_dep)
             relfulltext = newer(self.store.parsed_path(basefile), entry.indexed_ft)
 
+        # FIXME: temp debugging
+        reltriples = reldependencies = False
         if not(reltriples or reldependencies or relfulltext):
             self.log.debug("%s: skipped relate" % basefile)
             return
@@ -1757,7 +1759,7 @@ with the *config* object as single parameter.
                         fp.write(g.serialize(format="nt"))
                     values['triplecount'] = len(g)
             else:
-                if self.config.force:
+                if self.config.force and reltriples:
                     self.relate_triples(basefile)
                     entry.indexed_ts = datetime.now()
                 elif reltriples:
