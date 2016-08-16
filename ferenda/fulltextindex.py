@@ -7,6 +7,7 @@ standard_library.install_aliases()
 
 from datetime import date, datetime, MAXYEAR, MINYEAR
 from urllib.parse import quote
+from copy import deepcopy
 import itertools
 import json
 import math
@@ -767,8 +768,17 @@ class ElasticSearchIndex(RemoteIndex):
         self._writer.write(b"\n")
 
     def _query_payload(self, q, pagenum=1, pagelen=10, **kwargs):
-        relurl = "_search?from=%s&size=%s" % ((pagenum - 1) * pagelen, pagelen)
+        if kwargs.get("repo"):
+            types = [kwargs.get("repo")]
+        else:
+            types = [repo.alias for repo in self._repos if repo.config.relate]
 
+        # use a multitype search to specify the types we want so that
+        # we don't go searching in the foo_child types, only parent
+        # types.
+        relurl = "%s/_search?from=%s&size=%s" % (",".join(types),
+                                                 (pagenum - 1) * pagelen,
+                                                 pagelen)
         # 1: Filter on all specified fields
         filterterms = {}
         filterregexps = {}
@@ -804,9 +814,43 @@ class ElasticSearchIndex(RemoteIndex):
 
         # 3: If freetext param given, search on that
         match = {}
+        inner_highlight = {}
+        highlight = None
         if q:
-            # NOTE:
+            # NOTE: we need to specify highlight parameters for each
+            # subquery when using has_child, see
+            # https://github.com/elastic/elasticsearch/issues/14999
             match['_all'] = q
+            highlight = {'fields': {'_all': {}},
+                         'pre_tags': ["<strong class='match'>"],
+                         'post_tags': ["</strong>"],
+                         'fragment_size': '40'}
+            inner_highlight = {"highlight": highlight}
+
+        # now, explode the match query into a big OR query for
+        # matching each possible _child type (until someone solves
+        # http://stackoverflow.com/questions/38946547 for me)
+        submatches = [{"match": deepcopy(match)}]
+
+        # FIXME: where should we put the highligt parameters for the main query?
+        # if highlight:
+        #     submatches[0]["highlight"] = highlight
+
+        if kwargs.get("repo"):
+            iterator = [kwargs.get("repo")]
+        else:
+            iterator = self._repos
+
+        for repo in iterator:
+            if not repo.config.relate:
+                continue
+            submatches.append(
+                {"has_child": {"type": repo.alias + "_child",
+                               "inner_hits": inner_highlight,
+                               "query": {"match": deepcopy(match)}}})
+        match = {"bool": {"should": submatches}}
+
+
 
         if filterterms or filterregexps or filterranges:
             query = {"filtered":
@@ -825,18 +869,15 @@ class ElasticSearchIndex(RemoteIndex):
             if match:
                 query["filtered"]["query"] = {"match": match}
         else:
-            if match:
-                query = {"match": match}
-            else:
-                query = {"match_all": match}
+            query = match
+# FIXME:
+#            if match:
+#                query = {"match": match}
+#            else:
+#                query = {"match_all": match}
 
         payload = {'query': query,
                    'aggs': self._aggregation_payload()}
-        if q:
-            payload['highlight'] = {'fields': {'_all': {}},
-                                    'pre_tags': ["<strong class='match'>"],
-                                    'post_tags': ["</strong>"],
-                                    'fragment_size': '40'}
         # Don't include the full text of every document in every hit
         payload['_source'] = {'exclude': ['text']}
         
@@ -845,6 +886,8 @@ class ElasticSearchIndex(RemoteIndex):
     def _aggregation_payload(self):
         aggs = {'type': {'terms': {'field': '_type'}}}
         for repo in self._repos:
+            if not repo.config.relate:
+                continue
             for facet in repo.facets():
                 if (facet.dimension_label in ('creator', 'issued') and
                     facet.dimension_label not in aggs and
