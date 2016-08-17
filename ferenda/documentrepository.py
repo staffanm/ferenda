@@ -1735,8 +1735,6 @@ with the *config* object as single parameter.
             reldependencies = newer(self.store.distilled_path(basefile), entry.indexed_dep)
             relfulltext = newer(self.store.parsed_path(basefile), entry.indexed_ft)
 
-        # FIXME: temp debugging
-        reltriples = reldependencies = False
         if not(reltriples or reldependencies or relfulltext):
             self.log.debug("%s: skipped relate" % basefile)
             return
