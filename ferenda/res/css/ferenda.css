@@ -131,6 +131,21 @@ this grid system directly under body? */
 	vertical-align: top;
     }
 
+    body.search .hit {
+	margin-right: 20%;
+	margin-bottom: 1ex;
+	padding-left: 4pt;
+	border: solid 1px #eee;
+    }
+    body.search .hit:nth-child(odd) {
+	background-color: #eee;
+    }
+
+    body.search .innerhit {
+	margin-left: 1em;
+	margin-bottom: 0;
+    }
+    
     nav.affix-top {
 	width: 97%; /* of the .col-sm-3 element */
     }

@@ -327,7 +327,7 @@ class Between(SearchModifier):
 
 class Results(list):
     # this is just so that we can add arbitrary attributes to a
-    # list-like object
+    # list-like object.
     pass
 
 import whoosh.index
@@ -814,7 +814,7 @@ class ElasticSearchIndex(RemoteIndex):
 
         # 3: If freetext param given, search on that
         match = {}
-        inner_highlight = {}
+        inner_hits = {"_source": {"exclude": "text"}}
         highlight = None
         if q:
             # NOTE: we need to specify highlight parameters for each
@@ -824,33 +824,26 @@ class ElasticSearchIndex(RemoteIndex):
             highlight = {'fields': {'_all': {}},
                          'pre_tags': ["<strong class='match'>"],
                          'post_tags': ["</strong>"],
-                         'fragment_size': '40'}
-            inner_highlight = {"highlight": highlight}
+                         'fragment_size': '40'
+            }
+            inner_hits["highlight"] = highlight
 
         # now, explode the match query into a big OR query for
         # matching each possible _child type (until someone solves
         # http://stackoverflow.com/questions/38946547 for me)
         submatches = [{"match": deepcopy(match)}]
-
-        # FIXME: where should we put the highligt parameters for the main query?
-        # if highlight:
-        #     submatches[0]["highlight"] = highlight
-
         if kwargs.get("repo"):
-            iterator = [kwargs.get("repo")]
+            reponames = [kwargs.get("repo")]
         else:
-            iterator = self._repos
-
-        for repo in iterator:
-            if not repo.config.relate:
-                continue
+            reponames = [repo.alias for repo in self._repos if repo.config.relate]
+        for reponame in reponames:
             submatches.append(
-                {"has_child": {"type": repo.alias + "_child",
-                               "inner_hits": inner_highlight,
-                               "query": {"match": deepcopy(match)}}})
+                {"has_child": {"type": reponame + "_child",
+                               "inner_hits": inner_hits,
+                               "query": {"match": deepcopy(match)}
+                }})
+
         match = {"bool": {"should": submatches}}
-
-
 
         if filterterms or filterregexps or filterranges:
             query = {"filtered":
@@ -880,7 +873,12 @@ class ElasticSearchIndex(RemoteIndex):
                    'aggs': self._aggregation_payload()}
         # Don't include the full text of every document in every hit
         payload['_source'] = {'exclude': ['text']}
-        
+        # extra workaround, solution adapted from comments in
+        # https://github.com/elastic/elasticsearch/issues/14999 --
+        # revisit once Elasticsearch 2.4 is released.
+        # payload['highlight'] = highlight
+        # if q:
+        #    payload['highlight']['highlight_query'] = {'match': {'_all': q}}
         return relurl, json.dumps(payload, indent=4, default=util.json_default_date)
 
     def _aggregation_payload(self):
@@ -911,21 +909,15 @@ class ElasticSearchIndex(RemoteIndex):
         # (at this stage -- we could look at self.schema() though)
         jsonresp = json.loads(response.text,
                               object_hook=util.make_json_date_object_hook())
-        
         res = Results()
         for hit in jsonresp['hits']['hits']:
-            h = hit['_source']
-            h['repo'] = hit['_type']
-            if 'highlight' in hit:
-                # wrap highlighted field in P, convert to
-                # elements. 
-                hltext = re.sub("\s+", " ", " ... ".join([x.strip() for x in hit['highlight']['_all']]))
-                # FIXME: BeautifulSoup/lxml returns empty soup if
-                # first char is '§' or some other non-ascii char (like
-                # a smart quote). Padding with a space makes problem
-                # disappear, but need to find root cause.
-                soup = BeautifulSoup("<p> %s</p>" % hltext, "lxml")
-                h['text'] = html.elements_from_soup(soup.html.body.p)
+            h = self._decode_query_result_hit(hit)
+            if "inner_hits" in hit:
+                for inner_hit_type in hit["inner_hits"].keys():
+                    for inner_hit in hit["inner_hits"][inner_hit_type]["hits"]["hits"]:
+                        if not "innerhits" in h:
+                            h["innerhits"] = []
+                        h["innerhits"].append(self._decode_query_result_hit(inner_hit))
             res.append(h)
         pager = {'pagenum': pagenum,
                  'pagecount': int(math.ceil(jsonresp['hits']['total'] / float(pagelen))),
@@ -939,6 +931,22 @@ class ElasticSearchIndex(RemoteIndex):
         if 'aggregations' in jsonresp:
             setattr(res, 'aggregations', jsonresp['aggregations'])
         return res, pager
+
+
+    def _decode_query_result_hit(self, hit):
+        h = hit['_source']
+        h['repo'] = hit['_type']
+        if 'highlight' in hit:
+            # wrap highlighted field in P, convert to
+            # elements. 
+            hltext = re.sub("\s+", " ", " ... ".join([x.strip() for x in hit['highlight']['_all']]))
+            # FIXME: BeautifulSoup/lxml returns empty soup if
+            # first char is '§' or some other non-ascii char (like
+            # a smart quote). Padding with a space makes problem
+            # disappear, but need to find root cause.
+            soup = BeautifulSoup("<p> %s</p>" % hltext, "lxml")
+            h['text'] = html.elements_from_soup(soup.html.body.p)
+        return h
 
     def _count_payload(self):
         return "_count", None
