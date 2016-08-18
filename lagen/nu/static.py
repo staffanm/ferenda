@@ -8,7 +8,7 @@ from rdflib.namespace import DCTERMS, RDFS
 class Static(BaseStatic, SwedishLegalSource):
 
     def canonical_uri(self, basefile):
-        return "https://lagen.nu/%s" % basefile
+        return "https://lagen.nu/om/%s" % basefile
     
     def facets(self):
         # The facets of a repo control indexing, particularly the
