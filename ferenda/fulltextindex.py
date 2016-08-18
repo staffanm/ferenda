@@ -714,7 +714,7 @@ class ElasticSearchIndex(RemoteIndex):
             raise errors.IndexingError(str(e) + ": '%s'" % res.text)
         # if the errors field is set to True, errors might have
         # occurred even though the status code was 200
-        if res.json()["errors"]:
+        if res.json().get("errors"):
             raise errors.IndexingError("%s errors when committing, first was %r" %
                                        (len(res.json()["items"]),
                                         res.json()["items"][0]))
