@@ -10,6 +10,8 @@ before_install:
   - sudo apt-get update
   - sudo apt-get install -qq python-simpleparse antiword poppler-utils tesseract-ocr tesseract-ocr-swe tesseract-ocr-osd tidy
   - pip install -U setuptools
+  - xsltproc --version
+  - python -c 'from lxml import etree; print(etree.LIBXML_VERSION, etree.LIBXML_COMPILED_VERSION, etree.LIBXSLT_VERSION, etree.LIBXSLT_COMPILED_VERSION)'
 services:
   - elasticsearch
 install:

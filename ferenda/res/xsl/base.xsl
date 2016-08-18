@@ -122,8 +122,7 @@
 	  </div>
 	  <article class="col-sm-9">
 	    <xsl:call-template name="pagetitle"/>
-	    <xsl:choose>
-	      <xsl:when test="not($content-under-pagetitle)">
+	    <xsl:choose><xsl:when test="not($content-under-pagetitle)">
 		<xsl:apply-templates/>
 	      </xsl:when>
 	    </xsl:choose>
