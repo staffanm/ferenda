@@ -532,7 +532,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
                 with open(outfile, "wb") as fp:
                     fp.write(resp.content)
 
-                if not frames:
+                if not frames and os.environ.get("TRAVIS") != "true":
                     if suffix == "html":
                         print(
                             "requested %s, saved as %s. Edit if needed, then press enter" %
