@@ -1,0 +1,12 @@
+    .platsmarkor {
+        position: absolute;
+        left: -45px;
+        font-size: 0.6em;
+	margin-top: 2px;
+        color: #999;
+        font-family: Arial;
+    }
+
+    .andring {
+	margin-bottom: 6pt;
+    }
