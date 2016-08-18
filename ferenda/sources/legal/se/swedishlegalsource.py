@@ -919,6 +919,7 @@ class SwedishLegalSource(DocumentRepository):
 
     _relate_fulltext_value_cache = {}
     _default_creator = "Regeringen"
+
     def _relate_fulltext_value_rootlabel(self, desc):
         return "%s: %s" % (desc.getvalue(DCTERMS.identifier),
                            desc.getvalue(DCTERMS.title))
@@ -938,12 +939,17 @@ class SwedishLegalSource(DocumentRepository):
                     c = self.lookup_resource(self._default_creator)
                 if desc.getvalues(DCTERMS.issued):
                     i = desc.getvalue(DCTERMS.issued)
-                else:
-                    # we have no knowledge of when this was issued. It
-                    # should be in the doc itself, but for now we fake
-                    # one -- NB it'll be a year off 50% of the time.
+                elif desc.getvalues(RPUBL.arsutgava):
+                    # we have no knowledge of the exact date this was
+                    # issued. It should be in the doc itself, but for
+                    # now we fake one -- NB it'll be a year off 50% of
+                    # the time.
                     y = int(desc.getvalue(RPUBL.arsutgava).split("/")[0])
                     i = date(y, 12, 31)
+                else:
+                    # we have no indication whatsoever of the issued
+                    # date. Maybe it's today?
+                    i = date.today()
                 self._relate_fulltext_value_cache[rooturi] = {
                     "creator": c,
                     "issued": i,

@@ -2301,7 +2301,8 @@ class DV(SwedishLegalSource):
                     court = desc.getvalue(DCTERMS.creator)
                 else:
                     court = resource.get("about").split("#")[1]
-                v = "%s (%s)" % (v, court)
+                # v = "%s (%s)" % (v, court)
+                v = court
             return facet.dimension_label, v
         else:
             return super(DV, self)._relate_fulltext_value(facet, resource, desc)

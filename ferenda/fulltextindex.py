@@ -822,9 +822,7 @@ class ElasticSearchIndex(RemoteIndex):
             # https://github.com/elastic/elasticsearch/issues/14999
             match['_all'] = q
             highlight = {'fields': {'_all': {}},
-                         'pre_tags': ["<strong class='match'>"],
-                         'post_tags': ["</strong>"],
-                         'fragment_size': '40'
+                         'fragment_size': 60
             }
             inner_hits["highlight"] = highlight
 
@@ -860,7 +858,7 @@ class ElasticSearchIndex(RemoteIndex):
             else:
                 query["filtered"]["filter"] = filters[0]
             if match:
-                query["filtered"]["query"] = {"match": match}
+                query["filtered"]["query"] = match
         else:
             query = match
 # FIXME:
@@ -876,9 +874,9 @@ class ElasticSearchIndex(RemoteIndex):
         # extra workaround, solution adapted from comments in
         # https://github.com/elastic/elasticsearch/issues/14999 --
         # revisit once Elasticsearch 2.4 is released.
-        # payload['highlight'] = highlight
-        # if q:
-        #    payload['highlight']['highlight_query'] = {'match': {'_all': q}}
+        payload['highlight'] = deepcopy(highlight)
+        if q:
+           payload['highlight']['highlight_query'] = {'match': {'_all': q}}
         return relurl, json.dumps(payload, indent=4, default=util.json_default_date)
 
     def _aggregation_payload(self):
@@ -932,7 +930,6 @@ class ElasticSearchIndex(RemoteIndex):
             setattr(res, 'aggregations', jsonresp['aggregations'])
         return res, pager
 
-
     def _decode_query_result_hit(self, hit):
         h = hit['_source']
         h['repo'] = hit['_type']
@@ -940,6 +937,7 @@ class ElasticSearchIndex(RemoteIndex):
             # wrap highlighted field in P, convert to
             # elements. 
             hltext = re.sub("\s+", " ", " ... ".join([x.strip() for x in hit['highlight']['_all']]))
+            hltext = hltext.replace("<em>", "<strong class='match'>").replace("</em>", "</strong>")
             # FIXME: BeautifulSoup/lxml returns empty soup if
             # first char is '§' or some other non-ascii char (like
             # a smart quote). Padding with a space makes problem
