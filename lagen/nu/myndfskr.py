@@ -163,7 +163,7 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
                 Facet(RDF.type, use_for_toc=False),
                 Facet(DCTERMS.title, use_for_toc=False),
                 Facet(DCTERMS.publisher, use_for_toc=False),
-                Facet(DCTERMS.identifier)]
+                Facet(DCTERMS.identifier)] + self.standardfacets
 
     def toc_pagesets(self, data, facets):
         # FIXME: Main structure of this (create a two-level hierarchy

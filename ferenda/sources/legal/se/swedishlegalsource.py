@@ -919,6 +919,7 @@ class SwedishLegalSource(DocumentRepository):
 
     _relate_fulltext_value_cache = {}
     _default_creator = "Regeringen"
+
     def _relate_fulltext_value_rootlabel(self, desc):
         return "%s: %s" % (desc.getvalue(DCTERMS.identifier),
                            desc.getvalue(DCTERMS.title))
@@ -938,12 +939,17 @@ class SwedishLegalSource(DocumentRepository):
                     c = self.lookup_resource(self._default_creator)
                 if desc.getvalues(DCTERMS.issued):
                     i = desc.getvalue(DCTERMS.issued)
-                else:
-                    # we have no knowledge of when this was issued. It
-                    # should be in the doc itself, but for now we fake
-                    # one -- NB it'll be a year off 50% of the time.
+                elif desc.getvalues(RPUBL.arsutgava):
+                    # we have no knowledge of the exact date this was
+                    # issued. It should be in the doc itself, but for
+                    # now we fake one -- NB it'll be a year off 50% of
+                    # the time.
                     y = int(desc.getvalue(RPUBL.arsutgava).split("/")[0])
                     i = date(y, 12, 31)
+                else:
+                    # we have no indication whatsoever of the issued
+                    # date. Maybe it's today?
+                    i = date.today()
                 self._relate_fulltext_value_cache[rooturi] = {
                     "creator": c,
                     "issued": i,
@@ -953,16 +959,33 @@ class SwedishLegalSource(DocumentRepository):
             if facet.dimension_label == "label" and "#" in resourceuri:
                 if desc.getvalues(DCTERMS.title):
                     if desc.getvalues(BIBO.chapter):
-                        v = "%s, avsnitt %s '%s'" % (v,
-                                                     desc.getvalue(BIBO.chapter),
-                                                     desc.getvalue(DCTERMS.title))
+                        v = "%s %s" % (desc.getvalue(BIBO.chapter),
+                                       desc.getvalue(DCTERMS.title))
                     else:
-                        v = "%s, '%s'" % (v, desc.getvalue(DCTERMS.title))
+                        v = "%s" % (desc.getvalue(DCTERMS.title))
                 else:
-                    # we don't have any title for whatever
-                    # reason. Uniquify this rdfs:label by using the
-                    # URI fragment
+                    # we don't have any title/label for whatever
+                    # reason. Uniquify this by using the URI fragment
                     v = "%s, %s" % (v, resourceuri.split("#", 1)[1])
+                
+                # the below logic is useful for when labels must be
+                # "standalone". with nested / inner hits, labels are
+                # presented within the context of the parent document,
+                # ie. it's preferable to use "15.2 Konsekvenser"
+                # rather than "SOU 1997:39: Integritet ´ Offentlighet
+                # ´ Informationsteknik, avsnitt 15.2 'Konsekvenser'"
+#                if desc.getvalues(DCTERMS.title):
+#                    if desc.getvalues(BIBO.chapter):
+#                        v = "%s, avsnitt %s '%s'" % (v,
+#                                                     desc.getvalue(BIBO.chapter),
+#                                                     desc.getvalue(DCTERMS.title))
+#                    else:
+#                        v = "%s, '%s'" % (v, desc.getvalue(DCTERMS.title))
+#                else:
+#                    # we don't have any title for whatever
+#                    # reason. Uniquify this rdfs:label by using the
+#                    # URI fragment
+#                    v = "%s, %s" % (v, resourceuri.split("#", 1)[1])
             return facet.dimension_label, v
         else:
             return super(SwedishLegalSource, self)._relate_fulltext_value(facet, resource, desc)

@@ -7,6 +7,7 @@ standard_library.install_aliases()
 
 from datetime import date, datetime, MAXYEAR, MINYEAR
 from urllib.parse import quote
+from copy import deepcopy
 import itertools
 import json
 import math
@@ -31,10 +32,13 @@ class FulltextIndex(object):
 
     """
 
+
+    indextypes = {}  # this is repopulated at the very end of this
+                     # module, when the classes we need to specify are
+                     # defined.
     
-    
-    @staticmethod
-    def connect(indextype, location, repos):
+    @classmethod
+    def connect(cls, indextype, location, repos):
         """Open a fulltext index (creating it if it doesn't already exists).
 
         :param location: Type of fulltext index ("WHOOSH" or "ELASTICSEARCH")
@@ -44,8 +48,7 @@ class FulltextIndex(object):
 
         """
         # create correct subclass and return it
-        return {'WHOOSH': WhooshIndex,
-                'ELASTICSEARCH': ElasticSearchIndex}[indextype](location, repos)
+        return cls.indextypes[indextype](location, repos)
 
     def __init__(self, location, repos):
         self.location = location
@@ -324,7 +327,7 @@ class Between(SearchModifier):
 
 class Results(list):
     # this is just so that we can add arbitrary attributes to a
-    # list-like object
+    # list-like object.
     pass
 
 import whoosh.index
@@ -709,6 +712,12 @@ class ElasticSearchIndex(RemoteIndex):
             res.raise_for_status()
         except requests.exceptions.HTTPError as e:
             raise errors.IndexingError(str(e) + ": '%s'" % res.text)
+        # if the errors field is set to True, errors might have
+        # occurred even though the status code was 200
+        if res.json().get("errors"):
+            raise errors.IndexingError("%s errors when committing, first was %r" %
+                                       (len(res.json()["items"]),
+                                        res.json()["items"][0]))
         # make sure everything is really comitted (available for
         # search) before continuing? TODO: Check if this slows
         # multi-basefile (and multi-threaded) indexing down noticably,
@@ -731,6 +740,8 @@ class ElasticSearchIndex(RemoteIndex):
         # which uses unicode normalization form NFD). To be safe,
         # encodethe string to utf-8 beforehand (Which is what quote on
         # python 3 does anyways)
+        if "#" in uri:
+            repo = repo + "_child"
         relurl = "%s/%s" % (repo, quote(basefile.encode("utf-8"), safe=safe))  # eg type, id
         if "#" in uri:
             relurl += uri.split("#", 1)[1]
@@ -745,17 +756,29 @@ class ElasticSearchIndex(RemoteIndex):
             self._writer = tempfile.TemporaryFile()
         relurl, payload = self._update_payload(
             uri, repo, basefile, text, **kwargs)
+        metadata = {"index": {"_type": repo, "_id": basefile}}
         if "#" in uri:
-            basefile += uri.split("#", 1)[1]
-        metadata = '{ "index" : { "_type" : "%(repo)s", "_id" : "%(basefile)s" } }\n' % locals()
+            metadata["index"]['_type'] = repo + "_child"
+            metadata["index"]['_id'] += uri.split("#", 1)[1]
+            metadata["index"]['parent'] = basefile
+        metadata = json.dumps(metadata) + "\n"
         assert "\n" not in payload, "payload contains newlines, must be encoded for bulk API"
         self._writer.write(metadata.encode("utf-8"))
         self._writer.write(payload.encode("utf-8"))
         self._writer.write(b"\n")
 
     def _query_payload(self, q, pagenum=1, pagelen=10, **kwargs):
-        relurl = "_search?from=%s&size=%s" % ((pagenum - 1) * pagelen, pagelen)
+        if kwargs.get("repo"):
+            types = [kwargs.get("repo")]
+        else:
+            types = [repo.alias for repo in self._repos if repo.config.relate]
 
+        # use a multitype search to specify the types we want so that
+        # we don't go searching in the foo_child types, only parent
+        # types.
+        relurl = "%s/_search?from=%s&size=%s" % (",".join(types),
+                                                 (pagenum - 1) * pagelen,
+                                                 pagelen)
         # 1: Filter on all specified fields
         filterterms = {}
         filterregexps = {}
@@ -791,9 +814,34 @@ class ElasticSearchIndex(RemoteIndex):
 
         # 3: If freetext param given, search on that
         match = {}
+        inner_hits = {"_source": {"exclude": "text"}}
+        highlight = None
         if q:
-            # NOTE:
+            # NOTE: we need to specify highlight parameters for each
+            # subquery when using has_child, see
+            # https://github.com/elastic/elasticsearch/issues/14999
             match['_all'] = q
+            highlight = {'fields': {'_all': {}},
+                         'fragment_size': 60
+            }
+            inner_hits["highlight"] = highlight
+
+        # now, explode the match query into a big OR query for
+        # matching each possible _child type (until someone solves
+        # http://stackoverflow.com/questions/38946547 for me)
+        submatches = [{"match": deepcopy(match)}]
+        if kwargs.get("repo"):
+            reponames = [kwargs.get("repo")]
+        else:
+            reponames = [repo.alias for repo in self._repos if repo.config.relate]
+        for reponame in reponames:
+            submatches.append(
+                {"has_child": {"type": reponame + "_child",
+                               "inner_hits": inner_hits,
+                               "query": {"match": deepcopy(match)}
+                }})
+
+        match = {"bool": {"should": submatches}}
 
         if filterterms or filterregexps or filterranges:
             query = {"filtered":
@@ -810,28 +858,32 @@ class ElasticSearchIndex(RemoteIndex):
             else:
                 query["filtered"]["filter"] = filters[0]
             if match:
-                query["filtered"]["query"] = {"match": match}
+                query["filtered"]["query"] = match
         else:
-            if match:
-                query = {"match": match}
-            else:
-                query = {"match_all": match}
+            query = match
+# FIXME:
+#            if match:
+#                query = {"match": match}
+#            else:
+#                query = {"match_all": match}
 
         payload = {'query': query,
                    'aggs': self._aggregation_payload()}
-        if q:
-            payload['highlight'] = {'fields': {'_all': {}},
-                                    'pre_tags': ["<strong class='match'>"],
-                                    'post_tags': ["</strong>"],
-                                    'fragment_size': '40'}
         # Don't include the full text of every document in every hit
         payload['_source'] = {'exclude': ['text']}
-        
+        # extra workaround, solution adapted from comments in
+        # https://github.com/elastic/elasticsearch/issues/14999 --
+        # revisit once Elasticsearch 2.4 is released.
+        payload['highlight'] = deepcopy(highlight)
+        if q:
+           payload['highlight']['highlight_query'] = {'match': {'_all': q}}
         return relurl, json.dumps(payload, indent=4, default=util.json_default_date)
 
     def _aggregation_payload(self):
         aggs = {'type': {'terms': {'field': '_type'}}}
         for repo in self._repos:
+            if not repo.config.relate:
+                continue
             for facet in repo.facets():
                 if (facet.dimension_label in ('creator', 'issued') and
                     facet.dimension_label not in aggs and
@@ -855,21 +907,15 @@ class ElasticSearchIndex(RemoteIndex):
         # (at this stage -- we could look at self.schema() though)
         jsonresp = json.loads(response.text,
                               object_hook=util.make_json_date_object_hook())
-        
         res = Results()
         for hit in jsonresp['hits']['hits']:
-            h = hit['_source']
-            h['repo'] = hit['_type']
-            if 'highlight' in hit:
-                # wrap highlighted field in P, convert to
-                # elements. 
-                hltext = re.sub("\s+", " ", " ... ".join([x.strip() for x in hit['highlight']['_all']]))
-                # FIXME: BeautifulSoup/lxml returns empty soup if
-                # first char is '§' or some other non-ascii char (like
-                # a smart quote). Padding with a space makes problem
-                # disappear, but need to find root cause.
-                soup = BeautifulSoup("<p> %s</p>" % hltext, "lxml")
-                h['text'] = html.elements_from_soup(soup.html.body.p)
+            h = self._decode_query_result_hit(hit)
+            if "inner_hits" in hit:
+                for inner_hit_type in hit["inner_hits"].keys():
+                    for inner_hit in hit["inner_hits"][inner_hit_type]["hits"]["hits"]:
+                        if not "innerhits" in h:
+                            h["innerhits"] = []
+                        h["innerhits"].append(self._decode_query_result_hit(inner_hit))
             res.append(h)
         pager = {'pagenum': pagenum,
                  'pagecount': int(math.ceil(jsonresp['hits']['total'] / float(pagelen))),
@@ -883,6 +929,22 @@ class ElasticSearchIndex(RemoteIndex):
         if 'aggregations' in jsonresp:
             setattr(res, 'aggregations', jsonresp['aggregations'])
         return res, pager
+
+    def _decode_query_result_hit(self, hit):
+        h = hit['_source']
+        h['repo'] = hit['_type']
+        if 'highlight' in hit:
+            # wrap highlighted field in P, convert to
+            # elements. 
+            hltext = re.sub("\s+", " ", " ... ".join([x.strip() for x in hit['highlight']['_all']]))
+            hltext = hltext.replace("<em>", "<strong class='match'>").replace("</em>", "</strong>")
+            # FIXME: BeautifulSoup/lxml returns empty soup if
+            # first char is '§' or some other non-ascii char (like
+            # a smart quote). Padding with a space makes problem
+            # disappear, but need to find root cause.
+            soup = BeautifulSoup("<p> %s</p>" % hltext, "lxml")
+            h['text'] = html.elements_from_soup(soup.html.body.p)
+        return h
 
     def _count_payload(self):
         return "_count", None
@@ -962,6 +1024,7 @@ class ElasticSearchIndex(RemoteIndex):
             g = repo.make_graph()  # for qname lookup
             es_fields = {}
             schema = self.get_default_schema()
+            childschema = self.get_default_schema()
             for facet in repo.facets():
                 if facet.dimension_label:
                     fld = facet.dimension_label
@@ -969,17 +1032,41 @@ class ElasticSearchIndex(RemoteIndex):
                     fld = g.qname(facet.rdftype).replace(":", "_")
                 idxtype = facet.indexingtype
                 schema[fld] = idxtype
+                if facet.toplevel_only:
+                    childschema[fld] = idxtype
 
             for key, fieldtype in schema.items():
                 if key == "repo":
                     continue  # not really needed for ES, as type == repo.alias
                 es_fields[key] = self.to_native_field(fieldtype)
+
+            es_child_fields = {}
+            for key, fieldtype in childschema.items():
+                if key == "repo": continue
+                es_child_fields[key] = self.to_native_field(fieldtype)
+                
+
             # _source enabled so we can get the text back
             payload["mappings"][repo.alias] = {"_source": {"enabled": True},
                                                "_all": {"analyzer": "my_analyzer",
                                                         "store": True},
                                                "properties": es_fields}
+
+
+            childmapping = {"_source": {"enabled": True},
+                            "_all": {"analyzer": "my_analyzer",
+                                     "store": True},
+                            "_parent": {"type": repo.alias},
+                            "properties": es_child_fields
+                            }
+            
+            payload["mappings"][repo.alias+"_child"] = childmapping
         return "", json.dumps(payload, indent=4)
 
     def _destroy_payload(self):
         return "", None
+
+
+
+FulltextIndex.indextypes = {'WHOOSH': WhooshIndex,
+                            'ELASTICSEARCH': ElasticSearchIndex}

@@ -1757,7 +1757,7 @@ with the *config* object as single parameter.
                         fp.write(g.serialize(format="nt"))
                     values['triplecount'] = len(g)
             else:
-                if self.config.force:
+                if self.config.force and reltriples:
                     self.relate_triples(basefile)
                     entry.indexed_ts = datetime.now()
                 elif reltriples:

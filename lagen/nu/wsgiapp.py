@@ -48,9 +48,15 @@ lagen.nu."""
                 label = r['label'][0]
             else:
                 label = r['label']
-            doc.body.append(html.Div(
-                [html.B([elements.Link(label, uri=r['uri'])], **{'class': 'lead'}),
-                 html.P([r.get('text', '')])], **{'class': 'hit'}))
+            rendered_hit = html.Div(
+                [html.B([elements.Link(label, uri=r['uri'])], **{'class': 'lead'})],
+                **{'class': 'hit'})
+            if r.get('text'):
+                rendered_hit.append(html.P([r.get('text', '')]))
+            if 'innerhits' in r:
+                for innerhit in r['innerhits']:
+                    rendered_hit.append(self._search_render_innerhit(innerhit))
+            doc.body.append(rendered_hit)
         pagerelem = self._search_render_pager(pager, queryparams,
                                               environ['PATH_INFO'])
         doc.body.append(html.Div([
@@ -59,6 +65,12 @@ lagen.nu."""
                                  **{'class':'pager'}))
         data = self._search_transform_doc(doc)
         return self._return_response(data, start_response)
+
+    def _search_render_innerhit(self, innerhit):
+        r = innerhit
+        r['text'].insert(0, ": ")
+        r['text'].insert(0, elements.Link(r['label'], uri=r['uri']))
+        return html.P(r['text'], **{'class': 'innerhit'})
 
     repolabels = {'sfs': 'Författningar',
                   'prop': 'Propositioner',
@@ -74,6 +86,8 @@ lagen.nu."""
     facetlabels = {'type': 'Dokumenttyp',
                    'creator': 'Källa',
                    'issued': 'År'}
+
+    
     def _search_render_facets(self, facets, queryparams, environ):
         facetgroups = []
         commondata = self.repos[0].commondata
