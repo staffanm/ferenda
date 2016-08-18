@@ -16,7 +16,6 @@ install:
   - if [[ ${TRAVIS_PYTHON_VERSION%%.*} == '2' ]]; then pip install -r requirements.py2.txt; fi
   - if [[ ${TRAVIS_PYTHON_VERSION%%.*} == '3' ]]; then LANG=en_US.UTF-8 pip install -r requirements.py3.txt; fi
   - pip install coveralls
-  - xsltproc --version
   - python -c 'from lxml import etree; print(etree.LIBXML_VERSION, etree.LIBXML_COMPILED_VERSION, etree.LIBXSLT_VERSION, etree.LIBXSLT_COMPILED_VERSION)'
 script:
    - if [[ $TRAVIS_PYTHON_VERSION == '2.6' ]]; then PYTHONWARNINGS=i coverage run --include "ferenda/*py" --omit "ferenda/thirdparty/*" -m unittest2 discover -v test; fi
