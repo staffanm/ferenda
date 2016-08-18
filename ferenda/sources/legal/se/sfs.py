@@ -1656,7 +1656,7 @@ class SFS(Trips):
         # not even correct canonical uris, rather the canonical base
         # URI, but with old lagen-nu-style fragments). This is a
         # horrible workaround when using localized uris
-        canonical_uri = uri.replace("https://lagen.nu/sfs/",
+        canonical_uri = uri.replace("https://lagen.nu/",
                                     "http://rinfo.lagrummet.se/publ/sfs/")
         parts = legaluri.parse(canonical_uri)
         res = ""
