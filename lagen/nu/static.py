@@ -2,10 +2,15 @@ from ferenda import Facet
 from ferenda import fulltextindex
 from ferenda.sources.general import Static as BaseStatic
 from ferenda.sources.legal.se import SwedishLegalSource
-from rdflib.namespace import DCTERMS, RDFS
+from rdflib import Namespace
+from rdflib.namespace import DCTERMS, RDFS, RDF
+PROV = Namespace("http://www.w3.org/ns/prov#")
+
 
 # interit from SwedishLegalSource to get custom relate() impl (that indexes label, creator and issued)
 class Static(BaseStatic, SwedishLegalSource):
+
+    required_predicates = [RDF.type, DCTERMS.title, PROV.wasGeneratedBy]
 
     def canonical_uri(self, basefile):
         return "https://lagen.nu/om/%s" % basefile

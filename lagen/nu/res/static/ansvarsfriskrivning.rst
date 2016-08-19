@@ -1,6 +1,9 @@
 Ansvarsfriskrivning
 ===================
 
+:footer-order: 2
+
+
 Lagen.nu är ett ideellt projekt. Vi strävar efter att
 informationen på lagen.nu ska vara korrekt i alla avseenden. Vi
 kan dock inte garantera detta, och kan därför heller inte ta något

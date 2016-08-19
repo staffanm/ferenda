@@ -3,7 +3,7 @@ Cookies
 
 Lagen.nu använder inte egna cookies, men använder sig av
 tredjepartstjänster från `Google analytics
-<http://www.google.com/analytics/`_ och `Github
+<http://www.google.com/analytics/>`_ och `Github
 <http://www.google.com/analytics/>`_. Dessa tredjepartstjänster kan
 sätta cookies för att kunna samla in användarstatistik.
 

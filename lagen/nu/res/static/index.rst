@@ -1,5 +1,7 @@
-Välkommen till lagen.nu
-=======================
+Om lagen.nu
+===========
+
+:footer-order: 1
 
 `Information in English <english.html>`_
     

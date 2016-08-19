@@ -1,6 +1,8 @@
 Kontaktinformation
 ==================
 
+:footer-order: 3
+
 Lagen.nu drivs av Staffan Malmgren, som kan nås på staffan@tomtebo.org
 och som även är personuppgiftsansvarig för den
 personuppgiftsbehandling (hantering av rättsfallsinformation) som sker

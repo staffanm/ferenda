@@ -5,15 +5,19 @@ from builtins import *
 
 import os
 
-from rdflib import URIRef, Graph, Literal
-from docutils.core import publish_doctree
+from bs4 import BeautifulSoup
+from docutils.core import publish_string
+from rdflib import URIRef, Graph, Literal, Namespace
+from rdflib.namespace import DCTERMS, RDF
+OLO = Namespace("http://purl.org/ontology/olo/core#")
+PROV = Namespace("http://www.w3.org/ns/prov#")
 
 from ferenda import DocumentRepository
 from ferenda import DocumentStore
 from ferenda import util
 from ferenda.decorators import managedparsing
 from ferenda import elements
-
+from ferenda.elements.html import elements_from_soup
 
 class StaticStore(DocumentStore):
 
@@ -97,38 +101,26 @@ class Static(DocumentRepository):
     @managedparsing
     def parse(self, doc):
         source = util.readfile(self.store.downloaded_path(doc.basefile))
-        doctree = publish_doctree(source=source)
-        stack = []
-        root = self._transform(doctree, stack)
-        if isinstance(root[0], elements.Title):
-            doc.meta.add(
-                (URIRef(doc.uri), self.ns['dcterms'].title, Literal(str(root[0]), doc.lang)))
-            root.pop(0)
-        doc.body = root
+        html = publish_string(source, writer_name="html")
+        soup = BeautifulSoup(html, "lxml")
+        docinfo = soup.find("table", "docinfo")
+        docuri = URIRef(doc.uri)
+        if docinfo:
+            # this is where our custom metadata goes
+            for row in docinfo.find_all("tr", "field"):
+                key, val = row.th.text.strip(), row.td.text.strip()
+            if key == 'footer-order:':
+                doc.meta.add((docuri, OLO['index'], Literal(int(val))))
+            else:
+                self.log.warning("%s: Unknown metadata directive %s (%s)" %
+                                 (doc.basefile, key, val))
+        doc.body = elements_from_soup(soup.body)
+        doc.meta.add((docuri, DCTERMS.title,
+                      Literal(soup.title.text, doc.lang)))
+        doc.meta.add((docuri, PROV.wasGeneratedBy, Literal(self.qualified_class_name())))
+        doc.meta.add((docuri, RDF.type, self.rdf_type))
+        self.parse_entry_update(doc)
         return True
-
-    # converts a tree of docutils.nodes into ferenda.elements
-    def _transform(self, node, stack):
-        cls = {'document': elements.Body,
-               'title': elements.Title,
-               'paragraph': elements.Paragraph,
-               '#text': str
-               }.get(node.tagname, elements.CompoundElement)
-        if hasattr(node, 'attributes'):
-            attrs = dict((k, v) for (k, v) in node.attributes.items() if v)
-            el = cls(**attrs)
-        else:
-            el = cls(node)  # !
-
-        if len(stack) > 0:
-            top = stack[-1]
-            top.append(el)
-
-        if hasattr(node, 'attributes'):
-            stack.append(el)
-            for childnode in node:
-                self._transform(childnode, stack)
-            return stack.pop()
 
 
     def toc(self, otherrepos=[]):
@@ -139,7 +131,7 @@ class Static(DocumentRepository):
 
     def frontpage_content(self, primary=False):
         pass
-
+    
     def tabs(self):
         if os.path.exists(self.store.parsed_path("about")):
             return [("About", self.canonical_uri("about"))]
@@ -147,14 +139,16 @@ class Static(DocumentRepository):
             return[]
 
     def footer(self):
-        # FIXME: ordering?
-        res = []
+        res = {}
         for basefile in self.store.list_basefiles_for("generate"):
             uri = self.canonical_uri(basefile)
             g = Graph()
             g.parse(self.store.distilled_path(basefile))
-            title = g.value(URIRef(uri), self.ns['dcterms'].title).toPython()
-            if not title:
-                title = basefile
-            res.append((title, uri))
-        return res
+            # only return those files that have olo:index metadata, in
+            # that order
+            if g.value(URIRef(uri), OLO['index']):
+                title = g.value(URIRef(uri), self.ns['dcterms'].title).toPython()
+                if not title:
+                    title = basefile
+                res[int(g.value(URIRef(uri), OLO['index']))] = (title, uri)
+        return [res[x] for x in sorted(res)]

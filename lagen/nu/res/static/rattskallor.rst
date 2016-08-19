@@ -117,12 +117,11 @@ varandra. Särskilt problematiskt kan det bli med lagtext, där
 olika paragrafer i olika lagar tycks säga emot varandra. För att
 lösa sådana konflikter finns tre predecensregler:
 
-# Författningar med högre rang går före de med lägre rang (*lex
-  superior*): Grundlag gäller framför vanlig lag, som gäller framför
+# Författningar med högre rang går före de med lägre rang (*lex superior*):
+  Grundlag gäller framför vanlig lag, som gäller framför
   förordning, som gäller framför myndighetsföreskrift. Såvida inte
   författningen med högre rang uttryckligen säger att andra
-  författningar har företräde -- ett exempel är `Personuppgiftslagens
-  2 § <http://rinfo.lagrummet.se/publ/sfs/1998:204#P2>`_.
+  författningar har företräde -- ett exempel är `Personuppgiftslagens 2 § <http://rinfo.lagrummet.se/publ/sfs/1998:204#P2>`_.
 
 # Specifika författningar går före generella (*lex specialis*)
 
@@ -146,15 +145,15 @@ Hur går man vidare?
 Lagen.nu kan inte hjälpa till med svar på konkreta juridiska
 frågor. Men några vägar vidare är:
 
-* Ställ frågor och diskutera -- exempelvis på `Lawline
+- Ställ frågor och diskutera -- exempelvis på `Lawline
   <http://www.lawline.se/>`_, `Jureka <http://jureka.net/>`_ eller
   `Juridikfokus <http://www.juridikfokus.se/juridikfokus/om/>`_.</li>
 	  
-* Läs någon introduktion till juridik -- exempelvis `Bli inte blåst
+- Läs någon introduktion till juridik -- exempelvis `Bli inte blåst
   <http://www.manpocket.se/Bocker/Bokpresentationssida/?Isbn=9789172320505>`_
   eller `Juridik till vardags
   <http://www.bokus.com/b/9789146211433.html>`_.</li>
 
-* Gå en introduktionskurs -- exempelvis `juridisk översiktskurs
+- Gå en introduktionskurs -- exempelvis `juridisk översiktskurs
   <http://www.juridicum.su.se/jurweb/utbildning/kurser.asp?MomentID=2193&amp;Frist=1&amp;Takt=50>`_
   vid Stockholms Universitet.</li> </ul>
