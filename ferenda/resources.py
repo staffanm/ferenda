@@ -255,10 +255,15 @@ class Resources(object):
             # already exists.
             # self.log.debug("writing %s out to %s" % (filename, destdir))
             outfile = destdir + os.sep + os.path.basename(filename)
-            util.ensure_dir(outfile)
-            with open(outfile, "wb") as fp2:
-                fp2.write(fp.read())
-            fp.close()
+            if (os.path.islink(outfile) and
+                os.path.relpath(os.path.join(os.path.dirname(outfile),
+                                             os.readlink(outfile))) == util.name_from_fp(fp)):
+                self.log.warning("%s is a symlink to source file %s, won't overwrite" % (outfile, util.name_from_fp(fp)))
+            else:
+                util.ensure_dir(outfile)
+                with open(outfile, "wb") as fp2:
+                    fp2.write(fp.read())
+                fp.close()
             return self._filepath_to_urlpath(outfile, 2)
 
     def make_api_files(self):
