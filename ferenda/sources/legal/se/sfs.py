@@ -168,7 +168,9 @@ class SFS(Trips):
         opts['revisit'] = list
         opts['next_sfsnr'] = str
         opts['shortdesclen'] = 200  # how many (markup) characters of Författningskommentar to include
-        opts['cssfiles'] = ['css/sfs.css']
+        if 'cssfiles' not in opts:
+            opts['cssfiles'] = []
+        opts['cssfiles'].append('css/sfs.css')
         return opts
 
     def download(self, basefile=None):

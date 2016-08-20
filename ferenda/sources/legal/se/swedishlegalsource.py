@@ -168,6 +168,7 @@ class SwedishLegalSource(DocumentRepository):
         opts = super(SwedishLegalSource, cls).get_default_options()
         opts['pdfimages'] = False
         opts['parserefs'] = True
+        opts['cssfiles'] = ['css/swedishlegalsource.css']
         return opts
 
     def download_is_different(self, existing, new):

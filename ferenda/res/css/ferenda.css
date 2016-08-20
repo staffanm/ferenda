@@ -3,8 +3,6 @@
    min-width: 480px (tablet + mobile landscape?): site navigation in tabs
    min-width: 768px (desktop): search in header always visible, subheading, site navigation in tabs, asides aside
    min-width: 1140px (fullscreen desctop): toc navigation in leftmost columns
-   print: I
-
 */
 
 /* this overrides main.css by @verekia */
@@ -88,7 +86,6 @@ div.panel-body div.row p {
 	margin-bottom: 0;
 }
 body.search .hit {
-	margin-right: 20%;
 	margin-bottom: 1ex;
 	padding-left: 4pt;
 	border: solid 1px #eee;
@@ -99,7 +96,7 @@ body.search .hit:nth-child(odd) {
 
 body.search .innerhit {
 	margin-left: 1em;
-	margin-bottom: 0;
+	margin-bottom: 1ex;
 }
 
 footer nav {
@@ -121,34 +118,57 @@ this grid system directly under body? */
 .row {
     margin: 0;
 }
+
+/* for small screens, there is no left navigation to give extra
+   padding to the main article text, so it aligns right at the
+   screen edge, which is ugly. Add some padding for breathing room
+   (but do it at the article lvl, not body, since the top nav must
+   fill the entire width). */
 .col-sm-3, .col-sm-5, .col-sm-7, .col-sm-9 {
-    padding: 0 1em 0 0;
+    padding-left: 0.5em;
+    padding-right: 0.5em;
 }
 
+nav#toc ul {
+    padding-left: 0.5em;
+}
+nav#toc li {
+    list-style: none;
+}
+
+nav#toc > ul > li > ul  {
+    padding: 0;
+}
+nav#toc > ul > li > ul > li {
+    display: inline;
+}
+
+body.search nav#toc > ul > li > ul > li {
+    display: list-item;
+}
+
+nav#toc > ul > li > p {
+    font-weight: bold;
+    margin-bottom: 0;
+    margin-top: 0.5em;
+}
+
+body.toc article ul {
+    padding: 0;
+    list-style: none;
+}
+body.toc article ul li {
+    padding: 0;
+    list-style: none;
+    text-indent: -8em;
+    margin-left: 8em;
+}
+
+
 @media only screen and (min-width: 480px) {
-    body.toc nav#toc li {
-	list-style: none;
-    }
-    body.toc nav#toc > ul > li > ul  {
-	padding: 0;
-    }
-    body.toc nav#toc > ul > li > ul > li {
-	display: inline;
-    }
-    body.toc nav#toc > ul > li > p {
-	font-weight: bold;
-	margin-bottom: 0;
-	margin-top: 0.5em;
-    }
-    body.toc article ul {
-	padding: 0;
-	list-style: none;
-    }
-    body.toc article ul li {
-	padding: 0;
-	list-style: none;
-	text-indent: -8em;
-	margin-left: 8em;
+    
+    .col-sm-3, .col-sm-5, .col-sm-7, .col-sm-9 {
+        padding: 0 1em 0 0;
     }
 
     body.frontpage td {
@@ -165,32 +185,6 @@ this grid system directly under body? */
 	width: 24%;  /* of the entire page width, FOR SOME REASON */
     }
 
-    /* FIXME: This should go into
-       ferenda/sources/legal/se/res/offtryck.css (or possibly
-       pdf.css?) */
-    body.forarbete section {
-	border-left: solid 1px black;
-	border-right: solid 1px black;
-    }
-    body.forarbete div.sida {
-	margin-left: -16px;
-	margin-right: -16px;
-	border-top: solid 1px black;
-	border-bottom: solid 1px black;
-	border-left: none;
-	border-right: none;
-	background-color: white;
-    }
-    body.forarbete div.sida p {
-	margin: 0;
-	padding-top: 12pt;
-	text-align: right;
-    }
-    div.forfattningskommentar {
-	border: 1px solid black;
-	padding: 2px;
-	background-color: #d9edf7; // corresponding to the "info" bootstrap color
-    }
 }
 
 

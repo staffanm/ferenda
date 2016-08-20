@@ -1,0 +1,36 @@
+/* FIXME: This should go into
+   ferenda/sources/legal/se/res/offtryck.css (or possibly
+   pdf.css?) */
+body.forarbete section {
+	border-left: solid 1px black;
+	border-right: solid 1px black;
+}
+body.forarbete div.sida {
+	margin-left: -16px;
+	margin-right: -16px;
+	border-top: solid 1px black;
+	border-bottom: solid 1px black;
+	border-left: none;
+	border-right: none;
+	background-color: white;
+}
+body.forarbete div.sida p {
+	margin: 0;
+	padding-top: 12pt;
+	text-align: right;
+}
+div.forfattningskommentar {
+	border: 1px solid black;
+	padding: 2px;
+	background-color: #d9edf7; // corresponding to the "info" bootstrap color
+}
+
+body.frontpage td {
+    display: block;
+}
+
+@media only screen and (min-width: 480px) {
+    body#frontpage td {
+        display:table-cell;
+    }
+}

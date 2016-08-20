@@ -135,7 +135,7 @@ lagen.nu."""
                             "%s" % (lbl), **{'href': href}),
                                                    html.Span([str(bucket['doc_count'])], **{'class': 'badge pull-right'})]))
                     lbl = self.facetlabels.get(facetresult, facetresult)
-                    facetgroups.append(html.LI([lbl,
+                    facetgroups.append(html.LI([html.P([lbl]),
                                                 html.UL(facetgroup)]))
         return html.Div(facetgroups, **{'class': 'facets'})
 
