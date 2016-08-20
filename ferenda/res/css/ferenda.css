@@ -87,6 +87,30 @@ div.panel-body div.row p {
 	text-indent: 1em;
 	margin-bottom: 0;
 }
+body.search .hit {
+	margin-right: 20%;
+	margin-bottom: 1ex;
+	padding-left: 4pt;
+	border: solid 1px #eee;
+}
+body.search .hit:nth-child(odd) {
+	background-color: #eee;
+}
+
+body.search .innerhit {
+	margin-left: 1em;
+	margin-bottom: 0;
+}
+
+footer nav {
+    text-align: center;
+}
+footer nav li {
+    display: inline;
+}
+footer li + li::before {
+    content: " | ";
+}
 
 /* grid-framework.less gives all .rows negative left and right margins
 (-15px) for some reason. This causes the row to have more pixels than
@@ -131,20 +155,6 @@ this grid system directly under body? */
 	vertical-align: top;
     }
 
-    body.search .hit {
-	margin-right: 20%;
-	margin-bottom: 1ex;
-	padding-left: 4pt;
- 	border: solid 1px #eee;
-    }
-    body.search .hit:nth-child(odd) {
-	background-color: #eee;
-    }
-
-    body.search .innerhit {
-	margin-left: 1em;
-	margin-bottom: 0;
-    }
     
     nav.affix-top {
 	width: 97%; /* of the .col-sm-3 element */

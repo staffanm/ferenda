@@ -11,7 +11,8 @@ PROV = Namespace("http://www.w3.org/ns/prov#")
 class Static(BaseStatic, SwedishLegalSource):
 
     required_predicates = [RDF.type, DCTERMS.title, PROV.wasGeneratedBy]
-
+    urispace_segment = "om"
+    
     def canonical_uri(self, basefile):
         return "https://lagen.nu/om/%s" % basefile
     

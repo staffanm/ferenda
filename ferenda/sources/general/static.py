@@ -73,9 +73,12 @@ class Static(DocumentRepository):
        started, you can just copy this directory and set ``staticdir``
        to point at your copy.
 
-    Every file present in ``staticdir`` results in a link in the site
+    If a rst file has a special `:footer-order:` directive directly
+    underneath the main title, it will result in a link in the site
     footer. The link text will be the title of the document, i.e. the
-    first header in the ``.rst`` file.
+    first header in the ``.rst`` file. The order of those links is
+    controlled by the value of `:footer-order:`, which should be an
+    integer.
 
     """
     alias = "static"
@@ -114,6 +117,11 @@ class Static(DocumentRepository):
             else:
                 self.log.warning("%s: Unknown metadata directive %s (%s)" %
                                  (doc.basefile, key, val))
+
+            # we don't need these in the final result
+            docinfo.decompose()
+        soup.find("h1", "title").decompose()
+
         doc.body = elements_from_soup(soup.body)
         doc.meta.add((docuri, DCTERMS.title,
                       Literal(soup.title.text, doc.lang)))

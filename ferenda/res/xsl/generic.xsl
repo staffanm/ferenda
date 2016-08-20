@@ -52,7 +52,9 @@ It's a generic template for any kind of content
   <xsl:template match="xhtml:body/xhtml:div">
     <div class="section-wrapper toplevel">
       <section id="{substring-after(@about,'#')}">
-	<h2><xsl:value-of select="@content"/></h2>
+	<xsl:if test="@content">
+	  <h2><xsl:value-of select="@content"/></h2>
+	</xsl:if>
 	<xsl:apply-templates select="*[not(xhtml:div[@about])]"/>
       </section>
       <xsl:call-template name="aside-annotations">
