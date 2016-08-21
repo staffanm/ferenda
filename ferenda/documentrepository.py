@@ -744,6 +744,7 @@ with the *config* object as single parameter.
         self.log.debug("Starting at %s" % self.start_url)
         updated = False
         resp = self.session.get(self.start_url)
+        resp.raise_for_status()
         if self.download_iterlinks:
             tree = lxml.html.document_fromstring(resp.text)
             tree.make_links_absolute(self.start_url, resolve_base_href=True)

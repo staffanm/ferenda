@@ -3,7 +3,6 @@ Ansvarsfriskrivning
 
 :footer-order: 2
 
-
 Lagen.nu är ett ideellt projekt. Vi strävar efter att
 informationen på lagen.nu ska vara korrekt i alla avseenden. Vi
 kan dock inte garantera detta, och kan därför heller inte ta något
@@ -88,3 +87,55 @@ får vetskap om sådant gör vi själva en anonymisering som kan vara
 längre gående än den Domstolsverket utför. Vi undviker dock att
 anonymisera information som har betydelse för det juridiska
 resonemanget.
+
+Förarbeten
+----------
+
+De förarbeten (propositioner, utredningar i form av SOU- och
+Ds-betänkanden, samt komittédirektiv) som finns på lagen.nu hämtas
+från flera olika källor. I första hand hämtas dokumenten från
+`Regeringskansliets sida för rättsdokument
+<http://www.regeringen.se/rattsdokument>`_, men äldre dokument hämtas
+även från `Riksdagen <https://www.riksdagen.se/sv/Dokument-Lagar/>`_
+(propositioner) och `KB <http://regina.kb.se/sou/>`. Det framgår
+bredvid varje enskild förarbete vilken källa som använts. Äldre
+material är i regel skannat från pappersoriginal och sedan
+OCR-behandlats för att få ut läsbar text. I denna process kan fel i
+texten uppstå. Om något verkar konstigt, kontrollera mot det
+inskannade källdokumentet.
+
+Föreskrifter
+------------
+
+Lagen.nu innehåller ett urval av myndigheters författningssamlingar. I
+dessa publiceras föreskrifter som myndigheter ger ut med stöd av
+bemyndiganden i lag eller förordning. På lagen.nu finns långt ifrån
+alla sådana författningssamlingar. På lagrummet finns `en fullständig
+lista
+<https://lagrummet.se/rattsinformation/myndigheters-foreskrifter>`_.
+
+Det varierar från myndighet till myndighet på vilket sätt de hanterar
+ändringar av sina föreskrifter. Vissa myndigheter ger endast ut
+grundföreskrifter, dvs så fort en föreskrift måste ändras så
+publiceras hela föreskriften med ändringar som en ny föreskrift med ny
+beteckning, och den gamla föreskriften upphävs. Andra ger ut
+ändringsföreskrifter som endast innehåller de bestämmelser som
+ändrats. Av dessa senare myndigheter ger vissa även ut konsoliderade
+versioner af sina föreskrifter.
+
+Eftersom processerna för föreskriftsgivande och -publicerande skiljer
+sig åt är det svårt för lagen.nu att garantera att de föreskrifter som
+visas på webbplatsen inte är inaktuella. Vid osäkerhet bör kontroll
+mot myndighetens egen publicering av sin författningssamling göras.
+
+
+Praxis
+------
+
+På lagen.nu finns vägledande avgöranden från ARN, JO och JK. Dessa är
+hämtade direkt från myndigheternas respektive webbplatser, och
+bedömningen av vilka avgöranden som kan anses vägledande är
+myndigheternas. För särskilt JO saknas äldre praxis, även fast denna
+fortfarande är att se som vägledande. Inga garantier för
+fullständighet kan därför ges.
+

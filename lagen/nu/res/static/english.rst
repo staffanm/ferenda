@@ -4,11 +4,14 @@ About lagen.nu
 Lagen.nu is a non-profit, volunteer-run web site which provides access
 to legal information concerning the swedish legal system. It contains
 all statutes published in the main collection of statutory law, SFS
-(Svensk Författningssamling), as well as an archive of case law from
-the swedish supreme court, the supreme administrative court, and a
-number of special courts. It also contains commentary on a number of
-the most important statutes, as well as important legal terms. These
-commentaries are written by law students and practicing lawyers.
+(Svensk Författningssamling), an archive of case law from the swedish
+supreme court, the supreme administrative court, and a number of
+special courts, a large archive of preparatory works, a number of
+precental administrative decisions from a number of government
+agencies and regulations from several other government agencies. It
+also contains commentary on a number of the most important statutes,
+as well as important legal terms. These commentaries are written by
+law students and practicing lawyers.
 
 Collaborative commentaries
 --------------------------
@@ -139,8 +142,8 @@ section.
   throughout it's history, with links to more information
   (including a PDF of the actual change statute).
 
-Cases
-^^^^^
+Case law
+^^^^^^^^
 
 There are over 10 000 cases available on the web site, ranging
 back to 1981. The cases are from the swedish supreme court, the
@@ -203,17 +206,11 @@ long as the text is not improperly changed and the author (in this
 case the National Courts Administration) is credited.
 
 Lagen.nu makes these texts available in a structured, XML-based format
-(specifically XHTML with embedded RDFa metadata). The files are all
-available by requesting the MIME type ``application/xhtml+xml``, ie.::
-
-  curl -H "Accept: application/xhtml+xml" https://lagen.nu/1998:204
-
-
-They can also be downloaded in bulk. The metadata used in the system
-(for example titles, dates, case numbers, and links between cases and
-statutes) is expressed using RDF, and the entire metadata set
-(comprising over a million RDF triples) can be downloaded in bulk as
-well.
+(specifically XHTML with embedded RDFa metadata). They can also be
+downloaded in bulk. The metadata used in the system (for example
+titles, dates, case numbers, and links between cases and statutes) is
+expressed using RDF, and the entire metadata set (comprising over a
+million RDF triples) can be downloaded in bulk as well.
 
 Commentaries
 ^^^^^^^^^^^^

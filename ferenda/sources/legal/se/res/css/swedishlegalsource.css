@@ -30,7 +30,7 @@ body.frontpage td {
 }
 
 @media only screen and (min-width: 480px) {
-    body#frontpage td {
+    body.frontpage td {
         display:table-cell;
     }
 }

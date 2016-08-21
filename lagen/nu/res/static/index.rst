@@ -5,14 +5,14 @@ Om lagen.nu
 
 `Information in English <english>`_
     
-Syftet med lagen.nu är att samla information om innehållet i
-gällande svensk rätt, och att presentera denna på ett så enkelt
-och begripligt sätt som möjligt. Tjänsten innehåller alla lagar
-och andra författningar som ingår i Svensk författningssamling
-(SFS), och många vägledande domstolsavgöranden, inklusive samtliga
-HD-avgöranden som publicerats i NJA sedan 1981. För de viktigaste
-lagarna finns dessutom kommentarer som förklarar och exemplifierar
-reglerna i paragraferna.
+Syftet med lagen.nu är att samla information om innehållet i gällande
+svensk rätt, och att presentera denna på ett så enkelt och begripligt
+sätt som möjligt. Tjänsten innehåller alla lagar och andra
+författningar som ingår i Svensk författningssamling (SFS), många
+vägledande domstolsavgöranden, förarbeten, vägledande myndighetspraxis
+samt ett urval av myndigheters författningssamlingar. För de
+viktigaste lagarna finns dessutom kommentarer som förklarar och
+exemplifierar reglerna i paragraferna.
 
 Man får väldigt gärna länka till enskilda lagtexter eller
 paragrafer på lagen.nu. `Läs mer om hur man
@@ -32,11 +32,11 @@ För den som är lite mer van vid att använda rättsinformationtjänster
 uppdaterad, vem som står bakom, m.m. `Läs mer om hur tjänsten
 uppfyller Stiftelsen för rättsinformations kvalitetskrav
 <krav>`_.
-    
-Lagen.nu är inte bara en statisk lagsamling. Du kan även använda
-tjänsten för att hålla koll på lagändringar som är på väg att införas,
-och även nya vägledande domar från domstolarna. `Läs mer om
-nyhetsflöden </nyheter>`_.
+
+.. Lagen.nu är inte bara en statisk lagsamling. Du kan även använda
+   tjänsten för att hålla koll på lagändringar som är på väg att införas,
+   och även nya vägledande domar från domstolarna. `Läs mer om
+   nyhetsflöden </nyheter>`_.
 
 Eftersom tjänsten sköts helt automatiskt, med begränsade resurser och
 utgår från ofullständigt material så bör man räkna med att det finns

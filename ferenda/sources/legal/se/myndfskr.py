@@ -682,9 +682,11 @@ class MyndFskrBase(SwedishLegalSource):
 
 class AFS(MyndFskrBase):
     alias = "afs"
-    start_url = "http://www.av.se/lagochratt/afs/nummerordning.aspx"
-    basefile_regex = None
-    document_url_regex = ".*(afs|AFS)(?P<basefile>\d+_\d+)\.pdf$"
+    start_url = "https://www.av.se/arbetsmiljoarbete-och-inspektioner/publikationer/foreskrifter/foreskrifter-listade-i-nummerordning/"
+
+    basefile_regex = "^(?P<basefile>AFS \d+:\d+)"
+
+    # document_url_regex = ".*(afs|AFS)(?P<basefile>\d+_\d+)\.pdf$"
 
     # This handles the case when pdftotext confuses the metadata in
     # the right margin on the frontpage, eg:
@@ -735,6 +737,23 @@ class AFS(MyndFskrBase):
 
     def sanitize_basefile(self, basefile):
         return super(AFS, self).sanitize_basefile(basefile.replace("_", ":"))
+
+    def download_rewrite_url(self, basefile, url):
+        # download the landing page and find the appropriate URL
+        self.log.debug("%s: Loading %s to find PDF link" % (basefile, url))
+        resp = self.session.get(url)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "lxml")
+        identifier = basefile.upper().replace("/", " ")
+        regex = re.compile("^%s" % identifier)
+        link = soup.find("a", text=regex, href=re.compile("\.pdf$"))
+        if not link:
+            # this means that this FS has not had any changes and so
+            # no base FS is linked using it's identifier. Instead it's
+            # linked at the "Ladda ner pdf" link
+            link = soup.find("a", text="Ladda ner pdf")
+        assert link, "Couldn't find PDF link for %s at %s" % (basefile, url)
+        return urljoin(url, link["href"])
 
 
 class BOLFS(MyndFskrBase):
