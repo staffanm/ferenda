@@ -231,6 +231,8 @@ rpubl:Skrivelse space:abbrSlug "skr" .
 
 <https://lagen.nu/dataset/skvfs> space:abbrSlug "skvfs" .
 
+<https://lagen.nu/dataset/snfs> space:abbrSlug "snfs" .
+
 <https://lagen.nu/dataset/sosfs> space:abbrSlug "sosfs" .
 
 <https://lagen.nu/dataset/sou> space:abbrSlug "sou" .

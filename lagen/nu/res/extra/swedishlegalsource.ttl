@@ -1755,3 +1755,7 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/statens_jordbruksverk> ;
     foaf:name "Statens jordbruksverk"@sv .
 
+<https://lagen.nu/org/2016/arbetarskyddsstyrelsen> a foaf:Organization ;
+    rdfs:comment "Ersatt av Arbetsmiljöverket."@sv ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/arbetarskyddsstyrelsen> ;
+    foaf:name "Arbetarskyddsstyrelsen"@sv .

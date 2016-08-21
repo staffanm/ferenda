@@ -234,8 +234,6 @@ class MyndFskrBase(SwedishLegalSource):
         if doc.basefile in self.blacklist:
             raise errors.DocumentRemovedError("%s is blacklisted" % doc.basefile,
                                        dummyfile=self.store.parsed_path(doc.basefile))
-
-
         reader = self.textreader_from_basefile(doc.basefile)
         orig_basefile = doc.basefile
         try:
@@ -313,7 +311,7 @@ class MyndFskrBase(SwedishLegalSource):
     def fwdtests(self):
         return {'dcterms:issn': ['^ISSN (\d+\-\d+)$'],
                 'dcterms:title':
-                ['((?:Föreskrifter|[\w ]+s (?:föreskrifter|allmänna råd)).*?)\n\n'],
+                ['((?:Föreskrifter|[\w ]+s (?:föreskrifter|allmänna råd)).*?)[;\n]\n'],
                 'dcterms:identifier': ['^([A-ZÅÄÖ-]+FS\s\s?\d{4}:\d+)$'],
                 'rpubl:utkomFranTryck':
                 ['Utkom från\strycket\s+den\s(\d+ \w+ \d{4})'],
@@ -365,13 +363,13 @@ class MyndFskrBase(SwedishLegalSource):
                         test, page, re.MULTILINE | re.DOTALL | re.UNICODE)
                     if m:
                         props[prop] = util.normalize_space(m.group(1))
+                        break
             # Single required propery. If we find this, we're done (ie
             # we've skipped past the toc/cover pages).
             if 'rpubl:beslutsdatum' in props:
                 break
             self.log.debug("%s: Couldn't find required props on page %s" %
                            (doc.basefile, pagecount))
-
         if 'rpubl:beslutsdatum' not in props:
             # raise errors.ParseError(
             self.log.warning(
@@ -732,7 +730,7 @@ class AFS(MyndFskrBase):
             if newline:
                 if newline is True:
                     newline = ""
-                newtext += newline + "\n"
+            newtext += newline + "\n"
         return newtext
 
     def sanitize_basefile(self, basefile):
@@ -755,6 +753,10 @@ class AFS(MyndFskrBase):
         assert link, "Couldn't find PDF link for %s at %s" % (basefile, url)
         return urljoin(url, link["href"])
 
+#    def fwdtests(self):
+#        t = super(AFS, self).fwdtests()
+#        t["dcterms:title"].append('([\w ]+s (?:föreskrifter|allmänna råd)).*?)\nBeslutade'],
+#        return t
 
 class BOLFS(MyndFskrBase):
     # FIXME: The id is not linked, and the link does not *reliably*
@@ -1136,6 +1138,11 @@ class NFS(MyndFskrBase):
                 subbasefile = m.group(1).lower() + "/" + m.group(2)
                 suburl = urljoin(url, link.get("href"))
                 self.download_single(subbasefile, suburl)
+    def fwdtests(self):
+        t = super(NFS, self).fwdtests()
+        # it's hard to match "...föreskriver X följande" if X contains spaces ("följande" can be pretty much anything else)
+        t["rpubl:beslutadAv"].insert(0, '(?:meddelar|föreskriver) (Statens naturvårdsverk)')
+        return t
 
 
 class RNFS(MyndFskrBase):
