@@ -16,7 +16,16 @@ class DownloadError(FerendaException):
     """Raised when a download fails in a non-recoverable way."""
 
 
+class DownloadFileNotFoundError(DownloadError):
+    """Raised when we had indication that a particular document should
+    exist (we have a basefile for it) but on closer examination, it
+    turns that it doesn't exist after all. This is used when we
+    can't raise a requests.exceptions.HTTPError 404 error for some
+    reason."""
+    pass
+
 class ParseError(FerendaException):
+
     """Raised when :py:meth:`~ferenda.DocumentRepository.parse` fails in
     any way.
     """

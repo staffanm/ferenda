@@ -5,12 +5,17 @@ from builtins import *
 from future import standard_library
 standard_library.install_aliases()
 
-import os
+from io import StringIO
+from traceback import format_tb
+import datetime
 import hashlib
 import json
+import logging
+import os
+import sys
 
 from ferenda import util
-
+from ferenda.errors import DocumentRemovedError
 
 class DocumentEntry(object):
 
@@ -80,9 +85,11 @@ class DocumentEntry(object):
     """A dict that represents metadata about the document RDF metadata
     (such as it's URI, length, MIME-type and MD5 hash)."""
 
-    parse = None
-    """A dict containing various info about the latest attempt to parse
-    the document."""
+    status = None
+    """A nested dict containing various info about the latest attempt to
+    download/parse/relate/generate the document.
+
+    """
 
     # files = [{'path': 'data/sfs/downloaded/1999/175.html',
     #           'source': 'http://localhost/1234/567',
@@ -92,8 +99,6 @@ class DocumentEntry(object):
     def __init__(self, path=None):
         if path and os.path.exists(path):
             with open(path) as fp:
-                # FIXME: make_json_date_object_hook doesn't support
-                # nested fields (parse.date) yet
                 hook = util.make_json_date_object_hook('orig_created',
                                                        'orig_updated',
                                                        'orig_checked',
@@ -102,7 +107,10 @@ class DocumentEntry(object):
                                                        'indexed_ts',
                                                        'indexed_dep',
                                                        'indexed_ft',
-                                                       'parse.date')
+                                                       'status.download.date',
+                                                       'status.parse.date',
+                                                       'status.relate.date',
+                                                       'status.generate.date')
                 d = json.load(fp, object_hook=hook)
             self.__dict__.update(d)
             self._path = path
@@ -129,9 +137,13 @@ class DocumentEntry(object):
             # included resources)
             self.link = {}
 
-        # silently upgrade old entry JSON files lacking the parse dict
-        if self.parse is None:
-            self.parse = {}
+        # silently upgrade old entry JSON files with a root level
+        # parse dict and/or lacking the status dict
+        if self.status is None:
+            self.status = {}
+        if hasattr(self, 'parse'):
+            self.status['parse'] = self.parse
+            delattr(self.parse)
 
     def __repr__(self):
         return '<%s id=%s>' % (self.__class__.__name__, self.id)
@@ -229,3 +241,74 @@ class DocumentEntry(object):
             if filename.endswith(ext):
                 return mimetype
         return "application/octet-stream"
+
+    @staticmethod
+    def updateentry(f, section, entrypath, *args, **kwargs):
+        """runs the provided function with the provided arguments, captures
+        any logged events emitted, catches any errors, and records the
+        result in the entry file under the provided section. The basefile
+        is assumed to be the first element in args.
+
+        """
+
+        def clear(key, d):
+            if key in d:
+                del d[key]
+        from pudb import set_trace; set_trace()
+        logstream = StringIO()
+        handler = logging.StreamHandler(logstream)
+        # FIXME: Think about which format is optimal for storing in
+        # docentry. Do we need eg name and levelname? Should we log
+        # date as well as time?
+        fmt = "%(asctime)s %(name)s %(levelname)s %(message)s"
+        formatter = logging.Formatter(fmt, datefmt="%H:%M:%S")
+        handler.setFormatter(formatter)
+        handler.setLevel(logging.WARNING)
+        rootlog = logging.getLogger()
+        rootlog.addHandler(handler)
+        start = datetime.datetime.now()
+        try:
+            ret = f(*args, **kwargs)
+            success = True
+        except DocumentRemovedError as e:
+            success = "removed"
+            raise
+        except Exception as e:
+            success = False
+            errortype, errorval, errortb = sys.exc_info()
+            raise
+        except KeyboardInterrupt as e:
+            success = None
+            raise
+        else:
+            return ret
+        finally:
+            rootlog.removeHandler(handler)
+            if success is not None:
+                warnings = logstream.getvalue()
+                entry = DocumentEntry(entrypath)
+                if section not in entry.status:
+                    entry.status[section] = {}
+                entry.status[section]['success'] = success
+                entry.status[section]['date'] = start
+                delta = datetime.datetime.now()-start
+                try:
+                    duration = delta.total_seconds()
+                except AttributeError:
+                    # probably on py26, wich lack total_seconds()
+                    duration = delta.seconds + (delta.microseconds / 1000000.0)
+                entry.status[section]['duration'] = duration
+                if warnings:
+                    entry.status[section]['warnings'] = warnings
+                else:
+                    clear('warnings', entry.status[section])
+                if not success:
+                    entry.status[section]['traceback'] = "".join(format_tb(errortb))
+                    entry.status[section]['error'] = "%s: %s (%s)" % (errorval.__class__.__name__,
+                                                            errorval, util.location_exception(errorval))
+                else:
+                    clear('traceback', entry.status[section])
+                    clear('error', entry.status[section])
+                entry.save()
+    
+    

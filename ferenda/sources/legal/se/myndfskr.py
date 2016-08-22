@@ -127,11 +127,6 @@ class MyndFskrBase(SwedishLegalSource):
                     if (os.path.exists(self.store.downloaded_path(basefile))
                         and not self.config.refresh):
                         continue
-                    if self.download_rewrite_url:
-                        if callable(self.download_rewrite_url):
-                            link = self.download_rewrite_url(basefile, link)
-                        else:
-                            link = self.remote_url(basefile)
                     if basefile not in yielded:
                         yield (basefile, link)
                         yielded.add(basefile)
@@ -159,7 +154,12 @@ class MyndFskrBase(SwedishLegalSource):
                                          resolve_base_href=True)
                 source = tree.iterlinks()
 
-    def download_single(self, basefile, url=None):
+    def download_single(self, basefile, url):
+        if self.download_rewrite_url:
+            if callable(self.download_rewrite_url):
+                url = self.download_rewrite_url(basefile, url)
+            else:
+                url = self.remote_url(basefile)
         ret = super(MyndFskrBase, self).download_single(basefile, url)
         if self.downloaded_suffix == ".pdf":
             # assure that the downloaded resource really is a PDF
@@ -926,7 +926,7 @@ class FFFS(MyndFskrBase):
                 fp.write(str(titlediv))
             if (self.config.refresh or
                     (not os.path.exists(self.store.downloaded_path(basefile)))):
-                self.download_single(basefile)
+                util.updateentry(self.download_single, "download", basefile)
 
     # FIXME: This should create/update the documententry!!
     def download_single(self, basefile):
@@ -1012,10 +1012,14 @@ class FoHMFS(MyndFskrBase):
         basefile = basefile.replace("-", "")
         return super(FoHMFS, self).sanitize_basefile(basefile)
 
-    def download_rewrite_url(self, basefile, link):
-        soup = BeautifulSoup(self.session.get(link).text, "lxml")
+    def download_rewrite_url(self, basefile, url):
+        self.log.debug("%s: Loading %s to find PDF link" % (basefile, url))
+        soup = BeautifulSoup(self.session.get(url).text, "lxml")
         linkel = soup.find("a", href=re.compile(".pdf"))
-        link = urljoin(link, linkel.get("href"))
+        if linkel:
+            link = urljoin(url, linkel.get("href"))
+        else:
+            raise errors.DownloadFileNotFoundError("No suitable PDF link found")
         return link
 
 
@@ -1137,7 +1141,8 @@ class NFS(MyndFskrBase):
                 m = re.match("(S?NFS)\s+(\d+:\d+)", head.get_text())
                 subbasefile = m.group(1).lower() + "/" + m.group(2)
                 suburl = urljoin(url, link.get("href"))
-                self.download_single(subbasefile, suburl)
+                util.updateentry(self.download_single, "download", subbasefile, suburl)
+                # self.download_single(subbasefile, suburl)
     def fwdtests(self):
         t = super(NFS, self).fwdtests()
         # it's hard to match "...föreskriver X följande" if X contains spaces ("följande" can be pretty much anything else)

@@ -95,68 +95,6 @@ def parseifneeded(f):
             return f(self, basefile)
     return wrapper
 
-def updateentry(f):
-
-    @functools.wraps(f)
-    def wrapper(self, basefile):
-        def clear(key, d):
-            if key in d:
-                del d[key]
-        logstream = StringIO()
-        handler = logging.StreamHandler(logstream)
-        # FIXME: Think about which format is optimal for storing in
-        # docentry. Do we need eg name and levelname? Should we log
-        # date as well as time?
-        fmt = "%(asctime)s %(name)s %(levelname)s %(message)s"
-        formatter = logging.Formatter(fmt, datefmt="%H:%M:%S")
-        handler.setFormatter(formatter)
-        handler.setLevel(logging.WARNING)
-        rootlog = logging.getLogger()
-        rootlog.addHandler(handler)
-        start = datetime.now()
-        try:
-            ret = f(self, basefile)
-            success = True
-        except DocumentRemovedError as e:
-            success = "removed"
-            raise
-        except Exception as e:
-            success = False
-            errortype, errorval, errortb = sys.exc_info()
-            raise
-        except KeyboardInterrupt as e:
-            success = None
-            raise
-        else:
-            return ret
-        finally:
-            rootlog.removeHandler(handler)
-            if success is not None:
-                warnings = logstream.getvalue()
-                entry = DocumentEntry(self.store.documententry_path(basefile))
-                entry.parse['success'] = success
-                entry.parse['date'] = start
-                delta = datetime.now()-start
-                try:
-                    duration = delta.total_seconds()
-                except AttributeError:
-                    # probably on py26, wich lack total_seconds()
-                    duration = delta.seconds + (delta.microseconds / 1000000.0)
-                entry.parse['duration'] = duration
-                if warnings:
-                    entry.parse['warnings'] = warnings
-                else:
-                    clear('warnings', entry.parse)
-                if not success:
-                    entry.parse['traceback'] = "".join(format_tb(errortb))
-                    entry.parse['error'] = "%s: %s (%s)" % (errorval.__class__.__name__,
-                                                            errorval, util.location_exception(errorval))
-                else:
-                    clear('traceback', entry.parse)
-                    clear('error', entry.parse)
-                entry.save()
-    return wrapper
-
 
 def render(f):
     """Handles the serialization of the :py:class:`~ferenda.Document`
@@ -336,11 +274,12 @@ def managedparsing(f):
     :py:func:`~ferenda.decorators.timed`, 
     :py:func:`~ferenda.decorators.render`)"""
     return parseifneeded(
-        updateentry(
+        updateentry('downloaded')(
             makedocument(
                 # handleerror( # is this really a good idea?
                 timed(
                     render(f)))))
+
 
 
 def action(f):
@@ -375,3 +314,20 @@ def newstate(state):
         setattr(f, 'newstate', state)
         return f
     return real_decorator
+
+
+def updateentry(section):
+    def outer_wrapper(f):
+        @functools.wraps(f)
+        def wrapper(self, params):
+            if params:
+                # try to find out if we have a basefile
+                basefile = params[0]
+            else:
+                basefile = ".root"
+                params = ()
+            entrypath = self.store.documententry_path(basefile)
+            args = [self] + list(params)
+            DocumentEntry.updateentry(f, section, entrypath, *args)
+        return wrapper
+    return outer_wrapper

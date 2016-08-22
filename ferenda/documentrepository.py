@@ -686,6 +686,7 @@ with the *config* object as single parameter.
     #
     @decorators.action
     @decorators.recordlastdownload
+    @decorators.updateentry('download')
     def download(self, basefile=None):
         """Downloads all documents from a remote web service.
 
@@ -755,9 +756,19 @@ with the *config* object as single parameter.
             if (refresh or
                     (not os.path.exists(self.store.downloaded_path(basefile)))):
                 try:
-                    ret = self.download_single(basefile, link)
+                    ret = DocumentEntry.updateentry(self.download_single,
+                                                    'download',
+                                                    self.store.documententry_path(basefile),
+                                                    basefile,
+                                                    link)
                 except requests.exceptions.HTTPError as e:
                     if self.download_accept_404 and e.response.status_code == 404:
+                        self.log.error("%s: %s %s" % (basefile, link, e))
+                        ret = False
+                    else:
+                        raise e
+                except errors.DownloadFileNotFoundError as e:
+                    if self.download_accept_404:
                         self.log.error("%s: %s %s" % (basefile, link, e))
                         ret = False
                     else:

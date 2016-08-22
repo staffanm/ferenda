@@ -10,6 +10,7 @@ import codecs
 import datetime
 import filecmp
 import locale
+import logging
 import os
 import posixpath
 import re
@@ -824,3 +825,4 @@ def base27encode(s):
 def base27decode(num):
     b = 27
     return ((num == 0) and base27alphabet[0] ) or (base27decode(num // b ).lstrip(base27alphabet[0]) + base27alphabet[num % b])
+
