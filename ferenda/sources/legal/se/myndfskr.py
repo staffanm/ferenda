@@ -18,7 +18,7 @@ from rdflib.namespace import DCTERMS, SKOS
 
 from . import RPUBL, RINFOEX, SwedishLegalSource
 from .swedishlegalsource import SwedishCitationParser
-from ferenda import TextReader, Describer, Facet, PDFReader
+from ferenda import TextReader, Describer, Facet, PDFReader, DocumentEntry
 from ferenda import util, decorators, errors, fulltextindex
 from ferenda.elements import Body, Page, Preformatted, Link
 from ferenda.sources.legal.se.legalref import LegalRef
@@ -858,7 +858,7 @@ class ELSAKFS(MyndFskrBase):
     start_url = "http://www.elsakerhetsverket.se/om-oss/lag-och-ratt/gallande-regler/Elsakerhetsverkets-foreskrifter-listade-i-nummerordning/"
     download_rewrite_url = True
 
-    def download(self, basefile=None):
+    def download(self, basefile=None, reporter=None):
         # This repo source does not have a simple publishing strategy
         # where a frontpage holds predictable links to all base and
         # change acts. We disable downloading until we can devote
@@ -898,7 +898,7 @@ class FFFS(MyndFskrBase):
     def forfattningssamlingar(self):
         return ["fffs", "bffs"]
 
-    def download(self, basefile=None):
+    def download(self, basefile=None, reporter=None):
         self.session = requests.session()
         soup = BeautifulSoup(self.session.get(self.start_url).text, "lxml")
         main = soup.find(id="fffs-searchresults")
@@ -919,6 +919,7 @@ class FFFS(MyndFskrBase):
 
             number = ndiv.find('div', 'FFFSListAreaRight').get_text(strip=True)
             basefile = "fffs/" + number
+            reporter(basefile)
             tmpfile = mktemp()
             with self.store.open_downloaded(basefile, mode="w", attachment="snippet.html") as fp:
                 fp.write(str(ndiv))
@@ -926,7 +927,8 @@ class FFFS(MyndFskrBase):
                 fp.write(str(titlediv))
             if (self.config.refresh or
                     (not os.path.exists(self.store.downloaded_path(basefile)))):
-                util.updateentry(self.download_single, "download", basefile)
+                entrypath = self.store.documententry_path(basefile)
+                DocumentEntry.updateentry(self.download_single, "download", entrypath, basefile)
 
     # FIXME: This should create/update the documententry!!
     def download_single(self, basefile):

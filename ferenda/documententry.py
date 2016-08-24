@@ -143,7 +143,7 @@ class DocumentEntry(object):
             self.status = {}
         if hasattr(self, 'parse'):
             self.status['parse'] = self.parse
-            delattr(self.parse)
+            delattr(self, 'parse')
 
     def __repr__(self):
         return '<%s id=%s>' % (self.__class__.__name__, self.id)
@@ -254,7 +254,6 @@ class DocumentEntry(object):
         def clear(key, d):
             if key in d:
                 del d[key]
-        from pudb import set_trace; set_trace()
         logstream = StringIO()
         handler = logging.StreamHandler(logstream)
         # FIXME: Think about which format is optimal for storing in

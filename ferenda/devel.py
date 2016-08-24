@@ -678,11 +678,13 @@ class Devel(object):
             # bool...
             if 'parse' in repo.config and repo.config.parse in (False, "False"):
                 continue
-            basefiles = list(repo.store.list_basefiles_for("parse"))
+
+            # listing basefiles for the action "news" gives us
+            # everyting that has a docentry file.
+            basefiles = list(repo.store.list_basefiles_for("news"))
             if not basefiles:
                 continue
             repo_el = etree.SubElement(root, "repo", {"alias": repo.alias})
-            action_el = etree.SubElement(repo_el, "action", {"id": "parse"})
             successcnt = warncnt = failcnt = removecnt = errcnt = 0
             for basefile in basefiles:
                 # sys.stdout.write(".")
@@ -702,40 +704,50 @@ class Devel(object):
                     log.error("%s/%s: %s %s" % (repo.alias, basefile, e.__class__.__name__, e))
                     errcnt += 1
                     continue
-                if not entry.parse:  # an empty dict
-                    log.warning("%s/%s: file %s has no parse sub-dict" % (repo.alias, basefile, entrypath))
+                if not entry.status:  # an empty dict
+                    log.warning("%s/%s: file %s has no status sub-dict" % (repo.alias, basefile, entrypath))
                     errcnt += 1
                     continue
-                if entry.parse["success"] == "removed":
-                    # this special truthy value indicates that
-                    # everything went as OK as it could, but the
-                    # actual document doesn't exist (anymore) so we
-                    # don't feature it in our overview
-                    removecnt += 1
-                    continue
-                doc_el = etree.SubElement(action_el, "basefile",
-                                       {"id": basefile,
-                                        "success": str(entry.parse["success"]),
-                                        "duration": str(entry.parse["duration"]),
-                                        "date": entry.parse["date"]})
-                if entry.parse["success"]:
-                    successcnt += 1
-                else:
-                    failcnt += 1
-                if "warnings" in entry.parse:
-                    warncnt += 1
+                doc_el = etree.SubElement(repo_el, "basefile",
+                                          {"id": basefile})
+                # FIXME: we should sort the entries in a reasonable way, eg
+                # "download"/"parse"/"relate"/"generate"/any custom
+                # action, probably through a custom key func
+                for action in sorted(entry.status):
+                    status = entry.status[action]
+                    if "success" not in status:
+                        from pudb import set_trace; set_trace()
+                    if "success" in status and status["success"] == "removed":
+                        # this special truthy value indicates that
+                        # everything went as OK as it could, but the
+                        # actual document doesn't exist (anymore) so we
+                        # don't feature it in our overview
+                        removecnt += 1
+                        continue
+                    action_el = etree.SubElement(doc_el, "action",
+                                                 {"id": action,
+                                                  "success": str(status["success"]),
+                                                  "duration": str(status["duration"]),
+                                                  "date": status["date"]})
+                    if status["success"]:
+                        successcnt += 1
+                    else:
+                        failcnt += 1
+                    if "warnings" in status:
+                        warncnt += 1
 
-                # add additional (optional) text data if present
-                for optional in ("warnings", "error", "traceback"):
-                    if optional in entry.parse:
-                        opt_el = etree.SubElement(doc_el, optional)
-                        opt_el.text = entry.parse[optional]
+                    # add additional (optional) text data if present
+                    for optional in ("warnings", "error", "traceback"):
+                        if optional in status:
+                            opt_el = etree.SubElement(action_el, optional)
+                            opt_el.text = status[optional]
             log.info("%s: %s processed, %s ok (%s w/ warnings), %s failed, %s removed. %s corrupted entries." % (repo.alias, len(basefiles), successcnt, warncnt, failcnt, removecnt, errcnt))
         conffile = os.path.abspath(
             os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
         transformer = Transformer('XSLT', "xsl/statusreport.xsl", "xsl",
                                   resourceloader=repos[0].resourceloader,
                                   config=conffile)
+        from pudb import set_trace; set_trace()
         xhtmltree = transformer.transform(root, depth=1)
         outfile = os.sep.join([self.config.datadir, 'status', 'status.html'])
         util.ensure_dir(outfile)

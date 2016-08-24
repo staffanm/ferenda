@@ -103,20 +103,27 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
     # don't have to enable the subrepo specifically, eg:
     #
     # ./ferenda-build.py myndfs download bolfs:
-    def download(self, basefile=None):
+    def download(self, basefile=None, reporter=None):
         if basefile:
             # expect a basefile on the form "subrepoalias:basefile" or
             # just "subrepoalias:"
             subrepoalias, basefile = basefile.split(":")
-            for cls in self.subrepos:
-                if cls.alias == subrepoalias:
-                    inst = self.get_instance(cls)
-                    inst.download(basefile)
-                    break
-            else:
-                self.log.error("Couldn't find any subrepo with alias %s" % subrepoalias)
         else:
-            return super(MyndFskr, self).download()
+            subrepoalias = None
+        if not basefile:
+            basefile = None  # ie convert '' => None
+        for cls in self.subrepos:
+            if (subrepoalias is None or
+                cls.alias == subrepoalias):
+                inst = self.get_instance(cls)
+                basefiles = []
+                ret = inst.download(basefile, reporter=basefiles.append)
+                for basefile in basefiles:
+                    util.link_or_copy(inst.store.documententry_path(basefile),
+                                      self.store.documententry_path(basefile))
+        else:
+            self.log.error("Couldn't find any subrepo with alias %s" % subrepoalias)
+            
 
     # This custom implementation of parse is able to select a
     # particular subrepo and parse using that, eg::

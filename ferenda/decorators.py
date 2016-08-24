@@ -274,7 +274,7 @@ def managedparsing(f):
     :py:func:`~ferenda.decorators.timed`, 
     :py:func:`~ferenda.decorators.render`)"""
     return parseifneeded(
-        updateentry('downloaded')(
+        updateentry('parse')(
             makedocument(
                 # handleerror( # is this really a good idea?
                 timed(
@@ -317,17 +317,17 @@ def newstate(state):
 
 
 def updateentry(section):
-    def outer_wrapper(f):
+    def outer_wrapper(f, *args):
         @functools.wraps(f)
-        def wrapper(self, params):
-            if params:
+        def inner_wrapper(self, *args, **kwargs):
+            if args and args[0]:
                 # try to find out if we have a basefile
-                basefile = params[0]
+                basefile = args[0]
             else:
                 basefile = ".root"
-                params = ()
+                args = ()
             entrypath = self.store.documententry_path(basefile)
-            args = [self] + list(params)
-            DocumentEntry.updateentry(f, section, entrypath, *args)
-        return wrapper
+            args = [self] + list(args)
+            return DocumentEntry.updateentry(f, section, entrypath, *args, **kwargs)
+        return inner_wrapper
     return outer_wrapper

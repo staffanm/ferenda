@@ -24,7 +24,7 @@ class StaticStore(DocumentStore):
     """Customized DocumentStore that looks for all "downloaded" resources
     from the specified ``staticdir``. If ``staticdir`` isn't provided
     or doesn't exist, falls back to a collection of package resources
-    (under ferenda/res/static-content). Parsed, generated etc files
+    (under ferenda/res/static). Parsed, generated etc files
     are handled like normal, ie stored under
     ``[datadir]/static/{parsed,distilled,generated,...}/``
     """
@@ -93,7 +93,7 @@ class Static(DocumentRepository):
             staticdir = self.config.staticdir
             assert os.path.exists(staticdir), "%s does not exist" % staticdir
         else:
-            p = self.resourceloader.filename('static-content/README')
+            p = self.resourceloader.filename('static/README')
             staticdir = os.path.dirname(p)
         self.store.staticdir = staticdir
         

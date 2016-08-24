@@ -687,7 +687,7 @@ with the *config* object as single parameter.
     @decorators.action
     @decorators.recordlastdownload
     @decorators.updateentry('download')
-    def download(self, basefile=None):
+    def download(self, basefile=None, reporter=None):
         """Downloads all documents from a remote web service.
 
         The default generic implementation assumes that all documents
@@ -755,6 +755,7 @@ with the *config* object as single parameter.
         for (basefile, link) in self.download_get_basefiles(source):
             if (refresh or
                     (not os.path.exists(self.store.downloaded_path(basefile)))):
+                ret = None
                 try:
                     ret = DocumentEntry.updateentry(self.download_single,
                                                     'download',
@@ -773,6 +774,10 @@ with the *config* object as single parameter.
                         ret = False
                     else:
                         raise e
+                finally:
+                    if reporter:
+                        reporter(basefile)
+                        
                 updated = updated or ret
         self.config.lastdownload = datetime.now()
         return updated
@@ -1719,6 +1724,8 @@ with the *config* object as single parameter.
                 pass
         return True
 
+    @decorators.action
+    @decorators.updateentry('relate')
     def relate(self, basefile, otherrepos=[]):
         """Runs various indexing operations for the document represented by
            *basefile*: insert RDF statements into a triple store, add this
@@ -2231,6 +2238,7 @@ WHERE {
         """
 
     @decorators.action
+    @decorators.updateentry('generate')
     def generate(self, basefile, otherrepos=[]):
         """Generate a browser-ready HTML file from structured XML and RDF.
 

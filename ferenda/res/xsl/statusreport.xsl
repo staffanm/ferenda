@@ -51,21 +51,15 @@
 
 
   <xsl:template match="repo">
-      <h2><xsl:value-of select="@alias"/></h2>
-      <xsl:apply-templates/>
-  </xsl:template>
-
-  <xsl:template match="action">
-    <!-- action is always "parse" for now -->
-    <!--<h3><xsl:value-of select="@id"/></h3>-->
-    <p><xsl:value-of select="count(basefile[@success='True'])"/> OK, 
-    <xsl:value-of select="count(basefile[@success='False'])"/> failed</p>
+    <h2><xsl:value-of select="@alias"/></h2>
     <div class="basefiles">
       <xsl:apply-templates/>
     </div>
+    <p><xsl:value-of select="count(basefile[@success='True'])"/> OK, 
+    <xsl:value-of select="count(basefile[@success='False'])"/> failed</p>
   </xsl:template>
 
-  <xsl:template match="basefile">
+  <xsl:template match="action">
     <xsl:variable name="alerttype">
       <xsl:choose>
         <xsl:when test="@success='True' and ./warnings">alert-warning</xsl:when>
@@ -81,9 +75,17 @@
 <xsl:value-of select="./traceback"/></xsl:when>
       </xsl:choose>
     </xsl:variable> 
-    <p class="alert {$alerttype}" title="{$tooltip}"><xsl:value-of select="@id"/>
-      <!-- FIXME: add errormsg, warnings, traceback here somehow -->
+    <p class="alert {$alerttype}" title="{$tooltip}">
+      <xsl:value-of select="@id"/>
     </p>
+      
+  </xsl:template>
+
+  <xsl:template match="basefile">
+    <div class="basefile">
+      <p><xsl:value-of select="@id"/></p>
+      <xsl:apply-templates/>
+    </div>
   </xsl:template>
 
   <xsl:template match="repo" mode="toc"/>

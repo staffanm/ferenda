@@ -160,7 +160,7 @@ class CompositeRepository(DocumentRepository):
     # NOTE: this impl should NOT use the @managedparsing decorator --
     # but it can use @updateentry to catch warnings and errors thrown
     # by a subrepo
-    @updateentry
+    @updateentry("parse")
     def parse(self, basefile):
         # first, check if we really need to parse. If any subrepo
         # returns that parseneeded is false and we have parsed file in
@@ -229,12 +229,17 @@ class CompositeRepository(DocumentRepository):
     def copy_parsed(self, basefile, instance):
         # If the distilled and parsed links are recent, assume that
         # all external resources are OK as well
-        if (util.outfile_is_newer([instance.store.distilled_path(basefile)],
+        
+        if (not self.config.force and 
+            util.outfile_is_newer([instance.store.distilled_path(basefile)],
                                   self.store.distilled_path(basefile)) and
             util.outfile_is_newer([instance.store.parsed_path(basefile)],
                                   self.store.parsed_path(basefile))):
             self.log.debug("%s: Attachments are (likely) up-to-date" % basefile)
             return
+
+        util.link_or_copy(instance.store.documententry_path(basefile),
+                          self.store.documententry_path(basefile))
 
         util.link_or_copy(instance.store.distilled_path(basefile),
                           self.store.distilled_path(basefile))
