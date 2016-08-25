@@ -717,8 +717,9 @@ class Devel(object):
                 # action, probably through a custom key func
                 for action in sorted(entry.status):
                     status = entry.status[action]
-                    if "success" not in status:
-                        from pudb import set_trace; set_trace()
+                    if not status:
+                        log.warning("%s/%s: file %s has no status data for action %s" % (repo.alias, basefile, entrypath, action))
+                        continue
                     if "success" in status and status["success"] == "removed":
                         # this special truthy value indicates that
                         # everything went as OK as it could, but the

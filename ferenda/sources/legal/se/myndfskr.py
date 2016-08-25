@@ -154,7 +154,7 @@ class MyndFskrBase(SwedishLegalSource):
                                          resolve_base_href=True)
                 source = tree.iterlinks()
 
-    def download_single(self, basefile, url):
+    def download_single(self, basefile, url=None):
         if self.download_rewrite_url:
             if callable(self.download_rewrite_url):
                 url = self.download_rewrite_url(basefile, url)

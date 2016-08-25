@@ -119,10 +119,14 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
                 basefiles = []
                 try:
                     ret = inst.download(basefile, reporter=basefiles.append)
+                except Exception as e:
+                    loc = util.location_exception(e)
+                    self.log.error("download for %s failed: %s (%s)" % (c.alias, e, loc))
+                    ret = False
                 finally:
-                    for basefile in basefiles:
-                        util.link_or_copy(inst.store.documententry_path(basefile),
-                                          self.store.documententry_path(basefile))
+                    for b in basefiles:
+                        util.link_or_copy(inst.store.documententry_path(b),
+                                          self.store.documententry_path(b))
                     # msbfs/entries/.root.json -> myndfs/entries/msbfs.json
                     util.link_or_copy(inst.store.documententry_path(".root"),
                                       self.store.documententry_path(inst.alias))
