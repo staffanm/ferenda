@@ -46,7 +46,7 @@ class JKStore(SwedishLegalStore):
 class JK(SwedishLegalSource):
     alias = "jk"
 
-    start_url = "http://www.jk.se/Beslut.aspx?query=&type=all&dateFrom=%(date)s&dateTo=2100-01-01&dnr="
+    start_url = "http://www.jk.se/beslut-och-yttranden/"
     document_url_regex = "http://www.jk.se/Beslut/(?P<kategori>[\w\-]+)/(?P<basefile>\d+\-\d+\-\d+).aspx"
     rdf_type = RPUBL.VagledandeMyndighetsavgorande
     documentstore_class = JKStore
@@ -55,56 +55,24 @@ class JK(SwedishLegalSource):
     @recordlastdownload
     def download(self, basefile=None):
         self.session = requests.session()
-        if ('lastdownload' in self.config and
-                self.config.lastdownload and
-                not self.config.refresh):
-
-            # allow for 30 day window between decision date and publishing
-            startdate = self.config.lastdownload - timedelta(days=30)
-            start_url = self.start_url % {'date':
-                                          datetime.strftime(startdate, "%Y-%m-%d")}
-        else:
-            start_url = self.start_url % {'date': "1998-01-01"}
-
-        for basefile, url in self.download_get_basefiles(start_url):
+        for basefile, url in self.download_get_basefiles(self.start_url):
             self.download_single(basefile, url)
 
     @downloadmax
-    def download_get_basefiles(self, start_url):
-        document_url_regex = re.compile("(?P<basefile>\d+\-\d+\-\d+).aspx")
-        done = False
-        url = start_url
-        pagecount = 1
-        self.log.debug("Starting at %s" % start_url)
-        while not done:
-            self.log.debug("Getting page #%s" % pagecount)
-            soup = BeautifulSoup(requests.get(url).text, "lxml")
-            for link in soup.find_all("a", href=document_url_regex):
-                basefile = document_url_regex.search(link["href"]).group("basefile")
-                yield basefile, urljoin(url, link["href"])
+    def download_get_basefiles(self, url):
+        data = {'page': '9999'}   # this'll yield a single page with
+                                  # every descision ever. This is
+                                  # inefficient, but their webdevs
+                                  # have broken pagination, so...
+        self.log.debug("Starting at %s" % url)
+        resp = requests.post(url, data=data)
+        
+        document_url_regex = re.compile("/(?P<basefile>\d+\-\d+\-\d+)/$")
 
-            next = soup.find("img", src="/common/images/navigation-pil-grey.png")
-            if next and next.find_parent("a") and next.find_parent("a").get("href"):
-                url = urljoin(url, next.find_parent("a")["href"])
-                pagecount += 1
-            else:
-                done = True
-
-
-# Removed for now -- JK decisions ought to be immutable?
-#                
-#    def download_is_different(self, existing, new):
-#        # HTML pages many contain ASP.Net crap (__VIEWSTATE and
-#        # __EVENTVALIDATION) that differ from request to request. Only
-#        # compare div#mainContent
-#        existing_soup = BeautifulSoup(
-#            util.readfile(
-#                existing,
-#                encoding=self.source_encoding), "lxml")
-#        new_soup = BeautifulSoup(util.readfile(new, encoding=self.source_encoding), "lxml")
-#        return (existing_soup.find("div", id="mainContent") !=
-#                new_soup.find("div", id="mainContent"))
-
+        soup = BeautifulSoup(resp.text, "lxml")
+        for link in soup.find_all("a", href=document_url_regex):
+            basefile = document_url_regex.search(link["href"]).group("basefile")
+            yield basefile, urljoin(url, link["href"])
 
     def metadata_from_basefile(self, basefile):
         attribs = super(JK, self).metadata_from_basefile(basefile)
@@ -120,11 +88,12 @@ class JK(SwedishLegalSource):
         return "JK %s" % basefile
 
     def extract_metadata(self, soup, basefile):
-        title = soup.find("h1", "besluttitle").get_text()
-        beslutsdatum = soup.find("span", class_="label",
-                                 text="Beslutsdatum").find_next_sibling("span").get_text()
-        diarienummer = soup.find("span", class_="label",
-                                 text="Diarienummer").find_next_sibling("span").get_text()
+        content = soup.find("div", "content")
+        title = content.find("h2").get_text()
+        metadata = content.find("div", "date").get_text()
+        # eg "Diarienr: 4008-16-31 / Beslutsdatum: 12 jul 2016"
+        diarienummer = metadata.split()[1]
+        beslutsdatum = metadata.rsplit(": ", 1)[1]
         a = self.metadata_from_basefile(basefile)
         a.update({"dcterms:title": title,
                   "dcterms:publisher": self.lookup_resource("JK", SKOS.altLabel),
@@ -139,13 +108,10 @@ class JK(SwedishLegalSource):
         # read to the end -- need to seek(0)
         fp.seek(0)
         soup = BeautifulSoup(fp.read(), "lxml")
-        main = soup.find("div", id="mainContent")
-        # remove crap -- FIXME: after the first .decompose(), further
-        # calls to find() seem to fail with beautifulsoup4 4.4.0?
-        # 
-        # main.find("div", id="breadcrumbcontainer").decompose()
-        # main.find("h1", "besluttitle").decompose()
-        # main.find("div", "beslutmetadatacontainer").decompose()
+        main = soup.find("div", "content")
+        main.find("div", "actions").extract()
+        main.find("div", "date").extract()
+        main.find("h2").extract()
         return main
 
     def tokenize(self, main):
@@ -154,14 +120,33 @@ class JK(SwedishLegalSource):
 
 
     def get_parser(self, basefile, sanitized_body):
+        # a typical decision structure:
+
+        # [h1] Justitiekanslerns beslut
+        #    ... text ...
+        #    [h2] Ärendet (h3)
+        #        [h3] Bakgrund (p/em)
+        #        ... text ...
+        #        [h3] Anspråket
+        #        ... text ...
+        #        [h3 class="reglering"] Rättslig reglering m.m. (p/strong)
+        #    [h2] Justitiekanslerns bedömning
+        #        [h3] Skadestånd
+        #        [h3] Tillsyn
         def is_section(parser):
-            return parser.reader.peek().name == "h1"
+            return parser.reader.peek().name == "h3"
 
         def is_subsection(parser):
-            return parser.reader.peek().name == "h2"
+            chunk = parser.reader.peek()
+            return chunk.name == "p" and list(chunk.children)[0].name == "em"
+
+        def is_special_subsection(parser):
+            chunk = parser.reader.peek()
+            return chunk.name == "p" and list(chunk.children)[0].name == "strong"
 
         def is_subsubsection(parser):
-            return parser.reader.peek().name == "h3"
+            chunk = parser.reader.peek()
+            return chunk.name == "p" and list(chunk.children)[0].name == "u"
 
         def is_paragraph(parser):
             return True
@@ -177,6 +162,11 @@ class JK(SwedishLegalSource):
 
         @newstate('subsection')
         def make_subsection(parser):
+            s = AnonSektion(title=parser.reader.next().get_text())
+            return parser.make_children(s)
+
+        @newstate('special_subsection')
+        def make_special_subsection(parser):
             s = AnonSektion(title=parser.reader.next().get_text())
             return parser.make_children(s)
 
@@ -200,10 +190,16 @@ class JK(SwedishLegalSource):
             ("body", is_section): (make_section, "section"),
             ("section", is_section): (False, None),
             ("section", is_subsection): (make_subsection, "subsection"),
+            ("section", is_special_subsection): (make_special_subsection, "special_subsection"),
             ("subsection", is_section): (False, None),
             ("subsection", is_subsection): (False, None),
+            ("subsection", is_special_subsection): (False, None),
             ("subsection", is_subsubsection): (make_subsection, "subsubsection"),
+            ("special_subsection", is_section): (False, None),
+            ("special_subsection", is_subsection): (False, None),
+            ("special_subsection", is_subsubsection): (make_subsubsection, "subsubsection"),
             ("subsubsection", is_section): (False, None),
+            ("subsubsection", is_special_subsection): (False, None),
             ("subsubsection", is_subsection): (False, None),
             ("subsubsection", is_subsubsection): (False, None),
             (("body", "section", "subsection", "subsubsection"), is_paragraph): (make_paragraph, None)
