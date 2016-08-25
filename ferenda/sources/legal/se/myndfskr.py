@@ -1077,8 +1077,9 @@ class MRTVFS(MyndFskrBase):
 
 class MSBFS(MyndFskrBase):
     alias = "msbfs"
-    start_url = "https://www.msb.se/sv/Om-MSB/Lag-och-ratt/ (efter POST)"
-
+    start_url = "https://www.msb.se/sv/Om-MSB/Lag-och-ratt/"
+    # FIXME: start_url now requres a POST but with a bunch of
+    # viewstate crap to yield a full list
 
 class MYHFS(MyndFskrBase):
     #  (id vs länk)
@@ -1143,7 +1144,8 @@ class NFS(MyndFskrBase):
                 m = re.match("(S?NFS)\s+(\d+:\d+)", head.get_text())
                 subbasefile = m.group(1).lower() + "/" + m.group(2)
                 suburl = urljoin(url, link.get("href"))
-                util.updateentry(self.download_single, "download", subbasefile, suburl)
+                entrypath = self.store.documententry_path(subbasefile)
+                DocumentEntry.updateentry(self.download_single, "download", entrypath, subbasefile, suburl)
                 # self.download_single(subbasefile, suburl)
     def fwdtests(self):
         t = super(NFS, self).fwdtests()
@@ -1180,10 +1182,11 @@ class SJVFS(MyndFskrBase):
     @decorators.downloadmax
     def download_get_basefiles(self, source):
         soup = BeautifulSoup(source, "lxml")
-        main = soup.find_all("li", "active")
+        from pudb import set_trace; set_trace()
+        main = soup.find_all("ul", "consid-submenu")
         assert len(main) == 1
         extra = []
-        for a in list(main[0].ul.find_all("a")):
+        for a in list(main[0].find_all("a")):
             # only fetch subsections that start with a year, not
             # "Allmänna råd"/"Notiser"/"Meddelanden"
             label = a.text.split()[0]
@@ -1192,7 +1195,7 @@ class SJVFS(MyndFskrBase):
             # if lastdownload was 2015-02-24, dont download 2014
             # and earlier
             if (not self.config.refresh and
-                    self.config.lastdownload and
+                    'lastdownload' in self.config and self.config.lastdownload and
                     self.config.lastdownload.year > int(label)):
                 continue
             url = urljoin(self.start_url, a['href'])
