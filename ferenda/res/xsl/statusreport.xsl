@@ -38,6 +38,11 @@
   <xsl:template name="bodyclass">statusreport</xsl:template>
   <xsl:template name="pagetitle">
     <h1>Status report</h1>
+    <div class="control-panel">
+      <button onclick="$('div.alert-success').toggle()">show/hide successes</button>
+      <button onclick="$('div.alert-warning').toggle()">show/hide warnings</button>
+      <button onclick="$('div.alert-danger').toggle()">show/hide errors</button>
+    </div>
   </xsl:template>
   <xsl:param name="dyntoc" select="true()"/>
   <xsl:param name="content-under-pagetitle" select="false()"/>
@@ -55,8 +60,9 @@
     <div class="basefiles">
       <xsl:apply-templates/>
     </div>
-    <p><xsl:value-of select="count(basefile[@success='True'])"/> OK, 
-    <xsl:value-of select="count(basefile[@success='False'])"/> failed</p>
+    <p><xsl:value-of select="count(basefile)"/> processed, 
+    <xsl:value-of select="count(basefile[action/@success='False'])"/> failed,
+    <xsl:value-of select="count(basefile[action/warnings])"/> had warnings</p>
   </xsl:template>
 
   <xsl:template match="action">
@@ -77,13 +83,20 @@
     </xsl:variable> 
     <p class="alert {$alerttype}" title="{$tooltip}">
       <xsl:value-of select="@id"/>
-    </p>
+    </p><br/>
       
   </xsl:template>
 
   <xsl:template match="basefile">
-    <div class="basefile">
-      <p><xsl:value-of select="@id"/></p>
+    <xsl:variable name="alerttype">
+      <xsl:choose>
+        <xsl:when test="action[@success='False']">alert-danger</xsl:when>
+        <xsl:when test="action[@success='True'] and action/warnings">alert-warning</xsl:when>
+        <xsl:when test="action[@success='True']">alert-success</xsl:when>
+      </xsl:choose>
+    </xsl:variable> 
+    <div class="basefile alert {$alerttype}">
+      <b><xsl:value-of select="@id"/></b><br/>
       <xsl:apply-templates/>
     </div>
   </xsl:template>

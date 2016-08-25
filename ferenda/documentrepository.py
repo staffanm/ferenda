@@ -1727,10 +1727,12 @@ with the *config* object as single parameter.
     @decorators.action
     @decorators.updateentry('relate')
     def relate(self, basefile, otherrepos=[]):
-        """Runs various indexing operations for the document represented by
-           *basefile*: insert RDF statements into a triple store, add this
-           document to the dependency list to all documents that it refers to,
-           and put the text of the document into a fulltext index.
+        """Runs various indexing operations for the document.
+
+           This includes inserting RDF statements into a triple store,
+           adding this document to the dependency list to all
+           documents that it refers to, and putting the text of the
+           document into a fulltext index.
 
         """
         if self.config.relate is False:

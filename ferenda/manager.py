@@ -1471,6 +1471,7 @@ def _list_class_usage(cls):
     >>> _list_class_usage(DocumentRepository) == {
     ...     'download':'Downloads all documents from a remote web service.',
     ...     'parse':'Parse downloaded documents into structured XML and RDF.',
+    ...     'relate':'Runs various indexing operations for the document.',
     ...     'generate':'Generate a browser-ready HTML file from structured XML and RDF.'}
     True
 

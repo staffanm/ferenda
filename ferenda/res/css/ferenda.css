@@ -50,12 +50,23 @@ nav[data-toggle='toc'] {
   }
 }
 
-body.statusreport div.basefiles p {
-    display: inline;
-    margin: 1px;
+body.statusreport div.basefile {
+    margin: 2px 0;
     padding: 1px;
+    display: inline-block;
 }
 
+/*
+body.statusreport div.basefile.alert-success {
+    display: none;
+}
+*/
+
+body.statusreport p.alert {
+    padding: 1px;
+    margin: 2px;
+    display: inline;
+}
 
 /* Tighten the accordion panel headers */
 div.panel-group > div.panel {

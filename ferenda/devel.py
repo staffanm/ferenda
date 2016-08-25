@@ -687,6 +687,8 @@ class Devel(object):
             repo_el = etree.SubElement(root, "repo", {"alias": repo.alias})
             successcnt = warncnt = failcnt = removecnt = errcnt = 0
             for basefile in basefiles:
+                if basefile == ".root":
+                    from pudb import set_trace; set_trace()
                 # sys.stdout.write(".")
                 # print("%s/%s" % (repo.alias, basefile))
                 entrypath = repo.store.documententry_path(basefile)
@@ -747,7 +749,6 @@ class Devel(object):
         transformer = Transformer('XSLT', "xsl/statusreport.xsl", "xsl",
                                   resourceloader=repos[0].resourceloader,
                                   config=conffile)
-        from pudb import set_trace; set_trace()
         xhtmltree = transformer.transform(root, depth=1)
         outfile = os.sep.join([self.config.datadir, 'status', 'status.html'])
         util.ensure_dir(outfile)

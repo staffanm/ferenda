@@ -5,7 +5,7 @@ from builtins import *
 
 from ferenda import DocumentRepository, util, errors
 from ferenda.testutil import RepoTester
-
+from ferenda.decorators import updateentry
 # SUT
 from ferenda import CompositeRepository
 
@@ -17,6 +17,7 @@ class SubrepoA(DocumentRepository):
         util.writefile(self.store.downloaded_path("1"), "basefile 1, repo a")
         util.writefile(self.store.downloaded_path("3"), "basefile 3, repo a")
 
+    @updateentry("parse")
     def parse(self, basefile):
         if basefile in ("1", "3"):
             util.writefile(self.store.parsed_path(basefile),
@@ -37,6 +38,7 @@ class SubrepoB(DocumentRepository):
         util.writefile(self.store.downloaded_path("1"), "basefile 1, repo b")
         util.writefile(self.store.downloaded_path("2"), "basefile 2, repo b")
 
+    @updateentry("parse")
     def parse(self, basefile):
         if basefile == "1":
             util.writefile(self.store.parsed_path("1"),
@@ -109,8 +111,9 @@ class TestComposite(RepoTester):
 
     def test_parse(self):
         self.repo.download()
-        self.assertTrue(self.repo.parse("1")) # both A and B can handle this
-        # but B should win
+        self.assertTrue(self.repo.parse("1")) # both A and B can
+                                              # handle this but B
+                                              # should win
         self.assertEqual("basefile 1, parsed by b",
                          util.readfile(self.repo.store.parsed_path("1")))
         self.assertEqual("basefile 1, metadata from b",

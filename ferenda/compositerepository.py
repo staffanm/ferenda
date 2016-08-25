@@ -28,7 +28,12 @@ class CompositeStore(DocumentStore):
     def list_basefiles_for(self, action, basedir=None):
         if not basedir:
             basedir = self.datadir
-        if action in ("parse", "news"):
+        # if action in ("parse", "news"): # NB: since symlinks from
+        # <mainrepo>/entries to <subrepo>/entries is now created as
+        # part of parse (in .copy_parsed), and possibly even as part
+        # of download (see lagen.nu.myndfskr), we only need to query
+        # subrepos prior to the parse step
+        if action in ("parse"): 
             documents = set()
             for cls, inst in self.docrepo_instances.items():
                 for basefile in inst.store.list_basefiles_for(action):

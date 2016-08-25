@@ -117,10 +117,15 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
                 cls.alias == subrepoalias):
                 inst = self.get_instance(cls)
                 basefiles = []
-                ret = inst.download(basefile, reporter=basefiles.append)
-                for basefile in basefiles:
-                    util.link_or_copy(inst.store.documententry_path(basefile),
-                                      self.store.documententry_path(basefile))
+                try:
+                    ret = inst.download(basefile, reporter=basefiles.append)
+                finally:
+                    for basefile in basefiles:
+                        util.link_or_copy(inst.store.documententry_path(basefile),
+                                          self.store.documententry_path(basefile))
+                    # msbfs/entries/.root.json -> myndfs/entries/msbfs.json
+                    util.link_or_copy(inst.store.documententry_path(".root"),
+                                      self.store.documententry_path(inst.alias))
         else:
             self.log.error("Couldn't find any subrepo with alias %s" % subrepoalias)
             
