@@ -1217,13 +1217,9 @@ class SKVFS(MyndFskrBase):
     storage_policy = "dir"
     downloaded_suffix = ".html"
 
-    # start_url = "http://www.skatteverket.se/rattsinformation/foreskrifter/tidigarear.4.1cf57160116817b976680001670.html"
-    # This url contains slightly more (older) links (and a different layout)?
-    start_url = "http://www.skatteverket.se/rattsinformation/lagrummet/foreskriftergallande/aldrear.4.19b9f599116a9e8ef3680003547.html"
-
+    start_url = "http://www4.skatteverket.se/rattsligvagledning/115.html"
     # also consolidated versions
     # http://www.skatteverket.se/rattsinformation/lagrummet/foreskrifterkonsoliderade/aldrear.4.19b9f599116a9e8ef3680004242.html
-
     def forfattningssamlingar(self):
         return ["skvfs", "rsfs"]
 
@@ -1235,28 +1231,24 @@ class SKVFS(MyndFskrBase):
         startyear = str(
             self.config.lastdownload.year) if 'lastdownload' in self.config and not self.config.refresh else "0"
 
+        years = set()
         for (element, attribute, link, pos) in source:
+            # the "/rattsligvagledning/edition/" is to avoid false
+            # positives in a hidden mobile menu
             if not attribute == "href" or not element.text or not re.match(
-                    '\d{4}', element.text):
+                    '\d{4}', element.text) or "/rattsligvagledning/edition/" in element.get("href"):
                 continue
             year = element.text
-            if year >= startyear:   # string comparison is ok in this case
+            if year >= startyear and year not in years:   # string comparison is ok in this case
+                years.add(year)
                 self.log.debug("SKVFS: Downloading year %s from %s" % (year, link))
                 resp = self.session.get(link)
-                tree = lxml.html.document_fromstring(resp.text)
-                tree.make_links_absolute(link, resolve_base_href=True)
-                for (docelement, docattribute, doclink, docpos) in tree.iterlinks():
-                    if not docelement.text or not re.match(
-                            '\w+FS \d+:\d+', docelement.text):
-                        continue
-                    linktext = re.match("\w+FS \d+:\d+", docelement.text).group(0)
-                    basefile = self.sanitize_basefile(linktext.replace(" ", "/"))
-                    if "bilaga" in element.text:
-                        self.log.warning(
-                            "%s: Skipping attachment in %s" %
-                            (basefile, element.text))
-                        continue
-                    yield(basefile, doclink)
+                resp.raise_for_status()
+                soup = BeautifulSoup(resp.text, "lxml")
+                for basefile_el in soup.find_all("td", text=re.compile("^\w+FS \d+:\d+")):
+                    relurl = basefile_el.find_next_sibling("td").a["href"]
+                    basefile = self.sanitize_basefile(basefile_el.get_text().replace(" ", "/"))
+                    yield basefile, urljoin(link, relurl)
 
     def download_single(self, basefile, url):
         # The HTML version is the one we always can count on being
@@ -1454,4 +1446,5 @@ class STFS(MyndFskrBase):
 
 class SvKFS(MyndFskrBase):
     alias = "svkfs"
-    start_url = "http://www.svk.se/Tekniska-krav/Foreskrifter/"
+    start_url = "http://www.svk.se/om-oss/foreskrifter/"
+    basefile_regex = "^SvKFS (?P<basefile>\d{4}:\d{1,3})"
