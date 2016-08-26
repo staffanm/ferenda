@@ -23,6 +23,7 @@ from ferenda.elements import Body, Paragraph, Preformatted
 from ferenda.pdfreader import StreamingPDFReader
 from .fixedlayoutsource import FixedLayoutSource, FixedLayoutStore
 from . import Offtryck
+from .legalref import LegalRef
 
 
 class RiksdagenStore(FixedLayoutStore):
@@ -471,7 +472,11 @@ class Riksdagen(Offtryck, FixedLayoutSource):
                 self.log.debug("%s: Loading soup from %s" % (basefile, filename))
             except ValueError:
                 self.log.debug("%s: Loading placeholder soup" % (basefile))
-            return BeautifulSoup(fp.read(), "lxml")
+            text = fp.read()
+            if text == "Propositionen ej utgiven":
+                raise errors.DocumentRemovedError("%s was never published" % basefile)
+            else:
+                return BeautifulSoup(text, "lxml")
 
     @staticmethod
     def htmlparser(chunks):
@@ -551,8 +556,14 @@ class Riksdagen(Offtryck, FixedLayoutSource):
             defaultsize = 8
         sharedstate = {'basefile': basefile,
                        'defaultsize': defaultsize}
-        return [(self.find_primary_law, sharedstate),
-                (self.find_commentary, sharedstate)]
+        functions = [(self.find_primary_law, sharedstate),
+                     (self.find_commentary, sharedstate)]
+        if not hasattr(self, 'sfsparser'):
+            self.sfsparser = LegalRef(LegalRef.LAGRUM)
+        self.sfsparser.currentlynamedlaws.clear()
+        if self.document_type == self.PROPOSITION:
+            functions.append((self.find_kommittebetankande, sharedstate))
+        return functions
 
 
     def sourcefiles(self, basefile, resource=None):

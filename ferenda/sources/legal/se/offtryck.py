@@ -12,6 +12,7 @@ import difflib
 # 3rd party
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
+from bs4 import BeautifulSoup
 
 # own
 from ferenda import util
@@ -20,6 +21,7 @@ from ferenda.elements import Section, Link, Body, CompoundElement, Preformatted
 from ferenda.elements.html import P
 from ferenda.pdfreader import BaseTextDecoder, Page, Textbox
 from ferenda.decorators import newstate
+from ferenda.errors import ParseError
 
 from . import SwedishLegalSource, RPUBL
 from .legalref import Link, LegalRef, RefParseError
@@ -99,16 +101,13 @@ class Offtryck(SwedishLegalSource):
 
     def sanitize_body(self, rawbody):
         sanitized = super(Offtryck, self).sanitize_body(rawbody)
-        try:
+        if isinstance(sanitized, PDFReader):
             sanitized.analyzer = self.get_pdf_analyzer(sanitized)
-        except AttributeError:
-            if isinstance(sanitized, list):
-                pass  # means that we use a placeholder text instead
-                      # of a real document
-            else:
-                raise
+        elif isinstance(sanitized, (list, BeautifulSoup)):
+            pass
+        else:
+            raise ParseError("can't sanitize object of type %s" % type(rawbody))
         return sanitized
-
 
     # This is a fallback "parser" used when we can't get access to the
     # actual document text and instead conjure up a placeholder in the
@@ -206,7 +205,7 @@ class Offtryck(SwedishLegalSource):
         # (normally a PDFReader or StreamingPDFReader)
         rawbody = self.extract_body(fp, basefile)
         sanitized = self.sanitize_body(rawbody)
-        if not hasattr(sanitized, 'analyzer'):
+        if not hasattr(sanitized, 'analyzer') or isinstance(sanitized, BeautifulSoup):
             # fall back into the same logic as
             # SwedishLegalSource.parse_body at this point
             parser = self.get_parser(basefile, sanitized)
@@ -324,6 +323,9 @@ class Offtryck(SwedishLegalSource):
         # the following postprocessing code is so far only written for
         # Propositioner
         if self.rdf_type != RPUBL.Proposition:
+            return doc.body
+        if len(doc.body) == 0:
+            self.log.warning("%s: doc.body is empty" % doc.basefile)
             return doc.body
 
         # move the first pagebreak into the first pseudo-section
