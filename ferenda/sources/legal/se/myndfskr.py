@@ -1110,7 +1110,6 @@ class MSBFS(MyndFskrBase):
         resp = self.session.post(form.action, data=data)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "lxml")
-        from pudb import set_trace; set_trace()
         for link in soup.find_all("a", text=re.compile(self.basefile_regex),
                                   href=re.compile("\.pdf$")):
             basefile = re.match(self.basefile_regex, link.get_text()).group("basefile")
@@ -1218,7 +1217,6 @@ class SJVFS(MyndFskrBase):
     @decorators.downloadmax
     def download_get_basefiles(self, source):
         soup = BeautifulSoup(source, "lxml")
-        from pudb import set_trace; set_trace()
         main = soup.find_all("ul", "consid-submenu")
         assert len(main) == 1
         extra = []
