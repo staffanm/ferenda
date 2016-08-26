@@ -53,7 +53,7 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
         myndfskr.LMFS,
         myndfskr.LVFS,
         myndfskr.MIGRFS,
-        myndfskr.MRTVFS,
+        myndfskr.MPRTVFS,
         myndfskr.MSBFS,
         myndfskr.MYHFS,
         myndfskr.NFS,

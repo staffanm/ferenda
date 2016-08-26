@@ -1070,9 +1070,11 @@ class MIGRFS(MyndFskrBase):
     start_url = "http://www.migrationsverket.se/info/1082.html"
 
 
-class MRTVFS(MyndFskrBase):
-    alias = "mrtvfs"
-    start_url = "http://www.radioochtv.se/Publikationer-Blanketter/Foreskrifter/"
+class MPRTVFS(MyndFskrBase):
+    alias = "mprtvfs"
+    start_url = "http://www.radioochtv.se/sv/blanketter--publikationer/foreskrifter/"
+    def forfattningssamlingar(self):
+        return ["mrprtvfs", "mrtvfs", "rtvfs"]
 
 
 class MSBFS(MyndFskrBase):
@@ -1080,6 +1082,40 @@ class MSBFS(MyndFskrBase):
     start_url = "https://www.msb.se/sv/Om-MSB/Lag-och-ratt/"
     # FIXME: start_url now requres a POST but with a bunch of
     # viewstate crap to yield a full list
+    download_iterlinks = False # download_get_basefiles will be called
+                               # with start_url text, not result from
+                               # .iterlinks()
+
+    basefile_regex = "^(?P<basefile>(MSBFS|SRVFS|KBMFS|SÄIFS) \d+:\d+)"
+
+    def forfattningssamlingar(self):
+        return ["msbfs", "srvfs", "kbmfs", "säifs"]
+
+    def download_get_basefiles(self, source):
+        doc = lxml.html.fromstring(source)
+        doc.make_links_absolute(self.start_url)
+        form = doc.forms[0]
+        data=dict(form.fields)
+        # remove some fields that aren't sent by any real browser
+        del data['ctl00$ContentArea$MainContentArea$ctl02$ctl00$ctl04$ctl00$ctl00']
+        del data['ctl00$ContentArea$MainContentArea$ctl02$ctl00$ctl06$SearchFormBox$ctl00$ctl00']
+        del data['ctl00$ContentArea$MainContentArea$ctl02$ctl00$ctl06$SearchFormBox$ctl00$ctl01']
+        del data['ctl00$ShoppingCart$Button1']
+        del data['ctl00$SiteTop$SiteQuickSearch$cmdSearch']
+        data['ctl00$ContentArea$MainContentArea$ctl02$ctl00$ctl06$SearchFormBox$ctl00$cboValidDate'] = ''
+        data['ctl00$SiteTop$SiteQuickSearch$txtSearch'] = ''
+        data['ctl00$ContentArea$MainContentArea$ctl02$ctl00$ctl04$ctl00$txtSearch'] = ''
+        # simulate a click on the lower search button
+        data['ctl00$ContentArea$MainContentArea$ctl02$ctl00$ctl06$SearchFormBox$ctl00$ctl00'] = "Sök"
+        resp = self.session.post(form.action, data=data)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "lxml")
+        from pudb import set_trace; set_trace()
+        for link in soup.find_all("a", text=re.compile(self.basefile_regex),
+                                  href=re.compile("\.pdf$")):
+            basefile = re.match(self.basefile_regex, link.get_text()).group("basefile")
+            yield self.sanitize_basefile(basefile), urljoin(self.start_url, link["href"])
+            
 
 class MYHFS(MyndFskrBase):
     #  (id vs länk)
