@@ -1016,17 +1016,19 @@ def _start_multiprocessing(jobqueue, resultqueue, nprocs, clientname):
     log = getlog()
     # log.debug("Client: [pid %s] about to start %s processes" % (os.getpid(), nprocs))
     for i in range(nprocs):
-
-        p = multiprocessing.Process(
-            target=_build_worker,
-            args=(jobqueue, resultqueue, clientname))
+        p = _start_proc(jobqueue, resultqueue, clientname)
         procs.append(p)
-        # sleep(1)
-        p.start()
         log.debug("Client: [pid %s] Started process %s" % (os.getpid(), p.pid))
     return procs
 
+def _start_proc(jobqueue, resultqueue, clientname):
+        p = multiprocessing.Process(
+            target=_build_worker,
+            args=(jobqueue, resultqueue, clientname))
+        p.start()
+        return p
 
+    
 def _finish_multiprocessing(procs, join=True):
     # we could either send a DONE signal to each proc or we could just
     # kill them
@@ -1289,16 +1291,31 @@ def _parallelizejobs(iterable, inst, classname, command, config, argv):
     procs = _start_multiprocessing(jobqueue, resultqueue, inst.config.processes, None)
     try:
         basefiles = __queue_jobs_nomanager(jobqueue, iterable, inst, classname, command)
-        res = _process_resultqueue(resultqueue, basefiles)
+        res = _process_resultqueue(resultqueue, basefiles, procs, jobqueue, None)
         return res
     finally:
         _finish_multiprocessing(procs, join=False)
 
 
-def _process_resultqueue(resultqueue, basefiles):
+def _process_resultqueue(resultqueue, basefiles, procs, jobqueue, clientname):
     res = {}
     queuelength = len(basefiles)
+    log = getlog()
     for i in range(queuelength):
+        # check if all procs are still alive?
+        all_alive = True
+        dead = []
+        for p in procs:
+            if not p.is_alive():
+                log.error("Process %s is not alive!!!" % p.pid)
+                all_alive = False
+                dead.append(p)
+        for p in dead:
+            p.terminate()  ## needed?
+            procs.remove(p)
+            newp = _start_proc(jobqueue, resultqueue, clientname)
+            log.info("Client: [pid %s] Started new process %s" % (os.getpid(), newp.pid))
+            procs.append(newp)
         r = resultqueue.get()
         if isinstance(r['result'], tuple) and r['result'][0] == _WrappedKeyboardInterrupt:
             raise KeyboardInterrupt()
