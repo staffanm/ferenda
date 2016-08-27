@@ -620,7 +620,7 @@ class RemoteIndex(FulltextIndex):
     def update(self, uri, repo, basefile, text, **kwargs):
         relurl, payload = self._update_payload(
             uri, repo, basefile, text, **kwargs)
-        # print("update: PUT %s\n%s\n" % (self.location + relurl, payload))
+        # print("update: PUT %s\n%s\n" % (self.location + relurl, payload[:80]))
         res = requests.put(self.location + relurl, payload)
         try:
             res.raise_for_status()
@@ -1021,6 +1021,8 @@ class ElasticSearchIndex(RemoteIndex):
             "mappings": {}
         }
         for repo in repos:
+            if not repo.config.relate:
+                continue
             g = repo.make_graph()  # for qname lookup
             es_fields = {}
             schema = self.get_default_schema()

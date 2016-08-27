@@ -29,6 +29,7 @@ import logging.handlers
 import os
 import re
 import socket
+import sys
 import time
 
 # 3rd party
@@ -528,7 +529,7 @@ class DocumentRepository(object):
         }
 
     @classmethod
-    def setup(cls, action, config):
+    def setup(cls, action, config, *args, **kwargs):
         """Runs before any of the ``*_all`` methods starts executing. It just
 calls the appropriate setup method, ie if *action* is ``parse``, then
 this method calls ``parse_all_setup`` (if defined) with the *config*
@@ -537,10 +538,10 @@ object as single parameter."""
         if hasattr(cls, action + "_all_setup"):
             cbl = getattr(cls, action + "_all_setup")
             if callable(cbl):
-                return cbl(config)
+                return cbl(config, *args, **kwargs)
 
     @classmethod
-    def teardown(cls, action, config):
+    def teardown(cls, action, config, *args, **kwargs):
         """Runs after any of the ``*_all`` methods has finished executing. It
 just calls the appropriate teardown method, ie if *action* is
 ``parse``, then this method calls ``parse_all_teardown`` (if defined)
@@ -551,7 +552,7 @@ with the *config* object as single parameter.
         if hasattr(cls, action + "_all_teardown"):
             cbl = getattr(cls, action + "_all_teardown")
             if callable(cbl):
-                return cbl(config)
+                return cbl(config, *args, **kwargs)
 
     def get_archive_version(self, basefile):
         """Get a version identifier for the current version of the
@@ -1060,7 +1061,7 @@ with the *config* object as single parameter.
     # STEP 2: Parse the downloaded data into a structured XML document
     # with RDFa metadata.
     @classmethod
-    def parse_all_setup(cls, config):
+    def parse_all_setup(cls, config, *args, **kwargs):
         """
         Runs any action needed prior to parsing all documents in a
         docrepo. The default implementation does nothing.
@@ -1073,7 +1074,7 @@ with the *config* object as single parameter.
         """
 
     @classmethod
-    def parse_all_teardown(cls, config):
+    def parse_all_teardown(cls, config, *args, **kwargs):
         """
         Runs any cleanup action needed after parsing all documents in
         a docrepo. The default implementation does nothing.
@@ -1593,7 +1594,7 @@ with the *config* object as single parameter.
     #
     #
     @classmethod
-    def relate_all_setup(cls, config):
+    def relate_all_setup(cls, config, *args, **kwargs):
         """Runs any cleanup action needed prior to relating all documents in
         a docrepo. The default implementation clears the corresponsing
         context (see :py:meth:`~ferenda.DocumentRepository.dataset_uri`)
@@ -1642,9 +1643,18 @@ with the *config* object as single parameter.
         if 'relate' in config and config.relate is False:
             log.info("%s: Not relating" % cls.alias)
             return False
-        # FIXME: if config.fulltextindex, we should attempt to connect
-        # to the index (at least if config.indextype != "WHOOSH") to
-        # see if the server is up.
+        # if config.fulltextindex, we should attempt to connect to the
+        # index to see if the server is up. Also, a good idea in a
+        # multiprocessing context to have the main controlling process
+        # create the schema rather than the first random worker
+        # process.
+        if config.fulltextindex:
+            repos = kwargs.get("otherrepos", [])
+            if kwargs.get("currentrepo"):
+                repos.append(kwargs["currentrepo"])
+            FulltextIndex.connect(config.indextype,
+                                  config.indexlocation,
+                                  repos=repos)
 
         # Bulk upload: We implemented an alternate way of loading the
         # triplestore, where we didn't POST into the triplestore
@@ -1666,7 +1676,7 @@ with the *config* object as single parameter.
         return True
 
     @classmethod
-    def relate_all_teardown(cls, config):
+    def relate_all_teardown(cls, config, *args, **kwargs):
         """Runs any cleanup action needed after relating all documents in a
         docrepo. The default implementation dumps all RDF data loaded
         into the triplestore into one giant N-Triples file.
@@ -2216,7 +2226,7 @@ WHERE {
     #
 
     @classmethod
-    def generate_all_setup(cls, config):
+    def generate_all_setup(cls, config, *args, **kwargs):
         """
         Runs any action needed prior to generating all documents in a
         docrepo. The default implementation does nothing.
@@ -2228,7 +2238,7 @@ WHERE {
         """
 
     @classmethod
-    def generate_all_teardown(cls, config):
+    def generate_all_teardown(cls, config, *args, **kwargs):
         """
         Runs any cleanup action needed after generating all documents
         in a docrepo. The default implementation does nothing.

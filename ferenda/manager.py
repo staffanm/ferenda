@@ -883,7 +883,9 @@ def _run_class(enabled, argv, config):
             iterable = inst.store.list_basefiles_for(action)
             res = []
             # semi-magic handling
-            ret = cls.setup(action, inst.config)
+            kwargs['currentrepo'] = inst
+            ret = cls.setup(action, inst.config, **kwargs)
+            del kwargs['currentrepo']
             if ret is False:
                 log.info("%s %s: Nothing to do!" % (alias, action))
             else:
