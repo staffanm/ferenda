@@ -19,17 +19,19 @@ from ferenda.sources.legal.se import SwedishLegalSource
 
 class PBR(SwedishLegalSource):
     alias = "pbr"
-    start_url = "http://www.pbr.se/malregister?sok=&mnr=&mntp=hfd&sak=&dtx=&ktp=&knm=&kob=&mnm=&mob=&klass=&jus=&tes=&lag=&prf=&d1typ=&d1min=&d1max=&d2typ=&d2min=&d2max=&patent=1&vm=1&monster=1&namn=1&vxt=1&ubevis=1&u_bifall=1&u_bifall2=1&u_fastst=1&u_avslag=1&u_avskr=1&u_avvis=1&u_annan=1&vagledande=1&intressant=1&ovrigt=1&esf=1&ekf=1"
+
+    start_url = "http://www.pbr.se/malregister?sok=&mnr=&mntp=hfd&sak=&dtx=&ktp=&knm=&kob=&mnm=&mob=&klass=&jus=&tes=&lag=&prf=&d1typ=&d1min=&d1max=&d2typ=&d2min=&d2max=&patent=1&vm=1&monster=1&namn=1&vxt=1&ubevis=1&u_bifall=1&u_bifall2=1&u_fastst=1&u_avslag=1&u_avskr=1&u_avvis=1&u_annan=1&vagledande=1&intressant=1&ovrigt=1&esf=&ekf=1"
     download_iterlinks = False
     storage_policy = "dir"
 
     def download_get_basefiles(self, source):
         current_url = self.start_url
         soup = BeautifulSoup(source, "lxml")
+        self.log.debug(soup.find("div", "traffinfo").get_text())
         done = False
-        pagecnt = 1
+        pageidx = 1
         while not done:
-            self.log.debug("loading page %s of results" % pagecnt)
+            self.log.debug("loading page %s of results" % pageidx)
             for f in soup.find_all("div", "rad"):
                 link_el =  f.find("a", "block")
                 link = urljoin(self.start_url, link_el["href"])
@@ -39,9 +41,9 @@ class PBR(SwedishLegalSource):
                 with self.store.open_downloaded(basefile, attachment="snippet.html", mode="w") as fp:
                     fp.write(str(f))
                 yield basefile, link
-            next_el = soup.find("a", text=">")
+            next_el = soup.find("a", text=str(pageidx+1))
             if next_el:
-                pagecnt += 1
+                pageidx += 1
                 current_url = urljoin(current_url, next_el["href"])
                 resp = self.session.get(current_url)
                 resp.raise_for_status()
