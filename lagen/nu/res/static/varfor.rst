@@ -32,9 +32,8 @@ tillgänglig för vem som helst som är intresserad och
 motiverad. Människor med olika kunskapsnivåer kommunicerar - via mail,
 webbforum, IM, och oräkneligt många andra former - och hjälper
 varandra till större insikt. En webbtjänst med förstahandsinformation
-som är vettigt uppbyggd och framförallt <a
-href="manual.html#direktlankar">länkbar</a> kan vara en liten men
-viktig byggsten i ett sånt kunskapsbygge.
+som är vettigt uppbyggd och framförallt `länkar </manual>`_ kan vara
+en liten men viktig byggsten i ett sånt kunskapsbygge.
 
 Min förhoppning är att lagen.nu ska vara en sån byggsten.
 

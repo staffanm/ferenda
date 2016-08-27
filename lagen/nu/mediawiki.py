@@ -199,7 +199,12 @@ class LNMediaWiki(wiki.MediaWiki):
 
     def frontpage_content(self, primary=False):
         if primary:
-            return util.readfile(self.store.parsed_path("Lagen.nu:Huvudsida"))
+            page = "Lagen.nu:Huvudsida"
+            if not os.path.exists(self.store.parsed_path(page)):
+                self.log.info("%s doesn't exist, downloading and parsing" % page)
+                self.download(page)
+                self.parse(page)
+            return util.readfile(self.store.parsed_path(page))
         else:
             return super(LNMediaWiki, self).frontpage_content()
                             

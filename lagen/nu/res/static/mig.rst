@@ -17,7 +17,7 @@ lagtexter och började skriva program för att analysera
 texterna.
 
 Det ledde fram till lagen.nu, som jag hoppas ska vara en bra
-resurs för alla som vill förstå svensk lag och rättsskipning.</p>
+resurs för alla som vill förstå svensk lag och rättsskipning.
 
 Vill du veta mer om vad jag gör kanske du vill besöka `min blogg
 <http://blog.tomtebo.org/>`_?

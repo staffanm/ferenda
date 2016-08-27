@@ -1074,7 +1074,7 @@ class MPRTVFS(MyndFskrBase):
     alias = "mprtvfs"
     start_url = "http://www.radioochtv.se/sv/blanketter--publikationer/foreskrifter/"
     def forfattningssamlingar(self):
-        return ["mrprtvfs", "mrtvfs", "rtvfs"]
+        return ["mprtvfs", "mrtvfs", "rtvfs"]
 
 
 class MSBFS(MyndFskrBase):

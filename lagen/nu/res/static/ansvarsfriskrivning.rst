@@ -35,7 +35,7 @@ du själv är jurist (eller har motsvarande kunskaper) och vill hjälpa
 till med att skriva och förbättra kommentarer, gå till
 `Deltagarportalen
 <http://wiki.lagen.nu/index.php/Lagen.nu:Deltagarportalen>`_ för att
-komma igång.</p>
+komma igång.
 
 Lagar och andra författningar
 -----------------------------
@@ -98,10 +98,10 @@ från flera olika källor. I första hand hämtas dokumenten från
 <http://www.regeringen.se/rattsdokument>`_, men äldre dokument hämtas
 även från `Riksdagen <https://www.riksdagen.se/sv/Dokument-Lagar/>`_
 (propositioner) och `KB <http://regina.kb.se/sou/>`. Det framgår
-bredvid varje enskild förarbete vilken källa som använts. Äldre
-material är i regel skannat från pappersoriginal och sedan
-OCR-behandlats för att få ut läsbar text. I denna process kan fel i
-texten uppstå. Om något verkar konstigt, kontrollera mot det
+bredvid rubriken för varje enskilt förarbete vilken källa som
+använts. Äldre material är i regel skannat från pappersoriginal och
+sedan OCR-behandlats för att få ut läsbar text. I denna process kan
+fel i texten uppstå. Om något verkar konstigt, kontrollera mot det
 inskannade källdokumentet.
 
 Föreskrifter

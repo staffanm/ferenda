@@ -7,16 +7,16 @@ Om lagen.nu
     
 Syftet med lagen.nu är att samla information om innehållet i gällande
 svensk rätt, och att presentera denna på ett så enkelt och begripligt
-sätt som möjligt. Tjänsten innehåller alla lagar och andra
-författningar som ingår i Svensk författningssamling (SFS), många
-vägledande domstolsavgöranden, förarbeten, vägledande myndighetspraxis
-samt ett urval av myndigheters författningssamlingar. För de
-viktigaste lagarna finns dessutom kommentarer som förklarar och
-exemplifierar reglerna i paragraferna.
+sätt som möjligt. Tjänsten innehåller gällande lagar, rättsfall,
+förarbeten, kommentarer och mycket mer. `Läs mer om vilket innehåll
+som finns i tjänsten <innehall>`_.
 
-Man får väldigt gärna länka till enskilda lagtexter eller
-paragrafer på lagen.nu. `Läs mer om hur man
-länkar hit <lankning>`_.
+Dagens version av lagen.nu är den fjärde stora uppdateringen av
+tjänsten sedan starten 2004. `Läs om vad som är nytt i denna version
+<nytt>`_.
+
+Man får väldigt gärna länka till enskilda lagtexter eller paragrafer
+på lagen.nu. `Läs mer om hur man länkar hit <lankning>`_.
 
 För den som inte har läst juridik eller jobbat med juridiska frågor
 kan det vara lite svårt att överhuvudtaget veta var man ska börja för
@@ -41,7 +41,7 @@ uppfyller Stiftelsen för rättsinformations kvalitetskrav
 Eftersom tjänsten sköts helt automatiskt, med begränsade resurser och
 utgår från ofullständigt material så bör man räkna med att det finns
 felaktigheter i författningarna, så som de presenteras här. `Läs mer
-om felaktigheter och en ansvarsfriskrivning
+om brister i materialet och ansvarsfriskrivning
 <ansvarsfriskrivning>`_.
 
 Lagen.nu är ett ideellt projekt. Varför ägnar vi en massa timmar åt
@@ -49,7 +49,7 @@ att driva den här tjänsten gratis? `Läs mer om motivationen till
 lagen.nu <varfor>`_.
 
 Hur fungerar den här webtjänsten? `Läs mer om tekniken bakom lagen.nu
-<teknik>`_ och om `de byggstenar som använts <kolofon>`_.
+<teknik>`_.
 
 Har du frågor, synpunkter, klagomål, beröm? Hör gärna av dig -
 uppgifter finns under `kontaktinformation <kontakt>`_.

@@ -22,7 +22,7 @@ företräde vid konflikter. *Juridisk metod*, slutligen, är den
 arbetsmetod som jurister använder för att tillämpa rättsinformation
 enligt rättskälleläran på en konkret frågeställning, för att ge ett
 juridiskt underbyggt svar. Själva arbetet kallas ofta
-rättsutredning.</p>
+rättsutredning.
 
 Rättskällelära
 --------------
@@ -147,13 +147,13 @@ frågor. Men några vägar vidare är:
 
 - Ställ frågor och diskutera -- exempelvis på `Lawline
   <http://www.lawline.se/>`_, `Jureka <http://jureka.net/>`_ eller
-  `Juridikfokus <http://www.juridikfokus.se/juridikfokus/om/>`_.</li>
+  `Juridikfokus <http://www.juridikfokus.se/juridikfokus/om/>`_.
 	  
 - Läs någon introduktion till juridik -- exempelvis `Bli inte blåst
   <http://www.manpocket.se/Bocker/Bokpresentationssida/?Isbn=9789172320505>`_
   eller `Juridik till vardags
-  <http://www.bokus.com/b/9789146211433.html>`_.</li>
+  <http://www.bokus.com/b/9789146211433.html>`_.
 
 - Gå en introduktionskurs -- exempelvis `juridisk översiktskurs
   <http://www.juridicum.su.se/jurweb/utbildning/kurser.asp?MomentID=2193&amp;Frist=1&amp;Takt=50>`_
-  vid Stockholms Universitet.</li> </ul>
+  vid Stockholms Universitet.
