@@ -599,10 +599,10 @@ class Testrepo(DocumentRepository):
         return "%s news ok" % (self.alias)
 
     @classmethod
-    def setup(cls, action, config): pass
+    def setup(cls, action, config, *args, **kwargs): pass
 
     @classmethod
-    def teardown(cls, action, config): pass
+    def teardown(cls, action, config, *args, **kwargs): pass
 
 class CustomStore(DocumentStore):
     def custommethod(self):

@@ -793,6 +793,7 @@ class Repo(RepoTester):
         config = LayeredConfig(Defaults({'datadir': self.datadir,
                                          'url': 'http://localhost:8000/',
                                          'force': False,
+                                         'fulltextindex': False,
                                          'storetype': 'a',
                                          'storelocation': 'b',
                                          'storerepository': 'c'}))

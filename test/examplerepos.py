@@ -163,9 +163,9 @@ class staticmockclass(DocumentRepository):
         pass
 
     @classmethod
-    def setup(cls, action, config): pass
+    def setup(cls, action, config, *args, **kwargs): pass
     @classmethod
-    def teardown(cls, action, config): pass
+    def teardown(cls, action, config, *args, **kwargs): pass
         
     @classmethod
     def get_default_options(cls):
