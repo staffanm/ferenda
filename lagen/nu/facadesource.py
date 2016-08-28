@@ -18,11 +18,11 @@ class FacadeSource(CompositeRepository):
         pass
 
     @classmethod
-    def parse_all_setup(cls, config):
+    def parse_all_setup(cls, config, *args, **kwargs):
         return False
 
     @classmethod
-    def relate_all_setup(cls, config):
+    def relate_all_setup(cls, config, *args, **kwargs):
         return False
     
     def news_entries(self):

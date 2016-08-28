@@ -795,9 +795,9 @@ class Devel(object):
         pass  # pragma: no cover
 
     @classmethod
-    def setup(cls, action, config):
+    def setup(cls, action, config, *args, **kwargs):
         pass  # pragma: no cover
 
     @classmethod
-    def teardown(cls, action, config):
+    def teardown(cls, action, config, *args, **kwargs):
         pass  # pragma: no cover

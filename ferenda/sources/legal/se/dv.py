@@ -114,7 +114,7 @@ class DV(SwedishLegalSource):
     xslt_template = "xsl/dv.xsl"
 
     @classmethod
-    def relate_all_setup(cls, config):
+    def relate_all_setup(cls, config, *args, **kwargs):
         # FIXME: If this was an instancemethod, we could use
         # self.store methods instead
         parsed_dir = os.path.sep.join([config.datadir, 'dv', 'parsed'])
@@ -153,7 +153,7 @@ class DV(SwedishLegalSource):
         else:
             log.debug("Not regenerating uri.map")
             pass
-        return super(DV, cls).relate_all_setup(config)
+        return super(DV, cls).relate_all_setup(config, *args, **kwargs)
 
     # def relate(self, basefile, otherrepos): pass
     @classmethod

@@ -41,7 +41,12 @@ class PBR(SwedishLegalSource):
                 with self.store.open_downloaded(basefile, attachment="snippet.html", mode="w") as fp:
                     fp.write(str(f))
                 yield basefile, link
+            self.log.debug("Looking for link %s on ...%s" % (pageidx+1, current_url[-20:]))
             next_el = soup.find("a", text=str(pageidx+1))
+            if not next_el:
+                self.log.debug("Looking for link > on ...%s" % current_url[-20:])
+                next_el = soup.find("a", text=">")
+
             if next_el:
                 pageidx += 1
                 current_url = urljoin(current_url, next_el["href"])
@@ -49,6 +54,7 @@ class PBR(SwedishLegalSource):
                 resp.raise_for_status()
                 soup = BeautifulSoup(resp.text, "lxml")
             else:
+                self.log.debug("Didn't find it, we must be done!")
                 done = True
 
 
