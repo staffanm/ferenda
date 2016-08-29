@@ -1070,11 +1070,13 @@ class MIGRFS(MyndFskrBase):
     start_url = "http://www.migrationsverket.se/info/1082.html"
 
 
-class MPRTVFS(MyndFskrBase):
-    alias = "mprtvfs"
+class MPRTFS(MyndFskrBase):
+    alias = "mprtfs"
     start_url = "http://www.radioochtv.se/sv/blanketter--publikationer/foreskrifter/"
+    basefile_regex = "^(?P<basefile>(MPRTFS|MRTVFS|RTVFS) \d+:\d+)$"
+    document_url_regex = None
     def forfattningssamlingar(self):
-        return ["mprtvfs", "mrtvfs", "rtvfs"]
+        return ["mprtfs", "mrtvfs", "rtvfs"]
 
 
 class MSBFS(MyndFskrBase):
@@ -1090,6 +1092,13 @@ class MSBFS(MyndFskrBase):
 
     def forfattningssamlingar(self):
         return ["msbfs", "srvfs", "kbmfs", "säifs"]
+
+    # this repo has basefiles eg "säifs/2000:6" but the uri will be on
+    # the form "...saeifs/2000:6" so we do a special-case transform
+    def basefile_from_uri(self, uri):
+        uri = uri.replace("/saeifs/", "/säifs/")
+        return super(MyndFskrBase, self).basefile_from_uri(uri)
+    
 
     def download_get_basefiles(self, source):
         doc = lxml.html.fromstring(source)

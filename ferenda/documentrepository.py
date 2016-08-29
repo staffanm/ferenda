@@ -31,6 +31,7 @@ import re
 import socket
 import sys
 import time
+import unicodedata
 
 # 3rd party
 from layeredconfig import LayeredConfig, Defaults
@@ -459,7 +460,7 @@ class DocumentRepository(object):
             if label == str(candidate_label):
                 return resource
             else:
-                resources[candidate_label] = resource
+                resources[str(candidate_label)] = resource
 
         fuzz = difflib.get_close_matches(label, resources.keys(), 1, cutoff)
         if fuzz:
@@ -1292,13 +1293,16 @@ with the *config* object as single parameter.
         :rtype: ferenda.Document
         """
         doc = Document()
-        doc.basefile = basefile
+
+        # when parsing a single file from the command line, the
+        # basefile might be in unicode NFD (eg "./ferenda.build myndfs
+        # säifs/2000:6" on mac). Normalize this.
+        doc.basefile = unicodedata.normalize("NFC", basefile)
         doc.meta = self.make_graph()
         doc.lang = self.lang
         doc.body = Body()
-        if basefile:
-            doc.basefile = basefile
-            doc.uri = self.canonical_uri(basefile)
+        if doc.basefile:
+            doc.uri = self.canonical_uri(doc.basefile)
         return doc
 
     def make_graph(self):

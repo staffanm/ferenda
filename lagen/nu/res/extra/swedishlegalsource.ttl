@@ -409,6 +409,7 @@
     skos:prefLabel "Kammarkollegiets författningssamling"@sv .
 
 <https://lagen.nu/dataset/kbmfs> a rpubl:Forfattningssamling ;
+    dcterms:publisher <https://lagen.nu/org/2016/krisberedskapsmyndigheten> ;
     rdfs:comment "Har tagits över av Myndigheten för samhällsskydd och beredskaps författningssamling (MSBFS)"@sv ;
     rdfs:seeAlso <http://www.krisberedskapsmyndigheten.se/templates/PublicationList____470.aspx> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/kbmfs> ;
@@ -555,8 +556,15 @@
     skos:altLabel "MÖD"@sv ;
     skos:prefLabel "Miljööverdomstolen"@sv .
 
+<https://lagen.nu/dataset/mprtfs> a rpubl:Forfattningssamling ;
+    dcterms:publisher <https://lagen.nu/org/2016/myndigheten_for_press_radio_och_tv> ;
+    owl:sameAs <http://rinfo.lagrummet.se/serie/fs/mprtfs> ;
+    skos:altLabel "MPRTFS"@sv ;
+    skos:prefLabel "Myndigheten för press, radio och tv:s författningssamling"@sv .
+
 <https://lagen.nu/dataset/mrtvfs> a rpubl:Forfattningssamling ;
     dcterms:publisher <https://lagen.nu/org/2014/myndigheten_for_radio_och_tv> ;
+    rdfs:comment "Har tagits över av myndigheten för press, radio och tv:s författningssamling"@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/mrtvfs> ;
     skos:altLabel "MRTVFS"@sv ;
     skos:prefLabel "Myndigheten för radio och tv:s författningssamling"@sv .
@@ -687,7 +695,7 @@
 
 <https://lagen.nu/dataset/rtvfs> a rpubl:Forfattningssamling ;
     dcterms:publisher <https://lagen.nu/org/2014/radio-_och_tv-verket> ;
-    rdfs:comment "Har övertagits av Myndigheten för radio och tvs författningssamling (MRTVFS)"@sv ;
+    rdfs:comment "Har övertagits av Myndigheten för press, radio och tvs författningssamling (MPRTFS)"@sv ;
     rdfs:seeAlso <http://www.rtvv.se/se/blanketter/Om_verket/> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/rtvfs> ;
     skos:altLabel "RTVFS"@sv ;
@@ -1004,6 +1012,10 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/kammarraetten_i_sundsvall> ;
     foaf:name "Kammarrätten i Sundsvall"@sv .
 
+<https://lagen.nu/org/2016/krisberedskapsmyndigheten> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/krisberedskapsmyndigheten> ;
+    foaf:name "Krisberedskapsmyndigheten"@sv .
+
 <https://lagen.nu/org/2008/kommunikationsdepartementet> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/kommunikationsdepartementet> ;
     foaf:name "Kommunikationsdepartementet"@sv .
@@ -1091,6 +1103,10 @@
 <https://lagen.nu/org/2008/statens-provningsanstalt> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/statens_provningsanstalt> ;
     foaf:name "Statens provningsanstalt"@sv .
+
+<https://lagen.nu/org/2016/statens-raddningsverk> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/statens_raeddningsverk> ;
+    foaf:name "Statens räddningsverk"@sv .
 
 <https://lagen.nu/org/2008/statskontoret> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/statskontoret> ;
@@ -1585,6 +1601,10 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/myndigheten_foer_radio_och_tv> ;
     foaf:name "Myndigheten för radio och tv"@sv .
 
+<https://lagen.nu/org/2016/myndigheten_for_press_radio_och_tv> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/myndigheten_foer_press_radio_och_tv> ;
+    foaf:name "Myndigheten för press, radio och tv"@sv .
+
 <https://lagen.nu/org/2014/myndigheten_for_samhallsskydd_och_beredskap> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/myndigheten_foer_samhaellsskydd_och_beredskap> ;
     foaf:name "Myndigheten för samhällsskydd och beredskap"@sv .
@@ -1759,3 +1779,4 @@
     rdfs:comment "Ersatt av Arbetsmiljöverket."@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/org/arbetarskyddsstyrelsen> ;
     foaf:name "Arbetarskyddsstyrelsen"@sv .
+

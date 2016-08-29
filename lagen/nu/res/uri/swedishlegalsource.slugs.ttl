@@ -179,6 +179,12 @@ rpubl:Skrivelse space:abbrSlug "skr" .
 
 <https://lagen.nu/dataset/migrfs> space:abbrSlug "migrfs" .
 
+<https://lagen.nu/dataset/mprtfs> space:abbrSlug "mprtfs" .
+
+<https://lagen.nu/dataset/mrtvfs> space:abbrSlug "mrtvfs" .
+
+<https://lagen.nu/dataset/msbfs> space:abbrSlug "msbfs" .
+
 <https://lagen.nu/dataset/mod> space:abbrSlug "mod" .
 
 <https://lagen.nu/dataset/myhfs> space:abbrSlug "myhfs" .
