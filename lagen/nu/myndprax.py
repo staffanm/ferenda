@@ -75,7 +75,7 @@ WHERE {
                                                     pages=[])
                 selected = facets[1].selector(row, 'dcterms_issued', None)
                 selector_values[(pagesetid, selected)] = True
-            except KeyError as e:
+            except (KeyError, ValueError) as e:
                 self.log.error("toc_pagesets: Couldn't process row %s: %s" % (row.get("uri"), e))
         for (pagesetid, value) in sorted(list(selector_values.keys())):
             pageset = pagesetdict[pagesetid]
@@ -101,7 +101,7 @@ WHERE {
                 if key not in documents:
                     documents[key] = []
                 documents[key].append(row)
-            except KeyError as e:
+            except (KeyError, ValueError) as e:
                 self.log.error("toc_select_for_pages: Couldn't process row %s: %s" % (row.get("uri"), e))
         pagesetdict = {}
         for pageset in pagesets:

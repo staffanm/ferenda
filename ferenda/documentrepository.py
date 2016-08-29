@@ -1297,12 +1297,13 @@ with the *config* object as single parameter.
         # when parsing a single file from the command line, the
         # basefile might be in unicode NFD (eg "./ferenda.build myndfs
         # säifs/2000:6" on mac). Normalize this.
-        doc.basefile = unicodedata.normalize("NFC", basefile)
+        if basefile:
+            basefile = unicodedata.normalize("NFC", basefile)
+            doc.uri = self.canonical_uri(basefile)
+        doc.basefile = basefile
         doc.meta = self.make_graph()
         doc.lang = self.lang
         doc.body = Body()
-        if doc.basefile:
-            doc.uri = self.canonical_uri(doc.basefile)
         return doc
 
     def make_graph(self):
