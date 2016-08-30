@@ -193,7 +193,10 @@ body.toc article ul li {
     nav.affix {
 	position: fixed;
 	top: 0;
+	bottom: 0;  /* ie the div is 100% of the viewport height */
+	overflow: scroll; /* and we can get at the rest if the navmenu is larger than the viewport */
 	width: 24%;  /* of the entire page width, FOR SOME REASON */
+	
     }
 
 }
