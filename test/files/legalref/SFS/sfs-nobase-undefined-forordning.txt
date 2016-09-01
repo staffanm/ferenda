@@ -8,12 +8,12 @@ stycke 2).
 <list>
   <str>NOBASE: Närmare föreskrifter om tillämpningen av denna bestämmelse
 finns i förordningen (</str>
-  <Link uri="https://lagen.nu/sfs/1992:824">1992:824</Link>
+  <Link uri="https://lagen.nu/1992:824">1992:824</Link>
   <str>) om fingeravtryck m.m. Om det behövs
 för att utreda brott på vilket fängelse kan följa, får fotografi tas
 också av den som misstänks för brottet utan att vara anhållen eller
 häktad för detta samt av den som inte är misstänkt för brottet (</str>
-  <Link uri="https://lagen.nu/sfs/1992:824#P2">2 §</Link>
+  <Link uri="https://lagen.nu/1992:824#P2">2 §</Link>
   <str>
 stycke 2).</str>
 </list>

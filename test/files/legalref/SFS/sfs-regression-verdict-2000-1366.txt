@@ -1,9 +1,9 @@
 10 kap. 1 § och 8 § rättegångsbalken (1942:740)
 
 <list>
-  <Link uri="https://lagen.nu/sfs/1942:740#K10P1">10 kap. 1 §</Link>
+  <Link uri="https://lagen.nu/1942:740#K10P1">10 kap. 1 §</Link>
   <str> och </str>
-  <Link uri="https://lagen.nu/sfs/1942:740#K10P8">8 §</Link>
+  <Link uri="https://lagen.nu/1942:740#K10P8">8 §</Link>
   <str> </str>
-  <Link uri="https://lagen.nu/sfs/1942:740">rättegångsbalken (1942:740)</Link>
+  <Link uri="https://lagen.nu/1942:740">rättegångsbalken (1942:740)</Link>
 </list>

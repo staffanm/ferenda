@@ -4,10 +4,10 @@ avseende återförsäkring (indirekt försäkring) av försäkring [...]
 
 <list>
   <str>[...] som avses i </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#K2P3aS1">2 kap. 3 a § första stycket</Link>
+  <Link uri="https://lagen.nu/9999:999#K2P3aS1">2 kap. 3 a § första stycket</Link>
   <str> klasserna 1 och 2
 samt med rörelse [...] som avses i </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#K2P3aS2N11">2 kap. 3 a § andra stycket 11</Link>
+  <Link uri="https://lagen.nu/9999:999#K2P3aS2N11">2 kap. 3 a § andra stycket 11</Link>
   <str>
 avseende återförsäkring (indirekt försäkring) av försäkring [...]</str>
 </list>

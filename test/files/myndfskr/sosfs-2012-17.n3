@@ -9,7 +9,7 @@
 <http://rinfo.lagrummet.se/publ/sosfs/2012:17> a rpubl:Myndighetsforeskrift ;
     dcterms:identifier "SOSFS 2012:17" ;
     dcterms:publisher <http://rinfo.lagrummet.se/org/socialstyrelsen> ;
-    dcterms:title "Socialstyrelsens föreskrifter och allmänna råd om tandvård vid långvarig sjukdom eller funktionsnedsättning;"@sv ;
+    dcterms:title "Socialstyrelsens föreskrifter och allmänna råd om tandvård vid långvarig sjukdom eller funktionsnedsättning"@sv ;
     rpubl:arsutgava "2012" ;
     rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/1998:1338#p_13> ;
     rpubl:beslutadAv <http://rinfo.lagrummet.se/org/socialstyrelsen> ;

@@ -5,7 +5,7 @@
 <http://rinfo.lagrummet.se/publ/elsaek-fs/2008:2> a rpubl:Myndighetsforeskrift;
     dcterms:identifier "ELSÄK-FS 2008:2";
     dcterms:publisher <http://rinfo.lagrummet.se/org/elsaekerhetsverket>;
-    dcterms:title "Elsäkerhetsverkets föreskrifter och allmänna råd om varselmärkning vid elektriska starkströmsanläggningar;"@sv;
+    dcterms:title "Elsäkerhetsverkets föreskrifter och allmänna råd om varselmärkning vid elektriska starkströmsanläggningar"@sv;
     rpubl:arsutgava "2008";
     rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/1957:601#k_1-p_2>,
         <http://rinfo.lagrummet.se/publ/sfs/1957:601#k_5-p_1>,

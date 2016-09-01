@@ -6,7 +6,7 @@
     dcterms:identifier "FFFS 2011:26";
     dcterms:issn "1102-7460";
     dcterms:publisher <http://rinfo.lagrummet.se/org/finansinspektionen>;
-    dcterms:title "Finansinspektionens föreskrifter och allmänna råd om särskild tillsyn över finansiella konglomerat;"@sv;
+    dcterms:title "Finansinspektionens föreskrifter och allmänna råd om särskild tillsyn över finansiella konglomerat"@sv;
     rpubl:arsutgava "2011";
     rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2006:627>;
     rpubl:beslutadAv <http://rinfo.lagrummet.se/org/finansinspektionen>;

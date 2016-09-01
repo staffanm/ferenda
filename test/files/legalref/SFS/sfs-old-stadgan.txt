@@ -1,5 +1,5 @@
 29 § 2 mom. jaktstadgan (1938:279)
 
 <list>
-  <Link uri="https://lagen.nu/sfs/1938:279#P29O2">29 § 2 mom. jaktstadgan (1938:279)</Link>
+  <Link uri="https://lagen.nu/1938:279#P29O2">29 § 2 mom. jaktstadgan (1938:279)</Link>
 </list>

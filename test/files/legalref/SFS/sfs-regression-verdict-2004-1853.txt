@@ -2,26 +2,26 @@
 40 kap. 2 §, 6 §, 7 § och 14 § inkomstskattelagen (1999:1229)
 
 <list>
-  <Link uri="https://lagen.nu/sfs/1999:1229#K6P8">6 kap. 8 §</Link>
+  <Link uri="https://lagen.nu/1999:1229#K6P8">6 kap. 8 §</Link>
   <str>, </str>
-  <Link uri="https://lagen.nu/sfs/1999:1229#K6P9">9 §</Link>
+  <Link uri="https://lagen.nu/1999:1229#K6P9">9 §</Link>
   <str> och </str>
-  <Link uri="https://lagen.nu/sfs/1999:1229#K6P10">10 §</Link>
+  <Link uri="https://lagen.nu/1999:1229#K6P10">10 §</Link>
   <str>, </str>
-  <Link uri="https://lagen.nu/sfs/1999:1229#K35P2">35 kap. 2 §</Link>
+  <Link uri="https://lagen.nu/1999:1229#K35P2">35 kap. 2 §</Link>
   <str> och </str>
-  <Link uri="https://lagen.nu/sfs/1999:1229#K35P2a">2 a §</Link>
+  <Link uri="https://lagen.nu/1999:1229#K35P2a">2 a §</Link>
   <str>, </str>
-  <Link uri="https://lagen.nu/sfs/1999:1229#K37P25">37 kap. 25 §</Link>
+  <Link uri="https://lagen.nu/1999:1229#K37P25">37 kap. 25 §</Link>
   <str> samt
 </str>
-  <Link uri="https://lagen.nu/sfs/1999:1229#K40P2">40 kap. 2 §</Link>
+  <Link uri="https://lagen.nu/1999:1229#K40P2">40 kap. 2 §</Link>
   <str>, </str>
-  <Link uri="https://lagen.nu/sfs/1999:1229#K40P6">6 §</Link>
+  <Link uri="https://lagen.nu/1999:1229#K40P6">6 §</Link>
   <str>, </str>
-  <Link uri="https://lagen.nu/sfs/1999:1229#K40P7">7 §</Link>
+  <Link uri="https://lagen.nu/1999:1229#K40P7">7 §</Link>
   <str> och </str>
-  <Link uri="https://lagen.nu/sfs/1999:1229#K40P14">14 §</Link>
+  <Link uri="https://lagen.nu/1999:1229#K40P14">14 §</Link>
   <str> </str>
-  <Link uri="https://lagen.nu/sfs/1999:1229">inkomstskattelagen (1999:1229)</Link>
+  <Link uri="https://lagen.nu/1999:1229">inkomstskattelagen (1999:1229)</Link>
 </list>

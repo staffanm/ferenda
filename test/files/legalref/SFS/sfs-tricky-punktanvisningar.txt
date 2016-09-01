@@ -3,11 +3,11 @@
 32 § anvisningarna punkt 3 fjärde stycket kommunalskattelagen (1928:370)
 
 <list>
-  <Link uri="https://lagen.nu/sfs/1928:376#P41">41 § kommunalskattelagen (1928:376)</Link>
+  <Link uri="https://lagen.nu/1928:376#P41">41 § kommunalskattelagen (1928:376)</Link>
   <str>
 </str>
-  <Link uri="https://lagen.nu/sfs/1928:370#P41S1N4">41 § anvisningarna punkt 4 första stycket kommunalskattelagen (1928:370)</Link>
+  <Link uri="https://lagen.nu/1928:370#P41S1N4">41 § anvisningarna punkt 4 första stycket kommunalskattelagen (1928:370)</Link>
   <str>
 </str>
-  <Link uri="https://lagen.nu/sfs/1928:370#P32S4N3">32 § anvisningarna punkt 3 fjärde stycket kommunalskattelagen (1928:370)</Link>
+  <Link uri="https://lagen.nu/1928:370#P32S4N3">32 § anvisningarna punkt 3 fjärde stycket kommunalskattelagen (1928:370)</Link>
 </list>

@@ -2,10 +2,10 @@ har utan ändring i sak förts över till 4 kap. 9 c § och 10 § brottsbalken.
 
 <list>
   <str>har utan ändring i sak förts över till </str>
-  <Link uri="https://lagen.nu/sfs/1962:700#K4P9c">4 kap. 9 c §</Link>
+  <Link uri="https://lagen.nu/1962:700#K4P9c">4 kap. 9 c §</Link>
   <str> och </str>
-  <Link uri="https://lagen.nu/sfs/1962:700#K4P10">10 §</Link>
+  <Link uri="https://lagen.nu/1962:700#K4P10">10 §</Link>
   <str> </str>
-  <Link uri="https://lagen.nu/sfs/1962:700">brottsbalken</Link>
+  <Link uri="https://lagen.nu/1962:700">brottsbalken</Link>
   <str>.</str>
 </list>

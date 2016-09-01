@@ -16,7 +16,7 @@
 <http://rinfo.lagrummet.se/publ/afs/2014:44> a rpubl:Myndighetsforeskrift ;
     dcterms:identifier "AFS 2014:44" ;
     dcterms:publisher <http://rinfo.lagrummet.se/org/arbetsmiljoeverket> ;
-    dcterms:title "Arbetsmiljöverkets föreskrifter om upphävande av föreskrifterna (AFS 2005:19) om förebyggande av allvarliga kemikalieolyckor;"@sv ;
+    dcterms:title "Arbetsmiljöverkets föreskrifter om upphävande av föreskrifterna (AFS 2005:19) om förebyggande av allvarliga kemikalieolyckor"@sv ;
     rpubl:arsutgava "2014" ;
     rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/1977:1166#p_18> ;
     rpubl:beslutadAv <http://rinfo.lagrummet.se/org/arbetsmiljoeverket> ;

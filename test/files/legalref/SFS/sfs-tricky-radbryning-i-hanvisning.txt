@@ -3,7 +3,7 @@ a §.
 
 <list>
   <str>En hänvisning till </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P1a">1
+  <Link uri="https://lagen.nu/9999:999#P1a">1
 a §</Link>
   <str>.</str>
 </list>

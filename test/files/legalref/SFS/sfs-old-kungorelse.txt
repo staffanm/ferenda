@@ -1,5 +1,5 @@
 37 § 2 st. vägtrafikkungörelsen (1972:60)
 
 <list>
-  <Link uri="https://lagen.nu/sfs/1972:60#P37S2">37 § 2 st. vägtrafikkungörelsen (1972:60)</Link>
+  <Link uri="https://lagen.nu/1972:60#P37S2">37 § 2 st. vägtrafikkungörelsen (1972:60)</Link>
 </list>

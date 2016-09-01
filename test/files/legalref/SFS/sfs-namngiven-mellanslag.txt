@@ -3,7 +3,7 @@ att socialnämnden utan hinder av sekretess kan polisanmäla brott.
 
 <list>
   <str>Av </str>
-  <Link uri="https://lagen.nu/sfs/2009:400#K10P2">10 kap. 2 § offentlighets- och sekretesslagen (2009:400)</Link>
+  <Link uri="https://lagen.nu/2009:400#K10P2">10 kap. 2 § offentlighets- och sekretesslagen (2009:400)</Link>
   <str> framgår
 att socialnämnden utan hinder av sekretess kan polisanmäla brott.</str>
 </list>

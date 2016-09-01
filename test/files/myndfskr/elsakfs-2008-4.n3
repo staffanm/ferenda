@@ -5,7 +5,7 @@
 <http://rinfo.lagrummet.se/publ/elsaek-fs/2008:4> a rpubl:Myndighetsforeskrift;
     dcterms:identifier "ELSÄK-FS 2008:4";
     dcterms:publisher <http://rinfo.lagrummet.se/org/elsaekerhetsverket>;
-    dcterms:title "Elsäkerhetsverkets föreskrifter om upphävande av verkets föreskrifter om utförande och skötsel av elektriska starkströmsanläggningar samt allmänna råd om tillämpningen av dessa (ELSÄK-FS 1999:5);"@sv;
+    dcterms:title "Elsäkerhetsverkets föreskrifter om upphävande av verkets föreskrifter om utförande och skötsel av elektriska starkströmsanläggningar samt allmänna råd om tillämpningen av dessa (ELSÄK-FS 1999:5)"@sv;
     rpubl:arsutgava "2008";
     rpubl:beslutadAv <http://rinfo.lagrummet.se/org/elsaekerhetsverket>;
     rpubl:beslutsdatum "2008-01-31"^^xsd:date;

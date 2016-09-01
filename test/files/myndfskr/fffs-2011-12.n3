@@ -6,7 +6,7 @@
     dcterms:identifier "FFFS 2011:12";
     dcterms:issn "1102-7460";
     dcterms:publisher <http://rinfo.lagrummet.se/org/finansinspektionen>;
-    dcterms:title "Finansinspektionens allmänna råd om försäkringstekniska riktlinjer och försäkringstekniskt beräkningsunderlag;"@sv;
+    dcterms:title "Finansinspektionens allmänna råd om försäkringstekniska riktlinjer och försäkringstekniskt beräkningsunderlag"@sv;
     rpubl:arsutgava "2011";
     rpubl:beslutadAv <http://rinfo.lagrummet.se/org/finansinspektionen>;
     rpubl:beslutsdatum "2011-03-17"^^xsd:date;

@@ -6,6 +6,7 @@ from builtins import *
 from tempfile import mktemp
 from urllib.parse import urljoin, unquote
 from xml.sax.saxutils import escape as xml_escape
+from io import BytesIO
 import os
 import re
 
@@ -265,6 +266,9 @@ class MyndFskrBase(SwedishLegalSource):
         infile = self.store.downloaded_path(basefile)
         tmpfile = self.store.path(basefile, 'intermediate', '.pdf')
         outfile = self.store.path(basefile, 'intermediate', '.txt')
+        return self.textreader_from_basefile_pdftotext(infile, tmpfile, outfile, basefile, force_ocr)
+
+    def textreader_from_basefile_pdftotext(self, infile, tmpfile, outfile, basefile, force_ocr=False):
         if not util.outfile_is_newer([infile], outfile):
             util.copy_if_different(infile, tmpfile)
             with open(tmpfile, "rb") as fp:
@@ -284,7 +288,25 @@ class MyndFskrBase(SwedishLegalSource):
                 p._tesseract(tmpfile, os.path.dirname(outfile), "swe", False)
                 tmptif = self.store.path(basefile, 'intermediate', '.tif')
                 util.robust_remove(tmptif)
-        text = util.readfile(outfile)
+
+                
+        # remove control chars so that they don't end up in the XML
+        # (control chars might stem from text segments with weird
+        # character encoding, see pdfreader.BaseTextDecoder)
+        bytebuffer = util.readfile(outfile, "rb")
+        newbuffer = BytesIO()
+        warnings = []
+        for idx, b in enumerate(bytebuffer):
+            # allow CR, LF, FF
+            if b < 0x20 and b not in (0xa, 0xd, 0xc):
+                warnings.append(idx)
+            else:
+                newbuffer.write(bytes((b,)))
+        if warnings:
+            self.log.warning("%s: Invalid character(s) at byte pos %s" %
+                             (basefile, ", ".join([str(x) for x in warnings])))
+        newbuffer.seek(0)
+        text = newbuffer.getvalue().decode("utf-8")
         # if there's less than 100 chars on each page, chances are it's
         # just watermarks or leftovers from the scanning toolchain,
         # and that the real text is in non-OCR:ed images.
@@ -296,7 +318,8 @@ class MyndFskrBase(SwedishLegalSource):
                               len(text)))
             # parse_metadata_from_textreader will raise an error if it
             # can't find what it needs, at which time we might
-            # consider OCR:ing
+            # consider OCR:ing. FIXME: Do something with this
+            # parameter!
             self.might_need_ocr = True 
         else:
             self.might_need_ocr = False
@@ -323,8 +346,9 @@ class MyndFskrBase(SwedishLegalSource):
                  'utfärdad den (\d+ \w+ \d{4}) tillkännages härmed i andra hand.',
                  '(?:utfärdad|meddelad)e? den (\d+ \w+ \d{4}).'],
                 'rpubl:beslutadAv':
-                ['\n\s*([A-ZÅÄÖ][\w ]+?)\d? (?:meddelar|lämnar|föreskriver|beslutar)',
-                 '\s(?:meddelar|föreskriver) ([A-ZÅÄÖ][\w ]+?)\d?\s'],
+                ['\s(?:meddelar|föreskriver) ([A-ZÅÄÖ][\w ]+?)\d?\s',
+                 '\n\s*([A-ZÅÄÖ][\w ]+?)\d? (?:meddelar|lämnar|föreskriver|beslutar)',
+                 ],
                 'rpubl:bemyndigande':
                 [' ?(?:meddelar|föreskriver|Föreskrifterna meddelas|Föreskrifterna upphävs)\d?,? (?:följande |)med stöd av\s(.*?) ?(?:att|efter\ssamråd|dels|följande|i fråga om|och lämnar allmänna råd|och beslutar följande allmänna råd|\.\n)',
                  '^Med stöd av (.*)\s(?:meddelar|föreskriver)']
@@ -491,8 +515,14 @@ class MyndFskrBase(SwedishLegalSource):
         desc.value(DCTERMS.identifier, props['dcterms:identifier'])
         if 'rpubl:beslutadAv' in props:
             try:
+                beslutad_av = props['rpubl:beslutadAv']
+                if beslutad_av == "Räddningsverket":  # The agency sometimes doesn't use it's official name!
+                    self.log.warning("%s: rpubl:beslutadAv was '%s', "
+                                     "correcting to 'Statens räddningsverk'" %
+                                     (doc.basefile, beslutad_av))
+                    beslutad_av = "Statens räddningsverk" 
                 desc.rel(RPUBL.beslutadAv,
-                         self.lookup_resource(props['rpubl:beslutadAv']))
+                         self.lookup_resource(beslutad_av))
             except KeyError as e:
                 if self.alias == "ffs":
                     # These documents are often enacted by entities
@@ -584,6 +614,7 @@ class MyndFskrBase(SwedishLegalSource):
 
         has_bemyndiganden = False
         if 'rpubl:bemyndigande' in props:
+            from pudb import set_trace; set_trace()
             result = parser.parse_string(props['rpubl:bemyndigande'])
             bemyndiganden = [x.uri for x in result if hasattr(x, 'uri')]
 
@@ -1123,6 +1154,13 @@ class MSBFS(MyndFskrBase):
                                   href=re.compile("\.pdf$")):
             basefile = re.match(self.basefile_regex, link.get_text()).group("basefile")
             yield self.sanitize_basefile(basefile), urljoin(self.start_url, link["href"])
+
+
+    def fwdtests(self):
+        t = super(MSBFS, self).fwdtests()
+        # cf. NFS.fwdtests()
+        t["rpubl:beslutadAv"].insert(0, '(?:meddelar|föreskriver) (Statens räddningsverk)')
+        return t
             
 
 class MYHFS(MyndFskrBase):
@@ -1191,11 +1229,17 @@ class NFS(MyndFskrBase):
                 entrypath = self.store.documententry_path(subbasefile)
                 DocumentEntry.updateentry(self.download_single, "download", entrypath, subbasefile, suburl)
                 # self.download_single(subbasefile, suburl)
+
     def fwdtests(self):
         t = super(NFS, self).fwdtests()
         # it's hard to match "...föreskriver X följande" if X contains spaces ("följande" can be pretty much anything else)
-        t["rpubl:beslutadAv"].insert(0, '(?:meddelar|föreskriver) (Statens naturvårdsverk)')
+        t["rpubl:beslutadAv"].insert(0, '(?:meddelar|föreskriver) (Statens\s*naturvårdsverk)')
         return t
+
+    def sanitize_text(self, text, basefile):
+        # rudimentary dehyphenation for a special case (snfs/1994:2)
+        return text.replace("Statens na—\n\nturvårdsverk", "Statens naturvårdsverk")
+        
 
 
 class RNFS(MyndFskrBase):
@@ -1324,20 +1368,25 @@ class SKVFS(MyndFskrBase):
 
     # adapted from DVFS
     def textreader_from_basefile(self, basefile):
-        infile = self.store.downloaded_path(basefile)
-        soup = BeautifulSoup(util.readfile(infile), "lxml")
-        # the DOM tree for SKVFS HTML are a real mess -- let's hope
-        # this captures the relevant content. Maybe we should look for
-        # a "index.pdf" attachment and prefer that one?
-        h = soup.find("h1", text=re.compile("(Rikss|S)katteverkets författningssamling"))
-        main = h.find_parent("div").find_parent("div").find_parent("div")
-        if main:
-            maintext = main.get_text("\n\n", strip=True)
+        outfile = self.store.path(basefile, 'intermediate', '.txt')
+        # prefer the PDF attachment to the html page
+        infile = self.store.downloaded_path(basefile, attachment="index.pdf")
+        if os.path.exists(infile):
+            tmpfile = self.store.intermediate_path(basefile, attachment="index.pdf")
+            return self.textreader_from_basefile_pdftotext(infile, tmpfile, outfile, basefile)
+        else:
+            infile = self.store.downloaded_path(basefile)
+            soup = BeautifulSoup(util.readfile(infile), "lxml")
+        h = soup.find("h1", id="pageheader")
+        body = soup.find("div", "body")
+        if body:
+            maintext = body.get_text("\n\n", strip=True)
+            maintext = h.get_text().strip() + "\n\n" + maintext
             outfile = self.store.path(basefile, 'intermediate', '.txt')
             util.writefile(outfile, maintext)
             return TextReader(string=maintext)
         else:
-            raise ParseError("%s: Didn't find a suitable header" % basefile)
+            raise ParseError("%s: Didn't find a text body element" % basefile)
 
 
 class SOSFS(MyndFskrBase):

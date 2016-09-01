@@ -5,7 +5,7 @@
 <http://rinfo.lagrummet.se/publ/elsaek-fs/2010:1> a rpubl:Myndighetsforeskrift;
     dcterms:identifier "ELSÄK-FS 2010:1";
     dcterms:publisher <http://rinfo.lagrummet.se/org/elsaekerhetsverket>;
-    dcterms:title "Elsäkerhetsverkets föreskrifter om ändring i föreskrifter (ELSÄK-FS 2008:1) och allmänna råd om hur elektriska anläggningar ska vara utförda;"@sv;
+    dcterms:title "Elsäkerhetsverkets föreskrifter om ändring i föreskrifter (ELSÄK-FS 2008:1) och allmänna råd om hur elektriska anläggningar ska vara utförda"@sv;
     rpubl:andrar <http://rinfo.lagrummet.se/publ/elsaek-fs/2008:1>;
     rpubl:arsutgava "2010";
     rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2009:22#p_16>;

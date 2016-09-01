@@ -5,13 +5,13 @@ konkurslagen (1987:672) äga motsvarande tillämpning.
 <list>
   <str>Var säljarens egendom avträdd till konkurs, skall vad om återvinning
 av lös egendom till konkursbo är stadgat i </str>
-  <Link uri="https://lagen.nu/sfs/1987:672#K4">4 kap.</Link>
+  <Link uri="https://lagen.nu/1987:672#K4">4 kap.</Link>
   <str> </str>
-  <Link uri="https://lagen.nu/sfs/1987:672#K4P19">19</Link>
+  <Link uri="https://lagen.nu/1987:672#K4P19">19</Link>
   <str> och </str>
-  <Link uri="https://lagen.nu/sfs/1987:672#K4P20">20 §§</Link>
+  <Link uri="https://lagen.nu/1987:672#K4P20">20 §§</Link>
   <str>
 </str>
-  <Link uri="https://lagen.nu/sfs/1987:672">konkurslagen (1987:672)</Link>
+  <Link uri="https://lagen.nu/1987:672">konkurslagen (1987:672)</Link>
   <str> äga motsvarande tillämpning.</str>
 </list>

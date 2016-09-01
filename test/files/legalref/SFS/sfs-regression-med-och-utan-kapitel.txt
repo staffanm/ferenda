@@ -1,8 +1,8 @@
 5 kap. 4 § blahonga. 3 § blahonga
 
 <list>
-  <Link uri="https://lagen.nu/sfs/9999:999#K5P4">5 kap. 4 §</Link>
+  <Link uri="https://lagen.nu/9999:999#K5P4">5 kap. 4 §</Link>
   <str> blahonga. </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P3">3 §</Link>
+  <Link uri="https://lagen.nu/9999:999#P3">3 §</Link>
   <str> blahonga</str>
 </list>

@@ -2,10 +2,10 @@ avses i tredje stycket 2, 3 eller 4 i denna paragraf
 
 <list>
   <str>avses i </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#S3N2">tredje stycket 2</Link>
+  <Link uri="https://lagen.nu/9999:999#S3N2">tredje stycket 2</Link>
   <str>, </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#S3N3">3</Link>
+  <Link uri="https://lagen.nu/9999:999#S3N3">3</Link>
   <str> eller </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#S3N4">4</Link>
+  <Link uri="https://lagen.nu/9999:999#S3N4">4</Link>
   <str> i denna paragraf</str>
 </list>

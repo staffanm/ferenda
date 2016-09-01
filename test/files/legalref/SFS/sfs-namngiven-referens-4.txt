@@ -4,8 +4,8 @@ Allmänna handlingar skall oavsett upphovsrätten tillhandahållas enligt
 <list>
   <str>Allmänna handlingar skall oavsett upphovsrätten tillhandahållas enligt
 </str>
-  <Link uri="https://lagen.nu/sfs/1949:105#K2">2 kap.</Link>
+  <Link uri="https://lagen.nu/1949:105#K2">2 kap.</Link>
   <str> </str>
-  <Link uri="https://lagen.nu/sfs/1949:105">tryckfrihetsförordningen</Link>
+  <Link uri="https://lagen.nu/1949:105">tryckfrihetsförordningen</Link>
   <str>.</str>
 </list>

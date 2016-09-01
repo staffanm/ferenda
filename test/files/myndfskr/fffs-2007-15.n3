@@ -6,7 +6,7 @@
     dcterms:identifier "FFFS 2007:15";
     dcterms:issn "1102-7460";
     dcterms:publisher <http://rinfo.lagrummet.se/org/finansinspektionen>;
-    dcterms:title "Föreskrifter om upphävande av vissa föreskrifter och allmänna råd inom Finansinspektionens område;"@sv;
+    dcterms:title "Föreskrifter om upphävande av vissa föreskrifter och allmänna råd inom Finansinspektionens område"@sv;
     rpubl:arsutgava "2007";
     rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/1992:308#p_19_a>,
         <http://rinfo.lagrummet.se/publ/sfs/1995:1600#p_4>,

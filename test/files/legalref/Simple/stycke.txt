@@ -5,7 +5,7 @@ fall föreslå en ny grundlagsreglering.
 <list>
   <str>Kommittén skall också överväga om grundlagsregeln om integritets-skydd
 i </str>
-  <Link uri="https://lagen.nu/sfs/1974:152#K2P3S2">2 kap. 3 § andra stycket regeringsformen</Link>
+  <Link uri="https://lagen.nu/1974:152#K2P3S2">2 kap. 3 § andra stycket regeringsformen</Link>
   <str> (RF) bör ändras och i så
 fall föreslå en ny grundlagsreglering.</str>
 </list>

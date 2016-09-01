@@ -6,7 +6,7 @@
     dcterms:identifier "FFFS 2007:10";
     dcterms:issn "1102-7460";
     dcterms:publisher <http://rinfo.lagrummet.se/org/finansinspektionen>;
-    dcterms:title "Föreskrifter om ändring i Finansinspektionens föreskrifter och allmänna råd (FFFS 2007:1) om kapitaltäckning och stora exponeringar;"@sv;
+    dcterms:title "Föreskrifter om ändring i Finansinspektionens föreskrifter och allmänna råd (FFFS 2007:1) om kapitaltäckning och stora exponeringar"@sv;
     rpubl:andrar <http://rinfo.lagrummet.se/publ/fffs/2007:1>;
     rpubl:arsutgava "2007";
     rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2006:1533#p_32>;

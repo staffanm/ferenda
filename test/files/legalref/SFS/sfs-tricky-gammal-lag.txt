@@ -2,6 +2,6 @@ Förordning (1910:103 s. 1) angående behörighet att kyrkobokföras i icke territor
 
 <list>
   <str>Förordning (</str>
-  <Link uri="https://lagen.nu/sfs/1910:103_s._1">1910:103 s. 1</Link>
+  <Link uri="https://lagen.nu/1910:103_s._1">1910:103 s. 1</Link>
   <str>) angående behörighet att kyrkobokföras i icke territoriell församling av svenska kyrkan</str>
 </list>

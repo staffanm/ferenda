@@ -2,13 +2,13 @@ Regeringsformen, successionsordningen, tryckfrihetsförordningen och
 yttrandefrihetsgrundlagen är rikets grundlagar. 
 
 <list>
-  <Link uri="https://lagen.nu/sfs/1974:152">Regeringsformen</Link>
+  <Link uri="https://lagen.nu/1974:152">Regeringsformen</Link>
   <str>, </str>
-  <Link uri="https://lagen.nu/sfs/1810:0926">successionsordningen</Link>
+  <Link uri="https://lagen.nu/1810:0926">successionsordningen</Link>
   <str>, </str>
-  <Link uri="https://lagen.nu/sfs/1949:105">tryckfrihetsförordningen</Link>
+  <Link uri="https://lagen.nu/1949:105">tryckfrihetsförordningen</Link>
   <str> och
 </str>
-  <Link uri="https://lagen.nu/sfs/1991:1469">yttrandefrihetsgrundlagen</Link>
+  <Link uri="https://lagen.nu/1991:1469">yttrandefrihetsgrundlagen</Link>
   <str> är rikets grundlagar. </str>
 </list>

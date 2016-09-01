@@ -4,7 +4,7 @@ utföras utan tillstånd
 
 <list>
   <str>sådana restriktionsområden som bestämts av regeringen enligt </str>
-  <Link uri="https://lagen.nu/sfs/1957:297#K1P3S1M1">1 kap. 3
+  <Link uri="https://lagen.nu/1957:297#K1P3S1M1">1 kap. 3
 § första stycket första meningen luftfartslagen (1957:297)</Link>
   <str> får inte
 utföras utan tillstånd</str>

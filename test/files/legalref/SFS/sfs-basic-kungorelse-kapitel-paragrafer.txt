@@ -2,11 +2,11 @@
 ny regeringsform
 
 <list>
-  <Link uri="https://lagen.nu/sfs/1974:152#K2P18S2">2 kap. 18 § 2 st.</Link>
+  <Link uri="https://lagen.nu/1974:152#K2P18S2">2 kap. 18 § 2 st.</Link>
   <str> och </str>
-  <Link uri="https://lagen.nu/sfs/1974:152#K11P4">11 kap. 4 §</Link>
+  <Link uri="https://lagen.nu/1974:152#K11P4">11 kap. 4 §</Link>
   <str> kungörelsen (</str>
-  <Link uri="https://lagen.nu/sfs/1974:152">1974:152</Link>
+  <Link uri="https://lagen.nu/1974:152">1974:152</Link>
   <str>) om beslutad
 ny regeringsform</str>
 </list>

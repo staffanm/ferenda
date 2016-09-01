@@ -8,13 +8,13 @@
 
 <list>
   <str>                </str>
-  <Link uri="https://lagen.nu/sfs/1995:521#P20">20 §</Link>
+  <Link uri="https://lagen.nu/1995:521#P20">20 §</Link>
   <str>
             
              förordningen (
             
                 </str>
-  <Link uri="https://lagen.nu/sfs/1995:521">1995:521</Link>
+  <Link uri="https://lagen.nu/1995:521">1995:521</Link>
   <str>
             
             ) om behöriga myndigheter m.m. i fråga om kör- och vilotider samt färdskrivare vid vägtransporter</str>

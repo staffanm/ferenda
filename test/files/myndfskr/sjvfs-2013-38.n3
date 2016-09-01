@@ -17,7 +17,7 @@
     dcterms:identifier "SJVFS 2014:15" ;
     dcterms:issn "1102-0970" ;
     dcterms:publisher <http://rinfo.lagrummet.se/org/statens_jordbruksverk> ;
-    dcterms:title "Föreskrifter om ändring i Statens jordbruksverks föreskrifter (2013:38) om växtskadegörare som omfattas av Europeiska kommissionens genomförandebeslut;"@sv ;
+    dcterms:title "Föreskrifter om ändring i Statens jordbruksverks föreskrifter (2013:38) om växtskadegörare som omfattas av Europeiska kommissionens genomförandebeslut"@sv ;
     rpubl:andrar <http://rinfo.lagrummet.se/publ/sjvfs/2013:38> ;
     rpubl:arsutgava "2014" ;
     rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2006:817#p_10>,

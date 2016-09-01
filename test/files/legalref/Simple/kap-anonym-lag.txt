@@ -2,8 +2,8 @@ den artikeln är uppfylld genom 7 § lagen (1982:80) om anställ-ningsskydd jämte r
 
 <list>
   <str>den artikeln är uppfylld genom </str>
-  <Link uri="https://lagen.nu/sfs/1982:80#P7">7 §</Link>
+  <Link uri="https://lagen.nu/1982:80#P7">7 §</Link>
   <str> lagen (</str>
-  <Link uri="https://lagen.nu/sfs/1982:80">1982:80</Link>
+  <Link uri="https://lagen.nu/1982:80">1982:80</Link>
   <str>) om anställ-ningsskydd jämte rättspraxis</str>
 </list>

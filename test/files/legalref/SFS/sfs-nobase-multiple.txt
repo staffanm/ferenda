@@ -6,16 +6,16 @@ respektive 1 § i den sistnämnda).
 
 <list>
   <str>NOBASE: I övrigt finns i lagen (</str>
-  <Link uri="https://lagen.nu/sfs/1998:150">1998:150</Link>
+  <Link uri="https://lagen.nu/1998:150">1998:150</Link>
   <str>) om allmän kameraövervakning
 och i lagen (</str>
-  <Link uri="https://lagen.nu/sfs/1995:1506">1995:1506</Link>
+  <Link uri="https://lagen.nu/1995:1506">1995:1506</Link>
   <str>) om hemlig övervakning bestämmelser om
 videofilmning i vissa fall. Dessa lagar är emellertid inte tillämpliga
 på kameror som manövreras på platsen (jfr </str>
-  <Link uri="https://lagen.nu/sfs/1995:1506#P2">2 §</Link>
+  <Link uri="https://lagen.nu/1995:1506#P2">2 §</Link>
   <str> i den förstnämnda lagen
 respektive </str>
-  <Link uri="https://lagen.nu/sfs/1995:1506#P1">1 §</Link>
+  <Link uri="https://lagen.nu/1995:1506#P1">1 §</Link>
   <str> i den sistnämnda).</str>
 </list>

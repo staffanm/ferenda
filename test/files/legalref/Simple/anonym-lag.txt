@@ -2,7 +2,7 @@ lagen (1994:953) om åligganden för personal inom hälso- och sjukvården
 
 <list>
   <str>lagen (</str>
-  <Link uri="https://lagen.nu/sfs/1994:953">1994:953</Link>
+  <Link uri="https://lagen.nu/1994:953">1994:953</Link>
   <str>) om åligganden för personal inom hälso- och sjukvården</str>
 </list>
 

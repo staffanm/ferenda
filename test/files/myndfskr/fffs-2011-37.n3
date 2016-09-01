@@ -6,7 +6,7 @@
     dcterms:identifier "FFFS 2011:37";
     dcterms:issn "1102-7460";
     dcterms:publisher <http://rinfo.lagrummet.se/org/finansinspektionen>;
-    dcterms:title "Finansinspektionens föreskrifter om rapportering av likviditetsrisker för kreditinstitut och värdepappersbolag;"@sv;
+    dcterms:title "Finansinspektionens föreskrifter om rapportering av likviditetsrisker för kreditinstitut och värdepappersbolag"@sv;
     rpubl:arsutgava "2011";
     rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2004:329#k_5-p_2>,
         <http://rinfo.lagrummet.se/publ/sfs/2006:1533#p_32>,

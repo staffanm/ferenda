@@ -7,41 +7,41 @@ göras gällande.
 
 <list>
   <str>Bestämmelserna i </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P2S2">2 § andra</Link>
+  <Link uri="https://lagen.nu/9999:999#P2S2">2 § andra</Link>
   <str> och </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P2S3">tredje styckena</Link>
+  <Link uri="https://lagen.nu/9999:999#P2S3">tredje styckena</Link>
   <str>, </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P6">6</Link>
+  <Link uri="https://lagen.nu/9999:999#P6">6</Link>
   <str> - </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P9">9 §§</Link>
+  <Link uri="https://lagen.nu/9999:999#P9">9 §§</Link>
   <str>, </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P11S2">11 § andra
+  <Link uri="https://lagen.nu/9999:999#P11S2">11 § andra
 stycket</Link>
   <str>, </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P12S1">12 § första</Link>
+  <Link uri="https://lagen.nu/9999:999#P12S1">12 § första</Link>
   <str> och </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P12S2">andra styckena</Link>
+  <Link uri="https://lagen.nu/9999:999#P12S2">andra styckena</Link>
   <str>, </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P13">13</Link>
+  <Link uri="https://lagen.nu/9999:999#P13">13</Link>
   <str> - </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P22">22</Link>
+  <Link uri="https://lagen.nu/9999:999#P22">22</Link>
   <str>, </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P25">25</Link>
+  <Link uri="https://lagen.nu/9999:999#P25">25</Link>
   <str>, </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P26">26</Link>
+  <Link uri="https://lagen.nu/9999:999#P26">26</Link>
   <str> - </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P26b">26 b</Link>
+  <Link uri="https://lagen.nu/9999:999#P26b">26 b</Link>
   <str>, </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P26d">26 d</Link>
+  <Link uri="https://lagen.nu/9999:999#P26d">26 d</Link>
   <str>
 - </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P26f">26 f §§</Link>
+  <Link uri="https://lagen.nu/9999:999#P26f">26 f §§</Link>
   <str>, </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P26gS5">26 g § femte</Link>
+  <Link uri="https://lagen.nu/9999:999#P26gS5">26 g § femte</Link>
   <str> och </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P26gS6">sjätte styckena</Link>
+  <Link uri="https://lagen.nu/9999:999#P26gS6">sjätte styckena</Link>
   <str> samt </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P26i">26 i §</Link>
+  <Link uri="https://lagen.nu/9999:999#P26i">26 i §</Link>
   <str> skall
 tillämpas på arbeten som avses i denna paragraf. Är ett sådant arbete
 eller en del av det föremål för upphovsrätt, får denna rätt också

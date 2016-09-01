@@ -5,20 +5,20 @@ den tillträdesdag som anges i 36 §
 
 <list>
   <str>förmånsrätt enligt </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P6S1N1">6 § 1</Link>
+  <Link uri="https://lagen.nu/9999:999#P6S1N1">6 § 1</Link>
   <str>
 fordran som skall utgå med förmånsrätt enligt </str>
-  <Link uri="https://lagen.nu/sfs/1970:979#P6S1N1">6 § 1</Link>
+  <Link uri="https://lagen.nu/1970:979#P6S1N1">6 § 1</Link>
   <str> eller </str>
-  <Link uri="https://lagen.nu/sfs/1970:979#P7">7 §</Link>
+  <Link uri="https://lagen.nu/1970:979#P7">7 §</Link>
   <str> </str>
-  <Link uri="https://lagen.nu/sfs/1970:979#P7S1N1">1</Link>
+  <Link uri="https://lagen.nu/1970:979#P7S1N1">1</Link>
   <str> eller
 </str>
-  <Link uri="https://lagen.nu/sfs/1970:979#P7S1N2">2</Link>
+  <Link uri="https://lagen.nu/1970:979#P7S1N2">2</Link>
   <str> </str>
-  <Link uri="https://lagen.nu/sfs/1970:979">förmånsrättslagen (1970:979)</Link>
+  <Link uri="https://lagen.nu/1970:979">förmånsrättslagen (1970:979)</Link>
   <str> och som förfaller till betalning senast
 den tillträdesdag som anges i </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P36">36 §</Link>
+  <Link uri="https://lagen.nu/9999:999#P36">36 §</Link>
 </list>

@@ -2,6 +2,6 @@ föreligger enligt tredje stycket 2 i denna paragraf
 
 <list>
   <str>föreligger enligt </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#S3N2">tredje stycket 2</Link>
+  <Link uri="https://lagen.nu/9999:999#S3N2">tredje stycket 2</Link>
   <str> i denna paragraf</str>
 </list>

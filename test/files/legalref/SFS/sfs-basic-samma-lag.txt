@@ -14,26 +14,26 @@ användas. I underlaget skall det i förekommande fall ingå
   <str>Lag om garantipension, andra kapitlet fjärde paragrafen:
 Som underlag för beräkning av den pensionsberättigades årliga
 garantipension enligt </str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P11">11</Link>
+  <Link uri="https://lagen.nu/9999:999#P11">11</Link>
   <str>-</str>
-  <Link uri="https://lagen.nu/sfs/9999:999#P16">16 §§</Link>
+  <Link uri="https://lagen.nu/9999:999#P16">16 §§</Link>
   <str> skall ett beräkningsunderlag
 användas. I underlaget skall det i förekommande fall ingå
 1. tilläggspension enligt </str>
-  <Link uri="https://lagen.nu/sfs/1998:674#K6">6 kap.</Link>
+  <Link uri="https://lagen.nu/1998:674#K6">6 kap.</Link>
   <str> lagen (</str>
-  <Link uri="https://lagen.nu/sfs/1998:674">1998:674</Link>
+  <Link uri="https://lagen.nu/1998:674">1998:674</Link>
   <str>) om inkomstgrundad
    ålderspension för samma år efter samordning enligt </str>
-  <Link uri="https://lagen.nu/sfs/1998:674#K12P10">12 kap. 10 §
+  <Link uri="https://lagen.nu/1998:674#K12P10">12 kap. 10 §
    samma lag</Link>
   <str>,
 2. svensk tjänstepension,
 3. änkepension enligt lagen (</str>
-  <Link uri="https://lagen.nu/sfs/2000:461">2000:461</Link>
+  <Link uri="https://lagen.nu/2000:461">2000:461</Link>
   <str>) om efterlevandepension och
    efterlevandestöd till barn eller lagen (</str>
-  <Link uri="https://lagen.nu/sfs/2000:462">2000:462</Link>
+  <Link uri="https://lagen.nu/2000:462">2000:462</Link>
   <str>) om införande av
    nämnda lag,</str>
 </list>

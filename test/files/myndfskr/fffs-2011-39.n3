@@ -6,7 +6,7 @@
     dcterms:identifier "FFFS 2011:39";
     dcterms:issn "1102-7460";
     dcterms:publisher <http://rinfo.lagrummet.se/org/finansinspektionen>;
-    dcterms:title "Finansinspektionens föreskrifter och allmänna råd om information som gäller försäkring och tjänstepension;"@sv;
+    dcterms:title "Finansinspektionens föreskrifter och allmänna råd om information som gäller försäkring och tjänstepension"@sv;
     rpubl:arsutgava "2011";
     rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2011:257#k_7-p_2>,
         <http://rinfo.lagrummet.se/publ/sfs/2011:257#k_7-p_5>,

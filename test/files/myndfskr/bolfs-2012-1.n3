@@ -16,7 +16,7 @@
 <http://rinfo.lagrummet.se/publ/bolfs/2012:1> a rpubl:AllmannaRad ;
     dcterms:identifier "BOLFS 2012:1" ;
     dcterms:publisher <http://rinfo.lagrummet.se/org/bolagsverket> ;
-    dcterms:title "Patentombudsnämndens allmänna råd med vägledande regler om god patentombudssed enligt 5 § lagen (2010:1052) om auktorisation av patentombud;"@sv ;
+    dcterms:title "Patentombudsnämndens allmänna råd med vägledande regler om god patentombudssed enligt 5 § lagen (2010:1052) om auktorisation av patentombud"@sv ;
     rpubl:arsutgava "2012" ;
     rpubl:beslutadAv <http://rinfo.lagrummet.se/org/patentombudsnaemnden> ;
     rpubl:beslutsdatum "2012-01-26"^^xsd:date ;

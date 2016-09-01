@@ -1,9 +1,9 @@
 28 kap. 6 b § och 33 kap. 5 § 2 st 3 brottsbalken
 
 <list>
-  <Link uri="https://lagen.nu/sfs/1962:700#K28P6b">28 kap. 6 b §</Link>
+  <Link uri="https://lagen.nu/1962:700#K28P6b">28 kap. 6 b §</Link>
   <str> och </str>
-  <Link uri="https://lagen.nu/sfs/1962:700#K33P5S2N3">33 kap. 5 § 2 st 3</Link>
+  <Link uri="https://lagen.nu/1962:700#K33P5S2N3">33 kap. 5 § 2 st 3</Link>
   <str> </str>
-  <Link uri="https://lagen.nu/sfs/1962:700">brottsbalken</Link>
+  <Link uri="https://lagen.nu/1962:700">brottsbalken</Link>
 </list>

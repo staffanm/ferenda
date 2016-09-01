@@ -6,26 +6,26 @@ europabolag samt bestämmelserna i detta kapitel.
 <list>
   <str>För europabolag med säte i Sverige som har beviljats koncession
 att driva försäkringsrörelse gäller </str>
-  <Link uri="https://lagen.nu/sfs/2004:575#P2">2</Link>
+  <Link uri="https://lagen.nu/2004:575#P2">2</Link>
   <str>-</str>
-  <Link uri="https://lagen.nu/sfs/2004:575#P5">5</Link>
+  <Link uri="https://lagen.nu/2004:575#P5">5</Link>
   <str>, </str>
-  <Link uri="https://lagen.nu/sfs/2004:575#P7">7</Link>
+  <Link uri="https://lagen.nu/2004:575#P7">7</Link>
   <str> och </str>
-  <Link uri="https://lagen.nu/sfs/2004:575#P8">8 §§</Link>
+  <Link uri="https://lagen.nu/2004:575#P8">8 §§</Link>
   <str>, </str>
-  <Link uri="https://lagen.nu/sfs/2004:575#P16S1">16 § första</Link>
+  <Link uri="https://lagen.nu/2004:575#P16S1">16 § första</Link>
   <str>
 och </str>
-  <Link uri="https://lagen.nu/sfs/2004:575#P16S2">andra styckena</Link>
+  <Link uri="https://lagen.nu/2004:575#P16S2">andra styckena</Link>
   <str>, </str>
-  <Link uri="https://lagen.nu/sfs/2004:575#P17">17</Link>
+  <Link uri="https://lagen.nu/2004:575#P17">17</Link>
   <str>-</str>
-  <Link uri="https://lagen.nu/sfs/2004:575#P29">29</Link>
+  <Link uri="https://lagen.nu/2004:575#P29">29</Link>
   <str> och </str>
-  <Link uri="https://lagen.nu/sfs/2004:575#P32">32 §§</Link>
+  <Link uri="https://lagen.nu/2004:575#P32">32 §§</Link>
   <str> i lagen (</str>
-  <Link uri="https://lagen.nu/sfs/2004:575">2004:575</Link>
+  <Link uri="https://lagen.nu/2004:575">2004:575</Link>
   <str>) om
 europabolag samt bestämmelserna i detta kapitel.</str>
 </list>

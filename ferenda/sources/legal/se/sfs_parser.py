@@ -573,6 +573,7 @@ def make_parser(reader, basefile, log, trace):
         return match is not None
 
     def isKapitel(p=None):
+        from pudb import set_trace; set_trace()
         return idOfKapitel(p) is not None
 
     def idOfKapitel(p=None):
