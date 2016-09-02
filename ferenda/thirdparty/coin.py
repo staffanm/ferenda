@@ -35,10 +35,9 @@ class URISpace:
                                   COIN.template)]
         # primary sort order by :priority
         # secondary sort by type specificity (wether a self.forType is specified)
-        
         # tertiary sort order by specificity (number of vars per template)
         self.templates.sort(key=lambda x: (x.priority, x.forType, len(x.bindings)),
-                            reverse=True)
+                            reverse=True) 
         self.slugTransform = SlugTransformer(resource.value(COIN.slugTransform))
 
     def coin_uris(self, resource):

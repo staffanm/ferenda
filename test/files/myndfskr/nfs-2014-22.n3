@@ -1,0 +1,18 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://rinfo.lagrummet.se/publ/nfs/2014:22> a rpubl:Myndighetsforeskrift ;
+    dcterms:identifier "NFS 2014:22" ;
+    dcterms:issn "1403-8234" ;
+    dcterms:publisher <http://rinfo.lagrummet.se/org/naturvaardsverket> ;
+    dcterms:title "Föreskrifter om ändring i Naturvårdsverkets föreskrifter (NFS 2010:1) om förvaltning av björn, varg, järv, lo och kungsörn"@sv ;
+    rpubl:andrar <http://rinfo.lagrummet.se/publ/nfs/2010:1> ;
+    rpubl:arsutgava "2014" ;
+    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2009:1263#p_10> ;
+    rpubl:beslutadAv <http://rinfo.lagrummet.se/org/naturvaardsverket> ;
+    rpubl:beslutsdatum "2014-08-20"^^xsd:date ;
+    rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/nfs> ;
+    rpubl:ikrafttradandedatum "2014-09-22"^^xsd:date ;
+    rpubl:lopnummer "22" ;
+    rpubl:utkomFranTryck "2014-08-26"^^xsd:date .

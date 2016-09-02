@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2015-11-12T10:01:03.973277
+# Automatically transformed from sources at 2016-09-02T08:07:23.134473
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -1012,10 +1012,6 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/kammarraetten_i_sundsvall> ;
     foaf:name "Kammarrätten i Sundsvall"@sv .
 
-<https://lagen.nu/org/2016/krisberedskapsmyndigheten> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/krisberedskapsmyndigheten> ;
-    foaf:name "Krisberedskapsmyndigheten"@sv .
-
 <https://lagen.nu/org/2008/kommunikationsdepartementet> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/kommunikationsdepartementet> ;
     foaf:name "Kommunikationsdepartementet"@sv .
@@ -1103,10 +1099,6 @@
 <https://lagen.nu/org/2008/statens-provningsanstalt> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/statens_provningsanstalt> ;
     foaf:name "Statens provningsanstalt"@sv .
-
-<https://lagen.nu/org/2016/statens-raddningsverk> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/statens_raeddningsverk> ;
-    foaf:name "Statens räddningsverk"@sv .
 
 <https://lagen.nu/org/2008/statskontoret> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/statskontoret> ;
@@ -1364,6 +1356,15 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/e-haelsomyndigheten> ;
     foaf:name "E-hälsomyndigheten"@sv .
 
+<https://lagen.nu/org/2016/arbetarskyddsstyrelsen> a foaf:Organization ;
+    rdfs:comment "Ersatt av Arbetsmiljöverket."@sv ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/arbetarskyddsstyrelsen> ;
+    foaf:name "Arbetarskyddsstyrelsen"@sv .
+
+<https://lagen.nu/org/2016/statens-raddningsverk> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/statens_raeddningsverk> ;
+    foaf:name "Statens räddningsverk"@sv .
+
 <https://lagen.nu/org/2008/domstolsverket> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/domstolsverket> ;
     foaf:homepage <http://www.domstol.se/> ;
@@ -1601,10 +1602,6 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/myndigheten_foer_radio_och_tv> ;
     foaf:name "Myndigheten för radio och tv"@sv .
 
-<https://lagen.nu/org/2016/myndigheten_for_press_radio_och_tv> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/myndigheten_foer_press_radio_och_tv> ;
-    foaf:name "Myndigheten för press, radio och tv"@sv .
-
 <https://lagen.nu/org/2014/myndigheten_for_samhallsskydd_och_beredskap> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/myndigheten_foer_samhaellsskydd_och_beredskap> ;
     foaf:name "Myndigheten för samhällsskydd och beredskap"@sv .
@@ -1743,6 +1740,14 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/folkhaelsomyndigheten> ;
     foaf:name "Folkhälsomyndigheten"@sv .
 
+<https://lagen.nu/org/2016/krisberedskapsmyndigheten> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/krisberedskapsmyndigheten> ;
+    foaf:name "Krisberedskapsmyndigheten"@sv .
+
+<https://lagen.nu/org/2016/myndigheten_for_press_radio_och_tv> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/myndigheten_foer_press_radio_och_tv> ;
+    foaf:name "Myndigheten för press, radio och tv"@sv .
+
 <https://lagen.nu/org/2008/forsakringskassan> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/foersaekringskassan> ;
     foaf:name "Försäkringskassan"@sv .
@@ -1774,9 +1779,4 @@
 <https://lagen.nu/org/2014/statens_jordbruksverk> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/statens_jordbruksverk> ;
     foaf:name "Statens jordbruksverk"@sv .
-
-<https://lagen.nu/org/2016/arbetarskyddsstyrelsen> a foaf:Organization ;
-    rdfs:comment "Ersatt av Arbetsmiljöverket."@sv ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/arbetarskyddsstyrelsen> ;
-    foaf:name "Arbetarskyddsstyrelsen"@sv .
 

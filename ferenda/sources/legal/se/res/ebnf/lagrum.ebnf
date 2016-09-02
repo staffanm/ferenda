@@ -21,7 +21,7 @@ ExternalRefs                ::= SectionItemRefAndSectionItemRefs/MultipleGeneric
 
 ExternalChapterSectionRefs ::= MultipleGenericRefs, Whitespace, NamedExternalLawRef
 
-GenericRefs          ::= (SectionPieceItemRefs/SectionPieceRefs/IndividualChapterSectionRefs/ChapterSectionPieceRefs/ChapterSectionRefs/AlternateChapterSectionRefs/SectionRefs/PieceItemRefs/GenericRef)
+GenericRefs          ::= (SectionPieceItemRefs/SectionPieceRefs/SectionItemRefs/IndividualChapterSectionRefs/ChapterSectionPieceRefs/ChapterSectionRefs/AlternateChapterSectionRefs/SectionRefs/PieceItemRefs/GenericRef)
 
 CommaSpaceAndWhitespace ::= Comma, Whitespace, And, Whitespace
 

@@ -1,0 +1,20 @@
+5 kap. 2 § 9 förordningen (2004:329) om bank- och finansieringsrörelse, 6 kap. 1 § 60 förordningen (2007:572) om värdepappersmarknaden samt 32 § 39 och 40 förordningen (2006:1533) om kapitaltäckning och stora exponeringar
+
+<list>
+  <Link uri="https://lagen.nu/2004:329#K5P2S1N9">5 kap. 2 § 9</Link>
+  <str> förordningen (</str>
+  <Link uri="https://lagen.nu/2004:329">2004:329</Link>
+  <str>) om bank- och finansieringsrörelse, </str>
+  <Link uri="https://lagen.nu/2007:572#K6P1S1N60">6 kap. 1 § 60</Link>
+  <str> förordningen (</str>
+  <Link uri="https://lagen.nu/2007:572">2007:572</Link>
+  <str>) om värdepappersmarknaden samt </str>
+  <Link uri="https://lagen.nu/2006:1533#P32">32 §</Link>
+  <str> </str>
+  <Link uri="https://lagen.nu/2006:1533#P32S1N39">39</Link>
+  <str> och </str>
+  <Link uri="https://lagen.nu/2006:1533#P32S1N40">40</Link>
+  <str> förordningen (</str>
+  <Link uri="https://lagen.nu/2006:1533">2006:1533</Link>
+  <str>) om kapitaltäckning och stora exponeringar</str>
+</list>

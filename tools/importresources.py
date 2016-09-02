@@ -352,7 +352,44 @@ space: coin:template [
                       coin:variable "arsutgava" ],
                     [ coin:property rpubl:lopnummer ;
                       coin:variable "lopnummer" ] ;
-    ] .
+    ], [ 
+       coin:uriTemplate "/{arsutgava}:{lopnummer}_s._{sidnummer}";
+       coin:priority 1;
+       coin:binding [ coin:property rpubl:forfattningssamling ;
+                      coin:slugFrom space:abbrSlug ;
+                      coin:match "sfs" ;
+                      coin:variable "fs" ],
+                    [ coin:property rpubl:arsutgava ;
+                      coin:variable "arsutgava" ],
+                    [ coin:property rpubl:lopnummer ;
+                      coin:variable "lopnummer" ],
+                    [ coin:property rpubl:sidnummer ;
+                      coin:variable "sidnummer" ] ;
+     ], [ 
+        coin:uriTemplate "/{arsutgava}:bih_{bihang}_s._{sidnummer}";
+        coin:priority 1;
+        coin:binding [ coin:property rpubl:forfattningssamling ;
+                       coin:slugFrom space:abbrSlug ;
+                       coin:match "sfs" ;
+                       coin:variable "fs" ],
+                     [ coin:property rpubl:arsutgava ;
+                       coin:variable "arsutgava" ],
+                     [ coin:property rpubl:bihangsnummer ;
+                       coin:variable "bihang" ],
+                     [ coin:property rpubl:sidnummer ;
+                       coin:variable "sidnummer" ] ;
+     ], [ 
+        coin:uriTemplate "/{fs}/{arsutgava}:bih_{bihang}";
+        coin:priority 1;
+        coin:binding [ coin:property rpubl:forfattningssamling ;
+                       coin:slugFrom space:abbrSlug ;
+                       coin:match "sfs" ;
+                       coin:variable "fs" ],
+                     [ coin:property rpubl:arsutgava ;
+                       coin:variable "arsutgava" ],
+                     [ coin:property rpubl:bihangsnummer ;
+                       coin:variable "bihang" ] ;
+   ].
 """
     graph.parse(data=extra, format="turtle")
     writegraph(graph, dest)

@@ -374,9 +374,14 @@ class MyndFskrBase(SwedishLegalSource):
         #    until the "real" first page is found) NB: FFFS 2007:1
         #    has ten (10) TOC pages!
         pagecount = 0
+        # It's an open question if we should require all properties on
+        # the same page or if we can glean one from page 1, another
+        # from page 2 and so on. AFS 2014:44 requires that we glean
+        # dcterms:title from page 1 and rpubl:beslutsdatum from page
+        # 2.
+        props = {}  
         for page in reader.getiterator(reader.readpage):
             pagecount += 1
-            props = {}
             for (prop, tests) in list(self.fwdtests().items()):
                 if prop == "rpubl:beslutsdatum" and 'FERENDA_MYNDFSKR_DEBUG' in os.environ:
                     from pudb import set_trace; set_trace()
@@ -614,7 +619,6 @@ class MyndFskrBase(SwedishLegalSource):
 
         has_bemyndiganden = False
         if 'rpubl:bemyndigande' in props:
-            from pudb import set_trace; set_trace()
             result = parser.parse_string(props['rpubl:bemyndigande'])
             bemyndiganden = [x.uri for x in result if hasattr(x, 'uri')]
 
