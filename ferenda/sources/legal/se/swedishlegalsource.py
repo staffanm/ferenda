@@ -922,8 +922,13 @@ class SwedishLegalSource(DocumentRepository):
     _default_creator = "Regeringen"
 
     def _relate_fulltext_value_rootlabel(self, desc):
+        if desc.getvalues(DCTERMS.title):
+            title = desc.getvalue(DCTERMS.identifier)
+        else:
+            self.log.warning("Missing dcterms:title")
+            title = "(Titel saknas)"
         return "%s: %s" % (desc.getvalue(DCTERMS.identifier),
-                           desc.getvalue(DCTERMS.title))
+                           title)
     
     def _relate_fulltext_value(self, facet, resource, desc):
         if facet.dimension_label in ("label", "creator", "issued"):
@@ -932,7 +937,7 @@ class SwedishLegalSource(DocumentRepository):
             # change slighly.
             resourceuri = resource.get("about")
             rooturi = resourceuri.split("#")[0]
-            if "#" not in resourceuri:
+            if "#" not in resourceuri and rooturi not in self._relate_fulltext_value_cache:
                 l = self._relate_fulltext_value_rootlabel(desc)
                 if desc.getrels(RPUBL.departement):
                     c = desc.getrel(RPUBL.departement)

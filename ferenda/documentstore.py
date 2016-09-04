@@ -257,7 +257,7 @@ class DocumentStore(object):
             # ignore empty files placed by download (which may
             # have done that in order to avoid trying to
             # re-download nonexistent resources)
-            if os.path.exists(x) and os.path.getsize(x) > 0:
+            if os.path.exists(x) and os.path.getsize(x) > 0 and not x.endswith(".root.json"):
                 # get a pathfrag from full path
                 # suffixlen = len(suffix) if self.storage_policy == "file" else len(suffix) + 1
                 suffixlen = len(suffix)

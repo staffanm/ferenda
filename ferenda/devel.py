@@ -710,6 +710,9 @@ class Devel(object):
                     log.warning("%s/%s: file %s has no status sub-dict" % (repo.alias, basefile, entrypath))
                     errcnt += 1
                     continue
+                if "parse" in entry.status and "success" in entry.status["parse"] and entry.status["parse"]["success"] == "removed":
+                    log.debug("%s/%s: document was removed in parse" % (repo.alias, basefile))
+                    continue
                 doc_el = etree.SubElement(repo_el, "basefile",
                                           {"id": basefile})
                 # FIXME: we should sort the entries in a reasonable way, eg

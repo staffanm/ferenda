@@ -2018,8 +2018,9 @@ parsed document path to that documents dependency file."""
             v = v
         elif len(v) > 1:
             self.log.warning(
-                "%s (%s/%s) had multiple values for %s but multiple_values was not specified, randomly selecting one" %
-                (about, repo, basefile, facet.rdftype))
+                "%s had multiple values for %s but multiple_values was not specified, randomly selecting one" %
+                (resource.get("about", "[Unknown URI]"), 
+                 facet.rdftype))
             v = v[0]
         else:
             v = v[0]
