@@ -180,7 +180,8 @@ class MyndFskrBase(SwedishLegalSource):
         # optionally map fs identifier to match skos:altLabel.
         return {'ELSAKFS': 'ELSÄK-FS',
                 'HSLFFS': 'HSLF-FS',
-                'FOHMFS': 'FoHMFS'}.get(basefilefrag, basefilefrag)
+                'FOHMFS': 'FoHMFS',
+                'SVKFS': 'SvKFS'}.get(basefilefrag, basefilefrag)
     
     def metadata_from_basefile(self, basefile):
         # munge basefile or classname to find the skos:altLabel of the

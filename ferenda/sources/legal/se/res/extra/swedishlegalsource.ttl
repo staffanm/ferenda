@@ -1,4 +1,4 @@
-# Automatically concatenated from sources at 2015-11-12T10:01:02.194913
+# Automatically concatenated from sources at 2016-09-05T09:09:14.718704
 
 @prefix : <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
 @prefix bibo: <http://purl.org/ontology/bibo/> .
@@ -253,9 +253,6 @@
 
 <http://rinfo.lagrummet.se/org/riksskattenaemnden> a foaf:Organization ;
     foaf:name "Riksskattenämnden"@sv .
-
-<http://rinfo.lagrummet.se/org/riksskatteverket> a foaf:Organization ;
-    foaf:name "Riksskatteverket"@sv .
 
 <http://rinfo.lagrummet.se/org/riksvaerderingsnaemnden> a foaf:Organization ;
     foaf:name "Riksvärderingsnämnden"@sv .
@@ -841,6 +838,12 @@
     skos:altLabel "RPSFS"@sv ;
     skos:prefLabel "Rikspolisstyrelsens författningssamling"@sv .
 
+<http://rinfo.lagrummet.se/serie/fs/rsfs> a :Forfattningssamling ;
+    dct:publisher <http://rinfo.lagrummet.se/org/riksskatteverket> ;
+    rdfs:comment "Har tagits över av skatteverkets författningssamling (SKVFS)"@sv ;
+    skos:altLabel "RSFS"@sv ;
+    skos:prefLabel "Riksskateverkets författningssamling"@sv .
+
 <http://rinfo.lagrummet.se/serie/fs/rtvfs> a :Forfattningssamling ;
     dct:publisher <http://rinfo.lagrummet.se/org/radio-_och_tv-verket> ;
     rdfs:comment "Har övertagits av Myndigheten för radio och tvs författningssamling (MRTVFS)"@sv ;
@@ -1290,6 +1293,9 @@
 
 <http://rinfo.lagrummet.se/org/rikspolisstyrelsen> a foaf:Organization ;
     foaf:name "Rikspolisstyrelsen"@sv .
+
+<http://rinfo.lagrummet.se/org/riksskatteverket> a foaf:Organization ;
+    foaf:name "Riksskatteverket"@sv .
 
 <http://rinfo.lagrummet.se/org/sametinget> a foaf:Organization ;
     foaf:name "Sametinget"@sv .

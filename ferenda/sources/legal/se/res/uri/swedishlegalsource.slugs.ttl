@@ -1,4 +1,4 @@
-# Automatically concatenated from sources at 2016-09-02T08:15:54.449954
+# Automatically concatenated from sources at 2016-09-05T16:38:41.074871
 
 @prefix : <http://rinfo.lagrummet.se/sys/uri/space#> .
 @prefix coin: <http://purl.org/court/def/2009/coin#> .
@@ -206,6 +206,8 @@ rpubl:Skrivelse :abbrSlug "skr" .
 
 <http://rinfo.lagrummet.se/serie/fs/lmvfs> :abbrSlug "lmvfs" .
 
+<http://rinfo.lagrummet.se/serie/fs/lsfs> :abbrSlug "lsfs" .
+
 <http://rinfo.lagrummet.se/serie/fs/lvfs> :abbrSlug "lvfs" .
 
 <http://rinfo.lagrummet.se/serie/fs/migrfs> :abbrSlug "migrfs" .
@@ -233,6 +235,8 @@ rpubl:Skrivelse :abbrSlug "skr" .
 <http://rinfo.lagrummet.se/serie/fs/rnfs> :abbrSlug "rnfs" .
 
 <http://rinfo.lagrummet.se/serie/fs/rpsfs> :abbrSlug "rpsfs" .
+
+<http://rinfo.lagrummet.se/serie/fs/rsfs> :abbrSlug "rsfs" .
 
 <http://rinfo.lagrummet.se/serie/fs/rtvfs> :abbrSlug "rtvfs" .
 

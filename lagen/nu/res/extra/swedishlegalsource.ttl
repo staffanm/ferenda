@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2016-09-02T08:07:23.134473
+# Automatically transformed from sources at 2016-09-05T16:38:30.600819
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -693,6 +693,13 @@
     skos:altLabel "RPSFS"@sv ;
     skos:prefLabel "Rikspolisstyrelsens författningssamling"@sv .
 
+<https://lagen.nu/dataset/rsfs> a rpubl:Forfattningssamling ;
+    dcterms:publisher <https://lagen.nu/org/2014/riksskatteverket> ;
+    rdfs:comment "Har tagits över av skatteverkets författningssamling (SKVFS)"@sv ;
+    owl:sameAs <http://rinfo.lagrummet.se/serie/fs/rsfs> ;
+    skos:altLabel "RSFS"@sv ;
+    skos:prefLabel "Riksskateverkets författningssamling"@sv .
+
 <https://lagen.nu/dataset/rtvfs> a rpubl:Forfattningssamling ;
     dcterms:publisher <https://lagen.nu/org/2014/radio-_och_tv-verket> ;
     rdfs:comment "Har övertagits av Myndigheten för press, radio och tvs författningssamling (MPRTFS)"@sv ;
@@ -835,19 +842,13 @@
     skos:altLabel "STFS"@sv ;
     skos:prefLabel "Sametingets författningssamling"@sv .
 
-<https://lagen.nu/dataset/svkf> a rpubl:Forfattningssamling ;
-    dcterms:publisher <https://lagen.nu/org/2014/affarsverket_svenska_kraftnat> ;
-    rdfs:seeAlso <http://www.svk.se/web/Page.aspx?id=5319> ;
-    owl:sameAs <http://rinfo.lagrummet.se/serie/fs/svkfs> ;
-    skos:altLabel "SvKF"@sv ;
-    skos:prefLabel "Affärsverket svenska kraftnäts författningssamling"@sv .
-
 <https://lagen.nu/dataset/svkfs> a rpubl:Forfattningssamling ;
     dcterms:publisher <https://lagen.nu/org/2014/affarsverket_svenska_kraftnat> ;
     rdfs:seeAlso <http://www.svk.se/web/Page.aspx?id=5319> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/svkfs> ;
     skos:altLabel "SvKFS"@sv ;
-    skos:prefLabel "Affäsverket svenska kraftnäts författningssamling"@sv .
+    skos:prefLabel "Affärsverket svenska kraftnäts författningssamling"@sv,
+        "Affäsverket svenska kraftnäts författningssamling"@sv .
 
 <https://lagen.nu/dataset/tfs> a rpubl:Forfattningssamling ;
     dcterms:publisher <https://lagen.nu/org/2014/tullverket> ;
@@ -1291,10 +1292,6 @@
     skos:altLabel "JO"@sv ;
     foaf:name "Riksdagens ombudsmän"@sv .
 
-<https://lagen.nu/org/2014/riksskatteverket> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/riksskatteverket> ;
-    foaf:name "Riksskatteverket"@sv .
-
 <https://lagen.nu/org/2014/riksvarderingsnamnden> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/riksvaerderingsnaemnden> ;
     foaf:name "Riksvärderingsnämnden"@sv .
@@ -1389,6 +1386,10 @@
 <https://lagen.nu/org/2008/statistiska-centralbyran> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/statistiska_centralbyraan> ;
     foaf:name "Statistiska centralbyrån"@sv .
+
+<https://lagen.nu/org/2014/affarsverket_svenska_kraftnat> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/affaersverket_svenska_kraftnaet> ;
+    foaf:name "Affärsverket svenska kraftnät"@sv .
 
 <https://lagen.nu/org/2014/aklagarmyndigheten> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/aaklagarmyndigheten> ;
@@ -1638,6 +1639,10 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/rikspolisstyrelsen> ;
     foaf:name "Rikspolisstyrelsen"@sv .
 
+<https://lagen.nu/org/2014/riksskatteverket> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/riksskatteverket> ;
+    foaf:name "Riksskatteverket"@sv .
+
 <https://lagen.nu/org/2014/sametinget> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/sametinget> ;
     foaf:name "Sametinget"@sv .
@@ -1751,10 +1756,6 @@
 <https://lagen.nu/org/2008/forsakringskassan> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/foersaekringskassan> ;
     foaf:name "Försäkringskassan"@sv .
-
-<https://lagen.nu/org/2014/affarsverket_svenska_kraftnat> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/affaersverket_svenska_kraftnaet> ;
-    foaf:name "Affärsverket svenska kraftnät"@sv .
 
 <https://lagen.nu/org/2014/forsvarsmakten> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/foersvarsmakten> ;
