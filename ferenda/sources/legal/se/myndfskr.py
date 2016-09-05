@@ -347,7 +347,7 @@ class MyndFskrBase(SwedishLegalSource):
                  'utfärdad den (\d+ \w+ \d{4}) tillkännages härmed i andra hand.',
                  '(?:utfärdad|meddelad)e? den (\d+ \w+ \d{4}).'],
                 'rpubl:beslutadAv':
-                ['\s(?:meddelar|föreskriver) ([A-ZÅÄÖ][\w ]+?)\d?\s',
+                ['\s(?:meddelar|föreskriver)\s([A-ZÅÄÖ][\w ]+?)\d?\s',
                  '\n\s*([A-ZÅÄÖ][\w ]+?)\d? (?:meddelar|lämnar|föreskriver|beslutar)',
                  ],
                 'rpubl:bemyndigande':
@@ -367,6 +367,11 @@ class MyndFskrBase(SwedishLegalSource):
                  'att (.*) skall upphöra att gälla (denna dag|vid utgången av \w+ \d{4})']
                 }
 
+    # for some badly written docs, certain metadata properties cannot
+    # be found. We list missing properties here, as a last resort.
+    baseprops = {'nfs/2004:5': {"rpubl:beslutadAv": "Naturvårdsverket"}}
+                 
+
     def parse_metadata_from_textreader(self, reader, doc):
         g = doc.meta
 
@@ -380,12 +385,10 @@ class MyndFskrBase(SwedishLegalSource):
         # from page 2 and so on. AFS 2014:44 requires that we glean
         # dcterms:title from page 1 and rpubl:beslutsdatum from page
         # 2.
-        props = {}  
+        props = self.baseprops.get(doc.basefile, {})
         for page in reader.getiterator(reader.readpage):
             pagecount += 1
             for (prop, tests) in list(self.fwdtests().items()):
-                if prop == "rpubl:beslutsdatum" and 'FERENDA_MYNDFSKR_DEBUG' in os.environ:
-                    from pudb import set_trace; set_trace()
                 if prop in props:
                     continue
                 for test in tests:
@@ -1238,7 +1241,7 @@ class NFS(MyndFskrBase):
     def fwdtests(self):
         t = super(NFS, self).fwdtests()
         # it's hard to match "...föreskriver X följande" if X contains spaces ("följande" can be pretty much anything else)
-        t["rpubl:beslutadAv"].insert(0, '(?:meddelar|föreskriver) (Statens\s*naturvårdsverk)')
+        t["rpubl:beslutadAv"].insert(0, '(?:meddelar|föreskriver)\s(Statens\s*naturvårdsverk)')
         return t
 
     def sanitize_text(self, text, basefile):

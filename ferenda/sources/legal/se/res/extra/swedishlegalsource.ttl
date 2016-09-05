@@ -1,4 +1,4 @@
-# Automatically concatenated from sources at 2016-09-05T09:09:14.718704
+# Automatically concatenated from sources at 2016-09-05T20:58:03.321901
 
 @prefix : <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
 @prefix bibo: <http://purl.org/ontology/bibo/> .
@@ -152,6 +152,10 @@
 
 <http://rinfo.lagrummet.se/org/landsbygdsdepartementet> a foaf:Organization ;
     foaf:name "Landsbygdsdepartementet"@sv .
+
+<http://rinfo.lagrummet.se/org/lantbruksstyrelsen> a foaf:Organization ;
+    rdfs:comment "Ersatt av jordbruksverket 1 juli 1991"@sv ;
+    foaf:name "Lantbruksstyrelsen"@sv .
 
 <http://rinfo.lagrummet.se/org/luftfartsverket> a foaf:Organization ;
     foaf:name "Luftfartsverket"@sv .
@@ -763,6 +767,11 @@
     skos:altLabel "MIGRFS"@sv ;
     skos:prefLabel "Migrationsverkets författningssamling"@sv .
 
+<http://rinfo.lagrummet.se/serie/fs/mprtfs> a :Forfattningssamling ;
+    dct:publisher <http://rinfo.lagrummet.se/org/myndigheten_foer_press_radio_och_tv> ;
+    skos:altLabel "MRPTFS"@sv ;
+    skos:prefLabel "Myndigheten för press, radio och tv:s författningssamling"@sv .
+
 <http://rinfo.lagrummet.se/serie/fs/mrtvfs> a :Forfattningssamling ;
     dct:publisher <http://rinfo.lagrummet.se/org/myndigheten_foer_radio_och_tv> ;
     skos:altLabel "MRTVFS"@sv ;
@@ -801,11 +810,11 @@
     rdfs:seeAlso <http://www.prv.se/om_prv/styrdokument/forfattningssamling/start.html> ;
     skos:prefLabel "Patent- och registreringsverkets författningssamling"@sv .
 
-<http://rinfo.lagrummet.se/serie/fs/ptfs> a :Forfattningssamling ;
+<http://rinfo.lagrummet.se/serie/fs/ptsfs> a :Forfattningssamling ;
     dct:publisher <http://rinfo.lagrummet.se/org/post-_och_telestyrelsen> ;
     rdfs:seeAlso <http://www.pts.se/Sidor/sida.asp?SectionId=890> ;
     skos:altLabel "PRVFS"@sv,
-        "PTFS"@sv ;
+        "PTSFS"@sv ;
     skos:prefLabel "Post- och telestyrelsens författningssamling"@sv .
 
 <http://rinfo.lagrummet.se/serie/fs/ra-fs> a :Forfattningssamling ;
@@ -1257,6 +1266,10 @@
 
 <http://rinfo.lagrummet.se/org/miljoeoeverdomstolen> a foaf:Organization ;
     foaf:name "Miljööverdomstolen"@sv .
+
+<http://rinfo.lagrummet.se/org/myndigheten_foer_press_radio_och_tv> a foaf:Organization ;
+    rdfs:comment "Nytt namn på Myndigheten för radio och tv"@sv ;
+    foaf:name "Myndigheten för press, radio och tv"@sv .
 
 <http://rinfo.lagrummet.se/org/myndigheten_foer_radio_och_tv> a foaf:Organization ;
     foaf:name "Myndigheten för radio och tv"@sv .

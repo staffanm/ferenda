@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2016-09-05T16:38:30.600819
+# Automatically transformed from sources at 2016-09-05T20:58:03.991069
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -639,7 +639,8 @@
 <https://lagen.nu/dataset/ptfs> a rpubl:Forfattningssamling ;
     dcterms:publisher <https://lagen.nu/org/2014/post-_och_telestyrelsen> ;
     rdfs:seeAlso <http://www.pts.se/Sidor/sida.asp?SectionId=890> ;
-    owl:sameAs <http://rinfo.lagrummet.se/serie/fs/ptfs> ;
+    owl:sameAs <http://rinfo.lagrummet.se/serie/fs/ptfs>,
+        <http://rinfo.lagrummet.se/serie/fs/ptsfs> ;
     skos:altLabel "PTFS"@sv ;
     skos:prefLabel "Post- och telestyrelsens författningssamling"@sv .
 
@@ -1358,6 +1359,11 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/arbetarskyddsstyrelsen> ;
     foaf:name "Arbetarskyddsstyrelsen"@sv .
 
+<https://lagen.nu/org/2016/lantbruksstyrelsen> a foaf:Organization ;
+    rdfs:comment "Ersatt av jordbruksverket 1 juli 1991"@sv ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/lantbruksstyrelsen> ;
+    foaf:name "Lantbruksstyrelsen"@sv .
+
 <https://lagen.nu/org/2016/statens-raddningsverk> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/statens_raeddningsverk> ;
     foaf:name "Statens räddningsverk"@sv .
@@ -1750,6 +1756,7 @@
     foaf:name "Krisberedskapsmyndigheten"@sv .
 
 <https://lagen.nu/org/2016/myndigheten_for_press_radio_och_tv> a foaf:Organization ;
+    rdfs:comment "Nytt namn på Myndigheten för radio och tv"@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/org/myndigheten_foer_press_radio_och_tv> ;
     foaf:name "Myndigheten för press, radio och tv"@sv .
 
