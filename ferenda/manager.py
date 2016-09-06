@@ -1318,12 +1318,21 @@ def _process_resultqueue(resultqueue, basefiles, procs, jobqueue, clientname):
             newp = _start_proc(jobqueue, resultqueue, clientname)
             log.info("Client: [pid %s] Started new process %s" % (os.getpid(), newp.pid))
             procs.append(newp)
-        r = resultqueue.get()
-        if isinstance(r['result'], tuple) and r['result'][0] == _WrappedKeyboardInterrupt:
-            raise KeyboardInterrupt()
-        res[r['basefile']] = r['result']
-    # return the results in the same order as they were queued
-    return [res[x] for x in basefiles]
+        try:
+            r = resultqueue.get()
+            if isinstance(r['result'], tuple) and r['result'][0] == _WrappedKeyboardInterrupt:
+                raise KeyboardInterrupt()
+            res[r['basefile']] = r['result']
+        except TypeError as e:
+            # This can happen, and it seems like an error with
+            # multiprocessing.queues.get, which calls
+            # ForkingPickler.loads(res), which then crashes deep into
+            # lxmls C code with the weird "__init__() takes exactly 5
+            # positional arguments (2 given)"
+            log.error("result could not be decoded: %s" % e)
+            # now we'll have a basefile without a result -- maybe we should indicate somehow
+    # return the results in the same order as they were queued. If we miss a result for a particular 
+    return [res.get(x, {'basefile': x, 'result': False, 'log': 'CATASTROPHIC ERROR (couldnt decode result from client)', 'client': 'unknown'}) for x in basefiles]
 
 
 def _run_class_with_basefile(clbl, basefile, kwargs, command,
