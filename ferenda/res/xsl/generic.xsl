@@ -38,9 +38,6 @@ It's a generic template for any kind of content
     <xsl:if test="$annotations/resource[@uri=$uri]">
       <aside class="annotations">
 	<h2>Annotations for <xsl:value-of select="substring-after($uri,'http://localhost:8000/res/')"/></h2>
-	<p>Lorem ipsum dolor sit amet, consectetur adipiscing
-	elit. Quisque imperdiet eget dui nec faucibus. Vestibulum at
-	semper justo.</p>
 	<xsl:for-each select="$annotations/resource[@uri=$uri]/dcterms:isReferencedBy">
 	  <xsl:variable name="referencing" select="@ref"/>
 	  <a href="{@ref}"><xsl:value-of select="$annotations/resource[@uri=$referencing]/dcterms:identifier"/></a>

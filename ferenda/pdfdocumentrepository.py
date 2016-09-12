@@ -59,7 +59,10 @@ class PDFDocumentRepository(DocumentRepository):
         return doc
 
     def create_external_resources(self, doc):
+        resources = []
         cssfile = self.store.parsed_path(doc.basefile, attachment="index.css")
+        resources.append(cssfile)
+        util.ensure_dir(cssfile)
         with open(cssfile, "w") as fp:
             # Create CSS header with fontspecs
             for pdf in doc.body:
@@ -83,6 +86,7 @@ class PDFDocumentRepository(DocumentRepository):
                             doc.basefile, attachment=os.path.basename(page.background))
                         if util.copy_if_different(src, dest):
                             self.log.debug("Copied %s to %s" % (src, dest))
-
+                        resources.append(dest)
                         fp.write("#page%03d { background: url('%s');}\n" %
                                  (cnt, os.path.basename(dest)))
+        return resources

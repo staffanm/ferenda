@@ -179,7 +179,8 @@ Environ: %s
                 environ['PATH_INFO'] == "/robots.txt")
                and os.path.exists(fullpath)):
             for repo in self.repos:
-                (fp, length, status, mimetype) = repo.http_handle(environ)  # and args?
+                if repo.requesthandler.supports(environ):
+                    fp, length, status, mimetype = repo.requesthandler.handle(environ)
                 if fp:
                     status = {200: "200 OK",
                               406: "406 Not Acceptable"}[status]

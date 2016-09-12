@@ -32,6 +32,8 @@ class MyndFskrStore(CompositeStore, SwedishLegalStore):
 
 class MyndFskr(CompositeRepository, SwedishLegalSource):
     alias = "myndfs"
+    storage_policy = 'dir'
+    xslt_template = "xsl/paged.xsl"
     extrabases = SameAs,
     loadpath = [os.path.dirname(__file__) + os.sep + "res"]
     subrepos = [
@@ -75,6 +77,12 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
     sparql_annotations = None  # until we can speed things up
     documentstore_class = MyndFskrStore
     urispace_segment = ""
+
+    @classmethod
+    def get_default_options(cls):
+        opts = super(MyndFskr, cls).get_default_options()
+        opts['pdfimages'] = True
+        return opts
 
     def metadata_from_basefile(self, basefile):
         # FIXME: Copied from
@@ -244,12 +252,17 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
             url = unquote(request_uri(environ))
             if 'develurl' in self.config:
                 url = url.replace(self.config.develurl, self.config.url)
+            # if "." in url.rsplit("/", 1)[1]:
+            #     url, suffix = url.rsplit(".", 1)
+            # else:
+            #     suffix = None
             basefile = self.basefile_from_uri(url)
-            path = self.store.generated_path(basefile)
+            
+            path, data, contenttype = self.http_handle_lookup(environ, "res", basefile)
             return (open(path, 'rb'),
                     os.path.getsize(path),
                     200,
-                    "text/html")
+                    contenttype)
         else:
             # handle the /dataset case
             return super(MyndFskr, self).http_handle(environ)   

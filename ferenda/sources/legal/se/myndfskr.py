@@ -17,7 +17,7 @@ import lxml.html
 from rdflib import RDF, Graph
 from rdflib.namespace import DCTERMS, SKOS
 
-from . import RPUBL, RINFOEX, SwedishLegalSource
+from . import RPUBL, RINFOEX, SwedishLegalSource, FixedLayoutSource
 from .swedishlegalsource import SwedishCitationParser
 from ferenda import TextReader, Describer, Facet, PDFReader, DocumentEntry
 from ferenda import util, decorators, errors, fulltextindex
@@ -34,7 +34,8 @@ PROV = Namespace(util.ns['prov'])
 
 class RequiredTextMissing(errors.ParseError): pass
 
-class MyndFskrBase(SwedishLegalSource):
+# class MyndFskrBase(SwedishLegalSource):
+class MyndFskrBase(FixedLayoutSource):
 
     """A abstract base class for fetching and parsing regulations from
     various swedish government agencies. These documents often have a
@@ -47,6 +48,8 @@ class MyndFskrBase(SwedishLegalSource):
     source_encoding = "utf-8"
     downloaded_suffix = ".pdf"
     alias = 'myndfskr'
+    storage_policy = 'dir'
+    xslt_template = "xsl/paged.xsl"
 
     rdf_type = (RPUBL.Myndighetsforeskrift, RPUBL.AllmannaRad)
     required_predicates = [RDF.type, DCTERMS.title,
@@ -71,6 +74,12 @@ class MyndFskrBase(SwedishLegalSource):
     
     download_formid = None  # if the paging uses forms, POSTs and other
     # forms of insanity
+
+    @classmethod
+    def get_default_options(cls):
+        opts = super(MyndFskrBase, cls).get_default_options()
+        opts['pdfimages'] = True
+        return opts
 
     def forfattningssamlingar(self):
         return [self.alias]
@@ -220,8 +229,31 @@ class MyndFskrBase(SwedishLegalSource):
                      "myhfs/2013:2",   # Annan förteckning "FK" utan beslut
                      "myhfs/2013:5",   #   -""-
                      "myhfs/2014:4",   #   -""-
-                     "myhfs/2012:1",   # Saknar bara beslutsdatum, förbiseende?
+                     "myhfs/2012:1",   # Saknar bara beslutsdatum, förbiseende? Borde kunna fixas med baseprops
                     ])
+
+
+    # principial call chain
+    # parse
+    #    blacklist
+    #    textreader_from_basefile  -- parse_open
+    #       textreader_from_basefile_pdftotext
+    #          sanitize_text
+    #    parse_metadata_from_textreader
+    #       fwdtests
+    #       revtests
+    #       sanitize_metadata
+    #       polish_metadata
+    #          _basefile_frag_to_altlabel
+    #          makeurl
+    #             attributes_to_resource
+    #       infer_metadata
+    #    [possibly set returned basefile (instead of True)]
+    #    open_-> PDFReader
+    #    parse_document_from_textreader # sets doc.body
+    #    _serialize_unparsed 
+    #    refparser.parse_recursive 
+    #    parse_entry_update
     @decorators.action
     @decorators.managedparsing
     def parse(self, doc):
@@ -229,7 +261,7 @@ class MyndFskrBase(SwedishLegalSource):
         # works on PDF docs converted to plaintext, instead of HTML
         # trees. FIXME: We should convert the general structure to
         # what SwedishLegalSource uses.
-
+        
         # Some documents are just beyond usable and/or completely
         # uninteresting from a legal information point of view. We
         # keep a hardcoded black list to skip these. 
@@ -256,11 +288,20 @@ class MyndFskrBase(SwedishLegalSource):
             ret = doc.basefile
         else:
             ret = True # Signals that everything is OK
-        self.parse_document_from_textreader(reader, doc)
-        self._serialize_unparsed(doc.body, doc.basefile)
-        if self.config.parserefs and self.parse_types:
-            doc.body = self.refparser.parse_recursive(doc.body)
+
+        # now treat the body like PDFReader does
+        fp = self.parse_open(orig_basefile)
+        doc.body = self.parse_body(fp, doc.basefile)
+        doc.body.tagname = "body"
+        doc.body.uri = doc.uri
+        self.postprocess_doc(doc)
         self.parse_entry_update(doc)
+        
+#        self.parse_document_from_textreader(reader, doc)
+#        self._serialize_unparsed(doc.body, doc.basefile)
+#        if self.config.parserefs and self.parse_types:
+#            doc.body = self.refparser.parse_recursive(doc.body)
+#        self.parse_entry_update(doc)
         return ret 
 
     def textreader_from_basefile(self, basefile, force_ocr=False):
@@ -675,34 +716,36 @@ class MyndFskrBase(SwedishLegalSource):
             g = Graph().parse(data=fp.read())
         uri = self.canonical_uri(basefile)
         return str(g.value(URIRef(uri), DCTERMS.identifier))
-        
-            
-    def parse_document_from_textreader(self, reader, doc):
-        # Create data for the body, removing various control characters
-        # TODO: Use pdftohtml to create a nice viewable HTML
-        # version instead of this plaintext stuff
-        reader.seek(0)
-        body = Body()
 
-        # A fairly involved way of filtering out all control
-        # characters from a string
+    # FIXME: THis is copied verbatim from PDFDocumentRepository --
+    # should we inherit from that as well? Or should FixedLayoutSource
+    # do that? SHould this function do things depending on config.pdfimages?
+    def create_external_resources(self, doc):
+        resources = []
+        cssfile = self.store.parsed_path(doc.basefile, attachment="index.css")
+        resources.append(cssfile)
+        with open(cssfile, "w") as fp:
+            # Create CSS header with fontspecs
+            assert isinstance(doc.body, PDFReader), "doc.body is %s, not PDFReader -- still need to access fontspecs etc" % type(doc.body)
+            for spec in list(doc.body.fontspec.values()):
+                fp.write(".fontspec%s {font: %spx %s; color: %s;}\n" %
+                         (spec['id'], spec['size'], spec['family'], spec['color']))
 
-        # FIXME: should go in sanitize_text
-        import unicodedata
-        all_chars = (chr(i) for i in range(0x10000))
-        control_chars = ''.join(
-            c for c in all_chars if unicodedata.category(c) == 'Cc')
-        # tab and newline are technically Control characters in
-        # unicode, but we want to keep them.
-        control_chars = control_chars.replace("\t", "").replace("\n", "")
+            # 2 Copy all created png files to their correct locations
+            for cnt, page in enumerate(doc.body):
+                if page.background:
+                    src = self.store.intermediate_path(
+                        doc.basefile, attachment=os.path.basename(page.background))
+                    dest = self.store.parsed_path(
+                        doc.basefile, attachment=os.path.basename(page.background))
+                    resources.append(dest)
+                    if util.copy_if_different(src, dest):
+                        self.log.debug("Copied %s to %s" % (src, dest))
+                    desturi = "%s?attachment=%s" % (doc.uri, os.path.basename(dest))
+                    fp.write("#page%03d { background: url('%s');}\n" %
+                             (cnt+1, desturi))
+        return resources
 
-        control_char_re = re.compile('[%s]' % re.escape(control_chars))
-        for idx, page in enumerate(reader.getiterator(reader.readpage)):
-            text = xml_escape(control_char_re.sub('', page))
-            p = Page(ordinal=idx + 1)
-            p.append(Preformatted([text]))
-            body.append(p)
-        doc.body = body
 
     def facets(self):
         return [Facet(RDF.type),

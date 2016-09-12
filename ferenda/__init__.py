@@ -19,6 +19,7 @@ from .resourceloader import ResourceLoader
 from .transformer import Transformer
 from .document import Document
 from .documentstore import DocumentStore
+from .requesthandler import RequestHandler
 from .documentrepository import DocumentRepository
 from .pdfdocumentrepository import PDFDocumentRepository
 from .compositerepository import CompositeRepository, CompositeStore

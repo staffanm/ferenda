@@ -114,8 +114,11 @@ class WSGI(RepoTester): # base class w/o tests
     def call_wsgi(self, environ):
         start_response = Mock()
         buf = BytesIO()
-        for chunk in self.app(environ, start_response):
+        iterable = self.app(environ, start_response)
+        for chunk in iterable:
             buf.write(chunk)
+        if hasattr(iterable, 'close'):
+            iterable.close()
         call_args = start_response.mock_calls[0][1]
         # call_kwargs = start_response.mock_calls[0][2]
         return call_args[0], call_args[1], buf.getvalue()
@@ -291,6 +294,10 @@ indexlocation = data/whooshindex
             manager.runserver([])
             self.assertTrue(m2.called)
             self.assertTrue(m.serve_forever.called)
+
+class Parameters(WSGI):
+    pass
+    # test attachment, repo, dir parameters
 
 class ConNeg(WSGI):
     def setUp(self):
@@ -807,3 +814,5 @@ class Search(WSGI):
         self.assertEqual(3, len(pagination))
         self.assertEqual('Results 21-25 of 25', pager[0].text)
 
+
+        

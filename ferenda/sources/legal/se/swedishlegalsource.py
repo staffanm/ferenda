@@ -689,7 +689,10 @@ class SwedishLegalSource(DocumentRepository):
 
         """
         def default_parser(iterable):
-            return Body(list(iterable))
+            if isinstance(iterable, PDFReader):
+                return iterable
+            else:
+                return Body(list(iterable))
         return default_parser
     
     def get_pdf_analyzer(self, sanitized):

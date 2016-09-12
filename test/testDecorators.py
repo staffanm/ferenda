@@ -85,7 +85,7 @@ class Decorators(unittest.TestCase):
             pass
 
         mockdoc = Mock()
-        mockrepo = Mock()
+        mockrepo = MagicMock()
         mockrepo.store.parsed_path.return_value = "parsed_path.xhtml"
         with open("parsed_path.xhtml", "w") as fp:
             fp.write("""<?xml version="1.0" encoding="utf-8"?>

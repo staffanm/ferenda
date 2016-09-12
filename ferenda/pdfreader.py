@@ -530,8 +530,12 @@ class PDFReader(CompoundElement):
                         width=int(pageelement.attrib['width']),
                         height=int(pageelement.attrib['height']),
                         background=None)
+            basename = os.path.splitext(filename)[0]
+            if filename.endswith(".bz2"):
+                basename = os.path.splitext(basename)[0]
+            
             background = "%s%03d.png" % (
-                os.path.splitext(filename)[0], page.number)
+                basename, page.number)
 
             # Reasons this file might not exist: it was blank and
             # therefore removed, or We're running under RepoTester
@@ -1148,7 +1152,7 @@ all text in a Textbox has the same font and size.
         # points (which is what self.top, .left etc is using) and
         # pixels (which is what the CSS uses)
         element.set(
-            'style', 'top: %spx, left: %spx, height: %spx, width: %spx' %
+            'style', 'top: %spx; left: %spx; height: %spx; width: %spx' %
             (self.top, self.left, self.height, self.width))
         return element
 

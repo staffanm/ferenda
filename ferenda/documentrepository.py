@@ -13,7 +13,6 @@ from itertools import chain
 from operator import itemgetter
 from tempfile import mkstemp
 from wsgiref.handlers import format_date_time as format_http_date
-from wsgiref.util import request_uri
 from urllib.parse import quote, unquote, parse_qsl
 import builtins
 import locale
@@ -54,11 +53,10 @@ from ferenda import util, errors, decorators, fulltextindex
 from ferenda import (Describer, TripleStore, FulltextIndex, Document,
                      DocumentEntry, TocPageset, TocPage,
                      DocumentStore, Transformer, Facet, Feed, Feedset,
-                     ResourceLoader)
+                     ResourceLoader, RequestHandler)
 from ferenda.elements import (Body, Link,
                               UnorderedList, ListItem, Paragraph)
 from ferenda.elements.html import elements_from_soup
-from ferenda.thirdparty import httpheader
 # establish two central RDF Namespaces at the top level
 DCTERMS = Namespace(util.ns['dcterms'])
 PROV = Namespace(util.ns['prov'])
@@ -308,6 +306,10 @@ class DocumentRepository(object):
     documentstore_class = DocumentStore
 #    """Class that implements the :class:`~ferenda.DocumentStore` interface."""
 
+
+    requesthandler_class = RequestHandler
+#    """Class that implements the :class:`~ferenda.RequestHandler` interface."""
+
     def __init__(self, config=None, **kwargs):
         """See :py:class:`~ferenda.DocumentRepository`."""
         if not config:
@@ -318,6 +320,8 @@ class DocumentRepository(object):
             self._config = config
         if not hasattr(self, 'store'):
             self.store = self.documentstore_class(self.config.datadir + os.sep + self.alias)
+        self.requesthandler = self.requesthandler_class(self)
+        
         # should documentstore have a connection to self, ie
         # self.store = DocumentStore(basedir, self) ?
         self.store.downloaded_suffix = self.downloaded_suffix
@@ -1499,6 +1503,11 @@ with the *config* object as single parameter.
             return e
         bodycontent = doc.body.as_xhtml(doc.uri)
         headcontent = render_head(doc.meta, doc.uri)
+
+        # add any css files to headcontent
+        if hasattr(doc, 'cssuris'):
+            for cssuri in doc.cssuris:
+                headcontent.append(Element(LINK, {"rel": "stylesheet", "href": cssuri}))
 
         # examine headcontent and bodycontent to only use prefixes
         # that are actually used
@@ -3507,172 +3516,6 @@ WHERE {
         """
         return []
 
-    def http_handle(self, environ):
-        """Used by the WSGI support to indicate if this repo can provide a
-        response to a particular request. If so, returns a tuple *(fp,
-        length, memtype)*, where *fp* is an open file of the document
-        to be returned.
-
-        """
-        # FIXME: This function ought to be taken out and shot.
-        if environ['PATH_INFO'].count("/") >= 2:
-            # assume that PATH_INFO is interpreted by wsgi as latin-1
-            # (as per PEP 3333), but is really sent as UTF-8. FIXME:
-            # What's the story on Py2, is environ['PATH_INFO'] a
-            # unicode or a str there?
-            path_info = environ['PATH_INFO'].encode("latin-1").decode("utf-8")
-            segments = path_info.split("/", 3)
-            if "." in segments[-1]:
-                (segments[-1], suffix) = segments[-1].rsplit(".", 1)
-            else:
-                suffix = None
-            if len(segments) == 3:
-                null, res, alias = segments
-                self.log.info("%s: got %s, %s" % (self.alias, res, alias))
-            else:
-                null, res, alias, basefile = segments
-                self.log.info("%s: got %s, %s, basefile %s" % (self.alias, res, alias, basefile))
-
-            if (alias == self.alias):
-                # we SHOULD be able to handle this -- maybe provide
-                # apologetic message about this if we can't?
-                uri = unquote(request_uri(environ)) # we don't want '%C3%A5' in the URI, we want 'å'
-                self.log.info("%s: OK trying to handle this, uri=%s" % (self.alias, uri))
-                path = None
-
-                accept = environ.get('HTTP_ACCEPT', 'text/html')
-                # do proper content-negotiation, but make sure
-                # application/xhtml+xml ISN'T one of the
-                # available options (as modern browsers may
-                # prefer it to text/html, and our
-                # application/xhtml+xml isn't what they want)
-                # -- ie we only serve application/xhtml+xml if
-                # a client specifically only asks for
-                # that. Yep, that's a big FIXME.
-                available = ("text/html")  # add to this?
-                preferred = httpheader.acceptable_content_type(accept,
-                                                               available)
-
-                rdfformats = {'application/rdf+xml': 'pretty-xml',
-                              'text/turtle': 'turtle',
-                              'text/plain': 'nt',
-                              'application/json': 'json-ld'}
-                revformats = dict([(v, k) for k, v in rdfformats.items()])
-                rdfsuffixes = {'rdf': 'pretty-xml',
-                               'ttl': 'turtle',
-                               'nt': 'nt',
-                               'json': 'json-ld'}
-                mimesuffixes = {'xhtml': 'application/xhtml+xml',
-                                'rdf': 'application/rdf+xml'}
-                data = False
-                if res == "res":
-                    if basefile.endswith("/data"):
-                        data = True
-                        if suffix:  # remove trailing suffix
-                            uri = uri.rsplit(".")[0]
-                        uri = uri[:-5]  # remove trailing "/data"
-                    basefile = self.basefile_from_uri(uri)
-                    assert basefile, "Couldn't find basefile in uri %s" % uri
-
-                    # mapping MIME-type -> callable that retrieves a path
-                    pathfunc = None
-                    if not data:
-                        pathmap = {'text/html': self.store.generated_path,
-                                   'application/xhtml+xml': self.store.parsed_path,
-                                   'application/rdf+xml': self.store.distilled_path}
-                        suffixmap = {'xhtml': self.store.parsed_path,
-                                     'rdf': self.store.distilled_path}
-                        if accept in pathmap:
-                            contenttype = accept
-                            pathfunc = pathmap[accept]
-                        elif suffix in suffixmap:
-                            contenttype = mimesuffixes[suffix]
-                            pathfunc = suffixmap[suffix]
-                        else:
-                            if ((not suffix) and
-                                    preferred and
-                                    preferred[0].media_type == "text/html"):
-                                contenttype = preferred[0].media_type
-                                pathfunc = self.store.generated_path
-
-                    if pathfunc is None:
-                        if accept in rdfformats or suffix in rdfsuffixes:
-                            g = Graph()
-                            g.parse(self.store.distilled_path(basefile))
-                            if data:
-                                annotation_graph = self.annotation_file_to_graph(
-                                    self.store.annotation_path(basefile))
-                                g += annotation_graph
-                            path = None
-                        if accept in rdfformats:
-                            contenttype = accept
-                            # FIXME: we just changed the meaning of
-                            # the "data" variable!
-                            data = g.serialize(format=rdfformats[accept])
-                        elif suffix in rdfsuffixes:
-                            contenttype = revformats[rdfsuffixes[suffix]]
-                            # FIXME: we just changed the meaning of
-                            # the "data" variable!
-                            data = g.serialize(format=rdfsuffixes[suffix])
-                        else:
-                            data = None
-                    else:
-                        path = pathfunc(basefile)
-                        data = None
-                elif res == "dataset":
-                    # FIXME: this reimplements the logic that
-                    # calculates basefile/path at the end of
-                    # toc_pagesets AND transform_links
-                    contenttype = accept
-                    if ((not suffix) and
-                            preferred and
-                            preferred[0].media_type == "text/html"):
-                        contenttype = preferred[0].media_type
-
-                    if contenttype == "text/html":
-                        params = self.dataset_params_from_uri(uri)
-                        self.log.info("dataset_params_from_uri(%s) returned %s" % (uri, params))
-                        if params:
-                            pseudobasefile = "/".join(params)
-                        else:
-                            pseudobasefile = "index"
-                        path = self.store.resourcepath("toc/%s.html" % pseudobasefile)
-                        contenttype = "text/html"
-                    elif contenttype == "text/plain" or suffix == "nt":
-                        contenttype = "text/plain"
-                        path = self.store.resourcepath("distilled/dump.nt")
-                    elif contenttype in rdfformats:
-                        g = Graph()
-                        g.parse(self.store.resourcepath("distilled/dump.nt"),
-                                format="nt")
-                        data = g.serialize(format=rdfformats[accept])
-                    elif suffix in rdfsuffixes:
-                        # reverse lookup in rdfformats
-                        # "rdf" -> "pretty-xml" -> "application/rdf+xml"
-                        contenttype = revformats[rdfsuffixes[suffix]]
-                        g = Graph()
-                        g.parse(self.store.resourcepath("distilled/dump.nt"),
-                                format="nt")
-                        data = g.serialize(format=rdfsuffixes[suffix])
-
-                if path and os.path.exists(path):
-                    return (open(path, 'rb'),
-                            os.path.getsize(path),
-                            200,
-                            contenttype)
-                elif data:
-                    return (BytesIO(data),
-                            len(data),
-                            200,
-                            contenttype)
-                else:
-                    msg = "<h1>406</h1>No acceptable media found for <tt>%s</tt>" % accept
-                    return(BytesIO(msg.encode('utf-8')),
-                           len(msg.encode('utf-8')),
-                           406,
-                           "text/html")
-
-        return (None, None, None, None)
 
     @staticmethod
     def _setup_logger(logname):

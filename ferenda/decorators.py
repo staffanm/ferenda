@@ -123,6 +123,9 @@ def render(f):
             pass
         return res
 
+    def cssuri(baseuri, filename):
+        return "%s?attachment=%s" % (baseuri, os.path.basename(filename))
+
     @functools.wraps(f)
     def wrapper(self, doc):
         # call the actual function that creates the doc data
@@ -137,7 +140,15 @@ def render(f):
                 (doc.basefile,
                  self.store.serialized_path(
                      doc.basefile)))
-
+        # css file + background images + png renderings of text
+                                
+        resources = self.create_external_resources(doc)
+        if resources:
+            cssuris = [cssuri(doc.uri, x) for x in resources if x.endswith(".css")]
+        else:
+            cssuris = []
+        if cssuris:
+            doc.cssuris = cssuris
         updated = self.render_xhtml(doc, self.store.parsed_path(doc.basefile))
         if updated:
             self.log.debug(
@@ -146,8 +157,6 @@ def render(f):
                  self.store.parsed_path(
                      doc.basefile)))
 
-        # css file + background images + png renderings of text
-        self.create_external_resources(doc)
 
         # Extract all triples on the XHTML/RDFa data to a separate
         # RDF/XML file

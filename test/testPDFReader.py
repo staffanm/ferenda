@@ -370,7 +370,7 @@ class AsXHTML(unittest.TestCase, FerendaTestCase):
         body = Textbox([Textelement("test", tag=None)],
                        top=0, left=0, width=100, height=100, fontid=0)
         want = """
-<p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px, left: 0px, height: 100px, width: 100px">test</p>
+<p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px; left: 0px; height: 100px; width: 100px">test</p>
 """
         self._test_asxhtml(want, body)
 
@@ -381,7 +381,7 @@ class AsXHTML(unittest.TestCase, FerendaTestCase):
                         Textelement("both", tag="bi")
         ], top=0, left=0, width=100, height=100, fontid=0)
         want = """
-<p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px, left: 0px, height: 100px, width: 100px">normal<b>bold</b><i>italic</i><b><i>both</i></b></p>
+<p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px; left: 0px; height: 100px; width: 100px">normal<b>bold</b><i>italic</i><b><i>both</i></b></p>
 """
         self._test_asxhtml(want, body)
 
@@ -391,7 +391,7 @@ class AsXHTML(unittest.TestCase, FerendaTestCase):
                         Textelement("normal", tag=None),
         ], top=0, left=0, width=100, height=100, fontid=0)
         want = """
-<p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px, left: 0px, height: 100px, width: 100px"><b>bold</b>normal</p>
+<p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px; left: 0px; height: 100px; width: 100px"><b>bold</b>normal</p>
 """
         self._test_asxhtml(want, body)
                         
@@ -402,7 +402,7 @@ class AsXHTML(unittest.TestCase, FerendaTestCase):
                         Textelement("merge", tag="b"),
         ], top=0, left=0, width=100, height=100, fontid=0)
         want = """
-<p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px, left: 0px, height: 100px, width: 100px">identical tags <b>should merge</b></p>
+<p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px; left: 0px; height: 100px; width: 100px">identical tags <b>should merge</b></p>
 """
         self._test_asxhtml(want, body)
                         
@@ -413,13 +413,13 @@ class AsXHTML(unittest.TestCase, FerendaTestCase):
                         " raw string"
         ], top=0, left=0, width=100, height=100, fontid=0)
         want = """
-<p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px, left: 0px, height: 100px, width: 100px">plaintext <a href="http://example.org/" rel="dcterms:references">link</a> raw string</p>
+<p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px; left: 0px; height: 100px; width: 100px">plaintext <a href="http://example.org/" rel="dcterms:references">link</a> raw string</p>
 """
         self._test_asxhtml(want, body)
 
         # remove the last str so that the linksubject becomes the last item
         body[:] = body[:-1]
         want = """
-<p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px, left: 0px, height: 100px, width: 100px">plaintext <a href="http://example.org/" rel="dcterms:references">link</a></p>
+<p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px; left: 0px; height: 100px; width: 100px">plaintext <a href="http://example.org/" rel="dcterms:references">link</a></p>
 """
         self._test_asxhtml(want, body)
