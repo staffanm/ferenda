@@ -7,6 +7,7 @@ from wsgiref.util import request_uri
 import os
 from io import BytesIO
 from functools import partial
+from urllib.parse import urlparse
 
 from rdflib import Graph
 
@@ -42,6 +43,8 @@ class RequestHandler(object):
         # alias to check to be "base", not "base.rdf"
         return len(segments) > 2 and segments[2].rsplit(".")[0] == self.repo.alias
 
+    def supports_uri(self, uri):
+        return self.supports({'PATH_INFO': urlparse(uri).path})
 
     def path(self, uri):
         """Returns the physical path that the provided URI respolves
@@ -49,16 +52,27 @@ class RequestHandler(object):
         given URI, or the URI doesnt resolve to a static file.
         
         """
-        params = self.repo.basefile_params_from_basefile(uri)
-        if params:
-            uri = uri.split("?")[0]
-        basefile = self.repo.basefile_from_uri(uri)
-            
-        leaf = uri.split("/")[-1]
-        if "." in leaf:
-            suffix = leaf.rsplit(".", 1)[1]
-        else:
+        if urlparse(uri).path.startswith("/dataset/"):
+            params = self.repo.dataset_params_from_uri(uri)
             suffix = None
+            environ = {"HTTP_ACCEPT": "text/html"}
+            contenttype = self.contenttype(environ, uri, None, params, suffix)
+            pathfunc = self.get_dataset_pathfunc(environ, params, contenttype, suffix)
+            if pathfunc:
+                return pathfunc()
+            else:
+                return None
+        else:
+            params = self.repo.basefile_params_from_basefile(uri)
+            if params:
+                uri = uri.split("?")[0]
+            basefile = self.repo.basefile_from_uri(uri)
+
+            leaf = uri.split("/")[-1]
+            if "." in leaf:
+                suffix = leaf.rsplit(".", 1)[1]
+            else:
+                suffix = None
         environ = {}
         if not suffix:
             environ['HTTP_ACCEPT'] = "text/html"
@@ -68,6 +82,12 @@ class RequestHandler(object):
             return pathfunc(basefile)
 
 
+    def request_uri(self, environ):
+        uri = request_uri(environ).encode("latin-1").decode("utf-8")
+        if 'develurl' in self.repo.config:
+            uri = uri.replace(self.repo.config.develurl, self.repo.config.url)
+        return uri
+        
     def handle(self, environ):
 
         """provides a response to a particular request by returning a a tuple
@@ -75,13 +95,9 @@ class RequestHandler(object):
         document to be returned.
 
         """
-        path_info = environ['PATH_INFO'].encode("latin-1").decode("utf-8")
-        segments = path_info.split("/", 3)
+        segments = environ['PATH_INFO'].split("/", 3)
 
-        # shld we decode this like path_info above
-        uri = request_uri(environ).encode("latin-1").decode("utf-8")
-        if 'develurl' in self.repo.config:
-            uri = uri.replace(self.repo.config.develurl, self.repo.config.url)
+        uri = self.request_uri(environ)
         if "?" in uri:
             uri, querystring = uri.rsplit("?", 1)
         else:
@@ -179,6 +195,17 @@ class RequestHandler(object):
             method = partial(method, attachment=params["attachment"])
 
         return method
+
+    def get_dataset_pathfunc(self, environ, params, contenttype, suffix):
+        if contenttype == "text/html":
+            if params:
+                pseudobasefile = "/".join(params)
+            else:
+                pseudobasefile = "index"
+            return partial(self.repo.store.resourcepath, "toc/%s.html" % pseudobasefile)
+        elif contenttype == "text/plain" or suffix == "nt":
+            return partial(self.repo.store.resourcepath, "distilled/dump.nt")
+        
 
     def lookup_resource(self, environ, basefile, params, contenttype, suffix):
         pathfunc = self.get_pathfunc(environ, basefile, params, contenttype, suffix)

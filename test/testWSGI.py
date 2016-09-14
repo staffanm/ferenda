@@ -61,6 +61,15 @@ class Pathresolve(RepoTester):
         # this path does not resolve to a static file but rather a transformation function
         self.assertIsNone(self.p("http://localhost:8000/res/base/123/a.json"))
 
+    def test_dataset(self):
+        self.assertEqual(self.p("http://localhost:8000/dataset/base"),
+                         self.datadir + "/base/toc/index.html")
+
+    def test_dataset_params(self):
+        self.assertEqual(self.p("http://localhost:8000/dataset/base?title=a"),
+                         self.datadir + "/base/toc/title/a.html")
+        
+
 
 class WSGI(RepoTester): # base class w/o tests
     storetype = 'SQLITE'

@@ -2401,46 +2401,20 @@ WHERE {
                 return uri
             else:
                 for (repoidx, repo) in enumerate(repos):
-                    basefile = repo.basefile_from_uri(uri)
-                    # 2-tuple, empty tuple, or none
-                    dataset_params = repo.dataset_params_from_uri(uri)
-                    if basefile or (dataset_params is not None):
+                    if repo.requesthandler.supports_uri(uri):
                         break
-                # reorder repos in MRU order
-                repos.insert(0, repos.pop(repoidx))
-                if basefile:
-                    basefile_params = repo.basefile_params_from_basefile(basefile)
-                    if basefile_params.get('repo') and basefile_params['repo'] != repo.alias:
-                        basefile = basefile.split("?")[0]
-                        # This means that the main composite repo was
-                        # eg "prop", but the underlying subrepo was eg
-                        # "propriksdagen". Find the underlying subrepo.
-                        for repo in repos:
-                            if repo.alias == basefile_params['repo']:
-                                break
-                        else:
-                            raise ValueError("%s: Couldn't find proper subrepo %s" % (basefile, basefile_params['repo']))
-                        funcs = {'downloaded': repo.store.downloaded_path,
-                                 'parsed': repo.store.parsed_path}
-                        pathfunc = funcs.get(basefile_params["dir"],
-                                             repo.store.generated_path)
-                    else:
-                        pathfunc = repo.store.generated_path
-                    path = pathfunc(basefile, attachment=basefile_params.get("attachment"))
-                elif dataset_params is not None:
-                    # FIXME: This reimplements the logic that calculates
-                    # basefile at the end of toc_pagesets
-                    if dataset_params:
-                        pseudobasefile = "/".join(dataset_params)
-                    else:
-                        pseudobasefile = "index"
-                    path = repo.store.resourcepath("toc/%s.html" % pseudobasefile)
+                else:
+                    repoidx = path = None
+                    # raise ValueError("Cannot find repo that supports %s" % uri)
+                if repoidx is not None:
+                    # reorder repos in MRU order
+                    repos.insert(0, repos.pop(repoidx))
+                    path = repo.requesthandler.path(uri)
             if path:
                 relpath = os.path.relpath(path, basedir)
                 if os.sep == "\\":
                     relpath = relpath.replace(os.sep, "/")
                 return relpath
-
             else:
                 return uri
 
