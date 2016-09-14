@@ -649,6 +649,9 @@ with the *config* object as single parameter.
                 if alias == self.alias:
                     return basefile
 
+
+    # FIXME: dataset_params_from_uri and basefile_params_from_basefile
+    # should probably move into requesthandler
     def dataset_params_from_uri(self, uri):
         """Given a parametrized dataset URI, return the parameter and value
         used (or an empty tuple, if it is a dataset URI handled by

@@ -15,7 +15,7 @@ from rdflib.namespace import DCTERMS, OWL, RDF
 from ferenda.sources.legal.se import RPUBL, RINFOEX
 
 from ferenda import decorators, util
-from ferenda import TextReader, DocumentEntry, Describer
+from ferenda import TextReader, DocumentEntry, Describer, RequestHandler
 from ferenda.sources.legal.se import SFS as OrigSFS
 from ferenda.sources.legal.se.elements import (Kapitel, Paragraf, Rubrik,
                                                Stycke, Listelement,
@@ -23,8 +23,12 @@ from ferenda.sources.legal.se.elements import (Kapitel, Paragraf, Rubrik,
                                                Avdelning)
 from . import SameAs
 
+class SFSHandler(RequestHandler):
+    def supports(self, environ):
+        return re.match("/\d{4}\:", environ['PATH_INFO'])
 
 class SFS(OrigSFS, SameAs):
+    requesthandler_class = SFSHandler
     def basefile_from_uri(self, uri):
         if (uri.startswith(self.urispace_base) and
             re.match("\d{4}\:", uri[len(self.urispace_base)+1:])):
@@ -118,16 +122,3 @@ class SFS(OrigSFS, SameAs):
         return "%s författningar" % len(set([row['uri'] for row in self.faceted_data()]))
 
 
-    def http_handle(self, environ):
-        if re.match("/\d{4}\:", environ['PATH_INFO']):
-            url = unquote(request_uri(environ))
-            if 'develurl' in self.config:
-                url = url.replace(self.config.develurl, self.config.url)
-            basefile = self.basefile_from_uri(url)
-            path = self.store.generated_path(basefile)
-            return (open(path, 'rb'),
-                    os.path.getsize(path),
-                    200,
-                    "text/html")
-        else:
-            return super(SFS, self).http_handle(environ)

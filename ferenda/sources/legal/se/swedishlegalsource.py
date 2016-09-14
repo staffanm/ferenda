@@ -28,7 +28,7 @@ import bs4
 from cached_property import cached_property
 
 from ferenda import (DocumentRepository, DocumentStore, FSMParser,
-                     CitationParser, Describer, Facet)
+                     CitationParser, Describer, Facet, RequestHandler)
 from ferenda import util, fulltextindex
 from ferenda.sources.legal.se.legalref import Link, LegalRef, RefParseError
 from ferenda.elements.html import A, H1, H2, H3, P, Strong, Pre
@@ -62,8 +62,14 @@ class SwedishLegalStore(DocumentStore):
                          attachment=attachment)
 
 
+class SwedishLegalHandler(RequestHandler):
+    def supports(self, environ):
+        return environ['PATH_INFO'].startswith(self.repo.urispace_segment + "/"):
+        
+
 class SwedishLegalSource(DocumentRepository):
     documentstore_class = SwedishLegalStore
+    requesthandler_class = SwedishLegalHandler
     namespaces = ['rdf', 'rdfs', 'xsd', 'dcterms', 'skos', 'foaf',
                   'xhv', 'xsi', 'owl', 'prov', 'bibo', 'olo',
                   ('rpubl', 'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#'),
@@ -1033,27 +1039,6 @@ class SwedishLegalSource(DocumentRepository):
         # is prob more correct.
         return "%s dokument" % len(set([row['uri'] for row in self.faceted_data()]))
 
-    def http_handle(self, environ):
-        # assume that PATH_INFO is interpreted by wsgi as latin-1
-        # (as per PEP 3333), but is really sent as UTF-8. FIXME:
-        # What's the story on Py2, is environ['PATH_INFO'] a
-        # unicode or a str there?
-        path_info = environ['PATH_INFO'][1:].encode("latin-1").decode("utf-8")
-        if path_info.startswith(self.urispace_segment + "/"):
-            url = unquote(request_uri(environ))
-            if 'develurl' in self.config:
-                url = url.replace(self.config.develurl, self.config.url)
-            basefile = self.basefile_from_uri(url)
-            path = self.store.generated_path(basefile)
-            return (open(path, 'rb'),
-                    os.path.getsize(path),
-                    200,
-                    "text/html")
-        elif path_info.startswith("dataset/%s" % self.alias):
-            return super(SwedishLegalSource, self).http_handle(environ)
-        else:
-            return (None, None, None, None)
-        
 
     ################################################################
     # General small utility functions

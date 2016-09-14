@@ -17,7 +17,7 @@ from ferenda.sources.legal.se import RPUBL
 
 from ferenda.sources.legal.se import myndfskr
 from ferenda import (CompositeRepository, CompositeStore, Facet, TocPageset,
-                     TocPage)
+                     TocPage, RequestHandler)
 from ferenda import util, fulltextindex
 from ferenda.elements import Link
 from ferenda.sources.legal.se import (SwedishLegalSource, SwedishLegalStore)
@@ -28,6 +28,12 @@ from . import SameAs
 # from SwedishLegalStore)
 class MyndFskrStore(CompositeStore, SwedishLegalStore):
     pass
+
+class MyndFskrHandler(RequestHandler):
+    def supports(self, environ):
+        segment = environ['PATH_INFO'].split("/")[1]
+        fs = chain.from_iterable([self.get_instance(cls).forfattningssamlingar() for cls in self.subrepos])
+        return segment in fs
 
 
 class MyndFskr(CompositeRepository, SwedishLegalSource):
@@ -76,6 +82,7 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
                   ('rinfoex', 'http://lagen.nu/terms#')]
     sparql_annotations = None  # until we can speed things up
     documentstore_class = MyndFskrStore
+    requesthandler_class = MyndFskrHandler
     urispace_segment = ""
 
     @classmethod
@@ -245,26 +252,4 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
         return ("%s författningar från %s författningssamlingar" % (
             sum(c.values()), len(c)))
 
-    def http_handle(self, environ):
-        segment = environ['PATH_INFO'].split("/")[1]
-        fs = chain.from_iterable([self.get_instance(cls).forfattningssamlingar() for cls in self.subrepos])
-        if segment in fs:
-            url = unquote(request_uri(environ))
-            if 'develurl' in self.config:
-                url = url.replace(self.config.develurl, self.config.url)
-            # if "." in url.rsplit("/", 1)[1]:
-            #     url, suffix = url.rsplit(".", 1)
-            # else:
-            #     suffix = None
-            basefile = self.basefile_from_uri(url)
-            
-            path, data, contenttype = self.http_handle_lookup(environ, "res", basefile)
-            return (open(path, 'rb'),
-                    os.path.getsize(path),
-                    200,
-                    contenttype)
-        else:
-            # handle the /dataset case
-            return super(MyndFskr, self).http_handle(environ)   
-        
 

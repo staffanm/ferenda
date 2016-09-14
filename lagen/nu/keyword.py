@@ -11,9 +11,13 @@ from wsgiref.util import request_uri
 from lxml import etree
 from rdflib.namespace import DCTERMS
 
-from ferenda import TripleStore, Facet
+from ferenda import TripleStore, Facet, RequestHandler
 from ferenda.sources.general import keyword
 from ferenda.sources.legal.se import SwedishLegalSource, SFS
+
+class LNKeywordHandler(RequestHandler):
+    def supportself, environ):
+        return environ['PATH_INFO'].startswith("/concept/")
 
 
 class LNKeyword(keyword.Keyword):
@@ -146,20 +150,3 @@ class LNKeyword(keyword.Keyword):
         return "%s begrepp" % len(set([row['uri'] for row in self.faceted_data()]))
         
 
-    def http_handle(self, environ):
-        # slightly modified version of SwedishLegalSource.http_handle
-        if environ['PATH_INFO'].startswith("/concept/"):
-            path_info = environ['PATH_INFO'][1:].encode("latin-1").decode("utf-8")
-            url = unquote(request_uri(environ))
-            if 'develurl' in self.config:
-                url = url.replace(self.config.develurl, self.config.url)
-            basefile = self.basefile_from_uri(url)
-            path = self.store.generated_path(basefile)
-            return (open(path, 'rb'),
-                    os.path.getsize(path),
-                    200,
-                    "text/html")
-        elif environ['PATH_INFO'].startswith("/dataset/%s" % self.alias):
-            return super(LNKeyword, self).http_handle(environ)
-        else:
-            return (None, None, None, None)

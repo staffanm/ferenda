@@ -24,6 +24,44 @@ from ferenda.testutil import RepoTester
 # testing the API.
 DEFAULT_HTTP_ACCEPT = 'text/xml, application/xml, application/xhtml+xml, text/html;q=0.9, text/plain;q=0.8, image/png,*/*;q=0.5'
 
+from testCompositeRepo import CompositeExample
+
+class Pathresolve(RepoTester):
+    
+    repoclass = CompositeExample
+
+    def setUp(self):
+        super(Pathresolve, self).setUp()
+        self.p = self.repo.requesthandler.path
+        
+    
+    def test_basic(self):
+        p = self.repo.requesthandler.path
+        self.assertEqual(self.p("http://localhost:8000/res/base/123/a"),
+                         self.datadir + "/base/generated/123/a/index.html")
+
+    def test_repo_param(self):
+        self.assertEqual(self.p("http://localhost:8000/res/base/123/a?repo=a"),
+                         self.datadir + "/a/generated/123/a.html")
+
+    def test_dir_param(self):
+        self.assertEqual(self.p("http://localhost:8000/res/base/123/a?dir=downloaded"),
+                         self.datadir + "/base/downloaded/123/a/index.html")
+
+    def test_attachment_param(self):
+        self.assertEqual(self.p("http://localhost:8000/res/base/123/a?attachment=foo.pdf"),
+                         self.datadir + "/base/generated/123/a/foo.pdf")
+
+    def test_all_params(self):
+        self.assertEqual(self.p("http://localhost:8000/res/base/123/a?repo=b&"
+                           "dir=downloaded&attachment=foo.pdf"),
+                         self.datadir + "/b/downloaded/123/a/foo.pdf")
+
+    def test_no_pathfunc(self):
+        # this path does not resolve to a static file but rather a transformation function
+        self.assertIsNone(self.p("http://localhost:8000/res/base/123/a.json"))
+
+
 class WSGI(RepoTester): # base class w/o tests
     storetype = 'SQLITE'
     storelocation = 'data/ferenda.sqlite' # append self.datadir
@@ -155,6 +193,7 @@ class Fileserving(WSGI):
                             {'Content-Type': 'text/html'},
                             msg.encode(),
                             status, headers, content)
+
 
 # most parts of the API are tested with integrationAPI
 class API(WSGI):

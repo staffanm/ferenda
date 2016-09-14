@@ -6,6 +6,7 @@
 from wsgiref.util import request_uri
 import os
 from io import BytesIO
+from functools import partial
 
 from rdflib import Graph
 
@@ -24,15 +25,15 @@ class RequestHandler(object):
                     'ttl': 'turtle',
                     'nt': 'nt',
                     'json': 'json-ld'}
+    _mimemap = {'text/html': 'generated_path',
+                'application/xhtml+xml': 'parsed_path',
+                'application/rdf+xml': 'distilled_path'}
+    _suffixmap = {'xhtml': 'parsed_path',
+                  'rdf': 'distilled_path'}
     
 
     def __init__(self, repo):
         self.repo = repo
-        self.mimemap = {'text/html': repo.store.generated_path,
-                        'application/xhtml+xml': repo.store.parsed_path,
-                        'application/rdf+xml': repo.store.distilled_path}
-        self.suffixmap = {'xhtml': repo.store.parsed_path,
-                          'rdf': repo.store.distilled_path}
 
     def supports(self, environ):
         """Returns True iff this particular handler supports this particular request."""
@@ -41,7 +42,34 @@ class RequestHandler(object):
         # alias to check to be "base", not "base.rdf"
         return len(segments) > 2 and segments[2].rsplit(".")[0] == self.repo.alias
 
+
+    def path(self, uri):
+        """Returns the physical path that the provided URI respolves
+        to. Returns None if this requesthandler does not support the
+        given URI, or the URI doesnt resolve to a static file.
+        
+        """
+        params = self.repo.basefile_params_from_basefile(uri)
+        if params:
+            uri = uri.split("?")[0]
+        basefile = self.repo.basefile_from_uri(uri)
+            
+        leaf = uri.split("/")[-1]
+        if "." in leaf:
+            suffix = leaf.rsplit(".", 1)[1]
+        else:
+            suffix = None
+        environ = {}
+        if not suffix:
+            environ['HTTP_ACCEPT'] = "text/html"
+        contenttype = self.contenttype(environ, uri, basefile, params, suffix)
+        pathfunc = self.get_pathfunc(environ, basefile, params, contenttype, suffix)
+        if pathfunc:
+            return pathfunc(basefile)
+
+
     def handle(self, environ):
+
         """provides a response to a particular request by returning a a tuple
         *(fp, length, memtype)*, where *fp* is an open file of the
         document to be returned.
@@ -76,7 +104,6 @@ class RequestHandler(object):
             leaf = uri.split("/")[-1]
         if "." in leaf:
             suffix = leaf.rsplit(".", 1)[1]
-
         contenttype = self.contenttype(environ, uri, basefile, params, suffix)
         if segments[1] == "dataset":
             path, data = self.lookup_dataset(environ, params, contenttype, suffix)
@@ -85,21 +112,22 @@ class RequestHandler(object):
                                               contenttype, suffix)
         return self.prep_request(environ, path, data, contenttype)
         
-            
+
     def contenttype(self, environ, uri, basefile, params, suffix):
-        accept = environ.get('HTTP_ACCEPT', 'text/html')
-        self.repo.log.info("%s: OK trying to handle this, uri=%s" % (self.repo.alias, uri))
-        # do proper content-negotiation, but make sure
-        # application/xhtml+xml ISN'T one of the available options (as
-        # modern browsers may prefer it to text/html, and our
-        # application/xhtml+xml isn't what they want) -- ie we only
-        # serve application/xhtml+xml if a client specifically only
-        # asks for that. Yep, that's a big FIXME.
-        available = ("text/html")  # add to this?
-        preferred = httpheader.acceptable_content_type(accept,
-                                                       available)
+        accept = environ.get('HTTP_ACCEPT')
+        preferred = None
+        if accept:
+            # do proper content-negotiation, but make sure
+            # application/xhtml+xml ISN'T one of the available options (as
+            # modern browsers may prefer it to text/html, and our
+            # application/xhtml+xml isn't what they want) -- ie we only
+            # serve application/xhtml+xml if a client specifically only
+            # asks for that. Yep, that's a big FIXME.
+            available = ("text/html")  # add to this?
+            preferred = httpheader.acceptable_content_type(accept,
+                                                           available)
         contenttype = None
-        if accept in self.mimemap:
+        if accept in self._mimemap:
             contenttype = accept
         elif suffix in self._mimesuffixes:
             contenttype = self._mimesuffixes[suffix]
@@ -115,14 +143,46 @@ class RequestHandler(object):
                 # pathfunc = repo.store.generated_path
         return contenttype
 
-    def lookup_resource(self, environ, basefile, params, contenttype, suffix):
+    def get_pathfunc(self, environ, basefile, params, contenttype, suffix):
+        """Given the parameters, return a function that will, given a
+        basefile, produce the proper path to that basefile. If the
+        parameters indicate a version of the resource that does not
+        exist as a static file on disk (like ".../basefile/data.rdf"),
+        returns None
+
+        """
         # try to lookup pathfunc from contenttype (or possibly suffix, or maybe params)
-        if contenttype in self.mimemap and not basefile.endswith("/data"):
-            pathfunc = self.mimemap[contenttype]
-        elif suffix in self.suffixmap and not basefile.endswith("/data"):
-            pathfunc = self.suffixmap[suffix]
+        if "repo" in params:
+            # this must be a CompositeRepository that has the get_instance method
+            for cls in self.repo.subrepos:
+                if cls.alias == params['repo']:
+                    repo = self.repo.get_instance(cls)
+                    break
+            else:
+                raise ValueError("No '%s' repo is a subrepo of %s" %
+                                 (param['repo'], self.repo.alias))
         else:
-            pathfunc = None
+            repo = self.repo
+
+        if "dir" in params:
+            method = {'downloaded': repo.store.downloaded_path,
+                      'parsed': repo.store.parsed_path}[params["dir"]]
+        elif contenttype in self._mimemap and not basefile.endswith("/data"):
+            method = getattr(repo.store, self._mimemap[contenttype])
+        elif suffix in self._suffixmap and not basefile.endswith("/data"):
+            method = getattr(repo.store, self._suffixmap[suffix])
+        else:
+            # method = repo.store.generated_path
+            return None
+
+        if "attachment" in params:
+            method = partial(method, attachment=params["attachment"])
+
+        return method
+
+    def lookup_resource(self, environ, basefile, params, contenttype, suffix):
+        pathfunc = self.get_pathfunc(environ, basefile, params, contenttype, suffix)
+        if not pathfunc:
             extended = False
             # no static file exists, we need to call code to produce data
             if basefile.endswith("/data"):
@@ -149,6 +209,7 @@ class RequestHandler(object):
         return path, data
 
     def lookup_dataset(self, environ, params, contenttype, suffix):
+        # FIXME: This should also make use of pathfunc
         data = None
         path = None
         if contenttype == "text/html":
