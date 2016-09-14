@@ -64,7 +64,7 @@ class SwedishLegalStore(DocumentStore):
 
 class SwedishLegalHandler(RequestHandler):
     def supports(self, environ):
-        return environ['PATH_INFO'].startswith(self.repo.urispace_segment + "/"):
+        return environ['PATH_INFO'].startswith(self.repo.urispace_segment + "/")
         
 
 class SwedishLegalSource(DocumentRepository):
