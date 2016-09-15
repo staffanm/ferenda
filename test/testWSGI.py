@@ -131,6 +131,8 @@ class WSGI(RepoTester): # base class w/o tests
         util.ensure_dir(self.repo.store.generated_path("123/a"))
         shutil.copy2("test/files/base/generated/123/a.html",
                      self.repo.store.generated_path("123/a"))
+        shutil.copy2("test/files/base/generated/123/a.html",
+                     self.repo.store.generated_path("123/a"))
 
         # annotations
         util.ensure_dir(self.repo.store.annotation_path("123/a"))
@@ -344,8 +346,25 @@ indexlocation = data/whooshindex
             self.assertTrue(m.serve_forever.called)
 
 class Parameters(WSGI):
-    pass
-    # test attachment, repo, dir parameters
+
+    def test_attachment_param(self):
+        self.repo.store.storage_policy = "dir"
+        util.ensure_dir(self.repo.store.generated_path("123/a"))
+        cssdata = b"/* css data goes here */"
+        csspath = self.repo.store.generated_path("123/a", attachment="index.css")
+        with open(csspath, "wb") as fp:
+            fp.write(cssdata)
+        self.env["PATH_INFO"] = "/res/base/123/a?attachment=index.css"
+        status, headers, content = self.call_wsgi(self.env)
+        want = ["200 OK",
+                {'Content-Type': 'text/css'},
+                cssdata]
+        self.assertResponse(want[0], want[1], want[2],
+                            status, headers, content)
+        
+
+
+
 
 class ConNeg(WSGI):
     def setUp(self):

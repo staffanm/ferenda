@@ -6,13 +6,11 @@
 .pdfpage {
     background: #fff;
     border: solid 1px black;
-    margin-left:auto;
-    margin-right:auto;
     position:relative;
     margin-bottom: 1em;
 }
 
-.positioned {position:absolute;margin:0;padding:0;}
+.textbox {position:absolute;margin:0;padding:0;}
 
 .annotations {
     position: absolute;
@@ -23,10 +21,9 @@
     background:#c9de96;
 }
 
+ul.viewcontrol {display:none;}
+/* lets just hide this crap for now
 ul.viewcontrol {
-    position: absolute;
-    top: 0;
-    left: 0;
     list-style-type: none;
     margin-left:200pt;
     margin-bottom: 0;
@@ -44,11 +41,12 @@ ul.viewcontrol li {
 
 ul.viewcontrol li a {
     border: 1px solid black;
-    border-top: none;
+    border-bottom: none;
     color: black;
     background: white;
     text-decoration: none;
-    padding-top: 1px;
+    padding-bottom: 1px;
     padding-left: 10pt;
     padding-right: 10pt;
 }    
+*/

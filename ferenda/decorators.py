@@ -124,7 +124,7 @@ def render(f):
         return res
 
     def cssuri(baseuri, filename):
-        return "%s?attachment=%s" % (baseuri, os.path.basename(filename))
+        return "%s?dir=parsed&attachment=%s" % (baseuri, os.path.basename(filename))
 
     @functools.wraps(f)
     def wrapper(self, doc):

@@ -1144,8 +1144,8 @@ all text in a Textbox has the same font and size.
         if prevpart is not None:
             children.append(self._cleanstring(prevpart))
 
-            
-        element = E("p", {'class': 'textbox'}, *children)
+        cssclass = 'textbox fontspec%s' % self.fontid
+        element = E("p", {'class': cssclass}, *children)
         # FIXME: we should output these positioned style attributes
         # only when the resulting document is being serialized in a
         # positioned fashion. Possibly do some translation from PDF

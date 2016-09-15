@@ -7,7 +7,8 @@ from wsgiref.util import request_uri
 import os
 from io import BytesIO
 from functools import partial
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote, parse_qsl
+import mimetypes
 
 from rdflib import Graph
 
@@ -83,20 +84,18 @@ class RequestHandler(object):
 
 
     def request_uri(self, environ):
-        uri = request_uri(environ).encode("latin-1").decode("utf-8")
+        uri = unquote(request_uri(environ)).encode("latin-1").decode("utf-8")
         if 'develurl' in self.repo.config:
             uri = uri.replace(self.repo.config.develurl, self.repo.config.url)
         return uri
         
     def handle(self, environ):
-
         """provides a response to a particular request by returning a a tuple
         *(fp, length, memtype)*, where *fp* is an open file of the
         document to be returned.
 
         """
         segments = environ['PATH_INFO'].split("/", 3)
-
         uri = self.request_uri(environ)
         if "?" in uri:
             uri, querystring = uri.rsplit("?", 1)
@@ -113,7 +112,10 @@ class RequestHandler(object):
                 tmpuri += "?" + querystring
             params = self.repo.dataset_params_from_uri(tmpuri)
         else:
-            params = self.repo.basefile_params_from_basefile(basefile)
+            if querystring:
+                params = dict(parse_qsl(querystring))
+            else:
+                params = self.repo.basefile_params_from_basefile(basefile)
         if isinstance(params, dict) and 'attachment' in params:
             leaf = params['attachment']
         else:
@@ -151,6 +153,8 @@ class RequestHandler(object):
             contenttype = accept
         elif suffix in self._rdfsuffixes:
             contenttype = self._revformats[self._rdfsuffixes[suffix]]
+        elif suffix and "."+suffix in mimetypes.types_map:
+            contenttype = mimetypes.types_map["."+suffix]
         else:
             if ((not suffix) and
                     preferred and
@@ -187,6 +191,8 @@ class RequestHandler(object):
             method = getattr(repo.store, self._mimemap[contenttype])
         elif suffix in self._suffixmap and not basefile.endswith("/data"):
             method = getattr(repo.store, self._suffixmap[suffix])
+        elif "attachment" in params and mimetypes.guess_extension(contenttype):
+            method = repo.store.generated_path
         else:
             # method = repo.store.generated_path
             return None

@@ -32,7 +32,7 @@ class MyndFskrStore(CompositeStore, SwedishLegalStore):
 class MyndFskrHandler(RequestHandler):
     def supports(self, environ):
         segment = environ['PATH_INFO'].split("/")[1]
-        fs = chain.from_iterable([self.get_instance(cls).forfattningssamlingar() for cls in self.subrepos])
+        fs = chain.from_iterable([self.repo.get_instance(cls).forfattningssamlingar() for cls in self.repo.subrepos])
         return segment in fs
 
 
@@ -89,6 +89,9 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
     def get_default_options(cls):
         opts = super(MyndFskr, cls).get_default_options()
         opts['pdfimages'] = True
+        if 'cssfiles' not in opts:
+            opts['cssfiles'] = []
+        opts['cssfiles'].append('css/pdfview.css')
         return opts
 
     def metadata_from_basefile(self, basefile):

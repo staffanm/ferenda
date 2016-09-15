@@ -42,12 +42,15 @@ It's a generic template for paged content (assumes a bunch of <div class="pdfpag
       <div class="pdfpage" id="{@id}" style="{@style}">
 	<xsl:apply-templates/>
       </div>
-      <div class="image">
+      <div class="image" style="display: none;">
+	<p> image goes here</p>
 	<!-- add neccessary code to on-demand-load a PNG version of the page -->
       </div>
+      <!--
       <div class="annotations">
 	<p>Annotated content for <xsl:value-of select="@id"/> goes here</p>
-      </div>
+	</div>
+      -->
     </div>
   </xsl:template>
     

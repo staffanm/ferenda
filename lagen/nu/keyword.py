@@ -16,7 +16,7 @@ from ferenda.sources.general import keyword
 from ferenda.sources.legal.se import SwedishLegalSource, SFS
 
 class LNKeywordHandler(RequestHandler):
-    def supportself, environ):
+    def support(self, environ):
         return environ['PATH_INFO'].startswith("/concept/")
 
 

@@ -79,6 +79,9 @@ class MyndFskrBase(FixedLayoutSource):
     def get_default_options(cls):
         opts = super(MyndFskrBase, cls).get_default_options()
         opts['pdfimages'] = True
+        if 'cssfiles' not in opts:
+            opts['cssfiles'] = []
+        opts['cssfiles'].append('css/pdfview.css')
         return opts
 
     def forfattningssamlingar(self):
@@ -291,7 +294,22 @@ class MyndFskrBase(FixedLayoutSource):
 
         # now treat the body like PDFReader does
         fp = self.parse_open(orig_basefile)
+        if orig_basefile != doc.basefile:
+            # if basefile has changed, parse_open still needed the
+            # original basefile. But afterwards, move any created
+            # intermediate files to their correct place.
+            old_dir = os.path.dirname(self.store.intermediate_path(orig_basefile))
+            new_dir = os.path.dirname(self.store.intermediate_path(doc.basefile))
+            util.ensure_dir(new_dir)
+            if os.path.exists(new_dir):
+                util.robust_remove(new_dir)
+            # I'm not sure it's wise to remove the entire olddir, as
+            # this will cause self.parse_open to run pdftohtml again
+            # and again when using --force. But at least it will work.
+            os.rename(old_dir, new_dir)
+        
         doc.body = self.parse_body(fp, doc.basefile)
+
         doc.body.tagname = "body"
         doc.body.uri = doc.uri
         self.postprocess_doc(doc)
@@ -723,7 +741,10 @@ class MyndFskrBase(FixedLayoutSource):
     def create_external_resources(self, doc):
         resources = []
         cssfile = self.store.parsed_path(doc.basefile, attachment="index.css")
+        urltransform = self.get_url_transform_func([self], os.path.dirname(cssfile),
+                                                   develurl=self.config.develurl)
         resources.append(cssfile)
+        util.ensure_dir(cssfile)
         with open(cssfile, "w") as fp:
             # Create CSS header with fontspecs
             assert isinstance(doc.body, PDFReader), "doc.body is %s, not PDFReader -- still need to access fontspecs etc" % type(doc.body)
@@ -741,9 +762,10 @@ class MyndFskrBase(FixedLayoutSource):
                     resources.append(dest)
                     if util.copy_if_different(src, dest):
                         self.log.debug("Copied %s to %s" % (src, dest))
-                    desturi = "%s?attachment=%s" % (doc.uri, os.path.basename(dest))
-                    fp.write("#page%03d { background: url('%s');}\n" %
-                             (cnt+1, desturi))
+                    desturi = "%s?dir=parsed&attachment=%s" % (doc.uri, os.path.basename(dest))
+                    desturi = urltransform(desturi)
+                    fp.write("#page%03d { background: url('%s') no-repeat grey; width: %spx; height: %spx;}\n" %
+                             (cnt+1, desturi, page.width, page.height))
         return resources
 
 

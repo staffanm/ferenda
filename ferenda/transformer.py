@@ -117,7 +117,8 @@ class Transformer(object):
         for part in tree:
             # depth-first transformation seems the easiest
             self._transform_links(part, uritransform)
-            if part.tag != "a" and part.tag != '{http://www.w3.org/1999/xhtml}a':
+            if part.tag not in ("a", "{http://www.w3.org/1999/xhtml}a",
+                                "link", "{http://www.w3.org/1999/xhtml}link"):
                 continue
             uri = part.get("href")
             if not uri:
