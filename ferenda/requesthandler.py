@@ -4,6 +4,7 @@
 # request.
 
 from wsgiref.util import request_uri
+import re
 import os
 from io import BytesIO
 from functools import partial
@@ -42,7 +43,15 @@ class RequestHandler(object):
         segments = environ['PATH_INFO'].split("/", 3)
         # with PATH_INFO like /dataset/base.rdf, we still want the
         # alias to check to be "base", not "base.rdf"
-        return len(segments) > 2 and segments[2].rsplit(".")[0] == self.repo.alias
+        if len(segments) <= 2:
+            return False
+        reponame = segments[2]
+        # this segment might contain suffix or parameters -- remove
+        # them before comparison
+        m = re.search('[^\.\?]*$', reponame)
+        if m and m.start() > 0:
+            reponame = reponame[:m.start()-1]
+        return reponame == self.repo.alias
 
     def supports_uri(self, uri):
         return self.supports({'PATH_INFO': urlparse(uri).path})

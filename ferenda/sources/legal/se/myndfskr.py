@@ -764,8 +764,11 @@ class MyndFskrBase(FixedLayoutSource):
                         self.log.debug("Copied %s to %s" % (src, dest))
                     desturi = "%s?dir=parsed&attachment=%s" % (doc.uri, os.path.basename(dest))
                     desturi = urltransform(desturi)
-                    fp.write("#page%03d { background: url('%s') no-repeat grey; width: %spx; height: %spx;}\n" %
-                             (cnt+1, desturi, page.width, page.height))
+                    background = " background: url('%s') no-repeat grey;" % desturi
+                else:
+                    background = ""
+                fp.write("#page%03d {width: %spx; height: %spx;%s}\n" %
+                         (cnt+1, page.width, page.height, background))
         return resources
 
 

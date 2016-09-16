@@ -17,7 +17,7 @@ It's a generic template for paged content (assumes a bunch of <div class="pdfpag
   <xsl:include href="base.xsl"/>
 
 
-  <xsl:template name="headtitle"><xsl:value-of select="xhtml:title"/></xsl:template>
+  <xsl:template name="headtitle"><xsl:choose><xsl:when test="xhtml:title"><xsl:value-of select="xhtml:title"/></xsl:when><xsl:otherwise>(Title missing)</xsl:otherwise></xsl:choose></xsl:template>
   <xsl:template name="metarobots"><xsl:comment>Robot metatag goes here</xsl:comment></xsl:template>
   <xsl:template name="linkalternate"><xsl:comment>Alternate link(s)</xsl:comment></xsl:template>
   <xsl:template name="headmetadata"><xsl:comment>headmetadata?</xsl:comment></xsl:template>

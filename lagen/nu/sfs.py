@@ -25,6 +25,8 @@ from . import SameAs
 
 class SFSHandler(RequestHandler):
     def supports(self, environ):
+        if environ['PATH_INFO'].startswith("/dataset/"):
+            return super(SFSHandler, self).supports(environ)
         return re.match("/\d{4}\:", environ['PATH_INFO'])
 
 class SFS(OrigSFS, SameAs):

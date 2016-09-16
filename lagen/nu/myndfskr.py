@@ -31,7 +31,11 @@ class MyndFskrStore(CompositeStore, SwedishLegalStore):
 
 class MyndFskrHandler(RequestHandler):
     def supports(self, environ):
+        # resources are at /dvfs/2013:1
+        # datasets are at /dataset/myndfs?difs=2013
         segment = environ['PATH_INFO'].split("/")[1]
+        if segment == "dataset":
+            return super(MyndFskrHandler, self).supports(environ)
         fs = chain.from_iterable([self.repo.get_instance(cls).forfattningssamlingar() for cls in self.repo.subrepos])
         return segment in fs
 

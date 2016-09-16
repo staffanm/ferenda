@@ -64,6 +64,8 @@ class SwedishLegalStore(DocumentStore):
 
 class SwedishLegalHandler(RequestHandler):
     def supports(self, environ):
+        if environ['PATH_INFO'].startswith("/dataset/"):
+            return super(SwedishLegalHandler, self).supports(environ)
         return environ['PATH_INFO'].startswith(self.repo.urispace_segment + "/")
         
 

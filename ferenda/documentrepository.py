@@ -669,11 +669,6 @@ with the *config* object as single parameter.
         """
 
         wantedprefix = self.config.url + "dataset/" + self.alias
-        if 'develurl' in self.config:
-            self.log.info("dataset_params_from_uri: changing %s->%s in %s" % (self.config.url, self.config.develurl, uri))
-            wantedprefix = wantedprefix.replace(self.config.url, self.config.develurl)
-        else:
-            self.log.info("dataset_params_from_uri: develurl not defined")
         if uri == wantedprefix or ("?" in uri and
                                    uri.startswith(wantedprefix)):
             path = uri[len(wantedprefix) + 1:]

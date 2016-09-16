@@ -363,6 +363,21 @@ class Parameters(WSGI):
                             status, headers, content)
         
 
+    def test_dataset_param(self):
+        util.ensure_dir(self.repo.store.generated_path("123/a"))
+        tocdata = b"<!-- specific toc page goes here -->"
+        tocpath = self.repo.store.resourcepath("toc/title/a.html")
+        with open(tocpath, "wb") as fp:
+            fp.write(tocdata)
+        self.env["PATH_INFO"] = "/dataset/base?title=a"
+        status, headers, content = self.call_wsgi(self.env)
+        want = ["200 OK",
+                {'Content-Type': 'text/html'},
+                tocdata]
+        self.assertResponse(want[0], want[1], want[2],
+                            status, headers, content)
+        
+
 
 
 

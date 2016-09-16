@@ -17,6 +17,8 @@ from ferenda.sources.legal.se import SwedishLegalSource, SFS
 
 class LNKeywordHandler(RequestHandler):
     def support(self, environ):
+        if environ['PATH_INFO'].startswith("/dataset/"):
+            return super(LNKeywordHandler, self).supports(environ)
         return environ['PATH_INFO'].startswith("/concept/")
 
 
