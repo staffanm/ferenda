@@ -687,8 +687,6 @@ class Devel(object):
             repo_el = etree.SubElement(root, "repo", {"alias": repo.alias})
             successcnt = warncnt = failcnt = removecnt = errcnt = 0
             for basefile in basefiles:
-                if basefile == ".root":
-                    from pudb import set_trace; set_trace()
                 # sys.stdout.write(".")
                 # print("%s/%s" % (repo.alias, basefile))
                 entrypath = repo.store.documententry_path(basefile)
