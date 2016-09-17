@@ -15,6 +15,8 @@ from rdflib import Graph
 
 from ferenda.thirdparty import httpheader
 
+from ferenda.errors import RequestHandlerError
+
 class RequestHandler(object):
     
     _mimesuffixes = {'xhtml': 'application/xhtml+xml',
@@ -110,10 +112,9 @@ class RequestHandler(object):
             uri, querystring = uri.rsplit("?", 1)
         else:
             querystring = None
-        basefile = self.repo.basefile_from_uri(uri)
-        
         suffix = None
         if segments[1] == "dataset":
+            basefile = None
             tmpuri = uri
             if "." in uri.split("/")[-1]:
                 tmpuri = tmpuri.rsplit(".")[0]
@@ -121,6 +122,9 @@ class RequestHandler(object):
                 tmpuri += "?" + querystring
             params = self.repo.dataset_params_from_uri(tmpuri)
         else:
+            basefile = self.repo.basefile_from_uri(uri)
+            if not basefile:
+                raise RequestHandlerError("%s couldn't resolve %s to a basefile" % (self.repo.alias, uri))
             if querystring:
                 params = dict(parse_qsl(querystring))
             else:

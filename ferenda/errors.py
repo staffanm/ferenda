@@ -175,3 +175,8 @@ class PDFFileIsEmpty(FerendaException):
     information (maybe because it only contains scanned images).
 
     """
+
+class RequestHandlerError(FerendaException):
+    """Raised when :py:class:`~ferenda.RequestHandler` attempts to handle
+    an incoming request that it thinks it can support, but fails."""
+
