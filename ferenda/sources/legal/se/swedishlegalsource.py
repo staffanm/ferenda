@@ -62,11 +62,29 @@ class SwedishLegalStore(DocumentStore):
                          attachment=attachment)
 
 
+# used instead of False when we need to provide more information (yet
+# still evaluate to False in a bool context)
+class SupportsResult(int):
+
+    def __new__(cls, *args, **kwargs):
+        obj = int.__new__(cls, *args)
+        object.__setattr__(obj, 'reason', kwargs['reason'])
+        return obj
+
+    def __bool__(self):
+        return False
+
+
 class SwedishLegalHandler(RequestHandler):
     def supports(self, environ):
         if environ['PATH_INFO'].startswith("/dataset/"):
             return super(SwedishLegalHandler, self).supports(environ)
-        return environ['PATH_INFO'].startswith(self.repo.urispace_segment + "/")
+        
+        res = environ['PATH_INFO'].startswith("/" + self.repo.urispace_segment + "/")
+        if not res:
+            res =  SupportsResult(reason="'%s' didn't start with '/%s/'" % (environ['PATH_INFO'], 
+                                                                           self.repo.urispace_segment))
+        return res
         
 
 class SwedishLegalSource(DocumentRepository):

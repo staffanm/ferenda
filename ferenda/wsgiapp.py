@@ -175,12 +175,18 @@ Environ: %s
         # status, always 200, or mimetype, always text/html). None
         # means no.
         fp = None
+        reasons = OrderedDict()
         if not((environ['PATH_INFO'].startswith("/rsrc") or
                 environ['PATH_INFO'] == "/robots.txt")
                and os.path.exists(fullpath)):
             for repo in self.repos:
-                if repo.requesthandler.supports(environ):
+                supports = repo.requesthandler.supports(environ)
+                if supports:
                     fp, length, status, mimetype = repo.requesthandler.handle(environ)
+                elif hasattr(supports, 'reason'):
+                    reasons[repo.alias] = supports.reason
+                else:
+                    reasons[repo.alias] = '(unknown reason)'
                 if fp:
                     status = {200: "200 OK",
                               406: "406 Not Acceptable"}[status]
@@ -208,13 +214,21 @@ Environ: %s
                 fp = open(fullpath, "rb")
                 iterdata = FileWrapper(fp)
             else:
+                reasonmsg = "\n".join(["%s: %s" % (k, reasons[k]) for k in reasons])
                 msg = """<h1>404</h1>
 
 The path %s not found at %s.
 
-Examined %s repos.""" % (environ['PATH_INFO'],
-                         fullpath,
-                         len(self.repos))
+Examined %s repos.
+
+<pre>%s
+</pre>
+""" % (environ['PATH_INFO'],
+       fullpath,
+       len(self.repos),
+       reasonmsg)
+
+
                 mimetype = "text/html"
                 status = "404 Not Found"
                 length = len(msg.encode('utf-8'))
