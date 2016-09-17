@@ -291,8 +291,16 @@ class PDFReader(CompoundElement):
                         else:
                             self.log.debug("Keeping non-blank image %s" % f)
 
-            imgflag = "-i" if not images else ""
+            # imgflag = "-i" if not images else ""
 
+            # Change in how we treat images: As we've extracted
+            # background pictures above, we don't really need to
+            # extract each individual image again. Also, for some PDFs
+            # (FFFS 2011:34, an image is generated for most every
+            # non-text dot, resulting in thousands of images per
+            # page. So always ignore images.
+            imgflag = "-i"
+            
             # Without -fontfullname, all fonts are just reported as
             # having family="Times"...
             # Without -hidden, some scanned-and-OCR:ed files turn up
