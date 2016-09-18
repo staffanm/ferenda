@@ -99,10 +99,10 @@ class Main(unittest.TestCase):
         serialized = serialize(Body([x]))
         self.assertEqual("""<Body>
   <url>
-    <scheme>http</scheme>
     <netloc>example.org</netloc>
     <path>/foo</path>
     <query>param=val</query>
+    <scheme>http</scheme>
   </url>
 </Body>
 """, serialized)

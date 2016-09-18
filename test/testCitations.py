@@ -8,11 +8,11 @@ import codecs
 from ferenda import CitationParser
 from ferenda import util
 from ferenda.compat import unittest
-from ferenda.testutil import file_parametrize
+from ferenda.testutil import file_parametrize, FerendaTestCase
 import ferenda.citationpatterns
 
 
-class ParametricBase(unittest.TestCase):
+class ParametricBase(unittest.TestCase, FerendaTestCase):
     parser = ferenda.citationpatterns.url
 
     def parametric_test(self, filename):

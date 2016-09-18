@@ -1,13 +1,13 @@
 <url>
-  <scheme>http</scheme>
   <netloc>example.org</netloc>
   <path>/1</path>
+  <scheme>http</scheme>
 </url>
 
 is the start, the end is
 
 <url>
-  <scheme>http</scheme>
   <netloc>example.org</netloc>
   <path>/2</path>
+  <scheme>http</scheme>
 </url>

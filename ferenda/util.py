@@ -744,19 +744,37 @@ def parseresults_as_xml(parseres, depth=0):
     # pyparsing.ParseResults.__repr__ returns a string representation
     # of __tocdict), then parsing that with ast.literal_eval)
     #
+    # and of course, the __repr__ changed somewhere between pyparsing
+    # 2.1.0 and 2.1.9, and now doesn't include an ordinal which we
+    # used to sort by, plus is nested differently. we handle this by
+    # always sorting by production name, and try new-style and
+    # old-style nesting variants
+    #
+    # FIXME: we should really fix this in pyparsing and try to get it
+    # accepted upstream, or monkeypatch in a fix for asXML...
+    # sort by production key, alphabetically
+
+    
     # Note that this is not a complete as_xml implementation, but it
     # works for the ParseResult objects we're dealing with right now
     # -- this'll be updated as we go along.
     rep = repr(parseres)
     tocdict = literal_eval(rep)[1]
     res = "\n"
-    for k, v in sorted(tocdict.items(), key=lambda i: i[1][0][1]):
+    for k, v in sorted(tocdict.items(), key=lambda i: i[0]):
         if k == parseres.getName():
             continue
-
-        if isinstance(v[0][0], str):
+        if isinstance(v[0], str):
+            # new-style repr
+            res += "%s<%s>%s</%s>\n" % ("  " * (depth + 1), k, v[0], k)
+        elif isinstance(v[0][0], str):
+            # old-style repr
             res += "%s<%s>%s</%s>\n" % ("  " * (depth + 1), k, v[0][0], k)
+        elif v[0][1] == {}:
+            # new-style repr 
+            res += "%s<%s>%s</%s>\n" % ("  " * (depth + 1), k, v[0][0][0], k)
         elif v[0][0][1] == {}:
+            # old-style repr
             res += "%s<%s>%s</%s>\n" % ("  " * (depth + 1), k, v[0][0][0][0], k)
         # else: call parseresults_as_xml again somehow -- but we don't
         # have any 3-level grammar productions to test with

@@ -1,25 +1,25 @@
 A url (like
 
 <url>
-  <scheme>http</scheme>
   <netloc>example.org</netloc>
   <path>/1</path>
+  <scheme>http</scheme>
 </url>
 
 ) may be, like
 
 <url>
-  <scheme>http</scheme>
   <netloc>example.org</netloc>
   <path>/2</path>
+  <scheme>http</scheme>
 </url>
 
 , in running 
 
 <url>
-  <scheme>http</scheme>
   <netloc>example.org</netloc>
   <path>/text.html</path>
+  <scheme>http</scheme>
 </url>
 
 .
