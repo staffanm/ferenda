@@ -16,7 +16,7 @@ from ferenda.sources.general import keyword
 from ferenda.sources.legal.se import SwedishLegalSource, SFS
 
 class LNKeywordHandler(RequestHandler):
-    def support(self, environ):
+    def supports(self, environ):
         if environ['PATH_INFO'].startswith("/dataset/"):
             return super(LNKeywordHandler, self).supports(environ)
         return environ['PATH_INFO'].startswith("/concept/")
@@ -25,6 +25,7 @@ class LNKeywordHandler(RequestHandler):
 class LNKeyword(keyword.Keyword):
     """Manages descriptions of legal concepts (Lagen.nu-version of Keyword)
     """
+    requesthandler_class = LNKeywordHandler
     namespaces = SwedishLegalSource.namespaces
     lang = "sv"
     if sys.platform == "darwin":

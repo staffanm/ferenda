@@ -95,7 +95,8 @@ class RequestHandler(object):
 
 
     def request_uri(self, environ):
-        uri = unquote(request_uri(environ)).encode("latin-1").decode("utf-8")
+        rawuri = request_uri(environ)
+        uri = unquote(rawuri.encode("latin-1").decode("utf-8"))
         if 'develurl' in self.repo.config:
             uri = uri.replace(self.repo.config.develurl, self.repo.config.url)
         return uri
