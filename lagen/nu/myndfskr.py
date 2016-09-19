@@ -215,13 +215,15 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
             pagesetid = facets[0].identificator(row,
                                                 'rpubl_forfattningssamling',
                                                 self.commondata)
-            label = facets[0].selector(row, 'rpubl_forfattningssamling', self.commondata)
-            pagesetdict[pagesetid] = TocPageset(label=label,
+            altlabel = facets[0].selector(row, 'rpubl_forfattningssamling', self.commondata)
+            preflabel = self.commondata.value(URIRef(row['rpubl_forfattningssamling']),
+                                              SKOS.prefLabel)
+            pagesetdict[pagesetid] = TocPageset(label="%s (%s)" % (preflabel, altlabel),
                                                 predicate=pagesetid,  # ??
                                                 pages=[])
             selected = facets[1].selector(row, 'rpubl_arsutgava', self.commondata)
             selector_values[(pagesetid, selected)] = True
-        for (pagesetid, value) in sorted(list(selector_values.keys())):
+        for (pagesetid, value) in sorted(list(selector_values.keys()), reverse=True):
             pageset = pagesetdict[pagesetid]
             pageset.pages.append(TocPage(linktext=value,
                                          title="%s från %s" % (pageset.label, value),
