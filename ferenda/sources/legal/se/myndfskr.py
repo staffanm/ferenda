@@ -1422,7 +1422,7 @@ class SKVFS(MyndFskrBase):
         # this also updates the docentry
         html_downloaded = super(SKVFS, self).download_single(basefile, url)
         # try to find link to a PDF in what was just downloaded
-        soup = BeautifulSoup(util.readfile(self.store.downloaded_path(basefile)), "lxml")
+        soup = BeautifulSoup(util.readfile(self.store.downloaded_path(basefile, suffix=".html")), "lxml")
         pdffilename = self.store.downloaded_path(basefile,
                                                  attachment="index.pdf")
         if (self.config.refresh or not(os.path.exists(pdffilename))):
