@@ -34,9 +34,7 @@ PROV = Namespace(util.ns['prov'])
 
 class RequiredTextMissing(errors.ParseError): pass
 
-# class MyndFskrBase(SwedishLegalSource):
 class MyndFskrBase(FixedLayoutSource):
-
     """A abstract base class for fetching and parsing regulations from
     various swedish government agencies. These documents often have a
     similar structure both linguistically and graphically (most of the

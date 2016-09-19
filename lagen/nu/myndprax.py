@@ -77,7 +77,7 @@ WHERE {
                 selector_values[(pagesetid, selected)] = True
             except (KeyError, ValueError) as e:
                 self.log.error("toc_pagesets: Couldn't process row %s: %s" % (row.get("uri"), e))
-        for (pagesetid, value) in sorted(list(selector_values.keys())):
+        for (pagesetid, value) in sorted(list(selector_values.keys()), reverse=True):
             pageset = pagesetdict[pagesetid]
             pageset.pages.append(
                 TocPage(linktext=value,

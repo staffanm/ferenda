@@ -69,7 +69,8 @@ lagen.nu."""
     def _search_render_innerhit(self, innerhit):
         r = innerhit
         r['text'].insert(0, ": ")
-        r['text'].insert(0, elements.Link(r['label'], uri=r['uri']))
+        r['text'].insert(0, elements.Link(r.get('label', '(beteckning saknas)'),
+                                          uri=r['uri']))
         return html.P(r['text'], **{'class': 'innerhit'})
 
     repolabels = {'sfs': 'Författningar',

@@ -1,18 +1,8 @@
 /* own code goes here */
 
-$( document ).ready(function() {
-    $( "a.navbutton" ).click(function( event ) {
-	$( "header nav ul" ).slideToggle("fast");
-    });
-    $( "a.searchbutton" ).click(function( event ) {
-	$( "header form input" ).slideToggle("fast");
-    });
-    $( "a.tocbutton" ).click(function( event ) {
-	$( "nav#toc ul" ).slideToggle("fast");
-    });
-    $( "nav#toc ul li" ).click(function( event ) {
-	$(this).children("ul").toggle()
-    });
-    
+/* hook up the offcanvas classes to make a sliding left menu possible on small screens */
+$(document).ready(function () {
+  $('[data-toggle="offcanvas"]').click(function () {
+    $('.row-offcanvas').toggleClass('active')
+  });
 });
-	

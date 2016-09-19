@@ -115,7 +115,7 @@ class Resources(object):
             E.tabs(*self._links('tabs')),
             E.footerlinks(*self._links('footer')),
             E.stylesheets(*self._li_wrap(cssfiles, 'link', 'href', rel="stylesheet")),
-            E.javascripts(*self._li_wrap(jsfiles, 'script', 'src', text=" "))
+            E.javascripts(*self._li_wrap(jsfiles, 'script', 'src', text=" "))
         )
 
         if not self.config.staticsite:

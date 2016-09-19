@@ -105,31 +105,36 @@
 	  </div><!-- /.navbar-collapse -->
 	</div><!-- /.container-fluid -->
       </nav>
-	<div class="row">
-	  <div class="col-sm-3">
-	    <!-- note: importing stylesheet MUST define <xsl:param name="dyntoc" select="false()"/> (or true()) -->
-	    <xsl:comment>dyntoc: <xsl:value-of select="$dyntoc"/></xsl:comment>
-	    <xsl:choose><xsl:when test="$dyntoc">
-	      <nav id="toc" data-spy="affix" data-toggle="toc" data-offset-top="70"></nav>
-	      </xsl:when><xsl:otherwise>
-	      <nav id="toc">
-		<ul>
-		  <xsl:apply-templates mode="toc"/>
-		</ul>
-	      </nav>
-	    </xsl:otherwise>
-	    </xsl:choose>
-	  </div>
-	  <article class="col-sm-9">
-	    <xsl:call-template name="pagetitle"/>
-	    <xsl:choose><xsl:when test="not($content-under-pagetitle)">
-		<xsl:apply-templates/>
-	      </xsl:when>
-	    </xsl:choose>
-	    <!-- Main document text: header, sections (possibly nested) and footer goes here -->
-	  </article>
+      <div class="row row-offcanvas row-offcanvas-left">
+	<div class="col-sm-3 sidebar-offcanvas" id="sidebar">
+	  <!-- note: importing stylesheet MUST define <xsl:param name="dyntoc" select="false()"/> (or true()) -->
+	  <xsl:comment>dyntoc: <xsl:value-of select="$dyntoc"/></xsl:comment>
+	  <xsl:choose><xsl:when test="$dyntoc">
+	    <nav id="toc" data-spy="affix" data-toggle="toc" data-offset-top="70"></nav>
+	    </xsl:when><xsl:otherwise>
+	    <nav id="toc">
+	      <ul>
+		<xsl:apply-templates mode="toc"/>
+	      </ul>
+	    </nav>
+	  </xsl:otherwise>
+	  </xsl:choose>
 	</div>
-      <div class="footer-container">
+	<article class="col-sm-9">
+          <p class="visible-xs">
+ 	    <button type="button" class="btn btn-primary btn-xs" data-toggle="offcanvas">
+ 	      <span class="glyphicon glyphicon-menu-right showbutton">&#160;</span>
+ 	      <span class="glyphicon glyphicon-menu-left hidebutton">&#160;</span>
+ 	    </button>
+          </p>
+	  
+	  <xsl:call-template name="pagetitle"/>
+	  <xsl:choose><xsl:when test="not($content-under-pagetitle)">
+	    <xsl:apply-templates/>
+	  </xsl:when>
+	  </xsl:choose>
+	  <!-- Main document text: header, sections (possibly nested) goes here -->
+	</article>
 	<footer>
 	  <nav>
 	    <xsl:copy-of select="$configuration/footerlinks/*"/>
