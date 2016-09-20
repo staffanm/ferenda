@@ -1,0 +1,142 @@
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://lagen.nu/prop/1987/88:155#B1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155> ;
+    dcterms:references <https://lagen.nu/1915:218>,
+        <https://lagen.nu/1960:729>,
+        <https://lagen.nu/1962:700>,
+        <https://lagen.nu/1962:700#P5>,
+        <https://lagen.nu/1973:289> ;
+    dcterms:title ""@sv ;
+    bibo:chapter "1"@sv .
+
+<https://lagen.nu/prop/1987/88:155#PS1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155> ;
+    dcterms:title "Propositionens huvudsakliga innehåll"@sv .
+
+<https://lagen.nu/prop/1987/88:155#PS2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155> ;
+    dcterms:references <https://lagen.nu/1931:152>,
+        <https://lagen.nu/1942:740>,
+        <https://lagen.nu/1942:740#K15>,
+        <https://lagen.nu/1942:740#K15P5>,
+        <https://lagen.nu/1942:740#K15P8>,
+        <https://lagen.nu/1962:700>,
+        <https://lagen.nu/1962:700#K23>,
+        <https://lagen.nu/1962:700#K36>,
+        <https://lagen.nu/1973:289>,
+        <https://lagen.nu/1973:289#P21>,
+        <https://lagen.nu/1988:000> ;
+    dcterms:title "Propositionens lagförslag PFOP- 1987/381155       1 Förslag till"@sv .
+
+<https://lagen.nu/prop/1987/88:155#S2.1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155#S2> ;
+    dcterms:title "Allmänna utgångspunkter"@sv ;
+    bibo:chapter "2.1"@sv .
+
+<https://lagen.nu/prop/1987/88:155#S4.1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155#S4> ;
+    dcterms:references <https://lagen.nu/1915:218>,
+        <https://lagen.nu/1942:740>,
+        <https://lagen.nu/1942:740#K15>,
+        <https://lagen.nu/1942:740#K15P5>,
+        <https://lagen.nu/1942:740#K15P8>,
+        <https://lagen.nu/1949:345>,
+        <https://lagen.nu/1956:245>,
+        <https://lagen.nu/1962:700>,
+        <https://lagen.nu/1962:700#K23>,
+        <https://lagen.nu/1967:837>,
+        <https://lagen.nu/1972:207>,
+        <https://lagen.nu/1974:371>,
+        <https://lagen.nu/1976:580>,
+        <https://lagen.nu/1980:100>,
+        <https://lagen.nu/1985:206>,
+        <https://lagen.nu/2008:579>,
+        <https://lagen.nu/prop/1979/80:2>,
+        <https://lagen.nu/prop/1987/88:155#S2.10>,
+        <https://lagen.nu/prop/1987/88:155#S2.2>,
+        <https://lagen.nu/prop/1987/88:155#S2.3>,
+        <https://lagen.nu/prop/1987/88:155#S2.4>,
+        <https://lagen.nu/prop/1987/88:155#S2.5>,
+        <https://lagen.nu/prop/1987/88:155#S2.7>,
+        <https://lagen.nu/prop/1987/88:155#S2.8>,
+        <https://lagen.nu/prop/1987/88:155#S4.3> ;
+    dcterms:title "Förslag till lag om skydd för företagshemligheter"@sv ;
+    bibo:chapter "4.1"@sv .
+
+<https://lagen.nu/prop/1987/88:155#S4.2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155#S4> ;
+    dcterms:references <https://lagen.nu/1962:700>,
+        <https://lagen.nu/1988:000> ;
+    dcterms:title "Förslag till lag om ändring i datalagen (1973:289)"@sv ;
+    bibo:chapter "4.2"@sv .
+
+<https://lagen.nu/prop/1987/88:155#S5> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155> ;
+    dcterms:references <https://lagen.nu/1973:289> ;
+    dcterms:title "Hemställan"@sv ;
+    bibo:chapter "5"@sv .
+
+<https://lagen.nu/prop/1987/88:155#S6> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155> ;
+    dcterms:title "Beslut"@sv ;
+    bibo:chapter "6"@sv .
+
+<https://lagen.nu/prop/1987/88:155#US1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155#S1> ;
+    dcterms:title "Övriga lagförslag"@sv .
+
+<http://www.riksdagen.se/sv/Dokument-Lagar/Forslag/Propositioner-och-skrivelser/_GB03155/?text=true> rdfs:label "Källa"@sv .
+
+<https://lagen.nu/prop/1987/88:155#S2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155> ;
+    dcterms:title "Allmän motivering"@sv ;
+    bibo:chapter "2"@sv .
+
+<https://lagen.nu/prop/1987/88:155#S4.3> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155#S4> ;
+    dcterms:references <https://lagen.nu/1962:700>,
+        <https://lagen.nu/prop/1987/88:155#S2.10> ;
+    dcterms:title "Förslag till lag om ändring i sekretesslagen (19805 100)"@sv ;
+    bibo:chapter "4.3"@sv .
+
+<https://lagen.nu/prop/1987/88:155?attachment=index.pdf&repo=propriksdagen&dir=downloaded> rdfs:label "Prop. 1987/88:155"@sv .
+
+<https://lagen.nu/prop/1987/88:155#S4> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155> ;
+    dcterms:title "Specialmotivering"@sv ;
+    bibo:chapter "4"@sv .
+
+<https://lagen.nu/prop/1987/88:155> a rpubl:Proposition ;
+    dcterms:identifier "Prop. 1987/88:155" ;
+    dcterms:issued "2008-06-13"^^xsd:date ;
+    dcterms:references <https://lagen.nu/1931:152>,
+        <https://lagen.nu/1962:700>,
+        <https://lagen.nu/1973:289>,
+        <https://lagen.nu/2008:579>,
+        <https://lagen.nu/prop/1987/88:155#S2.3> ;
+    dcterms:title "om skydd för företagshemligheter"@sv ;
+    rpubl:arsutgava "1987/88" ;
+    rpubl:lopnummer "155" ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/prop/1987/88:155> ;
+    prov:alternateOf <http://www.riksdagen.se/sv/Dokument-Lagar/Forslag/Propositioner-och-skrivelser/_GB03155/?text=true> ;
+    prov:wasDerivedFrom <https://lagen.nu/prop/1987/88:155?attachment=index.pdf&repo=propriksdagen&dir=downloaded> ;
+    prov:wasGeneratedBy "lagen.nu.propositioner.PropRiksdagen" .
+
+[] a bibo:DocumentPart ;
+    dcterms:references <https://lagen.nu/1973:289>,
+        <https://lagen.nu/1980:100>,
+        <https://lagen.nu/prop/1972:5#sid483> ;
+    dcterms:title "Anmälan av lagrådsyttrande"@sv .
+
+[] a bibo:DocumentPart ;
+    dcterms:title "Beslut"@sv .
+

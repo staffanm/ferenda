@@ -24,17 +24,19 @@ from lagen.nu import ARN, DV, SFS, SOU, Ds, JO
 # subrepos, normally used through a container CompositeRepository
 from lagen.nu.direktiv import DirRegeringen, DirTrips
 from lagen.nu.propositioner import PropRegeringen, PropRiksdagen, PropTrips
-from lagen.nu.sou import SOURegeringen
+from lagen.nu.sou import SOURegeringen, SOUKB
 
 for cls in (Keyword, Skeleton, MediaWiki, RFC, W3Standards, PEP,
             EurlexCaselaw, EurlexTreaties, ARN, Direktiv, Ds, DV, JK,
             JO, Kommitte, MyndFskrBase, Propositioner, Regeringen,
             Riksdagen, SwedishLegalSource, PropRegeringen,
             PropRiksdagen, PropTrips, DirTrips, DirRegeringen,
-            SOURegeringen, SFS):
+            SOURegeringen, SOUKB, SFS):
     # Create a new class, based on RepoTester, on the fly.
     d = {'repoclass': cls,
-         'docroot': os.path.dirname(__file__)+"/files/repo/" + cls.alias}
+         'docroot': os.path.dirname(__file__)+"/files/repo/" + cls.alias,
+         'repoconfig': {'compress': 'bz2'}
+    }
     name = 'Test'+cls.__name__
     if sys.version_info[0] < 3:
         name = name.encode()

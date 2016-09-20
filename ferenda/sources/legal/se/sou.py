@@ -44,13 +44,14 @@ class SOUAnalyzer(PDFAnalyzer):
             # Sanity check: 
             if pageidx > 8 and currentdoc == 'frontmatter':
                 logging.getLogger("pdfanalyze").warn("missed the transition from frontmatter to main")
-                # act as there never was any frontmatter
+                # act as there never was any frontmatter -- all pages
+                # are considered part of the main content.
                 currentdoc = "main"
                 documents[0][-1] = "main"
             pgtitle = titleish(page)
             if pgtitle is not None:
                 pgtitle = str(pgtitle).strip()
-                if re.match("(Till s|S)tatsrådet ", pgtitle):
+                if re.match("(Till [sS]|S)tatsrådet ", pgtitle):
                     currentdoc = "main"
                 elif pgtitle in ("Innehåll", "Innehållsförteckning"):
                     currentdoc = "main"
@@ -232,6 +233,12 @@ class SOUKB(Offtryck, PDFDocumentRepository):
         attribs["dcterms:issued"] = issued
         return attribs
 
+    def sanitize_metadata(self, props, doc):
+        if 'dcterms:title' in props and " : betänkande" in props['dcterms:title']:
+            props['dcterms:title'] = props['dcterms:title'].rsplit(" : ")[0]
+        return props
+            
+
     def extract_body(self, fp, basefile):
         reader = StreamingPDFReader()
         reader.read(fp)
@@ -239,7 +246,7 @@ class SOUKB(Offtryck, PDFDocumentRepository):
         
     def sanitize_body(self, rawbody):
         sanitized = super(SOUKB, self).sanitize_body(rawbody)
-        sanitized.analyzer = self.get_pdf_analyzer(sanitized)
+        # Offtryck.sanitize_body will set self.analyzer
         sanitized.analyzer.scanned_source = True  # everything from KB
                                                   # is scanned, even
                                                   # though the PDF

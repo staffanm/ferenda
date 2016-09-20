@@ -334,9 +334,14 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         # setUpClass instead. If your test needs a fresh repo for each
         # case, make sure your tearDown deletes self.repo, so that
         # next setUp will recreate it.
+        if hasattr(cls, 'repoconfig'):
+            repoconfig = cls.repoconfig
+        else:
+            repoconfig = {}
         cls.repo = cls.repoclass(datadir=cls.datadir,
-                                   storelocation=cls.datadir + "/ferenda.sqlite",
-                                   indexlocation=cls.datadir + "/whoosh",)
+                                 storelocation=cls.datadir + "/ferenda.sqlite",
+                                 indexlocation=cls.datadir + "/whoosh",
+                                 **repoconfig)
         cls.setupclass = True
     
     def setUp(self):

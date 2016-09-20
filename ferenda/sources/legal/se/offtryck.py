@@ -266,6 +266,11 @@ class Offtryck(SwedishLegalSource):
                         # parsing the bulk of the text.
                         self.refparser._legalrefparser.currentlynamedlaws.update(self.sfsparser.currentlynamedlaws)
                     body = self.refparser.parse_recursive(body)
+            elif tag == 'frontmatter':
+                # Frontmatter is defined as pages with no meaningful
+                # content (cover page, edition notice, half title and
+                # other crap) -- we can just skip them
+                body = []
             else:
                 # copy pages verbatim -- make no attempt to glue
                 # textelements together, parse references etc. In
@@ -281,7 +286,10 @@ class Offtryck(SwedishLegalSource):
             # regardless of wether we used real parsing or verbatim
             # copying, we need to update the current page number
             lastpagebreak = self._find_subnode(body, Sidbrytning)
-            initialstate['pageno'] = lastpagebreak.ordinal + 1
+            if lastpagebreak is None:
+                initialstate['pageno'] = 1
+            else:
+                initialstate['pageno'] = lastpagebreak.ordinal + 1
             allbody += body[:]
         return allbody
 

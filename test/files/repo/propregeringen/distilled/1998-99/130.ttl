@@ -1,0 +1,1025 @@
+@prefix : <http://www.w3.org/1999/xhtml> .
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rinfoex: <http://lagen.nu/terms#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix xsi: <http://www.w3.org/2001/XMLSchema-instance> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-0000:10419030836605704805#K1P1> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/0000:10419030836605704805#K1P1> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Paragrafen saknar motsvarighet i kommitténs förslag. Jfr 1 kap. 1 § promemorian 1)</p>
+              <p>Paragrafen innehåller en översikt över lagens bestämmelser.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.1> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-0000:10419030836605704805#K1P2> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/0000:10419030836605704805#K1P2> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 3, 4 och 29 §§ i kommitténs förslag.)</p>
+              <p>Paragrafen innehåller definitioner på några i lagen använda begrepp. Av <i>punkten 1</i> framgår att begreppet företag i lagen används för att be-</p>
+              <p>teckna alla som är bokföringsskyldiga enligt lagen. Begreppet har där-med en vidare innebörd än det har i dagligt tal och omfattar även verk-samhet som helt saknar karaktär av affärsverksamhet. Det innefattar så-lunda – utöver enskilda näringsidkares näringsverksamhet – all verk-samhet som bedrivs i handelsbolag, aktiebolag, ekonomiska föreningar och liknande företagsformer samt även verksamhet i stiftelser, ideella föreningar och registrerade trossamfund i den mån dessa juridiska personer är bokföringsskyldiga enligt lagen.</p>
+              <p>I <i>punkten 2</i> anges vilka företag som omfattas av begreppet boksluts-</p>
+              <p>företag. I lagen används begreppet för att avgränsa den grupp av företag som alltid är skyldiga att avsluta den löpande bokföringen med ett års-bokslut eller en årsredovisning.</p>
+              <p>Av punkten 2 g framgår att alla företag som normalt har en årlig netto-</p>
+              <p>omsättning på minst 20 prisbasbelopp som huvudregel utgör boksluts-företag (i andra stycket finns ett undantag från denna huvudregel). Begreppet ”nettoomsättning” är avsett att ha samma innebörd som i <a href="https://lagen.nu/1995:1554#K3P12" rel="dcterms:references">3 kap. 12 § årsredovisningslagen</a>. Det innebär att nettoomsättningen omfattar intäkter från försålda varor och utförda tjänster som ingår i företagets normala verksamhet. Avdrag skall göras för lämnade rabatter, mervärdesskatt och annan skatt som är direkt knuten till omsättningen.</p>
+              <p>I <i>punkten 3</i> definieras begreppet verksamhet. Vad som faller under</p>
+              <p>begreppet <i>närings</i>verksamhet utvecklas närmare i kommentaren till 2 kap. 6 §.</p>
+              <span id="sid114"/>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.1> ;
+    dcterms:references <https://lagen.nu/1995:1554#K3P12> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-0000:10419030836605704805#K1P3> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/0000:10419030836605704805#K1P3> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Paragrafen saknar motsvarighet i kommitténs förslag. Jfr 1 kap. 3 § i promemorian 1.)</p>
+              <p>I flera avseenden, särskilt när det gäller kretsen av bokföringsskyldiga,</p>
+              <p>gör lagen åtskillnad på fysiska personer och juridiska personer. Ett dödsbo är en juridisk person men har i bokföringshänseende ansetts böra behandlas på samma sätt som en fysisk person. Denna paragraf innehåller därför en bestämmelse om att det i fråga om dödsbon gäller samma regler som för fysiska personer. Det får bl.a. till följd att ett dödsbo är bokföringsskyldigt enbart om det bedriver näringsverksamhet (jfr 2 kap. 6 §).</p>
+              <span id="sid194"/>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.1> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K1P1> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K1P1> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 1 kap. 1 § i kommitténs förslag.)</p>
+              <span id="sid195"/>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K1P2> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K1P2> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Paragrafen saknar motsvarighet i kommitténs förslag.)</p>
+              <p>Ordet ”bolag” har bytts ut mot ”företag”. Det beror på att 1 kap. 1 §</p>
+              <p>lagen (<a href="https://lagen.nu/1995:1560" rel="dcterms:references">1995:1560</a>) om årsredovisning i kreditinstitut och värdepappers-bolag innefattar även andra juridiska personer än sådana som är bolag.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:references <https://lagen.nu/1995:1560> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K1P3> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K1P3> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>Med <i>företag</i> avses <i>i denna lag fysiska eller juridiska personer som</i></p>
+              <p>
+                <i>direkt eller indirekt omfattas av en årsredovisning, en koncern-redovisning eller en delårsrapport.</i>
+              </p>
+              <p>Med andelar avses aktier och andra andelar i juridiska personer.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K1P4> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K1P4> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 1 kap. 4 § i kommitténs förslag).</p>
+              <p>Lagen har hittills varit direkt tillämplig enbart på aktiebolag och vissa</p>
+              <p>handelsbolag. Tillämpningsområdet har nu utvidgats så att lagen nu gäller också andra företag av det slag som anges i <a href="https://lagen.nu/1999:000#K6P1" rel="dcterms:references">6 kap. 1 § bokföringslagen</a>. Orden ”bolag” och ”moderbolag” har därför bytts ut mot ”företag” och ”moderföretag”.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:references <https://lagen.nu/1999:000#K6P1> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K1P5> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K1P5> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 1 kap. 5 § i kommitténs förslag.)</p>
+              <p>Ändringarna är av samma slag som ändringarna i 1 kap. 4 §.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K1P6> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K1P6> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 1 kap. 6 § i kommitténs förslag.)</p>
+              <p>Ändringen i <i>andra stycket</i> är av redaktionell natur.</p>
+              <span id="sid198"/>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K1P7> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K1P7> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 1 kap. 7 § i kommitténs förslag.)</p>
+              <p>Paragrafen, som är ny, innehåller upplysningsregler av det slag som</p>
+              <p>hittills har funnits i 3 kap. 11 § 1980 års årsredovisningslag, <a href="https://lagen.nu/2005:551#K8P38" rel="dcterms:references">8 kap. 38 § aktiebolagslagen</a>, 6 kap. 7 § föreningslagen och <a href="https://lagen.nu/1982:713#K8P9" rel="dcterms:references">8 kap. 9 § försäkrings-rörelselagen (1982:713)</a>. Någon saklig ändring är inte åsyftad.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:references <https://lagen.nu/1982:713#K8P9>,
+        <https://lagen.nu/2005:551#K8P38> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K2P1> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K2P1> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 2 kap. 1 § i kommitténs förslag.)</p>
+              <p>I paragrafens första stycke har det tidigare funnits en bestämmelse om</p>
+              <p>skyldigheten att årligen upprätta en årsredovisning. Då denna fråga numera regleras i <a href="https://lagen.nu/1999:000#K6P1" rel="dcterms:references">6 kap. 1 § bokföringslagen</a> har den bestämmelsen ut-mönstrats.</p>
+              <p><i>Första stycket </i>(tidigare det andra) har jämkats redaktionellt.</p>
+              <p>I<i> andra stycket</i> (tidigare det tredje) regleras när det i årsredovis-</p>
+              <p>ningen skall ingå en finansieringsanalys. Bestämmelsen anknyter till samma kriterier som avgör om ett företag är skyldigt att ha en auktori-serad revisor (se bl.a. <a href="https://lagen.nu/2005:551#K10P12" rel="dcterms:references">10 kap. 12 § aktiebolagslagen</a> [1975:1385]). Hittills har det skett genom en hänvisning till bestämmelserna i bl.a. <a href="https://lagen.nu/2005:551" rel="dcterms:references">aktiebolagslagen</a>. Den tekniken framstår emellertid som mindre lämplig i och med att <a href="https://lagen.nu/1995:1554" rel="dcterms:references">årsredovisningslagen</a> blir tillämplig på flera olika slag av juridiska personer. De aktuella kriterierna har i stället preciserats i paragrafen. Dessa kriterier överensstämmer i stort med de kriterier som finns i <a href="https://lagen.nu/2005:551#K10P12" rel="dcterms:references">10 kap. 12 § aktiebolagslagen</a>. En generell tillämpning av dessa kritierier på alla de företagsformer som kan vara skyldiga att upprätta årsredovisning har dock ansetts få alltför vittgående konsekvenser. Bl.a. skulle det leda till att också större ideella föreningar som inte bedriver näringsverksamhet tvingades att upprätta finansieringsanalys, trots att</p>
+              <span id="sid199"/>
+              <p>det knappast torde finnas något egentligt behov av detta. Punkten 1 har därför utformats så att det endast är i näringsdrivande verksamhets-former som företaget kan bli skyldigt att upprätta finansieringsanalys för det fall att balansomslutningen överskrider det i lagen angivna gränsvärdet.</p>
+              <p>En annan skillnad i förhållande till <a href="https://lagen.nu/2005:551" rel="dcterms:references">aktiebolagslagen</a> är att begreppet</p>
+              <p>”fastställda balansräkningar” har ersatts med ”balansräkningarna”. Skälet till det är att det i vissa slag av företag, t.ex. handelsbolag och stiftelser, inte förekommer någon fastställelse av balansräkningen. De balans-räkningar som avses är dock fortfarande de balansräkningar som ingår i företagets årsredovisningar eller årsbokslut.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:references <https://lagen.nu/1995:1554>,
+        <https://lagen.nu/1999:000#K6P1>,
+        <https://lagen.nu/2005:551>,
+        <https://lagen.nu/2005:551#K10P12> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K2P3> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K2P3> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 2 kap. 3 § i kommitténs förslag.)</p>
+              <p>Ändringen i <i>första stycket</i> innebär att ordet ”bolagets” har bytts ut</p>
+              <p>mot ”företagets.” Detta är en följd av att lagens tillämpningsområde har utvidgats till att omfatta andra verksamhetsformer än aktiebolag och vissa handelsbolag.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K2P4> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K2P4> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 2 kap. 4 § i kommitténs förslag.)</p>
+              <p>Ändringarna är av samma slag som ändringen i 3 §.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K2P7> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K2P7> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 2 kap. 7 § i kommitténs förslag.)</p>
+              <p>I <i>första stycket</i> och de nya <i>tredje och fjärde styckena </i>har det tagits in</p>
+              <p>regler om hur årsredovisningen för ekonomiska föreningar, stiftelser och de övriga företag som kan vara skyldiga att upprätta årsredovisning skall undertecknas. Kompletteringarna överensstämmer i huvudsak med hittills gällande rätt (jfr 9 kap. 2 § andra stycket föreningslagen, <a href="https://lagen.nu/1994:1220#K3P9" rel="dcterms:references">3 kap. 9 § stiftelselagen</a> och 2 kap. 2 § tredje stycket 1980 års årsredovis-ningslag).</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:references <https://lagen.nu/1994:1220#K3P9> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P1> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K3P1> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 3 kap. 1 § i kommitténs förslag.)</p>
+              <p>Ändringen är av samma slag som ändringen i 2 kap. 3 §.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P10> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K3P10> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 3 kap. 10 § i kommitténs förslag.)</p>
+              <p>Bestämmelsen har flyttats från 4 kap. 17 §. Ändringen i <i>andra stycket</i></p>
+              <p>är av samma slag som ändringen i 2 kap. 3 §.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P11> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K3P11> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>
+                <i>förlust, lämna uppgift om nettoomsättningen. Företaget skall i en not upplysa om skälen för sammanslagningen. Uppgift om nettoomsät-tningen får dock utelämnas om det är motiverat och Patent- och registreringsverket medger det.</i>
+              </p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P12> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K3P12> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 3 kap. 12 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats som 3 kap. 8 §. Ändringen är av</p>
+              <p>samma slag som i 2 kap. 3 §.</p>
+              <span id="sid205"/>
+              <p>
+                <i>Extraordinära intäkter och kostnader</i>
+              </p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P13> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K3P13> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 3 kap. 13 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats som 3 kap. 9 §. Ändringarna i</p>
+              <p><i>första </i>och<i> tredje styckena</i> är av samma slag som ändringen i 2 kap. 3 §.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P2> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K3P2> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 3 kap. 3 § i kommitténs förslag.)</p>
+              <p>Ändringen är av samma slag som ändringen i 2 kap. 3 §.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P3> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K3P3> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Paragrafen saknar motsvarighet i kommitténs förslag.)</p>
+              <p>Som en följd av att 1 kap. 1 § har fått en ny lydelse har den tidigare bi-</p>
+              <p>lagan 1 till lagen kunnat utmönstras. De bilagor som tidigare har beteck-nats 2–4 har därför erhållit beteckningarna 1–3. Detta har föranlett ändringar i förevarande paragrafs <i>första stycke. </i></p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P4> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K3P4> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 3 kap. 6 § i kommitténs förslag.)</p>
+              <p>Med hänsyn till att lagens tillämpningsområde inte längre är begränsat</p>
+              <p>till företagsformer som typiskt sett är inriktade på näringsverksamhet har ordet ”rörelse” i <i>andra stycket</i> bytts ut mot ”verksamhet”. </p>
+              <span id="sid202"/>
+              <p>
+                <i>Jämförelsetal</i>
+              </p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P5> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K3P5> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 3 kap. 7 § i kommitténs förslag.)</p>
+              <p>Ändringen i<i> andra stycket</i> är av samma slag som ändringen i 2 kap.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P6> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K3P6> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 3 kap. 2 § i kommitténs förslag.)</p>
+              <p>Paragrafen, som saknar tidigare motsvarighet i 3 kap., innehåller</p>
+              <p>bestämmelser om vissa särskilda poster i en ekonomisk förenings balansräkning.</p>
+              <p>Bestämmelsen i <i>första stycket</i> motsvarar de bestämmelser som hit-</p>
+              <p>tills har funnits i 9 kap. 7 § tredje stycket första och andra meningen föreningslagen.</p>
+              <p>Föreskriften i <i>andra stycket</i> motsvarar de bestämmelser som hittills</p>
+              <p>har funnits i 9 kap. 26 § andra meningen <a href="https://lagen.nu/1991:614" rel="dcterms:references">bostadsrättslagen (1991:614)</a>.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:references <https://lagen.nu/1991:614> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P7> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K3P7> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 3 kap. 4 § i kommitténs förslag.)</p>
+              <p>Bestämmelsen är ny och innehåller, liksom 6 §, en särskild bestäm-</p>
+              <p>melse avseende ekonomiska föreningar. Bestämmelsen har tidigare funnits i 9 kap. 6 § andra stycket andra meningen föreningslagen.</p>
+              <span id="sid203"/>
+              <p>
+                <i>Större periodiseringsposter</i>
+              </p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P8> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K3P8> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 3 kap. 8 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats 3 kap. 6 §. Ändringen i <i>andra</i></p>
+              <p><i>stycket</i> är av samma slag som ändringen i 2 kap. 3 §.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P9> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K3P9> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 3 kap. 9 § i kommitténs förslag.)</p>
+              <p>En motsvarande bestämmelse har tidigare funnits i 4 kap. 16 §. Den</p>
+              <p>har nu utformats som en klassificeringsregel med anknytning till balans-räkningen och det har därför ansetts naturligt att ta in den i 3 kap. i stället för i 4 kap. Någon saklig ändring när det gäller innebörden av begreppet avsättning är inte avsedd (jfr <a href="https://lagen.nu/prop/1998/99:130#S15.2.1" rel="dcterms:references">avsnitt 15.2.1</a>).</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:references <https://lagen.nu/prop/1998/99:130#S15.2.1> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K4P1> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K4P1> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 4 kap. 1 § i kommitténs förslag.)</p>
+              <p>Ändringen i <i>första stycket </i>är av samma slag som ändringen i 3 kap.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K4P12> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K4P12> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 4 kap. 12 § i kommitténs förslag.)</p>
+              <p>Ändringen är av samma slag som ändringen i 2 kap. 3 §.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K4P14> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K4P14> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 4 kap. 14 § i kommitténs förslag.)</p>
+              <p>Ändringarna i <i>andra stycket</i> är av samma slag som ändringen i 2 kap.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K4P2> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K4P2> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 4 kap. 2 § i kommitténs förslag.)</p>
+              <p>Ändringarna i <i>andra stycket</i> sammanhänger med att lagens tillämp-</p>
+              <p>ningsområde har utvidgats.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K4P6> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K4P6> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p><i>beloppet används för avsättning till en uppskrivningsfond eller, i aktiebolag,</i> <i>för ökning av aktiekapitalet genom fondemission eller nyemission.</i></p>
+              <p>I samband med uppskrivningar skall det i en not lämnas upplysning om</p>
+              <p>hur uppskrivningsbeloppet har behandlats skattemässigt.</p>
+              <p>Avskrivningar och nedskrivningar av den tillgång som har skrivits upp</p>
+              <p>skall efter uppskrivningen beräknas med utgångspunkt i det uppskrivna värdet.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K4P7> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K4P7> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 4 kap. 7 § i kommitténs förslag.)</p>
+              <span id="sid207"/>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K4P9> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K4P9> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 4 kap. 9 § i kommitténs förslag.)</p>
+              <p>Ändringen i <i>fjärde stycket</i> är av samma slag som ändringen i 2 kap.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P1> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K5P1> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 5 kap. 1 § i kommitténs förslag.)</p>
+              <span id="sid209"/>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P11> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K5P11> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 5 kap. 11 § i kommitténs förslag.)</p>
+              <p>Ändringen i <i>andra stycket</i> är av samma slag som ändringen i 2 kap 3 §.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P12> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K5P12> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 5 kap. 12 § i kommitténs förslag.)</p>
+              <p>Ändringarna i <i>första och andra styckena</i> är av samma slag som</p>
+              <p>ändringarna i 2 kap. 3 §.</p>
+              <p>I <i>tredje stycket</i> har det klargjorts att det endast är aktiebolag som</p>
+              <p>omfattas av stycket.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P13> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K5P13> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 5 kap. 13 § i kommitténs förslag.)</p>
+              <p>Ändringen är av samma slag som ändringen i 2 kap. 3 §.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P15> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K5P15> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>
+                <i>sig, balanserad vinst eller förlust samt nettovinst eller förlust för räkenskapsåret. Balanserad förlust och förlust för räkenskapsåret tas därvid upp som avdragsposter.</i>
+              </p>
+              <p>
+                <i>Förändringar i eget kapital jämfört med föregående års balans-</i>
+              </p>
+              <p>
+                <i>räkning skall specificeras.</i>
+              </p>
+              <p>
+                <i>Vad som sägs i första stycket om insats gäller också upplåtelse-</i>
+              </p>
+              <p>
+                <i>avgift i en bostadsrättsförening.</i>
+              </p>
+              <p>Uppgift skall lämnas om skillnaden mellan å ena sidan den inkomstskatt som har redovisats i resultaträkningen under räkenskapsåret och tidigare räkenskapsår samt å andra sidan den inkomstskatt som belöper sig på verksamheten för dessa år. Uppgift behöver dock inte lämnas om skillnaden är obetydlig.</p>
+              <p>Första stycket gäller inte <i>företag</i> som avses i 3 kap. <i>8</i> § andra stycket.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P17> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K5P17> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 5 kap. 17 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats 5 kap. 16 §. I <i>andra stycket</i> har det</p>
+              <p>dels gjorts samma slag av ändring som i 2 kap. 3 §, dels gjorts en anpass-ning till den nya paragrafnumreringen i 3 kap.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P18> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K5P18> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 5 kap.18 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats 5 kap. 17 §. Ändringen är av samma</p>
+              <p>slag som ändringen i 2 kap. 3 §.</p>
+              <span id="sid213"/>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P20> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K5P20> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 5 kap. 20 § i kommitténs förslag)</p>
+              <p>Paragrafen har tidigare betecknats 5 kap. 19 §. Ändringen i <i>tredje</i></p>
+              <p><i>stycket</i> är av samma slag som ändringen i 2 kap. 3 §.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P23> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K5P23> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 5 kap. 22 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats 5 kap. 21 §. Ändringarna är endast</p>
+              <p>föranledda av en ändrad paragrafnumrering.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P24> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K5P24> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 5 kap. 23 i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats 5 kap. 22 §. Ändringen är endast en</p>
+              <p>följd av ändrad paragrafnumrering.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P25> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K5P25> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 5 kap. 24 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats 5 kap. 23 §. Ändringarna är av</p>
+              <p>samma slag som ändringen i 2 kap. 3 §.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P26> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K5P26> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 5 kap. 25 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats 5 kap. 24 §. På <i>Lagrådets</i> förslag</p>
+              <p>har bestämmelsen kompletterats med ett krav på att ett dotterföretag vars moderföretag är en fysisk person, skall lämna uppgift om dennes personnummer. I övrigt är ändringarna är av samma slag som ändringen i 2 kap. 3 §.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P6> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K5P6> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 5 kap. 6 § i kommitténs förslag.)</p>
+              <p>I <i>första stycket</i> har ordet ”rörelsegrenar” bytts ut mot ”verksamhets-</p>
+              <p>grenar”. Anledningen till detta är att lagen i sin nya lydelse är tillämplig även på företag som i normala fall inte bedriver rörelse, t.ex. ideella föreningar och registrerade trossamfund.</p>
+              <p>Ändringarna i <i>andra stycket</i> är av samma slag som ändringen i 2 kap.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P7> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K5P7> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 5 kap. 7 § i kommitténs förslag.)</p>
+              <p>Ändringen i <i>första stycket</i> är av samma slag som ändringen i 2 kap. 3 §</p>
+              <p>m.fl. paragrafer.</p>
+              <p>Av bestämmelserna i 7 kap. 3 § framgår att ett moderföretag under</p>
+              <p>vissa förhållanden inte behöver upprätta någon koncernredovisning. När detta undantag utnyttjas, skall moderföretaget, enligt <i>andra stycket, </i>lämna upplysning om internvinster på transaktioner som har företagits inom koncernen<i>. </i>Frågan har behandlats i <a href="https://lagen.nu/prop/1998/99:130#S16.2" rel="dcterms:references">avsnitt 16.2</a>.Med begreppet ”transaktioner inom koncernen” förstås varje koncernintern överlåtelse av varor, tjänster, anläggningstillgångar eller annat. Begreppet intern-vinster har samma innebörd som i 7 kap. 13 §.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:references <https://lagen.nu/prop/1998/99:130#S16.2> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P8> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K5P8> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 5 kap. 8 § i kommitténs förslag.)</p>
+              <p>Ändringarna i paragrafen utgör följdändringar till den nya bokförings-</p>
+              <p>lagen eller till andra ändringar i <a href="https://lagen.nu/1995:1554" rel="dcterms:references">årsredovisningslagen</a>. Ordet bolag har bytts ut mot företag. <i>Första stycket</i> har också formulerats om för att dess innebörd skall bli klarare. I <i>första stycket</i> <i>2 </i>har ordet ”årsredovis-ning” lagts till, eftersom den nya <a href="https://lagen.nu/1999:000" rel="dcterms:references">bokföringslagen</a> innebär att bok-föringen kan avslutas med ett årsbokslut <i>eller</i> en årsredovisning. </p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:references <https://lagen.nu/1995:1554>,
+        <https://lagen.nu/1999:000> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P9> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K5P9> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 5 kap. 9 § i kommitténs förslag.)</p>
+              <p>I paragrafens <i>andra stycke</i> har orden ”regeringen eller den myndighet</p>
+              <p>som regeringen bestämmer” bytts ut mot ”Patent- och registrerings-verket”. Patent- och registreringsverket har redan tidigare, med stöd av ett bemyndigande i <a href="https://lagen.nu/1995:1633#P6" rel="dcterms:references">6 §</a> förordningen (<a href="https://lagen.nu/1995:1633" rel="dcterms:references">1995:1633</a>) om vissa årsredo-visningsfrågor, prövat dessa tillståndsärenden. Det har nu ansetts att prövningen av ärendena över huvud taget inte bör ligga hos regeringen och – såsom framgår av den nya 10 kap. 1 § – att överklagande av beslut i ärendena i fortsättningen skall ske till allmän förvaltningsdomstol. Det har mot den bakgrunden ansetts naturligt att det redan av årsredovis-ningslagen framgår att ärendena skall prövas av Patent- och regist-reringsverket.</p>
+              <p>Ändringarna i <i>fjärde stycket</i> är av samma slag som ändringen i 2 kap.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:references <https://lagen.nu/1995:1633>,
+        <https://lagen.nu/1995:1633#P6> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K6P1> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K6P1> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 6 kap. 1 § i kommitténs förslag.)</p>
+              <p>Ändringarna är av samma slag som ändringen i 2 kap. 3 §, dvs. ordet</p>
+              <p>”bolag” i olika böjningsformer har bytts ut mot ”företag” i motsvarande böjningsformer.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K6P2> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K6P2> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 6 kap. 2 § första stycket i kommitténs förslag.)</p>
+              <p>Paragrafen, som innehåller bestämmelser om förslag till vinst-</p>
+              <p>dispositioner, har hittills enbart varit tillämplig på aktiebolag. Tillämp-ningsområdet har nu vidgats till att även omfatta ekonomiska föreningar. Motsvarande bestämmelser för ekonomiska föreningar har hittills funnits i 9 kap. 9 § tredje stycket och 11 § fjärde stycket tredje meningen föreningslagen.</p>
+              <span id="sid215"/>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K6P3> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K6P3> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 6 kap. 1 § fjärde stycket i kommitténs förslag.)</p>
+              <p>Paragrafen är ny. Bestämmelserna i <i>första stycket</i> överensstämmer med de bestäm-</p>
+              <p>melser som hittills har funnits i 9 kap. 9 § första stycket 3–6 förenings-lagen.</p>
+              <p><i>Andra stycket</i> motsvarar 14 § andra meningen lagen (<a href="https://lagen.nu/1975:417" rel="dcterms:references">1975:417</a>) om</p>
+              <p>sambruksföreningar.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:references <https://lagen.nu/1975:417> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K6P4> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K6P4> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 6 kap. 2 § andra stycket i kommitténs förslag.)</p>
+              <p>Paragrafen, som är ny, ställer krav på att en stiftelses förvaltnings-</p>
+              <p>berättelse skall innehålla uppgift om hur stiftelsens ändamål har främjats under året. Detta överensstämmer med vad som redan tidigare har gällt enligt <a href="https://lagen.nu/1994:1220#K3P7S3" rel="dcterms:references">3 kap. 7 § tredje stycket stiftelselagen</a> samt enligt 17 a och 30 §§ tryggandelagen.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:references <https://lagen.nu/1994:1220#K3P7S3> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K6P5> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K6P5> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 6 kap. 3 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats 6 kap. 3 §. Ändringen är av samma</p>
+              <p>slag som ändringen i 2 kap. 3 §.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P1> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K7P1> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 7 kap. 1 § i kommitténs förslag.)</p>
+              <p>Ändringen av ordet ”bolag” till ”företag” är föranledd av att lagens</p>
+              <p>tillämpningsområde har vidgats.</p>
+              <p>Med anledning av att det i 3 § har tillkommit ett nytt undantag från</p>
+              <p>skyldigheten att upprätta koncernredovisning har orden ”eller 3 §” tillfogats i slutet av paragrafen.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P10> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K7P10> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 7 kap. 10 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats 7 kap. 9 §. Ändringarna är av samma</p>
+              <p>slag som ändringen i 2 kap. 3 §.</p>
+              <span id="sid221"/>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P12> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K7P12> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 7 kap. 12 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats 7 kap. 11 §. Den ger uttryck för den</p>
+              <p>grundläggande principen om att samma värderingsprinciper skall tillämpas i årsredovisningen som i koncernredovisningen. I <a href="https://lagen.nu/prop/1998/99:130#S16.3" rel="dcterms:references">avsnitt 16.3</a> har regeringen behandlat frågan om det bör ges större utrymme att tillämpa skilda värderingsprinciper men har kommit till slutsatsen att någon sådan ändring inte bör göras.</p>
+              <p>Ändringarna i paragrafen är därför endast av formell natur, den ena av</p>
+              <p>samma slag som ändringen i 2 kap. 3 §, den andra en följd av ändrad paragrafnumrering.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:references <https://lagen.nu/prop/1998/99:130#S16.3> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P13> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K7P13> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 7 kap. 13 i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats 7 kap. 12 §. Ändringen i <i>andra</i></p>
+              <p><i>stycket</i> utgör en anpassning till en ändrad paragrafnumrering, medan</p>
+              <p>ändringen i <i>tredje stycket</i> är av samma slag som ändringen i 2 kap. 3 §.</p>
+              <span id="sid222"/>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P14> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K7P14> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 7 kap. 14 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats 7 kap. 13 §. Ändringen är en följd</p>
+              <p>av de ändringar som har gjorts i 5 kap.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P16> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K7P16> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 7 kap. 16 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats 7 kap. 15 §. Ändringen i <i>tredje</i></p>
+              <p><i>stycket</i> är av samma slag som ändringen i 2 kap. 3 §.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P17> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K7P17> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 7 kap. 17 § i kommitténs förslag.)</p>
+              <p>I paragrafen, som tidigare har betecknats 7 kap. 16 §, har fastslagits att</p>
+              <p>sådana dispensfrågor som avses i paragrafen skall prövas av Patent- och registreringsverket. En motsvarande ändring har gjorts i 5 kap. 9 §. Skälen till ändringen har behandlats i kommentaren till den paragrafen.</p>
+              <p>Paragrafen har också justerats med hänsyn till den ändrade paragraf-</p>
+              <p>numreringen i kapitlet.</p>
+              <span id="sid223"/>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P18> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K7P18> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 7 kap. 18 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare haft beteckningen 7 kap. 17 §. Ändringarna är</p>
+              <p>av samma slag som ändringen i 2 kap. 3 § respektive en följd av ändrad paragrafnumrering.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P19> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K7P19> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 7 kap. 19 § i kommitténs förslag)</p>
+              <p>Paragrafen har tidigare betecknats 7 kap. 18 §. Ändringen är av samma</p>
+              <p>slag som ändringen i 2 kap. 3 §.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P20> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K7P20> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 7 kap. 20 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare haft beteckningen 7 kap. 19 §. Ändringen är av</p>
+              <p>samma slag som ändringen i 2 kap. 3 §.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P21> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K7P21> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 7 kap. 21 § i kommitténs förslag.)</p>
+              <p>Paragrafen har hittills betecknats 7 kap. 20 §. Ändringen utgörs enbart</p>
+              <p>av en anpassning till den nya paragrafnumreringen i kapitlet.</p>
+              <span id="sid224"/>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P22> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K7P22> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 7 kap. 22 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats 7 kap. 21 §. Ändringarna beror på</p>
+              <p>den nya paragrafnumreringen i kapitlet.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P23> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K7P23> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 7 kap. 23 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare haft beteckningen 7 kap. 22. Ändringarna är</p>
+              <p>endast av formell natur, några av samma slag som ändringen i 2 kap. 3 §, andra en följd av ändrad paragrafnumrering.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P26> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K7P26> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 7 kap. 26 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats 7 kap. 25 §. Ändringen i <i>första</i></p>
+              <p><i>stycket</i> är av samma slag som ändringen i 2 kap. 3 §.<i>7 kap. 27 § </i></p>
+              <p>(Jfr 7 kap. 27 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats 7 kap. 26 §. Ändringen utgör enbart</p>
+              <p>en anpassning till den ändrade paragrafnumreringen i kapitlet.</p>
+              <p>(Jfr 7 kap. 28 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats 7 kap. 27 §. Den har anpassats till</p>
+              <p>den nya paragrafnumreringen i kapitlet.</p>
+              <p>(Jfr 7 kap. 30 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats 7 kap. 28 §. Ändringen utgörs</p>
+              <p>enbart av en anpassning till den nya paragrafnumreringen i kapitlet.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P28> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K7P28> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 7 kap. 8 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats 7 kap. 7 §. I <i>första stycket</i> har gjorts en ändring av samma slag som den som har </p>
+              <p>gjorts i bl.a. 2 kap. 3 §. Stycket har också – liksom <i>andra–</i> <i>fjärde</i></p>
+              <p><i>styckena</i> – justerats med hänsyn till att andra paragrafer, till vilka texten</p>
+              <p>hänvisar, har fått ändrad beteckning.</p>
+              <p>I <i>andra stycket</i> har namnet på den rubrik under vilken kapital-</p>
+              <p>andelsfonden skall tas upp angetts mera fullständigt än hittills. Någon ändring i sak är inte åsyftad.</p>
+              <p>Av paragrafens första stycke följer att bl.a. 3 kap. 11 § skall tillämpas</p>
+              <p>vid upprättandet av koncernresultaträkningen. Det finns alltså ett ut-rymme för att – med de begränsningar och under de villkor som anges i 3 kap. 11 § – slå samman poster i resultaträkningen. Enligt <i>fjärde </i></p>
+              <p><i>stycket</i> gäller dock en begränsning för regelns användning utöver de</p>
+              <p>begränsningar som anges i 3 kap. 11 §. Sammanslagning av poster i koncernresultaträkningen får sålunda inte ske om balansomslutningen respektive antalet anställda i <i>koncernen</i> överstiger de gränsvärden som anges i 4 § andra stycket.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P29> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K7P29> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 7 kap. 25 § i kommitténs förslag.) Paragrafen har tidigare betecknats 7 kap. 24 §. Flertalet ändringar beror på den förskjutna paragrafnumreringen i kapitlet. I <i>andra stycket</i> har också gjorts en ändring av samma slag som ändringen i 2 kap. 3 §.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P3> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K7P3> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 7 kap. 3 § i kommitténs förslag.)</p>
+              <p>Paragrafen saknar motsvarighet i det tidigare 7 kap. och innehåller ett</p>
+              <p>viktigt undantag från skyldigheten att upprätta koncernredovisning. För företag som hittills har omfattats av 1980 års årsredovisningslag eller <a href="https://lagen.nu/1994:1220" rel="dcterms:references">stiftelselagen</a> innebär den att skyldigheten att upprätta koncernredovis-ning får i huvudsak samma omfattning som den hittills har haft (jfr 3 kap. 1 § 1980 års årsredovisningslag och <a href="https://lagen.nu/1994:1220#K3P7" rel="dcterms:references">3 kap. 7 § stiftelselagen</a>). För aktie-bolag innebär bestämmelsen däremot en väsentlig förändring, såtillvida</p>
+              <span id="sid218"/>
+              <p>att koncernredovisning inte behöver upprättas lika ofta som hittills har varit fallet. Frågan har behandlats i <a href="https://lagen.nu/prop/1998/99:130#S16.1" rel="dcterms:references">avsnitt 16.1</a>.</p>
+              <p>Enligt <i>första stycket</i> behöver ett moderföretag inte upprätta någon</p>
+              <p>koncernredovisning om omfattningen på koncernens verksamhet på moderföretagets balansdag inte överstiger två särskilt angivna gräns-värden. Dessa gränsvärden är tio anställda respektive 24 miljoner kronor i balansomslutning. Båda värdena skall beräknas för koncernen som helhet. Så snart ett av värdena överskrids, skall moderföretaget upprätta en koncernredovisning.</p>
+              <p>Av bestämmelsen i <i>andra stycket</i> följer att undantaget i paragrafens</p>
+              <p>första stycke inte gäller om något av koncernföretagen har sina aktier eller andra skuldebrev inregistrerade vid en börs i Sverige eller någon annan stat inom EES. Företag som är noterade vid en börs utan att vara inregistrerade – t.ex. OTC-bolag – omfattas inte av bestämmelsen (jfr 5 kap. 1 § och 6 kap. 1 § lagen [1992:543]om börs- och clearing-</p>
+              <p>verksamhet).</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:references <https://lagen.nu/1994:1220>,
+        <https://lagen.nu/1994:1220#K3P7>,
+        <https://lagen.nu/prop/1998/99:130#S16.1> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P30> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K7P30> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 7 kap. 31 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats 7 kap. 29 §. Den har genomgått</p>
+              <p>vissa redaktionella ändringar. Därutöver har vissa formella justeringar gjorts, dels ändringar av samma slag som ändringen i 2 kap. 3 §, dels anpassningar till ändrad paragrafnumrering.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P31> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K7P31> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Paragrafen saknar motsvarighet i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats 7 kap. 30 §. Förändringen beror på</p>
+              <p>att det i 6 kap. har tillkommit två nya paragrafer med bestämmelser om att ekonomiska föreningar och stiftelser skall lämna vissa särskilda upplysningar i förvaltningsberättelsen.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P4> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K7P4> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p>(Jfr 7 kap. 4 § i kommitténs förslag.)</p>
+              <p>Paragrafen har tidigare betecknats 7 kap. 3 §. Avparagrafens <i>andra stycke</i> framgår vilka moderföretag som måste </p>
+              <p>upprätta en finansieringsanalys. Bestämmelsen anknyter till samma kriterier som avgör om moderbolaget i en koncern är skyldigt att ha en auktoriserad revisor (se <a href="https://lagen.nu/1975:1385#K10P13" rel="dcterms:references">10 kap. 13 § aktiebolagslagen</a> [1975:1385]). Hittills har det skett genom en hänvisning till bestämmelsen i aktie-bolagslagen. Den tekniken framstår emellertid som mindre lämplig i och med att <a href="https://lagen.nu/1995:1554" rel="dcterms:references">årsredovisningslagens</a> tillämpningsområde utsträcks till att omfatta flera olika slag av juridiska personer. De aktuella kriterierna har i stället preciserats i paragrafen. Av skäl som har återgetts i kommen-taren till den motsvarande bestämmelsen i 2 kap. 1 § har dock skyldig-heten att upprätta finansieringsanalys på grund av balansomslutningens</p>
+              <span id="sid219"/>
+              <p>storlek begränsats till de fall då något av koncernföretagen bedriver näringsverksamhet. Härigenom undantas bl.a. ideella föreningar som är moderföreningar i större koncerner men som varken själva eller genom sina dotterföretag bedriver någon näringsverksamhet från kravet på finansieringsanalys.</p>
+              <p>En skillnad i förhållande till <a href="https://lagen.nu/1975:1385#K10P13" rel="dcterms:references">10 kap. 13 § aktiebolagslagen</a> är att, såvitt</p>
+              <p>gäller punkten 1, begreppet ”fastställda koncernbalansräkningar” ersatts av ordet ”balansräkningarna”. Beträffande skälen till detta, se författ-ningskommentaren till 2 kap. 1 §.</p>
+              <p><i>Punkten 3</i> innebär en saklig nyhet och har tillkommit efter synpunkter</p>
+              <p>från <i>Lagrådet</i>. Bestämmelsen medför att ett moderföretag vars aktier eller skuldebrev är noterade vid en börs eller auktoriserad marknadsplats alltid skall upprätta en finansieringsanalys för koncernen. Redan enligt hittills gällande rätt har ett noterat företag varit skyldigt att ta in en finansieringsanalys i årsredovisningen (jfr 2 kap. 1 §). Det har ansetts naturligt att ett sådant företag, om det upprättar en koncernredovisning, tar in en finansieringsanalys även där.</p>
+              <p>Koncernredovisningen skall omfatta samtliga dotterföretag, om inte annat följer av andra eller tredje stycket.</p>
+              <p>Ett dotterföretag behöver inte omfattas av koncernredovisningen, om</p>
+              <p>företaget är av ringa betydelse med hänsyn till kravet i <i>6</i> § på rättvisande bild. Om flera dotterföretag tillsammans har mer än sådan ringa betydelse, skall de dock omfattas av koncernredovisningen.</p>
+              <p>Ett dotterföretag behöver inte heller omfattas av koncernredovis-</p>
+              <p>ningen, om</p>
+              <p>1. betydande och varaktiga hinder i väsentlig grad begränsar <i>moder-</i></p>
+              <p><i>företagets</i> möjligheter att utöva sitt inflytande över dotterföretaget,</p>
+              <p>2. nödvändig information för att upprätta koncernredovisningen inte</p>
+              <p>kan fås utan oskälig kostnad eller inom rimlig tid, eller</p>
+              <p>3. andelarna i dotterföretaget innehas tillfälligt och uteslutande i</p>
+              <p>avsikt att säljas vidare.</p>
+              <p>Ett <i>företag</i> som tillämpar andra eller tredje stycket skall i en not</p>
+              <p>upplysa om skälen för detta.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:references <https://lagen.nu/1975:1385#K10P13>,
+        <https://lagen.nu/1995:1554> .
+
+<https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P5> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/1995:1554#K7P5> ;
+    dcterms:description """
+            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+              <p><i>personnummer</i> samt säte för det <i>överordnade</i> moderföretag som</p>
+              <p>upprättar den i stycket nämnda koncernredovisningen.</p>
+            </div>
+          """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+
+<https://lagen.nu/prop/1998/99:130> a rpubl:Proposition ;
+    dcterms:abstract ""@sv ;
+    dcterms:identifier "Prop. 1998/99:130" ;
+    dcterms:issued "1999-01-01"^^xsd:date ;
+    dcterms:title "Ny bokföringslag m.m."@sv ;
+    rpubl:arsutgava "1998/99" ;
+    rpubl:departement <https://lagen.nu/org/2008/justitiedepartementet> ;
+    rpubl:lopnummer "130" ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/prop/1998/99:130> ;
+    prov:wasDerivedFrom <https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m&repo=propregeringen&dir=downloaded> ;
+    prov:wasGeneratedBy "lagen.nu.propositioner.PropRegeringen" .
+
+<https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m&repo=propregeringen&dir=downloaded> rdfs:label "Ny bokföringslag m.m. (pdf 805 kB)"@sv .
+
+<https://lagen.nu/prop/1998/99:130#S25> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130> ;
+    dcterms:title "Författningskommentar"@sv ;
+    bibo:chapter "25"@sv .
+
+<https://lagen.nu/prop/1998/99:130#S25.1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25> ;
+    dcterms:references <https://lagen.nu/1962:381>,
+        <https://lagen.nu/1995:1554>,
+        <https://lagen.nu/1995:1554#K1P4>,
+        <https://lagen.nu/1995:1559>,
+        <https://lagen.nu/1995:1560>,
+        <https://lagen.nu/1999:1078>,
+        <https://lagen.nu/prop/1975:104#sid156>,
+        <https://lagen.nu/prop/1998/99:130#S11.1>,
+        <https://lagen.nu/prop/1998/99:130#S12.1> ;
+    dcterms:title "Förslaget till bokföringslag"@sv ;
+    bibo:chapter "25.1"@sv .
+
+<https://lagen.nu/prop/1998/99:130#S25.16> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25> ;
+    dcterms:references <https://lagen.nu/1962:381>,
+        <https://lagen.nu/1975:1385>,
+        <https://lagen.nu/1975:1385#K12P8>,
+        <https://lagen.nu/1975:417>,
+        <https://lagen.nu/1987:667>,
+        <https://lagen.nu/1987:667#K4>,
+        <https://lagen.nu/1987:667#K4P1>,
+        <https://lagen.nu/1987:667#K4P3>,
+        <https://lagen.nu/1995:1554>,
+        <https://lagen.nu/1995:1559>,
+        <https://lagen.nu/1995:1559#K1P1S1>,
+        <https://lagen.nu/1995:1560>,
+        <https://lagen.nu/1995:1560#K1P1S1>,
+        <https://lagen.nu/1998:808#K9P6>,
+        <https://lagen.nu/1999:000>,
+        <https://lagen.nu/1999:000#K6P1>,
+        <https://lagen.nu/prop/1998/99:130#S15.3>,
+        <https://lagen.nu/prop/1998/99:130#S8.3> ;
+    dcterms:title "Förslaget till lag om ändring i årsredovisningslagen (1995:1554)"@sv ;
+    bibo:chapter "25.16"@sv .
+

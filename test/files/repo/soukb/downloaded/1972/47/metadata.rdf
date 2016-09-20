@@ -1,0 +1,26 @@
+<rdf:RDF
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:rda="http://RDVocab.info/Elements/"
+    xmlns:dc="http://purl.org/dc/elements/1.1/"
+    xmlns:owl="http://www.w3.org/2002/07/owl#"
+    xmlns:libris="http://libris.kb.se/vocabulary/experimental#"
+    xmlns:bibo="http://purl.org/ontology/bibo/"
+    xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#" > 
+  <rdf:Description rdf:about="http://libris.kb.se/resource/bib/8350729">
+    <dc:creator>Sverige. Justitiedepartementet</dc:creator>
+    <rdf:type rdf:resource="http://purl.org/ontology/bibo/Book"/>
+    <dc:date>1972</dc:date>
+    <dc:subject>Integritetsskydd: Sverige</dc:subject>
+    <dc:type>text</dc:type>
+    <bibo:isbn10>9138002531</bibo:isbn10>
+    <rdfs:isDefinedBy rdf:resource="http://data.libris.kb.se/open/bib/8350729.rdf"/>
+    <dc:description xml:lang="sv">Justitiedepartementet</dc:description>
+    <rda:placeOfPublication rdf:resource="http://purl.org/NET/marccodes/countries/sw#location"/>
+    <dc:identifier rdf:resource="URN:ISBN:9138002531"/>
+    <dc:title xml:lang="sv">Data och integritet : betänkande</dc:title>
+    <dc:relation>Data och integritet</dc:relation>
+    <dc:creator>Offentlighets- och sekretesslagstiftningskommittén</dc:creator>
+    <dc:language rdf:resource="http://purl.org/NET/marccodes/languages/swe#lang"/>
+    <dc:publisher></dc:publisher>
+  </rdf:Description>
+</rdf:RDF>
