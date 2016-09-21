@@ -132,7 +132,6 @@ class Offtryck(SwedishLegalSource):
         If your docrepo requires a FSMParser-created parser, you should
         instantiate and return it here.
         """
-
         if not isinstance(sanitized, PDFReader):
             return self.textparser
 
@@ -221,6 +220,7 @@ class Offtryck(SwedishLegalSource):
         initialstate = {'pageno': 1}
         serialized = False
         documents = sanitized.analyzer.documents()
+        
         if len(documents) > 1:
             self.log.debug("%s: segmented into docs %s" % (basefile, documents))
         for (startpage, pagecount, tag) in documents:
@@ -1091,8 +1091,14 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         txt = str(chunk).strip()
         # Since this recognizer is hardcoded to recognize a fixed set
         # of headings we could just make sure the font is bigger than
-        # defalt. For old material (scanned) we don't even look at size. 
-        if not metrics.scanned_source and chunk.font.size <= metrics.default.size:
+        # defalt. For old material (scanned) we don't even look at size.
+        #
+        # A problem with this is that it's too easy to mistake an
+        # entry for a section in the TOC for the actual section
+        # heading. We probably need a more fine-grained or contextual
+        # detection.
+        # if not metrics.scanned_source and chunk.font.size <= metrics.default.size:
+        if chunk.font.size <= metrics.default.size:
             return False
         if "...." in txt:  # probably a line in a TOC
             return False
@@ -1103,7 +1109,8 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                              'Sammanfattning',
                              'Propositionens lagförslag', # is preamble in older props
                              'Författningsförslag',       # and also eg Ds 2008:68
-                             'Referenser'                 # more like PostambleSection (eg SOU 2007:72 p 377)
+                             'Referenser',                 # more like PostambleSection (eg SOU 2007:72 p 377)
+                             'Förkortningar'
         ):
             if txt.startswith(validheading):
                 return True
@@ -1177,7 +1184,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                               # function with .peek(2) and .peek(3)
                               # below
             txt = str(chunk).strip()
-            return (chunk.font.size == metrics.h1.size and txt.startswith("Bilaga "))
+            return (chunk.font.size == metrics.h1.size and txt.startswith("Bilaga ") or txt.startswith("Bilagor"))
         def is_implicit_appendix(chunk):
             # The technique of starting a new appendix without stating
             # so in the margin on the first page of the appendix
@@ -1581,10 +1588,20 @@ def offtryck_gluefunc(textbox, nextbox, prevbox):
     # overlapping
 
     if hasattr(nextbox, 'parid'):
-        # scanned_source = True, allow for slight change in fontsize 
+        # scanned_source = True, allow for slight change in fontsize
+        # and vertical align FIXME: for SOUKB material, scanned_source
+        # is true even though we have no parid attribute (since text
+        # is extracted with pdf2html, not tesseract). One way would be
+        # to set textbox.parid = False on every goddamn textbox when
+        # scanned_source is True.
         sizematch = lambda p, n: abs(p.font.size - n.font.size) <= 1
+        alignmatch = lambda p, n: abs(p.left - n.left) <= 2
     else:
         sizematch = lambda p, n: p.font.size == n.font.size
+        # we allow two points of misalignment even for pdf2html
+        # material, since we can't yet determine if it comes from a
+        # scanned source.
+        alignmatch = lambda p, n: abs(p.left - n.left) <= 2
 
     familymatch = lambda p, n: p.font.family == n.font.family
 
@@ -1630,7 +1647,7 @@ def offtryck_gluefunc(textbox, nextbox, prevbox):
         textbox.top + textbox.height + linespacing > nextbox.top and
         prevbox.left < nextbox.right and
         ((prevbox.top + prevbox.height == nextbox.top + nextbox.height) or  # compare baseline, not topline
-         (prevbox.left == nextbox.left) or
+         alignmatch(prevbox, nextbox) or
          (parindent * 2 >= (prevbox.left - nextbox.left) >= parindent)
          )):
         return True

@@ -1248,7 +1248,16 @@ class Textelement(UnicodeElement):
                         'height': other.height}
             else:
                 dims = {}
-        new = self.__class__(str(self) + extraspace + str(other), tag=self.tag, **dims)
+        strself = str(self)
+        strother = str(other)
+        # mandatory dehyphenation. FIXME: we'd like to make this
+        # configurable (but where?).
+        # 
+        # FIXME: This dehyphenates eg "EG-" + "direktiv". How many
+        # other exceptions to this algorithm are needed.
+        if strself and strself[-1] == '-' and strother and strother[0].islower():
+            strself = strself[:-1]
+        new = self.__class__(strself + extraspace + strother, tag=self.tag, **dims)
         return new
 
 class LinkedTextelement(Textelement):

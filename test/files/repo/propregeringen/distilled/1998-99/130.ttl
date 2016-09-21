@@ -27,11 +27,11 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 3, 4 och 29 §§ i kommitténs förslag.)</p>
               <p>Paragrafen innehåller definitioner på några i lagen använda begrepp. Av <i>punkten 1</i> framgår att begreppet företag i lagen används för att be-</p>
-              <p>teckna alla som är bokföringsskyldiga enligt lagen. Begreppet har där-med en vidare innebörd än det har i dagligt tal och omfattar även verk-samhet som helt saknar karaktär av affärsverksamhet. Det innefattar så-lunda – utöver enskilda näringsidkares näringsverksamhet – all verk-samhet som bedrivs i handelsbolag, aktiebolag, ekonomiska föreningar och liknande företagsformer samt även verksamhet i stiftelser, ideella föreningar och registrerade trossamfund i den mån dessa juridiska personer är bokföringsskyldiga enligt lagen.</p>
+              <p>teckna alla som är bokföringsskyldiga enligt lagen. Begreppet har därmed en vidare innebörd än det har i dagligt tal och omfattar även verksamhet som helt saknar karaktär av affärsverksamhet. Det innefattar sålunda – utöver enskilda näringsidkares näringsverksamhet – all verksamhet som bedrivs i handelsbolag, aktiebolag, ekonomiska föreningar och liknande företagsformer samt även verksamhet i stiftelser, ideella föreningar och registrerade trossamfund i den mån dessa juridiska personer är bokföringsskyldiga enligt lagen.</p>
               <p>I <i>punkten 2</i> anges vilka företag som omfattas av begreppet boksluts-</p>
-              <p>företag. I lagen används begreppet för att avgränsa den grupp av företag som alltid är skyldiga att avsluta den löpande bokföringen med ett års-bokslut eller en årsredovisning.</p>
+              <p>företag. I lagen används begreppet för att avgränsa den grupp av företag som alltid är skyldiga att avsluta den löpande bokföringen med ett årsbokslut eller en årsredovisning.</p>
               <p>Av punkten 2 g framgår att alla företag som normalt har en årlig netto-</p>
-              <p>omsättning på minst 20 prisbasbelopp som huvudregel utgör boksluts-företag (i andra stycket finns ett undantag från denna huvudregel). Begreppet ”nettoomsättning” är avsett att ha samma innebörd som i <a href="https://lagen.nu/1995:1554#K3P12" rel="dcterms:references">3 kap. 12 § årsredovisningslagen</a>. Det innebär att nettoomsättningen omfattar intäkter från försålda varor och utförda tjänster som ingår i företagets normala verksamhet. Avdrag skall göras för lämnade rabatter, mervärdesskatt och annan skatt som är direkt knuten till omsättningen.</p>
+              <p>omsättning på minst 20 prisbasbelopp som huvudregel utgör bokslutsföretag (i andra stycket finns ett undantag från denna huvudregel). Begreppet ”nettoomsättning” är avsett att ha samma innebörd som i <a href="https://lagen.nu/1995:1554#K3P12" rel="dcterms:references">3 kap. 12 § årsredovisningslagen</a>. Det innebär att nettoomsättningen omfattar intäkter från försålda varor och utförda tjänster som ingår i företagets normala verksamhet. Avdrag skall göras för lämnade rabatter, mervärdesskatt och annan skatt som är direkt knuten till omsättningen.</p>
               <p>I <i>punkten 3</i> definieras begreppet verksamhet. Vad som faller under</p>
               <p>begreppet <i>närings</i>verksamhet utvecklas närmare i kommentaren till 2 kap. 6 §.</p>
               <span id="sid114"/>
@@ -68,7 +68,7 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Paragrafen saknar motsvarighet i kommitténs förslag.)</p>
               <p>Ordet ”bolag” har bytts ut mot ”företag”. Det beror på att 1 kap. 1 §</p>
-              <p>lagen (<a href="https://lagen.nu/1995:1560" rel="dcterms:references">1995:1560</a>) om årsredovisning i kreditinstitut och värdepappers-bolag innefattar även andra juridiska personer än sådana som är bolag.</p>
+              <p>lagen (<a href="https://lagen.nu/1995:1560" rel="dcterms:references">1995:1560</a>) om årsredovisning i kreditinstitut och värdepappersbolag innefattar även andra juridiska personer än sådana som är bolag.</p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
@@ -80,7 +80,7 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>Med <i>företag</i> avses <i>i denna lag fysiska eller juridiska personer som</i></p>
               <p>
-                <i>direkt eller indirekt omfattas av en årsredovisning, en koncern-redovisning eller en delårsrapport.</i>
+                <i>direkt eller indirekt omfattas av en årsredovisning, en koncernredovisning eller en delårsrapport.</i>
               </p>
               <p>Med andelar avses aktier och andra andelar i juridiska personer.</p>
             </div>
@@ -126,7 +126,7 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 1 kap. 7 § i kommitténs förslag.)</p>
               <p>Paragrafen, som är ny, innehåller upplysningsregler av det slag som</p>
-              <p>hittills har funnits i 3 kap. 11 § 1980 års årsredovisningslag, <a href="https://lagen.nu/2005:551#K8P38" rel="dcterms:references">8 kap. 38 § aktiebolagslagen</a>, 6 kap. 7 § föreningslagen och <a href="https://lagen.nu/1982:713#K8P9" rel="dcterms:references">8 kap. 9 § försäkrings-rörelselagen (1982:713)</a>. Någon saklig ändring är inte åsyftad.</p>
+              <p>hittills har funnits i 3 kap. 11 § 1980 års årsredovisningslag, <a href="https://lagen.nu/2005:551#K8P38" rel="dcterms:references">8 kap. 38 § aktiebolagslagen</a>, 6 kap. 7 § föreningslagen och <a href="https://lagen.nu/1982:713#K8P9" rel="dcterms:references">8 kap. 9 § försäkringsrörelselagen (1982:713)</a>. Någon saklig ändring är inte åsyftad.</p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
@@ -139,14 +139,14 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 2 kap. 1 § i kommitténs förslag.)</p>
               <p>I paragrafens första stycke har det tidigare funnits en bestämmelse om</p>
-              <p>skyldigheten att årligen upprätta en årsredovisning. Då denna fråga numera regleras i <a href="https://lagen.nu/1999:000#K6P1" rel="dcterms:references">6 kap. 1 § bokföringslagen</a> har den bestämmelsen ut-mönstrats.</p>
+              <p>skyldigheten att årligen upprätta en årsredovisning. Då denna fråga numera regleras i <a href="https://lagen.nu/1999:000#K6P1" rel="dcterms:references">6 kap. 1 § bokföringslagen</a> har den bestämmelsen utmönstrats.</p>
               <p><i>Första stycket </i>(tidigare det andra) har jämkats redaktionellt.</p>
               <p>I<i> andra stycket</i> (tidigare det tredje) regleras när det i årsredovis-</p>
-              <p>ningen skall ingå en finansieringsanalys. Bestämmelsen anknyter till samma kriterier som avgör om ett företag är skyldigt att ha en auktori-serad revisor (se bl.a. <a href="https://lagen.nu/2005:551#K10P12" rel="dcterms:references">10 kap. 12 § aktiebolagslagen</a> [1975:1385]). Hittills har det skett genom en hänvisning till bestämmelserna i bl.a. <a href="https://lagen.nu/2005:551" rel="dcterms:references">aktiebolagslagen</a>. Den tekniken framstår emellertid som mindre lämplig i och med att <a href="https://lagen.nu/1995:1554" rel="dcterms:references">årsredovisningslagen</a> blir tillämplig på flera olika slag av juridiska personer. De aktuella kriterierna har i stället preciserats i paragrafen. Dessa kriterier överensstämmer i stort med de kriterier som finns i <a href="https://lagen.nu/2005:551#K10P12" rel="dcterms:references">10 kap. 12 § aktiebolagslagen</a>. En generell tillämpning av dessa kritierier på alla de företagsformer som kan vara skyldiga att upprätta årsredovisning har dock ansetts få alltför vittgående konsekvenser. Bl.a. skulle det leda till att också större ideella föreningar som inte bedriver näringsverksamhet tvingades att upprätta finansieringsanalys, trots att</p>
+              <p>ningen skall ingå en finansieringsanalys. Bestämmelsen anknyter till samma kriterier som avgör om ett företag är skyldigt att ha en auktoriserad revisor (se bl.a. <a href="https://lagen.nu/2005:551#K10P12" rel="dcterms:references">10 kap. 12 § aktiebolagslagen</a> [1975:1385]). Hittills har det skett genom en hänvisning till bestämmelserna i bl.a. <a href="https://lagen.nu/2005:551" rel="dcterms:references">aktiebolagslagen</a>. Den tekniken framstår emellertid som mindre lämplig i och med att <a href="https://lagen.nu/1995:1554" rel="dcterms:references">årsredovisningslagen</a> blir tillämplig på flera olika slag av juridiska personer. De aktuella kriterierna har i stället preciserats i paragrafen. Dessa kriterier överensstämmer i stort med de kriterier som finns i <a href="https://lagen.nu/2005:551#K10P12" rel="dcterms:references">10 kap. 12 § aktiebolagslagen</a>. En generell tillämpning av dessa kritierier på alla de företagsformer som kan vara skyldiga att upprätta årsredovisning har dock ansetts få alltför vittgående konsekvenser. Bl.a. skulle det leda till att också större ideella föreningar som inte bedriver näringsverksamhet tvingades att upprätta finansieringsanalys, trots att</p>
               <span id="sid199"/>
-              <p>det knappast torde finnas något egentligt behov av detta. Punkten 1 har därför utformats så att det endast är i näringsdrivande verksamhets-former som företaget kan bli skyldigt att upprätta finansieringsanalys för det fall att balansomslutningen överskrider det i lagen angivna gränsvärdet.</p>
+              <p>det knappast torde finnas något egentligt behov av detta. Punkten 1 har därför utformats så att det endast är i näringsdrivande verksamhetsformer som företaget kan bli skyldigt att upprätta finansieringsanalys för det fall att balansomslutningen överskrider det i lagen angivna gränsvärdet.</p>
               <p>En annan skillnad i förhållande till <a href="https://lagen.nu/2005:551" rel="dcterms:references">aktiebolagslagen</a> är att begreppet</p>
-              <p>”fastställda balansräkningar” har ersatts med ”balansräkningarna”. Skälet till det är att det i vissa slag av företag, t.ex. handelsbolag och stiftelser, inte förekommer någon fastställelse av balansräkningen. De balans-räkningar som avses är dock fortfarande de balansräkningar som ingår i företagets årsredovisningar eller årsbokslut.</p>
+              <p>”fastställda balansräkningar” har ersatts med ”balansräkningarna”. Skälet till det är att det i vissa slag av företag, t.ex. handelsbolag och stiftelser, inte förekommer någon fastställelse av balansräkningen. De balansräkningar som avses är dock fortfarande de balansräkningar som ingår i företagets årsredovisningar eller årsbokslut.</p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
@@ -182,7 +182,7 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 2 kap. 7 § i kommitténs förslag.)</p>
               <p>I <i>första stycket</i> och de nya <i>tredje och fjärde styckena </i>har det tagits in</p>
-              <p>regler om hur årsredovisningen för ekonomiska föreningar, stiftelser och de övriga företag som kan vara skyldiga att upprätta årsredovisning skall undertecknas. Kompletteringarna överensstämmer i huvudsak med hittills gällande rätt (jfr 9 kap. 2 § andra stycket föreningslagen, <a href="https://lagen.nu/1994:1220#K3P9" rel="dcterms:references">3 kap. 9 § stiftelselagen</a> och 2 kap. 2 § tredje stycket 1980 års årsredovis-ningslag).</p>
+              <p>regler om hur årsredovisningen för ekonomiska föreningar, stiftelser och de övriga företag som kan vara skyldiga att upprätta årsredovisning skall undertecknas. Kompletteringarna överensstämmer i huvudsak med hittills gällande rätt (jfr 9 kap. 2 § andra stycket föreningslagen, <a href="https://lagen.nu/1994:1220#K3P9" rel="dcterms:references">3 kap. 9 § stiftelselagen</a> och 2 kap. 2 § tredje stycket 1980 års årsredovisningslag).</p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
@@ -214,7 +214,7 @@
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>
-                <i>förlust, lämna uppgift om nettoomsättningen. Företaget skall i en not upplysa om skälen för sammanslagningen. Uppgift om nettoomsät-tningen får dock utelämnas om det är motiverat och Patent- och registreringsverket medger det.</i>
+                <i>förlust, lämna uppgift om nettoomsättningen. Företaget skall i en not upplysa om skälen för sammanslagningen. Uppgift om nettoomsättningen får dock utelämnas om det är motiverat och Patent- och registreringsverket medger det.</i>
               </p>
             </div>
           """^^rdf:XMLLiteral ;
@@ -262,7 +262,7 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Paragrafen saknar motsvarighet i kommitténs förslag.)</p>
               <p>Som en följd av att 1 kap. 1 § har fått en ny lydelse har den tidigare bi-</p>
-              <p>lagan 1 till lagen kunnat utmönstras. De bilagor som tidigare har beteck-nats 2–4 har därför erhållit beteckningarna 1–3. Detta har föranlett ändringar i förevarande paragrafs <i>första stycke. </i></p>
+              <p>lagan 1 till lagen kunnat utmönstras. De bilagor som tidigare har betecknats 2–4 har därför erhållit beteckningarna 1–3. Detta har föranlett ändringar i förevarande paragrafs <i>första stycke. </i></p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
@@ -340,7 +340,7 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 3 kap. 9 § i kommitténs förslag.)</p>
               <p>En motsvarande bestämmelse har tidigare funnits i 4 kap. 16 §. Den</p>
-              <p>har nu utformats som en klassificeringsregel med anknytning till balans-räkningen och det har därför ansetts naturligt att ta in den i 3 kap. i stället för i 4 kap. Någon saklig ändring när det gäller innebörden av begreppet avsättning är inte avsedd (jfr <a href="https://lagen.nu/prop/1998/99:130#S15.2.1" rel="dcterms:references">avsnitt 15.2.1</a>).</p>
+              <p>har nu utformats som en klassificeringsregel med anknytning till balansräkningen och det har därför ansetts naturligt att ta in den i 3 kap. i stället för i 4 kap. Någon saklig ändring när det gäller innebörden av begreppet avsättning är inte avsedd (jfr <a href="https://lagen.nu/prop/1998/99:130#S15.2.1" rel="dcterms:references">avsnitt 15.2.1</a>).</p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
@@ -494,7 +494,7 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 5 kap. 17 § i kommitténs förslag.)</p>
               <p>Paragrafen har tidigare betecknats 5 kap. 16 §. I <i>andra stycket</i> har det</p>
-              <p>dels gjorts samma slag av ändring som i 2 kap. 3 §, dels gjorts en anpass-ning till den nya paragrafnumreringen i 3 kap.</p>
+              <p>dels gjorts samma slag av ändring som i 2 kap. 3 §, dels gjorts en anpassning till den nya paragrafnumreringen i 3 kap.</p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
@@ -586,7 +586,7 @@
               <p>Ändringen i <i>första stycket</i> är av samma slag som ändringen i 2 kap. 3 §</p>
               <p>m.fl. paragrafer.</p>
               <p>Av bestämmelserna i 7 kap. 3 § framgår att ett moderföretag under</p>
-              <p>vissa förhållanden inte behöver upprätta någon koncernredovisning. När detta undantag utnyttjas, skall moderföretaget, enligt <i>andra stycket, </i>lämna upplysning om internvinster på transaktioner som har företagits inom koncernen<i>. </i>Frågan har behandlats i <a href="https://lagen.nu/prop/1998/99:130#S16.2" rel="dcterms:references">avsnitt 16.2</a>.Med begreppet ”transaktioner inom koncernen” förstås varje koncernintern överlåtelse av varor, tjänster, anläggningstillgångar eller annat. Begreppet intern-vinster har samma innebörd som i 7 kap. 13 §.</p>
+              <p>vissa förhållanden inte behöver upprätta någon koncernredovisning. När detta undantag utnyttjas, skall moderföretaget, enligt <i>andra stycket, </i>lämna upplysning om internvinster på transaktioner som har företagits inom koncernen<i>. </i>Frågan har behandlats i <a href="https://lagen.nu/prop/1998/99:130#S16.2" rel="dcterms:references">avsnitt 16.2</a>.Med begreppet ”transaktioner inom koncernen” förstås varje koncernintern överlåtelse av varor, tjänster, anläggningstillgångar eller annat. Begreppet internvinster har samma innebörd som i 7 kap. 13 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
@@ -598,7 +598,7 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 5 kap. 8 § i kommitténs förslag.)</p>
               <p>Ändringarna i paragrafen utgör följdändringar till den nya bokförings-</p>
-              <p>lagen eller till andra ändringar i <a href="https://lagen.nu/1995:1554" rel="dcterms:references">årsredovisningslagen</a>. Ordet bolag har bytts ut mot företag. <i>Första stycket</i> har också formulerats om för att dess innebörd skall bli klarare. I <i>första stycket</i> <i>2 </i>har ordet ”årsredovis-ning” lagts till, eftersom den nya <a href="https://lagen.nu/1999:000" rel="dcterms:references">bokföringslagen</a> innebär att bok-föringen kan avslutas med ett årsbokslut <i>eller</i> en årsredovisning. </p>
+              <p>lagen eller till andra ändringar i <a href="https://lagen.nu/1995:1554" rel="dcterms:references">årsredovisningslagen</a>. Ordet bolag har bytts ut mot företag. <i>Första stycket</i> har också formulerats om för att dess innebörd skall bli klarare. I <i>första stycket</i> <i>2 </i>har ordet ”årsredovisning” lagts till, eftersom den nya <a href="https://lagen.nu/1999:000" rel="dcterms:references">bokföringslagen</a> innebär att bokföringen kan avslutas med ett årsbokslut <i>eller</i> en årsredovisning. </p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
@@ -611,12 +611,13 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 5 kap. 9 § i kommitténs förslag.)</p>
               <p>I paragrafens <i>andra stycke</i> har orden ”regeringen eller den myndighet</p>
-              <p>som regeringen bestämmer” bytts ut mot ”Patent- och registrerings-verket”. Patent- och registreringsverket har redan tidigare, med stöd av ett bemyndigande i <a href="https://lagen.nu/1995:1633#P6" rel="dcterms:references">6 §</a> förordningen (<a href="https://lagen.nu/1995:1633" rel="dcterms:references">1995:1633</a>) om vissa årsredo-visningsfrågor, prövat dessa tillståndsärenden. Det har nu ansetts att prövningen av ärendena över huvud taget inte bör ligga hos regeringen och – såsom framgår av den nya 10 kap. 1 § – att överklagande av beslut i ärendena i fortsättningen skall ske till allmän förvaltningsdomstol. Det har mot den bakgrunden ansetts naturligt att det redan av årsredovis-ningslagen framgår att ärendena skall prövas av Patent- och regist-reringsverket.</p>
+              <p>som regeringen bestämmer” bytts ut mot ”Patent- och registreringsverket”. Patent- och registreringsverket har redan tidigare, med stöd av ett bemyndigande i <a href="https://lagen.nu/1995:1633#P6" rel="dcterms:references">6 §</a> förordningen (<a href="https://lagen.nu/1995:1633" rel="dcterms:references">1995:1633</a>) om vissa årsredovisningsfrågor, prövat dessa tillståndsärenden. Det har nu ansetts att prövningen av ärendena över huvud taget inte bör ligga hos regeringen och – såsom framgår av den nya 10 kap. 1 § – att överklagande av beslut i ärendena i fortsättningen skall ske till allmän förvaltningsdomstol. Det har mot den bakgrunden ansetts naturligt att det redan av <a href="https://lagen.nu/1995:1554" rel="dcterms:references">årsredovisningslagen</a> framgår att ärendena skall prövas av Patent- och registreringsverket.</p>
               <p>Ändringarna i <i>fjärde stycket</i> är av samma slag som ändringen i 2 kap.</p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
-    dcterms:references <https://lagen.nu/1995:1633>,
+    dcterms:references <https://lagen.nu/1995:1554>,
+        <https://lagen.nu/1995:1633>,
         <https://lagen.nu/1995:1633#P6> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K6P1> a rinfoex:Forfattningskommentar ;
@@ -636,7 +637,7 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 6 kap. 2 § första stycket i kommitténs förslag.)</p>
               <p>Paragrafen, som innehåller bestämmelser om förslag till vinst-</p>
-              <p>dispositioner, har hittills enbart varit tillämplig på aktiebolag. Tillämp-ningsområdet har nu vidgats till att även omfatta ekonomiska föreningar. Motsvarande bestämmelser för ekonomiska föreningar har hittills funnits i 9 kap. 9 § tredje stycket och 11 § fjärde stycket tredje meningen föreningslagen.</p>
+              <p>dispositioner, har hittills enbart varit tillämplig på aktiebolag. Tillämpningsområdet har nu vidgats till att även omfatta ekonomiska föreningar. Motsvarande bestämmelser för ekonomiska föreningar har hittills funnits i 9 kap. 9 § tredje stycket och 11 § fjärde stycket tredje meningen föreningslagen.</p>
               <span id="sid215"/>
             </div>
           """^^rdf:XMLLiteral ;
@@ -648,7 +649,7 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 6 kap. 1 § fjärde stycket i kommitténs förslag.)</p>
               <p>Paragrafen är ny. Bestämmelserna i <i>första stycket</i> överensstämmer med de bestäm-</p>
-              <p>melser som hittills har funnits i 9 kap. 9 § första stycket 3–6 förenings-lagen.</p>
+              <p>melser som hittills har funnits i 9 kap. 9 § första stycket 3–6 föreningslagen.</p>
               <p><i>Andra stycket</i> motsvarar 14 § andra meningen lagen (<a href="https://lagen.nu/1975:417" rel="dcterms:references">1975:417</a>) om</p>
               <p>sambruksföreningar.</p>
             </div>
@@ -866,7 +867,7 @@
               <p>I <i>andra stycket</i> har namnet på den rubrik under vilken kapital-</p>
               <p>andelsfonden skall tas upp angetts mera fullständigt än hittills. Någon ändring i sak är inte åsyftad.</p>
               <p>Av paragrafens första stycke följer att bl.a. 3 kap. 11 § skall tillämpas</p>
-              <p>vid upprättandet av koncernresultaträkningen. Det finns alltså ett ut-rymme för att – med de begränsningar och under de villkor som anges i 3 kap. 11 § – slå samman poster i resultaträkningen. Enligt <i>fjärde </i></p>
+              <p>vid upprättandet av koncernresultaträkningen. Det finns alltså ett utrymme för att – med de begränsningar och under de villkor som anges i 3 kap. 11 § – slå samman poster i resultaträkningen. Enligt <i>fjärde </i></p>
               <p><i>stycket</i> gäller dock en begränsning för regelns användning utöver de</p>
               <p>begränsningar som anges i 3 kap. 11 §. Sammanslagning av poster i koncernresultaträkningen får sålunda inte ske om balansomslutningen respektive antalet anställda i <i>koncernen</i> överstiger de gränsvärden som anges i 4 § andra stycket.</p>
             </div>
@@ -888,11 +889,11 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 7 kap. 3 § i kommitténs förslag.)</p>
               <p>Paragrafen saknar motsvarighet i det tidigare 7 kap. och innehåller ett</p>
-              <p>viktigt undantag från skyldigheten att upprätta koncernredovisning. För företag som hittills har omfattats av 1980 års årsredovisningslag eller <a href="https://lagen.nu/1994:1220" rel="dcterms:references">stiftelselagen</a> innebär den att skyldigheten att upprätta koncernredovis-ning får i huvudsak samma omfattning som den hittills har haft (jfr 3 kap. 1 § 1980 års årsredovisningslag och <a href="https://lagen.nu/1994:1220#K3P7" rel="dcterms:references">3 kap. 7 § stiftelselagen</a>). För aktie-bolag innebär bestämmelsen däremot en väsentlig förändring, såtillvida</p>
+              <p>viktigt undantag från skyldigheten att upprätta koncernredovisning. För företag som hittills har omfattats av 1980 års årsredovisningslag eller <a href="https://lagen.nu/1994:1220" rel="dcterms:references">stiftelselagen</a> innebär den att skyldigheten att upprätta koncernredovisning får i huvudsak samma omfattning som den hittills har haft (jfr 3 kap. 1 § 1980 års årsredovisningslag och <a href="https://lagen.nu/1994:1220#K3P7" rel="dcterms:references">3 kap. 7 § stiftelselagen</a>). För aktiebolag innebär bestämmelsen däremot en väsentlig förändring, såtillvida</p>
               <span id="sid218"/>
               <p>att koncernredovisning inte behöver upprättas lika ofta som hittills har varit fallet. Frågan har behandlats i <a href="https://lagen.nu/prop/1998/99:130#S16.1" rel="dcterms:references">avsnitt 16.1</a>.</p>
               <p>Enligt <i>första stycket</i> behöver ett moderföretag inte upprätta någon</p>
-              <p>koncernredovisning om omfattningen på koncernens verksamhet på moderföretagets balansdag inte överstiger två särskilt angivna gräns-värden. Dessa gränsvärden är tio anställda respektive 24 miljoner kronor i balansomslutning. Båda värdena skall beräknas för koncernen som helhet. Så snart ett av värdena överskrids, skall moderföretaget upprätta en koncernredovisning.</p>
+              <p>koncernredovisning om omfattningen på koncernens verksamhet på moderföretagets balansdag inte överstiger två särskilt angivna gränsvärden. Dessa gränsvärden är tio anställda respektive 24 miljoner kronor i balansomslutning. Båda värdena skall beräknas för koncernen som helhet. Så snart ett av värdena överskrids, skall moderföretaget upprätta en koncernredovisning.</p>
               <p>Av bestämmelsen i <i>andra stycket</i> följer att undantaget i paragrafens</p>
               <p>första stycke inte gäller om något av koncernföretagen har sina aktier eller andra skuldebrev inregistrerade vid en börs i Sverige eller någon annan stat inom EES. Företag som är noterade vid en börs utan att vara inregistrerade – t.ex. OTC-bolag – omfattas inte av bestämmelsen (jfr 5 kap. 1 § och 6 kap. 1 § lagen [1992:543]om börs- och clearing-</p>
               <p>verksamhet).</p>
@@ -931,11 +932,11 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 7 kap. 4 § i kommitténs förslag.)</p>
               <p>Paragrafen har tidigare betecknats 7 kap. 3 §. Avparagrafens <i>andra stycke</i> framgår vilka moderföretag som måste </p>
-              <p>upprätta en finansieringsanalys. Bestämmelsen anknyter till samma kriterier som avgör om moderbolaget i en koncern är skyldigt att ha en auktoriserad revisor (se <a href="https://lagen.nu/1975:1385#K10P13" rel="dcterms:references">10 kap. 13 § aktiebolagslagen</a> [1975:1385]). Hittills har det skett genom en hänvisning till bestämmelsen i aktie-bolagslagen. Den tekniken framstår emellertid som mindre lämplig i och med att <a href="https://lagen.nu/1995:1554" rel="dcterms:references">årsredovisningslagens</a> tillämpningsområde utsträcks till att omfatta flera olika slag av juridiska personer. De aktuella kriterierna har i stället preciserats i paragrafen. Av skäl som har återgetts i kommen-taren till den motsvarande bestämmelsen i 2 kap. 1 § har dock skyldig-heten att upprätta finansieringsanalys på grund av balansomslutningens</p>
+              <p>upprätta en finansieringsanalys. Bestämmelsen anknyter till samma kriterier som avgör om moderbolaget i en koncern är skyldigt att ha en auktoriserad revisor (se <a href="https://lagen.nu/1975:1385#K10P13" rel="dcterms:references">10 kap. 13 § aktiebolagslagen</a> [1975:1385]). Hittills har det skett genom en hänvisning till bestämmelsen i <a href="https://lagen.nu/1975:1385" rel="dcterms:references">aktiebolagslagen</a>. Den tekniken framstår emellertid som mindre lämplig i och med att <a href="https://lagen.nu/1995:1554" rel="dcterms:references">årsredovisningslagens</a> tillämpningsområde utsträcks till att omfatta flera olika slag av juridiska personer. De aktuella kriterierna har i stället preciserats i paragrafen. Av skäl som har återgetts i kommentaren till den motsvarande bestämmelsen i 2 kap. 1 § har dock skyldigheten att upprätta finansieringsanalys på grund av balansomslutningens</p>
               <span id="sid219"/>
               <p>storlek begränsats till de fall då något av koncernföretagen bedriver näringsverksamhet. Härigenom undantas bl.a. ideella föreningar som är moderföreningar i större koncerner men som varken själva eller genom sina dotterföretag bedriver någon näringsverksamhet från kravet på finansieringsanalys.</p>
               <p>En skillnad i förhållande till <a href="https://lagen.nu/1975:1385#K10P13" rel="dcterms:references">10 kap. 13 § aktiebolagslagen</a> är att, såvitt</p>
-              <p>gäller punkten 1, begreppet ”fastställda koncernbalansräkningar” ersatts av ordet ”balansräkningarna”. Beträffande skälen till detta, se författ-ningskommentaren till 2 kap. 1 §.</p>
+              <p>gäller punkten 1, begreppet ”fastställda koncernbalansräkningar” ersatts av ordet ”balansräkningarna”. Beträffande skälen till detta, se författningskommentaren till 2 kap. 1 §.</p>
               <p><i>Punkten 3</i> innebär en saklig nyhet och har tillkommit efter synpunkter</p>
               <p>från <i>Lagrådet</i>. Bestämmelsen medför att ett moderföretag vars aktier eller skuldebrev är noterade vid en börs eller auktoriserad marknadsplats alltid skall upprätta en finansieringsanalys för koncernen. Redan enligt hittills gällande rätt har ett noterat företag varit skyldigt att ta in en finansieringsanalys i årsredovisningen (jfr 2 kap. 1 §). Det har ansetts naturligt att ett sådant företag, om det upprättar en koncernredovisning, tar in en finansieringsanalys även där.</p>
               <p>Koncernredovisningen skall omfatta samtliga dotterföretag, om inte annat följer av andra eller tredje stycket.</p>
@@ -954,7 +955,8 @@
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
-    dcterms:references <https://lagen.nu/1975:1385#K10P13>,
+    dcterms:references <https://lagen.nu/1975:1385>,
+        <https://lagen.nu/1975:1385#K10P13>,
         <https://lagen.nu/1995:1554> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P5> a rinfoex:Forfattningskommentar ;

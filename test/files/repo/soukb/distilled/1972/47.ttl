@@ -1,0 +1,64 @@
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://lagen.nu/utr/sou/1972:47#B1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/utr/sou/1972:47> ;
+    dcterms:title "Bilagor"@sv ;
+    bibo:chapter "1"@sv .
+
+<https://lagen.nu/utr/sou/1972:47#PS1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/utr/sou/1972:47> ;
+    dcterms:references <https://lagen.nu/1949:105> ;
+    dcterms:title "Till Statsrådet och chefen för justitiedepartementet"@sv .
+
+<https://lagen.nu/utr/sou/1972:47#PS2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/utr/sou/1972:47> ;
+    dcterms:references <https://lagen.nu/1949:105> ;
+    dcterms:title "Förkortningar"@sv .
+
+<https://lagen.nu/utr/sou/1972:47#PS3> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/utr/sou/1972:47> ;
+    dcterms:references <https://lagen.nu/1937:249>,
+        <https://lagen.nu/1942:740>,
+        <https://lagen.nu/1949:105>,
+        <https://lagen.nu/1949:105#K2>,
+        <https://lagen.nu/1962:700>,
+        <https://lagen.nu/1962:700#K4> ;
+    dcterms:title "Sammanfattning"@sv .
+
+<https://lagen.nu/utr/sou/1972:47#S1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/utr/sou/1972:47> ;
+    dcterms:references <https://lagen.nu/1937:249>,
+        <https://lagen.nu/1949:105>,
+        <https://lagen.nu/1949:105#K2P1> ;
+    dcterms:title "Direktiv"@sv ;
+    bibo:chapter "1"@sv .
+
+<https://lagen.nu/utr/sou/1972:47#S2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/utr/sou/1972:47> ;
+    dcterms:title "Redovisning av OSK:s arbete hittills"@sv ;
+    bibo:chapter "2"@sv .
+
+<http://example.org/docs/1972%3A47.html> rdfs:label "Källa"@sv .
+
+<https://lagen.nu/utr/sou/1972:47?attachment=index.pdf&repo=soukb&dir=downloaded> rdfs:label "SOU 1972:47"@sv .
+
+<https://lagen.nu/utr/sou/1972:47> a rpubl:Utredningsbetankande ;
+    dcterms:identifier "SOU 1972:47" ;
+    dcterms:issued "1972-01-01"^^xsd:gYear ;
+    dcterms:title "Data och integritet"@sv ;
+    rpubl:arsutgava "1972" ;
+    rpubl:lopnummer "47" ;
+    rpubl:utrSerie <https://lagen.nu/dataset/sou> ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/utr/sou/1972:47> ;
+    prov:alternateOf <http://example.org/docs/1972%3A47.html> ;
+    prov:wasDerivedFrom <https://lagen.nu/utr/sou/1972:47?attachment=index.pdf&repo=soukb&dir=downloaded> ;
+    prov:wasGeneratedBy "lagen.nu.sou.SOUKB" .
+

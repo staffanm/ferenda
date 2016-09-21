@@ -58,12 +58,8 @@
 
 <https://lagen.nu/prop/1991/92:167#PS3> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
-    dcterms:title "Propositionens huvudsakliga innehåll"@sv .
-
-<https://lagen.nu/prop/1991/92:167#PS4> a bibo:DocumentPart ;
-    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
     dcterms:references <https://lagen.nu/1981:1361> ;
-    dcterms:title "Propositionens lagförslag . . . . . . . . . . . . . . . . . . . . . . . .       Utdrag ur protokoll vid regeringssammanträde       den 9 april 1992 . . . . . . . . . . . . . . . . . . . . . . . . . . . . ."@sv .
+    dcterms:title "Propositionens huvudsakliga innehåll"@sv .
 
 <https://lagen.nu/prop/1991/92:167#S1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;

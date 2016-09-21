@@ -7,6 +7,7 @@ from builtins import *
 import re
 import os
 import logging
+import unicodedata
 from datetime import datetime
 from urllib.parse import urljoin
 
@@ -29,8 +30,10 @@ class SOUAnalyzer(PDFAnalyzer):
     # footers less so (but more than the default .2%), 1 %
     footer_significance_threshold = 0.01
 
-    # h1 / h2's can be a bit rare though.
-    style_significance_threshold = 0.001
+    # h1 / h2's can be a bit rare though, particularly in older
+    # material which only use different size for h1:s (0.07% is
+    # enough)
+    style_significance_threshold = 0.0007
     
 
     def documents(self):
@@ -220,8 +223,12 @@ class SOUKB(Offtryck, PDFDocumentRepository):
         return None  # "rawhead" is never used
         
     def extract_metadata(self, rawhead, basefile):
-        sourcegraph = Graph().parse(self.store.downloaded_path(
+        metadata = util.readfile(self.store.downloaded_path(
             basefile, attachment="metadata.rdf"))
+        # For some reason these RDF files might use canonical
+        # decomposition form (NFD) which is less optimal. Fix this.
+        metadata = unicodedata.normalize("NFC", metadata)
+        sourcegraph = Graph().parse(data=metadata)
         rooturi = sourcegraph.value(predicate=RDF.type, object=BIBO.Book)
         title = sourcegraph.value(subject=rooturi, predicate=DC.title)
         issued = sourcegraph.value(subject=rooturi, predicate=DC.date)
