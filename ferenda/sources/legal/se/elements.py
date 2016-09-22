@@ -307,8 +307,14 @@ class VerbatimSection(CompoundElement):
 
 class Sidbrytning(OrdinalElement):
     def as_xhtml(self, uri, parent_uri=None):
-        return E("span", {'id': 'sid%s' % self.ordinal,
-                          'class': 'sidbrytning'})
+        attrs = {'id': 'sid%s' % self.ordinal,
+                 'class': 'sidbrytning'}
+        if hasattr(self, 'src'):
+            attrs['src'] = self.src
+            attrs['width'] = str(self.width)
+            attrs['height'] = str(self.height)
+        
+        return E("span", attrs)
     def as_plaintext(self):
         return "\n\n"
 

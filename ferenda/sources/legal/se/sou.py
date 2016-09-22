@@ -46,7 +46,7 @@ class SOUAnalyzer(PDFAnalyzer):
         for pageidx, page in enumerate(self.pdf):
             # Sanity check: 
             if pageidx > 8 and currentdoc == 'frontmatter':
-                logging.getLogger("pdfanalyze").warn("missed the transition from frontmatter to main")
+                logging.getLogger("pdfanalyze").warning("missed the transition from frontmatter to main")
                 # act as there never was any frontmatter -- all pages
                 # are considered part of the main content.
                 currentdoc = "main"

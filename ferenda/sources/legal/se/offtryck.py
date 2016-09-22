@@ -278,8 +278,8 @@ class Offtryck(SwedishLegalSource):
                 # positioned textboxes that don't reflow etc
                 s = VerbatimSection()
                 for relidx, page in enumerate(sanitized[startpage:startpage+pagecount]):
-                    sb = Sidbrytning()
-                    sb.ordinal = initialstate['pageno']+relidx
+                    sb = Sidbrytning(ordinal=initialstate['pageno']+relidx,
+                                     filename=page.filename)
                     s.append(sb)
                     s.append(page)
                 body = Body([s])
@@ -488,6 +488,10 @@ class Offtryck(SwedishLegalSource):
                             images=self.config.pdfimages,
                             keep_xml=keep_xml,
                             ocr_lang="swe")
+        identifier = self.canonical_uri(basefile)
+        baseuri = "%s?attachment=%s&repo=%s&dir=downloaded&format=png" % (identifier, os.path.basename(pdffile), self.alias)
+        for page in pdf:
+            page.src = "%s&page=%s" % (baseuri, (page.number - 1))
         return pdf
 
 
@@ -1388,8 +1392,10 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         # increment pageno
         state.page = parser.reader.next()
         state.pageno = state.page.number
-        sb = Sidbrytning()
-        sb.ordinal = state.pageno
+        sb = Sidbrytning(width=state.page.width,
+                         height=state.page.height,
+                         src=state.page.src,
+                         ordinal=state.page.number)
         state.appendixstarted = False
         return sb
 

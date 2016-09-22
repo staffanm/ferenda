@@ -118,12 +118,15 @@ class Transformer(object):
             # depth-first transformation seems the easiest
             self._transform_links(part, uritransform)
             if part.tag not in ("a", "{http://www.w3.org/1999/xhtml}a",
-                                "link", "{http://www.w3.org/1999/xhtml}link"):
+                                "link", "{http://www.w3.org/1999/xhtml}link",
+                                "img", "{http://www.w3.org/1999/xhtml}img"):
                 continue
-            uri = part.get("href")
-            if not uri:
-                continue
-            part.set("href", uritransform(uri))
+            for attr in ("href", "src", "data-src"):
+                uri = part.get(attr)
+                if not uri:
+                    continue
+                part.set(attr, uritransform(uri))
+                break
 
     def transform_stream(self, instream, depth,
                          parameters=None, uritransform=None):

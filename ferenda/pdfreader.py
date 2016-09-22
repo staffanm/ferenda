@@ -353,6 +353,7 @@ class PDFReader(CompoundElement):
             page = Page(number=int(pageelement.get('id')[5:]),
                         width=dim['right'] - dim['left'],
                         height=dim['bottom'] - dim['top'],
+                        src=None,
                         background=None)
 
             # we discard elements at the ocr_carea (content area?)
@@ -537,6 +538,7 @@ class PDFReader(CompoundElement):
             page = Page(number=int(pageelement.attrib['number']),  # alwaysint?
                         width=int(pageelement.attrib['width']),
                         height=int(pageelement.attrib['height']),
+                        src=None,
                         background=None)
             basename = os.path.splitext(filename)[0]
             if filename.endswith(".bz2"):
@@ -775,6 +777,13 @@ class PDFReader(CompoundElement):
                 textbox.top < nextbox.top and
                 textbox.bottom + (prevbox.height * linespacing) - prevbox.height >= nextbox.top):
             return True
+
+    def __iadd__(self, other):
+        if not hasattr(self, 'files'):
+            self.files = [(0, len(self), self.filename)]
+        self.files.append((len(self), len(other), other.filename))
+        super(PDFReader, self).__iadd__(other)
+        return self
 
 class StreamingPDFReader(PDFReader):
     def __init__(self, *args, **kwargs):

@@ -12,9 +12,9 @@ from urllib.parse import urlparse, unquote, parse_qsl
 import mimetypes
 
 from rdflib import Graph
-
 from ferenda.thirdparty import httpheader
 
+from ferenda import util
 from ferenda.errors import RequestHandlerError
 
 class RequestHandler(object):
@@ -130,12 +130,15 @@ class RequestHandler(object):
                 params = dict(parse_qsl(querystring))
             else:
                 params = self.repo.basefile_params_from_basefile(basefile)
-        if isinstance(params, dict) and 'attachment' in params:
-            leaf = params['attachment']
+        if isinstance(params, dict) and 'format' in params:
+            suffix = params['format']
         else:
-            leaf = uri.split("/")[-1]
-        if "." in leaf:
-            suffix = leaf.rsplit(".", 1)[1]
+            if isinstance(params, dict) and 'attachment' in params:
+                leaf = params['attachment']
+            else:
+                leaf = uri.split("/")[-1]
+            if "." in leaf:
+                suffix = leaf.rsplit(".", 1)[1]
         contenttype = self.contenttype(environ, uri, basefile, params, suffix)
         if segments[1] == "dataset":
             path, data = self.lookup_dataset(environ, params, contenttype, suffix)
@@ -201,6 +204,32 @@ class RequestHandler(object):
         if "dir" in params:
             method = {'downloaded': repo.store.downloaded_path,
                       'parsed': repo.store.parsed_path}[params["dir"]]
+            if "page" in params and "format" in params:
+                baseparam = "-size 400x300 -pointsize 12 -gravity center"
+                baseattach = None
+                try:
+                    if "attachment" in params:
+                        sourcefile = method(basefile, attachment=params["attachment"])
+                    else:
+                        sourcefile = method(basefile)
+                    assert params["page"].isdigit(), "%s is not a digit" % params["page"]
+                    assert params["format"] in ("png", "jpg"), ("%s is not a valid image format" %
+                                                                params["format"])
+                    baseattach = "page_%s.%s" % (params["page"], params["format"])
+                    if "attachment" in params:
+                        baseattach = "%s_%s" % (params["attachment"], baseattach)
+                    outfile = repo.store.intermediate_path(basefile, attachment=baseattach)
+                    if not os.path.exists(outfile):
+                        cmdline = "convert %s[%s] %s" % (sourcefile, params["page"], outfile)
+                        util.runcmd(cmdline, require_success=True)
+                except Exception as e:
+                    if not baseattach:
+                        baseattach = "page_error.png"
+                    errormsg = str(e).replace("\n", "\\n")
+                    cmdline = "convert  label:'%s' %s" % (errormsg, outfile)
+                    util.runcmd(cmdline, require_success=True)
+                method = partial(repo.store.intermediate_path, attachment=baseattach)
+            return method
         elif contenttype in self._mimemap and not basefile.endswith("/data"):
             method = getattr(repo.store, self._mimemap[contenttype])
         elif suffix in self._suffixmap and not basefile.endswith("/data"):

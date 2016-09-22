@@ -145,11 +145,15 @@ It's a generic template for any kind of content
   <xsl:template match="xhtml:div[@about]" mode="toc"/>
 
   <xsl:template match="xhtml:span[@class='sidbrytning']">
-    <xsl:element name="div">
-      <xsl:attribute name="id"><xsl:value-of select="@id"/></xsl:attribute>
-      <xsl:attribute name="class">sida</xsl:attribute>
-      <p class="sidbrytning"><i>Sida <xsl:value-of select="substring(@id,4)"/></i></p>
-    </xsl:element>
+    <div class="sida" id="{@id}">
+      <p class="sidbrytning"><i>Sida <xsl:value-of select="substring(@id,4)"/></i>
+      <button type="button" class="view-facsimile pull-left">
+ 	<span>Visa faksimil</span>
+ 	<span style="display: none">Visa text</span>
+      </button>
+      <img data-src="{@src}" class="facsimile"/>
+      </p>
+    </div>
   </xsl:template>
 
 
