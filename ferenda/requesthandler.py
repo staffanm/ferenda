@@ -64,9 +64,9 @@ class RequestHandler(object):
         given URI, or the URI doesnt resolve to a static file.
         
         """
+        suffix = None
         if urlparse(uri).path.startswith("/dataset/"):
             params = self.repo.dataset_params_from_uri(uri)
-            suffix = None
             environ = {"HTTP_ACCEPT": "text/html"}
             contenttype = self.contenttype(environ, uri, None, params, suffix)
             pathfunc = self.get_dataset_pathfunc(environ, params, contenttype, suffix)
@@ -80,11 +80,15 @@ class RequestHandler(object):
                 uri = uri.split("?")[0]
             basefile = self.repo.basefile_from_uri(uri)
 
-            leaf = uri.split("/")[-1]
-            if "." in leaf:
-                suffix = leaf.rsplit(".", 1)[1]
+            if isinstance(params, dict) and 'format' in params:
+                suffix = params['format']
             else:
-                suffix = None
+                if isinstance(params, dict) and 'attachment' in params:
+                    leaf = params['attachment']
+                else:
+                    leaf = uri.split("/")[-1]
+                if "." in leaf:
+                    suffix = leaf.rsplit(".", 1)[1]
         environ = {}
         if not suffix:
             environ['HTTP_ACCEPT'] = "text/html"
@@ -229,7 +233,6 @@ class RequestHandler(object):
                     cmdline = "convert  label:'%s' %s" % (errormsg, outfile)
                     util.runcmd(cmdline, require_success=True)
                 method = partial(repo.store.intermediate_path, attachment=baseattach)
-            return method
         elif contenttype in self._mimemap and not basefile.endswith("/data"):
             method = getattr(repo.store, self._mimemap[contenttype])
         elif suffix in self._suffixmap and not basefile.endswith("/data"):

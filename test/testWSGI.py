@@ -52,6 +52,7 @@ class Pathresolve(RepoTester):
         self.assertEqual(self.p("http://localhost:8000/res/base/123/a?attachment=foo.pdf"),
                          self.datadir + "/base/generated/123/a/foo.pdf")
 
+
     def test_all_params(self):
         self.assertEqual(self.p("http://localhost:8000/res/base/123/a?repo=b&"
                            "dir=downloaded&attachment=foo.pdf"),
