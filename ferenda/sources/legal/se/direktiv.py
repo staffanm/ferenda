@@ -193,8 +193,8 @@ class DirTrips(Trips):
 
 
 class DirAsp(FixedLayoutSource):
-
     """Downloads Direktiv in PDF format from http://rkrattsdb.gov.se/kompdf/"""
+
     alias = "dirasp"
     # FIXME: these url should start with http://rkrattsdb.gov.se/, but
     # on at least some systems we have some IPv4/IPv6 problems with
@@ -213,6 +213,8 @@ class DirAsp(FixedLayoutSource):
     urispace_segment = "dir"
     
     def download(self, basefile=None):
+        if basefile:
+            return super(DirAsp, self).download(basefile)
         resp = requests.get(self.start_url)
         soup = BeautifulSoup(resp.text, "lxml")
         depts = [opt['value'] for opt in soup.find_all("option", value=True)]
