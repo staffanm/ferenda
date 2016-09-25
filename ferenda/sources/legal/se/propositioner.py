@@ -18,6 +18,7 @@ from bs4 import BeautifulSoup
 from lxml import etree
 import requests
 from layeredconfig import LayeredConfig
+from cached_property import cached_property
 
 from ferenda import util
 from ferenda.elements import Preformatted, Body
@@ -36,6 +37,7 @@ class PropAnalyzer(PDFAnalyzer):
     # in an entire document.
     style_significance_threshold = 0.001
 
+    @cached_property
     def documents(self):
         def boxmatch(page, textpattern):
             for box in page.boundingbox(bottom=page.height / 5):
@@ -58,13 +60,19 @@ class PropAnalyzer(PDFAnalyzer):
             else:
                 # if there is a text box matching "Bilaga \d" in top
                 # margin and the bilagenummer is new and dominant
-                # style (family and size) is different from any of the
+                # style (family) is different from any of the
                 # top 3 currrent dominant styles:
+                #
+                # NOTE that normally we want to treat appendicies as
+                # part of the regular text (so that
+                # offtryck_parser.is_appendix et al can do their
+                # thing. This heuristic should only catch appendicies
+                # that are v. different.
                 appendix = boxmatch(page, "Bilaga (\d)\s*$")
                 if (appendix and
                     appendix != currentappendix and
                     styles.most_common(1) and 
-                    styles.most_common(1)[0][0] not in [x[0] for x in mainstyles.most_common(3)]):
+                    styles.most_common(1)[0][0][0] not in [x[0][0] for x in mainstyles.most_common(3)]):
                     currentdoc = 'appendix'
                 elif ".hocr." in self.pdf.filename:
                     # scanned sources have fluctuating page sizes,
@@ -78,6 +86,12 @@ class PropAnalyzer(PDFAnalyzer):
                         # if the page dimensions suddenly change,
                         # that's a dead giveaway that some external
                         # appendix has been lifted right into the PDF
+                        #
+                        # But in some cases dimension change does NOT
+                        # mean external appendix. In Prop 2015/16:195,
+                        # which is split in 4 pdfs (2 logical volumes)
+                        # it's just an artifact due to the 2nd pdf
+                        # being properly cropped while the 1st isn't.
                         currentdoc = 'appendix'
                     else:
                         currentdoc = 'main'
@@ -95,7 +109,7 @@ class PropAnalyzer(PDFAnalyzer):
 
     def metrics(self, metricspath=None, plotpath=None, startpage=0,
                 pagecount=None, force=False):
-        docsegments = self.documents()
+        docsegments = self.documents
         if len(docsegments) == 1:
             return super(PropAnalyzer, self).metrics(metricspath,
                                                      plotpath,

@@ -8,10 +8,10 @@ import logging
 from collections import OrderedDict, Counter
 
 from rdflib.namespace import SKOS
+from cached_property import cached_property
 
 from ferenda import PDFAnalyzer
 from ferenda.errors import ParseError
-
 from . import Regeringen, Offtryck, RPUBL 
 
 
@@ -21,6 +21,7 @@ class DsAnalyzer(PDFAnalyzer):
     # in an entire document.
     style_significance_threshold = 0.001
 
+    @cached_property
     def documents(self):
         def titleish(page):
             for textelement in page:

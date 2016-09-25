@@ -120,7 +120,7 @@ class Offtryck(SwedishLegalSource):
             b.append(Preformatted([p.replace("\n"," ")]))
         return b
     
-    def get_parser(self, basefile, sanitized, initialstate=None):
+    def get_parser(self, basefile, sanitized, initialstate=None, startpage=None, pagecount=None):
         """should return a function that gets any iterable (the output
         from tokenize) and returns a ferenda.elements.Body object.
         
@@ -137,34 +137,34 @@ class Offtryck(SwedishLegalSource):
 
         # most of this method is just calculating metrics and enabling
         # plot/debuganalysis
-        if self.document_type == self.PROPOSITION:
-            # the first page of a prop has a document-unique title
-            # font, larger than h1. To avoid counting that as h1, and
-            # subsequently counting h1 as h2, etc, we skip the first
-            # page.
-            startpage = 1
-        else:
-            startpage = 0
-        pagecount = len(sanitized)
+        if startpage is None:
+            if self.document_type == self.PROPOSITION:
+                # the first page of a prop has a document-unique title
+                # font, larger than h1. To avoid counting that as h1, and
+                # subsequently counting h1 as h2, etc, we skip the first
+                # page.
+                startpage = 1
+            else:
+                startpage = 0
+        if pagecount is None:
+            pagecount = len(sanitized)
+
         if hasattr(sanitized, 'analyzer'):
             analyzer = sanitized.analyzer
-            for _, pagecount, tag in analyzer.documents():
-                if tag == 'main':
-                    break
         else:
             analyzer = self.get_pdf_analyzer(sanitized)
         if "hocr" in sanitized.filename:
             analyzer.scanned_source = True
         metrics_path = self.store.path(basefile, 'intermediate',
                                        '.metrics.json')
-
         if os.environ.get("FERENDA_PLOTANALYSIS"):
             plot_path = self.store.path(basefile, 'intermediate',
                                         '.plot.png')
         else:
             plot_path = None
         self.log.debug("%s: Calculating PDF metrics for %s pages "
-                       "starting at %s" % (basefile, pagecount, startpage))
+                       "starting at %s" % (basefile, pagecount,
+                                           startpage))
         metrics = analyzer.metrics(metrics_path, plot_path,
                                    startpage=startpage,
                                    pagecount=pagecount,
@@ -203,7 +203,7 @@ class Offtryck(SwedishLegalSource):
         # subclass instance as a property on the sanitized object
         # (normally a PDFReader or StreamingPDFReader)
         rawbody = self.extract_body(fp, basefile)
-        sanitized = self.sanitize_body(rawbody)
+        sanitized = self.sanitize_body(rawbody, basefile)
         if not hasattr(sanitized, 'analyzer') or isinstance(sanitized, BeautifulSoup):
             # fall back into the same logic as
             # SwedishLegalSource.parse_body at this point
@@ -219,14 +219,15 @@ class Offtryck(SwedishLegalSource):
         allbody = Body()
         initialstate = {'pageno': 1}
         serialized = False
-        documents = sanitized.analyzer.documents()
+        documents = sanitized.analyzer.documents
         
         if len(documents) > 1:
             self.log.debug("%s: segmented into docs %s" % (basefile, documents))
         for (startpage, pagecount, tag) in documents:
             if tag == 'main':
                 initialstate['pageno'] -= 1  # argh....
-                parser = self.get_parser(basefile, sanitized, initialstate)
+                parser = self.get_parser(basefile, sanitized, initialstate,
+                                         startpage, pagecount)
                 tokenstream = sanitized.textboxes(offtryck_gluefunc,
                                                   pageobjects=True,
                                                   startpage=startpage,
@@ -279,7 +280,9 @@ class Offtryck(SwedishLegalSource):
                 s = VerbatimSection()
                 for relidx, page in enumerate(sanitized[startpage:startpage+pagecount]):
                     sb = Sidbrytning(ordinal=initialstate['pageno']+relidx,
-                                     filename=page.filename)
+                                     width=page.width,
+                                     height=page.height,
+                                     src=page.src)
                     s.append(sb)
                     s.append(page)
                 body = Body([s])
@@ -498,19 +501,19 @@ class Offtryck(SwedishLegalSource):
     def get_pdf_analyzer(self, reader):
         if self.document_type == self.KOMMITTEDIREKTIV:
             from ferenda.sources.legal.se.direktiv import DirAnalyzer
-            analyzer = DirAnalyzer(reader)
+            cls = DirAnalyzer
         elif self.document_type == self.SOU:
             from ferenda.sources.legal.se.sou import SOUAnalyzer
-            analyzer = SOUAnalyzer(reader)
+            cls = SOUAnalyzer
         elif self.document_type == self.DS:
             from ferenda.sources.legal.se.ds import DsAnalyzer
-            analyzer = DsAnalyzer(reader)
+            cls = DsAnalyzer
         elif self.document_type == self.PROPOSITION:
             from ferenda.sources.legal.se.propositioner import PropAnalyzer
-            analyzer = PropAnalyzer(reader)
+            cls = PropAnalyzer
         else:
-            analyzer = PDFAnalyzer(reader)
-        return analyzer
+            cls = PDFAnalyzer
+        return cls(reader)
 
     def find_primary_law(self, node, state):
         if 'primarylaw' in state:
@@ -1223,6 +1226,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         # everything before prop 1987/88:69) the "Bilaga" margin
         # header appears in the (extended) topmargin, not in the
         # leftmargin. For Ds it always appears in the topmargin
+        # FIXME: Doc-specific fixes should be in Proposition.sanitize_body
         if ((parser.current_identifier.startswith("Prop.") and
              ("Prop. 1987/88:69" > parser.current_identifier)) or
             parser.current_identifier.startswith("Ds")):

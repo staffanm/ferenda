@@ -233,6 +233,8 @@ class RequestHandler(object):
                     cmdline = "convert  label:'%s' %s" % (errormsg, outfile)
                     util.runcmd(cmdline, require_success=True)
                 method = partial(repo.store.intermediate_path, attachment=baseattach)
+                return method  # we really don't want to partial()
+                               # this method again below
         elif contenttype in self._mimemap and not basefile.endswith("/data"):
             method = getattr(repo.store, self._mimemap[contenttype])
         elif suffix in self._suffixmap and not basefile.endswith("/data"):

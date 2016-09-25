@@ -16,6 +16,7 @@ from rdflib.namespace import SKOS, DC, RDF, XSD
 BIBO = Namespace("http://purl.org/ontology/bibo/")
 from bs4 import BeautifulSoup
 import lxml.html
+from cached_property import cached_property
 
 from ferenda import (PDFAnalyzer, CompositeRepository, DocumentEntry,
                      PDFDocumentRepository, CompositeStore)
@@ -35,7 +36,7 @@ class SOUAnalyzer(PDFAnalyzer):
     # enough)
     style_significance_threshold = 0.0007
     
-
+    @cached_property
     def documents(self):
         def titleish(page):
             for textelement in page:

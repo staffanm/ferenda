@@ -4,6 +4,7 @@ from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 from builtins import *
 
+# stdlib
 import logging
 import json
 from collections import Counter
@@ -11,6 +12,10 @@ from io import BytesIO
 from itertools import chain
 from math import floor, ceil
 
+# 3rd party
+from cached_property import cached_property
+
+# mine
 from .pdfreader import Page
 from ferenda import util
 
@@ -76,6 +81,7 @@ class PDFAnalyzer(object):
         self.pdf = pdf
         self.scanned_source = False
 
+    @cached_property
     def documents(self):
         """Attempts to distinguish different logical document (eg parts with
         differing pagesizes/margins/styles etc) within this PDF.
@@ -286,16 +292,16 @@ class PDFAnalyzer(object):
         l = self.filterdict(vcounters['leftmargin'], lambda x: x < midpage)
         r = self.filterdict(vcounters['rightmargin'], lambda x: x > midpage)
         if l:
-            vmargins['leftmargin'] = self.findmargin(l, trunc_func=floor)
+            vmargins['leftmargin'] = self.findmargin(l, trunc_func=floor, quantize=self.scanned_source)
         if r:
-            vmargins['rightmargin'] = self.findmargin(r, trunc_func=ceil)
+            vmargins['rightmargin'] = self.findmargin(r, trunc_func=ceil, quantize=True)
         if self.twopage:
             le = self.filterdict(vcounters['leftmargin_even'], lambda x: x < midpage)
             re = self.filterdict(vcounters['rightmargin_even'], lambda x: x > midpage)
             if le:
-                vmargins['leftmargin_even'] = self.findmargin(le, trunc_func=floor)
+                vmargins['leftmargin_even'] = self.findmargin(le, trunc_func=floor, quantize=self.scanned_source)
             if re:
-                vmargins['rightmargin_even'] = self.findmargin(re, trunc_func=ceil)
+                vmargins['rightmargin_even'] = self.findmargin(re, trunc_func=ceil, quantize=True)
         vmargins['pagewidth'] = max(vcounters['pagewidth'])
         return vmargins
 
@@ -308,8 +314,8 @@ class PDFAnalyzer(object):
                 newcounter[x] = counter[x]
         return newcounter
 
-    def findmargin(self, counter, trunc_func=round):
-        if not self.scanned_source:
+    def findmargin(self, counter, trunc_func=round, quantize=False):
+        if not quantize:
             return counter.most_common(1)[0][0]
         else:
             # Taking most_common() works badly for scanned sources
@@ -318,6 +324,8 @@ class PDFAnalyzer(object):
             # at 100. A naive way is to "quantize" everything by eg
             # dividing everything by 4 or 10 or something (ie lowering
             # resolution), finding the most_common of that.
+            #
+            # also, it works bad for right edges in general
             binsize = 10 # FIXME: make configurable or selfadjusting
             lowres = Counter()
             for val in counter:

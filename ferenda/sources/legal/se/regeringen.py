@@ -291,7 +291,7 @@ class Regeringen(Offtryck):
         # earliest point at which we can check against that blacklist.
         # FIXME: we should have a no-semantic-parse fallback that does
         # no analysis, just attempts to create a viewable
-        # page-oriented HTML representation of the PDF. Maybe that
+        # page-oriented HTML representation of the PDF. Mayboe that
         # fallback should even be part of
         # ferenda.PDFDocumentRepository
         if (self.document_type, basefile) in self.blacklist:
@@ -395,7 +395,7 @@ class Regeringen(Offtryck):
         return resource
 
 
-    def sanitize_body(self, rawbody):
+    def sanitize_body(self, rawbody, basefile):
         sanitized = super(Regeringen, self).sanitize_body(rawbody)
         # Sanitize particular files with known issues
         if hasattr(rawbody, 'filename'):
@@ -416,6 +416,22 @@ class Regeringen(Offtryck):
                 del rawbody[73]
                 for page in rawbody[73:]:
                     page.number -= 1
+            elif rawbody.filename.endswith("2015-16/195/nytt-regelverk-om-upphandling-del-1-av-4-kapitel-1-21-prop.-201516195.pdf"):
+                for page in rawbody:
+                    # also, we need to transpose each textbox so that
+                    # margins line up with the first PDF
+                    if "del-2-av-4" in page.src or "del-3-av-4" in page.src:
+                        # rawbody is constructed from 4 physical PDFs,
+                        # some of which are cropped differently from
+                        # the first. Unify.
+                        page.width = 892
+                        page.height = 1263
+                        for textbox in page:
+                            # 79 should be 172: +93
+                            # 79 + 450 should be 172 + 450: +93
+                            # 185 should be 278: +93
+                            textbox.left += 93
+                            textbox.right += 93
         try:
             sanitized.analyzer = self.get_pdf_analyzer(sanitized)
         except AttributeError:
