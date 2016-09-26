@@ -511,13 +511,13 @@ class PropTrips(Trips, Offtryck, FixedLayoutSource):
         else:
             return super(PropTrips, self).extract_body(fp, basefile)
 
-    def sanitize_body(self, rawbody, initialstate=None):
+    def sanitize_body(self, rawbody):
         if isinstance(rawbody, TextReader):
             return rawbody
         else:
             return super(PropTrips, self).sanitize_body(rawbody)
 
-    def get_parser(self, basefile, sanitized, initialstate=None):
+    def get_parser(self, basefile, sanitized, initialstate=None, startpage=None, pagecount=None):
         if isinstance(sanitized, TextReader):
             return self.textparser
         else:

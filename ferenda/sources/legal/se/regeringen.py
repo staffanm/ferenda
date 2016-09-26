@@ -395,7 +395,7 @@ class Regeringen(Offtryck):
         return resource
 
 
-    def sanitize_body(self, rawbody, basefile):
+    def sanitize_body(self, rawbody):
         sanitized = super(Regeringen, self).sanitize_body(rawbody)
         # Sanitize particular files with known issues
         if hasattr(rawbody, 'filename'):
@@ -442,8 +442,10 @@ class Regeringen(Offtryck):
                 raise
         return sanitized
 
+
     placeholders = set([(PROPOSITION, "2015/16:47"),
                         (PROPOSITION, "2015/16:99")])
+
     def extract_body(self, fp, basefile):
         if ((self.document_type == self.PROPOSITION and
              basefile.split(":")[1] in ("1", "100")) or

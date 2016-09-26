@@ -203,7 +203,7 @@ class Offtryck(SwedishLegalSource):
         # subclass instance as a property on the sanitized object
         # (normally a PDFReader or StreamingPDFReader)
         rawbody = self.extract_body(fp, basefile)
-        sanitized = self.sanitize_body(rawbody, basefile)
+        sanitized = self.sanitize_body(rawbody)
         if not hasattr(sanitized, 'analyzer') or isinstance(sanitized, BeautifulSoup):
             # fall back into the same logic as
             # SwedishLegalSource.parse_body at this point
@@ -655,7 +655,9 @@ class Offtryck(SwedishLegalSource):
                 # chapter. alter the parsing context from law to
                 # chapter in law
                 # self.log.debug("...detecting chapter header w/o acttext")
-                law = self._parse_uri_from_text(text, state['basefile'], law)
+                newlaw = self._parse_uri_from_text(text, state['basefile'], law)
+                if newlaw:
+                    law = newlaw
                 skipheader = True
                 textnodes.append(subnode)
                 subnode = None
@@ -676,7 +678,9 @@ class Offtryck(SwedishLegalSource):
 
             elif re.match("\d+ kap. +[^\d]", text):  # eg "4 kap. Om domare"
                 # self.log.debug("...detecting chapter header with title, no section")
-                law = self._parse_uri_from_text(text, state['basefile'], law)
+                newlaw = self._parse_uri_from_text(text, state['basefile'], law)
+                if newlaw:
+                    law = newlaw
                 skipheader = True  # really depends on whether the _next_ subnode is acttext or not 
                 textnodes.append(subnode)
                 parsestate = "acttext"
@@ -836,7 +840,6 @@ class Offtryck(SwedishLegalSource):
         # with a space, at least when interpreting a subsection title.
         # FIXME: This doesn't fix "20a§"
         text = re.sub("(\d+)(§)", r"\1 \2", text)
-
         m = self.re_urisegments.match(baseuri)
         if m:
             attributes = {'law':m.group(2),

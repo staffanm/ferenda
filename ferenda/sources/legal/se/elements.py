@@ -309,7 +309,7 @@ class Sidbrytning(OrdinalElement):
     def as_xhtml(self, uri, parent_uri=None):
         attrs = {'id': 'sid%s' % self.ordinal,
                  'class': 'sidbrytning'}
-        if hasattr(self, 'src'):
+        if hasattr(self, 'src') and self.src:
             attrs['src'] = self.src
             attrs['width'] = str(self.width)
             attrs['height'] = str(self.height)

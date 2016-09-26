@@ -489,11 +489,11 @@ class Riksdagen(Offtryck, FixedLayoutSource):
                 b.append(tagtype([t]))
         return b
 
-    def get_parser(self, basefile, sanitized, initialstate=None):
+    def get_parser(self, basefile, sanitized, initialstate=None, startpage=None, pagecount=None):
         if isinstance(sanitized, BeautifulSoup):
             return self.htmlparser
         else:
-            return super(Riksdagen, self).get_parser(basefile, sanitized, initialstate)
+            return super(Riksdagen, self).get_parser(basefile, sanitized, initialstate, startpage, pagecount)
 
     def sanitize_body(self, rawbody):
         sanitized = super(Riksdagen, self).sanitize_body(rawbody)
