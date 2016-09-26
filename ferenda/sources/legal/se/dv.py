@@ -686,13 +686,43 @@ class DV(SwedishLegalSource):
     def sanitize_body(self, rawbody):
         result = []
         seen_delmal = {}
-        for x in rawbody:
+
+        # ADO 1994 nr 102 to nr 113 have double \n between *EVERY
+        # LINE*, not between every paragraph. Lines are short, less
+        # than 60 chars. This leads to is_heading matching almost
+        # every chunk. The weirdest thing is that the specific line
+        # starting with "Ledamöter: " do NOT exhibit this trait... Try
+        # to detect and undo.
+        if max(len(line) for line in rawbody if not line.startswith("Ledamöter: ")) < 60:
+            self.log.warning("Source has double newlines between every line, attempting "
+                             "to reconstruct sections")
+            newbody = []
+            currentline = ""
+            for idx, line in enumerate(rawbody):
+                if (line.isupper() or
+                    (idx + 1 < len(rawbody) and rawbody[idx+1].isupper()) or
+                    (idx + 1 < len(rawbody) and
+                     len(line) < 45 and
+                     line[-1] in (".", "?", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9") and
+                     rawbody[idx+1][0].isupper())):
+                    newbody.append(currentline + "\n" + line)
+                    currentline = ""
+                else:
+                    currentline += "\n" + line
+            rawbody = newbody
+        for idx, x in enumerate(rawbody):
             if isinstance(x, str):
                 # match smushed-together delmål markers like in "(jfr
                 # 1990 s 772 och s 796)I" and "Domslut HD fastställer
                 # HovR:ns domslut.II"
+                #
+                # But since we apparently need to handle spaces before
+                # I, we might mismatch this with sentences like
+                # "...och Dalarna. I\ndistributionsrörelsen
+                # sysselsattes...". Try to avoid this by checking for
+                # probable sentence start in next line
                 m = re.match("(.*[\.\) ])(I+)$", x, re.DOTALL)
-                if m:
+                if m and rawbody[idx+1][0].isupper():
                     x = [m.group(1), m.group(2)]
                 else:
                     x = [x]
