@@ -146,13 +146,20 @@ It's a generic template for any kind of content
 
   <xsl:template match="xhtml:span[@class='sidbrytning']">
     <div class="sida" id="{@id}">
+      <!-- Nav tabs -->
+      <ul class="nav nav-tabs">
+	<li class="active"><a href="#{@id}-text" class="view-text">Sida <xsl:value-of select="substring(@id,4)"/></a></li>
+	<li><a href="#{@id}-img" class="view-img"><span class="glyphicon glyphicon-picture">&#160;</span>Original</a></li>
+      </ul>
+      <img data-src="{@src}" class="facsimile"/>
+      <!--
       <p class="sidbrytning"><i>Sida <xsl:value-of select="substring(@id,4)"/></i>
       <button type="button" class="view-facsimile pull-left">
  	<span>Visa faksimil</span>
  	<span style="display: none">Visa text</span>
       </button>
-      <img data-src="{@src}" class="facsimile"/>
       </p>
+      -->
     </div>
   </xsl:template>
 

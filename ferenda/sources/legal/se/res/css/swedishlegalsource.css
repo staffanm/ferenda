@@ -2,22 +2,23 @@
    ferenda/sources/legal/se/res/offtryck.css (or possibly
    pdf.css?) */
 body.forarbete section {
-	border-left: solid 1px black;
-	border-right: solid 1px black;
+	border-left: solid 1px #ddd;
+	border-right: solid 1px #ddd;
 }
 body.forarbete div.sida {
 	margin-left: -16px;
 	margin-right: -16px;
-	border-top: solid 1px black;
-	border-bottom: solid 1px black;
+	border-top: solid 1px #ddd;
 	border-left: none;
 	border-right: none;
 	background-color: white;
 }
-body.forarbete div.sida p {
-	margin: 0;
+body.forarbete div.sida ul {
 	padding-top: 12pt;
-	text-align: right;
+	font-size: smaller;
+}
+body.forarbete div.sida ul li a {
+    padding: 5px 15px;
 }
 div.forfattningskommentar {
 	border: 1px solid black;

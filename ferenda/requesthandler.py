@@ -224,7 +224,8 @@ class RequestHandler(object):
                         baseattach = "%s_%s" % (params["attachment"], baseattach)
                     outfile = repo.store.intermediate_path(basefile, attachment=baseattach)
                     if not os.path.exists(outfile):
-                        cmdline = "convert %s[%s] %s" % (sourcefile, params["page"], outfile)
+                        # params['page'] is 0-based, pdftoppm is 1-based
+                        cmdline = "pdftoppm -f %s -singlefile -png %s %s" % (int(params["page"])+1, sourcefile, outfile.replace(".png",""))
                         util.runcmd(cmdline, require_success=True)
                 except Exception as e:
                     if not baseattach:

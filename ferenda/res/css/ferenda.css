@@ -94,7 +94,12 @@ nav[data-toggle='toc'] {
   .row-offcanvas-left button { position: absolute; top:-30px }
 }
 
-img.facsimile { display: none }
+img.facsimile { 
+    display: none;
+    border-left: 1px solid #ddd;
+    border-right: 1px solid #ddd;
+    width: 100%;
+}
 
 body.statusreport div.basefile {
     margin: 2px 0;
