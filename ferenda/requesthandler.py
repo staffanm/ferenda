@@ -216,6 +216,14 @@ class RequestHandler(object):
                         sourcefile = method(basefile, attachment=params["attachment"])
                     else:
                         sourcefile = method(basefile)
+
+                    # we might run this on a host to where we haven't
+                    # transferred the downloaded files -- try to
+                    # re-aquire them now that someone wants to watch
+                    # them.
+                    if not os.path.exists(sourcefile):
+                        repo.download(basefile)
+
                     assert params["page"].isdigit(), "%s is not a digit" % params["page"]
                     assert params["format"] in ("png", "jpg"), ("%s is not a valid image format" %
                                                                 params["format"])
