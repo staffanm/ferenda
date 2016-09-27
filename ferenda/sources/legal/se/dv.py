@@ -693,7 +693,8 @@ class DV(SwedishLegalSource):
         # every chunk. The weirdest thing is that the specific line
         # starting with "Ledamöter: " do NOT exhibit this trait... Try
         # to detect and undo.
-        if max(len(line) for line in rawbody if not line.startswith("Ledamöter: ")) < 60:
+        if (isinstance(rawbody[0], str) and  # Notisfall rawbody is a list of lists...
+            max(len(line) for line in rawbody if not line.startswith("Ledamöter: ")) < 60):
             self.log.warning("Source has double newlines between every line, attempting "
                              "to reconstruct sections")
             newbody = []
@@ -722,7 +723,8 @@ class DV(SwedishLegalSource):
                 # sysselsattes...". Try to avoid this by checking for
                 # probable sentence start in next line
                 m = re.match("(.*[\.\) ])(I+)$", x, re.DOTALL)
-                if m and rawbody[idx+1][0].isupper():
+                if (m and rawbody[idx+1][0].isupper() and
+                    not re.search("mellandomstema I+$", x, flags=re.IGNORECASE)):
                     x = [m.group(1), m.group(2)]
                 else:
                     x = [x]
@@ -1595,17 +1597,26 @@ class DV(SwedishLegalSource):
             return {}
 
         def is_instans(parser, chunk=None):
-            """Determines whether the current position starts a new instans part of the report.
+            """Determines whether the current position starts a new instans part of the report
+.
 
             """
             chunk = parser.reader.peek()
             strchunk = str(chunk)
             res = analyze_instans(strchunk)
+            # sometimes, HD domskäl is written in a way that mirrors
+            # the referat of the lower instance (eg. "1. Optimum
+            # ansökte vid Lunds tingsrätt om stämning mot..."). If the
+            # instans progression goes from higher->lower court,
+            # something is amiss.
+            if (hasattr(parser, 'current_instans') and
+                parser.current_instans.court == "Högsta domstolen" and
+                isinstance(res.get('court'), str) and "tingsrätt" in res['court']):
+                return False
             if res:
                 # in some referats, two subsequent chunks both matches
                 # analyze_instans, even though they refer to the _same_
                 # instans. Check to see if that is the case
-
                 if (hasattr(parser, 'current_instans') and
                     hasattr(parser.current_instans, 'court') and
                     parser.current_instans.court and
@@ -1634,6 +1645,10 @@ class DV(SwedishLegalSource):
             #     return newcourt
             newcourt = canonicalize_court(newcourt)
             oldcourt = canonicalize_court(oldcourt)
+            if newcourt is True and oldcourt in ('Högsta domstolen'):
+                # typically an effect of both parties appealing to the
+                # supreme court
+                return True
             if newcourt == oldcourt:
                 return True
             else:

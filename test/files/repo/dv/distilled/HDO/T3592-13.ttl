@@ -8,7 +8,7 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/rf/nja/2014s499#I/HDO> dcterms:creator "HD"@sv ;
+<https://lagen.nu/rf/nja/2014s499#I/HDO> dcterms:creator "Högsta domstolen"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/2014s499#I> ;
     dcterms:references <https://lagen.nu/1962:700#K29P1S2>,
         <https://lagen.nu/1972:207#K2P3>,
@@ -44,7 +44,7 @@
         <https://lagen.nu/rf/ad/2010:91>,
         <https://lagen.nu/rf/nja/2006s170> .
 
-<https://lagen.nu/rf/nja/2014s499#II/HDO> dcterms:creator "HD"@sv ;
+<https://lagen.nu/rf/nja/2014s499#II/HDO> dcterms:creator "Högsta domstolen"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/2014s499#II> ;
     dcterms:references <https://lagen.nu/1972:207#K2P3>,
         <https://lagen.nu/1998:204>,
