@@ -751,7 +751,7 @@ with the *config* object as single parameter.
 
         self.log.debug("Starting at %s" % self.start_url)
         updated = False
-        resp = self.session.get(self.start_url)
+        resp = self.download_get_first_page()
         resp.raise_for_status()
         if self.download_iterlinks:
             tree = lxml.html.document_fromstring(resp.text)
@@ -788,6 +788,10 @@ with the *config* object as single parameter.
                 updated = updated or ret
         self.config.lastdownload = datetime.now()
         return updated
+
+    def download_get_first_page(self):
+        resp = self.session.get(self.start_url)
+        return resp
 
     @decorators.downloadmax
     def download_get_basefiles(self, source):

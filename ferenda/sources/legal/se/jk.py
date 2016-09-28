@@ -51,7 +51,7 @@ class JK(SwedishLegalSource):
     rdf_type = RPUBL.VagledandeMyndighetsavgorande
     documentstore_class = JKStore
     urispace_segment = "avg/jk"
-
+    download_iterlinks = False
 
     @recordlastdownload
     def download(self, basefile=None, reporter=None):
@@ -66,22 +66,22 @@ class JK(SwedishLegalSource):
         else:
             return super(JK, self).download(basefile, reporter)
         
-
-    @downloadmax
-    def download_get_basefiles(self, url):
+    def download_get_first_page(self):
         data = {'page': '9999'}   # this'll yield a single page with
                                   # every descision ever. This is
                                   # inefficient, but their webdevs
                                   # have broken pagination, so...
-        self.log.debug("Starting at %s" % url)
-        resp = requests.post(url, data=data)
-        
+        self.log.debug("Starting at %s" % self.start_url)
+        resp = requests.post(self.start_url, data=data)
+        return resp
+                
+    @downloadmax
+    def download_get_basefiles(self, source):
         document_url_regex = re.compile("/(?P<basefile>\d+\-\d+\-\d+)/$")
-
-        soup = BeautifulSoup(resp.text, "lxml")
+        soup = BeautifulSoup(source, "lxml")
         for link in soup.find_all("a", href=document_url_regex):
             basefile = document_url_regex.search(link["href"]).group("basefile")
-            yield basefile, urljoin(url, link["href"])
+            yield basefile, urljoin(self.start_url, link["href"])
 
     def metadata_from_basefile(self, basefile):
         attribs = super(JK, self).metadata_from_basefile(basefile)
