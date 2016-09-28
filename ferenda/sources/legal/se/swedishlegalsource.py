@@ -88,6 +88,7 @@ class SwedishLegalHandler(RequestHandler):
         
 
 class SwedishLegalSource(DocumentRepository):
+    download_archive = False
     documentstore_class = SwedishLegalStore
     requesthandler_class = SwedishLegalHandler
     namespaces = ['rdf', 'rdfs', 'xsd', 'dcterms', 'skos', 'foaf',
@@ -202,7 +203,10 @@ class SwedishLegalSource(DocumentRepository):
         # are immutable, ie they should never change. If some repo
         # needs to handle changed resources (like SFS) they'll have to
         # override this and do a proper semantic difference check.
-        return False
+        if self.config.refresh:
+            return True
+        else:
+            return False  # or maybe just return self.config.refresh...
 
     def lookup_label(self, resource, predicate=FOAF.name):
         """The inverse of

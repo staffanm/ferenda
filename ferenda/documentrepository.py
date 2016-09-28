@@ -143,6 +143,9 @@ class DocumentRepository(object):
     """File suffix for the main document format. Determines the suffix
     of downloaded files."""
 
+    download_archive = True
+    """TBD"""
+
     # FIXME: Duplicated in documentstore -- how do we unify?
     storage_policy = "file"
     """Some repositories have documents in several formats, documents
@@ -352,7 +355,7 @@ class DocumentRepository(object):
         # priority over the inheritance-graph derived loadpath:
         if self.loadpath:
             loadpath = self.loadpath + loadpath
-        # A "res/" in the the currrent directory has priority over
+        # A "res/" in the the current directory has priority over
         # class loadpaths:
         if os.path.exists("res") and os.path.isdir("res"):
             loadpath = ["res"] + loadpath
@@ -844,7 +847,8 @@ with the *config* object as single parameter.
         filename = self.store.downloaded_path(basefile)
         created = not os.path.exists(filename)
         # util.print_open_fds()
-        if self.download_if_needed(url, basefile):
+        
+        if self.download_if_needed(url, basefile, archive=self.download_archive):
             if created:
                 self.log.info("%s: downloaded from %s" % (basefile, url))
             else:

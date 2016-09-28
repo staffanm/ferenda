@@ -16,7 +16,7 @@ from . import SwedishLegalSource, SwedishLegalStore, RPUBL
 from .elements import *
 from .swedishlegalsource import AnonStycke
 from ferenda import FSMParser
-from ferenda import util
+from ferenda import util, errors
 from ferenda.decorators import downloadmax, recordlastdownload, newstate
 from ferenda.elements import Body
 
@@ -51,12 +51,21 @@ class JK(SwedishLegalSource):
     rdf_type = RPUBL.VagledandeMyndighetsavgorande
     documentstore_class = JKStore
     urispace_segment = "avg/jk"
-    
+
+
     @recordlastdownload
-    def download(self, basefile=None):
-        self.session = requests.session()
-        for basefile, url in self.download_get_basefiles(self.start_url):
-            self.download_single(basefile, url)
+    def download(self, basefile=None, reporter=None):
+        if basefile:
+            resp = self.session.post(self.start_url, data={'diarienummer': basefile})
+            soup = BeautifulSoup(resp.text, "lxml")
+            link = soup.find("div", "ruling-results").find("a", href=re.compile("/beslut-och-yttranden/"))
+            if not link:
+                raise errors.DownloadFileNotFoundError(basefile)
+            url = urljoin(self.start_url, link["href"])
+            return self.download_single(basefile, url)
+        else:
+            return super(JK, self).download(basefile, reporter)
+        
 
     @downloadmax
     def download_get_basefiles(self, url):

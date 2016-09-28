@@ -1645,7 +1645,7 @@ class DV(SwedishLegalSource):
             #     return newcourt
             newcourt = canonicalize_court(newcourt)
             oldcourt = canonicalize_court(oldcourt)
-            if newcourt is True and oldcourt in ('Högsta domstolen'):
+            if newcourt is True and str(oldcourt) in ('Högsta domstolen'):
                 # typically an effect of both parties appealing to the
                 # supreme court
                 return True

@@ -748,8 +748,9 @@ class Devel(object):
             log.info("%s: %s processed, %s ok (%s w/ warnings), %s failed, %s removed. %s corrupted entries." % (repo.alias, len(basefiles), successcnt, warncnt, failcnt, removecnt, errcnt))
         conffile = os.path.abspath(
             os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
+        resourceloader = [x.resourceloader for x in repos if hasattr(x, 'resourceloader')][0]
         transformer = Transformer('XSLT', "xsl/statusreport.xsl", "xsl",
-                                  resourceloader=repos[0].resourceloader,
+                                  resourceloader=resourceloader,
                                   config=conffile)
         xhtmltree = transformer.transform(root, depth=1)
         outfile = os.sep.join([self.config.datadir, 'status', 'status.html'])

@@ -7,7 +7,6 @@
 		xmlns:dcterms="http://purl.org/dc/terms/"
 		xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
-		xml:space="preserve"
 		exclude-result-prefixes="xhtml rdf atom">
 
   <!-- assume a statusreport.xml like this:
@@ -68,17 +67,20 @@
   <xsl:template match="action">
     <xsl:variable name="alerttype">
       <xsl:choose>
-        <xsl:when test="@success='True' and ./warnings">alert-warning</xsl:when>
-        <xsl:when test="@success='True'">alert-success</xsl:when>
-        <xsl:when test="@success='False'">alert-danger</xsl:when>
+	<xsl:when test="@success='True' and ./warnings">alert-warning</xsl:when>
+	<xsl:when test="@success='True'">alert-success</xsl:when>
+	<xsl:when test="@success='False'">alert-danger</xsl:when>
       </xsl:choose>
     </xsl:variable> 
     <xsl:variable name="tooltip">
       <xsl:choose>
-        <xsl:when test="@success='True' and ./warnings"><xsl:value-of select="./warnings"/></xsl:when>
-        <xsl:when test="@success='False'"><xsl:value-of select="./error"/>
--------------------	
-<xsl:value-of select="./traceback"/></xsl:when>
+	<xsl:when test="@success='True' and ./warnings">
+	<xsl:value-of select="./warnings"/></xsl:when>
+	<xsl:when test="@success='False'">
+	  <xsl:value-of select="./error"/>
+-------------------
+<xsl:value-of select="./traceback"/>
+	</xsl:when>
       </xsl:choose>
     </xsl:variable> 
     <p class="alert {$alerttype}" title="{$tooltip}">
@@ -90,9 +92,9 @@
   <xsl:template match="basefile">
     <xsl:variable name="alerttype">
       <xsl:choose>
-        <xsl:when test="action[@success='False']">alert-danger</xsl:when>
-        <xsl:when test="action[@success='True'] and action/warnings">alert-warning</xsl:when>
-        <xsl:when test="action[@success='True']">alert-success</xsl:when>
+	<xsl:when test="action[@success='False']">alert-danger</xsl:when>
+	<xsl:when test="action[@success='True'] and action/warnings">alert-warning</xsl:when>
+	<xsl:when test="action[@success='True']">alert-success</xsl:when>
       </xsl:choose>
     </xsl:variable> 
     <div class="basefile alert {$alerttype}">
