@@ -1,0 +1,26 @@
+13. Vad som ska räknas till lägenheten och vad som hör till huset i
+övrigt framgår inte av bostadsrättslagen. I prop. 2002/03:12 uttalade
+regeringen att det synes vara i det närmaste omöjligt att i
+författning mera i detalj ange vilka delar av en fastighet som
+föreningen är ansvarig för och vilka den enskilde bostadsrättshavaren
+ansvarar för. I sammanhanget nämndes att saken kan regleras i
+föreningens stadgar. (Se a. prop. s. 51. Se också prop. 1990/91:92
+s. 99.)
+
+<list>
+  <str>13. Vad som ska räknas till lägenheten och vad som hör till huset i
+övrigt framgår inte av bostadsrättslagen. I </str>
+  <Link uri="https://lagen.nu/prop/2002/03:12">prop. 2002/03:12</Link>
+  <str> uttalade
+regeringen att det synes vara i det närmaste omöjligt att i
+författning mera i detalj ange vilka delar av en fastighet som
+föreningen är ansvarig för och vilka den enskilde bostadsrättshavaren
+ansvarar för. I sammanhanget nämndes att saken kan regleras i
+föreningens stadgar. (Se </str>
+  <Link uri="https://lagen.nu/prop/2002/03:12#sid51">a. prop. s. 51</Link>
+  <str>. Se också </str>
+  <Link uri="https://lagen.nu/prop/1990/91:92#sid99">prop. 1990/91:92
+s. 99</Link>
+  <str>.)</str>
+</list>
+

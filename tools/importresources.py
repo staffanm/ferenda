@@ -324,6 +324,19 @@ space: coin:template [
                      [ coin:property rpubl:arsutgava ;
                        coin:variable "arsutgava" ]
      ], [
+        # yes we should really do this as a general relFromBase rpubl:sida?
+        coin:uriTemplate "/utr/{serie}/{arsutgava}:{lopnummer}#sid{sidnummer}";
+        coin:binding [ coin:property rpubl:sidnummer ],
+                     [ coin:property rpubl:utrSerie ;
+                       coin:slugFrom space:abbrSlug ;
+                       coin:variable "serie" ],
+                     [ coin:property rpubl:lopnummer ;
+                       coin:variable "lopnummer" ],
+                     [ coin:property rpubl:sidnummer ;
+                       coin:variable "sidnummer" ],
+                     [ coin:property rpubl:arsutgava ;
+                       coin:variable "arsutgava" ]
+     ], [
         coin:uriTemplate "/{rtype}/{arsutgava}:{lopnummer}#S{avsnitt}";
         coin:binding [ coin:property rinfoex:avsnitt ],
                      [ coin:property rdf:type ;

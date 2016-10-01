@@ -1,0 +1,9 @@
+(se prop. 2002/03:12, s. 51 och 62)
+
+<list>
+  <str>(se </str>
+  <Link uri="https://lagen.nu/prop/2002/03:12#sid51">prop. 2002/03:12, s. 51</Link>
+  <str> och </str>
+  <Link uri="https://lagen.nu/prop/2002/03:12#sid62">62</Link>
+  <str>)</str>
+</list>

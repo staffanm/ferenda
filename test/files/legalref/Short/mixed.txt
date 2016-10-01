@@ -2,6 +2,6 @@ Huvudregeln är att det enligt 10 kap. 1 § ÄB ska upprättas...
 
 <list>
   <str>Huvudregeln är att det enligt </str>
-  <Link uri="https://lagen.nu/sfs/1958:637#K10P1">10 kap. 1 § ÄB</Link>
+  <Link uri="https://lagen.nu/1958:637#K10P1">10 kap. 1 § ÄB</Link>
   <str> ska upprättas...</str>
 </list>

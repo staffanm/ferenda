@@ -1,46 +1,66 @@
 # -*- coding: iso-8859-1 -*-
 # ------------ forarbeten.ebnf ----------------
 
-# FÖRARBETEN - dvs propositioner, utskottsbetänkanden,
-# riksdagsskrivelser och CELEX-nummer, sånt som anges som förarbeten i
-# en SFS. (obs att SOU/Ds/Regeringssskrivelser etc inte är med)
+# FÖRARBETEN - propositioner, utskottsbetänkanden,
+# regeringsskrivelser, EU-rättsakter (endast CELEX-nummer), SOU:er och
+# Ds:ar
 
-forarbeteref          ::= (PropRef/BetRef/SkrivelseRef/CelexRef/ExternalAvsnittRef/ExternalAvsnittRefs/AvsnittRefs)
+forarbeteref          ::= (ForarbRefs/ForarbRef/ExternalAvsnittRefs/ExternalAvsnittRef/AvsnittRefs/AnonPropRefs)
 
 # exv "2007/08" eller "1999/2000"
-Riksmote       ::= LangtAr, (Slash, Ar)?
-# Riksmote       ::= digit, digit, digit, digit, (Slash, digit, digit, (digit, digit)?)?
+RiksmoteID       ::= LangtAr, (Slash, Ar)?
+
+ForarbRef ::= (PropRef/BetRef/SkrivelseRef/CelexRef/SouRef/DsRef)
+ForarbRefs ::= ForarbRef, Sidor
 
 # Propositioner exv "Prop. 1999/2000:100"
-PropRef	       ::= PropPrefix, Whitespace, PropRefID, SidnrRef?
+PropRef	       ::= PropPrefix, Whitespace, PropRefID
 PropPrefix     ::= ('prop.'/'Prop.')
-PropRefID      ::= Riksmote, Colon, number
+PropRefID      ::= RiksmoteID, Colon, LopnrID
+LopnrID        ::= number
+
+# exv "a. prop. s. 42"
+AnonPropRefs ::= "a. prop.", Sidor
 
 # Betänkanden exv "bet. 1998/99:Ju12"
 BetRef         ::= BetPrefix, Whitespace, BetRefID
 BetPrefix      ::= 'bet.'
-BetRefID       ::= Riksmote, Colon, BetNum
-BetNum         ::= char, char, char?, number
+BetRefID       ::= RiksmoteID, Colon, BetNumID
+BetNumID       ::= char, char, char?, number
 
 # Riksdagsskrivelser exv "rskr. 1992/93:17"
 SkrivelseRef   ::= SkrivelsePrefix, Whitespace, SkrivelseRefID
 SkrivelsePrefix::= 'rskr.'
-SkrivelseRefID ::= Riksmote, Colon, number
+SkrivelseRefID ::= RiksmoteID, Colon, LopnrID
 
 # CELEX-hänvisningar
 CelexRef       ::= CelexRefID
 CelexRefID     ::= '3', digit, digit, (digit, digit)?, 'L', digit, digit, digit, digit
 
-# Sidnr-hänvisningar ("prop. 1989/90:89 s. 154")
-SidnrRef       ::= Whitespace, 's.', Period?, Whitespace, SidnrRefID
+# Sida-hänvisningar ("s. 154", ", s. 154")
+SidaRef       ::= Comma?, Whitespace, 's', Period?, Whitespace, SidaRefID
+# "123 och 135", "123-125, 140-143", 
+Sidor ::= SidaRef, (Hyphen, SidaRefID)?, (CommaSpace/WAndOrW, SidaRefID, (Hyphen, SidaRefID)?)*
+
+SidaRefID ::= number
+
+# SOU:er exv "SOU 2000:2, s. 183"
+SouRef ::= SouPrefix, Whitespace, SouRefID
+SouPrefix ::= "SOU"
+SouRefID ::= RiksmoteID, Colon, LopnrID
+
+# Ds:er exv "Ds 1997:29, s. 112"
+DsRef ::= DsPrefix, Whitespace, DsRefID
+DsPrefix ::= "Ds"
+DsRefID ::= RiksmoteID, Colon, LopnrID
 
 
 # Avsnitt ("3", "3.2",  "3.2.1", or "3.2.1.4")
 AvsnittRefID    ::= digit+, (Period, digit+, (Period, digit+, (Period, digit+)?)?)?
 AvsnittRef      ::= 'avsnitt', Whitespace, AvsnittRefID
 AvsnittRefs     ::= AvsnittRef, (CommaSpace/WAndOrW, AvsnittRefID)*
-ExternalBetRef  ::= 'i', Whitespace, 'kommitténs', Whitespace, 'betänkande'
-ExternalAvsnittRef  ::= AvsnittRef, Whitespace, ExternalBetRef
-ExternalAvsnittRefs ::= AvsnittRefs, Whitespace, ExternalBetRef
+ExternalBetRef  ::= Whitespace, 'i', Whitespace, 'kommitténs', Whitespace, 'betänkande'
+ExternalAvsnittRef  ::= AvsnittRef, ExternalBetRef
+ExternalAvsnittRefs ::= AvsnittRefs, ExternalBetRef
 
 # ------------ end of forarbeten.ebnf ----------------

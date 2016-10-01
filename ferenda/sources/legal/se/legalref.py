@@ -87,7 +87,7 @@ class LegalRef:
         if not os.path.sep in __file__:
             scriptdir = os.getcwd()
         else:
-            scriptdir = os.path.dirname(__file__)
+           scriptdir = os.path.dirname(__file__)
         resourceloader = ResourceLoader(scriptdir)
         fname = resourceloader.filename
         
@@ -172,6 +172,10 @@ class LegalRef:
         self.currentpiece = None
         self.lastlaw = None
         self.currentlynamedlaws = {}
+
+        # Forarbete-specifik kod
+        self.current_forarbete_attributes = {}
+        self.last_forarbete_attributes = {}
 
     def load_ebnf(self, file):
         """Laddar in produktionerna i den angivna filen i den
@@ -1144,6 +1148,7 @@ class LegalRef:
         self.betankanderef = False
         return res
 
+
     def format_ExternalAvsnittRefs(self, root):
         self.betankanderef = True
         res = []
@@ -1151,7 +1156,41 @@ class LegalRef:
             # FIXME: need to set uriformatter somehow
             res.extend(self.formatter_dispatch(node))
         self.betankanderef = False
+        # for aestethic reasons, combine the last two links (eg
+        # "avsnitt 8.2.2" and " i kommitténs betänkande using the more
+        # specific former link for URI
+        if len(res) > 1 and isinstance(res[-1], LinkSubject) and isinstance(res[-2], LinkSubject):
+            res[-2:] = [Link(res[-2]+res[-1], uri=res[-2].uri, predicate=res[-1].predicate)]
         return res
+        
+        return res
+
+    def format_ForarbRef(self, root):
+        res = self.format_tokentree(root)
+        self.last_forarbete_attributes = self.find_attributes(root.nodes)
+        return res
+
+    def format_ForarbRefs(self, root):
+        # compare to format_ExternalAvsnittRefs but also format_ExternalRefs
+        forarb_ref = self.find_node(root, 'ForarbRef')
+        self.current_forarbete_attributes = self.find_attributes(forarb_ref.nodes)
+        for node in root.nodes:
+            res = self.format_tokentree(root)
+        self.current_forarbete_attributes = {}
+        # for aesthetic reasons, combine the first two links (eg
+        # "prop. 2002/03:12" and ", s. 51"), using the more specific
+        # latter link for URI
+        if len(res) > 1 and isinstance(res[0], LinkSubject) and isinstance(res[1], LinkSubject):
+            res[0:2] = [LinkSubject(res[0]+res[1], uri=res[1].uri, predicate=res[1].predicate)]
+        return res
+
+    def format_AnonPropRefs(self, root):
+        if not self.last_forarbete_attributes:
+            log.warning("(unknown): found reference to \"a. prop.\" but self.last_forarbete_attributes is not set")
+        self.current_forarbete_attributes = self.last_forarbete_attributes
+        # do the thing
+        return [self.format_generic_link(root, uriformatter=self.forarbete_format_uri)]
+        
 
     def forarbete_format_uri(self, attributes):
         a = attributes
@@ -1175,9 +1214,15 @@ class LegalRef:
                 log.warning("Don't know the ID of 'kommitténs betänkande', leaving reference %s unlinked" %  a)
                 return None
         else:
-            # this reference is relative to the current document
-            a.update(self.baseuri_attributes)
+            if self.current_forarbete_attributes:
+                a.update(self.current_forarbete_attributes)
+            else:
+                # this reference is relative to the current document
+                a.update(self.baseuri_attributes)
         for key, val in list(a.items()):
+            if key == 'sida':
+                a['sidnr'] = val
+                del a[key]
             if key == 'prop':
                 a['type'] = RPUBL.Proposition
                 a['year'], a['no'] = val.split(":")
@@ -1191,6 +1236,17 @@ class LegalRef:
                 a['type'] = RINFOEX.Riksdagsskrivelse
                 a['year'], a['no'] = val.split(":")
                 del a[key]
+            elif key == 'sou':
+                a['type'] = RPUBL.Betankande
+                a['utrSerie'] = self.metadata_graph.value(predicate=SKOS.altLabel, object=Literal("SOU", lang="sv"))
+                a['year'], a['no'] = val.split(":")
+                del a[key]
+            elif key == 'ds':
+                a['type'] = RPUBL.Betankande
+                a['utrSerie'] = self.metadata_graph.value(predicate=SKOS.altLabel, object=Literal("Ds", lang="sv"))
+                a['year'], a['no'] = val.split(":")
+                del a[key]
+            # elif key == 'dir': 
             elif key == 'celex':
                 if len(val) == 8:  # badly formatted, uses YY instead of YYYY
                     a[key] = val[0] + '19' + val[1:]

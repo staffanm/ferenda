@@ -3,7 +3,7 @@ säljaren som har bevisbördan
 
 <list>
   <str>Av förarbetena (se </str>
-  <Link uri="https://lagen.nu/prop/1989/90:89#s154">prop. 1989/90:89 s. 154</Link>
+  <Link uri="https://lagen.nu/prop/1989/90:89#sid154">prop. 1989/90:89 s. 154</Link>
   <str>) framgår att det är
 säljaren som har bevisbördan</str>
 </list>

@@ -3,12 +3,13 @@ from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 from builtins import *
 
+import ast
 import sys
 import os
 import codecs
 import re
 
-from rdflib import Namespace, Graph, RDF
+from rdflib import Namespace, Graph, RDF, URIRef
 
 from ferenda.compat import unittest
 from ferenda import ResourceLoader
@@ -66,20 +67,19 @@ class TestLegalRef(unittest.TestCase):
         for para in test_paras:
             if para.startswith("RESET:"):
                 parser.currentlynamedlaws.clear()
-            if para.startswith("NOBASE:"):
+            elif para.startswith("NOBASE:"):
                 baseuri_attributes = {}
+            elif para.startswith("BASE:"):
+                b = para.split("\n")[0].split(":",1)[1]
+                baseuri_attributes = ast.literal_eval(b)
+                if 'type' in baseuri_attributes:
+                    baseuri_attributes['type'] = URIRef(baseuri_attributes['type'])
+                para = para.split("\n",1)[1]
+                if 'kommittensbetankande' in baseuri_attributes:
+                    parser.kommittensbetankande = baseuri_attributes['kommittensbetankande']
+                    del baseuri_attributes['kommittensbetankande']
             else:
-                if "/Regpubl/" in testfile:
-                    from ferenda.sources.legal.se import RPUBL
-                    # pretend we're in Prop. 1996/97:44
-                    baseuri_attributes = {'type': RPUBL.Proposition,
-                                          'year': "1996/97",
-                                          'no': "44"}
-                    # This is a temporary "API" while we gather requirements
-                    parser.kommittensbetankande = "1997:39"  # assume SOU 1997:39
-                else:
-                    # 
-                    baseuri_attributes = {'law': '9999:999'}
+                baseuri_attributes = {'law': '9999:999'}
             nodes = parser.parse(para, self.minter, self.metadata,
                                  baseuri_attributes)
             got_paras.append(serialize(nodes).strip())

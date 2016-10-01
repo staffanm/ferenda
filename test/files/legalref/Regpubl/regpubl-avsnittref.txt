@@ -1,3 +1,4 @@
+BASE:{'type': 'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Proposition', 'year': "1996/97", 'no': "44", 'kommittensbetankande': "1997:39"}
 Paragrafen överensstämmer i huvudsak med Datalagskommitténs förslag
 och har berörts i avsnitt 8.2.2 i kommitténs betänkande.
 Frågan om en teknikoberoende lag har behandlats i avsnitt
@@ -19,9 +20,7 @@ och har berörts i </str>
   <str>, </str>
   <Link uri="https://lagen.nu/utr/sou/1997:39#S12.2.8">12.2.8</Link>
   <str> och </str>
-  <Link uri="https://lagen.nu/utr/sou/1997:39#S12.2.12">12.2.12</Link>
-  <str> </str>
-  <Link uri="https://lagen.nu/utr/sou/1997:39">i kommitténs
+  <Link uri="https://lagen.nu/utr/sou/1997:39#S12.2.12">12.2.12 i kommitténs
 betänkande</Link>
   <str>.</str>
 </list>

@@ -2,6 +2,6 @@ Enligt 3 § MBL så
 
 <list>
   <str>Enligt </str>
-  <Link uri="https://lagen.nu/sfs/1976:580#P3">3 § MBL</Link>
+  <Link uri="https://lagen.nu/1976:580#P3">3 § MBL</Link>
   <str> så</str>
 </list>
