@@ -31,6 +31,7 @@ class Ds(CompositeRepository, SwedishLegalSource):
     urispace_segment = "utr/ds"
     documentstore_class = DsStore
     xslt_template = "xsl/forarbete.xsl"
+    sparql_annotations = "sparql/describe-with-subdocs.rq"
 
     # NB: The same logic as in
     # ferenda.sources.legal.se.{Regeringen,Riksdagen}.metadata_from_basefile

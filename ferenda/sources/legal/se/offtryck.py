@@ -43,7 +43,7 @@ class Offtryck(SwedishLegalSource):
 
     parse_types = LegalRef.RATTSFALL, LegalRef.FORARBETEN, LegalRef.ENKLALAGRUM, LegalRef.KORTLAGRUM
     xslt_template = "xsl/forarbete.xsl"
-
+    sparql_annotations = "sparql/describe-with-subdocs.rq"
 
     # Correct some invalid identifiers spotted in the wild:
     # 1999/20 -> 1999/2000
@@ -174,7 +174,8 @@ class Offtryck(SwedishLegalSource):
                                             '.debug.pdf')
 
             self.log.debug("Creating debug version of PDF")
-            analyzer.drawboxes(pdfdebug_path, offtryck_gluefunc,
+            gluefunc = self.get_gluefunc(basefile, analyzer)
+            analyzer.drawboxes(pdfdebug_path, gluefunc,
                                metrics=metrics)
         if self.document_type == self.PROPOSITION:
             preset = 'proposition'
@@ -192,6 +193,85 @@ class Offtryck(SwedishLegalSource):
                                  initialstate=initialstate)
         return parser.parse
 
+
+    def get_gluefunc(self, basefile, analyzer):
+
+        scanned_source = analyzer.scanned_source
+        
+        def offtryck_gluefunc(textbox, nextbox, prevbox):
+            # linespacing = nextbox.font.size / 2
+            linespacing = nextbox.font.size / 1.2 # bboxes for scanned
+                                                  # material seem very tight,
+                                                  # so that lines appear to
+                                                  # have greater linespacing
+            parindent = nextbox.font.size
+            # if we're using hOCR data, take advantage of the paragraph
+            # segmentation that tesseract does through the p.ocr_par mechanism
+            if (hasattr(prevbox, 'parid') and hasattr(nextbox, 'parid') and
+                prevbox.parid == nextbox.parid):
+                return True
+            if scanned_source:
+                # allow for slight change in fontsize and vert align.
+                sizematch = lambda p, n: abs(p.font.size - n.font.size) <= 1
+                alignmatch = lambda p, n: abs(p.left - n.left) <= 2
+                valignmatch = lambda p, n: abs(p.bottom - n.bottom) <= 3 or abs(p.top - n.top) <= 3
+            else:
+                sizematch = lambda p, n: p.font.size == n.font.size
+                alignmatch = lambda p, n: p.left == n.left
+                valignmatch = lambda p, n: p.bottom == p.bottom
+            familymatch = lambda p, n: p.font.family == n.font.family
+            # numbered section headings can have large space between
+            # the leading number and the rest of the heading, and the
+            # top/bottom of the leading number box might differ from
+            # the heading with one or a few points. These special
+            # conditions helps glue these parts *vertically* by
+            # checking that the vertical space is not unreasonable and
+            # that horizontal alignment is at least 50 % overlapping
+            if nextbox.font.size > 13: # might be a heading -- but we have no
+                                      # real way of guessing this at this
+                                      # stage (metrics are not available to
+                                      # this function)
+                if (sizematch(textbox, nextbox) and
+                    familymatch(textbox, nextbox) and 
+                    nextbox.top < prevbox.top + (prevbox.height / 2) < nextbox.bottom and
+                    textbox.left - (prevbox.right) < (prevbox.width * 3)):
+                    return True
+
+            # Any line that ONLY contains a section reference should probably
+            # be interpreted as a header
+            strprevbox = str(prevbox).strip()
+            if re.match("(\d+ kap. |)\d+( \w|) §$", strprevbox) and prevbox.bottom <= nextbox.top:
+                return False
+
+            # these text locutions indicate a new paragraph (normally, this is
+            # also catched by the conditions below, but if prevbox is unusally
+            # short (one line) they might not catch it.:
+            strnextbox = str(nextbox).strip() 
+            if re.match("Skälen för (min bedömning|mitt förslag): ", strnextbox):
+                return False
+            if re.match("\d\. +", strnextbox):  # item in ordered list
+                return False
+            if (re.match("\d+ §", strnextbox) and
+                 (strprevbox[-1] not in ("–", "-") and # make sure this isn't really a continuation
+                  not strprevbox.endswith("och") and
+                  not strprevbox.endswith("enligt") and
+                  not strprevbox.endswith("kap.") and
+                  not strprevbox.endswith("lagens")   # OK this is getting ridiculous
+                 )and
+                (nextbox.top - prevbox.bottom >= (prevbox.font.size * 0.3))):  # new section (with a suitable linespacing (30% of a line))
+                return False
+            # These final conditions glue primarily *horizontally*
+            if (sizematch(textbox, nextbox) and
+                familymatch(textbox, nextbox) and
+                textbox.top + textbox.height + linespacing > nextbox.top and
+                prevbox.left < nextbox.right and
+                (valignmatch(prevbox, nextbox) or  # compare baseline, not topline
+                 alignmatch(prevbox, nextbox) or
+                 (parindent * 2 >= (prevbox.left - nextbox.left) >= parindent)
+                 )):
+                return True
+
+        return offtryck_gluefunc
 
     def parse_body(self, fp, basefile):
         # this version knows how to use an appropriate analyzer to
@@ -219,6 +299,12 @@ class Offtryck(SwedishLegalSource):
         allbody = Body()
         initialstate = {'pageno': 1}
         serialized = False
+        gluefunc = self.get_gluefunc(basefile, sanitized.analyzer)
+        # FIXME: temporary non-API workaround -- need to figure out
+        # what PDFAnalyzer.documents really need in terms of
+        # doc-specific magic in order to reliably separate document
+        # parts
+        sanitized.analyzer.gluefunc = gluefunc
         documents = sanitized.analyzer.documents
         
         if len(documents) > 1:
@@ -228,7 +314,7 @@ class Offtryck(SwedishLegalSource):
                 initialstate['pageno'] -= 1  # argh....
                 parser = self.get_parser(basefile, sanitized, initialstate,
                                          startpage, pagecount)
-                tokenstream = sanitized.textboxes(offtryck_gluefunc,
+                tokenstream = sanitized.textboxes(gluefunc,
                                                   pageobjects=True,
                                                   startpage=startpage,
                                                   pagecount=pagecount)
@@ -1578,90 +1664,4 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     p.debug = bool(debug)
     return p
 
-
-def offtryck_gluefunc(textbox, nextbox, prevbox):
-    # linespacing = nextbox.font.size / 2
-    linespacing = nextbox.font.size / 1.2 # bboxes for scanned
-                                          # material seem very tight,
-                                          # so that lines appear to
-                                          # have greater linespacing
-    parindent = nextbox.font.size
-
-    # if we're using hOCR data, take advantage of the paragraph
-    # segmentation that tesseract does through the p.ocr_par mechanism
-    if (hasattr(prevbox, 'parid') and hasattr(nextbox, 'parid') and
-        prevbox.parid == nextbox.parid):
-        return True
-    # numbered section headings can have large space between the
-    # leading number and the rest of the heading, and the top/bottom
-    # of the leading number box might differ from the heading with one
-    # or a few points. These special conditions helps glue these parts
-    # *vertically* by checking that the vertical space is not
-    # unreasonable and that horizontal alignment is at least 50 %
-    # overlapping
-
-    if hasattr(nextbox, 'parid'):
-        # scanned_source = True, allow for slight change in fontsize
-        # and vertical align FIXME: for SOUKB material, scanned_source
-        # is true even though we have no parid attribute (since text
-        # is extracted with pdf2html, not tesseract). One way would be
-        # to set textbox.parid = False on every goddamn textbox when
-        # scanned_source is True.
-        sizematch = lambda p, n: abs(p.font.size - n.font.size) <= 1
-        alignmatch = lambda p, n: abs(p.left - n.left) <= 2
-    else:
-        sizematch = lambda p, n: p.font.size == n.font.size
-        # we allow two points of misalignment even for pdf2html
-        # material, since we can't yet determine if it comes from a
-        # scanned source.
-        alignmatch = lambda p, n: abs(p.left - n.left) <= 2
-
-    familymatch = lambda p, n: p.font.family == n.font.family
-
-        
-    if nextbox.font.size > 13: # might be a heading -- but we have no
-                              # real way of guessing this at this
-                              # stage (metrics are not available to
-                              # this function)
-        if (sizematch(textbox, nextbox) and
-            familymatch(textbox, nextbox) and 
-            nextbox.top < prevbox.top + (prevbox.height / 2) < nextbox.bottom and
-            textbox.left - (prevbox.right) < (prevbox.width * 3)):
-            return True
-
-    # Any line that ONLY contains a section reference should probably
-    # be interpreted as a header
-    strprevbox = str(prevbox).strip()
-    if re.match("(\d+ kap. |)\d+( \w|) §$", strprevbox) and prevbox.bottom <= nextbox.top:
-        return False
-        
-    # these text locutions indicate a new paragraph (normally, this is
-    # also catched by the conditions below, but if prevbox is unusally
-    # short (one line) they might not catch it.:
-    strnextbox = str(nextbox).strip() 
-    if re.match("Skälen för (min bedömning|mitt förslag): ", strnextbox):
-        return False
-    if re.match("\d\. +", strnextbox):  # item in ordered list
-        return False
-    if (re.match("\d+ §", strnextbox) and
-         (strprevbox[-1] not in ("–", "-") and # make sure this isn't really a continuation
-          not strprevbox.endswith("och") and
-          not strprevbox.endswith("enligt") and
-          not strprevbox.endswith("kap.") and
-          not strprevbox.endswith("lagens")   # OK this is getting ridiculous
-         )and
-        (nextbox.top - prevbox.bottom >= (prevbox.font.size * 0.3))):  # new section (with a suitable linespacing (30% of a line))
-        return False
-
-    
-    # These final conditions glue primarily *horizontally*
-    if (sizematch(textbox, nextbox) and
-        familymatch(textbox, nextbox) and
-        textbox.top + textbox.height + linespacing > nextbox.top and
-        prevbox.left < nextbox.right and
-        ((prevbox.top + prevbox.height == nextbox.top + nextbox.height) or  # compare baseline, not topline
-         alignmatch(prevbox, nextbox) or
-         (parindent * 2 >= (prevbox.left - nextbox.left) >= parindent)
-         )):
-        return True
 

@@ -53,14 +53,29 @@ It's a generic template for any kind of content
 
   <xsl:template name="aside-annotations">
     <xsl:param name="uri"/>
+    <xsl:param name="elem">div</xsl:param>
+    <xsl:param name="class">col-sm-4</xsl:param>
     <xsl:if test="$annotations/resource[@uri=$uri]">
-      <div class="col-sm-4">
-	<h2>Annotations for <xsl:value-of select="substring-after($uri,'http://localhost:8000/res/')"/></h2>
-	<xsl:for-each select="$annotations/resource[@uri=$uri]/dcterms:isReferencedBy">
-	  <xsl:variable name="referencing" select="@ref"/>
-	  <a href="{@ref}"><xsl:value-of select="$annotations/resource[@uri=$referencing]/dcterms:identifier"/></a>
-	</xsl:for-each>
+      <!-- <div class="col-sm-4">-->
+      <xsl:element name="{$elem}"><xsl:attribute name="class"><xsl:value-of select="$class"/></xsl:attribute>
+      <div class="panel-group">
+	<div class="panel panel-default">
+	  <div class="panel-heading">
+	    <h4 class="panel-title">Hänvisningar till <xsl:value-of select="substring-after($uri,'#')"/></h4>
+	  </div>
+	  <div class="panel-body">
+	    <xsl:for-each select="$annotations/resource[@uri=$uri]/dcterms:isReferencedBy">
+	      <xsl:variable name="referencing" select="@ref"/>
+	      <xsl:variable name="label"><xsl:choose><xsl:when test="not($annotations/resource[@uri=$referencing]/dcterms:identifier)">
+		<xsl:value-of select="@ref"/>
+	      </xsl:when>
+	      <xsl:otherwise><xsl:value-of select="$annotations/resource[@uri=$referencing]/dcterms:identifier"/></xsl:otherwise></xsl:choose></xsl:variable>
+	      <a href="{@ref}"><xsl:value-of select="$label"/></a>
+	    </xsl:for-each>
+	  </div>
+	</div>
       </div>
+      </xsl:element>
     </xsl:if>
   </xsl:template>
 
@@ -161,6 +176,13 @@ It's a generic template for any kind of content
       </p>
       -->
     </div>
+    <xsl:variable name="uri"><xsl:value-of select="//@about"/>#<xsl:value-of select="@id"/></xsl:variable>
+    <xsl:comment>ID URI is <xsl:value-of select="$uri"/></xsl:comment>
+    <xsl:call-template name="aside-annotations">
+      <xsl:with-param name="uri" select="$uri"/>
+      <xsl:with-param name="elem">aside</xsl:with-param>
+      <xsl:with-param name="class">sidannotering</xsl:with-param>
+    </xsl:call-template>
   </xsl:template>
 
 

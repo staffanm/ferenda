@@ -34,4 +34,14 @@ body.frontpage td {
     body.frontpage td {
         display:table-cell;
     }
+
+    /* since a div.sida might appear inside of a top-level div.row,
+       we'll have to resort to positioning trickery to get the aside to
+       line up to the right. This sort-of works on my machine. */
+    aside.sidannotering {
+	position: absolute;
+	right: -41%;
+	width: 40%;
+		   
+    }
 }

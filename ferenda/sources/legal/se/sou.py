@@ -35,13 +35,21 @@ class SOUAnalyzer(PDFAnalyzer):
     # material which only use different size for h1:s (0.07% is
     # enough)
     style_significance_threshold = 0.0007
-    
+
+    gluefunc = None
+
     @cached_property
     def documents(self):
         def titleish(page):
-            for textelement in page:
-                if textelement.font.size >= 18: # Ds 2009:55 uses size 18. The normal is 26.
-                    return textelement
+            # return the largest text element found on the page (first
+            # one in case of a tie) -- that's probably the title on
+            # the page
+            iterator = self.pdf.textboxes(self.gluefunc, startpage=page.number-1, pagecount=1) if self.gluefunc else page
+            candidate = None
+            for te in iterator:
+                if candidate is None or str(te)[0].isupper() and te.font.size > candidate.font.size:
+                    candidate = te
+            return candidate
         documents = []
         currentdoc = 'frontmatter'
         for pageidx, page in enumerate(self.pdf):
@@ -52,13 +60,14 @@ class SOUAnalyzer(PDFAnalyzer):
                 # are considered part of the main content.
                 currentdoc = "main"
                 documents[0][-1] = "main"
-            pgtitle = titleish(page)
-            if pgtitle is not None:
-                pgtitle = str(pgtitle).strip()
-                if re.match("(Till [sS]|S)tatsrådet ", pgtitle):
-                    currentdoc = "main"
-                elif pgtitle in ("Innehåll", "Innehållsförteckning"):
-                    currentdoc = "main"
+            if currentdoc == 'frontmatter':
+                pgtitle = titleish(page)
+                if pgtitle is not None:
+                    pgtitle = str(pgtitle).strip()
+                    if re.match("(Till [sS]|S)tatsrådet ", pgtitle):
+                        currentdoc = "main"
+                    elif pgtitle in ("Innehåll", "Innehållsförteckning"):
+                        currentdoc = "main"
             # update the current document segment tuple or start a new one
             if documents and documents[-1][2] == currentdoc:
                 documents[-1][1] += 1
@@ -250,7 +259,13 @@ class SOUKB(Offtryck, PDFDocumentRepository):
     def extract_body(self, fp, basefile):
         reader = StreamingPDFReader()
         reader.read(fp)
+        identifier = self.canonical_uri(basefile)
+        baseuri = "%s?repo=%s&dir=downloaded&format=png" % (identifier, self.alias)
+        for page in reader:
+            page.src = "%s&page=%s" % (baseuri, (page.number - 1))
+
         return reader
+    
         
     def sanitize_body(self, rawbody):
         sanitized = super(SOUKB, self).sanitize_body(rawbody)
@@ -263,15 +278,6 @@ class SOUKB(Offtryck, PDFDocumentRepository):
                                                   # the real source is
                                                   # not a hOCR file
         return sanitized
-
-#    def get_parser(self, basefile, sanitized):
-#        p = offtryck_parser(basefile, preset="dir")
-#        p.current_identifier = "SOU %s" % basefile
-#        return p.parse
-#
-#    def tokenize(self, pdfreader):
-#        # FIXME: We should probably build a better tokenizer
-#        return pdfreader.textboxes(offtryck_gluefunc)
 
     def create_external_resources(self, doc):
         pass
@@ -289,6 +295,7 @@ class SOU(CompositeRepository):
     urispace_segment = "utr/sou"
     documentstore_class = SOUStore
     xslt_template = "xsl/forarbete.xsl"
+    sparql_annotations = "sparql/describe-with-subdocs.rq"
 
     # NB: The same logic as in
     # ferenda.sources.legal.se.{Regeringen,Riksdagen}.metadata_from_basefile

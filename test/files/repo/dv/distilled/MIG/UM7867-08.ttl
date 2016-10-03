@@ -15,6 +15,7 @@
         <https://lagen.nu/prop/1971:30>,
         <https://lagen.nu/prop/2004/05:170#sid105>,
         <https://lagen.nu/prop/2004/05:170#sid129>,
+        <https://lagen.nu/prop/2004/05:170#sid131>,
         <https://lagen.nu/rf/mig/2006:9> .
 
 <https://lagen.nu/rf/mig/2009:30#MIV> dcterms:creator "Migrationsverket"@sv ;
