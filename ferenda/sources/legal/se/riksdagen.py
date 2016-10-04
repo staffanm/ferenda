@@ -34,6 +34,9 @@ class RiksdagenStore(FixedLayoutStore):
 
     def intermediate_path(self, basefile, version=None, attachment=None):
         candidate = None
+        if attachment:
+            return super(RiksdagenStore, self).intermediate_path(basefile, version, attachment)
+        
         for suffix in (".hocr.html.bz2", ".hocr.html", ".xml", ".xml.bz2"):
             candidate = self.path(basefile, "intermediate", suffix)
             if os.path.exists(candidate):
@@ -462,8 +465,13 @@ class Riksdagen(Offtryck, FixedLayoutSource):
             not (self.document_type, basefile) in self.metadataonly):
             fp = self.parse_open(basefile)
             parser = "ocr" if ".hocr." in util.name_from_fp(fp) else "xml"
-            return StreamingPDFReader().read(fp, parser=parser)
+            reader = StreamingPDFReader().read(fp, parser=parser)
+            identifier = self.canonical_uri(basefile)
+            baseuri = "%s?repo=%s&dir=downloaded&format=png&attachment=index.pdf" % (identifier, self.alias)
             # this will have returned a fully-loaded PDFReader document
+            for page in reader:
+                page.src = "%s&page=%s" % (baseuri, (page.number - 1))
+            return reader
         else:
             # fp points to a HTML file, which we can use directly.
             # fp will be a raw bitstream of a latin-1 file.
