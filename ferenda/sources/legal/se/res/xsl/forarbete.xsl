@@ -32,9 +32,18 @@ It's a generic template for any kind of content
 	<p style="font-size: 20pt;"><xsl:value-of select="../xhtml:head/xhtml:title"/></p>
       </section>
       <aside class="source col-sm-4">
-	<xsl:variable name="docuri" select="@about"/>
-	<xsl:variable name="derivedfrom" select="$annotations/resource[@uri=$docuri]/prov:wasDerivedFrom/@ref"/>
-	Originaldokument: <a href="{$derivedfrom}"><xsl:value-of select="$annotations/resource[@uri=$derivedfrom]/rdfs:label"/></a>, <a href="{$annotations/resource[@uri=$docuri]/prov:alternateOf/@ref}">Källa</a>
+	<div class="panel-group">
+	  <div class="panel panel-default">
+	    <div class="panel-heading">
+	      Källor
+	    </div>
+	    <div class="panel-body">
+	      <xsl:variable name="docuri" select="@about"/>
+	      <xsl:variable name="derivedfrom" select="$annotations/resource[@uri=$docuri]/prov:wasDerivedFrom/@ref"/>
+	      Originaldokument: <a href="{$derivedfrom}"><xsl:value-of select="$annotations/resource[@uri=$derivedfrom]/rdfs:label"/></a>, <a href="{$annotations/resource[@uri=$docuri]/prov:alternateOf/@ref}">Källa</a>
+	    </div>
+	  </div>
+	</div>
       </aside>
     </div>
   </xsl:template>
@@ -79,10 +88,29 @@ It's a generic template for any kind of content
     </xsl:if>
   </xsl:template>
 
+  <!-- This matches all top-level elements that are contained in a
+       section div. This is typically preamble stuff -->
+  <xsl:template match="xhtml:body/*[self::xhtml:p or self::xhtml:span]" priority="10">
+    <div class="row toplevel">
+      <section class="col-sm-8">
+	<xsl:if test="local-name() = 'span'"><xsl:call-template name="sidbrytning"/></xsl:if><xsl:if test="local-name() != 'span'"><xsl:element name="{local-name()}"><xsl:apply-templates/></xsl:element></xsl:if>
+      </section>
+    </div>
+  </xsl:template>
+  
   <xsl:template match="xhtml:body/xhtml:div">
+    <!-- this might be used for sections that aren't referencable
+         entiries in their own right, but still containers of other
+         things, ie the Protokollsutdrag structure of older
+         propositions (c.f. prop 1990/91:172) -->
     <div class="row toplevel">
       <section id="{substring-after(@about,'#')}" class="col-sm-8">
-	<xsl:apply-templates select="*[not(xhtml:div[@about])]"/>
+	<h2><xsl:value-of select="@content"/></h2>
+	<!-- FIXME: We try to avoid including referencable
+	     sub-entities here, since they need to be wrapped in a
+	     div.row, and we can't nest those. 
+	-->
+	<xsl:apply-templates select="*[not(@about)]"/>
       </section>
       <!--
       <xsl:call-template name="aside-annotations">
@@ -90,11 +118,12 @@ It's a generic template for any kind of content
 	</xsl:call-template>
 	-->
     </div>
+    <xsl:apply-templates select="*[@about]"/>
   </xsl:template>
     
   <!-- everything that has an @about attribute, i.e. _is_ something
        (with a URI) gets a <section> with an <aside> for inbound links etc -->
-  <xsl:template match="xhtml:div[@about and @class='section']">
+  <xsl:template match="xhtml:div[@about and (@class='section' or @class='preamblesection' or @class='unorderedsection')]">
     <div class="row" about="{@about}"><!-- needed? -->
       <section id="{substring-after(@about,'#')}" class="col-sm-8">
 	<xsl:variable name="sectionheading"><xsl:if test="xhtml:span/@content"><xsl:value-of select="xhtml:span/@content"/>. </xsl:if><xsl:value-of select="@content"/></xsl:variable>
@@ -136,9 +165,7 @@ It's a generic template for any kind of content
    does not hold.
     -->
          	 
-    <xsl:comment>docpart level: subparts start</xsl:comment>
     <xsl:apply-templates select="xhtml:div[@about and @class!='forfattningskommentar']"/>
-    <xsl:comment>docpart level: subparts end</xsl:comment>
   </xsl:template>
 
 
@@ -159,7 +186,7 @@ It's a generic template for any kind of content
 
   <xsl:template match="xhtml:div[@about]" mode="toc"/>
 
-  <xsl:template match="xhtml:span[@class='sidbrytning']">
+  <xsl:template match="xhtml:span[@class='sidbrytning']" name="sidbrytning">
     <div class="sida" id="{@id}">
       <!-- Nav tabs -->
       <ul class="nav nav-tabs">
@@ -177,7 +204,6 @@ It's a generic template for any kind of content
       -->
     </div>
     <xsl:variable name="uri"><xsl:value-of select="//@about"/>#<xsl:value-of select="@id"/></xsl:variable>
-    <xsl:comment>ID URI is <xsl:value-of select="$uri"/></xsl:comment>
     <xsl:call-template name="aside-annotations">
       <xsl:with-param name="uri" select="$uri"/>
       <xsl:with-param name="elem">aside</xsl:with-param>
