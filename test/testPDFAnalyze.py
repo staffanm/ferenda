@@ -25,7 +25,7 @@ class Analyze(unittest.TestCase):
         self.analyzer = PDFAnalyzer(self.pdf)
 
     def test_documents(self):
-        self.assertEquals([(0,3, 'main')], self.analyzer.documents())
+        self.assertEquals([(0,3, 'main')], self.analyzer.documents)
 
     def test_vcounters(self):
         vcounters = self.analyzer.count_vertical_margins(0, 3)
@@ -57,8 +57,8 @@ class Analyze(unittest.TestCase):
         self.assertEquals({'leftmargin': 135,
                            'leftmargin_even': 108,
                            'pagewidth': 892,
-                           'rightmargin': 784,
-                           'rightmargin_even': 748},
+                           'rightmargin': 770,
+                           'rightmargin_even': 760},
                           hmetrics)
 
     def test_analyze_vmargins(self):
@@ -98,8 +98,8 @@ class Analyze(unittest.TestCase):
                                'leftmargin_even': 108,
                                'pageheight': 1262,
                                'pagewidth': 892,
-                               'rightmargin': 759,
-                               'rightmargin_even': 748,
+                               'rightmargin': 760,
+                               'rightmargin_even': 760,
                                'scanned_source': False},
                               metrics)
             self.assertTrue(os.path.exists(jsonpath))
@@ -119,7 +119,7 @@ class Analyze(unittest.TestCase):
                            'leftmargin_even': 108,
                            'pageheight': 1262,
                            'pagewidth': 892,
-                           'rightmargin_even': 748,
+                           'rightmargin_even': 760,
                            'scanned_source': False},
                           metrics)
 
