@@ -132,8 +132,15 @@ class PropAnalyzer(PDFAnalyzer):
         with open(metricspath, "w") as fp:
             s = json.dumps(r[0], indent=4, separators=(', ', ': '), sort_keys=True)
             fp.write(s)
-
         return r[0]
+
+    def count_styles(self, startpage, pagecount):
+        # we should avoid counting the styles on the front page, as
+        # that page uses a title font, not used anywhere else in the
+        # document, which is then mistaken for the h1 font.
+        if not startpage:
+            startpage = 1
+        return super(PropAnalyzer, self).count_styles(startpage, pagecount)
 
 class PropRegeringen(Regeringen):
     alias = "propregeringen"

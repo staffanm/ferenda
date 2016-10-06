@@ -99,6 +99,7 @@ img.facsimile {
     border-left: 1px solid #ddd;
     border-right: 1px solid #ddd;
     width: 100%;
+    padding: 10px;
 }
 
 body.statusreport div.basefile {

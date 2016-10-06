@@ -1,0 +1,79 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://lagen.nu/rf/nja/2011s45#HDO> dcterms:creator "Högsta domstolen"@sv ;
+    dcterms:isPartOf <https://lagen.nu/rf/nja/2011s45> ;
+    dcterms:references <https://lagen.nu/1939:207>,
+        <https://lagen.nu/1962:700>,
+        <https://lagen.nu/1962:700#K16P14>,
+        <https://lagen.nu/1982:1011>,
+        <https://lagen.nu/1994:1000>,
+        <https://lagen.nu/prop/1981/82:170#sid111>,
+        <https://lagen.nu/prop/1981/82:170#sid112>,
+        <https://lagen.nu/prop/1993/94:182#sid52>,
+        <https://lagen.nu/rf/nja/1944s256>,
+        <https://lagen.nu/rf/nja/1960s339>,
+        <https://lagen.nu/rf/nja/1967s615> .
+
+<https://lagen.nu/rf/nja/2011s45#HVS> dcterms:creator "Hovrätten för Västra Sverige"@sv ;
+    dcterms:isPartOf <https://lagen.nu/rf/nja/2011s45> ;
+    dcterms:references <https://lagen.nu/1962:700#K16P14>,
+        <https://lagen.nu/1962:700#K30P3S2N2>,
+        <https://lagen.nu/1994:1000>,
+        <https://lagen.nu/utr/sou/2006:11>,
+        <https://lagen.nu/utr/sou/2008:124> .
+
+<https://lagen.nu/rf/nja/2011s45#TUD> dcterms:creator "Uddevalla tingsrätt"@sv ;
+    dcterms:isPartOf <https://lagen.nu/rf/nja/2011s45> ;
+    dcterms:references <https://lagen.nu/1962:700#K16P14>,
+        <https://lagen.nu/1962:700#K16P14M2>,
+        <https://lagen.nu/1994:1000>,
+        <https://lagen.nu/1994:1000#P3>,
+        <https://lagen.nu/prop/1981/82:170>,
+        <https://lagen.nu/rf/nja/1944s256>,
+        <https://lagen.nu/rf/nja/1960s339>,
+        <https://lagen.nu/rf/rh/1985:71>,
+        <https://lagen.nu/rf/rh/2007:82> .
+
+<https://lagen.nu/dom/hd/B2760-09/2011-04-06> a rpubl:VagledandeDomstolsavgorande ;
+    dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
+    dcterms:subject <https://lagen.nu/concept/Dobbleri>,
+        <https://lagen.nu/concept/Lotteri>,
+        <https://lagen.nu/concept/Poker>,
+        <https://lagen.nu/concept/Spel> ;
+    dcterms:title "En variant av poker (Texas Hold´em) har i ett visst fall när den spelats i turneringsform inte ansetts vara ett spel vars utgång helt eller till väsentlig del beror på slumpen i den mening som avses i 16 kap. 14 § brottsbalken."@sv ;
+    rpubl:avdelning "2" ;
+    rpubl:avgorandedatum "2011-04-06"^^xsd:date ;
+    rpubl:lagrum <https://lagen.nu/1962:700#K16P14> ;
+    rpubl:malnummer "B2760-09" ;
+    rpubl:rattsfall <https://lagen.nu/rf/nja/1944s256>,
+        <https://lagen.nu/rf/nja/1960s339>,
+        <https://lagen.nu/rf/nja/1967s615> ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/b2760-09/2011-04-06> .
+
+<https://lagen.nu/rf/nja/2011s45?repo=dv&dir=downloaded> rdfs:label "NJA 2011 s. 45"@sv .
+
+<https://lagen.nu/rf/nja/2011s45> a rpubl:Rattsfallsreferat ;
+    dcterms:bibliographicCitation "NJA 2011:8" ;
+    dcterms:identifier "NJA 2011 s. 45" ;
+    dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
+    dcterms:references <https://lagen.nu/1962:700#K16P14>,
+        <https://lagen.nu/rf/nja/1944s256>,
+        <https://lagen.nu/rf/nja/1960s339>,
+        <https://lagen.nu/rf/nja/1967s615> ;
+    rpubl:arsutgava "2011" ;
+    rpubl:lopnummer "8" ;
+    rpubl:rattsfallspublikation <https://lagen.nu/dataset/nja> ;
+    rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/hd/B2760-09/2011-04-06> ;
+    rpubl:referatrubrik "En variant av poker (Texas Hold´em) har i ett visst fall när den spelats i turneringsform inte ansetts vara ett spel vars utgång helt eller till väsentlig del beror på slumpen i den mening som avses i 16 kap. 14 § brottsbalken."@sv ;
+    rpubl:sidnummer "45" ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rf/nja/2011/s_45> ;
+    prov:wasDerivedFrom <https://lagen.nu/rf/nja/2011s45?repo=dv&dir=downloaded> ;
+    prov:wasGeneratedBy "lagen.nu.dv.DV" .
+

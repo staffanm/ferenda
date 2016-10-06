@@ -231,6 +231,19 @@ class FerendaTestCase(object):
         errors = []
         want_tree = treeify(want)
         got_tree = treeify(got)
+        # example on how to filter attributes from one of the trees to
+        # compare. In this case, b/c we want to test without some
+        # attributes that a newly added change added to all
+        # 'pagebreak' spans (to see if the change broke anything
+        # else).
+        # for tree in (got_tree, want_tree):
+        #     for pagebreak in tree.findall("//{http://www.w3.org/1999/xhtml}span"):
+        #         if pagebreak.get("id") and pagebreak.get("id").startswith("sid"):
+        #             if "src" in pagebreak.attrib:
+        #                 del pagebreak.attrib["src"]
+        #                 del pagebreak.attrib["width"]
+        #                 del pagebreak.attrib["height"]
+                
         xml_compare(want_tree.getroot(),
                     got_tree.getroot(),
                     errors.append)

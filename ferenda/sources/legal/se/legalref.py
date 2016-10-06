@@ -165,17 +165,8 @@ class LegalRef:
         self.verbose = False
         self.depth = 0
 
-        # SFS-specifik kod
-        self.currentlaw = None
-        self.currentchapter = None
-        self.currentsection = None
-        self.currentpiece = None
-        self.lastlaw = None
-        self.currentlynamedlaws = {}
-
-        # Forarbete-specifik kod
-        self.current_forarbete_attributes = {}
-        self.last_forarbete_attributes = {}
+        self.reset()
+        
 
     def load_ebnf(self, file):
         """Laddar in produktionerna i den angivna filen i den
@@ -383,6 +374,22 @@ class LegalRef:
                 normres[i] = self.re_xmlcharref.sub(
                     self.unescape_xmlcharref, normres[i])
         return normres
+
+    def reset(self):
+        """Reset any context related to discovered/remembered data about
+        things found in previous calls to parse() (last named law etc)"""
+        # SFS-specifik kod
+        self.currentlaw = None
+        self.currentchapter = None
+        self.currentsection = None
+        self.currentpiece = None
+        self.lastlaw = None
+        self.currentlynamedlaws = {}
+
+        # Forarbete-specifik kod
+        self.current_forarbete_attributes = {}
+        self.last_forarbete_attributes = {}
+        
 
     def unescape_xmlcharref(self, m):
         return chr(int(m.group(0)[2:-1]))
@@ -1159,10 +1166,8 @@ class LegalRef:
         # for aestethic reasons, combine the last two links (eg
         # "avsnitt 8.2.2" and " i kommitténs betänkande using the more
         # specific former link for URI
-        if len(res) > 1 and isinstance(res[-1], LinkSubject) and isinstance(res[-2], LinkSubject):
-            res[-2:] = [Link(res[-2]+res[-1], uri=res[-2].uri, predicate=res[-1].predicate)]
-        return res
-        
+        if len(res) > 1 and isinstance(res[-1], Link) and isinstance(res[-2], Link):
+            res[-2:] = self._concatlinks(res[-2:], res[-2])
         return res
 
     def format_ForarbRef(self, root):
@@ -1180,10 +1185,17 @@ class LegalRef:
         # for aesthetic reasons, combine the first two links (eg
         # "prop. 2002/03:12" and ", s. 51"), using the more specific
         # latter link for URI
-        if len(res) > 1 and isinstance(res[0], LinkSubject) and isinstance(res[1], LinkSubject):
-            res[0:2] = [LinkSubject(res[0]+res[1], uri=res[1].uri, predicate=res[1].predicate)]
+        if len(res) > 1 and isinstance(res[0], Link) and isinstance(res[1], Link):
+            res[0:2] = self._concatlinks(res[0:2], res[1])
         return res
 
+    def _concatlinks(self, links, primarylink):
+        cls = primarylink.__class__
+        kwargs = {'uri': primarylink.uri}
+        if hasattr(primarylink, 'predicate'):
+            kwargs['predicate'] = primarylink.predicate
+        return [cls(links[0] + links[1], **kwargs)]
+    
     def format_AnonPropRefs(self, root):
         if not self.last_forarbete_attributes:
             log.warning("(unknown): found reference to \"a. prop.\" but self.last_forarbete_attributes is not set")
@@ -1214,11 +1226,15 @@ class LegalRef:
                 log.warning("Don't know the ID of 'kommitténs betänkande', leaving reference %s unlinked" %  a)
                 return None
         else:
-            if self.current_forarbete_attributes:
-                a.update(self.current_forarbete_attributes)
-            else:
-                # this reference is relative to the current document
-                a.update(self.baseuri_attributes)
+            if not('prop' in a or 'bet' in a or 'skrivelse' in a or 'sou' in a or 'ds' in a or 'dir' in a or 'celex' in a):
+                # this means we have an "incomplete"
+                # (cuntextual-dependent) reference, need to complete
+                # that with context
+                if self.current_forarbete_attributes:
+                    a.update(self.current_forarbete_attributes)
+                else:
+                    # this reference is relative to the current document
+                    a.update(self.baseuri_attributes)
         for key, val in list(a.items()):
             if key == 'sida':
                 a['sidnr'] = val

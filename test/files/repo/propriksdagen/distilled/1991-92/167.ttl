@@ -63,7 +63,8 @@
 
 <https://lagen.nu/prop/1991/92:167#S1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
-    dcterms:references <https://lagen.nu/1981:1361> ;
+    dcterms:references <https://lagen.nu/1981:1361>,
+        <https://lagen.nu/utr/ds/1991:68> ;
     dcterms:title "Inledning"@sv ;
     bibo:chapter "1"@sv .
 
@@ -115,15 +116,28 @@
 <https://lagen.nu/prop/1991/92:167#S3.6> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
     dcterms:references <https://lagen.nu/1981:1361>,
-        <https://lagen.nu/1981:1361#P4>,
-        <https://lagen.nu/1985:716>,
         <https://lagen.nu/1988:1385>,
         <https://lagen.nu/1990:931>,
         <https://lagen.nu/1991:980>,
         <https://lagen.nu/prop/1971:86#sid66>,
-        <https://lagen.nu/prop/1971:86#sid97> ;
+        <https://lagen.nu/utr/sou/1987:58#sid441> ;
     dcterms:title "Undantag från hemförsäljningslagen för vissa prestationer"@sv ;
     bibo:chapter "3.6"@sv .
+
+<https://lagen.nu/prop/1991/92:167#S3.7> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
+    dcterms:references <https://lagen.nu/1981:1361>,
+        <https://lagen.nu/1981:1361#P4>,
+        <https://lagen.nu/prop/1971:86#sid97> ;
+    dcterms:title "Näringsidkarens infomrationsplikt"@sv ;
+    bibo:chapter "3.7"@sv .
+
+<https://lagen.nu/prop/1991/92:167#S3.8> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
+    dcterms:references <https://lagen.nu/1981:1361>,
+        <https://lagen.nu/1985:716> ;
+    dcterms:title "Konsumentens ångerrätt"@sv ;
+    bibo:chapter "3.8"@sv .
 
 <https://lagen.nu/prop/1991/92:167#S3.9> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
@@ -145,7 +159,8 @@
         <https://lagen.nu/1991:980>,
         <https://lagen.nu/prop/1971:86#sid90>,
         <https://lagen.nu/prop/1981/82:40#sid24>,
-        <https://lagen.nu/prop/1981/82:40#sid35> ;
+        <https://lagen.nu/prop/1981/82:40#sid35>,
+        <https://lagen.nu/utr/sou/1979:76> ;
     dcterms:title "Specialmotiverin g"@sv ;
     bibo:chapter "5"@sv .
 

@@ -659,6 +659,7 @@ class SwedishLegalSource(DocumentRepository):
             self.visit_node(body, func, initialstate)
         self._serialize_unparsed(body, basefile)
         if self.config.parserefs and self.parse_types:
+            # self.refparser.reset()
             body = self.refparser.parse_recursive(body)
         return body
 
@@ -1167,10 +1168,15 @@ class SwedishCitationParser(CitationParser):
         self._legalrefparser = legalrefparser
         self._minter = minter
         self._commondata = commondata
+        self._allow_relative = allow_relative
+        self.reset()
+        self.log = logging.getLogger("scp")
+
+    def reset(self):
+        self._legalrefparser.reset()
         self._currenturl = None
         self._currentattribs = None
-        self._allow_relative = allow_relative
-        self.log = logging.getLogger("scp")
+        
 
     def parse_recursive(self, part, predicate="dcterms:references"):
         if hasattr(part, 'about'):

@@ -153,8 +153,9 @@ class Offtryck(SwedishLegalSource):
             analyzer = sanitized.analyzer
         else:
             analyzer = self.get_pdf_analyzer(sanitized)
-        if "hocr" in sanitized.filename:
-            analyzer.scanned_source = True
+        # This should be done in get_pdf_analyzer
+        # if "hocr" in sanitized.filename:
+        #     analyzer.scanned_source = True
         metrics_path = self.store.path(basefile, 'intermediate',
                                        '.metrics.json')
         if os.environ.get("FERENDA_PLOTANALYSIS"):
@@ -195,7 +196,6 @@ class Offtryck(SwedishLegalSource):
 
 
     def get_gluefunc(self, basefile, analyzer):
-
         scanned_source = analyzer.scanned_source
         
         def offtryck_gluefunc(textbox, nextbox, prevbox):
@@ -217,8 +217,10 @@ class Offtryck(SwedishLegalSource):
                 valignmatch = lambda p, n: abs(p.bottom - n.bottom) <= 3 or abs(p.top - n.top) <= 3
             else:
                 sizematch = lambda p, n: p.font.size == n.font.size
-                alignmatch = lambda p, n: p.left == n.left
-                valignmatch = lambda p, n: p.bottom == p.bottom
+                # allow for slight variations in vert align since
+                # left margin in practice is not always straight.
+                alignmatch = lambda p, n: abs(p.left - n.left) <= 2 
+                valignmatch = lambda p, n: p.bottom == n.bottom
             familymatch = lambda p, n: p.font.family == n.font.family
             # numbered section headings can have large space between
             # the leading number and the rest of the heading, and the
@@ -242,6 +244,7 @@ class Offtryck(SwedishLegalSource):
             strprevbox = str(prevbox).strip()
             if re.match("(\d+ kap. |)\d+( \w|) §$", strprevbox) and prevbox.bottom <= nextbox.top:
                 return False
+
 
             # these text locutions indicate a new paragraph (normally, this is
             # also catched by the conditions below, but if prevbox is unusally
@@ -269,6 +272,15 @@ class Offtryck(SwedishLegalSource):
                  alignmatch(prevbox, nextbox) or
                  (parindent * 2 >= (prevbox.left - nextbox.left) >= parindent)
                  )):
+
+                # if the two boxes are on the same line, but have a
+                # wide space between them, the nextbox is probably a
+                # pagenumber
+                if (valignmatch(prevbox, nextbox) and
+                    (nextbox.left - textbox.right) > 50 and
+                    len(strnextbox) < 10):
+                    return False
+
                 return True
 
         return offtryck_gluefunc
@@ -599,7 +611,10 @@ class Offtryck(SwedishLegalSource):
             cls = PropAnalyzer
         else:
             cls = PDFAnalyzer
-        return cls(reader)
+        analyzer = cls(reader)
+        if ".hocr." in reader.filename:
+            analyzer.scanned_source = True
+        return analyzer
 
     def find_primary_law(self, node, state):
         if 'primarylaw' in state:
@@ -1086,13 +1101,14 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         # pagenumbers -- always nonessential
         if chunk.top > metrics.bottommargin or chunk.bottom < metrics.topmargin:
             return True
-
         if metrics.scanned_source:
             # this is some sort of printer's instruction at the bottom
             # of the page, but not reliably within
-            # metrics.bottommargin
+            # metrics.bottommargin.
+            # eg "4 Riksdagen 1987/88. I saml. Nr 155" (and with OCR errors like
+            # '5 Rikxdzguøn /987/88. I .su/nl. Nr [55' or "6 Rikxtltrguwi I987/':'\'3. I smul. iVI' /55"
             if (chunk.top > metrics.pageheight * 0.8 and
-                re.match("\d+ riksdagen \d+\. ?\d saml. nr \d", strchunk, flags=re.IGNORECASE)):
+                re.match(r"\d+ rik(sdagen|xdzguøn|xtltrguwi) [\d\./ :'I\\]+(saml|smul|su/nl)\. (nr|iVI') [\[/]?\d", strchunk, flags=re.IGNORECASE)):
                 return True
             # very old props (only up till about 1971:20) have
             # something like "Kungl. Maj:ts proposition nr 4 år 1971"
@@ -1142,9 +1158,10 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             return True
         
         # Direktiv first page has a similar identifier, but it starts
-        # slightly before the right margin (hence +10), and is set in
+        # slightly before the right margin (which in itself might be
+        # quantized slightly to the left, hence +20), and is set in
         # larger type.
-        if (chunk.left + 10 > metrics_rightmargin() and
+        if (chunk.left + 20 > metrics_rightmargin() and
                 strchunk == parser.current_identifier):
             return True
 
@@ -1264,7 +1281,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             # the new sizematch() function)
             if re.match("\.?[l\d]\s*§$", str(chunk).strip()):
                 return False
-        return (sizematch(metrics.h2.size, chunk.font.size, tolerate_less_ocr=0, tolerate_more_ocr=1) and 
+        return (sizematch(metrics.h2.size, chunk.font.size, tolerate_less_ocr=0, tolerate_more_ocr=1) and
                 chunk.font.family == metrics.h2.family)
 
     def is_subsubsection(parser):

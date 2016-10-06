@@ -1855,6 +1855,8 @@ class DV(SwedishLegalSource):
         @newstate('delmal')
         def make_delmal(parser):
             attrs = is_delmal(parser, parser.reader.next())
+            if hasattr(parser, 'current_instans'):
+                delattr(parser, 'current_instans')
             d = Delmal(ordinal=attrs['id'], malnr=attrs['malnr'])
             return parser.make_children(d)
 
