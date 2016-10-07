@@ -2818,7 +2818,6 @@ WHERE {
         doc.body = Body([nav,
                          ul
                          ])
-        from pudb import set_trace; set_trace()
         conffile = os.path.abspath(
             os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
         transformer = Transformer('XSLT', "xsl/toc.xsl", "xsl",
