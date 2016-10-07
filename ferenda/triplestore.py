@@ -466,7 +466,7 @@ class RemoteStore(TripleStore):
         url = self._endpoint_url()
         url += "?query=" + quote(query)
         try:
-            format = "xml"
+            format = "turtle"
             headers = {'Accept': self._contenttype[format]}
             resp = requests.get(url, headers=headers)
             resp.raise_for_status()
