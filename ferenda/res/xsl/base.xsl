@@ -7,9 +7,13 @@
 		xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
 		xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
-		xml:space="preserve"
 		exclude-result-prefixes="xhtml rdf dcterms xsd rinfo rinfoex"
 		>
+  <!-- I removed xml:space="preserve" from the above attributes, as it
+       caused toc.xsl to not properly pretty-print the navbar
+       (instead, everything got smushed. But it might have some
+       adverse side effect -->
+
   <xsl:strip-space elements="*"/>
   <xsl:param name="value"/>
   <xsl:param name="annotationfile"/>
@@ -169,4 +173,3 @@
   </xsl:template>
   
 </xsl:stylesheet>
-

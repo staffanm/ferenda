@@ -97,7 +97,25 @@ class Static(DocumentRepository):
             staticdir = os.path.dirname(p)
         self.store.staticdir = staticdir
         
-
+    @property
+    def config(self):
+        return self._config
+    
+    @config.setter
+    def config(self, config):
+        staticdir = self.store.staticdir
+        # FIXME: we reimplement this method instead of calling the
+        # super()class implementation because I have no idea on how to
+        # do that with a @property decorator. We need to re-set the
+        # store.staticdir property, hence the need for this subclass
+        # implementation.
+        self._config = config
+        self.store = self.documentstore_class(
+            config.datadir + os.sep + self.alias,
+            downloaded_suffix=self.downloaded_suffix,
+            storage_policy=self.storage_policy)
+        self.store.staticdir = staticdir
+        
     def download(self):
         pass
 

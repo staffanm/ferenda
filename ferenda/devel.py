@@ -27,7 +27,8 @@ from ferenda import (TextReader, TripleStore, FulltextIndex, WSGIApp,
                      CompositeRepository, DocumentEntry, Transformer)
 from ferenda.elements import serialize
 from ferenda import decorators, util
-
+# from ferenda.sources.general import Static
+from lagen.nu import Static
 
 class DummyStore(object):
 
@@ -612,7 +613,10 @@ class Devel(object):
             samplesize = int(self.config.samplesize)
         else:
             samplesize = 10
-        classes = set()
+        classes = set([Static,]) # blacklist static because of how it
+                              # hardcodes .store.staticdir -- leads to
+                              # copy attempts with identical src and
+                              # dst
         for alias in self.config._parent._subsections:
             if alias == self.alias:  # ie "devel"
                 continue
