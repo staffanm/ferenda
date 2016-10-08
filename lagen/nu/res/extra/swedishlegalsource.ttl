@@ -848,8 +848,7 @@
     rdfs:seeAlso <http://www.svk.se/web/Page.aspx?id=5319> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/svkfs> ;
     skos:altLabel "SvKFS"@sv ;
-    skos:prefLabel "Affärsverket svenska kraftnäts författningssamling"@sv,
-        "Affäsverket svenska kraftnäts författningssamling"@sv .
+    skos:prefLabel "Affärsverket svenska kraftnäts författningssamling"@sv .
 
 <https://lagen.nu/dataset/tfs> a rpubl:Forfattningssamling ;
     dcterms:publisher <https://lagen.nu/org/2014/tullverket> ;
