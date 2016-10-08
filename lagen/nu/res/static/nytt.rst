@@ -7,13 +7,15 @@ Den stora nyheten är att det nu finns mycket mer information, då både förarb
 myndighetspraxis och myndigheters författningssamlingar tillkommit. Även vägledande 
 rättsfall har utökats med drygt 5 000 notisfall.
 
-Förarbetena består av propositioner (tillbaka till 1971), SOU:er (tillbaka till 1921),
-Ds: och kommittédirektiv. Det omfattar sammanlagt ca 18 000 dokument.
+Förarbetena består av propositioner (tillbaka till 1971), SOU:er
+(tillbaka till 1921), Ds och kommittédirektiv. Det omfattar sammanlagt
+ca 18 000 dokument.
 
 Myndighetspraxis hämtas i dagsläget från ARN, JO och JK. Det omfattar sammanlagt drygt
 4 000 vägledande avgöranden.
 
-Myndigheters författningssamlingar hämtas i dagsläget från ett tiotal myndigheter.
+Myndigheters författningssamlingar hämtas i dagsläget från ca 30
+myndigheter och omfattar ca 2 000 föreskrifter.
 
 Tjänsten använder sig bl.a. av det inskannade material som Riksdagen och Kungliga biblioteket
 gjort tillgängligt.
