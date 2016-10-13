@@ -1513,7 +1513,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     # eliminates misinterpretation of things like "5 a
     # kap. Referensland för..." being interpreted as ordinal "5" and
     # title "a kap. Referensland för...")
-    re_sectionstart = re.compile("^(\d[\.\d]*) +([A-ZÅÄÖ].*[^\.])$").match
+    re_sectionstart = re.compile("^(\d[\.\d]*) +([A-ZÅÄÖ].*)$").match
 
     def analyze_sectionstart(parser, chunk=None):
         """returns (ordinal, headingtype, text) if it looks like a section
@@ -1535,9 +1535,12 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         if chunk.font.size <= min_size:
             return (None, None, chunk)
         strchunk = str(chunk).strip()
-
-        if (strchunk.endswith(",") or
-            strchunk.endswith(".") or
+        if ((strchunk.endswith(".") and not 
+             (strchunk.endswith("m.m.") or
+              strchunk.endswith("m. m.") or
+              strchunk.endswith("m.fl.") or
+              strchunk.endswith("m. fl."))) or
+            strchunk.endswith(",") or
             strchunk.endswith("och") or
             strchunk.endswith("eller") or
             strchunk.endswith(":") or

@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-Note: this template expects XHTML1.1, outputs HTML5
-
-It's a generic template for any kind of content
+This should be able to handle any well-structured large document, but is only
+really tested with direktiv, utredningar (SOU/Ds) and propositioner.
 -->
 <xsl:stylesheet version="1.0"
 		xmlns:xhtml="http://www.w3.org/1999/xhtml"
@@ -13,7 +12,6 @@ It's a generic template for any kind of content
 		xmlns:prov="http://www.w3.org/ns/prov#"
 		xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
-		xml:space="preserve"
 		exclude-result-prefixes="xhtml rdf rdfs prov">
 
   <xsl:import href="uri.xsl"/>
@@ -32,22 +30,25 @@ It's a generic template for any kind of content
 	<p style="font-size: 20pt;"><xsl:value-of select="../xhtml:head/xhtml:title"/></p>
       </section>
       <aside class="source col-sm-4">
+	<xsl:variable name="docuri" select="@about"/>
+	<xsl:variable name="derivedfrom" select="//xhtml:head/xhtml:link[@rel='prov:wasDerivedFrom']/@href"/>
+	<xsl:variable name="alternateof" select="//xhtml:head/xhtml:link[@rel='prov:alternateOf']/@href"/>
+	<xsl:if test="$alternateof">
 	<div class="panel-group">
 	  <div class="panel panel-default">
 	    <div class="panel-heading">
 	      Källor
 	    </div>
 	    <div class="panel-body">
-	      <xsl:variable name="docuri" select="@about"/>
-	      <xsl:variable name="derivedfrom" select="$annotations/resource[@uri=$docuri]/prov:wasDerivedFrom/@ref"/>
-	      Originaldokument: <a href="{$derivedfrom}"><xsl:value-of select="$annotations/resource[@uri=$derivedfrom]/rdfs:label"/></a>, <a href="{$annotations/resource[@uri=$docuri]/prov:alternateOf/@ref}">Källa</a>
+	      Originaldokument: <a href="{$derivedfrom}"><xsl:value-of select="//xhtml:head/xhtml:meta[@about=$derivedfrom]/@content"/></a>, <a href="{$alternateof}">Källa</a>
 	    </div>
 	  </div>
 	</div>
+	</xsl:if>
       </aside>
     </div>
   </xsl:template>
-  <xsl:param name="dyntoc" select="true()"/>
+  <xsl:param name="dyntoc" select="false()"/>
   <xsl:param name="content-under-pagetitle" select="false()"/>
 
   <!-- Headings shouldn't be expressed with <h*> tags, but rather with
@@ -104,8 +105,10 @@ It's a generic template for any kind of content
          things, ie the Protokollsutdrag structure of older
          propositions (c.f. prop 1990/91:172) -->
     <div class="row toplevel">
-      <section id="{substring-after(@about,'#')}" class="col-sm-8">
-	<h2><xsl:value-of select="@content"/></h2>
+      <section id="{translate(substring-after(@about,'#'),'.','-')}" class="col-sm-8">
+	<xsl:if test="@content">
+	  <h2><xsl:value-of select="@content"/></h2>
+	</xsl:if>
 	<!-- FIXME: We try to avoid including referencable
 	     sub-entities here, since they need to be wrapped in a
 	     div.row, and we can't nest those. 
@@ -125,7 +128,7 @@ It's a generic template for any kind of content
        (with a URI) gets a <section> with an <aside> for inbound links etc -->
   <xsl:template match="xhtml:div[@about and (@class='section' or @class='preamblesection' or @class='unorderedsection')]">
     <div class="row" about="{@about}"><!-- needed? -->
-      <section id="{substring-after(@about,'#')}" class="col-sm-8">
+      <section id="{translate(substring-after(@about,'#'),'.','-')}" class="col-sm-8">
 	<xsl:variable name="sectionheading"><xsl:if test="xhtml:span/@content"><xsl:value-of select="xhtml:span/@content"/>. </xsl:if><xsl:value-of select="@content"/></xsl:variable>
 	<xsl:if test="count(ancestor::*) = 2">
 	    <h2><xsl:value-of select="$sectionheading"/></h2>
@@ -173,7 +176,7 @@ It's a generic template for any kind of content
     <xsl:if test="string-length(@content) > 0">
       <h3><xsl:value-of select="@content"/></h3>
     </xsl:if>
-    <div class="forfattningskommentar" id="{substring-after(@about, '#')}">
+    <div class="forfattningskommentar" id="{translate(substring-after(@about, '#'),'.','-')}">
        <xsl:apply-templates select="xhtml:div/xhtml:div/*"/>
     </div>
   </xsl:template>
@@ -235,7 +238,30 @@ It's a generic template for any kind of content
     </xsl:copy>
   </xsl:template>
   --> 
-  <!-- toc handling (do nothing) -->
+
+
+  <!-- TABLE OF CONTENTS (TOC) HANDLING -->
+  <xsl:template match="xhtml:div[@typeof='bibo:DocumentPart']" mode="toc">
+    <xsl:message>found a top-level document part</xsl:message>
+    <xsl:variable name="label">
+      <xsl:if test="@class = 'appendix'">
+	Bilaga
+      </xsl:if>
+      <xsl:if test="xhtml:span[@property='bibo:chapter']">
+	<xsl:value-of select="xhtml:span[@property='bibo:chapter']/@content"/>. 
+      </xsl:if>
+      <xsl:value-of select="@content"/>
+    </xsl:variable>
+    <li><a href="#{translate(substring-after(@about, '#'), '.', '-')}"><xsl:value-of select="$label"/></a>
+    <xsl:if test="xhtml:div[@typeof='bibo:DocumentPart']">
+      <ul class="nav">
+	<xsl:apply-templates mode="toc"/>
+      </ul>
+    </xsl:if>
+    </li>
+  </xsl:template>
+  
+  <!-- otherwise do nothing) -->
   <xsl:template match="@*|node()" mode="toc"/>
   
 </xsl:stylesheet>

@@ -31,6 +31,75 @@ nav[data-toggle='toc'] {
     margin-top: 0; /* used to be 30px, wonder what i was thinking... */
 }
 
+/* start of scrollspy-enabled toc */
+
+/* 2nd level list items (and below) are displayed as inline, while their child
+   anchors are blocks, which enables us to have a straight left
+   margin, while still indenting each new level */ 
+nav[data-toggle='toc'] > ul.nav > li > ul > li,
+nav[data-toggle='toc'] > ul.nav > li > ul > li > ul > li {
+    display: inline;
+}
+
+/* top level style */
+nav[data-toggle='toc'] ul.nav > li > a {
+  display: block;
+  padding-left: 10px;
+  padding-top: 0;
+  padding-bottom: 3px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+}
+/* top level when active */
+nav[data-toggle='toc'] ul.nav > .active > a {
+  padding-left: 8px;
+  font-weight: bold;
+  color: #337ab7;
+  background-color: transparent;
+  border-left: 2px solid #337ab7;
+}
+
+/* second level and below */
+nav[data-toggle='toc'] ul.nav ul.nav {
+  display: none; /* Hide by default */
+}
+nav[data-toggle='toc'] ul.nav > .active > ul.nav {
+  display: block;  /* but when active, show as block */
+}
+
+nav[data-toggle='toc'] ul.nav ul.nav > li > a {
+  padding-left: 20px;
+  font-size: 12px;
+  font-weight: normal;
+}
+
+/* second level and below, active */
+nav[data-toggle='toc'] ul.nav ul.nav > li.active > a {
+  padding-left: 18px;
+  font-weight: bold;
+}
+
+
+/* third level, extra indent */
+nav[data-toggle='toc'] ul.nav ul.nav ul.nav > li > a {
+  padding-left: 30px;
+}
+nav[data-toggle='toc'] ul.nav ul.nav ul.nav > li.active > a {
+  padding-left: 28px;
+}
+
+/* fourth level, even more indent */
+nav[data-toggle='toc'] ul.nav ul.nav ul.nav ul.nav > li > a {
+  padding-left: 40px;
+}
+nav[data-toggle='toc'] ul.nav ul.nav ul.nav ul.nav > li.active > a {
+  padding-left: 38px;
+}
+
+/* end of scrollspy-enabled toc (save for small-screen overrides) */
+
+
 /* small screens */
 @media (max-width: 768px) {
   /* override the Affix plugin so that the navigation isn't sticky */
