@@ -33,7 +33,8 @@
 
 <https://lagen.nu/1915:218/konsolidering> owl:sameAs <https://lagen.nu/1915:218/konsolidering/1994:1513> .
 
-<https://lagen.nu/1915:218#K2> a rpubl:Kapitel .
+<https://lagen.nu/1915:218#K2> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "2"@sv .
 
 <https://lagen.nu/1915:218/konsolidering/1994:1513> a rpubl:KonsolideradGrundforfattning ;
     dcterms:creator <https://lagen.nu/org/2008/justitiedepartementet> ;
@@ -103,14 +104,18 @@
     rpubl:utfardandedatum "1915-12-31"^^xsd:date ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1915:218> .
 
-<https://lagen.nu/1915:218#K1> a rpubl:Kapitel .
+<https://lagen.nu/1915:218#K1> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "1"@sv .
 
 <https://lagen.nu/1915:218#P10> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/1915:218#K2> .
+    dcterms:isPartOf <https://lagen.nu/1915:218#K2> ;
+    rpubl:paragrafnummer "10"@sv .
 
 <https://lagen.nu/1915:218#P1> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/1915:218#K1> .
+    dcterms:isPartOf <https://lagen.nu/1915:218#K1> ;
+    rpubl:paragrafnummer "1"@sv .
 
 <https://lagen.nu/1915:218#P2> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/1915:218#K1> .
+    dcterms:isPartOf <https://lagen.nu/1915:218#K1> ;
+    rpubl:paragrafnummer "2"@sv .
 

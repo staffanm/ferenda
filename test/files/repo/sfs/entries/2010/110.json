@@ -1,0 +1,45 @@
+{
+  "basefile": "2010:110", 
+  "content": {
+    "hash": "md5:fc1f9373bd0af32526db15f7eca96798", 
+    "markup": null, 
+    "src": "https://lagen.nu/sfs/parsed/2010:110.xhtml", 
+    "type": "application/html+xml"
+  }, 
+  "id": "https://lagen.nu/2010:110/konsolidering/2016:28", 
+  "indexed_dep": "2016-10-06T11:37:51.919955", 
+  "indexed_ft": "2016-10-06T11:38:02.891681", 
+  "indexed_ts": "2016-10-06T11:37:45.961058", 
+  "link": {
+    "hash": "md5:f19a5a7ebdd6258e0c5ec4237d5a8e08", 
+    "href": "https://lagen.nu/sfs/distilled/2010:110.rdf", 
+    "length": 1110255, 
+    "type": "application/rdf+xml"
+  }, 
+  "orig_checked": "2016-09-25T22:15:39.347753", 
+  "orig_created": "2016-03-04T00:18:08.395591", 
+  "orig_updated": "2016-03-04T00:18:08.395591", 
+  "orig_url": "http://193.188.157.111/sfst?bet=2010:110", 
+  "published": "2016-05-22T13:00:22.645024", 
+  "status": {
+    "generate": {
+      "date": "2016-10-07T09:20:04.504810", 
+      "duration": 1.07654, 
+      "success": true
+    }, 
+    "parse": {
+      "date": "2016-10-04T22:07:08.179676", 
+      "duration": 256.526357, 
+      "success": true
+    }, 
+    "relate": {
+      "date": "2016-10-06T11:37:35.529463", 
+      "duration": 27.38805, 
+      "success": true
+    }
+  }, 
+  "summary": null, 
+  "title": "Socialf\u00f6rs\u00e4kringsbalk (2010:110)", 
+  "updated": "2016-10-07T01:45:55.509297", 
+  "url": "https://lagen.nu/sfs/generated/2010:110.html"
+}

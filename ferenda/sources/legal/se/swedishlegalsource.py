@@ -268,7 +268,7 @@ class SwedishLegalSource(DocumentRepository):
                       "rinfoex:subpunktnummer", "rinfoex:punktnummer",
                       "rinfoex:styckenummer", "rpubl:paragrafnummer",
                       "rinfoex:rubriknummer", "rpubl:kapitelnummer",
-                      "rinfoex:avdelningnummer",
+                      "rinfoex:underavdelningnummer", "rinfoex:avdelningnummer",
                       "rinfoex:bilaganummer", "rinfoex:andringsforfattningnummer"):
                 if k in attributes:
                     p = uri(k)
@@ -706,6 +706,7 @@ class SwedishLegalSource(DocumentRepository):
         The default implementation returns its input unchanged.
 
         """
+        from pudb import set_trace; set_trace()
         return rawbody
 
     def get_parser(self, basefile, sanitized, initialstate=None):

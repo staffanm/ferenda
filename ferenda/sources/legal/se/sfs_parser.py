@@ -13,7 +13,7 @@ from .elements import *
 re_SimpleSfsId = re.compile(r'(\d{4}:\d+)\s*$')
 re_SearchSfsId = re.compile(r'\((\d{4}:\d+)\)').search
 re_ChangeNote = re.compile(r'(Lag|Förordning) \(\d{4}:\d+\)\.?$')
-re_ChapterId = re.compile(r'^(\d+( \w|)) [Kk][Aa][Pp]\.').match
+re_ChapterId = re.compile(r'^(\d+( \w|))\s[Kk][Aa][Pp]\.').match
 re_DivisionId = re.compile(r'^AVD. ([IVX]*)').match
 re_SectionId = re.compile(
    r'^(\d+ ?\w?) \xa7[ \.]')  # used for both match+sub
@@ -44,7 +44,6 @@ re_dehyphenate = re.compile(r'\b- (?!(och|eller))', re.UNICODE).sub
 re_roman_numeral_matcher = re.compile(
     '^M?M?M?(CM|CD|D?C?C?C?)(XC|XL|L?X?X?X?)(IX|IV|V?I?I?I?)$').match
 
-
 state = {'current_section': '0',
          'current_headline_level': 0}  # 0 = unknown, 1 = normal, 2 = sub
 
@@ -63,7 +62,10 @@ def _swedish_ordinal(s):
     return None
 
 def make_parser(reader, basefile, log, trace):
-    state['current_section'] = '0'
+    state['current_avdelning'] = '0'    # avdelning
+    state['current_chapter'] = '0' 
+    state['current_section'] = '0' # paragraf
+    state['fake_chapter'] = '0'
     state['current_headline_level'] = 0
     state['basefile'] = basefile
 
@@ -104,13 +106,16 @@ def make_parser(reader, basefile, log, trace):
         return b
 
     def makeAvdelning():
+        global state
         avdelningsnummer = idOfAvdelning()
+        state['current_avdelning'] = avdelningsnummer
         p = Avdelning(rubrik=reader.readline(),
                       ordinal=avdelningsnummer,
                       underrubrik=None)
         if (reader.peekline(1) == "" and
             reader.peekline(3) == "" and
-                not isKapitel(reader.peekline(2))):
+                not (isKapitel(reader.peekline(2)) or
+                     isUnderavdelning(reader.peekline(2)))):
             reader.readline()
             p.underrubrik = reader.readline()
 
@@ -123,6 +128,29 @@ def make_parser(reader, basefile, log, trace):
                                  makeOvergangsbestammelser,
                                  makeBilaga):
                 log.debug("  Avdelning %s färdig" % p.ordinal)
+                return p
+            else:
+                res = state_handler()
+                if res is not None:
+                    p.append(res)
+        # if eof is reached
+        return p
+
+    def makeUnderavdelning():
+        para = reader.readparagraph()
+        ordinal, rubrik = para.split(" ", 1)
+        if ordinal.strip().endswith("."):
+            ordinal = ordinal.strip()[:-1]
+        p = Underavdelning(rubrik=rubrik,
+                           ordinal=ordinal)
+        log.debug("  Ny underavdelning: '%s...'" % p.rubrik[:30])
+        while not reader.eof():
+            state_handler = guess_state()
+            if state_handler in (makeUnderavdelning,  # Strukturer som signalerar att denna underavdelning är slut
+                                 makeAvdelning, 
+                                 makeOvergangsbestammelser,
+                                 makeBilaga):
+                log.debug("  Underavdelning %s färdig" % p.ordinal)
                 return p
             else:
                 res = state_handler()
@@ -155,7 +183,8 @@ def make_parser(reader, basefile, log, trace):
         k = Kapitel(**kwargs)
         state['current_headline_level'] = 0
         state['current_section'] = '0'
-
+        state['fake_chapter'] = '0'
+        state['current_chapter'] = kapitelnummer
         log.debug("    Nytt kapitel: '%s...'" % line[:30])
 
         while not reader.eof():
@@ -163,6 +192,7 @@ def make_parser(reader, basefile, log, trace):
 
             if state_handler in (makeKapitel,  # Strukturer som signalerar slutet på detta kapitel
                                  makeUpphavtKapitel,
+                                 makeUnderavdelning,
                                  makeAvdelning,
                                  makeOvergangsbestammelser,
                                  makeBilaga):
@@ -198,14 +228,14 @@ def make_parser(reader, basefile, log, trace):
         paragrafnummer = idOfParagraf(reader.peekline())
         p = UpphavdParagraf(reader.readline(),
                             ordinal=paragrafnummer)
-        current_section = paragrafnummer
+        state['current_section'] = paragrafnummer
         log.debug("      Upphävd paragraf: '%s...'" % p[:30])
         return p
 
     def makeParagraf():
         firstline = reader.peekline()
         paragrafnummer = idOfParagraf(reader.peekparagraph())
-        current_section = paragrafnummer
+        state['current_section'] = paragrafnummer
         log.debug("      Ny paragraf: '%s...'" % firstline[:30])
         # Läs förbi paragrafnumret:
         reader.read(len(paragrafnummer) + len(' \xa7 '))
@@ -243,6 +273,7 @@ def make_parser(reader, basefile, log, trace):
                                  makeUpphavdParagraf,
                                  makeKapitel,
                                  makeUpphavtKapitel,
+                                 makeUnderavdelning,
                                  makeAvdelning,
                                  makeRubrik,
                                  makeOvergangsbestammelser,
@@ -474,12 +505,13 @@ def make_parser(reader, basefile, log, trace):
         return (line.strip(), dates['upphor'], dates['ikrafttrader'])
 
     def guess_state():
-        # sys.stdout.write("        Guessing for '%s...'" % reader.peekline()[:30])
         try:
             if reader.peekline() == "":
                 handler = blankline
             elif isAvdelning():
                 handler = makeAvdelning
+            elif isUnderavdelning():
+                handler = makeUnderavdelning
             elif isUpphavtKapitel():
                 handler = makeUpphavtKapitel
             elif isUpphavdParagraf():
@@ -512,14 +544,32 @@ def make_parser(reader, basefile, log, trace):
         return handler
 
     def isAvdelning():
-        # The start of a part ("avdelning") should be a single line
-        if '\n' in reader.peekparagraph() != "":
+        global state
+        p = reader.peekparagraph()
+        if p.count("\n") > 2:
+            # An Avdelning heading should not be more than max three lines (AVD VII in 2009:400 has 3 lines)
             return False
+        ordinal = idOfAvdelning()
+        # can't have a avdelning with equal or less ordinal to the
+        # current. also, current chapter should not be '1' otherwise
+        # it's probably a TOC excerpt (see 2011:1244)
+        return (ordinal and
+                util.numcmp(ordinal, state['current_avdelning']) > 0 and
+                state['current_chapter'] != '1')
 
-        return idOfAvdelning() is not None
+    def isUnderavdelning(p=None):
+        global state
+        if state['basefile'] in ("1942:740", "2010:110"):  # only SFS that uses this structural element
+            if p is None:
+                p = reader.peekparagraph()
+            # if it has max 2 lines, starts with a roman
+            # numeral+space+sentence, and ends like a proper header,
+            # it's probably an underavdelning.
+            if p.count("\n") < 2 and re.match("^[IVX]+\.? +[A-ZÅÄÖ]", p) and (not p.endswith(".") or p.endswith("m.m.")):
+                return True
 
     def idOfAvdelning():
-        # There are four main styles of parts ("Avdelning") in swedish law
+        # There are six main styles of parts ("Avdelning") in swedish law
         #
         # 1998:808: "FÖRSTA AVDELNINGEN\n\nÖVERGRIPANDE BESTÄMMELSER"
         #  (also in 1932:130, 1942:740, 1956:623, 1957:297, 1962:381, 1962:700,
@@ -538,7 +588,9 @@ def make_parser(reader, basefile, log, trace):
         # 1999:1229: "AVD. I INNEH\XE5LL OCH DEFINITIONER"
         #
         # 2009:400: "AVDELNING I. INLEDANDE BESTÄMMELSER"
-        #
+        # 
+        # 2010:110: "AVD. A ÖVERGRIPANDE BESTÄMMELSER"
+        # 
         # and also "1 avd." (in 1959:287 (revoked), 1959:420 (revoked)
         #
         #  The below code checks for all these patterns in turn
@@ -553,8 +605,10 @@ def make_parser(reader, basefile, log, trace):
             roman = re.split(r'\s+', p)[1]
             if roman.endswith("."):
                 roman = roman[:-1]
-            if re_roman_numeral_matcher(roman):
+            if re_roman_numeral_matcher(roman) and state['basefile'] != '2010:110': # avoid mismatch and subsequent conversion from roman on "AVD. C" and "AVD. D"
                 return str(util.from_roman(roman))
+            elif roman in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']:  # single chars used in 2010:110
+                return roman
         elif p.startswith("Avdelning "):
             roman = re.split(r'\s+', p)[1]
             if re_roman_numeral_matcher(roman):
@@ -573,7 +627,34 @@ def make_parser(reader, basefile, log, trace):
         return match is not None
 
     def isKapitel(p=None):
-        return idOfKapitel(p) is not None
+        global state
+        ordinal = idOfKapitel(p)
+        if ordinal:
+            if util.numcmp(ordinal, state['current_chapter']) > 0:
+                if state['current_chapter'] == '1' and state['current_section'] == '1':
+                    # if we've only seen a single § in the current
+                    # (first) chapter, this is probably not a legit
+                    # new chapter (more likely some form of toc).
+                    if util.numcmp(ordinal, state['fake_chapter']) < 0:
+                        # the new chapter is smaller than the last
+                        # non-legit chapter we saw, this might mean
+                        # that it is legit (and that the first chapter
+                        # had a single § containing the toc,
+                        # cf. 2011:1244)
+                        return True
+                    else:
+                        state['fake_chapter'] = ordinal
+                        return False
+                else:
+                    # chapter is bigger than the one we're currently
+                    # on AND the current chapter had multiple §§'s,
+                    # this is probably a new legit chapter
+                    return True
+            else:
+                # chapter is smaller or equal to the one we're
+                # currently on, probably not legit.
+                pass
+        return False
 
     def idOfKapitel(p=None):
         if not p:
@@ -748,7 +829,7 @@ def make_parser(reader, basefile, log, trace):
         # /1991:1469#K1P7S1.
         if util.numcmp(paragrafnummer, state['current_section']) < 0:
             trace['paragraf'].debug(
-                "isParagraf: section numbering compare failed (%s <= %s)" % (paragrafnummer, current_section))
+                "isParagraf: section numbering compare failed (%s <= %s)" % (paragrafnummer, state['current_section']))
             return False
 
         # a similar case exists in 1994:260 and 2007:972, but there

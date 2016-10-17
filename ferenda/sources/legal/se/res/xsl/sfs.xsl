@@ -88,7 +88,7 @@
       </xsl:if>
     </div>
   </xsl:template>
-  <xsl:param name="dyntoc" select="true()"/>
+  <xsl:param name="dyntoc" select="false()"/>
   <xsl:param name="content-under-pagetitle" select="false()"/>
 
   <xsl:template name="docmetadata">
@@ -382,7 +382,6 @@
 	</xsl:otherwise>
       </xsl:choose></h2>
       <xsl:if test="(number($year) > 1998) or (number($year) = 1998 and number($nr) >= 306)">
-
 	<p><a href="http://rkrattsdb.gov.se/SFSdoc/{substring($year,3,2)}/{substring($year,3,2)}{format-number($nr,'0000')}.PDF">Officiell version (PDF)</a></p>
       </xsl:if>
       <xsl:apply-templates mode="in-paragraf"/>
@@ -391,33 +390,6 @@
 
   <!-- emit nothing - this is already handled above -->
   <xsl:template match="xhtml:span[@class='paragrafbeteckning']"/>
-  
-  <!-- FIXME: in order to be valid xhtml1, we must remove unordered
-       lists from within paragraphs, and place them after the
-       paragraph. This turns out to be tricky in XSLT, the following
-       is a non-working attempt -->
-  <!--
-  <xsl:template match="p">
-    <p>
-      <xsl:if test="@id">
-	<xsl:attribute name="id"><xsl:value-of select="@id"/></xsl:attribute>
-      </xsl:if>
-      <xsl:for-each select="text()|*">
-	<xsl:if test="not(name()='ul')">
-	  <xsl:element name="XX{name()}">
-	    <xsl:apply-templates select="text()|*"/>
-	  </xsl:element>
-	</xsl:if>
-	<xsl:if test="not(name(node()[1]))">
-	  TXT:<xsl:value-of select="."/>END
-	</xsl:if>
-      </xsl:for-each>
-    </p>
-    <xsl:if test="ul">
-      <xsl:apply-templates select="ul"/>
-    </xsl:if>
-  </xsl:template>
-  -->
   
   <!-- remove spans which only purpose is to contain RDFa data -->
   <xsl:template match="xhtml:span[@property and @content and not(text())]"/>
@@ -450,12 +422,50 @@
   
   <!-- TABLE OF CONTENTS (TOC) HANDLING -->
 
-  <!--
+  <!-- getting a nested structure of headings and subheadings within a
+       chapter is difficult due to them being on the same nesting, but
+       http://stackoverflow.com/a/2165644/2718243 has an answer -->
+  <xsl:template match="xhtml:div[@typeof='rinfoex:Avdelning']" mode="toc">
+    <xsl:choose>
+      <xsl:when test="xhtml:div[@class='underavdelning']"> <!-- 2010:110 and 1942:740 are the only ones that have these elements -->
+	<xsl:variable name="chapters" select="xhtml:div/xhtml:div[@typeof='rpubl:Kapitel']"/>
+	<xsl:variable name="firstchapter" select="$chapters[1]/@content"/>
+	<xsl:variable name="lastchapter" select="$chapters[last()]/@content"/>
+	<li><a href="#{@id}"><xsl:value-of select="xhtml:h1/@abbr"/> (kap. <xsl:value-of select="$firstchapter"/><xsl:if test="$firstchapter != $lastchapter">-<xsl:value-of select="$lastchapter"/></xsl:if>)</a>
+	<ul class="nav">
+	  <xsl:for-each select="xhtml:div[@class='underavdelning']">
+	    <xsl:call-template name="toc-chapters"/>
+	  </xsl:for-each>
+	</ul>
+	</li>
+      </xsl:when>
+      <xsl:otherwise>
+	<xsl:call-template name="toc-chapters"/>
+      </xsl:otherwise>
+    </xsl:choose>
+  </xsl:template>
+      
+  <xsl:template name="toc-chapters">
+    <xsl:variable name="chapters" select="xhtml:div[@typeof='rpubl:Kapitel']"/>
+    <xsl:variable name="firstchapter" select="$chapters[1]/@content"/>
+    <xsl:variable name="lastchapter" select="$chapters[last()]/@content"/>
+    <xsl:variable name="label">
+      <xsl:choose>
+	<xsl:when test="xhtml:h1/@abbr"><xsl:value-of select="xhtml:h1/@abbr"/></xsl:when>
+	<xsl:otherwise><xsl:value-of select="xhtml:h1"/></xsl:otherwise>
+      </xsl:choose>
+    </xsl:variable>
+    <li><a href="#{@id}"><xsl:value-of select="$label"/> (kap. <xsl:value-of select="$firstchapter"/><xsl:if test="$firstchapter != $lastchapter">-<xsl:value-of select="$lastchapter"/></xsl:if>)</a>
+      <ul class="nav">
+	<xsl:apply-templates mode="toc" select="xhtml:div[@typeof='rpubl:Kapitel']"/>
+      </ul>
+    </li>
+  </xsl:template>
+
   <xsl:template match="xhtml:div[@typeof='rpubl:Kapitel']" mode="toc">
-    <xsl:message>found a chapter</xsl:message>
-    <li class="toc-kapitel"><a href="#{@id}"><xsl:value-of select="xhtml:h1"/></a>
+    <li><a href="#{@id}"><xsl:value-of select="xhtml:h1"/></a>
     <xsl:if test="xhtml:h2|xhtml:h3">
-      <ul>
+      <ul class="nav">
 	<xsl:apply-templates mode="toc"/>
       </ul>
     </xsl:if>
@@ -463,20 +473,25 @@
   </xsl:template>
   
   <xsl:template match="xhtml:h2" mode="toc">
-    <xsl:message>found a h2</xsl:message>
-    <li class="toc-rubrik"><a href="#{@id}"><xsl:value-of select="."/></a></li>
+    <xsl:variable name="this" select="."/>
+    <xsl:variable name="subheadings" select="following-sibling::xhtml:h3[preceding-sibling::xhtml:h2[1] = $this]"/>
+    <xsl:variable name="subparas" select="following-sibling::xhtml:div[preceding-sibling::xhtml:h2[1] = $this]"/>
+    <xsl:variable name="firstpara" select="$subparas[1]/@content"/><!-- select="$subparas[first()]/@content"/> -->
+    <xsl:variable name="lastpara" select="$subparas[last()]/@content"/><!-- select="$subparas[last()]/@content"/> -->
+    <xsl:variable name="scope"><!-- either '4 §' or '4-6 §§' -->
+      <xsl:value-of select="$firstpara"/>&#160;<xsl:if test="$firstpara != $lastpara">- <xsl:value-of select="$lastpara"/> §</xsl:if>§</xsl:variable>
+    <li><a href="#{@id}"><xsl:value-of select="."/> (<xsl:value-of select="$scope"/>)</a>
+    <xsl:if test="$subheadings">
+      <ul class="nav">
+	<xsl:for-each select="$subheadings">
+	  <li><a href="#{@id}"><xsl:value-of select="."/></a></li>
+	</xsl:for-each>
+      </ul>
+    </xsl:if>
+    </li>
   </xsl:template>
 
-  <xsl:template match="xhtml:h3" mode="toc">
-    <xsl:message>found a h3</xsl:message>
-    <li class="toc-underrubrik"><a href="#{@id}"><xsl:value-of select="."/></a></li>
-  </xsl:template>
-  -->
-
-
-  <!-- toc handling (do nothing) -->
-  <xsl:template match="@*|node()" mode="toc">
-    <xsl:message>mode doc do nothing (<xsl:value-of select="name(.)"/> @about=<xsl:value-of select="@about"/>)</xsl:message>
-  </xsl:template>
+  <!-- otherwise do nothing -->
+  <xsl:template match="@*|node()" mode="toc"/>
 
 </xsl:stylesheet>

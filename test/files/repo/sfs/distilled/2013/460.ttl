@@ -20,10 +20,12 @@
 <https://lagen.nu/2013:460/konsolidering> owl:sameAs <https://lagen.nu/2013:460/konsolidering/2013:460> .
 
 <https://lagen.nu/2013:460#P7> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/2013:460> .
+    dcterms:isPartOf <https://lagen.nu/2013:460> ;
+    rpubl:paragrafnummer "7"@sv .
 
 <https://lagen.nu/2013:460#P8> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/2013:460> .
+    dcterms:isPartOf <https://lagen.nu/2013:460> ;
+    rpubl:paragrafnummer "8"@sv .
 
 <https://lagen.nu/2013:460/konsolidering/2013:460> a rpubl:KonsolideradGrundforfattning ;
     dcterms:creator <https://lagen.nu/org/2008/justitiedepartementet> ;

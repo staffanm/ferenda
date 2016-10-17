@@ -16,7 +16,8 @@
 <https://lagen.nu/2008:344/konsolidering> owl:sameAs <https://lagen.nu/2008:344/konsolidering/2013:647> .
 
 <https://lagen.nu/2008:344#P1> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/2008:344> .
+    dcterms:isPartOf <https://lagen.nu/2008:344> ;
+    rpubl:paragrafnummer "1"@sv .
 
 <https://lagen.nu/2008:344/konsolidering/2013:647> a rpubl:KonsolideradGrundforfattning ;
     rinfoex:senastHamtad "2013-06-12T18:58:58.242181"^^xsd:dateTime ;

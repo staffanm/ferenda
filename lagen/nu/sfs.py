@@ -20,7 +20,7 @@ from ferenda.sources.legal.se import SFS as OrigSFS
 from ferenda.sources.legal.se.elements import (Kapitel, Paragraf, Rubrik,
                                                Stycke, Listelement,
                                                Overgangsbestammelse, Bilaga,
-                                               Avdelning)
+                                               Avdelning, Underavdelning)
 from . import SameAs
 
 class SFSHandler(RequestHandler):
@@ -50,7 +50,8 @@ class SFS(OrigSFS, SameAs):
         Listelement: "rinfoex:punktnummer",
         Overgangsbestammelse: "rinfoex:andringsforfattningnummer",
         Bilaga: "rinfoex:bilaganummer",
-        Avdelning: "rinfoex:avdelningnummer"
+        Avdelning: "rinfoex:avdelningnummer",
+        Underavdelning: "rinfoex:underavdelningnummer"
     }
 
     def _makeimages(self):

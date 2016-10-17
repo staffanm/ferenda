@@ -687,7 +687,6 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
                     log = logging.getLogger(logname)
                     log.propagate = False
                 logger.addHandler(handler)
-                
             self.repo.parse(basefile)
             if "FERENDA_LOG_TEST" in os.environ:
                 logger.removeHandler(handler)

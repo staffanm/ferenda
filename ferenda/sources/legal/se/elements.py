@@ -80,12 +80,63 @@ class Tabellcell(CompoundElement):
 class Avdelning(CompoundElement, OrdinalElement):
     tagname = "div"
     fragment_label = "A"
-
+    typeof = "rinfoex:Avdelning"
+    
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get("id", None)
         self.uri = kwargs.get("uri", None)
         super(Avdelning, self).__init__(*args, **kwargs)
 
+    def as_xhtml(self, uri=None, parent_uri=None):
+        res = super(Avdelning, self).as_xhtml()
+        attrs = {}
+        if self.underrubrik:
+            res.insert(0, E('h2', self.underrubrik))
+            # FIXME: attr is not a valid attribute of h1
+            attrs['abbr'] = self.ordinal + ". " + self.underrubrik
+        elif self.rubrik.startswith("AVDELNING "):
+            # transform "AVDELNING I. INNEHÅLL, TILLÄMPNING OCH
+            # DEFINITIONER" to "I. Innehåll, tillämpning och
+            # definitioner" 
+            segments = self.rubrik.split(". ", 1)
+            segments[0] = segments[0].replace("AVDELNING ", "")
+            segments[1] = segments[1].capitalize()
+            attrs['abbr'] = ". ".join(segments)
+
+        elif self.rubrik.startswith("AVD. "):
+            # transform "AVD. C FÖRMÅNER VID SJUKDOM ELLER
+            # ARBETSSKADA" to "C. Förmåner vid sjukdom eller
+            # arbetsskada"            
+            tmp = self.rubrik.replace("AVD. ", "")
+            segments = [x.strip() for x in tmp.split(" ", 1)]
+            segments[0] = segments[0].replace("AVD. ", "")
+            if segments[0].endswith("."):  # Handle "AVD. VI. Särskilda bestämmelser ..." (2009:400)
+                segments[0] = segments[0][:-1]
+            segments[1] = segments[1].capitalize()
+            attrs['abbr'] = ". ".join(segments)
+
+        res.attrib.update({"property": "rinfoex:avdelningsnummer",
+                           "content": self.ordinal})
+        res.insert(0, E('h1', self.rubrik, attrs))
+        return res
+
+class Underavdelning(CompoundElement, OrdinalElement):
+    # only ever used by SFB (2010:110)
+    tagname = "div"
+    fragment_label = "U"
+    classname = "underavdelning"
+    # No typeof defined, these arent really real entities (but they
+    # need ids because of document navmenu
+
+    def __init__(self, *args, **kwargs):
+        self.id = kwargs.get("id", None)
+        self.uri = kwargs.get("uri", None)
+        super(Underavdelning, self).__init__(*args, **kwargs)
+
+    def as_xhtml(self, uri=None, parent_uri=None):
+        res = super(Underavdelning, self).as_xhtml()
+        res.insert(0, E('h1', self.ordinal + " " + self.rubrik))
+        return res
 
 class UpphavtKapitel(UnicodeElement, OrdinalElement):
     """Ett UpphavtKapitel är annorlunda från ett upphävt Kapitel på så
@@ -108,6 +159,8 @@ class Kapitel(CompoundElement, OrdinalElement):
 
     def as_xhtml(self, uri=None, parent_uri=None):
         res = super(Kapitel, self).as_xhtml()
+        res.attrib.update({"property": "rpubl:kapitelnummer",
+                           "content": self.ordinal})
         res.insert(0, E('h1', self.rubrik))
         return res
 
@@ -130,6 +183,8 @@ class Paragraf(CompoundElement, OrdinalElement):
 
     def as_xhtml(self, uri=None, parent_uri=None):
         res = super(Paragraf, self).as_xhtml(uri, parent_uri)
+        res.attrib.update({"property": "rpubl:paragrafnummer",
+                           "content": self.ordinal})
         # NOTE: we insert the paragrafbeteckning within the first
         # stycke (res[0] is a dcterms:isPartOf <span>, res[1] is the
         # first Stycke). This makes XSLT rendering easier and is

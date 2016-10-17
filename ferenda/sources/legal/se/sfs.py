@@ -933,6 +933,21 @@ class SFS(Trips):
         return resource
 
 
+    re_missing_newline = re.compile("(\.)\n([IV]+  )", flags=re.MULTILINE)
+    def sanitize_body(self, textreader):
+        # add missing newlines where we can detect them missing. We
+        # could do this with patchfiles, but some errors seem
+        # systematic.
+
+        # missing extra newline before underavdelning (identified by
+        # roman numeral followed by double space) occurs multiple
+        # times in 2010:110. Check for end of sentence followed by
+        # single newline followed by roman numeral.
+        if self.re_missing_newline.search(textreader.data):
+            textreader.data = self.re_missing_newline.sub("\\1\n\n\\2", textreader.data)
+            textreader.maxpos = len(textreader.data)
+        return textreader
+
     def postprocess_doc(self, doc):
         # finally, combine data from the registry with any possible
         # overgangsbestammelser, and append them at the end of the
@@ -1017,6 +1032,8 @@ class SFS(Trips):
                 '2013:411': date(2013, 5, 30),
                 '2013:647': date(2013, 7, 2),
                 '2010:448': date(2010, 6, 8),
+                '2010:110': date(2010, 3, 16),
+                '2010:343': date(2010, 5, 19),
                 }
         return fake.get(sfsnr, None)
 
@@ -1281,10 +1298,12 @@ class SFS(Trips):
         if 'K' in elements and elements['P1'] < 2:
             self.skipfragments = [
                 ('rinfoex:avdelningnummer', 'rpubl:kapitelnummer'),
+                ('rinfoex:underavdelningnummer', 'rpubl:kapitelnummer'),
                 ('rpubl:kapitelnummer', 'rpubl:paragrafnummer')]
         else:
-            self.skipfragments = [('rinfoex:avdelningnummer',
-                                   'rpubl:kapitelnummer')]
+            self.skipfragments = [('rinfoex:avdelningnummer', 'rpubl:kapitelnummer'),
+                                  ('rinfoex:underavdelningnummer', 'rpubl:kapitelnummer')
+            ]
         return None  # run only on root element
 
     def get_parser(self, basefile, sanitized):

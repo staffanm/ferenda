@@ -261,7 +261,7 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
     </li>
   </xsl:template>
   
-  <!-- otherwise do nothing) -->
+  <!-- otherwise do nothing -->
   <xsl:template match="@*|node()" mode="toc"/>
   
 </xsl:stylesheet>

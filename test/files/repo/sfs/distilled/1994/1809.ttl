@@ -37,27 +37,35 @@
 <https://lagen.nu/1994:1809/konsolidering> owl:sameAs <https://lagen.nu/1994:1809/konsolidering/2014:686> .
 
 <https://lagen.nu/1994:1809#K1P1> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/1994:1809#K1> .
+    dcterms:isPartOf <https://lagen.nu/1994:1809#K1> ;
+    rpubl:paragrafnummer "1"@sv .
 
 <https://lagen.nu/1994:1809#K1P2> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/1994:1809#K1> .
+    dcterms:isPartOf <https://lagen.nu/1994:1809#K1> ;
+    rpubl:paragrafnummer "2"@sv .
 
-<https://lagen.nu/1994:1809#K2> a rpubl:Kapitel .
+<https://lagen.nu/1994:1809#K2> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "2"@sv .
 
 <https://lagen.nu/1994:1809#K2P1> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/1994:1809#K2> .
+    dcterms:isPartOf <https://lagen.nu/1994:1809#K2> ;
+    rpubl:paragrafnummer "1"@sv .
 
 <https://lagen.nu/1994:1809#K3P1> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/1994:1809#K3> .
+    dcterms:isPartOf <https://lagen.nu/1994:1809#K3> ;
+    rpubl:paragrafnummer "1"@sv .
 
 <https://lagen.nu/1994:1809#K3P2> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/1994:1809#K3> .
+    dcterms:isPartOf <https://lagen.nu/1994:1809#K3> ;
+    rpubl:paragrafnummer "2"@sv .
 
 <https://lagen.nu/1994:1809#K3P3> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/1994:1809#K3> .
+    dcterms:isPartOf <https://lagen.nu/1994:1809#K3> ;
+    rpubl:paragrafnummer "3"@sv .
 
 <https://lagen.nu/1994:1809#K3P4> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/1994:1809#K3> .
+    dcterms:isPartOf <https://lagen.nu/1994:1809#K3> ;
+    rpubl:paragrafnummer "4"@sv .
 
 <https://lagen.nu/1994:1809/konsolidering/2014:686> a rpubl:KonsolideradGrundforfattning ;
     dcterms:creator <https://lagen.nu/org/2008/forsvarsdepartementet> ;
@@ -119,7 +127,9 @@
     rpubl:utfardandedatum "1994-12-31"^^xsd:date ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1994:1809> .
 
-<https://lagen.nu/1994:1809#K1> a rpubl:Kapitel .
+<https://lagen.nu/1994:1809#K1> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "1"@sv .
 
-<https://lagen.nu/1994:1809#K3> a rpubl:Kapitel .
+<https://lagen.nu/1994:1809#K3> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "3"@sv .
 
