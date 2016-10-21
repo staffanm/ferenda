@@ -8,11 +8,13 @@ import os
 import re
 import json
 import difflib
+import ast
 
 # 3rd party
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
 from bs4 import BeautifulSoup
+from cached_property import cached_property
 
 # own
 from ferenda import util
@@ -21,7 +23,7 @@ from ferenda.elements import Section, Link, Body, CompoundElement, Preformatted
 from ferenda.elements.html import P
 from ferenda.pdfreader import BaseTextDecoder, Page, Textbox
 from ferenda.decorators import newstate
-from ferenda.errors import ParseError
+from ferenda.errors import ParseError, DocumentSkippedError
 
 from . import SwedishLegalSource, RPUBL
 from .legalref import Link, LegalRef, RefParseError
@@ -285,15 +287,42 @@ class Offtryck(SwedishLegalSource):
 
         return offtryck_gluefunc
 
+    @cached_property
+    def parse_options(self):
+        # we use a file with python literals rather than json because
+        # comments
+        if self.resourceloader.exists("options/options.py"):
+            with self.resourceloader.open("options/options.py") as fp:
+                return ast.literal_eval(fp.read())
+        else:
+            return {}
+    
+    def get_parse_options(self, basefile):
+        return self.parse_options.get((self.urispace_segment, basefile), None)
+    
+
     def parse_body(self, fp, basefile):
-        # this version knows how to use an appropriate analyzer to
-        # segment documents into subdocs and use the appropritate
-        # parsing method on each subdoc. FIXME: This should really be
-        # available to all classes that make use of
-        # SwedishLegalSource.offtryck_{parser,gluefunc}. NOTE: this
-        # requires that sanitize_body has set up a PDFAnalyzer
-        # subclass instance as a property on the sanitized object
-        # (normally a PDFReader or StreamingPDFReader)
+        # this version of parse_body knows how to:
+        #
+        # - look up document-specific options (eg "skip",
+        #   "metadataonly", "plainparse") from a resource file (used
+        #   to blacklist old files with no relevance today, or handle
+        #   otherwise difficult documents.
+        # - use an appropriate analyzer to segment documents into
+        #   subdocs and use the appropritate parsing method on each
+        #   subdoc. NOTE: this requires that sanitize_body has set up
+        #   a PDFAnalyzer subclass instance as a property on the
+        #   sanitized object (normally a PDFReader or
+        #   StreamingPDFReader)
+        options = self.get_parse_options(basefile)
+        if options == "skip":
+            raise DocumentSkippedError("%s: Skipped because of options.py" % basefile,
+                                       dummyfile=self.store.parsed_path(basefile))
+        # elif options == "metadataonly":
+        #     do something smart
+        # elif options == "simple":
+        #     do something else smart
+
         rawbody = self.extract_body(fp, basefile)
         sanitized = self.sanitize_body(rawbody)
         if not hasattr(sanitized, 'analyzer') or isinstance(sanitized, BeautifulSoup):

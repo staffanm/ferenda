@@ -369,22 +369,43 @@
   </xsl:template>
 
   <xsl:template match="xhtml:div[@class='registerpost']">
-    <xsl:variable name="year" select="substring-before(dl/dd[@property='rpubl:fsNummer'],':')"/>
-    <xsl:variable name="nr" select="substring-after(dl/dd[@property='rpubl:fsNummer'],':')"/>
+    <xsl:variable name="year" select="xhtml:span[@property='rpubl:arsutgava']/@content"/>
+    <xsl:variable name="nr" select="xhtml:span[@property='rpubl:lopnummer']/@content"/>
     <div class="andring" id="{concat(substring-before(@id,':'),'-',substring-after(@id,':'))}" about="{@about}">
-      <!-- titel eller sfsnummer, om ingen titel finns -->
-      <h2><xsl:choose>
-	<xsl:when test="dl/dd[@property='dcterms:title']">
-	  <xsl:value-of select="dl/dd[@property='dcterms:title']"/>
-	</xsl:when>
-	<xsl:otherwise>
-	  <xsl:value-of select="dl/dd[@property='rpubl:fsNummer']"/>
-	</xsl:otherwise>
-      </xsl:choose></h2>
+      <h2><xsl:value-of select="@content"/></h2>
       <xsl:if test="(number($year) > 1998) or (number($year) = 1998 and number($nr) >= 306)">
 	<p><a href="http://rkrattsdb.gov.se/SFSdoc/{substring($year,3,2)}/{substring($year,3,2)}{format-number($nr,'0000')}.PDF">Officiell version (PDF)</a></p>
       </xsl:if>
-      <xsl:apply-templates mode="in-paragraf"/>
+      <xsl:if test="xhtml:div[@class='overgangsbestammelse'">
+	<div class="overgangsbestammelse">
+	  <h3>Övergångsbestämmelse</h3>
+	  <xsl:apply-templates select="xhtml:div[@class='overgangsbestammelse']"/>
+	</div>
+      </xsl:if>
+      <dl>
+	<xsl:if test="xhtml:span[@rel='rpubl:forarbete']">
+	  <dt>Förarbeten</dt>
+	  <dd>
+	    <xsl:for-each select="xhtml:span[@rel='rpubl:forarbete']">
+	      <a href="@href"><xsl:value-of select="xhtml:span/@content"/></a>, <!-- if last() -->
+	    </xsl:for-each>
+	  </dd>
+	</xsl:if>
+	<xsl:if test="xhtml:span[@rel='rpubl:andrar']">
+	  <dt>Omfattning</dt>
+	  <dd>
+	</xsl:if>
+      </dl>
+	<xsl:for-each select="xhtml:span[@rel='' or @rel='' or @rel=''">
+	  <dt><xsl:value-of select="@property"/></dt>
+	  <dd>
+	    <xsl:choose>
+	      <xsl:when test="xhtml:span/@property='dcterms:identifier'">
+		<xsl:value-of select="@content"/>
+	      </xsl:when>
+	      <xsl:otherwise>
+		<xsl:value-of select="@
+	    
     </div>
   </xsl:template>
 

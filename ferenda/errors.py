@@ -59,6 +59,12 @@ class DocumentRemovedError(FerendaException):
         super(DocumentRemovedError, self).__init__(value)
         self.dummyfile = dummyfile
 
+
+class DocumentSkippedError(DocumentRemovedError):
+    """Raised if the document should not be processed (even though it may
+    exist) since it's not interesting."""
+
+
 class PatchError(ParseError):
     """Raised if a patch cannot be applied by
 :py:meth:`~ferenda.DocumentRepository.patch_if_needed`."""

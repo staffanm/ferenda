@@ -24,7 +24,7 @@ from ferenda import util
 from ferenda.decorators import recordlastdownload, downloadmax
 from ferenda.elements import Section, Link, Body, CompoundElement
 from ferenda.pdfreader import PDFReader, Textbox, Textelement, Page, BaseTextDecoder
-from ferenda.errors import DocumentRemovedError, DownloadError
+from ferenda.errors import DocumentRemovedError, DownloadError, DocumentSkippedError
 from . import SwedishLegalSource, Offtryck, RPUBL
 from .legalref import LegalRef
 from .elements import PreambleSection, UnorderedSection, Forfattningskommentar, Sidbrytning, VerbatimSection
@@ -274,15 +274,6 @@ class Regeringen(Offtryck):
             a["rpubl:utrSerie"] = self.lookup_resource(altlabel, SKOS.altLabel)
         return a
 
-    blacklist = set([(SOU, "2008:35"),  # very atypical report
-                     (DS, "2002:34"),   # 2-column report, uninteresting
-                     (SOU, "2002:11"),  # -""-
-                     (DS, "2007:30"),   # atypical report in english
-                     (DS, "2014:32"),   # -""-
-                     (DS, "2008:73"),   # -""-
-                     (DS, "2008:82"),   # -""-            in swedish
-                     # (DS, "2004:46"),   # -""-            in swedish
-                    ])
 
     def extract_head(self, fp, basefile):
         # Some documents are just beyond usable and/or completely
@@ -291,11 +282,11 @@ class Regeringen(Offtryck):
         # earliest point at which we can check against that blacklist.
         # FIXME: we should have a no-semantic-parse fallback that does
         # no analysis, just attempts to create a viewable
-        # page-oriented HTML representation of the PDF. Mayboe that
+        # page-oriented HTML representation of the PDF. Maybe that
         # fallback should even be part of
         # ferenda.PDFDocumentRepository
-        if (self.document_type, basefile) in self.blacklist:
-            raise DocumentRemovedError("%s is blacklisted" % basefile,
+        if self.get_parse_options(basefile) == "skip":
+            raise DocumentSkippedError("%s is blacklisted" % basefile,
                                        dummyfile=self.store.parsed_path(basefile))
         soup = BeautifulSoup(fp.read(), "lxml")
         self._rawbody = soup.body
