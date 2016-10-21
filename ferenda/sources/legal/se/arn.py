@@ -51,6 +51,9 @@ class ARN(FixedLayoutSource):
     rdf_type = RPUBL.VagledandeMyndighetsavgorande
     storage_policy = "dir"
     urispace_segment = "avg/arn"
+    xslt_template = "xsl/avg.xsl"
+    sparql_annotations = "sparql/avg-annotations.rq"
+    sparql_expect_results = False
 
     def metadata_from_basefile(self, basefile):
         attribs = super(ARN, self).metadata_from_basefile(basefile)
@@ -229,7 +232,7 @@ class ARN(FixedLayoutSource):
                   'rpubl:arendenummer': nextcell("Änr"),
                   'rpubl:diarienummer': nextcell("Änr"),
                   'rpubl:avgorandedatum': nextcell("Avgörande"),
-                  'dcterms:subject': Literal(nextcell("Avdelning"), lang="sv"),
+                  'dcterms:subject': nextcell("Avdelning"),
                   'dcterms:title': soup.table.find_all("tr")[3].get_text(),
                   'dcterms:issued': nextcell("Avgörande")
         })

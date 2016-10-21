@@ -1,0 +1,47 @@
+# -*- coding: iso-8859-1 -*-
+# ------------ avg.ebnf ----------------
+
+# Myndighetsavgöranden (ARN, JO, JK)
+
+avgref          ::= (ARNRefs/JORefs/JKRefs/UnknownAvgRefs)
+
+# ARN: Ärendenummer på formen ÅÅÅÅ-NNNN (alltid minst 4 N)
+# Nämnden har i ett tidigare avgörande instämt häri (avgörande 1999-01-12; 1998-3712).
+# ARN:s änr 1999-1495, 1999-4143)
+
+ARNRefs  ::= (AvgorandeW, ISODate, Semicolon, Whitespace)/ARNRefPreamble, (ARNRefID, AvgorandeConnector)*, ARNRefID
+ARNRefID ::= LangtAr, '-', LopnrID
+AvgorandeW ::= "avgörande "
+AvgorandeConnector ::= "; "/", "/" och "
+ARNRefPreamble ::= "ARN:s änr "
+
+# JO: Diarienummer: NNNN-ÅÅÅÅ
+# JO 2013/14 s. 392, dnr 2914-2011
+# Se JO 2014/15 s. 281, dnr 4379-2013 och 5176-2013
+# samt JO 2012/13 s. 106 och JO:s beslut den 30 november 2012, dnr 3577-2011)
+#
+# NOTE: We only detect dnr, not the page references
+JORefs ::= JORefPreamble, CommaDnr, (JORefID, AvgorandeConnector)*, JORefID?
+CommaDnr ::= ", dnr "
+JORefPreamble ::= (JOLabel, LangtAr, Slash, KortAr, WSidnrRefW, number)/(JOBeslut, Datum)
+JORefID ::= LopnrID, "-", LangtAr
+JOLabel ::= "JO "
+WSidnrRefW ::= " s. "
+JOBeslut ::= "JO:s beslut den "
+
+# JK: Diarienummer: NNN-ÅÅ-TT  (där TT är typ)
+# se JK-beslut den 4 april 2003, dnr 1879-02-40,
+# Jfr i sammanhanget Justitiekanslerns beslut den 31 januari 2006 i ärende nr 2567-05-40.
+# de bedömningar som Justitiekanslern gjort i två ärenden med dnr 5588-07-42 och 1870-09-42
+# se t.ex. JK:s beslut 2002-12-02 i ärende med dnr 1808-02-42 och 2004-11-09 med dnr 753-03-42
+JKRefs ::= ("JK-beslut"/"Justitiekanslerns beslut"," den", Datum, ", ")?, (DnrW/"ärende nr "), (JKRefID, WAndOrW)*, JKRefID
+JKRefID ::= LopnrID, '-', KortAr, '-', JKAvgTypID
+JKAvgTypID ::= number
+
+# UnknownAvgRefs
+UnknownAvgRefs ::= DnrW, (UnknownAvgRefID, CommaSpace/WAndOrW)*, UnknownAvgRefID
+# Match eg 123-16, 2016/42, etc
+UnknownAvgRefID ::= number, "/"/"-", number   
+DnrW ::= "Dnr "/"dnr "
+
+# ------------ end of avg.ebnf ----------------

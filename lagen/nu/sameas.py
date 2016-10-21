@@ -7,6 +7,7 @@ from rdflib import Graph, Namespace, RDF, URIRef
 from rdflib.namespace import OWL
 from cached_property import cached_property
 
+from ferenda import util
 from ferenda import ResourceLoader
 from ferenda.thirdparty.coin import URIMinter
 
@@ -59,3 +60,10 @@ class SameAs(object):
         except ValueError as e:
             self.log.error("Couldn't mint owl:sameAs: %s" % e)
         return resource
+
+
+    def keyword_uri(self, keyword):
+        baseuri = "https://lagen.nu/concept/"
+        # FIXME: Do something smart with "
+        return baseuri + util.ucfirst(keyword).replace(' ', '_')
+

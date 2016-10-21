@@ -1,0 +1,15 @@
+de bedömningar som Justitiekanslern gjort i två ärenden med dnr 5588-07-42 och 1870-09-42
+se t.ex. JK:s beslut 2002-12-02 i ärende med dnr 1808-02-42 och 2004-11-09 med dnr 753-03-42
+
+<list>
+  <str>de bedömningar som Justitiekanslern gjort i två ärenden med dnr </str>
+  <Link uri="https://lagen.nu/avg/jk/5588-07-42">5588-07-42</Link>
+  <str> och </str>
+  <Link uri="https://lagen.nu/avg/jk/1870-09-42">1870-09-42</Link>
+  <str>
+se t.ex. JK:s beslut 2002-12-02 i ärende med dnr </str>
+  <Link uri="https://lagen.nu/avg/jk/1808-02-42">1808-02-42</Link>
+  <str> och 2004-11-09 med dnr </str>
+  <Link uri="https://lagen.nu/avg/jk/753-03-42">753-03-42</Link>
+</list>
+

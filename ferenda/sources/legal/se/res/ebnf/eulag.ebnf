@@ -34,6 +34,5 @@ Lopnummer       ::= number
 SamarbeteRefID  ::= Samarbete
 Samarbete       ::= 'EG'/'EEG'
 AvDatum		::= 'av', Whitespace, 'den', Whitespace, Datum
-Datum           ::=  number, Whitespace, month, Whitespace, LangtAr
 # ------------ end of eglag.ebnf ----------------
 

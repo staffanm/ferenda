@@ -1,0 +1,7 @@
+jfr även JO 1989/90 s. 204, dnr 2576-1987, som dock gällde...
+
+<list>
+  <str>jfr även JO 1989/90 s. 204, dnr </str>
+  <Link uri="https://lagen.nu/avg/jo/2576-1987">2576-1987</Link>
+  <str>, som dock gällde...</str>
+</list>

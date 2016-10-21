@@ -1,0 +1,7 @@
+samt JO 2012/13 s. 106 och JO:s beslut den 30 november 2012, dnr 3577-2011)
+
+<list>
+  <str>samt JO 2012/13 s. 106 och JO:s beslut den 30 november 2012, dnr </str>
+  <Link uri="https://lagen.nu/avg/jo/3577-2011">3577-2011</Link>
+  <str>)</str>
+</list>

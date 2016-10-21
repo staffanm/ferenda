@@ -21,13 +21,13 @@
   <xsl:template name="metarobots"/>
   <xsl:template name="linkalternate"/>
   <xsl:template name="headmetadata"/>
-  <xsl:template name="bodyclass">dv</xsl:template>
+  <xsl:template name="bodyclass">avg</xsl:template>
 
   <xsl:template name="pagetitle">
     <div class="section-wrapper toplevel">
       <section class="col-sm-7">
 	<h1><xsl:value-of select="//xhtml:meta[@property='dcterms:identifier']/@content"/></h1>
-	<p class="lead"><xsl:value-of select="//xhtml:meta[@property='rpubl:referatrubrik']/@content"/></p>
+	<p class="lead"><xsl:value-of select="//*[@property='dcterms:title']"/></p>
 	<xsl:apply-templates/>
       </section>
       <xsl:call-template name="aside-annotations">
@@ -44,52 +44,32 @@
 
   <xsl:template name="aside-annotations">
     <xsl:param name="uri"/>
-    <xsl:variable name="domuri" select="//xhtml:link[@rel='rpubl:referatAvDomstolsavgorande']/@href"/>
     <xsl:variable name="metadata">
       <dl class="dl-horizontal">
-	<dt>Domstol</dt>
-	<dd><xsl:value-of select="//xhtml:link[@rel='dcterms:publisher' and @about=$domuri]/@href"/></dd>
-	<dt>Avgörandedatum</dt>
-	<dd><xsl:value-of select="//xhtml:meta[@property='rpubl:avgorandedatum' and @about=$domuri]/@content"/></dd>
-	<dt>Målnummer</dt>
-	<dd><xsl:value-of select="//xhtml:meta[@property='rpubl:malnummer' and @about=$domuri]/@content"/></dd>
-	<xsl:if test="//xhtml:link[@rel='rpubl:lagrum' and @about=$domuri]">
-	  <dt>Lagrum</dt>
-	  <xsl:for-each select="//xhtml:link[@rel='rpubl:lagrum' and @about=$domuri]">
-	    <dd><a href="{@href}"><xsl:value-of select="substring-after(@href, '/sfs/')"/></a></dd>
-	  </xsl:for-each>
-	</xsl:if>
-	<xsl:if test="//xhtml:link[@rel='rpubl:rattsfallshanvisning']">
-	  <dt>Rättsfall</dt>
-	  <xsl:for-each select="//xhtml:link[@rel='rpubl:rattsfallshanvisning']">
-	    <dd><xsl:apply-templates select="."/></dd>
-	  </xsl:for-each>
-	</xsl:if>
-	<xsl:if test="//xhtml:meta[@property='dcterms:relation']">
-	  <dt>Litteratur</dt>
-	  <xsl:for-each select="//xhtml:meta[@property='dcterms:relation']">
-	    <dd><xsl:value-of select="."/></dd>
-	  </xsl:for-each>
-	</xsl:if>
-	<xsl:if test="//xhtml:link[@about=$domuri and @rel='dcterms:subject']">
-	  <dt>Sökord</dt>
-	  <xsl:for-each select="//xhtml:link[@about=$domuri and @rel='dcterms:subject']">
-	    <dd><a href="{@href}"><xsl:value-of select="substring-after(@href, '/concept/')"/></a></dd>
-	  </xsl:for-each>
-	</xsl:if>
+	<dt>Myndighet</dt>
+	<dd><xsl:value-of select="//xhtml:link[@rel='dcterms:publisher']/@href"/></dd>
+	<dt>Beslutdatum</dt>
+	<dd><xsl:value-of select="//xhtml:meta[@property='rpubl:beslutsdatum']/@content"/></dd>
+	<dt>Diarienummer</dt>
+	<dd><xsl:value-of select="//xhtml:meta[@property='rpubl:diarienummer']/@content"/></dd>
 	<dt>Källa</dt>
-	<dd><a href="http://www.rattsinfosok.dom.se/lagrummet/index.jsp">Domstolsverket</a></dd>
+	<dd>
+	  <a href="{//xhtml:head/xhtml:link[@rel='prov:alternateOf']/@href}">
+	    <xsl:value-of select="//xhtml:head/xhtml:meta[@about=//xhtml:head/xhtml:link[@rel='prov:wasDerivedFrom']/@href]/@content"/>
+	  </a>
+	</dd>
       </dl>
     </xsl:variable>
-    <xsl:variable name="rattsfall" select="$annotations/resource[a/rpubl:Rattsfallsreferat]"/>
-    <xsl:variable name="forarbeten" select="$annotations/resource[a/rpubl:Proposition]"/>
-    <xsl:variable name="rattsfall-markup">
-      <xsl:for-each select="$rattsfall">
-	<!-- FIXME: tune width of rpubl:rattsfallsreferat -->
-	<li><a href="{@uri}"><b><xsl:value-of select="dcterms:identifier"/></b>:</a> <xsl:value-of select="rpubl:referatrubrik"/></li>
+
+    <xsl:variable name="avgoranden" select="$annotations/resource[a/rpubl:VagledandeMyndighetsavgorande]"/>
+
+    <xsl:variable name="avgoranden-markup">
+      <xsl:for-each select="$avgoranden">
+	<li><a href="{@uri}"><b><xsl:value-of select="dcterms:identifier"/></b>:</a> <xsl:value-of select="dcterms:title"/></li>
       </xsl:for-each>
     </xsl:variable>
 
+    <xsl:variable name="forarbeten" select="$annotations/resource[a/rpubl:Proposition]"/>
     <xsl:variable name="forarbeten-markup">
       <xsl:for-each select="$forarbeten">
 	<li><b><xsl:value-of select="dcterms:identifier"/></b>: <xsl:value-of select="dcterms:title"/>
@@ -110,11 +90,11 @@
 	<xsl:with-param name="nodeset" select="ext:node-set($metadata)"/>
       </xsl:call-template>
 
-      <xsl:if test="$rattsfall">
+      <xsl:if test="$avgoranden">
 	<xsl:call-template name="aside-annotations-panel">
-	  <xsl:with-param name="title">Rättsfall som hänvisar till detta</xsl:with-param>
-	  <xsl:with-param name="badgecount" select="count($rattsfall)"/>
-	  <xsl:with-param name="nodeset" select="ext:node-set($rattsfall-markup)"/>
+	  <xsl:with-param name="title">Praxis som hänvisar till detta</xsl:with-param>
+	  <xsl:with-param name="badgecount" select="count($avgoranden)"/>
+	  <xsl:with-param name="nodeset" select="ext:node-set($avgoranden-markup)"/>
 	  <xsl:with-param name="panelid">top</xsl:with-param>
 	  <xsl:with-param name="paneltype">rattsfall</xsl:with-param>
 	  <xsl:with-param name="expanded" select="true()"/>
@@ -134,12 +114,10 @@
     </aside>
   </xsl:template>
   
-  <!-- FIXME: this template is copied from sfs.xsl, and should
-       probably be in a lib that dv.xsl, sfs.xsl and lnkeyword.xsl can
-       share. -->
-  <xsl:template name="rattsfall">
-    <xsl:param name="rattsfall"/>
-      <xsl:for-each select="$rattsfall">
+
+  <xsl:template name="avgoranden">
+    <xsl:param name="avgoranden"/>
+      <xsl:for-each select="$avgoranden">
 	<xsl:sort select="@uri"/>
 	<xsl:variable name="tuned-width">
 	  <xsl:call-template name="tune-width">
@@ -160,74 +138,6 @@
 	</xsl:choose>
 	<br/>
       </xsl:for-each>
-  </xsl:template>
-
-
-  <xsl:template match="xhtml:div[@class='delmal']">
-    <div>
-      <h1><xsl:value-of select="@content"/></h1>
-      <xsl:apply-templates/>
-    </div>
-  </xsl:template>
-
-  <xsl:template match="xhtml:div[@class='instans']">
-    <div>
-      <xsl:if test="@content">
-	<h2><xsl:value-of select="@content"/></h2>
-      </xsl:if>
-    <xsl:apply-templates/>
-    </div>
-  </xsl:template>
-
-  <xsl:template match="xhtml:div[@class='dom']">
-    <xsl:apply-templates/>
-  </xsl:template>
-
-  <xsl:template match="xhtml:div[@class='domskal']">
-    <div>
-      <h3>Domskäl</h3>
-      <xsl:apply-templates/>
-    </div>
-  </xsl:template>
-
-  <xsl:template match="xhtml:div[@class='domslut']">
-    <div>
-      <h3>Domskäl</h3>
-      <xsl:apply-templates/>
-    </div>
-  </xsl:template>
-
-  <xsl:template match="xhtml:div[@class='skiljaktig']">
-    <div>
-      <h3>Skiljaktig</h3>
-      <xsl:apply-templates/>
-    </div>
-  </xsl:template>
-
-  <xsl:template match="xhtml:div[@class='tillagg']">
-    <div>
-      <h3>Tillägg</h3>
-      <xsl:apply-templates/>
-    </div>
-  </xsl:template>
-
-  <xsl:template match="xhtml:div[@class='endmeta']">
-    <div>
-      <!-- <h3>Metadata</h3> -->
-      <xsl:apply-templates/>
-    </div>
-  </xsl:template>
-
-  <xsl:template match="xhtml:h1">
-    <h4><xsl:value-of select="."/></h4>
-  </xsl:template>
-  
-  <!-- last resort -->
-  <xsl:template match="xhtml:div">
-    <h1>THIS SHOULDN'T HAPPEN: <xsl:value-of select="@class"/></h1>
-      <section>
-	<xsl:apply-templates/>
-      </section>
   </xsl:template>
 
   <!-- remove spans which only purpose is to contain RDFa data -->

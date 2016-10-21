@@ -15,7 +15,7 @@ from rdflib.namespace import SKOS, DCTERMS
 from . import SwedishLegalSource, SwedishLegalStore, RPUBL
 from .elements import *
 from .swedishlegalsource import AnonStycke
-from ferenda import FSMParser
+from ferenda import FSMParser, DocumentEntry
 from ferenda import util, errors
 from ferenda.decorators import downloadmax, recordlastdownload, newstate
 from ferenda.elements import Body
@@ -52,10 +52,15 @@ class JK(SwedishLegalSource):
     documentstore_class = JKStore
     urispace_segment = "avg/jk"
     download_iterlinks = False
+    xslt_template = "xsl/avg.xsl"
+    sparql_annotations = "sparql/avg-annotations.rq"
+    sparql_expect_results = False
+
 
     @recordlastdownload
     def download(self, basefile=None, reporter=None):
         if basefile:
+            from pudb import set_trace; set_trace()
             resp = self.session.post(self.start_url, data={'diarienummer': basefile})
             soup = BeautifulSoup(resp.text, "lxml")
             link = soup.find("div", "ruling-results").find("a", href=re.compile("/beslut-och-yttranden/"))
@@ -82,6 +87,12 @@ class JK(SwedishLegalSource):
         for link in soup.find_all("a", href=document_url_regex):
             basefile = document_url_regex.search(link["href"]).group("basefile")
             yield basefile, urljoin(self.start_url, link["href"])
+
+    def source_url(self, basefile):
+        # this source does not have any predictable URLs, so we try to
+        # find if we made a note on the URL when we ran download()
+        entry = DocumentEntry(self.store.documententry_path(basefile))
+        return entry.orig_url
 
     def metadata_from_basefile(self, basefile):
         attribs = super(JK, self).metadata_from_basefile(basefile)

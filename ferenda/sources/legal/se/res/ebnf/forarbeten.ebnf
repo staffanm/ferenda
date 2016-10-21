@@ -17,7 +17,6 @@ ForarbRefs ::= ForarbRef, Sidor
 PropRef	       ::= PropPrefix, Whitespace, PropRefID
 PropPrefix     ::= ('prop.'/'Prop.')
 PropRefID      ::= RiksmoteID, Colon, LopnrID
-LopnrID        ::= number
 
 # exv "a. prop. s. 42"
 AnonPropRefs ::= "a. prop.", Sidor

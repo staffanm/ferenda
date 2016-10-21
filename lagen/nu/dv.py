@@ -34,11 +34,7 @@ class DV(OrigDV, SameAs):
         return cd
         
     def add_keyword_to_metadata(self, domdesc, keyword):
-        def sokord_uri(value):
-            # FIXME: This should coined by self.minter
-            baseuri = "https://lagen.nu/concept/"
-            return baseuri + util.ucfirst(value).replace(' ', '_')
-        domdesc.rel(DCTERMS.subject, sokord_uri(keyword))
+        domdesc.rel(DCTERMS.subject, self.keyword_uri(keyword))
 
     # override polish_metadata to add some extra owl:sameAs attributes
     def polish_metadata(self, head):

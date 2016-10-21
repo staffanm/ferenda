@@ -7,6 +7,7 @@ import logging
 import os
 import sys
 import re
+from datetime import date 
 
 # thirdparty
 from simpleparse.parser import Parser
@@ -149,6 +150,12 @@ class LegalRef:
             for p in productions:
                 self.uriformatter[p] = self.eurattsfall_format_uri
             self.roots.append("ecjcaseref")
+
+        if self.MYNDIGHETSBESLUT in args:
+            productions = self.load_ebnf(fname("res/ebnf/avg.ebnf"))
+            for p in productions:
+                self.uriformatter[p] = self.myndighetsbeslut_format_uri
+            self.roots.append("avgref")
 
         rootprod = "root ::= (%s/plain)+\n" % "/".join(self.roots)
         self.decl += rootprod
@@ -739,7 +746,9 @@ class LegalRef:
                     "domstol": RPUBL.rattsfallspublikation,
                     "ar": RPUBL.arsutgava,
                     "avsnitt": RINFOEX.avsnitt,
-                    "utrSerie": RPUBL.utrSerie
+                    "utrSerie": RPUBL.utrSerie,
+                    "myndighet": DCTERMS.publisher,
+                    "diarienr": RPUBL.diarienummer
                     }
 
     def attributes_to_resource(self, attributes, rest=()):
@@ -804,10 +813,8 @@ class LegalRef:
                          'sjunde': '7',
                          'åttonde': '8',
                          'nionde': '9'}
-
         attributeorder = ['law', 'chapter', 'section', 'element',
                           'piece', 'item', 'itemnumeric', 'sentence']
-
         # possibly complete attributes with data from
         # baseuri_attributes as needed
         if self.allow_relative:
@@ -1277,11 +1284,6 @@ class LegalRef:
         res = self.attributes_to_resource(a)
         return self.minter.space.coin_uri(res)
 
-    def format_ChapterSectionRef(self, root):
-        assert(root.nodes[0].nodes[0].tag == 'ChapterRefID')
-        self.currentchapter = root.nodes[0].nodes[0].text.strip()
-        return [self.format_generic_link(root)]
-
     #
     # KOD FÖR EULAGSTIFTNING
     def eulag_format_uri(self, attributes):
@@ -1366,7 +1368,37 @@ class LegalRef:
         attributes['serial'] = '%04d' % int(attributes['serial'])
         attributes['descriptor'] = descriptormap[attributes['decision']]
         res = self.attributes_to_resource(attributes)
-        return self.minter.coin_uri(res)
+        return self.minter.space.coin_uri(res)
+
+    #
+    #
+    # KOD FÖR MYNDIGHETSBESLUT
+    def myndighetsbeslut_format_uri(self, attributes):
+        def lookup(label):
+            for lang in ("sv", None):
+                v = self.metadata_graph.value(predicate=SKOS.altLabel,
+                                              object=Literal(label, lang=lang))
+                if v:
+                    return v
+            raise RefParseError("Couldn't lookup label %s" % label)
+        attributes["type"] = RPUBL.VagledandeMyndighetsavgorande
+        for myndighet in ("jo", "jk", "arn"):
+            if myndighet in attributes:
+                if myndighet == "jk":  # do extra check to distinguish JK dnr from dates
+                    ordinal, year, category = [int(x) for x in attributes[myndighet].split("-")]
+                    if (1980 <= ordinal <= date.today().year and
+                        1 <= year <= 12 and
+                        category <= 31):
+                        # This is probably a date
+                        return None
+                        
+                attributes["myndighet"] = lookup(myndighet.upper())
+                attributes["diarienr"] = attributes[myndighet]
+                del attributes[myndighet]
+        res = self.attributes_to_resource(attributes)
+        uri = self.minter.space.coin_uri(res)
+        return uri
+
 
 class NodeTree:
     """Encapsuates the node structure from mx.TextTools in a tree oriented interface"""

@@ -1,0 +1,33 @@
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX bibo: <http://purl.org/ontology/bibo/>
+CONSTRUCT {
+  <%(uri)s> dcterms:isReferencedBy ?inboundavg . 
+  <%(uri)s> dcterms:isReferencedBy ?inboundforarbete .
+  ?inboundavg rdf:type rpubl:VagledandeMyndighetsavgorande ;
+              dcterms:identifier ?avgid ;
+              dcterms:title ?avgtitel .
+  ?inboundforarbete rdf:type rpubl:Proposition ;
+                    dcterms:identifier ?forarbeteid ;
+                    dcterms:title ?forarbetetitel ;
+                    bibo:chapter ?forarbeteavsnitt .
+} WHERE
+{
+   {
+     ?inboundavg rdf:type rpubl:VagledandeMyndighetsavgorande;
+		 dcterms:references <%(uri)s> ;
+                 dcterms:identifier ?avgid ;
+                 dcterms:title ?avgtitel .
+   } UNION {
+     ?inboundforarbeteavsnitt dcterms:references <%(uri)s> ;
+                              dcterms:isPartOf* ?inboundforarbete ;
+                              bibo:chapter ?forarbeteavsnitt .
+     ?inboundforarbete rdf:type rpubl:Proposition ;
+                    rdf:type ?forarbetetyp ;
+                    dcterms:identifier ?forarbeteid ;
+                    dcterms:title ?forarbetetitel .
+   }
+}

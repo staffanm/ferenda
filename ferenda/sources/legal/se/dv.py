@@ -1294,7 +1294,10 @@ class DV(SwedishLegalSource):
         # Canonical uris don't define a URI space for
         # keywords/concepts. Instead refer to bnodes
         # with rdfs:label set (cf. rdl/documentation/exempel/
-        # documents/publ/Domslut/HD/2009/T_170-08.rdf)
+        # documents/publ/Domslut/HD/2009/T_170-08.rdf).
+        #
+        # Subclasses that has an idea of how to create a URI for a
+        # keyword/concept might override this. 
         with domdesc.rel(DCTERMS.subject):
             domdesc.value(RDFS.label, keyword, lang=self.lang)
 

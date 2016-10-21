@@ -14,6 +14,7 @@ Hyphen               ::= [–—-]
 SectionMark	     ::= '§'
 DoubleSectionMark    ::= SectionMark, SectionMark
 Colon                ::= ':'
+Semicolon            ::= ';'
 LeftParen            ::= '('
 RightParen           ::= ')'
 Pipe		     ::= '|'
@@ -22,15 +23,19 @@ Period               ::= '.'
 Ar                   ::= LangtAr/KortAr
 LangtAr              ::= digit, digit, digit, digit
 KortAr               ::= digit, digit
-
+ISODate              ::= LangtAr,Hyphen,monthnumber,Hyphen,digit,digit
+Datum                ::= number, Whitespace, month, Whitespace, LangtAr
 
 ordinal             ::= "första"/"andra"/"tredje"/"fjärde"/"femte"/"sjätte"/"sjunde"/"åttonde"/"nionde"/[1-9]
 month               ::= "januari"/"februari"/"mars"/"april"/"maj"/"juni"/"juli"/"augusti"/"september"/"oktober"/"november"/"december"
+monthnumber         ::= "01"/"02"/"03"/"04"/"05"/"06"/"07"/"08"/"09"/"10"/"11"/"12"
 PieceOrPieces       ::= "st."/"stycket"/"styckena"/("st",?" ")
 SentenceOrSentences ::= "meningen"/"meningarna"
 SectionRefChar      ::= [a-n]
 Element	            ::= 'mom.'
 SidnrRefID          ::= number
+LopnrID             ::= number
+
 
 # GRUNDLÄGGANDE BYGGSTENAR
 plain        ::= (Whitespace/word/number/punctuation/other)

@@ -102,7 +102,7 @@ class SwedishLegalSource(DocumentRepository):
 
     rdf_type = RPUBL.Rattsinformationsdokument  # subclasses override this
 
-    parse_types = LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.KORTLAGRUM, LegalRef.FORARBETEN
+    parse_types = LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.KORTLAGRUM, LegalRef.FORARBETEN, LegalRef.MYNDIGHETSBESLUT
     parse_allow_relative = False
     sparql_annotations = "sparql/describe-base.rq"
     
@@ -574,7 +574,7 @@ class SwedishLegalSource(DocumentRepository):
         """Given a sanitized flat dict of metadata for a document, return a
         rdflib.Resource version of the same. 
 
-        """ 
+        """
         # even though our attributes are sanitized, plain-str objects
         # might need conversion (language-tagged literals, typed
         # literals, lookups from a label to a URIRef...)
@@ -614,6 +614,12 @@ class SwedishLegalSource(DocumentRepository):
                     result.append(self.lookup_resource(value))
                 elif k in ("rpubl:forfattningssamling"):
                     result.append(self.lookup_resource(value, SKOS.altLabel))
+                elif k in ("dcterms:subject"):
+                    # FIXME: for canonical URI:s no URI should be
+                    # created for a keyword, instead a BNode with
+                    # RDFS.label should be created (see
+                    # DV.add_keyword_to_metadata)
+                    result.append(self.keyword_uri(value))
                 else:
                     # the default: just create a plain string literal
                     result.append(Literal(value))
@@ -706,7 +712,6 @@ class SwedishLegalSource(DocumentRepository):
         The default implementation returns its input unchanged.
 
         """
-        from pudb import set_trace; set_trace()
         return rawbody
 
     def get_parser(self, basefile, sanitized, initialstate=None):

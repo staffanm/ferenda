@@ -1,0 +1,6 @@
+JO 2013/14 s. 392, dnr 2914-2011
+
+<list>
+  <str>JO 2013/14 s. 392, dnr </str>
+  <Link uri="https://lagen.nu/avg/jo/2914-2011">2914-2011</Link>
+</list>

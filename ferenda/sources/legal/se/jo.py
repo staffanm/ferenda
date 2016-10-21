@@ -59,8 +59,10 @@ class JO(FixedLayoutSource):
     storage_policy = "dir"
     downloaded_suffix = ".pdf"
     documentstore_class = JOStore
-
     urispace_segment = "avg/jo"
+    xslt_template = "xsl/avg.xsl"
+    sparql_annotations = "sparql/avg-annotations.rq"
+    sparql_expect_results = False
 
     def metadata_from_basefile(self, basefile):
         attribs = super(JO, self).metadata_from_basefile(basefile)

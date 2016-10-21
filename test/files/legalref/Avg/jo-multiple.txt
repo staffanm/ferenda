@@ -1,0 +1,8 @@
+Se JO 2014/15 s. 281, dnr 4379-2013 och 5176-2013
+
+<list>
+  <str>Se JO 2014/15 s. 281, dnr </str>
+  <Link uri="https://lagen.nu/avg/jo/4379-2013">4379-2013</Link>
+  <str> och </str>
+  <Link uri="https://lagen.nu/avg/jo/5176-2013">5176-2013</Link>
+</list>

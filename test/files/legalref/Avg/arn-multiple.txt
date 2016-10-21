@@ -1,0 +1,9 @@
+(ARN:s änr 1999-1495, 1999-4143)
+
+<list>
+  <str>(ARN:s änr </str>
+  <Link uri="https://lagen.nu/avg/arn/1999-1495">1999-1495</Link>
+  <str>, </str>
+  <Link uri="https://lagen.nu/avg/arn/1999-4143">1999-4143</Link>
+  <str>)</str>
+</list>

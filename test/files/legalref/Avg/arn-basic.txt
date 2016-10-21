@@ -1,0 +1,8 @@
+Nämnden har i ett tidigare avgörande instämt häri (avgörande 1999-01-12; 1998-3712).
+
+<list>
+  <str>Nämnden har i ett tidigare avgörande instämt häri (avgörande 1999-01-12; </str>
+  <Link uri="https://lagen.nu/avg/arn/1998-3712">1998-3712</Link>
+  <str>).</str>
+</list>
+

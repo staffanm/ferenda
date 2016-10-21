@@ -10,10 +10,15 @@
 <https://lagen.nu/avg/arn/2013-07406> a rpubl:VagledandeMyndighetsavgorande ;
     dcterms:identifier "ARN 2013-07406" ;
     dcterms:issued "2013-11-19"^^xsd:date ;
-    dcterms:subject "Resor"@sv ;
+    dcterms:publisher <https://lagen.nu/org/2014/allmanna_reklamationsnamnden> ;
+    dcterms:subject "https://lagen.nu/concept/Resor" ;
     dcterms:title "Fråga om köparen fullgjort sin skyldighet att kontrollera riktigheten av utfärdade biljetter samt om resebyrås ansvar för de felaktiga biljetterna."@sv ;
-    owl:sameAs <http://rinfo.lagrummet.se/publ/avg/arn/2013-07406>;
     rpubl:arendenummer "2013-07406" ;
     rpubl:avgorandedatum "2013-11-19"^^xsd:date ;
+    rpubl:diarienummer "2013-07406" ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/avg/arn/2013-07406> ;
+    prov:wasDerivedFrom <https://lagen.nu/avg/arn/2013-07406?attachment=index.pdf&repo=arn&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.arn.ARN" .
+
+<https://lagen.nu/avg/arn/2013-07406?attachment=index.pdf&repo=arn&dir=downloaded> rdfs:label "ARN 2013-07406"@sv .
 

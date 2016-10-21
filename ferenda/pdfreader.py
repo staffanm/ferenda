@@ -1165,9 +1165,8 @@ all text in a Textbox has the same font and size.
         element = E("p", {'class': cssclass}, *children)
         # FIXME: we should output these positioned style attributes
         # only when the resulting document is being serialized in a
-        # positioned fashion. Possibly do some translation from PDF
-        # points (which is what self.top, .left etc is using) and
-        # pixels (which is what the CSS uses)
+        # positioned fashion (and probably also the textbox/fontspec
+        # attributes). 
         element.set(
             'style', 'top: %spx; left: %spx; height: %spx; width: %spx' %
             (self.top, self.left, self.height, self.width))

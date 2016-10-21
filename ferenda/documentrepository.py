@@ -304,6 +304,9 @@ class DocumentRepository(object):
     sparql_annotations = "sparql/annotations.rq"
     """A template SPARQL CONSTRUCT query for document annotations."""
 
+    sparql_expect_results = True
+    # TBD
+
     # FIXME: Sphinx really wants to treat this class as a reference,
     # but cannot resolve it
     documentstore_class = DocumentStore
@@ -2455,7 +2458,7 @@ WHERE {
             with self.store.open_annotation(basefile, "w") as fp:
                 fp.write(self.graph_to_annotation_file(graph))
             return self.store.annotation_path(basefile)
-        else:
+        elif self.sparql_expect_results:
             self.log.warning(
                 "%s: No annotation data fetched, something might be wrong with the SPARQL query" % basefile)
 

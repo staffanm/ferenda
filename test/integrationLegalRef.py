@@ -122,6 +122,12 @@ class EUCaselaw(TestLegalRef):
         p = LegalRef(LegalRef.EGRATTSFALL)
         return self._test_parser(datafile, p)
 
+class Avg(TestLegalRef):
+    def parametric_test(self,datafile):
+        p = LegalRef(LegalRef.MYNDIGHETSBESLUT)
+        # p.verbose = True
+        return self._test_parser(datafile, p)
+
 # Some tests are not simply working right now. Since having testdata
 # and wanted result in the same file makes it tricky to mark tests as
 # expectedFailure, we'll just list them here.
@@ -145,3 +151,4 @@ file_parametrize(EULaw, "test/files/legalref/EGLag",".txt")
 file_parametrize(EUCaselaw, "test/files/legalref/ECJ",".txt",
                  make_closure(['civilservicetrib.txt',
                                'simple.txt']))
+file_parametrize(Avg, "test/files/legalref/Avg",".txt")

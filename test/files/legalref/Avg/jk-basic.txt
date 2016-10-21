@@ -1,0 +1,11 @@
+se JK-beslut den 4 april 2003, dnr 1879-02-40,
+Jfr i sammanhanget Justitiekanslerns beslut den 31 januari 2006 i ärende nr 2567-05-40.
+
+<list>
+  <str>se JK-beslut den 4 april 2003, dnr </str>
+  <Link uri="https://lagen.nu/avg/jk/1879-02-40">1879-02-40</Link>
+  <str>,
+Jfr i sammanhanget Justitiekanslerns beslut den 31 januari 2006 i </str>
+  <Link uri="https://lagen.nu/avg/jk/2567-05-40">2567-05-40</Link>
+  <str>.</str>
+</list>
