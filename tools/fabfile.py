@@ -55,8 +55,9 @@ def copy_files():
                   exclude=["*downloaded*", "*archive*"],
                   delete=True,
                   default_opts="-azi")
+    run("chmod -R go+w /home/staffan/www/ferenda.lagen.nu/data")
 
-
+    
 def git_pull():
     with cd("~/wds/ferenda"):
         run("git pull --rebase")
