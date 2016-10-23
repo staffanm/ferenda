@@ -406,7 +406,6 @@ def make_parser(reader, basefile, log, trace):
         # konsoliderade lagtexten öht, men det verkar vara kutym att
         # ha med åtminstone de som kan ha relevans för gällande rätt
         log.debug("    Ny Övergångsbestämmelser")
-
         if rubrik_saknas:
             rubrik = "[Övergångsbestämmelser]"
         else:

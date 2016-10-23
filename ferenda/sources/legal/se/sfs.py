@@ -976,7 +976,7 @@ class SFS(Trips):
         # move some data from the big document graph to a series of
         # small graphs, one for each change act.
         trash = set()
-        for res in sorted(doc.meta.resource(doc.uri).objects(RPUBL.konsolideringsunderlag)):
+        for res in sorted(doc.meta.resource(doc.uri).objects(RPUBL.konsolideringsunderlag), key=lambda uri:util.split_numalpha(str(uri))):
             if not res.value(RDF.type):
                 continue
             identifier = res.value(DCTERMS.identifier).replace("SFS ", "L")
@@ -996,9 +996,10 @@ class SFS(Trips):
                                   doc.meta.value(o, RPUBL.celexNummer))
                     graph.add(triple)
                     trash.add(triple)
-            rp = Registerpost(uri=res.identifier, meta=graph, id=identifier)
+            uri = str(res.identifier)
+            rp = Registerpost(uri=uri, meta=graph, id=identifier)
             reg.append(rp)
-            if res.identifier in obs:
+            if uri in obs:
                 rp.append(obs[uri])
         for triple in trash:
             doc.meta.remove(triple)
