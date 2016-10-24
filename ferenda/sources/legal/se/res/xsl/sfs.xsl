@@ -245,7 +245,7 @@
 	  </xsl:variable>
 	  <xsl:call-template name="aside-annotations-panel">
 	    <xsl:with-param name="title">Ändringar</xsl:with-param>
-	    <xsl:with-param name="badgecount" select="count($inford) + count($andrad) + count(upphavd)"/>
+	    <xsl:with-param name="badgecount" select="count($inford) + count($andrad) + count($upphavd)"/>
 	    <xsl:with-param name="panelid" select="$panelid"/>
 	    <xsl:with-param name="paneltype">a</xsl:with-param>
 	    <xsl:with-param name="nodeset" select="ext:node-set($andringar)"/>

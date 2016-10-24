@@ -530,6 +530,8 @@ class SFS(Trips):
             return
         # remove any possible "/konsolidering/2015:123" trailing info
         basefile = basefile.split("/")[0]
+        if "#" in basefile:
+            basefile = basefile.split("#", 1)[0]
         # "1874:26 s.11" -> <https://lagen.nu/sfs/1874:26_s.11> -> "1874:26 s.11"
         # NOTE: This is unneccesary now that the URISpace defines spaceReplacement
         # basefile = basefile.replace("s.", " s.")

@@ -38,7 +38,7 @@ from lxml import etree
 from lxml.etree import Element
 from lxml.builder import ElementMaker
 from rdflib import Graph, Literal, Namespace, URIRef, BNode, RDF, RDFS
-from rdflib.namespace import FOAF
+from rdflib.namespace import FOAF, OWL
 from rdflib.collection import Collection
 import bs4
 import lxml.html
@@ -1897,7 +1897,7 @@ parsed document path to that documents dependency file."""
                 # multiple, linked, resources. Don't attempt to
                 # find basefiles for these resources, even if they
                 # occur as objects in the graphs as well.
-                if p == RDF.type:
+                if p in (RDF.type, OWL.sameAs):
                     continue
                 if o in subjects:
                     continue
