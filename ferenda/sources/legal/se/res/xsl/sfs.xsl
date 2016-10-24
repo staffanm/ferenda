@@ -365,23 +365,26 @@
   </xsl:template>
   
   <xsl:template match="xhtml:div[@class='register']">
-    <div class="andringar"><xsl:apply-templates/></div>
+    <div class="andringar" id="L"><xsl:apply-templates/></div>
   </xsl:template>
 
   <xsl:template match="xhtml:div[@class='registerpost']">
     <xsl:variable name="year" select="xhtml:span[@property='rpubl:arsutgava']/@content"/>
     <xsl:variable name="nr" select="xhtml:span[@property='rpubl:lopnummer']/@content"/>
-    <div class="andring" id="{concat(substring-before(@id,':'),'-',substring-after(@id,':'))}" about="{@about}">
+    <div class="andring" id="{@id}" about="{@about}">
       <h2><xsl:value-of select="@content"/></h2>
       <xsl:if test="(number($year) > 1998) or (number($year) = 1998 and number($nr) >= 306)">
 	<p><a href="http://rkrattsdb.gov.se/SFSdoc/{substring($year,3,2)}/{substring($year,3,2)}{format-number($nr,'0000')}.PDF">Officiell version (PDF)</a></p>
       </xsl:if>
-      <xsl:if test="xhtml:div[@class='overgangsbestammelse'">
+      <xsl:if test="xhtml:div[@class='overgangsbestammelse']">
 	<div class="overgangsbestammelse">
-	  <h3>Övergångsbestämmelse</h3>
+	  <h3>Övergångsbestämmelse</h3> <!-- FIXME: sometimes better labeled as Ikraftträdandebestämmelse -->
 	  <xsl:apply-templates select="xhtml:div[@class='overgangsbestammelse']"/>
 	</div>
       </xsl:if>
+      <!-- since the rest of the data is only available as an RDF
+           graph, serialized as naive RDFa, generating good HTML is a
+           bit involved -->
       <dl>
 	<xsl:if test="xhtml:span[@rel='rpubl:forarbete']">
 	  <dt>Förarbeten</dt>
@@ -391,21 +394,19 @@
 	    </xsl:for-each>
 	  </dd>
 	</xsl:if>
-	<xsl:if test="xhtml:span[@rel='rpubl:andrar']">
+	<xsl:if test="xhtml:span[@property='rpubl:andrar']">
 	  <dt>Omfattning</dt>
-	  <dd>
+	  <dd><xsl:value-of select="xhtml:span[@property='rpubl:andrar']/@content"/></dd>
+	</xsl:if>
+	<xsl:if test="xhtml:span[@rel='rpubl:genomforDirektiv']">
+	  <dt>CELEX-nr</dt>
+	  <dd><a href="xhtml:span[@rel='rpubl:genomforDirektiv']/@href"><xsl:value-of select="xhtml:span[@rel='rpubl:genomforDirektiv']/xhtml:span/@content"/></a></dd>
+	</xsl:if>
+	<xsl:if test="xhtml:span[@property='rpubl:ikrafttradandedatum']">
+	  <dt>Omfattning</dt>
+	  <dd><xsl:value-of select="xhtml:span[@property='rpubl:ikrafttradandedatum']/@content"/></dd>
 	</xsl:if>
       </dl>
-	<xsl:for-each select="xhtml:span[@rel='' or @rel='' or @rel=''">
-	  <dt><xsl:value-of select="@property"/></dt>
-	  <dd>
-	    <xsl:choose>
-	      <xsl:when test="xhtml:span/@property='dcterms:identifier'">
-		<xsl:value-of select="@content"/>
-	      </xsl:when>
-	      <xsl:otherwise>
-		<xsl:value-of select="@
-	    
     </div>
   </xsl:template>
 
@@ -511,6 +512,17 @@
     </xsl:if>
     </li>
   </xsl:template>
+
+  <xsl:template match="xhtml:div[@class='register']" mode="toc">
+    <li><a href="#L"><xsl:value-of select="xhtml:h1"/></a>
+    <ul class="nav">
+      <xsl:for-each select="xhtml:div[@class='registerpost']">
+	<li><a href="#{@id}"><xsl:value-of select="xhtml:span[@property='dcterms:identifier']/@content"/></a></li>
+      </xsl:for-each>
+    </ul>
+    </li>
+  </xsl:template>
+
 
   <!-- otherwise do nothing -->
   <xsl:template match="@*|node()" mode="toc"/>

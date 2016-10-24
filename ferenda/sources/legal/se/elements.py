@@ -215,6 +215,7 @@ class Overgangsbestammelser(CompoundElement):
 
 class Overgangsbestammelse(CompoundElement, OrdinalElement):
     tagname = "div"
+    classname = "overgangsbestammelse"
     fragment_label = "L"
 
     def __init__(self, *args, **kwargs):
@@ -222,6 +223,11 @@ class Overgangsbestammelse(CompoundElement, OrdinalElement):
         self.uri = kwargs.get("uri", None)
         super(Overgangsbestammelse, self).__init__(*args, **kwargs)
 
+
+    def as_xhtml(self, uri=None, parent_uri=None):
+        res = super(Overgangsbestammelse, self).as_xhtml(uri, parent_uri)
+        return res
+        
 
 class Bilaga(CompoundElement):
     fragment_label = "B"
@@ -262,7 +268,11 @@ class Registerpost(CompoundElement):
     def as_xhtml(self, uri=None, parent_uri=None):
         # FIXME: Render this better (particularly the rpubl:andring
         # property -- should be parsed and linked)
-        return super(Registerpost, self).as_xhtml()
+        res = super(Registerpost, self).as_xhtml()
+        # Bootstrap scrollspy has issues with using ':' (amongst other
+        # chars) in a fragment. '-' is fine.
+        res.set("id", res.get("id").replace(":", "-"))
+        return res
 
 class OrderedParagraph(Paragraph, OrdinalElement):
 
