@@ -204,6 +204,13 @@
     </div>
   </xsl:template>
 
+  <xsl:template match="xhtml:div[@class='betankande']">
+    <div>
+      <h3>Betänkande</h3>
+      <xsl:apply-templates/>
+    </div>
+  </xsl:template>
+
   <xsl:template match="xhtml:div[@class='tillagg']">
     <div>
       <h3>Tillägg</h3>
