@@ -733,7 +733,9 @@ class SFS(Trips):
                                                                     pred):
                             if hasattr(node, 'predicate'):
                                 qname = g.qname(node.predicate)
-                                d[docuri][qname] = node.uri
+                                if qname not in d[docuri]:
+                                    d[docuri][qname] = []
+                                d[docuri][qname].append(node.uri)
                     # Secondly, preserve the entire text
                     d[docuri]["rpubl:andrar"] = val
                 elif key == 'F\xf6rarbeten':
@@ -1511,7 +1513,8 @@ class SFS(Trips):
             if not 'changes' in stuff[lagrum]:
                 stuff[lagrum]['changes'] = []
             stuff[lagrum]['changes'].append({'uri': row['change'],
-                                             'id': row['id']})
+                                             'id': row['id'],
+                                             'changetype': row['changetype']})
 
 
         # 7. all forfattnigskommentar
@@ -1578,6 +1581,11 @@ class SFS(Trips):
             if ":" in string:
                 prefix, tag = string.split(":", 1)
                 return "{%s}%s" % (str(self.ns[prefix]), tag)
+
+        reversename = {'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#inforsI': 'rpubl:isEnactedBy',
+                       'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#ersatter': 'rpubl:isChangedBy',
+                       'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#upphaver': 'rpubl:isRemovedBy'}
+
         root_node = etree.Element(ns("rdf:RDF"), nsmap=self.ns)
 
         for l in sorted(list(stuff.keys()), key=util.split_numalpha):
@@ -1646,8 +1654,8 @@ class SFS(Trips):
 
             if 'changes' in stuff[l]:
                 for r in stuff[l]['changes']:
-                    ischanged_node = etree.SubElement(
-                        lagrum_node, ns("rpubl:isChangedBy"))
+                    qname = ns(reversename[r['changetype']])
+                    ischanged_node = etree.SubElement(lagrum_node, qname)
                     #rattsfall_node = etree.SubElement(islagrumfor_node, "rdf:Description")
                     # rattsfall_node.set("rdf:about",r['uri'])
                     id_node = etree.SubElement(ischanged_node, ns("rpubl:fsNummer"))

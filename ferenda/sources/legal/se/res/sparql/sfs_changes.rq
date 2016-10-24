@@ -2,10 +2,11 @@ PREFIX dcterms:<http://purl.org/dc/terms/>
 PREFIX rpubl:<http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
 
 SELECT ?change ?changetype ?id ?lagrum
-
-WHERE { ?change (rpubl:ersatter|rpubl:upphaver|rpubl:inforsI)  ?lagrum;
-		?changetype ?lagrum;
-                dcterms:identifier ?id .
-
-        FILTER(STRSTARTS(STR(?lagrum), "%(uri)s")) 
+WHERE {
+  GRAPH <%(context)s> {
+    ?change (rpubl:ersatter|rpubl:upphaver|rpubl:inforsI)  ?lagrum;
+	    ?changetype ?lagrum;
+            dcterms:identifier ?id .
+    FILTER(STRSTARTS(STR(?lagrum), "%(uri)s")) 
+  }
 }
