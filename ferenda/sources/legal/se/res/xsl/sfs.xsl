@@ -293,9 +293,9 @@
     <xsl:param name="typ"/>
     <xsl:param name="andringar"/>
     <xsl:if test="$andringar">
-      <xsl:value-of select="$typ"/>: SFS
+      <xsl:value-of select="$typ"/>: SFS 
       <xsl:for-each select="$andringar">
-	<a href="#L{concat(substring-before(rpubl:fsNummer,':'),'-',substring-after(rpubl:fsNummer,':'))}"><xsl:value-of select="rpubl:fsNummer"/></a><xsl:if test="position()!= last()">, </xsl:if>
+	<a href="#L{concat(substring-before(rpubl:fsNummer,':'),'-',substring-after(rpubl:fsNummer,':'))}"><xsl:value-of select="rpubl:fsNummer"/><xsl:value-of select="rpubl:proposition"/></a><xsl:if test="position()!= last()">, </xsl:if>
       </xsl:for-each>
       <br/>
     </xsl:if>
@@ -390,7 +390,7 @@
 	  <dt>Förarbeten</dt>
 	  <dd>
 	    <xsl:for-each select="xhtml:span[@rel='rpubl:forarbete']">
-	      <a href="@href"><xsl:value-of select="xhtml:span/@content"/></a>, <!-- if last() -->
+	      <a href="{@href}"><xsl:value-of select="xhtml:span/@content"/></a><xsl:if test="position()!= last()">, </xsl:if>
 	    </xsl:for-each>
 	  </dd>
 	</xsl:if>

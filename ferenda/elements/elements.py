@@ -363,7 +363,7 @@ class CompoundElement(AbstractElement, list):
                 'href': str(obj)
             }
             if graph:
-                for sub_pred, sub_obj in graph.predicate_objects(subject=obj):
+                for sub_pred, sub_obj in sorted(graph.predicate_objects(subject=obj)):
                     children.append(self._span(obj, sub_pred, sub_obj, graph))
         else:
             attrs = {}

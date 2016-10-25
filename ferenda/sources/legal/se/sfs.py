@@ -31,9 +31,8 @@ from ferenda.sources.legal.se import legaluri
 from ferenda import util
 from ferenda.errors import FerendaException, DocumentRemovedError, ParseError
 from .legalref import LegalRef, LinkSubject
-from . import Trips, SwedishCitationParser, RPUBL, SwedishLegalStore
+from . import Trips, SwedishCitationParser, RPUBL, SwedishLegalStore, RINFOEX
 from .elements import *
-
 
 
 class UpphavdForfattning(DocumentRemovedError):
@@ -901,8 +900,20 @@ class SFS(Trips):
                     attributes["rpubl:konsolideringsunderlag"].append(r.identifier)
                     post_count += 1
                 else: 
-                   # get a anonymous (BNode) rdflib.Resource
+                    # get a anonymous (BNode) rdflib.Resource
                     ar = self.attributes_to_resource(attributes[k])
+                    # Add a rdf:type to this BNode if we can determine
+                    # it.  FIXME: we should be able to get this
+                    # information from forarbete_parser, since it has
+                    # already gleaned it. Also, this general class
+                    # shouldn't deal with RINFOEX classes (this should
+                    # be something for lagen.nu.SFS)
+                    if "/prop/" in k:
+                        ar.add(RDF.type, RPUBL.Proposition)
+                    elif "/bet/" in k:
+                        ar.add(RDF.type, RINFOEX.Utskottsbetankande)
+                    elif "/rskr/" in k:
+                        ar.add(RDF.type, RINFOEX.Riksdagsskrivelse)
                     del attributes[k]
                     attributes[URIRef(k)] = ar
         resource = super(SFS, self).polish_metadata(attributes,
@@ -991,13 +1002,18 @@ class SFS(Trips):
                 triple = (s.identifier, p.identifier, o)
                 graph.add(triple)
                 doc.meta.remove(triple)
-                if p.identifier in (RPUBL.forarbete, RPUBL.genomforDirektiv):
-                    if p.identifier == RPUBL.forarbete:
-                        triple = (o, DCTERMS.identifier,
-                                  doc.meta.value(o, DCTERMS.identifier))
-                    elif p.identifier == RPUBL.genomforDirektiv:
-                        triple = (o, RPUBL.celexNummer,
-                                  doc.meta.value(o, RPUBL.celexNummer))
+                if p.identifier == RPUBL.forarbete:
+                    triple = (o, DCTERMS.identifier,
+                              doc.meta.value(o, DCTERMS.identifier))
+                    graph.add(triple)
+                    trash.add(triple)
+                    triple = (o, RDF.type,
+                              doc.meta.value(o, RDF.type))
+                    graph.add(triple)
+                    trash.add(triple)
+                elif p.identifier == RPUBL.genomforDirektiv:
+                    triple = (o, RPUBL.celexNummer,
+                              doc.meta.value(o, RPUBL.celexNummer))
                     graph.add(triple)
                     trash.add(triple)
             uri = str(res.identifier)
@@ -1504,7 +1520,7 @@ class SFS(Trips):
         changes = self.time_store_select(store,
                                          "sparql/sfs_changes.rq",
                                          basefile,
-                                         sfsdataset,
+                                         None, # need both prop and sfs contexts
                                          "change annotations")
         for row in changes:
             lagrum = row['lagrum']
@@ -1512,9 +1528,11 @@ class SFS(Trips):
                 stuff[lagrum] = {}
             if not 'changes' in stuff[lagrum]:
                 stuff[lagrum]['changes'] = []
-            stuff[lagrum]['changes'].append({'uri': row['change'],
-                                             'id': row['id'],
-                                             'changetype': row['changetype']})
+            stuff[lagrum]['changes'].append({'uri':        row['change'],
+                                             'id':         row['id'],
+                                             'changetype': row['changetype'],
+                                             'propid':     row.get('propid'),
+                                             'proptitle':  row.get('proptitle')})
 
 
         # 7. all forfattnigskommentar
@@ -1659,7 +1677,10 @@ class SFS(Trips):
                     #rattsfall_node = etree.SubElement(islagrumfor_node, "rdf:Description")
                     # rattsfall_node.set("rdf:about",r['uri'])
                     id_node = etree.SubElement(ischanged_node, ns("rpubl:fsNummer"))
-                    id_node.text = r['id']
+                    id_node.text = r['id'].replace("SFS ", "")
+                    if r['propid']:
+                        prop_node = etree.SubElement(ischanged_node, ns("rpubl:proposition"))
+                        prop_node.text = " (%(proptitle)s)" % r
             if 'desc' in stuff[l]:
                 desc_node = etree.SubElement(lagrum_node, ns("dcterms:description"))
                 xhtmlstr = "<div xmlns='http://www.w3.org/1999/xhtml'>%s</div>" % stuff[
