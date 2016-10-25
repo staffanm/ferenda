@@ -111,6 +111,7 @@ class DV(SwedishLegalSource):
 
     DCTERMS = Namespace(util.ns['dcterms'])
     sparql_annotations = "sparql/dv-annotations.rq"
+    sparql_expect_results = False
     xslt_template = "xsl/dv.xsl"
 
     @classmethod

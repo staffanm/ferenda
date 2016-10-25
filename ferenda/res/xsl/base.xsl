@@ -111,17 +111,13 @@
       <div class="row row-offcanvas row-offcanvas-left">
 	<div class="col-sm-3 sidebar-offcanvas" id="sidebar">
 	  <!-- note: importing stylesheet MUST define <xsl:param name="dyntoc" select="false()"/> (or true()) -->
-	  <xsl:comment>dyntoc: <xsl:value-of select="$dyntoc"/></xsl:comment>
-	  <xsl:choose><xsl:when test="$dyntoc">
-	    <nav id="toc" data-spy="affix" data-toggle="toc" data-offset-top="70"></nav>
-	    </xsl:when><xsl:otherwise>
-	    <nav id="toc" data-spy="affix" data-toggle="toc" data-offset-top="70">
+	  <nav id="toc" data-spy="affix" data-toggle="toc" data-offset-top="70">
+	    <xsl:if test="not($dyntoc)">
 	      <ul class="nav">
 		<xsl:apply-templates mode="toc"/>
 	      </ul>
-	    </nav>
-	  </xsl:otherwise>
-	  </xsl:choose>
+	    </xsl:if>
+	  </nav>
 	</div>
 	<article class="col-sm-9">
           <p class="visible-xs">
@@ -146,6 +142,9 @@
       </div>
       <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js">&#160;</script>
       <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous">&#160;</script>
+      <xsl:if test="$dyntoc">
+	<script src="https://cdn.rawgit.com/afeld/bootstrap-toc/v0.3.0/dist/bootstrap-toc.min.js">&#160;</script> 
+      </xsl:if>
       <xsl:copy-of select="$configuration/javascripts/*"/>
     </body>
   </xsl:template>

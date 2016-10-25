@@ -101,7 +101,7 @@ nav[data-toggle='toc'] ul.nav ul.nav ul.nav ul.nav > li.active > a {
 
 
 /* small screens */
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   /* override the Affix plugin so that the navigation isn't sticky */
   nav.affix[data-toggle='toc'] {
     position: static;
