@@ -963,7 +963,7 @@ class SwedishLegalSource(DocumentRepository):
 
     def _relate_fulltext_value_rootlabel(self, desc):
         if desc.getvalues(DCTERMS.title):
-            title = desc.getvalue(DCTERMS.identifier)
+            title = desc.getvalue(DCTERMS.title)
         else:
             self.log.warning("Missing dcterms:title")
             title = "(Titel saknas)"

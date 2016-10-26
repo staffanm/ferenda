@@ -83,7 +83,8 @@ lagen.nu."""
                   'arn': 'Beslut från ARN',
                   'dv': 'Domar',
                   'jk': 'Beslut från JK',
-                  'jo': 'Beslut från JO'}
+                  'jo': 'Beslut från JO',
+                  'static': 'Om lagen.nu'}
     facetlabels = {'type': 'Dokumenttyp',
                    'creator': 'Källa',
                    'issued': 'År'}
