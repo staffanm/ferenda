@@ -4,8 +4,7 @@ PREFIX rpubl:<http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
 
 SELECT DISTINCT ?change ?changetype ?id ?lagrum ?prop ?propid ?proptitle
 WHERE {
-    ?change (rpubl:ersatter|rpubl:upphaver|rpubl:inforsI)  ?lagrum;
-	    ?changetype ?lagrum;
+    ?change ?changetype ?lagrum;
             dcterms:identifier ?id;
             rpubl:forarbete ?prop .
     ?prop rdf:type rpubl:Proposition . 
@@ -13,5 +12,5 @@ WHERE {
       ?prop dcterms:identifier ?propid;
             dcterms:title ?proptitle .
     }
-    FILTER(STRSTARTS(STR(?lagrum), "%(uri)s"))
+    FILTER(STRSTARTS(STR(?lagrum), "%(uri)s") && ?changetype IN (rpubl:ersatter, rpubl:upphaver, rpubl:inforsI))
 }
