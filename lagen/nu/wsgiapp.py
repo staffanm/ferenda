@@ -68,8 +68,10 @@ lagen.nu."""
 
     def _search_render_innerhit(self, innerhit):
         r = innerhit
+        if 'text' not in r:
+            r['text'] = []
         r['text'].insert(0, ": ")
-        r['text'].insert(0, elements.Link(r.get('label', '(beteckning saknas)'),
+        r['text'].insert(0, elements.LinkMarkup(r.get('label', ['(beteckning saknas)']),
                                           uri=r['uri']))
         return html.P(r['text'], **{'class': 'innerhit'})
 

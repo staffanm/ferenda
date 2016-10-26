@@ -546,6 +546,17 @@ class LinkSubject(PredicateElement, Link):
         return element
 
 
+class LinkMarkup(CompoundElement):
+    """A link that can contain mixed content, ie bold and italic tags, etc"""
+    tagname = "a"
+
+    def as_xhtml(self, uri, parent_uri=None):
+        element = super(LinkMarkup, self).as_xhtml(uri, parent_uri)
+        if hasattr(self, 'uri'):
+            element.set('href', self.uri)
+        return element
+    
+
 class Body(CompoundElement):
 
     def as_xhtml(self, uri, parent_uri=None):

@@ -60,7 +60,6 @@ class JK(SwedishLegalSource):
     @recordlastdownload
     def download(self, basefile=None, reporter=None):
         if basefile:
-            from pudb import set_trace; set_trace()
             resp = self.session.post(self.start_url, data={'diarienummer': basefile})
             soup = BeautifulSoup(resp.text, "lxml")
             link = soup.find("div", "ruling-results").find("a", href=re.compile("/beslut-och-yttranden/"))

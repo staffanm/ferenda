@@ -820,16 +820,19 @@ class ElasticSearchIndex(RemoteIndex):
             # NOTE: we need to specify highlight parameters for each
             # subquery when using has_child, see
             # https://github.com/elastic/elasticsearch/issues/14999
-            match['_all'] = q
-            highlight = {'fields': {'_all': {}},
-                         'fragment_size': 60
+            match['fields'] = ["label", "text"]
+            match['query'] = q
+            highlight = {'fields': {'text': {},
+                                    'label': {}},
+                         'fragment_size': 150,
+                         'number_of_fragments': 2
             }
             inner_hits["highlight"] = highlight
 
         # now, explode the match query into a big OR query for
         # matching each possible _child type (until someone solves
         # http://stackoverflow.com/questions/38946547 for me)
-        submatches = [{"match": deepcopy(match)}]
+        submatches = [{"simple_query_string": deepcopy(match)}]
         if kwargs.get("repo"):
             reponames = [kwargs.get("repo")]
         else:
@@ -838,7 +841,7 @@ class ElasticSearchIndex(RemoteIndex):
             submatches.append(
                 {"has_child": {"type": reponame + "_child",
                                "inner_hits": inner_hits,
-                               "query": {"match": deepcopy(match)}
+                               "query": {"simple_query_string": deepcopy(match)}
                 }})
 
         match = {"bool": {"should": submatches}}
@@ -875,8 +878,8 @@ class ElasticSearchIndex(RemoteIndex):
         # https://github.com/elastic/elasticsearch/issues/14999 --
         # revisit once Elasticsearch 2.4 is released.
         payload['highlight'] = deepcopy(highlight)
-        if q:
-           payload['highlight']['highlight_query'] = {'match': {'_all': q}}
+        # if q:
+        #    payload['highlight']['highlight_query'] = {'match': {'_all': q}}
         return relurl, json.dumps(payload, indent=4, default=util.json_default_date)
 
     def _aggregation_payload(self):
@@ -934,16 +937,18 @@ class ElasticSearchIndex(RemoteIndex):
         h = hit['_source']
         h['repo'] = hit['_type']
         if 'highlight' in hit:
-            # wrap highlighted field in P, convert to
-            # elements. 
-            hltext = re.sub("\s+", " ", " ... ".join([x.strip() for x in hit['highlight']['_all']]))
-            hltext = hltext.replace("<em>", "<strong class='match'>").replace("</em>", "</strong>")
-            # FIXME: BeautifulSoup/lxml returns empty soup if
-            # first char is '§' or some other non-ascii char (like
-            # a smart quote). Padding with a space makes problem
-            # disappear, but need to find root cause.
-            soup = BeautifulSoup("<p> %s</p>" % hltext, "lxml")
-            h['text'] = html.elements_from_soup(soup.html.body.p)
+            for hlfield in ('text', 'label'):
+                if hlfield in hit['highlight']:
+                    # wrap highlighted field in P, convert to
+                    # elements.
+                    hltext = re.sub("\s+", " ", " ... ".join([x.strip() for x in hit['highlight'][hlfield]]))
+                    hltext = hltext.replace("<em>", "<strong class='match'>").replace("</em>", " </strong>")
+                    # FIXME: BeautifulSoup/lxml returns empty soup if
+                    # first char is '§' or some other non-ascii char (like
+                    # a smart quote). Padding with a space makes problem
+                    # disappear, but need to find root cause.
+                    soup = BeautifulSoup("<p> %s</p>" % hltext, "lxml")
+                    h[hlfield] = html.elements_from_soup(soup.html.body.p)
         return h
 
     def _count_payload(self):
@@ -1067,8 +1072,6 @@ class ElasticSearchIndex(RemoteIndex):
 
     def _destroy_payload(self):
         return "", None
-
-
 
 FulltextIndex.indextypes = {'WHOOSH': WhooshIndex,
                             'ELASTICSEARCH': ElasticSearchIndex}

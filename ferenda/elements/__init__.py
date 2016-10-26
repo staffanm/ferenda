@@ -9,6 +9,7 @@ from .elements import PredicateElement
 from .elements import OrdinalElement
 from .elements import Link
 from .elements import LinkSubject
+from .elements import LinkMarkup
 from .elements import Body
 from .elements import Title
 from .elements import Page
