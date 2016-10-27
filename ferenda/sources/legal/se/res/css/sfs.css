@@ -17,6 +17,11 @@
     margin-bottom: 6pt;
 }
 
+.upphavdparagraf, .upphavtkapitel {
+    font-size: smaller;
+    font-style: italic;
+}
+
 ol.numreradlista, ol.bokstavslista, ul.strecksatslista { list-style: none; }
 
 ol.numreradlista > li:before, ol.bokstavslista > li:before, ul.strecksatslista > li:before {
