@@ -27,8 +27,6 @@ from ferenda import (TextReader, TripleStore, FulltextIndex, WSGIApp,
                      CompositeRepository, DocumentEntry, Transformer)
 from ferenda.elements import serialize
 from ferenda import decorators, util
-# from ferenda.sources.general import Static
-from lagen.nu import Static
 
 class DummyStore(object):
 
@@ -609,6 +607,8 @@ class Devel(object):
     @decorators.action
     def samplerepos(self, sourcedir):
         """Copy a random selection of external documents to the current datadir - for all docrepos.""" 
+        # from ferenda.sources.general import Static
+        from lagen.nu import Static
         if 'samplesize' in self.config:
             samplesize = int(self.config.samplesize)
         else:
