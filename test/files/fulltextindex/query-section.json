@@ -4,16 +4,16 @@
     "basefile": "1",
     "dcterms_identifier": "Doc #1 (section 2)",
     "dcterms_title": "Second sec"
-},"highlight":{"_all":["This is another independent <strong class='match'>section</strong>"]}},{"_index":"ferenda","_type":"base","_id":"1s1","_score":2.6516504, "_source" : {
+},"highlight":{"text":["This is another independent <strong class='match'>section</strong>"]}},{"_index":"ferenda","_type":"base","_id":"1s1","_score":2.6516504, "_source" : {
     "text": "This is an (updated version of a) independent section, with extra section boost",
     "uri": "http://example.org/doc/1#s1",
     "basefile": "1",
     "dcterms_identifier": "Doc #1 (section 1)",
     "dcterms_title": "First section"
-},"highlight":{"_all":[") independent <strong class='match'>section</strong>, with extra <strong class='match'>section</strong> boost"]}},{"_index":"ferenda","_type":"base","_id":"1","_score":0.15467961, "_source" : {
+},"highlight":{"text":[") independent <strong class='match'>section</strong>, with extra <strong class='match'>section</strong> boost"]}},{"_index":"ferenda","_type":"base","_id":"1","_score":0.15467961, "_source" : {
     "text": "This is the main text of the document (independent sections excluded)",
     "uri": "http://example.org/doc/1",
     "basefile": "1",
     "dcterms_identifier": "Doc #1",
     "dcterms_title": "First example"
-},"highlight":{"_all":["This is the main text of the document (independent <strong class='match'>sections</strong> excluded)"]}}]}}
+},"highlight":{"text":["This is the main text of the document (independent <strong class='match'>sections</strong> excluded)"]}}]}}

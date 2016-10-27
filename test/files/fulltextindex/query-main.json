@@ -4,4 +4,4 @@
     "basefile": "1",
     "dcterms_identifier": "Doc #1",
     "dcterms_title": "First example"
-},"highlight":{"_all":["This is the <strong class='match'>main</strong> text of the document (independent sections excluded)"]}}]}}
+},"highlight":{"text":["This is the <strong class='match'>main</strong> text of the document (independent sections excluded)"]}}]}}

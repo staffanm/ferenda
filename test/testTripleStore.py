@@ -256,7 +256,7 @@ class Main(unittest.TestCase, FerendaTestCase):
             mock_get.side_effect = requests.exceptions.HTTPError("Server error", response=mockresponse)
             got = store.select("the-query", format="python")
     
-    @patch('requests.get', side_effect=canned((200, "construct-results.xml")))
+    @patch('requests.get', side_effect=canned((200, "construct-results.ttl")))
     def test_sesame_construct(self, mock_get):
         store = TripleStore.connect("SESAME", "", "")
         rf = util.readfile

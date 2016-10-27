@@ -4,10 +4,10 @@
     "basefile": "2",
     "dcterms_identifier": "Doc #2",
     "dcterms_title": "Second document"
-},"highlight":{"_all":["This is the second <strong class='match'>document</strong> (not the first)"]}},{"_index":"ferenda","_type":"base","_id":"1","_score":0.19917816, "_source" : {
+},"highlight":{"text":["This is the second <strong class='match'>document</strong> (not the first)"]}},{"_index":"ferenda","_type":"base","_id":"1","_score":0.19917816, "_source" : {
     "text": "This is the main text of the document (independent sections excluded)",
     "uri": "http://example.org/doc/1",
     "basefile": "1",
     "dcterms_identifier": "Doc #1",
     "dcterms_title": "First example"
-},"highlight":{"_all":["This is the main text of the <strong class='match'>document</strong> (independent sections excluded)"]}}]}}
+},"highlight":{"text":["This is the main text of the <strong class='match'>document</strong> (independent sections excluded)"]}}]}}

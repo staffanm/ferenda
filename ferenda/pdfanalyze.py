@@ -331,8 +331,28 @@ class PDFAnalyzer(object):
             for val in counter:
                 lowresbin = trunc_func(val / binsize)
                 lowres[lowresbin * binsize] += counter[val]
-            return lowres.most_common(1)[0][0]
-    
+
+            # it's entirely possible that two or more bins will have the same count. Find out how many, and select the best candidate
+            prevcount = None
+            candidates = []
+            for val, count in lowres.most_common():
+                if prevcount and count != prevcount:
+                    # ok we're done, select the best candidate
+                    if trunc_func == ceil:
+                        select_func = max
+                    elif trunc_func == floor:
+                        select_func = min
+                    else:
+                        # the average value of all candidates
+                        select_func = lambda l: sum(l)/len(l)
+                    return select_func(candidates)
+                else:
+                    candidates.append(val)
+                    prevcount = count
+            return candidates[0]  # this should only happen if we only have a single candidate
+
+
+        
     def fontsize_key(self, fonttuple):
         family, size = fonttuple
         if "Bold" in family:

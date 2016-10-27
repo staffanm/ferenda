@@ -168,14 +168,14 @@ class TOC(RepoTester):
         # Various other tests on a.html
         # 2.1 CSS links, relativized correctly?
         css = t.findall("head/link[@rel='stylesheet']")
-        self.assertEqual(len(css),5) # bootstrap, bootstrap-theme, bootstrap-toc, ferenda and sfs (?!)
+        self.assertEqual(len(css),4) # bootstrap, bootstrap-theme, ferenda and sfs (?!)
         
-        self.assertRegex(css[4].get('href'), '^../../../rsrc/css')
+        self.assertRegex(css[3].get('href'), '^../../../rsrc/css')
         
         # 2.2 JS links, relativized correctly?
         js = t.findall("body/script")
-        self.assertEqual(len(js), 4) # jquery, bootstrap, bootstrap-toc, ferenda
-        self.assertRegex(js[3].get('src'), '^../../../rsrc/js')
+        self.assertEqual(len(js), 3) # jquery, bootstrap, ferenda
+        self.assertRegex(js[2].get('src'), '^../../../rsrc/js')
         # 2.3 <nav id="toc"> correct (c.f 1.2)
         navlinks = t.findall(".//nav[@id='toc']//li/a")
         self.assertEqual(len(navlinks),9)
