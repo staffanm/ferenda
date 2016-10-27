@@ -55,13 +55,12 @@ class Strecksatslista (CompoundElement):
 
 
 class NumreradLista (CompoundElement):
-    tagname = "ul"  # These list are not always monotonically
-    # increasing, which a <ol> requrires
+    tagname = "ol"  # list elements have their ordinals encoded as rinfoex:punkt triples
     classname = "numreradlista"
 
 
 class Bokstavslista (CompoundElement):
-    tagname = "ul"  # See above
+    tagname = "ol"
     classname = "bokstavslista"
 
 
@@ -166,7 +165,13 @@ class Kapitel(CompoundElement, OrdinalElement):
 
 
 class UpphavdParagraf(UnicodeElement, OrdinalElement):
-    pass
+    tagname = "div"
+    classname = "upphavdparagraf"
+
+
+class UpphavtKapitel(UnicodeElement, OrdinalElement):
+    tagname = "div"
+    classname = "upphavtkapitel"
 
 
 # en paragraf har inget "eget" värde, bara ett nummer och ett eller
@@ -205,6 +210,12 @@ class Listelement(CompoundElement, OrdinalElement):
         self.uri = kwargs.get("uri", None)
         super(Listelement, self).__init__(*args, **kwargs)
 
+    def as_xhtml(self, uri=None, parent_uri=None):
+        res = super(Listelement, self).as_xhtml(uri, parent_uri)
+        res.attrib.update({"property": "rinfoex:punkt",
+                           "content": self.ordinal})
+        return res
+        
 
 class Overgangsbestammelser(CompoundElement):
 

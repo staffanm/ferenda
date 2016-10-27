@@ -20,12 +20,18 @@ re_SectionId = re.compile(
 re_SectionIdOld = re.compile(
     r'^\xa7 (\d+ ?\w?).')     # as used in eg 1810:0926
 re_NumberRightPara = re.compile(r'^(\d+)\) ').match
+
+# NOTE: If we need to change these (used by idOfNumreradLista and
+# idOfBokstavslista) to allow other separators than '.' and ')', we
+# need to store the separator in the resulting Listelement objects
 re_DottedNumber = re.compile(r'^(\d+ ?\w?)\. ')
 re_Bokstavslista = re.compile(r'^(\w)\) ')
+re_Strecksatslista = re.compile(r'^(- |\x96 |\u2013 |--)')
+
 re_ElementId = re.compile(
     r'^(\d+) mom\.')        # used for both match+sub
 re_ChapterRevoked = re.compile(
-    r'^(\d+( \w|)) [Kk]ap. (upphävd|har upphävts) genom (förordning|lag) \([\d\:\. s]+\)\.?$').match
+    r'^(\d+( \w|)) [Kk]ap. (upphävd|[Hh]ar upphävts) genom (förordning|lag) \([\d\:\. s]+\)\.?$').match
 re_SectionRevoked = re.compile(
     r'^(\d+ ?\w?) \xa7[ \.]([Hh]ar upphävts|[Nn]y beteckning (\d+ ?\w?) \xa7) genom ([Ff]örordning|[Ll]ag) \([\d\:\. s]+\)\.$').match
 re_RevokeDate = re.compile(
@@ -328,7 +334,6 @@ def make_parser(reader, basefile, log, trace):
                 state_handler = makeNumreradLista
             else:
                 state_handler = guess_state()
-
             if state_handler not in (blankline,
                                      makeNumreradLista,
                                      makeBokstavslista,
@@ -342,7 +347,9 @@ def make_parser(reader, basefile, log, trace):
                                    reader.peekline()[:30])
                     listelement_ordinal = idOfNumreradLista()
                     li = Listelement(ordinal=listelement_ordinal)
-                    p = reader.readparagraph()
+                    # remove the ordinal from the string since we have
+                    # it as the ordinal attribute
+                    p = re_DottedNumber.sub('', reader.readparagraph())
                     li.append(p)
                     n.append(li)
                 else:
@@ -366,7 +373,7 @@ def make_parser(reader, basefile, log, trace):
                                reader.peekline()[:30])
                 listelement_ordinal = idOfBokstavslista()
                 li = Listelement(ordinal=listelement_ordinal)
-                p = reader.readparagraph()
+                p = re_Bokstavslista.sub('', reader.readparagraph())
                 li.append(p)
                 n.append(li)
                 log.debug("            Underpunkt %s avslutad" %
@@ -386,7 +393,7 @@ def make_parser(reader, basefile, log, trace):
                 log.debug("            Ny strecksats: '%s...'" %
                                reader.peekline()[:60])
                 cnt += 1
-                p = reader.readparagraph()
+                p = re_Strecksatslista.sub('', reader.readparagraph())
                 li = Listelement(ordinal=str(cnt))
                 li.append(p)
                 n.append(li)
@@ -1169,11 +1176,6 @@ def make_parser(reader, basefile, log, trace):
     def idOfNumreradLista(p=None):
         if not p:
             p = reader.peekline()
-            trace['numlist'].debug(
-                "idOfNumreradLista: called directly (%s)" % p[:30])
-        else:
-            trace['numlist'].debug(
-                "idOfNumreradLista: called w/ '%s'" % p[:30])
         match = re_DottedNumber.match(p)
 
         if match is not None:
@@ -1193,10 +1195,7 @@ def make_parser(reader, basefile, log, trace):
     def isStrecksatslista(p=None):
         if not p:
             p = reader.peekline()
-
-        return (p.startswith("- ") or
-                p.startswith("\x96 ") or
-                p.startswith("--"))
+        return re_Strecksatslista.match(p) != None
 
     def isBokstavslista():
         return idOfBokstavslista() is not None

@@ -14,11 +14,8 @@
 <https://lagen.nu/2011:1244#A2> a rinfoex:Avdelning ;
     rinfoex:avdelningsnummer "2"@sv .
 
-<https://lagen.nu/2011:1244#K15P1S1> a rinfoex:Stycke ;
-    dcterms:isPartOf <https://lagen.nu/2011:1244#K15P1> .
-
-<https://lagen.nu/2011:1244#K15P1S2> a rinfoex:Stycke ;
-    dcterms:isPartOf <https://lagen.nu/2011:1244#K15P1> ;
+<https://lagen.nu/2011:1244#K15P1S1N1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2011:1244#K15P1S1> ;
     dcterms:references <https://lagen.nu/2011:1244#K15P2> .
 
 <https://lagen.nu/2011:1244#K1P1S1> a rinfoex:Stycke ;
@@ -63,6 +60,13 @@
 <https://lagen.nu/2011:1244#K15> a rpubl:Kapitel ;
     rpubl:kapitelnummer "15"@sv .
 
+<https://lagen.nu/2011:1244#K15P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2011:1244#K15> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/2011:1244#K15P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2011:1244#K15P1> .
+
 <https://lagen.nu/2011:1244#K2P1> a rpubl:Paragraf ;
     dcterms:isPartOf <https://lagen.nu/2011:1244#K2> ;
     rpubl:paragrafnummer "1"@sv .
@@ -89,7 +93,8 @@
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2011:1244/konsolidering/2011-12-01> ;
     prov:wasGeneratedBy "lagen.nu.sfs.SFS" .
 
-<https://lagen.nu/bet/2011/12:SkU3> dcterms:identifier "bet. 2011/12:SkU3" .
+<https://lagen.nu/bet/2011/12:SkU3> a rinfoex:Utskottsbetankande ;
+    dcterms:identifier "bet. 2011/12:SkU3" .
 
 <https://lagen.nu/ext/celex/32003L0048> rpubl:celexNummer "32003L0048" .
 
@@ -107,9 +112,11 @@
 
 <https://lagen.nu/ext/celex/32010R0904> rpubl:celexNummer "32010R0904" .
 
-<https://lagen.nu/prop/2010/11:165> dcterms:identifier "Prop. 2010/11:165" .
+<https://lagen.nu/prop/2010/11:165> a rpubl:Proposition ;
+    dcterms:identifier "Prop. 2010/11:165" .
 
-<https://lagen.nu/rskr/2011/12:28> dcterms:identifier "rskr. 2011/12:28" .
+<https://lagen.nu/rskr/2011/12:28> a rinfoex:Riksdagsskrivelse ;
+    dcterms:identifier "rskr. 2011/12:28" .
 
 <https://lagen.nu/2011:1244> a rpubl:Lag ;
     dcterms:identifier "SFS 2011:1244" ;
@@ -136,10 +143,6 @@
 
 <https://lagen.nu/2011:1244#K1> a rpubl:Kapitel ;
     rpubl:kapitelnummer "1"@sv .
-
-<https://lagen.nu/2011:1244#K15P1> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/2011:1244#K15> ;
-    rpubl:paragrafnummer "1"@sv .
 
 <https://lagen.nu/2011:1244#K4> a rpubl:Kapitel ;
     rpubl:kapitelnummer "4"@sv .

@@ -288,6 +288,10 @@
       <xsl:apply-templates/>
     </p>
   </xsl:template>
+
+  <xsl:template match="xhtml:li[@property='rinfoex:punkt']">
+    <li id="{@id}" about="{@about}" data-ordinal="{@content}"><xsl:apply-templates/></li>
+  </xsl:template>
   
   <xsl:template name="andringsnoteringar">
     <xsl:param name="typ"/>
