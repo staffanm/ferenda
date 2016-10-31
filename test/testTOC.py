@@ -174,8 +174,8 @@ class TOC(RepoTester):
         
         # 2.2 JS links, relativized correctly?
         js = t.findall("body/script")
-        self.assertEqual(len(js), 3) # jquery, bootstrap, ferenda
-        self.assertRegex(js[2].get('src'), '^../../../rsrc/js')
+        self.assertEqual(len(js), 4) # jquery, bootstrap, hammer, ferenda
+        self.assertRegex(js[3].get('src'), '^../../../rsrc/js')
         # 2.3 <nav id="toc"> correct (c.f 1.2)
         navlinks = t.findall(".//nav[@id='toc']//li/a")
         self.assertEqual(len(navlinks),9)
