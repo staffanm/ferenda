@@ -204,7 +204,9 @@ nav[data-toggle='toc'].affix {
 	width: 25%;
 	border: none;
     }
-
+    .row-offcanvas-left .sidebar-offcanvas .slidebutton {
+	display: none;
+    }
     .row-offcanvas-left article {
 	width: 75%;
     }

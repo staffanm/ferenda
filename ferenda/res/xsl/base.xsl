@@ -112,7 +112,7 @@
 	  
 	<div class="col-sm-3 sidebar-offcanvas" id="sidebar">
 	  <a href="#" onclick="$('.row-offcanvas').toggleClass('active')">
-	  <div class="slidebutton hidden-lg" data-toggle="offcanvas">
+	  <div class="slidebutton" data-toggle="offcanvas">
 	    <div class="inner-slidebutton">
 	      <span class="glyphicon glyphicon-menu-right">&#8288;</span>
 	      <span class="glyphicon glyphicon-menu-left">&#8288;</span>

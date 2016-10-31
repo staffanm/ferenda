@@ -55,7 +55,10 @@ def copy_files():
                   exclude=["*downloaded*", "*archive*"],
                   delete=True,
                   default_opts="-azi")
-    run("chmod -R go+w /home/staffan/www/ferenda.lagen.nu/data")
+    # we use quiet=True since this may fail on webserver-owned
+    # directories (if the webserver owns the directory, we don't
+    # need to chmod it).
+    run("chmod -R go+w /home/staffan/www/ferenda.lagen.nu/data", quiet=True)
 
     
 def git_pull():
