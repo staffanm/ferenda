@@ -49,6 +49,7 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
     </div>
   </xsl:template>
   <xsl:param name="dyntoc" select="false()"/>
+  <xsl:param name="fixedtoc" select="true()"/>
   <xsl:param name="content-under-pagetitle" select="false()"/>
 
   <!-- Headings shouldn't be expressed with <h*> tags, but rather with

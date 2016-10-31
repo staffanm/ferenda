@@ -1,9 +1,23 @@
-$(document).ready(function () {
-    /* hook up the offcanvas classes to make a sliding left menu possible on small screens */
-    $('[data-toggle="offcanvas"]').click(function () {
-	$('.row-offcanvas').toggleClass('active')
-    });
+function toggleOffcanvas() {
+  $('.row-offcanvas').toggleClass('active')
+}
 
+$(document).ready(function () {
+  /* hook up the offcanvas classes to make a sliding left menu
+   * possible on small screens -- in three different ways
+   1. as a onclickhandler on the slide button (doesn't work, the
+      slidebutton doesn't recieve the click)
+   2. as a keypress handler, press 'f' to toggle the menu
+   3. as a swipeleft handler (doesn't work, at least not on Chrome devtools)
+ */
+  $('button.slidebutton').click(toggleOffcanvas);
+  $('body').keydown(function(e) {
+    if (e.key == 'f') { toggleOffcanvas() }
+  });
+  $('body').on("swipeleft", function(e) {
+    toggleOffcanvas()
+  });
+		    
     /* functions for replacing the text rendering of a pdf page with an image rendering of same */
     $('div.sida a.view-img').click(function () {
 	/* hide everything else from here to next page */

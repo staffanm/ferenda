@@ -89,12 +89,13 @@
     </div>
   </xsl:template>
   <xsl:param name="dyntoc" select="false()"/>
+  <xsl:param name="fixedtoc" select="true()"/>
   <xsl:param name="content-under-pagetitle" select="false()"/>
 
   <xsl:template name="docmetadata">
     <dl id="refs-dokument" class="dl-horizontal">
       <dt>Departement</dt>
-      <dd><xsl:value-of select="//xhtml:link[@rel='dcterms:creator']/@href"/></dd>
+      <dd><xsl:value-of select="substring-after(//xhtml:link[@rel='dcterms:creator']/@href, '/2008/')"/></dd>
       <dt>Utfärdad</dt>
       <dd><xsl:value-of select="//xhtml:meta[@property='rpubl:utfardandedatum']/@content"/></dd>
       <dt>Ändring införd</dt>
@@ -389,7 +390,7 @@
       <!-- since the rest of the data is only available as an RDF
            graph, serialized as naive RDFa, generating good HTML is a
            bit involved -->
-      <dl>
+      <dl class="dl-horizontal">
 	<xsl:if test="xhtml:span[@rel='rpubl:forarbete']">
 	  <dt>Förarbeten</dt>
 	  <dd>

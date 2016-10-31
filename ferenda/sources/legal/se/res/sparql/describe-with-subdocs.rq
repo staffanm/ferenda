@@ -4,17 +4,26 @@ PREFIX rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX bibo: <http://purl.org/ontology/bibo/>
 PREFIX olo: <http://purl.org/ontology/olo/core#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 
 
 CONSTRUCT {
   ?target dcterms:isReferencedBy ?referer .
-  ?referer ?p ?o .
+  ?referer dcterms:isPartOf ?rootdoc ;
+           dcterms:identifier ?refid ;
+           dcterms:title ?reftitle ;
+           bibo:chapter ?refchapter .
+  ?rootdoc dcterms:identifier ?rootid ;
+           dcterms:title ?roottitle .
 }
 WHERE
 {
-      ?referer dcterms:references ?target .
-      ?referer ?p ?o .
-      FILTER(STRSTARTS(STR(?target), "%(uri)s"))
-
+  ?referer dcterms:references ?target ;
+           dcterms:isPartOf* ?rootdoc . 
+  ?rootdoc dcterms:identifier ?rootid ;
+           dcterms:title ?roottitle .
+  OPTIONAL { ?referer dcterms:identifier ?refid . }
+  OPTIONAL { ?referer dcterms:title ?reftitle . }
+  OPTIONAL { ?referer bibo:chapter ?refchapter . }
+  FILTER(STRSTARTS(STR(?target), "%(uri)s#"))
 }
-

@@ -23,12 +23,62 @@ body.forarbete div.sida ul li a {
 div.forfattningskommentar {
 	border: 1px solid black;
 	padding: 2px;
-	background-color: #d9edf7; // corresponding to the "info" bootstrap color
+	background-color: #d9edf7; /* corresponding to the "info" bootstrap color */
 }
 
 body.frontpage td {
     display: block;
 }
+
+@media only screen and (min-width: 480px) {
+    body.frontpage td {
+	vertical-align: top;
+    }
+}
+/* force horizontal DLs, even for small screens */
+dl.dl-horizontal dt { 
+    float: left;
+    width: 110px;
+    overflow: hidden;
+    clear: left;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+dl.dl-horizontal dd {
+    margin-left: 120px;
+}
+dl.dl-horizontal {
+    margin-bottom: 0;
+}
+
+/* in general, legal sources should use more subdued headings. These
+   look good with SFS, other doc types might override this using eg
+   the body.forarbete selector */
+h1 {
+    font-size: 1.5em;
+    margin-top: 10px
+}
+
+section#top h1 {
+    /* main document header should not have any margin, as the navbar
+       provides ample space, and this causes the header to line up
+       with the document TOC */ 
+    margin-top: 0;
+}
+
+h2 {
+    font-size: 1.1em;
+    margin-top: 10px;
+}
+
+h3 {
+    font-size: 1em;
+    font-weight: normal;
+    font-style: italic;
+    margin-top: 10px;
+}
+
 
 @media only screen and (min-width: 480px) {
     body.frontpage td {

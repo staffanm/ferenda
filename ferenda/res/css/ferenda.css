@@ -1,37 +1,51 @@
-/* NTS: Media queries screen sizes used:
-   (default): (mobile portrait): site navigation and toc navigation use hamburger foldouts, asides below
-   min-width: 480px (tablet + mobile landscape?): site navigation in tabs
-   min-width: 768px (desktop): search in header always visible, subheading, site navigation in tabs, asides aside
-   min-width: 1140px (fullscreen desctop): toc navigation in leftmost columns
+/*  
+   Screen sizes used and UI element behaviour:
+
+   default, eg mobile: site navigation and doc TOC use hamburger foldouts
+                       asides below the main text
+
+   min-width: 768px, eg tablet portrait: Site navigation uses tabs,
+                                         asides beside the main
+                                         text. Doc TOC still use
+                                         foldout/offscreen canvas
+
+   min-width: 960px, eg desktop/tablet landscape: Doc TOC always on-screen
+
+
+
+   CSS rules structure:
+
+   1. Header/Navbar
+   2. Document/content area
+     2.1 Sidebar/Document-TOC
+     2.1.1 Scrollspy-dependent nav styling (foldouts etc)
+     2.1.2 Off-canvas handling of sidebar
+     2.1.3 Misc doc TOC styling
+     2.2 Accordion panel styling (asides)
+     2.3 Search results styling
+     2.4 TOC pages styling
+     2.5 Misc styling
+   3. Footer
+
 */
 
-/* this overrides main.css by @verekia */
-
 /* GENERAL/GLOBAL PARTS */
-/* PART 1: the general header area - should be thin, green and fixed to the viewport */
 
 
-/* PART 1, larger displays */
-
-@media only screen and (min-width: 480px) {
-}
+/* PART 1: Navbar */
 
 
-@media only screen and (min-width: 768px) {
-    /* headers should line up with panels that are aside them (when screen is big enough to have asides on the side) */
-    div.row > section > h1 {
-	margin-top: 0;
-    }
-}
-
+/* ...needs no customization now that we're using a stock Bootstrap
+   navbar and it's responsiveness */
 
 /* PART 2: The main content area (including document TOC) */
 
+/* PART 2.1: Sidebar/document TOC */
 nav[data-toggle='toc'] {
     margin-top: 0; /* used to be 30px, wonder what i was thinking... */
 }
 
-/* start of scrollspy-enabled toc */
+/* PART 2.1.1: Scrollspy-dependent styling  */
 
 /* 2nd level list items (and below) are displayed as inline, while their child
    anchors are blocks, which enables us to have a straight left
@@ -97,93 +111,147 @@ nav[data-toggle='toc'] ul.nav ul.nav ul.nav ul.nav > li.active > a {
   padding-left: 38px;
 }
 
-/* end of scrollspy-enabled toc (save for small-screen overrides) */
-
-
-/* small screens */
-@media (max-width: 767px) {
-  /* override the Affix plugin so that the navigation isn't sticky */
-  nav.affix[data-toggle='toc'] {
+nav[data-toggle='toc'].affix {
     position: static;
-  }
-
-  /* PICK ONE */
-  /* don't expand nested items, which pushes down the rest of the page when navigating */
-  /* nav[data-toggle='toc'] .nav .active .nav {
-    display: none;
-  }
-  */
-  /* alternatively, if you *do* want the second-level navigation to be shown (as seen on this page on mobile), use this */
-  nav[data-toggle='toc'] .nav .nav {
-    display: block;
-  }
-
-  .row-offcanvas {
-    position: relative;
-    -webkit-transition: all .25s ease-out;
-         -o-transition: all .25s ease-out;
-            transition: all .25s ease-out;
-  }
-
-  .row-offcanvas-right {
-    right: 0;
-  }
-
-  .row-offcanvas-left {
-    left: 0;
-  }
-
-  .row-offcanvas-right
-  .sidebar-offcanvas {
-    right: -50%; /* 6 columns */
-  }
-
-  .row-offcanvas-left
-  .sidebar-offcanvas {
-    left: -50%; /* 6 columns */
-  }
-
-  .row-offcanvas-right.active {
-    right: 50%; /* 6 columns */
-  }
-
-  .row-offcanvas-left.active {
-    left: 50%; /* 6 columns */
-  }
-
-  .sidebar-offcanvas {
-    position: absolute;
-    top: 0;
-    width: 50%; /* 6 columns */
-  }
-  
-  .row-offcanvas-left.active button span.showbutton { display: none; }
-  .row-offcanvas-left.active button span.hidebutton { display: inline-block; } 
-  .row-offcanvas-left button span.hidebutton { display: none; }
-  .row-offcanvas-left button { position: absolute; top:-30px }
 }
 
-img.facsimile { 
-    display: none;
-    border-left: 1px solid #ddd;
-    border-right: 1px solid #ddd;
-    width: 100%;
-    padding: 10px;
+@media only screen and (min-width: 960px) {
+    nav[data-toggle='toc'].affix {
+	position: fixed;
+    }
 }
 
-body.statusreport div.basefile {
-    margin: 2px 0;
-    padding: 1px;
-    display: inline-block;
+/* end of scrollspy-enabled toc */
+
+/* PART 2.1.2: Use off-canvas technique for doc TOC by default (larger screens can override this */
+
+
+.row-offcanvas-left {
+  left: 0;
 }
 
+.row-offcanvas-left.active {
+  left: 200px;
+}
 
-body.statusreport p.alert {
-    padding: 1px;
-    margin: 2px;
+.row-offcanvas-left.active article {
+    margin-left: 200px;
+}
+
+.row-offcanvas-left .sidebar-offcanvas {
+  position: fixed; 
+  top: 0;
+  width: 200px;
+  left: -198px; /* leave just a few pixels of the border so that the user notices it */
+  height: 100vh;
+  padding: 3px; 
+  border-width: 0 5px 0 0;
+  border-style: solid;
+  border-image: linear-gradient(to left, black, rgba(0, 0, 0, 0)) 1 100%;
+  background-color: #fff;
+}
+
+.row-offcanvas-left.active .sidebar-offcanvas {
+  left: 0;
+}
+ 
+.sidebar-offcanvas nav {
+  overflow: scroll;
+  height: 100vh;
+}
+
+.sidebar-offcanvas nav#toc ul {
+    padding: 0;
+}
+
+.slidebutton {
+  position: absolute;
+  width: 22px;
+  right: -14px;
+  top: 50vh;
+  height: 22px;
+  border-radius: 13px;
+  padding: 1px;
+  background: #000;
+}
+
+.inner-slidebutton {
+  width:20px;
+  height:20px;
+  border-radius:10px;
+  color:#000;
+  line-height:20px;
+  text-align:right;
+  padding-right: 3px;
+  background:#fff;
+  text-decoration: none;
+}
+
+@media only screen and (min-width: 960px) {
+    .row-offcanvas-left .sidebar-offcanvas {
+	left: 0;
+	position: relative;
+	width: 25%;
+	border: none;
+    }
+    .slidebutton
+}
+/* end offscreen canvas */
+
+
+/* PART 2.1.3: Misc doc TOC styling. FIXME: Should probably be merged with 2.1.1 above */
+nav#toc ul {
+    padding-left: 0.5em;
+}
+
+nav#toc li {
+    list-style: none;
+}
+
+nav#toc > ul > li > ul  {
+    padding: 0;
+}
+nav#toc > ul > li > ul > li {
     display: inline;
 }
 
+nav#toc > ul > li > p {
+    font-weight: bold;
+    margin-bottom: 0;
+    margin-top: 0.5em;
+}
+
+
+/* small screens */
+/*
+@media (max-width: 767px) {
+    override the Affix plugin so that the navigation isn't sticky
+   (which it is by default?) 
+    nav.affix[data-toggle='toc'] {
+	position: static;
+    }
+
+    nav[data-toggle='toc'] .nav .nav {
+	display: block;
+    }
+}
+*/
+
+@media only screen and (min-width: 960px) {
+    nav.affix-top {
+	width: 97%; /* of the .col-sm-3 element */
+    }
+    nav.affix {
+	position: fixed;
+	top: 0;
+	bottom: 0;  /* ie the div is 100% of the viewport height */
+	overflow: scroll; /* let us reach rest if the navmenu is larger than the viewport */
+	width: 24%;  /* of the entire page width, FOR SOME REASON */
+    }
+}
+
+
+/* PART 2.2: Accordion panel styling (asides) */ 
 /* Tighten the accordion panel headers */
 div.panel-group > div.panel {
 	border-radius: 0;
@@ -212,6 +280,29 @@ div.panel-body div.row p {
 	text-indent: 1em;
 	margin-bottom: 0;
 }
+
+@media (min-width: 768px) {
+    /* in tablet portrait mode, the main content is in a .col-sm-9 div,
+       which should cover the entire width */ 
+    .col-sm-9 {
+	width: 100%;
+    }
+}
+
+@media (min-width: 960px) {
+    /* in desktop mode, the sidebar is always visible (in a .col-sm-3 div)
+   and so the content area should only take 3/4 of the screen */
+    .col-sm-9 {
+	width: 75%
+    }
+}
+/* PART 2.3: Search results styling */
+
+/* FIXME: what was the purpose of this, again? */
+body.search nav#toc > ul > li > ul > li {
+    display: list-item;
+}
+
 body.search .hit {
 	margin-bottom: 1ex;
 	padding-left: 4pt;
@@ -226,14 +317,27 @@ body.search .innerhit {
 	margin-bottom: 1ex;
 }
 
-footer nav {
-    text-align: center;
+/* PART 2.4: TOC pages styling (A specific page type, not to be
+   confused with document TOC styling */ 
+body.toc article ul {
+    padding: 0;
+    list-style: none;
 }
-footer nav li {
-    display: inline;
+body.toc article ul li {
+    padding: 0;
+    list-style: none;
+    text-indent: -8em;
+    margin-left: 8em;
 }
-footer li + li::before {
-    content: " | ";
+
+
+/* PART 2.5: Misc styling */
+img.facsimile { 
+    display: none;
+    border-left: 1px solid #ddd;
+    border-right: 1px solid #ddd;
+    width: 100%;
+    padding: 10px;
 }
 
 /* grid-framework.less gives all .rows negative left and right margins
@@ -256,72 +360,27 @@ this grid system directly under body? */
     padding-right: 0.5em;
 }
 
-nav#toc ul {
-    padding-left: 0.5em;
+/* Maybe these should go into devel.css */
+body.statusreport div.basefile {
+    margin: 2px 0;
+    padding: 1px;
+    display: inline-block;
 }
-nav#toc li {
-    list-style: none;
-}
-
-nav#toc > ul > li > ul  {
-    padding: 0;
-}
-nav#toc > ul > li > ul > li {
+body.statusreport p.alert {
+    padding: 1px;
+    margin: 2px;
     display: inline;
 }
 
-body.search nav#toc > ul > li > ul > li {
-    display: list-item;
+/* PART 3: Footer */
+footer nav {
+    text-align: center;
+}
+footer nav li {
+    display: inline;
+}
+footer li + li::before {
+    content: " | ";
 }
 
-nav#toc > ul > li > p {
-    font-weight: bold;
-    margin-bottom: 0;
-    margin-top: 0.5em;
-}
-
-body.toc article ul {
-    padding: 0;
-    list-style: none;
-}
-body.toc article ul li {
-    padding: 0;
-    list-style: none;
-    text-indent: -8em;
-    margin-left: 8em;
-}
-
-
-@media only screen and (min-width: 480px) {
-    
-    .col-sm-3, .col-sm-5, .col-sm-7, .col-sm-9 {
-        padding: 0 1em 0 0;
-    }
-
-    body.frontpage td {
-	vertical-align: top;
-    }
-
-    
-    nav.affix-top {
-	width: 97%; /* of the .col-sm-3 element */
-    }
-    nav.affix {
-	position: fixed;
-	top: 0;
-	bottom: 0;  /* ie the div is 100% of the viewport height */
-	overflow: scroll; /* and we can get at the rest if the navmenu is larger than the viewport */
-	width: 24%;  /* of the entire page width, FOR SOME REASON */
-	
-    }
-
-}
-
-
-@media only screen and (min-width: 768px) {
-}
-
-
-@media only screen and (min-width: 1140px) {
-}
 

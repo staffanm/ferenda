@@ -25,6 +25,7 @@ It's a generic template for any kind of content
   <xsl:template name="bodyclass">frontpage</xsl:template>
   <xsl:template name="pagetitle"/>
   <xsl:param name="dyntoc" select="false()"/>
+  <xsl:param name="fixedtoc" select="true()"/>
   <xsl:param name="content-under-pagetitle" select="false()"/>
       
   <xsl:template match="xhtml:a">

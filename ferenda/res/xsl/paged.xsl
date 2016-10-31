@@ -26,6 +26,7 @@ It's a generic template for paged content (assumes a bunch of <div class="pdfpag
     <h1><xsl:value-of select="../xhtml:head/xhtml:title"/></h1>
   </xsl:template>
   <xsl:param name="dyntoc" select="true()"/>
+  <xsl:param name="fixedtoc" select="true()"/>
   <xsl:param name="content-under-pagetitle" select="false()"/>
       
 

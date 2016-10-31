@@ -109,24 +109,36 @@
 	</div><!-- /.container-fluid -->
       </nav>
       <div class="row row-offcanvas row-offcanvas-left">
+	  
 	<div class="col-sm-3 sidebar-offcanvas" id="sidebar">
-	  <!-- note: importing stylesheet MUST define <xsl:param name="dyntoc" select="false()"/> (or true()) -->
-	  <nav id="toc" data-spy="affix" data-toggle="toc" data-offset-top="70">
-	    <xsl:if test="not($dyntoc)">
-	      <ul class="nav">
-		<xsl:apply-templates mode="toc"/>
-	      </ul>
-	    </xsl:if>
-	  </nav>
+	  <a href="#" onclick="$('.row-offcanvas').toggleClass('active')">
+	  <div class="slidebutton hidden-lg" data-toggle="offcanvas">
+	    <div class="inner-slidebutton">&gt;</div>
+	  </div>
+	  </a>
+	  <!-- note: importing stylesheet MUST define
+	       <xsl:param name="dyntoc" select="false()"/>
+	       (or true()). Same for fixedtoc -->
+	  <xsl:choose>
+	    <xsl:when test="$fixedtoc">
+	      <nav id="toc" data-spy="affix" data-toggle="toc" data-offset-top="70">
+		<xsl:if test="not($dyntoc)">
+		  <ul class="nav">
+		    <xsl:apply-templates mode="toc"/>
+		  </ul>
+		</xsl:if>
+	      </nav>
+	    </xsl:when>
+	    <xsl:otherwise>
+	      <nav id="toc">
+		<ul class="nav">
+		  <xsl:apply-templates mode="toc"/>
+		</ul>
+	      </nav>
+	    </xsl:otherwise>
+	  </xsl:choose>
 	</div>
 	<article class="col-sm-9">
-          <p class="visible-xs">
- 	    <button type="button" class="btn btn-primary btn-xs" data-toggle="offcanvas">
- 	      <span class="glyphicon glyphicon-menu-right showbutton">&#160;</span>
- 	      <span class="glyphicon glyphicon-menu-left hidebutton">&#160;</span>
- 	    </button>
-          </p>
-	  
 	  <xsl:call-template name="pagetitle"/>
 	  <xsl:choose><xsl:when test="not($content-under-pagetitle)">
 	    <xsl:apply-templates/>
@@ -142,6 +154,8 @@
       </div>
       <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js">&#160;</script>
       <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous">&#160;</script>
+      <!-- <script src="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js">&#160;</script> -->
+      <script src="http://hammerjs.github.io/dist/hammer.min.js">&#160;</script>
       <xsl:if test="$dyntoc">
 	<script src="https://cdn.rawgit.com/afeld/bootstrap-toc/v0.3.0/dist/bootstrap-toc.min.js">&#160;</script> 
       </xsl:if>
