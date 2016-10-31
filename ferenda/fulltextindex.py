@@ -822,6 +822,7 @@ class ElasticSearchIndex(RemoteIndex):
             # https://github.com/elastic/elasticsearch/issues/14999
             match['fields'] = ["label", "text"]
             match['query'] = q
+            match['default_operator'] = "and"
             highlight = {'fields': {'text': {},
                                     'label': {}},
                          'fragment_size': 150,
