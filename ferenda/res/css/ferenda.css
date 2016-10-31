@@ -123,8 +123,8 @@ nav[data-toggle='toc'].affix {
 
 /* end of scrollspy-enabled toc */
 
-/* PART 2.1.2: Use off-canvas technique for doc TOC by default (larger screens can override this */
-
+/* PART 2.1.2: Use off-canvas technique for doc TOC by default (larger
+   screens can override this */
 
 .row-offcanvas-left {
   left: 0;
@@ -134,7 +134,11 @@ nav[data-toggle='toc'].affix {
   left: 200px;
 }
 
+.row-offcanvas-left article {
+    width: 100vw;
+}
 .row-offcanvas-left.active article {
+    width: 100vw;
     margin-left: 200px;
 }
 
@@ -142,7 +146,7 @@ nav[data-toggle='toc'].affix {
   position: fixed; 
   top: 0;
   width: 200px;
-  left: -198px; /* leave just a few pixels of the border so that the user notices it */
+  left: -195px; /* leave just a few pixels of the border so that the user notices it */
   height: 100vh;
   padding: 3px; 
   border-width: 0 5px 0 0;
@@ -157,7 +161,6 @@ nav[data-toggle='toc'].affix {
  
 .sidebar-offcanvas nav {
   overflow: scroll;
-  height: 100vh;
 }
 
 .sidebar-offcanvas nav#toc ul {
@@ -181,11 +184,18 @@ nav[data-toggle='toc'].affix {
   border-radius:10px;
   color:#000;
   line-height:20px;
-  text-align:right;
-  padding-right: 3px;
   background:#fff;
   text-decoration: none;
+  padding-top: 1px;
+  padding-right: 3px;
+  text-align: right;
 }
+
+/* by default: don't show the left-pointing icon on the button */
+.inner-slidebutton .glyphicon-menu-left { display: none }
+/* but when active, show it and hide the other */
+.active .inner-slidebutton .glyphicon-menu-right { display: none }
+.active .inner-slidebutton .glyphicon-menu-left { display: inline }
 
 @media only screen and (min-width: 960px) {
     .row-offcanvas-left .sidebar-offcanvas {
@@ -194,7 +204,10 @@ nav[data-toggle='toc'].affix {
 	width: 25%;
 	border: none;
     }
-    .slidebutton
+
+    .row-offcanvas-left article {
+	width: 75%;
+    }
 }
 /* end offscreen canvas */
 
