@@ -1,5 +1,5 @@
 function toggleOffcanvas() {
-  $('.row-offcanvas').toggleClass('active')
+  $('.row-offcanvas').toggleClass('active');
 }
 
 $(document).ready(function () {
@@ -14,11 +14,15 @@ $(document).ready(function () {
   $('body').keydown(function(e) {
     if (e.key == 'f') { toggleOffcanvas() }
   });
-  $('body').on("swipeleft", function(e) {
-    toggleOffcanvas()
+
+  /* this is said to work in situations where doc.body doesn't... */
+  body = document.getElementsByTagName('body')[0];
+  hammer = new Hammer(body);
+  hammer.on("swipe", function(e) {
+    $('.row-offcanvas').toggleClass('active');
   });
 		    
-    /* functions for replacing the text rendering of a pdf page with an image rendering of same */
+  /* functions for replacing the text rendering of a pdf page with an image rendering of same */
     $('div.sida a.view-img').click(function () {
 	/* hide everything else from here to next page */
 	$(this).parents("div.sida").nextUntil("div.sida").hide()

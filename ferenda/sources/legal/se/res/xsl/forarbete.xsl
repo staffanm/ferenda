@@ -10,6 +10,7 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
 		xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
 		xmlns:dcterms="http://purl.org/dc/terms/"
 		xmlns:prov="http://www.w3.org/ns/prov#"
+		xmlns:bibo="http://purl.org/ontology/bibo/"
 		xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
 		exclude-result-prefixes="xhtml rdf rdfs prov">
@@ -75,14 +76,37 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
 	    <h4 class="panel-title">Hänvisningar till <xsl:value-of select="substring-after($uri,'#')"/></h4>
 	  </div>
 	  <div class="panel-body">
+	    <ul>
 	    <xsl:for-each select="$annotations/resource[@uri=$uri]/dcterms:isReferencedBy">
 	      <xsl:variable name="referencing" select="@ref"/>
-	      <xsl:variable name="label"><xsl:choose><xsl:when test="not($annotations/resource[@uri=$referencing]/dcterms:identifier)">
-		<xsl:value-of select="@ref"/>
-	      </xsl:when>
-	      <xsl:otherwise><xsl:value-of select="$annotations/resource[@uri=$referencing]/dcterms:identifier"/></xsl:otherwise></xsl:choose></xsl:variable>
-	      <a href="{@ref}"><xsl:value-of select="$label"/></a>
+	      <xsl:variable name="label">
+		<xsl:variable name="referrer" select="$annotations/resource[@uri=$referencing]"/>
+		<xsl:choose>
+		  <xsl:when test="$referrer">
+		    <xsl:if test="$referrer/dcterms:isPartOf"><xsl:value-of select="$annotations/resource[@uri=$referrer/dcterms:isPartOf/@ref]/dcterms:identifier"/>: </xsl:if>
+		    <xsl:choose>
+		      <xsl:when test="$referrer/dcterms:identifier">
+			<xsl:value-of select="$referrer/dcterms:identifier"/>
+		      </xsl:when>
+		      <xsl:when test="$referrer/bibo:chapter">
+			avsnitt <xsl:value-of select="$referrer/bibo:chapter"/>
+		      </xsl:when>
+		      <xsl:when test="$referrer/dcterms:creator">
+			(<xsl:value-of select="$referrer/dcterms:creator"/>)
+		      </xsl:when>
+		      <xsl:otherwise>
+			<xsl:value-of select="substring-after($referencing,'#')"/>
+		      </xsl:otherwise>
+		    </xsl:choose>
+		  </xsl:when>
+		  <xsl:otherwise>
+		    <!-- the base case: we have no useful labels for for the referring doc, so just show the URI -->
+		    <xsl:value-of select="@ref"/>
+		  </xsl:otherwise>
+	      </xsl:choose></xsl:variable>
+	      <li><a href="{@ref}"><xsl:value-of select="$label"/></a></li>
 	    </xsl:for-each>
+	    </ul>
 	  </div>
 	</div>
       </div>

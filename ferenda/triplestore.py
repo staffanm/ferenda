@@ -661,6 +661,7 @@ class FusekiStore(RemoteStore):
             query = self.re_construct_query.sub("} WHERE { GRAPH <urn:x-arq:UnionGraph> {",
                                                 query)
             query += " }"
+        # print("Running this query:\n%s" % query)
         return super(FusekiStore, self).construct(query)
 
     re_select_query = re.compile(r"\s+WHERE\s+{", flags=re.MULTILINE)
