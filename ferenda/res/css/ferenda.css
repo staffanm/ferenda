@@ -204,11 +204,18 @@ nav[data-toggle='toc'].affix {
 	width: 25%;
 	border: none;
     }
+    .row-offcanvas-left.active {
+	left: 0;
+    }
     .row-offcanvas-left .sidebar-offcanvas .slidebutton {
 	display: none;
     }
     .row-offcanvas-left article {
 	width: 75%;
+    }
+    .row-offcanvas-left.active article {
+	width: 75%;
+	margin-left: 0;
     }
 }
 /* end offscreen canvas */
