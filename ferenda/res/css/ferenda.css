@@ -140,7 +140,7 @@ nav[data-toggle='toc'].affix {
 }
 .row-offcanvas-left.active article {
     width: 100vw;
-    margin-left: 200px;
+    margin-left: 200px; /* It is this property that makes the (active) offscreen canvas scroll with the document... for exactly 200px */
 }
 
 .row-offcanvas-left .sidebar-offcanvas {
@@ -155,6 +155,7 @@ nav[data-toggle='toc'].affix {
   border-image: linear-gradient(to left, black, rgba(0, 0, 0, 0)) 1 100%;
   background-color: #fff;
   transition: all .15s ease-out;
+  z-index: 10; /* since it occupies the same space as article.col-sm-9, and comes before it in the HTML, it seems to be obscured? Try to raise it. */
 }
 
 .row-offcanvas-left.active .sidebar-offcanvas {

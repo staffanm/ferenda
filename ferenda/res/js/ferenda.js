@@ -10,7 +10,7 @@ $(document).ready(function () {
    2. as a keypress handler, press 'f' to toggle the menu
    3. as a swipeleft handler (doesn't work, at least not on Chrome devtools)
  */
-  $('button.slidebutton').click(toggleOffcanvas);
+  $('.slidebutton').click(toggleOffcanvas);
   $('body').keydown(function(e) {
     if (e.key == 'f') { toggleOffcanvas() }
   });
