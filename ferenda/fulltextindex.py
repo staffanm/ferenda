@@ -664,34 +664,37 @@ class RemoteIndex(FulltextIndex):
         pass
 
 
+    
 class ElasticSearchIndex(RemoteIndex):
-
     # maps our field classes to concrete ES field properties
     fieldmapping = ((Identifier(),
-                     {"type": "string", "index": "not_analyzed", "store": True}),  # uri
+                     {"type": "keyword", "store": True}),  # uri
                     (Label(),
-                     {"type": "string", "index": "not_analyzed", }),  # repo, basefile
+                     {"type": "keyword"}),  # repo, basefile
                     (Label(boost=16),
-                     {"type": "string", "boost": 16.0, "index": "not_analyzed", "norms": {"enabled": True}}),  # identifier
+                     {"type": "keyword", "boost": 16.0, "norms": True}),  # identifier
                     (Text(boost=4),
-                     {"type": "string", "boost": 4.0, "index": "not_analyzed", "norms": {"enabled": True}}),  # title
+                     {"type": "text", "boost": 4.0}),  # title
                     (Text(boost=2),
-                     {"type": "string", "boost": 2.0, "index": "not_analyzed", "norms": {"enabled": True}}),  # abstract
+                     {"type": "text", "boost": 2.0}),  # abstract
                     (Text(),
-                     {"type": "string", "analyzer": "my_analyzer", "store": True}),  # text
+                     {"type": "text", "analyzer": "my_analyzer", "store": True}),  # text
                     (Datetime(),
                      {"type": "date", "format": "dateOptionalTime"}),
                     (Boolean(),
                      {"type": "boolean"}),
                     (Resource(),
-                     {"properties": {"iri": {"type": "string", "index": "not_analyzed"},
-                                     "label": {"type": "string", "index": "not_analyzed"}}}),
+                     {"properties": {"iri": {"type": "keyword"},
+                                     "label": {"type": "keyword"}}}),
                     (Keyword(),
-                     # {"type": "string", "index_name": "keyword"}), index_name is ES 1.x only
-                     {"type": "string", "copy_to": ["keyword"]}),
+                     {"type": "keyword", "copy_to": ["keyword"]}),
                     (URI(),
-                     {"type": "string", "index": "not_analyzed", "boost": 1.1, "norms": {"enabled": True}}),
+                     {"type": "keyword", "boost": 1.1, "norms": True}),
                     )
+
+    term_excludes = "excludes"  # this key changed name 
+                                # "exclude"->"excludes" from 2.* to
+                                # 5.*
 
     def __init__(self, location, repos):
         self._writer = None
@@ -814,7 +817,7 @@ class ElasticSearchIndex(RemoteIndex):
 
         # 3: If freetext param given, search on that
         match = {}
-        inner_hits = {"_source": {"exclude": "text"}}
+        inner_hits = {"_source": {self.term_excludes: "text"}}
         highlight = None
         if q:
             # NOTE: we need to specify highlight parameters for each
@@ -874,7 +877,7 @@ class ElasticSearchIndex(RemoteIndex):
         payload = {'query': query,
                    'aggs': self._aggregation_payload()}
         # Don't include the full text of every document in every hit
-        payload['_source'] = {'exclude': ['text']}
+        payload['_source'] = {self.term_excludes: ['text']}
         # extra workaround, solution adapted from comments in
         # https://github.com/elastic/elasticsearch/issues/14999 --
         # revisit once Elasticsearch 2.4 is released.
@@ -1002,7 +1005,6 @@ class ElasticSearchIndex(RemoteIndex):
         return schema
 
     def _create_schema_payload(self, repos):
-        
         language = {'en': 'English',
                     'sv': 'Swedish'}.get(repos[0].lang, "English")
         payload = {
@@ -1040,7 +1042,7 @@ class ElasticSearchIndex(RemoteIndex):
                     fld = g.qname(facet.rdftype).replace(":", "_")
                 idxtype = facet.indexingtype
                 schema[fld] = idxtype
-                if facet.toplevel_only:
+                if not facet.toplevel_only:
                     childschema[fld] = idxtype
 
             for key, fieldtype in schema.items():
@@ -1060,7 +1062,6 @@ class ElasticSearchIndex(RemoteIndex):
                                                         "store": True},
                                                "properties": es_fields}
 
-
             childmapping = {"_source": {"enabled": True},
                             "_all": {"analyzer": "my_analyzer",
                                      "store": True},
@@ -1074,5 +1075,36 @@ class ElasticSearchIndex(RemoteIndex):
     def _destroy_payload(self):
         return "", None
 
+class ElasticSearch2x (ElasticSearchIndex):
+    # "Legacy" versions of ElasticSearch has a simpler text type ("string") and no keyword type
+    fieldmapping = ((Identifier(),
+                     {"type": "string", "index": "not_analyzed", "store": True}),  # uri
+                    (Label(),
+                     {"type": "string", "index": "not_analyzed", }),  # repo, basefile
+                    (Label(boost=16),
+                     {"type": "string", "boost": 16.0, "index": "not_analyzed", "norms": {"enabled": True}}),  # identifier
+                    (Text(boost=4),
+                     {"type": "string", "boost": 4.0, "index": "not_analyzed", "norms": {"enabled": True}}),  # title
+                    (Text(boost=2),
+                     {"type": "string", "boost": 2.0, "index": "not_analyzed", "norms": {"enabled": True}}),  # abstract
+                    (Text(),
+                     {"type": "string", "analyzer": "my_analyzer", "store": True}),  # text
+                    (Datetime(),
+                     {"type": "date", "format": "dateOptionalTime"}),
+                    (Boolean(),
+                     {"type": "boolean"}),
+                    (Resource(),
+                     {"properties": {"iri": {"type": "string", "index": "not_analyzed"},
+                                     "label": {"type": "string", "index": "not_analyzed"}}}),
+                    (Keyword(),
+                     {"type": "string", "copy_to": ["keyword"]}),
+                    (URI(),
+                     {"type": "string", "index": "not_analyzed", "boost": 1.1, "norms": {"enabled": True}}),
+                    )
+    term_excludes = "exclude"
+
+
+
 FulltextIndex.indextypes = {'WHOOSH': WhooshIndex,
-                            'ELASTICSEARCH': ElasticSearchIndex}
+                            'ELASTICSEARCH': ElasticSearchIndex,
+                            'ELASTICSEARCH2': ElasticSearch2x}
