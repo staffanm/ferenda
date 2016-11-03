@@ -211,6 +211,15 @@ class SOUKB(Offtryck, PDFDocumentRepository):
         entry.save()
         return updated
 
+    def source_url(self, basefile):
+        # this source does not have any predictable URLs, so we try to
+        # find if we made a note on the URL when we ran download()
+        # FIXME: This code is repeated in jk.py and regeringen.py --
+        # maybe we should let the default impl of source_url try this
+        # strategy if eg self.remote_url is None?
+        entry = DocumentEntry(self.store.documententry_path(basefile))
+        return entry.orig_url
+
     def metadata_from_basefile(self, basefile):
         attrib = super(SOUKB, self).metadata_from_basefile(basefile) 
         year, ordinal = basefile.split(":")
