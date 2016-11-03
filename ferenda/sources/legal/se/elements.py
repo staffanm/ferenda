@@ -486,6 +486,9 @@ class Forfattningskommentar(CompoundElement):
                     div.append(child)
             assert len(div) > 0, "Författningskommentar for %s seems empty" % self.uri
             element.append(span)
+            if hasattr(self, 'label'):
+                element.append(E("span", {"property": "rdfs:label",
+                                          "content": self.label}))
             # also wrap everything* in a <div about="{comment_on}
             # property="dcterms:description"
             # datatype="rdf:XMLLiteral">
@@ -494,6 +497,7 @@ class Forfattningskommentar(CompoundElement):
             
         if hasattr(self, "title"):
             element.set("content", self.title)
+        
         return element
 
 class Appendix(SectionalElement):

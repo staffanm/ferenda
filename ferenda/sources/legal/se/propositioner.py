@@ -19,12 +19,13 @@ from lxml import etree
 import requests
 from layeredconfig import LayeredConfig
 from cached_property import cached_property
+from rdflib.namespace import DCTERMS
 
 from ferenda import util
 from ferenda.elements import Preformatted, Body
 from ferenda import CompositeRepository, CompositeStore
 from ferenda import TextReader, PDFAnalyzer
-from ferenda import DocumentEntry
+from ferenda import DocumentEntry, Facet
 from . import (Trips, NoMoreLinks, Regeringen, Riksdagen,
                SwedishLegalSource, SwedishLegalStore, RPUBL, Offtryck)
 from .fixedlayoutsource import FixedLayoutStore, FixedLayoutSource
@@ -564,6 +565,10 @@ class Propositioner(CompositeRepository, SwedishLegalSource):
         a = super(Propositioner, self).metadata_from_basefile(basefile)
         a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":", 1)
         return a
+
+    def facets(self):
+        return super(Propositioner, self).facets() + [Facet(DCTERMS.title,
+                                                       toplevel_only=False)]
 
     def tabs(self):
         if self.config.tabs:

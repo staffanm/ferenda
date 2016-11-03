@@ -21,7 +21,7 @@ from . import (SwedishLegalSource, SwedishLegalStore, FixedLayoutSource,
 from ferenda import CompositeRepository, CompositeStore
 from ferenda import TextReader
 from ferenda import util
-from ferenda import PDFAnalyzer
+from ferenda import PDFAnalyzer, Facet
 from ferenda.decorators import downloadmax, recordlastdownload
 from ferenda.elements import Body, Heading, ListItem, Paragraph
 from ferenda.errors import DocumentRemovedError
@@ -331,3 +331,6 @@ class Direktiv(CompositeRepository, SwedishLegalSource):
         a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":", 1)
         return a
 
+    def facets(self):
+        return super(Direktiv, self).facets() + [Facet(DCTERMS.title,
+                                                       toplevel_only=False)]

@@ -85,6 +85,9 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
 		  <xsl:when test="$referrer">
 		    <xsl:if test="$referrer/dcterms:isPartOf"><xsl:value-of select="$annotations/resource[@uri=$referrer/dcterms:isPartOf/@ref]/dcterms:identifier"/>: </xsl:if>
 		    <xsl:choose>
+		      <xsl:when test="$referrer/rdfs:label">
+			<xsl:value-of select="$referrer/rdfs:label"/>
+		      </xsl:when>
 		      <xsl:when test="$referrer/dcterms:identifier">
 			<xsl:value-of select="$referrer/dcterms:identifier"/>
 		      </xsl:when>

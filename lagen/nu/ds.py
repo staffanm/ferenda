@@ -3,15 +3,14 @@ from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 from builtins import *
 
-from rdflib.namespace import SKOS
+from rdflib.namespace import SKOS, DCTERMS
 
-from ferenda import CompositeRepository, CompositeStore
+from ferenda import CompositeRepository, CompositeStore, Facet
 from ferenda.sources.legal.se import Ds as OrigDs
 from ferenda.sources.legal.se import (SwedishLegalSource, SwedishLegalStore,
                                       RPUBL)
 from .regeringenlegacy import DsRegeringenLegacy
 from . import SameAs
-
 
 class DsRegeringen(OrigDs, SameAs):
     alias = "dsregeringen"
@@ -40,3 +39,7 @@ class Ds(CompositeRepository, SwedishLegalSource):
         a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":", 1)
         a["rpubl:utrSerie"] = self.lookup_resource("Ds", SKOS.altLabel)
         return a
+
+    def facets(self):
+        return super(Ds, self).facets() + [Facet(DCTERMS.title,
+                                                       toplevel_only=False)]

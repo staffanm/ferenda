@@ -12,7 +12,8 @@ CONSTRUCT {
   ?referer dcterms:isPartOf ?rootdoc ;
            dcterms:identifier ?refid ;
            dcterms:title ?reftitle ;
-           bibo:chapter ?refchapter ; 
+           bibo:chapter ?refchapter ;
+           rdfs:label ?reflabel ;
            dcterms:creator ?refcreator . 
   ?rootdoc dcterms:identifier ?rootid ;
            dcterms:title ?roottitle .
@@ -26,6 +27,7 @@ WHERE
   OPTIONAL { ?referer dcterms:title ?reftitle . }
   OPTIONAL { ?referer bibo:chapter ?refchapter . }
   OPTIONAL { ?referer dcterms:creator ?refcreator . }
+  OPTIONAL { ?referer rdfs:label ?reflabel . }
   OPTIONAL { ?rootdoc dcterms:title ?roottitle . }
   FILTER(STRSTARTS(STR(?target), "%(uri)s#"))
 }

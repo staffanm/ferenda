@@ -12,14 +12,14 @@ from datetime import datetime
 from urllib.parse import urljoin
 
 from rdflib import URIRef, Literal, Graph, Namespace
-from rdflib.namespace import SKOS, DC, RDF, XSD
+from rdflib.namespace import SKOS, DC, RDF, XSD, DCTERMS
 BIBO = Namespace("http://purl.org/ontology/bibo/")
 from bs4 import BeautifulSoup
 import lxml.html
 from cached_property import cached_property
 
 from ferenda import (PDFAnalyzer, CompositeRepository, DocumentEntry,
-                     PDFDocumentRepository, CompositeStore)
+                     PDFDocumentRepository, CompositeStore, Facet)
 from ferenda import util, decorators
 from ferenda.pdfreader import StreamingPDFReader
 from . import Regeringen, SwedishLegalSource, SwedishLegalStore, Offtryck, RPUBL
@@ -305,3 +305,5 @@ class SOU(CompositeRepository):
         a["rpubl:utrSerie"] = self.lookup_resource("SOU", SKOS.altLabel)
         return a
 
+    def facets(self):
+        return super(SOU, self).facets() + [Facet(DCTERMS.title)]

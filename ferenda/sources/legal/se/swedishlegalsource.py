@@ -1009,6 +1009,8 @@ class SwedishLegalSource(DocumentRepository):
                                        desc.getvalue(DCTERMS.title))
                     else:
                         v = "%s" % (desc.getvalue(DCTERMS.title))
+                elif desc.getvalues(RDFS.label):
+                    v = desc.getvalue(RDFS.label)
                 else:
                     # we don't have any title/label for whatever
                     # reason. Uniquify this by using the URI fragment

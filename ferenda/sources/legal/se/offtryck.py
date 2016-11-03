@@ -13,12 +13,13 @@ import ast
 # 3rd party
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
+from rdflib.namespace import DCTERMS
 from bs4 import BeautifulSoup
 from cached_property import cached_property
 
 # own
 from ferenda import util
-from ferenda import PDFReader, FSMParser, Describer
+from ferenda import PDFReader, FSMParser, Describer, Facet
 from ferenda.elements import Section, Link, Body, CompoundElement, Preformatted
 from ferenda.elements.html import P
 from ferenda.pdfreader import BaseTextDecoder, Page, Textbox
@@ -654,8 +655,9 @@ class Offtryck(SwedishLegalSource):
             else:
                 return None  # visit_node won't call any subnode
         state['primarylaw'] = self._parse_uri_from_text(node.title, state['basefile'])
-        self.log.debug("%s: find_primary_law finds %s" % (
-            state['basefile'], state['primarylaw']))
+        state['primarylawname'] = node.title
+        self.log.debug("%s: find_primary_law finds %s (%s)" % (
+            state['basefile'], state['primarylaw'], state['primarylawname']))
         return None
 
     def find_kommittebetankande(self, node, state):
@@ -691,6 +693,7 @@ class Offtryck(SwedishLegalSource):
                 # change (can be new or existing)
                 if re.match("Förslag(|et) till lag om ändring i", subsection.title):
                     uri = self._parse_uri_from_text(subsection.title, state['basefile'])
+                    lawname = subsection.title.split(" ", 6)[-1]
                 elif re.match("Förslag(|et) till", subsection.title):
                     # create a reference that could pass for a real
                     # SFS-id, but with the name (the only identifying
@@ -703,21 +706,20 @@ class Offtryck(SwedishLegalSource):
                 else:
                     uri = None
                 if uri:
-                    commentary.append((uri, subsection))
+                    commentary.append((uri, lawname, subsection))
                     
         if commentary == []:  # no subsecs, ie the prop changes a single law
             if 'primarylaw' in state:
-                commentary.append((state['primarylaw'], node))
+                commentary.append((state['primarylaw'], state['primarylawname'], node))
             else:
                 self.log.warning("%s: Författningskommentar does not specify name of law and find_primary_law didn't find it either" % state['basefile'])
-        for law, section in commentary:
-            textnodes = self._find_commentary_for_law(law, section, state)
-            
+        for law, lawname, section in commentary:
+            textnodes = self._find_commentary_for_law(law, section, state, lawname)
             # this is kinda risky but wth...
             section[:] = textnodes[:]
 
 
-    def _find_commentary_for_law(self, law, section, state):
+    def _find_commentary_for_law(self, law, section, state, lawname):
         # FIXME: this is basically a ad-hoc statemachine, with a lot
         # of ill-understood conditionals and flag settings. Luckily
         # there's a decent test harness in the
@@ -791,12 +793,14 @@ class Offtryck(SwedishLegalSource):
                 skipheader = True
                 textnodes.append(subnode)
                 subnode = None
+                reftext = text
                 
             elif len(text) < 20 and text.endswith("§"):
                 # self.log.debug("...detecting section header w/o acttext")
                 comment_on = self._parse_uri_from_text(text, state['basefile'], law)
                 skipheader = True
                 offset = 1
+                reftext = text
                 while isinstance(section[idx+offset], Sidbrytning):
                     offset += 1
                 if state['defaultsize'] >= section[idx+offset].font.size + 2:
@@ -896,7 +900,8 @@ class Offtryck(SwedishLegalSource):
                     if comment_on:
                         current_comment = Forfattningskommentar(title=title,
                                                                 comment_on=comment_on,
-                                                                uri=None)
+                                                                uri=None,
+                                                                label="Författningskommentar till %s %s" % (reftext, lawname))
                         if parsestate != "commenttext":
                             self.log.debug("%s, comment on %s, parsestate was '%s', "
                                            "setting to 'commenttext'" %
@@ -919,7 +924,8 @@ class Offtryck(SwedishLegalSource):
                         # Forfattningskommentar for law itself")
                         current_comment = Forfattningskommentar(title="",
                                                                 comment_on=law,
-                                                                uri=None)
+                                                                uri=None,
+                                                                label="Författningskommentar till %s" % lawname)
                         textnodes.append(current_comment)
                     if not skipheader:
                         current_comment.append(subnode)
@@ -1008,6 +1014,11 @@ class Offtryck(SwedishLegalSource):
                 if isinstance(res, cls):
                     return res
 
+
+    def facets(self):
+        return super(Offtryck, self).facets() + [Facet(DCTERMS.title,
+                                                       toplevel_only=False)]
+                
 
     def create_external_resources(self, doc):
 
