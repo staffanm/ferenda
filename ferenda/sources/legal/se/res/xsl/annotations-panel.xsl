@@ -23,8 +23,13 @@
     <div id="collapse-{$paneltype}-{$panelid}" class="panel-collapse collapse {$expanded-class}" role="tabpanel" aria-labelledby="heading-{$paneltype}-{$panelid}">
       <div class="panel-body">
 	<xsl:if test="$nodeset">
-	  <!-- <xsl:apply-templates select="$nodeset"/> -->
-	  <xsl:copy-of select="$nodeset"/>
+	  <!-- by using apply-templates rather than copy-of, we
+	       transform the namespace from
+	       http://www.w3.org/1999/xhtml to the default namespace
+	       (and avoid declaring a whole mess of namespaces used in
+	       the source doc -->
+	  <xsl:apply-templates select="$nodeset"/>
+	  <!-- <xsl:copy-of select="$nodeset"/> -->
 	</xsl:if>
       </div>
     </div>

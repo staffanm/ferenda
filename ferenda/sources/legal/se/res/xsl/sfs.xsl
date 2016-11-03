@@ -93,6 +93,7 @@
   <xsl:param name="content-under-pagetitle" select="false()"/>
 
   <xsl:template name="docmetadata">
+    <xsl:variable name="regpost" select="//xhtml:div[@class='registerpost'][1]"/>
     <dl id="refs-dokument" class="dl-horizontal">
       <dt>Departement</dt>
       <dd><xsl:value-of select="substring-after(//xhtml:link[@rel='dcterms:creator']/@href, '/2008/')"/></dd>
@@ -105,7 +106,7 @@
 	<dd><xsl:value-of select="//xhtml:meta[@property='rinfoex:tidsbegransad']/@content"/></dd>
       </xsl:if>
       <dt>Källa</dt>
-      <dd rel="dcterms:publisher" resource="http://lagen.nu/org/2008/regeringskansliet"><a href="http://62.95.69.15/cgi-bin/thw?%24%7BHTML%7D=sfst_lst&amp;%24%7BOOHTML%7D=sfst_dok&amp;%24%7BSNHTML%7D=sfst_err&amp;%24%7BBASE%7D=SFST&amp;%24%7BTRIPSHOW%7D=format%3DTHW&amp;BET={//span[@property='rpubl:arsutgava'][1]}:{//span[@property='rpubl:lopnummer'][1]}">Regeringskansliets rättsdatabaser</a></dd>
+      <dd rel="dcterms:publisher" resource="http://lagen.nu/org/2008/regeringskansliet"><a href="http://rkrattsbaser.gov.se/sfst?bet={$regpost/xhtml:span[@property='rpubl:arsutgava']/@content}:{$regpost/xhtml:span[@property='rpubl:lopnummer']/@content}">Regeringskansliets rättsdatabaser</a></dd>
       <dt>Senast hämtad</dt>
       <dd><xsl:value-of select="substring(//xhtml:meta[@property='rinfoex:senastHamtad']/@content, 1, 10)"/></dd>
       <xsl:if test="//xhtml:meta[@property='rdfs:comment']/@content">
@@ -114,6 +115,8 @@
       </xsl:if>
     </dl>
   </xsl:template>
+
+  
   
   <xsl:template match="xhtml:a">
     <xsl:call-template name="link"/>
@@ -284,7 +287,7 @@
 	<a href="#{@id}" title="Permalänk till detta stycke"><img class="platsmarkor" src="../../../rsrc/img/{$marker}.png"/></a>
       </xsl:if>
       <xsl:if test="xhtml:span[@class='paragrafbeteckning']">
-	<a href="#{@id}" class="paragrafbeteckning" title="Permalänk till detta stycke"><xsl:copy-of select="xhtml:span[@class='paragrafbeteckning']"/></a>&#160;
+	<a href="#{@id}" class="paragrafbeteckning" title="Permalänk till detta stycke"><xsl:value-of  select="xhtml:span[@class='paragrafbeteckning']"/></a>&#160;
       </xsl:if>
       <xsl:apply-templates/>
     </p>
