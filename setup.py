@@ -28,6 +28,8 @@ install_requires = ['beautifulsoup4 >= 4.3.0',
                     # 'patchit >= 1.2',   # not released yet, using vendorized copy
 ]
 
+if sys.version_info < (3,0,0):
+    install_requires.append("configparser")
     
 if sys.version_info < (2,7,0):
     install_requires.append('ordereddict >= 1.1')
