@@ -107,8 +107,11 @@ WHERE {
             pagesetdict[pagesetid] = TocPageset(label=label,
                                                 predicate=pagesetid,  # ??
                                                 pages=[])
-            selected = facets[1].selector(row, 'rpubl_arsutgava', None)
-            selector_values[(pagesetid, selected)] = True
+            try:
+                selected = facets[1].selector(row, 'rpubl_arsutgava', None)
+                selector_values[(pagesetid, selected)] = True
+            except KeyError as e:
+                self.log.error("Unable to sect from %r: %s" % row, e)
         for (pagesetid, value) in sorted(list(selector_values.keys()), reverse=True):
             pageset = pagesetdict[pagesetid]
             pageset.pages.append(TocPage(linktext=value,
