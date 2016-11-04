@@ -111,14 +111,12 @@
       <div class="row row-offcanvas row-offcanvas-left">
 	  
 	<div class="col-sm-3 sidebar-offcanvas" id="sidebar">
-	  <a href="#" onclick="$('.row-offcanvas').toggleClass('active')">
 	  <div class="slidebutton" data-toggle="offcanvas">
 	    <div class="inner-slidebutton">
 	      <span class="glyphicon glyphicon-menu-right">&#8288;</span>
 	      <span class="glyphicon glyphicon-menu-left">&#8288;</span>
 	    </div>
 	  </div>
-	  </a>
 	  <!-- note: importing stylesheet MUST define
 	       <xsl:param name="dyntoc" select="false()"/>
 	       (or true()). Same for fixedtoc -->
