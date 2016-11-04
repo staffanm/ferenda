@@ -31,9 +31,29 @@
 
 /* GENERAL/GLOBAL PARTS */
 
+body {
+    /* extra space so that .slidebutton doesn't obscure the text */
+    margin-left: 10px;
+}
+@media (min-width: 960px) {
+    body {
+	margin-left: 0;
+    }
+}
+
+
 
 /* PART 1: Navbar */
 
+nav.navbar-default {
+    /* undo the body margin set by the body rule */
+    margin-left: -10px;
+}
+@media (min-width: 960px) {
+    nav.navbar-default {
+	margin-left: 0;
+    }
+}
 
 /* ...needs no customization now that we're using a stock Bootstrap
    navbar and it's responsiveness */
@@ -41,6 +61,8 @@
 /* PART 2: The main content area (including document TOC) */
 
 /* PART 2.1: Sidebar/document TOC */
+
+
 nav[data-toggle='toc'] {
     margin-top: 0; /* used to be 30px, wonder what i was thinking... */
 }
@@ -172,25 +194,26 @@ nav[data-toggle='toc'].affix {
 
 .slidebutton {
   position: absolute;
-  width: 22px;
-  right: -14px;
+  width: 40px;
+  right: -24px;
   top: 50vh;
-  height: 22px;
-  border-radius: 13px;
-  padding: 1px;
+  height: 40px;
+  border-radius: 20px;
+  padding: 2px;
   background: #000;
 }
 
 .inner-slidebutton {
-  width:20px;
-  height:20px;
-  border-radius:10px;
+  width:36px;
+  height:36px;
+  border-radius:18px;
   color:#000;
   line-height:20px;
   background:#fff;
   text-decoration: none;
-  padding-top: 1px;
+  padding-top: 5px;
   padding-right: 3px;
+  font-size: 26px;
   text-align: right;
 }
 
