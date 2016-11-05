@@ -111,7 +111,7 @@ WHERE {
                 selected = facets[1].selector(row, 'rpubl_arsutgava', None)
                 selector_values[(pagesetid, selected)] = True
             except KeyError as e:
-                self.log.error("Unable to sect from %r: %s" % row, e)
+                self.log.error("Unable to select from %r: %s" % (row, e))
         for (pagesetid, value) in sorted(list(selector_values.keys()), reverse=True):
             pageset = pagesetdict[pagesetid]
             pageset.pages.append(TocPage(linktext=value,
@@ -131,11 +131,14 @@ WHERE {
         res = {}
         documents = {}
         for row in data:
-            key = (facets[0].identificator(row, 'rdf_type', None),
-                   facets[1].selector(row, 'rpubl_arsutgava', None))
-            if key not in documents:
-                documents[key] = []
-            documents[key].append(row)
+            try:
+                key = (facets[0].identificator(row, 'rdf_type', None),
+                       facets[1].selector(row, 'rpubl_arsutgava', None))
+                if key not in documents:
+                    documents[key] = []
+                documents[key].append(row)
+            except KeyError as e:
+                self.log.error("Unable to sect from %r: %s" % (row, e))
         pagesetdict = {}
         for pageset in pagesets:
             pagesetdict[pageset.predicate] = pageset
