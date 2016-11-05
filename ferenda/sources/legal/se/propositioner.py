@@ -177,6 +177,7 @@ class PropTripsStore(FixedLayoutStore):
     doctypes = OrderedDict([(".pdf", b'%PDF'),
                             (".doc", b'\xd0\xcf\x11\xe0'),
                             (".docx", b'PK\x03\x04'),
+                            (".wpd", b'\xffWPC'),
                             (".html", b'<!DO')])
 
     def intermediate_path(self, basefile):
