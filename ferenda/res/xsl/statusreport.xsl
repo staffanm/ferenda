@@ -99,6 +99,7 @@
       </xsl:choose>
     </xsl:variable> 
     <div class="basefile alert {$alerttype}">
+      <xsl:if test="$alerttype = 'alert-success'"><xsl:attribute name="style">display: none;</xsl:attribute></xsl:if>
       <b><xsl:value-of select="@id"/></b><br/>
       <xsl:apply-templates/>
     </div>
