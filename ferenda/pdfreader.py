@@ -587,17 +587,27 @@ class PDFReader(CompoundElement):
                             thisfont = self.fontspec[int(attribs['font'])]
                         except KeyError as e:
                             raise e
+                        
+                        elementtext = element.text
+                        if element.text and not isinstance(element.text, str):
+                            # this can happen on py2 -- if a
+                            # particular element contains no
+                            # non-ascii chars, it's returned as a
+                            # bytestring instead of a unicode
+                            # string
+                            elementtext = elementtext.decode()
                         if (lastfont.family == thisfont['family'] and
                             lastfont.size > thisfont['size'] and
                             page[-1].right == int(attribs['left']) and # FIXME: add 1-2pts of tolerance
-                            element.text and
-                            element.text.isdigit()):
+                            elementtext and
+                            elementtext.isdigit()):
                             # add to existing Textbox (removing font
                             # styling info and also dimensions) as "sup"
                             # also removes element.tail which shouldn't be
                             # anything
                             assert not element.tail.strip(), "Assumed element.tail to be empty, was in fact '%s'" % element.tail
-                            page[-1].append(Textelement(str(element.text), tag="sup"))
+                                    
+                            page[-1].append(Textelement(str(elementtext), tag="sup"))
                             page[-1].right = int(attribs['left']) + int(attribs['width'])
                             page[-1].width = page[-1].right - page[-1].left
                             after_footnote = True
@@ -610,7 +620,7 @@ class PDFReader(CompoundElement):
                               page[-1].height == int(attribs['height']) and
                               page[-1].right == int(attribs['left'])): # FIXME: add tolerance
                             assert not element.tail.strip(), "Assumed element.tail to be empty, was in fact '%s'" % element.tail
-                            page[-1].append(Textelement(element.text, tag=None))
+                            page[-1].append(Textelement(elementtext, tag=None))
                             page[-1].right = int(attribs['left']) + int(attribs['width'])
                             page[-1].width = page[-1].right - page[-1].left
                             after_footnote = False
