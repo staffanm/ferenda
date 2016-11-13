@@ -17,7 +17,12 @@ $(document).ready(function () {
 
   /* this is said to work in situations where doc.body doesn't... */
   body = document.getElementsByTagName('body')[0];
-  hammer = new Hammer(body);
+  /* for some bizarre reason, hammmer.js disables text selection by
+   * default...  That's strike two against this lib (first being
+   * indecipherable API), see
+   * https://github.com/hammerjs/hammer.js/issues/81 */
+  
+  hammer = new Hammer(body, {cssProps: {userSelect: false}});
   hammer.on("swipe", function(e) {
     $('.row-offcanvas').toggleClass('active');
   });
