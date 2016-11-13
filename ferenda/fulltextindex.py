@@ -696,6 +696,8 @@ class ElasticSearchIndex(RemoteIndex):
                                 # "exclude"->"excludes" from 2.* to
                                 # 5.*
 
+    fragment_size = 150
+
     def __init__(self, location, repos):
         self._writer = None
         self._repos = repos
@@ -775,7 +777,6 @@ class ElasticSearchIndex(RemoteIndex):
             types = [kwargs.get("repo")]
         else:
             types = [repo.alias for repo in self._repos if repo.config.relate]
-
         # use a multitype search to specify the types we want so that
         # we don't go searching in the foo_child types, only parent
         # types.
@@ -828,60 +829,49 @@ class ElasticSearchIndex(RemoteIndex):
             match['default_operator'] = "and"
             highlight = {'fields': {'text': {},
                                     'label': {}},
-                         'fragment_size': 150,
+                         'fragment_size': self.fragment_size,
                          'number_of_fragments': 2
             }
             inner_hits["highlight"] = highlight
 
-        # now, explode the match query into a big OR query for
-        # matching each possible _child type (until someone solves
-        # http://stackoverflow.com/questions/38946547 for me)
-        submatches = [{"simple_query_string": deepcopy(match)}]
-        if kwargs.get("repo"):
-            reponames = [kwargs.get("repo")]
-        else:
-            reponames = [repo.alias for repo in self._repos if repo.config.relate]
-        for reponame in reponames:
-            submatches.append(
-                {"has_child": {"type": reponame + "_child",
-                               "inner_hits": inner_hits,
-                               "query": {"simple_query_string": deepcopy(match)}
-                }})
+            # now, explode the match query into a big OR query for
+            # matching each possible _child type (until someone solves
+            # http://stackoverflow.com/questions/38946547 for me)
+            submatches = [{"simple_query_string": deepcopy(match)}]
+            if kwargs.get("repo"):
+                reponames = [kwargs.get("repo")]
+            else:
+                reponames = [repo.alias for repo in self._repos if repo.config.relate]
+            for reponame in reponames:
+                submatches.append(
+                    {"has_child": {"type": reponame + "_child",
+                                   "inner_hits": inner_hits,
+                                   "query": {"simple_query_string": deepcopy(match)}
+                    }})
 
-        match = {"bool": {"should": submatches}}
+            match = {"bool": {"should": submatches}}
+        else:
+            match = {"bool": {}}
 
         if filterterms or filterregexps or filterranges:
-            query = {"filtered":
-                     {"filter": {}
-                      }
-                     }
             filters = []
             for key, val in (("term", filterterms),
                              ("regexp", filterregexps),
                              ("range", filterranges)):
                 filters.extend([{key: {k: v}} for (k, v) in val.items()])
             if len(filters) > 1:
-                query["filtered"]["filter"]["bool"] = {"must": filters}
+                match["bool"]["filter"] = {"bool": {"must": filters}}
             else:
-                query["filtered"]["filter"] = filters[0]
-            if match:
-                query["filtered"]["query"] = match
-        else:
-            query = match
-# FIXME:
-#            if match:
-#                query = {"match": match}
-#            else:
-#                query = {"match_all": match}
-
-        payload = {'query': query,
+                match["bool"]["filter"] = filters[0]
+        payload = {'query': match,
                    'aggs': self._aggregation_payload()}
         # Don't include the full text of every document in every hit
         payload['_source'] = {self.term_excludes: ['text']}
         # extra workaround, solution adapted from comments in
         # https://github.com/elastic/elasticsearch/issues/14999 --
         # revisit once Elasticsearch 2.4 is released.
-        payload['highlight'] = deepcopy(highlight)
+        if highlight:
+            payload['highlight'] = deepcopy(highlight)
         # if q:
         #    payload['highlight']['highlight_query'] = {'match': {'_all': q}}
         return relurl, json.dumps(payload, indent=4, default=util.json_default_date)
@@ -1103,6 +1093,118 @@ class ElasticSearch2x (ElasticSearchIndex):
                     )
     term_excludes = "exclude"
 
+    # This override uses the old style filtering, which uses a
+    # filtered query as the top level query
+    # (https://www.elastic.co/guide/en/elasticsearch/reference/2.4/query-dsl-filtered-query.html),
+    # which was deprecated and removed in ES5
+    # http://stackoverflow.com/questions/40519806/no-query-registered-for-filtered
+    #
+    # NOTE: The "new" logic in the superclass ought to work on ES2
+    # servers as well, so maybe we should just remove this
+    # implementation.
+    def _query_payload(self, q, pagenum=1, pagelen=10, **kwargs):
+        if kwargs.get("repo"):
+            types = [kwargs.get("repo")]
+        else:
+            types = [repo.alias for repo in self._repos if repo.config.relate]
+
+        # use a multitype search to specify the types we want so that
+        # we don't go searching in the foo_child types, only parent
+        # types.
+        relurl = "%s/_search?from=%s&size=%s" % (",".join(types),
+                                                 (pagenum - 1) * pagelen,
+                                                 pagelen)
+        # 1: Filter on all specified fields
+        filterterms = {}
+        filterregexps = {}
+        schema = self.schema()
+        for k, v in kwargs.items():
+            if isinstance(v, SearchModifier):
+                continue
+            if k in ("type", "repo"):  # FIXME: maybe should only be "repo"
+                k = "_type"
+            elif isinstance(schema[k], Resource):
+                # also map k to "%s.iri" % k if k is Resource
+                k += ".iri"
+
+            if isinstance(v, str) and "*" in v:
+                # if v contains "*", make it a {'regexp': '.*/foo'} instead of a {'term'}
+                # also transform * to .*
+                filterregexps[k] = v.replace("*", ".*")
+            else:
+                filterterms[k] = v
+
+        # 2: Create filterranges if SearchModifier objects are used
+        filterranges = {}
+        for k, v in kwargs.items():
+            if not isinstance(v, SearchModifier):
+                continue
+            if isinstance(v, Less):
+                filterranges[k] = {"lt": v.max}
+            elif isinstance(v, More):
+                filterranges[k] = {"gt": v.min}
+            elif isinstance(v, Between):
+                filterranges[k] = {"lt": v.max,
+                                   "gt": v.min}
+
+        # 3: If freetext param given, search on that
+        match = {}
+        inner_hits = {"_source": {self.term_excludes: "text"}}
+        highlight = None
+        if q:
+            # NOTE: we need to specify highlight parameters for each
+            # subquery when using has_child, see
+            # https://github.com/elastic/elasticsearch/issues/14999
+            match['fields'] = ["label", "text"]
+            match['query'] = q
+            match['default_operator'] = "and"
+            highlight = {'fields': {'text': {},
+                                    'label': {}},
+                         'fragment_size': 150,
+                         'number_of_fragments': 2
+            }
+            inner_hits["highlight"] = highlight
+
+        # now, explode the match query into a big OR query for
+        # matching each possible _child type (until someone solves
+        # http://stackoverflow.com/questions/38946547 for me)
+        submatches = [{"simple_query_string": deepcopy(match)}]
+        if kwargs.get("repo"):
+            reponames = [kwargs.get("repo")]
+        else:
+            reponames = [repo.alias for repo in self._repos if repo.config.relate]
+        for reponame in reponames:
+            submatches.append(
+                {"has_child": {"type": reponame + "_child",
+                               "inner_hits": inner_hits,
+                               "query": {"simple_query_string": deepcopy(match)}
+                }})
+
+        match = {"bool": {"should": submatches}}
+
+        if filterterms or filterregexps or filterranges:
+            query = {"filtered":
+                     {"filter": {}
+                      }
+                     }
+            filters = []
+            for key, val in (("term", filterterms),
+                             ("regexp", filterregexps),
+                             ("range", filterranges)):
+                filters.extend([{key: {k: v}} for (k, v) in val.items()])
+            if len(filters) > 1:
+                query["filtered"]["filter"]["bool"] = {"must": filters}
+            else:
+                query["filtered"]["filter"] = filters[0]
+            if match:
+                query["filtered"]["query"] = match
+        else:
+            query = match
+        payload = {'query': query,
+                   'aggs': self._aggregation_payload()}
+        payload['_source'] = {self.term_excludes: ['text']}
+        payload['highlight'] = deepcopy(highlight)
+        return relurl, json.dumps(payload, indent=4, default=util.json_default_date)
 
 
 FulltextIndex.indextypes = {'WHOOSH': WhooshIndex,

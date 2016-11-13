@@ -203,13 +203,14 @@ class BasicQuery(object):
         # can't get these results when using MockESBasicQuery with
         # CREATE_CANNED=True for some reason...
         if type(self) == ESBasicQuery:
-            self.assertEqual(len(res),3)
+            self.assertEqual(len(res),1)
+            self.assertEqual(len(res[0]['innerhits']), 2)
             # NOTE: ES scores all three results equally (1.0), so it doesn't
             # neccesarily put section 1 in the top
             if isinstance(self, ESBase):
-                self.assertEqual(res[0]['dcterms_identifier'], 'Doc #1 (section 2)') 
+                self.assertEqual(res[0]['innerhits'][0]['dcterms_identifier'], 'Doc #1 (section 2)') 
             else:
-                self.assertEqual(res[0]['dcterms_identifier'], 'Doc #1 (section 1)')
+                self.assertEqual(res[0]['innerhits'][0]['dcterms_identifier'], 'Doc #1 (section 1)')
 
 
     def test_fragmented(self):
@@ -223,6 +224,7 @@ class BasicQuery(object):
                        haystack haystack haystack haystack haystack haystack
                        haystack haystack needle haystack haystack."""}
             ])
+        self.index.fragment_size = 60  # the default is 150, which doesn't trigger this
         res, pager = self.index.query("needle")
         # this should return 1 hit (only 1 document)
         self.assertEqual(1, len(res))
