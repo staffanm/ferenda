@@ -74,9 +74,11 @@ class MediaWiki(DocumentRepository):
     keyword_class = Keyword
     namespaces = ['rdf', 'skos', 'prov', 'dcterms']
 
-    def __init__(self, config=None, **kwargs):
+    def __init__(self, config=None, keywordrepo=None, **kwargs):
         super(MediaWiki, self).__init__(config, **kwargs)
-        if self.config._parent and hasattr(self.config._parent, 'keyword'):
+        if keywordrepo:
+            self.keywordrepo = keywordrepo
+        elif self.config._parent and hasattr(self.config._parent, 'keyword'):
             self.keywordrepo = self.keyword_class(self.config._parent.keyword)
         else:
             self.keywordrepo = self.keyword_class()

@@ -87,7 +87,10 @@ class Avdelning(CompoundElement, OrdinalElement):
         super(Avdelning, self).__init__(*args, **kwargs)
 
     def as_xhtml(self, uri=None, parent_uri=None):
-        res = super(Avdelning, self).as_xhtml()
+        # parent_uri will be eg https://lagen.nu/1998:808, while uri
+        # will be https://lagen.nu/1998:808/konsolidering/2015:670 --
+        # it's better to use parent_uri as the base uri at this point
+        res = super(Avdelning, self).as_xhtml(parent_uri, parent_uri)
         attrs = {}
         if self.underrubrik:
             res.insert(0, E('h2', self.underrubrik))
@@ -157,7 +160,7 @@ class Kapitel(CompoundElement, OrdinalElement):
         super(Kapitel, self).__init__(*args, **kwargs)
 
     def as_xhtml(self, uri=None, parent_uri=None):
-        res = super(Kapitel, self).as_xhtml()
+        res = super(Kapitel, self).as_xhtml(uri, uri)
         res.attrib.update({"property": "rpubl:kapitelnummer",
                            "content": self.ordinal})
         res.insert(0, E('h1', self.rubrik))

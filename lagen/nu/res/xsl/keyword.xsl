@@ -7,10 +7,12 @@
 		xmlns:dcterms="http://purl.org/dc/terms/"
 		xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
+		xmlns:ext="http://exslt.org/common"
 		xml:space="preserve"
 		exclude-result-prefixes="xhtml rdf">
 
   <xsl:import href="uri.xsl"/>
+  <xsl:import href="annotations-panel.xsl"/>
   <xsl:include href="base.xsl"/>
   <!-- NOTE: this annotation file does not use Grit syntax (yet) -->
   <xsl:variable name="myannotations" select="document($annotationfile)/rdf:RDF"/>
@@ -34,7 +36,7 @@
       </xsl:call-template>
     </div>
   </xsl:template>
-  <xsl:param name="dyntoc" select="true()"/>
+  <xsl:param name="dyntoc" select="false()"/>
   <xsl:param name="fixedtoc" select="true()"/>
   <xsl:param name="content-under-pagetitle" select="true()"/>
       
@@ -45,9 +47,23 @@
 
   <xsl:template name="aside-annotations">
     <xsl:param name="uri"/>
-    <xsl:variable name="legaldefs" select="$myannotations/rdf:Description/rinfoex:isDefinedBy/*"/>
+    <xsl:variable name="legaldefinitioner" select="$myannotations/rdf:Description/rinfoex:isDefinedBy/*"/>
     <xsl:variable name="rattsfall" select="$myannotations/rdf:Description/dcterms:subject/rdf:Description"/>
-    <xsl:message>aside: <xsl:value-of select="count($legaldefs)"/> legaldefs, <xsl:value-of select="count($rattsfall)"/> legalcases</xsl:message>
+    <xsl:variable name="rattsfall-markup">
+      <ul>
+	<xsl:for-each select="$rattsfall">
+	  <li><a href="{@rdf:about}"><b><xsl:value-of select="dcterms:identifier"/></b></a>:
+	  <xsl:value-of select="dcterms:description"/></li>
+	</xsl:for-each>
+      </ul>
+    </xsl:variable>
+    <xsl:variable name="legaldefinitioner-markup">
+      <ul>
+	<xsl:for-each select="$legaldefinitioner">
+	  <li><a href="{@rdf:about}"><xsl:value-of select="rdfs:label"/></a></li>
+	</xsl:for-each>
+      </ul>
+    </xsl:variable>
 
     <aside class="panel-group col-sm-5" role="tablist" id="panel-top"
 	   aria-multiselectable="true">
@@ -55,74 +71,25 @@
 	<xsl:call-template name="aside-annotations-panel">
 	  <xsl:with-param name="title">Rättsfall</xsl:with-param>
 	  <xsl:with-param name="badgecount" select="count($rattsfall)"/>
-	  <xsl:with-param name="nodeset">
-	    <xsl:call-template name="rattsfall">
-	      <xsl:with-param name="rattsfall" select="$rattsfall"/>
-	    </xsl:call-template>
-	  </xsl:with-param>
+	  <xsl:with-param name="nodeset" select="ext:node-set($rattsfall-markup)"/>
 	  <xsl:with-param name="panelid">top</xsl:with-param>
 	  <xsl:with-param name="paneltype">rattsfall</xsl:with-param>
 	  <xsl:with-param name="expanded" select="true()"/>
 	</xsl:call-template>
       </xsl:if>
 
-      <xsl:if test="$legaldefs">
+      <xsl:if test="$legaldefinitioner">
 	<xsl:call-template name="aside-annotations-panel">
 	  <xsl:with-param name="title">Legaldefinitioner</xsl:with-param>
 	  <xsl:with-param name="badgecount" select="count($rattsfall)"/>
-	  <xsl:with-param name="nodeset">
-	    <xsl:call-template name="inbound">
-	      <xsl:with-param name="inbound" select="$legaldefs"/>
-	    </xsl:call-template>
-	  </xsl:with-param>
+	  <xsl:with-param name="nodeset" select="ext:node-set($legaldefinitioner-markup)"/>
 	  <xsl:with-param name="panelid">top</xsl:with-param>
-	  <xsl:with-param name="paneltype">rattsfall</xsl:with-param>
+	  <xsl:with-param name="paneltype">legaldefinitioner</xsl:with-param>
 	  <xsl:with-param name="expanded" select="true()"/>
 	</xsl:call-template>
       </xsl:if>
     </aside>
   </xsl:template>
-
-  <!-- FIXME: these 2 templates are copied from sfs.xsl, and they
-       should probably be part of lnkeyword.xsl -->
-  <xsl:template name="rattsfall">
-    <xsl:param name="rattsfall"/>
-      <xsl:for-each select="$rattsfall">
-	<xsl:sort select="@rdf:about"/>
-	<xsl:variable name="tuned-width">
-	  <xsl:call-template name="tune-width">
-	    <xsl:with-param name="txt" select="dcterms:description"/>
-	    <xsl:with-param name="width" select="80"/>
-	    <xsl:with-param name="def" select="80"/>
-	  </xsl:call-template>
-	</xsl:variable>
-	<xsl:variable name="localurl"><xsl:call-template name="localurl"><xsl:with-param name="uri" select="@rdf:about"/></xsl:call-template></xsl:variable>
-	<a href="{$localurl}"><b><xsl:value-of select="dcterms:identifier"/></b></a>:
-	<xsl:choose>
-	  <xsl:when test="string-length(dcterms:description) > 80">
-	    <xsl:value-of select="normalize-space(substring(dcterms:description, 1, $tuned-width - 1))" />...
-	  </xsl:when>
-	  <xsl:otherwise>
-	    <xsl:value-of select="dcterms:description"/>
-	  </xsl:otherwise>
-	</xsl:choose>
-	<br/>
-      </xsl:for-each>
-  </xsl:template>
-
-  <xsl:template name="inbound">
-    <xsl:param name="inbound"/>
-    <ul class="lagrumslista">
-      <xsl:for-each select="$inbound">
-	<li>
-	  <xsl:variable name="localurl"><xsl:call-template name="localurl"><xsl:with-param name="uri" select="@rdf:about"/></xsl:call-template></xsl:variable>
-	  <a href="{$localurl}"><xsl:value-of select="rdfs:label"/></a>
-	</li>
-      </xsl:for-each>
-    </ul>
-  </xsl:template>
-
-
 
   <xsl:template match="xhtml:body/xhtml:div">
   </xsl:template>

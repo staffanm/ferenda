@@ -35,7 +35,9 @@ class LNKeyword(keyword.Keyword):
 
     def __init__(self, config=None, **kwargs):
         super(LNKeyword, self).__init__(config, **kwargs)
-        self.termset_funcs = []
+        # FIXME: Don't bother with the large wp download right now
+        # (but reinstate later)
+        self.termset_funcs.remove(self.download_termset_wikipedia)
         if self.config._parent and hasattr(self.config._parent, "sfs"):
             self.sfsrepo = SFS(self.config._parent.sfs)
         else:
@@ -60,6 +62,11 @@ class LNKeyword(keyword.Keyword):
         else:
             return super(LNKeyword, self).basefile_from_uri(uri)
         
+    def _download_termset_mediawiki_titles(self):
+        for basefile in self.mediawikirepo.store.list_basefiles_for("parse"):
+            if not basefile.startswith("SFS/"):
+                yield basefile
+
     def prep_annotation_file_termsets(self, basefile, main_node):
         dvdataset = self.config.url + "dataset/dv"
         sfsdataset = self.config.url + "dataset/sfs"
