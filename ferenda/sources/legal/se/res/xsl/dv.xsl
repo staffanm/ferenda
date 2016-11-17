@@ -9,10 +9,8 @@
 		xmlns:rinfoex="http://lagen.nu/terms#"
 		xmlns:bibo="http://purl.org/ontology/bibo/"
 		xmlns:ext="http://exslt.org/common"
-		xml:space="preserve"
 		exclude-result-prefixes="xhtml rdf">
 
-  <xsl:import href="uri.xsl"/>
   <xsl:import href="annotations-panel.xsl"/>
   <xsl:include href="base.xsl"/>
 
@@ -39,17 +37,14 @@
   <xsl:param name="fixedtoc" select="true()"/>
   <xsl:param name="content-under-pagetitle" select="true()"/>
 
-  <xsl:template match="xhtml:a">
-    <xsl:call-template name="link"/>
-  </xsl:template>
-
   <xsl:template name="aside-annotations">
     <xsl:param name="uri"/>
     <xsl:variable name="domuri" select="//xhtml:link[@rel='rpubl:referatAvDomstolsavgorande']/@href"/>
     <xsl:variable name="metadata">
       <dl class="dl-horizontal">
 	<dt>Domstol</dt>
-	<dd><xsl:value-of select="//xhtml:link[@rel='dcterms:publisher' and @about=$domuri]/@href"/></dd>
+
+	<dd><xsl:value-of select="substring-after(//xhtml:link[@rel='dcterms:publisher' and @about=$domuri]/@href, '/2008/')"/></dd>
 	<dt>Avgörandedatum</dt>
 	<dd><xsl:value-of select="//xhtml:meta[@property='rpubl:avgorandedatum' and @about=$domuri]/@content"/></dd>
 	<dt>Målnummer</dt>
@@ -57,17 +52,17 @@
 	<xsl:if test="//xhtml:link[@rel='rpubl:lagrum' and @about=$domuri]">
 	  <dt>Lagrum</dt>
 	  <xsl:for-each select="//xhtml:link[@rel='rpubl:lagrum' and @about=$domuri]">
-	    <dd><a href="{@href}"><xsl:value-of select="substring-after(@href, '/sfs/')"/></a></dd>
+	    <dd><a href="{@href}"><xsl:value-of select="substring-after(@href,'https://lagen.nu/')"/></a></dd>
 	  </xsl:for-each>
 	</xsl:if>
 	<xsl:if test="//xhtml:link[@rel='rpubl:rattsfallshanvisning']">
 	  <dt>Rättsfall</dt>
 	  <xsl:for-each select="//xhtml:link[@rel='rpubl:rattsfallshanvisning']">
-	    <dd><xsl:apply-templates select="."/></dd>
+	    <dd><a href="{@href}"><xsl:value-of select="substring-after(@href, '/rf/')"/></a></dd>
 	  </xsl:for-each>
 	</xsl:if>
-	<xsl:if test="//xhtml:meta[@property='dcterms:relation']">
-	  <dt>Litteratur</dt>
+	<xsl:if test="count(//xhtml:meta[@property='dcterms:relation']) > 0">
+	  <dt>Litteratur <xsl:value-of select="count(//xhtml:meta[@property='dcterms:relation'])"/></dt>
 	  <xsl:for-each select="//xhtml:meta[@property='dcterms:relation']">
 	    <dd><xsl:value-of select="."/></dd>
 	  </xsl:for-each>
@@ -75,7 +70,7 @@
 	<xsl:if test="//xhtml:link[@about=$domuri and @rel='dcterms:subject']">
 	  <dt>Sökord</dt>
 	  <xsl:for-each select="//xhtml:link[@about=$domuri and @rel='dcterms:subject']">
-	    <dd><a href="{@href}"><xsl:value-of select="substring-after(@href, '/concept/')"/></a></dd>
+	    <dd><a href="{@href}"><xsl:value-of select="substring-after(@href, '/begrepp/')"/></a></dd>
 	  </xsl:for-each>
 	</xsl:if>
 	<dt>Källa</dt>
@@ -243,10 +238,21 @@
   
   <!-- default template: translate everything from whatever namespace
        it's in (usually the XHTML1.1 NS) into the default namespace
-       NOTE: It removes any attributes not accounted for otherwise
        -->
   <xsl:template match="*">
-    <xsl:element name="{local-name(.)}"><xsl:apply-templates select="node()"/></xsl:element>
+    <xsl:message>Adding element <xsl:value-of select="local-name()"/></xsl:message>
+    <!-- remove element prefix -->
+    <xsl:element name="{local-name()}">
+      <!-- process attributes -->
+      <xsl:for-each select="@*">
+	<xsl:message>....Adding attribute <xsl:value-of select="local-name()"/></xsl:message>
+        <!-- remove attribute prefix -->
+        <xsl:attribute name="{local-name()}">
+          <xsl:value-of select="."/>
+        </xsl:attribute>
+      </xsl:for-each>
+      <xsl:apply-templates/>
+    </xsl:element>
   </xsl:template>
 
   <!-- toc handling (do nothing) -->

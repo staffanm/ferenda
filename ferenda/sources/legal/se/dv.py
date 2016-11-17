@@ -1267,11 +1267,12 @@ class DV(SwedishLegalSource):
                 for i in value:
                     for node in parser.parse_string(i):
                         if isinstance(node, Link):
-                            domdesc.rel(RPUBL.rattsfall,
+                            domdesc.rel(RPUBL.rattsfallshanvisning,
                                         node.uri)
             elif label == "Litteratur":
-                for i in value.split(";"):
-                    domdesc.value(DCTERMS.relation, util.normalize_space(i))
+                if value:
+                    for i in value.split(";"):
+                        domdesc.value(DCTERMS.relation, util.normalize_space(i))
             elif label == "Sökord":
                 for s in value:
                     self.add_keyword_to_metadata(domdesc, s)
