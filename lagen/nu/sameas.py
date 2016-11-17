@@ -63,7 +63,7 @@ class SameAs(object):
 
 
     def keyword_uri(self, keyword):
-        baseuri = "https://lagen.nu/concept/"
+        baseuri = "https://lagen.nu/begrepp/"
         # FIXME: Do something smart with "
         return baseuri + util.ucfirst(keyword).replace(' ', '_')
 

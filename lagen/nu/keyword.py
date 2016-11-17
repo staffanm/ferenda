@@ -11,6 +11,7 @@ from wsgiref.util import request_uri
 from lxml import etree
 from rdflib.namespace import DCTERMS
 
+from ferenda import util
 from ferenda import TripleStore, Facet, RequestHandler
 from ferenda.sources.general import keyword
 from ferenda.sources.legal.se import SwedishLegalSource, SFS
@@ -19,7 +20,7 @@ class LNKeywordHandler(RequestHandler):
     def supports(self, environ):
         if environ['PATH_INFO'].startswith("/dataset/"):
             return super(LNKeywordHandler, self).supports(environ)
-        return environ['PATH_INFO'].startswith("/concept/")
+        return environ['PATH_INFO'].startswith("/begrepp/")
 
 
 class LNKeyword(keyword.Keyword):
@@ -37,7 +38,7 @@ class LNKeyword(keyword.Keyword):
         super(LNKeyword, self).__init__(config, **kwargs)
         # FIXME: Don't bother with the large wp download right now
         # (but reinstate later)
-        self.termset_funcs.remove(self.download_termset_wikipedia)
+        # self.termset_funcs.remove(self.download_termset_wikipedia)
         if self.config._parent and hasattr(self.config._parent, "sfs"):
             self.sfsrepo = SFS(self.config._parent.sfs)
         else:
@@ -53,10 +54,10 @@ class LNKeyword(keyword.Keyword):
     def canonical_uri(self, basefile):
         # FIXME: make configurable like SFS.canonical_uri
         capitalized = basefile[0].upper() + basefile[1:]
-        return 'https://lagen.nu/concept/%s' % capitalized.replace(' ', '_')
+        return 'https://lagen.nu/begrepp/%s' % capitalized.replace(' ', '_')
 
     def basefile_from_uri(self, uri):
-        prefix = "https://lagen.nu/concept/"
+        prefix = "https://lagen.nu/begrepp/"
         if prefix in uri:
             return uri.replace(prefix, "").replace("_", " ")
         else:
@@ -108,12 +109,21 @@ class LNKeyword(keyword.Keyword):
         for l in legaldefs:
             subject_node = etree.SubElement(main_node,
                                             ns("rinfoex:isDefinedBy"))
-            rattsfall_node = etree.SubElement(subject_node,
+            legaldef_node = etree.SubElement(subject_node,
                                               ns("rdf:Description"))
-            rattsfall_node.set(ns("rdf:about"), l['uri'])
-            id_node = etree.SubElement(rattsfall_node, ns("rdfs:label"))
+            legaldef_node.set(ns("rdf:about"), l['uri'])
+            id_node = etree.SubElement(legaldef_node, ns("rdfs:label"))
             # id_node.text = "%s %s" % (l['uri'].split("#")[1], l['label'])
             id_node.text = self.sfsrepo.display_title(l['uri'])
+
+        if 'wikipedia\n' in util.readfile(self.store.downloaded_path(basefile)):
+            subject_node = etree.SubElement(main_node,
+                                            ns("rdfs:seeAlso"))
+            link_node = etree.SubElement(subject_node,
+                                         ns("rdf:Description"))
+            link_node.set(ns("rdf:about"), 'http://sv.wikipedia.org/wiki/' + basefile.replace(" ","_"))
+            label_node = etree.SubElement(link_node, ns("rdfs:label"))
+            label_node.text = "Begreppet %s finns även beskrivet på svenska Wikipedia" % basefile
 
     def facets(self):
         def kwselector(row, binding, resource_graph):

@@ -603,6 +603,7 @@ with the *config* object as single parameter.
         #
         # It might also be impossible to provide the canonical_uri
         # without actually parse()ing the document
+
         return "%sres/%s/%s" % (self.config.url, self.alias, basefile)
 
     def dataset_uri(self, param=None, value=None):

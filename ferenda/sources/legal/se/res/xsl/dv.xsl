@@ -240,13 +240,8 @@
        it's in (usually the XHTML1.1 NS) into the default namespace
        -->
   <xsl:template match="*">
-    <xsl:message>Adding element <xsl:value-of select="local-name()"/></xsl:message>
-    <!-- remove element prefix -->
     <xsl:element name="{local-name()}">
-      <!-- process attributes -->
       <xsl:for-each select="@*">
-	<xsl:message>....Adding attribute <xsl:value-of select="local-name()"/></xsl:message>
-        <!-- remove attribute prefix -->
         <xsl:attribute name="{local-name()}">
           <xsl:value-of select="."/>
         </xsl:attribute>

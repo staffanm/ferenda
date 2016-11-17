@@ -1072,7 +1072,7 @@ class SFS(Trips):
     # it's canonical_uri()
     def _term_to_subject(self, term):
         capitalized = term[0].upper() + term[1:]
-        return 'https://lagen.nu/concept/%s' % capitalized.replace(' ', '_')
+        return 'https://lagen.nu/begrepp/%s' % capitalized.replace(' ', '_')
 
     # this struct is intended to be overridable
     ordinalpredicates = {

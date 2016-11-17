@@ -8,6 +8,7 @@ import re
 import os
 from collections import defaultdict
 import unicodedata
+import gzip
 
 # 3rdparty libs
 import requests
@@ -65,9 +66,18 @@ class Keyword(DocumentRepository):
 
     def __init__(self, config=None, **kwargs):
         super(Keyword, self).__init__(config, **kwargs)
+
+        self.mediawikirepo = None
+        if self.config._parent and hasattr(self.config._parent, 'mediawiki'):
+            from ferenda.manager import _load_class
+            classname = getattr(self.config._parent.mediawiki, 'class')
+            cls = _load_class(classname)
+            self.mediawikirepo = cls(self.config._parent.mediawiki, keywordrepo=self)
+
         # extra functions -- subclasses can add / remove from this
         self.termset_funcs = [self.download_termset_mediawiki,
                               self.download_termset_wikipedia]
+
 
     @classmethod
     def get_default_options(cls):
@@ -150,43 +160,53 @@ class Keyword(DocumentRepository):
         return term
                 
     def download_termset_mediawiki(self, terms):
-        # 2) Download the wiki.lagen.nu dump from
-        # http://wiki.lagen.nu/pages-articles.xml -- term set "mediawiki"
-        xml = etree.parse(requests.get(self.config.mediawikidump).text)
-        wikinamespaces = []
+        if 'mediawikidump' in self.config:
+            # 2) Download the wiki.lagen.nu dump from
+            # http://wiki.lagen.nu/pages-articles.xml -- term set "mediawiki"
+            xml = etree.parse(requests.get(self.config.mediawikidump).text)
+            wikinamespaces = []
 
-        # FIXME: Handle any MW_NS namespace (c.f. wiki.py)
-
-        for ns_el in xml.findall("//" + MW_NS + "namespace"):
-            wikinamespaces.append(ns_el.text)
-        for page_el in xml.findall(MW_NS + "page"):
-            title = page_el.find(MW_NS + "title").text
-            if title == "Huvudsida":
-                continue
-            if ":" in title and title.split(":")[0] in wikinamespaces:
-                continue  # only process pages in the main namespace
-            if title.startswith("SFS/"):  # FIXME: should be handled in
-                                         # subclass -- or
-                                         # repo-specific pages should
-                                         # be kept in subclasses
-                continue  # only proces normal keywords
-            terms[title]['mediawiki'] = True
+            # FIXME: Handle any MW_NS namespace (c.f. wiki.py)
+            for ns_el in xml.findall("//" + MW_NS + "namespace"):
+                wikinamespaces.append(ns_el.text)
+            for page_el in xml.findall(MW_NS + "page"):
+                title = page_el.find(MW_NS + "title").text
+                if title == "Huvudsida":
+                    continue
+                if ":" in title and title.split(":")[0] in wikinamespaces:
+                    continue  # only process pages in the main namespace
+                terms[title]['mediawiki'] = True
+        elif self.mediawikirepo:
+            for term in self.mediawikirepo.store.list_basefiles_for("parse"):
+                terms[term]['mediawiki'] = True
+        else:
+            self.log.error("Neither mediawikidump or mediawikirepo is defined, "
+                           "can't download mediawiki terms")
 
         self.log.debug("Retrieved subject terms from wiki, now have %s terms" %
                        len(terms))
+
+    def _download_termset_mediawiki_titles(self):
+        # subclasses might want to override this to filter stuff out
+        # from the set of titles
+        for title in self.mediawikirepo.store.list_basefiles_for("parse"):
+            yield title
 
     def download_termset_wikipedia(self, terms):
         # 3) Download the Wikipedia dump from
         # http://download.wikimedia.org/svwiki/latest/svwiki-latest-all-titles-in-ns0.gz
         # -- term set "wikipedia"
-        # FIXME: only download when needed
-        resp = requests.get(self.config.wikipediatitles)
-        wikipediaterms = resp.text.split("\n")
-        for utf8_term in wikipediaterms:
-            term = utf8_term.decode('utf-8').strip()
-            if term in terms:
-                terms[term]['wikipedia'] = True
-
+        filename = self.store.datadir + "/downloaded/wikititles.gz"
+        updated = self.download_if_needed(self.config.wikipediatitles, None, filename=filename)
+        with gzip.open(filename, mode='rt', encoding="utf-8") as fp:
+            # to avoid creating a term for every page on wikipedia,
+            # only register those terms that have already been
+            # featured in another termset. This means that this
+            # function must run last of all termset funcs
+            for term in fp:
+                term = term.strip()
+                if term in terms:
+                    terms[term]['wikipedia'] = True
         self.log.debug("Retrieved terms from wikipedia, now have %s terms" % len(terms))
 
     @managedparsing
@@ -200,8 +220,8 @@ class Keyword(DocumentRepository):
         self.parse_entry_update(doc)
         return True
 
-    re_tagstrip = re.compile(r'<[^>]*>')
 
+    re_tagstrip = re.compile(r'<[^>]*>')
     # FIXME: This is copied verbatim from sfs.py -- maybe it could go
     # into DocumentRepository or util? (or possibly triplestore?)
     def store_select(self, store, query_template, uri, context=None):

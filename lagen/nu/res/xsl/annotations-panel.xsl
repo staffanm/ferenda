@@ -8,7 +8,6 @@
     <xsl:param name="panelid"/>
     <xsl:param name="expanded" select="false()"/>
     <xsl:variable name="expanded-class"><xsl:if test="$expanded">in</xsl:if></xsl:variable>
-    <xsl:message><xsl:value-of select="$paneltype"/>-<xsl:value-of select="$panelid"/>: expanded-class='<xsl:value-of select="$expanded-class"/>'</xsl:message>
     <div class="panel panel-default">
       <div class="panel-heading" role="tab" id="heading-{$paneltype}-{$panelid}">
 	<h4 class="panel-title">
@@ -27,8 +26,8 @@
 	       transform the namespace from
 	       http://www.w3.org/1999/xhtml to the default namespace
 	       (and avoid declaring a whole mess of namespaces used in
-	       the source doc -->
-	  <xsl:apply-templates select="$nodeset"/>
+	       the source doc) -->
+	    <xsl:apply-templates select="$nodeset"/>
 	  <!-- <xsl:copy-of select="$nodeset"/> -->
 	</xsl:if>
       </div>
