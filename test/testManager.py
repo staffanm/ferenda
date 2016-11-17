@@ -507,6 +507,7 @@ indexlocation = data/whooshindex
         # 2. dump 2 example docrepo classes to example.py
         # FIXME: should we add self.tempdir to sys.path also (and remove it in teardown)?
         util.writefile(modulename+".py", """# Test code
+from __future__ import unicode_literals
 import os
 from time import sleep
 

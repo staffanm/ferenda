@@ -554,7 +554,7 @@ def enable(classname):
     configfilename = _find_config_file(create=True)
     cfg.read([configfilename])
     alias = cls.alias
-    if sys.version_info[0] < 3:
+    if False:
         # configparser on py2 has a different API wrt
         # unicode/bytestrings...
         cfg.add_section(alias.encode())
