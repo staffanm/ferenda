@@ -1339,6 +1339,23 @@ class SFS(Trips):
                 (self.find_definitions, False))
 
 
+    def parse_entry_id(self, doc):
+        # For SFS, the doc.uri can be temporal, ie
+        # https://lagen.nu/2015:220/konsolidering/2015:667, but we'd
+        # like to use a static value as entry.id, ie
+        # https://lagen.nu/2015:220.
+        return str(doc.meta.value(URIRef(doc.uri), RPUBL.konsoliderar))
+
+    def parse_entry_title(self, doc):
+        # should use eg Lag (2015:667) om ändring i lagen (2015:220) om blahonga
+        return super(SFS, self).parse_entry_title(doc)
+    
+    def parse_entry_summary(self, doc):
+        # should use eg. omfattning (if change) + förarbeten
+        return "Omfattning: Ändrat 5 §, Ny 6 a §\n\n"
+    
+        
+    
     _document_name_cache = {}
     _query_template_cache = {}
     def store_select(self, store, query_template, uri, context=None, extraparams=None):

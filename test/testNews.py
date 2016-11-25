@@ -386,8 +386,8 @@ class Feedsets(RepoTester):
         # should contain all entries.
         self.assertEquals(len(got[-1].feeds), 1)
         self.assertEquals(len(got[-1].feeds[0].entries), 4)
-        self.assertEquals("http://example.org/articles/pm942051",
-                          got[-1].feeds[0].entries[0]['uri'])
         self.assertEquals("http://example.org/articles/pm14907713",
+                          got[-1].feeds[0].entries[0]['uri'])
+        self.assertEquals("http://example.org/articles/pm942051",
                           got[-1].feeds[0].entries[3]['uri'])
 

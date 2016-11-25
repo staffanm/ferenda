@@ -11,10 +11,11 @@ It's a generic template for any kind of content
 		xmlns:dcterms="http://purl.org/dc/terms/"
 		xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
-		xml:space="preserve"
+		xmlns:ext="http://exslt.org/common"
 		exclude-result-prefixes="xhtml rdf">
 
   <xsl:import href="uri.xsl"/>
+  <xsl:import href="annotations-panel.xsl"/>
   <xsl:include href="base.xsl"/>
 
   <!-- Implementations of templates called by base.xsl -->
@@ -36,20 +37,30 @@ It's a generic template for any kind of content
 
   <xsl:template name="aside-annotations">
     <xsl:param name="uri"/>
+    <xsl:variable name="markup">
+      <xsl:for-each select="$annotations/resource[@uri=$uri]/dcterms:isReferencedBy">
+	<xsl:variable name="referencing" select="@ref"/>
+	<a href="{@ref}"><xsl:value-of select="$annotations/resource[@uri=$referencing]/dcterms:identifier"/></a>
+      </xsl:for-each>
+    </xsl:variable>
+
     <xsl:if test="$annotations/resource[@uri=$uri]">
-      <aside class="annotations">
-	<h2>Annotations for <xsl:value-of select="substring-after($uri,'http://localhost:8000/res/')"/></h2>
-	<xsl:for-each select="$annotations/resource[@uri=$uri]/dcterms:isReferencedBy">
-	  <xsl:variable name="referencing" select="@ref"/>
-	  <a href="{@ref}"><xsl:value-of select="$annotations/resource[@uri=$referencing]/dcterms:identifier"/></a>
-	</xsl:for-each>
+      <aside class="panel-group col-sm-4" role="tablist" id="panel-top" aria-multiselectable="true">
+      <xsl:call-template name="aside-annotations-panel">
+	<xsl:with-param name="title">Annotations</xsl:with-param>
+	<xsl:with-param name="badgecount"/>
+	<xsl:with-param name="nodeset" select="ext:node-set($markup)"/>
+	<xsl:with-param name="panelid">top</xsl:with-param>
+	<xsl:with-param name="paneltype">metadata</xsl:with-param>
+	<xsl:with-param name="expanded" select="true()"/>
+      </xsl:call-template>
       </aside>
     </xsl:if>
   </xsl:template>
 
   <xsl:template match="xhtml:body/xhtml:div">
     <div class="section-wrapper toplevel">
-      <section id="{substring-after(@about,'#')}">
+      <section id="{substring-after(@about,'#')}" class="col-sm-8">
 	<xsl:if test="@content">
 	  <h2><xsl:value-of select="@content"/></h2>
 	</xsl:if>
@@ -110,20 +121,18 @@ It's a generic template for any kind of content
   
   <!-- default template: translate everything from whatever namespace
        it's in (usually the XHTML1.1 NS) into the default namespace
-       NOTE: It removes any attributes not accounted for otherwise
        -->
   <xsl:template match="*">
-    <xsl:element name="{local-name(.)}"><xsl:apply-templates select="node()"/></xsl:element>
+    <xsl:element name="{local-name()}">
+      <xsl:for-each select="@*">
+        <xsl:attribute name="{local-name()}">
+          <xsl:value-of select="."/>
+        </xsl:attribute>
+      </xsl:for-each>
+      <xsl:apply-templates/>
+    </xsl:element>
   </xsl:template>
 
-  <!-- alternatively: identity transform (keep source namespace) -->
-  <!--
-  <xsl:template match="@*|node()">
-    <xsl:copy>
-      <xsl:apply-templates select="@*|node()"/>
-    </xsl:copy>
-  </xsl:template>
-  --> 
   <!-- toc handling (do nothing) -->
   <xsl:template match="@*|node()" mode="toc"/>
   

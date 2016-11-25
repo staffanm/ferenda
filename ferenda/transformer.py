@@ -91,7 +91,6 @@ class Transformer(object):
         :returns: The transformed document
 
         """
-
         if parameters is None:
             parameters = {}
 
@@ -251,7 +250,7 @@ class XSLTTransform(TransformerEngine):
             strparams['configurationfile'] = XSLT.strparam(config_fullpath)
         removefiles = []
         for key, value in parameters.items():
-            if key.endswith("file"):
+            if key.endswith("file") and value:
                 if all(ord(c) < 128 for c in value):
                     # IF the file name contains ONLY ascii chars, we can
                     # use it directly. However, we need to relativize path

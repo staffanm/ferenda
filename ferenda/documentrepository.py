@@ -130,9 +130,12 @@ class DocumentRepository(object):
 #        toc_generate_pages
 #
 #    news
-#        news_selections
-#        news_selection
-#            news_get_entry
+#        news_facet_entries
+#        news_feedsets
+#        news_select_for_feeds
+#            news_item
+#        news_generate_feeds
+#            news_write_atom
 #
 #    frontpage_content
 
@@ -517,6 +520,7 @@ class DocumentRepository(object):
             'republishsource': False,
             'tabs': True,
             'primaryfrontpage': False,
+            'frontpagefeed': False,
             'class': cls.__module__ + "." + cls.__name__,
             # FIXME: These only make sense at a global level, and
             # furthermore are duplicated in manager._load_config. We
@@ -524,7 +528,7 @@ class DocumentRepository(object):
             # base.xsl
             'cssfiles': ['css/ferenda.css'],
             'jsfiles': ['js/ferenda.js'],
-            'imgfiles': [],
+            'imgfiles': ['img/atom.png'],
             'storetype': 'SQLITE',
             'storelocation': 'data/ferenda.sqlite',
             'storerepository': 'ferenda',
@@ -606,7 +610,7 @@ with the *config* object as single parameter.
 
         return "%sres/%s/%s" % (self.config.url, self.alias, basefile)
 
-    def dataset_uri(self, param=None, value=None):
+    def dataset_uri(self, param=None, value=None, feed=False):
         """Returns the URI that identifies the dataset that this docrepository
         provides. The default implementation is based on the url
         config parameter and the alias attribute of the class,
@@ -623,9 +627,21 @@ with the *config* object as single parameter.
         'http://example.org/dataset/base'
         >>> d.dataset_uri("title","a")
         'http://example.org/dataset/base?title=a'
+        >>> d.dataset_uri(feed=True)
+        'http://example.org/dataset/base/feed'
+        >>> d.dataset_uri("title", "a", feed=True)
+        'http://example.org/dataset/base/feed?title=a'
+        >>> d.dataset_uri("title", "a", feed=".atom")
+        'http://example.org/dataset/base/feed.atom?title=a'
+
         """
 
         uri = "%sdataset/%s" % (self.config.url, self.alias)
+        if feed:
+            uri += "/feed"
+            if not isinstance(feed, bool):
+                # ie add an ".atom" suffix, if that's whats passed as the feed parameter
+                uri += feed
         if param and value:
             uri += "?%s=%s" % (param, quote(value))
         return uri
@@ -657,38 +673,6 @@ with the *config* object as single parameter.
                     return basefile
 
 
-    # FIXME: dataset_params_from_uri and basefile_params_from_basefile
-    # should probably move into requesthandler
-    def dataset_params_from_uri(self, uri):
-        """Given a parametrized dataset URI, return the parameter and value
-        used (or an empty tuple, if it is a dataset URI handled by
-        this repo, but without any parameters).
-
-        >>> d = DocumentRepository()
-        >>> d.alias
-        'base'
-        >>> d.config.url = "http://example.org/"
-        >>> d.dataset_params_from_uri("http://example.org/dataset/base?title=a")
-        ('title', 'a')
-        >>> d.dataset_params_from_uri("http://example.org/dataset/base")
-        ()
-
-        """
-
-        wantedprefix = self.config.url + "dataset/" + self.alias
-        if uri == wantedprefix or ("?" in uri and
-                                   uri.startswith(wantedprefix)):
-            path = uri[len(wantedprefix) + 1:]
-            if "=" in path:
-                return tuple(path.split("=", 1))
-            else:
-                return ()
-
-    def basefile_params_from_basefile(self, basefile):
-        if "?" not in basefile:
-            return {}
-        else:
-            return dict(parse_qsl(basefile.split("?", 1)[1]))
 
     #
     #
@@ -1142,16 +1126,37 @@ with the *config* object as single parameter.
         """Update the DocumentEntry json file for this document."""
         entry = DocumentEntry(self.store.documententry_path(doc.basefile))
         entry.basefile = doc.basefile  # do we even need this?
-        entry.id = doc.uri
+        entry.id = self.parse_entry_id(doc)
         entry.title = self.parse_entry_title(doc)
+        entry.summary = self.parse_entry_summary(doc)
         entry.save()
+
+    def parse_entry_id(self, doc):
+        """Construct a id (URI) for the document, 
+        to be stored in it's DocumentEntry json file.
+
+        Normally, this is identical to the main document URI as
+        specified in doc.uri.
+
+        """
+        return doc.uri
 
     def parse_entry_title(self, doc):
         """Construct a useful title for the document, like it's dcterms:title,
         to be stored in it's DocumentEntry json file."""
-        title = doc.meta.value(URIRef(doc.uri), self.ns['dcterms'].title)
+        title = doc.meta.value(URIRef(doc.uri), DCTERMS.title)
         if title:
             return str(title)
+
+    def parse_entry_summary(self, doc):
+        """Construct a useful summary for the document, like it's dcterms:abstract,
+        to be stored in it's DocumentEntry json file."""
+        summary = doc.meta.value(URIRef(doc.uri), DCTERMS.abstract)
+        if summary:
+            if summary.datatype == RDF.XMLLiteral:
+                return summary
+            else:
+                return str(summary)
 
     def soup_from_basefile(self, basefile, encoding='utf-8', parser='lxml'):
         """
@@ -2783,7 +2788,7 @@ WHERE {
                                       documents, pagesets, "index", otherrepos)
 
     def toc_generate_page(self, binding, value, documentlist, pagesets,
-                          effective_basefile=None, otherrepos=[]):
+                          effective_basefile=None, title=None, otherrepos=[]):
         """Generate a single TOC page.
 
         :param binding: The binding used (eg. 'title' or 'issued')
@@ -2816,12 +2821,12 @@ WHERE {
 
         d.value(self.ns['dcterms'].title, title)
 
-        # Consider other strategies; definition lists with
-        # subheadings, orderedlists, tables...
-        ul = UnorderedList([ListItem(x) for x in documentlist], role='main')
-        doc.body = Body([nav,
-                         ul
-                         ])
+        # Override toc_generate_page_body to implement other
+        # presentation strategies; definition lists with subheadings,
+        # orderedlists, tables...
+        
+        doc.body = self.toc_generate_page_body(documentlist, nav)
+        
         conffile = os.path.abspath(
             os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
         transformer = Transformer('XSLT', "xsl/toc.xsl", "xsl",
@@ -2857,6 +2862,14 @@ WHERE {
         self.log.info("Created %s" % outfile)
         return outfile
 
+    def toc_generate_page_body(self, documentlist, nav):
+        ul = UnorderedList([ListItem(x) for x in documentlist], role='main')
+        return Body([nav,
+                     ul
+        ])
+
+
+    news_sortkey = 'updated'
     def news(self, otherrepos=[]):
         """Create a set of Atom feeds and corresponding HTML pages for
         new/updated documents in different categories in the
@@ -2875,7 +2888,8 @@ WHERE {
         with util.logtime(self.log.debug,
                           "news: selected %(rowcount)s decorated rows (%(elapsed).3f sec)",
                           params):
-            data = self.news_facet_entries()
+            keyfunc = itemgetter(self.news_sortkey)
+            data = self.news_facet_entries(keyfunc)
             params['rowcount'] = len(data)
 
         # create an object for each Atom feed. This should include a
@@ -3052,7 +3066,8 @@ WHERE {
             facets.append(Facet(rdftype=RDFS.Resource,  # all the things
                                 identificator=lambda x, y, z: None,
                                 selector=lambda x, y, z: None,
-                                key=lambda row, binding, resource_graph: row['updated']))
+                                key=lambda row, binding, resource_graph: row[self.news_sortkey],
+                                key_descending=True))
         for feedset, facet in zip(feedsets, facets):
             documents = defaultdict(list)
             if facet.dimension_label:

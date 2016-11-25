@@ -160,7 +160,7 @@ class=testManager.staticmockclass2
                         imgfiles=[]).make(api=False)
         s = os.sep
         want = {'css':[s.join(['rsrc', 'css','ferenda.css'])],
-                'img':[],
+                'img':[s.join(['rsrc', 'img', 'atom.png'])],
                 'js':[s.join(['rsrc', 'js','ferenda.js'])],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
                       }

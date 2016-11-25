@@ -40,7 +40,6 @@ It's a generic template for TOC pages (assumes that there exists a <ul role="nav
   -->
   
   <xsl:template match="xhtml:ul[@role='navigation']" mode="toc">
-    <xsl:comment>Navigation toc rule applied</xsl:comment>
     <xsl:apply-templates/>
   </xsl:template>
     
@@ -56,13 +55,6 @@ It's a generic template for TOC pages (assumes that there exists a <ul role="nav
   <xsl:template match="@*">
     <xsl:copy><xsl:apply-templates/></xsl:copy>
   </xsl:template>
-  <!--
-  <xsl:template match="@*|node()">
-    <xsl:copy>
-      <xsl:apply-templates select="@*|node()"/>
-    </xsl:copy>
-  </xsl:template>
-  -->
   
   <xsl:template match="@*|node()" mode="toc">
     <!-- do nothing -->

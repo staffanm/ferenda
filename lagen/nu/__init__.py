@@ -14,3 +14,4 @@ from .jk import JK
 from .myndprax import MyndPrax
 from .forarbeten import Forarbeten
 from .static import Static
+from .sitenews import Sitenews

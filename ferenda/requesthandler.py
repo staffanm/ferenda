@@ -20,7 +20,8 @@ from ferenda.errors import RequestHandlerError
 class RequestHandler(object):
     
     _mimesuffixes = {'xhtml': 'application/xhtml+xml',
-                     'rdf': 'application/rdf+xml'}
+                     'rdf': 'application/rdf+xml',
+                     'atom': 'application/atom+xml'}
     _rdfformats = {'application/rdf+xml': 'pretty-xml',
                    'text/turtle': 'turtle',
                    'text/plain': 'nt',
@@ -39,6 +40,46 @@ class RequestHandler(object):
 
     def __init__(self, repo):
         self.repo = repo
+
+    def dataset_params_from_uri(self, uri):
+        """Given a parametrized dataset URI, return the parameter and value
+        used (or an empty tuple, if it is a dataset URI handled by
+        this repo, but without any parameters).
+
+        >>> d = DocumentRepository()
+        >>> d.alias
+        'base'
+        >>> d.config.url = "http://example.org/"
+        >>> d.dataset_params_from_uri("http://example.org/dataset/base?title=a")
+        {"param": "title", "value": "a", "feed": False}
+        >>> d.dataset_params_from_uri("http://example.org/dataset/base")
+        {}
+
+        >>> d.dataset_params_from_uri("http://example.org/dataset/base/feed/title")
+        {"param": "title", "feed": True}
+        """
+
+        wantedprefix = self.repo.config.url + "dataset/" + self.repo.alias
+        if (uri == wantedprefix or
+            ("?" in uri and uri.startswith(wantedprefix)) or
+            ("/feed" in uri and uri.startswith(wantedprefix))):
+            
+            path = uri[len(wantedprefix) + 1:]
+            params = {}
+            if path.startswith("feed"):
+                params['feed'] = True
+            if "=" in path:
+                param, value = path.split("=", 1)
+                params['param'] = param
+                params['value'] = value
+            return params
+        # else return None (which is different from {})
+
+    def basefile_params_from_basefile(self, basefile):
+        if "?" not in basefile:
+            return {}
+        else:
+            return dict(parse_qsl(basefile.split("?", 1)[1]))
 
     def supports(self, environ):
         """Returns True iff this particular handler supports this particular request."""
@@ -66,8 +107,12 @@ class RequestHandler(object):
         """
         suffix = None
         if urlparse(uri).path.startswith("/dataset/"):
-            params = self.repo.dataset_params_from_uri(uri)
-            environ = {"HTTP_ACCEPT": "text/html"}
+            params = self.dataset_params_from_uri(uri)
+            if ".atom" in uri:
+                suffix = "atom"
+                environ = {}
+            else:
+                environ = {"HTTP_ACCEPT": "text/html"}
             contenttype = self.contenttype(environ, uri, None, params, suffix)
             pathfunc = self.get_dataset_pathfunc(environ, params, contenttype, suffix)
             if pathfunc:
@@ -75,15 +120,15 @@ class RequestHandler(object):
             else:
                 return None
         else:
-            params = self.repo.basefile_params_from_basefile(uri)
+            params = self.basefile_params_from_basefile(uri)
             if params:
                 uri = uri.split("?")[0]
             basefile = self.repo.basefile_from_uri(uri)
 
-            if isinstance(params, dict) and 'format' in params:
+            if 'format' in params:
                 suffix = params['format']
             else:
-                if isinstance(params, dict) and 'attachment' in params:
+                if 'attachment' in params:
                     leaf = params['attachment']
                 else:
                     leaf = uri.split("/")[-1]
@@ -125,7 +170,7 @@ class RequestHandler(object):
                 tmpuri = tmpuri.rsplit(".")[0]
             if querystring:
                 tmpuri += "?" + querystring
-            params = self.repo.dataset_params_from_uri(tmpuri)
+            params = self.dataset_params_from_uri(tmpuri)
         else:
             basefile = self.repo.basefile_from_uri(uri)
             if not basefile:
@@ -133,11 +178,11 @@ class RequestHandler(object):
             if querystring:
                 params = dict(parse_qsl(querystring))
             else:
-                params = self.repo.basefile_params_from_basefile(basefile)
-        if isinstance(params, dict) and 'format' in params:
+                params = self.basefile_params_from_basefile(basefile)
+        if 'format' in params:
             suffix = params['format']
         else:
-            if isinstance(params, dict) and 'attachment' in params:
+            if 'attachment' in params:
                 leaf = params['attachment']
             else:
                 leaf = uri.split("/")[-1]
@@ -265,12 +310,20 @@ class RequestHandler(object):
         return method
 
     def get_dataset_pathfunc(self, environ, params, contenttype, suffix):
-        if contenttype == "text/html":
+        suffix = {"text/html": "html",
+                  "application/atom+xml": "atom"}.get(contenttype, None)
+        if suffix:
             if params:
-                pseudobasefile = "/".join(params)
+                if 'feed' in params:
+                    if 'param' in params:
+                        pseudobasefile = "feed/%s.%s" % (params['value'], suffix)
+                    else:
+                        pseudobasefile = "feed/main.%s" % suffix
+                else:
+                    pseudobasefile = "toc/%s/%s.html" % (params['param'], params['value'])
             else:
-                pseudobasefile = "index"
-            return partial(self.repo.store.resourcepath, "toc/%s.html" % pseudobasefile)
+                pseudobasefile = "toc/index.html"
+            return partial(self.repo.store.resourcepath, pseudobasefile)
         elif contenttype == "text/plain" or suffix == "nt":
             return partial(self.repo.store.resourcepath, "distilled/dump.nt")
         
@@ -307,12 +360,20 @@ class RequestHandler(object):
         # FIXME: This should also make use of pathfunc
         data = None
         path = None
-        if contenttype == "text/html":
+        suffix = {"text/html": "html",
+                  "application/atom+xml": "atom"}.get(contenttype, None)
+        if suffix:
             if params:
-                pseudobasefile = "/".join(params)
+                if 'feed' in params:
+                    if 'param' in params:
+                        pseudobasefile = "feed/%s.%s" % (params['value'], suffix)
+                    else:
+                        pseudobasefile = "feed/main.%s" % suffix
+                else:
+                    pseudobasefile = "toc/%s/%s.html" % (params['param'], params['value'])
             else:
-                pseudobasefile = "index"
-            path = self.repo.store.resourcepath("toc/%s.html" % pseudobasefile)
+                pseudobasefile = "toc/index.html"
+            path = self.repo.store.resourcepath(pseudobasefile)
         elif contenttype == "text/plain" or suffix == "nt":
             path = self.repo.store.resourcepath("distilled/dump.nt")
         elif contenttype in self._rdfformats or suffix in self._rdfsuffixes:

@@ -1229,9 +1229,9 @@ class Generate(RepoTester):
             self.repo.generate("1")
         
         t = etree.parse(self.repo.store.generated_path("1"))
-        # find top node .annotations,
-        anode = t.find(".//aside[@class='annotations']")
-        annotations = anode.findall("a")
+        # find top node annotations,
+        anode = t.find(".//aside")
+        annotations = anode.findall(".//div[@class='panel-body']//a")
         # confirm that exactly a:2, a:2#part1, b:1, b:1#part is there
         self.assertEqual(4, len(annotations))
         labels = set([a.text    for a in annotations])
@@ -1247,7 +1247,7 @@ class Generate(RepoTester):
                               'http://example.org/repo/a/2part1']),
                          refs)
         anode = t.find(".//div[@about='http://example.org/repo/a/1part']/aside")
-        annotations = anode.findall("a")
+        annotations = anode.findall(".//div[@class='panel-body']//a")
         self.assertEqual(1, len(annotations))
         self.assertEqual('http://example.org/repo/a/2part2',
                          annotations[0].get('href'))

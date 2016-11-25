@@ -152,10 +152,13 @@ def frontpage(repos,
         # .frontpage_content() into that repos .frontpage impl (and this
         # method should not have any xhtml template like below).
         xhtml = None
+        feed = None
         for inst in repos:
-            if inst.config.primaryfrontpage:
+            if inst.config.primaryfrontpage and not xhtml:
                 xhtml = inst.frontpage_content(primary=True)
-                break
+            if inst.config.frontpagefeed and not feed:
+                feed = inst.store.resourcepath("feed/main.atom")
+                
         if not xhtml:
             for inst in repos:
                 content = inst.frontpage_content()
@@ -195,7 +198,6 @@ def frontpage(repos,
             for p in subpath:
                 if p not in loadpath:
                     loadpath.append(p)
-
         transformer = Transformer('XSLT', stylesheet, "xsl",
                                   resourceloader=ResourceLoader(*loadpath),
                                   config=conffile,
@@ -206,7 +208,12 @@ def frontpage(repos,
             urltransform = repos[0].get_url_transform_func(develurl=develurl)
         else:
             urltransform = None
-        transformer.transform_file(xhtml_path, path, uritransform=urltransform)
+        if feed:
+            params = {"feedfile": feed}
+        else:
+            params = {"feedfile": ""}
+        transformer.transform_file(xhtml_path, path,
+                                   parameters=params, uritransform=urltransform)
     return True
 
 
@@ -1352,6 +1359,8 @@ def _run_class_with_basefile(clbl, basefile, kwargs, command,
             exc_type, exc_value, tb = sys.exc_info()
             return exc_type, exc_value, traceback.extract_tb(tb)
     except Exception as e:
+        if 'bdb.BdbQuit' in str(type(e)):
+            raise
         errmsg = str(e)
         loc = util.location_exception(e)
         getlog().error("%s %s %s failed: %s (%s)" %

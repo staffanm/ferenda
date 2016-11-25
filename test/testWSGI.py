@@ -69,6 +69,22 @@ class Pathresolve(RepoTester):
     def test_dataset_params(self):
         self.assertEqual(self.p("http://localhost:8000/dataset/base?title=a"),
                          self.datadir + "/base/toc/title/a.html")
+
+    def test_dataset_feed(self):
+        self.assertEqual(self.p("http://localhost:8000/dataset/base/feed"),
+                         self.datadir + "/base/feed/main.html")
+
+    def test_dataset_feed_params(self):
+        self.assertEqual(self.p("http://localhost:8000/dataset/base/feed?type=foo"),
+                         self.datadir + "/base/feed/foo.html")
+
+    def test_dataset_feed_atom(self):
+        self.assertEqual(self.p("http://localhost:8000/dataset/base/feed.atom"),
+                         self.datadir + "/base/feed/main.atom")
+
+    def test_dataset_feed_atom_params(self):
+        self.assertEqual(self.p("http://localhost:8000/dataset/base/feed.atom?type=foo"),
+                         self.datadir + "/base/feed/foo.atom")
         
 
 
@@ -374,6 +390,21 @@ class Parameters(WSGI):
         status, headers, content = self.call_wsgi(self.env)
         want = ["200 OK",
                 {'Content-Type': 'text/html'},
+                tocdata]
+        self.assertResponse(want[0], want[1], want[2],
+                            status, headers, content)
+        
+
+    def test_feed_param(self):
+        tocdata = b"<!-- specific feed goes here -->"
+        tocpath = self.repo.store.resourcepath("feed/a.atom")
+        util.ensure_dir(tocpath)
+        with open(tocpath, "wb") as fp:
+            fp.write(tocdata)
+        self.env["PATH_INFO"] = "/dataset/base/feed.atom?title=a"
+        status, headers, content = self.call_wsgi(self.env)
+        want = ["200 OK",
+                {'Content-Type': 'application/atom+xml'},
                 tocdata]
         self.assertResponse(want[0], want[1], want[2],
                             status, headers, content)

@@ -388,6 +388,10 @@ img.facsimile {
     padding: 10px;
 }
 
+body.frontpage nav#toc ul > li > ul {
+    padding-left: 10px;
+}
+
 /* grid-framework.less gives all .rows negative left and right margins
 (-15px) for some reason. This causes the row to have more pixels than
 body (eg 1310 when body is 1280). This makes it possible to right
