@@ -13,6 +13,15 @@ body.forarbete div.sida {
 	border-right: none;
 	background-color: white;
 }
+
+body.forarbete div.forfattningskommentar div.sida {
+    /* when pagebreaks occur inside of a div.forfattningkommentar, we need extra work to "break out" of the surrounding section border */
+    margin-left: -19px;
+    margin-right: -19px;
+    margin-bottom: -1px; /* handles the case when the pagebreak occurs last in, but still
+   inside of, a div.forfattningskommentar */
+}
+
 body.forarbete div.sida ul {
 	padding-top: 12pt;
 	font-size: smaller;

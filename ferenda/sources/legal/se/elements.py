@@ -482,7 +482,7 @@ class Forfattningskommentar(CompoundElement):
                 if child.tag != "{http://www.w3.org/1999/xhtml}span" or not child.get("rel"):
                     element.remove(child)
                     # remove attribs that don't need to be in the RDF
-                    if child.get("class"):
+                    if child.get("class") != "sidbrytning":
                         del child.attrib["class"]
                     if child.get("style"):
                         del child.attrib["style"]

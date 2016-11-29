@@ -205,7 +205,14 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
       <h3><xsl:value-of select="@content"/></h3>
     </xsl:if>
     <div class="forfattningskommentar" id="{translate(substring-after(@about, '#'),'.','-')}">
-       <xsl:apply-templates select="xhtml:div/xhtml:div/*"/>
+      <xsl:for-each select="xhtml:div/xhtml:div/*">
+	<xsl:apply-templates/>
+	<xsl:if test="@class='sidbrytning'">
+	  [<xsl:value-of select="local-name(.)"/>]
+	  <xsl:call-template name="sidbrytning"/>
+	</xsl:if>
+      </xsl:for-each>
+      <!-- <xsl:apply-templates select="xhtml:div/xhtml:div/*"/> -->
     </div>
   </xsl:template>
 
