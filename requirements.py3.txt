@@ -26,3 +26,4 @@ psutil
 layeredconfig
 grako
 responses
+langdetect

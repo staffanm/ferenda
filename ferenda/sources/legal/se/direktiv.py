@@ -41,11 +41,18 @@ class DirAnalyzer(PDFAnalyzer):
         # 3rd largest: used for the id (eg "Dir. 2014:158") on the frontpage.
         # 4th largest (same size as body text but bold): h1
         # 5th largest (same size as body text but italic): h2
-        (ts, dummy, h1, h2) = sorted(styles.keys(), key=self.fontsize_key,
-                                     reverse=True)[1:5]
+        styles = sorted(styles.keys(), key=self.fontsize_key,
+                        reverse=True)[1:5]
+        if len(styles) < 4: # might be the case if no h2:s are ever used
+            (ts, dummy, h1) = styles
+            h2 = None
+        else:
+            (ts, dummy, h1, h2) = styles
+
         styledefs['title'] = self.fontdict(ts)
         styledefs['h1'] = self.fontdict(h1)
-        styledefs['h2'] = self.fontdict(h2)
+        if h2:
+            styledefs['h2'] = self.fontdict(h2)
         return styledefs
 
 

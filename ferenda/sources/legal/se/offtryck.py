@@ -28,7 +28,7 @@ from ferenda.errors import ParseError, DocumentSkippedError
 
 from . import SwedishLegalSource, RPUBL
 from .legalref import Link, LegalRef, RefParseError
-from .decoders import OffsetDecoder1d, OffsetDecoder20
+from .decoders import OffsetDecoder1d, OffsetDecoder20, DetectingDecoder
 from .elements import *
 
 class Offtryck(SwedishLegalSource):
@@ -599,7 +599,7 @@ class Offtryck(SwedishLegalSource):
         else:
             keep_xml = True
         tup = (self.document_type, basefile)
-        default_decoder = (OffsetDecoder1d, None)
+        default_decoder = (DetectingDecoder, None)
         # This just just a list of known different encoding
         # schemes. FIXME: try to find out whether all Ds documents should
         # use the (non-decoding) BaseTextDecoder
@@ -847,7 +847,7 @@ class Offtryck(SwedishLegalSource):
                         # acttext state, replace that object with just
                         # the title
                         comment_on = current_comment.comment_on
-                        assert current_comment.title
+                        assert current_comment.title, "Expected current_comment to have a .title"
                         titlenode = P([current_comment.title])
                         if current_comment in textnodes:
                             textnodes[textnodes.index(current_comment)] = titlenode

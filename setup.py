@@ -25,6 +25,7 @@ install_requires = ['beautifulsoup4 >= 4.3.0',
                     'responses >= 0.3.0',
                     'SimpleParse >= 2.2.0',
                     'cached_property >= 1.3.0',
+                    'langdetect >= 1.0.0',
                     # 'patchit >= 1.2',   # not released yet, using vendorized copy
 ]
 

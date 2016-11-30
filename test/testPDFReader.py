@@ -329,7 +329,21 @@ class Decoding(unittest.TestCase):
         self.assertEqual("Landsorganisationen i Sverige (LO)", page[39][0]) # ")" is encoded as TAB
         self.assertEqual("i", page[39][0].tag)
         
-
+    def test_autodetect_encoding(self):
+        from ferenda.sources.legal.se.decoders import DetectingDecoder
+        self._copy_sample()
+        reader = PDFReader(filename="test/files/pdfreader/multiple-encodings.pdf",
+                           workdir=self.datadir,
+                           textdecoder=DetectingDecoder())
+        page = reader[0]
+        self.assertEqual("Detta är helt vanlig icke-kodad text på svenska.",
+                         str(page[0]))     # unencoded (but marked as Custom encoding)
+        self.assertEqual("mellan Konungariket Sveriges regering och Konungariket Danmarks",
+                         str(page[1]))       # basic encoding (0x1d)
+        self.assertEqual("Skälen för regeringens bedömning och förslag",
+                         str(page[2]))         # other encoding (0x20
+        
+        
 class TestParseXML(unittest.TestCase):
 
     def test_grandchildren(self):

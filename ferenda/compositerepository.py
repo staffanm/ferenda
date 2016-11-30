@@ -227,9 +227,15 @@ class CompositeRepository(DocumentRepository):
             # self.store.basefiles[c])
             subrepos_lbl = ", ".join([self.get_instance(x).qualified_class_name()
                                       for x in self.subrepos if basefile in self.store.basefiles[x]])
-            raise errors.ParseError(
-                "No instance of %s was able to parse %s" %
-                (subrepos_lbl, basefile))
+            if subrepos_lbl:
+                raise errors.ParseError(
+                    "No instance of %s was able to parse %s" %
+                    (subrepos_lbl, basefile))
+            else:
+                raise errors.ParseError(
+                    "No available instance (out of %s) had basefile %s" %
+                    (len(self.subrepos), basefile))
+                
 
     def copy_parsed(self, basefile, instance):
         # If the distilled and parsed links are recent, assume that

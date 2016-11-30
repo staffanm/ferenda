@@ -6,10 +6,13 @@ from builtins import *
 import re
 
 from ferenda.pdfreader import BaseTextDecoder, Textelement
-
+from ferenda import errors
 
 class OffsetDecoder1d(BaseTextDecoder):
 
+    low_offset = 0x1d
+    high_offset = 0x7a
+    unmapped = []
     def __init__(self, dummy=None):
         """Decoder for most PDFs with custom encoding coming from
         Regeringskansliet.
@@ -18,27 +21,31 @@ class OffsetDecoder1d(BaseTextDecoder):
         but with a 0x1d offset.
 
         """
-        self.map = self.encodingmap()
+        self.map = self.encodingmap(self.low_offset, self.high_offset, self.unmapped)
         self.re_xmlcharref = re.compile("&#\d+;")
 
-    def encodingmap(self):
+    def encodingmap(self, low_offset, high_offset,unmapped):
         customencoding_map = {}
         for i in range(0x20, 0x7e):
-            customencoding_map[i - 0x1d] = i
-            # assume that the rest is coded using windows-1252 but with a 0x7a
-            # offset. We have no basis for this assumption.
-            for i in range(0x80, 0xff):
-                if i - 0x7a in customencoding_map:
-                    # print("would have mapped %s to %s but %s was already in customencoding_map" %
-                    #       (chr(i - 0x7a), chr(i), chr(customencoding_map[i - 0x7a])))
-                    pass
-                else:
-                    customencoding_map[i - 0x7a] = i
+            customencoding_map[i - low_offset] = i
+
+        for i in unmapped:
+            customencoding_map[i] = i
+
+        # assume that the rest is coded using windows-1252 but with a 0x7a
+        # offset. We have no basis for this assumption.
+        for i in range(0x80, 0xff):
+            if i - high_offset in customencoding_map:
+                # print("would have mapped %s to %s but %s was already in customencoding_map" %
+                #       (chr(i - 0x7a), chr(i), chr(customencoding_map[i - 0x7a])))
+                pass
+            else:
+                customencoding_map[i - high_offset] = i
         return customencoding_map
 
-    def decode_string(self, s):
+    def decode_string(self, s, encoding_map):
         s = self.re_xmlcharref.sub(lambda m: chr(int(m.group(0)[2:-1])), s)
-        return s.translate(self.map)
+        return s.translate(encoding_map)
 
     def __call__(self, textbox, fontspecs): 
         if 'encoding' not in fontspecs[textbox.fontid]:  # only for some testcases
@@ -53,7 +60,7 @@ class OffsetDecoder1d(BaseTextDecoder):
         for idx, subpart in enumerate(textbox):
             if (isinstance(subpart, Textelement) and
                 (decode_all or subpart.tag == 'i')):
-                textbox[idx] = Textelement(self.decode_string(subpart),
+                textbox[idx] = Textelement(self.decode_string(subpart, self.map),
                                            tag=subpart.tag)
         return textbox
 
@@ -93,6 +100,9 @@ class OffsetDecoder20(OffsetDecoder1d):
 
     """
 
+    low_offset = 0x20
+    high_offset = 0x40
+    unmapped = [0x20]
     fixedleaders = ["(Skälen för r|R)egeringens (bedömning och förslag|bedömning|förslag):", "Remissinstanserna:"]
     
     def __init__(self, kommittenamn=None):
@@ -121,22 +131,6 @@ class OffsetDecoder20(OffsetDecoder1d):
                 newstring += c
         return newstring
 
-    def encodingmap(self):
-        customencoding_map = {}
-        for i in range(0x20, 0x7e):
-            customencoding_map[i - 0x20] = i
-
-        # space is space
-        customencoding_map[0x20] = 0x20
-
-        # the rest is coded using windows-1252 but with a 0x40 offset.
-        for i in range(0x80, 0xff):
-            if i - 0x40 in customencoding_map:
-                pass
-            else:
-                customencoding_map[i - 0x40] = i
-        return customencoding_map
-
 
     def __call__(self, textbox, fontspecs):
         if fontspecs[textbox.fontid]['encoding'] != "Custom":
@@ -163,7 +157,7 @@ class OffsetDecoder20(OffsetDecoder1d):
                     boundary = m.end()
             if boundary:
                 orig = str(textbox[0])
-                textbox[0] = Textelement(self.decode_string(orig[:boundary]), tag="b")
+                textbox[0] = Textelement(self.decode_string(orig[:boundary], self.map), tag="b")
                 textbox.insert(1, Textelement(orig[boundary:], tag=None))
                 # Find the id for the "real" non-bold font. I think
                 # that in every known case the fontid should simply be
@@ -173,7 +167,7 @@ class OffsetDecoder20(OffsetDecoder1d):
                 newfontid = self.find_fontid(fontspecs, "Times-Roman", textbox.font.size)
                 expected_length = 2
             else:
-                textbox[0] = Textelement(self.decode_string(textbox[0]), tag=textbox[0].tag)
+                textbox[0] = Textelement(self.decode_string(textbox[0], self.map), tag=textbox[0].tag)
                 expected_length = 1
                 newfontid = textbox.fontid
             if len(textbox) > expected_length: # the <text> element contained subelements
@@ -201,3 +195,52 @@ class OffsetDecoder20(OffsetDecoder1d):
         else:
              raise KeyError("No fontspec matching (%s, %s) found" % (family, size))
 
+# this decoder has a special analyze_font(fontid, sample) method that
+# is called with a selection of textboxes using that font, and records
+# through language detection whether that font uses encoding or not.
+from langdetect import detect
+from langdetect.lang_detect_exception import LangDetectException
+
+class DetectingDecoder(OffsetDecoder1d):
+    def __init__(self, dummy=None):
+        super(DetectingDecoder, self).__init__(dummy)
+        self.encodingmaps = {}
+        
+    def analyze_font(self, fontid, sample):
+        for low_offset, high_offset, unmapped in ((0,0, []),
+                                                  (0x1d, 0x7a, []),
+                                                  (0x20, 0x40, [0x20])):
+            if low_offset and high_offset:
+                encodingmap = self.encodingmap(low_offset, high_offset, unmapped)
+                decoded_sample = self.decode_string(sample, encodingmap)
+            else:
+                encodingmap = None
+                decoded_sample = sample
+            try:
+                lang = detect(decoded_sample)
+                if lang == 'sv':
+                    self.encodingmaps[int(fontid)] = encodingmap
+                    return low_offset # used for diagnostic logging
+            except LangDetectException:
+                pass
+        raise errors.PDFDecodeError("cannot detect how to decode font %s using %r" %
+                                    (fontid, sample))
+
+
+    def __call__(self, textbox, fontspecs):
+        if 'encoding' not in fontspecs[textbox.fontid]:  # only for some testcases
+            return textbox
+        if (fontspecs[textbox.fontid]['encoding'] != "Custom" or
+            self.encodingmaps.get(textbox.fontid) is None):
+            return textbox
+        # NOTE: This weird checking for occurrences of 'i'
+        # tags is needed for functionalSources.
+        # TestPropRegeringen.test_parse_1999_2000_17 to pass
+        # (and matches encoding usage in practice)
+        decode_all = not('i' in [getattr(x, 'tag', None) for x in textbox])
+        for idx, subpart in enumerate(textbox):
+            if (isinstance(subpart, Textelement) and
+                (decode_all or subpart.tag == 'i')):
+                textbox[idx] = Textelement(self.decode_string(subpart, self.encodingmaps[textbox.fontid]),
+                                           tag=subpart.tag)
+        return textbox

@@ -182,6 +182,10 @@ class PDFFileIsEmpty(FerendaException):
 
     """
 
+class PDFDecodeError(FerendaException):
+    """Raised when a BaseTextDecoder or subclass encounters a problem decoding a non-standard encoding"""
+
+
 class RequestHandlerError(FerendaException):
     """Raised when :py:class:`~ferenda.RequestHandler` attempts to handle
     an incoming request that it thinks it can support, but fails."""

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pdf2xml SYSTEM "pdf2xml.dtd">
+
+<pdf2xml producer="poppler" version="0.36.0">
+<page number="1" position="absolute" top="0" left="0" height="1263" width="892">
+	<fontspec id="0" size="12" family="Times-Roman" color="#000000"/>
+	<fontspec id="1" size="12" family="CBGMAD+Times.New.Roman.Kursiv0104" color="#000000"/>
+	<fontspec id="2" size="12" family="CBGMAF+Times.New.Roman.Fet0104" color="#000000"/>
+<text top="476" left="85" width="553" height="24" font="0">Detta är helt vanlig icke-kodad text på svenska.</text>
+<text top="476" left="85" width="553" height="24" font="1">PHOODQ.RQXQJDULNHW6YHULJHVUHJHULQJRFK.RQXQJDULNHW'DQPDUNV</text>
+<text top="628" left="106" width="531" height="24" font="2">3K¤LEN F¶R REGERINGENS BED¶MNING OCH F¶RSLAG</text>
+</page>
+</pdf2xml>

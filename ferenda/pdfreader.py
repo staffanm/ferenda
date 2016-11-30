@@ -128,7 +128,8 @@ class PDFReader(CompoundElement):
             self._textdecoder = BaseTextDecoder()
         else:
             self._textdecoder = textdecoder
-            
+
+
         if convert_to_pdf:
             newfilename = workdir + os.sep + \
                 os.path.splitext(os.path.basename(filename))[0] + ".pdf"
@@ -526,6 +527,15 @@ class PDFReader(CompoundElement):
 
         assert root.tag == "pdf2xml", "Unexpected root node from pdftohtml -xml: %s" % root.tag
 
+        # We're experimenting with a auto-detecting decoder, which
+        # needs a special API call in order to do the detection. If
+        # this turns out to be a good idea we'll rework it into an
+        # official subclass of BaseTextDecoder (maybe
+        # AnalyzingTextDecoder) and test with isinstance
+
+        if hasattr(self._textdecoder, 'analyze_font'):
+            self._analyze_font_encodings(root, fontinfo)
+
         # for each page element
         for pageelement in root:
             if pageelement.tag == "outline":
@@ -686,6 +696,37 @@ class PDFReader(CompoundElement):
         self.log.debug("PDFReader initialized: %d pages, %d fontspecs" %
                        (len(self), len(self.fontspec)))
         
+
+    def _analyze_font_encodings(self, root, fontinfo):
+        encoded_fontids = {}
+        for pageelement in root:
+            if pageelement.tag == "outline":
+                continue
+            elif isinstance(pageelement, etree._Comment):
+                continue
+            # we need to loop through all textboxes on all pages,
+            # because the very last one might have a new fontspec
+            for e in pageelement:
+                if e.tag == 'fontspec':
+                    fontid = e.attrib['id']
+                    family = e.attrib['family']
+                    if fontinfo.get(family) and fontinfo[family]['encoding'] == "Custom":
+                        encoded_fontids[fontid] = []
+                elif e.tag == 'text' and e.attrib["font"] in encoded_fontids:
+                    if len(encoded_fontids[e.attrib["font"]]) < 10:
+                        txt = etree.tostring(e, method="text", encoding="utf-8").decode("utf-8")
+                        encoded_fontids[e.attrib["font"]].append(txt)
+
+        for fontid, samples in encoded_fontids.items():
+            try:
+                offset = self._textdecoder.analyze_font(fontid, " ".join(samples))
+                if offset:
+                    self.log.debug("Font %s: Decoding with offset %02x" % (fontid, offset))
+                else:
+                    self.log.debug("Font %s: No offset used" % fontid)
+            except errors.PDFDecodeError:
+                self.log.warning("Font %s: Encoding could not be detected, assuming no encoding" %  fontid)
+
     ################################################################
     # Properties and methods relating to the initialized PDFReader
     # object

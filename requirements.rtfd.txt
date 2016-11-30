@@ -28,3 +28,4 @@ grako
 # PyPDF2
 # reportlab
 responses
+langdetect
