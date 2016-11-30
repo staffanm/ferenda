@@ -45,7 +45,7 @@
         <https://lagen.nu/2005:716#K5P6>,
         <https://lagen.nu/2005:716#K5P9> ;
     rpubl:malnummer "UM7533-12" ;
-    rpubl:rattsfall <https://lagen.nu/rf/mig/2007:48>,
+    rpubl:rattsfallshanvisning <https://lagen.nu/rf/mig/2007:48>,
         <https://lagen.nu/rf/mig/2010:23> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/mig/um7533-12/2013-03-22> .
 

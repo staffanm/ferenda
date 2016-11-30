@@ -44,7 +44,7 @@
     rpubl:avgorandedatum "2010-03-31"^^xsd:date ;
     rpubl:lagrum <https://lagen.nu/1994:1219> ;
     rpubl:malnummer "B5498-09" ;
-    rpubl:rattsfall <https://lagen.nu/rf/nja/2000s622>,
+    rpubl:rattsfallshanvisning <https://lagen.nu/rf/nja/2000s622>,
         <https://lagen.nu/rf/nja/2004s840>,
         <https://lagen.nu/rf/nja/2005s856>,
         <https://lagen.nu/rf/nja/2006s467>,

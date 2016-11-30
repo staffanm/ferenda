@@ -38,7 +38,7 @@
         <https://lagen.nu/1994:1219>,
         <https://lagen.nu/2005:716#K16P5> ;
     rpubl:malnummer "UM7867-08" ;
-    rpubl:rattsfall <https://lagen.nu/rf/mig/2006:9> ;
+    rpubl:rattsfallshanvisning <https://lagen.nu/rf/mig/2006:9> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/mig/um7867-08/2009-11-03> .
 
 <https://lagen.nu/rf/mig/2009:30?repo=dv&dir=downloaded> rdfs:label "MIG 2009:30"@sv .

@@ -33,7 +33,7 @@
     rpubl:domsnummer "2013-63" ;
     rpubl:lagrum <https://lagen.nu/1995:584#P16> ;
     rpubl:malnummer "B-114-2012" ;
-    rpubl:rattsfall <https://lagen.nu/rf/ad/2009:56>,
+    rpubl:rattsfallshanvisning <https://lagen.nu/rf/ad/2009:56>,
         <https://lagen.nu/rf/ad/2011:23>,
         <https://lagen.nu/rf/ad/2013:18> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/ad/b-114-2012/2013-08-21> .

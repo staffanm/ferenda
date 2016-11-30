@@ -31,7 +31,7 @@
     rpubl:avgorandedatum "2007-10-05"^^xsd:date ;
     rpubl:lagrum <https://lagen.nu/1942:740#K12P2> ;
     rpubl:malnummer "Ö2668-07" ;
-    rpubl:rattsfall <https://lagen.nu/rf/nja/1936s605>,
+    rpubl:rattsfallshanvisning <https://lagen.nu/rf/nja/1936s605>,
         <https://lagen.nu/rf/nja/2002s129> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/oe2668-07/2007-10-05> .
 

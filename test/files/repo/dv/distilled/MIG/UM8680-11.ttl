@@ -46,7 +46,7 @@
         <https://lagen.nu/2005:716#K12P22>,
         <https://lagen.nu/2005:716#K12P4> ;
     rpubl:malnummer "UM8680-11" ;
-    rpubl:rattsfall <https://lagen.nu/rf/mig/2007/not/2> ;
+    rpubl:rattsfallshanvisning <https://lagen.nu/rf/mig/2007/not/2> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/mig/um8680-11/2013-03-19> .
 
 <https://lagen.nu/rf/mig/2013:4?repo=dv&dir=downloaded> rdfs:label "MIG 2013:4"@sv .

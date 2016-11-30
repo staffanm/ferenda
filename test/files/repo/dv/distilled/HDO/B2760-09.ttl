@@ -52,7 +52,7 @@
     rpubl:avgorandedatum "2011-04-06"^^xsd:date ;
     rpubl:lagrum <https://lagen.nu/1962:700#K16P14> ;
     rpubl:malnummer "B2760-09" ;
-    rpubl:rattsfall <https://lagen.nu/rf/nja/1944s256>,
+    rpubl:rattsfallshanvisning <https://lagen.nu/rf/nja/1944s256>,
         <https://lagen.nu/rf/nja/1960s339>,
         <https://lagen.nu/rf/nja/1967s615> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/b2760-09/2011-04-06> .

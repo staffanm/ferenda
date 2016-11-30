@@ -101,7 +101,7 @@
         <https://lagen.nu/2008:567#K5P1>,
         <https://lagen.nu/2008:567#K5P2> ;
     rpubl:malnummer "T3592-13" ;
-    rpubl:rattsfall <https://lagen.nu/rf/nja/2008s915>,
+    rpubl:rattsfallshanvisning <https://lagen.nu/rf/nja/2008s915>,
         <https://lagen.nu/rf/nja/2012s211>,
         <https://lagen.nu/rf/nja/2013s1046>,
         <https://lagen.nu/rf/nja/2013s842> ;
