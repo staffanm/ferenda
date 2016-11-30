@@ -31,12 +31,12 @@
 
 <https://lagen.nu/dom/hfd/4217-14/2014-12-23> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2011/hogsta-forvaltningsdomstolen> ;
-    dcterms:subject <https://lagen.nu/concept/Förhandsbesked>,
-        <https://lagen.nu/concept/Förhandsbesked_undanröjdes_med_hänsyn_till_att>,
-        <https://lagen.nu/concept/Inkomstskatt>,
-        <https://lagen.nu/concept/Skatter>,
-        <https://lagen.nu/concept/Skatter_-_skatter>,
-        <https://lagen.nu/concept/Övriga_frågor> ;
+    dcterms:subject <https://lagen.nu/begrepp/Förhandsbesked>,
+        <https://lagen.nu/begrepp/Förhandsbesked_undanröjdes_med_hänsyn_till_att>,
+        <https://lagen.nu/begrepp/Inkomstskatt>,
+        <https://lagen.nu/begrepp/Skatter>,
+        <https://lagen.nu/begrepp/Skatter_-_skatter>,
+        <https://lagen.nu/begrepp/Övriga_frågor> ;
     dcterms:title "Överklagande av Skatteverket och HeidelbergCement Northern Europe AB av ett förhandsbesked ang. inkomstskatt"@sv ;
     rpubl:avgorandedatum "2014-12-23"^^xsd:date ;
     rpubl:lagrum <https://lagen.nu/1998:189>,

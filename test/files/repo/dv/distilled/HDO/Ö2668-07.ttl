@@ -23,9 +23,9 @@
 
 <https://lagen.nu/dom/hd/Ö2668-07/2007-10-05> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
-    dcterms:subject <https://lagen.nu/concept/Avvisning>,
-        <https://lagen.nu/concept/Redbarhet>,
-        <https://lagen.nu/concept/Rättegångsombud> ;
+    dcterms:subject <https://lagen.nu/begrepp/Avvisning>,
+        <https://lagen.nu/begrepp/Redbarhet>,
+        <https://lagen.nu/begrepp/Rättegångsombud> ;
     dcterms:title "Fråga om tidigare brottslighet utgjort skäl att avvisa en person som rättegångsombud på grund av bristande redbarhet."@sv ;
     rpubl:avdelning "1" ;
     rpubl:avgorandedatum "2007-10-05"^^xsd:date ;

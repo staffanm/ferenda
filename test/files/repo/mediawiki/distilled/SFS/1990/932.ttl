@@ -19,7 +19,7 @@
 
 <https://lagen.nu/1990:932#P1> dcterms:description """
       <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-        <p><a href="https://lagen.nu/concept/Lös_sak">Lösa saker</a> är till exempel sådana varor som livsmedel, kläder, möbler och bilar. </p>
+        <p><a href="https://lagen.nu/begrepp/Lös_sak">Lösa saker</a> är till exempel sådana varor som livsmedel, kläder, möbler och bilar. </p>
       </div>
     """^^rdf:XMLLiteral .
 

@@ -21,8 +21,8 @@
 
 <https://lagen.nu/dom/regr/2655-1992/2094-07-07> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringsratten> ;
-    dcterms:subject <https://lagen.nu/concept/Återställande_av_försutten_tid_-_avslag_(psykisk_insufficiens)>,
-        <https://lagen.nu/concept/Återställande_av_försutten_tid_-_psykisk_insufficiens_(avslag)> ;
+    dcterms:subject <https://lagen.nu/begrepp/Återställande_av_försutten_tid_-_avslag_(psykisk_insufficiens)>,
+        <https://lagen.nu/begrepp/Återställande_av_försutten_tid_-_psykisk_insufficiens_(avslag)> ;
     dcterms:title "Ansökan av Åsa F.-S. om återställande av försutten tid för att överklaga en dom ang. disciplinansvar"@sv ;
     rpubl:avgorandedatum "2094-07-07"^^xsd:date ;
     rpubl:malnummer "2655-1992" ;

@@ -27,12 +27,12 @@
 
 <https://lagen.nu/dom/regr/5267-09/2010-01-04> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringsratten> ;
-    dcterms:subject <https://lagen.nu/concept/Avslag_)>,
-        <https://lagen.nu/concept/Beslut_att_anta_detaljplan>,
-        <https://lagen.nu/concept/Detaljplanefrågor>,
-        <https://lagen.nu/concept/Förutsättningar_för_beslut_av_byggnadsnämnden_ansågs_uppfyllda_(avslag)>,
-        <https://lagen.nu/concept/Plan-_och_bygglagen>,
-        <https://lagen.nu/concept/Rättsprövning_enligt_lagen_(2006:304)_om_rättsprövning_av_vissa_regeringsbeslut> ;
+    dcterms:subject <https://lagen.nu/begrepp/Avslag_)>,
+        <https://lagen.nu/begrepp/Beslut_att_anta_detaljplan>,
+        <https://lagen.nu/begrepp/Detaljplanefrågor>,
+        <https://lagen.nu/begrepp/Förutsättningar_för_beslut_av_byggnadsnämnden_ansågs_uppfyllda_(avslag)>,
+        <https://lagen.nu/begrepp/Plan-_och_bygglagen>,
+        <https://lagen.nu/begrepp/Rättsprövning_enligt_lagen_(2006:304)_om_rättsprövning_av_vissa_regeringsbeslut> ;
     dcterms:title "Ansökningar av H.J., A.W. och Odlarföreningen Gränbyodlarna (föreningen) om rättsprövning av ett beslut att anta detaljplan"@sv ;
     rpubl:avgorandedatum "2010-01-04"^^xsd:date ;
     rpubl:lagrum <https://lagen.nu/1987:10#K5P29>,

@@ -8,7 +8,7 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix xsi: <http://www.w3.org/2001/XMLSchema-instance> .
 
-<https://lagen.nu/concept/Anskaffarfrihet> a skos:Concept ;
+<https://lagen.nu/begrepp/Anskaffarfrihet> a skos:Concept ;
     dcterms:description """
     <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
       <p>En tryckfrihetsrättsliga princip som innebär att alla har rätt att anskaffa uppgifter i syfte att offentliggöra eller publicera dem. </p>
@@ -16,7 +16,7 @@
       <p>Synonym: Anskaffarskydd. </p>
     </div>
   """^^rdf:XMLLiteral ;
-    dcterms:subject <https://lagen.nu/concept/Tryckfrihetsrätt> ;
+    dcterms:subject <https://lagen.nu/begrepp/Tryckfrihetsrätt> ;
     dcterms:title "Anskaffarfrihet"@sv ;
     prov:wasGeneratedBy "lagen.nu.mediawiki.LNMediaWiki" .
 

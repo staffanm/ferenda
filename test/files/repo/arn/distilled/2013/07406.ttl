@@ -11,7 +11,7 @@
     dcterms:identifier "ARN 2013-07406" ;
     dcterms:issued "2013-11-19"^^xsd:date ;
     dcterms:publisher <https://lagen.nu/org/2014/allmanna_reklamationsnamnden> ;
-    dcterms:subject "https://lagen.nu/concept/Resor" ;
+    dcterms:subject "https://lagen.nu/begrepp/Resor" ;
     dcterms:title "Fråga om köparen fullgjort sin skyldighet att kontrollera riktigheten av utfärdade biljetter samt om resebyrås ansvar för de felaktiga biljetterna."@sv ;
     rpubl:arendenummer "2013-07406" ;
     rpubl:avgorandedatum "2013-11-19"^^xsd:date ;

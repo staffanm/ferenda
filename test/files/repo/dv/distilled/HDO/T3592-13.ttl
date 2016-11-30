@@ -87,10 +87,10 @@
 
 <https://lagen.nu/dom/hd/T3592-13/2014-06-26> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
-    dcterms:subject <https://lagen.nu/concept/Diskriminering>,
-        <https://lagen.nu/concept/Diskrimineringsersättning>,
-        <https://lagen.nu/concept/Ideell_ersättning>,
-        <https://lagen.nu/concept/Skadestånd> ;
+    dcterms:subject <https://lagen.nu/begrepp/Diskriminering>,
+        <https://lagen.nu/begrepp/Diskrimineringsersättning>,
+        <https://lagen.nu/begrepp/Ideell_ersättning>,
+        <https://lagen.nu/begrepp/Skadestånd> ;
     dcterms:title "Diskrimineringsersättning (I och II)."@sv ;
     rpubl:avdelning "2" ;
     rpubl:avgorandedatum "2014-06-26"^^xsd:date ;

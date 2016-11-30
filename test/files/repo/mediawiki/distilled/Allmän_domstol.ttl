@@ -8,13 +8,13 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix xsi: <http://www.w3.org/2001/XMLSchema-instance> .
 
-<https://lagen.nu/concept/Allmän_domstol> a skos:Concept ;
+<https://lagen.nu/begrepp/Allmän_domstol> a skos:Concept ;
     dcterms:description """
     <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-      <p><b>Allmän domstol</b> är <a href="https://lagen.nu/concept/Tingsrätt">tingsrätt</a>, <a href="https://lagen.nu/concept/Hovrätt">hovrätt</a> och <a href="https://lagen.nu/concept/Högsta_domstolen">Högsta domstolen</a>. </p>
+      <p><b>Allmän domstol</b> är <a href="https://lagen.nu/begrepp/Tingsrätt">tingsrätt</a>, <a href="https://lagen.nu/begrepp/Hovrätt">hovrätt</a> och <a href="https://lagen.nu/begrepp/Högsta_domstolen">Högsta domstolen</a>. </p>
     </div>
   """^^rdf:XMLLiteral ;
-    dcterms:subject <https://lagen.nu/concept/Processrätt> ;
+    dcterms:subject <https://lagen.nu/begrepp/Processrätt> ;
     dcterms:title "Allmän domstol"@sv ;
     prov:wasGeneratedBy "lagen.nu.mediawiki.LNMediaWiki" .
 

@@ -43,10 +43,10 @@
 
 <https://lagen.nu/dom/hd/B2760-09/2011-04-06> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
-    dcterms:subject <https://lagen.nu/concept/Dobbleri>,
-        <https://lagen.nu/concept/Lotteri>,
-        <https://lagen.nu/concept/Poker>,
-        <https://lagen.nu/concept/Spel> ;
+    dcterms:subject <https://lagen.nu/begrepp/Dobbleri>,
+        <https://lagen.nu/begrepp/Lotteri>,
+        <https://lagen.nu/begrepp/Poker>,
+        <https://lagen.nu/begrepp/Spel> ;
     dcterms:title "En variant av poker (Texas Hold´em) har i ett visst fall när den spelats i turneringsform inte ansetts vara ett spel vars utgång helt eller till väsentlig del beror på slumpen i den mening som avses i 16 kap. 14 § brottsbalken."@sv ;
     rpubl:avdelning "2" ;
     rpubl:avgorandedatum "2011-04-06"^^xsd:date ;

@@ -35,9 +35,9 @@
 
 <https://lagen.nu/dom/regr/1754-10/2010-06-14> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringsratten> ;
-    dcterms:subject <https://lagen.nu/concept/Rättsprövning_enligt_lagen_(2006:304)_om_rättsprövning_av_vissa_regeringsbeslut>,
-        <https://lagen.nu/concept/Väglagen_-_beslut_om_spärrning_av_enskild_anslutning_till_väg_(avslag)>,
-        <https://lagen.nu/concept/Övriga_frågor> ;
+    dcterms:subject <https://lagen.nu/begrepp/Rättsprövning_enligt_lagen_(2006:304)_om_rättsprövning_av_vissa_regeringsbeslut>,
+        <https://lagen.nu/begrepp/Väglagen_-_beslut_om_spärrning_av_enskild_anslutning_till_väg_(avslag)>,
+        <https://lagen.nu/begrepp/Övriga_frågor> ;
     dcterms:title "Ansökan av Sweets Konfektyr i Partille AB (bolaget) om rättsprövning av beslut om spärrning av enskild anslutning till väg"@sv ;
     rpubl:avgorandedatum "2010-06-14"^^xsd:date ;
     rpubl:lagrum <https://lagen.nu/1971:948#P40>,

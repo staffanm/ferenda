@@ -8,13 +8,13 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix xsi: <http://www.w3.org/2001/XMLSchema-instance> .
 
-<https://lagen.nu/concept/Kategori:Allmän_förvaltningsrätt> a skos:Concept ;
+<https://lagen.nu/begrepp/Kategori:Allmän_förvaltningsrätt> a skos:Concept ;
     dcterms:description """
     <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-      <p>Till den allmänna förvaltningsrätten räknas främst frågor om myndigheternas <a href="https://lagen.nu/concept/Handläggning">handläggning</a> av <a href="https://lagen.nu/concept/Ärenden">ärenden</a> och den enskildes <a href="https://lagen.nu/concept/Insynsrätt">insynsrätt</a> i myndigheternas verksamhet. </p>
+      <p>Till den allmänna förvaltningsrätten räknas främst frågor om myndigheternas <a href="https://lagen.nu/begrepp/Handläggning">handläggning</a> av <a href="https://lagen.nu/begrepp/Ärenden">ärenden</a> och den enskildes <a href="https://lagen.nu/begrepp/Insynsrätt">insynsrätt</a> i myndigheternas verksamhet. </p>
     </div>
   """^^rdf:XMLLiteral ;
-    dcterms:subject <https://lagen.nu/concept/Förvaltningsrätt> ;
+    dcterms:subject <https://lagen.nu/begrepp/Förvaltningsrätt> ;
     dcterms:title "Kategori:Allmän förvaltningsrätt"@sv ;
     prov:wasGeneratedBy "lagen.nu.mediawiki.LNMediaWiki" .
 

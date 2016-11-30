@@ -22,7 +22,7 @@
 <https://lagen.nu/dom/hfd/33-12/2013-05-27> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2011/hogsta-forvaltningsdomstolen> ;
     dcterms:relation "Prop. 1992/93:30 s. 34 och 39" ;
-    dcterms:subject <https://lagen.nu/concept/Allmän_försäkring> ;
+    dcterms:subject <https://lagen.nu/begrepp/Allmän_försäkring> ;
     dcterms:title "Minskning av en retroaktivt beviljad sjukersättning med sjukpenning som tidigare betalats ut för en del av den retroaktiva perioden skulle göras för den retroaktiva perioden i dess helhet."@sv ;
     rpubl:avgorandedatum "2013-05-27"^^xsd:date ;
     rpubl:lagrum <https://lagen.nu/1962:381>,

@@ -30,13 +30,13 @@
 <https://lagen.nu/dom/mig/UM7533-12/2013-03-22> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/migrationsoverdomstolen> ;
     dcterms:relation "Prop. 2004/05:170 s. 191" ;
-    dcterms:subject <https://lagen.nu/concept/Barn>,
-        <https://lagen.nu/concept/Hälsotillstånd>,
-        <https://lagen.nu/concept/Leukemi>,
-        <https://lagen.nu/concept/Sjukdom>,
-        <https://lagen.nu/concept/Synnerligen_ömmande_omständigheter>,
-        <https://lagen.nu/concept/Tidsbegränsat_uppehållstillstånd>,
-        <https://lagen.nu/concept/Vårdbehov_av_övergående_natur> ;
+    dcterms:subject <https://lagen.nu/begrepp/Barn>,
+        <https://lagen.nu/begrepp/Hälsotillstånd>,
+        <https://lagen.nu/begrepp/Leukemi>,
+        <https://lagen.nu/begrepp/Sjukdom>,
+        <https://lagen.nu/begrepp/Synnerligen_ömmande_omständigheter>,
+        <https://lagen.nu/begrepp/Tidsbegränsat_uppehållstillstånd>,
+        <https://lagen.nu/begrepp/Vårdbehov_av_övergående_natur> ;
     dcterms:title "Ett barn, som lider av livshotande leukemi, har tillsammans med sin förälder beviljats uppehållstillstånd på grund av synnerligen ömmande omständigheter. Eftersom barnets behov av avancerad vård och behandling har bedömts vara av övergående natur har uppehållstillstånden tidsbegränsats."@sv ;
     rpubl:avdelning "1" ;
     rpubl:avgorandedatum "2013-03-22"^^xsd:date ;
