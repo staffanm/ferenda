@@ -46,7 +46,7 @@
     dcterms:title "Redovisning av OSK:s arbete hittills"@sv ;
     bibo:chapter "2"@sv .
 
-<http://example.org/docs/1972%3A47.html> rdfs:label "Källa"@sv .
+<http://urn.kb.se/resolve?urn=urn:nbn:se:kb:sou-8350729> rdfs:label "Källa"@sv .
 
 <https://lagen.nu/utr/sou/1972:47?attachment=index.pdf&repo=soukb&dir=downloaded> rdfs:label "SOU 1972:47"@sv .
 
@@ -58,7 +58,7 @@
     rpubl:lopnummer "47" ;
     rpubl:utrSerie <https://lagen.nu/dataset/sou> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/utr/sou/1972:47> ;
-    prov:alternateOf <http://example.org/docs/1972%3A47.html> ;
+    prov:alternateOf <http://urn.kb.se/resolve?urn=urn:nbn:se:kb:sou-8350729> ;
     prov:wasDerivedFrom <https://lagen.nu/utr/sou/1972:47?attachment=index.pdf&repo=soukb&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.sou.SOUKB" .
 

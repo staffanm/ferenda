@@ -1,0 +1,46 @@
+{
+  "basefile": "1972:47", 
+  "content": {
+    "hash": "md5:51e45b8c81f9a8e6afde715296f5c895", 
+    "markup": null, 
+    "src": "https://lagen.nu/sou/parsed/1972:47.xhtml", 
+    "type": "application/html+xml"
+  }, 
+  "id": "https://lagen.nu/utr/sou/1972:47", 
+  "indexed_dep": "2016-11-08T01:39:05.091433", 
+  "indexed_ft": "2016-11-08T01:39:06.030596", 
+  "indexed_ts": "2016-11-08T01:39:04.967140", 
+  "link": {
+    "hash": "md5:ca092aa301a32e70042598bd30604f87", 
+    "href": "https://lagen.nu/sou/distilled/1972:47.rdf", 
+    "length": 29819, 
+    "type": "application/rdf+xml"
+  }, 
+  "orig_checked": "2015-09-22T21:24:14.923227", 
+  "orig_created": "2015-09-22T21:24:14.923227", 
+  "orig_updated": "2015-09-22T21:24:14.923227", 
+  "orig_url": "http://urn.kb.se/resolve?urn=urn:nbn:se:kb:sou-8350729", 
+  "published": "2016-02-25T21:15:43.339119", 
+  "status": {
+    "generate": {
+      "date": "2016-11-08T05:59:51.302450", 
+      "duration": 4.162358, 
+      "success": true
+    }, 
+    "parse": {
+      "date": "2016-11-07T06:29:00.574588", 
+      "duration": 75.494283, 
+      "success": true, 
+      "warnings": "06:29:08 ferenda.fsmparser WARNING Dupe section 1 'Allm\u00e4n bakgrund' at p 109, previous at 'Direktiv' at p 32. Ignoring.\n06:29:08 ferenda.fsmparser WARNING Dupe section 2 'Enk\u00e4ten till den offentliga sektorn' at p 110, previous at 'Redovisning av OSK:s arbete hittills' at p 37. Ignoring.\n"
+    }, 
+    "relate": {
+      "date": "2016-11-08T01:38:55.546654", 
+      "duration": 10.547019, 
+      "success": true
+    }
+  }, 
+  "summary": null, 
+  "title": "Data och integritet", 
+  "updated": "2016-11-08T05:59:55.372055", 
+  "url": "https://lagen.nu/sou/generated/1972:47.html"
+}
