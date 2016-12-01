@@ -205,7 +205,11 @@ class FerendaTestCase(object):
 
         def tidy(tree):
             import subprocess
-            p = subprocess.Popen("tidy -i -q -asxhtml -w 100 -utf8",
+            # without the "--drop-empty-elements no" argument, empty
+            # span tags (containing RDFa data) will be
+            # dropped. Unfortunately this seems to be a new argument
+            # only available in the tidy-html5 branch.
+            p = subprocess.Popen("tidy -i -q -asxhtml -w 100 -utf8 --drop-empty-elements no",
                                  shell=True,
                                  stdin=subprocess.PIPE,
                                  stdout=subprocess.PIPE,
@@ -243,7 +247,6 @@ class FerendaTestCase(object):
         #                 del pagebreak.attrib["src"]
         #                 del pagebreak.attrib["width"]
         #                 del pagebreak.attrib["height"]
-                
         xml_compare(want_tree.getroot(),
                     got_tree.getroot(),
                     errors.append)
