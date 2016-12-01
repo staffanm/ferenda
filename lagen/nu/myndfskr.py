@@ -191,10 +191,17 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
                 return str(resource_graph.value(uri, SKOS.altLabel))
             else:
                 return row[binding]
+
+        def mainfs(row, binding, resource_graph):
+            uri = URIRef(row[binding])
+            mainuri = resource_graph.value(uri, DCTERMS.isReplacedBy)
+            if mainuri:
+                uri = mainuri
+            return util.uri_leaf(uri)
             
         return [Facet(RPUBL.forfattningssamling,
                       selector=altlabel,
-                      identificator=Facet.term,
+                      identificator=mainfs,
                       use_for_toc=True),
                 Facet(RPUBL.arsutgava,
                       indexingtype=fulltextindex.Label(),
@@ -210,20 +217,43 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
         # based on two different facets) mirrors the dv.py
         # toc_pagesets and could possibly be abstracted.
         pagesetdict = {}
+        labelsets = {} 
         selector_values = {}
         for row in data:
+            if row.get("dcterms_identifier") =="DFS 2007:3":
+                from pudb import set_trace; set_trace()
             pagesetid = facets[0].identificator(row,
                                                 'rpubl_forfattningssamling',
                                                 self.commondata)
             altlabel = facets[0].selector(row, 'rpubl_forfattningssamling', self.commondata)
-            preflabel = self.commondata.value(URIRef(row['rpubl_forfattningssamling']),
-                                              SKOS.prefLabel)
-            pagesetdict[pagesetid] = TocPageset(label="%s (%s)" % (preflabel, altlabel),
-                                                predicate=pagesetid,  # ??
-                                                pages=[])
+            if "|" in altlabel:
+                mainaltlabel, altaltlabel = altlabel.split
+            else:
+                mainaltlabel = altaltlabel = altlabel
+
+            # this makes sure that each value in labelsets is a array
+            # with the main preflabel and altlabel first (eg ["Statens
+            # Jordbruksverks författningssamling, "SJVFS"]), and
+            # alternate altlabels (eg DFS) later (in an arbitrary
+            # order).
+            if pagesetid not in labelsets:
+                preflabel = self.commondata.value(URIRef(row['rpubl_forfattningssamling']),
+                                                  SKOS.prefLabel)
+                labelsets[pagesetid] = [preflabel, mainaltlabel]
+            if altaltlabel not in labelsets[pagesetid]:
+                labelsets[pagesetid].append(altaltlabel)
+                
             selected = facets[1].selector(row, 'rpubl_arsutgava', self.commondata)
             selector_values[(pagesetid, selected)] = True
         for (pagesetid, value) in sorted(list(selector_values.keys()), reverse=True):
+            if pagesetid not in pagesetdict:
+                # generate eg "Skatteverkets författningssamling (SKVFS, RSFS)
+                labels = labelsets[pagesetid]
+                preflabel = labels.pop(0)
+                pslabel = "%s (%s)" % (preflabel, ", ".join(labels))
+                pagesetdict[pagesetid] = TocPageset(label=pslabel,
+                                                    predicate=pagesetid,  # ??
+                                                    pages=[])
             pageset = pagesetdict[pagesetid]
             pageset.pages.append(TocPage(linktext=value,
                                          title="%s från %s" % (pageset.label, value),

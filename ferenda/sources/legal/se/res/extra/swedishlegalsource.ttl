@@ -1,4 +1,4 @@
-# Automatically concatenated from sources at 2016-09-05T20:58:03.321901
+# Automatically concatenated from sources at 2016-12-01T14:52:28.488747
 
 @prefix : <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
 @prefix bibo: <http://purl.org/ontology/bibo/> .
@@ -486,11 +486,6 @@
     skos:altLabel "ÅFS"@sv ;
     skos:prefLabel "Åklagarmyndighetens författningssamling"@sv .
 
-<http://rinfo.lagrummet.se/serie/fs/affs> a :Forfattningssamling ;
-    dct:publisher <http://rinfo.lagrummet.se/org/arbetsfoermedlingen> ;
-    skos:altLabel "AFFS"@sv ;
-    skos:prefLabel "Arbetsförmedlingens författningssamling"@sv .
-
 <http://rinfo.lagrummet.se/serie/fs/afs> a :Forfattningssamling ;
     dct:publisher <http://rinfo.lagrummet.se/org/arbetsmiljoeverket> ;
     rdfs:seeAlso <http://www.av.se/lagochratt/index.aspx> ;
@@ -505,18 +500,13 @@
     skos:prefLabel "Arbetsgivarverkets författningssamling"@sv .
 
 <http://rinfo.lagrummet.se/serie/fs/amsfs> a :Forfattningssamling ;
+    dct:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/affs> ;
     dct:publisher <http://rinfo.lagrummet.se/org/arbetsmarknadsstyrelsen> ;
     rdfs:comment "Har tagits över av Arbetsförmedlingens författningssamling (AFFS)"@sv,
         "Har tagits över av arbetsförmedlingens författningssamling (AFFS)"@sv ;
     rdfs:seeAlso <http://www2.ams.se/regelbok/index.html> ;
     skos:altLabel "AMSFS"@sv ;
     skos:prefLabel "Arbetsmarknadsstyrelsens författningssamling"@sv .
-
-<http://rinfo.lagrummet.se/serie/fs/bffs> a :Forfattningssamling ;
-    dct:publisher <http://rinfo.lagrummet.se/org/bankinspektionen> ;
-    rdfs:comment "Har tagits över av Finansinspektionens författningssamling (FFFS)"@sv ;
-    skos:altLabel "BFFS"@sv ;
-    skos:prefLabel "Bankinspektionens och försäkringsinspektionens författningssamling"@sv .
 
 <http://rinfo.lagrummet.se/serie/fs/bfs> a :Forfattningssamling ;
     dct:publisher <http://rinfo.lagrummet.se/org/boverket> ;
@@ -544,6 +534,7 @@
     skos:prefLabel "Centrala studiestödsnämndens författningssamling"@sv .
 
 <http://rinfo.lagrummet.se/serie/fs/dfs> a :Forfattningssamling ;
+    dct:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/sjvfs> ;
     dct:publisher <http://rinfo.lagrummet.se/org/djurskyddsmyndigheten> ;
     rdfs:comment "Har tagits över av jordbruksverkets författningssamling (SJVFS)"@sv ;
     rdfs:seeAlso <http://www.djurskyddsmyndigheten.se/Steria/templates/Page.aspx?id=482> ;
@@ -642,6 +633,7 @@
 
 <http://rinfo.lagrummet.se/serie/fs/itpsfs> a :Forfattningssamling ;
     dct:comment "Har tagits över av Myndigheten för tillväxtpolitiska utvärderingar och analysers författningssamling (MTFS)"@sv ;
+    dct:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/mtfs> ;
     dct:publisher <http://rinfo.lagrummet.se/org/institutet_foer_tillvaextpolitiska_studier> ;
     rdfs:seeAlso <http://www.itps.se/Listor/Publikationssok.asp?secId=902> ;
     skos:altLabel "ITPSFS"@sv ;
@@ -649,6 +641,7 @@
 
 <http://rinfo.lagrummet.se/serie/fs/jvsfs> a :Forfattningssamling ;
     dct:comment "Har tagits över av Transportstyrelsens författningssamling (TSFS)"@sv ;
+    dct:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/tsfs> ;
     rdfs:seeAlso <http://www.jvs.se/forfattningssamling.htm> ;
     skos:altLabel "JvSFS"@sv ;
     skos:prefLabel "Järnvägsstyrelsens författningssamling "@sv .
@@ -661,6 +654,7 @@
     skos:prefLabel "Kammarkollegiets författningssamling"@sv .
 
 <http://rinfo.lagrummet.se/serie/fs/kbmfs> a :Forfattningssamling ;
+    dct:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/msbfs> ;
     rdfs:comment "Har tagits över av Myndigheten för samhällsskydd och beredskaps författningssamling (MSBFS)"@sv ;
     rdfs:seeAlso <http://www.krisberedskapsmyndigheten.se/templates/PublicationList____470.aspx> ;
     skos:altLabel "KBMFS"@sv ;
@@ -721,12 +715,14 @@
     skos:prefLabel "Lantbruksstyrelsens föreskrifter"@sv .
 
 <http://rinfo.lagrummet.se/serie/fs/lfnfs> a :Forfattningssamling ;
+    dct:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/tlvfs> ;
     rdfs:comment "Har tagits över av Tandvårds- och läkemedelsförmånsverkets författningssamling (TLVFS)"@sv ;
     rdfs:seeAlso <http://www.lfn.se/LFNTemplates/Page____277.aspx> ;
     skos:altLabel "LFNFS"@sv ;
     skos:prefLabel "Läkemedelsförmånsnämndens författningssamling"@sv .
 
 <http://rinfo.lagrummet.se/serie/fs/lfs> a :Forfattningssamling ;
+    dct:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/tsfs> ;
     rdfs:comment "Har tagits över av Transportstyrelsens författningssamling (TSFS)"@sv ;
     rdfs:seeAlso <http://www.lfs.luftfartsstyrelsen.se/irisext/> ;
     skos:altLabel "LFS"@sv ;
@@ -776,17 +772,6 @@
     dct:publisher <http://rinfo.lagrummet.se/org/myndigheten_foer_radio_och_tv> ;
     skos:altLabel "MRTVFS"@sv ;
     skos:prefLabel "Myndigheten för radio och tv:s författningssamling"@sv .
-
-<http://rinfo.lagrummet.se/serie/fs/msbfs> a :Forfattningssamling ;
-    dct:publisher <http://rinfo.lagrummet.se/org/myndigheten_foer_samhaellsskydd_och_beredskap> ;
-    rdfs:comment "Utnyttjas också av Riksvärderingsnämnden"@sv ;
-    skos:altLabel "MSBFS"@sv ;
-    skos:prefLabel "Myndigheten för samhällsskydd och beredskaps författningssamling"@sv .
-
-<http://rinfo.lagrummet.se/serie/fs/mtfs> a :Forfattningssamling ;
-    dct:publisher <http://rinfo.lagrummet.se/org/myndigheten_foer_tillvaextpolitiska_utvaerderingar_och_analyser> ;
-    skos:altLabel "MTFS"@sv ;
-    skos:prefLabel "Myndigheten för tillväxtpolitiska utvärderingar och analysers författningssamling"@sv .
 
 <http://rinfo.lagrummet.se/serie/fs/myhfs> a :Forfattningssamling ;
     dct:publisher <http://rinfo.lagrummet.se/org/myndigheten_foer_yrkeshoegskolan> ;
@@ -891,13 +876,6 @@
     skos:altLabel "SJÖFS"@sv ;
     skos:prefLabel "Sjöfartsverkets författningssamling"@sv .
 
-<http://rinfo.lagrummet.se/serie/fs/sjvfs> a :Forfattningssamling ;
-    dct:publisher <http://rinfo.lagrummet.se/org/statens_jordbruksverk> ;
-    rdfs:comment "Utnyttjas också av Centrala försöksdjursnämnden."@sv ;
-    rdfs:seeAlso <http://www.sjv.se/startsida/forfattningar.4.7502f61001ea08a0c7fff120602.html> ;
-    skos:altLabel "SJVFS"@sv ;
-    skos:prefLabel "Statens jordbruksverks författningssamling"@sv .
-
 <http://rinfo.lagrummet.se/serie/fs/skifs> a :Forfattningssamling ;
     rdfs:comment "Har ersatts av Strålsäkerhetsmyndighetens författningssamling (SSIFS)"@sv ;
     rdfs:seeAlso <http://www.ski.se/se/index_forfattningssamling.html> ;
@@ -984,11 +962,6 @@
     skos:altLabel "TFS"@sv ;
     skos:prefLabel "Tullverkets författningssamling"@sv .
 
-<http://rinfo.lagrummet.se/serie/fs/tlvfs> a :Forfattningssamling ;
-    dct:publisher <http://rinfo.lagrummet.se/org/tandvaards-_och_laekemedelsfoermaansverket> ;
-    skos:altLabel "TLVFS"@sv ;
-    skos:prefLabel "Tandvårds- och läkemedelsförmånsverkets författningssamling"@sv .
-
 <http://rinfo.lagrummet.se/serie/fs/tpvfs> a :Forfattningssamling ;
     dct:publisher <http://rinfo.lagrummet.se/org/totalfoersvarets_pliktverk> ;
     rdfs:seeAlso <http://www.pliktverket.se/sv/Om_Pliktverket/Forfattningar/> ;
@@ -1004,12 +977,6 @@
     dct:publisher <http://rinfo.lagrummet.se/org/trafikverket> ;
     skos:altLabel "TRVFS"@sv ;
     skos:prefLabel "Trafikverkets författningssamling"@sv .
-
-<http://rinfo.lagrummet.se/serie/fs/tsfs> a :Forfattningssamling ;
-    dct:publisher <http://rinfo.lagrummet.se/org/transportstyrelsen> ;
-    rdfs:comment "Utnyttjas också av Luftfartsverket och Sveriges meteorologiska och hydrologiska institut."@sv ;
-    skos:altLabel "TSFS"@sv ;
-    skos:prefLabel "Transportstyrelsens författningssamling"@sv .
 
 <http://rinfo.lagrummet.se/serie/fs/tvfs> a :Forfattningssamling ;
     dct:publisher <http://rinfo.lagrummet.se/org/tillvaextverket> ;
@@ -1387,11 +1354,34 @@
 <http://rinfo.lagrummet.se/org/vetenskapsraadet> a foaf:Organization ;
     foaf:name "Vetenskapsrådet"@sv .
 
+<http://rinfo.lagrummet.se/serie/fs/affs> a :Forfattningssamling ;
+    dct:publisher <http://rinfo.lagrummet.se/org/arbetsfoermedlingen> ;
+    skos:altLabel "AFFS"@sv ;
+    skos:prefLabel "Arbetsförmedlingens författningssamling"@sv .
+
+<http://rinfo.lagrummet.se/serie/fs/bffs> a :Forfattningssamling ;
+    dct:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/bffs> ;
+    dct:publisher <http://rinfo.lagrummet.se/org/bankinspektionen> ;
+    rdfs:comment "Har tagits över av Finansinspektionens författningssamling (FFFS)"@sv ;
+    skos:altLabel "BFFS"@sv ;
+    skos:prefLabel "Bankinspektionens och försäkringsinspektionens författningssamling"@sv .
+
 <http://rinfo.lagrummet.se/serie/fs/lmfs> a :Forfattningssamling ;
     dct:publisher <http://rinfo.lagrummet.se/org/lantmaeteriet> ;
     rdfs:seeAlso <http://www.lantmateriet.se/templates/LMV_Page.aspx?id=2123> ;
     skos:altLabel "LMFS"@sv ;
     skos:prefLabel "Lantmäteriets författningssamling"@sv .
+
+<http://rinfo.lagrummet.se/serie/fs/msbfs> a :Forfattningssamling ;
+    dct:publisher <http://rinfo.lagrummet.se/org/myndigheten_foer_samhaellsskydd_och_beredskap> ;
+    rdfs:comment "Utnyttjas också av Riksvärderingsnämnden"@sv ;
+    skos:altLabel "MSBFS"@sv ;
+    skos:prefLabel "Myndigheten för samhällsskydd och beredskaps författningssamling"@sv .
+
+<http://rinfo.lagrummet.se/serie/fs/mtfs> a :Forfattningssamling ;
+    dct:publisher <http://rinfo.lagrummet.se/org/myndigheten_foer_tillvaextpolitiska_utvaerderingar_och_analyser> ;
+    skos:altLabel "MTFS"@sv ;
+    skos:prefLabel "Myndigheten för tillväxtpolitiska utvärderingar och analysers författningssamling"@sv .
 
 <http://rinfo.lagrummet.se/serie/fs/nfs> a :Forfattningssamling ;
     dct:publisher <http://rinfo.lagrummet.se/org/naturvaardsverket> ;
@@ -1399,6 +1389,18 @@
     rdfs:seeAlso <http://www.naturvardsverket.se/Start/Lagar-och-styrning/Foreskrifter-och-allmanna-rad/> ;
     skos:altLabel "NFS"@sv ;
     skos:prefLabel "Naturvårdsverkets författningssamling"@sv .
+
+<http://rinfo.lagrummet.se/serie/fs/sjvfs> a :Forfattningssamling ;
+    dct:publisher <http://rinfo.lagrummet.se/org/statens_jordbruksverk> ;
+    rdfs:comment "Utnyttjas också av Centrala försöksdjursnämnden."@sv ;
+    rdfs:seeAlso <http://www.sjv.se/startsida/forfattningar.4.7502f61001ea08a0c7fff120602.html> ;
+    skos:altLabel "SJVFS"@sv ;
+    skos:prefLabel "Statens jordbruksverks författningssamling"@sv .
+
+<http://rinfo.lagrummet.se/serie/fs/tlvfs> a :Forfattningssamling ;
+    dct:publisher <http://rinfo.lagrummet.se/org/tandvaards-_och_laekemedelsfoermaansverket> ;
+    skos:altLabel "TLVFS"@sv ;
+    skos:prefLabel "Tandvårds- och läkemedelsförmånsverkets författningssamling"@sv .
 
 <http://rinfo.lagrummet.se/serie/rf/ra> a :Rattsfallspublikation ;
     skos:altLabel "RÅ"@sv ;
@@ -1415,6 +1417,12 @@
 
 <http://rinfo.lagrummet.se/org/socialstyrelsen> a foaf:Organization ;
     foaf:name "Socialstyrelsen"@sv .
+
+<http://rinfo.lagrummet.se/serie/fs/tsfs> a :Forfattningssamling ;
+    dct:publisher <http://rinfo.lagrummet.se/org/transportstyrelsen> ;
+    rdfs:comment "Utnyttjas också av Luftfartsverket och Sveriges meteorologiska och hydrologiska institut."@sv ;
+    skos:altLabel "TSFS"@sv ;
+    skos:prefLabel "Transportstyrelsens författningssamling"@sv .
 
 <http://rinfo.lagrummet.se/org/regeringskansliet> a foaf:Organization ;
     foaf:name "Regeringskansliet"@sv .

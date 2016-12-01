@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2016-09-05T20:58:03.991069
+# Automatically transformed from sources at 2016-12-01T14:52:29.198640
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -193,6 +193,7 @@
     skos:prefLabel "Arbetsgivarverkets författningssamling"@sv .
 
 <https://lagen.nu/dataset/amsfs> a rpubl:Forfattningssamling ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/affs> ;
     dcterms:publisher <https://lagen.nu/org/2014/arbetsmarknadsstyrelsen> ;
     rdfs:comment "Har tagits över av arbetsförmedlingens författningssamling (AFFS)"@sv ;
     rdfs:seeAlso <http://www2.ams.se/regelbok/index.html> ;
@@ -201,6 +202,7 @@
     skos:prefLabel "Arbetsmarknadsstyrelsens författningssamling"@sv .
 
 <https://lagen.nu/dataset/bffs> a rpubl:Forfattningssamling ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/bffs> ;
     dcterms:publisher <https://lagen.nu/org/2014/bankinspektionen> ;
     rdfs:comment "Har tagits över av Finansinspektionens författningssamling (FFFS)"@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/bffs> ;
@@ -244,6 +246,7 @@
     skos:prefLabel "Centrala studiestödsnämndens författningssamling"@sv .
 
 <https://lagen.nu/dataset/dfs> a rpubl:Forfattningssamling ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/sjvfs> ;
     dcterms:publisher <https://lagen.nu/org/2014/djurskyddsmyndigheten> ;
     rdfs:comment "Har tagits över av jordbruksverkets författningssamling (SJVFS)"@sv ;
     rdfs:seeAlso <http://www.djurskyddsmyndigheten.se/Steria/templates/Page.aspx?id=482> ;
@@ -387,6 +390,7 @@
 
 <https://lagen.nu/dataset/itpsfs> a rpubl:Forfattningssamling ;
     dcterms:comment "Har tagits över av Myndigheten för tillväxtpolitiska utvärderingar och analysers författningssamling (MTFS)"@sv ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/mtfs> ;
     dcterms:publisher <https://lagen.nu/org/2014/institutet_for_tillvaxtpolitiska_studier> ;
     rdfs:seeAlso <http://www.itps.se/Listor/Publikationssok.asp?secId=902> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/itpsfs> ;
@@ -395,6 +399,7 @@
 
 <https://lagen.nu/dataset/jvsfs> a rpubl:Forfattningssamling ;
     dcterms:comment "Har tagits över av Transportstyrelsens författningssamling (TSFS)"@sv ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/tsfs> ;
     rdfs:seeAlso <http://www.jvs.se/forfattningssamling.htm> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/jvsfs> ;
     skos:altLabel "JvSFS"@sv ;
@@ -409,6 +414,7 @@
     skos:prefLabel "Kammarkollegiets författningssamling"@sv .
 
 <https://lagen.nu/dataset/kbmfs> a rpubl:Forfattningssamling ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/msbfs> ;
     dcterms:publisher <https://lagen.nu/org/2016/krisberedskapsmyndigheten> ;
     rdfs:comment "Har tagits över av Myndigheten för samhällsskydd och beredskaps författningssamling (MSBFS)"@sv ;
     rdfs:seeAlso <http://www.krisberedskapsmyndigheten.se/templates/PublicationList____470.aspx> ;
@@ -480,6 +486,7 @@
     skos:prefLabel "Lantbruksstyrelsens föreskrifter"@sv .
 
 <https://lagen.nu/dataset/lfnfs> a rpubl:Forfattningssamling ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/tlvfs> ;
     rdfs:comment "Har tagits över av Tandvårds- och läkemedelsförmånsverkets författningssamling (TLVFS)"@sv ;
     rdfs:seeAlso <http://www.lfn.se/LFNTemplates/Page____277.aspx> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/lfnfs> ;
@@ -487,6 +494,7 @@
     skos:prefLabel "Läkemedelsförmånsnämndens författningssamling"@sv .
 
 <https://lagen.nu/dataset/lfs> a rpubl:Forfattningssamling ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/tsfs> ;
     rdfs:comment "Har tagits över av Transportstyrelsens författningssamling (TSFS)"@sv ;
     rdfs:seeAlso <http://www.lfs.luftfartsstyrelsen.se/irisext/> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/lfs> ;
