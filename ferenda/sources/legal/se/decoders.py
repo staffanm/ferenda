@@ -5,6 +5,8 @@ from builtins import *
 
 import re
 
+from lxml import etree
+
 from ferenda.pdfreader import BaseTextDecoder, Textelement
 from ferenda import errors
 
@@ -206,16 +208,31 @@ class DetectingDecoder(OffsetDecoder1d):
         super(DetectingDecoder, self).__init__(dummy)
         self.encodingmaps = {}
         
-    def analyze_font(self, fontid, sample):
+    def analyze_font(self, fontid, samples):
+        sampletext = ""
+
+        # very involved way of getting a representative sample, since
+        # an encoded font can be partially unencoded...
+        for textbox in samples:
+            decode_all = not('i' in [getattr(x, 'tag', None) for x in textbox])
+            if decode_all:
+                sampletext += etree.tostring(textbox, method="text",
+                                             encoding="utf-8").decode("utf-8")
+            else:
+                for subpart in textbox:
+                    if (isinstance(subpart, etree._Element) and
+                        (decode_all or subpart.tag == 'i')):
+                        sampletext += subpart.text
+
         for low_offset, high_offset, unmapped in ((0,0, []),
                                                   (0x1d, 0x7a, []),
                                                   (0x20, 0x40, [0x20])):
             if low_offset and high_offset:
                 encodingmap = self.encodingmap(low_offset, high_offset, unmapped)
-                decoded_sample = self.decode_string(sample, encodingmap)
+                decoded_sample = self.decode_string(sampletext, encodingmap)
             else:
                 encodingmap = None
-                decoded_sample = sample
+                decoded_sample = sampletext
             try:
                 lang = detect(decoded_sample)
                 if lang == 'sv':
@@ -224,7 +241,7 @@ class DetectingDecoder(OffsetDecoder1d):
             except LangDetectException:
                 pass
         raise errors.PDFDecodeError("cannot detect how to decode font %s using %r" %
-                                    (fontid, sample))
+                                    (fontid, sampletext))
 
 
     def __call__(self, textbox, fontspecs):

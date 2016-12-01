@@ -714,12 +714,11 @@ class PDFReader(CompoundElement):
                         encoded_fontids[fontid] = []
                 elif e.tag == 'text' and e.attrib["font"] in encoded_fontids:
                     if len(encoded_fontids[e.attrib["font"]]) < 10:
-                        txt = etree.tostring(e, method="text", encoding="utf-8").decode("utf-8")
-                        encoded_fontids[e.attrib["font"]].append(txt)
+                        encoded_fontids[e.attrib["font"]].append(e)
 
         for fontid, samples in encoded_fontids.items():
             try:
-                offset = self._textdecoder.analyze_font(fontid, " ".join(samples))
+                offset = self._textdecoder.analyze_font(fontid, samples)
                 if offset:
                     self.log.debug("Font %s: Decoding with offset %02x" % (fontid, offset))
                 else:
