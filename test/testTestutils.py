@@ -212,9 +212,9 @@ children 1 do not match: bar"""
 </html>"""
         wantmsg = """--- want.xml
 +++ got.xml
-@@ -6 +6 @@
+@@ -4,6 +4,6 @@
+   <title></title>
  </head>
- 
  <body>
 -  <h1>Hi</h1>
 +  <h1>Ho</h1>
