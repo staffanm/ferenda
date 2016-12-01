@@ -13,7 +13,6 @@
 
 <https://lagen.nu/dom/hd/Ö2072-91/1994-03-10> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
-    dcterms:relation "" ;
     dcterms:subject <https://lagen.nu/begrepp/Arvsskatt>,
         <https://lagen.nu/begrepp/Bouppteckning>,
         <https://lagen.nu/begrepp/Inkomstskatt>,
