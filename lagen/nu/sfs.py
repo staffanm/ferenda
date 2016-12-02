@@ -13,9 +13,11 @@ from wsgiref.util import request_uri
 from rdflib import URIRef
 from rdflib.namespace import DCTERMS, OWL, RDF
 from ferenda.sources.legal.se import RPUBL, RINFOEX
+from ferenda.sources.legal.se.swedishlegalsource import SwedishLegalHandler
 
 from ferenda import decorators, util
 from ferenda import TextReader, DocumentEntry, Describer, RequestHandler
+from ferenda.sources.legal.se import SFS as OrigSFS
 from ferenda.sources.legal.se import SFS as OrigSFS
 from ferenda.sources.legal.se.elements import (Kapitel, Paragraf, Rubrik,
                                                Stycke, Listelement,
@@ -23,7 +25,8 @@ from ferenda.sources.legal.se.elements import (Kapitel, Paragraf, Rubrik,
                                                Avdelning, Underavdelning)
 from . import SameAs
 
-class SFSHandler(RequestHandler):
+# class SFSHandler(RequestHandler):
+class SFSHandler(SwedishLegalHandler):
     def supports(self, environ):
         if environ['PATH_INFO'].startswith("/dataset/"):
             return super(SFSHandler, self).supports(environ)
