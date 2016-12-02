@@ -189,7 +189,9 @@ Environ: %s
                     reasons[repo.alias] = '(unknown reason)'
                 if fp:
                     status = {200: "200 OK",
-                              406: "406 Not Acceptable"}[status]
+                              404: "404 Not found",
+                              406: "406 Not Acceptable",
+                              500: "500 Server error"}[status]
                     iterdata = FileWrapper(fp)
                     break
         # no repo handled the path

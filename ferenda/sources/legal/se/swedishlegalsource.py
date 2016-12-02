@@ -16,6 +16,7 @@ import os
 import sys
 import re
 import codecs
+from io import BytesIO
 
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
@@ -26,12 +27,14 @@ OLO = Namespace("http://purl.org/ontology/olo/core#")
 from six import text_type as str
 import bs4
 from cached_property import cached_property
+from lxml import etree
 
 from ferenda import (DocumentRepository, DocumentStore, FSMParser,
-                     CitationParser, Describer, Facet, RequestHandler)
+                     CitationParser, Describer, Facet, RequestHandler,
+                     Transformer, DocumentEntry)
 from ferenda import util, fulltextindex
 from ferenda.sources.legal.se.legalref import Link, LegalRef, RefParseError
-from ferenda.elements.html import A, H1, H2, H3, P, Strong, Pre
+from ferenda.elements.html import A, H1, H2, H3, P, Strong, Pre, Div, Body
 from ferenda.elements import serialize, Section, Body, CompoundElement, UnicodeElement, Preformatted
 from ferenda.pdfreader import Page, BaseTextDecoder, Textelement
 from ferenda.pdfreader import PDFReader
@@ -86,6 +89,68 @@ class SwedishLegalHandler(RequestHandler):
                                                                            self.repo.urispace_segment))
         return res
         
+    def prep_request(self, environ, path, data, contenttype):
+        if path and not os.path.exists(path):
+            # OK, we recieved a request for a path that we should have
+            # been able to handle, but weren't. This could mean that
+            # we either don't have the basefile at all, or that we
+            # have it, but for some reason it hasn't been generated.
+            request_uri = self.request_uri(environ)
+            basefile = self.repo.basefile_from_uri(request_uri)
+            assert basefile, "Cannot derive basefile from %s" % uri
+            entrypath = self.repo.store.documententry_path(basefile)
+            if os.path.exists(entrypath):
+                # We have the resource but cannot for some reason
+                # serve it -- return 500
+                entry = DocumentEntry(entrypath)
+                data = Div([H1(["Något fel är trasigt"]),
+                            P(["Vi har dokumentet %s, men kan inte visa det." % basefile])])
+                for stage in ("parse", "relate", "generate"):
+                    if stage in entry.status and entry.status[stage]["success"] is False:
+                        data.extend([H2(["Fel i %s" % stage]),
+                                     P([entry.status[stage]["error"]]),
+                                     Pre([entry.status[stage]["traceback"]])])
+                title = "Dokumentet kan inte visas"
+                status = 500
+            else:
+                data = Div([H1("Något fel är trasigt"),
+                            P(["Vi har inte något dokument %s" % basefile])])
+                title = "Dokumentet saknas"
+                status = 404
+
+            # 1. serialize data to XHTML
+            doc = self.repo.make_document()
+            doc.uri = request_uri
+            doc.meta.add((URIRef(doc.uri),
+                          DCTERMS.title,
+                          Literal(title, lang="sv")))
+            doc.body = Body([data])
+            xhtml = self.repo.render_xhtml_tree(doc)
+
+            # 2. use Transformer with error.xsl to get a tree
+            conffile = os.sep.join([self.repo.config.datadir, 'rsrc',
+                                    'resources.xml'])
+            transformer = Transformer('XSLT', "xsl/error.xsl", "xsl",
+                                      resourceloader=self.repo.resourceloader,
+                                      config=conffile)
+
+            depth = environ["PATH_INFO"].count("/")
+            urltransform = None
+            if 'develurl' in self.repo.config:
+                urltransform = self.repo.get_url_transform_func(
+                    develurl=self.repo.config.develurl)
+            tree = transformer.transform(xhtml, depth,
+                                         uritransform=urltransform)
+
+            # 3. return the data with proper status and headers
+            data = etree.tostring(tree, encoding="utf-8")
+            return (BytesIO(data),
+                    len(data),
+                    status,
+                    contenttype)
+        else:
+            return super(SwedishLegalHandler, self).prep_request(environ, path, data, contenttype)
+
 
 class SwedishLegalSource(DocumentRepository):
     download_archive = False
