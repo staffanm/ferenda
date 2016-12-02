@@ -185,7 +185,7 @@ nav[data-toggle='toc'].affix {
 }
  
 .sidebar-offcanvas nav {
-  overflow: scroll;
+  overflow: auto;
 }
 
 .sidebar-offcanvas nav#toc ul {

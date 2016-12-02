@@ -44,3 +44,6 @@ ul.strecksatslista > li:before {
 td {
     vertical-align: top;
 }
+body.sfs article {
+    padding-left: 30px;
+}
