@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2016-12-01T14:52:29.198640
+# Automatically transformed from sources at 2016-12-03T22:03:08.275817
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -703,6 +703,7 @@
     skos:prefLabel "Rikspolisstyrelsens författningssamling"@sv .
 
 <https://lagen.nu/dataset/rsfs> a rpubl:Forfattningssamling ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/skvfs> ;
     dcterms:publisher <https://lagen.nu/org/2014/riksskatteverket> ;
     rdfs:comment "Har tagits över av skatteverkets författningssamling (SKVFS)"@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/rsfs> ;
@@ -718,6 +719,7 @@
     skos:prefLabel "Radio- och TV-verkets författningssamling"@sv .
 
 <https://lagen.nu/dataset/saifs> a rpubl:Forfattningssamling ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/msbfs> ;
     dcterms:publisher <https://lagen.nu/org/2014/sprangamnesinspektionen> ;
     rdfs:comment "Har övertagits av Myndigheten för samhällsskydd och beredskaps författningssamling (MSBFS)"@sv ;
     rdfs:seeAlso <http://www2.msb.se/shopping/srv_itemlist____13768.aspx> ;
