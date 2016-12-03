@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2016-12-03T22:03:08.275817
+# Automatically transformed from sources at 2016-12-03T22:05:29.938361
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -202,7 +202,7 @@
     skos:prefLabel "Arbetsmarknadsstyrelsens författningssamling"@sv .
 
 <https://lagen.nu/dataset/bffs> a rpubl:Forfattningssamling ;
-    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/bffs> ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/fffs> ;
     dcterms:publisher <https://lagen.nu/org/2014/bankinspektionen> ;
     rdfs:comment "Har tagits över av Finansinspektionens författningssamling (FFFS)"@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/bffs> ;
