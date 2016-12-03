@@ -220,8 +220,6 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
         labelsets = {} 
         selector_values = {}
         for row in data:
-            if row.get("dcterms_identifier") =="DFS 2007:3":
-                from pudb import set_trace; set_trace()
             pagesetid = facets[0].identificator(row,
                                                 'rpubl_forfattningssamling',
                                                 self.commondata)
