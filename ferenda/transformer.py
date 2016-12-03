@@ -124,7 +124,15 @@ class Transformer(object):
                 uri = part.get(attr)
                 if not uri:
                     continue
-                part.set(attr, uritransform(uri))
+                newuri = uritransform(uri)
+                if newuri is False:
+                    # add the "invalid" class to the element if the
+                    # URI doesn't correspond to a document we have
+                    existingclasses = list(filter(None,part.get("class", "").split(" ")))
+                    part.set("class", " ".join(existingclasses + ["invalid-link"]))
+                else:
+                    part.set(attr, newuri)
+                
                 break
 
     def transform_stream(self, instream, depth,

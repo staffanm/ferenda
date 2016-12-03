@@ -521,6 +521,7 @@ class DocumentRepository(object):
             'tabs': True,
             'primaryfrontpage': False,
             'frontpagefeed': False,
+            'removeinvalidlinks': True,
             'class': cls.__module__ + "." + cls.__name__,
             # FIXME: These only make sense at a global level, and
             # furthermore are duplicated in manager._load_config. We
@@ -2359,16 +2360,17 @@ WHERE {
                                           resourceloader=self.resourceloader,
                                           config=conffile,
                                           documentroot=self.config.datadir)
-                urltransform = None
+
+                repos = list(otherrepos)
+                if self not in repos:
+                    repos.append(self)
+                transformargs = {'repos': repos,
+                                 'remove_missing': self.config.removeinvalidlinks}
                 if self.config.staticsite:
-                    repos = list(otherrepos)
-                    if self not in repos:
-                        repos.append(self)
-                    urltransform = self.get_url_transform_func(
-                        repos,
-                        os.path.dirname(outfile))
+                    transformargs['basedir'] = os.path.dirname(outfile)
                 elif 'develurl' in self.config:
-                    urltransform = self.get_url_transform_func(develurl=self.config.develurl)
+                    transformargs['develurl'] = self.config.develurl
+                urltransform = self.get_url_transform_func(**transformargs)
                 transformer.transform_file(infile, outfile,
                                            params, urltransform)
 
@@ -2385,7 +2387,7 @@ WHERE {
             docentry.updated = now
             docentry.save()
 
-    def get_url_transform_func(self, repos=None, basedir=None, develurl=None):
+    def get_url_transform_func(self, repos=None, basedir=None, develurl=None, remove_missing=False):
         """Returns a function that, when called with a URI, transforms that
         URI to another suitable reference. This can be used to eg. map
         between canonical URIs and local URIs. The function is run on
@@ -2395,52 +2397,75 @@ WHERE {
         only run if ``config.staticsite``is ``True``.
 
         """
-        # FIXME: This might be called with an abundance of repos (25
-        # right now) where only ~5 needed to do the transforming. This
-        # is worsened if calling basefile_from_uri or
-        # dataset_params_from_uri is expensive.
-
-        # This implementation always transforms URLs to local file
-        # paths (or if they can't be mapped, leaves them alone)
-
-        # FIXME: apply some memoization to this
-        def transform(uri):
-            path = None
-            if uri == self.config.url:
-                path = self.config.datadir + os.sep + "index.html"
-                # path = basedir + os.sep + "index.html"
-            elif uri.startswith("#"):
-                return uri
-            else:
-                for (repoidx, repo) in enumerate(repos):
-                    if repo.requesthandler.supports_uri(uri):
-                        break
-                else:
-                    repoidx = path = None
-                    # raise ValueError("Cannot find repo that supports %s" % uri)
-                if repoidx is not None:
-                    # reorder repos in MRU order
-                    repos.insert(0, repos.pop(repoidx))
-                    path = repo.requesthandler.path(uri)
-            if path:
-                relpath = os.path.relpath(path, basedir)
-                if os.sep == "\\":
-                    relpath = relpath.replace(os.sep, "/")
-                return relpath
-            else:
-                return uri
-
+        def getpath(url, repos):
+            for (repoidx, repo) in enumerate(repos):
+                # FIXME: This works less than optimal when using
+                # CompositeRepository -- the problem is that a subrepo
+                # might come before the main repo in this list, and
+                # yield an improper path (eg
+                # /data/soukb/entries/... when the real entry is at
+                # /data/sou/entries/...). One solution is to remove
+                # subrepos from the ferenda.ini file, but right now we
+                # need them enabled to properly store lastdownload
+                # options. Another solution would be to make sure all
+                # CompositeRepository repos come before subrepos in
+                # the list.
+                if repo.requesthandler.supports_uri(url):
+                    basefile = repo.basefile_from_uri(url)
+                    if basefile:  # if not, might be a dataset uri
+                        return repo.store.documententry_path(basefile)
+        
         def simple_transform(url):
             if url.startswith(self.config.url):
-                # convert eg. "https://lagen.nu/dom/md/2014:2?repo=dv&attachment=1.pdf" to just "/dom/md/2014:2?repo=dv&attachment=1.pdf"
+                if base_transform(url) is False:
+                    return False
+                # convert eg.
+                # "https://lagen.nu/dom/md/2014:2?repo=dv&attachment=1.pdf"
+                # to just "/dom/md/2014:2?repo=dv&attachment=1.pdf"
                 return url[len(self.config.url)-1:]
             else:
                 return url
 
+        def static_transform(url):
+            path = None
+            if url == self.config.url:
+                path = self.config.datadir + os.sep + "index.html"
+                # path = basedir + os.sep + "index.html"
+            elif url.startswith("#"):
+                return url
+            else:
+                path = getpath(url, repos)
+            if path:
+                if os.path.exists(path) or not remove_missing:
+                    relpath = os.path.relpath(path, basedir)
+                    if os.sep == "\\":
+                        relpath = relpath.replace(os.sep, "/")
+                    return relpath
+                else:
+                    return False
+            else:
+                return url
+
+        def base_transform(url):
+            if remove_missing:
+                path = getpath(url, repos)
+                if path and not os.path.exists(path):
+                    return False
+            return url
+
+
+        # sort repolist so that CompositeRepository instances come
+        # before others (see comment in getpath)
+        from ferenda import CompositeRepository
+        repos = sorted(repos, key=lambda x: isinstance(x, CompositeRepository), reverse=True)
         if develurl:
             return simple_transform
+        elif basefile:
+            return static_transform
         else:
-            return transform
+            return base_transform
+        
+        
 
     def prep_annotation_file(self, basefile):
         """Helper function used by
@@ -2840,13 +2865,14 @@ WHERE {
 
         depth = len(outfile[len(self.store.datadir) + 1:].split(os.sep))
         repos = [self] + otherrepos
+        transformargs = {'repos': repos,
+                         'remove_missing': self.config.removeinvalidlinks}
         if self.config.staticsite:
-            urltransform = self.get_url_transform_func(repos,
-                                                       os.path.dirname(outfile))
+            transformargs['basedir'] = os.path.dirname(outfile)
         elif 'develurl' in self.config:
-            urltransform = self.get_url_transform_func(develurl=self.config.develurl)
-        else:
-            urltransform = None
+            transformargs['develurl'] = self.config.develurl
+
+        urltransform = self.get_url_transform_func(**transformargs)
         tree = transformer.transform(
             self.render_xhtml_tree(doc),
             depth,

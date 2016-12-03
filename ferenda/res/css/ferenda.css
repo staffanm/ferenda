@@ -429,6 +429,31 @@ h1, h2, h3, h4, h5, h6 {
     font-weight: bold;
 }
 
+
+/* make invalid links not clickable, but still hoverable */
+.invalid-link {
+    cursor: default;
+    color: inherit;
+    border-bottom: 1px #ccc dotted;  /* very discrete indication that there is
+                                        something here */
+}
+.invalid-link:active {
+    pointer-events: none;
+}
+.invalid-link:hover {
+    text-decoration: none;
+    border-bottom: 1px dotted;
+}
+/* sort of a faux tooltip */
+.invalid-link:hover:after {
+    content: "Document does not exist";
+    position: absolute;
+    padding: 3px 6px;
+    box-shadow: 0 0 4px #aaa;
+    background: #eee;
+    color: black;
+    font-size: smaller;
+}
 /* PART 3: Footer */
 footer nav {
     text-align: center;

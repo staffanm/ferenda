@@ -88,6 +88,9 @@ h3 {
     margin-top: 10px;
 }
 
+.invalid-link:hover:after {
+    content: "Dokumentet finns inte i databasen";
+}
 
 @media only screen and (min-width: 480px) {
     body.frontpage td {
