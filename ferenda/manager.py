@@ -85,6 +85,7 @@ DEFAULT_CONFIG = {'loglevel': 'DEBUG',
                   'disallowrobots': False,
                   'legacyapi': False,
                   'fulltextindex': True,
+                  'removeinvalidlinks': True,
                   'serverport': 5555,
                   'authkey': b'secret'}
 
@@ -133,7 +134,8 @@ def frontpage(repos,
               stylesheet="xsl/frontpage.xsl",
               sitename="MySite",
               staticsite=False,
-              develurl=None):
+              develurl=None,
+              removeinvalidlinks=True):
     """Create a suitable frontpage.
 
     :param repos: The repositories to list on the frontpage, as instantiated
@@ -202,12 +204,14 @@ def frontpage(repos,
                                   resourceloader=ResourceLoader(*loadpath),
                                   config=conffile,
                                   documentroot=docroot)
+        
+        transformargs = {'repos': repos,
+                         'remove_missing': removeinvalidlinks}
         if staticsite:
-            urltransform = repos[0].get_url_transform_func(repos, os.path.dirname(path))
+            transformargs['basedir'] = os.path.dirname(outfile)
         elif develurl:
-            urltransform = repos[0].get_url_transform_func(develurl=develurl)
-        else:
-            urltransform = None
+            transformargs['develurl'] = develurl
+        urltransform = repos[0].get_url_transform_func(**transformargs)
         if feed:
             params = {"feedfile": feed}
         else:
@@ -1654,6 +1658,7 @@ def _setup_frontpage_args(config, argv):
             'path': config.datadir + "/index.html",
             'staticsite': config.staticsite,
             'develurl': develurl,
+            'removeinvalidlinks': config.removeinvalidlinks,
             'repos': repos}
 
 

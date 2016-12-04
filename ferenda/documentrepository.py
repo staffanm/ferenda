@@ -2413,7 +2413,13 @@ WHERE {
                 if repo.requesthandler.supports_uri(url):
                     basefile = repo.basefile_from_uri(url)
                     if basefile:  # if not, might be a dataset uri
-                        return repo.store.documententry_path(basefile)
+                        # What is the proper path if we want to test
+                        # if a resource exists? entry_path is not
+                        # right, since a doc might have an entry that
+                        # only signifies that a doc has been removed
+                        # (success=removed). So we test if a parse has
+                        # been successful
+                        return repo.store.parsed_path(basefile)
         
         def simple_transform(url):
             if url.startswith(self.config.url):
@@ -2449,7 +2455,7 @@ WHERE {
         def base_transform(url):
             if remove_missing:
                 path = getpath(url, repos)
-                if path and not os.path.exists(path):
+                if path and not (os.path.exists(path) and os.path.getsize(path) > 0):
                     return False
             return url
 
@@ -3224,15 +3230,13 @@ WHERE {
                                       config=conffile)
             repos = [self]  # FIXME: we must make otherrespos (passed
                             #  to news()) available to this scope
-
+            transformargs = {'repos': repos,
+                             'remove_missing': self.config.removeinvalidlinks}
             if self.config.staticsite:
-                urltransform = self.get_url_transform_func(
-                    repos,
-                    os.path.dirname(outfile))
+                transformargs['basedir'] = os.path.dirname(outfile)
             elif 'develurl' in self.config:
-                urltransform = self.get_url_transform_func(develurl=self.config.develurl)
-            else:
-                urltransform = None
+                transformargs['develurl'] = self.config.develurl
+            urltransform = self.get_url_transform_func(**transformargs)
 
         for feedset in feedsets:
             for feed in feedset.feeds:
