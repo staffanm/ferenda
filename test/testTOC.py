@@ -200,6 +200,7 @@ class TOC(RepoTester):
 
     def test_generate_page_staticsite(self):
         self.repo.config.staticsite = True
+        self.repo.config.removeinvalidlinks = False
         path = self.repo.toc_generate_page('dcterms_title','a', 
                                            self.documentlists[('dcterms_title','a')], 
                                            self.pagesets)
@@ -220,6 +221,9 @@ class TOC(RepoTester):
         # docs (which in this case use non-base-repo-contained URIs, should be unaffected
         docs = t.findall(".//ul[@role='main']/li/a")
         self.assertEqual('http://example.org/books/And_Then_There_Were_None', docs[0].get("href"))
+        self.repo.config.removeinvalidlinks = True
+
+
 
     def test_generate_pages(self):
         paths = self.repo.toc_generate_pages(self.documentlists,self.pagesets)

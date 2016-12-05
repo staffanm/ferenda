@@ -2387,7 +2387,8 @@ WHERE {
             docentry.updated = now
             docentry.save()
 
-    def get_url_transform_func(self, repos=None, basedir=None, develurl=None, remove_missing=False):
+    def get_url_transform_func(self, repos=None, basedir=None,
+                               develurl=None, remove_missing=False):
         """Returns a function that, when called with a URI, transforms that
         URI to another suitable reference. This can be used to eg. map
         between canonical URIs and local URIs. The function is run on
@@ -2397,7 +2398,7 @@ WHERE {
         only run if ``config.staticsite``is ``True``.
 
         """
-        def getpath(url, repos):
+        def getpath(url, repos, methodname="documententry_path"):
             for (repoidx, repo) in enumerate(repos):
                 # FIXME: This works less than optimal when using
                 # CompositeRepository -- the problem is that a subrepo
@@ -2414,12 +2415,18 @@ WHERE {
                     basefile = repo.basefile_from_uri(url)
                     if basefile:  # if not, might be a dataset uri
                         # What is the proper path if we want to test
-                        # if a resource exists? entry_path is not
-                        # right, since a doc might have an entry that
-                        # only signifies that a doc has been removed
-                        # (success=removed). So we test if a parse has
-                        # been successful
-                        return repo.store.parsed_path(basefile)
+                        # if a resource exists? sometimes entries/,
+                        # sometimes parsed/, sometimes generated/
+                        method = getattr(repo.store, methodname)
+                        return method(basefile)
+                    else:
+                        # even dataset uris must be mapped to a
+                        # path... this is complicated, but
+                        # requesthandler.path solves most of it
+                        # (except that it doesn't handle selecting a
+                        # path to the parsed or docentry file, only
+                        # generated files)
+                        return repo.requesthandler.path(url)
         
         def simple_transform(url):
             if url.startswith(self.config.url):
@@ -2440,7 +2447,7 @@ WHERE {
             elif url.startswith("#"):
                 return url
             else:
-                path = getpath(url, repos)
+                path = getpath(url, repos, "generated_path")
             if path:
                 if os.path.exists(path) or not remove_missing:
                     relpath = os.path.relpath(path, basedir)
@@ -2466,7 +2473,7 @@ WHERE {
         repos = sorted(repos, key=lambda x: isinstance(x, CompositeRepository), reverse=True)
         if develurl:
             return simple_transform
-        elif basefile:
+        elif basedir:
             return static_transform
         else:
             return base_transform

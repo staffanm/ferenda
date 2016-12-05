@@ -238,7 +238,8 @@ class=testManager.staticmockclass2
         Resources([test,test2], self.tempdir+'/rsrc').make()
         manager.frontpage([test,test2],
                           path=outfile,
-                          staticsite=True)
+                          staticsite=True,
+                          removeinvalidlinks=False)
         # print("\n============== OUTFILE =====================")
         # print(util.readfile(outfile))
         # print("==============================================")

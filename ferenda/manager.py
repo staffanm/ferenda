@@ -208,7 +208,7 @@ def frontpage(repos,
         transformargs = {'repos': repos,
                          'remove_missing': removeinvalidlinks}
         if staticsite:
-            transformargs['basedir'] = os.path.dirname(outfile)
+            transformargs['basedir'] = os.path.dirname(path)
         elif develurl:
             transformargs['develurl'] = develurl
         urltransform = repos[0].get_url_transform_func(**transformargs)

@@ -1487,6 +1487,7 @@ class Generate(RepoTester):
         self.assertEqual(4,len(divs))
         
     def test_staticsite_url(self):
+        self.repo.config.removeinvalidlinks = False
         tree = self._generate_complex(staticsite=True)
         link = tree.xpath(".//a[text()='external']")[0]
         self.assertEqual("something-else.html", link.get("href"))
@@ -1499,6 +1500,7 @@ class Generate(RepoTester):
 
         link = tree.xpath(".//a[text()='root']")[0]
         self.assertEqual("../../index.html", link.get("href"))
+        self.repo.config.removeinvalidlinks = True
 
     def test_dependency_mgmt(self):
         with self.repo.store.open_dependencies("a", "w") as fp:

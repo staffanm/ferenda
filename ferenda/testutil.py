@@ -208,24 +208,30 @@ class FerendaTestCase(object):
             # without the "--drop-empty-elements no" argument, empty
             # span tags (containing RDFa data) will be
             # dropped. Unfortunately this seems to be a new argument
-            # only available in the tidy-html5 branch.
-            p = subprocess.Popen("tidy -i -q -asxhtml -w 100 -utf8 --drop-empty-elements no",
-                                 shell=True,
-                                 stdin=subprocess.PIPE,
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE)
-            treestr = etree.tostring(tree, encoding="utf-8")
-            stdout, stderr = p.communicate(treestr)
-            if stdout.strip():
-                rawres = stdout
-                cookedres = stdout.decode(
-                    "utf-8").replace("&nbsp;", "&#160;").encode("utf-8")
-                newtree = etree.parse(BytesIO(cookedres))
-                return newtree
-            elif p.returncode and stderr:
-                raise ExternalCommandError(stderr)
-            newtree = etree.parse(BytesIO(stdout))
-            return newtree
+            # only available in the tidy-html5 branch. Assume that we
+            # have the new version, and fall back to the old, worse,
+            # version otherwise:
+            for cmdline in ("tidy -i -q -asxhtml -w 100 -utf8 --drop-empty-elements no",
+                            "tidy -i -q -asxhtml -w 100 -utf8"):
+                p = subprocess.Popen(cmdline,
+                                     shell=True,
+                                     stdin=subprocess.PIPE,
+                                     stdout=subprocess.PIPE,
+                                     stderr=subprocess.PIPE)
+                treestr = etree.tostring(tree, encoding="utf-8")
+                stdout, stderr = p.communicate(treestr)
+                if stdout.strip():
+                    rawres = stdout
+                    cookedres = stdout.decode(
+                        "utf-8").replace("&nbsp;", "&#160;").encode("utf-8")
+                    newtree = etree.parse(BytesIO(cookedres))
+                    return newtree
+                elif p.returncode and stderr:
+                    log = logging.getLogger("tidy")
+                    log.warning("'%s' failed: %s" % (cmdline, stderr.decode().split("\n")[0]))
+
+            # if we reach this point, all command lines have failed
+            raise ExternalCommandError(stderr)
 
         def c14nize(tree):
             tmp = BytesIO()
