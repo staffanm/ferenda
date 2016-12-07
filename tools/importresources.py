@@ -311,53 +311,19 @@ space: coin:template [
         coin:fragmentTemplate "B{bilaganummer}";
         coin:binding [ coin:property rinfoex:bilaganummer ]
      ], [
+         coin:relFromBase rinfoex:sid ;
+         coin:fragmentTemplate "sid{sidnummer}" ;
+         coin:binding [ coin:property rinfoex:sidnummer ] 
+     ], [ 
+        coin:relFromBase rinfoex:avsnitt ;
+        coin:binding [ coin:property rinfoex:avsnittnummer ] ;
+        coin:fragmentTemplate "S{avsnittnummer}" ;
+        coin:slugTransform [ coin:apply coin:ToBaseChar ;
+                             coin:replace ". -" ]
+     ], [
         coin:uriTemplate "/ext/celex/{celexNummer}#{artikelnummer}";
         coin:binding [ coin:property rpubl:celexNummer ],
                      [ coin:property rinfoex:artikelnummer ]
-     ], [
-        # maybe do this as a general relFromBase rpubl:sida?
-        coin:uriTemplate "/{rtype}/{arsutgava}:{lopnummer}#sid{sidnummer}";
-        coin:binding [ coin:property rpubl:sidnummer ],
-                     [ coin:property rdf:type ;
-                       coin:slugFrom space:abbrSlug ;
-                       coin:variable "rtype" ],
-                     [ coin:property rpubl:lopnummer ;
-                       coin:variable "lopnummer" ],
-                     [ coin:property rpubl:sidnummer ;
-                       coin:variable "sidnummer" ],
-                     [ coin:property rpubl:arsutgava ;
-                       coin:variable "arsutgava" ]
-     ], [
-        # yes we should really do this as a general relFromBase rpubl:sida?
-        coin:uriTemplate "/utr/{serie}/{arsutgava}:{lopnummer}#sid{sidnummer}";
-        coin:binding [ coin:property rpubl:sidnummer ],
-                     [ coin:property rpubl:utrSerie ;
-                       coin:slugFrom space:abbrSlug ;
-                       coin:variable "serie" ],
-                     [ coin:property rpubl:lopnummer ;
-                       coin:variable "lopnummer" ],
-                     [ coin:property rpubl:sidnummer ;
-                       coin:variable "sidnummer" ],
-                     [ coin:property rpubl:arsutgava ;
-                       coin:variable "arsutgava" ]
-     ], [
-        coin:uriTemplate "/{rtype}/{arsutgava}:{lopnummer}#S{avsnitt}";
-        coin:binding [ coin:property rinfoex:avsnitt ],
-                     [ coin:property rdf:type ;
-                       coin:slugFrom space:abbrSlug ;
-                       coin:variable "rtype" ],
-                     [ coin:property rpubl:lopnummer ;
-                       coin:variable "lopnummer" ],
-                     [ coin:property rpubl:arsutgava ;
-                       coin:variable "arsutgava" ]
-     ], [
-        coin:uriTemplate "/utr/{serie}/{arsutgava}:{lopnummer}#S{avsnitt}";
-        coin:binding [ coin:property rpubl:utrSerie ;
-                       coin:slugFrom space:abbrSlug ;
-                       coin:variable "serie" ],
-                     [ coin:property rinfoex:avsnitt ],
-                     [ coin:property rpubl:arsutgava ],
-                     [ coin:property rpubl:lopnummer ]
     ], [ 
        coin:uriTemplate "/{arsutgava}:{lopnummer}";
        coin:priority 1;

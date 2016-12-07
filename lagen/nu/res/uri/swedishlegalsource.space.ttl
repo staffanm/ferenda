@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2016-10-16T21:10:22.167174
+# Automatically transformed from sources at 2016-12-07T22:52:49.231734
 
 @prefix : <http://rinfo.lagrummet.se/sys/uri/space#> .
 @prefix coin: <http://purl.org/court/def/2009/coin#> .
@@ -150,47 +150,13 @@ space: a coin:URISpace ;
                     coin:variable "fs" ],
                 [ coin:property rpubl:arsutgava ;
                     coin:variable "arsutgava" ],
-                [ coin:property rpubl:lopnummer ;
-                    coin:variable "lopnummer" ] ;
-            coin:priority 1 ;
-            coin:uriTemplate "/{arsutgava}:{lopnummer}" ],
-        [ coin:binding [ coin:match "sfs" ;
-                    coin:property rpubl:forfattningssamling ;
-                    coin:slugFrom space:abbrSlug ;
-                    coin:variable "fs" ],
-                [ coin:property rpubl:arsutgava ;
-                    coin:variable "arsutgava" ],
-                [ coin:property rpubl:lopnummer ;
-                    coin:variable "lopnummer" ],
-                [ coin:property rpubl:sidnummer ;
-                    coin:variable "sidnummer" ] ;
-            coin:priority 1 ;
-            coin:uriTemplate "/{arsutgava}:{lopnummer}_s._{sidnummer}" ],
-        [ coin:binding [ coin:match "sfs" ;
-                    coin:property rpubl:forfattningssamling ;
-                    coin:slugFrom space:abbrSlug ;
-                    coin:variable "fs" ],
-                [ coin:property rpubl:arsutgava ;
-                    coin:variable "arsutgava" ],
-                [ coin:property rpubl:bihangsnummer ;
-                    coin:variable "bihang" ],
-                [ coin:property rpubl:sidnummer ;
-                    coin:variable "sidnummer" ] ;
-            coin:priority 1 ;
-            coin:uriTemplate "/{arsutgava}:bih_{bihang}_s._{sidnummer}" ],
-        [ coin:binding [ coin:property rinfoex:momentnummer ] ;
-            coin:fragmentTemplate "O{momentnummer}" ;
-            coin:relFromBase rinfoex:moment ],
-        [ coin:binding [ coin:match "sfs" ;
-                    coin:property rpubl:forfattningssamling ;
-                    coin:slugFrom space:abbrSlug ;
-                    coin:variable "fs" ],
-                [ coin:property rpubl:arsutgava ;
-                    coin:variable "arsutgava" ],
                 [ coin:property rpubl:bihangsnummer ;
                     coin:variable "bihang" ] ;
             coin:priority 1 ;
             coin:uriTemplate "/{fs}/{arsutgava}:bih_{bihang}" ],
+        [ coin:binding [ coin:property rinfoex:momentnummer ] ;
+            coin:fragmentTemplate "O{momentnummer}" ;
+            coin:relFromBase rinfoex:moment ],
         [ coin:binding [ coin:property rinfoex:punktnummer ] ;
             coin:fragmentTemplate "N{punktnummer}" ;
             coin:relFromBase rinfoex:punkt ],
@@ -218,50 +184,54 @@ space: a coin:URISpace ;
         [ coin:binding [ coin:property rinfoex:bilaganummer ] ;
             coin:fragmentTemplate "B{bilaganummer}" ;
             coin:relFromBase rinfoex:bilaga ],
+        [ coin:binding [ coin:property rinfoex:sidnummer ] ;
+            coin:fragmentTemplate "sid{sidnummer}" ;
+            coin:relFromBase rinfoex:sid ],
+        [ coin:binding [ coin:property rinfoex:avsnittnummer ] ;
+            coin:fragmentTemplate "S{avsnittnummer}" ;
+            coin:relFromBase rinfoex:avsnitt ;
+            coin:slugTransform [ coin:apply coin:ToBaseChar ;
+                    coin:replace ". -" ] ],
         [ coin:binding [ coin:property rpubl:celexNummer ],
                 [ coin:property rinfoex:artikelnummer ] ;
             coin:uriTemplate "/ext/celex/{celexNummer}#{artikelnummer}" ],
-        [ coin:binding [ coin:property rpubl:sidnummer ],
-                [ coin:property rdf:type ;
+        [ coin:binding [ coin:match "sfs" ;
+                    coin:property rpubl:forfattningssamling ;
                     coin:slugFrom space:abbrSlug ;
-                    coin:variable "rtype" ],
+                    coin:variable "fs" ],
+                [ coin:property rpubl:arsutgava ;
+                    coin:variable "arsutgava" ],
+                [ coin:property rpubl:lopnummer ;
+                    coin:variable "lopnummer" ] ;
+            coin:priority 1 ;
+            coin:uriTemplate "/{arsutgava}:{lopnummer}" ],
+        [ coin:binding [ coin:match "sfs" ;
+                    coin:property rpubl:forfattningssamling ;
+                    coin:slugFrom space:abbrSlug ;
+                    coin:variable "fs" ],
+                [ coin:property rpubl:arsutgava ;
+                    coin:variable "arsutgava" ],
                 [ coin:property rpubl:lopnummer ;
                     coin:variable "lopnummer" ],
                 [ coin:property rpubl:sidnummer ;
-                    coin:variable "sidnummer" ],
-                [ coin:property rpubl:arsutgava ;
-                    coin:variable "arsutgava" ] ;
-            coin:uriTemplate "/{rtype}/{arsutgava}:{lopnummer}#sid{sidnummer}" ],
-        [ coin:binding [ coin:property rpubl:sidnummer ],
-                [ coin:property rpubl:utrSerie ;
-                    coin:slugFrom space:abbrSlug ;
-                    coin:variable "serie" ],
-                [ coin:property rpubl:lopnummer ;
-                    coin:variable "lopnummer" ],
-                [ coin:property rpubl:sidnummer ;
-                    coin:variable "sidnummer" ],
-                [ coin:property rpubl:arsutgava ;
-                    coin:variable "arsutgava" ] ;
-            coin:uriTemplate "/utr/{serie}/{arsutgava}:{lopnummer}#sid{sidnummer}" ],
-        [ coin:binding [ coin:property rinfoex:avsnitt ],
-                [ coin:property rdf:type ;
-                    coin:slugFrom space:abbrSlug ;
-                    coin:variable "rtype" ],
-                [ coin:property rpubl:lopnummer ;
-                    coin:variable "lopnummer" ],
-                [ coin:property rpubl:arsutgava ;
-                    coin:variable "arsutgava" ] ;
-            coin:uriTemplate "/{rtype}/{arsutgava}:{lopnummer}#S{avsnitt}" ],
+                    coin:variable "sidnummer" ] ;
+            coin:priority 1 ;
+            coin:uriTemplate "/{arsutgava}:{lopnummer}_s._{sidnummer}" ],
         [ coin:binding [ coin:property rinfoex:styckenummer ] ;
             coin:fragmentTemplate "S{styckenummer}" ;
             coin:relFromBase rinfoex:stycke ],
-        [ coin:binding [ coin:property rpubl:utrSerie ;
+        [ coin:binding [ coin:property rpubl:sidnummer ;
+                    coin:variable "sidnummer" ],
+                [ coin:match "sfs" ;
+                    coin:property rpubl:forfattningssamling ;
                     coin:slugFrom space:abbrSlug ;
-                    coin:variable "serie" ],
-                [ coin:property rinfoex:avsnitt ],
-                [ coin:property rpubl:arsutgava ],
-                [ coin:property rpubl:lopnummer ] ;
-            coin:uriTemplate "/utr/{serie}/{arsutgava}:{lopnummer}#S{avsnitt}" ] .
+                    coin:variable "fs" ],
+                [ coin:property rpubl:arsutgava ;
+                    coin:variable "arsutgava" ],
+                [ coin:property rpubl:bihangsnummer ;
+                    coin:variable "bihang" ] ;
+            coin:priority 1 ;
+            coin:uriTemplate "/{arsutgava}:bih_{bihang}_s._{sidnummer}" ] .
 
 space:abbrSlug a rdf:Property ;
     rdfs:isDefinedBy : ;
