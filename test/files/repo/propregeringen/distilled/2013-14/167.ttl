@@ -12,6 +12,99 @@
     dcterms:isPartOf <https://lagen.nu/prop/2013/14:167> ;
     dcterms:title "Propositionens huvudsakliga innehåll"@sv .
 
+<https://lagen.nu/prop/2013/14:167#S1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:167> ;
+    dcterms:references <https://lagen.nu/prop/2013/14:167#S9> ;
+    dcterms:title "Förslag till riksdagsbeslut"@sv ;
+    bibo:chapter "1"@sv .
+
+<https://lagen.nu/prop/2013/14:167#S2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:167> ;
+    dcterms:title "Ärendet och dess beredning"@sv ;
+    bibo:chapter "2"@sv .
+
+<https://lagen.nu/prop/2013/14:167#S3> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:167> ;
+    dcterms:references <https://lagen.nu/prop/2013/14:166> ;
+    dcterms:title "Bakgrund"@sv ;
+    bibo:chapter "3"@sv .
+
+<https://lagen.nu/prop/2013/14:167#S4> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:167> ;
+    dcterms:title "Den regionala integrationen i Centralamerika"@sv ;
+    bibo:chapter "4"@sv .
+
+<https://lagen.nu/prop/2013/14:167#S5> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:167> ;
+    dcterms:title "Den ekonomiska utvecklingen i Centralamerika"@sv ;
+    bibo:chapter "5"@sv .
+
+<https://lagen.nu/prop/2013/14:167#S6> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:167> ;
+    dcterms:title "EU och Centralamerika"@sv ;
+    bibo:chapter "6"@sv .
+
+<https://lagen.nu/prop/2013/14:167#S7> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:167> ;
+    dcterms:title "Sverige och Centralamerika"@sv ;
+    bibo:chapter "7"@sv .
+
+<https://lagen.nu/prop/2013/14:167#S8-1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:167#S8> ;
+    dcterms:title "Allmänna och institutionella bestämmelser (artiklarna 1 –11)"@sv ;
+    bibo:chapter "8.1"@sv .
+
+<https://lagen.nu/prop/2013/14:167#S8-2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:167#S8> ;
+    dcterms:title "Politisk dialog (artiklarna 12 –23)"@sv ;
+    bibo:chapter "8.2"@sv .
+
+<https://lagen.nu/prop/2013/14:167#S8-3> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:167#S8> ;
+    dcterms:title "Samarbete (artiklarna 24 –76)"@sv ;
+    bibo:chapter "8.3"@sv .
+
+<https://lagen.nu/prop/2013/14:167#S8-4> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:167#S8> ;
+    dcterms:title "Handel (artiklarna 77 –351)"@sv ;
+    bibo:chapter "8.4"@sv .
+
+<https://lagen.nu/prop/2013/14:167#S8-5> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:167#S8> ;
+    dcterms:title "Slutbestämmelser (artiklarna 352 –363)"@sv ;
+    bibo:chapter "8.5"@sv .
+
+<https://lagen.nu/prop/2013/14:167#S8-6> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:167#S8> ;
+    dcterms:title "Protokoll om kulturellt samarbete"@sv ;
+    bibo:chapter "8.6"@sv .
+
+<https://lagen.nu/prop/2013/14:167#S9> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:167> ;
+    dcterms:references <https://lagen.nu/1974:152#K10P3>,
+        <https://lagen.nu/2000:1219>,
+        <https://lagen.nu/2000:1219#K2P6>,
+        <https://lagen.nu/2009:400>,
+        <https://lagen.nu/2009:400#K15P1a>,
+        <https://lagen.nu/2009:400#K27P5>,
+        <https://lagen.nu/2009:400#K8P3>,
+        <https://lagen.nu/2009:400#P3>,
+        <https://lagen.nu/2009:400#P5>,
+        <https://lagen.nu/prop/2013/14:167#S8-4-10>,
+        <https://lagen.nu/prop/2013/14:167#S8-4-4>,
+        <https://lagen.nu/prop/2013/14:167#S8-4-5>,
+        <https://lagen.nu/prop/2013/14:20#sid15>,
+        <https://lagen.nu/prop/2013/14:20#sid16> ;
+    dcterms:title "Godkännande av avtalet"@sv ;
+    bibo:chapter "9"@sv .
+
+<https://lagen.nu/prop/2013/14:167?attachment=associeringsavtal-mellan-europeiska-unionen-och-dess-medlemsstater-a-ena-sidan-och-centralamerika-a-andra-sidan-prop.-201314167&repo=propregeringen&dir=downloaded> rdfs:label "Associeringsavtal mellan Europeiska unionen och dess medlemsstater, å ena sidan, och Centralamerika, å andra sidan Prop. 2013/14:167 (pdf 21 MB)"@sv .
+
+<https://lagen.nu/prop/2013/14:167#S8> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:167> ;
+    dcterms:title "Associeringsavtalets innehåll"@sv ;
+    bibo:chapter "8"@sv .
+
 <https://lagen.nu/prop/2013/14:167> a rpubl:Proposition ;
     dcterms:abstract "I propositionen föreslås att riksdagen godkänner associeringsavtalet mellan Europeiska unionen och dess medlemsstater, å ena sidan, och Centralamerika, å andra sidan. Avtalsparter på den centralamerikanska sidan är republikerna Costa Rica, El Salvador, Guatemala, Honduras, Nicaragua och Panama. Förhandlingar om ett associeringsavtal med Costa Rica, El Salvador, Guatemala, Honduras och Nicaragua inleddes 2007. Panama anslöt sig till förhandlingarna i januari 2010. Avtalet undertecknades i juni 2012 och i december 2012 godkände Europaparlamentet associeringsavtalet. Avtalet ger en rättslig ram för alla aspekter av EU:s förbindelser med Centralamerika och består av tre pelare: politisk dialog, samarbete och handel. Målet med den politiska dialogen är att upprätta ett politiskt partnerskap som grundar sig på respekten för bl.a. demokrati, fred och en hållbar utveckling. Avtalet innehåller också rättsligt bindande åtaganden om respekt för mänskliga rättigheter och skyldigheter i fråga om ickespridning av massförstörelsevapen. Genom avtalet upprättas också ett frihandelsområde för varor och tjänster. Parterna kommer att öppna sina marknader genom att avveckla tullar och andra tariffära och icke-tariffära handelshinder. Andra områden som liberaliseras är tjänstehandel och etableringar. Avtalet förväntas öka den ekonomiska tillväxten och sysselsättningen i Centralamerika samt bidra till en ökad förutsägbarhet i affärs- och investeringsklimatet i de centralamerikanska länderna. En avsikt med avtalet är också att stärka den regionala ekonomiska integrationen i Centralamerika, något som i ett långsiktigt perspektiv främjar stabilitetet och en hållbar utveckling i regionen."@sv ;
     dcterms:identifier "Prop. 2013/14:167" ;
@@ -23,6 +116,4 @@
     owl:sameAs <http://rinfo.lagrummet.se/publ/prop/2013/14:167> ;
     prov:wasDerivedFrom <https://lagen.nu/prop/2013/14:167?attachment=associeringsavtal-mellan-europeiska-unionen-och-dess-medlemsstater-a-ena-sidan-och-centralamerika-a-andra-sidan-prop.-201314167&repo=propregeringen&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.propositioner.PropRegeringen" .
-
-<https://lagen.nu/prop/2013/14:167?attachment=associeringsavtal-mellan-europeiska-unionen-och-dess-medlemsstater-a-ena-sidan-och-centralamerika-a-andra-sidan-prop.-201314167&repo=propregeringen&dir=downloaded> rdfs:label "Associeringsavtal mellan Europeiska unionen och dess medlemsstater, å ena sidan, och Centralamerika, å andra sidan Prop. 2013/14:167 (pdf 21 MB)"@sv .
 

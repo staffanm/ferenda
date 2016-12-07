@@ -17,20 +17,24 @@
     dcterms:title "Förslag till riksdagsbeslut"@sv ;
     bibo:chapter "1"@sv .
 
-<https://lagen.nu/prop/2013/14:51#S4.1> a bibo:DocumentPart ;
+<https://lagen.nu/prop/2013/14:51#S4-1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2013/14:51#S4> ;
+    dcterms:references <https://lagen.nu/1962:700#K19> ;
     dcterms:title "Begreppet rikets säkerhet"@sv ;
     bibo:chapter "4.1"@sv .
 
-<https://lagen.nu/prop/2013/14:51#S4.2.1> a bibo:DocumentPart ;
-    dcterms:isPartOf <https://lagen.nu/prop/2013/14:51#S4.2> ;
+<https://lagen.nu/prop/2013/14:51#S4-2-1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:51#S4-2> ;
+    dcterms:references <https://lagen.nu/1962:700#K19P5> ;
     dcterms:title "Spioneri"@sv ;
     bibo:chapter "4.2.1"@sv .
 
-<https://lagen.nu/prop/2013/14:51#S4.2> a bibo:DocumentPart ;
+<https://lagen.nu/prop/2013/14:51#S4-2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2013/14:51#S4> ;
     dcterms:title "Aktuella straffbestämmelser i 19 kap. brottsbalken"@sv ;
     bibo:chapter "4.2"@sv .
+
+<https://lagen.nu/prop/2013/14:51?attachment=forstarkt-skydd-mot-frammande-makts-underrattelseverksamhet-prop.-20131451&repo=propregeringen&dir=downloaded> rdfs:label "Förstärkt skydd mot främmande makts underrättelseverksamhet, prop. 2013/14:51 (pdf 932 kB)"@sv .
 
 <https://lagen.nu/prop/2013/14:51#S4> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2013/14:51> ;
@@ -49,5 +53,6 @@
         <https://lagen.nu/dir/2012:3>,
         <https://lagen.nu/utr/sou/2012:95> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/prop/2013/14:51> ;
+    prov:wasDerivedFrom <https://lagen.nu/prop/2013/14:51?attachment=forstarkt-skydd-mot-frammande-makts-underrattelseverksamhet-prop.-20131451&repo=propregeringen&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.propositioner.PropRegeringen" .
 

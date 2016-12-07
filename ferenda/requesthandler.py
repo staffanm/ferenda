@@ -125,6 +125,9 @@ class RequestHandler(object):
                 uri = uri.split("?")[0]
             basefile = self.repo.basefile_from_uri(uri)
 
+            if basefile is None:
+                return None
+            
             if 'format' in params:
                 suffix = params['format']
             else:

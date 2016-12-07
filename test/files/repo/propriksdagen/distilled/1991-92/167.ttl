@@ -74,32 +74,32 @@
     dcterms:title "EG-reglemas införlivande i svensk rätt"@sv ;
     bibo:chapter "2"@sv .
 
-<https://lagen.nu/prop/1991/92:167#S3.1> a bibo:DocumentPart ;
+<https://lagen.nu/prop/1991/92:167#S3-1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
     dcterms:references <https://lagen.nu/1981:1361>,
         <https://lagen.nu/prop/1971:86#sid89> ;
     dcterms:title "Förvärvets syfte"@sv ;
     bibo:chapter "3.1"@sv .
 
-<https://lagen.nu/prop/1991/92:167#S3.10> a bibo:DocumentPart ;
+<https://lagen.nu/prop/1991/92:167#S3-10> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
     dcterms:references <https://lagen.nu/1981:1361> ;
     dcterms:title "Lagens benämning"@sv ;
     bibo:chapter "3.10"@sv .
 
-<https://lagen.nu/prop/1991/92:167#S3.12> a bibo:DocumentPart ;
+<https://lagen.nu/prop/1991/92:167#S3-12> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
     dcterms:title "Ikraftträdande"@sv ;
     bibo:chapter "3.12"@sv .
 
-<https://lagen.nu/prop/1991/92:167#S3.2> a bibo:DocumentPart ;
+<https://lagen.nu/prop/1991/92:167#S3-2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
     dcterms:references <https://lagen.nu/1981:1361>,
         <https://lagen.nu/prop/1981/82:40#sid23> ;
     dcterms:title "Begreppet näringsidkare"@sv ;
     bibo:chapter "3.2"@sv .
 
-<https://lagen.nu/prop/1991/92:167#S3.3> a bibo:DocumentPart ;
+<https://lagen.nu/prop/1991/92:167#S3-3> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
     dcterms:references <https://lagen.nu/1981:1361>,
         <https://lagen.nu/1981:1361#P2>,
@@ -109,11 +109,11 @@
         <https://lagen.nu/1990:932#P2>,
         <https://lagen.nu/prop/1981/82:40#sid24>,
         <https://lagen.nu/prop/1981/82:40#sid41>,
-        <https://lagen.nu/prop/1991/92:167#S2.2> ;
+        <https://lagen.nu/prop/1991/92:167#S2-2> ;
     dcterms:title "Avtalstyperna"@sv ;
     bibo:chapter "3.3"@sv .
 
-<https://lagen.nu/prop/1991/92:167#S3.6> a bibo:DocumentPart ;
+<https://lagen.nu/prop/1991/92:167#S3-6> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
     dcterms:references <https://lagen.nu/1981:1361>,
         <https://lagen.nu/1988:1385>,
@@ -124,7 +124,7 @@
     dcterms:title "Undantag från hemförsäljningslagen för vissa prestationer"@sv ;
     bibo:chapter "3.6"@sv .
 
-<https://lagen.nu/prop/1991/92:167#S3.7> a bibo:DocumentPart ;
+<https://lagen.nu/prop/1991/92:167#S3-7> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
     dcterms:references <https://lagen.nu/1981:1361>,
         <https://lagen.nu/1981:1361#P4>,
@@ -132,14 +132,14 @@
     dcterms:title "Näringsidkarens infomrationsplikt"@sv ;
     bibo:chapter "3.7"@sv .
 
-<https://lagen.nu/prop/1991/92:167#S3.8> a bibo:DocumentPart ;
+<https://lagen.nu/prop/1991/92:167#S3-8> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
     dcterms:references <https://lagen.nu/1981:1361>,
         <https://lagen.nu/1985:716> ;
     dcterms:title "Konsumentens ångerrätt"@sv ;
     bibo:chapter "3.8"@sv .
 
-<https://lagen.nu/prop/1991/92:167#S3.9> a bibo:DocumentPart ;
+<https://lagen.nu/prop/1991/92:167#S3-9> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
     dcterms:references <https://lagen.nu/1981:1361> ;
     dcterms:title "Regleringens tvingande karaktär"@sv ;

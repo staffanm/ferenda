@@ -238,7 +238,8 @@ class LegalRef:
             self._supported_sub_objects = ("sentence", "item",
                                            "itemnumeric", "piece",
                                            "element", "section",
-                                           "chapter", "lawref")
+                                           "chapter", "lawref",
+                                           "avsnitt", "sida")
 
         
         self.metadata_graph = metadata_graph if metadata_graph else Graph()
@@ -739,13 +740,14 @@ class LegalRef:
                     "celex": RPUBL.celexNummer,
                     "artikel": RINFOEX.artikelnummer,
                     "sidnr": RPUBL.sidnummer,
+                    "sida": RINFOEX.sidnummer, # yes, RINFOEX (to convert to rinfoex:sid)
                     "type": RDF.type,
                     "lopnr": RPUBL.lopnummer,
                     "notnr": RPUBL.lopnummer,
                     "rattsfallspublikation": RPUBL.rattsfallspublikation,
                     "domstol": RPUBL.rattsfallspublikation,
                     "ar": RPUBL.arsutgava,
-                    "avsnitt": RINFOEX.avsnitt,
+                    "avsnitt": RINFOEX.avsnittnummer,
                     "utrSerie": RPUBL.utrSerie,
                     "myndighet": DCTERMS.publisher,
                     "diarienr": RPUBL.diarienummer
@@ -1243,9 +1245,6 @@ class LegalRef:
                     # this reference is relative to the current document
                     a.update(self.baseuri_attributes)
         for key, val in list(a.items()):
-            if key == 'sida':
-                a['sidnr'] = val
-                del a[key]
             if key == 'prop':
                 a['type'] = RPUBL.Proposition
                 a['year'], a['no'] = val.split(":")

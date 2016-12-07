@@ -10,6 +10,8 @@
 
 <https://lagen.nu/prop/2008/09:5#PS1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2008/09:5> ;
+    dcterms:references <https://lagen.nu/1977:1160>,
+        <https://lagen.nu/1977:1160#K3> ;
     dcterms:title "Propositionens huvudsakliga innehåll"@sv .
 
 <https://lagen.nu/prop/2008/09:5> a rpubl:Proposition ;
@@ -23,5 +25,8 @@
     rpubl:utgarFran <https://lagen.nu/utr/ds/2008:24>,
         <https://lagen.nu/utr/sou/2007:43> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/prop/2008/09:5> ;
+    prov:wasDerivedFrom <https://lagen.nu/prop/2008/09:5?attachment=battre-genomforande-av-egs-byggplatsdirektiv-prop.-2008095&repo=propregeringen&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.propositioner.PropRegeringen" .
+
+<https://lagen.nu/prop/2008/09:5?attachment=battre-genomforande-av-egs-byggplatsdirektiv-prop.-2008095&repo=propregeringen&dir=downloaded> rdfs:label "Bättre genomförande av EG:s byggplatsdirektiv, Prop. 2008/09:5"@sv .
 

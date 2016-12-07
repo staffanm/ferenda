@@ -20,7 +20,7 @@
               <p>Paragrafen innehåller en översikt över lagens bestämmelser.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.1> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-1> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-0000:10419030836605704805#K1P2> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 1 kap. 2 § bokföringslag"@sv ;
@@ -39,7 +39,7 @@
               <span class="sidbrytning" height="1263" id="sid114" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=113" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.1> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-1> ;
     dcterms:references <https://lagen.nu/1995:1554#K3P12> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-0000:10419030836605704805#K1P3> a rinfoex:Forfattningskommentar ;
@@ -53,7 +53,7 @@
               <span class="sidbrytning" height="1263" id="sid194" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=193" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.1> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-1> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K1P1> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 1 kap. 1 § årsredovisningslagen (1995:1554)"@sv ;
@@ -64,7 +64,7 @@
               <span class="sidbrytning" height="1263" id="sid195" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=194" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K1P2> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 1 kap. 2 § årsredovisningslagen (1995:1554)"@sv ;
@@ -76,7 +76,7 @@
               <p>lagen (<a href="https://lagen.nu/1995:1560" rel="dcterms:references">1995:1560</a>) om årsredovisning i kreditinstitut och värdepappersbolag innefattar även andra juridiska personer än sådana som är bolag.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> ;
     dcterms:references <https://lagen.nu/1995:1560> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K1P3> a rinfoex:Forfattningskommentar ;
@@ -91,7 +91,7 @@
               <p>Med andelar avses aktier och andra andelar i juridiska personer.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K1P4> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 1 kap. 4 § årsredovisningslagen (1995:1554)"@sv ;
@@ -103,7 +103,7 @@
               <p>handelsbolag. Tillämpningsområdet har nu utvidgats så att lagen nu gäller också andra företag av det slag som anges i <a href="https://lagen.nu/1999:000#K6P1" rel="dcterms:references">6 kap. 1 § bokföringslagen</a>. Orden ”bolag” och ”moderbolag” har därför bytts ut mot ”företag” och ”moderföretag”.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> ;
     dcterms:references <https://lagen.nu/1999:000#K6P1> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K1P5> a rinfoex:Forfattningskommentar ;
@@ -115,7 +115,7 @@
               <p>Ändringarna är av samma slag som ändringarna i 1 kap. 4 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K1P6> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 1 kap. 6 § årsredovisningslagen (1995:1554)"@sv ;
@@ -127,7 +127,7 @@
               <span class="sidbrytning" height="1263" id="sid198" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=197" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K1P7> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 1 kap. 7 § årsredovisningslagen (1995:1554)"@sv ;
@@ -139,7 +139,7 @@
               <p>hittills har funnits i 3 kap. 11 § 1980 års årsredovisningslag, <a href="https://lagen.nu/2005:551#K8P38" rel="dcterms:references">8 kap. 38 § aktiebolagslagen</a>, 6 kap. 7 § föreningslagen och <a href="https://lagen.nu/1982:713#K8P9" rel="dcterms:references">8 kap. 9 § försäkringsrörelselagen (1982:713)</a>. Någon saklig ändring är inte åsyftad.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> ;
     dcterms:references <https://lagen.nu/1982:713#K8P9>,
         <https://lagen.nu/2005:551#K8P38> .
 
@@ -160,7 +160,7 @@
               <p>”fastställda balansräkningar” har ersatts med ”balansräkningarna”. Skälet till det är att det i vissa slag av företag, t.ex. handelsbolag och stiftelser, inte förekommer någon fastställelse av balansräkningen. De balansräkningar som avses är dock fortfarande de balansräkningar som ingår i företagets årsredovisningar eller årsbokslut.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> ;
     dcterms:references <https://lagen.nu/1995:1554>,
         <https://lagen.nu/1999:000#K6P1>,
         <https://lagen.nu/2005:551>,
@@ -176,7 +176,7 @@
               <p>mot ”företagets.” Detta är en följd av att lagens tillämpningsområde har utvidgats till att omfatta andra verksamhetsformer än aktiebolag och vissa handelsbolag.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K2P4> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 2 kap. 4 § årsredovisningslagen (1995:1554)"@sv ;
@@ -187,7 +187,7 @@
               <p>Ändringarna är av samma slag som ändringen i 3 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K2P7> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 2 kap. 7 § årsredovisningslagen (1995:1554)"@sv ;
@@ -199,7 +199,7 @@
               <p>regler om hur årsredovisningen för ekonomiska föreningar, stiftelser och de övriga företag som kan vara skyldiga att upprätta årsredovisning skall undertecknas. Kompletteringarna överensstämmer i huvudsak med hittills gällande rätt (jfr 9 kap. 2 § andra stycket föreningslagen, <a href="https://lagen.nu/1994:1220#K3P9" rel="dcterms:references">3 kap. 9 § stiftelselagen</a> och 2 kap. 2 § tredje stycket 1980 års årsredovisningslag).</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> ;
     dcterms:references <https://lagen.nu/1994:1220#K3P9> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P1> a rinfoex:Forfattningskommentar ;
@@ -211,7 +211,7 @@
               <p>Ändringen är av samma slag som ändringen i 2 kap. 3 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P10> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 3 kap. 10 § årsredovisningslagen (1995:1554)"@sv ;
@@ -223,7 +223,7 @@
               <p>är av samma slag som ändringen i 2 kap. 3 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P11> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 3 kap. 11 § årsredovisningslagen (1995:1554)"@sv ;
@@ -235,7 +235,7 @@
               </p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P12> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 3 kap. 12 § årsredovisningslagen (1995:1554)"@sv ;
@@ -251,7 +251,7 @@
               </p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P13> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 3 kap. 13 § årsredovisningslagen (1995:1554)"@sv ;
@@ -263,7 +263,7 @@
               <p><i>första </i>och<i> tredje styckena</i> är av samma slag som ändringen i 2 kap. 3 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P2> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 3 kap. 2 § årsredovisningslagen (1995:1554)"@sv ;
@@ -274,7 +274,7 @@
               <p>Ändringen är av samma slag som ändringen i 2 kap. 3 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P3> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 3 kap. 3 § årsredovisningslagen (1995:1554)"@sv ;
@@ -286,7 +286,7 @@
               <p>lagan 1 till lagen kunnat utmönstras. De bilagor som tidigare har betecknats 2–4 har därför erhållit beteckningarna 1–3. Detta har föranlett ändringar i förevarande paragrafs <i>första stycke. </i></p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P4> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 3 kap. 4 § årsredovisningslagen (1995:1554)"@sv ;
@@ -302,7 +302,7 @@
               </p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P5> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 3 kap. 5 § årsredovisningslagen (1995:1554)"@sv ;
@@ -313,7 +313,7 @@
               <p>Ändringen i<i> andra stycket</i> är av samma slag som ändringen i 2 kap.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P6> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 3 kap. 6 § årsredovisningslagen (1995:1554)"@sv ;
@@ -329,7 +329,7 @@
               <p>har funnits i 9 kap. 26 § andra meningen <a href="https://lagen.nu/1991:614" rel="dcterms:references">bostadsrättslagen (1991:614)</a>.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> ;
     dcterms:references <https://lagen.nu/1991:614> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P7> a rinfoex:Forfattningskommentar ;
@@ -346,7 +346,7 @@
               </p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P8> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 3 kap. 8 § årsredovisningslagen (1995:1554)"@sv ;
@@ -358,7 +358,7 @@
               <p><i>stycket</i> är av samma slag som ändringen i 2 kap. 3 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K3P9> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 3 kap. 9 § årsredovisningslagen (1995:1554)"@sv ;
@@ -367,11 +367,11 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 3 kap. 9 § i kommitténs förslag.)</p>
               <p>En motsvarande bestämmelse har tidigare funnits i 4 kap. 16 §. Den</p>
-              <p>har nu utformats som en klassificeringsregel med anknytning till balansräkningen och det har därför ansetts naturligt att ta in den i 3 kap. i stället för i 4 kap. Någon saklig ändring när det gäller innebörden av begreppet avsättning är inte avsedd (jfr <a href="https://lagen.nu/prop/1998/99:130#S15.2.1" rel="dcterms:references">avsnitt 15.2.1</a>).</p>
+              <p>har nu utformats som en klassificeringsregel med anknytning till balansräkningen och det har därför ansetts naturligt att ta in den i 3 kap. i stället för i 4 kap. Någon saklig ändring när det gäller innebörden av begreppet avsättning är inte avsedd (jfr <a href="https://lagen.nu/prop/1998/99:130#S15-2-1" rel="dcterms:references">avsnitt 15.2.1</a>).</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
-    dcterms:references <https://lagen.nu/prop/1998/99:130#S15.2.1> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> ;
+    dcterms:references <https://lagen.nu/prop/1998/99:130#S15-2-1> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K4P1> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 4 kap. 1 § årsredovisningslagen (1995:1554)"@sv ;
@@ -382,7 +382,7 @@
               <p>Ändringen i <i>första stycket </i>är av samma slag som ändringen i 3 kap.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K4P12> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 4 kap. 12 § årsredovisningslagen (1995:1554)"@sv ;
@@ -393,7 +393,7 @@
               <p>Ändringen är av samma slag som ändringen i 2 kap. 3 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K4P14> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 4 kap. 14 § årsredovisningslagen (1995:1554)"@sv ;
@@ -404,7 +404,7 @@
               <p>Ändringarna i <i>andra stycket</i> är av samma slag som ändringen i 2 kap.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K4P2> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 4 kap. 2 § årsredovisningslagen (1995:1554)"@sv ;
@@ -416,7 +416,7 @@
               <p>ningsområde har utvidgats.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K4P6> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 4 kap. 6 § årsredovisningslagen (1995:1554)"@sv ;
@@ -430,7 +430,7 @@
               <p>skall efter uppskrivningen beräknas med utgångspunkt i det uppskrivna värdet.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K4P7> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 4 kap. 7 § årsredovisningslagen (1995:1554)"@sv ;
@@ -441,7 +441,7 @@
               <span class="sidbrytning" height="1263" id="sid207" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=206" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K4P9> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 4 kap. 9 § årsredovisningslagen (1995:1554)"@sv ;
@@ -452,7 +452,7 @@
               <p>Ändringen i <i>fjärde stycket</i> är av samma slag som ändringen i 2 kap.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P1> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 5 kap. 1 § årsredovisningslagen (1995:1554)"@sv ;
@@ -463,7 +463,7 @@
               <span class="sidbrytning" height="1263" id="sid209" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=208" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P11> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 5 kap. 11 § årsredovisningslagen (1995:1554)"@sv ;
@@ -474,7 +474,7 @@
               <p>Ändringen i <i>andra stycket</i> är av samma slag som ändringen i 2 kap 3 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P12> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 5 kap. 12 § årsredovisningslagen (1995:1554)"@sv ;
@@ -488,7 +488,7 @@
               <p>omfattas av stycket.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P13> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 5 kap. 13 § årsredovisningslagen (1995:1554)"@sv ;
@@ -499,7 +499,7 @@
               <p>Ändringen är av samma slag som ändringen i 2 kap. 3 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P15> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 5 kap. 15 § årsredovisningslagen (1995:1554)"@sv ;
@@ -525,7 +525,7 @@
               <p>Första stycket gäller inte <i>företag</i> som avses i 3 kap. <i>8</i> § andra stycket.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P17> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 5 kap. 17 § årsredovisningslagen (1995:1554)"@sv ;
@@ -537,7 +537,7 @@
               <p>dels gjorts samma slag av ändring som i 2 kap. 3 §, dels gjorts en anpassning till den nya paragrafnumreringen i 3 kap.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P18> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 5 kap. 18 § årsredovisningslagen (1995:1554)"@sv ;
@@ -550,7 +550,7 @@
               <span class="sidbrytning" height="1263" id="sid213" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=212" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P20> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 5 kap. 20 § årsredovisningslagen (1995:1554)"@sv ;
@@ -562,7 +562,7 @@
               <p><i>stycket</i> är av samma slag som ändringen i 2 kap. 3 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P23> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 5 kap. 23 § årsredovisningslagen (1995:1554)"@sv ;
@@ -574,7 +574,7 @@
               <p>föranledda av en ändrad paragrafnumrering.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P24> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 5 kap. 24 § årsredovisningslagen (1995:1554)"@sv ;
@@ -586,7 +586,7 @@
               <p>följd av ändrad paragrafnumrering.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P25> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 5 kap. 25 § årsredovisningslagen (1995:1554)"@sv ;
@@ -598,7 +598,7 @@
               <p>samma slag som ändringen i 2 kap. 3 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P26> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 5 kap. 26 § årsredovisningslagen (1995:1554)"@sv ;
@@ -610,7 +610,7 @@
               <p>har bestämmelsen kompletterats med ett krav på att ett dotterföretag vars moderföretag är en fysisk person, skall lämna uppgift om dennes personnummer. I övrigt är ändringarna är av samma slag som ändringen i 2 kap. 3 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P6> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 5 kap. 6 § årsredovisningslagen (1995:1554)"@sv ;
@@ -623,7 +623,7 @@
               <p>Ändringarna i <i>andra stycket</i> är av samma slag som ändringen i 2 kap.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P7> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 5 kap. 7 § årsredovisningslagen (1995:1554)"@sv ;
@@ -634,11 +634,11 @@
               <p>Ändringen i <i>första stycket</i> är av samma slag som ändringen i 2 kap. 3 §</p>
               <p>m.fl. paragrafer.</p>
               <p>Av bestämmelserna i 7 kap. 3 § framgår att ett moderföretag under</p>
-              <p>vissa förhållanden inte behöver upprätta någon koncernredovisning. När detta undantag utnyttjas, skall moderföretaget, enligt <i>andra stycket, </i>lämna upplysning om internvinster på transaktioner som har företagits inom koncernen<i>. </i>Frågan har behandlats i <a href="https://lagen.nu/prop/1998/99:130#S16.2" rel="dcterms:references">avsnitt 16.2</a>.Med begreppet ”transaktioner inom koncernen” förstås varje koncernintern överlåtelse av varor, tjänster, anläggningstillgångar eller annat. Begreppet internvinster har samma innebörd som i 7 kap. 13 §.</p>
+              <p>vissa förhållanden inte behöver upprätta någon koncernredovisning. När detta undantag utnyttjas, skall moderföretaget, enligt <i>andra stycket, </i>lämna upplysning om internvinster på transaktioner som har företagits inom koncernen<i>. </i>Frågan har behandlats i <a href="https://lagen.nu/prop/1998/99:130#S16-2" rel="dcterms:references">avsnitt 16.2</a>.Med begreppet ”transaktioner inom koncernen” förstås varje koncernintern överlåtelse av varor, tjänster, anläggningstillgångar eller annat. Begreppet internvinster har samma innebörd som i 7 kap. 13 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
-    dcterms:references <https://lagen.nu/prop/1998/99:130#S16.2> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> ;
+    dcterms:references <https://lagen.nu/prop/1998/99:130#S16-2> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K5P8> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 5 kap. 8 § årsredovisningslagen (1995:1554)"@sv ;
@@ -650,7 +650,7 @@
               <p>lagen eller till andra ändringar i <a href="https://lagen.nu/1995:1554" rel="dcterms:references">årsredovisningslagen</a>. Ordet bolag har bytts ut mot företag. <i>Första stycket</i> har också formulerats om för att dess innebörd skall bli klarare. I <i>första stycket</i> <i>2 </i>har ordet ”årsredovisning” lagts till, eftersom den nya <a href="https://lagen.nu/1999:000" rel="dcterms:references">bokföringslagen</a> innebär att bokföringen kan avslutas med ett årsbokslut <i>eller</i> en årsredovisning. </p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> ;
     dcterms:references <https://lagen.nu/1995:1554>,
         <https://lagen.nu/1999:000> .
 
@@ -665,7 +665,7 @@
               <p>Ändringarna i <i>fjärde stycket</i> är av samma slag som ändringen i 2 kap.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> ;
     dcterms:references <https://lagen.nu/1995:1554>,
         <https://lagen.nu/1995:1633>,
         <https://lagen.nu/1995:1633#P6> .
@@ -680,7 +680,7 @@
               <p>”bolag” i olika böjningsformer har bytts ut mot ”företag” i motsvarande böjningsformer.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K6P2> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 6 kap. 2 § årsredovisningslagen (1995:1554)"@sv ;
@@ -693,7 +693,7 @@
               <span class="sidbrytning" height="1263" id="sid215" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=214" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K6P3> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 6 kap. 3 § årsredovisningslagen (1995:1554)"@sv ;
@@ -707,7 +707,7 @@
               <p>sambruksföreningar.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> ;
     dcterms:references <https://lagen.nu/1975:417> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K6P4> a rinfoex:Forfattningskommentar ;
@@ -720,7 +720,7 @@
               <p>berättelse skall innehålla uppgift om hur stiftelsens ändamål har främjats under året. Detta överensstämmer med vad som redan tidigare har gällt enligt <a href="https://lagen.nu/1994:1220#K3P7S3" rel="dcterms:references">3 kap. 7 § tredje stycket stiftelselagen</a> samt enligt 17 a och 30 §§ tryggandelagen.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> ;
     dcterms:references <https://lagen.nu/1994:1220#K3P7S3> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K6P5> a rinfoex:Forfattningskommentar ;
@@ -733,7 +733,7 @@
               <p>slag som ändringen i 2 kap. 3 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P1> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 7 kap. 1 § årsredovisningslagen (1995:1554)"@sv ;
@@ -747,7 +747,7 @@
               <p>skyldigheten att upprätta koncernredovisning har orden ”eller 3 §” tillfogats i slutet av paragrafen.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P10> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 7 kap. 10 § årsredovisningslagen (1995:1554)"@sv ;
@@ -760,7 +760,7 @@
               <span class="sidbrytning" height="1263" id="sid221" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=220" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P12> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 7 kap. 12 § årsredovisningslagen (1995:1554)"@sv ;
@@ -769,13 +769,13 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 7 kap. 12 § i kommitténs förslag.)</p>
               <p>Paragrafen har tidigare betecknats 7 kap. 11 §. Den ger uttryck för den</p>
-              <p>grundläggande principen om att samma värderingsprinciper skall tillämpas i årsredovisningen som i koncernredovisningen. I <a href="https://lagen.nu/prop/1998/99:130#S16.3" rel="dcterms:references">avsnitt 16.3</a> har regeringen behandlat frågan om det bör ges större utrymme att tillämpa skilda värderingsprinciper men har kommit till slutsatsen att någon sådan ändring inte bör göras.</p>
+              <p>grundläggande principen om att samma värderingsprinciper skall tillämpas i årsredovisningen som i koncernredovisningen. I <a href="https://lagen.nu/prop/1998/99:130#S16-3" rel="dcterms:references">avsnitt 16.3</a> har regeringen behandlat frågan om det bör ges större utrymme att tillämpa skilda värderingsprinciper men har kommit till slutsatsen att någon sådan ändring inte bör göras.</p>
               <p>Ändringarna i paragrafen är därför endast av formell natur, den ena av</p>
               <p>samma slag som ändringen i 2 kap. 3 §, den andra en följd av ändrad paragrafnumrering.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
-    dcterms:references <https://lagen.nu/prop/1998/99:130#S16.3> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> ;
+    dcterms:references <https://lagen.nu/prop/1998/99:130#S16-3> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P13> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 7 kap. 13 § årsredovisningslagen (1995:1554)"@sv ;
@@ -789,7 +789,7 @@
               <span class="sidbrytning" height="1263" id="sid222" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=221" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P14> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 7 kap. 14 § årsredovisningslagen (1995:1554)"@sv ;
@@ -801,7 +801,7 @@
               <p>av de ändringar som har gjorts i 5 kap.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P16> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 7 kap. 16 § årsredovisningslagen (1995:1554)"@sv ;
@@ -813,7 +813,7 @@
               <p><i>stycket</i> är av samma slag som ändringen i 2 kap. 3 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P17> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 7 kap. 17 § årsredovisningslagen (1995:1554)"@sv ;
@@ -828,7 +828,7 @@
               <span class="sidbrytning" height="1263" id="sid223" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=222" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P18> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 7 kap. 18 § årsredovisningslagen (1995:1554)"@sv ;
@@ -840,7 +840,7 @@
               <p>av samma slag som ändringen i 2 kap. 3 § respektive en följd av ändrad paragrafnumrering.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P19> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 7 kap. 19 § årsredovisningslagen (1995:1554)"@sv ;
@@ -852,7 +852,7 @@
               <p>slag som ändringen i 2 kap. 3 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P20> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 7 kap. 20 § årsredovisningslagen (1995:1554)"@sv ;
@@ -864,7 +864,7 @@
               <p>samma slag som ändringen i 2 kap. 3 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P21> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 7 kap. 21 § årsredovisningslagen (1995:1554)"@sv ;
@@ -877,7 +877,7 @@
               <span class="sidbrytning" height="1263" id="sid224" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=223" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P22> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 7 kap. 22 § årsredovisningslagen (1995:1554)"@sv ;
@@ -889,7 +889,7 @@
               <p>den nya paragrafnumreringen i kapitlet.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P23> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 7 kap. 23 § årsredovisningslagen (1995:1554)"@sv ;
@@ -901,7 +901,7 @@
               <p>endast av formell natur, några av samma slag som ändringen i 2 kap. 3 §, andra en följd av ändrad paragrafnumrering.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P26> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 7 kap. 26 § årsredovisningslagen (1995:1554)"@sv ;
@@ -922,7 +922,7 @@
               <p>enbart av en anpassning till den nya paragrafnumreringen i kapitlet.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P28> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 28 § årsredovisningslagen (1995:1554)"@sv ;
@@ -942,7 +942,7 @@
               <p>begränsningar som anges i 3 kap. 11 §. Sammanslagning av poster i koncernresultaträkningen får sålunda inte ske om balansomslutningen respektive antalet anställda i <i>koncernen</i> överstiger de gränsvärden som anges i 4 § andra stycket.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P29> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 29 § årsredovisningslagen (1995:1554)"@sv ;
@@ -952,7 +952,7 @@
               <p>(Jfr 7 kap. 25 § i kommitténs förslag.) Paragrafen har tidigare betecknats 7 kap. 24 §. Flertalet ändringar beror på den förskjutna paragrafnumreringen i kapitlet. I <i>andra stycket</i> har också gjorts en ändring av samma slag som ändringen i 2 kap. 3 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P3> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 7 kap. 3 § årsredovisningslagen (1995:1554)"@sv ;
@@ -963,7 +963,7 @@
               <p>Paragrafen saknar motsvarighet i det tidigare 7 kap. och innehåller ett</p>
               <p>viktigt undantag från skyldigheten att upprätta koncernredovisning. För företag som hittills har omfattats av 1980 års årsredovisningslag eller <a href="https://lagen.nu/1994:1220" rel="dcterms:references">stiftelselagen</a> innebär den att skyldigheten att upprätta koncernredovisning får i huvudsak samma omfattning som den hittills har haft (jfr 3 kap. 1 § 1980 års årsredovisningslag och <a href="https://lagen.nu/1994:1220#K3P7" rel="dcterms:references">3 kap. 7 § stiftelselagen</a>). För aktiebolag innebär bestämmelsen däremot en väsentlig förändring, såtillvida</p>
               <span class="sidbrytning" height="1263" id="sid218" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=217" width="894"/>
-              <p>att koncernredovisning inte behöver upprättas lika ofta som hittills har varit fallet. Frågan har behandlats i <a href="https://lagen.nu/prop/1998/99:130#S16.1" rel="dcterms:references">avsnitt 16.1</a>.</p>
+              <p>att koncernredovisning inte behöver upprättas lika ofta som hittills har varit fallet. Frågan har behandlats i <a href="https://lagen.nu/prop/1998/99:130#S16-1" rel="dcterms:references">avsnitt 16.1</a>.</p>
               <p>Enligt <i>första stycket</i> behöver ett moderföretag inte upprätta någon</p>
               <p>koncernredovisning om omfattningen på koncernens verksamhet på moderföretagets balansdag inte överstiger två särskilt angivna gränsvärden. Dessa gränsvärden är tio anställda respektive 24 miljoner kronor i balansomslutning. Båda värdena skall beräknas för koncernen som helhet. Så snart ett av värdena överskrids, skall moderföretaget upprätta en koncernredovisning.</p>
               <p>Av bestämmelsen i <i>andra stycket</i> följer att undantaget i paragrafens</p>
@@ -971,10 +971,10 @@
               <p>verksamhet).</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> ;
     dcterms:references <https://lagen.nu/1994:1220>,
         <https://lagen.nu/1994:1220#K3P7>,
-        <https://lagen.nu/prop/1998/99:130#S16.1> .
+        <https://lagen.nu/prop/1998/99:130#S16-1> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P30> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 7 kap. 30 § årsredovisningslagen (1995:1554)"@sv ;
@@ -986,7 +986,7 @@
               <p>vissa redaktionella ändringar. Därutöver har vissa formella justeringar gjorts, dels ändringar av samma slag som ändringen i 2 kap. 3 §, dels anpassningar till ändrad paragrafnumrering.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P31> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 7 kap. 31 § årsredovisningslagen (1995:1554)"@sv ;
@@ -998,7 +998,7 @@
               <p>att det i 6 kap. har tillkommit två nya paragrafer med bestämmelser om att ekonomiska föreningar och stiftelser skall lämna vissa särskilda upplysningar i förvaltningsberättelsen.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130#kommentar-1995:1554#K7P4> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 7 kap. 4 § årsredovisningslagen (1995:1554)"@sv ;
@@ -1029,7 +1029,7 @@
               <p>upplysa om skälen för detta.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> ;
     dcterms:references <https://lagen.nu/1975:1385>,
         <https://lagen.nu/1975:1385#K10P13>,
         <https://lagen.nu/1995:1554> .
@@ -1043,7 +1043,7 @@
               <p>upprättar den i stycket nämnda koncernredovisningen.</p>
             </div>
           """^^rdf:XMLLiteral ;
-    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25.16> .
+    dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
 
 <https://lagen.nu/prop/1998/99:130> a rpubl:Proposition ;
     dcterms:abstract ""@sv ;
@@ -1064,7 +1064,7 @@
     dcterms:title "Författningskommentar"@sv ;
     bibo:chapter "25"@sv .
 
-<https://lagen.nu/prop/1998/99:130#S25.1> a bibo:DocumentPart ;
+<https://lagen.nu/prop/1998/99:130#S25-1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25> ;
     dcterms:references <https://lagen.nu/1962:381>,
         <https://lagen.nu/1995:1554>,
@@ -1073,14 +1073,14 @@
         <https://lagen.nu/1995:1560>,
         <https://lagen.nu/1999:1078>,
         <https://lagen.nu/prop/1975:104#sid156>,
-        <https://lagen.nu/prop/1998/99:130#S11.1>,
-        <https://lagen.nu/prop/1998/99:130#S12.1>,
+        <https://lagen.nu/prop/1998/99:130#S11-1>,
+        <https://lagen.nu/prop/1998/99:130#S12-1>,
         <https://lagen.nu/utr/sou/1973:57#sid102>,
         <https://lagen.nu/utr/sou/1973:57#sid103> ;
     dcterms:title "Förslaget till bokföringslag"@sv ;
     bibo:chapter "25.1"@sv .
 
-<https://lagen.nu/prop/1998/99:130#S25.16> a bibo:DocumentPart ;
+<https://lagen.nu/prop/1998/99:130#S25-16> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25> ;
     dcterms:references <https://lagen.nu/1962:381>,
         <https://lagen.nu/1975:1385>,
@@ -1098,8 +1098,8 @@
         <https://lagen.nu/1998:808#K9P6>,
         <https://lagen.nu/1999:000>,
         <https://lagen.nu/1999:000#K6P1>,
-        <https://lagen.nu/prop/1998/99:130#S15.3>,
-        <https://lagen.nu/prop/1998/99:130#S8.3> ;
+        <https://lagen.nu/prop/1998/99:130#S15-3>,
+        <https://lagen.nu/prop/1998/99:130#S8-3> ;
     dcterms:title "Förslaget till lag om ändring i årsredovisningslagen (1995:1554)"@sv ;
     bibo:chapter "25.16"@sv .
 

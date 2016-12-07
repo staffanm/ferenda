@@ -20,13 +20,13 @@
     dcterms:title "Förslag till riksdagsbeslut"@sv ;
     bibo:chapter "1"@sv .
 
-<https://lagen.nu/prop/1999/2000:17#S2.1> a bibo:DocumentPart ;
+<https://lagen.nu/prop/1999/2000:17#S2-1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1999/2000:17#S2> ;
     dcterms:references <https://lagen.nu/1996:1512> ;
     dcterms:title "Förslag till lag om ändring i lagen (1996:1512) om dubbelbeskattningsavtal mellan de nordiska länderna"@sv ;
     bibo:chapter "2.1"@sv .
 
-<https://lagen.nu/prop/1999/2000:17#S2.2> a bibo:DocumentPart ;
+<https://lagen.nu/prop/1999/2000:17#S2-2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1999/2000:17#S2> ;
     dcterms:references <https://lagen.nu/1996:1512>,
         <https://lagen.nu/1996:1512#P1>,

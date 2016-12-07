@@ -10,7 +10,31 @@
 
 <https://lagen.nu/prop/2012/13:182#PS1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2012/13:182> ;
+    dcterms:references <https://lagen.nu/2009:400>,
+        <https://lagen.nu/2010:1932> ;
     dcterms:title "Propositionens huvudsakliga innehåll"@sv .
+
+<https://lagen.nu/prop/2012/13:182#S3> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2012/13:182> ;
+    dcterms:references <https://lagen.nu/2000:562>,
+        <https://lagen.nu/2009:400>,
+        <https://lagen.nu/2010:1932>,
+        <https://lagen.nu/prop/2009/10:237#sid96>,
+        <https://lagen.nu/utr/ds/2011:46> ;
+    dcterms:title "Ärendet och dess beredning"@sv ;
+    bibo:chapter "3"@sv .
+
+<https://lagen.nu/prop/2012/13:182#S4-1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2012/13:182#S4> ;
+    dcterms:title "Internationell delgivning – en översikt"@sv ;
+    bibo:chapter "4.1"@sv .
+
+<https://lagen.nu/prop/2012/13:182#S4> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2012/13:182> ;
+    dcterms:title "Nuvarande ordning"@sv ;
+    bibo:chapter "4"@sv .
+
+<https://lagen.nu/prop/2012/13:182?attachment=internationell-delgivning.-prop.-201213182&repo=propregeringen&dir=downloaded> rdfs:label "Internationell delgivning. Prop. 2012/13:182 (pdf 318 kB)"@sv .
 
 <https://lagen.nu/prop/2012/13:182> a rpubl:Proposition ;
     dcterms:abstract "I propositionen föreslås ändringar i delgivningslagen (2010:1932) som tillsammans med en ny förordningsreglering kommer att skapa en modern och mer effektiv ordning för internationell delgivning. De ärenden om delgivning som i dag hanteras inom Regeringskansliet (Justitiedepartementet) såsom centralmyndighet och mottagande organ för delgivningssamarbetet föreslås flyttas över till Länsstyrelsen i Stockholms län. Vidare föreslås en tydligare reglering kring delgivning i utlandet och vilka förutsättningar som ska gälla vid bistånd med delgivning i Sverige, bl.a. när avvikelse från delgivningslagens regler får ske och vilka översättningskrav som ska gälla för de handlingar som ska delges. Slutligen föreslås ändringar i offentlighets- och sekretesslagen (2009:400) i syfte att tydliggöra att sekretess även gäller vid bistånd med delgivning. Lagändringarna föreslås träda i kraft den 1 januari 2014."@sv ;
@@ -22,5 +46,6 @@
     rpubl:lopnummer "182" ;
     rpubl:utgarFran <https://lagen.nu/utr/ds/2011:46> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/prop/2012/13:182> ;
+    prov:wasDerivedFrom <https://lagen.nu/prop/2012/13:182?attachment=internationell-delgivning.-prop.-201213182&repo=propregeringen&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.propositioner.PropRegeringen" .
 

@@ -76,6 +76,7 @@ class Tabellcell(CompoundElement):
     tagname = "td"
 
 
+    
 class Avdelning(CompoundElement, OrdinalElement):
     tagname = "div"
     fragment_label = "A"
@@ -414,7 +415,17 @@ class PreambleSection(CompoundElement):
         return element
 
 
-class PseudoSection(CompoundElement):
+class Avsnitt(SectionalElement):
+    classname = "section" # for backwards compatibility -- should be
+                          # removed eventually, when all other
+                          # *Section classes in this module are
+                          # renamed *Avsnitt and we regenerate all the
+                          # test cases (yet again)
+    def compute_uri(self, baseuri):
+        return baseuri + "#S%s" % self.ordinal.replace(".", "-")
+    
+    
+class Pseudosection(CompoundElement):
     # used when we really want to use a Section, but can't since we
     # don't have an ordinal (or the ordinal is invalid/duplicate)
     tagname = "div"

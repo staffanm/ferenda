@@ -14,7 +14,8 @@
         <https://lagen.nu/1960:729>,
         <https://lagen.nu/1962:700>,
         <https://lagen.nu/1962:700#P5>,
-        <https://lagen.nu/1973:289> ;
+        <https://lagen.nu/1973:289>,
+        <https://lagen.nu/1980:100> ;
     dcterms:title ""@sv ;
     bibo:chapter "1"@sv .
 
@@ -37,12 +38,12 @@
         <https://lagen.nu/1988:000> ;
     dcterms:title "Propositionens lagförslag PFOP- 1987/381155       1 Förslag till"@sv .
 
-<https://lagen.nu/prop/1987/88:155#S2.1> a bibo:DocumentPart ;
+<https://lagen.nu/prop/1987/88:155#S2-1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1987/88:155#S2> ;
     dcterms:title "Allmänna utgångspunkter"@sv ;
     bibo:chapter "2.1"@sv .
 
-<https://lagen.nu/prop/1987/88:155#S4.1> a bibo:DocumentPart ;
+<https://lagen.nu/prop/1987/88:155#S4-1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1987/88:155#S4> ;
     dcterms:references <https://lagen.nu/1915:218>,
         <https://lagen.nu/1942:740>,
@@ -61,18 +62,18 @@
         <https://lagen.nu/1985:206>,
         <https://lagen.nu/2008:579>,
         <https://lagen.nu/prop/1979/80:2>,
-        <https://lagen.nu/prop/1987/88:155#S2.10>,
-        <https://lagen.nu/prop/1987/88:155#S2.2>,
-        <https://lagen.nu/prop/1987/88:155#S2.3>,
-        <https://lagen.nu/prop/1987/88:155#S2.4>,
-        <https://lagen.nu/prop/1987/88:155#S2.5>,
-        <https://lagen.nu/prop/1987/88:155#S2.7>,
-        <https://lagen.nu/prop/1987/88:155#S2.8>,
-        <https://lagen.nu/prop/1987/88:155#S4.3> ;
+        <https://lagen.nu/prop/1987/88:155#S2-10>,
+        <https://lagen.nu/prop/1987/88:155#S2-2>,
+        <https://lagen.nu/prop/1987/88:155#S2-3>,
+        <https://lagen.nu/prop/1987/88:155#S2-4>,
+        <https://lagen.nu/prop/1987/88:155#S2-5>,
+        <https://lagen.nu/prop/1987/88:155#S2-7>,
+        <https://lagen.nu/prop/1987/88:155#S2-8>,
+        <https://lagen.nu/prop/1987/88:155#S4-3> ;
     dcterms:title "Förslag till lag om skydd för företagshemligheter"@sv ;
     bibo:chapter "4.1"@sv .
 
-<https://lagen.nu/prop/1987/88:155#S4.2> a bibo:DocumentPart ;
+<https://lagen.nu/prop/1987/88:155#S4-2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1987/88:155#S4> ;
     dcterms:references <https://lagen.nu/1962:700>,
         <https://lagen.nu/1988:000> ;
@@ -92,6 +93,7 @@
 
 <https://lagen.nu/prop/1987/88:155#US1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1987/88:155#S1> ;
+    dcterms:references <https://lagen.nu/1980:100> ;
     dcterms:title "Övriga lagförslag"@sv .
 
 <http://www.riksdagen.se/sv/Dokument-Lagar/Forslag/Propositioner-och-skrivelser/_GB03155/?text=true> rdfs:label "Källa"@sv .
@@ -101,10 +103,10 @@
     dcterms:title "Allmän motivering"@sv ;
     bibo:chapter "2"@sv .
 
-<https://lagen.nu/prop/1987/88:155#S4.3> a bibo:DocumentPart ;
+<https://lagen.nu/prop/1987/88:155#S4-3> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1987/88:155#S4> ;
     dcterms:references <https://lagen.nu/1962:700>,
-        <https://lagen.nu/prop/1987/88:155#S2.10> ;
+        <https://lagen.nu/prop/1987/88:155#S2-10> ;
     dcterms:title "Förslag till lag om ändring i sekretesslagen (19805 100)"@sv ;
     bibo:chapter "4.3"@sv .
 
@@ -122,7 +124,8 @@
         <https://lagen.nu/1962:700>,
         <https://lagen.nu/1973:289>,
         <https://lagen.nu/2008:579>,
-        <https://lagen.nu/prop/1987/88:155#S2.3> ;
+        <https://lagen.nu/prop/1987/88:155#S2-3>,
+        <https://lagen.nu/utr/sou/1983:52> ;
     dcterms:title "om skydd för företagshemligheter"@sv ;
     rpubl:arsutgava "1987/88" ;
     rpubl:lopnummer "155" ;
@@ -132,11 +135,11 @@
     prov:wasGeneratedBy "lagen.nu.propositioner.PropRiksdagen" .
 
 [] a bibo:DocumentPart ;
+    dcterms:title "Beslut"@sv .
+
+[] a bibo:DocumentPart ;
     dcterms:references <https://lagen.nu/1973:289>,
         <https://lagen.nu/1980:100>,
         <https://lagen.nu/prop/1972:5#sid483> ;
     dcterms:title "Anmälan av lagrådsyttrande"@sv .
-
-[] a bibo:DocumentPart ;
-    dcterms:title "Beslut"@sv .
 

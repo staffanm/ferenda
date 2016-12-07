@@ -20,7 +20,7 @@ from cached_property import cached_property
 # own
 from ferenda import util
 from ferenda import PDFReader, FSMParser, Describer, Facet
-from ferenda.elements import Section, Link, Body, CompoundElement, Preformatted
+from ferenda.elements import Link, Body, CompoundElement, Preformatted
 from ferenda.elements.html import P
 from ferenda.pdfreader import BaseTextDecoder, Page, Textbox
 from ferenda.decorators import newstate
@@ -536,7 +536,7 @@ class Offtryck(SwedishLegalSource):
                    # to be referrable. For latter, we should make sure
                    # that no URIs are created for contained sections.
                    for subnode in toplevelnode:
-                       if isinstance(subnode, Section):
+                       if isinstance(subnode, Avsnitt):
                            # first remove the safety feature that
                            # keeps us from adding new attributes to
                            # initialized elements. FIXME: it's not a
@@ -649,7 +649,7 @@ class Offtryck(SwedishLegalSource):
     def find_primary_law(self, node, state):
         if 'primarylaw' in state:
             return None
-        if not isinstance(node, Section) or not re.match("Förslag(|et) till lag om ändring i", node.title):
+        if not isinstance(node, Avsnitt) or not re.match("Förslag(|et) till lag om ändring i", node.title):
             if isinstance(node, Body):
                 return state
             else:
@@ -661,7 +661,7 @@ class Offtryck(SwedishLegalSource):
         return None
 
     def find_kommittebetankande(self, node, state):
-        if not isinstance(node, Section) or (node.title not in ("Ärendet och dess beredning")):
+        if not isinstance(node, Avsnitt) or (node.title not in ("Ärendet och dess beredning")):
             if isinstance(node, Body):
                 return state  
             else:
@@ -676,7 +676,7 @@ class Offtryck(SwedishLegalSource):
         return None
 
     def find_commentary(self, node, state):
-        if not isinstance(node, Section) or (node.title not in ("Författningskommentar",
+        if not isinstance(node, Avsnitt) or (node.title not in ("Författningskommentar",
                                                                 "Författningskommentarer",
                                                                 "Specialmotivering")):
             if isinstance(node, Body):
@@ -1529,7 +1529,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             else:
                 state.sectioncache[ordinal] = "'%s' at p %s" % (short(title), state.pageno)
         if ordinal:
-            s = Section(ordinal=ordinal, title=title)
+            s = Avsnitt(ordinal=ordinal, title=title)
         else:
             s = PseudoSection(title=str(title))
         return parser.make_children(s)

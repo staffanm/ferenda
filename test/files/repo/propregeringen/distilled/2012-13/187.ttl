@@ -10,7 +10,20 @@
 
 <https://lagen.nu/prop/2012/13:187#PS1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2012/13:187> ;
+    dcterms:references <https://lagen.nu/2010:800>,
+        <https://lagen.nu/2010:801> ;
     dcterms:title "Propositionens huvudsakliga innehåll"@sv .
+
+<https://lagen.nu/prop/2012/13:187#S3> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2012/13:187> ;
+    dcterms:references <https://lagen.nu/2010:800>,
+        <https://lagen.nu/2010:800#K28P3>,
+        <https://lagen.nu/2010:800#K2P16b>,
+        <https://lagen.nu/2010:801> ;
+    dcterms:title "Ärendet och dess beredning"@sv ;
+    bibo:chapter "3"@sv .
+
+<https://lagen.nu/prop/2012/13:187?attachment=vissa-skolfragor-prop.-201213187&repo=propregeringen&dir=downloaded> rdfs:label "Vissa skolfrågor, Prop. 2012/13:187 (pdf 623 kB)"@sv .
 
 <https://lagen.nu/prop/2012/13:187> a rpubl:Proposition ;
     dcterms:abstract "I propositionen föreslås att regeringen eller den myndighet som regeringen bestämmer bemyndigas att meddela föreskrifter om vad som krävs för att vara behörig att bedriva viss undervisning i skolväsendet. När det gäller lärare som bedriver undervisning i vissa estetiska ämnen samt lärare som har fått en behörighetsförklaring av Skolöverstyrelsen bemyndigas regeringen att meddela föreskrifter om undantag från kraven för legitimation. I fråga om lärare i grundsärskolan, specialskolan, gymnasiesärskolan och särskild utbildning för vuxna föreslås att övergångsperioden innan det ställs krav på legitimation och behörighet förlängs till och med den 30 juni 2018. När det gäller sådana speciallärare och specialpedagoger som är anställda som lärare i grundsärskolan, specialskolan, gymnasiesärskolan eller särskild utbildning för vuxna bemyndigas regeringen att meddela föreskrifter om undantag från kraven på legitimation eller behörighet för att få bedriva undervisning. Bestämmelserna om kompletterande behörighet förtydligas och en bestämmelse införs om undantag från kraven på legitimation och behörighet när det gäller undervisning i fritidshem. Slutligen redovisas regeringens bedömningar i fråga om modersmålsundervisning och det föreslås att en riksdagsbindning när det gäller kompletterande utbildningar ska upphävas. Förslagen innebär ändringar i skollagen (2010:800) och lagen (2010:801) om införande av skollagen. Ändringarna föreslås i huvudsak träda i kraft den 1 december 2013."@sv ;
@@ -21,5 +34,6 @@
     rpubl:departement <https://lagen.nu/org/2008/utbildningsdepartementet> ;
     rpubl:lopnummer "187" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/prop/2012/13:187> ;
+    prov:wasDerivedFrom <https://lagen.nu/prop/2012/13:187?attachment=vissa-skolfragor-prop.-201213187&repo=propregeringen&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.propositioner.PropRegeringen" .
 
