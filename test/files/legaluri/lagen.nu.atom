@@ -2,7 +2,8 @@
 <feed xmlns="http://www.w3.org/2005/Atom"
       xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
       xmlns:dct="http://purl.org/dc/terms/"
-      xmlns:rpubl="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#">
+      xmlns:rpubl="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#"
+      xmlns:rinfoex="http://lagen.nu/terms#">
 
     <id>https://github.com/staffanm/ferenda/test/files/legaluri/lagen.nu.atom</id>
 
@@ -46,4 +47,35 @@
     </entry>
 
 
+    <entry>
+        <id>https://lagen.nu/prop/2002/03:20#S8-1</id>
+        <summary>Proposition med avsnittsreferens</summary>
+        <content type="application/rdf+xml">
+            <rpubl:Proposition>
+                <rpubl:arsutgava>2002/03</rpubl:arsutgava>
+                <rpubl:lopnummer>20</rpubl:lopnummer>
+		<rinfoex:avsnitt>
+		  <rinfoex:Avsnitt>
+                    <rinfoex:avsnittnummer>8.1</rinfoex:avsnittnummer>
+		  </rinfoex:Avsnitt>
+		</rinfoex:avsnitt>
+            </rpubl:Proposition>
+        </content>
+    </entry>
+
+    <entry>
+        <id>https://lagen.nu/prop/2002/03:20#sid42</id>
+        <summary>Proposition med sidreferens</summary>
+        <content type="application/rdf+xml">
+            <rpubl:Proposition>
+                <rpubl:arsutgava>2002/03</rpubl:arsutgava>
+                <rpubl:lopnummer>20</rpubl:lopnummer>
+		<rinfoex:sid>
+		  <rinfoex:Sida>
+                    <rpubl:sidnummer>42</rpubl:sidnummer>
+		  </rinfoex:Sida>
+		</rinfoex:sid>
+            </rpubl:Proposition>
+        </content>
+    </entry>
 </feed>

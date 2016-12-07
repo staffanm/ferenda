@@ -62,9 +62,17 @@ class Coinstruct(unittest.TestCase):
 
     def coin_test(self, uri, resourcegraph):
         # get the bnode
-        subjects = set(resourcegraph.subjects())
-        self.assertEqual(len(subjects), 1)
-        coined_uri = coinstruct_from_graph(resourcegraph, subjects.pop(), self.minter)
+        rg = resourcegraph
+        subjects = set(rg.subjects())
+        for subject in subjects:
+            # see if this subject is the leaf of a tree, ie it does
+            # not have any objects that are themselves subjects in
+            # this particular graph
+            if not any([list(rg.predicates(subject, x)) for x in subjects]):
+                rootnode = subject
+                break
+            
+        coined_uri = coinstruct_from_graph(resourcegraph, rootnode, self.minter)
         self.assertEqual(uri, coined_uri)
 
 
