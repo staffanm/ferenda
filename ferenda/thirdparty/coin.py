@@ -30,6 +30,7 @@ class URISpace:
     def __init__(self, resource):
         self.base = str(resource.value(COIN.base))
         self.fragmentSeparator = str(resource.value(COIN.fragmentSeparator))
+        self.slugTransform = SlugTransformer(resource.value(COIN.slugTransform))
         self.templates = [Template(self, template_resource)
                           for template_resource in resource.objects(
                                   COIN.template)]
@@ -38,7 +39,6 @@ class URISpace:
         # tertiary sort order by specificity (number of vars per template)
         self.templates.sort(key=lambda x: (x.priority, x.forType, len(x.bindings)),
                             reverse=True) 
-        self.slugTransform = SlugTransformer(resource.value(COIN.slugTransform))
 
     def coin_uris(self, resource):
         for template in self.templates:
@@ -52,9 +52,6 @@ class URISpace:
             return next(self.coin_uris(resource))
         except StopIteration: 
             raise ValueError("Couldn't mint uri from %s" % resource)
-
-    def transform_value(self, value):
-        return self.slugTransform(value)
 
 
 class SlugTransformer:
@@ -116,6 +113,14 @@ class Template:
         # IMPROVE: if not template and variable bindings correspond: TemplateException
         assert self.uriTemplate or self.fragmentTemplate, "No template for template"
 
+        # If there's a special slug transform defined for this
+        # template, use that, otherwise use the one defined for the
+        # entire URISpace
+        if resource.value(COIN.slugTransform):
+            self.slugTransform = SlugTransformer(resource.value(COIN.slugTransform))
+        else:
+            self.slugTransform = space.slugTransform
+
     def __repr__(self):
         if self.uriTemplate:
             return "<Template %s>" % self.uriTemplate
@@ -157,7 +162,7 @@ class Template:
 
         expanded = expanded.replace("{+base}", base)
         for var, value in matches.items():
-            slug = self.space.transform_value(value)
+            slug = self.transform_value(value)
             expanded = expanded.replace("{%s}" % var, slug)
         # if base is eg "http://localhost/res/" and expanded is a
         # /-prefixed relative uri like "/sfs/9999:998", urljoin
@@ -196,6 +201,8 @@ class Template:
         else:
             return base
 
+    def transform_value(self, value):
+        return self.slugTransform(value)
 
 class Binding:
 
