@@ -13,7 +13,7 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
 		xmlns:bibo="http://purl.org/ontology/bibo/"
 		xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
-		exclude-result-prefixes="xhtml rdf rdfs prov">
+		exclude-result-prefixes="xhtml rdf rdfs prov bibo">
 
   <xsl:import href="uri.xsl"/>
   <xsl:include href="base.xsl"/>
@@ -133,7 +133,7 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
          things, ie the Protokollsutdrag structure of older
          propositions (c.f. prop 1990/91:172) -->
     <div class="row toplevel">
-      <section id="{translate(substring-after(@about,'#'),'.','-')}" class="col-sm-8">
+      <section id="{substring-after(@about,'#')}" class="col-sm-8">
 	<xsl:if test="@content">
 	  <h2><xsl:value-of select="@content"/></h2>
 	</xsl:if>
@@ -156,7 +156,7 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
        (with a URI) gets a <section> with an <aside> for inbound links etc -->
   <xsl:template match="xhtml:div[@about and (@class='section' or @class='preamblesection' or @class='unorderedsection')]">
     <div class="row" about="{@about}"><!-- needed? -->
-      <section id="{translate(substring-after(@about,'#'),'.','-')}" class="col-sm-8">
+      <section id="{substring-after(@about,'#')}" class="col-sm-8">
 	<xsl:variable name="sectionheading"><xsl:if test="xhtml:span/@content"><xsl:value-of select="xhtml:span/@content"/>. </xsl:if><xsl:value-of select="@content"/></xsl:variable>
 	<xsl:if test="count(ancestor::*) = 2">
 	    <h2><xsl:value-of select="$sectionheading"/></h2>
@@ -204,7 +204,7 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
     <xsl:if test="string-length(@content) > 0">
       <h3><xsl:value-of select="@content"/></h3>
     </xsl:if>
-    <div class="forfattningskommentar" id="{translate(substring-after(@about, '#'),'.','-')}">
+    <div class="forfattningskommentar" id="{substring-after(@about, '#')}">
       <xsl:for-each select="xhtml:div/xhtml:div/*">
 	<xsl:apply-templates/>
 	<xsl:if test="@class='sidbrytning'">
@@ -287,7 +287,7 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
       </xsl:if>
       <xsl:value-of select="@content"/>
     </xsl:variable>
-    <li><a href="#{translate(substring-after(@about, '#'), '.', '-')}"><xsl:value-of select="$label"/></a>
+    <li><a href="#{substring-after(@about, '#')}"><xsl:value-of select="$label"/></a>
     <xsl:if test="xhtml:div[@typeof='bibo:DocumentPart']">
       <ul class="nav">
 	<xsl:apply-templates mode="toc"/>
