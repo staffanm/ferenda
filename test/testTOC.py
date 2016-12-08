@@ -168,9 +168,9 @@ class TOC(RepoTester):
         # Various other tests on a.html
         # 2.1 CSS links, relativized correctly?
         css = t.findall("head/link[@rel='stylesheet']")
-        self.assertEqual(len(css),4) # bootstrap, bootstrap-theme, ferenda and sfs (?!)
+        self.assertEqual(len(css),3) # bootstrap, ferenda and sfs (?!)
         
-        self.assertRegex(css[3].get('href'), '^../../../rsrc/css')
+        self.assertRegex(css[2].get('href'), '^../../../rsrc/css')
         
         # 2.2 JS links, relativized correctly?
         js = t.findall("body/script")
@@ -245,7 +245,7 @@ class TOC(RepoTester):
         # (NOTE: the first page in the first pageset (by title/a) isn't linked. The second one (by title/d) is).
         self.assertEqual("http://localhost:8000/dataset/base?dcterms_title=d",
                          tree.find(".//nav[@id='toc']").findall(".//a")[0].get("href"))
-        self.assertEqual("https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css",
+        self.assertEqual("https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css",
                          tree.find(".//link").get("href"))
                          
         self.assertEqual('Documents starting with "a"',

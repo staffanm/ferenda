@@ -788,8 +788,8 @@ class Search(WSGI):
 
         t = etree.parse(BytesIO(content))
         css = t.findall("head/link[@rel='stylesheet']")
-        self.assertEqual(len(css), 4) # bootstrap, bootstrap-theme, ferenda and sfs (?!)
-        self.assertEqual('https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css',
+        self.assertEqual(len(css), 3) # bootstrap, bootstrap-theme, ferenda and sfs (?!)
+        self.assertEqual('https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css',
                          css[0].get('href'))
         js = t.findall("body/script")
         self.assertEqual(len(js), 4) # jquery, bootstrap, hammer, ferenda
