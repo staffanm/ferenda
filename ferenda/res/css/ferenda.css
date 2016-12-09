@@ -328,6 +328,10 @@ div.panel-body div.row p {
 	text-indent: 1em;
 	margin-bottom: 0;
 }
+div.panel-body ul {
+    padding: inherit;
+    list-style: none;
+}
 
 @media (min-width: 768px) {
     /* in tablet portrait mode, the main content is in a .col-sm-9 div,
