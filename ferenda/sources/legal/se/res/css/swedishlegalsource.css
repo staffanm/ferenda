@@ -92,11 +92,12 @@ h3 {
     content: "Dokumentet finns inte i databasen";
 }
 
-@media only screen and (min-width: 480px) {
+@media only screen and (min-width: 768px) {
     body.frontpage td {
         display:table-cell;
     }
-
+}
+@media only screen and (min-width: 480px) {
     /* since a div.sida might appear inside of a top-level div.row,
        we'll have to resort to positioning trickery to get the aside to
        line up to the right. This sort-of works on my machine. */
