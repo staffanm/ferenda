@@ -39,6 +39,7 @@
     <xsl:message>pagetitle: documenturi is <xsl:value-of select="$documenturi"/></xsl:message>
     <xsl:variable name="rattsfall" select="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/rpubl:isLagrumFor/rdf:Description"/>
     <xsl:variable name="kommentar" select="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/dcterms:description/xhtml:div/*"/>
+    <xsl:variable name="myndfs" select="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/rpubl:isBemyndigandeFor/rdf:Description"/>
     <xsl:variable name="forfattningskommentar" select="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/rinfoex:forfattningskommentar/xhtml:div/*"/>
     <div class="row">
       <section id="top" class="col-sm-7">
@@ -62,7 +63,7 @@
 	  </div>
 	</xsl:if>
       </section>
-      <xsl:if test="$kommentar or $rattsfall">
+      <xsl:if test="$kommentar or $rattsfall or $myndfs">
 	<div class="panel-group col-sm-5" role="tablist" id="panel-top" aria-multiselectable="true">
 	  <xsl:if test="$kommentar">
 	    <xsl:call-template name="aside-annotations-panel">
@@ -82,6 +83,23 @@
 	      <xsl:with-param name="panelid">top</xsl:with-param>
 	      <xsl:with-param name="paneltype">r</xsl:with-param>
 	      <xsl:with-param name="expanded" select="not($kommentar)"/>
+	    </xsl:call-template>
+	  </xsl:if>
+	  <xsl:if test="$myndfs">
+	    <xsl:variable name="myndfs-markup">
+	      <ul>
+		<xsl:for-each select="$myndfs">
+		  <li><b><a href="{@rdf:about}"><xsl:value-of select="dcterms:identifier"/></a>: </b><xsl:value-of select="dcterms:title"/></li>
+		</xsl:for-each>
+	      </ul>
+	    </xsl:variable>
+	    <xsl:call-template name="aside-annotations-panel">
+	      <xsl:with-param name="title">Meddelat med bemyndigande i denna författning</xsl:with-param>
+	      <xsl:with-param name="badgecount" select="count($myndfs)"/>
+	      <xsl:with-param name="nodeset" select="ext:node-set($myndfs-markup)"/>
+	      <xsl:with-param name="panelid">top</xsl:with-param>
+	      <xsl:with-param name="paneltype">m</xsl:with-param>
+	      <xsl:with-param name="expanded" select="not($kommentar or $rattsfall)"/>
 	    </xsl:call-template>
 	  </xsl:if>
 	</div>
@@ -175,15 +193,16 @@
     <xsl:param name="uri"/>
     <!-- plocka fram referenser kring/till denna paragraf -->
     <xsl:variable name="rattsfall" select="$sfsannotations/rdf:Description[@rdf:about=$uri]/rpubl:isLagrumFor/rdf:Description"/>
-    <xsl:variable name="inbound" select="$sfsannotations/rdf:Description[@rdf:about=$uri]/dcterms:references"/>
+    <xsl:variable name="inbound"   select="$sfsannotations/rdf:Description[@rdf:about=$uri]/dcterms:references"/>
     <xsl:variable name="kommentar" select="$sfsannotations/rdf:Description[@rdf:about=$uri]/dcterms:description/xhtml:div/*"/>
     <xsl:variable name="forfattningskommentar" select="$sfsannotations/rdf:Description[@rdf:about=$uri]/rinfoex:forfattningskommentar/xhtml:div/*"/>
-    <xsl:variable name="inford" select="$sfsannotations/rdf:Description[@rdf:about=$uri]/rpubl:isEnactedBy"/>
-    <xsl:variable name="andrad" select="$sfsannotations/rdf:Description[@rdf:about=$uri]/rpubl:isChangedBy"/>
-    <xsl:variable name="upphavd" select="$sfsannotations/rdf:Description[@rdf:about=$uri]/rpubl:isRemovedBy"/>
-    <xsl:variable name="panelid" select="substring-after($uri, '#')"/>
-    <xsl:variable name="expanded" select="'true'"/>
-    <xsl:if test="$kommentar or $forfattningskommentar or $rattsfall or $inbound or $inford or $andrad or $upphavd">
+    <xsl:variable name="inford"    select="$sfsannotations/rdf:Description[@rdf:about=$uri]/rpubl:isEnactedBy"/>
+    <xsl:variable name="andrad"    select="$sfsannotations/rdf:Description[@rdf:about=$uri]/rpubl:isChangedBy"/>
+    <xsl:variable name="upphavd"   select="$sfsannotations/rdf:Description[@rdf:about=$uri]/rpubl:isRemovedBy"/>
+    <xsl:variable name="myndfs"    select="$sfsannotations/rdf:Description[@rdf:about=$uri]/rpubl:isBemyndigandeFor/rdf:Description"/>
+    <xsl:variable name="panelid"   select="substring-after($uri, '#')"/>
+    <xsl:variable name="expanded"  select="'true'"/>
+    <xsl:if test="$kommentar or $forfattningskommentar or $rattsfall or $myndfs or $inbound or $inford or $andrad or $upphavd">
       <div class="panel-group col-sm-5" role="tablist" id="panel-{$panelid}" aria-multiselectable="true">
 	<xsl:if test="$kommentar">
 	  <xsl:call-template name="aside-annotations-panel">
@@ -222,6 +241,23 @@
 	    <xsl:with-param name="expanded" select="not($kommentar or $forfattningskommentar)"/>
 	  </xsl:call-template>
 	</xsl:if>
+	<xsl:if test="$myndfs">
+	  <xsl:variable name="myndfs-markup">
+	    <ul>
+	      <xsl:for-each select="$myndfs">
+		<li><b><a href="{@rdf:about}"><xsl:value-of select="dcterms:identifier"/></a>: </b><xsl:value-of select="dcterms:title"/></li>
+	      </xsl:for-each>
+	    </ul>
+	  </xsl:variable>
+	  <xsl:call-template name="aside-annotations-panel">
+	    <xsl:with-param name="title">Meddelat med detta bemyndigande</xsl:with-param>
+	    <xsl:with-param name="badgecount" select="count($myndfs)"/>
+	    <xsl:with-param name="nodeset" select="ext:node-set($myndfs-markup)"/>
+	    <xsl:with-param name="panelid" select="$panelid"/>
+	    <xsl:with-param name="paneltype">m</xsl:with-param>
+	    <xsl:with-param name="expanded" select="not($kommentar or $forfattningskommentar or $rattsfall)"/>
+	  </xsl:call-template>
+	</xsl:if>
 	<xsl:if test="$inbound">
 	  <xsl:call-template name="aside-annotations-panel">
 	    <xsl:with-param name="title">Lagrumshänvisningar hit</xsl:with-param>
@@ -229,7 +265,7 @@
 	    <xsl:with-param name="nodeset" select="$inbound"/>
 	    <xsl:with-param name="panelid" select="$panelid"/>
 	    <xsl:with-param name="paneltype">l</xsl:with-param>
-	    <xsl:with-param name="expanded" select="not($kommentar or $forfattningskommentar or $rattsfall)"/>
+	    <xsl:with-param name="expanded" select="not($kommentar or $forfattningskommentar or $myndfs or $rattsfall)"/>
 	  </xsl:call-template>
 	</xsl:if>
 	<xsl:if test="$inford or $andrad or $upphavd">
@@ -253,7 +289,7 @@
 	    <xsl:with-param name="panelid" select="$panelid"/>
 	    <xsl:with-param name="paneltype">a</xsl:with-param>
 	    <xsl:with-param name="nodeset" select="ext:node-set($andringar)"/>
-	    <xsl:with-param name="expanded" select="not($kommentar or $forfattningskommentar or $rattsfall or $inbound)"/>
+	    <xsl:with-param name="expanded" select="not($kommentar or $forfattningskommentar or $myndfs or $rattsfall or $inbound)"/>
 	  </xsl:call-template>
 	</xsl:if>
       </div>

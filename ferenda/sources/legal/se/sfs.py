@@ -1532,7 +1532,22 @@ class SFS(Trips):
                 stuff[lagrum] = {}
             stuff[lagrum]['desc'] = row['desc']
         # (4. eurlex.nu data (mapping CELEX ids to titles))
-        # (5. Propositionstitlar)
+
+        # 5. References to bemyndiganden
+        bemyndiganden = self.time_store_select(store,
+                                               "sparql/sfs_bemyndiganden.rq",
+                                               basefile,
+                                               None, # need all possible fs contexts
+                                               "bemyndiganden")
+        for row in bemyndiganden:
+            lagrum = row['bemyndigande']
+            if lagrum not in stuff:
+                stuff[lagrum] = {}
+            if 'bemyndiganden' not in stuff[lagrum]:
+                stuff[lagrum]['bemyndiganden'] = []
+            stuff[lagrum]['bemyndiganden'].append({'uri': row['fskr'],
+                                                   'title': row['fskrtitle'],
+                                                   'identifier': row['fskrid']})
         # 6. change entries for each section
         changes = self.time_store_select(store,
                                          "sparql/sfs_changes.rq",
@@ -1710,7 +1725,16 @@ class SFS(Trips):
                     l]['kommentar']
                 desc_node.append(etree.fromstring(xhtmlstr.encode('utf-8')))
 
-
+            if 'bemyndiganden' in stuff[l]:
+                for myndfs in stuff[l]['bemyndiganden']:
+                    bf_node = etree.Element(ns("rpubl:isBemyndigandeFor"))
+                    myndfs_node = etree.SubElement(bf_node, ns("rdf:Description"))
+                    myndfs_node.set(ns("rdf:about"), myndfs['uri'])
+                    myndfstitle_node = etree.SubElement(myndfs_node, ns("dcterms:title"))
+                    myndfstitle_node.text = myndfs['title']
+                    myndfsid_node = etree.SubElement(myndfs_node, ns("dcterms:identifier"))
+                    myndfsid_node.text = myndfs['identifier']
+                    lagrum_node.append(bf_node)
 
         # tree = etree.ElementTree(root_node)
         treestring = etree.tostring(root_node, encoding="utf-8", pretty_print=True)

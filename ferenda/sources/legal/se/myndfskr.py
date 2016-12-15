@@ -265,7 +265,7 @@ class MyndFskrBase(FixedLayoutSource):
         
         # Some documents are just beyond usable and/or completely
         # uninteresting from a legal information point of view. We
-        # keep a hardcoded black list to skip these. 
+        # keep a hardcoded black list to skip these.
         if doc.basefile in self.blacklist:
             raise errors.DocumentRemovedError("%s is blacklisted" % doc.basefile,
                                        dummyfile=self.store.parsed_path(doc.basefile))
@@ -680,6 +680,8 @@ class MyndFskrBase(FixedLayoutSource):
 
         has_bemyndiganden = False
         if 'rpubl:bemyndigande' in props:
+            # dehyphenate (note that normalize_space already has changed "\n" to " "...
+            props['rpubl:bemyndigande'] = props['rpubl:bemyndigande'].replace("\xad ", "")
             result = parser.parse_string(props['rpubl:bemyndigande'])
             bemyndiganden = [x.uri for x in result if hasattr(x, 'uri')]
 

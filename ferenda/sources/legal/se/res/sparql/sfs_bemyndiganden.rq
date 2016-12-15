@@ -1,0 +1,10 @@
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX rpubl:<http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
+
+SELECT ?fskr ?fskrtitle ?fskrid ?bemyndigande
+WHERE {
+  ?fskr rpubl:bemyndigande ?bemyndigande ;
+        dcterms:title ?fskrtitle ;
+        dcterms:identifier ?fskrid .
+  FILTER(STRSTARTS(STR(?bemyndigande), "%(uri)s"))
+}
