@@ -2470,6 +2470,8 @@ WHERE {
         # sort repolist so that CompositeRepository instances come
         # before others (see comment in getpath)
         from ferenda import CompositeRepository
+        if repos is None:
+            repos = []
         repos = sorted(repos, key=lambda x: isinstance(x, CompositeRepository), reverse=True)
         if develurl:
             return simple_transform
