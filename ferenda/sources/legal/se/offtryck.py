@@ -47,7 +47,7 @@ class Offtryck(SwedishLegalSource):
     parse_types = LegalRef.RATTSFALL, LegalRef.FORARBETEN, LegalRef.ENKLALAGRUM, LegalRef.KORTLAGRUM
     xslt_template = "xsl/forarbete.xsl"
     sparql_annotations = "sparql/describe-with-subdocs.rq"
-
+    sparql_expect_results = False
     # Correct some invalid identifiers spotted in the wild:
     # 1999/20 -> 1999/2000
     # 2000/2001 -> 2000/01
