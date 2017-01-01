@@ -7,8 +7,8 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/rf/nja/1994s119#HDO> dcterms:creator "HD"@sv ;
-    dcterms:isPartOf <https://lagen.nu/rf/nja/1994s119> ;
+<https://lagen.nu/dom/nja/1994s119#HDO> dcterms:creator "HD"@sv ;
+    dcterms:isPartOf <https://lagen.nu/dom/nja/1994s119> ;
     dcterms:references <https://lagen.nu/2005:104> .
 
 <https://lagen.nu/dom/hd/Ö2072-91/1994-03-10> a rpubl:VagledandeDomstolsavgorande ;
@@ -27,11 +27,11 @@
         <https://lagen.nu/1941:416#P13>,
         <https://lagen.nu/1941:416#P28> ;
     rpubl:malnummer "Ö2072-91" ;
-    rpubl:rattsfallshanvisning <https://lagen.nu/rf/nja/1970s529>,
-        <https://lagen.nu/rf/nja/1975s33> ;
+    rpubl:rattsfallshanvisning <https://lagen.nu/dom/nja/1970s529>,
+        <https://lagen.nu/dom/nja/1975s33> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/oe2072-91/1994-03-10> .
 
-<https://lagen.nu/rf/nja/1994s119> a rpubl:Rattsfallsreferat ;
+<https://lagen.nu/dom/nja/1994s119> a rpubl:Rattsfallsreferat ;
     dcterms:bibliographicCitation "NJA 1994:25" ;
     dcterms:identifier "NJA 1994 s. 119" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
@@ -42,8 +42,8 @@
     rpubl:referatrubrik "Arvsskattemål. Sedan en person som tecknat en pensionsförsäkring avlidit, har ett återbäringsbelopp tillfallit dödsboet. Återbäringen har ansetts böra tas upp som en fordran bland tillgångarna i bouppteckningen. Inkomstskatten på återbäringen har ansetts böra tas upp som en skuldpost."@sv ;
     rpubl:sidnummer "119" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rf/nja/1994/s_119> ;
-    prov:wasDerivedFrom <https://lagen.nu/rf/nja/1994s119?repo=dv&dir=downloaded> ;
+    prov:wasDerivedFrom <https://lagen.nu/dom/nja/1994s119?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
-<https://lagen.nu/rf/nja/1994s119?repo=dv&dir=downloaded> rdfs:label "NJA 1994 s. 119"@sv .
+<https://lagen.nu/dom/nja/1994s119?repo=dv&dir=downloaded> rdfs:label "NJA 1994 s. 119"@sv .
 

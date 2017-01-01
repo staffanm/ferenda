@@ -7,11 +7,11 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/rf/mig/2013:4#MFS> dcterms:creator "Förvaltningsrätten i Stockholm, migrationsdomstolen"@sv ;
-    dcterms:isPartOf <https://lagen.nu/rf/mig/2013:4> .
+<https://lagen.nu/dom/mig/2013:4#MFS> dcterms:creator "Förvaltningsrätten i Stockholm, migrationsdomstolen"@sv ;
+    dcterms:isPartOf <https://lagen.nu/dom/mig/2013:4> .
 
-<https://lagen.nu/rf/mig/2013:4#MIG> dcterms:creator "Kammarrätten i Stockholm, Migrationsöverdomstolen"@sv ;
-    dcterms:isPartOf <https://lagen.nu/rf/mig/2013:4> ;
+<https://lagen.nu/dom/mig/2013:4#MIG> dcterms:creator "Kammarrätten i Stockholm, Migrationsöverdomstolen"@sv ;
+    dcterms:isPartOf <https://lagen.nu/dom/mig/2013:4> ;
     dcterms:references <https://lagen.nu/2005:716>,
         <https://lagen.nu/2005:716#K12P19S1>,
         <https://lagen.nu/2005:716#K4>,
@@ -19,8 +19,8 @@
         <https://lagen.nu/2005:716#K8P7>,
         <https://lagen.nu/prop/2004/05:170#sid227> .
 
-<https://lagen.nu/rf/mig/2013:4#MIV> dcterms:creator "Migrationsverket"@sv ;
-    dcterms:isPartOf <https://lagen.nu/rf/mig/2013:4> ;
+<https://lagen.nu/dom/mig/2013:4#MIV> dcterms:creator "Migrationsverket"@sv ;
+    dcterms:isPartOf <https://lagen.nu/dom/mig/2013:4> ;
     dcterms:references <https://lagen.nu/2005:716#K5P6>,
         <https://lagen.nu/2005:716#K8P7> .
 
@@ -46,12 +46,12 @@
         <https://lagen.nu/2005:716#K12P22>,
         <https://lagen.nu/2005:716#K12P4> ;
     rpubl:malnummer "UM8680-11" ;
-    rpubl:rattsfallshanvisning <https://lagen.nu/rf/mig/2007/not/2> ;
+    rpubl:rattsfallshanvisning <https://lagen.nu/dom/mig/2007/not/2> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/mig/um8680-11/2013-03-19> .
 
-<https://lagen.nu/rf/mig/2013:4?repo=dv&dir=downloaded> rdfs:label "MIG 2013:4"@sv .
+<https://lagen.nu/dom/mig/2013:4?repo=dv&dir=downloaded> rdfs:label "MIG 2013:4"@sv .
 
-<https://lagen.nu/rf/mig/2013:4> a rpubl:Rattsfallsreferat ;
+<https://lagen.nu/dom/mig/2013:4> a rpubl:Rattsfallsreferat ;
     dcterms:identifier "MIG 2013:4" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
     rpubl:arsutgava "2013" ;
@@ -60,6 +60,6 @@
     rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/mig/UM8680-11/2013-03-19> ;
     rpubl:referatrubrik "En ny prövning enligt 12 kap. 19 § utlänningslagen kan beviljas om det har framkommit uppgifter om att utlänningen är medborgare i annat land än vad den tidigare prövningen har omfattat. En sådan prövning av frågan om uppehållstillstånd kan omfatta skyddsskäl som hänför sig till annat land än det som omfattas av det lagakraftvunna utvisningsbeslutet."@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rf/mig/2013:4> ;
-    prov:wasDerivedFrom <https://lagen.nu/rf/mig/2013:4?repo=dv&dir=downloaded> ;
+    prov:wasDerivedFrom <https://lagen.nu/dom/mig/2013:4?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 

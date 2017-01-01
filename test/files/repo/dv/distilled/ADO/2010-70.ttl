@@ -7,7 +7,7 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/rf/ad/2010:70> a rpubl:Rattsfallsreferat ;
+<https://lagen.nu/dom/ad/2010:70> a rpubl:Rattsfallsreferat ;
     dcterms:identifier "AD 2010 nr 70" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
     rpubl:arsutgava "2010" ;
@@ -16,7 +16,7 @@
     rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/ad/B-117-2009/2010-10-13> ;
     rpubl:referatrubrik "Målet gällde skadestånd. Domen innebar att tingsrättens domslut fastställdes."@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rf/ad/2010:70> ;
-    prov:wasDerivedFrom <https://lagen.nu/rf/ad/2010:70?repo=dv&dir=downloaded> ;
+    prov:wasDerivedFrom <https://lagen.nu/dom/ad/2010:70?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
 <https://lagen.nu/dom/ad/B-117-2009/2010-10-13> a rpubl:VagledandeDomstolsavgorande ;
@@ -27,5 +27,5 @@
     rpubl:malnummer "B-117-2009" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/ad/b-117-2009/2010-10-13> .
 
-<https://lagen.nu/rf/ad/2010:70?repo=dv&dir=downloaded> rdfs:label "AD 2010 nr 70"@sv .
+<https://lagen.nu/dom/ad/2010:70?repo=dv&dir=downloaded> rdfs:label "AD 2010 nr 70"@sv .
 

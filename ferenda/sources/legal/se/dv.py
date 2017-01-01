@@ -123,12 +123,9 @@ class DV(SwedishLegalSource):
             [config.datadir, 'dv', 'generated', 'uri.map'])
         log = cls._setup_logger(cls.alias)
         if not util.outfile_is_newer(util.list_dirs(parsed_dir, ".xhtml"), mapfile):
-            # FIXME: We really need to make this an instancemethod so that we have access to self.minter etc.
-            # if self.urispace_base == "http://rinfo.lagrummet.se":
-            #     prefix = self.urispace_base + "/publ" + self.urispace_segment
-            # else:
-            #     prefix = self.urispace_base + self.urispace_segment
-            prefix = "https://lagen.nu/rf/"  # FIXME: just a stopgap until we can compute the prefix for real
+            prefix = "https://lagen.nu/dom/"  # FIXME: just a stopgap
+                                              # until we can compute
+                                              # the prefix for real
             re_xmlbase = re.compile('<head about="%s([^"]+)"' % prefix)
             log.info("Creating uri.map file")
             cnt = 0
@@ -1267,8 +1264,8 @@ class DV(SwedishLegalSource):
                 for i in value:
                     for node in parser.parse_string(i):
                         if isinstance(node, Link):
-                            domdesc.rel(RPUBL.rattsfallshanvisning,
-                                        node.uri)
+                            with domdesc.rel(RPUBL.rattsfallshanvisning, node.uri):
+                                domdesc.value(DCTERMS.identifier, i)
             elif label == "Litteratur":
                 if value:
                     for i in value.split(";"):

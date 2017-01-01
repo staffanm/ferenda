@@ -7,10 +7,10 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/rf/nja/2009/not/1> a rpubl:Rattsfallsnotis ;
+<https://lagen.nu/dom/nja/2009/not/1> a rpubl:Rattsfallsnotis ;
     dcterms:identifier "NJA 2009 not 1" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
-    dcterms:references <https://lagen.nu/rf/nja/1999s715>,
+    dcterms:references <https://lagen.nu/dom/nja/1999s715>,
         <https://lagen.nu/1942:740#K32P6S1> ;
     rpubl:arsutgava "2009" ;
     rpubl:lopnummer "1" ;
@@ -18,7 +18,7 @@
     rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/hd/Ö1242-08/2009-01-27> ;
     rpubl:referatrubrik "S.O. mot Riksåklagaren angående utdömande av vite."@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rf/nja/2009/not/1> ;
-    prov:wasDerivedFrom <https://lagen.nu/rf/nja/2009/not/1?repo=dv&dir=downloaded> ;
+    prov:wasDerivedFrom <https://lagen.nu/dom/nja/2009/not/1?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
 <https://lagen.nu/dom/hd/Ö1242-08/2009-01-27> a rpubl:VagledandeDomstolsavgorande ;
@@ -28,5 +28,5 @@
     rpubl:malnummer "Ö1242-08" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/oe1242-08/2009-01-27> .
 
-<https://lagen.nu/rf/nja/2009/not/1?repo=dv&dir=downloaded> rdfs:label "NJA 2009 not 1"@sv .
+<https://lagen.nu/dom/nja/2009/not/1?repo=dv&dir=downloaded> rdfs:label "NJA 2009 not 1"@sv .
 

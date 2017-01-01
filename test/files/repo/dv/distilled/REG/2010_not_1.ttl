@@ -7,7 +7,7 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/rf/ra/2010/not/1> a rpubl:Rattsfallsnotis ;
+<https://lagen.nu/dom/ra/2010/not/1> a rpubl:Rattsfallsnotis ;
     dcterms:identifier "RÅ 2010 not 1" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
     dcterms:references <https://lagen.nu/prop/1985/86:1>,
@@ -22,7 +22,7 @@
     rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/regr/5267-09/2010-01-04> ;
     rpubl:referatrubrik "Ansökningar av H.J., A.W. och Odlarföreningen Gränbyodlarna (föreningen) om rättsprövning av ett beslut att anta detaljplan"@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rf/ra/2010/not/1> ;
-    prov:wasDerivedFrom <https://lagen.nu/rf/ra/2010/not/1?repo=dv&dir=downloaded> ;
+    prov:wasDerivedFrom <https://lagen.nu/dom/ra/2010/not/1?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
 <https://lagen.nu/dom/regr/5267-09/2010-01-04> a rpubl:VagledandeDomstolsavgorande ;
@@ -42,5 +42,5 @@
     rpubl:malnummer "5267-09" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/regr/5267-09/2010-01-04> .
 
-<https://lagen.nu/rf/ra/2010/not/1?repo=dv&dir=downloaded> rdfs:label "RÅ 2010 not 1"@sv .
+<https://lagen.nu/dom/ra/2010/not/1?repo=dv&dir=downloaded> rdfs:label "RÅ 2010 not 1"@sv .
 

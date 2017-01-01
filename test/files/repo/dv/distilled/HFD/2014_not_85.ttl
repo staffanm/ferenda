@@ -7,7 +7,7 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/rf/hfd/2014/not/85> a rpubl:Rattsfallsnotis ;
+<https://lagen.nu/dom/hfd/2014/not/85> a rpubl:Rattsfallsnotis ;
     dcterms:identifier "HFD 2014 not 85" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
     dcterms:references <https://lagen.nu/prop/2012/13:1>,
@@ -26,7 +26,7 @@
     rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/hfd/4217-14/2014-12-23> ;
     rpubl:referatrubrik "Överklagande av Skatteverket och HeidelbergCement Northern Europe AB av ett förhandsbesked ang. inkomstskatt"@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rf/hfd/2014/not/85> ;
-    prov:wasDerivedFrom <https://lagen.nu/rf/hfd/2014/not/85?repo=dv&dir=downloaded> ;
+    prov:wasDerivedFrom <https://lagen.nu/dom/hfd/2014/not/85?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
 <https://lagen.nu/dom/hfd/4217-14/2014-12-23> a rpubl:VagledandeDomstolsavgorande ;
@@ -45,5 +45,5 @@
     rpubl:malnummer "4217-14" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hfd/4217-14/2014-12-23> .
 
-<https://lagen.nu/rf/hfd/2014/not/85?repo=dv&dir=downloaded> rdfs:label "HFD 2014 not 85"@sv .
+<https://lagen.nu/dom/hfd/2014/not/85?repo=dv&dir=downloaded> rdfs:label "HFD 2014 not 85"@sv .
 

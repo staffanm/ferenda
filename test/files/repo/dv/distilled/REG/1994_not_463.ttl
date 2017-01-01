@@ -7,7 +7,7 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/rf/ra/1994/not/463> a rpubl:Rattsfallsnotis ;
+<https://lagen.nu/dom/ra/1994/not/463> a rpubl:Rattsfallsnotis ;
     dcterms:identifier "RÅ 1994 not 463" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
     rpubl:arsutgava "1994" ;
@@ -16,7 +16,7 @@
     rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/regr/2655-1992/2094-07-07> ;
     rpubl:referatrubrik "Ansökan av Åsa F.-S. om återställande av försutten tid för att överklaga en dom ang. disciplinansvar"@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rf/ra/1994/not/463> ;
-    prov:wasDerivedFrom <https://lagen.nu/rf/ra/1994/not/463?repo=dv&dir=downloaded> ;
+    prov:wasDerivedFrom <https://lagen.nu/dom/ra/1994/not/463?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
 <https://lagen.nu/dom/regr/2655-1992/2094-07-07> a rpubl:VagledandeDomstolsavgorande ;
@@ -28,5 +28,5 @@
     rpubl:malnummer "2655-1992" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/regr/2655-1992/2094-07-07> .
 
-<https://lagen.nu/rf/ra/1994/not/463?repo=dv&dir=downloaded> rdfs:label "RÅ 1994 not 463"@sv .
+<https://lagen.nu/dom/ra/1994/not/463?repo=dv&dir=downloaded> rdfs:label "RÅ 1994 not 463"@sv .
 

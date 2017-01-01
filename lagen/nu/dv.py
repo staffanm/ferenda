@@ -21,6 +21,8 @@ from . import SameAs
 
 class DV(OrigDV, SameAs):
 
+    urispace_segment = "dom"
+    
     @cached_property
     def commondata(self):
         # for parsing, our .commondata needs to access named laws

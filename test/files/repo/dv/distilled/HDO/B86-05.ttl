@@ -7,16 +7,16 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/rf/nja/2007s227#HDO> dcterms:creator "Högsta domstolen"@sv ;
-    dcterms:isPartOf <https://lagen.nu/rf/nja/2007s227> ;
+<https://lagen.nu/dom/nja/2007s227#HDO> dcterms:creator "Högsta domstolen"@sv ;
+    dcterms:isPartOf <https://lagen.nu/dom/nja/2007s227> ;
     dcterms:references <https://lagen.nu/2000:1225>,
         <https://lagen.nu/2000:1225#P8> .
 
-<https://lagen.nu/rf/nja/2007s227#HSV> dcterms:creator "Svea hovrätt"@sv ;
-    dcterms:isPartOf <https://lagen.nu/rf/nja/2007s227> .
+<https://lagen.nu/dom/nja/2007s227#HSV> dcterms:creator "Svea hovrätt"@sv ;
+    dcterms:isPartOf <https://lagen.nu/dom/nja/2007s227> .
 
-<https://lagen.nu/rf/nja/2007s227#TST> dcterms:creator "Stockholms tingsrätt"@sv ;
-    dcterms:isPartOf <https://lagen.nu/rf/nja/2007s227> ;
+<https://lagen.nu/dom/nja/2007s227#TST> dcterms:creator "Stockholms tingsrätt"@sv ;
+    dcterms:isPartOf <https://lagen.nu/dom/nja/2007s227> ;
     dcterms:references <https://lagen.nu/2000:1225>,
         <https://lagen.nu/2000:1281> .
 
@@ -45,9 +45,9 @@
     rpubl:malnummer "B86-05" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/b86-05/2007-04-04> .
 
-<https://lagen.nu/rf/nja/2007s227?repo=dv&dir=downloaded> rdfs:label "NJA 2007 s. 227"@sv .
+<https://lagen.nu/dom/nja/2007s227?repo=dv&dir=downloaded> rdfs:label "NJA 2007 s. 227"@sv .
 
-<https://lagen.nu/rf/nja/2007s227> a rpubl:Rattsfallsreferat ;
+<https://lagen.nu/dom/nja/2007s227> a rpubl:Rattsfallsreferat ;
     dcterms:bibliographicCitation "NJA 2007:32" ;
     dcterms:identifier "NJA 2007 s. 227" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
@@ -58,6 +58,6 @@
     rpubl:referatrubrik "Bestämmelsen i 8 § smugglingslagen om \"tull, skatt eller annan avgift\" har befunnits tillämplig i fråga om en i EG-förordningen nr (EEG) 1470/2001 föreskriven antidumpningstull. Det har ansetts förenligt med regeringsformens bestämmelser om normgivning och med legalitetsprincipen att straffbestämmelsen såvitt gäller tullplikten fått sitt innehåll utfyllt av föreskrifter i en EG-förordning. Undandragande av pålagor som avses i den nämnda förordningen har bedömts rikta sig mot \"det allmänna\". Även fråga om EG-förordningen utgör en in casu-lagstiftning."@sv ;
     rpubl:sidnummer "227" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rf/nja/2007/s_227> ;
-    prov:wasDerivedFrom <https://lagen.nu/rf/nja/2007s227?repo=dv&dir=downloaded> ;
+    prov:wasDerivedFrom <https://lagen.nu/dom/nja/2007s227?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 

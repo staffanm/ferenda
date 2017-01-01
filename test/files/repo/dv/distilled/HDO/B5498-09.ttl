@@ -8,28 +8,28 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/rf/nja/2010s168#I/HDO> dcterms:creator "Högsta domstolen"@sv ;
-    dcterms:isPartOf <https://lagen.nu/rf/nja/2010s168#I> .
+<https://lagen.nu/dom/nja/2010s168#I/HDO> dcterms:creator "Högsta domstolen"@sv ;
+    dcterms:isPartOf <https://lagen.nu/dom/nja/2010s168#I> .
 
-<https://lagen.nu/rf/nja/2010s168#I/HGO> dcterms:creator "Göta hovrätt"@sv ;
-    dcterms:isPartOf <https://lagen.nu/rf/nja/2010s168#I> ;
+<https://lagen.nu/dom/nja/2010s168#I/HGO> dcterms:creator "Göta hovrätt"@sv ;
+    dcterms:isPartOf <https://lagen.nu/dom/nja/2010s168#I> ;
     dcterms:references <https://lagen.nu/1942:740#K30P9> .
 
-<https://lagen.nu/rf/nja/2010s168#I/TLI> dcterms:creator "Linköpings tingsrätt"@sv ;
-    dcterms:isPartOf <https://lagen.nu/rf/nja/2010s168#I> ;
+<https://lagen.nu/dom/nja/2010s168#I/TLI> dcterms:creator "Linköpings tingsrätt"@sv ;
+    dcterms:isPartOf <https://lagen.nu/dom/nja/2010s168#I> ;
     dcterms:references <https://lagen.nu/1971:69#P4>,
         <https://lagen.nu/1971:69#P5> .
 
-<https://lagen.nu/rf/nja/2010s168#II/HDO> dcterms:creator "Högsta domstolen"@sv ;
-    dcterms:isPartOf <https://lagen.nu/rf/nja/2010s168#II> ;
-    dcterms:references <https://lagen.nu/rf/nja/2000s622>,
-        <https://lagen.nu/rf/nja/2004s840> .
+<https://lagen.nu/dom/nja/2010s168#II/HDO> dcterms:creator "Högsta domstolen"@sv ;
+    dcterms:isPartOf <https://lagen.nu/dom/nja/2010s168#II> ;
+    dcterms:references <https://lagen.nu/dom/nja/2000s622>,
+        <https://lagen.nu/dom/nja/2004s840> .
 
-<https://lagen.nu/rf/nja/2010s168#II/HSB> dcterms:creator "Hovrätten över Skåne och Blekinge"@sv ;
-    dcterms:isPartOf <https://lagen.nu/rf/nja/2010s168#II> .
+<https://lagen.nu/dom/nja/2010s168#II/HSB> dcterms:creator "Hovrätten över Skåne och Blekinge"@sv ;
+    dcterms:isPartOf <https://lagen.nu/dom/nja/2010s168#II> .
 
-<https://lagen.nu/rf/nja/2010s168#II/TLU> dcterms:creator "Lunds tingsrätt"@sv ;
-    dcterms:isPartOf <https://lagen.nu/rf/nja/2010s168#II> ;
+<https://lagen.nu/dom/nja/2010s168#II/TLU> dcterms:creator "Lunds tingsrätt"@sv ;
+    dcterms:isPartOf <https://lagen.nu/dom/nja/2010s168#II> ;
     dcterms:references <https://lagen.nu/1971:69#P4> .
 
 <https://lagen.nu/dom/hd/B5498-09/2010-03-31> a rpubl:VagledandeDomstolsavgorande ;
@@ -44,27 +44,27 @@
     rpubl:avgorandedatum "2010-03-31"^^xsd:date ;
     rpubl:lagrum <https://lagen.nu/1994:1219> ;
     rpubl:malnummer "B5498-09" ;
-    rpubl:rattsfallshanvisning <https://lagen.nu/rf/nja/2000s622>,
-        <https://lagen.nu/rf/nja/2004s840>,
-        <https://lagen.nu/rf/nja/2005s856>,
-        <https://lagen.nu/rf/nja/2006s467>,
-        <https://lagen.nu/rf/nja/2008s946>,
-        <https://lagen.nu/rf/ra/2000:65> ;
+    rpubl:rattsfallshanvisning <https://lagen.nu/dom/nja/2000s622>,
+        <https://lagen.nu/dom/nja/2004s840>,
+        <https://lagen.nu/dom/nja/2005s856>,
+        <https://lagen.nu/dom/nja/2006s467>,
+        <https://lagen.nu/dom/nja/2008s946>,
+        <https://lagen.nu/dom/ra/2000:65> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/b5498-09/2010-03-31> .
 
-<https://lagen.nu/rf/nja/2010s168?repo=dv&dir=downloaded> rdfs:label "NJA 2010 s. 168"@sv .
+<https://lagen.nu/dom/nja/2010s168?repo=dv&dir=downloaded> rdfs:label "NJA 2010 s. 168"@sv .
 
-<https://lagen.nu/rf/nja/2010s168> a rpubl:Rattsfallsreferat ;
+<https://lagen.nu/dom/nja/2010s168> a rpubl:Rattsfallsreferat ;
     dcterms:bibliographicCitation "NJA 2010:19" ;
     dcterms:identifier "NJA 2010 s. 168" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
-    dcterms:references <https://lagen.nu/rf/nja/2000s622>,
-        <https://lagen.nu/rf/nja/2004s840>,
-        <https://lagen.nu/rf/nja/2005s856>,
-        <https://lagen.nu/rf/nja/2006s467>,
-        <https://lagen.nu/rf/nja/2008s946>,
-        <https://lagen.nu/rf/ra/2000:65>,
-        <https://lagen.nu/rf/ra/2009:94> ;
+    dcterms:references <https://lagen.nu/dom/nja/2000s622>,
+        <https://lagen.nu/dom/nja/2004s840>,
+        <https://lagen.nu/dom/nja/2005s856>,
+        <https://lagen.nu/dom/nja/2006s467>,
+        <https://lagen.nu/dom/nja/2008s946>,
+        <https://lagen.nu/dom/ra/2000:65>,
+        <https://lagen.nu/dom/ra/2009:94> ;
     rpubl:arsutgava "2010" ;
     rpubl:lopnummer "19" ;
     rpubl:rattsfallspublikation <https://lagen.nu/dataset/nja> ;
@@ -72,12 +72,12 @@
     rpubl:referatrubrik "Fråga om det svenska systemet med dubbla sanktioner (skattetillägg och brottspåföljd) och två förfaranden för oriktiga uppgifter i skatteförfarandet är förenligt med det i artikel 4 i det sjunde tilläggsprotokollet till Europakonventionen upptagna förbudet mot dubbla förfaranden (ne bis in idem). (I=B 5498-09 och II= 2509-09)"@sv ;
     rpubl:sidnummer "168" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rf/nja/2010/s_168> ;
-    prov:wasDerivedFrom <https://lagen.nu/rf/nja/2010s168?repo=dv&dir=downloaded> ;
+    prov:wasDerivedFrom <https://lagen.nu/dom/nja/2010s168?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
-<https://lagen.nu/rf/nja/2010s168#I> dcterms:isPartOf <https://lagen.nu/rf/nja/2010s168> ;
+<https://lagen.nu/dom/nja/2010s168#I> dcterms:isPartOf <https://lagen.nu/dom/nja/2010s168> ;
     ns1:delmalordinal "I"@sv .
 
-<https://lagen.nu/rf/nja/2010s168#II> dcterms:isPartOf <https://lagen.nu/rf/nja/2010s168> ;
+<https://lagen.nu/dom/nja/2010s168#II> dcterms:isPartOf <https://lagen.nu/dom/nja/2010s168> ;
     ns1:delmalordinal "II"@sv .
 

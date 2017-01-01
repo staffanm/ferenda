@@ -425,7 +425,7 @@ class Avsnitt(SectionalElement):
         return baseuri + "#S%s" % self.ordinal.replace(".", "-")
     
     
-class Pseudosection(CompoundElement):
+class PseudoSection(CompoundElement):
     # used when we really want to use a Section, but can't since we
     # don't have an ordinal (or the ordinal is invalid/duplicate)
     tagname = "div"

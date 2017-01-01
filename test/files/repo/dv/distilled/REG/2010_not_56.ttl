@@ -7,7 +7,7 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/rf/ra/2010/not/56> a rpubl:Rattsfallsnotis ;
+<https://lagen.nu/dom/ra/2010/not/56> a rpubl:Rattsfallsnotis ;
     dcterms:identifier "RÅ 2010 not 56" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
     dcterms:references <https://lagen.nu/1971:291#P30S1>,
@@ -30,7 +30,7 @@
     rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/regr/1754-10/2010-06-14> ;
     rpubl:referatrubrik "Ansökan av Sweets Konfektyr i Partille AB (bolaget) om rättsprövning av beslut om spärrning av enskild anslutning till väg"@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rf/ra/2010/not/56> ;
-    prov:wasDerivedFrom <https://lagen.nu/rf/ra/2010/not/56?repo=dv&dir=downloaded> ;
+    prov:wasDerivedFrom <https://lagen.nu/dom/ra/2010/not/56?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
 <https://lagen.nu/dom/regr/1754-10/2010-06-14> a rpubl:VagledandeDomstolsavgorande ;
@@ -46,5 +46,5 @@
     rpubl:malnummer "1754-10" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/regr/1754-10/2010-06-14> .
 
-<https://lagen.nu/rf/ra/2010/not/56?repo=dv&dir=downloaded> rdfs:label "RÅ 2010 not 56"@sv .
+<https://lagen.nu/dom/ra/2010/not/56?repo=dv&dir=downloaded> rdfs:label "RÅ 2010 not 56"@sv .
 

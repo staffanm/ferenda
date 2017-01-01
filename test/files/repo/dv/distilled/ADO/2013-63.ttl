@@ -7,7 +7,7 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/rf/ad/2013:63> a rpubl:Rattsfallsreferat ;
+<https://lagen.nu/dom/ad/2013:63> a rpubl:Rattsfallsreferat ;
     dcterms:identifier "AD 2013 nr 63" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
     dcterms:references <https://lagen.nu/1975:635#P6>,
@@ -20,7 +20,7 @@
     rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/ad/B-114-2012/2013-08-21> ;
     rpubl:referatrubrik "En arbetsgivare har krävt att en arbetstagare som anmält ledighet med tillfällig föräldrapenning ska uppvisa läkarintyg avseende barnets sjukdom. Sedan arbetstagaren motsatt sig detta och har hon tilldelats en varning, bl.a. för olovlig frånvaro den aktuella dagen. Arbetsdomstolen har funnit att arbetstagaren har missgynnats i strid med 16 § föräldraledighetslagen."@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rf/ad/2013:63> ;
-    prov:wasDerivedFrom <https://lagen.nu/rf/ad/2013:63?repo=dv&dir=downloaded> ;
+    prov:wasDerivedFrom <https://lagen.nu/dom/ad/2013:63?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
 <https://lagen.nu/dom/ad/B-114-2012/2013-08-21> a rpubl:VagledandeDomstolsavgorande ;
@@ -33,10 +33,10 @@
     rpubl:domsnummer "2013-63" ;
     rpubl:lagrum <https://lagen.nu/1995:584#P16> ;
     rpubl:malnummer "B-114-2012" ;
-    rpubl:rattsfallshanvisning <https://lagen.nu/rf/ad/2009:56>,
-        <https://lagen.nu/rf/ad/2011:23>,
-        <https://lagen.nu/rf/ad/2013:18> ;
+    rpubl:rattsfallshanvisning <https://lagen.nu/dom/ad/2009:56>,
+        <https://lagen.nu/dom/ad/2011:23>,
+        <https://lagen.nu/dom/ad/2013:18> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/ad/b-114-2012/2013-08-21> .
 
-<https://lagen.nu/rf/ad/2013:63?repo=dv&dir=downloaded> rdfs:label "AD 2013 nr 63"@sv .
+<https://lagen.nu/dom/ad/2013:63?repo=dv&dir=downloaded> rdfs:label "AD 2013 nr 63"@sv .
 

@@ -58,13 +58,14 @@
 	<xsl:if test="//xhtml:link[@rel='rpubl:rattsfallshanvisning']">
 	  <dt>Rättsfall</dt>
 	  <xsl:for-each select="//xhtml:link[@rel='rpubl:rattsfallshanvisning']">
-	    <dd><a href="{@href}"><xsl:value-of select="substring-after(@href, '/rf/')"/></a></dd>
+	    <xsl:variable name="href" select="@href"/>
+	    <dd><a href="{@href}"><xsl:value-of select="//xhtml:meta[@about=$href and @property='dcterms:identifier']/@content"/></a></dd>
 	  </xsl:for-each>
 	</xsl:if>
 	<xsl:if test="count(//xhtml:meta[@property='dcterms:relation']) > 0">
-	  <dt>Litteratur <xsl:value-of select="count(//xhtml:meta[@property='dcterms:relation'])"/></dt>
+	  <dt>Litteratur</dt>
 	  <xsl:for-each select="//xhtml:meta[@property='dcterms:relation']">
-	    <dd><xsl:value-of select="."/></dd>
+	    <dd><xsl:value-of select="@content"/></dd>
 	  </xsl:for-each>
 	</xsl:if>
 	<xsl:if test="//xhtml:link[@about=$domuri and @rel='dcterms:subject']">
