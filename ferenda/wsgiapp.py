@@ -150,7 +150,7 @@ Environ: %s
             (self._str("Content-Length"), self._str(str(length))),
         ])
         
-        if isinstance(data, Iterable):
+        if isinstance(data, Iterable) and not isinstance(data, bytes):
             # logging.getLogger("wsgi").info("returning data as-is")
             return data
         else:
