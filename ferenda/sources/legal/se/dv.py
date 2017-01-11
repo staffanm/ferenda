@@ -12,7 +12,7 @@ from datetime import datetime
 from ftplib import FTP
 from io import BytesIO
 from time import mktime
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 import codecs
 import itertools
 import os
@@ -122,11 +122,8 @@ class DV(SwedishLegalSource):
         mapfile = os.path.sep.join(
             [config.datadir, 'dv', 'generated', 'uri.map'])
         log = cls._setup_logger(cls.alias)
-        if not util.outfile_is_newer(util.list_dirs(parsed_dir, ".xhtml"), mapfile):
-            prefix = "https://lagen.nu/dom/"  # FIXME: just a stopgap
-                                              # until we can compute
-                                              # the prefix for real
-            re_xmlbase = re.compile('<head about="%s([^"]+)"' % prefix)
+        if (not util.outfile_is_newer(util.list_dirs(parsed_dir, ".xhtml"), mapfile)) or config.force:
+            re_xmlbase = re.compile('<head about="([^"]+)"')
             log.info("Creating uri.map file")
             cnt = 0
             util.robust_remove(mapfile + ".new")
@@ -140,7 +137,13 @@ class DV(SwedishLegalSource):
                     head = codecs.open(f, encoding='utf-8').read(1024)
                     m = re_xmlbase.search(head)
                     if m:
-                        fp.write("%s\t%s\n" % (m.group(1), basefile))
+                        path = urlparse(m.group(1)).path
+                        if config.mapfiletype == "nginx":
+                            fp.write("%s\t/dv/generated/%s.html;\n" % (path, basefile))
+                        else:
+                            # remove prefix "/dom/" from path
+                            path = path.replace("/%s/" % cls.urispace_segment, "", 1)
+                            fp.write("%s\t%s\n" % (path, basefile))
                         cnt += 1
                     else:
                         log.warning(
@@ -159,6 +162,7 @@ class DV(SwedishLegalSource):
         opts = super(DV, cls).get_default_options()
         opts['ftpuser'] = ''  # None  # Doesn't work great since Defaults is a typesource...
         opts['ftppassword'] = ''  # None
+        opts['mapfiletype'] = 'apache' # or nginx
         return opts
 
     def canonical_uri(self, basefile):
@@ -206,12 +210,16 @@ class DV(SwedishLegalSource):
         # real basefile (eg "HDO/Ö463-95_1")
         if basefile:
             if not hasattr(self, "_basefilemap"):
+                if self.config.mapfiletype == "nginx":
+                    regex = "/%s/(.*)\t/dv/generated/(.*).html;" % self.urispace_segment
+                else:
+                    regex = "(.*)\t(.*)"
                 self._basefilemap = {}
                 mapfile = self.store.path("uri", "generated", ".map")
                 try:
                     with codecs.open(mapfile, encoding="utf-8") as fp:
                         for line in fp:
-                            uriseg, bf = line.split("\t")
+                            uriseg, bf = re.match(regex, line).groups()
                             self._basefilemap[uriseg] = bf.strip()
                 except FileNotFoundError:
                     self.log.error("Couldn't find %s, probably need to run ./ferenda-build.py dv relate --all" % mapfile)
@@ -1306,7 +1314,11 @@ class DV(SwedishLegalSource):
         util.ensure_dir(mapfile)
         idx = len(self.urispace_base) + len(self.urispace_segment) + 2
         with codecs.open(mapfile, "a", encoding="utf-8") as fp:
-            fp.write("%s\t%s\n" % (doc.uri[idx:], doc.basefile))
+            if self.config.mapfiletype == "nginx":
+                fp.write("%s\t/dv/generated/%s.html;\n" % (urlparse(doc.uri).path,
+                                                           doc.basefile))
+            else:
+                fp.write("%s\t%s\n" % (doc.uri[idx:], doc.basefile))
             if hasattr(self, "_basefilemap"):
                 delattr(self, "_basefilemap")
 
