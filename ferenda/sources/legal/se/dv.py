@@ -131,6 +131,7 @@ class DV(SwedishLegalSource):
             # FIXME: Not sure utf-8 is the correct codec for us -- it
             # might be iso-8859-1 (it's to be used by mod_rewrite).
             with codecs.open(mapfile + ".new", "w", encoding="utf-8") as fp:
+                paths = set()
                 for f in util.list_dirs(parsed_dir, ".xhtml"):
                     # get basefile from f in the simplest way
                     basefile = f[len(parsed_dir) + 1:-6]
@@ -138,6 +139,14 @@ class DV(SwedishLegalSource):
                     m = re_xmlbase.search(head)
                     if m:
                         path = urlparse(m.group(1)).path
+                        if path in paths:
+                            # turns out this happens for around 700
+                            # files. Could shave some time of a parse
+                            # --all by only parsing the first basefile
+                            # with a given path?
+                            # 
+                            # log.warning("Path %s is already in map" % path)
+                            continue
                         if config.mapfiletype == "nginx":
                             fp.write("%s\t/dv/generated/%s.html;\n" % (path, basefile))
                         else:
@@ -145,6 +154,7 @@ class DV(SwedishLegalSource):
                             path = path.replace("/%s/" % cls.urispace_segment, "", 1)
                             fp.write("%s\t%s\n" % (path, basefile))
                         cnt += 1
+                        paths.add(path)
                     else:
                         log.warning(
                             "%s: Could not find valid head[@about] in %s" %
