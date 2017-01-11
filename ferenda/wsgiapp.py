@@ -5,7 +5,7 @@ from builtins import *
 from future import standard_library
 standard_library.install_aliases()
 
-from collections import defaultdict, OrderedDict, Counter
+from collections import defaultdict, OrderedDict, Counter, Iterable
 from datetime import date, datetime
 from io import BytesIO
 from operator import itemgetter
@@ -140,12 +140,23 @@ Environ: %s
         return self._return_response(data, start_response)
 
     def _return_response(self, data, start_response, status="200 OK",
-                         contenttype="text/html; charset=utf-8"):
+                         contenttype="text/html; charset=utf-8", length=None):
+        if length is None:
+            length = len(data)
+        # logging.getLogger("wsgi").info("Calling start_response")
         start_response(self._str(status), [
+            (self._str("X-WSGI-app"), self._str("ferenda")),
             (self._str("Content-Type"), self._str(contenttype)),
-            (self._str("Content-Length"), self._str(str(len(data))))
+            (self._str("Content-Length"), self._str(str(length))),
         ])
-        return iter([data])
+        
+        if isinstance(data, Iterable):
+            # logging.getLogger("wsgi").info("returning data as-is")
+            return data
+        else:
+            # logging.getLogger("wsgi").info("returning data as-iterable")
+            return iter([data])
+
 
     def api(self, environ, start_response):
         """WSGI method, called by the wsgi app for requests that matches
@@ -236,12 +247,14 @@ Examined %s repos.
                 length = len(msg.encode('utf-8'))
                 fp = BytesIO(msg.encode('utf-8'))
                 iterdata = FileWrapper(fp)
-        length = str(length)
-        start_response(self._str(status), [
-            (self._str("Content-Type"), self._str(mimetype)),
-            (self._str("Content-Length"), self._str(length))
-        ])
-        return iterdata
+        # logging.getLogger("wsgi").info("Abt to return response")
+        return self._return_response(iterdata, start_response, status, mimetype, length)
+#        length = str(length)
+#        start_response(self._str(status), [
+#            (self._str("Content-Type"), self._str(mimetype)),
+#            (self._str("Content-Length"), self._str(length))
+#        ])
+#        return iterdata
         # FIXME: How can we make sure fp.close() is called, regardless of
         # whether it's a real fileobject or a BytesIO object?
 
