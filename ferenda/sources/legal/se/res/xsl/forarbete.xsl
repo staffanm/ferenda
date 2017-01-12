@@ -40,7 +40,24 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
 	      Källor
 	    </div>
 	    <div class="panel-body">
-	      Originaldokument: <a href="{$derivedfrom}"><xsl:value-of select="//xhtml:head/xhtml:meta[@about=$derivedfrom]/@content"/></a>, <a href="{$alternateof}">Källa</a>
+	      <xsl:choose>
+		<xsl:when test="//xhtml:head/xhtml:meta[@property='olo:index']">
+		  <!-- original documents are more than one file -->
+		  Originaldokument:
+		  <ul>
+		    <xsl:for-each select="//xhtml:head/xhtml:meta[@property='olo:index']">
+		      <xsl:sort select="@content"/>
+		      <xsl:variable name="derivedfrom-part" select="@about"/>
+		      <li><a href="{$derivedfrom-part}"><xsl:value-of select="//xhtml:head/xhtml:meta[@property='rdfs:label' and @about=$derivedfrom-part]/@content"/></a></li>
+		    </xsl:for-each>
+		  </ul>
+		  <a href="{$alternateof}">Källa</a> <!-- the original uri, always just one -->
+		</xsl:when>
+		<xsl:otherwise>
+		  <!-- original document is a single file -->
+		  Originaldokument: <a href="{$derivedfrom}"><xsl:value-of select="//xhtml:head/xhtml:meta[@about=$derivedfrom]/@content"/></a>, <a href="{$alternateof}">Källa</a>
+		</xsl:otherwise>
+	      </xsl:choose>
 	    </div>
 	  </div>
 	</div>
