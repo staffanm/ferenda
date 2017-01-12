@@ -295,7 +295,7 @@ class XSLTTransform(TransformerEngine):
     # nativedata = lxml.etree
     def native_to_file(self, nativedata, outfile):
         res = self.html5_doctype_workaround(
-            etree.tostring(nativedata, pretty_print=self.format, encoding="utf-8"))
+            etree.tostring(nativedata, pretty_print=self.format, encoding="utf-8", method="html"))
         util.ensure_dir(outfile)
         with open(outfile, "wb") as fp:
             fp.write(res)

@@ -14,7 +14,6 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
 		xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
 		exclude-result-prefixes="xhtml rdf rdfs prov bibo">
-
   <xsl:import href="uri.xsl"/>
   <xsl:include href="base.xsl"/>
 

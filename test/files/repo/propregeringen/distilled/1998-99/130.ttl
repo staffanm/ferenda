@@ -423,7 +423,9 @@
     rinfoex:kommentarTill <https://lagen.nu/1995:1554#K4P6> ;
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p><i>beloppet används för avsättning till en uppskrivningsfond eller, i aktiebolag,</i> <i>för ökning av aktiekapitalet genom fondemission eller nyemission.</i></p>
+              <p>
+                <i>beloppet används för avsättning till en uppskrivningsfond eller, i aktiebolag, för ökning av aktiekapitalet genom fondemission eller nyemission.</i>
+              </p>
               <p>I samband med uppskrivningar skall det i en not lämnas upplysning om</p>
               <p>hur uppskrivningsbeloppet har behandlats skattemässigt.</p>
               <p>Avskrivningar och nedskrivningar av den tillgång som har skrivits upp</p>
@@ -634,7 +636,7 @@
               <p>Ändringen i <i>första stycket</i> är av samma slag som ändringen i 2 kap. 3 §</p>
               <p>m.fl. paragrafer.</p>
               <p>Av bestämmelserna i 7 kap. 3 § framgår att ett moderföretag under</p>
-              <p>vissa förhållanden inte behöver upprätta någon koncernredovisning. När detta undantag utnyttjas, skall moderföretaget, enligt <i>andra stycket, </i>lämna upplysning om internvinster på transaktioner som har företagits inom koncernen<i>. </i>Frågan har behandlats i <a href="https://lagen.nu/prop/1998/99:130#S16-2" rel="dcterms:references">avsnitt 16.2</a>.Med begreppet ”transaktioner inom koncernen” förstås varje koncernintern överlåtelse av varor, tjänster, anläggningstillgångar eller annat. Begreppet internvinster har samma innebörd som i 7 kap. 13 §.</p>
+              <p>vissa förhållanden inte behöver upprätta någon koncernredovisning. När detta undantag utnyttjas, skall moderföretaget, enligt <i>andra stycket, </i>lämna upplysning om internvinster på transaktioner som har företagits inom koncernen<i>. </i>Frågan har behandlats i <a href="https://lagen.nu/prop/1998/99:130#S16-2" rel="dcterms:references">avsnitt 16.2</a>. Med begreppet ”transaktioner inom koncernen” förstås varje koncernintern överlåtelse av varor, tjänster, anläggningstillgångar eller annat. Begreppet internvinster har samma innebörd som i 7 kap. 13 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> ;
@@ -647,7 +649,7 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 5 kap. 8 § i kommitténs förslag.)</p>
               <p>Ändringarna i paragrafen utgör följdändringar till den nya bokförings-</p>
-              <p>lagen eller till andra ändringar i <a href="https://lagen.nu/1995:1554" rel="dcterms:references">årsredovisningslagen</a>. Ordet bolag har bytts ut mot företag. <i>Första stycket</i> har också formulerats om för att dess innebörd skall bli klarare. I <i>första stycket</i> <i>2 </i>har ordet ”årsredovisning” lagts till, eftersom den nya <a href="https://lagen.nu/1999:000" rel="dcterms:references">bokföringslagen</a> innebär att bokföringen kan avslutas med ett årsbokslut <i>eller</i> en årsredovisning. </p>
+              <p>lagen eller till andra ändringar i <a href="https://lagen.nu/1995:1554" rel="dcterms:references">årsredovisningslagen</a>. Ordet bolag har bytts ut mot företag. <i>Första stycket</i> har också formulerats om för att dess innebörd skall bli klarare. I <i>första stycket 2 </i>har ordet ”årsredovisning” lagts till, eftersom den nya <a href="https://lagen.nu/1999:000" rel="dcterms:references">bokföringslagen</a> innebär att bokföringen kan avslutas med ett årsbokslut <i>eller</i> en årsredovisning. </p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> ;
@@ -931,7 +933,7 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 7 kap. 8 § i kommitténs förslag.)</p>
               <p>Paragrafen har tidigare betecknats 7 kap. 7 §. I <i>första stycket</i> har gjorts en ändring av samma slag som den som har </p>
-              <p>gjorts i bl.a. 2 kap. 3 §. Stycket har också – liksom <i>andra–</i> <i>fjärde</i></p>
+              <p>gjorts i bl.a. 2 kap. 3 §. Stycket har också – liksom <i>andra– fjärde</i></p>
               <p><i>styckena</i> – justerats med hänsyn till att andra paragrafer, till vilka texten</p>
               <p>hänvisar, har fått ändrad beteckning.</p>
               <p>I <i>andra stycket</i> har namnet på den rubrik under vilken kapital-</p>
@@ -1006,7 +1008,7 @@
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 7 kap. 4 § i kommitténs förslag.)</p>
-              <p>Paragrafen har tidigare betecknats 7 kap. 3 §. Avparagrafens <i>andra stycke</i> framgår vilka moderföretag som måste </p>
+              <p>Paragrafen har tidigare betecknats 7 kap. 3 §. Av paragrafens <i>andra stycke</i> framgår vilka moderföretag som måste </p>
               <p>upprätta en finansieringsanalys. Bestämmelsen anknyter till samma kriterier som avgör om moderbolaget i en koncern är skyldigt att ha en auktoriserad revisor (se <a href="https://lagen.nu/1975:1385#K10P13" rel="dcterms:references">10 kap. 13 § aktiebolagslagen</a> [1975:1385]). Hittills har det skett genom en hänvisning till bestämmelsen i <a href="https://lagen.nu/1975:1385" rel="dcterms:references">aktiebolagslagen</a>. Den tekniken framstår emellertid som mindre lämplig i och med att <a href="https://lagen.nu/1995:1554" rel="dcterms:references">årsredovisningslagens</a> tillämpningsområde utsträcks till att omfatta flera olika slag av juridiska personer. De aktuella kriterierna har i stället preciserats i paragrafen. Av skäl som har återgetts i kommentaren till den motsvarande bestämmelsen i 2 kap. 1 § har dock skyldigheten att upprätta finansieringsanalys på grund av balansomslutningens</p>
               <span class="sidbrytning" height="1263" id="sid219" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=218" width="894"/>
               <p>storlek begränsats till de fall då något av koncernföretagen bedriver näringsverksamhet. Härigenom undantas bl.a. ideella föreningar som är moderföreningar i större koncerner men som varken själva eller genom sina dotterföretag bedriver någon näringsverksamhet från kravet på finansieringsanalys.</p>

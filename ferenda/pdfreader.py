@@ -672,18 +672,19 @@ class PDFReader(CompoundElement):
                             grandchildren = child.getchildren()
                             # special handling of the <i><b> construct
                             if grandchildren != []:
-                                if child.text:
+                                if child.text and child.text.strip():
                                     b.append(Textelement(txt(child.text), tag=child.tag))
                                 b.append(Textelement(
-                                    txt(" ".join([x.text or '' for x in grandchildren])), tag="ib"))
+                                    txt(" ".join([x.text or '' for x in grandchildren if x.text.strip()])), tag="ib"))
                                 if grandchildren[0].tail:
                                     b.append(Textelement(txt(grandchildren[0].tail), tag=child.tag))
                                 if child.tail:
                                     b.append(Textelement(txt(child.tail), tag=None))
                             else:
-                                b.append(
-                                    Textelement(txt(child.text), tag=child.tag))
-                                if child.tail:
+                                if child.text.strip():
+                                    b.append(
+                                        Textelement(txt(child.text), tag=child.tag))
+                                if child.tail and child.tail.strip():
                                     b.append(Textelement(txt(child.tail), tag=None))
                     if element.tail and element.tail.strip():  # can this happen?
                         b.append(Textelement(txt(element.tail), tag=None))
