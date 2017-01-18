@@ -11,10 +11,10 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
 		xmlns:dcterms="http://purl.org/dc/terms/"
 		xmlns:prov="http://www.w3.org/ns/prov#"
 		xmlns:bibo="http://purl.org/ontology/bibo/"
-		xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
+		xmlns:rpubl="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
-		exclude-result-prefixes="xhtml rdf rdfs prov bibo">
-  <xsl:import href="uri.xsl"/>
+		xmlns:ext="http://exslt.org/common"
+		exclude-result-prefixes="xhtml rdf rdfs prov bibo rpubl ext">
   <xsl:include href="base.xsl"/>
 
   <!-- Implementations of templates called by base.xsl -->
@@ -69,15 +69,12 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
   <xsl:param name="fixedtoc" select="true()"/>
   <xsl:param name="content-under-pagetitle" select="false()"/>
 
+
   <!-- Headings shouldn't be expressed with <h*> tags, but rather with
        RDFa attribs in <div class="section"> element. However,
        DirTrips still generates h1 headings, so we can't just ignore
        these. -->
   <!-- <xsl:template match="xhtml:h1|xhtml:h2"/> -->
-  
-  <xsl:template match="xhtml:a">
-    <xsl:call-template name="link"/>
-  </xsl:template>
 
   <xsl:template name="aside-annotations">
     <xsl:param name="uri"/>
@@ -92,45 +89,62 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
 	    <h4 class="panel-title">Hänvisningar till <xsl:value-of select="substring-after($uri,'#')"/></h4>
 	  </div>
 	  <div class="panel-body">
-	    <ul>
-	    <xsl:for-each select="$annotations/resource[@uri=$uri]/dcterms:isReferencedBy">
-	      <xsl:variable name="referencing" select="@ref"/>
-	      <xsl:variable name="label">
-		<xsl:variable name="referrer" select="$annotations/resource[@uri=$referencing]"/>
-		<xsl:choose>
-		  <xsl:when test="$referrer">
-		    <xsl:if test="$referrer/dcterms:isPartOf"><xsl:value-of select="$annotations/resource[@uri=$referrer/dcterms:isPartOf/@ref]/dcterms:identifier"/>: </xsl:if>
-		    <xsl:choose>
-		      <xsl:when test="$referrer/rdfs:label">
-			<xsl:value-of select="$referrer/rdfs:label"/>
-		      </xsl:when>
-		      <xsl:when test="$referrer/dcterms:identifier">
-			<xsl:value-of select="$referrer/dcterms:identifier"/>
-		      </xsl:when>
-		      <xsl:when test="$referrer/bibo:chapter">
-			avsnitt <xsl:value-of select="$referrer/bibo:chapter"/>
-		      </xsl:when>
-		      <xsl:when test="$referrer/dcterms:creator">
-			(<xsl:value-of select="$referrer/dcterms:creator"/>)
-		      </xsl:when>
-		      <xsl:otherwise>
-			<xsl:value-of select="substring-after($referencing,'#')"/>
-		      </xsl:otherwise>
-		    </xsl:choose>
-		  </xsl:when>
-		  <xsl:otherwise>
-		    <!-- the base case: we have no useful labels for for the referring doc, so just show the URI -->
-		    <xsl:value-of select="@ref"/>
-		  </xsl:otherwise>
-	      </xsl:choose></xsl:variable>
-	      <li><a href="{@ref}"><xsl:value-of select="$label"/></a></li>
-	    </xsl:for-each>
-	    </ul>
+	    <xsl:call-template name="render-referers">
+	      <xsl:with-param name="uri" select="$uri"/>
+	    </xsl:call-template>
 	  </div>
 	</div>
       </div>
       </xsl:element>
     </xsl:if>
+  </xsl:template>
+
+  <xsl:key name="referers-by-document" match="resource" use="dcterms:isPartOf/@ref"/>
+
+  <xsl:template name="render-referers">
+    <xsl:param name="uri"/>
+    <xsl:variable name="resources">
+      <xsl:for-each select="$annotations/resource[@uri=$uri]/dcterms:isReferencedBy">
+	<xsl:sort select="@ref"/>
+	<xsl:variable name="refuri" select="@ref"/>
+	<dcterms:isReferencedBy ref="{$refuri}">
+	  <xsl:copy-of select="$annotations/resource[@uri=$refuri]"/>
+	</dcterms:isReferencedBy>
+      </xsl:for-each>
+    </xsl:variable>
+    <xsl:variable name="resroot" select="$annotations/resource[@uri=$uri]"/>
+    <ul>
+      <xsl:for-each select="ext:node-set($resources)/dcterms:isReferencedBy/resource[count(. | key('referers-by-document', dcterms:isPartOf/@ref)[1]) = 1]">
+	<xsl:variable name="current-grouping-key" 
+                      select="dcterms:isPartOf/@ref"/>
+	<xsl:variable name="current-group" 
+                      select="key('referers-by-document', $current-grouping-key)"/>
+	<xsl:variable name="rootresource" select="$annotations/resource[@uri=$current-grouping-key]"/>
+	<li>
+	  <xsl:choose>
+	    <xsl:when test="$rootresource/a/rpubl:Utredningsbetankande or $rootresource/a/rpubl:Proposition">
+	      <b title="{$rootresource/dcterms:title}"><xsl:value-of select="$rootresource/dcterms:identifier"/>:</b>
+	      <xsl:call-template name="render-doc-referers">
+		<xsl:with-param name="current-group" select="$current-group"/>
+	      </xsl:call-template>
+	    </xsl:when>
+	    <xsl:otherwise>
+	      <!-- If the current-grouping-key isn't identical to the
+	           root resource, it's probably just a section in a
+	           referat. In both cases, we should just link the root
+	           resource. -->
+	      <a href="{$rootresource/@uri}"><xsl:value-of select="$rootresource/dcterms:identifier"/></a>
+	    </xsl:otherwise>
+	  </xsl:choose>
+	</li>
+      </xsl:for-each>
+    </ul>
+  </xsl:template>
+
+  <xsl:template name="render-doc-referers">
+    <xsl:param name="current-group"/>
+    Avsnitt <xsl:for-each select="$current-group"><xsl:sort select="@uri"/>
+    <a href="{@uri}" title="{dcterms:title}"><xsl:value-of select="rdfs:label|bibo:chapter|dcterms:title"/></a><xsl:if test="position() != last()">, </xsl:if></xsl:for-each>
   </xsl:template>
 
   <!-- This matches all top-level elements that are contained in a
@@ -293,7 +307,6 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
 
   <!-- TABLE OF CONTENTS (TOC) HANDLING -->
   <xsl:template match="xhtml:div[@typeof='bibo:DocumentPart']" mode="toc">
-    <xsl:message>found a top-level document part</xsl:message>
     <xsl:variable name="label">
       <xsl:if test="@class = 'appendix'">
 	Bilaga

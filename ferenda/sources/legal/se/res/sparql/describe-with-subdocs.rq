@@ -15,14 +15,16 @@ CONSTRUCT {
            bibo:chapter ?refchapter ;
            rdfs:label ?reflabel ;
            dcterms:creator ?refcreator . 
-  ?rootdoc dcterms:identifier ?rootid ;
+  ?rootdoc rdf:type ?roottype ;
+           dcterms:identifier ?rootid ;
            dcterms:title ?roottitle .
 }
 WHERE
 {
   ?referer dcterms:references ?target ;
            dcterms:isPartOf* ?rootdoc . 
-  ?rootdoc dcterms:identifier ?rootid .
+  ?rootdoc rdf:type ?roottype ;
+           dcterms:identifier ?rootid .
   OPTIONAL { ?referer dcterms:identifier ?refid . }
   OPTIONAL { ?referer dcterms:title ?reftitle . }
   OPTIONAL { ?referer bibo:chapter ?refchapter . }
