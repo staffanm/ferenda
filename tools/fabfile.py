@@ -33,7 +33,7 @@ def copy_elastic():
     rsync_project(local_dir=snapshotdir,
                   remote_dir=snapshotdir,
                   delete=True,
-                  default_opts="-azi")
+                  default_opts="-aziO --no-perms")
     # sudo("chown -R elasticsearch:elasticsearch %s" % snapshotdir)
 
     # on target, curl POST to restore snapshot (close index beforehand
@@ -54,7 +54,7 @@ def copy_files():
                   remote_dir="/home/staffan/www/ferenda.lagen.nu/data",
                   exclude=["*downloaded*", "*archive*"],
                   delete=True,
-                  default_opts="-azi")
+                  default_opts="-aziO --no-perms")
     # we use quiet=True since this may fail on webserver-owned
     # directories (if the webserver owns the directory, we don't
     # need to chmod it).
