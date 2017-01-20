@@ -729,21 +729,32 @@ class DV(SwedishLegalSource):
             rawbody = newbody
         for idx, x in enumerate(rawbody):
             if isinstance(x, str):
-                # match smushed-together delmål markers like in "(jfr
-                # 1990 s 772 och s 796)I" and "Domslut HD fastställer
-                # HovR:ns domslut.II"
-                #
-                # But since we apparently need to handle spaces before
-                # I, we might mismatch this with sentences like
-                # "...och Dalarna. I\ndistributionsrörelsen
-                # sysselsattes...". Try to avoid this by checking for
-                # probable sentence start in next line
-                m = re.match("(.*[\.\) ])(I+)$", x, re.DOTALL)
-                if (m and rawbody[idx+1][0].isupper() and
-                    not re.search("mellandomstema I+$", x, flags=re.IGNORECASE)):
+                # detect and fix smushed numbered sections which MD
+                # has, eg "18Marknadsandelar är..." ->
+                # "18. Marknadsandelar är..."
+                x = re.sub("^(\d{1,3})([A-ZÅÄÖ])", r"\1. \2", x)
+
+                m = re.match("(KÄRANDE|SVARANDE|SAKEN)([A-ZÅÄÖ].*)", x) 
+                if m:
+                    # divide smushed-together headings like MD has,
+                    # eg. "SAKENMarknadsföring av bilverkstäder..."
                     x = [m.group(1), m.group(2)]
                 else:
-                    x = [x]
+                    # match smushed-together delmål markers like in "(jfr
+                    # 1990 s 772 och s 796)I" and "Domslut HD fastställer
+                    # HovR:ns domslut.II"
+                    #
+                    # But since we apparently need to handle spaces before
+                    # "I", we might get false positives with sentences like
+                    # "...och Dalarna. I\ndistributionsrörelsen
+                    # sysselsattes...". Try to avoid this by checking for
+                    # probable sentence start in next line
+                    m = re.match("(.*[\.\) ])(I+)$", x, re.DOTALL)
+                    if (m and rawbody[idx+1][0].isupper() and
+                        not re.search("mellandomstema I+$", x, flags=re.IGNORECASE)):
+                        x = [m.group(1), m.group(2)]
+                    else:
+                        x = [x]
                 for p in x:
                     m = re.match("(I{1,3}|IV)\.? ?(|\(\w+\-\d+\))$", p)
                     if m:
@@ -757,6 +768,7 @@ class DV(SwedishLegalSource):
         if seen_delmal and "I" not in seen_delmal:
             self.log.warning("Inserting missing 'I' for first delmal")
             result.insert(0, Paragraph(["I"]))
+
         return result
 
 
