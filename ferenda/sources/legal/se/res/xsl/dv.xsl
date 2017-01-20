@@ -225,6 +225,23 @@
   <xsl:template match="xhtml:h1">
     <h4><xsl:value-of select="."/></h4>
   </xsl:template>
+
+  <xsl:template match="xhtml:p[@class='orderedparagraph']">
+    <div class="orderedparagraph">
+      <xsl:if test="@about"><xsl:attribute name="id"><xsl:value-of select="substring-after(@about, '#')"/></xsl:attribute></xsl:if>
+      <div class="ordinal">
+	<xsl:choose>
+	  <xsl:when test="@about">
+	    <a href="{@about}"><xsl:value-of select="@data-ordinal"/>.</a>
+	  </xsl:when>
+	  <xsl:otherwise>
+	    <xsl:value-of select="@data-ordinal"/>.
+	  </xsl:otherwise>
+	</xsl:choose>
+      </div>
+      <p><xsl:apply-templates/></p>
+    </div>
+  </xsl:template>
   
   <!-- last resort -->
   <xsl:template match="xhtml:div">

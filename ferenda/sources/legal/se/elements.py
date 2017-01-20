@@ -290,12 +290,17 @@ class Registerpost(CompoundElement):
         return res
 
 class OrderedParagraph(Paragraph, OrdinalElement):
+    classname = "orderedparagraph"
+    def __init__(self, *args, **kwargs):
+        self.uri = kwargs.get("uri", None)
+        super(OrderedParagraph, self).__init__(*args, **kwargs)
 
     def as_xhtml(self, baseuri, parent_uri=None):
         element = super(OrderedParagraph, self).as_xhtml(baseuri, parent_uri)
+        from pudb import set_trace; set_trace()
         # FIXME: id needs to be unique in document by prepending a
         # instans identifier
-        # element.set('id', self.ordinal)
+        element.set('data-ordinal', self.ordinal)
         return element
 
 

@@ -92,6 +92,19 @@ h3 {
     content: "Dokumentet finns inte i databasen";
 }
 
+div.orderedparagraph div.ordinal {
+    float: left;
+    width: 5%;
+}
+
+div.orderedparagraph p {
+    float: right;
+    width: 95%;
+}
+
+div.orderedparagraph {
+    clear: both;
+}
 @media only screen and (min-width: 768px) {
     body.frontpage td {
         display:table-cell;

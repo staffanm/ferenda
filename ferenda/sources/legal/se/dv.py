@@ -1323,6 +1323,8 @@ class DV(SwedishLegalSource):
         mapfile = self.store.path("uri", "generated", ".map")
         util.ensure_dir(mapfile)
         idx = len(self.urispace_base) + len(self.urispace_segment) + 2
+        # FIXME: when re-parsing, this causes duplicate entries in the
+        # mapfile (this is OK by apache, but not by nginx)
         with codecs.open(mapfile, "a", encoding="utf-8") as fp:
             if self.config.mapfiletype == "nginx":
                 fp.write("%s\t/dv/generated/%s.html;\n" % (urlparse(doc.uri).path,
@@ -1361,7 +1363,6 @@ class DV(SwedishLegalSource):
                 if isinstance(node, Instans) and len(node) == 0:
                     # print("Removing Instans %r" % node.court)
                     root.remove(node)
-
 
     def infer_identifier(self, basefile):
         p = self.store.distilled_path(basefile)
@@ -1971,8 +1972,11 @@ class DV(SwedishLegalSource):
             if ordered(strchunk):
                 # FIXME: Cut the ordinal from chunk somehow
                 if isinstance(chunk, Paragraph):
-                    p = OrderedParagraph(list(chunk), ordinal=ordered(strchunk))
+                    chunks = list(chunk)
+                    chunks[0] = re.sub("^\d+\. ", "", chunks[0])
+                    p = OrderedParagraph(chunks, ordinal=ordered(strchunk))
                 else:
+                    chunk = re.sub("^\d+\. ", "", chunk)
                     p = OrderedParagraph([chunk], ordinal=ordered(strchunk))
             else:
                 if isinstance(chunk, Paragraph):
@@ -2285,7 +2289,10 @@ class DV(SwedishLegalSource):
                 node.uri = state['uri'] + courtslug
             else:
                 return state
-        elif isinstance(node, Body):
+        elif isinstance(node, OrderedParagraph):
+            from pudb import set_trace; set_trace()
+            node.uri = state['uri'] + "/P" + node.ordinal
+        elif isinstance(node, (Body, Dom, Domskal)):
             return state
         else:
             return None
@@ -2294,10 +2301,9 @@ class DV(SwedishLegalSource):
 
     
     def visitor_functions(self, basefile):
-        return (
-            (self.construct_id, {'uri': self._canonical_uri,
-                                 'basefile': basefile}),
-        )
+        return ((self.construct_id, {'uri': self._canonical_uri,
+                                     'basefile': basefile}),
+                )
 
     def facets(self):
         # NOTE: it's important that RPUBL.rattsfallspublikation is the
