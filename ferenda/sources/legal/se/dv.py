@@ -1982,6 +1982,8 @@ class DV(SwedishLegalSource):
             if not strchunk.strip():  # filter out empty things
                 return None
             if ordered(strchunk):
+                if strchunk.startswith("150"):
+                    from pudb import set_trace; set_trace()
                 # FIXME: Cut the ordinal from chunk somehow
                 if isinstance(chunk, Paragraph):
                     chunks = list(chunk)
@@ -1998,7 +2000,7 @@ class DV(SwedishLegalSource):
             return p
 
         def ordered(chunk):
-            if re.match("(\d+).", chunk):
+            if re.match("(\d+)\.", chunk):
                 return chunk.split(".", 1)[0]
 
         def transition_domskal(symbol, statestack):
@@ -2303,6 +2305,7 @@ class DV(SwedishLegalSource):
                 return state
         elif isinstance(node, OrderedParagraph):
             node.uri = state['uri'] + "/P" + node.ordinal
+            return state
         elif isinstance(node, (Body, Dom, Domskal)):
             return state
         else:
