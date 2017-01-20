@@ -297,7 +297,6 @@ class OrderedParagraph(Paragraph, OrdinalElement):
 
     def as_xhtml(self, baseuri, parent_uri=None):
         element = super(OrderedParagraph, self).as_xhtml(baseuri, parent_uri)
-        from pudb import set_trace; set_trace()
         # FIXME: id needs to be unique in document by prepending a
         # instans identifier
         element.set('data-ordinal', self.ordinal)

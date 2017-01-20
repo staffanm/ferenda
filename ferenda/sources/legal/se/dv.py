@@ -2302,7 +2302,6 @@ class DV(SwedishLegalSource):
             else:
                 return state
         elif isinstance(node, OrderedParagraph):
-            from pudb import set_trace; set_trace()
             node.uri = state['uri'] + "/P" + node.ordinal
         elif isinstance(node, (Body, Dom, Domskal)):
             return state
