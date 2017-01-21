@@ -273,7 +273,8 @@ class DirAsp(FixedLayoutSource):
     def postprocess_doc(self, doc):
         next_is_title = False
         newbody = Body()
-        for para in doc.body.textboxes(pageobjects=True):
+        glue = lambda x, y, z: False
+        for para in doc.body.textboxes(gluefunc=glue, pageobjects=True):
             strpara = str(para).strip()
             if strpara == "Kommittédirektiv":
                 next_is_title = True
