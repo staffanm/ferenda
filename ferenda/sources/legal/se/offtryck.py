@@ -458,6 +458,19 @@ class Offtryck(SwedishLegalSource):
                     helper(subnode, meta)
         helper(doc.body, doc.meta)
 
+
+        if not doc.meta.value(URIRef(doc.uri), RPUBL.departement):
+            # We have no information about which departement is
+            # responsible in the metadata -- try to find it from the
+            # doc itself. This is done differently depending on doctype
+            from pudb import set_trace; set_trace()
+            if self.rdf_type == RPUBL.Kommittedirektiv:
+                candidate = str(doc.body[-1][-1]).strip()
+                if candidate.endswith("departementet)"):
+                    dep = candidate[1:-1]  # remove enclosing paren
+                    doc.meta.add((URIRef(doc.uri), RPUBL.departement, self.lookup_resource(dep)))
+                else:
+                    self.log.warning("%s: No ansvarig departement found in either metadata or doc" % doc.basefile)
         
         # the following postprocessing code is so far only written for
         # Propositioner

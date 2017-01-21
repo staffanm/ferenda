@@ -260,7 +260,7 @@ class Regeringen(Offtryck):
         # two different departments (eg dir. 2011:80). Convert string
         # to a list in these cases (SwedishLegalSource.polish_metadata
         # will handle that)
-        if a["rpubl:departement"] and ", " in a["rpubl:departement"]:
+        if "rpubl:departement" in a and ", " in a["rpubl:departement"]:
             a["rpubl:departement"] = a["rpubl:departement"].split(", ")
         # remove empty utgarFran list
         if a["rpubl:utgarFran"]:
@@ -321,7 +321,8 @@ class Regeringen(Offtryck):
         try:
             ansvarig = content.find("p", "media--publikations__sender").a.text
         except AttributeError:
-            self.log.warning("%s: No ansvarig departement found" % basefile)
+            if self.rdf_type != RPUBL.Kommittedirektiv:  # postprocess_doc has us covered
+                self.log.warning("%s: No ansvarig departement found" % basefile)
             ansvarig = None
         s = content.find("div", "has-wordExplanation")
         for a in s.find_all("a"):  # links in summary are extra tacked-on bogus
@@ -373,8 +374,9 @@ class Regeringen(Offtryck):
                   'dcterms:issued': utgiven,
                   'dcterms:abstract': sammanfattning,
                   'rpubl:utgarFran': utgarFran,
-                  'rpubl:departement': ansvarig
         })
+        if ansvarig:
+            a['rpubl:departement'] = ansvarig
         return a
 
 

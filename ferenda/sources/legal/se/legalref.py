@@ -792,7 +792,6 @@ class LegalRef:
                     v = Literal(v)
                 g.add((current, self.attributemap[k], v))
             else:
-                from pudb import set_trace; set_trace()
                 # We know that these attribs do not need to be mapped
                 # to RDF predicates (as equivalent information must
                 # exist elsewhere)

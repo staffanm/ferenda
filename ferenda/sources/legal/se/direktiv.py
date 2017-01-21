@@ -18,6 +18,7 @@ import requests
 
 from . import (SwedishLegalSource, SwedishLegalStore, FixedLayoutSource,
                Trips, Regeringen, RPUBL, Offtryck)
+from .elements import Sidbrytning
 from ferenda import CompositeRepository, CompositeStore
 from ferenda import TextReader
 from ferenda import util
@@ -26,6 +27,7 @@ from ferenda.decorators import downloadmax, recordlastdownload
 from ferenda.elements import Body, Heading, ListItem, Paragraph
 from ferenda.errors import DocumentRemovedError
 from ferenda.compat import urljoin
+from ferenda.pdfreader import Page
 
 # custom style analyzer
 class DirAnalyzer(PDFAnalyzer):
@@ -270,7 +272,8 @@ class DirAsp(FixedLayoutSource):
 
     def postprocess_doc(self, doc):
         next_is_title = False
-        for para in doc.body:
+        newbody = Body()
+        for para in doc.body.textboxes(pageobjects=True):
             strpara = str(para).strip()
             if strpara == "Kommittédirektiv":
                 next_is_title = True
@@ -284,7 +287,14 @@ class DirAsp(FixedLayoutSource):
                 doc.meta.add((URIRef(doc.uri), DCTERMS.issued,
                               Literal(self.parse_swedish_date(datestr),
                                       datatype=XSD.date)))
-                break
+            if isinstance(para, Page):
+                newbody.append(Sidbrytning(ordinal=para.number,
+                                           width=para.width,
+                                           height=para.height,
+                                           src=para.src))
+            else:
+                newbody.append(para)
+            doc.body = newbody
 
 class DirRegeringen(Regeringen):
 
