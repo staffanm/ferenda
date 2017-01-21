@@ -792,6 +792,7 @@ class LegalRef:
                     v = Literal(v)
                 g.add((current, self.attributemap[k], v))
             else:
+                from pudb import set_trace; set_trace()
                 # We know that these attribs do not need to be mapped
                 # to RDF predicates (as equivalent information must
                 # exist elsewhere)
@@ -1394,6 +1395,11 @@ class LegalRef:
                 attributes["myndighet"] = lookup(myndighet.upper())
                 attributes["diarienr"] = attributes[myndighet]
                 del attributes[myndighet]
+                break;
+        else:
+            # there is no myndighet in the collected attributes - we
+            # won't be able to create a URI from this
+            return None
         res = self.attributes_to_resource(attributes)
         uri = self.minter.space.coin_uri(res)
         return uri

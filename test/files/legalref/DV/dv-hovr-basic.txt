@@ -1,5 +1,5 @@
 RH 2007:108
 
 <list>
-  <Link uri="https://lagen.nu/rf/rh/2007:108">RH 2007:108</Link>
+  <Link uri="https://lagen.nu/dom/rh/2007:108">RH 2007:108</Link>
 </list>

@@ -12,7 +12,7 @@ import time
 from bs4 import BeautifulSoup
 import requests
 import requests.exceptions
-from rdflib import Literal
+from rdflib import Literal, URIRef
 from rdflib.namespace import DCTERMS
 
 # My own stuff
@@ -240,10 +240,17 @@ class ARN(FixedLayoutSource):
         return d
 
     def sanitize_metadata(self, attribs, basefile):
-        attribs['dcterms:title'] = Literal(
-            re.sub("Avgörande \d+-\d+-\d+; \d+-\d+\.?",
-                   "", util.normalize_space(attribs['dcterms:title'])),
-            lang="sv")
+        # remove trailing "Avgörande 1993-05-03; 92-2571"
+        if attribs['dcterms:title'].strip():
+            attribs['dcterms:title'] = Literal(
+                re.sub("Avgörande \d+-\d+-\d+; \d+-\d+\.?",
+                       "", util.normalize_space(attribs['dcterms:title'])),
+                lang="sv")
+        else:
+            del attribs['dcterms:title'] # no real content -- delete
+                                         # it and fill the value with
+                                         # stuff from the document
+                                         # later.
         return attribs
 
     def infer_identifier(self, basefile):
@@ -261,6 +268,16 @@ class ARN(FixedLayoutSource):
                    nextbox.top > prevbox.top)
             return res
         return reader.textboxes(gluecondition)
+
+    def postprocess_doc(self, doc):
+        if not doc.meta.value(URIRef(doc.uri), DCTERMS.title):
+            # The title of the document wasn't in the HTML
+            # fragment. Use first line of the document instead (and
+            # scrub trailing "Avgörande 1993-05-03; 92-2571" the
+            # normal way.
+            t = {'dcterms:title': str(doc.body[0])}
+            t = self.sanitize_metadata(t, doc.basefile)
+            doc.meta.add((URIRef(doc.uri), DCTERMS.title, t['dcterms:title']))
 
     def create_external_resources(self, doc):
         pass

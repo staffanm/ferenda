@@ -8,6 +8,7 @@ import os
 
 from . import SwedishLegalStore, SwedishLegalSource
 from ferenda import util
+from ferenda.errors import DocumentRemovedError
 from ferenda.pdfreader import StreamingPDFReader
 
 
@@ -107,4 +108,8 @@ class FixedLayoutSource(SwedishLegalSource):
         return self.metadata_from_basefile(basefile)
     
     def extract_body(self, fp, basefile):
-        return StreamingPDFReader().read(fp)
+        reader = StreamingPDFReader().read(fp)
+        if reader.is_empty():
+            raise DocumentRemovedError(dummyfile=self.store.parsed_path(basefile))
+        else:
+            return reader
