@@ -185,7 +185,8 @@ properties (such as ordinal label, date of enactment, etc)."""
         
         # elements with no actual text gets stripped
         if str(self).strip():
-            res.text = str(self)
+            # remove any Ctrl-C's (0x03) that might have been present in the source
+            res.text = str(self).translate({3: None})
             return res
         else:
             return None

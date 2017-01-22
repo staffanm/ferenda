@@ -222,7 +222,8 @@ class DetectingDecoder(OffsetDecoder1d):
                 for subpart in textbox:
                     if (isinstance(subpart, etree._Element) and
                         (decode_all or subpart.tag == 'i')):
-                        sampletext += subpart.text
+                        if subpart.text: # it might be None, for eg "<i><b>text is in child instead</b></i>"
+                            sampletext += subpart.text
 
         for low_offset, high_offset, unmapped in ((0,0, []),
                                                   (0x1d, 0x7a, []),

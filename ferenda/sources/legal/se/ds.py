@@ -33,7 +33,7 @@ class DsAnalyzer(PDFAnalyzer):
         for pageidx, page in enumerate(self.pdf):
             # Sanity check: 
             if pageidx > 5 and currentdoc == 'frontmatter':
-                logging.getLogger("pdfanalyze").warn("missed the transition from frontmatter to main")
+                logging.getLogger("pdfanalyze").warning("missed the transition from frontmatter to main")
                 # act as there never was any frontmatter
                 currentdoc = "main"
                 documents[0][-1] = "main"
@@ -50,8 +50,9 @@ class DsAnalyzer(PDFAnalyzer):
                     currentdoc = 'endregister'
             styles = self.count_styles(pageidx, 1)
             # find the most dominant style on the page. If it uses the
-            # EU font, it's a separate section.
-            if styles and styles.most_common(1)[0][0][0].startswith("EUAlbertina"):
+            # EU font (even if it's the second most dominant), it's a
+            # separate section.
+            if styles and [s for s in self.count_styles(pageidx, 1).most_common(2) if s[0][0].startswith("EUAlbertina")]:
                 currentdoc = 'eudok'
             elif currentdoc == "eudok":
                 currentdoc == "main" ## CONTINUE

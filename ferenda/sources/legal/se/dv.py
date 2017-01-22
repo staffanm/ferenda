@@ -1982,8 +1982,6 @@ class DV(SwedishLegalSource):
             if not strchunk.strip():  # filter out empty things
                 return None
             if ordered(strchunk):
-                if strchunk.startswith("150"):
-                    from pudb import set_trace; set_trace()
                 # FIXME: Cut the ordinal from chunk somehow
                 if isinstance(chunk, Paragraph):
                     chunks = list(chunk)

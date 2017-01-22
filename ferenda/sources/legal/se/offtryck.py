@@ -463,7 +463,6 @@ class Offtryck(SwedishLegalSource):
             # We have no information about which departement is
             # responsible in the metadata -- try to find it from the
             # doc itself. This is done differently depending on doctype
-            from pudb import set_trace; set_trace()
             if self.rdf_type == RPUBL.Kommittedirektiv:
                 candidate = str(doc.body[-1][-1]).strip()
                 if candidate.endswith("departementet)"):
@@ -471,6 +470,9 @@ class Offtryck(SwedishLegalSource):
                     doc.meta.add((URIRef(doc.uri), RPUBL.departement, self.lookup_resource(dep)))
                 else:
                     self.log.warning("%s: No ansvarig departement found in either metadata or doc" % doc.basefile)
+            elif self.rdf_type == RPUBL.Utredningsbetankande:
+                # look for the first PreambleSection and determine if the title endswith "departementet"  (gonna be rare)
+                pass
         
         # the following postprocessing code is so far only written for
         # Propositioner
@@ -1326,16 +1328,17 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         # Subsections in "Författningskommentar" sections are
         # not always numbered. As a backup, check font size and family as well
         chunk = parser.reader.peek()
-        if metrics.scanned_source:
-            # avoid having sectionheaders in
-            # forfattningskommentar/specialmotivering interpreted as
-            # (might otherwise happen due to irregular font size
-            # estimates -- although that should be less common with
-            # the new sizematch() function)
-            if re.match("\.?[l\d]\s*§$", str(chunk).strip()):
-                return False
-        return (sizematch(metrics.h2.size, chunk.font.size, tolerate_less_ocr=0, tolerate_more_ocr=1) and
-                chunk.font.family == metrics.h2.family)
+        # avoid having sectionheaders in
+        # forfattningskommentar/specialmotivering (like "5 c §") interpreted as
+        # subsection headers (might otherwise happen due to
+        # irregular font size estimates or irregular font size usage
+        # The regex is forgiving of OCR errors.
+        if re.match("\.?[l\d]\s*(|\w )§$", str(chunk).strip()):
+            return False
+        if (sizematch(metrics.h2.size, chunk.font.size, tolerate_less_ocr=0, tolerate_more_ocr=1) and
+                chunk.font.family == metrics.h2.family):
+            return True
+        
 
     def is_subsubsection(parser):
         (ordinal, headingtype, title) = analyze_sectionstart(parser)
@@ -1384,13 +1387,14 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         # NOTE: in some cases (prop 1972:105 p 145 and generally
         # everything before prop 1987/88:69) the "Bilaga" margin
         # header appears in the (extended) topmargin, not in the
-        # leftmargin. For Ds it always appears in the topmargin
-        # FIXME: Doc-specific fixes should be in Proposition.sanitize_body
-        if ((parser.current_identifier.startswith("Prop.") and
-             ("Prop. 1987/88:69" > parser.current_identifier)) or
-            parser.current_identifier.startswith("Ds")):
+        # leftmargin. 
+        if (parser.current_identifier.startswith("Prop.") and
+            ("Prop. 1987/88:69" > parser.current_identifier)):
             extended_topmargin = metrics.pageheight / 5
             placement = lambda c: c.bottom < extended_topmargin
+        elif parser.current_identifier.startswith("Ds"):
+            # For Ds it always appears in the topmargin
+            placement = lambda c: c.bottom <= metrics.topmargin
         else:
             placement = lambda c: c.right < metrics_leftmargin() or c.left > metrics_rightmargin()
 

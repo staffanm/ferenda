@@ -725,7 +725,7 @@ class PDFReader(CompoundElement):
                 else:
                     self.log.debug("Font %s: No offset used" % fontid)
             except errors.PDFDecodeError:
-                self.log.warning("Font %s: Encoding could not be detected, assuming no encoding" %  fontid)
+                self.log.debug("Font %s: Encoding could not be detected, assuming no encoding" %  fontid)
 
     ################################################################
     # Properties and methods relating to the initialized PDFReader

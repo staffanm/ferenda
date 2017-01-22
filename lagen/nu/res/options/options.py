@@ -6,6 +6,7 @@
     ("utr/ds", "2014:32"): "skip",   # -""-
     ("utr/ds", "2008:73"): "skip",   # -""-
     ("utr/ds", "2008:82"): "skip",   # -""-            in swedish
+    ("utr/ds", "2014:111"): "skip",   # -""-            in swedish
     # some ridiculusly large document (statsbudget) have little legal
     # importance. Just process the metadata
     ("prop", "1971:1"): "metadataonly",

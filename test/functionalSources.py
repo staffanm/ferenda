@@ -25,13 +25,14 @@ from lagen.nu import ARN, DV, SFS, SOU, Ds, JO
 from lagen.nu.direktiv import DirRegeringen, DirTrips
 from lagen.nu.propositioner import PropRegeringen, PropRiksdagen, PropTrips
 from lagen.nu.sou import SOURegeringen, SOUKB
+from lagen.nu.ds import DsRegeringen
 
 for cls in (Keyword, Skeleton, MediaWiki, RFC, W3Standards, PEP,
             EurlexCaselaw, EurlexTreaties, ARN, Direktiv, Ds, DV, JK,
             JO, Kommitte, MyndFskrBase, Propositioner, Regeringen,
             Riksdagen, SwedishLegalSource, PropRegeringen,
             PropRiksdagen, PropTrips, DirTrips, DirRegeringen,
-            SOURegeringen, SOUKB, SFS):
+            DsRegeringen, SOURegeringen, SOUKB, SFS):
     # Create a new class, based on RepoTester, on the fly.
     d = {'repoclass': cls,
          'docroot': os.path.dirname(__file__)+"/files/repo/" + cls.alias,
