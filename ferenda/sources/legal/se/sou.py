@@ -305,6 +305,7 @@ class SOU(CompositeRepository):
     documentstore_class = SOUStore
     xslt_template = "xsl/forarbete.xsl"
     sparql_annotations = "sparql/describe-with-subdocs.rq"
+    sparql_expect_results = False
 
     # NB: The same logic as in
     # ferenda.sources.legal.se.{Regeringen,Riksdagen}.metadata_from_basefile
