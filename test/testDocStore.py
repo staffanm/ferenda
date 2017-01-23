@@ -252,6 +252,22 @@ class Store(unittest.TestCase):
             # list_attachments(action, basefile, version=None)
         self.assertEqual(list(self.store.list_attachments("123/a", "downloaded")),
                          attachments)
+
+    def test_list_invalid_attachments(self):
+        # test that files with an invalid suffix (in
+        # store.invalid_suffixes) is not listed
+        self.store.storage_policy = "dir" # attachments require this
+        files = ["downloaded/123/a/index.html",
+                 "downloaded/123/a/index.invalid",
+                 "downloaded/123/a/other.invalid",
+                 "downloaded/123/a/other.txt"]
+        basefiles = ['123/a']
+        attachments = ['other.txt']
+        for f in files:
+            util.writefile(self.p(f),"nonempty")
+            # list_attachments(action, basefile, version=None)
+        self.assertEqual(list(self.store.list_attachments("123/a", "downloaded")),
+                         attachments)
         
     def test_list_attachments_version(self):
         self.store.storage_policy = "dir" # attachments require this

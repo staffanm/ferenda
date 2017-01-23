@@ -16,6 +16,8 @@ from ferenda import errors
 
 class DocumentStore(object):
 
+    invalid_suffixes = [".invalid"]
+
     """
     Unifies handling of reading and writing of various data files
     during the ``download``, ``parse`` and ``generate`` stages.
@@ -40,7 +42,6 @@ class DocumentStore(object):
                            methods)
     :type storage_policy: str
     """
-
     def __init__(self, datadir, downloaded_suffix=".html", storage_policy="file"):
         self.datadir = datadir  # docrepo.datadir + docrepo.alias
         self.downloaded_suffix = downloaded_suffix
@@ -354,7 +355,8 @@ class DocumentStore(object):
             # /datadir/base/downloaded/basefile/attachment.txt => attachment.txt
             x = x[len(directory) + 1:]
             if x != mainfile:
-                yield x
+                if not [suffix for suffix in self.invalid_suffixes if x.endswith(suffix)]:
+                    yield x
 
     def basefile_to_pathfrag(self, basefile):
         """Given a basefile, returns a string that can safely be used
