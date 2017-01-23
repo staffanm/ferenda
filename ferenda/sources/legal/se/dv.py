@@ -2316,7 +2316,8 @@ class DV(SwedishLegalSource):
             else:
                 return state
         elif isinstance(node, OrderedParagraph):
-            node.uri = state['uri'] + "/P" + node.ordinal
+            separator = "/" if "#" in state['uri'] else "#"
+            node.uri = state['uri'] + separator + "P" + node.ordinal
             return state
         elif isinstance(node, (Body, Dom, Domskal)):
             return state
