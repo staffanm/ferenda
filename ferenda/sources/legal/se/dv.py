@@ -2180,8 +2180,7 @@ class DV(SwedishLegalSource):
         "Skatterättsnämnden": "SRN",
         "Skatteverket": "SKV",
         "Migrationsverket": "MIV",
-        "PTS": "PTS"
-
+        "PTS": "PTS",
         "Attunda tingsrätt": "TAT",
         "Blekinge tingsrätt": "TBL",
         "Bollnäs TR": "TBOL",
