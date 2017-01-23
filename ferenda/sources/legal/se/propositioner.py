@@ -219,19 +219,17 @@ class PropTrips(Trips, Offtryck, FixedLayoutSource):
     def download(self, basefile=None):
         if self.config.ipbasedurls:
             self._make_ipbasedurls()
+        urlmap_path = self.store.path("urls", "downloaded", ".map",
+                                      storage_policy="file")
+        self.urlmap = {}
+        if os.path.exists(urlmap_path):
+            with codecs.open(urlmap_path, encoding="utf-8") as fp:
+                for line in fp:
+                    url, attachment = line.split("\t")
+                    self.urlmap[url] = attachment.strip()
         if basefile:
             return super(PropTrips, self).download(basefile)
-
         try:
-            urlmap_path = self.store.path("urls", "downloaded", ".map",
-                                          storage_policy="file")
-            self.urlmap = {}
-            if os.path.exists(urlmap_path):
-                with codecs.open(urlmap_path, encoding="utf-8") as fp:
-                    for line in fp:
-                        url, attachment = line.split("\t")
-                        self.urlmap[url] = attachment.strip()
-
             now = datetime.now()
             if ('lastyear' in self.config and
                     self.config.lastyear and

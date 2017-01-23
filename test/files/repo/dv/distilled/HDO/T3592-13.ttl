@@ -8,29 +8,139 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/dom/nja/2014s499#I/HDO> dcterms:creator "Högsta domstolen"@sv ;
-    dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I> ;
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P1> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P10> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P11> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> ;
+    dcterms:references <https://lagen.nu/2008:567> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P12> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> ;
+    dcterms:references <https://lagen.nu/2008:567#K1P4S1N3> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P13> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> ;
+    dcterms:references <https://lagen.nu/2008:567#K5P1S1> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P14> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> ;
+    dcterms:references <https://lagen.nu/2008:567#K2P12> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P15> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P16> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> ;
+    dcterms:references <https://lagen.nu/1972:207#K2P3>,
+        <https://lagen.nu/prop/2007/08:95#sid390> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P17> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P18> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> ;
+    dcterms:references <https://lagen.nu/2008:567#K5P1S3> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P19> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P2> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P20> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P21> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P22> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> ;
+    dcterms:references <https://lagen.nu/1972:207#K2P3> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P23> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> ;
+    dcterms:references <https://lagen.nu/dom/nja/2012s211>,
+        <https://lagen.nu/dom/nja/2013s1046> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P24> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P25> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> ;
+    dcterms:references <https://lagen.nu/1972:207#K2P3> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P26> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> ;
+    dcterms:references <https://lagen.nu/1972:207#K2P3>,
+        <https://lagen.nu/dom/nja/2012s211> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P27> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P28> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> ;
+    dcterms:references <https://lagen.nu/1972:207#K2P3>,
+        <https://lagen.nu/dom/nja/2008s915> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P29> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> ;
+    dcterms:references <https://lagen.nu/1972:207#K2P3> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P3> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P30> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> ;
+    dcterms:references <https://lagen.nu/dom/nja/2013s842> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P31> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P32> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P33> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> ;
+    dcterms:references <https://lagen.nu/1972:207#K2P3> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P34> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> ;
     dcterms:references <https://lagen.nu/1962:700#K29P1S2>,
-        <https://lagen.nu/1972:207#K2P3>,
-        <https://lagen.nu/2008:567>,
-        <https://lagen.nu/2008:567#K1P4S1N3>,
-        <https://lagen.nu/2008:567#K2P12>,
-        <https://lagen.nu/2008:567#K5P1S1>,
-        <https://lagen.nu/2008:567#K5P1S3>,
-        <https://lagen.nu/prop/2007/08:95#sid390>,
-        <https://lagen.nu/dom/nja/2008s915>,
-        <https://lagen.nu/dom/nja/2012s211>,
-        <https://lagen.nu/dom/nja/2013s1046>,
-        <https://lagen.nu/dom/nja/2013s842> .
+        <https://lagen.nu/2008:567> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P35> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P36> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P37> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P38> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P39> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P4> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P40> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P41> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P42> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P43> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P44> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P45> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P46> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P47> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P48> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P49> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P5> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P50> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P51> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P52> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P6> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P7> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P8> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO/P9> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I/HDO> .
 
 <https://lagen.nu/dom/nja/2014s499#I/HSV> dcterms:creator "Svea hovrätt"@sv ;
     dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I> ;
     dcterms:references <https://lagen.nu/2008:567>,
         <https://lagen.nu/2008:567#K6P3>,
-        <https://lagen.nu/prop/2007/08:95#sid398>,
         <https://lagen.nu/dom/ad/2010:91>,
         <https://lagen.nu/dom/ad/2011:2>,
-        <https://lagen.nu/dom/nja/2006s170> .
+        <https://lagen.nu/dom/nja/2006s170>,
+        <https://lagen.nu/prop/2007/08:95#sid398>,
+        <https://lagen.nu/prop/2007/08:95#sid399> .
 
 <https://lagen.nu/dom/nja/2014s499#I/TSO> dcterms:creator "Solna tingsrätt"@sv ;
     dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I> ;
@@ -40,30 +150,89 @@
         <https://lagen.nu/2008:567#K2P12S2>,
         <https://lagen.nu/2008:567#K5P1>,
         <https://lagen.nu/2008:567#K5P1S3>,
-        <https://lagen.nu/prop/2007/08:95#sid489>,
         <https://lagen.nu/dom/ad/2010:91>,
-        <https://lagen.nu/dom/nja/2006s170> .
+        <https://lagen.nu/dom/nja/2006s170>,
+        <https://lagen.nu/prop/2007/08:95#sid391>,
+        <https://lagen.nu/prop/2007/08:95#sid489>,
+        <https://lagen.nu/prop/2007/08:95#sid492> .
 
-<https://lagen.nu/dom/nja/2014s499#II/HDO> dcterms:creator "Högsta domstolen"@sv ;
-    dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II> ;
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P1> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P10> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P11> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P12> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P13> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P14> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P15> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P16> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P17> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> ;
     dcterms:references <https://lagen.nu/1972:207#K2P3>,
         <https://lagen.nu/1998:204>,
-        <https://lagen.nu/2008:567>,
-        <https://lagen.nu/2008:567#K1P4S1N1>,
-        <https://lagen.nu/2008:567#K2P13S1N1>,
-        <https://lagen.nu/2008:567#K5P1S1>,
-        <https://lagen.nu/2008:567#K5P1S3>,
-        <https://lagen.nu/2008:567#K5P2>,
-        <https://lagen.nu/prop/2007/08:95#sid486>,
         <https://lagen.nu/dom/nja/2013s1046>,
         <https://lagen.nu/dom/nja/2013s842> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P18> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> ;
+    dcterms:references <https://lagen.nu/2008:567>,
+        <https://lagen.nu/2008:567#K5P1S3> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P19> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P2> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P20> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> ;
+    dcterms:references <https://lagen.nu/2008:567#K5P1S3> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P21> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P22> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P23> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P24> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P25> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P26> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P27> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P28> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P29> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P3> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P4> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P5> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> ;
+    dcterms:references <https://lagen.nu/2008:567#K2P13S1N1>,
+        <https://lagen.nu/prop/2007/08:95#sid486> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P6> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> ;
+    dcterms:references <https://lagen.nu/2008:567#K5P1S1> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P7> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> ;
+    dcterms:references <https://lagen.nu/2008:567#K5P2> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P8> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO/P9> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II/HDO> .
 
 <https://lagen.nu/dom/nja/2014s499#II/HSV> dcterms:creator "Svea hovrätt"@sv ;
     dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II> ;
     dcterms:references <https://lagen.nu/2008:567#K1P4S1N1>,
         <https://lagen.nu/2008:567#K5P1S3>,
+        <https://lagen.nu/dom/nja/2006s170>,
         <https://lagen.nu/prop/2007/08:95#sid391>,
-        <https://lagen.nu/dom/nja/2006s170> .
+        <https://lagen.nu/prop/2007/08:95#sid399>,
+        <https://lagen.nu/prop/2007/08:95#sid403> .
 
 <https://lagen.nu/dom/nja/2014s499#II/TST> dcterms:creator "Stockholms tingsrätt"@sv ;
     dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II> ;
@@ -76,14 +245,16 @@
         <https://lagen.nu/2008:567#K5P1>,
         <https://lagen.nu/2008:567#K5P1S3>,
         <https://lagen.nu/2008:567#K6P3>,
-        <https://lagen.nu/prop/2007/08:95#sid487>,
-        <https://lagen.nu/prop/2007/08:95#sid488>,
-        <https://lagen.nu/prop/2008/08:95#sid391>,
         <https://lagen.nu/dom/nja/2005s462>,
         <https://lagen.nu/dom/nja/2006s170>,
         <https://lagen.nu/dom/nja/2007s295>,
         <https://lagen.nu/dom/nja/2007s584>,
-        <https://lagen.nu/dom/nja/2010s363> .
+        <https://lagen.nu/dom/nja/2010s363>,
+        <https://lagen.nu/prop/2007/08:95#sid487>,
+        <https://lagen.nu/prop/2007/08:95#sid488>,
+        <https://lagen.nu/prop/2008/08:95#sid391>,
+        <https://lagen.nu/prop/2008/08:95#sid398>,
+        <https://lagen.nu/utr/sou/2010:87> .
 
 <https://lagen.nu/dom/hd/T3592-13/2014-06-26> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
@@ -135,9 +306,24 @@
     prov:wasDerivedFrom <https://lagen.nu/dom/nja/2014s499?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
+<https://lagen.nu/dom/nja/2008s915> dcterms:identifier "NJA 2008 s. 915" .
+
 <https://lagen.nu/dom/nja/2014s499#I> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499> ;
     ns1:delmalordinal "I"@sv .
 
 <https://lagen.nu/dom/nja/2014s499#II> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499> ;
     ns1:delmalordinal "II"@sv .
+
+<https://lagen.nu/dom/nja/2012s211> dcterms:identifier "NJA 2012 s. 211" .
+
+<https://lagen.nu/dom/nja/2013s1046> dcterms:identifier "NJA 2013 s. 1046" .
+
+<https://lagen.nu/dom/nja/2013s842> dcterms:identifier "NJA 2013 s. 842" .
+
+<https://lagen.nu/dom/nja/2014s499#II/HDO> dcterms:creator "Högsta domstolen"@sv ;
+    dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II> ;
+    dcterms:references <https://lagen.nu/2008:567#K1P4S1N1> .
+
+<https://lagen.nu/dom/nja/2014s499#I/HDO> dcterms:creator "Högsta domstolen"@sv ;
+    dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#I> .
 

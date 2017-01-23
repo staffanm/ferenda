@@ -1,0 +1,27 @@
+{
+    "bottommargin": 940, 
+    "default": {
+        "family": "TimesNewRomanPSMT", 
+        "size": 13
+    }, 
+    "h1": {
+        "family": "TimesNewRomanPSMT", 
+        "size": 20
+    }, 
+    "h2": {
+        "family": "TimesNewRomanPSMT", 
+        "size": 17
+    }, 
+    "h3": {
+        "family": "TimesNewRomanPS-BoldMT", 
+        "size": 13
+    }, 
+    "leftmargin": 172, 
+    "leftmargin_even": 278, 
+    "pageheight": 1263, 
+    "pagewidth": 892, 
+    "rightmargin": 620, 
+    "rightmargin_even": 730, 
+    "scanned_source": false, 
+    "topmargin": 59
+}

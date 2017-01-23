@@ -1,0 +1,27 @@
+{
+    "bottommargin": 905, 
+    "default": {
+        "family": "Calibri", 
+        "size": 14
+    }, 
+    "h1": {
+        "family": "TradeGothic-Light", 
+        "size": 26
+    }, 
+    "h2": {
+        "family": "TradeGothic-BoldTwo", 
+        "size": 16
+    }, 
+    "h3": {
+        "family": "TradeGothic-BoldTwo", 
+        "size": 14
+    }, 
+    "leftmargin": 85, 
+    "leftmargin_even": 149, 
+    "pageheight": 1029, 
+    "pagewidth": 701, 
+    "rightmargin": 560, 
+    "rightmargin_even": 630, 
+    "scanned_source": false, 
+    "topmargin": 51
+}

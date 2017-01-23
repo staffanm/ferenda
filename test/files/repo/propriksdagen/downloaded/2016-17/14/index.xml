@@ -1,0 +1,151 @@
+<dokumentstatus><dokument>
+ <hangar_id>4544971</hangar_id>
+ <dok_id>H40314</dok_id>
+ <rm>2016/17</rm>
+ <beteckning>14</beteckning>
+ <typ>prop</typ>
+ <subtyp>prop</subtyp>
+ <doktyp>prop</doktyp>
+ <dokumentnamn>Proposition</dokumentnamn>
+ <debattnamn>Proposition</debattnamn>
+ <tempbeteckning></tempbeteckning>
+ <organ>Finansdepartementet</organ>
+ <mottagare>SkU</mottagare>
+ <nummer>14</nummer>
+ <slutnummer>0</slutnummer>
+ <datum>2016-09-27 00:00:00</datum>
+ <systemdatum>2016-11-24 16:36:38</systemdatum>
+ <publicerad>2016-09-27 00:00:00</publicerad>
+ <titel>Ny definition av fastighetsbegreppet i mervärdesskattelagen</titel>
+ <subtitel></subtitel>
+ <status>Klar</status>
+ <htmlformat>html-ec</htmlformat>
+ <relaterat_id></relaterat_id>
+ <source>prop-RIM</source>
+ <sourceid>f8d7a55f-b5b6-4306-b506-2ac9b393eabb</sourceid>
+ <dokument_url_text>http://data.riksdagen.se/dokument/H40314/text</dokument_url_text>
+ <dokument_url_html>http://data.riksdagen.se/dokument/H40314</dokument_url_html>
+ <dokumentstatus_url_xml>http://data.riksdagen.se/dokumentstatus/H40314</dokumentstatus_url_xml>
+ <html>dummy</html>
+</dokument>
+<dokforslag>
+<forslag>
+<nummer>1</nummer>
+<beteckning>1</beteckning>
+<lydelse>Riksdagen antar regeringens förslag till lag om ändring i mervärdesskattelagen (1994:200).</lydelse>
+<lydelse2></lydelse2>
+<utskottet>Bifall</utskottet>
+<kammaren>Bifall</kammaren>
+<behandlas_i>2016/17:SkU8</behandlas_i>
+<behandlas_i_punkt></behandlas_i_punkt>
+<kammarbeslutstyp></kammarbeslutstyp>
+<intressent>SkU</intressent>
+<avsnitt></avsnitt>
+<grundforfattning></grundforfattning>
+<andringsforfattning></andringsforfattning>
+</forslag>
+</dokforslag>
+<dokaktivitet>
+<aktivitet>
+<kod>INL</kod>
+<namn>Inlämnad</namn>
+<datum>2016-09-27 00:00:00</datum>
+<status>inträffat</status>
+<ordning>0</ordning>
+<process>behandling</process>
+</aktivitet>
+<aktivitet>
+<kod>B</kod>
+<namn>Bordlagd</namn>
+<datum>2016-09-27 00:00:00</datum>
+<status>inträffat</status>
+<ordning>0</ordning>
+<process>behandling</process>
+</aktivitet>
+<aktivitet>
+<kod>HÄN</kod>
+<namn>Hänvisad</namn>
+<datum>2016-09-28 00:00:00</datum>
+<status>inträffat</status>
+<ordning>0</ordning>
+<process>behandling</process>
+</aktivitet>
+<aktivitet>
+<kod>MOT</kod>
+<namn>Motionstid slutar</namn>
+<datum>2016-10-12 00:00:00</datum>
+<status>inträffat</status>
+<ordning>0</ordning>
+<process>behandling</process>
+</aktivitet>
+</dokaktivitet>
+<dokintressent>
+<intressent>
+<intressent_id>0218878014918</intressent_id>
+<namn>Stefan Löfven</namn>
+<partibet>S</partibet>
+<ordning>1</ordning>
+<roll>Statsråd1</roll>
+</intressent>
+<intressent>
+<intressent_id>098412828516</intressent_id>
+<namn>Magdalena Andersson</namn>
+<partibet>S</partibet>
+<ordning>2</ordning>
+<roll>Statsråd2</roll>
+</intressent>
+</dokintressent>
+<dokuppgift>
+<uppgift>
+<kod>inlamnatav</kod>
+<namn>Inlämnat av</namn>
+<text>Finansdepartementet</text>
+<dok_id>H40314</dok_id>
+<systemdatum>2016-11-24 16:36:38</systemdatum>
+</uppgift>
+<uppgift>
+<kod>tilldelat</kod>
+<namn>Tilldelat</namn>
+<text>Skatteutskottet</text>
+<dok_id>H40314</dok_id>
+<systemdatum>2016-11-24 16:36:38</systemdatum>
+</uppgift>
+</dokuppgift>
+<dokbilaga>
+<bilaga>
+<dok_id>H40314</dok_id>
+<titel>Ny definition av fastighetsbegreppet i mervärdesskattelagen</titel>
+<subtitel></subtitel>
+<filnamn>prop_201617__14.pdf</filnamn>
+<filstorlek>378349</filstorlek>
+<filtyp>pdf</filtyp>
+<fil_url>http://data.riksdagen.se/fil/D095E7A9-2F8E-4238-94FA-1C0DF79703F3</fil_url>
+</bilaga>
+</dokbilaga>
+<dokreferens>
+<referens>
+<referenstyp>behandlas_i</referenstyp>
+<uppgift>2016/17:SkU8</uppgift>
+<ref_dok_id>H401SkU8</ref_dok_id>
+<ref_dok_typ>bet</ref_dok_typ>
+<ref_dok_rm>2016/17</ref_dok_rm>
+<ref_dok_bet>SkU8</ref_dok_bet>
+<ref_dok_titel>Ny definition av fastighetsbegreppet i mervärdesskattelagen</ref_dok_titel>
+<ref_dok_subtitel></ref_dok_subtitel>
+<ref_dok_subtyp>bet</ref_dok_subtyp>
+<ref_dok_dokumentnamn>Betänkande</ref_dok_dokumentnamn>
+</referens>
+<referens>
+<referenstyp>följdmotion</referenstyp>
+<uppgift>av Per Åsling m.fl. (C, M, L, KD)&lt;br /&gt;med anledning av prop. 2016/2017:14 Ny definition av fastighetsbegreppet i mervärdesskattelagen</uppgift>
+<ref_dok_id>H4023502</ref_dok_id>
+<ref_dok_typ>mot</ref_dok_typ>
+<ref_dok_rm>2016/17</ref_dok_rm>
+<ref_dok_bet>3502</ref_dok_bet>
+<ref_dok_titel>med anledning av prop. 2016/2017:14 Ny definition av fastighetsbegreppet i mervärdesskattelagen</ref_dok_titel>
+<ref_dok_subtitel>av Per Åsling m.fl. (C, M, L, KD)</ref_dok_subtitel>
+<ref_dok_subtyp>mot</ref_dok_subtyp>
+<ref_dok_dokumentnamn>Motion</ref_dok_dokumentnamn>
+</referens>
+</dokreferens>
+</dokumentstatus>

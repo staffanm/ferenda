@@ -7,19 +7,79 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/dom/nja/2011s45#HDO> dcterms:creator "Högsta domstolen"@sv ;
-    dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45> ;
+<https://lagen.nu/dom/nja/2011s45#HDO/P1> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P10> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P11> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> ;
     dcterms:references <https://lagen.nu/1939:207>,
-        <https://lagen.nu/1962:700>,
-        <https://lagen.nu/1962:700#K16P14>,
-        <https://lagen.nu/1982:1011>,
-        <https://lagen.nu/1994:1000>,
-        <https://lagen.nu/prop/1981/82:170#sid111>,
-        <https://lagen.nu/prop/1981/82:170#sid112>,
-        <https://lagen.nu/prop/1993/94:182#sid52>,
-        <https://lagen.nu/dom/nja/1944s256>,
+        <https://lagen.nu/1982:1011> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P12> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P13> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> ;
+    dcterms:references <https://lagen.nu/dom/nja/1944s256>,
         <https://lagen.nu/dom/nja/1960s339>,
         <https://lagen.nu/dom/nja/1967s615> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P14> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> ;
+    dcterms:references <https://lagen.nu/1982:1011> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P15> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> ;
+    dcterms:references <https://lagen.nu/1982:1011>,
+        <https://lagen.nu/1994:1000>,
+        <https://lagen.nu/prop/1981/82:170#sid111> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P16> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P17> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> ;
+    dcterms:references <https://lagen.nu/1994:1000>,
+        <https://lagen.nu/prop/1993/94:182#sid52> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P18> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P19> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> ;
+    dcterms:references <https://lagen.nu/prop/1981/82:170#sid112> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P2> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P20> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P21> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> ;
+    dcterms:references <https://lagen.nu/1962:700> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P22> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> ;
+    dcterms:references <https://lagen.nu/1962:700#K16P14> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P23> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P24> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> ;
+    dcterms:references <https://lagen.nu/1962:700#K16P14> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P25> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P26> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> ;
+    dcterms:references <https://lagen.nu/1962:700#K16P14> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P27> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> ;
+    dcterms:references <https://lagen.nu/1994:1000> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P28> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P3> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P4> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P5> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P6> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P7> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P8> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> ;
+    dcterms:references <https://lagen.nu/1962:700#K16P14> .
+
+<https://lagen.nu/dom/nja/2011s45#HDO/P9> dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45#HDO> .
 
 <https://lagen.nu/dom/nja/2011s45#HVS> dcterms:creator "Hovrätten för Västra Sverige"@sv ;
     dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45> ;
@@ -35,11 +95,11 @@
         <https://lagen.nu/1962:700#K16P14M2>,
         <https://lagen.nu/1994:1000>,
         <https://lagen.nu/1994:1000#P3>,
-        <https://lagen.nu/prop/1981/82:170>,
         <https://lagen.nu/dom/nja/1944s256>,
         <https://lagen.nu/dom/nja/1960s339>,
         <https://lagen.nu/dom/rh/1985:71>,
-        <https://lagen.nu/dom/rh/2007:82> .
+        <https://lagen.nu/dom/rh/2007:82>,
+        <https://lagen.nu/prop/1981/82:170> .
 
 <https://lagen.nu/dom/hd/B2760-09/2011-04-06> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
@@ -59,6 +119,8 @@
 
 <https://lagen.nu/dom/nja/2011s45?repo=dv&dir=downloaded> rdfs:label "NJA 2011 s. 45"@sv .
 
+<https://lagen.nu/dom/nja/1967s615> dcterms:identifier "NJA 1967 s. 615" .
+
 <https://lagen.nu/dom/nja/2011s45> a rpubl:Rattsfallsreferat ;
     dcterms:bibliographicCitation "NJA 2011:8" ;
     dcterms:identifier "NJA 2011 s. 45" ;
@@ -76,4 +138,13 @@
     owl:sameAs <http://rinfo.lagrummet.se/publ/rf/nja/2011/s_45> ;
     prov:wasDerivedFrom <https://lagen.nu/dom/nja/2011s45?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
+
+<https://lagen.nu/dom/nja/1944s256> dcterms:identifier "NJA 1944 s. 256" .
+
+<https://lagen.nu/dom/nja/1960s339> dcterms:identifier "NJA 1960 s. 339" .
+
+<https://lagen.nu/dom/nja/2011s45#HDO> dcterms:creator "Högsta domstolen"@sv ;
+    dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45> ;
+    dcterms:references <https://lagen.nu/1962:700#K16P14>,
+        <https://lagen.nu/1994:1000> .
 

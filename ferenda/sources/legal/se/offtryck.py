@@ -323,7 +323,7 @@ class Offtryck(SwedishLegalSource):
         #     do something smart
         # elif options == "simple":
         #     do something else smart
-
+        
         rawbody = self.extract_body(fp, basefile)
         sanitized = self.sanitize_body(rawbody)
         if not hasattr(sanitized, 'analyzer') or isinstance(sanitized, BeautifulSoup):
@@ -706,7 +706,7 @@ class Offtryck(SwedishLegalSource):
             if hasattr(subsection, 'title'):
                 # find out which laws this proposition proposes to
                 # change (can be new or existing)
-                if re.match("Förslag(|et) till lag om ändring i", subsection.title):
+                if re.match("Förslag(|et) (till lag om|om lag till) ändring i", subsection.title):
                     uri = self._parse_uri_from_text(subsection.title, state['basefile'])
                     lawname = subsection.title.split(" ", 6)[-1]
                 elif re.match("Förslag(|et) till", subsection.title):
@@ -751,6 +751,8 @@ class Offtryck(SwedishLegalSource):
         prevnode = None
         # self.log.debug("Finding commentary for %s" % law)
         for idx, subnode in enumerate(section):
+            if not isinstance(subnode, (Textbox, Sidbrytning)):
+                raise ValueError("_find_commentary_for_law: Got a %s instead of a Textbox or Sidbrytning, this indicates broken parsing" % type(subnode))
             text = str(subnode).strip()
             # self.log.debug("Examining %s..." % text[:60])
             if reexamine_state:  # meaning the previous node was
@@ -779,7 +781,6 @@ class Offtryck(SwedishLegalSource):
                 # (eg first para of prop 1997/98:44 p 116, which
                 # misidentifies as acttext due to strangely low
                 # linespacing.
-                    
 #                 if subnode.lines > 1:
 #                     horizontal_scale = 2 / 3
 #                     linespacing = ((subnode.height - (subnode.font.size/horizontal_scale)) /
@@ -1612,7 +1613,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             # spaces in other places (3- or 4 level section headings)
             strchunk = re.sub("(\d+)\.\s+(\d+)", r"\1.\2", strchunk)
 
-            if re.match("\d Förslag [tl]ill", strchunk):
+            if re.match("\d Förslag(|et) [tl]ill", strchunk):
                 # this is a pattern prevalent in older propositioner
                 # (eg 1972:105) where the text starts with something
                 # that looks like numbered sections (numbered from 1
@@ -1624,7 +1625,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                 return (None, None, chunk)
         if (chunk.font.size < metrics.h1.size and
             parser._state_stack[-1] == 'preamblesection' and
-            re.match("\d Förslag till", strchunk)):
+            re.match("\d Förslag(|et) till", strchunk)):
             # similar to above, but occurs in some modern documents
             # (ds 2008:68). only when heading size is less than whats
             # identified as h1, though. FIXME: should probably be

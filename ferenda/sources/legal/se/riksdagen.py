@@ -188,7 +188,11 @@ class Riksdagen(Offtryck, FixedLayoutSource):
                 self.log.info("%s: downloaded from %s" % (basefile, url))
             fileupdated = False
             r = None
-            docsoup = BeautifulSoup(open(xmlfile), features="xml")
+            # for some reason, using a XML parser ("xml" or
+            # "lxml-xml") causes only the first ~70 kb of the file
+            # being parsed... But the lxml parser should work good
+            # enough for our needs, even if it uses non-html tags.
+            docsoup = BeautifulSoup(open(xmlfile), "lxml")
             dokid = docsoup.find('dok_id').text
             if docsoup.find('dokument_url_html'):
                 htmlurl = docsoup.find('dokument_url_html').text
