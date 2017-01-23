@@ -210,7 +210,15 @@ class DV(SwedishLegalSource):
         return doc
 
     urispace_segment = "rf"
-    
+
+
+    expected_cases = {"ra":  1993,
+                      "nja": 1981,
+                      "rh":  1993,
+                      "ad":  1993,
+                      "mod": 1999,
+                      "md":  2004}
+
     # override to account for the fact that there is no 1:1
     # correspondance between basefiles and uris
     def basefile_from_uri(self, uri):
@@ -241,7 +249,13 @@ class DV(SwedishLegalSource):
                 # basefiles for these, and gain a sort of skeleton
                 # entry for those, which we could use to track
                 # eg. frequently referenced older cases.
-                self.log.warning("%s: Could not find corresponding basefile" % uri)
+
+                # right now, we only check if we ought to have a
+                # basefile (because it's recent enough) and warn then.
+                court, year = basefile.split("/", 1)
+                year=int(year[:4])
+                if court not in self.expected_cases or self.expected_cases[court] <= year:
+                    self.log.warning("%s: Could not find corresponding basefile" % uri)
                 return None
 
     def download(self, basefile=None):
