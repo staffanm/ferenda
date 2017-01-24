@@ -220,6 +220,7 @@ class FSMParser():
                 except StopIteration:
                     self._debug("Couldn't make child -- seems we're done!")
                     element = None
+                    return parent
                 if element is not None:
                     parent.append(element)
             else:

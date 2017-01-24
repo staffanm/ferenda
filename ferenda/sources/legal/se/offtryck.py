@@ -1354,7 +1354,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                               # function with .peek(2) and .peek(3)
                               # below
             txt = str(chunk).strip()
-            return (chunk.font.size == metrics.h1.size and txt.startswith("Bilaga ") or txt.startswith("Bilagor"))
+            return (chunk.font.size == metrics.h1.size and (txt.startswith("Bilaga ") or txt.startswith("Bilagor")))
         def is_implicit_appendix(chunk):
             # The technique of starting a new appendix without stating
             # so in the margin on the first page of the appendix
@@ -1425,7 +1425,6 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                         return False
                     else:
                         return True
-                
 
     def is_paragraph(parser):
         return True
@@ -1543,6 +1542,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                 parser.log.warning("Dupe section %s '%s' at p %s, previous at %s. Ignoring." %
                                    (ordinal, short(title), state.pageno,
                                     state.sectioncache[ordinal]))
+                title = "%s. %s" % (ordinal, title)
                 ordinal = None
             else:
                 state.sectioncache[ordinal] = "'%s' at p %s" % (short(title), state.pageno)

@@ -91,7 +91,7 @@ class JK(SwedishLegalSource):
         # this source does not have any predictable URLs, so we try to
         # find if we made a note on the URL when we ran download()
         entry = DocumentEntry(self.store.documententry_path(basefile))
-        return entry.orig_url
+        return entry.orig_url.replace(" ", "%20")
 
     def metadata_from_basefile(self, basefile):
         attribs = super(JK, self).metadata_from_basefile(basefile)
@@ -107,12 +107,43 @@ class JK(SwedishLegalSource):
         return "JK %s" % basefile
 
     def extract_metadata(self, soup, basefile):
+        # for the following decisions, we only have downloaded
+        # versions that uses an older HTML template. These descisions
+        # are for some reason no longer available at www.jk.se.
+        # 
+        # 1075-97-40, 1263-97-21, 2600-97-21, 3541-97-21, 396-98-22,
+        # 402-98-30, 358-01-40, 3272-01-65, 930-03-21, 2226-03-40,
+        # 3059-03-40, 3775-04-35, 4839-06-40, 5458-07-41, 6372-07-31,
+        # 3131-11-31, 3261-13-40 and 2356-15-28
+        #
+        # So we have an alternate scraping strategy for these.
+        
         content = soup.find("div", "content")
-        title = content.find("h2").get_text()
-        metadata = content.find("div", "date").get_text()
-        # eg "Diarienr: 4008-16-31 / Beslutsdatum: 12 jul 2016"
-        diarienummer = metadata.split()[1]
-        beslutsdatum = metadata.rsplit(": ", 1)[1]
+        if content:
+            title = content.find("h2").get_text()
+            metadata = content.find("div", "date").get_text()
+            # eg "Diarienr: 4008-16-31 / Beslutsdatum: 12 jul 2016"
+            diarienummer = metadata.split()[1]
+            beslutsdatum = metadata.rsplit(": ", 1)[1]
+        else:
+            # old HTML template
+            title = soup.find("h1", "besluttitle").get_text()
+            beslutsdatum = soup.find("span", class_="label",
+                                     text="Beslutsdatum").find_next_sibling("span").get_text()
+            diarienummer = soup.find("span", class_="label",
+                                     text="Diarienummer").find_next_sibling("span").get_text()
+            # in some rare cases given like <span
+            # class="data">3391-14-30 3696-14-30</span>, in which case
+            # we choose the last one. But sometimes they're given as
+            # "4243-13-40 m.fl.", in which case we choose the first
+            # "one"
+            if " " in diarienummer:
+                idx = 0 if "m.fl." in diarienummer else -1
+                diarienummer = diarienummer.split(" ")[idx]
+
+        if diarienummer != basefile:
+            self.log.warning("%s: Different diarienummer %s found in document" % (basefile, diarienummer))
+            
         a = self.metadata_from_basefile(basefile)
         a.update({"dcterms:title": title,
                   "dcterms:publisher": self.lookup_resource("JK", SKOS.altLabel),
@@ -128,9 +159,16 @@ class JK(SwedishLegalSource):
         fp.seek(0)
         soup = BeautifulSoup(fp.read(), "lxml")
         main = soup.find("div", "content")
-        main.find("div", "actions").extract()
-        main.find("div", "date").extract()
-        main.find("h2").extract()
+        if main:
+            main.find("div", "actions").extract()
+            main.find("div", "date").extract()
+            main.find("h2").extract()
+        else:
+            # old HTML template -- see comment in parse_metadata
+            main = soup.find("div", id="mainContent")
+            main.find("div", id="breadcrumbcontainer").extract()
+            main.find("h1", "besluttitle").extract()
+            main.find("div", "beslutmetadatacontainer").decompose()
         return main
 
     def tokenize(self, main):
