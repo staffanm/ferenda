@@ -7,6 +7,8 @@
 		xmlns:dcterms="http://purl.org/dc/terms/"
 		xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
+		xmlns:date="http://exslt.org/dates-and-times" 
+		extension-element-prefixes="date"
 		exclude-result-prefixes="xhtml rdf atom">
 
   <!-- assume a statusreport.xml like this:
@@ -36,13 +38,37 @@
   <xsl:template name="headmetadata"/>
   <xsl:template name="bodyclass">statusreport</xsl:template>
   <xsl:template name="pagetitle">
-    <h1>Status report</h1>
+    <xsl:variable name="total" select="count(//basefile)"/>
+    <xsl:variable name="failed" select="count(//basefile[action/@success='False'])"/>
+    <xsl:variable name="warnings" select="count(//basefile[action/warnings])"/>
+    <h1>Status report
+    <small><xsl:value-of select="date:date-time()"/>-
+
+      <!--
+      <xsl:value-of select="date:year()"/>-
+      <xsl:value-of select="date:month-in-year()"/>-
+      <xsl:value-of select="date:day-in-month()"/> | 
+      <xsl:value-of select="date:hour-in-day()"/>:
+      <xsl:value-of select="date:minute-in-hour()"/>:
+      <xsl:value-of select="date:second-in-minute()"/>
+      -->
+    </small>
+    </h1>
+    <h2>
+      <xsl:value-of select="$total"/> total documents
+      <small>
+	<xsl:value-of select="round(($failed div $total) * 100)"/> % failed,
+	<xsl:value-of select="round(($warnings div $total) * 100)"/> % warnings
+      </small>
+    </h2>
+
     <div class="control-panel">
       <button onclick="$('div.alert-success').toggle()">show/hide successes</button>
       <button onclick="$('div.alert-warning').toggle()">show/hide warnings</button>
       <button onclick="$('div.alert-danger').toggle()">show/hide errors</button>
     </div>
-  </xsl:template>
+</xsl:template>
+  
   <xsl:param name="dyntoc" select="true()"/>
   <xsl:param name="fixedtoc" select="true()"/>
   <xsl:param name="content-under-pagetitle" select="false()"/>
@@ -56,13 +82,22 @@
 
 
   <xsl:template match="repo">
-    <h2><xsl:value-of select="@alias"/></h2>
+    <xsl:variable name="total" select="count(basefile)"/>
+    <xsl:variable name="failed" select="count(basefile[action/@success='False'])"/>
+    <xsl:variable name="warnings" select="count(basefile[action/warnings])"/>
+    <h2>
+      <xsl:value-of select="@alias"/>
+      <small> - 
+	<xsl:value-of select="round(($failed div $total) * 100)"/> % failed,
+	<xsl:value-of select="round(($warnings div $total) * 100)"/> % warnings
+      </small>
+    </h2>
     <div class="basefiles">
       <xsl:apply-templates/>
     </div>
-    <p><xsl:value-of select="count(basefile)"/> processed, 
-    <xsl:value-of select="count(basefile[action/@success='False'])"/> failed,
-    <xsl:value-of select="count(basefile[action/warnings])"/> had warnings</p>
+    <p><xsl:value-of select="$total"/> processed, 
+    <xsl:value-of select="$failed"/> failed,
+    <xsl:value-of select="$warnings"/> had warnings</p>
   </xsl:template>
 
   <xsl:template match="action">
