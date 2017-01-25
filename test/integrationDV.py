@@ -112,6 +112,10 @@ class TestInstans(TestDVParserBase):
                "M.J. överklagade i Göta hovrätt och yrkade, såvitt nu är i "
                "fråga, att hovrätten skulle avvisa åtalet och undanröja "
                "tingsrättens dom.")
+        self.t({'court': 'Hovrätten över Skåne och Blekinge'},
+               '18 S. G. överklagade tingsrättens dom till Hovrätten över '
+               'Skåne och Blekinge (Sverige), som i dom av d. 9 juni 1998 '
+               'biföll hennes talan')
 
     def test_hd(self):
         self.t({'court': True},
@@ -552,7 +556,7 @@ class TestDelmal(TestDVParserBase):
         self.t({}, "IIII")        
 
     def test_with_malnr(self):
-        self.t({'id': 'I'}, "I (UM1001-08)")
+        self.t({'id': 'I', 'malnr': 'UM1001-08'}, "I (UM1001-08)")
         
 
 class TestDomslut(TestDVParserBase):

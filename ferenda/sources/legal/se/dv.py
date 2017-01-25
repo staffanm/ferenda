@@ -1403,7 +1403,7 @@ class DV(SwedishLegalSource):
     # @staticmethod
     def get_parser(self, basefile, sanitized):
         re_courtname = re.compile(
-            "^(Högsta domstolen|Hovrätten (över|för) [A-ZÅÄÖa-zåäö ]+|([A-ZÅÄÖ][a-zåäö]+ )(tingsrätt|hovrätt))(|, mark- och miljödomstolen|, Mark- och miljööverdomstolen)$")
+            "^(Högsta domstolen|Hovrätten (över|för)[A-ZÅÄÖa-zåäö ]+|([A-ZÅÄÖ][a-zåäö]+ )(tingsrätt|hovrätt))(|, mark- och miljödomstolen|, Mark- och miljööverdomstolen)$")
 
 #         productions = {'karande': '..',
 #                        'court': '..',
@@ -1558,7 +1558,7 @@ class DV(SwedishLegalSource):
             {'name': 'överklag-3',
              're': '(?P<karanden>[\w\.\(\)\- ]+) överklagade (?P<prevcourt>'
                    '\w+)s (beslut|omprövningsbeslut|dom)( i ersättningsfrågan|) (hos|till) '
-                   '(?P<court>[\w\, ]+?)( och|, som|$)',
+                   '(?P<court>[\w\, ]+?)( och yrkade| och anförde|, som| \(Sverige\)|$)',
              'method': 'match',
              'type': ('instans',)},
             {'name': 'överklag-4',
@@ -1643,8 +1643,10 @@ class DV(SwedishLegalSource):
             if len(strchunk) < 20:
                 m = re.match("(I{1,3}|IV)\.? ?(|\(\w+\-\d+\))$", strchunk)
                 if m:
-                    return {'id': m.group(1),
-                            'malnr': m.group(2)[1:-1] if m.group(2) else None}
+                    res = {'id': m.group(1)}
+                    if m.group(2):
+                        res['malnr'] = m.group(2)[1:-1]
+                    return res
             return {}
 
         def is_instans(parser, chunk=None):
@@ -2012,8 +2014,11 @@ class DV(SwedishLegalSource):
             return p
 
         def ordered(chunk):
-            if re.match("(\d+)\.", chunk):
-                return chunk.split(".", 1)[0]
+            # most ordered paras use "18. Blahonga". But when quoting
+            # EU law, sometimes "18 Blahonga". Treat these the same.
+            m =re.match("(\d+\.?)", chunk )
+            if m:
+                return m.group(1)
 
         def transition_domskal(symbol, statestack):
             if 'betankande' in statestack:
