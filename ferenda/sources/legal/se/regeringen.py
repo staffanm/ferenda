@@ -66,13 +66,15 @@ class Regeringen(Offtryck):
 
 
     @recordlastdownload
-    def download(self, basefile=None):
+    def download(self, basefile=None, url=None):
         if basefile:
-            entry = DocumentEntry(self.store.documententry_path(basefile))
-            if entry.orig_url:
-                return self.download_single(basefile, entry.orig_url)
+            if not url:
+                entry = DocumentEntry(self.store.documententry_path(basefile))
+                url = entry.orig_url
+            if url:
+                return self.download_single(basefile, url)
             else:
-                raise DownloadError("%s doesn't support downloading single basefiles" %
+                raise DownloadError("%s doesn't support downloading single basefiles w/o page URL" %
                                     self.__class__.__name__)
         params = {'filterType': 'Taxonomy',
                   'filterByType': 'FilterablePageBase',
