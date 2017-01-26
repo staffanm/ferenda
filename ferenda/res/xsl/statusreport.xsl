@@ -54,7 +54,7 @@
       -->
     </small>
     </h1>
-    <h2>
+    <h2 data-toc-skip="true">
       <xsl:value-of select="$total"/> total documents
       <small>
 	<xsl:value-of select="round(($failed div $total) * 100)"/> % failed,

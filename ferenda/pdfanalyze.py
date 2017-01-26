@@ -332,11 +332,17 @@ class PDFAnalyzer(object):
                 lowresbin = trunc_func(val / binsize)
                 lowres[lowresbin * binsize] += counter[val]
 
-            # it's entirely possible that two or more bins will have the same count. Find out how many, and select the best candidate
+            # it's entirely possible that two or more bins will have
+            # the same count (or similar -- common when analyzing
+            # three-col-layouts). 
             prevcount = None
             candidates = []
+
+            # a suitable candidate is one within 20 % of the candidate
+            # with the largest count
+            candidate_threshold = lowres.most_common()[0][1] * 0.8
             for val, count in lowres.most_common():
-                if prevcount and count != prevcount:
+                if count < candidate_threshold:
                     # ok we're done, select the best candidate
                     if trunc_func == ceil:
                         select_func = max
@@ -592,7 +598,7 @@ class PDFAnalyzer(object):
             size = pagewidth if "left" in counterkey or "right" in counterkey else pageheight
             # this is ridiculiously slow. Maybe ordinary bar charts
             # are faster?
-            bins = plot.hist(series, bins=size, range=(0, size))
+            bins = plot.hist(series, bins=int(size/10), range=(0, size))
             plot.set_title(counterkey)
             for k, v in metrics.items():
                  # FIXME: How annotate parindent, 2col etc ?
