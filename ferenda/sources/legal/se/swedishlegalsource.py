@@ -16,7 +16,7 @@ import os
 import sys
 import re
 import codecs
-from io import BytesIO
+from io import BytesIO, StringIO, BufferedIOBase
 
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
@@ -514,6 +514,7 @@ class SwedishLegalSource(DocumentRepository):
         PreambleSection.counter = 0
         self.refparser._legalrefparser.namedlaws = {}
         fp = self.parse_open(doc.basefile)
+        # maybe the fp now contains a .patchdescription?
         resource = self.parse_metadata(fp, doc.basefile)
         doc.meta = resource.graph
         doc.uri = str(resource.identifier)
@@ -571,13 +572,33 @@ class SwedishLegalSource(DocumentRepository):
         descpath = patchstore.path(basefile, "patches", ".desc")
         if not os.path.exists(patchpath):
             return fp
-        from patchit import PatchSet
-        with open(patchpath, 'r') as pfp:
+        self.log.warning("%s: Applying patch %s" % (basefile, patchpath))
+        from ferenda.thirdparty.patchit import PatchSet, PatchSyntaxError, PatchConflictError
+        if isinstance(fp, BufferedIOBase): # binary stream, won't play nice with patchit
+            fp = codecs.getreader(self.source_encoding)(fp)
+        with codecs.open(patchpath, 'r', encoding=self.source_encoding) as pfp:
+            if self.config.patchformat == "rot13":
+                # replace the rot13 obfuscated stream with a plaintext stream
+                # pfp = BytesIO(codecs.encode(codecs.decode(pfp.read(), encoding="rot13"), self.source_encoding))
+                pfp = StringIO(codecs.decode(pfp.read(), encoding="rot13"))
             # this might raise a PatchSyntaxError
             ps = PatchSet.from_stream(pfp)
         assert len(ps.patches) == 1
-        stream = ps.patches[0].merge(fp)
-        return stream
+
+        if ps.patches[0].hunks[0].comment:
+            desc = ps.patches[0].hunks[0].comment
+        elif os.path.exists(descpath):
+            desc = util.readfile(descpath).strip()
+        else:
+            desc = "(No patch description available)"
+
+        # perform the patching, return the result as a stream, and add
+        # an attribute with the description
+        fp = StringIO("\n".join(ps.patches[0].merge(fp.readlines(keepends=False))))
+        fp.patchdescription = desc
+        return fp
+    
+
 
     def downloaded_to_intermediate(self, basefile):
         """Given a basefile, convert the corresponding downloaded file 
@@ -585,7 +606,7 @@ class SwedishLegalSource(DocumentRepository):
         to that intermediate format (if any).
         
         The default implementation does not do any conversation, simply
-        opens downloaded_path. Any source that actually uses
+        opens downloaded_path. Any source that actuallyhou uses
         intermediate files should override this.
         
         """
@@ -597,6 +618,12 @@ class SwedishLegalSource(DocumentRepository):
         about the object."""
         rawhead = self.extract_head(fp, basefile)
         attribs = self.extract_metadata(rawhead, basefile)
+        # examine fp to see if we have a patchdescription
+        if hasattr(fp, 'patchdescription') and 'patchdescription' not in attribs:
+            # FIXME: we shouldn't use rinfoex: in canonical code. Is
+            # there anything in prov: or somewhere else that could be
+            # used to signify description of a patch?
+            attribs['rinfoex:patchdescription'] = fp.patchdescription
         sane_attribs = self.sanitize_metadata(attribs, basefile)
         resource = self.polish_metadata(sane_attribs)
         self.infer_metadata(resource, basefile)

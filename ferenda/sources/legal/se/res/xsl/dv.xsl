@@ -24,6 +24,11 @@
   <xsl:template name="pagetitle">
     <div class="section-wrapper toplevel">
       <section class="col-sm-7">
+	<xsl:if test="//xhtml:meta[@property='rinfoex:patchdescription']">
+	  <p class="alert alert-warning patchdescription">
+	    Texten har ändrats jämfört med källan: <xsl:value-of select="//xhtml:meta[@property='rinfoex:patchdescription']/@content"/>
+	  </p>
+	</xsl:if>
 	<h1><xsl:value-of select="//xhtml:meta[@property='dcterms:identifier']/@content"/></h1>
 	<p class="lead"><xsl:value-of select="//xhtml:meta[@property='rpubl:referatrubrik']/@content"/></p>
 	<xsl:apply-templates/>

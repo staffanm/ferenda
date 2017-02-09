@@ -1,0 +1,44 @@
+--- data/sfs/intermediate/1979/1152.txt	2010-01-03 19:36:35.116000000 +0100
++++ c:\users\staffan\appdata\local\temp\tmpktpphz	2010-01-03 19:36:27.073600000 +0100
+@@ -255,12 +255,14 @@
+                 lagring av bränsle och annan byggnad för produktionen utgör
+                 kraftverksbyggnad.
+ 
+-Industribyggnad Byggnad som är inrättad för industriell verksamhet och som
++Industri-
++byggnad         Byggnad som är inrättad för industriell verksamhet och som
+                 inte utgör kraftverksbyggnad.
+ 
+ Specialbyggnad  Med specialbyggnad avses
+ 
+-                Försvarsbyggnad Byggnad som används för försvarsändamål eller
++                Försvars-
++                byggnad         Byggnad som används för försvarsändamål eller
+                                 ekonomisk försvarsberedskap, om byggnaden
+                                 inte är en fristående industriellanläggning.
+                                 Även mässbyggnad ska utgöra försvarsbyggnad.
+@@ -298,7 +300,7 @@
+                                 inte anläggning där verksamheten i allt
+                                 väsentligt utgör ett led i en industriell
+                                 process.
+-
++ 
+                 Vårdbyggnad     Byggnad som används för sjukvård,
+                                 missbrukarvård, omsorger om barn och ungdom,
+                                 kriminalvård, åldringsvård eller omsorger om
+@@ -337,8 +339,7 @@
+                                 Krematorium och annan byggnad som används för
+                                  begravningsverksamhet.
+ 
+-                Allmän byggnad  Byggnad som tillhör staten, kommun eller
+-annan
++                Allmän byggnad  Byggnad som tillhör staten, kommun eller annan
+                                 menighet och som används för allmän styrelse,
+                                 förvaltning, rättsvård, ordning eller säkerhet
+                                 samt fritidsgård och byggnad med likartad
+@@ -3669,4 +3670,4 @@
+ 
+ 2. Vid tillämpning av 2 kap. 4 § ska täkttillstånd enligt
+ 18 § naturvårdslagen (1964:822) eller vattenlagen (1983:291)
+-anses som täkttillstånd enligt miljöbalken.
++anses som täkttillstånd enligt miljöbalken.

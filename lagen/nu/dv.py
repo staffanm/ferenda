@@ -6,7 +6,7 @@ from builtins import *
 from collections import Counter
 from operator import attrgetter, index
 
-from rdflib import RDF, URIRef, BNode, Graph
+from rdflib import RDF, URIRef, BNode, Graph, Literal
 from rdflib.namespace import DCTERMS, OWL, RDFS
 from cached_property import cached_property
 
@@ -15,7 +15,7 @@ from ferenda import fulltextindex, util
 from ferenda.elements import Link
 from ferenda.elements.html import Strong
 from ferenda.sources.legal.se import DV as OrigDV
-from ferenda.sources.legal.se import RPUBL
+from ferenda.sources.legal.se import RPUBL, RINFOEX
 from . import SameAs
 
 
@@ -45,6 +45,9 @@ class DV(OrigDV, SameAs):
         coin_uri = self.sameas_minter.space.coin_uri
         resource = super(DV, self).polish_metadata(head)
         refuri = resource.identifier
+        if 'rinfoex:patchdescription' in head:
+            resource.add(RINFOEX.patchdescription,
+                         Literal(head['rinfoex:patchdescription'], lang="sv"))
         refuri_sameas = coin_uri(resource)
         resource.graph.add((URIRef(refuri), OWL.sameAs, URIRef(refuri_sameas)))
         # NB: In theory, we have all the data we need to generate a

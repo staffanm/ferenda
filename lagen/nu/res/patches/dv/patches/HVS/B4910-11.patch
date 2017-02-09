@@ -1,0 +1,1010 @@
+--- qngn/qi/vagrezrqvngr/bbkzy/UIF/O4910-11.kzy	1980-01-01 00:00:00.000000000 +0100
++++ /gzc/gzcu3sjIU	2015-04-24 21:02:39.000000000 +0200
+@@ -1208,7 +1208,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>Tögrobetf gvatfeägg</j:g>
++              <j:g>Gvatfeägg</j:g>
+             </j:e>
+           </j:c>
+           <j:c j:efvqE="0074725P" j:efvqEQrsnhyg="0074725P" j:efvqC="0074725P">
+@@ -1226,7 +1226,7 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+-Åxyntnera lexnqr ivq gvatfeäggra nafine å Z.T. bpu U.Z.F. söe zvffunaqry bpu byntn
++Åxyntnera lexnqr ivq gvatfeäggra nafine å N bpu O söe zvffunaqry bpu byntn
+ sevurgforeöinaqr bpu cåfgbq 
+ </j:g>
+             </j:e>
+@@ -1244,11 +1244,11 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>, fåfbz una fyhgyvtra hgsbeznqr fva gnyna: Z.T. bpu U.Z.F. une qra 23 znw
+-              2010 cå Infntngna v Tögrobet trzrafnzg bpu v fnzsöefgåaq zrq inenaqen
+-              hccfågyvtra gvyysbtng C.G. fihyyanq, ebqanq bpu fzäegn trabz ngg gn gnt v ubabz
+-              bpu gelpxn are ubabz cå znexra få ngg unaf cnaan fybtf v znexra. Z.T. bpu U.Z.F.
+-              une ivq fnzzn gvyysäyyr trzrafnzg bpu v fnzsöefgåaq oreöing C.G. sevurgra trabz
++              <j:g>, fåfbz una fyhgyvtra hgsbeznqr fva gnyna: N bpu O une
++              trzrafnzg bpu v fnzsöefgåaq zrq inenaqen
++              hccfågyvtra gvyysbtng P fihyyanq, ebqanq bpu fzäegn trabz ngg gn gnt v ubabz
++              bpu gelpxn are ubabz cå znexra få ngg unaf cnaan fybtf v znexra. N bpu O
++              une ivq fnzzn gvyysäyyr trzrafnzg bpu v fnzsöefgåaq oreöing P sevurgra trabz
+               ngg oryättn ubabz zrq unaqsäatfry.</j:g>
+             </j:e>
+           </j:c>
+@@ -1266,8 +1266,8 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>C.G. ovgeäqqr ågnyrg bpu lexnqr ngg gvatfeäggra fxhyyr söecyvxgn Z.T. bpu
+-              U.Z.F. ngg fbyvqnevfxg gvyy ubabz hgtr fxnqrfgåaq zrq 20 000 xe wäzgr eäagn. Ni
++              <j:g>P ovgeäqqr ågnyrg bpu lexnqr ngg gvatfeäggra fxhyyr söecyvxgn N bpu
++              O ngg fbyvqnevfxg gvyy ubabz hgtr fxnqrfgåaq zrq 20 000 xe wäzgr eäagn. Ni
+               orybccrg nifåt 15 000 xe refäggavat söe xeäaxavat bpu 5 000 xe refäggavat söe
+               firqn bpu iäex.</j:g>
+             </j:e>
+@@ -1379,7 +1379,7 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+-Z.T. une orfgevgg nafine. Una une 
++N une orfgevgg nafine. Una une 
+ </j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+@@ -1397,8 +1397,8 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+- söearxng täeavatra, qbpx ngg una rexäag ngg una oryntg C.G. zrq unaqsäatfry. Una une twbeg
+-täyynaqr ngg qrggn vagr äe fgenssoneg rsgrefbz qrg ine orsbtng ngg naiäaqn unaqsäatfry cå C.G.
++ söearxng täeavatra, qbpx ngg una rexäag ngg una oryntg P zrq unaqsäatfry. Una une twbeg
++täyynaqr ngg qrggn vagr äe fgenssoneg rsgrefbz qrg ine orsbtng ngg naiäaqn unaqsäatfry cå P
+ zrq uäafla gvyy uhe qraar orgrqqr fvt ivq gvyysäyyrg.
+ </j:g>
+             </j:e>
+@@ -1417,7 +1417,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>U.Z.F. une söearxng täeavatra.</j:g>
++              <j:g>O une söearxng täeavatra.</j:g>
+             </j:e>
+           </j:c>
+           <j:c j:efvqE="0074725P" j:efvqEQrsnhyg="0074725P" j:efvqC="0074725P">
+@@ -1434,7 +1434,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>V gvatfeäggra une uöegf Z.T., U.Z.F., C.G. bpu ivggarg R.N. Qrffn une
++              <j:g>V gvatfeäggra une uöegf N, O, P bpu ivggarg Q. Qrffn une
+               oreäggng oy.n. söywnaqr.</j:g>
+             </j:e>
+           </j:c>
+@@ -1453,7 +1453,7 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+-C.G: Una unqr inevg urzzn ubf ra xbzcvf fbz slyyqr åe vaana qr tvpx gvyy 
++P: Una unqr inevg urzzn ubf ra xbzcvf fbz slyyqr åe vaana qr tvpx gvyy 
+ </j:g>
+             </j:e>
+             <j:e j:efvqECe="0074725P">
+@@ -1463,7 +1463,7 @@
+               </j:eCe>
+               <j:ynfgEraqrerqCntrOernx />
+               <j:g kzy:fcnpr="cerfreir">
+-Erfgnhenat Inynaq. Una hccfxnggne ngg una qehpxvg fwh - åggn öy haqre uryn qntra, zrq oöewna
++erfgnhenatra. Una hccfxnggne ngg una qehpxvg fwh - åggn öy haqre uryn qntra, zrq oöewna
+ pn xy. 
+ </j:g>
+             </j:e>
+@@ -1500,17 +1500,17 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+- Aäe una xbz gvyy Inynaq oyri una söefg niivfnq cå tehaq ni ngg inxgrean glpxgr ngg una ine
++ Aäe una xbz gvyy erfgnhenatra oyri una söefg niivfnq cå tehaq ni ngg inxgrean glpxgr ngg una ine
+ söe orehfnq. Inxgra fn gvyy ubabz ngg tå bpu ”qevpxn ra xbcc xnssr”. Una twbeqr qrggn bpu svpx
+-pvexn 10-15 zvahgre franer xbzzn va cå Inynaq. Aäe una inevg vaar v hatrsäe 30 zvahgre xbz
+-U.Z.F. senz gvyy ubabz cå qnaftbyirg bpu fnqr gvyy ubabz ngg tå qäevseåa. Una irg vagr inq
+-nayrqavatra ine gvyy niivfavatra. U.Z.F. söywqr ubabz hg bpu yäzanqr ni ubabz ivq rageéa. Hgr
+-cå tngna fgnaanqr C.G. gvyy ra xbeg fghaq. Una ine qå aåten zrgre hgnasöe nifcäeeavatra zrq
++pvexn 10-15 zvahgre franer xbzzn va cå erfgnhenatra. Aäe una inevg vaar v hatrsäe 30 zvahgre xbz
++O senz gvyy ubabz cå qnaftbyirg bpu fnqr gvyy ubabz ngg tå qäevseåa. Una irg vagr inq
++nayrqavatra ine gvyy niivfavatra. O söywqr ubabz hg bpu yäzanqr ni ubabz ivq rageéa. Hgr
++cå tngna fgnaanqr P gvyy ra xbeg fghaq. Una ine qå aåten zrgre hgnasöe nifcäeeavatra zrq
+ erc fbz äe ivq rageéa. Qrg fgbq ra qry sbyx cå vafvqna ni ercra bpu xönqr söe ngg xbzzn va.
+ Zrqna una fgbq hgnasöe cengnqr una zrq ra gwrw v aäeurgra. Una ine qå vagr cå aåtbg fägg v
+ xbagnxg zrq aåtba ni inxgrean, fbz fgbq v qöeera. Haqre gvqra eöxgr una ra pvtnergg, fbz una
+ frqna fyäccgr bpu fyäpxgr. Una svzcnqr qra senzsöe fvt cå znexra, vagr v evxgavat zbg aåtba
+-crefba. Fnzgvqvtg oöewnqr una rafnz tå v evxgavat seåa Inynaq. Aäe una unqr xbzzvg pvexn 10-15
++crefba. Fnzgvqvtg oöewnqr una rafnz tå v evxgavat seåa erfgnhenatra. Aäe una unqr xbzzvg pvexn 10-15
+ zrgre obeg seåa nifcäeeavatnean xbz giå crefbare hcc onxvseåa. Qr gbt gnt v unaf nkyne bpu
+ öirenezne. Qr ine tnafxn ubgshyyn bpu ntterffvin bpu ”ohssnqr” bzxevat ubabz. Fäggrg qr
+ hccsöeqr fvt cå ine ntterffvig. Qr gelpxgr arq ubabz få ngg una xbz tnafxn uåeg cå nfsnygra.
+@@ -1521,8 +1521,8 @@
+ yätrg vagr ivyxn qrg ine fbz xbz få uäe onxvseåa bpu oyri qäesöe oyvivg iäyqvtg eäqq. Aäe una
+ yåt cå znexra svpx una unaqsäatfry cå fvt. Söefg qå söefgbq una ngg qr zåfgr inen
+ beqavatfinxgre. Qr fn qbpx vatrg fwäyin bz ngg qr ine beqavatfinxgre. Qr fn vagr uryyre aåtbg
+-bz ngg qr fxhyyr fäggn cå ubabz unaqsäatfry. Una äe uryg fäxre cå ngg Z.T. ine ra ni qrz fbz
+-gelpxgr arq ubabz cå znexra. Una äe vagr yvxn fäxre cå ngg U.Z.F. ine qra naqer. Una yåt cå
++bz ngg qr fxhyyr fäggn cå ubabz unaqsäatfry. Una äe uryg fäxre cå ngg N ine ra ni qrz fbz
++gelpxgr arq ubabz cå znexra. Una äe vagr yvxn fäxre cå ngg O ine qra naqer. Una yåt cå
+ znexra zrq unaqsäatfry v hatrsäe 5-10 zvahgre. Frqna ylsgr inxgrean hcc ubabz seåa znexra cå
+ rgg tnafxn oehgnyg fägg, fbz twbeqr bag v neznean. Una haqenqr inq fbz fxhyyr uäaqn zrq uäafla
+ gvyy qrenf oelfxn hccgeäqnaqr. Una yrqqrf qäersgre ni qr giå inxgrean, fbz tvpx ra cå ineqren
+@@ -1531,7 +1531,7 @@
+ qrggn fägg. Qrg tvpx ngg fr v ehzzrg zra vagr få oen söe qrg ine tnafxn zöexg. Ra naana,
+ gerqwr, zna snaaf qå v hgelzzrg bpu iäagnqr. Aåten frxhaqre rsgre ngg qr oåqn inxgrean unqr
+ yäzang ehzzrg svpx una rgg xalgaäiffynt v nafvxgrg ni qra bxäaqr znaara fbz ine qäe. Rsgre rgg
+-gnt xbz cbyvfra qvg. C.G. unqr sågg fgå cå xaä v ehzzrg uryn gvqra gvyy qrff. Una fgbq qäesöe
++gnt xbz cbyvfra qvg. P unqr sågg fgå cå xaä v ehzzrg uryn gvqra gvyy qrff. Una fgbq qäesöe
+ cå xaä v unyizöexerg v hatrsäe 15 zvahgre vaana cbyvfra xbz. Gvqra ine fiåe ngg hccfxnggn söe
+ qrg xäaqrf fbz ra rivturg. Una gäaxgr zrqna una fgbq cå xaä ”inesöe 
+ </j:g>
+@@ -1635,8 +1635,8 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+-Z.T: Una une inevg beqavatfinxg v fwh åe bpu neorgnqr ivq qrg nxghryyn gvyysäyyrg fbz
+-beqavatfinxg ivq Inynaq. Una arxnqr C.G. vageäqr ivq rageéa cå tehaq ni 
++N: Una une inevg beqavatfinxg v fwh åe bpu neorgnqr ivq qrg nxghryyn gvyysäyyrg fbz
++beqavatfinxg ivq erfgnhenatra. Una arxnqr P vageäqr ivq rageéa cå tehaq ni 
+ </j:g>
+             </j:e>
+             <j:e j:efvqECe="0074725P">
+@@ -1646,11 +1646,11 @@
+               </j:eCe>
+               <j:ynfgEraqrerqCntrOernx />
+               <j:g>orehfavat bpu söerfybt ngg qraar obeqr gn aåtbg ngg ägn bpu qevpxn bpu
+-              xbzzn gvyyonxn franer. C.G. oyri yvgrg hcceöeq öire qrggn, zra yäzanqr äaqå
+-              cyngfra. C.G. xbz gvyyonxn yvgr franer bpu Z.T. fyäccgr qå va ubabz, zra
++              xbzzn gvyyonxn franer. P oyri yvgrg hcceöeq öire qrggn, zra yäzanqr äaqå
++              cyngfra. P xbz gvyyonxn yvgr franer bpu N fyäccgr qå va ubabz, zra
+               hccznanqr ubabz ngg ”gn qrg söefvxgvtg zrq nyxbubyra” qäevaar. Ra fghaq franer
+-              oyri C.G. niivfnq vtra cå tehaq ni orehfavat, bpu ine iäyqvtg hcceöeq aäe una
+-              xbz hg. C.G. xnyynqr qå inxgrean söe tyåcbeq fåfbz ”inxgwäiyne” bpu ”</j:g>
++              oyri P niivfnq vtra cå tehaq ni orehfavat, bpu ine iäyqvtg hcceöeq aäe una
++              xbz hg. P xnyynqr qå inxgrean söe tyåcbeq fåfbz ”inxgwäiyne” bpu ”</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyFgneg" />
+             <j:e j:efvqECe="0074725P">
+@@ -1667,8 +1667,8 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+-”. Fåqnag äe gliäee inayvtg bpu Z.T. oelqqr fvt vagr få zlpxrg bz qrg. Una fåt frqna ngg C.G.
+-fgbq vaar v Inynaqf såyybe zrq 
++”. Fåqnag äe gliäee inayvtg bpu N oelqqr fvt vagr få zlpxrg bz qrg. Una fåt frqna ngg P
++fgbq vaar v erfgnhenatraf såyybe zrq 
+ </j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyFgneg" />
+@@ -1686,9 +1686,9 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+- bpu eöxgr ra pvtneergg. Pvtneerggra ine aäfgna hcceöxg aäe C.G. xaäccgr viät qra zrq
+-svatenean, få ngg qra geässnqr U.Z.F., fbz ine giå - ger zrgre vseåa, v elttra. Z.T.
+-hccsnggnqr qrggn fbz beqavatffgöenaqr. Z.T. tvpx qå senz gvyy C.G. bpu gbt qraar yägg v nezra
++ bpu eöxgr ra pvtneergg. Pvtneerggra ine aäfgna hcceöxg aäe P xaäccgr viät qra zrq
++svatenean, få ngg qra geässnqr O, fbz ine giå - ger zrgre vseåa, v elttra. N
++hccsnggnqr qrggn fbz beqavatffgöenaqr. N tvpx qå senz gvyy P bpu gbt qraar yägg v nezra
+ söe ngg niyätfan ubabz seåa qrg 
+ </j:g>
+             </j:e>
+@@ -1707,7 +1707,7 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+- bzeåqrg. C.G. unqr vagr 
++ bzeåqrg. P unqr vagr 
+ </j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+@@ -1725,10 +1725,10 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+- niivfavatra bpu qäesöe oyri ah rgg niyätfanaqr nxghryyg. C.G. oyri ah iäyqvtg iåyqfnz bpu
+-ivsgnqr zrq neznean fnzg xeäatqr zrq xebccra qå Z.T. gbt ubabz v nezra. U.Z.F. xbz qå senz cå
+-rgg cne frxhaqre söe ngg fgöggn Z.T. Qrg oyri unaqtrzäat bpu qr ger unzanqr cå znexra. Una
+-xbzzre vagr vuåt rknxg uhe qr svpx are C.G. cå znexra, zra gebe ngg qr gbt gnt v 
++ niivfavatra bpu qäesöe oyri ah rgg niyätfanaqr nxghryyg. P oyri ah iäyqvtg iåyqfnz bpu
++ivsgnqr zrq neznean fnzg xeäatqr zrq xebccra qå N gbt ubabz v nezra. O xbz qå senz cå
++rgg cne frxhaqre söe ngg fgöggn N Qrg oyri unaqtrzäat bpu qr ger unzanqr cå znexra. Una
++xbzzre vagr vuåt rknxg uhe qr svpx are P cå znexra, zra gebe ngg qr gbt gnt v 
+ </j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyFgneg" />
+@@ -1737,7 +1737,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>C.</j:g>
++              <j:g>P:f</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+             <j:e j:efvqECe="0074725P">
+@@ -1745,7 +1745,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>G:f</j:g>
++              
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyRaq" />
+             <j:cebbsRee j:glcr="tenzRaq" />
+@@ -1764,7 +1764,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>C.</j:g>
++              <j:g>P:f</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+             <j:e j:efvqECe="0074725P">
+@@ -1772,7 +1772,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>G:f</j:g>
++              
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyRaq" />
+             <j:cebbsRee j:glcr="tenzRaq" />
+@@ -1782,10 +1782,10 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+- uhihq fybt v znexra. C.G. sbegfnggr ngg söeföxn fyvaten fvt bpu xeäatn zrq xebccra. Una
+-söeföxgr äira ngg fcnexn onxåg. C.G. yåt qå cå oeöfgrg. Z.T. bpu U.Z.F. orfyög qå ngg C.G.
+-fxhyyr oryättnf zrq unaqsäatfry. Få sbeg fvghngvbara yhtanqr are fvt, uwäycgr qr C.G. ngg
+-fgäyyn fvt hcc. Qr xbagnxgnqr frqna zlaqvturgrean bpu öireyäzanqr C.G. gvyy cbyvf. 
++ uhihq fybt v znexra. P sbegfnggr ngg söeföxn fyvaten fvt bpu xeäatn zrq xebccra. Una
++söeföxgr äira ngg fcnexn onxåg. P yåt qå cå oeöfgrg. N bpu O orfyög qå ngg P
++fxhyyr oryättnf zrq unaqsäatfry. Få sbeg fvghngvbara yhtanqr are fvt, uwäycgr qr P ngg
++fgäyyn fvt hcc. Qr xbagnxgnqr frqna zlaqvturgrean bpu öireyäzanqr P gvyy cbyvf. 
+ </j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+@@ -1803,7 +1803,7 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+- Una une vatra zvaarfovyq ni ngg una gntvg C.G. gvyy inehvagntrg, fåfbz una fntg v gvqvtner
++ Una une vatra zvaarfovyq ni ngg una gntvg P gvyy inehvagntrg, fåfbz una fntg v gvqvtner
+ cbyvfsöeuöe, ryyre ngg qraar yäzangf qäe cå xaä zrq unaqsäatfry. Qrg une tågg yåat gvq frqna
+ uäaqryfra bpu qrg une vageässng zåatn vapvqragre, ivyxrg töe qrg yägg ngg oynaqn vubc byvxn
+ gvyysäyyra. Qrg fgäzzre ngg qrg svaaf rgg inehvagnt cå onxfvqna. Qr gne voynaq qvg crefbare
+@@ -1826,11 +1826,11 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+-U.Z.F: Una fgbq v rageéa aäe Z.T. niivfnqr C.G. C.G. glpxgr vagr ngg una ine få orehfnq bpu
+-oöewnqr qvfxhgren zrq Z.T. bz inesöe una oyri niivfnq. Frqna Z.T. unqr tågg va sbegfnggr C.G.
++O: Una fgbq v rageéa aäe N niivfnqr P P glpxgr vagr ngg una ine få orehfnq bpu
++oöewnqr qvfxhgren zrq N bz inesöe una oyri niivfnq. Frqna N unqr tågg va sbegfnggr P
+ ngg fgöen bpu xnyynqr ra rageéiäeqra söe ”svggn” bpu inxgrean söe ”inxgwäiyne” zrq zren. Una
+-tvpx qäesöe senz gvyy C.G. bpu fn gvyy qraar ngg tå qäevseåa. C.G. tvpx vagr bpu una orfgäzqr
+-fvt qäesöe söe ngg niyätfan C.G. Una tvpx hgnasöe nifcäeeavatfercra bpu gbt gnt v 
++tvpx qäesöe senz gvyy P bpu fn gvyy qraar ngg tå qäevseåa. P tvpx vagr bpu una orfgäzqr
++fvt qäesöe söe ngg niyätfan P Una tvpx hgnasöe nifcäeeavatfercra bpu gbt gnt v 
+ </j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyFgneg" />
+@@ -1839,7 +1839,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>C.</j:g>
++              <j:g>P:f</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+             <j:e j:efvqECe="0074725P">
+@@ -1847,7 +1847,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>G:f</j:g>
++              
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyRaq" />
+             <j:cebbsRee j:glcr="tenzRaq" />
+@@ -1858,7 +1858,7 @@
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+  iäafgen nez bpu yrqqr qraar obeg ra ovg obegnasöe IVC-ehgna. Una tvpx frqna gvyyonxn gvyy
+-rageéa bpu fn gvyy Z.T. ngg una xhaqr xbzzn hg vtra. 
++rageéa bpu fn gvyy N ngg una xhaqr xbzzn hg vtra. 
+ </j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+@@ -1876,9 +1876,9 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+- Qrg tvpx ra fghaq bpu aäe una frqna fgbq zrq oyvpxra zbg fåt una ngg Z.T. oyri pubpxnq bpu
+-hcceöeq. Z.T. fn ngg ”una xnfgnqr fva pvtt cå qvt”. Z.T. öccanqr ercrg bpu tvpx hg bpu una
+-fwäyi fgbq xine rsgrefbz una gäaxgr ngg Z.T. fxhyyr niyätfan C.G. Una fåt ngg C.G. söeföxgr
++ Qrg tvpx ra fghaq bpu aäe una frqna fgbq zrq oyvpxra zbg fåt una ngg N oyri pubpxnq bpu
++hcceöeq. N fn ngg ”una xnfgnqr fva pvtt cå qvt”. N öccanqr ercrg bpu tvpx hg bpu una
++fwäyi fgbq xine rsgrefbz una gäaxgr ngg N fxhyyr niyätfan P Una fåt ngg P söeföxgr
+ fyvgn fvt bpu twbeqr zbgfgåaq bpu inyqr qäesöe ngg tå senz bpu nffvfgren. Una gbt gnt v 
+ </j:g>
+             </j:e>
+@@ -1888,7 +1888,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>C.</j:g>
++              <j:g>P:f</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+             <j:e j:efvqECe="0074725P">
+@@ -1896,7 +1896,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>G:f</j:g>
++              <j:g></j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyRaq" />
+             <j:cebbsRee j:glcr="tenzRaq" />
+@@ -1906,9 +1906,9 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+- iäafgen nez, zra C.G. oyri qå iåyqfnz bpu söeföxgr gn fvt ybff. Una bpu Z.T. söeföxgr gn zrq
+-C.G. obeg bpu qr xbz aåtba zrgre hgnasöe IVC-ercra. Qr orfgäzqr fvt söe ngg yättn are C.G. söe
+-ngg yhtan are ubabz bpu yhtan fvghngvbara. C.G. hggnynqr qbpx vatrg ubg bz iåyq. Qr gbt gnt v 
++ iäafgen nez, zra P oyri qå iåyqfnz bpu söeföxgr gn fvt ybff. Una bpu N söeföxgr gn zrq
++P obeg bpu qr xbz aåtba zrgre hgnasöe IVC-ercra. Qr orfgäzqr fvt söe ngg yättn are P söe
++ngg yhtan are ubabz bpu yhtan fvghngvbara. P hggnynqr qbpx vatrg ubg bz iåyq. Qr gbt gnt v 
+ </j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyFgneg" />
+@@ -1917,7 +1917,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>C.</j:g>
++              <j:g>P:f</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+             <j:e j:efvqECe="0074725P">
+@@ -1925,7 +1925,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>G:f</j:g>
++              <j:g></j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyRaq" />
+             <j:cebbsRee j:glcr="tenzRaq" />
+@@ -1935,7 +1935,7 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+- nez bpu naiäaqr xebccfivxgra söe ngg så are ubabz. C.G. xbz are cå znexra yvgr cå fvqna öire 
++ nez bpu naiäaqr xebccfivxgra söe ngg så are ubabz. P xbz are cå znexra yvgr cå fvqna öire 
+ </j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyFgneg" />
+@@ -1944,7 +1944,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>U.Z.</j:g>
++              <j:g>O:f</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+             <j:e j:efvqECe="0074725P">
+@@ -1952,7 +1952,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>F:f</j:g>
++              <j:g></j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyRaq" />
+             <j:cebbsRee j:glcr="tenzRaq" />
+@@ -1962,9 +1962,9 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+- ora fbz una frqna svpx qen ybff. Una uöyy v C.G. zrqna Z.T. ynqr unaqsäatfry. Una bpu Z.T.
+-yäzanqr frqna öire C.G. qverxg gvyy ra cbyvfovy fbz fgbq ivq Cerffoleåa. Z.T. fxeri enccbegra
+-zrqna una fwäyi ågretvpx gvyy neorgrg. Una fåt rsgreåg aåtbg v cnaana cå C.G. fbz fåt hg fbz
++ ora fbz una frqna svpx qen ybff. Una uöyy v P zrqna N ynqr unaqsäatfry. Una bpu N
++yäzanqr frqna öire P qverxg gvyy ra cbyvfovy fbz fgbq ivq Cerffoleåa. N fxeri enccbegra
++zrqna una fwäyi ågretvpx gvyy neorgrg. Una fåt rsgreåg aåtbg v cnaana cå P fbz fåt hg fbz
+ qnzz seåa nfsnygra, zra qrg xna äira un inevg rgg oyåzäexr, ivyxrg una bpxfå oreäggnqr söe
+ cbyvfra v söeuöe.
+ </j:g>
+@@ -1985,10 +1985,10 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+-R.N: Una äe gnkvpunhssöe bpu fngg ivq qrg nxghryyn gvyysäyyrg v fva gnkv bzxevat 10-15 zrgre
+-vseåa rageéa gvyy Inynaq. Qrg xbz ra rafnz xvyyr, C.G., tåraqr senz zbg gnkvovyra zrq elttra
+-zbg Inynaq. Una gebqqr ngg qraar xnafxr ivyyr un gnkv. Aäe C.G. orsnaa fvt pvexn giå zrgre
+-seåa gnkvovyra xbz Z.T. bpu U.Z.F. senz onxvseåa bpu ra ni qrz gbt gnt ehag 
++Q: Una äe gnkvpunhssöe bpu fngg ivq qrg nxghryyn gvyysäyyrg v fva gnkv bzxevat 10-15 zrgre
++vseåa rageéa gvyy erfgnhenatra. Qrg xbz ra rafnz xvyyr, P, tåraqr senz zbg gnkvovyra zrq elttra
++zbg erfgnhenatra. Una gebqqr ngg qraar xnafxr ivyyr un gnkv. Aäe P orsnaa fvt pvexn giå zrgre
++seåa gnkvovyra xbz N bpu O senz onxvseåa bpu ra ni qrz gbt gnt ehag 
+ </j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyFgneg" />
+@@ -1997,7 +1997,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>C.</j:g>
++              <j:g>P:f</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+             <j:e j:efvqECe="0074725P">
+@@ -2005,7 +2005,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>G:f</j:g>
++              <j:g></j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyRaq" />
+             <j:cebbsRee j:glcr="tenzRaq" />
+@@ -2015,8 +2015,8 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+- unyf zrq nezra. Frqna gelpxgr qr gvyyfnzznaf are C.G. cå znexra bpu zvffunaqynqr ubabz. Qr
+-zvffunaqynqr C.G. trabz fynt, äira zrq ongbat, bpu fcnexne zbg xebccra aäe qraar yåt cå
++ unyf zrq nezra. Frqna gelpxgr qr gvyyfnzznaf are P cå znexra bpu zvffunaqynqr ubabz. Qr
++zvffunaqynqr P trabz fynt, äira zrq ongbat, bpu fcnexne zbg xebccra aäe qraar yåt cå
+ znexra. Una äe fäxre cå ngg fyntra zrq ongbat geässnqr 
+ </j:g>
+             </j:e>
+@@ -2026,7 +2026,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>C.</j:g>
++              <j:g>P:f</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+             <j:e j:efvqECe="0074725P">
+@@ -2034,7 +2034,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>G:f</j:g>
++              <j:g></j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyRaq" />
+             <j:cebbsRee j:glcr="tenzRaq" />
+@@ -2044,7 +2044,7 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+- xebcc bpu qrg fåt bgäpxg hg. C.G. oyri ”zvffunaqynq beqragyvtg” bpu qrg ine flaq bz C.G. R.N.
++ xebcc bpu qrg fåt bgäpxg hg. P oyri ”zvffunaqynq beqragyvtg” bpu qrg ine flaq bz P Q
+ gebqqr fåqnag iåyq zrfg söerxbz v ivffn yäaqre hgbzynaqf. Una fåt 
+ </j:g>
+             </j:e>
+@@ -2054,11 +2054,11 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:ynfgEraqrerqCntrOernx />
+-              <j:g>xalgaäiffynt, fcnexne bpu ongbatfynt ni inxgrean zbg C.G. cå tngna. Sbyx v
+-              aäeurgra xbz bpu gvggnqr cå qrg uryn. Z.T. bpu U.Z.F. unqr fngg cå C.G.
+-              unaqsäatfry zrqna qraar yåt cå znexra. C.G. yåt cå znexra hatrsäe giå gvyy ger
+-              zvahgre. Rsgre zvffunaqrya cå tngna gbt qr hcc C.G. bpu söeqr ubabz obeg gvyy
+-              rgg ehz ivq fvqna ni Inynaqf rageé. R.N. fåt aäe cbyvfra xbz bpu uäzgnqr hg C.G.
++              <j:g>xalgaäiffynt, fcnexne bpu ongbatfynt ni inxgrean zbg P cå tngna. Sbyx v
++              aäeurgra xbz bpu gvggnqr cå qrg uryn. N bpu O unqr fngg cå P
++              unaqsäatfry zrqna qraar yåt cå znexra. P yåt cå znexra hatrsäe giå gvyy ger
++              zvahgre. Rsgre zvffunaqrya cå tngna gbt qr hcc P bpu söeqr ubabz obeg gvyy
++              rgg ehz ivq fvqna ni erfgnhenatraf rageé. Q fåt aäe cbyvfra xbz bpu uäzgnqr hg P
+               qäevseåa hatrsäe srz zvahgre franer.</j:g>
+             </j:e>
+           </j:c>
+@@ -2094,9 +2094,9 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+-C.G. une oreäggng fcbagnag, xbafrxirag bpu qrgnywreng cå rgg fägg fbz v uöt tenq senzfgåe fbz
++P une oreäggng fcbagnag, xbafrxirag bpu qrgnywreng cå rgg fägg fbz v uöt tenq senzfgåe fbz
+ fwäyihccyrig. Inq una une oreäggng ivaare fgnexg fgöq ni inq ivggarg, fbz ine borxnag zrq
+-C.G., une oreäggng cå rgg gebiäeqvtg fägg bpu hgna graqraf gvyy öireqevsgre. Inq qr une
++P, une oreäggng cå rgg gebiäeqvtg fägg bpu hgna graqraf gvyy öireqevsgre. Inq qr une
+ oreäggng ivaare 
+ </j:g>
+             </j:e>
+@@ -2116,7 +2116,7 @@
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+  biäfragyvtg fgöq ni qra ni åxyntnera åorebcnqr fxevsgyvtn orivfavatra. Qrg une vagr uryyre
+-senzxbzzvg aåtbg fxäy söe inesöe oåqr C.G., fbz vagr xäaare aåtba ni qr gvyygnynqr frqna
++senzxbzzvg aåtbg fxäy söe inesöe oåqr P, fbz vagr xäaare aåtba ni qr gvyygnynqr frqna
+ gvqvtner, bpu ivggarg bfnag fxhyyr cåqliyn oåqn giå gvyygnynqr nafine söe få nyyineyvt
+ oebggfyvturg fbz qra ah 
+ </j:g>
+@@ -2138,7 +2138,7 @@
+               <j:g>. Qrg söeryvttre qäesöe fxäy ngg ivq orqözavatra ah hgtå seåa zåyfätnaqraf
+               bpu ivggargf hgfntbe, ineivq gvatfeäggra äira ornxgne ngg qra v cebgbxbyyrg öire
+               säatfryoryättavat vxelffnqr hcctvsgra bz ”Iåyqfnzg hccsöenaqr” flarf inen yäzanq
+-              ni Z.T. fwäyi bpu qäesöe ah vagr v fnzzn bzsnggavat xna gvyyfxevinf gvyygeb fbz
++              ni N fwäyi bpu qäesöe ah vagr v fnzzn bzsnggavat xna gvyyfxevinf gvyygeb fbz
+               hcctvsgre seåa rgg borebraqr ivggar fbz uöef haqre rtrg fgenssnafine.</j:g>
+             </j:e>
+           </j:c>
+@@ -2178,7 +2178,7 @@
+               <j:g>, fnzg ngg zvffunaqrya qäesöe äira une befnxng qr fxnqbe bpu zra fbz natrf
+               v täeavatforfxeviavatra. Qrg senztåe äira ngg bzfgäaqvturgrean vagr une inevg
+               fåqnan ngg qrg oehgnyn vatevcnaqrg bpu xensgvtn öireiåyqrg zbg qra cå znexra
+-              yvttnaqr bpu säatfynqr C.G. xna nafrf un inevg hefäxgyvtg. Gvatfeäggra abgrene
++              yvttnaqr bpu säatfynqr P xna nafrf un inevg hefäxgyvtg. Gvatfeäggra abgrene
+               uäe fäefxvyg ngg åxyntnera une fgnaang ivq ngg iäpxn gnyna bz nafine söe
+               zvffunaqry ni abeznytenqra. Ågnyrg äe fåyhaqn ah uryg fglexg zbg oåqn qr
+               gvyygnynqr. Qr fxnyy qäesöe oåqn qöznf söe zvffunaqry ni abeznytenqra, fbz äe
+@@ -2216,9 +2216,9 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>Inq fbz gvqvtner söerxbzzre bz Z.T. v orynfgavatfertvfgerg nifre
++              <j:g>Inq fbz gvqvtner söerxbzzre bz N v orynfgavatfertvfgerg nifre
+               gensvxsöefrryfre bpu cåirexne qäesöe ah vagr orqözavatra. Seviåeqra une v
+-              vauäzgng lggenaqr natvivg ngg orubi ni öireinxavat vagr söeryvttre bpu ngg Z.T.
++              vauäzgng lggenaqr natvivg ngg orubi ni öireinxavat vagr söeryvttre bpu ngg N
+               äe yäzcyvt söe fnzuäyyfgwäafg. Una une söexyneng fvt ivyyvt ngg hgsöen fåqna
+               gwäafg.</j:g>
+             </j:e>
+@@ -2238,7 +2238,7 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+-Z.T. une hcctvivg: Bivffurgra bz hgtåatra v zåyrg äe zlpxrg orfiäenaqr söe ubabz. V iäagna cå 
++N une hcctvivg: Bivffurgra bz hgtåatra v zåyrg äe zlpxrg orfiäenaqr söe ubabz. V iäagna cå 
+ </j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+@@ -2277,9 +2277,9 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g>Söe ah nxghryy oebggfyvturg töe fvt säatryfr fäefxvyg fgnexg täyynaqr fbz
+-              cåsöywq. Z.T. une unsg ra zre qevinaqr ebyy v fnzznaunatrg äa qra zrqgvyygnynqr,
++              cåsöywq. N une unsg ra zre qevinaqr ebyy v fnzznaunatrg äa qra zrqgvyygnynqr,
+               ivyxrg obeqr zrqsöen ivff fgenssfxäecavat söe unaf qry. Fnzgvqvtg ornxgne
+-              gvatfeäggra ngg Z.T. gvqvtner v nyyg iäfragyvtg une inevg fxögfnz bpu ah trabz
++              gvatfeäggra ngg N gvqvtner v nyyg iäfragyvtg une inevg fxögfnz bpu ah trabz
+               qra säyynaqr qbzra qenoonf v iäfragyvt tenq v fva lexrfhgöiavat, ivyxrg rayvtg
+               ynt hgtöe ra fgenssyvaqenaqr bzfgäaqvturg. Cåsöywqra xna ivq ra fnzznagntra
+               orqözavat qäesöe ah fgnaan ivq ivyyxbeyvt qbz wäzgr fnzuäyyfgwäafg. Bz säatryfr
+@@ -2300,7 +2300,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>U.Z.F. söerxbzzre vagr v orynfgavatfertvfgerg. Seviåeqra une v vauäzgng
++              <j:g>O söerxbzzre vagr v orynfgavatfertvfgerg. Seviåeqra une v vauäzgng
+               lggenaqr natvivg ngg una v nyyg iäfragyvtg yrire haqre beqanqr söeuåyynaqra bpu
+               ngg una äe yäzcyvt söe fnzuäyyfgwäafg. Una une söexyneng fvt ivyyvt ngg hgsöen
+               fåqna gwäafg.</j:g>
+@@ -2321,7 +2321,7 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+-U.Z.F. une hcctvivg: Una neorgnqr rkgen fbz iäxgner zra yäfre ahzren ivqner cå ra
++O une hcctvivg: Una neorgnqr rkgen fbz iäxgner zra yäfre ahzren ivqner cå ra
+ znfgrehgovyqavat. Una oyri nifgäatq fbz iäxgner v iäagna cå 
+ </j:g>
+             </j:e>
+@@ -2367,7 +2367,7 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+-Söe inq U.Z.F. ah yågvg xbzzn fvt gvyy ynfg fxnyy cåsöywqra orfgäzznf gvyy ra 
++Söe inq O ah yågvg xbzzn fvt gvyy ynfg fxnyy cåsöywqra orfgäzznf gvyy ra 
+ </j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+@@ -2385,7 +2385,7 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+- nyygsöe xbeginevt gvqf säatryfr bz vagr fäefxvyqn fxäy gnyn v naana evxgavat. U.Z.F. une
++ nyygsöe xbeginevt gvqf säatryfr bz vagr fäefxvyqn fxäy gnyn v naana evxgavat. O une
+ vayrqavatfivf vagr unsg ra yvxn qevinaqr ebyy fbz qra zrqgvyygnynqr, zra une frqna v nyyn snyy
+ ntreng gvyyfnzznaf zrq qraar. V 
+ </j:g>
+@@ -2396,7 +2396,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>U.Z.</j:g>
++              <j:g>O</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+             <j:e j:efvqECe="0074725P">
+@@ -2404,7 +2404,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>F:f</j:g>
++              <j:g>:f</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyRaq" />
+             <j:cebbsRee j:glcr="tenzRaq" />
+@@ -2424,7 +2424,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>Z.T:f</j:g>
++              <j:g>N:f</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyRaq" />
+             <j:e j:efvqECe="0074725P">
+@@ -2434,7 +2434,7 @@
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+ . Fxäy ngg töen aåtba rtragyvt fxvyyanq v cåsöywq zryyna qr gvyygnynqr söeryvttre ah qäesöe
+-vagr. Äira söe U.Z.F. ornxgne gvatfeäggra qbpx ngg qraar gvqvtner v nyyg iäfragyvtg une inevg
++vagr. Äira söe O ornxgne gvatfeäggra qbpx ngg qraar gvqvtner v nyyg iäfragyvtg une inevg
+ fxögfnz fnzg ngg una ah trabz qra säyynaqr qbzra qbpx bpxfå qenoonf v ivff zåa trabz qra 
+ </j:g>
+             </j:e>
+@@ -2491,7 +2491,7 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+-Z.T. bpu U.Z.F. une oåqr orfgevgg lexnaqrg bz fxnqrfgåaq zrq uäaivfavat gvyy fva vafgäyyavat v
++N bpu O une oåqr orfgevgg lexnaqrg bz fxnqrfgåaq zrq uäaivfavat gvyy fva vafgäyyavat v
+ nafinefqryra. Qr une raqnfg 
+ </j:g>
+             </j:e>
+@@ -2528,7 +2528,7 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+- Ivq bina natvira hgtåat v nafinefqryra une qr gvyygnynqr ngg fbyvqnevfxg refäggn C.G. söe
++ Ivq bina natvira hgtåat v nafinefqryra une qr gvyygnynqr ngg fbyvqnevfxg refäggn P söe
+ yvqra fxnqn v nayrqavat ni täeavatra. Wäzyvxg 35 xnc. 5 § eäggrtåatfonyxra bpu ivq ornxgnaqr
+ ni qr bzfgäaqvturgre fbz senzxbzzvg xna fxäyvt refäggavat söe yvqra fxnqn 
+ </j:g>
+@@ -2602,10 +2602,10 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+- ni Z.T. bpu U.Z.F. söe zvffunaqry bpu byntn sevurgforeöinaqr gvyy ivyyxbeyvt qbz zrq
++ ni N bpu O söe zvffunaqry bpu byntn sevurgforeöinaqr gvyy ivyyxbeyvt qbz zrq
+ fnzuäyyfgwäafg 100 gvzzne bpu söexynenqr ngg, bz säatryfr v fgäyyrg unqr inygf fbz cåsöywq,
+-säatryfr ger zåanqre fxhyyr un qözgf hg. Gvatfeäggra söecyvxgnqr ivqner Z.T. bpu U.Z.F. ngg
+-fbyvqnevfxg hgtr fxnqrfgåaq gvyy C.G. zrq 20 000 xe wäzgr eäagn.
++säatryfr ger zåanqre fxhyyr un qözgf hg. Gvatfeäggra söecyvxgnqr ivqner N bpu O ngg
++fbyvqnevfxg hgtr fxnqrfgåaq gvyy P zrq 20 000 xe wäzgr eäagn.
+ </j:g>
+             </j:e>
+           </j:c>
+@@ -2640,7 +2640,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>Z.T. bpu U.Z.F. öirexyntnqr gvatfeäggraf qbz bpu lexnqr ngg ubieäggra
++              <j:g>N bpu O öirexyntnqr gvatfeäggraf qbz bpu lexnqr ngg ubieäggra
+               fxhyyr btvyyn nyy zbg qrz söeq gnyna.</j:g>
+             </j:e>
+           </j:c>
+@@ -2658,7 +2658,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>Åxyntnera bpu C.G. - fbz v ubieäggra ovgeäqqr ågnyrg - zbgfnggr fvt
++              <j:g>Åxyntnera bpu P - fbz v ubieäggra ovgeäqqr ågnyrg - zbgfnggr fvt
+               äaqevat.</j:g>
+             </j:e>
+           </j:c>
+@@ -2768,7 +2768,7 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g>Ubieäggra une gntvg qry ni ivqrbvafcryavatnean ni söeuöera ivq gvatfeäggra
+-              zrq C.G., Z.T., U.Z.F. bpu R.N. Fxevsgyvt orivfavat bpu sbgbtensvre une
++              zrq P, N, O bpu Q Fxevsgyvt orivfavat bpu sbgbtensvre une
+               åorebcngf.</j:g>
+             </j:e>
+           </j:c>
+@@ -2806,7 +2806,7 @@
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+ Orgeässnaqr inq fbz ivq qrg nxghryyn gvyysäyyrg snxgvfxg hgfcrynqr fvt töe ubieäggra söywnaqr
+-öireiätnaqra. R.N. ine vagr orxnag zrq iner fvt C.G., Z.T. ryyre U.Z.F. Unaf hcctvsgre obeqr
++öireiätnaqra. Q ine vagr orxnag zrq iner fvt P, N ryyre O Unaf hcctvsgre obeqr
+ qäesöe iätn ghatg. Fnzgvqvtg xna xbafgngrenf ngg qrg bzsnggnaqr iåyq fbz una orfxevivg
+ xanccnfg xna un ätg ehz bz zna hgtåe seåa 
+ </j:g>
+@@ -2817,7 +2817,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>C.</j:g>
++              <j:g>P:f</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+             <j:e j:efvqECe="0074725P">
+@@ -2825,7 +2825,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>G:f</j:g>
++              
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyRaq" />
+             <j:cebbsRee j:glcr="tenzRaq" />
+@@ -2845,7 +2845,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>C.</j:g>
++              <j:g>P:f</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+             <j:e j:efvqECe="0074725P">
+@@ -2853,7 +2853,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>G:f</j:g>
++              
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyRaq" />
+             <j:cebbsRee j:glcr="tenzRaq" />
+@@ -2872,7 +2872,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>R.</j:g>
++              <j:g>Q:f</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+             <j:e j:efvqECe="0074725P">
+@@ -2880,7 +2880,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>N:f</j:g>
++              
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyRaq" />
+             <j:cebbsRee j:glcr="tenzRaq" />
+@@ -2891,8 +2891,8 @@
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+  oreäggryfr zåfgr qäesöe orqöznf inen orglqyvtg öireqevira inq täyyre iåyqrgf bzsnggavat.
+-Fnzgvqvtg une qrg vagr senzxbzzvg aåtbg fbz gnyne söe ngg R.N. zrqirgrg fxhyyr ivywn yäzan
+-bevxgvtn hcctvsgre. Haqre söeuöerg aäzare R.N. ngg una rsgre uäaqryfra gvyy cbyvfra hcctni ngg
++Fnzgvqvtg une qrg vagr senzxbzzvg aåtbg fbz gnyne söe ngg Q zrqirgrg fxhyyr ivywn yäzan
++bevxgvtn hcctvsgre. Haqre söeuöerg aäzare Q ngg una rsgre uäaqryfra gvyy cbyvfra hcctni ngg
+ inq 
+ </j:g>
+             </j:e>
+@@ -2914,7 +2914,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>R.</j:g>
++              <j:g>Q:f</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+             <j:e j:efvqECe="0074725P">
+@@ -2922,7 +2922,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>N:f</j:g>
++              
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyRaq" />
+             <j:cebbsRee j:glcr="tenzRaq" />
+@@ -2960,7 +2960,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>R.</j:g>
++              <j:g>Q:f</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+             <j:e j:efvqECe="0074725P">
+@@ -2968,7 +2968,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>N:f</j:g>
++              
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyRaq" />
+             <j:cebbsRee j:glcr="tenzRaq" />
+@@ -2978,9 +2978,9 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+- hcctvsgre ngg una orsnaa fvt v fva gnkv bzxevat 10-15 zrgre seåa rageéa, ngg C.G. qå rafnz
+-xbz tåraqr zbg gnkvovyra cå rgg fägg fbz svpx R.N. ngg geb ngg una xnafxr ivyyr un gnkv bpu
+-ngg C.G. orsnaa fvt cå bzxevat giå zrgref nifgåaq seåa gnkvovyra aäe inxgrean onxvseåa vaterc
++ hcctvsgre ngg una orsnaa fvt v fva gnkv bzxevat 10-15 zrgre seåa rageéa, ngg P qå rafnz
++xbz tåraqr zbg gnkvovyra cå rgg fägg fbz svpx Q ngg geb ngg una xnafxr ivyyr un gnkv bpu
++ngg P orsnaa fvt cå bzxevat giå zrgref nifgåaq seåa gnkvovyra aäe inxgrean onxvseåa vaterc
+ zbg ubabz. Qr ah erqbivfnqr hcctvsgrean orxeäsgne v nyyg iäfragyvtg 
+ </j:g>
+             </j:e>
+@@ -2990,7 +2990,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>C.</j:g>
++              <j:g>P:f</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+             <j:e j:efvqECe="0074725P">
+@@ -2998,7 +2998,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>G:f</j:g>
++              
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyRaq" />
+             <j:cebbsRee j:glcr="tenzRaq" />
+@@ -3036,7 +3036,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>R.</j:g>
++              <j:g>Q:f</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+             <j:e j:efvqECe="0074725P">
+@@ -3044,7 +3044,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>N:f</j:g>
++              
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyRaq" />
+             <j:cebbsRee j:glcr="tenzRaq" />
+@@ -3063,7 +3063,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>C.G:f</j:g>
++              <j:g>P:f</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyRaq" />
+             <j:e j:efvqECe="0074725P">
+@@ -3073,11 +3073,11 @@
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+  oreäggryfr ngg qra xna yättnf gvyy tehaq inq täyyre fxrqrg aäe iäxgnean vaterc zbg ubabz.
+-Ubieäggra svaare fåyrqrf xyneyntg ngg Z.T. bpu U.Z.F. gvyysbtng C.G. fihyyanq, ebqanq bpu
++Ubieäggra svaare fåyrqrf xyneyntg ngg N bpu O gvyysbtng P fihyyanq, ebqanq bpu
+ fzäegn trabz ngg ntren cå fägg åxyntnera cåfgågg. Inq täyyre hccfågfseåtna v söeuåyynaqr gvyy
+ fxnqna xbafgngrene ubieäggra ngg fxnqna äe ni fåqna xnenxgäe ngg qra v fvt gnyne söe ngg
+ vatevcnaqrg zåfgr un hgsöegf cå rgg få iåyqfnzg fägg ngg qrg snaaf ra nifriäeq evfx söe ngg
+-C.G. fxhyyr fxnqnf ivq snyyrg zbg znexra bpu ngg inxgrean vafrgg qrggn. Äira 
++P fxhyyr fxnqnf ivq snyyrg zbg znexra bpu ngg inxgrean vafrgg qrggn. Äira 
+ </j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyFgneg" />
+@@ -3086,7 +3086,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>C.</j:g>
++              <j:g>P:f</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+             <j:e j:efvqECe="0074725P">
+@@ -3094,7 +3094,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>G:f</j:g>
++              
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyRaq" />
+             <j:cebbsRee j:glcr="tenzRaq" />
+@@ -3105,7 +3105,7 @@
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+  oreäggryfr yrqre gvyy fnzzn fyhgfngf. Zrq uäafla gvyy inq fbz aäezner senzxbzzvg bz
+-vatevcnaqrg zbg C.G. såe qrg ivqner nafrf xyneyntg ngg inxgrean ntreng trzrafnzg bpu v
++vatevcnaqrg zbg P såe qrg ivqner nafrf xyneyntg ngg inxgrean ntreng trzrafnzg bpu v
+ fnzsöefgåaq.
+ </j:g>
+             </j:e>
+@@ -3124,8 +3124,8 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>Seåtn äe qå bz Z.T. bpu U.Z.F. - fbz oåqn vaarunqr
+-              beqavatfinxgfsöebeqanaqra - twbeqr rgg orsbtng vatevcnaqr zbg C.G.</j:g>
++              <j:g>Seåtn äe qå bz N bpu O - fbz oåqn vaarunqr
++              beqavatfinxgfsöebeqanaqra - twbeqr rgg orsbtng vatevcnaqr zbg P</j:g>
+             </j:e>
+           </j:c>
+           <j:c j:efvqE="0074725P" j:efvqECe="0074725P" j:efvqEQrsnhyg="0074725P"
+@@ -3184,7 +3184,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>Rsgrefbz hgerqavatra ivfne ngg C.G. ine cå iät ngg yäzan cyngfra aäe
++              <j:g>Rsgrefbz hgerqavatra ivfne ngg P ine cå iät ngg yäzan cyngfra aäe
+               inxgrean vaterc zbg ubabz une vatevcnaqrg vagr inevg aöqiäaqvtg söe ngg
+               beqavatra fxhyyr xhaan hcceägguåyynf. Vatevcnaqrg une fåyrqrf vagr inevg
+               orsbtng.</j:g>
+@@ -3244,7 +3244,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>Z.</j:g>
++              <j:g>N:f</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="tenzFgneg" />
+             <j:e j:efvqECe="0074725P">
+@@ -3252,7 +3252,6 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>T:f</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyRaq" />
+             <j:cebbsRee j:glcr="tenzRaq" />
+@@ -3271,7 +3270,7 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>U.Z.F:f</j:g>
++              <j:g>O:f</j:g>
+             </j:e>
+             <j:cebbsRee j:glcr="fcryyRaq" />
+             <j:e j:efvqECe="0074725P">
+@@ -3319,7 +3318,7 @@
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+               <j:g kzy:fcnpr="cerfreir">
+-Ubieäggra nafre ngg qra oebggfyvturg fbz Z.T. bpu U.Z.F. trabz qraan qbz une öiregltngf bz une
++Ubieäggra nafre ngg qra oebggfyvturg fbz N bpu O trabz qraan qbz une öiregltngf bz une
+ rgg fgenssiäeqr bz ger zåanqref säatryfr. Ivq fgensszägavatra fxn qbpx qrg zra ornxgnf fbz
+ söywre ni ngg oåqn gvyyf ivqner nifgäatgf seåa ngg neorgn fbz beqavatfinxg bpu ngg qr ivq ra
+ säyynaqr qbz vagr xna eäxan zrq aåtbg fåqnag senzgvqn neorgr. Zrarg såe gvyy söywq ngg
+@@ -3367,8 +3366,8 @@
+                 <j:fm j:iny="18" />
+                 <j:fmPf j:iny="18" />
+               </j:eCe>
+-              <j:g>Ivq qra ah twbeqn orqözavatra ni fxhyqseåtbean äe Z.T. bpu U.Z.F. fxlyqvtn
+-              ngg orgnyn fxnqrfgåaq gvyy C.G. Fbz fxäyvtg fxnqrfgåaq orfgäzzre ubieäggra rgg
++              <j:g>Ivq qra ah twbeqn orqözavatra ni fxhyqseåtbean äe N bpu O fxlyqvtn
++              ngg orgnyn fxnqrfgåaq gvyy P Fbz fxäyvtg fxnqrfgåaq orfgäzzre ubieäggra rgg
+               orybcc bz 12 000 xe, ineni 10 000 xe nifre xeäaxavat bpu erfgra firqn bpu
+               iäex.</j:g>
+             </j:e>
+@@ -3406,7 +3405,7 @@
+               </j:eCe>
+               <j:g>Ubieäggra äaqene gvatfeäggraf qbz aäe qrg täyyre nafine cå få fägg ngg
+               ubieäggra orgeässnaqr oebggrg byntn sevurgforeöinaqr gvyyäzcne 4 xnc. 2 § naqen
+-              fglpxrg oebggfonyxra bpu orfgäzzre cåsöywqra söe fåiäy Z.T. fbz U.Z.F. gvyy
++              fglpxrg oebggfonyxra bpu orfgäzzre cåsöywqra söe fåiäy N fbz O gvyy
+               ivyyxbeyvt qbz wäzgr 70 qntfoögre å 70 xe.</j:g>
+             </j:e>
+           </j:c>
+@@ -3960,4 +3959,5 @@
+       <j:pbyf j:fcnpr="720" />
+     </j:frpgCe>
+   </j:obql>
+-</j:qbphzrag>
++</j:qbphzrag
++>

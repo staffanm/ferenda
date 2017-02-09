@@ -1,0 +1,14 @@
+--- data\sfs\intermediate\2009\62.txt	2009-03-18 00:44:14.568179600 +0100
++++ data\sfs\intermediate\2009\62-mod.txt	2009-03-23 07:55:45.813000000 +0100
+@@ -747,8 +747,9 @@
+ 
+ Prövningstillstånd krävs vid överklagande till kammarrätten.
+ 
+-7 kap. Ansvarsbestämmelse 1 § Till böter döms den som
+-uppsåtligen eller av grov oaktsamhet
++7 kap. Ansvarsbestämmelse 
++
++1 § Till böter döms den som uppsåtligen eller av grov oaktsamhet
+ 
+ 1. åsidosätter gransknings- eller uppgiftsskyldigheten enligt
+ 3 kap. 1 §, eller

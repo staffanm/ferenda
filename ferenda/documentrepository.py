@@ -8,7 +8,7 @@ from future.utils import native_str
 # stdlib
 from collections import defaultdict, OrderedDict
 from datetime import datetime
-from io import BytesIO
+from io import BytesIO, StringIO
 from itertools import chain
 from operator import itemgetter
 from tempfile import mkstemp
@@ -501,6 +501,7 @@ class DocumentRepository(object):
         return {  # 'loglevel': 'INFO',
             'datadir': 'data',
             'patchdir': 'patches',
+            'patchformat': 'default',
             'processes': 1,
             'force': False,
             'parseforce': False,
@@ -1278,6 +1279,9 @@ with the *config* object as single parameter.
             return text, None
         from .thirdparty.patchit import PatchSet, PatchSyntaxError, PatchConflictError
         with codecs.open(patchpath, 'r', encoding=self.source_encoding) as pfp:
+            if self.config.patchformat == "rot13":
+                # replace the rot13 obfuscated stream with a plaintext stream
+                pfp = StringIO(codecs.decode(pfp.read(), "rot13"))
             # this might raise a PatchSyntaxError
             try:
                 ps = PatchSet.from_stream(pfp)

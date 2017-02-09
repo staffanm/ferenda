@@ -1,0 +1,1945 @@
+--- data/sfs/intermediate/2007/90.txt	2009-09-27 17:47:25.052000000 +0200
++++ c:\users\staffan\appdata\local\temp\tmpi1slv4	2009-09-27 17:47:16.021799900 +0200
+@@ -40,22 +40,22 @@
+ (1998:490), lagen (2001:559) om vägtrafikdefinitioner och
+ förordningen (2001:651) om vägtrafikdefinitioner.
+ 
+-Beteckning      Betydelse
++Beteckning       Betydelse
+ 
+-Symbol          Bild som används i stället för en text.
++Symbol           Bild som används i stället för en text.
+ 
+-Vägmärkesbild   Den information som lämnas på ett vägmärke
+-                genom text och symboler. I vägmärkesbilden
+-                ingår bårder och motsvarande.
+-
+-Vägvisningsplan 1. En förteckning över geografiska mål som
+-                skall anges med lokaliseringsmärken för
+-                vägvisning längs de allmänna vägarna.
+-
+-                2. En förteckning över mål av turistiskt
+-                intresse som får anges med lokaliseringsmärken
+-                för vägvisning eller med lokaliseringsmärken
+-                för turistiskt intressanta mål.
++Vägmärkesbild    Den information som lämnas på ett vägmärke
++                 genom text och symboler. I vägmärkesbilden
++                 ingår bårder och motsvarande.
++
++Vägvisningsplan  1. En förteckning över geografiska mål som
++                 skall anges med lokaliseringsmärken för
++                 vägvisning längs de allmänna vägarna.
++ 
++                 2. En förteckning över mål av turistiskt
++                 intresse som får anges med lokaliseringsmärken
++                 för vägvisning eller med lokaliseringsmärken
++                 för turistiskt intressanta mål.
+ 
+ 3 § Vägmärken och andra anordningar skall tillsammans med väg-
+ och gatuutformningen och dess anpassning till väg- och gaturum
+@@ -317,13 +317,13 @@
+ F.      lokaliseringsmärken för vägvisning,
+ 
+ G.      lokaliseringsmärken för upplysning om allmänna
+-inrättningar m.m.,
++        inrättningar m.m.,
+ 
+ H.      lokaliseringsmärken för upplysning om
+-serviceanläggningar m.m.,
++        serviceanläggningar m.m.,
+ 
+ I.      lokaliseringsmärken för turistiskt intressanta mål,
+-och
++         och
+ 
+ J.      upplysningsmärken.
+ 
+@@ -1113,93 +1113,93 @@
+ Märke                           Närmare föreskrifter
+ 
+ D1 Påbjuden körriktning         Märket anger att fordon endast
+-får föras i pilens eller, där
+-två pilar finns, i endera
+-pilens riktning.
++                                får föras i pilens eller, där
++                                två pilar finns, i endera
++                                pilens riktning.
+ 
+-Symbolen är anpassad efter
+-förhållandena på platsen.
++                                Symbolen är anpassad efter
++                                förhållandena på platsen.
+ 
+ D2 Påbjuden körbana             Märkena anger att fordon endast
+-får föras förbi märket där
+-pilen visar eller, där två pilar
+-finns, där pilarna visar.
++                                får föras förbi märket där
++                                pilen visar eller, där två pilar
++                                finns, där pilarna visar.
+ 
+ 
+-Symbolen är anpassad efter
+-förhållandena på platsen.
++                                Symbolen är anpassad efter
++                                förhållandena på platsen.
+ 
+ D3 Cirkulationsplats
+ 
+ D4 Påbjuden cykelbana           Om moped klass II inte får
+-föras på banan anges det på en
+-tilläggstavla.
++                                föras på banan anges det på en
++                                tilläggstavla.
+ 
+ D5 Påbjuden gångbana            Märket anger bana avsedd endast
+-för gående.
++                                för gående.
+ 
+ D6 Påbjuden gång- och
+ cykelbana                       Märket anger gemensam bana för
+-gående och cyklande.
++                                gående och cyklande.
+ 
+-Om moped klass II inte får
+-föras på banan anges det på en
+-tilläggstavla.
++                                Om moped klass II inte får
++                                föras på banan anges det på en
++                                tilläggstavla.
+ 
+ D7 Påbjudna gång- och
+ cykelbanor                      Märket anger banor som är
+-delade genom vägmarkering,
+-skiljeremsa eller liknande i en
+-del för gående och en del för
+-cyklande.
+-
+-Symbolernas placering på märket
+-anger vilken del av banan som
+-är avsedd för gående respektive
+-cyklande.
+-
+-Om moped klass II inte får
+-föras på banan anges det på en
+-tilläggstavla.
++                                delade genom vägmarkering,
++                                skiljeremsa eller liknande i en
++                                del för gående och en del för
++                                cyklande.
++
++                                Symbolernas placering på märket
++                                anger vilken del av banan som
++                                är avsedd för gående respektive
++                                cyklande.
++
++                                Om moped klass II inte får
++                                föras på banan anges det på en
++                                tilläggstavla.
+ 
+ D8 Påbjuden ridväg              Märket anger även att
+-gångtrafik är tillåten.
++                                gångtrafik är tillåten.
+ 
+ D9 Påbjuden led för
+ terrängmotorfordon
+ och terrängsläp                 Märket anger även att
+-gångtrafik är tillåten.
++                                gångtrafik är tillåten.
+ 
+ D10 Påbjudet körfält eller
+ körbana för fordon i
+ linjetrafik m.fl.               Märket anger även att fordon
+-som anges i 8 kap. 2 §
+-trafikförordningen (1998:1276)
+-får använda körfältet eller
+-körbanan, om inte annat anges
+-på en tilläggstavla. Om andra
+-fordon tillåts trafikera
+-körfältet eller körbanan anges
+-det på en tilläggstavla.
++                                som anges i 8 kap. 2 §
++                                trafikförordningen (1998:1276)
++                                får använda körfältet eller
++                                körbanan, om inte annat anges
++                                på en tilläggstavla. Om andra
++                                fordon tillåts trafikera
++                                körfältet eller körbanan anges
++                                det på en tilläggstavla.
+ 
+ D11 Slut på påbjuden bana,
+ körfält, väg eller led          Märket anger att påbjuden bana,
+-körfält, väg eller led som
+-märkts ut med något av märkena
+-D4-D10 upphör.
+-
+-Märket behöver inte sättas upp
+-om det ändå tydligt framgår att
+-påbudet upphör.
+-
+-Andra symboler för
+-trafikantgrupper eller
+-fordonsslag kan vara infogade i
+-märket. Den symbol som är
+-infogad i märket är samma som
+-på det märke som använts för
+-att märka ut banan, körfältet,
+-vägen eller leden.
++                                körfält, väg eller led som
++                                märkts ut med något av märkena
++                                D4-D10 upphör.
++
++                                Märket behöver inte sättas upp
++                                om det ändå tydligt framgår att
++                                påbudet upphör.
++
++                                Andra symboler för
++                                trafikantgrupper eller
++                                fordonsslag kan vara infogade i
++                                märket. Den symbol som är
++                                infogad i märket är samma som
++                                på det märke som använts för
++                                att märka ut banan, körfältet,
++                                vägen eller leden.
+ Förordning (2007:448).
+ 
+ Anvisningsmärken
+@@ -1588,9 +1588,7 @@
+ anläggning eller liknande, om inte annat anges.
+ Lokaliseringsmärken är följande.
+ 
+-Märke
+-
+-Närmare föreskrifter
++Märke                           Närmare föreskrifter
+ 
+ F1 Orienteringstavla            Märket är en förberedande
+                                 upplysning om korsning,
+@@ -2009,37 +2007,37 @@
+ Märke                           Närmare föreskrifter
+ 
+ G1 Post                         Märket anger postombud där
+-brev- och pakethantering samt
+-frimärksförsäljning erbjuds.
++                                brev- och pakethantering samt
++                                frimärksförsäljning erbjuds.
+ 
+ G2 Hjälptelefon                 G3 Radiostation för
+-vägtrafikinformation
++                                vägtrafikinformation
+ 
+-Märket anger att
+-vägtrafikinformation ges
+-regelbundet i återkommande
+-sändningar som är avsedda att
+-täcka ett större område.
++                                Märket anger att
++                                vägtrafikinformation ges
++                                regelbundet i återkommande
++                                sändningar som är avsedda att
++                                täcka ett större område.
+ 
+ G4 Akutsjukhus                  Märket anger ett sjukhus med
+-akutmottagning.
++                                akutmottagning.
+ 
+ G5 Industriområde               Märket anger ett område för
+-industri eller annan liknande
+-verksamhet.
++                                industri eller annan liknande
++                                verksamhet.
+ 
+ G6 Järnvägsstation
+ 
+ G7 Busstation                   Märket anger en busstation som
+-utgör knutpunkt för flera
+-busslinjer.
++                                utgör knutpunkt för flera
++                                busslinjer.
+ 
+ G8 Flygplats                    Märket anger en flygplats med
+-reguljär flygtrafik.
++                                reguljär flygtrafik.
+ 
+ G9 Brandsläckare                Lokaliseringsmärken för
+-upplysning om
+-serviceanläggningar m.m.
++                                upplysning om
++                                serviceanläggningar m.m.
+ 
+ 23 § Lokaliseringsmärken för upplysning om serviceanläggningar
+ m.m. kan vara infogade i ett lokaliseringsmärke för vägvisning.
+@@ -2052,29 +2050,29 @@
+ Märke                           Närmare föreskrifter
+ 
+ H1 Informationsplats            Märket anger en plats där det
+-går att få information.
++                                går att få information.
+ 
+-Uppgift om vilken typ av
+-information som finns kan anges
+-i anslutning till märket.
++                                Uppgift om vilken typ av
++                                information som finns kan anges
++                                i anslutning till märket.
+ 
+ H2 Fordonsverkstad
+ 
+ H3 Drivmedel                    Märket anger en anläggning som
+-tillhandahåller drivmedel.
++                                tillhandahåller drivmedel.
+ 
+-Företagsemblem kan anges i
+-anslutning till märket.
++                                Företagsemblem kan anges i
++                                anslutning till märket.
+ 
+ H4 Gas för fordonsdrift         Märkena anger anläggningar som
+-tillhandahåller olika typer av
+-fordonsgas där typ av gas
+-framgår av förkortningen i
+-märket.
++                                tillhandahåller olika typer av
++                                fordonsgas där typ av gas
++                                framgår av förkortningen i
++                                märket.
+ 
+ H5 Servering                    Märket anger en anläggning som
+-serverar drycker och enklare
+-maträtter.
++                                serverar drycker och enklare
++                                maträtter.
+ 
+ H6 Restaurang
+ 
+@@ -2083,28 +2081,28 @@
+ H8 Vandrarhem
+ 
+ H9 Stugby                       Märket anger en anläggning med
+-ett större antal stugor.
++                                ett större antal stugor.
+ 
+ H10 Stuga                       Märket anger en anläggning med
+-ett fåtal stugor.
++                                ett fåtal stugor.
+ 
+ H11 Campingplats                Märket anger en anläggning som
+-tillhandahåller platser för
+-såväl tält som husvagnar och
+-husbilar.
++                                tillhandahåller platser för
++                                såväl tält som husvagnar och
++                                husbilar.
+ 
+ H12 Husvagnsplats               Märket anger en anläggning som
+-enbart tillhandahåller platser
+-för husvagnar och husbilar.
++                                enbart tillhandahåller platser
++                                för husvagnar och husbilar.
+ 
+ H13 Rastplats                   Märket anger en rastplats där
+-det finns toalett som är
+-tillgänglig även för
+-rörelsehindrade.
++                                det finns toalett som är
++                                tillgänglig även för
++                                rörelsehindrade.
+ 
+ H14 Toalett                     Märket anger en toalett som är
+-tillgänglig även för
+-rörelsehindrade.
++                                tillgänglig även för
++                                rörelsehindrade.
+ 
+ H15 Badplats                    Märket anger ett utomhusbad.
+ 
+@@ -2113,10 +2111,10 @@
+ H17 Vandringsled
+ 
+ H18 Stollift                    Märket anger en liftanläggning
+-med stolar eller liknande.
++                                med stolar eller liknande.
+ 
+ H19 Släplift                    Märket anger en liftanläggning
+-där skidåkare dras fram.
++                                där skidåkare dras fram.
+ 
+ H20 Golfbana
+ 
+@@ -2124,29 +2122,29 @@
+ fiskekort
+ 
+ H22 Sevärdhet                   Märket anger en sevärdhet av
+-nationellt intresse.
++                                nationellt intresse.
+ 
+-Sevärdhetens art anges i
+-anslutning till märket.
++                                Sevärdhetens art anges i
++                                anslutning till märket.
+ 
+ H23 Förberedande upplysning
+ om vägnära service              Märket anger vägnära
+-serviceanläggningar samt i
+-vissa fall namn på dessa.
++                                serviceanläggningar samt i
++                                vissa fall namn på dessa.
+ 
+-Symbol för
+-serviceanläggningarna
+-drivmedel, restaurang och
+-hotell kan vara kompletterade
+-med företagsemblem eller
+-företagsnamn.
++                                Symbol för
++                                serviceanläggningarna
++                                drivmedel, restaurang och
++                                hotell kan vara kompletterade
++                                med företagsemblem eller
++                                företagsnamn.
+ 
+-På märket anges avståndet till
+-aktuell avfart eller korsning.
++                                På märket anges avståndet till
++                                aktuell avfart eller korsning.
+ 
+ H24 Rum och frukost             Märket anger en anläggning som
+-tillhandahåller rum för
+-övernattning och frukost.
++                                tillhandahåller rum för
++                                övernattning och frukost.
+ Förordning (2008:191).
+ 
+ Lokaliseringsmärken för turistiskt intressanta mål m.m.
+@@ -2203,21 +2201,21 @@
+ Märke                           Närmare föreskrifter
+ 
+ J2 Upplysningsmärke             Märket ger upplysning av
+-väsentligt intresse för
+-framkomlighet eller säkerhet
+-som inte kan ges på annat sätt.
+-
+-Varnings- eller förbudsmärke
+-kan vara infogat som
+-förberedande upplysning.
++                                väsentligt intresse för
++                                framkomlighet eller säkerhet
++                                som inte kan ges på annat sätt.
++
++                                Varnings- eller förbudsmärke
++                                kan vara infogat som
++                                förberedande upplysning.
+ 
+-Anvisningar med versal och
+-gemen text kan förekomma.
++                                Anvisningar med versal och
++                                gemen text kan förekomma.
+ 
+ J3 Livsfarlig ledning           Märket anger att det finns en
+-elektrisk ledning över vägen
+-eller leden som kan innebära
+-fara.
++                                elektrisk ledning över vägen
++                                eller leden som kan innebära
++                                fara.
+ Förordning (2008:45).
+ 
+ Symboler
+@@ -2226,9 +2224,7 @@
+ tilläggstavlor för att ange ett visst fordonsslag, en viss
+ trafikantgrupp eller viss verksamhet.
+ 
+-Symbol
+-
+-Betydelse
++Symbol                          Betydelse
+ 
+ S1 Tung lastbil
+ 
+@@ -2246,8 +2242,8 @@
+ klass II
+ 
+ S7 Motorcykel                   Symbolen anger tvåhjulig
+-motorcykel och moped klass I
+-utan sidvagn.
++                                motorcykel och moped klass I
++                                utan sidvagn.
+ 
+ S8 Cykel och moped klass II
+ 
+@@ -2258,14 +2254,14 @@
+ S11 Rörelsehindrade
+ 
+ S12 Färja                       Symbolen anger ett färjeläge
+-eller att angivet färdmål nås
+-med färja.
++                                eller att angivet färdmål nås
++                                med färja.
+ 
+ S13 Personfärja                 Symbolen anger ett färjeläge
+-för personfärja eller att
+-angivet färdmål endast kan nås
+-med färja avsedd för
+-persontransport.
++                                för personfärja eller att
++                                angivet färdmål endast kan nås
++                                med färja avsedd för
++                                persontransport.
+ 
+ Tilläggstavlor
+ 
+@@ -2283,211 +2279,210 @@
+ Tavla                           Närmare föreskrifter
+ 
+ T1 Vägsträckas längd            Tavlan anger början och slutet
+-på en vägsträcka.
++                                på en vägsträcka.
+ 
+ T2 Avstånd                      Tavlan anger avståndet till det
+-som vägmärket avser.
++                                som vägmärket avser.
+ 
+ T3 Avstånd till stopplikt       Tavlan används endast under
+-märke B1, väjningsplikt.
++                                märke B1, väjningsplikt.
+ 
+ T4 Fri bredd
+ 
+ T5 Totalvikt                    Tavlan anger att angivelsen på
+-märket gäller fordon med en
+-totalvikt som överstiger det
+-angivna värdet.
++                                märket gäller fordon med en
++                                totalvikt som överstiger det
++                                angivna värdet.
+ 
+ T6 Tidsangivelse                Tavlan anger när angivelsen på
+-vägmärket gäller.
++                                vägmärket gäller.
+ 
+-Används klockslag i kombination
+-med andra villkor anger tavlan
+-även när dessa villkor gäller.
+-
+-Svarta eller vita siffror utan
+-parentes avser vardagar utom
+-vardag före sön- och helgdag.
+-
+-Svarta eller vita siffror inom
+-parentes avser vardag före sön-
+-och helgdag.
+-
+-Röda siffror avser sön- och
+-helgdag.
+-
+-Om angivelsen sträcker sig över
+-midnatt gäller tidsperioden
+-efter midnatt påföljande dag.
+-
+-Anges viss dag eller viss
+-veckodag gäller regleringen
+-denna dag oavsett om dagen är
+-en vardag, söndag eller
+-helgdag.
++                                Används klockslag i kombination
++                                med andra villkor anger tavlan
++                                även när dessa villkor gäller.
++
++                                Svarta eller vita siffror utan
++                                parentes avser vardagar utom
++                                vardag före sön- och helgdag.
++
++                                Svarta eller vita siffror inom
++                                parentes avser vardag före sön-
++                                och helgdag.
++
++                                Röda siffror avser sön- och
++                                helgdag.
++
++                                Om angivelsen sträcker sig över
++                                midnatt gäller tidsperioden
++                                efter midnatt påföljande dag.
++
++                                Anges viss dag eller viss
++                                veckodag gäller regleringen
++                                denna dag oavsett om dagen är
++                                en vardag, söndag eller
++                                helgdag.
+ 
+ T7 Särskilda bestämmelser
+-för stannande och parkering
+-Tavlan anger avvikelse från det
+-märke som den är uppsatt under
+-eller från 3 kap. 53 § 10 eller
+-54 § trafikförordningen
+-(1998:1276).
+-
+-Den används under något av
+-märkena C35, förbud mot att
+-parkera fordon, C36, förbud mot
+-att parkera fordon på dag med
+-udda datum, C37, förbud mot att
+-parkera fordon på dag med jämt
+-datum, C38, datumparkering,
+-C39, förbud mot att stanna och
+-parkera fordon, C40,
+-ändamålsplats, C42, vändplats,
+-D10, påbjudet körfält eller
+-körbana för fordon i
+-linjetrafik m.fl., E19,
+-parkering, E20, områdesmärke,
+-eller E22, busshållplats. På
+-tavlan avbildas något av dessa
+-märken i miniatyr. För
+-klockslag gäller de närmare
+-föreskrifterna för tavla T6,
+-tidsangivelse. Bottenfärgen på
+-tavlan är densamma som
+-bottenfärgen på det märke som
+-avbildas på tavlan enligt vad
+-som anges i 29 §.
++för stannande och parkering     Tavlan anger avvikelse från det
++                                märke som den är uppsatt under
++                                eller från 3 kap. 53 § 10 eller
++                                54 § trafikförordningen
++                                (1998:1276).
++
++                                Den används under något av
++                                märkena C35, förbud mot att
++                                parkera fordon, C36, förbud mot
++                                att parkera fordon på dag med
++                                udda datum, C37, förbud mot att
++                                parkera fordon på dag med jämt
++                                datum, C38, datumparkering,
++                                C39, förbud mot att stanna och
++                                parkera fordon, C40,
++                                ändamålsplats, C42, vändplats,
++                                D10, påbjudet körfält eller
++                                körbana för fordon i
++                                linjetrafik m.fl., E19,
++                                parkering, E20, områdesmärke,
++                                eller E22, busshållplats. På
++                                tavlan avbildas något av dessa
++                                märken i miniatyr. För
++                                klockslag gäller de närmare
++                                föreskrifterna för tavla T6,
++                                tidsangivelse. Bottenfärgen på
++                                tavlan är densamma som
++                                bottenfärgen på det märke som
++                                avbildas på tavlan enligt vad
++                                som anges i 29 §.
+ 
+ T8 Symboltavla                  Tavlan anger att det märke som
+-tavlan är uppsatt under endast
+-gäller för det fordonsslag
+-eller den trafikantgrupp som
+-anges på tavlan.
+-
+-Anges symbol S11,
+-rörelsehindrade, på en
+-tilläggstavla under märke E19,
+-parkering, får endast
+-rörelsehindrade som är
+-innehavare av
+-parkeringstillstånd som avses i
+-13 kap. 8 § trafikförordningen
+-parkera.
++                                tavlan är uppsatt under endast
++                                gäller för det fordonsslag
++                                eller den trafikantgrupp som
++                                anges på tavlan.
++
++                                Anges symbol S11,
++                                rörelsehindrade, på en
++                                tilläggstavla under märke E19,
++                                parkering, får endast
++                                rörelsehindrade som är
++                                innehavare av
++                                parkeringstillstånd som avses i
++                                13 kap. 8 § trafikförordningen
++                                parkera.
+ 
+ T9 Nedsatt syn                  Tavlan anger att personer med
+-nedsatt syn är vanligt
+-förekommande.
++                                nedsatt syn är vanligt
++                                förekommande.
+ 
+-Tavlan har alltid gul
+-bottenfärg.
++                                Tavlan har alltid gul
++                                bottenfärg.
+ 
+ T10 Nedsatt hörsel              Tavlan anger att personer med
+-nedsatt hörsel är vanligt
+-förekommande.
++                                nedsatt hörsel är vanligt
++                                förekommande.
+ 
+-Tavlan har alltid gul
+-bottenfärg.
++                                Tavlan har alltid gul
++                                bottenfärg.
+ 
+ T11 Utsträckning                Tavlan med dubbelriktade pilar,
+-uppsatt vågrätt eller lodrätt,
+-anger att angivelsen gäller på
+-båda sidor av märket.
+-
+-Tavlan med nedåtriktad pil
+-anger att angivelsen slutar.
+-
+-Tavlan med höger- eller
+-vänsterriktad pil visar att
+-angivelsen gäller åt det håll
+-pilen visar.
+-
+-Används tavlan under märke E19,
+-parkering, har den svarta
+-tecken på vit botten utan bård.
+-
+-Tavlorna kan även användas
+-fristående för att ange
+-avgränsning av
+-uppställningsplatser på ett
+-område, om det vid infarten
+-till området anges att
+-parkering är tillåten.
++                                uppsatt vågrätt eller lodrätt,
++                                anger att angivelsen gäller på
++                                båda sidor av märket.
++
++                                Tavlan med nedåtriktad pil
++                                anger att angivelsen slutar.
++
++                                Tavlan med höger- eller
++                                vänsterriktad pil visar att
++                                angivelsen gäller åt det håll
++                                pilen visar.
++
++                                Används tavlan under märke E19,
++                                parkering, har den svarta
++                                tecken på vit botten utan bård.
++
++                                Tavlorna kan även användas
++                                fristående för att ange
++                                avgränsning av
++                                uppställningsplatser på ett
++                                område, om det vid infarten
++                                till området anges att
++                                parkering är tillåten.
+ 
+ T12 Riktning                    Tavlan anger riktning till
+-angivelsen på märket.
++                                angivelsen på märket.
+ 
+-Tavlan är anpassad till
+-förhållandena på platsen.
++                                Tavlan är anpassad till
++                                förhållandena på platsen.
+ 
+ T13 Flervägsväjning             Tavlan anger att förare på
+-samtliga tillfarter i en
+-korsning har väjningsplikt.
++                                samtliga tillfarter i en
++                                korsning har väjningsplikt.
+ 
+ T14 Flervägsstopp               Tavlan anger att förare på
+-samtliga tillfarter i en
+-korsning har stopplikt.
++                                samtliga tillfarter i en
++                                korsning har stopplikt.
+ 
+ T15 Vägars fortsättning i
+ korsning                        Tavlan anger en korsning där
+-förare på en väg som anges med
+-smalt streck har väjningsplikt
+-mot fordon på en väg som anges
+-med brett streck.
++                                förare på en väg som anges med
++                                smalt streck har väjningsplikt
++                                mot fordon på en väg som anges
++                                med brett streck.
+ 
+-Symbolen är anpassad efter
+-förhållandena på platsen.
++                                Symbolen är anpassad efter
++                                förhållandena på platsen.
+ 
+ T16 Avgift                      Tavlan anger att avgift skall
+-betalas för parkering enligt
+-den taxa som anges på en
+-parkeringsmätare,
+-biljettautomat eller
+-motsvarande och att övriga
+-villkor för parkering som anges
+-där skall iakttas.
+-
+-För klockslag gäller de närmare
+-föreskrifterna för tavla T6,
+-tidsangivelse.
++                                betalas för parkering enligt
++                                den taxa som anges på en
++                                parkeringsmätare,
++                                biljettautomat eller
++                                motsvarande och att övriga
++                                villkor för parkering som anges
++                                där skall iakttas.
++
++                                För klockslag gäller de närmare
++                                föreskrifterna för tavla T6,
++                                tidsangivelse.
+ 
+ T17 Parkeringsskiva             Tavlan anger att tiden när
+-parkering påbörjas skall anges
+-med en parkeringsskiva eller
+-någon annan anordning.
+-
+-För klockslag gäller de närmare
+-föreskrifterna för tavla T6,
+-tidsangivelse.
++                                parkering påbörjas skall anges
++                                med en parkeringsskiva eller
++                                någon annan anordning.
++
++                                För klockslag gäller de närmare
++                                föreskrifterna för tavla T6,
++                                tidsangivelse.
+ 
+ T18 Tillåten tid för parkering  Tavlan anger längsta tillåten
+-tid för parkering.
++                                tid för parkering.
+ 
+ T19 Boende                      Tavlan anger att boende i ett
+-område, med särskilt tillstånd,
+-får parkera enligt särskilda
+-villkor.
++                                område, med särskilt tillstånd,
++                                får parkera enligt särskilda
++                                villkor.
+ 
+-Texten kan vara kompletterad
+-med områdesbeteckning eller
+-motsvarande.
++                                Texten kan vara kompletterad
++                                med områdesbeteckning eller
++                                motsvarande.
+ 
+ T20 Parkeringsbiljett           Tavlan anger att parkering är
+-avgiftsfri men att
+-parkeringsbiljett skall
+-användas vid parkering.
++                                avgiftsfri men att
++                                parkeringsbiljett skall
++                                användas vid parkering.
+ 
+ T21 Uppställning av fordon      Tavlan anger hur fordon skall
+-ställas upp på en
+-parkeringsplats.
++                                ställas upp på en
++                                parkeringsplats.
+ 
+-Tavlan är anpassad efter
+-förhållandena på platsen.
++                                Tavlan är anpassad efter
++                                förhållandena på platsen.
+ 
+ T22 Text                        Tavlan ger kompletterande
+-anvisning som inte kan ges med
+-någon annan tilläggstavla eller
+-kombinationer av dessa.
++                                anvisning som inte kan ges med
++                                någon annan tilläggstavla eller
++                                kombinationer av dessa.
+ Förordning (2007:448).
+ 
+ 3 kap. Trafiksignaler
+@@ -2553,38 +2548,38 @@
+ Signalbild                      Närmare föreskrifter
+ 
+ Röd                             Stopp. Fordon får inte passera
+-stopplinjen eller, om sådan
+-saknas, signalen.
++                                stopplinjen eller, om sådan
++                                saknas, signalen.
+ 
+-Signal med konturpil gäller
+-endast den eller de
+-färdriktningar som anges med
+-pilen.
++                                Signal med konturpil gäller
++                                endast den eller de
++                                färdriktningar som anges med
++                                pilen.
+ 
+ Röd+gul                         Växling till grön signalbild är
+-omedelbart förestående. I
+-övrigt har signalbilden samma
+-innebörd som röd.
++                                omedelbart förestående. I
++                                övrigt har signalbilden samma
++                                innebörd som röd.
+ 
+ Grön                            Fordon får fortsätta framåt.
+ 
+-Grön pil innebär att signalen
+-gäller den färdriktning som
+-anges med pilen. Fordon får
+-föras i pilens riktning även om
+-en annan signalbild visas
+-samtidigt.
++                                Grön pil innebär att signalen
++                                gäller den färdriktning som
++                                anges med pilen. Fordon får
++                                föras i pilens riktning även om
++                                en annan signalbild visas
++                                samtidigt.
+ 
+ Gul                             Stanna. Fordon får inte passera
+-stopplinjen eller, om sådan
+-saknas, signalen i annat fall än
+-då det hunnit så långt fram när
+-signalbilden växlar från grön
+-till gul att det inte kan
+-stannas utan fara.
++                                stopplinjen eller, om sådan
++                                saknas, signalen i annat fall än
++                                då det hunnit så långt fram när
++                                signalbilden växlar från grön
++                                till gul att det inte kan
++                                stannas utan fara.
+ 
+ Blinkande gul                   Särskild försiktighet skall
+-iakttas vid passage.
++                                iakttas vid passage.
+ 
+ 7 § En gångsignal har två ljusöppningar: en för rött ljus som
+ visar bilden av en stående person och en för grönt ljus som
+@@ -2600,30 +2595,29 @@
+ Röd
+ Akustisk signal med
+ långsam pulsfrekvens            Förbjudet att beträda en
+-körbana, cykelbana eller
+-järnvägs- eller
+-spårvägskorsning.
+-
+-
+-Gående som befinner sig på
+-körbanan eller cykelbanan när
+-signalen slår om till röd
+-signalbild skall fortsätta till
+-andra sidan. Finns en refug
+-eller liknande anordning skall
+-den gående dock stanna där.
++                                körbana, cykelbana eller
++                                järnvägs- eller
++                                spårvägskorsning.
++
++                                Gående som befinner sig på
++                                körbanan eller cykelbanan när
++                                signalen slår om till röd
++                                signalbild skall fortsätta till
++                                andra sidan. Finns en refug
++                                eller liknande anordning skall
++                                den gående dock stanna där.
+ 
+ Grön
+ Akustisk signal med
+ snabb pulsfrekvens              Körbana, cykelbana eller
+-järnvägs- eller
+-spårvägskorsning får beträdas.
++                                järnvägs- eller
++                                spårvägskorsning får beträdas.
+ 
+ Blinkande grön
+ Akustisk signal med
+ snabb pulsfrekvens
+ och avbrott                     Växling till röd signalbild är
+-nära förestående.
++                                nära förestående.
+ 
+ Kollektivtrafiksignaler
+ 
+@@ -2651,28 +2645,28 @@
+ Signalbild                      Närmare föreskrifter
+ 
+ S                               Stopp. Fordon och spårvagn får
+-inte passera stopplinjen, eller
+-om sådan saknas, signalen.
++                                inte passera stopplinjen, eller
++                                om sådan saknas, signalen.
+ 
+ S+vågrätt streck                Växling till lodrätt streck är
+-omedelbart förestående. I
+-övrigt har signalbilden samma
+-innebörd som S.
++                                omedelbart förestående. I
++                                övrigt har signalbilden samma
++                                innebörd som S.
+ 
+ Lodrätt streck                  Fordon och spårvagn får
+-fortsätta framåt.
++                                fortsätta framåt.
+ 
+ Vågrätt streck                  Stanna. Fordon och spårvagn får
+-inte passera stopplinjen, eller
+-om sådan saknas, signalen i
+-annat fall än då det hunnit så
+-långt fram när signalen växlar
+-från lodrätt till vågrätt
+-streck att det inte kan stannas
+-utan fara.
++                                inte passera stopplinjen, eller
++                                om sådan saknas, signalen i
++                                annat fall än då det hunnit så
++                                långt fram när signalen växlar
++                                från lodrätt till vågrätt
++                                streck att det inte kan stannas
++                                utan fara.
+ 
+ Blinkande vågrätt streck        Särskild försiktighet skall
+-iakttas vid passage.
++                                iakttas vid passage.
+ 
+ Körfältssignaler
+ 
+@@ -2688,18 +2682,18 @@
+ Signalbild                      Närmare föreskrifter
+ 
+ Rött kryss                      Körfältet och i förekommande
+-fall vägrenen intill körfältet
+-får inte användas för trafik.
++                                fall vägrenen intill körfältet
++                                får inte användas för trafik.
+ 
+ Gul pil eller pilar             Föraren skall byta körfält i
+-den riktning pilen eller
+-pilarna anger.
++                                den riktning pilen eller
++                                pilarna anger.
+ 
+ Grön pil                        Körfältet får användas för
+-trafik.
++                                trafik.
+ 
+-I stället för grön pil kan ett
+-vägmärke förekomma.
++                                I stället för grön pil kan ett
++                                vägmärke förekomma.
+ Förordning (2007:448).
+ 
+ Signaler vid korsning med järnväg eller spårväg
+@@ -2724,12 +2718,12 @@
+ Signalbild                      Närmare föreskrifter
+ 
+ Rött blinkande ljus             Stopp. Trafikanter får inte
+-passera stopplinjen eller, om
+-sådan saknas, signalen.
++                                passera stopplinjen eller, om
++                                sådan saknas, signalen.
+ 
+ Ljudsignal                      Stopp. Trafikanter får inte
+-passera stopplinjen eller, om
+-sådan saknas, signalen.
++                                passera stopplinjen eller, om
++                                sådan saknas, signalen.
+ 
+ Signaler vid rörlig bro, utryckningsstation, flygfält, tunnel
+ eller liknande
+@@ -2748,8 +2742,8 @@
+ Signalbild                      Närmare föreskrifter
+ 
+ Rött blinkande ljus             Stopp. Trafikanter får inte
+-passera stopplinjen eller, om
+-sådan saknas, signalen.
++                                passera stopplinjen eller, om
++                                sådan saknas, signalen.
+ 
+ Signaler för påkallande av särskild försiktighet
+ 
+@@ -2759,30 +2753,30 @@
+ Signalbild                      Närmare föreskrifter
+ 
+ Rött fast ljus                  Signalen anger att en väg är
+-helt avstängd.
++                                helt avstängd.
+ 
+ Gult blinkande ljus             Signalen används där en väg är
+-delvis avstängd eller för att
+-förstärka en anvisning som ges
+-genom någon annan anordning.
+-
+-Antalet ljusöppningar och deras
+-placering är anpassade till
+-förhållandena på platsen.
+-
+-Signalen kan användas
+-fristående eller tillsammans
+-med en anordning som avger ljud
+-för att ge anvisning för gående
+-om korsande spårvagn eller
+-buss.
++                                delvis avstängd eller för att
++                                förstärka en anvisning som ges
++                                genom någon annan anordning.
++
++                                Antalet ljusöppningar och deras
++                                placering är anpassade till
++                                förhållandena på platsen.
++
++                                Signalen kan användas
++                                fristående eller tillsammans
++                                med en anordning som avger ljud
++                                för att ge anvisning för gående
++                                om korsande spårvagn eller
++                                buss.
+ 
+ Ljudfyr                         En ljudfyr avger tonstötar
+-eller motsvarande.
++                                eller motsvarande.
+ 
+-Signalen anger lämplig plats
+-för gående att korsa en
+-körbana.
++                                Signalen anger lämplig plats
++                                för gående att korsa en
++                                körbana.
+ 
+ 4 kap. Vägmarkeringar
+ 
+@@ -2817,79 +2811,79 @@
+ 
+ M1 Mittlinje eller
+ körfältslinje                   Mittlinje anger gränsen mellan
+-körfält avsedda för färd i
+-motsatta färdriktningar.
++                                körfält avsedda för färd i
++                                motsatta färdriktningar.
+ 
+-Körfältslinje anger gränsen
+-mellan körfält för färd i samma
+-riktning.
+-
+-Markeringen har
+-längdförhållandet 1:3 eller 1:1
+-mellan dellinje och mellanrum.
+-
+-Mittlinje kan även ange en
+-cykelbanas mitt och har då
+-längdförhållandet 1:1 mellan
+-dellinje och mellanrum.
++                                Körfältslinje anger gränsen
++                                mellan körfält för färd i samma
++                                riktning.
++
++                                Markeringen har
++                                längdförhållandet 1:3 eller 1:1
++                                mellan dellinje och mellanrum.
++
++                                Mittlinje kan även ange en
++                                cykelbanas mitt och har då
++                                längdförhållandet 1:1 mellan
++                                dellinje och mellanrum.
+ 
+ M2 Kantlinje                    Markeringen anger en körbanas
+-yttre gräns.
++                                yttre gräns.
+ 
+-Markeringen har
+-längdförhållandet 1:2 mellan
+-dellinje och mellanrum.
++                                Markeringen har
++                                längdförhållandet 1:2 mellan
++                                dellinje och mellanrum.
+ 
+ M3 Varningslinje                Varningslinje används för att
+-informera om att linjen är
+-olämplig att överskrida på
+-grund av trafikförhållandena.
+-Markeringen anger gränsen
+-mellan körfält avsedda för färd
+-i motsatta färdriktningar.
+-
+-Markeringen har
+-längdförhållandet 3:1 mellan
+-dellinje och mellanrum.
++                                informera om att linjen är
++                                olämplig att överskrida på
++                                grund av trafikförhållandena.
++                                Markeringen anger gränsen
++                                mellan körfält avsedda för färd
++                                i motsatta färdriktningar.
++
++                                Markeringen har
++                                längdförhållandet 3:1 mellan
++                                dellinje och mellanrum.
+ 
+ M4 Ledlinje                     Markeringen anger lämplig
+-färdväg för trafik i
+-komplicerade korsningar.
++                                färdväg för trafik i
++                                komplicerade korsningar.
+ 
+-Markeringen används även i
+-andra fall där det finns behov
+-av ledning.
+-
+-Markeringen har
+-längdförhållandet 1:1 mellan
+-dellinje och mellanrum.
++                                Markeringen används även i
++                                andra fall där det finns behov
++                                av ledning.
++
++                                Markeringen har
++                                längdförhållandet 1:1 mellan
++                                dellinje och mellanrum.
+ 
+ M5 Cykelfältslinje              Markeringen anger gränsen
+-mellan ett cykelfält och ett
+-annat körfält.
++                                mellan ett cykelfält och ett
++                                annat körfält.
+ 
+-Markeringen har
+-längdförhållandet 1:1 mellan
+-dellinje och mellanrum.
++                                Markeringen har
++                                längdförhållandet 1:1 mellan
++                                dellinje och mellanrum.
+ 
+ M6 Linje för fordon i
+ linjetrafik m.fl.               Markeringen anger gränsen
+-mellan körfält för fordon i
+-linjetrafik m.fl. och ett annat
+-körfält.
+-
+-Markeringen har
+-längdförhållandet 1:1 mellan
+-dellinje och mellanrum.
++                                mellan körfält för fordon i
++                                linjetrafik m.fl. och ett annat
++                                körfält.
++
++                                Markeringen har
++                                längdförhållandet 1:1 mellan
++                                dellinje och mellanrum.
+ 
+ M7 Reversibelt körfält          Markeringen avgränsar körfält
+-som upplåts för trafik
+-omväxlande i den ena och i den
+-andra färdriktningen.
+-
+-Markeringen har
+-längdförhållandet 1:1 mellan
+-dellinje och mellanrum.
++                                som upplåts för trafik
++                                omväxlande i den ena och i den
++                                andra färdriktningen.
++
++                                Markeringen har
++                                längdförhållandet 1:1 mellan
++                                dellinje och mellanrum.
+ 
+ 5 § Heldragna linjer används i stället för motsvarande brutna
+ linjer när det av trafiksäkerhetsskäl inte är tillåtet att
+@@ -2905,29 +2899,29 @@
+ Markering                       Närmare föreskrifter
+ 
+ M8 Heldragen linje              Heldragen linje anger att
+-bestämmelserna i 3 kap. 11 §
+-eller 12 § tredje stycket
+-trafikförordningen (1998:1276)
+-eller föreskrifter meddelade
+-med stöd av den förordningen är
+-tillämpliga.
+-
+-Heldragen mittlinje förekommer
+-såväl enkel som dubblerad. Om
+-den är dubblerad kan
+-mellanrummet mellan linjerna
+-variera.
++                                bestämmelserna i 3 kap. 11 §
++                                eller 12 § tredje stycket
++                                trafikförordningen (1998:1276)
++                                eller föreskrifter meddelade
++                                med stöd av den förordningen är
++                                tillämpliga.
++
++                                Heldragen mittlinje förekommer
++                                såväl enkel som dubblerad. Om
++                                den är dubblerad kan
++                                mellanrummet mellan linjerna
++                                variera.
+ 
+ M9 Spärrområde                  Markeringen anger ett område
+-där fordon inte får föras
+-enligt 3 kap. 11 §
+-trafikförordningen.
+-
+-Markeringen består av vinklade
+-eller snedställda streck
+-beroende på förhållandena på
+-platsen. Del av eller hela
+-området kan utföras i vitt.
++                                där fordon inte får föras
++                                enligt 3 kap. 11 §
++                                trafikförordningen.
++
++                                Markeringen består av vinklade
++                                eller snedställda streck
++                                beroende på förhållandena på
++                                platsen. Del av eller hela
++                                området kan utföras i vitt.
+ 
+ 7 § Heldragna och brutna linjer i kombination anger i stället
+ för enbart mittlinje eller körfältslinje gränsen mellan
+@@ -2938,34 +2932,33 @@
+ M10 Mittlinje eller
+ körfältslinje och
+ heldragen linje                 Markeringen används där det
+-inte är tillåtet för fordon som
+-befinner sig på samma sida som
+-den heldragna linjen att byta
+-körfält.
++                                inte är tillåtet för fordon som
++                                befinner sig på samma sida som
++                                den heldragna linjen att byta
++                                körfält.
+ 
+ M11 Varningslinje och
+-heldragen linje
+-Markeringen används där det
+-inte är tillåtet för fordon som
+-befinner sig på samma sida som
+-den heldragna linjen att byta
+-körfält.
+-
+-Markeringen kan även användas
+-för att upplysa om en kommande
+-heldragen linje på den sida där
+-varningslinjen finns.
++heldragen linje                 Markeringen används där det
++                                inte är tillåtet för fordon som
++                                befinner sig på samma sida som
++                                den heldragna linjen att byta
++                                körfält.
++
++                                Markeringen kan även användas
++                                för att upplysa om en kommande
++                                heldragen linje på den sida där
++                                varningslinjen finns.
+ 
+ M12 Mittlinje och
+ varningslinje                   Markeringen används där det är
+-olämpligt att överskrida
+-varningslinjen på grund av
+-trafikförhållandena.
+-
+-Markeringen kan även användas
+-för att upplysa om en kommande
+-heldragen linje på den sida där
+-varningslinjen finns.
++                                olämpligt att överskrida
++                                varningslinjen på grund av
++                                trafikförhållandena.
++
++                                Markeringen kan även användas
++                                för att upplysa om en kommande
++                                heldragen linje på den sida där
++                                varningslinjen finns.
+ Förordning (2007:448).
+ 
+ Tvärgående markeringar
+@@ -2975,23 +2968,23 @@
+ Markering                       Närmare föreskrifter
+ 
+ M13 Stopplinje                  Markeringen anger var ett
+-fordon skall stannas enligt ett
+-vägmärke eller en trafiksignal.
++                                fordon skall stannas enligt ett
++                                vägmärke eller en trafiksignal.
+ 
+ M14 Väjningslinje               Markeringen anger den linje som
+-fordon inte bör passera när
+-föraren iakttar väjningsplikt.
++                                fordon inte bör passera när
++                                föraren iakttar väjningsplikt.
+ 
+ M15 Övergångsställe             Markeringen anger ett
+-övergångsställe och är utförd
+-där märke B3, övergångsställe,
+-är uppsatt.
++                                övergångsställe och är utförd
++                                där märke B3, övergångsställe,
++                                är uppsatt.
+ 
+ M16 Cykelöverfart
+ 
+ M17 Farthinder                  Markeringen anger ett
+-farthinder i form av gupp, grop
+-eller liknande.
++                                farthinder i form av gupp, grop
++                                eller liknande.
+ 
+ Övriga markeringar
+ 
+@@ -3002,125 +2995,125 @@
+ M18 Förberedande upplysning
+ om väjningsplikt eller
+ stopplikt                       Markeringen anger att
+-väjningsplikt eller stopplikt
+-gäller längre fram i
+-färdriktningen.
++                                väjningsplikt eller stopplikt
++                                gäller längre fram i
++                                färdriktningen.
+ 
+ M19 Körfältspilar               Markeringen anger, för närmaste
+-korsning, lämplig färdväg i
+-markerat körfält.
++                                korsning, lämplig färdväg i
++                                markerat körfält.
+ 
+-Är körfältet avgränsat med
+-heldragen körfältslinje skall
+-förare följa den eller de
+-riktningar som pilen visar.
+-Detta gäller dock inte förare
+-som i anslutning till
+-korsningen färdas in i eller
+-från ett reserverat körfält.
+-
+-Markeringen anger också att
+-fordon inte får föras i motsatt
+-riktning.
+-
+-Körfältspil med två
+-pilangivelser i samma riktning
+-upplyser om färdväg i närmaste
+-och därpå följande korsning.
++                                Är körfältet avgränsat med
++                                heldragen körfältslinje skall
++                                förare följa den eller de
++                                riktningar som pilen visar.
++                                Detta gäller dock inte förare
++                                som i anslutning till
++                                korsningen färdas in i eller
++                                från ett reserverat körfält.
++
++                                Markeringen anger också att
++                                fordon inte får föras i motsatt
++                                riktning.
++
++                                Körfältspil med två
++                                pilangivelser i samma riktning
++                                upplyser om färdväg i närmaste
++                                och därpå följande korsning.
+ 
+ M20 Körfältsbyte                Markeringen anger att
+-körfältsbyte snarast måste ske.
++                                körfältsbyte snarast måste ske.
+ 
+-Om markeringen är utförd mellan
+-körfält för trafik i motsatta
+-riktningar anger den att en
+-heldragen linje eller
+-motsvarande finns längre fram i
+-färdriktningen.
++                                Om markeringen är utförd mellan
++                                körfält för trafik i motsatta
++                                riktningar anger den att en
++                                heldragen linje eller
++                                motsvarande finns längre fram i
++                                färdriktningen.
+ 
+ M21 Förbud mot att stanna
+ och parkera                     Markeringen anger förbud mot
+-att stanna och parkera fordon
+-och är placerad i körbanans
+-kant.
++                                att stanna och parkera fordon
++                                och är placerad i körbanans
++                                kant.
+ 
+-Avvikelse från färg får inte
+-ske.
++                                Avvikelse från färg får inte
++                                ske.
+ 
+ M22 Förbud mot att parkera      Markeringen anger förbud mot
+-att parkera fordon och är
+-placerad i körbanans kant.
++                                att parkera fordon och är
++                                placerad i körbanans kant.
+ 
+-Markeringen anger även
+-utsträckning av busshållplats.
++                                Markeringen anger även
++                                utsträckning av busshållplats.
+ 
+-Markeringen har
+-längdförhållandet 1:1 mellan
+-dellinje och mellanrum.
++                                Markeringen har
++                                längdförhållandet 1:1 mellan
++                                dellinje och mellanrum.
+ 
+-Avvikelse från färg får inte
+-ske.
++                                Avvikelse från färg får inte
++                                ske.
+ 
+ M23 Förbud mot att stanna
+ och parkera eller att
+ parkera                         Markeringen används som
+-förstärkning av markeringarna
+-M21, förbud mot att stanna och
+-parkera, och M22, förbud mot
+-att parkera.
++                                förstärkning av markeringarna
++                                M21, förbud mot att stanna och
++                                parkera, och M22, förbud mot
++                                att parkera.
+ 
+-Avvikelse från färg får inte
+-ske.
++                                Avvikelse från färg får inte
++                                ske.
+ 
+ M24 Uppställningsplats          Markeringen anger gränsen för
+-uppställningsplats för fordon.
++                                uppställningsplats för fordon.
+ 
+-Markeringen kan vara utförd med
+-bruten linje.
++                                Markeringen kan vara utförd med
++                                bruten linje.
+ 
+ M25 Gång- och cykelpil          Markeringen visar lämplig
+-färdväg för gående eller
+-cyklande och förare av moped
+-klass II.
++                                färdväg för gående eller
++                                cyklande och förare av moped
++                                klass II.
+ 
+ M26 Cykel                       Markeringen visar bana eller
+-lämplig färdväg för cyklande
+-och förare av moped klass II.
++                                lämplig färdväg för cyklande
++                                och förare av moped klass II.
+ 
+ M27 Gående                      Markeringen visar bana eller
+-lämplig färdväg för gående.
++                                lämplig färdväg för gående.
+ 
+ M28 Buss                        Markeringen visar att körfältet
+-är avsett för fordon i
+-linjetrafik m.fl.
++                                är avsett för fordon i
++                                linjetrafik m.fl.
+ 
+ M29 Hastighet                   Markeringen upplyser om högsta
+-tillåtna hastighet.
++                                tillåtna hastighet.
+ 
+ M30 Vägnummer                   Markeringen upplyser om
+-vägnummer.
++                                vägnummer.
+ 
+ M31 Ändamålsplats               Markeringen upplyser om en
+-uppställningsplats som är
+-avsedd för ett visst ändamål.
+-Texten anpassas efter
+-ändamålet.
++                                uppställningsplats som är
++                                avsedd för ett visst ändamål.
++                                Texten anpassas efter
++                                ändamålet.
+ 
+ M32 Stopp                       Markeringen upplyser om
+-stopplikt.
++                                stopplikt.
+ 
+-Markeringen används
+-tillsammans med märke B2,
+-stopplikt, för att förstärka
+-anvisningen.
++                                Markeringen används
++                                tillsammans med märke B2,
++                                stopplikt, för att förstärka
++                                anvisningen.
+ 
+ M33 Rörelsehindrad              Markeringen upplyser om
+-uppställningsplats endast för
+-rörelsehindrade.
++                                uppställningsplats endast för
++                                rörelsehindrade.
+ 
+ M34 Information                 Markeringen ger upplysning,
+-varning eller vägledning av
+-vikt för trafikanten.
++                                varning eller vägledning av
++                                vikt för trafikanten.
+ Förordning (2007:448).
+ 
+ 5 kap. Andra anordningar för anvisningar för trafiken och
+@@ -3133,84 +3126,84 @@
+ Anordning                       Närmare föreskrifter
+ 
+ X1 Markeringspil                Anordningen anger att
+-fordonsförare måste svänga
+-kraftigt i pilarnas riktning på
+-grund av till exempel en kurva.
+-
+-Om anordningen används vid ett
+-vägarbete eller liknande arbete
+-är den röd och gul.
++                                fordonsförare måste svänga
++                                kraftigt i pilarnas riktning på
++                                grund av till exempel en kurva.
++
++                                Om anordningen används vid ett
++                                vägarbete eller liknande arbete
++                                är den röd och gul.
+ 
+ X2 Markeringsskärm för
+ hinder                          Anordningen anger att
+-framkomligheten på vägen är
+-inskränkt på grund av ett
+-hinder.
+-
+-Anordningen kan även ange att
+-en väg är helt eller delvis
+-avstängd för trafik.
+-
+-Om anordningen används vid ett
+-vägarbete eller liknande arbete
+-är den röd och gul.
++                                framkomligheten på vägen är
++                                inskränkt på grund av ett
++                                hinder.
++
++                                Anordningen kan även ange att
++                                en väg är helt eller delvis
++                                avstängd för trafik.
++
++                                Om anordningen används vid ett
++                                vägarbete eller liknande arbete
++                                är den röd och gul.
+ 
+ X3 Markeringsskärm för
+ sidohinder, farthinder m.m.     Anordningen anger att
+-förhållandena ändras så att
+-hastigheten behöver anpassas.
++                                förhållandena ändras så att
++                                hastigheten behöver anpassas.
+ 
+-Anordningen används för att
+-ange vägens eller körbanans
+-kant eller för att skilja
+-trafikriktningar åt vid
+-komplicerade passager.
+-
+-Anordningen är placerad så att
+-fälten lutar nedåt på den sida
+-där trafiken skall färdas.
+-
+-Om anordningen används vid ett
+-vägarbete eller liknande arbete
+-är den röd och gul. Fälten kan
+-då även vara vågräta.
++                                Anordningen används för att
++                                ange vägens eller körbanans
++                                kant eller för att skilja
++                                trafikriktningar åt vid
++                                komplicerade passager.
++
++                                Anordningen är placerad så att
++                                fälten lutar nedåt på den sida
++                                där trafiken skall färdas.
++
++                                Om anordningen används vid ett
++                                vägarbete eller liknande arbete
++                                är den röd och gul. Fälten kan
++                                då även vara vågräta.
+ 
+ X4 Avfartsskärm                 Anordningen anger skiljepunkten
+-mellan en huvudkörbana och en
+-avfart där det finns ett
+-retardationsfält.
++                                mellan en huvudkörbana och en
++                                avfart där det finns ett
++                                retardationsfält.
+ 
+ X5 Gul ljuspil eller
+ ljuspilar                       Anordningen anger att
+-trafikanter skall passera på
+-den sida pilen eller pilarna
+-visar. Pilen eller pilarna kan
+-vara blinkande.
++                                trafikanter skall passera på
++                                den sida pilen eller pilarna
++                                visar. Pilen eller pilarna kan
++                                vara blinkande.
+ 
+ X6 Särskild varningsanordning   Anordningen anger att
+-framkomligheten på en väg är
+-inskränkt på grund av ett
+-tillfälligt hinder eller
+-liknande.
++                                framkomligheten på en väg är
++                                inskränkt på grund av ett
++                                tillfälligt hinder eller
++                                liknande.
+ 
+-Texten på anordningen anpassas
+-till orsaken.
++                                Texten på anordningen anpassas
++                                till orsaken.
+ 
+ X7 Bom                          Anordningen anger att en väg är
+-helt eller delvis avstängd för
+-trafik.
++                                helt eller delvis avstängd för
++                                trafik.
+ 
+-En bom kan vara försedd med
+-ytterligare anordningar för att
+-öka synbarheten.
++                                En bom kan vara försedd med
++                                ytterligare anordningar för att
++                                öka synbarheten.
+ 
+ X8 Plankorsningsskärm           Anordningen används för att
+-göra en plankorsning lättare
+-att upptäcka.
++                                göra en plankorsning lättare
++                                att upptäcka.
+ 
+ X9 Cirkulationstrafik           Anordningen anger mittpunkten i
+-en rondell runt vilken fordon
+-skall föras.
++                                en rondell runt vilken fordon
++                                skall föras.
+ 
+ Tecken av vakt
+ 
+@@ -3219,22 +3212,22 @@
+ Tecken                          Innebörd
+ 
+ X10 Stopp                       Tecknet anger stopp för den
+-trafikant vakten är vänd mot.
++                                trafikant vakten är vänd mot.
+ 
+-Under mörker ges tecknet med
+-lykta med rött ljus. Tecknet
+-får också ges med märke C34,
+-stopp för angivet ändamål, med
+-texten Vakt.
++                                Under mörker ges tecknet med
++                                lykta med rött ljus. Tecknet
++                                får också ges med märke C34,
++                                stopp för angivet ändamål, med
++                                texten Vakt.
+ 
+ X11 Kör fram                    Tecknet anger att trafikanten
+-får fortsätta framåt.
++                                får fortsätta framåt.
+ 
+-Tecknet ges med en vinkande
+-rörelse i färdriktningen.
++                                Tecknet ges med en vinkande
++                                rörelse i färdriktningen.
+ 
+ X12 Kännetecken                 Kännetecken skall bäras både
+-framtill och baktill.
++                                framtill och baktill.
+ 
+ 6 kap. Säkerhetsanordningar i korsningar med järnväg eller
+ spårväg
+@@ -3271,104 +3264,104 @@
+ Tecken                          Närmare föreskrifter
+ 
+ P1 Stopp                        Tecknet anger stopp för den
+-trafikant som kommer framifrån
+-eller bakifrån. Tecknet används
+-i vägkorsning och gäller så
+-länge polismannen vänder sig åt
+-samma håll. För trafikanter som
+-kommer från sidan betyder
+-tecknet att vägen är fri och
+-att det är tillåtet att köra.
+-Tecknet får ges i kombination
+-med tecken P2, stopp. Tecknet
+-kan ges med en stoppspade.
++                                trafikant som kommer framifrån
++                                eller bakifrån. Tecknet används
++                                i vägkorsning och gäller så
++                                länge polismannen vänder sig åt
++                                samma håll. För trafikanter som
++                                kommer från sidan betyder
++                                tecknet att vägen är fri och
++                                att det är tillåtet att köra.
++                                Tecknet får ges i kombination
++                                med tecken P2, stopp. Tecknet
++                                kan ges med en stoppspade.
+ 
+ P2 Stopp                        Tecknet anger stopp för den
+-trafikant som handflatan är
+-vänd mot. Tecknet kan ges med
+-en stoppspade.
++                                trafikant som handflatan är
++                                vänd mot. Tecknet kan ges med
++                                en stoppspade.
+ 
+ P3 Stopp                        Tecknet anger stopp för den
+-trafikant som lyktan är vänd
+-mot. Tecknet används under
+-mörker och vid nedsatt sikt.
+-Lyktan hålls i den position
+-där den lättast uppfattas av
+-trafikanter.
++                                trafikant som lyktan är vänd
++                                mot. Tecknet används under
++                                mörker och vid nedsatt sikt.
++                                Lyktan hålls i den position
++                                där den lättast uppfattas av
++                                trafikanter.
+ 
+ P4 Kör fram                     Tecknet anger att trafikanter i
+-den färdriktning som tecknet
+-ges får fortsätta framåt.
+-Tecknet ges med en vinkande
+-rörelse i färdriktningen.
++                                den färdriktning som tecknet
++                                ges får fortsätta framåt.
++                                Tecknet ges med en vinkande
++                                rörelse i färdriktningen.
+ 
+ P5 Minska hastigheten           Tecknet anger att den trafikant
+-som polismannen är vänd mot
+-skall minska hastigheten. Under
+-mörker och vid nedsatt sikt kan
+-tecknet vara förtydligat med en
+-lykta som visar vitt eller gult
+-ljus eller en reflexanordning
+-som återkastar vitt eller gult
+-ljus.
++                                som polismannen är vänd mot
++                                skall minska hastigheten. Under
++                                mörker och vid nedsatt sikt kan
++                                tecknet vara förtydligat med en
++                                lykta som visar vitt eller gult
++                                ljus eller en reflexanordning
++                                som återkastar vitt eller gult
++                                ljus.
+ 
+ P6 Kontroll                     När symbolerna och texten visas
+-skall fordonsförare köra in på
+-kontrollplats för kontroll.
+-Visas symboler med visst eller
+-vissa slag av fordon gäller
+-skyldigheten att köra in för
+-kontroll endast dessa fordon.
+-Anvisningen är anpassad till
+-förhållandena på platsen.
++                                skall fordonsförare köra in på
++                                kontrollplats för kontroll.
++                                Visas symboler med visst eller
++                                vissa slag av fordon gäller
++                                skyldigheten att köra in för
++                                kontroll endast dessa fordon.
++                                Anvisningen är anpassad till
++                                förhållandena på platsen.
+ 
+ P7 Förberedande upplysning
+ om kontroll                     Symbolerna och texten visas som
+-förberedande upplysning om
+-kontroll. Det angivna avståndet
+-är anpassat till förhållandena
+-på platsen.
++                                förberedande upplysning om
++                                kontroll. Det angivna avståndet
++                                är anpassat till förhållandena
++                                på platsen.
+ 
+ P8 Minska hastigheten           Tecknet anger att de
+-trafikanter som befinner sig
+-bakom polisfordonet skall
+-minska hastigheten. Under
+-mörker och vid nedsatt sikt
+-får tecknet förtydligas med en
+-lykta som visar vitt eller gult
+-ljus eller en reflexanordning
+-som återkastar vitt eller gult
+-ljus.
++                                trafikanter som befinner sig
++                                bakom polisfordonet skall
++                                minska hastigheten. Under
++                                mörker och vid nedsatt sikt
++                                får tecknet förtydligas med en
++                                lykta som visar vitt eller gult
++                                ljus eller en reflexanordning
++                                som återkastar vitt eller gult
++                                ljus.
+ 
+ P9 Minska hastigheten           Tecknet anger att de
+-trafikanter som möter
+-polisfordonet skall minska
+-hastigheten. Under mörker och
+-vid nedsatt sikt får tecknet
+-förtydligas med en lykta som
+-visar vitt eller gult ljus
+-eller en reflexanordning som
+-återkastar vitt eller gult
+-ljus.
++                                trafikanter som möter
++                                polisfordonet skall minska
++                                hastigheten. Under mörker och
++                                vid nedsatt sikt får tecknet
++                                förtydligas med en lykta som
++                                visar vitt eller gult ljus
++                                eller en reflexanordning som
++                                återkastar vitt eller gult
++                                ljus.
+ 
+ P10 Följ efter och stanna
+ bakom polisfordonet när
+ detta stannar                   Tecknet anger att föraren av
+-det fordon som befinner sig
+-bakom polisfordonet skall följa
+-efter det och stanna när
+-polisfordonet stannar. Tecknet
+-kan ges med en stoppspade.
++                                det fordon som befinner sig
++                                bakom polisfordonet skall följa
++                                efter det och stanna när
++                                polisfordonet stannar. Tecknet
++                                kan ges med en stoppspade.
+ 
+ P11 Kör in till vägkanten
+ och stanna framför
+ polisfordonet                   Tecknet anger att föraren av
+-det fordon som befinner sig
+-framför polisfordonet skall
+-köra in till vägkanten och
+-stanna. Tecknet ges med
+-växelvis blinkande blått och
+-rött ljus.
++                                det fordon som befinner sig
++                                framför polisfordonet skall
++                                köra in till vägkanten och
++                                stanna. Tecknet ges med
++                                växelvis blinkande blått och
++                                rött ljus.
+ 
+ 8 kap. Bemyndiganden, kostnader m.m.
+ 
+@@ -3523,4 +3516,4 @@
+ tidigare än utgången av år 2020, och
+ 
+ c) meddela ytterligare övergångsbestämmelser.
+-Förordning (2008:1180).
++Förordning (2008:1180).

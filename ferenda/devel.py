@@ -288,6 +288,9 @@ class Devel(object):
         # 4.1 write patch
         patchcontent = "".join(difflines)
         if patchcontent:
+            if repo.config.patchmethod == "rot13":
+                print("rot13:ing the patch at %s" % patchpath)
+                patchcontent = codecs.encode(patchcontent, "rot13")
             # write the patch using the same encoding as the
             # downloaded/intermediate files
             util.writefile(patchpath, patchcontent, encoding=encoding)
