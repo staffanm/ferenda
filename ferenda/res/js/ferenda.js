@@ -22,11 +22,13 @@ $(document).ready(function () {
    * indecipherable API), see
    * https://github.com/hammerjs/hammer.js/issues/81 */
   
+  /*
   hammer = new Hammer(body, {cssProps: {userSelect: false}});
   hammer.on("swipe", function(e) {
     $('.row-offcanvas').toggleClass('active');
   });
-		    
+  */
+  
   /* functions for replacing the text rendering of a pdf page with an image rendering of same */
     $('div.sida a.view-img').click(function () {
 	/* hide everything else from here to next page */
@@ -50,7 +52,7 @@ $(document).ready(function () {
 	    $(this).show();
 	})
     });
-    $('div.sida a.view-text').click(function() {
+  $('div.sida a.view-text').click(function() {
 	navtabs = $(this).parents("ul")
 	navtabs.find("li:nth-child(1)").addClass("active");
 	navtabs.find("li:nth-child(2)").removeClass("active");
@@ -62,6 +64,42 @@ $(document).ready(function () {
 	    nextsectionstart.nextUntil("div.sida").show();
 	}
     });
+
+  var suggestions = new Bloodhound({
+    datumTokenizer: Bloodhound.tokenizers.obj.whitespace('label'),
+    queryTokenizer: Bloodhound.tokenizers.whitespace,
+    /*
+    prefetch: {
+      url: '/rsrc/api/suggestions.json',
+      cache: false
+    },
+    */
+    remote: {
+      url: '/api/?q=%QUERY&_ac=true',
+      wildcard: '%QUERY'
+    } 
+  });
+  promise = suggestions.initialize();
+  promise
+    .done(function() {
+      console.log('ready to go!');
+    })
+    .fail(function() {
+      console.log('err, something went wrong :(');
+    });
+  $('.navbar-form .typeahead').typeahead(null, {
+    name: 'suggestions',
+    display: 'label',
+    source: suggestions,
+    templates: {
+      suggestion: function(ctx) {
+	return "<div class='tt-suggestion'>" + ctx.label + "<br/><small>" + ctx.desc + "</small></div>";
+      }
+    }
+  });
+  $('.navbar-form .typeahead').bind('typeahead:select', function(ev, suggestion) {
+     window.location.href=suggestion.url
+  });
 })
 
 

@@ -153,7 +153,8 @@
       </div>
       <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js">&#160;</script>
       <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous">&#160;</script>
-      <script src="http://hammerjs.github.io/dist/hammer.min.js">&#160;</script>
+      <script src="https://hammerjs.github.io/dist/hammer.min.js">&#160;</script>
+      <script src="https://cdn.rawgit.com/twitter/typeahead.js/v0.11.1/dist/typeahead.bundle.min.js">&#160;</script>
       <xsl:if test="$dyntoc">
 	<script src="https://cdn.rawgit.com/afeld/bootstrap-toc/v0.3.0/dist/bootstrap-toc.min.js">&#160;</script> 
       </xsl:if>

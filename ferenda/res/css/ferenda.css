@@ -24,7 +24,8 @@
      2.2 Accordion panel styling (asides)
      2.3 Search results styling
      2.4 TOC pages styling
-     2.5 Misc styling
+     2.5 Autocomplete/typeahead styling
+     2.6 Misc styling
    3. Footer
 
 */
@@ -53,6 +54,10 @@ nav.navbar-default {
     nav.navbar-default {
 	margin-left: 0;
     }
+    nav.navbar-default input {
+	width: 400px; !important
+    }
+    
 }
 
 /* ...needs no customization now that we're using a stock Bootstrap
@@ -382,8 +387,63 @@ body.toc article ul li {
     margin-left: 8em;
 }
 
+/* PART 2.5: Autocomplete/typeahead styling */
+.typeahead,
+.tt-query,
+.tt-hint {
+  height: 30px;
+  padding: 8px 12px;
+  outline: none;
+}
 
-/* PART 2.5: Misc styling */
+.typeahead {
+}
+
+.typeahead:focus {
+}
+
+.tt-query {
+}
+
+.tt-hint {
+  color: #999
+}
+
+.tt-menu {
+  width: 200%;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  right: 0 !important;
+  left: initial !important;
+}
+
+.tt-suggestion {
+  padding: 3px 5px;
+  font-size: 12px;
+  line-height: 14px;
+  border-bottom: 1px dotted #ccc;
+}
+
+.tt-suggestion:hover {
+  cursor: pointer;
+  color: #fff;
+  background-color: #0097cf;
+}
+
+.tt-suggestion.tt-cursor {
+  color: #fff;
+  background-color: #0097cf;
+}
+
+.tt-suggestion p {
+  margin: 0;
+}
+
+
+
+/* PART 2.6: Misc styling */
 img.facsimile { 
     display: none;
     border-left: 1px solid #ddd;

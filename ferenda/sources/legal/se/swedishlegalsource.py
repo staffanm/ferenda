@@ -574,8 +574,10 @@ class SwedishLegalSource(DocumentRepository):
             return fp
         self.log.warning("%s: Applying patch %s" % (basefile, patchpath))
         from ferenda.thirdparty.patchit import PatchSet, PatchSyntaxError, PatchConflictError
+        binarystream = False
         if isinstance(fp, BufferedIOBase): # binary stream, won't play nice with patchit
             fp = codecs.getreader(self.source_encoding)(fp)
+            binarystream = True
         with codecs.open(patchpath, 'r', encoding=self.source_encoding) as pfp:
             if self.config.patchformat == "rot13":
                 # replace the rot13 obfuscated stream with a plaintext stream
@@ -594,7 +596,11 @@ class SwedishLegalSource(DocumentRepository):
 
         # perform the patching, return the result as a stream, and add
         # an attribute with the description
-        fp = StringIO("\n".join(ps.patches[0].merge(fp.readlines(keepends=False))))
+        patchedtext = "\n".join(ps.patches[0].merge(fp.readlines(keepends=False)))
+        if binarystream:
+            fp = BytesIO(patchedtext.encode(self.source_encoding))
+        else:
+            fp = StringIO(patchedtext)
         fp.patchdescription = desc
         return fp
     

@@ -635,8 +635,8 @@ class RemoteIndex(FulltextIndex):
             res = requests.get(self.location + relurl)
         return self._decode_count_result(res)
 
-    def query(self, q=None, pagenum=1, pagelen=10, **kwargs):
-        relurl, payload = self._query_payload(q, pagenum, pagelen, **kwargs)
+    def query(self, q=None, pagenum=1, pagelen=10, ac_query=False, **kwargs):
+        relurl, payload = self._query_payload(q, pagenum, pagelen, ac_query, **kwargs)
         if payload:
             # print("query: POST %s:\n%s" % (self.location + relurl, payload))
             res = requests.post(self.location + relurl, payload)
@@ -668,11 +668,11 @@ class RemoteIndex(FulltextIndex):
 class ElasticSearchIndex(RemoteIndex):
     # maps our field classes to concrete ES field properties
     fieldmapping = ((Identifier(),
-                     {"type": "keyword", "store": True}),  # uri
+                     {"type": "text", "store": True, "analyzer": "lowercase_keyword"}),  # uri -- using type=text with analyzer=keyword (instead of type=keyword) enables us to use regex queries on this field, which is nice for autocomplete
                     (Label(),
                      {"type": "keyword"}),  # repo, basefile
                     (Label(boost=16),
-                     {"type": "keyword", "boost": 16.0, "norms": True}),  # identifier
+                     {"type": "text", "boost": 16.0, "analyzer": "lowercase_keyword"}),  # identifier
                     (Text(boost=4),
                      {"type": "text", "boost": 4.0}),  # title
                     (Text(boost=2),
@@ -757,32 +757,48 @@ class ElasticSearchIndex(RemoteIndex):
         return relurl, json.dumps(payload, default=util.json_default_date)
 
     def update(self, uri, repo, basefile, text, **kwargs):
+        
         if not self._writer:
             self._writer = tempfile.TemporaryFile()
         relurl, payload = self._update_payload(
             uri, repo, basefile, text, **kwargs)
         metadata = {"index": {"_type": repo, "_id": basefile}}
+        extra = ""
         if "#" in uri:
             metadata["index"]['_type'] = repo + "_child"
             metadata["index"]['_id'] += uri.split("#", 1)[1]
             metadata["index"]['parent'] = basefile
+            extra = " (parent: %s)" % basefile
+
+        # print("index: %s, id: %s, uri: %s %s" % (metadata["index"]['_type'],
+        #                                          metadata["index"]['_id'],
+        #                                          uri, extra))
+        # print("Label: %s" % kwargs['label'])
+        # print("Text: %s" % text[:72])
+        # print("---------------------------------------")
+
         metadata = json.dumps(metadata) + "\n"
         assert "\n" not in payload, "payload contains newlines, must be encoded for bulk API"
         self._writer.write(metadata.encode("utf-8"))
         self._writer.write(payload.encode("utf-8"))
         self._writer.write(b"\n")
 
-    def _query_payload(self, q, pagenum=1, pagelen=10, **kwargs):
+    def _query_payload(self, q, pagenum=1, pagelen=10, ac_query=False, **kwargs):
         if kwargs.get("repo"):
             types = [kwargs.get("repo")]
         else:
             types = [repo.alias for repo in self._repos if repo.config.relate]
-        # use a multitype search to specify the types we want so that
-        # we don't go searching in the foo_child types, only parent
-        # types.
-        relurl = "%s/_search?from=%s&size=%s" % (",".join(types),
-                                                 (pagenum - 1) * pagelen,
-                                                 pagelen)
+
+        if ac_query:
+            relurl = "_search?from=%s&size=%s" % ((pagenum - 1) * pagelen,
+                                                  pagelen)
+        else:
+            # use a multitype search to specify the types we want so that
+            # we don't go searching in the foo_child types, only parent
+            # types.
+            relurl = "%s/_search?from=%s&size=%s" % (",".join(types),
+                                                     (pagenum - 1) * pagelen,
+                                                     pagelen)
         # 1: Filter on all specified fields
         filterterms = {}
         filterregexps = {}
@@ -798,8 +814,8 @@ class ElasticSearchIndex(RemoteIndex):
 
             if isinstance(v, str) and "*" in v:
                 # if v contains "*", make it a {'regexp': '.*/foo'} instead of a {'term'}
-                # also transform * to .*
-                filterregexps[k] = v.replace("*", ".*")
+                # also transform * to .* and escape '#' and '.'
+                filterregexps[k] = v.replace(".", "\\.").replace("#", "\\#").replace("*", ".*")
             else:
                 filterterms[k] = v
 
@@ -820,11 +836,12 @@ class ElasticSearchIndex(RemoteIndex):
         match = {}
         inner_hits = {"_source": {self.term_excludes: "text"}}
         highlight = None
-        if q:
+        if q and not ac_query:
             # NOTE: we need to specify highlight parameters for each
             # subquery when using has_child, see
             # https://github.com/elastic/elasticsearch/issues/14999
-            match['fields'] = ["label", "text"]
+            match['fields'] = ["label^3", # boost label (title) 3x compared to text
+                               "text"]
             match['query'] = q
             match['default_operator'] = "and"
             highlight = {'fields': {'text': {},
@@ -866,7 +883,8 @@ class ElasticSearchIndex(RemoteIndex):
         payload = {'query': match,
                    'aggs': self._aggregation_payload()}
         # Don't include the full text of every document in every hit
-        payload['_source'] = {self.term_excludes: ['text']}
+        if not ac_query:
+            payload['_source'] = {self.term_excludes: ['text']}
         # extra workaround, solution adapted from comments in
         # https://github.com/elastic/elasticsearch/issues/14999 --
         # revisit once Elasticsearch 2.4 is released.
@@ -1006,7 +1024,11 @@ class ElasticSearchIndex(RemoteIndex):
                                      "filter": ["lowercase", "snowball"],
                                      "tokenizer": "standard",
                                      "type": "custom"
-                                 }
+                                 },
+                                 "lowercase_keyword": {
+                                     "tokenizer": "keyword",
+                                     "filter": ["lowercase"]
+                                     }
                              },
                              "filter": {
                                  "snowball": {

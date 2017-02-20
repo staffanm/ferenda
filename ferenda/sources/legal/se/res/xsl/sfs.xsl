@@ -55,12 +55,9 @@
 	  </div>
 	</xsl:if>
 	<xsl:if test="//xhtml:meta[@property='rinfoex:patchdescription']/@content">
-	  <div class="ui-state-highlight">
-	    <span class="ui-icon ui-icon-info" style="float: left;margin-right:.3em;"/>
-	    Texten har ändrats jämfört med ursprungsmaterialet:
-	    <xsl:value-of
-		select="//xhtml:meta[@property='rinfoex:patchdescription']/@content"/>
-	  </div>
+	  <p class="alert alert-warning patchdescription">
+	    Texten har ändrats jämfört med ursprungsmaterialet: <xsl:value-of select="//xhtml:meta[@property='rinfoex:patchdescription']/@content"/>
+	  </p>
 	</xsl:if>
       </section>
       <xsl:if test="$kommentar or $rattsfall or $myndfs">

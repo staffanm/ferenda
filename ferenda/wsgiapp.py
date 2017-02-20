@@ -418,44 +418,20 @@ Examined %s repos.
 
     def query(self, environ):
 
-        def _elements_to_html(elements):
-            res = ""
-            for e in elements:
-                if isinstance(e, str):
-                    res += e
-                else:
-                    res += '<em class="match">%s</em>' % str(e)
-            return res
+        # this is needed -- but the connect call shouldn't neccesarily
+        # have to call exists() (one HTTP call)
         idx = FulltextIndex.connect(self.config.indextype,
                                     self.config.indexlocation,
                                     self.repos)
-        schema = idx.schema()
         q, param, pagenum, pagelen, stats = self.parse_parameters(
-            environ['QUERY_STRING'], schema)
+            environ['QUERY_STRING'])
+        ac_query=True  ## FIXME: how to set this? Or allow override by lagen.nu.WSGIApp?
         res, pager = idx.query(q=q,
                                pagenum=pagenum,
                                pagelen=pagelen,
+                               ac_query=ac_query, 
                                **param)
-        # Mangle res into the expected JSON structure (see qresults.json)
-        mangled = []
-        for hit in sorted(res, key=itemgetter("uri"), reverse=True):
-            mangledhit = {}
-            for k, v in hit.items():
-                if self.config.legacyapi:
-                    if "_" in k:
-                        # drop prefix (dcterms_issued -> issued)
-                        k = k.split("_", 1)[1]
-                if k == "uri":
-                    k = "iri"
-                if k == "text":
-                    mangledhit["matches"] = {"text": _elements_to_html(hit["text"])}
-                elif k in ("basefile", "repo"):
-                    # these fields should not be included in results
-                    pass
-                else:
-                    mangledhit[k] = v
-            mangled.append(mangledhit)
-
+        mangled = self.mangle_results(res, ac_query)
         # 3.1 create container for results
         res = {"startIndex": pager['firstresult'] - 1,
                "itemsPerPage": int(param.get('_pageSize', '10')),
@@ -469,7 +445,54 @@ Examined %s repos.
             res["statistics"] = self.stats(mangled)
         return res
 
-    def parse_parameters(self, querystring, schema):
+
+    def mangle_results(self, res, ac_query):
+        def _elements_to_html(elements):
+            res = ""
+            for e in elements:
+                if isinstance(e, str):
+                    res += e
+                else:
+                    res += '<em class="match">%s</em>' % str(e)
+            return res
+
+        # Mangle res into the expected JSON structure (see qresults.json)
+        if ac_query:
+            # when doing an autocomplete query, we want the relevance order from ES
+            hiterator = res
+        else:
+            # for a regular API query, we need another order (I forgot exactly why...)
+            hiterator = sorted(res, key=itemgetter("uri"), reverse=True)
+        mangled = []
+        for hit in hiterator:
+            mangledhit = {}
+            for k, v in hit.items():
+                if self.config.legacyapi:
+                    if "_" in k:
+                        # drop prefix (dcterms_issued -> issued)
+                        k = k.split("_", 1)[1]
+                if k == "uri":
+                    k = "iri"
+                    # change eg https://lagen.nu/1998:204 to
+                    # http://localhost:8080/1998:204 during
+                    # development
+                    if v.startswith(self.config.url) and self.config.develurl:
+                        v = v.replace(self.config.url, self.config.develurl)
+                if k == "text":
+                    mangledhit["matches"] = {"text": _elements_to_html(hit["text"])}
+                elif k in ("basefile", "repo"):
+                    # these fields should not be included in results
+                    pass
+                else:
+                    mangledhit[k] = v
+            mangledhit = self.mangle_result(mangledhit, ac_query)
+            mangled.append(mangledhit)
+        return mangled
+
+    def mangle_result(self, hit):
+        return hit
+
+    def parse_parameters(self, querystring):
         def _guess_real_fieldname(k, schema):
             for fld in schema:
                 if fld.endswith(k):
@@ -486,89 +509,94 @@ Examined %s repos.
         param = dict(parse_qsl(querystring))
         filtered = dict([(k, v)
                          for k, v in param.items() if not (k.startswith("_") or k == "q")])
-        # Range: some parameters have additional parameters, eg
-        # "min-dcterms_issued=2014-01-01&max-dcterms_issued=2014-02-01"
-        newfiltered = {}
-        for k, v in list(filtered.items()):
-            if k.startswith("min-") or k.startswith("max-"):
-                op = k[:4]
-                compliment = k.replace(op, {"min-": "max-",
-                                            "max-": "min-"}[op])
-                k = k[4:]
-                if compliment in filtered:
-                    start = filtered["min-" + k]
-                    stop = filtered["max-" + k]
-                    newfiltered[k] = fulltextindex.Between(datetime.strptime(start, "%Y-%m-%d"),
-                                                           datetime.strptime(stop, "%Y-%m-%d"))
-                else:
-                    cls = {"min-": fulltextindex.More,
-                           "max-": fulltextindex.Less}[op]
-                    # FIXME: need to handle a greater variety of str->datatype conversions
-                    v = datetime.strptime(v, "%Y-%m-%d")
-                    newfiltered[k] = cls(v)
-            elif k.startswith("year-"):
-                # eg for year-dcterms_issued=2013, interpret as
-                # Between(2012-12-31 and 2014-01-01)
-                k = k[5:]
-                newfiltered[k] = fulltextindex.Between(date(int(v) - 1, 12, 31),
-                                                       date(int(v) + 1, 1, 1))
-            else:
-                newfiltered[k] = v
-        filtered = newfiltered
-
-        if self.config.legacyapi:
-            # 2.3 legacyapi requires that parameters do not include
-            # prefix. Therefore, transform publisher.iri =>
-            # dcterms_publisher (ie remove trailing .iri and append a
-            # best-guess prefix
+        if filtered:
+            # OK, we have some field parameters. We need to get at the
+            # current schema to know how to process some of these and
+            # convert them into fulltextindex.SearchModifier objects
+            
+            # Range: some parameters have additional parameters, eg
+            # "min-dcterms_issued=2014-01-01&max-dcterms_issued=2014-02-01"
             newfiltered = {}
-            for k, v in filtered.items():
-                if k.endswith(".iri"):
-                    k = k[:-4]
-                    # the parameter *looks* like it's a ref, but it should
-                    # be interpreted as a value -- remove starting */ to
-                    # get at actual querystring
-
-                    # FIXME: in order to lookup k in schema, we may need
-                    # to guess its prefix, but we're cut'n pasting the
-                    # strategy from below. Unify.
-                    if k not in schema and "_" not in k and k not in ("uri"):
-                        k = _guess_real_fieldname(k, schema)
-
-                    if v.startswith(
-                            "*/") and not isinstance(schema[k], fulltextindex.Resource):
-                        v = v[2:]
-                if k not in schema and "_" not in k and k not in ("uri"):
-                    k = _guess_real_fieldname(k, schema)
-                    newfiltered[k] = v
+            for k, v in list(filtered.items()):
+                if k.startswith("min-") or k.startswith("max-"):
+                    op = k[:4]
+                    compliment = k.replace(op, {"min-": "max-",
+                                                "max-": "min-"}[op])
+                    k = k[4:]
+                    if compliment in filtered:
+                        start = filtered["min-" + k]
+                        stop = filtered["max-" + k]
+                        newfiltered[k] = fulltextindex.Between(datetime.strptime(start, "%Y-%m-%d"),
+                                                               datetime.strptime(stop, "%Y-%m-%d"))
+                    else:
+                        cls = {"min-": fulltextindex.More,
+                               "max-": fulltextindex.Less}[op]
+                        # FIXME: need to handle a greater variety of str->datatype conversions
+                        v = datetime.strptime(v, "%Y-%m-%d")
+                        newfiltered[k] = cls(v)
+                elif k.startswith("year-"):
+                    # eg for year-dcterms_issued=2013, interpret as
+                    # Between(2012-12-31 and 2014-01-01)
+                    k = k[5:]
+                    newfiltered[k] = fulltextindex.Between(date(int(v) - 1, 12, 31),
+                                                           date(int(v) + 1, 1, 1))
                 else:
                     newfiltered[k] = v
             filtered = newfiltered
 
-        # 2.1 some values need to be converted, based upon the
-        # fulltextindex schema.
-        # if schema[k] == fulltextindex.Datetime, do strptime.
-        # if schema[k] == fulltextindex.Boolean, convert 'true'/'false' to True/False.
-        # if k = "rdf_type" and v looks like a qname or termname, expand v
-        for k, fld in schema.items():
-            # NB: Some values might already have been converted previously!
-            if k in filtered and isinstance(filtered[k], str):
-                if isinstance(fld, fulltextindex.Datetime):
-                    filtered[k] = datetime.strptime(filtered[k], "%Y-%m-%d")
-                elif isinstance(fld, fulltextindex.Boolean):
-                    filtered[k] = (filtered[k] == "true")  # only "true" is True
-                elif k == "rdf_type" and re.match("\w+:[\w\-_]+", filtered[k]):
-                    # expand prefix ("bibo:Standard" -> "http://purl.org/ontology/bibo/")
-                    (prefix, term) = re.match("(\w+):([\w\-_]+)", filtered[k]).groups()
-                    for repo in self.repos:
-                        if prefix in repo.ns:
-                            filtered[k] = str(repo.ns[prefix]) + term
-                            break
+            if self.config.legacyapi:
+                # 2.3 legacyapi requires that parameters do not include
+                # prefix. Therefore, transform publisher.iri =>
+                # dcterms_publisher (ie remove trailing .iri and append a
+                # best-guess prefix
+                newfiltered = {}
+                for k, v in filtered.items():
+                    if k.endswith(".iri"):
+                        k = k[:-4]
+                        # the parameter *looks* like it's a ref, but it should
+                        # be interpreted as a value -- remove starting */ to
+                        # get at actual querystring
+
+                        # FIXME: in order to lookup k in schema, we may need
+                        # to guess its prefix, but we're cut'n pasting the
+                        # strategy from below. Unify.
+                        if k not in schema and "_" not in k and k not in ("uri"):
+                            k = _guess_real_fieldname(k, schema)
+
+                        if v.startswith(
+                                "*/") and not isinstance(schema[k], fulltextindex.Resource):
+                            v = v[2:]
+                    if k not in schema and "_" not in k and k not in ("uri"):
+                        k = _guess_real_fieldname(k, schema)
+                        newfiltered[k] = v
                     else:
-                        self.log.warning("Can't map %s to full URI" % (filtered[k]))
-                    pass
-                elif k == "rdf_type" and self.config.legacyapi and re.match("[\w\-\_]+", filtered[k]):
-                    filtered[k] = "*" + filtered[k]
+                        newfiltered[k] = v
+                filtered = newfiltered
+
+            # 2.1 some values need to be converted, based upon the
+            # fulltextindex schema.
+            # if schema[k] == fulltextindex.Datetime, do strptime.
+            # if schema[k] == fulltextindex.Boolean, convert 'true'/'false' to True/False.
+            # if k = "rdf_type" and v looks like a qname or termname, expand v
+            for k, fld in schema.items():
+                # NB: Some values might already have been converted previously!
+                if k in filtered and isinstance(filtered[k], str):
+                    if isinstance(fld, fulltextindex.Datetime):
+                        filtered[k] = datetime.strptime(filtered[k], "%Y-%m-%d")
+                    elif isinstance(fld, fulltextindex.Boolean):
+                        filtered[k] = (filtered[k] == "true")  # only "true" is True
+                    elif k == "rdf_type" and re.match("\w+:[\w\-_]+", filtered[k]):
+                        # expand prefix ("bibo:Standard" -> "http://purl.org/ontology/bibo/")
+                        (prefix, term) = re.match("(\w+):([\w\-_]+)", filtered[k]).groups()
+                        for repo in self.repos:
+                            if prefix in repo.ns:
+                                filtered[k] = str(repo.ns[prefix]) + term
+                                break
+                        else:
+                            self.log.warning("Can't map %s to full URI" % (filtered[k]))
+                        pass
+                    elif k == "rdf_type" and self.config.legacyapi and re.match("[\w\-\_]+", filtered[k]):
+                        filtered[k] = "*" + filtered[k]
 
         q = param['q'] if 'q' in param else None
 
@@ -598,6 +626,11 @@ Examined %s repos.
         query = queryparams.get('q')
         if isinstance(query, bytes):  # happens on py26
             query = query.decode("utf-8")  # pragma: no cover
+        query += "*"  # we use a simple_query_string query by default,
+                      # and we probably want to do a prefix query (eg
+                      # "personuppgiftslag" should match a label field
+                      # containing "personuppgiftslag (1998:204)",
+                      # therefore the "*"
         pagenum = int(queryparams.get('p', '1'))
         qpcopy = dict(queryparams)
         for x in ('q', 'p'):

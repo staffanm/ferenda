@@ -204,7 +204,9 @@ class LNMediaWiki(wiki.MediaWiki):
                 self.log.info("%s doesn't exist, downloading and parsing" % page)
                 self.download(page)
                 self.parse(page)
-            return util.readfile(self.store.parsed_path(page))
+            res = util.readfile(self.store.parsed_path(page))
+            res = res.replace(page, self.config.sitename)
+            return res
         else:
             return super(LNMediaWiki, self).frontpage_content()
                             

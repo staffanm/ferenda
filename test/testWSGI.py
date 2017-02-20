@@ -22,6 +22,7 @@ from ferenda.testutil import RepoTester
 # simulates what make_server().serve_forever() would send and
 # recieve. Should be simple enough, yet reasonably realistic, for
 # testing the API.
+
 DEFAULT_HTTP_ACCEPT = 'text/xml, application/xml, application/xhtml+xml, text/html;q=0.9, text/plain;q=0.8, image/png,*/*;q=0.5'
 
 from testCompositeRepo import CompositeExample
@@ -927,6 +928,4 @@ class Search(WSGI):
         pagination = pager.find("ul[@class='pagination']")
         self.assertEqual(3, len(pagination))
         self.assertEqual('Results 21-25 of 25', pager[0].text)
-
-
-        
+    

@@ -683,7 +683,7 @@ class Offtryck(SwedishLegalSource):
                 return None  # visit_node won't call any subnode
         commentary = []
         sectiontext = util.normalize_space(str(node))
-        m = re.search("SOU (\d+:\d+)", sectiontext)
+        m = re.search("(SOU|Ds) (\d+:\d+)", sectiontext)
         if m:
             state['kommittensbetankande'] = m.group(1)
         else:
@@ -1419,11 +1419,16 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                     # OK, this can very well be an appendix, but just
                     # to be sure, keep reading to see if we have a
                     # Appendix-like heading as well
-                    if (is_appendix_header(parser.reader.peek(2)) or
-                        is_appendix_header(parser.reader.peek(3))):
-                        state.appendixno = ordinal
-                        return False
-                    else:
+                    try:
+                        if (is_appendix_header(parser.reader.peek(2)) or
+                            is_appendix_header(parser.reader.peek(3))):
+                            state.appendixno = ordinal
+                            return False
+                        else:
+                            return True
+                    except StopIteration:
+                        # So no more document? this might be a very
+                        # short appendix...
                         return True
 
     def is_paragraph(parser):
@@ -1490,6 +1495,12 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         # First, find either an indicator of the appendix number, or
         # calculate our own
         chunk = parser.reader.next()
+        strchunk = str(chunk)
+
+        # correct OCR mistake
+        if state.appendixno and state.appendixno > 1 and strchunk.startswith("Bilaga ll-"):
+            strchunk = strchunk.replace("Bilaga ll-", "Bilaga 4")
+            
         m = re.search("Bilaga( \d+| I| l|$)", str(chunk))
         if m and m.group(1):
             match = m.group(1).strip()

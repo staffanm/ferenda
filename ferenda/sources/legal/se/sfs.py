@@ -578,15 +578,17 @@ class SFS(Trips):
                                                  dummyfile=self.store.parsed_path(basefile))
         return self._extract_text(basefile)
 
-    def patch_if_needed(self, fp, basefile):
-        fp = super(SFS, self).patch_if_needed(fp, basefile)
-        # find out if patching occurred and record the patch description
-        # (maybe this should only be done in the lagen.nu.SFS subclass?
-        # the canonical SFS repo should maybe not have patches?)
-        if None and patchdesc:
-            desc.value(self.ns['rinfoex'].patchdescription,
-                       patchdesc)
-        return fp
+#  I think maybe SwedishLegalSource.patch_if_needed does all this now?
+#
+#    def patch_if_needed(self, fp, basefile):
+#        fp = super(SFS, self).patch_if_needed(fp, basefile)
+#        # find out if patching occurred and record the patch description
+#        # (maybe this should only be done in the lagen.nu.SFS subclass?
+#        # the canonical SFS repo should maybe not have patches?)
+#        if None and patchdesc:
+#            desc.value(self.ns['rinfoex'].patchdescription,
+#                       patchdesc)
+#        return fp
 
     def extract_head(self, fp, basefile):
         """Parsear ut det SFSR-registret som inneh\xe5ller alla \xe4ndringar
@@ -671,9 +673,13 @@ class SFS(Trips):
                     # sanitize_metadata->sanitize_department, lookup
                     # resource in polish_metadata
                 elif key == 'Rubrik':
-                    # Change acts to Balkar never contain the SFS no
-                    # of the Balk.
-                    if basefile not in val and not val.endswith("balken"):
+                    # Change acts to some special laws never contain the SFS no
+                    # of the law
+                    special = ("1949:381", "1958:637", "1987:230", "1970:994",
+                               "1998:808", "1962:700", "1942:740", "1981:774",
+                               "2010:110", "1949:105", "1810:0926", "1974:152",
+                               "2014:801", "1991:1469")
+                    if basefile not in val and not basefile in special:
                         self.log.warning(
                             "%s: Base SFS %s not in title %r" % (basefile,
                                                                  basefile,
@@ -1905,6 +1911,12 @@ WHERE {
             return facet.dimension_label, v
         else:
             return super(SFS, self)._relate_fulltext_value(facet, resource, desc)
+
+    from .sfs_parser import re_SectionId
+    def _extract_plaintext(self, node, resources):
+        plaintext = super(SFS, self)._extract_plaintext(node, resources)
+        # remove leading "3 § " so that autocomplete returns more useful text objects.
+        return self.re_SectionId.sub('', plaintext)
 
     def toc_item(self, binding, row):
         """Returns a formatted version of row, using Element objects"""

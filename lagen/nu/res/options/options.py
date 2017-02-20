@@ -10,6 +10,7 @@
     # some ridiculusly large document (statsbudget) have little legal
     # importance. Just process the metadata
     ("prop", "1971:1"): "metadataonly",
+    ("prop", "1971:75"): "metadataonly",
     ("prop", "1971:115"): "metadataonly",
     ("prop", "1972:1"): "metadataonly",
     ("prop", "1972:90"): "metadataonly",

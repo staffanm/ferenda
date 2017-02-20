@@ -1230,7 +1230,6 @@ class DV(SwedishLegalSource):
             return [x[:-1] for x in value.split("(")]
 
         # 1. mint uris and create the two Describers we'll use
-        # if self.config.localizeuri or '_nja_ordinal' not in head:
         graph = self.make_graph()
         refuri = ref_to_uri(head["Referat"])
         refdesc = Describer(graph, refuri)
@@ -1248,7 +1247,7 @@ class DV(SwedishLegalSource):
             resource = dtmp.graph.resource(bnodetmp)
             domuri = self.minter.space.coin_uri(resource)
             domdesc = Describer(graph, domuri)
-
+            
         # 2. convert all strings in head to proper RDF
         #
         #
