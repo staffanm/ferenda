@@ -491,7 +491,7 @@ Disallow: /-/
                 results = OrderedDict()
                 for action in ("download",
                                "parse", "relate", "makeresources",
-                               "generate", "toc", "news", "frontpage"):
+                               "toc", "generate", "news", "frontpage"):
                     if action in ("makeresources", "frontpage"):
                         argscopy = argv[2:]  # skip alias and action
                         argscopy.insert(0, action)

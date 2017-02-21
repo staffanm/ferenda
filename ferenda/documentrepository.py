@@ -1985,7 +1985,12 @@ parsed document path to that documents dependency file."""
                     continue
                 about = resource.get('about')
                 if not about:  # if the <body> element lacks @about
-                    continue
+                    # maybe we can resolve about if we have an @id
+                    if resource.get('id'):
+                        about = body.get("about") + "#" + resource.get("id")
+                        resource.set('about', about) # needed in _relate_fulltext_value
+                    else:
+                        continue
                 if isinstance(about, bytes):  # happens under py2
                     about = about.decode()    # pragma: no cover
                 desc.about(about)
@@ -2885,7 +2890,7 @@ WHERE {
         depth = len(outfile[len(self.store.datadir) + 1:].split(os.sep))
         repos = [self] + otherrepos
         transformargs = {'repos': repos,
-                         'remove_missing': self.config.removeinvalidlinks}
+                         'remove_missing': False}  # never remove links
         if self.config.staticsite:
             transformargs['basedir'] = os.path.dirname(outfile)
         elif 'develurl' in self.config:
