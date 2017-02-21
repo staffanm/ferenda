@@ -285,24 +285,19 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
   </xsl:template>
   <!-- default template: translate everything from whatever namespace
        it's in (usually the XHTML1.1 NS) into the default namespace
-       NOTE: It removes any attributes not accounted for otherwise
        -->
   <xsl:template match="*">
-    <xsl:element name="{local-name(.)}"><xsl:apply-templates select="node()"/></xsl:element>
-  </xsl:template>
-
-  <xsl:template match="@*">
-    <xsl:attribute name="{local-name(.)}"><xsl:apply-templates select="@*"/></xsl:attribute>
-  </xsl:template>
-
-  <!-- alternatively: identity transform (keep source namespace) -->
-  <!--
-  <xsl:template match="@*|node()">
-    <xsl:copy>
+    <xsl:element name="{name()}">
       <xsl:apply-templates select="@*|node()"/>
-    </xsl:copy>
+    </xsl:element>
   </xsl:template>
-  --> 
+  <!-- remove attributes left behind by pdfreader that we have no clear use for -->
+  <xsl:template match="@style"/>
+  <xsl:template match="@class"/>
+  <xsl:template match="@*">
+    <xsl:copy><xsl:apply-templates/></xsl:copy>
+  </xsl:template>
+
 
 
   <!-- TABLE OF CONTENTS (TOC) HANDLING -->

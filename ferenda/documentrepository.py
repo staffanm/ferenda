@@ -2475,7 +2475,6 @@ WHERE {
                     return False
             return url
 
-
         # sort repolist so that CompositeRepository instances come
         # before others (see comment in getpath)
         from ferenda import CompositeRepository
@@ -3249,7 +3248,7 @@ WHERE {
             repos = [self]  # FIXME: we must make otherrespos (passed
                             #  to news()) available to this scope
             transformargs = {'repos': repos,
-                             'remove_missing': self.config.removeinvalidlinks}
+                             'remove_missing': False}  # never remove links
             if self.config.staticsite:
                 transformargs['basedir'] = os.path.dirname(outfile)
             elif 'develurl' in self.config:

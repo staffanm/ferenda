@@ -150,8 +150,7 @@
 	    <xsl:with-param name="def" select="80"/>
 	  </xsl:call-template>
 	</xsl:variable>
-	<xsl:variable name="localurl"><xsl:call-template name="localurl"><xsl:with-param name="uri" select="@rdf:about"/></xsl:call-template></xsl:variable>
-	<a href="{$localurl}"><b><xsl:value-of select="dcterms:identifier"/></b></a>:
+	<a href="{@rdf:about}"><b><xsl:value-of select="dcterms:identifier"/></b></a>:
 	<xsl:choose>
 	  <xsl:when test="string-length(rpubl:referatrubrik) > 80">
 	    <xsl:value-of select="normalize-space(substring(rpubl:referatrubrik, 1, $tuned-width - 1))" />...

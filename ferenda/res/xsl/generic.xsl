@@ -14,7 +14,6 @@ It's a generic template for any kind of content
 		xmlns:ext="http://exslt.org/common"
 		exclude-result-prefixes="xhtml rdf">
 
-  <xsl:import href="uri.xsl"/>
   <xsl:import href="annotations-panel.xsl"/>
   <xsl:include href="base.xsl"/>
 
@@ -31,10 +30,6 @@ It's a generic template for any kind of content
   <xsl:param name="fixedtoc" select="true()"/>
   <xsl:param name="content-under-pagetitle" select="false()"/>
       
-  <xsl:template match="xhtml:a">
-    <xsl:call-template name="link"/>
-  </xsl:template>
-
   <xsl:template name="aside-annotations">
     <xsl:param name="uri"/>
     <xsl:variable name="markup">

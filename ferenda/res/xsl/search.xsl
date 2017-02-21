@@ -13,9 +13,7 @@ It's a generic template for search result pages.
 		xmlns:rinfoex="http://lagen.nu/terms#"
 		exclude-result-prefixes="xhtml rdf dcterms rinfo rinfoex">
 
-  <xsl:import href="uri.xsl"/>
   <xsl:include href="base.xsl"/>
-
 
   <xsl:template name="headtitle"><xsl:value-of select="xhtml:title"/></xsl:template>
   <xsl:template name="metarobots"><xsl:comment>Robot metatag goes here</xsl:comment></xsl:template>

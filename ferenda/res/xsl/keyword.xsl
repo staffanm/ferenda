@@ -10,7 +10,6 @@
 		xml:space="preserve"
 		exclude-result-prefixes="xhtml rdf">
 
-  <xsl:import href="uri.xsl"/>
   <xsl:include href="base.xsl"/>
   <!-- NOTE: this annotation file does not use Grit syntax (yet) -->
   <xsl:variable name="myannotations" select="document($annotationfile)/rdf:RDF"/>
@@ -37,11 +36,6 @@
   <xsl:param name="dyntoc" select="true()"/>
   <xsl:param name="fixedtoc" select="true()"/>
   <xsl:param name="content-under-pagetitle" select="true()"/>
-      
-
-  <xsl:template match="xhtml:a">
-    <xsl:call-template name="link"/>
-  </xsl:template>
 
   <xsl:template name="aside-annotations">
     <xsl:param name="uri"/>
@@ -96,8 +90,7 @@
 	    <xsl:with-param name="def" select="80"/>
 	  </xsl:call-template>
 	</xsl:variable>
-	<xsl:variable name="localurl"><xsl:call-template name="localurl"><xsl:with-param name="uri" select="@rdf:about"/></xsl:call-template></xsl:variable>
-	<a href="{$localurl}"><b><xsl:value-of select="dcterms:identifier"/></b></a>:
+	<a href="{@rdf:about}"><b><xsl:value-of select="dcterms:identifier"/></b></a>:
 	<xsl:choose>
 	  <xsl:when test="string-length(dcterms:description) > 80">
 	    <xsl:value-of select="normalize-space(substring(dcterms:description, 1, $tuned-width - 1))" />...
@@ -115,8 +108,7 @@
     <ul class="lagrumslista">
       <xsl:for-each select="$inbound">
 	<li>
-	  <xsl:variable name="localurl"><xsl:call-template name="localurl"><xsl:with-param name="uri" select="@rdf:about"/></xsl:call-template></xsl:variable>
-	  <a href="{$localurl}"><xsl:value-of select="rdfs:label"/></a>
+	  <a href="{@rdf:about}"><xsl:value-of select="rdfs:label"/></a>
 	</li>
       </xsl:for-each>
     </ul>

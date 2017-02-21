@@ -9,7 +9,6 @@
 		xmlns:ext="http://exslt.org/common"
 		exclude-result-prefixes="xhtml rdf rpubl ext">
 
-  <xsl:import href="uri.xsl"/>
   <xsl:import href="tune-width.xsl"/>
   <xsl:import href="annotations-panel.xsl"/>
   <xsl:include href="base.xsl"/>
@@ -129,12 +128,6 @@
 	<dd><xsl:value-of select="//xhtml:meta[@property='rdfs:comment']/@content"/></dd>
       </xsl:if>
     </dl>
-  </xsl:template>
-
-  
-  
-  <xsl:template match="xhtml:a">
-    <xsl:call-template name="link"/>
   </xsl:template>
 
   <xsl:template match="xhtml:div">
@@ -353,8 +346,7 @@
 	    <xsl:with-param name="def" select="80"/>
 	  </xsl:call-template>
 	</xsl:variable>
-	<xsl:variable name="localurl"><xsl:call-template name="localurl"><xsl:with-param name="uri" select="@rdf:about"/></xsl:call-template></xsl:variable>
-	<a href="{$localurl}"><b><xsl:value-of select="dcterms:identifier"/></b></a>:
+	<a href="{@rdf:about}"><b><xsl:value-of select="dcterms:identifier"/></b></a>:
 	<xsl:choose>
 	  <xsl:when test="string-length(dcterms:description) > 80">
 	    <xsl:value-of select="normalize-space(substring(dcterms:description, 1, $tuned-width - 1))" />...
@@ -374,8 +366,7 @@
 	<li>
 	  <xsl:for-each select="rdf:Description">
 	    <xsl:if test="./dcterms:identifier != ''">
-	      <xsl:variable name="localurl"><xsl:call-template name="localurl"><xsl:with-param name="uri" select="@rdf:about"/></xsl:call-template></xsl:variable>
-	      <a href="{$localurl}"><xsl:value-of select="dcterms:identifier"/></a><xsl:if test="position()!=last()">, </xsl:if>
+	      <a href="{@rdf:about}"><xsl:value-of select="dcterms:identifier"/></a><xsl:if test="position()!=last()">, </xsl:if>
 	    </xsl:if>
 	  </xsl:for-each>
 	</li>

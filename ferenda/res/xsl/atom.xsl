@@ -14,7 +14,6 @@ Note: this template expects Atom 1.0, outputs HTML5
 		xml:space="preserve"
 		exclude-result-prefixes="xhtml rdf atom">
 
-  <xsl:import href="uri.xsl"/>
   <xsl:include href="base.xsl"/>
   <xsl:param name="dyntoc" select="false()"/>
   <xsl:param name="fixedtoc" select="true()"/>

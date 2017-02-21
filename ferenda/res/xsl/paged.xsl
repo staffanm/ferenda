@@ -13,9 +13,7 @@ It's a generic template for paged content (assumes a bunch of <div class="pdfpag
 		xmlns:rinfoex="http://lagen.nu/terms#"
 		exclude-result-prefixes="xhtml rdf dcterms rinfo rinfoex">
 
-  <xsl:import href="uri.xsl"/>
   <xsl:include href="base.xsl"/>
-
 
   <xsl:template name="headtitle"><xsl:choose><xsl:when test="xhtml:title"><xsl:value-of select="xhtml:title"/></xsl:when><xsl:otherwise>(Title missing)</xsl:otherwise></xsl:choose></xsl:template>
   <xsl:template name="metarobots"><xsl:comment>Robot metatag goes here</xsl:comment></xsl:template>
@@ -28,11 +26,6 @@ It's a generic template for paged content (assumes a bunch of <div class="pdfpag
   <xsl:param name="dyntoc" select="true()"/>
   <xsl:param name="fixedtoc" select="true()"/>
   <xsl:param name="content-under-pagetitle" select="false()"/>
-      
-
-  <xsl:template match="xhtml:a">
-    <xsl:call-template name="link"/>
-  </xsl:template>
 
   <xsl:template match="xhtml:div[@class='pdfpage']">
     <div class="page">

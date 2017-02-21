@@ -13,7 +13,6 @@ It's a generic template for error pages.
 		xmlns:rinfoex="http://lagen.nu/terms#"
 		exclude-result-prefixes="xhtml rdf dcterms rinfo rinfoex">
 
-  <xsl:import href="uri.xsl"/>
   <xsl:include href="base.xsl"/>
 
   <xsl:template name="headtitle"><xsl:value-of select="xhtml:title"/></xsl:template>

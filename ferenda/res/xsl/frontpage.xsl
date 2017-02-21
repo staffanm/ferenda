@@ -15,7 +15,6 @@ It's a generic template for any kind of content
 		xml:space="preserve"
 		exclude-result-prefixes="xhtml rdf atom">
 
-  <xsl:import href="uri.xsl"/>
   <xsl:include href="base.xsl"/>
 
   <!-- Implementations of templates called by base.xsl -->
@@ -29,10 +28,6 @@ It's a generic template for any kind of content
   <xsl:param name="fixedtoc" select="true()"/>
   <xsl:param name="content-under-pagetitle" select="false()"/>
       
-  <xsl:template match="xhtml:a">
-    <xsl:call-template name="link"/>
-  </xsl:template>
-
   <xsl:template match="xhtml:body/xhtml:div">
     <div class="section-wrapper" id="{@id}">
       <xsl:apply-templates/>

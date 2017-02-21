@@ -29,7 +29,6 @@
   </status>
   -->
 
-  <xsl:import href="uri.xsl"/>
   <xsl:include href="base.xsl"/>
 
   <xsl:template name="headtitle">Status report | <xsl:value-of select="$configuration/sitename"/></xsl:template>
