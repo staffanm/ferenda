@@ -22,7 +22,7 @@ from ferenda import (PDFAnalyzer, CompositeRepository, DocumentEntry,
                      PDFDocumentRepository, CompositeStore, Facet)
 from ferenda import util, decorators
 from ferenda.pdfreader import StreamingPDFReader
-from . import Regeringen, SwedishLegalSource, SwedishLegalStore, Offtryck, RPUBL
+from . import Regeringen, SwedishLegalSource, FixedLayoutSource, SwedishLegalStore, Offtryck, RPUBL
 
 
 class SOUAnalyzer(PDFAnalyzer):
@@ -297,7 +297,7 @@ class SOUStore(CompositeStore, SwedishLegalStore):
     pass
 
     
-class SOU(CompositeRepository):
+class SOU(CompositeRepository, FixedLayoutSource):
     alias = "sou"
     rdf_type = RPUBL.Utredningsbetankande
     subrepos = (SOURegeringen, SOUKB)

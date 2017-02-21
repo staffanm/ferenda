@@ -64,7 +64,7 @@ class WSGIApp(OrigWSGIApp):
                 # normalize any page reference ("nja 2015 s 42" => "nja 2015 s. 42")
                 q = q.lower()
                 q = re.sub("\s*s\s*(\d)", " s. \\1", q)
-                q = re.sub("^prop\s*", "prop. ", q)
+                q = re.sub("^prop\s+", "prop. ", q)
                 param['label'] = q + "*"
             q = None
         return q, param, pagenum, pagelen, stats

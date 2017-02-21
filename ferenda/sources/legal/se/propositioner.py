@@ -549,7 +549,7 @@ class PropositionerStore(CompositeStore, SwedishLegalStore):
     pass
 
 
-class Propositioner(CompositeRepository, SwedishLegalSource):
+class Propositioner(CompositeRepository, FixedLayoutSource):
     subrepos = PropRegeringen, PropTrips, PropRiksdagen
     alias = "prop"
     xslt_template = "xsl/forarbete.xsl"

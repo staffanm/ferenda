@@ -6,6 +6,9 @@ from builtins import *
 from collections import OrderedDict
 import os
 
+from rdflib import URIRef
+from rdflib.namespace import DCTERMS
+
 from . import SwedishLegalStore, SwedishLegalSource
 from ferenda import util
 from ferenda.errors import DocumentRemovedError
@@ -113,3 +116,35 @@ class FixedLayoutSource(SwedishLegalSource):
             raise DocumentRemovedError(dummyfile=self.store.parsed_path(basefile))
         else:
             return reader
+
+    def _extract_plaintext(self, resource, resources):
+        about = resource.get("about") 
+        if not about or "#sid" not in about:
+            return super(FixedLayoutSource, self)._extract_plaintext(resource, resources)
+        else:
+            # select all text content contained in the first 4 <p>
+            # tags following the pagebreak -- this should typically
+            # represent the text of the page (although it skips
+            # headings)
+            nodes = resource.xpath("following::h:p[position() < 4]//text()",
+                                   namespaces={'h': 'http://www.w3.org/1999/xhtml'})
+            plaintext = util.normalize_space(" ".join(nodes))
+            if not plaintext:
+                plaintext = "(Sid %s saknar text)" % about.split("#sid")[1]
+            return plaintext
+
+    def _relate_fulltext_resources(self, body):
+        res = super(FixedLayoutSource, self)._relate_fulltext_resources(body)
+        res = [res[0]]
+        # also: add every page (the pagebreak element)
+        for r in body.findall(".//*[@class='sidbrytning']"):
+            res.append(r)
+        return res
+
+    def _relate_fulltext_value_label(self, resourceuri, rooturi, desc):
+        if "#sid" not in resourceuri:
+            return super(FixedLayoutSource, self)._relate_fulltext_value_label(resourceuri, rooturi, desc)
+        else:
+            pageno = resourceuri.split("#sid")[1]
+            return "%s s. %s" % (desc.graph.value(URIRef(rooturi), DCTERMS.identifier),
+                                 pageno)

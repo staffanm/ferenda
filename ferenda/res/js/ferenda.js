@@ -91,9 +91,10 @@ $(document).ready(function () {
     name: 'suggestions',
     display: 'label',
     source: suggestions,
+    limit: 9,
     templates: {
       suggestion: function(ctx) {
-	return "<div class='tt-suggestion'>" + ctx.label + "<br/><small>" + ctx.desc + "</small></div>";
+	return "<div class='tt-suggestion'><strong>" + ctx.label + "</strong><br/><small>" + ctx.desc + "</small></div>";
       }
     }
   });

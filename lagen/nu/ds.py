@@ -7,8 +7,9 @@ from rdflib.namespace import SKOS, DCTERMS
 
 from ferenda import CompositeRepository, CompositeStore, Facet
 from ferenda.sources.legal.se import Ds as OrigDs
-from ferenda.sources.legal.se import (SwedishLegalSource, SwedishLegalStore,
-                                      RPUBL)
+from ferenda.sources.legal.se import (SwedishLegalSource,
+                                      SwedishLegalStore,
+                                      FixedLayoutSource, RPUBL)
 from .regeringenlegacy import DsRegeringenLegacy
 from . import SameAs
 
@@ -23,7 +24,7 @@ class DsStore(CompositeStore, SwedishLegalStore):
 
 # We inherit from SwedishLegalSource to get at the custom tabs()
 # implementation (that respects config.tabs)
-class Ds(CompositeRepository, SwedishLegalSource):
+class Ds(CompositeRepository, FixedLayoutSource):
     rdf_type = RPUBL.Utredningsbetankande
     alias = "ds"
     subrepos = DsRegeringen, DsRegeringenLegacy
