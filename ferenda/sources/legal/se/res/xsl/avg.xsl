@@ -38,10 +38,6 @@
   <xsl:param name="fixedtoc" select="true()"/>
   <xsl:param name="content-under-pagetitle" select="true()"/>
 
-  <xsl:template match="xhtml:a">
-    <xsl:call-template name="link"/>
-  </xsl:template>
-
   <xsl:template name="aside-annotations">
     <xsl:param name="uri"/>
     <xsl:variable name="metadata">
