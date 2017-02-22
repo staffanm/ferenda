@@ -57,7 +57,7 @@ class Analyze(unittest.TestCase):
         self.assertEquals({'leftmargin': 135,
                            'leftmargin_even': 108,
                            'pagewidth': 892,
-                           'rightmargin': 770,
+                           'rightmargin': 780,
                            'rightmargin_even': 760},
                           hmetrics)
 
@@ -98,7 +98,7 @@ class Analyze(unittest.TestCase):
                                'leftmargin_even': 108,
                                'pageheight': 1262,
                                'pagewidth': 892,
-                               'rightmargin': 760,
+                               'rightmargin': 780,
                                'rightmargin_even': 760,
                                'scanned_source': False},
                               metrics)

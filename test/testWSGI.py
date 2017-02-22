@@ -260,7 +260,8 @@ class API(WSGI):
                 'schema_free': True,
                 'rdf_type': 'bibo:Standard', # FIXME: should be http://purl.org/ontology/bibo/Standard -- but requires that self.repos in wsgiapp is set up
                 'pagenum': 1,
-                'pagelen': 10}
+                'pagelen': 10,
+                'ac_query': False}
         with patch('ferenda.wsgiapp.FulltextIndex', **config):
             status, headers, content = self.call_wsgi(self.env)
             config['connect.return_value'].query.assert_called_once_with(**want)
@@ -285,7 +286,8 @@ class API(WSGI):
                 'schema_free': True,
                 'rdf_type': '*Standard', # should be bibo:Standard or even http://purl.org/ontology/bibo/Standard, but requires proper context handling to work
                 'pagenum': 1,
-                'pagelen': 10}
+                'pagelen': 10,
+                'ac_query': False}
 
         with patch('ferenda.wsgiapp.FulltextIndex', **config):
             status, headers, content = self.call_wsgi(self.env)
@@ -793,7 +795,7 @@ class Search(WSGI):
         self.assertEqual('https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css',
                          css[0].get('href'))
         js = t.findall("body/script")
-        self.assertEqual(len(js), 4) # jquery, bootstrap, hammer, ferenda
+        self.assertEqual(len(js), 5) # jquery, bootstrap, hammer, ferenda, typeahead
         
         resulthead = t.find(".//article/h1").text
         self.assertEqual(resulthead, "3 matches for 'part'")

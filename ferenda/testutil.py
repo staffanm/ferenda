@@ -613,9 +613,8 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             add_downloaded_files(state['downloaded'], spec,
                                  state['previous_url'])
             with open(specfile, "w") as fp:
-                s = json.dumps(spec, fp, indent=4, 
-                           separators=(', ', ': '))
-                fp.write(s)
+                json.dump(spec, fp, indent=4, 
+                          separators=(', ', ': '))
 
         # organize a temporary copy of files that we can compare our results to
         wantdir = "%s/%s-want" % (self.datadir, self.repoclass.alias)

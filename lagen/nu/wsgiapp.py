@@ -52,8 +52,9 @@ class WSGIApp(OrigWSGIApp):
         self.lagforkortningar_regex = "|".join(sorted(self.lagforkortningar, key=len, reverse=True))
             
 
-    def parse_parameters(self, querystring):
-        q, param, pagenum, pagelen, stats = super(WSGIApp, self).parse_parameters(querystring)
+    def parse_parameters(self, querystring, idx):
+        q, param, pagenum, pagelen, stats = super(WSGIApp,
+                                                  self).parse_parameters(querystring, idx)
         # if Autocomple call, transform q to suitable parameters (find
         # uri)
         if querystring.endswith("_ac=true"):

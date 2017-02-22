@@ -424,8 +424,8 @@ Examined %s repos.
                                     self.config.indexlocation,
                                     self.repos)
         q, param, pagenum, pagelen, stats = self.parse_parameters(
-            environ['QUERY_STRING'])
-        ac_query=True  ## FIXME: how to set this? Or allow override by lagen.nu.WSGIApp?
+            environ['QUERY_STRING'], idx)
+        ac_query = environ['QUERY_STRING'].endswith("_ac=true")
         res, pager = idx.query(q=q,
                                pagenum=pagenum,
                                pagelen=pagelen,
@@ -492,7 +492,7 @@ Examined %s repos.
     def mangle_result(self, hit):
         return hit
 
-    def parse_parameters(self, querystring):
+    def parse_parameters(self, querystring, idx):
         def _guess_real_fieldname(k, schema):
             for fld in schema:
                 if fld.endswith(k):
@@ -544,6 +544,7 @@ Examined %s repos.
                     newfiltered[k] = v
             filtered = newfiltered
 
+            schema = idx.schema()
             if self.config.legacyapi:
                 # 2.3 legacyapi requires that parameters do not include
                 # prefix. Therefore, transform publisher.iri =>

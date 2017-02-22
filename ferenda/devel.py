@@ -220,7 +220,6 @@ class Devel(object):
         """
         # 1. initialize the docrepo indicated by "alias"
         repo = self._repo_from_alias(alias)
-
         # 2. find out if there is an intermediate file or downloaded
         # file for basefile
         if os.path.exists(repo.store.intermediate_path(basefile)):
@@ -288,7 +287,7 @@ class Devel(object):
         # 4.1 write patch
         patchcontent = "".join(difflines)
         if patchcontent:
-            if repo.config.patchmethod == "rot13":
+            if repo.config.patchformat == "rot13":
                 print("rot13:ing the patch at %s" % patchpath)
                 patchcontent = codecs.encode(patchcontent, "rot13")
             # write the patch using the same encoding as the
