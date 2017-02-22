@@ -1,4 +1,8 @@
-# This fixture does a bunch of real HTTP request against a selected server (
+# -*- coding: utf-8 -*-
+
+# This fixture does a bunch of real HTTP request against a selected
+# server (determined by the environment variable FERENDA_TESTURL,
+# which is http://localhost:8080/
 
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
@@ -158,7 +162,7 @@ class TestAutocomplete(TestLagen):
         self.assertTrue(hits[0]['desc'].startswith("Till främjande av ett fritt meningsutbyte"))
 
     def test_incomplete_lawname(self):
-        res = self.get(self.baseurl + "api/?q=person&_ac=true",
+        res = self.get(self.baseurl + "api/?q=personuppgiftsl&_ac=true",
                        headers={'Accept': 'application/json'})
         hits = res.json()
         self.assertEqual(hits[0]['url'], self.baseurl + "1998:204")

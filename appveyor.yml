@@ -18,6 +18,8 @@ install:
   - "%PYTHON%/python.exe c:/get-pip.py"
   - "%PYTHON%/Scripts/pip.exe -q install wheel"
   - "%PYTHON%/Scripts/wheel.exe convert %LXML%.exe"
+  - "dir"
+  - "dir tools/win32"
   - "%PYTHON%/Scripts/wheel.exe install %LXML%.whl"
   - "%PYTHON%/Scripts/pip.exe -q install -r %REQUIREMENTS%"
 test_script:
