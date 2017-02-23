@@ -730,12 +730,14 @@ class DV(SwedishLegalSource):
             newbody = []
             currentline = ""
             for idx, line in enumerate(rawbody):
-                if (line.isupper() or
-                    (idx + 1 < len(rawbody) and rawbody[idx+1].isupper()) or
-                    (idx + 1 < len(rawbody) and
+                if (line.isupper() or # this is a obvious header
+                    (idx + 1 < len(rawbody) and rawbody[idx+1].isupper()) or # next line is a obvious header
+                    (idx + 1 < len(rawbody) and # line is short and a probable sentence enter + next line starts with a new sentence 
                      len(line) < 45 and
                      line[-1] in (".", "?", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9") and
-                     rawbody[idx+1][0].isupper())):
+                     rawbody[idx+1][0].isupper()) or
+                    (idx + 1 < len(rawbody) and re.match("\d\.\s+[A-ZÅÄÖ]", rawbody[idx+1])) # next line seem to be a ordered paragraph
+                    ):
                     newbody.append(currentline + "\n" + line)
                     currentline = ""
                 else:
@@ -1909,7 +1911,7 @@ class DV(SwedishLegalSource):
             attrs = is_delmal(parser, parser.reader.next())
             if hasattr(parser, 'current_instans'):
                 delattr(parser, 'current_instans')
-            d = Delmal(ordinal=attrs['id'], malnr=attrs['malnr'])
+            d = Delmal(ordinal=attrs['id'], malnr=attrs.get('malnr'))
             return parser.make_children(d)
 
         @newstate('instans')
@@ -1996,14 +1998,14 @@ class DV(SwedishLegalSource):
             strchunk = str(chunk)
             if not strchunk.strip():  # filter out empty things
                 return None
-            if ordered(strchunk):
+            if parser.has_ordered_paras and ordered(strchunk):
                 # FIXME: Cut the ordinal from chunk somehow
                 if isinstance(chunk, Paragraph):
                     chunks = list(chunk)
-                    chunks[0] = re.sub("^\d+\. ", "", chunks[0])
+                    chunks[0] = re.sub("^\s*\d+\. ", "", chunks[0])
                     p = OrderedParagraph(chunks, ordinal=ordered(strchunk))
                 else:
-                    chunk = re.sub("^\d+\. ", "", chunk)
+                    chunk = re.sub("^\s*\d+\. ", "", chunk)
                     p = OrderedParagraph([chunk], ordinal=ordered(strchunk))
             else:
                 if isinstance(chunk, Paragraph):
@@ -2013,9 +2015,15 @@ class DV(SwedishLegalSource):
             return p
 
         def ordered(chunk):
+            """Given a string that might be a ordered paragraph, return the
+            ordinal if so, or None otherwise.x
+
+            """
             # most ordered paras use "18. Blahonga". But when quoting
             # EU law, sometimes "18 Blahonga". Treat these the same.
-            m =re.match("(\d+\.?)", chunk )
+            # NOTE: It should not match eg "24hPoker är en
+            # bolagskonstruktion..." (HDO/B2760-09)
+            m = re.match("(\d+)\.?\s", chunk)
             if m:
                 return m.group(1)
 
@@ -2126,6 +2134,9 @@ class DV(SwedishLegalSource):
         p.initial_state = "body"
         p.initial_constructor = make_body
         p.debug = os.environ.get('FERENDA_FSMDEBUG', False)
+        # only NJA and MD cases (distinguished by the first three
+        # chars of basefile) can have ordered paragraphs
+        p.has_ordered_paras = basefile[:3] in ('HDO', 'MDO')
         # return p
         return p.parse
 

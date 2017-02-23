@@ -1543,7 +1543,8 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     # probably wont work due to the newstate property
     @newstate('section')
     def make_section(parser):
-        ordinal, headingtype, title = analyze_sectionstart(parser, parser.reader.next())
+        chunk = parser.reader.next()
+        ordinal, headingtype, title = analyze_sectionstart(parser, chunk)
         # make sure the ordinal hasn't been used before
         if ordinal:
             short = lambda x: x if len(x) < 50 else x[:50] + "..."
@@ -1553,7 +1554,8 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                 parser.log.warning("Dupe section %s '%s' at p %s, previous at %s. Ignoring." %
                                    (ordinal, short(title), state.pageno,
                                     state.sectioncache[ordinal]))
-                title = "%s. %s" % (ordinal, title)
+                # make it a pseudosection
+                title = util.normalize_space(str(chunk))
                 ordinal = None
             else:
                 state.sectioncache[ordinal] = "'%s' at p %s" % (short(title), state.pageno)

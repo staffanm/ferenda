@@ -3,10 +3,12 @@ version: 0.3.1.dev1.{build}
 environment:
   matrix:
     - PYTHON: "C:/Python27"
-      LXML: "tools/win32/lxml-3.7.3.win32-py2.7"
+      LXML: "tools/win32/lxml-3.7.3.win32-py2.7.exe"
+      LXML_WHEEL: "lxml-3.7.3-cp27-none-win32.whl"
       REQUIREMENTS: "requirements.py2.txt"
     - PYTHON: "C:/Python34"
-      LXML: "tools/win32/lxml-3.7.3.win32-py3.4"
+      LXML: "tools/win32/lxml-3.7.3.win32-py3.4.exe"
+      LXML_WHEEL: "lxml-3.7.3-cp34-none-win32.whl"
       REQUIREMENTS: "requirements.py3.txt"
 init:
   - "ECHO %PYTHON%"
@@ -17,10 +19,9 @@ install:
   - "copy tools\\win32\\tidy.exe tidy.exe"
   - "%PYTHON%/python.exe c:/get-pip.py"
   - "%PYTHON%/Scripts/pip.exe -q install wheel"
-  - "%PYTHON%/Scripts/wheel.exe convert %LXML%.exe"
+  - "%PYTHON%/Scripts/wheel.exe convert %LXML%"
   - "dir"
-  - "dir tools/win32"
-  - "%PYTHON%/Scripts/wheel.exe install %LXML%.whl"
+  - "%PYTHON%/Scripts/wheel.exe install %LXML_WHEEL%"
   - "%PYTHON%/Scripts/pip.exe -q install -r %REQUIREMENTS%"
 test_script:
   - "%PYTHON%/python.exe -Wi tools/rununittest.py discover test"
