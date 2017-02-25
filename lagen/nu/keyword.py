@@ -54,12 +54,12 @@ class LNKeyword(keyword.Keyword):
     def canonical_uri(self, basefile):
         # FIXME: make configurable like SFS.canonical_uri
         capitalized = basefile[0].upper() + basefile[1:]
-        return 'https://lagen.nu/begrepp/%s' % capitalized.replace(' ', '_')
+        return 'https://lagen.nu/begrepp/%s' % quote(capitalized.replace(' ', '_'))
 
     def basefile_from_uri(self, uri):
         prefix = "https://lagen.nu/begrepp/"
         if prefix in uri:
-            return uri.replace(prefix, "").replace("_", " ")
+            return unquote(uri.replace(prefix, "").replace("_", " "))
         else:
             return super(LNKeyword, self).basefile_from_uri(uri)
         

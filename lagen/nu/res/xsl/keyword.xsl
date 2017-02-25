@@ -10,7 +10,6 @@
 		xmlns:ext="http://exslt.org/common"
 		exclude-result-prefixes="xhtml rdf">
 
-  <xsl:import href="uri.xsl"/>
   <xsl:import href="annotations-panel.xsl"/>
   <xsl:include href="base.xsl"/>
   <!-- NOTE: this annotation file does not use Grit syntax (yet) -->
