@@ -10,8 +10,7 @@
 <https://lagen.nu/dom/hfd/2014/not/85> a rpubl:Rattsfallsnotis ;
     dcterms:identifier "HFD 2014 not 85" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
-    dcterms:references <https://lagen.nu/prop/2012/13:1>,
-        <https://lagen.nu/1998:189>,
+    dcterms:references <https://lagen.nu/1998:189>,
         <https://lagen.nu/1998:189#P12>,
         <https://lagen.nu/1998:189#P5>,
         <https://lagen.nu/1999:1229>,
@@ -19,31 +18,29 @@
         <https://lagen.nu/1999:1229#K24P10a>,
         <https://lagen.nu/1999:1229#K24P10b>,
         <https://lagen.nu/1999:1229#K24P10d>,
-        <https://lagen.nu/1999:1229#K24P10dS3> ;
+        <https://lagen.nu/1999:1229#K24P10dS3>,
+        <https://lagen.nu/prop/2012/13:1> ;
     rpubl:arsutgava "2014" ;
     rpubl:lopnummer "85" ;
     rpubl:rattsfallspublikation <https://lagen.nu/dataset/hfd> ;
     rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/hfd/4217-14/2014-12-23> ;
-    rpubl:referatrubrik "Överklagande av Skatteverket och HeidelbergCement Northern Europe AB av ett förhandsbesked ang. inkomstskatt"@sv ;
+    rpubl:referatrubrik "Förhandsbesked undanröjdes med hänsyn till att frågan om det förelåg en väsentlig skatteförmån enligt bestämmelserna om avdragsbegränsning för räntor inte lämpade sig för förhandsbesked (inkomstskatt)"@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rf/hfd/2014/not/85> ;
     prov:wasDerivedFrom <https://lagen.nu/dom/hfd/2014/not/85?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
+<https://lagen.nu/dom/hfd/2014/not/85?repo=dv&dir=downloaded> rdfs:label "HFD 2014 not 85"@sv .
+
 <https://lagen.nu/dom/hfd/4217-14/2014-12-23> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2011/hogsta-forvaltningsdomstolen> ;
-    dcterms:subject <https://lagen.nu/begrepp/Förhandsbesked>,
-        <https://lagen.nu/begrepp/Förhandsbesked_undanröjdes_med_hänsyn_till_att>,
+    dcterms:subject <https://lagen.nu/begrepp/Förhandsbesked,_skatter>,
         <https://lagen.nu/begrepp/Inkomstskatt>,
-        <https://lagen.nu/begrepp/Skatter>,
-        <https://lagen.nu/begrepp/Skatter_-_skatter>,
-        <https://lagen.nu/begrepp/Övriga_frågor> ;
-    dcterms:title "Överklagande av Skatteverket och HeidelbergCement Northern Europe AB av ett förhandsbesked ang. inkomstskatt"@sv ;
+        <https://lagen.nu/begrepp/Skatter,_övriga_frågor> ;
+    dcterms:title "Förhandsbesked undanröjdes med hänsyn till att frågan om det förelåg en väsentlig skatteförmån enligt bestämmelserna om avdragsbegränsning för räntor inte lämpade sig för förhandsbesked (inkomstskatt)"@sv ;
     rpubl:avgorandedatum "2014-12-23"^^xsd:date ;
     rpubl:lagrum <https://lagen.nu/1998:189>,
         <https://lagen.nu/1998:189#P5>,
         <https://lagen.nu/1999:1229#K24P10d> ;
     rpubl:malnummer "4217-14" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hfd/4217-14/2014-12-23> .
-
-<https://lagen.nu/dom/hfd/2014/not/85?repo=dv&dir=downloaded> rdfs:label "HFD 2014 not 85"@sv .
 

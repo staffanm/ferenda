@@ -28,23 +28,24 @@
     rpubl:lopnummer "56" ;
     rpubl:rattsfallspublikation <https://lagen.nu/dataset/ra> ;
     rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/regr/1754-10/2010-06-14> ;
-    rpubl:referatrubrik "Ansökan av Sweets Konfektyr i Partille AB (bolaget) om rättsprövning av beslut om spärrning av enskild anslutning till väg"@sv ;
+    rpubl:referatrubrik "Frågor om handläggningen hos länsstyrelse och regeringen i ärende om spärrning av enskild anslutning till väg (avslag)"@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rf/ra/2010/not/56> ;
     prov:wasDerivedFrom <https://lagen.nu/dom/ra/2010/not/56?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
+<https://lagen.nu/dom/ra/2010/not/56?repo=dv&dir=downloaded> rdfs:label "RÅ 2010 not 56"@sv .
+
 <https://lagen.nu/dom/regr/1754-10/2010-06-14> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringsratten> ;
-    dcterms:subject <https://lagen.nu/begrepp/Rättsprövning_enligt_lagen_(2006:304)_om_rättsprövning_av_vissa_regeringsbeslut>,
-        <https://lagen.nu/begrepp/Väglagen_-_beslut_om_spärrning_av_enskild_anslutning_till_väg_(avslag)>,
+    dcterms:subject <https://lagen.nu/begrepp/Beslut_om_spärrning_av_enskild_anslutning_till_väg_(avslag)>,
+        <https://lagen.nu/begrepp/Rättsprövning_enligt_lagen_(2006:304)_om_rättsprövning_av_vissa_regeringsbeslut>,
+        <https://lagen.nu/begrepp/Väglagen>,
         <https://lagen.nu/begrepp/Övriga_frågor> ;
-    dcterms:title "Ansökan av Sweets Konfektyr i Partille AB (bolaget) om rättsprövning av beslut om spärrning av enskild anslutning till väg"@sv ;
+    dcterms:title "Frågor om handläggningen hos länsstyrelse och regeringen i ärende om spärrning av enskild anslutning till väg (avslag)"@sv ;
     rpubl:avgorandedatum "2010-06-14"^^xsd:date ;
     rpubl:lagrum <https://lagen.nu/1971:948#P40>,
         <https://lagen.nu/2006:304>,
         <https://lagen.nu/2006:304#P1> ;
     rpubl:malnummer "1754-10" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/regr/1754-10/2010-06-14> .
-
-<https://lagen.nu/dom/ra/2010/not/56?repo=dv&dir=downloaded> rdfs:label "RÅ 2010 not 56"@sv .
 

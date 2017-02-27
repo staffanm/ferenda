@@ -11,6 +11,7 @@ from datetime import date
 
 # SUT
 from ferenda.sources.legal.se import DV
+from ferenda.sources.legal.se.dv import KeywordContainsDescription 
 from ferenda import fsmparser
 
 class TestDVParserBase(unittest.TestCase):
@@ -576,3 +577,35 @@ class TestDomslut(TestDVParserBase):
         self.t({'court': 'Migrationsöverdomstolen'},
                "Migrationsöverdomstolens avgörande. Migrationsöverdomstolen "
                "bifaller")
+
+class TestKeywords(unittest.TestCase):
+
+    def test_keyword_sets(self):
+        repo = DV()
+        s = """Återställande av försutten tid - ofullständig
+besvärshänvisning (avslag); - Återställande av försutten tid - avslag
+(ofullständig besvärshänvisning)"""
+        
+        got = repo.sanitize_sokord(s, "RÅ 1999 not 119")
+        self.assertEqual(["Återställande av försutten tid",
+                          "Ofullständig besvärshänvisning (avslag)",
+                          "Återställande av försutten tid",
+                          "Avslag (ofullständig besvärshänvisning)"],
+                         got)
+
+    def test_implicit_rubrik(self):
+        repo = DV()
+        s = """Rättsprövning - plan- och bygglagen - beslut om upphävande
+av beslut att anta detaljplan (avslag); Byggnadsmål - detaljplanefrågor
+- - beslut om upphävande av beslut att anta detaljplan (rättsprövning,
+avslag)"""
+        with self.assertRaises(KeywordContainsDescription) as cm:
+            repo.sanitize_sokord(s, "RÅ 1994 not 717")
+            assertEqual(["Rättsprövning", "Plan- och bygglagen",
+                          "Byggnadsmål", "Detaljplanefrågor"],
+                        cm.exception.keywords)
+            assertEqual(["Beslut om upphävande av beslut att anta detaljplan (avslag)",
+                         "Beslut om upphävande av beslut att anta detaljplan (rättsprövning, avslag)"],
+                        cm.exception.descriptions)
+
+

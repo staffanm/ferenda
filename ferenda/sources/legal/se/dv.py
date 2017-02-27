@@ -86,6 +86,10 @@ class DVStore(DocumentStore):
             for x in super(DVStore, self).list_basefiles_for(action, basedir):
                 yield x
 
+class KeywordContainsDescription(errors.FerendaException):
+    def __init__(self, keywords, descriptions):
+        self.keywords = keywords
+        self.descriptions = descriptions
 
 class DV(SwedishLegalSource):
 
@@ -1177,21 +1181,17 @@ class DV(SwedishLegalSource):
                 raise errors.ParseError("Unparseable ref '%s'" % head["Referat"])
 
         # 7. Convert Sökord string to an actual list
-        res = []
         if head.get("Sökord"):
-            for s in self.re_delimSplit(head["Sökord"]):
-                s = util.normalize_space(s)
-                if not s:
-                    continue
-                # terms longer than 72 chars are not legitimate
-                # terms. more likely descriptions. If a term has a - in
-                # it, it's probably a separator between a term and a
-                # description
-                while len(s) >= 72 and " - " in s:
-                    h, s = s.split(" - ", 1)
-                    res.append(h)
-                if len(s) < 72:
-                    res.append(s)
+            try:
+                res = self.sanitize_sokord(head["Sökord"], basefile)
+            except KeywordContainsDescription as e:
+                res = e.keywords
+                rubrik = " / ".join(e.descriptions)
+                # I don't really know if this turns out to be a good
+                # idea, but let's try it
+                if "Rubrik" in head:
+                    self.log.warning("%s: Changing rubrik %s -> %s (is that better?)" % (basefile, head["Rubrik"], rubrik))
+                    head["Rubrik"] = rubrik
             head["Sökord"] = res
 
         # 8. Convert Avgörandedatum to a sensible value in the face of
@@ -1212,6 +1212,53 @@ class DV(SwedishLegalSource):
 
         # 9. Done!
         return head
+
+    def sanitize_sokord(self, sokordstring, basefile):
+        def capitalize(s):
+            # remove any non-word char start (like "- ", which
+            # sometimes occur due to double-dashes)
+            s = re.sub("^\W+", "", s)
+            if s[0].islower(): # capitalize first char (but leave all-caps keywords as-is)
+                return s[0].upper() + s[1:]
+            else:
+                return s
+
+        def probable_description(s):
+            # FIXME: try to determine if this is sentence-like
+            # (eg. containing common verbs like "ansågs", containing
+            # more than x words etc)
+            return len(s) >= 60
+        res = []
+        descs = []
+        if basefile.startswith("XXX/"):
+            delimiter = ","
+        else:
+            delimiter = ";"
+        for s in sokordstring.split(delimiter):
+            s = util.normalize_space(s)
+            if not s:
+                continue
+            # terms longer than 60 chars are not legitimate
+            # terms. more likely descriptions. If a term has a - in
+            # it, it's probably a separator between a term and a
+            # description
+            while len(s) >= 60 and " - " in s:
+                h, s = s.split(" - ", 1)
+                res.append(capitalize(h))
+            if not probable_description(s):
+                res.append(capitalize(s))
+            else:
+                descs.append(capitalize(s))
+        if descs:
+            # the remainder is not a legit keyword term. However, it
+            # might be a useful title. Communicate it back to the
+            # caller (but if we have several, omit shorter substrings
+            # of longer descs)
+            descs.sort(key=len)
+            descs = [desc for idx, desc in enumerate(descs) if (idx + 1) == len(descs) or desc not in descs[idx+1]]
+            raise KeywordContainsDescription(res, descs)
+        return res
+    
 
     # create nice RDF from the sanitized metadata
     def polish_metadata(self, head):
