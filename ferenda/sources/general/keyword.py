@@ -14,6 +14,7 @@ import gzip
 import requests
 from lxml import etree
 from rdflib import Literal, Namespace
+import yaml
 
 # my libs
 from ferenda import util
@@ -22,15 +23,11 @@ from ferenda.decorators import managedparsing
 from ferenda.elements import Body
 
 
-# FIXME: Use MW_NS = "{%s}" % xml.getroot().nsmap[None]
-MW_NS = "{http://www.mediawiki.org/xml/export-0.3/}"
-
-
 class KeywordStore(DocumentStore):
 
     def basefile_to_pathfrag(self, basefile):
-        # Shard all files under initial letter, eg "Avtal" => "a/Avtal"
-        first = basefile[0].lower()
+        # Shard all files under initial letter, eg "Avtal" => "A/Avtal"
+        first = basefile[0]
         return "%s/%s" % (first, basefile)
 
     def pathfrag_to_basefile(self, pathfrag):
@@ -63,7 +60,10 @@ class Keyword(DocumentRepository):
     xslt_template = "xsl/keyword.xsl"
     rdf_type = Namespace(util.ns['skos']).Concept
     namespaces = ['skos', 'prov', 'dcterms']
-
+    invalid_term_start = [".", "/", ":"]
+    invalid_term_end = [".", ","]
+    term_max_len = 100
+    term_min_len = 2
     def __init__(self, config=None, **kwargs):
         super(Keyword, self).__init__(config, **kwargs)
 
@@ -101,6 +101,7 @@ class Keyword(DocumentRepository):
             ret = ret.replace("_", " ")
         return ret
 
+
     def download(self, basefile=None):
         # Get all "term sets" (used dcterms:subject Objects, wiki pages
         # describing legal concepts, swedish wikipedia pages...)
@@ -114,7 +115,7 @@ class Keyword(DocumentRepository):
         PREFIX dcterms:<http://purl.org/dc/terms/>
         PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
 
-        SELECT DISTINCT ?subject ?label
+        SELECT ?uri ?subject ?label
         WHERE { {?uri dcterms:subject ?subject . }
                 OPTIONAL {?subject rdfs:label ?label . } }
         """
@@ -130,10 +131,12 @@ class Keyword(DocumentRepository):
                 if label is None:
                     self.log.warning("could not determine keyword from %s" % row['subject'])
                     continue
-            # sanity checking -- not everything can be a legit
-            # keyword. Must be under 100 chars and not start with . or /
-            if len(label) < 100 and not label[0] in (".", "/", ":"):
-                terms[label]['subjects'] = True
+            
+            sanitized = self.sanitize_term(label)
+            if sanitized:
+                if sanitized not in terms:
+                    terms[sanitized]['subjects'] = []
+                terms[sanitized]['subjects'].append(row['uri'])
 
         self.log.debug("Retrieved %s subject terms from triplestore" % len(terms))
 
@@ -147,17 +150,23 @@ class Keyword(DocumentRepository):
             oldterms = ""
             termpath = self.store.downloaded_path(term)
             if os.path.exists(termpath):
-                oldterms = util.readfile(termpath)
-            newterms = "\n".join(sorted(terms[term])) + "\n"
-            if newterms != oldterms:
+                oldterms = yaml.load(util.readfile(termpath))
+            if terms[term] != oldterms:
                 util.ensure_dir(termpath)
-                util.writefile(termpath, newterms)
+                util.writefile(termpath, yaml.dump(terms[term], default_flow_style=False))
                 self.log.info("%s: in %s termsets" % (term, len(terms[term])))
             else:
                 self.log.debug("%s: skipped" % term)
 
     def sanitize_term(self, term):
-        return term
+        # sanity checking -- not everything can be a legit
+        # keyword. Must be under 100 chars and not start with . or /
+        term = util.normalize_space(term)
+        if (self.term_max_len >= len(term) >= self.term_min_len and 
+            term[0] not in self.invalid_term_start and 
+            term[-1] not in self.invalid_term_end):
+            return term
+        # else return None
                 
     def download_termset_mediawiki(self, terms):
         if 'mediawikidump' in self.config:
@@ -166,7 +175,7 @@ class Keyword(DocumentRepository):
             xml = etree.parse(requests.get(self.config.mediawikidump).text)
             wikinamespaces = []
 
-            # FIXME: Handle any MW_NS namespace (c.f. wiki.py)
+            MW_NS = "{%s}" % xml.getroot().nsmap[None]
             for ns_el in xml.findall("//" + MW_NS + "namespace"):
                 wikinamespaces.append(ns_el.text)
             for page_el in xml.findall(MW_NS + "page"):
