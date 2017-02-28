@@ -25,13 +25,16 @@
     prov:wasDerivedFrom <https://lagen.nu/dom/ra/2010/not/1?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
+<https://lagen.nu/begrepp/Rättsprövning_enligt_lagen_(2006:304)_om_rättsprövning_av_vissa_regeringsbeslut//Plan-_och_bygglagen,_detaljplanefrågor//Beslut_att_anta_detaljplan> rdfs:label "Rättsprövning enligt lagen (2006:304) om rättsprövning av vissa regeringsbeslut»Plan- och bygglagen, detaljplanefrågor»Beslut att anta detaljplan" ;
+    dcterms:isPartOf <https://lagen.nu/begrepp/Rättsprövning_enligt_lagen_(2006:304)_om_rättsprövning_av_vissa_regeringsbeslut//Plan-_och_bygglagen,_detaljplanefrågor> .
+
 <https://lagen.nu/dom/ra/2010/not/1?repo=dv&dir=downloaded> rdfs:label "RÅ 2010 not 1"@sv .
 
 <https://lagen.nu/dom/regr/5267-09/2010-01-04> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringsratten> ;
-    dcterms:subject <https://lagen.nu/begrepp/Beslut_att_anta_detaljplan>,
-        <https://lagen.nu/begrepp/Plan-_och_bygglagen,_detaljplanefrågor>,
-        <https://lagen.nu/begrepp/Rättsprövning_enligt_lagen_(2006:304)_om_rättsprövning_av_vissa_regeringsbeslut> ;
+    dcterms:subject <https://lagen.nu/begrepp/Rättsprövning_enligt_lagen_(2006:304)_om_rättsprövning_av_vissa_regeringsbeslut>,
+        <https://lagen.nu/begrepp/Rättsprövning_enligt_lagen_(2006:304)_om_rättsprövning_av_vissa_regeringsbeslut//Plan-_och_bygglagen,_detaljplanefrågor>,
+        <https://lagen.nu/begrepp/Rättsprövning_enligt_lagen_(2006:304)_om_rättsprövning_av_vissa_regeringsbeslut//Plan-_och_bygglagen,_detaljplanefrågor//Beslut_att_anta_detaljplan> ;
     dcterms:title "Förutsättningar för beslut av byggnadsnämnden ansågs uppfyllda (avslag) / För att möjliggöra bostadsbebyggelse (fråga om planen borde ha antagits av kommunfullmäktige i stället för av byggnadsnämnden och om dess konsekvenser för skyddade arter, avslag )"@sv ;
     rpubl:avgorandedatum "2010-01-04"^^xsd:date ;
     rpubl:lagrum <https://lagen.nu/1987:10#K5P29>,
@@ -40,4 +43,9 @@
         <https://lagen.nu/2007:845#P4> ;
     rpubl:malnummer "5267-09" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/regr/5267-09/2010-01-04> .
+
+<https://lagen.nu/begrepp/Rättsprövning_enligt_lagen_(2006:304)_om_rättsprövning_av_vissa_regeringsbeslut> rdfs:label "Rättsprövning enligt lagen (2006:304) om rättsprövning av vissa regeringsbeslut" .
+
+<https://lagen.nu/begrepp/Rättsprövning_enligt_lagen_(2006:304)_om_rättsprövning_av_vissa_regeringsbeslut//Plan-_och_bygglagen,_detaljplanefrågor> rdfs:label "Rättsprövning enligt lagen (2006:304) om rättsprövning av vissa regeringsbeslut»Plan- och bygglagen, detaljplanefrågor" ;
+    dcterms:isPartOf <https://lagen.nu/begrepp/Rättsprövning_enligt_lagen_(2006:304)_om_rättsprövning_av_vissa_regeringsbeslut> .
 

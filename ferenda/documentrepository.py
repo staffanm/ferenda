@@ -1754,6 +1754,7 @@ with the *config* object as single parameter.
             with util.logtime(log.info,
                               "Dumped %(triplecount)s triples from context %(context)s to %(dumpfile)s (%(elapsed).3f sec)",
                               values):
+                util.ensure_dir(dumppath)
                 store.get_serialized_file(dumppath, format="nt", context=context)
                 # just to report the number of dumped triples -- may be unneccesary
                 with open(dumppath) as fp:

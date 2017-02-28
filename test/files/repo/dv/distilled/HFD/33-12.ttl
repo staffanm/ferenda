@@ -19,6 +19,10 @@
 <https://lagen.nu/dom/hfd/2013:29#KGO> dcterms:creator "Kammarrätten i Göteborg"@sv ;
     dcterms:isPartOf <https://lagen.nu/dom/hfd/2013:29> .
 
+<https://lagen.nu/begrepp/Allmän_försäkring> rdfs:label "Allmän försäkring" .
+
+<https://lagen.nu/dom/hfd/2013:29?repo=dv&dir=downloaded> rdfs:label "HFD 2013:29"@sv .
+
 <https://lagen.nu/dom/hfd/33-12/2013-05-27> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2011/hogsta-forvaltningsdomstolen> ;
     dcterms:relation "Prop. 1992/93:30 s. 34 och 39" ;
@@ -29,8 +33,6 @@
         <https://lagen.nu/1962:381#K17P1S1> ;
     rpubl:malnummer "33-12" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hfd/33-12/2013-05-27> .
-
-<https://lagen.nu/dom/hfd/2013:29?repo=dv&dir=downloaded> rdfs:label "HFD 2013:29"@sv .
 
 <https://lagen.nu/dom/hfd/2013:29> a rpubl:Rattsfallsreferat ;
     dcterms:identifier "HFD 2013:29" ;

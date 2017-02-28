@@ -29,6 +29,12 @@
         <https://lagen.nu/1996:1619#P27S2>,
         <https://lagen.nu/prop/1978/79:90#sid209> .
 
+<https://lagen.nu/begrepp/Biträdesersättning> rdfs:label "Biträdesersättning" .
+
+<https://lagen.nu/begrepp/Ersättning> rdfs:label "Ersättning" .
+
+<https://lagen.nu/begrepp/Rättshjälp> rdfs:label "Rättshjälp" .
+
 <https://lagen.nu/dom/hd/Ö4503-04/2007-05-16> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
     dcterms:subject <https://lagen.nu/begrepp/Biträdesersättning>,

@@ -11,6 +11,16 @@
     dcterms:isPartOf <https://lagen.nu/dom/nja/1994s119> ;
     dcterms:references <https://lagen.nu/2005:104> .
 
+<https://lagen.nu/begrepp/Arvsskatt> rdfs:label "Arvsskatt" .
+
+<https://lagen.nu/begrepp/Bouppteckning> rdfs:label "Bouppteckning" .
+
+<https://lagen.nu/begrepp/Inkomstskatt> rdfs:label "Inkomstskatt" .
+
+<https://lagen.nu/begrepp/Pensionsförsäkring> rdfs:label "Pensionsförsäkring" .
+
+<https://lagen.nu/begrepp/Återbäring> rdfs:label "Återbäring" .
+
 <https://lagen.nu/dom/hd/Ö2072-91/1994-03-10> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
     dcterms:subject <https://lagen.nu/begrepp/Arvsskatt>,
@@ -30,6 +40,10 @@
     rpubl:rattsfallshanvisning <https://lagen.nu/dom/nja/1970s529>,
         <https://lagen.nu/dom/nja/1975s33> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/oe2072-91/1994-03-10> .
+
+<https://lagen.nu/dom/nja/1970s529> dcterms:identifier "NJA 1970 s. 529 I och II" .
+
+<https://lagen.nu/dom/nja/1975s33> dcterms:identifier "NJA 1975 s. 33" .
 
 <https://lagen.nu/dom/nja/1994s119> a rpubl:Rattsfallsreferat ;
     dcterms:bibliographicCitation "NJA 1994:25" ;

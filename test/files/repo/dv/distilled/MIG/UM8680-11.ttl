@@ -24,6 +24,28 @@
     dcterms:references <https://lagen.nu/2005:716#K5P6>,
         <https://lagen.nu/2005:716#K8P7> .
 
+<https://lagen.nu/begrepp/Lagakraftvunnet_avlägsnandebeslut> rdfs:label "Lagakraftvunnet avlägsnandebeslut" .
+
+<https://lagen.nu/begrepp/Ny_omständighet> rdfs:label "Ny omständighet" .
+
+<https://lagen.nu/begrepp/Ny_prövning> rdfs:label "Ny prövning" .
+
+<https://lagen.nu/begrepp/Nytt_land> rdfs:label "Nytt land" .
+
+<https://lagen.nu/begrepp/Processram> rdfs:label "Processram" .
+
+<https://lagen.nu/begrepp/Resning> rdfs:label "Resning" .
+
+<https://lagen.nu/begrepp/Uppehållstillstånd_efter_ny_prövning> rdfs:label "Uppehållstillstånd efter ny prövning" .
+
+<https://lagen.nu/begrepp/Verkställighetshinder> rdfs:label "Verkställighetshinder" .
+
+<https://lagen.nu/begrepp/Verkställighetsstadiet> rdfs:label "Verkställighetsstadiet" .
+
+<https://lagen.nu/dom/mig/2007/not/2> dcterms:identifier "MIG 2007 not. 2" .
+
+<https://lagen.nu/dom/mig/2013:4?repo=dv&dir=downloaded> rdfs:label "MIG 2013:4"@sv .
+
 <https://lagen.nu/dom/mig/UM8680-11/2013-03-19> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/migrationsoverdomstolen> ;
     dcterms:relation "Prop. 2004/05:170 s. 153, 224 ff.",
@@ -48,8 +70,6 @@
     rpubl:malnummer "UM8680-11" ;
     rpubl:rattsfallshanvisning <https://lagen.nu/dom/mig/2007/not/2> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/mig/um8680-11/2013-03-19> .
-
-<https://lagen.nu/dom/mig/2013:4?repo=dv&dir=downloaded> rdfs:label "MIG 2013:4"@sv .
 
 <https://lagen.nu/dom/mig/2013:4> a rpubl:Rattsfallsreferat ;
     dcterms:identifier "MIG 2013:4" ;

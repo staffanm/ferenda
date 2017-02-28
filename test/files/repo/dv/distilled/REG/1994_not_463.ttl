@@ -19,15 +19,23 @@
     prov:wasDerivedFrom <https://lagen.nu/dom/ra/1994/not/463?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
+<https://lagen.nu/begrepp/Återställande_av_försutten_tid//Avslag_(psykisk_insufficiens)> rdfs:label "Återställande av försutten tid»Avslag (psykisk insufficiens)" ;
+    dcterms:isPartOf <https://lagen.nu/begrepp/Återställande_av_försutten_tid> .
+
+<https://lagen.nu/begrepp/Återställande_av_försutten_tid//Psykisk_insufficiens_(avslag)> rdfs:label "Återställande av försutten tid»Psykisk insufficiens (avslag)" ;
+    dcterms:isPartOf <https://lagen.nu/begrepp/Återställande_av_försutten_tid> .
+
 <https://lagen.nu/dom/ra/1994/not/463?repo=dv&dir=downloaded> rdfs:label "RÅ 1994 not 463"@sv .
 
 <https://lagen.nu/dom/regr/2655-1992/2094-07-07> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringsratten> ;
-    dcterms:subject <https://lagen.nu/begrepp/Avslag_(psykisk_insufficiens)>,
-        <https://lagen.nu/begrepp/Psykisk_insufficiens_(avslag)>,
-        <https://lagen.nu/begrepp/Återställande_av_försutten_tid> ;
+    dcterms:subject <https://lagen.nu/begrepp/Återställande_av_försutten_tid>,
+        <https://lagen.nu/begrepp/Återställande_av_försutten_tid//Avslag_(psykisk_insufficiens)>,
+        <https://lagen.nu/begrepp/Återställande_av_försutten_tid//Psykisk_insufficiens_(avslag)> ;
     dcterms:title "Ansökan av Åsa F.-S. om återställande av försutten tid för att överklaga en dom ang. disciplinansvar"@sv ;
     rpubl:avgorandedatum "2094-07-07"^^xsd:date ;
     rpubl:malnummer "2655-1992" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/regr/2655-1992/2094-07-07> .
+
+<https://lagen.nu/begrepp/Återställande_av_försutten_tid> rdfs:label "Återställande av försutten tid" .
 

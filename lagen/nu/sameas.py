@@ -61,9 +61,7 @@ class SameAs(object):
             self.log.error("Couldn't mint owl:sameAs: %s" % e)
         return resource
 
-
     def keyword_uri(self, keyword):
         baseuri = "https://lagen.nu/begrepp/"
-        # FIXME: Do something smart with "
-        return baseuri + util.ucfirst(keyword).replace(' ', '_')
+        return baseuri + util.ucfirst(keyword).replace(' ', '_').replace('"', "%22").replace("»", "//")
 

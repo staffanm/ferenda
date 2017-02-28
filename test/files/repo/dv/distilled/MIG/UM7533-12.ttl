@@ -20,12 +20,28 @@
         <https://lagen.nu/2005:716#K5P6>,
         <https://lagen.nu/2005:716#K5P6S1>,
         <https://lagen.nu/2005:716#K5P9>,
-        <https://lagen.nu/prop/2004/05:170#sid191>,
         <https://lagen.nu/dom/mig/2007:48>,
-        <https://lagen.nu/dom/mig/2010:23> .
+        <https://lagen.nu/dom/mig/2010:23>,
+        <https://lagen.nu/prop/2004/05:170#sid191> .
 
 <https://lagen.nu/dom/mig/2013:6#MIV> dcterms:creator "Migrationsverket"@sv ;
     dcterms:isPartOf <https://lagen.nu/dom/mig/2013:6> .
+
+<https://lagen.nu/begrepp/Barn> rdfs:label "Barn" .
+
+<https://lagen.nu/begrepp/Hälsotillstånd> rdfs:label "Hälsotillstånd" .
+
+<https://lagen.nu/begrepp/Leukemi> rdfs:label "Leukemi" .
+
+<https://lagen.nu/begrepp/Sjukdom> rdfs:label "Sjukdom" .
+
+<https://lagen.nu/begrepp/Synnerligen_ömmande_omständigheter> rdfs:label "Synnerligen ömmande omständigheter" .
+
+<https://lagen.nu/begrepp/Tidsbegränsat_uppehållstillstånd> rdfs:label "Tidsbegränsat uppehållstillstånd" .
+
+<https://lagen.nu/begrepp/Vårdbehov_av_övergående_natur> rdfs:label "Vårdbehov av övergående natur" .
+
+<https://lagen.nu/dom/mig/2013:6?repo=dv&dir=downloaded> rdfs:label "MIG 2013:6"@sv .
 
 <https://lagen.nu/dom/mig/UM7533-12/2013-03-22> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/migrationsoverdomstolen> ;
@@ -49,7 +65,9 @@
         <https://lagen.nu/dom/mig/2010:23> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/mig/um7533-12/2013-03-22> .
 
-<https://lagen.nu/dom/mig/2013:6?repo=dv&dir=downloaded> rdfs:label "MIG 2013:6"@sv .
+<https://lagen.nu/dom/mig/2007:48> dcterms:identifier "MIG 2007:48" .
+
+<https://lagen.nu/dom/mig/2010:23> dcterms:identifier "MIG 2010:23" .
 
 <https://lagen.nu/dom/mig/2013:6> a rpubl:Rattsfallsreferat ;
     dcterms:identifier "MIG 2013:6" ;

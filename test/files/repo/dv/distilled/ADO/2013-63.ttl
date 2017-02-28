@@ -23,6 +23,20 @@
     prov:wasDerivedFrom <https://lagen.nu/dom/ad/2013:63?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
+<https://lagen.nu/begrepp/Föräldraledighet> rdfs:label "Föräldraledighet" .
+
+<https://lagen.nu/begrepp/Missgynnande> rdfs:label "Missgynnande" .
+
+<https://lagen.nu/begrepp/Tillfällig_föräldrapenning> rdfs:label "Tillfällig föräldrapenning" .
+
+<https://lagen.nu/dom/ad/2009:56> dcterms:identifier "AD 2009 nr 56" .
+
+<https://lagen.nu/dom/ad/2011:23> dcterms:identifier "AD 2011 nr 23" .
+
+<https://lagen.nu/dom/ad/2013:18> dcterms:identifier "AD 2013 nr 18" .
+
+<https://lagen.nu/dom/ad/2013:63?repo=dv&dir=downloaded> rdfs:label "AD 2013 nr 63"@sv .
+
 <https://lagen.nu/dom/ad/B-114-2012/2013-08-21> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/arbetsdomstolen> ;
     dcterms:subject <https://lagen.nu/begrepp/Föräldraledighet>,
@@ -37,6 +51,4 @@
         <https://lagen.nu/dom/ad/2011:23>,
         <https://lagen.nu/dom/ad/2013:18> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/ad/b-114-2012/2013-08-21> .
-
-<https://lagen.nu/dom/ad/2013:63?repo=dv&dir=downloaded> rdfs:label "AD 2013 nr 63"@sv .
 

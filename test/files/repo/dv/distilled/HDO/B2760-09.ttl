@@ -101,6 +101,14 @@
         <https://lagen.nu/dom/rh/2007:82>,
         <https://lagen.nu/prop/1981/82:170> .
 
+<https://lagen.nu/begrepp/Dobbleri> rdfs:label "Dobbleri" .
+
+<https://lagen.nu/begrepp/Lotteri> rdfs:label "Lotteri" .
+
+<https://lagen.nu/begrepp/Poker> rdfs:label "Poker" .
+
+<https://lagen.nu/begrepp/Spel> rdfs:label "Spel" .
+
 <https://lagen.nu/dom/hd/B2760-09/2011-04-06> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
     dcterms:subject <https://lagen.nu/begrepp/Dobbleri>,

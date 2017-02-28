@@ -256,6 +256,14 @@
         <https://lagen.nu/prop/2008/08:95#sid398>,
         <https://lagen.nu/utr/sou/2010:87> .
 
+<https://lagen.nu/begrepp/Diskriminering> rdfs:label "Diskriminering" .
+
+<https://lagen.nu/begrepp/Diskrimineringsersättning> rdfs:label "Diskrimineringsersättning" .
+
+<https://lagen.nu/begrepp/Ideell_ersättning> rdfs:label "Ideell ersättning" .
+
+<https://lagen.nu/begrepp/Skadestånd> rdfs:label "Skadestånd" .
+
 <https://lagen.nu/dom/hd/T3592-13/2014-06-26> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
     dcterms:subject <https://lagen.nu/begrepp/Diskriminering>,

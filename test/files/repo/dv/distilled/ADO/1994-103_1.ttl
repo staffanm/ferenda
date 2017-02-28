@@ -1,0 +1,40 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://lagen.nu/dom/ad/1994:103> a rpubl:Rattsfallsreferat ;
+    dcterms:identifier "AD 1994 nr 103" ;
+    dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
+    dcterms:references <https://lagen.nu/1975:635#P6>,
+        <https://lagen.nu/dom/ad/1979:149>,
+        <https://lagen.nu/dom/ad/1980:81>,
+        <https://lagen.nu/prop/1975/76:105> ;
+    rpubl:arsutgava "1994" ;
+    rpubl:lopnummer "103" ;
+    rpubl:rattsfallspublikation <https://lagen.nu/dataset/ad> ;
+    rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/ad/A-295-1993/1994-08-24> ;
+    rpubl:referatrubrik "Fråga huruvida arbetsgivare åsidosatte den primära förhandlingsskyldigheten enligt 11 § medbestämmandelagen genom att inte alls förhandla innan en verksamhetsgren överläts eller genom att uppta och genomföra förhandling för sent."@sv ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rf/ad/1994:103> ;
+    prov:wasDerivedFrom <https://lagen.nu/dom/ad/1994:103?repo=dv&dir=downloaded> ;
+    prov:wasGeneratedBy "lagen.nu.dv.DV" .
+
+<https://lagen.nu/begrepp/Medbestämmandelagen> rdfs:label "Medbestämmandelagen" .
+
+<https://lagen.nu/dom/ad/1994:103?repo=dv&dir=downloaded> rdfs:label "AD 1994 nr 103"@sv .
+
+<https://lagen.nu/dom/ad/A-295-1993/1994-08-24> a rpubl:VagledandeDomstolsavgorande ;
+    dcterms:publisher <https://lagen.nu/org/2008/arbetsdomstolen> ;
+    dcterms:subject <https://lagen.nu/begrepp/Medbestämmandelagen> ;
+    dcterms:title "Fråga huruvida arbetsgivare åsidosatte den primära förhandlingsskyldigheten enligt 11 § medbestämmandelagen genom att inte alls förhandla innan en verksamhetsgren överläts eller genom att uppta och genomföra förhandling för sent."@sv ;
+    rpubl:avgorandedatum "1994-08-24"^^xsd:date ;
+    rpubl:domsnummer "1994-103" ;
+    rpubl:lagrum <https://lagen.nu/1976:580>,
+        <https://lagen.nu/1976:580#P11> ;
+    rpubl:malnummer "A-295-1993" ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/dom/ad/a-295-1993/1994-08-24> .
+

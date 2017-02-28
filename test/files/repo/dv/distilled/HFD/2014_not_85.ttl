@@ -29,13 +29,19 @@
     prov:wasDerivedFrom <https://lagen.nu/dom/hfd/2014/not/85?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
+<https://lagen.nu/begrepp/Förhandsbesked,_skatter//Inkomstskatt> rdfs:label "Förhandsbesked, skatter»Inkomstskatt" ;
+    dcterms:isPartOf <https://lagen.nu/begrepp/Förhandsbesked,_skatter> .
+
+<https://lagen.nu/begrepp/Förhandsbesked,_skatter//Skatter,_övriga_frågor> rdfs:label "Förhandsbesked, skatter»Skatter, övriga frågor" ;
+    dcterms:isPartOf <https://lagen.nu/begrepp/Förhandsbesked,_skatter> .
+
 <https://lagen.nu/dom/hfd/2014/not/85?repo=dv&dir=downloaded> rdfs:label "HFD 2014 not 85"@sv .
 
 <https://lagen.nu/dom/hfd/4217-14/2014-12-23> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2011/hogsta-forvaltningsdomstolen> ;
     dcterms:subject <https://lagen.nu/begrepp/Förhandsbesked,_skatter>,
-        <https://lagen.nu/begrepp/Inkomstskatt>,
-        <https://lagen.nu/begrepp/Skatter,_övriga_frågor> ;
+        <https://lagen.nu/begrepp/Förhandsbesked,_skatter//Inkomstskatt>,
+        <https://lagen.nu/begrepp/Förhandsbesked,_skatter//Skatter,_övriga_frågor> ;
     dcterms:title "Förhandsbesked undanröjdes med hänsyn till att frågan om det förelåg en väsentlig skatteförmån enligt bestämmelserna om avdragsbegränsning för räntor inte lämpade sig för förhandsbesked (inkomstskatt)"@sv ;
     rpubl:avgorandedatum "2014-12-23"^^xsd:date ;
     rpubl:lagrum <https://lagen.nu/1998:189>,
@@ -43,4 +49,6 @@
         <https://lagen.nu/1999:1229#K24P10d> ;
     rpubl:malnummer "4217-14" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hfd/4217-14/2014-12-23> .
+
+<https://lagen.nu/begrepp/Förhandsbesked,_skatter> rdfs:label "Förhandsbesked, skatter" .
 

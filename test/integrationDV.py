@@ -587,11 +587,40 @@ besvärshänvisning (avslag); - Återställande av försutten tid - avslag
 (ofullständig besvärshänvisning)"""
         
         got = repo.sanitize_sokord(s, "RÅ 1999 not 119")
-        self.assertEqual(["Återställande av försutten tid",
-                          "Ofullständig besvärshänvisning (avslag)",
-                          "Återställande av försutten tid",
-                          "Avslag (ofullständig besvärshänvisning)"],
+        self.assertEqual([("Återställande av försutten tid", "Ofullständig besvärshänvisning (avslag)"),
+                          ("Återställande av försutten tid", "Avslag (ofullständig besvärshänvisning)")],
                          got)
+
+    def test_sub_keywords(self):
+        repo = DV()
+        s = """Förbud (utformning av) förbudsföreläggande; Hälsopåståenden - bestämt; Hälsopåståenden - icke specificerat; Kosttillskott; Livsmedel; Rättegångskostnader - 18 kap 6 § (vid begäran om förhandsavgörande); Rättsfråga - målgrupp; Rättsfråga - genomsnittskonsument; Transaktionstest (vid lagstridighet); Vite - särskilt högt"""
+        got = repo.sanitize_sokord(s, "MDO/2016-5")
+        self.maxDiff = None
+        self.assertEqual([("Förbud (utformning av) förbudsföreläggande", ),
+                          ("Hälsopåståenden", "Bestämt"),
+                          ("Hälsopåståenden", "Icke specificerat"),
+                          ("Kosttillskott", ),
+                          ("Livsmedel", ),
+                          ("Rättegångskostnader", "18 kap 6 § (vid begäran om förhandsavgörande)"),
+                          ("Rättsfråga", "Målgrupp"),
+                          ("Rättsfråga", "Genomsnittskonsument"),
+                          ("Transaktionstest (vid lagstridighet)",),
+                          ("Vite", "Särskilt högt")],
+                         got)
+        
+    def test_normalize_subkeyword_delimiter(self):
+        repo = DV()
+        self.assertEqual([("Allmän handling", "Allmän handling eller inte")],
+                         repo.sanitize_sokord("Allmän handling, allmän handling eller inte", ""))
+
+        self.assertEqual([("Allmän handling", "Brev till biskop i pastoral angelägenhet")],
+                         repo.sanitize_sokord("Allmän handling? (brev till biskop i pastoral angelägenhet)", ""))
+        
+        self.assertEqual([("Allmän handling", "Övriga frågor")],
+                         repo.sanitize_sokord("Allmän handling -övriga frågor", ""))
+
+        self.assertEqual([("Allmän handling", "Sekretess eller inte")],
+                         repo.sanitize_sokord("Allmän handling sekretess eller inte", ""))
 
     def test_implicit_rubrik(self):
         repo = DV()
@@ -601,11 +630,11 @@ av beslut att anta detaljplan (avslag); Byggnadsmål - detaljplanefrågor
 avslag)"""
         with self.assertRaises(KeywordContainsDescription) as cm:
             repo.sanitize_sokord(s, "RÅ 1994 not 717")
-            assertEqual(["Rättsprövning", "Plan- och bygglagen",
-                          "Byggnadsmål", "Detaljplanefrågor"],
-                        cm.exception.keywords)
-            assertEqual(["Beslut om upphävande av beslut att anta detaljplan (avslag)",
-                         "Beslut om upphävande av beslut att anta detaljplan (rättsprövning, avslag)"],
-                        cm.exception.descriptions)
+            self.assertEqual([("Rättsprövning", "Plan- och bygglagen"),
+                              ("Byggnadsmål", "Detaljplanefrågor")],
+                             cm.exception.keywords)
+            self.assertEqual(["Beslut om upphävande av beslut att anta detaljplan (avslag)",
+                              "Beslut om upphävande av beslut att anta detaljplan (rättsprövning, avslag)"],
+                             cm.exception.descriptions)
 
 

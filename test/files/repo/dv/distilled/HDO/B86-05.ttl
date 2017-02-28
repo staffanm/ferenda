@@ -20,6 +20,24 @@
     dcterms:references <https://lagen.nu/2000:1225>,
         <https://lagen.nu/2000:1281> .
 
+<https://lagen.nu/begrepp/Antidumpningstull> rdfs:label "Antidumpningstull" .
+
+<https://lagen.nu/begrepp/Det_allmänna> rdfs:label "Det allmänna" .
+
+<https://lagen.nu/begrepp/EG-rätt> rdfs:label "EG-rätt" .
+
+<https://lagen.nu/begrepp/Kungörande> rdfs:label "Kungörande" .
+
+<https://lagen.nu/begrepp/Legalitetsprincipen> rdfs:label "Legalitetsprincipen" .
+
+<https://lagen.nu/begrepp/Normgivning> rdfs:label "Normgivning" .
+
+<https://lagen.nu/begrepp/Regeringsformen> rdfs:label "Regeringsformen" .
+
+<https://lagen.nu/begrepp/Rättsvillfarelse> rdfs:label "Rättsvillfarelse" .
+
+<https://lagen.nu/begrepp/Smuggling> rdfs:label "Smuggling" .
+
 <https://lagen.nu/dom/hd/B86-05/2007-04-04> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
     dcterms:subject <https://lagen.nu/begrepp/Antidumpningstull>,

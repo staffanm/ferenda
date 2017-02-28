@@ -8,8 +8,9 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/dom/nja/2010s168#I/HDO> dcterms:creator "Högsta domstolen"@sv ;
-    dcterms:isPartOf <https://lagen.nu/dom/nja/2010s168#I> .
+<https://lagen.nu/dom/nja/2010s168#I/HDO/P1> dcterms:isPartOf <https://lagen.nu/dom/nja/2010s168#I/HDO> .
+
+<https://lagen.nu/dom/nja/2010s168#I/HDO/P40> dcterms:isPartOf <https://lagen.nu/dom/nja/2010s168#I/HDO> .
 
 <https://lagen.nu/dom/nja/2010s168#I/HGO> dcterms:creator "Göta hovrätt"@sv ;
     dcterms:isPartOf <https://lagen.nu/dom/nja/2010s168#I> ;
@@ -20,10 +21,7 @@
     dcterms:references <https://lagen.nu/1971:69#P4>,
         <https://lagen.nu/1971:69#P5> .
 
-<https://lagen.nu/dom/nja/2010s168#II/HDO> dcterms:creator "Högsta domstolen"@sv ;
-    dcterms:isPartOf <https://lagen.nu/dom/nja/2010s168#II> ;
-    dcterms:references <https://lagen.nu/dom/nja/2000s622>,
-        <https://lagen.nu/dom/nja/2004s840> .
+<https://lagen.nu/dom/nja/2010s168#II/HDO/P1> dcterms:isPartOf <https://lagen.nu/dom/nja/2010s168#II/HDO> .
 
 <https://lagen.nu/dom/nja/2010s168#II/HSB> dcterms:creator "Hovrätten över Skåne och Blekinge"@sv ;
     dcterms:isPartOf <https://lagen.nu/dom/nja/2010s168#II> .
@@ -31,6 +29,16 @@
 <https://lagen.nu/dom/nja/2010s168#II/TLU> dcterms:creator "Lunds tingsrätt"@sv ;
     dcterms:isPartOf <https://lagen.nu/dom/nja/2010s168#II> ;
     dcterms:references <https://lagen.nu/1971:69#P4> .
+
+<https://lagen.nu/begrepp/Dubbla_förfaranden> rdfs:label "Dubbla förfaranden" .
+
+<https://lagen.nu/begrepp/Ne_bis_in_idem> rdfs:label "Ne bis in idem" .
+
+<https://lagen.nu/begrepp/Res_judicata> rdfs:label "Res judicata" .
+
+<https://lagen.nu/begrepp/Skattebrott> rdfs:label "Skattebrott" .
+
+<https://lagen.nu/begrepp/Skattetillägg> rdfs:label "Skattetillägg" .
 
 <https://lagen.nu/dom/hd/B5498-09/2010-03-31> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
@@ -52,7 +60,18 @@
         <https://lagen.nu/dom/ra/2000:65> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/b5498-09/2010-03-31> .
 
+<https://lagen.nu/dom/nja/2010s168#II/HDO> dcterms:creator "Högsta domstolen"@sv ;
+    dcterms:isPartOf <https://lagen.nu/dom/nja/2010s168#II> ;
+    dcterms:references <https://lagen.nu/dom/nja/2000s622>,
+        <https://lagen.nu/dom/nja/2004s840> .
+
 <https://lagen.nu/dom/nja/2010s168?repo=dv&dir=downloaded> rdfs:label "NJA 2010 s. 168"@sv .
+
+<https://lagen.nu/dom/nja/2005s856> dcterms:identifier "NJA 2005 s. 856" .
+
+<https://lagen.nu/dom/nja/2006s467> dcterms:identifier "NJA 2006 s. 467" .
+
+<https://lagen.nu/dom/nja/2008s946> dcterms:identifier "NJA 2008 s. 946" .
 
 <https://lagen.nu/dom/nja/2010s168> a rpubl:Rattsfallsreferat ;
     dcterms:bibliographicCitation "NJA 2010:19" ;
@@ -74,6 +93,15 @@
     owl:sameAs <http://rinfo.lagrummet.se/publ/rf/nja/2010/s_168> ;
     prov:wasDerivedFrom <https://lagen.nu/dom/nja/2010s168?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
+
+<https://lagen.nu/dom/nja/2010s168#I/HDO> dcterms:creator "Högsta domstolen"@sv ;
+    dcterms:isPartOf <https://lagen.nu/dom/nja/2010s168#I> .
+
+<https://lagen.nu/dom/ra/2000:65> dcterms:identifier "RÅ 2000 ref. 65" .
+
+<https://lagen.nu/dom/nja/2000s622> dcterms:identifier "NJA 2000 s. 622" .
+
+<https://lagen.nu/dom/nja/2004s840> dcterms:identifier "NJA 2004 s. 840 I och II" .
 
 <https://lagen.nu/dom/nja/2010s168#I> dcterms:isPartOf <https://lagen.nu/dom/nja/2010s168> ;
     ns1:delmalordinal "I"@sv .

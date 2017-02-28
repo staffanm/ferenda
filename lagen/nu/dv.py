@@ -36,8 +36,18 @@ class DV(OrigDV, SameAs):
         return cd
         
     def add_keyword_to_metadata(self, domdesc, keyword):
-        domdesc.rel(DCTERMS.subject, self.keyword_uri(keyword))
-
+        # <.../b/Allmän_handling//Begärd_handling_saknades>Allmän handling»Begärd handling saknades</> dcterms:isPartOf <.../b/Allmän_handling>
+        label = ""
+        prevuri = None
+        for k in keyword:
+            label += "»" + k
+            uri = self.keyword_uri(label[1:])
+            with domdesc.rel(DCTERMS.subject, uri):
+                domdesc.value(RDFS.label, label[1:])
+                if prevuri:
+                    domdesc.rel(DCTERMS.isPartOf, prevuri)
+                prevuri = uri
+                    
     # override polish_metadata to add some extra owl:sameAs attributes
     def polish_metadata(self, head):
 

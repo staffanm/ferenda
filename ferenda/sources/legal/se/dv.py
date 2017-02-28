@@ -1189,7 +1189,7 @@ class DV(SwedishLegalSource):
                 rubrik = " / ".join(e.descriptions)
                 # I don't really know if this turns out to be a good
                 # idea, but let's try it
-                if "Rubrik" in head:
+                if "Rubrik" in head and "_not_" in basefile:
                     self.log.warning("%s: Changing rubrik %s -> %s (is that better?)" % (basefile, head["Rubrik"], rubrik))
                     head["Rubrik"] = rubrik
             head["Sökord"] = res
@@ -1213,21 +1213,21 @@ class DV(SwedishLegalSource):
         # 9. Done!
         return head
 
+    # Strings that might look like descriptions but actually are legit
+    # keywords (albeit very wordy keywords)
+    sokord_whitelist = ("Rättsprövning enligt lagen (2006:304) om rättsprövning av vissa regeringsbeslut",)
     def sanitize_sokord(self, sokordstring, basefile):
         def capitalize(s):
             # remove any non-word char start (like "- ", which
             # sometimes occur due to double-dashes)
             s = re.sub("^\W+", "", s)
-            if s[0].islower(): # capitalize first char (but leave all-caps keywords as-is)
-                return s[0].upper() + s[1:]
-            else:
-                return s
+            return util.ucfirst(s)
 
         def probable_description(s):
             # FIXME: try to determine if this is sentence-like
             # (eg. containing common verbs like "ansågs", containing
             # more than x words etc)
-            return len(s) >= 60
+            return (s not in self.sokord_whitelist) and len(s) >= 50
         res = []
         descs = []
         if basefile.startswith("XXX/"):
@@ -1238,17 +1238,28 @@ class DV(SwedishLegalSource):
             s = util.normalize_space(s)
             if not s:
                 continue
-            # terms longer than 60 chars are not legitimate
-            # terms. more likely descriptions. If a term has a - in
-            # it, it's probably a separator between a term and a
-            # description
-            while len(s) >= 60 and " - " in s:
-                h, s = s.split(" - ", 1)
-                res.append(capitalize(h))
-            if not probable_description(s):
-                res.append(capitalize(s))
-            else:
-                descs.append(capitalize(s))
+
+            # normalize the delimiter between the main keyword and
+            # subkeyword for some common variations like "Allmän
+            # handling, allmän handling eller inte", "Allmän handling?
+            # (brev till biskop i pastoral angelägenhet)" or "Allmän
+            # handling -övriga frågor?"
+
+            s = re.sub("(Allmän handling)[:,?]?\s+\(?(.*?)\)?$", r"\1 - \2", s)
+            subres = []
+            substrings = s.split(" - ") 
+            for idx, subs in enumerate(substrings):
+                # often, what should be keywords is more of
+                # descriptions, never occurring more than once. Try to
+                # identify these pseudo-descriptions (which sometimes
+                # are pretty good as descriptions go)
+                if not probable_description(subs):
+                    subres.append(capitalize(subs))
+                else:
+                    if idx + 1 != len(substrings):
+                        self.log.warning("%: Found probable description '%r' in sökord, but not at last position")
+                    descs.append(capitalize(subs))
+            res.append(tuple(subres))
         if descs:
             # the remainder is not a legit keyword term. However, it
             # might be a useful title. Communicate it back to the
@@ -1389,8 +1400,10 @@ class DV(SwedishLegalSource):
         #
         # Subclasses that has an idea of how to create a URI for a
         # keyword/concept might override this. 
+        assert isinstance(keyword, tuple), "Keyword %s should have been a tuple of sub-keywords (possible 1-tuple)"
         with domdesc.rel(DCTERMS.subject):
-            domdesc.value(RDFS.label, keyword, lang=self.lang)
+            # if subkeywords, create a label like "Allmän handling»Begärd handling saknades"
+            domdesc.value(RDFS.label, "»".join(keyword), lang=self.lang)
 
     def postprocess_doc(self, doc):
         # append to mapfile -- duplicates are OK at this point

@@ -15,6 +15,7 @@ from ferenda import util
 from ferenda import TripleStore, Facet, RequestHandler
 from ferenda.sources.general import keyword
 from ferenda.sources.legal.se import SwedishLegalSource, SFS
+from . import SameAs  # for the keyword_uri implementation
 
 class LNKeywordHandler(RequestHandler):
     def supports(self, environ):
@@ -23,7 +24,7 @@ class LNKeywordHandler(RequestHandler):
         return environ['PATH_INFO'].startswith("/begrepp/")
 
 
-class LNKeyword(keyword.Keyword):
+class LNKeyword(keyword.Keyword, SameAs):
     """Manages descriptions of legal concepts (Lagen.nu-version of Keyword)
     """
     requesthandler_class = LNKeywordHandler
@@ -45,21 +46,19 @@ class LNKeyword(keyword.Keyword):
             self.sfsrepo = SFS()
 
     def sanitize_term(self, term):
-        # attempt to filter out some obvious false positives
-        if term.strip()[:-1] in (".", ","):
-            return None
-        else:
-            return term
+        sanitized = super(LNKeyword, self).sanitize_term(term)
+        if sanitized is not None:
+            # handle word inflections etc ("personuppgifter" -> "personuppgift")
+            return sanitized
+        # else return None
             
     def canonical_uri(self, basefile):
-        # FIXME: make configurable like SFS.canonical_uri
-        capitalized = basefile[0].upper() + basefile[1:]
-        return 'https://lagen.nu/begrepp/%s' % quote(capitalized.replace(' ', '_'))
+        return self.keyword_uri(basefile)
 
     def basefile_from_uri(self, uri):
         prefix = "https://lagen.nu/begrepp/"
         if prefix in uri:
-            return unquote(uri.replace(prefix, "").replace("_", " "))
+            return unquote(uri.replace(prefix, "").replace("_", " ").replace("//", "»"))
         else:
             return super(LNKeyword, self).basefile_from_uri(uri)
         
@@ -124,6 +123,7 @@ class LNKeyword(keyword.Keyword):
             link_node.set(ns("rdf:about"), 'http://sv.wikipedia.org/wiki/' + basefile.replace(" ","_"))
             label_node = etree.SubElement(link_node, ns("rdfs:label"))
             label_node.text = "Begreppet %s finns även beskrivet på svenska Wikipedia" % basefile
+
 
     def facets(self):
         def kwselector(row, binding, resource_graph):

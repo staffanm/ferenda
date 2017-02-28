@@ -12,17 +12,25 @@
     dcterms:references <https://lagen.nu/1971:291#P9>,
         <https://lagen.nu/2005:716>,
         <https://lagen.nu/2005:716#K16P5S2>,
+        <https://lagen.nu/dom/mig/2006:9>,
         <https://lagen.nu/prop/1971:30>,
         <https://lagen.nu/prop/2004/05:170#sid105>,
         <https://lagen.nu/prop/2004/05:170#sid129>,
-        <https://lagen.nu/prop/2004/05:170#sid131>,
-        <https://lagen.nu/dom/mig/2006:9> .
+        <https://lagen.nu/prop/2004/05:170#sid131> .
 
 <https://lagen.nu/dom/mig/2009:30#MIV> dcterms:creator "Migrationsverket"@sv ;
     dcterms:isPartOf <https://lagen.nu/dom/mig/2009:30> .
 
 <https://lagen.nu/dom/mig/2009:30#MLS> dcterms:creator "Länsrätten i Stockholms län, migrationsdomstolen"@sv ;
     dcterms:isPartOf <https://lagen.nu/dom/mig/2009:30> .
+
+<https://lagen.nu/begrepp/Asyl> rdfs:label "Asyl" .
+
+<https://lagen.nu/begrepp/Europakonventionen> rdfs:label "Europakonventionen" .
+
+<https://lagen.nu/begrepp/Muntlig_förhandling> rdfs:label "Muntlig förhandling" .
+
+<https://lagen.nu/dom/mig/2009:30?repo=dv&dir=downloaded> rdfs:label "MIG 2009:30"@sv .
 
 <https://lagen.nu/dom/mig/UM7867-08/2009-11-03> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/migrationsoverdomstolen> ;
@@ -41,7 +49,7 @@
     rpubl:rattsfallshanvisning <https://lagen.nu/dom/mig/2006:9> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/mig/um7867-08/2009-11-03> .
 
-<https://lagen.nu/dom/mig/2009:30?repo=dv&dir=downloaded> rdfs:label "MIG 2009:30"@sv .
+<https://lagen.nu/dom/mig/2006:9> dcterms:identifier "MIG 2006:9" .
 
 <https://lagen.nu/dom/mig/2009:30> a rpubl:Rattsfallsreferat ;
     dcterms:identifier "MIG 2009:30" ;
