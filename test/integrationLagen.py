@@ -68,6 +68,15 @@ class TestPaths(TestLagen):
         self.assert200(self.baseurl + "begrepp/Sekundär_sekretessbestämmelse")
 
 
+class TestPages(TestLagen):
+    def test_frontpage_links(self):
+        # <a> elements should have a href attribute (you'd think that
+        # was obvious, but it's not)
+        res = self.get(self.baseurl)
+        soup = BeautifulSoup(res.text, "lxml")
+        firstlink = soup.article.a
+        self.assertTrue(firstlink.get("href"))
+
 class TestPatching(TestLagen):
 
     def test_file_has_been_patched(self):
@@ -108,7 +117,7 @@ class TestSearch(TestLagen):
                               ("mediawiki", 1),
                               ("sfs", 1),
                               ("static", 1)):
-            link = nav.find("a", href=re.compile("type=%s$" % repo))
+            link = nav.find("a", href=re.compile("type=%s" % repo))
             self.assertIsNotNone(link, "Found no nav link of type=%s" % repo)
             hits = int(link.parent.span.text) # a <span class="badge pull-right">42</span>
             self.assertGreaterEqual(hits, minhits, "Expected more hits for %s" % repo)

@@ -12,7 +12,6 @@ It's a generic template for any kind of content
 		xmlns:dcterms="http://purl.org/dc/terms/"
 		xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
-		xml:space="preserve"
 		exclude-result-prefixes="xhtml rdf atom">
 
   <xsl:include href="base.xsl"/>
@@ -38,7 +37,14 @@ It's a generic template for any kind of content
        it's in (usually the XHTML1.1 NS) into the default namespace
        -->
   <xsl:template match="*">
-    <xsl:element name="{local-name(.)}"><xsl:apply-templates select="node()"/></xsl:element>
+    <xsl:element name="{local-name()}">
+      <xsl:for-each select="@*">
+        <xsl:attribute name="{local-name()}">
+          <xsl:value-of select="."/>
+        </xsl:attribute>
+	</xsl:for-each>
+      <xsl:apply-templates/>
+    </xsl:element>
   </xsl:template>
 
 
