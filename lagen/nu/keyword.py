@@ -7,12 +7,15 @@ import os
 import sys
 from urllib.parse import quote, unquote
 from wsgiref.util import request_uri
+from collections import OrderedDict
 
 from lxml import etree
 from rdflib.namespace import DCTERMS
 
 from ferenda import util
 from ferenda import TripleStore, Facet, RequestHandler
+from ferenda.elements import Body, UnorderedList, ListItem, Link
+from ferenda.elements.html import Div, H2
 from ferenda.sources.general import keyword
 from ferenda.sources.legal.se import SwedishLegalSource, SFS
 from . import SameAs  # for the keyword_uri implementation
@@ -151,7 +154,71 @@ class LNKeyword(keyword.Keyword, SameAs):
         return self.toc_generate_page(firstpage.binding, firstpage.value,
                                       documents, pagesets, "index", otherrepos)
 
+    def toc_generate_page_body(self, documentlist, nav):
+        # make a copy because toc_generate_page_body_thread will eat
+        # it, and we need to reuse it
+        documentlist = list(documentlist)
+        # for item in documentlist:
+        #     print(repr(str(item[0]))+",")
+        rootul = self.toc_generate_page_body_thread(documentlist)
+        assert len(documentlist) == 0, "toc_generate_page_body_thread left some items in the documentlist"
+        uls = OrderedDict()
+        # create one ul per two-char-prefix (eg "Ab", "Ac", "Ad", "Af" and so on)
+        for li in rootul:
+            strdoc = str(li)
+            prefix = strdoc.replace(" ","").replace("-", "")[:2].capitalize() # maybe clean even more, eg remove space?
+            # remove anything non-numerical
+            if prefix not in uls:
+                uls[prefix] = UnorderedList()
+                currentul = uls[prefix]
+            currentul.append(li)
+        d = Div(**{'class': 'threecol'})
+        for k, v in uls.items():
+            if len(k) > 2:
+                continue
+            d.append(H2([k]))
+            d.append(v)
+        return Body([nav,d])
         
+    def toc_generate_page_body_thread(self, documentlist, rootsegments=()):
+        def remove_rootsegments(item, rootsegments):
+            linktext = str(item[0])
+            prefix = "»".join(rootsegments)
+            assert linktext.startswith(prefix), "Tried to remove prefix %s from %s" % (prefix, linktext)
+            prefixlen = len(prefix)
+            if prefixlen:
+                prefixlen += 1 # removes extra "»", but not if rootsegments is empty
+            return [Link(linktext[prefixlen:], uri=item[0].uri)]
+
+        ul = UnorderedList()
+        doc = documentlist.pop(0)
+        try:
+            while doc:
+                strdoc = str(doc[0])
+                segments = tuple(strdoc.split("»"))
+                # check if we're the same depth or deeper
+                if rootsegments == segments[:len(rootsegments)]:
+                    if len(segments) > len(rootsegments) + 1:
+                        # OK, this indicates a sublist to our current list
+                        documentlist.insert(0,doc)
+                        if (not ul or # we're in a brand new sub-ul
+                            not isinstance(ul[-1][0], Link) or # previous li is a phantom
+                            not str(ul[-1][0]).endswith(segments[len(rootsegments)])): # previous li is a different branch than our current
+                            # create phantom entry
+                            ul.append(ListItem([segments[len(rootsegments)]]))
+                        ul[-1].append(
+                            self.toc_generate_page_body_thread(documentlist, segments[:len(rootsegments)+1]))
+                    else:
+                        ul.append(ListItem(remove_rootsegments(doc, rootsegments)))
+                # ok we're not, pop and return
+                else:
+                    documentlist.insert(0,doc)
+                    return ul
+                doc = documentlist.pop(0)
+        except IndexError: # ok the list is done
+            return ul
+            
+
     def tabs(self):
         return [("Begrepp", self.dataset_uri())]
 

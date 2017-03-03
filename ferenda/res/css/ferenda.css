@@ -376,15 +376,27 @@ body.search .innerhit {
 
 /* PART 2.4: TOC pages styling (A specific page type, not to be
    confused with document TOC styling */ 
-body.toc article ul {
-    padding: 0;
+body.toc article div > ul {
+    padding-left: 0;
     list-style: none;
 }
 body.toc article ul li {
-    padding: 0;
     list-style: none;
-    text-indent: -8em;
-    margin-left: 8em;
+}
+body.toc article ul li ul {
+    padding-left: 2em;
+}
+
+body.toc div.threecol {
+    column-count: 3;
+    column-rule: 1px dotted grey;
+		      
+}
+body.toc article h2 {
+    margin-bottom: 0;
+}
+
+body.toc article ul li ul li {
 }
 
 /* PART 2.5: Autocomplete/typeahead styling */

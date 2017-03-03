@@ -22,7 +22,8 @@ from rdflib import Graph, URIRef
 from rdflib.namespace import DCTERMS
 
 # own
-from lagen.nu import SFS
+from ferenda.elements import Link, serialize
+from lagen.nu import SFS, LNKeyword
 from lagen.nu.wsgiapp import WSGIApp
 
 class TestLagen(unittest.TestCase):
@@ -219,3 +220,267 @@ class TestACExpand(unittest.TestCase):
     def test_chapterless_expand_prefixed_sections(self):
         self.assertEqual(self.wsgiapp.expand_partial_ref("PUL 3"),
                          "https://lagen.nu/1998:204#P3")
+
+class TestKeywordToc(unittest.TestCase):
+    maxDiff = None
+    def makeitem(self, text):
+        return [Link(text, uri="https://lagen.nu/begrepp/" + text.replace("»", "//").replace(" ", "_"))]
+
+    def do_test(self, keywords, want):
+        repo = LNKeyword()
+        body = repo.toc_generate_page_body(map(self.makeitem, keywords), None)
+        got = serialize(body[1])
+        self.assertEqual(want, got)
+        
+        
+    def test_prefix_segmentation(self):
+        self.do_test(["Abc",
+                      "Abd",
+                      "Abe",
+                      "Afg",
+                      "Ahi",
+                      "Ahj",
+                      "Ahk"],
+                      """<Div class="threecol">
+  <H2>
+    <str>Ab</str>
+  </H2>
+  <UnorderedList>
+    <ListItem>
+      <Link uri="https://lagen.nu/begrepp/Abc">Abc</Link>
+    </ListItem><ListItem>
+      <Link uri="https://lagen.nu/begrepp/Abd">Abd</Link>
+    </ListItem><ListItem>
+      <Link uri="https://lagen.nu/begrepp/Abe">Abe</Link>
+    </ListItem>
+  </UnorderedList>
+  <H2>
+    <str>Af</str>
+  </H2>
+  <UnorderedList>
+    <ListItem>
+      <Link uri="https://lagen.nu/begrepp/Afg">Afg</Link>
+    </ListItem>
+  </UnorderedList>
+  <H2>
+    <str>Ah</str>
+  </H2>
+  <UnorderedList>
+    <ListItem>
+      <Link uri="https://lagen.nu/begrepp/Ahi">Ahi</Link>
+    </ListItem><ListItem>
+      <Link uri="https://lagen.nu/begrepp/Ahj">Ahj</Link>
+    </ListItem><ListItem>
+      <Link uri="https://lagen.nu/begrepp/Ahk">Ahk</Link>
+    </ListItem>
+  </UnorderedList>
+</Div>
+""")
+        
+
+    def test_segmentation_casing(self):
+        self.do_test(["Albanien",
+                      "ALFA",
+                      "Algolean"], """<Div class="threecol">
+  <H2>
+    <str>Al</str>
+  </H2>
+  <UnorderedList>
+    <ListItem>
+      <Link uri="https://lagen.nu/begrepp/Albanien">Albanien</Link>
+    </ListItem><ListItem>
+      <Link uri="https://lagen.nu/begrepp/ALFA">ALFA</Link>
+    </ListItem><ListItem>
+      <Link uri="https://lagen.nu/begrepp/Algolean">Algolean</Link>
+    </ListItem>
+  </UnorderedList>
+</Div>
+""")
+    
+    def test_nested(self):
+        self.do_test(["Abc",
+                      "Abc»D",
+                      "Abc»D»Efg",
+                      "Abc»D»Hij",
+                      # Note that there is no "Abc»K" entry -- the test should create a non-linked "phantom" entry
+                      "Abc»K»Lmn",
+                      "Abc»K»Opq",
+                      "Ars"],
+                     """<Div class="threecol">
+  <H2>
+    <str>Ab</str>
+  </H2>
+  <UnorderedList>
+    <ListItem>
+      <Link uri="https://lagen.nu/begrepp/Abc">Abc</Link>
+      <UnorderedList>
+        <ListItem>
+          <Link uri="https://lagen.nu/begrepp/Abc//D">D</Link>
+          <UnorderedList>
+            <ListItem>
+              <Link uri="https://lagen.nu/begrepp/Abc//D//Efg">Efg</Link>
+            </ListItem><ListItem>
+              <Link uri="https://lagen.nu/begrepp/Abc//D//Hij">Hij</Link>
+            </ListItem>
+          </UnorderedList>
+        </ListItem><ListItem>
+          <str>K</str>
+          <UnorderedList>
+            <ListItem>
+              <Link uri="https://lagen.nu/begrepp/Abc//K//Lmn">Lmn</Link>
+            </ListItem><ListItem>
+              <Link uri="https://lagen.nu/begrepp/Abc//K//Opq">Opq</Link>
+            </ListItem>
+          </UnorderedList>
+        </ListItem>
+      </UnorderedList>
+    </ListItem>
+  </UnorderedList>
+  <H2>
+    <str>Ar</str>
+  </H2>
+  <UnorderedList>
+    <ListItem>
+      <Link uri="https://lagen.nu/begrepp/Ars">Ars</Link>
+    </ListItem>
+  </UnorderedList>
+</Div>
+""")
+
+    def test_nested_mixed(self):
+        self.do_test(["Abc",
+                      "Abc»D",
+                      "Abf",
+                      "Abf»G"],
+                      """<Div class="threecol">
+  <H2>
+    <str>Ab</str>
+  </H2>
+  <UnorderedList>
+    <ListItem>
+      <Link uri="https://lagen.nu/begrepp/Abc">Abc</Link>
+      <UnorderedList>
+        <ListItem>
+          <Link uri="https://lagen.nu/begrepp/Abc//D">D</Link>
+        </ListItem>
+      </UnorderedList>
+    </ListItem><ListItem>
+      <Link uri="https://lagen.nu/begrepp/Abf">Abf</Link>
+      <UnorderedList>
+        <ListItem>
+          <Link uri="https://lagen.nu/begrepp/Abf//G">G</Link>
+        </ListItem>
+      </UnorderedList>
+    </ListItem>
+  </UnorderedList>
+</Div>
+""")
+
+
+    def test_phantoms(self):
+        self.do_test(["Alkoholdryck»Sprit",
+                      "Allmän försäkring»Sjukpenninggrundande inkomst"],
+                     """<Div class="threecol">
+  <H2>
+    <str>Al</str>
+  </H2>
+  <UnorderedList>
+    <ListItem>
+      <str>Alkoholdryck</str>
+      <UnorderedList>
+        <ListItem>
+          <Link uri="https://lagen.nu/begrepp/Alkoholdryck//Sprit">Sprit</Link>
+        </ListItem>
+      </UnorderedList>
+    </ListItem><ListItem>
+      <str>Allmän försäkring</str>
+      <UnorderedList>
+        <ListItem>
+          <Link uri="https://lagen.nu/begrepp/Allmän_försäkring//Sjukpenninggrundande_inkomst">Sjukpenninggrundande inkomst</Link>
+        </ListItem>
+      </UnorderedList>
+    </ListItem>
+  </UnorderedList>
+</Div>
+""")
+        
+    def test_threelevels_phantom(self):
+        self.do_test(["Analysmetod",
+                      "Analys»Principalkomponentanalys»Sensorisk analys"],
+                     """<Div class="threecol">
+  <H2>
+    <str>An</str>
+  </H2>
+  <UnorderedList>
+    <ListItem>
+      <Link uri="https://lagen.nu/begrepp/Analysmetod">Analysmetod</Link>
+    </ListItem><ListItem>
+      <str>Analys</str>
+      <UnorderedList>
+        <ListItem>
+          <str>Principalkomponentanalys</str>
+          <UnorderedList>
+            <ListItem>
+              <Link uri="https://lagen.nu/begrepp/Analys//Principalkomponentanalys//Sensorisk_analys">Sensorisk analys</Link>
+            </ListItem>
+          </UnorderedList>
+        </ListItem>
+      </UnorderedList>
+    </ListItem>
+  </UnorderedList>
+</Div>
+""")
+
+
+    def test_nested_wat(self):
+        # Some corner cases that broke the previous version of
+        # toc_generate_page_body_thread
+        self.do_test(['Allmän försäkring»Sjukpenninggrundande inkomst',
+                      'Allmän försäkring vårdbidrag',
+                      'Allmän försäkring»Återbetalning av sjukpenning'],
+                     """<Div class="threecol">
+  <H2>
+    <str>Al</str>
+  </H2>
+  <UnorderedList>
+    <ListItem>
+      <str>Allmän försäkring</str>
+      <UnorderedList>
+        <ListItem>
+          <Link uri="https://lagen.nu/begrepp/Allmän_försäkring//Sjukpenninggrundande_inkomst">Sjukpenninggrundande inkomst</Link>
+        </ListItem>
+      </UnorderedList>
+    </ListItem><ListItem>
+      <Link uri="https://lagen.nu/begrepp/Allmän_försäkring_vårdbidrag">Allmän försäkring vårdbidrag</Link>
+    </ListItem><ListItem>
+      <str>Allmän försäkring</str>
+      <UnorderedList>
+        <ListItem>
+          <Link uri="https://lagen.nu/begrepp/Allmän_försäkring//Återbetalning_av_sjukpenning">Återbetalning av sjukpenning</Link>
+        </ListItem>
+      </UnorderedList>
+    </ListItem>
+  </UnorderedList>
+</Div>
+""")
+
+        self.do_test(['Allmän försäkring vårdbidrag',
+                      'Allmän försäkring»Återbetalning av sjukpenning'],
+                     """<Div class="threecol">
+  <H2>
+    <str>Al</str>
+  </H2>
+  <UnorderedList>
+    <ListItem>
+      <Link uri="https://lagen.nu/begrepp/Allmän_försäkring_vårdbidrag">Allmän försäkring vårdbidrag</Link>
+    </ListItem><ListItem>
+      <str>Allmän försäkring</str>
+      <UnorderedList>
+        <ListItem>
+          <Link uri="https://lagen.nu/begrepp/Allmän_försäkring//Återbetalning_av_sjukpenning">Återbetalning av sjukpenning</Link>
+        </ListItem>
+      </UnorderedList>
+    </ListItem>
+  </UnorderedList>
+</Div>
+""")
