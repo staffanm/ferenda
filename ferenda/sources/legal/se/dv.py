@@ -1245,7 +1245,7 @@ class DV(SwedishLegalSource):
             # (brev till biskop i pastoral angelägenhet)" or "Allmän
             # handling -övriga frågor?"
 
-            s = re.sub("(Allmän handling)[:,?]?\s+\(?(.*?)\)?$", r"\1 - \2", s)
+            s = re.sub("(Allmän handling|Allmän försäkring|Arbetsskadeförsäkring|Besvärsrätt|Byggnadsmål|Förhandsbesked|Plan- och bygglagen|Resning)[:,?]?\s+\(?(.*?)\)?$", r"\1 - \2", s)
             subres = []
             substrings = s.split(" - ") 
             for idx, subs in enumerate(substrings):
