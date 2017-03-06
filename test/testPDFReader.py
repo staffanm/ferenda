@@ -234,6 +234,26 @@ class Read(unittest.TestCase):
         self.assertEqual("nya-avfallsregler-ds-200937.html#9", page[10][0].uri)
 
 
+    def test_linked_footnote(self):
+        # this is like test_links
+        self._copy_sample()
+        reader = PDFReader(filename="test/files/pdfreader/linked-footnote.pdf",
+                           workdir=self.datadir)
+        page = reader[0]
+        self.assertIsInstance(page[0][0], Textelement)
+        self.assertEqual("bindande verkan för det allmänna.", page[0][0])
+
+        self.assertIsInstance(page[0][1], LinkedTextelement)
+        self.assertEqual("7", page[0][1])
+        self.assertEqual("s", page[0][1].tag)
+
+        self.assertIsInstance(page[0][2], LinkedTextelement)
+        self.assertEqual(" ", page[0][2])
+
+        self.assertIsInstance(page[0][3], Textelement)
+        self.assertEqual("Bestämmelsen kan således inte ", page[0][3])
+
+
 class Decoding(unittest.TestCase):
 
     def setUp(self):
@@ -375,7 +395,7 @@ class TestParseXML(unittest.TestCase):
 class AsXHTML(unittest.TestCase, FerendaTestCase):
 
     def _test_asxhtml(self, want, body):
-        body._fontspec = {0: {'family': 'Times'},
+        body._fontspec = {0: {'family': 'Times', 'size': '12'},
                           1: {'family': 'Comic sans', 'encoding': 'Custom'}}
         got = etree.tostring(body.as_xhtml(None), pretty_print=True)
         self.assertEqualXML(want, got)
@@ -437,3 +457,18 @@ class AsXHTML(unittest.TestCase, FerendaTestCase):
 <p xmlns="http://www.w3.org/1999/xhtml" class="textbox fontspec0" style="top: 0px; left: 0px; height: 100px; width: 100px">plaintext <a href="http://example.org/" rel="dcterms:references">link</a></p>
 """
         self._test_asxhtml(want, body)
+
+
+    def test_linkelements(self):
+        body = Textbox([Textelement("normal", tag=None),
+                        LinkedTextelement("link", uri="http://example.org/", tag=None),
+                        Textelement("footnote marker", tag="sup"),
+                        LinkedTextelement("linked footnote marker",
+                                          uri="http://example.org/", tag="s")],
+                       top=0, left=0, width=100, height=100, fontid=0)
+        
+        want = """
+<p xmlns="http://www.w3.org/1999/xhtml" class="textbox fontspec0" style="top: 0px; left: 0px; height: 100px; width: 100px">normal<a href="http://example.org/">link</a><sup>footnote marker</sup><a href="http://example.org/"><sup>linked footnote marker</sup></a></p>
+"""
+        self._test_asxhtml(want, body)
+                        

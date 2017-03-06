@@ -1181,6 +1181,7 @@ class DV(SwedishLegalSource):
                 raise errors.ParseError("Unparseable ref '%s'" % head["Referat"])
 
         # 7. Convert Sökord string to an actual list
+        from pudb import set_trace; set_trace()
         if head.get("Sökord"):
             try:
                 res = self.sanitize_sokord(head["Sökord"], basefile)
@@ -1245,6 +1246,7 @@ class DV(SwedishLegalSource):
             # (brev till biskop i pastoral angelägenhet)" or "Allmän
             # handling -övriga frågor?"
 
+            # FIXME: Incorrectly removes closing parent for "Förhandsbesked, skatter - skatter, övriga frågor - förhandsbesked undanröjdes med hänsyn till att frågan om det förelåg en väsentlig skatteförmån enligt bestämmelserna om avdragsbegränsning för räntor inte lämpade sig för förhandsbesked (inkomstskatt)"
             s = re.sub("(Allmän handling|Allmän försäkring|Arbetsskadeförsäkring|Besvärsrätt|Byggnadsmål|Förhandsbesked|Plan- och bygglagen|Resning)[:,?]?\s+\(?(.*?)\)?$", r"\1 - \2", s)
             subres = []
             substrings = s.split(" - ") 

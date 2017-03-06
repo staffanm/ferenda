@@ -59,8 +59,6 @@ class PDFReader(CompoundElement):
     # properties and methods relating to the initialization of the
     # PDFReader object
 
-
-
     def __init__(self,
                  pages=None,
                  filename=None,
@@ -597,9 +595,17 @@ class PDFReader(CompoundElement):
                             thisfont = self.fontspec[int(attribs['font'])]
                         except KeyError as e:
                             raise e
+
+                        elementtext = None
+                        elementlink = None
                         
-                        elementtext = element.text
-                        if element.text and not isinstance(element.text, str):
+                        if element.text:
+                            elementtext = element.text
+                        elif len(element) and element[0].tag == "a":
+                            elementtext = element[0].text
+                            elementlink = element[0].get("href")
+
+                        if elementtext and not isinstance(elementtext, str):
                             # this can happen on py2 -- if a
                             # particular element contains no
                             # non-ascii chars, it's returned as a
@@ -608,7 +614,7 @@ class PDFReader(CompoundElement):
                             elementtext = elementtext.decode()
                         if (lastfont.family == thisfont['family'] and
                             lastfont.size > thisfont['size'] and
-                            page[-1].right == int(attribs['left']) and # FIXME: add 1-2pts of tolerance
+                            abs(page[-1].right - int(attribs['left'])) < 3 and
                             elementtext and
                             elementtext.isdigit()):
                             # add to existing Textbox (removing font
@@ -616,8 +622,15 @@ class PDFReader(CompoundElement):
                             # also removes element.tail which shouldn't be
                             # anything
                             assert not element.tail.strip(), "Assumed element.tail to be empty, was in fact '%s'" % element.tail
-                                    
-                            page[-1].append(Textelement(str(elementtext), tag="sup"))
+
+                            if elementlink:
+                                # NOTE: "s" means "sup", not strikethrough...
+                                page[-1].append(LinkedTextelement(str(elementtext),
+                                                                  uri=elementlink,
+                                                                  tag="s"))
+                            else:
+                                page[-1].append(Textelement(str(elementtext), tag="sup"))
+                            
                             page[-1].right = int(attribs['left']) + int(attribs['width'])
                             page[-1].width = page[-1].right - page[-1].left
                             after_footnote = True
@@ -628,11 +641,17 @@ class PDFReader(CompoundElement):
                               lastfont.size == thisfont['size'] and
                               page[-1].top == int(attribs['top']) and
                               page[-1].height == int(attribs['height']) and
-                              page[-1].right == int(attribs['left'])): # FIXME: add tolerance
+                              abs(page[-1].right - int(attribs['left'])) < 3): 
                             assert not element.tail.strip(), "Assumed element.tail to be empty, was in fact '%s'" % element.tail
-                            page[-1].append(Textelement(elementtext, tag=None))
+                            if elementlink:
+                                page[-1].append(LinkedTextelement(elementtext,
+                                                                  uri=elementlink, tag=None))
+                            else:
+                                page[-1].append(Textelement(elementtext, tag=None))
                             page[-1].right = int(attribs['left']) + int(attribs['width'])
                             page[-1].width = page[-1].right - page[-1].left
+                            if len(element) and element[0].tail:
+                                page[-1].append(Textelement(element[0].tail, tag=None))
                             after_footnote = False
                             continue
                         after_footnote = False
@@ -668,6 +687,8 @@ class PDFReader(CompoundElement):
                             if not tags:  # change from "" to None
                                 tags = None 
                             b.append(LinkedTextelement(txt(text), uri=child.get("href"), tag=tags))
+                            if child.tail and child.tail.strip():
+                                b.append(Textelement(txt(child.tail), tag=None))
                         else:
                             grandchildren = child.getchildren()
                             # special handling of the <i><b> construct
@@ -1197,7 +1218,8 @@ all text in a Textbox has the same font and size.
                 # as_xhtml as this adds a meaningless <span>
                 if (hasattr(prevpart, 'as_xhtml') and
                     (not isinstance(prevpart, Textelement) or
-                     prevpart.tag)):
+                     prevpart.tag or
+                     getattr(prevpart, 'uri', None))):
                     prevpart = prevpart.as_xhtml(uri, parent_uri)
                 if prevpart is not None:
                     children.append(self._cleanstring(prevpart))
@@ -1340,6 +1362,8 @@ class LinkedTextelement(Textelement):
             taglist = "a"
         element = None
         for tag in reversed(taglist):
+            if tag == "s":  # since every subtag must a single char...
+                tag = "sup"
             if element is None:
                 element = E(tag, {}, str(self))
             else:
