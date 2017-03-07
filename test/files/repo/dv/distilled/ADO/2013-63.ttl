@@ -1,4 +1,5 @@
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -29,12 +30,6 @@
 
 <https://lagen.nu/begrepp/Tillfällig_föräldrapenning> rdfs:label "Tillfällig föräldrapenning" .
 
-<https://lagen.nu/dom/ad/2009:56> dcterms:identifier "AD 2009 nr 56" .
-
-<https://lagen.nu/dom/ad/2011:23> dcterms:identifier "AD 2011 nr 23" .
-
-<https://lagen.nu/dom/ad/2013:18> dcterms:identifier "AD 2013 nr 18" .
-
 <https://lagen.nu/dom/ad/2013:63?repo=dv&dir=downloaded> rdfs:label "AD 2013 nr 63"@sv .
 
 <https://lagen.nu/dom/ad/B-114-2012/2013-08-21> a rpubl:VagledandeDomstolsavgorande ;
@@ -51,4 +46,6 @@
         <https://lagen.nu/dom/ad/2011:23>,
         <https://lagen.nu/dom/ad/2013:18> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/ad/b-114-2012/2013-08-21> .
+
+<https://lagen.nu/org/2008/arbetsdomstolen> foaf:name "Arbetsdomstolen" .
 

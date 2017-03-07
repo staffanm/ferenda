@@ -1,4 +1,5 @@
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -34,8 +35,10 @@
 
 <https://lagen.nu/dom/mig/UM7867-08/2009-11-03> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/migrationsoverdomstolen> ;
-    dcterms:relation "Prop. 1971:30 del 2 s. 537",
-        "Prop. 2004/05:170 s. 105 och 129-131" ;
+    dcterms:relation <https://lagen.nu/prop/1971:30>,
+        <https://lagen.nu/prop/2004/05:170#sid105>,
+        <https://lagen.nu/prop/2004/05:170#sid129>,
+        <https://lagen.nu/prop/2004/05:170#sid131> ;
     dcterms:subject <https://lagen.nu/begrepp/Asyl>,
         <https://lagen.nu/begrepp/Europakonventionen>,
         <https://lagen.nu/begrepp/Muntlig_förhandling> ;
@@ -49,7 +52,7 @@
     rpubl:rattsfallshanvisning <https://lagen.nu/dom/mig/2006:9> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/mig/um7867-08/2009-11-03> .
 
-<https://lagen.nu/dom/mig/2006:9> dcterms:identifier "MIG 2006:9" .
+<https://lagen.nu/org/2008/migrationsoverdomstolen> foaf:name "Migrationsöverdomstolen" .
 
 <https://lagen.nu/dom/mig/2009:30> a rpubl:Rattsfallsreferat ;
     dcterms:identifier "MIG 2009:30" ;

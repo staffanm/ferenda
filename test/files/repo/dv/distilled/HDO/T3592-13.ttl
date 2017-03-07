@@ -1,4 +1,5 @@
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix ns1: <rinfoex:> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
@@ -288,6 +289,8 @@
 
 <https://lagen.nu/dom/nja/2014s499?repo=dv&dir=downloaded> rdfs:label "NJA 2014 s. 499"@sv .
 
+<https://lagen.nu/org/2008/hogsta-domstolen> foaf:name "Högsta domstolen" .
+
 <https://lagen.nu/dom/nja/2014s499> a rpubl:Rattsfallsreferat ;
     dcterms:bibliographicCitation "NJA 2014:45" ;
     dcterms:identifier "NJA 2014 s. 499" ;
@@ -314,19 +317,11 @@
     prov:wasDerivedFrom <https://lagen.nu/dom/nja/2014s499?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
-<https://lagen.nu/dom/nja/2008s915> dcterms:identifier "NJA 2008 s. 915" .
-
 <https://lagen.nu/dom/nja/2014s499#I> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499> ;
     ns1:delmalordinal "I"@sv .
 
 <https://lagen.nu/dom/nja/2014s499#II> dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499> ;
     ns1:delmalordinal "II"@sv .
-
-<https://lagen.nu/dom/nja/2012s211> dcterms:identifier "NJA 2012 s. 211" .
-
-<https://lagen.nu/dom/nja/2013s1046> dcterms:identifier "NJA 2013 s. 1046" .
-
-<https://lagen.nu/dom/nja/2013s842> dcterms:identifier "NJA 2013 s. 842" .
 
 <https://lagen.nu/dom/nja/2014s499#II/HDO> dcterms:creator "Högsta domstolen"@sv ;
     dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II> ;

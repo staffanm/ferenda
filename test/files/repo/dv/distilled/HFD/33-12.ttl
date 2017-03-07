@@ -1,4 +1,5 @@
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -25,7 +26,8 @@
 
 <https://lagen.nu/dom/hfd/33-12/2013-05-27> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2011/hogsta-forvaltningsdomstolen> ;
-    dcterms:relation "Prop. 1992/93:30 s. 34 och 39" ;
+    dcterms:relation <https://lagen.nu/prop/1992/93:30#sid34>,
+        <https://lagen.nu/prop/1992/93:30#sid39> ;
     dcterms:subject <https://lagen.nu/begrepp/Allmän_försäkring> ;
     dcterms:title "Minskning av en retroaktivt beviljad sjukersättning med sjukpenning som tidigare betalats ut för en del av den retroaktiva perioden skulle göras för den retroaktiva perioden i dess helhet."@sv ;
     rpubl:avgorandedatum "2013-05-27"^^xsd:date ;
@@ -33,6 +35,8 @@
         <https://lagen.nu/1962:381#K17P1S1> ;
     rpubl:malnummer "33-12" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hfd/33-12/2013-05-27> .
+
+<https://lagen.nu/org/2011/hogsta-forvaltningsdomstolen> foaf:name "Högsta förvaltningsdomstolen" .
 
 <https://lagen.nu/dom/hfd/2013:29> a rpubl:Rattsfallsreferat ;
     dcterms:identifier "HFD 2013:29" ;

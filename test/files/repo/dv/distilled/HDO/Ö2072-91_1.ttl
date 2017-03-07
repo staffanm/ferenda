@@ -1,4 +1,5 @@
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -41,10 +42,6 @@
         <https://lagen.nu/dom/nja/1975s33> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/oe2072-91/1994-03-10> .
 
-<https://lagen.nu/dom/nja/1970s529> dcterms:identifier "NJA 1970 s. 529 I och II" .
-
-<https://lagen.nu/dom/nja/1975s33> dcterms:identifier "NJA 1975 s. 33" .
-
 <https://lagen.nu/dom/nja/1994s119> a rpubl:Rattsfallsreferat ;
     dcterms:bibliographicCitation "NJA 1994:25" ;
     dcterms:identifier "NJA 1994 s. 119" ;
@@ -60,4 +57,6 @@
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
 <https://lagen.nu/dom/nja/1994s119?repo=dv&dir=downloaded> rdfs:label "NJA 1994 s. 119"@sv .
+
+<https://lagen.nu/org/2008/hogsta-domstolen> foaf:name "Högsta domstolen" .
 

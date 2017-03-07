@@ -1,4 +1,5 @@
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -45,7 +46,7 @@
 
 <https://lagen.nu/dom/mig/UM7533-12/2013-03-22> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/migrationsoverdomstolen> ;
-    dcterms:relation "Prop. 2004/05:170 s. 191" ;
+    dcterms:relation <https://lagen.nu/prop/2004/05:170#sid191> ;
     dcterms:subject <https://lagen.nu/begrepp/Barn>,
         <https://lagen.nu/begrepp/Hälsotillstånd>,
         <https://lagen.nu/begrepp/Leukemi>,
@@ -65,9 +66,7 @@
         <https://lagen.nu/dom/mig/2010:23> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/mig/um7533-12/2013-03-22> .
 
-<https://lagen.nu/dom/mig/2007:48> dcterms:identifier "MIG 2007:48" .
-
-<https://lagen.nu/dom/mig/2010:23> dcterms:identifier "MIG 2010:23" .
+<https://lagen.nu/org/2008/migrationsoverdomstolen> foaf:name "Migrationsöverdomstolen" .
 
 <https://lagen.nu/dom/mig/2013:6> a rpubl:Rattsfallsreferat ;
     dcterms:identifier "MIG 2013:6" ;

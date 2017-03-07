@@ -1,4 +1,5 @@
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -44,12 +45,10 @@
 
 <https://lagen.nu/dom/nja/2007s650?repo=dv&dir=downloaded> rdfs:label "NJA 2007 s. 650"@sv .
 
+<https://lagen.nu/org/2008/hogsta-domstolen> foaf:name "Högsta domstolen" .
+
 <https://lagen.nu/dom/nja/2007s650#TVA> dcterms:creator "Växjö tingsrätt"@sv ;
     dcterms:isPartOf <https://lagen.nu/dom/nja/2007s650> .
-
-<https://lagen.nu/dom/nja/1936s605> dcterms:identifier "NJA 1936 s. 605" .
-
-<https://lagen.nu/dom/nja/2002s129> dcterms:identifier "NJA 2002 s. 129" .
 
 <https://lagen.nu/dom/nja/2007s650> a rpubl:Rattsfallsreferat ;
     dcterms:bibliographicCitation "NJA 2007:79" ;

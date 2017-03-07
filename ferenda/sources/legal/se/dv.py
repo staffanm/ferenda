@@ -21,8 +21,9 @@ import tempfile
 import zipfile
 
 # 3rdparty libs
+from cached_property import cached_property
 from rdflib import Namespace, URIRef, Graph, RDF, RDFS, BNode
-from rdflib.namespace import DCTERMS, SKOS
+from rdflib.namespace import DCTERMS, SKOS, FOAF
 import requests
 import lxml.html
 from lxml import etree
@@ -36,7 +37,7 @@ from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda.elements import (Body, Paragraph, CompoundElement, OrdinalElement,
                               Heading, Link)
 
-from ferenda.elements.html import Strong, Em
+from ferenda.elements.html import Strong, Em, Div, P
 from . import SwedishLegalSource, SwedishCitationParser, RPUBL
 from .elements import *
 
@@ -1181,7 +1182,6 @@ class DV(SwedishLegalSource):
                 raise errors.ParseError("Unparseable ref '%s'" % head["Referat"])
 
         # 7. Convert Sökord string to an actual list
-        from pudb import set_trace; set_trace()
         if head.get("Sökord"):
             try:
                 res = self.sanitize_sokord(head["Sökord"], basefile)
@@ -1245,9 +1245,8 @@ class DV(SwedishLegalSource):
             # handling, allmän handling eller inte", "Allmän handling?
             # (brev till biskop i pastoral angelägenhet)" or "Allmän
             # handling -övriga frågor?"
-
-            # FIXME: Incorrectly removes closing parent for "Förhandsbesked, skatter - skatter, övriga frågor - förhandsbesked undanröjdes med hänsyn till att frågan om det förelåg en väsentlig skatteförmån enligt bestämmelserna om avdragsbegränsning för räntor inte lämpade sig för förhandsbesked (inkomstskatt)"
-            s = re.sub("(Allmän handling|Allmän försäkring|Arbetsskadeförsäkring|Besvärsrätt|Byggnadsmål|Förhandsbesked|Plan- och bygglagen|Resning)[:,?]?\s+\(?(.*?)\)?$", r"\1 - \2", s)
+            if " - " not in s:
+                s = re.sub("(Allmän handling|Allmän försäkring|Arbetsskadeförsäkring|Besvärsrätt|Byggnadsmål|Plan- och bygglagen|Förhandsbesked|Resning)[:,?]?\s+\(?(.*?)\)?$", r"\1 - \2", s)
             subres = []
             substrings = s.split(" - ") 
             for idx, subs in enumerate(substrings):
@@ -1273,18 +1272,30 @@ class DV(SwedishLegalSource):
         return res
     
 
-    # create nice RDF from the sanitized metadata
-    def polish_metadata(self, head):
-        parser = SwedishCitationParser(LegalRef(LegalRef.RATTSFALL),
+    @cached_property
+    def rattsfall_parser(self):
+        return SwedishCitationParser(LegalRef(LegalRef.RATTSFALL),
+                                     self.minter,
+                                     self.commondata)
+
+    @cached_property
+    def lagrum_parser(self):
+        return SwedishCitationParser(LegalRef(LegalRef.LAGRUM),
                                        self.minter,
                                        self.commondata)
 
-        lparser = SwedishCitationParser(LegalRef(LegalRef.LAGRUM),
-                                        self.minter,
-                                        self.commondata)
+    @cached_property
+    def litteratur_parser(self):
+        return SwedishCitationParser(LegalRef(LegalRef.FORARBETEN),
+                                       self.minter,
+                                       self.commondata)
+
+    # create nice RDF from the sanitized metadata
+    def polish_metadata(self, head):
+
 
         def ref_to_uri(ref):
-            nodes = parser.parse_string(ref)
+            nodes = self.rattsfall_parser.parse_string(ref)
             assert isinstance(nodes[0], Link), "Can't make URI from '%s'" % ref
             return nodes[0].uri
 
@@ -1310,9 +1321,9 @@ class DV(SwedishLegalSource):
             domuri = self.minter.space.coin_uri(resource)
             domdesc = Describer(graph, domuri)
             
-        # 2. convert all strings in head to proper RDF
-        #
-        #
+        # 2. convert all strings in head to proper RDF (well, some is
+        # converted to mixed-content lists and stored in self._bodymeta
+        self._bodymeta = defaultdict(list)
         for label, value in head.items():
             if label == "Rubrik":
                 value = util.normalize_space(value)
@@ -1320,7 +1331,13 @@ class DV(SwedishLegalSource):
                 domdesc.value(DCTERMS.title, value, lang="sv")
 
             elif label == "Domstol":
-                domdesc.rel(DCTERMS.publisher, self.lookup_resource(value))
+                with domdesc.rel(DCTERMS.publisher, self.lookup_resource(value)):
+                    # NB: Here, we take the court name as provided in
+                    # the source document as the value for the
+                    # foaf:name triple. We could also look it up in
+                    # self.commondata, but since we already have it...
+                    domdesc.value(FOAF.name, value)
+                
             elif label == "Målnummer":
                 for v in value:
                     # FIXME: In these cases (multiple målnummer, which
@@ -1359,22 +1376,32 @@ class DV(SwedishLegalSource):
             elif label == "Avgörandedatum":
                 domdesc.value(RPUBL.avgorandedatum, self.parse_iso_date(value))
 
+
+            # The following metadata (Lagrum, Rättsfall and
+            # Litteratur) is handled slightly differently -- it's not
+            # added to the RDF graph (doc.meta) that will later be
+            # addede to the XHTML <head> section. Instead, it's saved
+            # in a struct which will later be added to doc.body. This
+            # is so that we can represent mixed content metadata
+            # (links, linktexts and unlinked text)
             elif label == "Lagrum":
                 for i in value:  # better be list not string
-                    for node in lparser.parse_string(i):
-                        if isinstance(node, Link):
-                            domdesc.rel(RPUBL.lagrum,
-                                        node.uri)
+                    if (re.search("\d+/\d+/(EU|EG|EEG)", i) or
+                        re.search("\((EU|EG|EEG)\) nr \d+/\d+", i) or
+                        " direktiv" in i or " förordning" in i):
+                        self.log.warning("%s(%s): Lagrum ref to EULaw: '%s'" %
+                                         (head.get("Referat"), head.get("Målnummer"), i))
+                    self._bodymeta[label].append(self.lagrum_parser.parse_string(i,
+                                                 predicate="rpubl:lagrum"))
             elif label == "Rättsfall":
                 for i in value:
-                    for node in parser.parse_string(i):
-                        if isinstance(node, Link):
-                            with domdesc.rel(RPUBL.rattsfallshanvisning, node.uri):
-                                domdesc.value(DCTERMS.identifier, i)
+                    self._bodymeta[label].append(self.rattsfall_parser.parse_string(i,
+                                                 predicate="rpubl:rattsfallshanvisning"))
             elif label == "Litteratur":
                 if value:
                     for i in value.split(";"):
-                        domdesc.value(DCTERMS.relation, util.normalize_space(i))
+                        self._bodymeta[label].append(self.litteratur_parser.parse_string(i,
+                                                     predicate="dcterms:relation"))
             elif label == "Sökord":
                 for s in value:
                     self.add_keyword_to_metadata(domdesc, s)
@@ -1408,7 +1435,6 @@ class DV(SwedishLegalSource):
             domdesc.value(RDFS.label, "»".join(keyword), lang=self.lang)
 
     def postprocess_doc(self, doc):
-        # append to mapfile -- duplicates are OK at this point
         mapfile = self.store.path("uri", "generated", ".map")
         util.ensure_dir(mapfile)
         idx = len(self.urispace_base) + len(self.urispace_segment) + 2
@@ -1452,6 +1478,18 @@ class DV(SwedishLegalSource):
                 if isinstance(node, Instans) and len(node) == 0:
                     # print("Removing Instans %r" % node.court)
                     root.remove(node)
+
+        # add information from _bodymeta to doc.body
+        bodymeta = Div(**{'class': 'bodymeta',
+                          'about': str(doc.meta.value(URIRef(doc.uri), RPUBL.referatAvDomstolsavgorande))})
+        for k, v in sorted(self._bodymeta.items()):
+            d = Div(**{'class': k})
+            for i in v:
+                d.append(P(i))
+            bodymeta.append(d)
+        doc.body.insert(0, bodymeta)
+        
+            
 
     def infer_identifier(self, basefile):
         p = self.store.distilled_path(basefile)

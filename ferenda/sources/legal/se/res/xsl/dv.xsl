@@ -45,34 +45,21 @@
   <xsl:template name="aside-annotations">
     <xsl:param name="uri"/>
     <xsl:variable name="domuri" select="//xhtml:link[@rel='rpubl:referatAvDomstolsavgorande']/@href"/>
+    <xsl:variable name="publisheruri" select="//xhtml:link[@rel='dcterms:publisher' and @about=$domuri]/@href"/> 
     <xsl:variable name="metadata">
       <dl class="dl-horizontal">
 	<dt>Domstol</dt>
-
-	<dd><xsl:value-of select="substring-after(//xhtml:link[@rel='dcterms:publisher' and @about=$domuri]/@href, '/2008/')"/></dd>
+	<dd><xsl:value-of select="//xhtml:meta[@property='foaf:name' and @about=$publisheruri]/@content"/></dd>
 	<dt>Avgörandedatum</dt>
 	<dd><xsl:value-of select="//xhtml:meta[@property='rpubl:avgorandedatum' and @about=$domuri]/@content"/></dd>
 	<dt>Målnummer</dt>
 	<dd><xsl:value-of select="//xhtml:meta[@property='rpubl:malnummer' and @about=$domuri]/@content"/></dd>
-	<xsl:if test="//xhtml:link[@rel='rpubl:lagrum' and @about=$domuri]">
-	  <dt>Lagrum</dt>
-	  <xsl:for-each select="//xhtml:link[@rel='rpubl:lagrum' and @about=$domuri]">
-	    <dd><a href="{@href}"><xsl:value-of select="substring-after(@href,'https://lagen.nu/')"/></a></dd>
+	<xsl:for-each select="//xhtml:div[@class='bodymeta']/xhtml:div">
+	  <dt><xsl:value-of select="@class"/></dt>
+	  <xsl:for-each select="xhtml:p">
+	    <dd><xsl:apply-templates/></dd>
 	  </xsl:for-each>
-	</xsl:if>
-	<xsl:if test="//xhtml:link[@rel='rpubl:rattsfallshanvisning']">
-	  <dt>Rättsfall</dt>
-	  <xsl:for-each select="//xhtml:link[@rel='rpubl:rattsfallshanvisning']">
-	    <xsl:variable name="href" select="@href"/>
-	    <dd><a href="{@href}"><xsl:value-of select="//xhtml:meta[@about=$href and @property='dcterms:identifier']/@content"/></a></dd>
-	  </xsl:for-each>
-	</xsl:if>
-	<xsl:if test="count(//xhtml:meta[@property='dcterms:relation']) > 0">
-	  <dt>Litteratur</dt>
-	  <xsl:for-each select="//xhtml:meta[@property='dcterms:relation']">
-	    <dd><xsl:value-of select="@content"/></dd>
-	  </xsl:for-each>
-	</xsl:if>
+	</xsl:for-each>
 	<xsl:if test="//xhtml:link[@about=$domuri and @rel='dcterms:subject']">
 	  <dt>Sökord</dt>
 	  <xsl:for-each select="//xhtml:link[@about=$domuri and @rel='dcterms:subject']">
@@ -164,6 +151,10 @@
   </xsl:template>
 
 
+  <!-- div.bodymeta contains only metadata, but which we cannot for
+       reasons include in <head>. We pull this in aside-annotations -->
+  <xsl:template match="xhtml:div[@class='bodymeta']"/>
+  
   <xsl:template match="xhtml:div[@class='delmal']">
     <div>
       <h1><xsl:value-of select="@content"/></h1>

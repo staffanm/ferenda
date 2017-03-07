@@ -32,7 +32,7 @@ ArRefID         ::= Ar
 LopnummerRefID  ::= Lopnummer
 Lopnummer       ::= number
 SamarbeteRefID  ::= Samarbete
-Samarbete       ::= 'EG'/'EEG'
+Samarbete       ::= 'EU'/'EG'/'EEG'
 AvDatum		::= 'av', Whitespace, 'den', Whitespace, Datum
 # ------------ end of eglag.ebnf ----------------
 
