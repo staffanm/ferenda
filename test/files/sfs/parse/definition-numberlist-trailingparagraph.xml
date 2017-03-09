@@ -4,14 +4,13 @@
       <str>I denna förordning avses med:</str>
       <NumreradLista>
         <Listelement id="P2S1N1" ordinal="1">
-          <str>1. </str>
-          <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Tekniska_regler">tekniska regler</LinkSubject>
+          <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/begrepp/Tekniska_regler">tekniska regler</LinkSubject>
           <str>:</str>
           <Bokstavslista>
             <Listelement id="P2S1N1Na" ordinal="a">
-              <str>a) föreskrifter eller andra bestämmelser som utgörs av eller hänvisar till tekniska specifikationer,</str>
+              <str>föreskrifter eller andra bestämmelser som utgörs av eller hänvisar till tekniska specifikationer,</str>
             </Listelement><Listelement id="P2S1N1Nb" ordinal="b">
-              <str>b) föreskrifter om informationssamhällets tjänster.</str>
+              <str>föreskrifter om informationssamhällets tjänster.</str>
             </Listelement>
           </Bokstavslista>
         </Listelement>
@@ -20,12 +19,10 @@
       <str>Till tekniska regler som är faktiskt tvingande räknas bl.a. frivilliga överenskommelser,</str>
       <NumreradLista>
         <Listelement id="P2S2N2" ordinal="2">
-          <str>2. </str>
-          <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Tekniska_specifikationer">tekniska specifikationer</LinkSubject>
+          <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/begrepp/Tekniska_specifikationer">tekniska specifikationer</LinkSubject>
           <str>: specifikationer intagna i ett dokument och som fastställer de egenskaper som krävs,</str>
         </Listelement><Listelement id="P2S2N3" ordinal="3">
-          <str>3. </str>
-          <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Andra_krav">andra krav</LinkSubject>
+          <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/begrepp/Andra_krav">andra krav</LinkSubject>
           <str>: krav som inte är tekniska specifikationer och som ställs på en vara.</str>
         </Listelement>
       </NumreradLista>

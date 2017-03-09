@@ -25,7 +25,7 @@ class Parse(unittest.TestCase):
         cls.p = SFS()
         cls.p.id = '9999:998'
         # for compatibility with old test files:
-        cls.p.minter.space.base = "http://localhost:8000/res/" 
+        cls.p.minter.space.base = "http://localhost:8000/res/sfs" 
 
     
     def parametric_test(self, filename):
@@ -49,7 +49,8 @@ class Parse(unittest.TestCase):
                                      'rpubl:kapitelnummer')]
 
         # NB: _construct_ids won't look for references
-        self.p.visit_node(b, self.p.construct_id, {'basefile': '9999:998'})
+        self.p.visit_node(b, self.p.construct_id, {'basefile': '9999:998',
+                                                   'uris': set()})
         self.p.visit_node(b, self.p.find_definitions, False, debug=False)
         self.p.lagrum_parser.parse_recursive(b)
         self._remove_uri_for_testcases(b)

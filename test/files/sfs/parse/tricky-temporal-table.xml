@@ -1,9 +1,7 @@
 <Forfattning>
-  <Paragraf id="P6" ordinal="6" upphor="datetime.datetime(2007, 7, 1, 0, 0)">
-    <Stycke id="P6S1">
-      <str>Den som anges nedan ansvarar för att sådana anordningar och tecken för anvisning för trafiken som avses i </str>
-      <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P1">1 §</LinkSubject>
-      <str> sätts upp, tas bort, underhålls, och utförs i den omfattning som anges för respektive plats.</str>
+  <Paragraf ordinal="6" upphor="datetime.datetime(2007, 7, 1, 0, 0)">
+    <Stycke>
+      <str>Den som anges nedan ansvarar för att sådana anordningar och tecken för anvisning för trafiken som avses i 1 § sätts upp, tas bort, underhålls, och utförs i den omfattning som anges för respektive plats.</str>
     </Stycke>
   </Paragraf>
   <Paragraf id="P6" ikrafttrader="datetime.datetime(2007, 7, 1, 0, 0)" ordinal="6">

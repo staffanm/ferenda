@@ -176,7 +176,6 @@ def make_parser(reader, basefile, log, trace):
     def makeKapitel():
         global state
         kapitelnummer = idOfKapitel()
-
         para = reader.readparagraph()
         (line, upphor, ikrafttrader) = andringsDatum(para)
 
@@ -636,7 +635,11 @@ def make_parser(reader, basefile, log, trace):
         global state
         ordinal = idOfKapitel(p)
         if ordinal:
-            if util.numcmp(ordinal, state['current_chapter']) > 0:
+            # It might be OK if the current chapter is equal to this
+            # one, since it might mean a title change for the chapter
+            # in question (see
+            # integrationSFS.Parse.test_temporal_kapitelrubriker):
+            if util.numcmp(ordinal, state['current_chapter']) >= 0:
                 if state['current_chapter'] == '1' and state['current_section'] == '1':
                     # if we've only seen a single § in the current
                     # (first) chapter, this is probably not a legit

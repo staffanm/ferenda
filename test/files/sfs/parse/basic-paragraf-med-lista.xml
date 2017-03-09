@@ -4,11 +4,11 @@
       <str>Det här är en paragraf som har</str>
       <NumreradLista>
         <Listelement id="P1S1N1" ordinal="1">
-          <str>1. En</str>
+          <str>En</str>
         </Listelement><Listelement id="P1S1N2" ordinal="2">
-          <str>2. Två</str>
+          <str>Två</str>
         </Listelement><Listelement id="P1S1N3" ordinal="3">
-          <str>3. Tre listpunkter</str>
+          <str>Tre listpunkter</str>
         </Listelement>
       </NumreradLista>
     </Stycke>

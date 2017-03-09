@@ -1087,6 +1087,10 @@ class SFS(Trips):
     }
 
     def construct_id(self, node, state):
+        def not_in_force(para):
+            return ((hasattr(para, 'upphor') and datetime.now() > para.upphor) or
+                    (hasattr(para, 'ikrafttrader') and datetime.now() < para.ikrafttrader))
+                
         # copy our state (no need for copy.deepcopy as state shouldn't
         # use nested dicts)
         state = dict(state)
@@ -1134,11 +1138,21 @@ class SFS(Trips):
                 uri = None
             if uri:
                 # if there's two versions of a para (before and after
-                # a change act), only use a URI for the first one to
-                # avoid having two nodes with identical @about
-                if uri not in state['uris']:
+                # a change act), only use a URI for the version
+                # currently in force to avoid having two nodes with
+                # identical @about.
+                if uri not in state['uris'] and (not isinstance(node, (Paragraf, Kapitel, Rubrik)) or
+                                                 not not_in_force(node)):
                     node.uri = uri
                     state['uris'].add(uri)
+                else:
+                    # No uri added to this node means we shouldn't add
+                    # an id either, and not recurse to it's
+                    # children. Returning None instead of current
+                    # state will prevent recursive calls on this nodes
+                    # childen
+                    return None
+                    
                 # else:
                 #     print("Not assigning %s to another node" % uri)
                 if "#" in uri:
@@ -1344,7 +1358,6 @@ class SFS(Trips):
                                      'uris': set()}),
                 (self.find_definitions, False))
 
-
     def parse_entry_id(self, doc):
         # For SFS, the doc.uri can be temporal, ie
         # https://lagen.nu/2015:220/konsolidering/2015:667, but we'd
@@ -1359,8 +1372,6 @@ class SFS(Trips):
     def parse_entry_summary(self, doc):
         # should use eg. omfattning (if change) + förarbeten
         return "Omfattning: Ändrat 5 §, Ny 6 a §\n\n"
-    
-        
     
     _document_name_cache = {}
     _query_template_cache = {}

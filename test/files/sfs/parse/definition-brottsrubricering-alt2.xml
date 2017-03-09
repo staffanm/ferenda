@@ -2,7 +2,7 @@
   <Paragraf id="P7" ordinal="7">
     <Stycke id="P7S1">
       <str>Om någon olovligen brukar någon annans sak och därigenom vållar skada eller olägenhet, döms han för </str>
-      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Olovligt_brukande">olovligt brukande</LinkSubject>
+      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/begrepp/Olovligt_brukande">olovligt brukande</LinkSubject>
       <str> till böter eller fängelse i högst ett år.</str>
     </Stycke>
   </Paragraf>

@@ -2,7 +2,7 @@
   <Paragraf id="P6" ordinal="6">
     <Stycke id="P6S1">
       <str>Med </str>
-      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Granskningsärende">granskningsärende</LinkSubject>
+      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/begrepp/Granskningsärende">granskningsärende</LinkSubject>
       <str> avses i denna förordning ett ärende i vilket nämnden prövar om den som ansvarar för sändningen har fullgjort sina skyldigheter.</str>
     </Stycke>
   </Paragraf>

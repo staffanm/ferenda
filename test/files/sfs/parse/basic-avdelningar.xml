@@ -3,16 +3,20 @@
     <Kapitel id="K1" ordinal="1" rubrik="1 Kap. Första kapitlet">
       <Paragraf id="K1P1" ordinal="1">
         <Stycke id="K1P1S1">
-          <str>Första paragrafen.</str>
+          <str>Första paragrafen i första kapitlet.</str>
+        </Stycke>
+      </Paragraf><Paragraf id="K1P2" ordinal="2">
+        <Stycke id="K1P2S1">
+          <str>Andra paragrafen i första kapitlet.</str>
         </Stycke>
       </Paragraf>
-    </Kapitel>
+    </Kapitel><Kapitel id="K2" ordinal="2" rubrik="2 Kap. Andra kapitlet" />
   </Avdelning>
   <Avdelning id="A2" ordinal="2" rubrik="ANDRA AVDELNINGEN" underrubrik="NÅGOT ANNAT">
-    <Kapitel id="K2" ordinal="2" rubrik="2 Kap. Andra kapitlet">
-      <Paragraf id="K2P1" ordinal="1">
-        <Stycke id="K2P1S1">
-          <str>Första paragrafen.</str>
+    <Kapitel id="K3" ordinal="3" rubrik="3 Kap. Tredje kapitlet">
+      <Paragraf id="K3P1" ordinal="1">
+        <Stycke id="K3P1S1">
+          <str>Första paragrafen i tredje kapitlet.</str>
         </Stycke>
       </Paragraf>
     </Kapitel>

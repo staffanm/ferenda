@@ -1,11 +1,11 @@
 <Forfattning>
   <Bokstavslista>
     <Listelement id="Na" ordinal="a">
-      <str>a) Vissa ordnade listor använder bokstäver</str>
+      <str>Vissa ordnade listor använder bokstäver</str>
     </Listelement><Listelement id="Nb" ordinal="b">
-      <str>b) istället för siffror</str>
+      <str>istället för siffror</str>
     </Listelement><Listelement id="Nc" ordinal="c">
-      <str>c) men i verkliga världen är de alltid underlistor</str>
+      <str>men i verkliga världen är de alltid underlistor</str>
     </Listelement>
   </Bokstavslista>
 </Forfattning>

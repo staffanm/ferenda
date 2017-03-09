@@ -1,19 +1,19 @@
 <Forfattning>
-  <Paragraf id="P9" ordinal="9" upphor="datetime.datetime(2008, 2, 15, 0, 0)">
-    <Stycke id="P9S1">
+  <Paragraf ordinal="9" upphor="datetime.datetime(2008, 2, 15, 0, 0)">
+    <Stycke>
       <str>A Bestämmelser om betydelsen av följande begrepp, termer och uttryck finns i nedan angivna paragrafer:</str>
       <Tabell>
         <Tabellrad>
           <Tabellcell>
             <str>absorption</str>
           </Tabellcell><Tabellcell>
-            <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K23P1">23 kap. 1 §</LinkSubject>
+            <str>23 kap. 1 §</str>
           </Tabellcell>
         </Tabellrad><Tabellrad>
           <Tabellcell>
             <str>apportegendom</str>
           </Tabellcell><Tabellcell>
-            <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K2P6">2 kap. 6 §</LinkSubject>
+            <str>2 kap. 6 §</str>
           </Tabellcell>
         </Tabellrad>
       </Tabell>

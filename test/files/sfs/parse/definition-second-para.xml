@@ -5,10 +5,10 @@
     </Stycke><Stycke id="P1S2">
       <str>I denna paragraf avses med</str>
     </Stycke><Stycke id="P1S3">
-      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Konsument">konsument</LinkSubject>
+      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/begrepp/Konsument">konsument</LinkSubject>
       <str>: en fysisk person som handlar huvudsakligen för ändamål som faller utanför näringsverksamhet,</str>
     </Stycke><Stycke id="P1S4">
-      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Näringsidkare">näringsidkare</LinkSubject>
+      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/begrepp/Näringsidkare">näringsidkare</LinkSubject>
       <str>: en fysisk eller juridisk person som handlar för ändamål som har samband med den egna näringsverksamheten. </str>
       <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#L2002:587">Lag (2002:587).</LinkSubject>
     </Stycke>

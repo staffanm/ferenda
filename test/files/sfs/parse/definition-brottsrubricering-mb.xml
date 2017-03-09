@@ -2,7 +2,7 @@
   <Paragraf id="P1" ordinal="1">
     <Stycke id="P1S1">
       <str>För </str>
-      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Miljöbrott">miljöbrott</LinkSubject>
+      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/begrepp/Miljöbrott">miljöbrott</LinkSubject>
       <str> döms till böter eller fängelse i högst två år den som med uppsåt eller av oaktsamhet.</str>
     </Stycke>
   </Paragraf>

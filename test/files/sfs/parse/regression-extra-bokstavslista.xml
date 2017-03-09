@@ -3,17 +3,17 @@
     <Overgangsbestammelse id="L1993:1617" sfsnr="1993:1617">
       <NumreradLista>
         <Listelement id="L1993:1617N1" ordinal="1">
-          <str>1. Denna lag träder i kraft den 1 april 1994.</str>
+          <str>Denna lag träder i kraft den 1 april 1994.</str>
         </Listelement>
       </NumreradLista><Stycke id="L1993:1617S1">
         <str>Vid ikraftträdandet skall följande författningar upphöra att gälla, nämligen</str>
         <Bokstavslista>
           <Listelement id="L1993:1617S1Na" ordinal="a">
-            <str>a) lagen (</str>
+            <str>lagen (</str>
             <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/1956:618">1956:618</LinkSubject>
             <str>) om allmänna sammankomster,</str>
           </Listelement><Listelement id="L1993:1617S1Nb" ordinal="b">
-            <str>b) allmänna </str>
+            <str>allmänna </str>
             <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/1956:617">ordningsstadgan (1956:617)</LinkSubject>
             <str>,</str>
           </Listelement>

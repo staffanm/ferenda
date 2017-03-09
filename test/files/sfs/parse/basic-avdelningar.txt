@@ -4,12 +4,16 @@ FÖRSTA AVDELNINGEN
 
 1 Kap. Första kapitlet
 
-1 § Första paragrafen.
+1 § Första paragrafen i första kapitlet.
+
+2 § Andra paragrafen i första kapitlet.
+
+2 Kap. Andra kapitlet
 
 ANDRA AVDELNINGEN
 
 NÅGOT ANNAT
 
-2 Kap. Andra kapitlet
+3 Kap. Tredje kapitlet
 
-1 § Första paragrafen.
+1 § Första paragrafen i tredje kapitlet.

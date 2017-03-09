@@ -1,11 +1,11 @@
 <Forfattning>
   <Strecksatslista>
     <Listelement id="N1" ordinal="1">
-      <str>- En punkt</str>
+      <str>En punkt</str>
     </Listelement><Listelement id="N2" ordinal="2">
-      <str>- En annan punkt</str>
+      <str>En annan punkt</str>
     </Listelement><Listelement id="N3" ordinal="3">
-      <str>- En tredje punkt</str>
+      <str>En tredje punkt</str>
     </Listelement>
   </Strecksatslista>
 </Forfattning>

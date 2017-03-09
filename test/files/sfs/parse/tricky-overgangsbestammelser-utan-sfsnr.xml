@@ -8,9 +8,9 @@
     <Overgangsbestammelse id="L9999:998" sfsnr="9999:998">
       <NumreradLista>
         <Listelement id="L9999:998N1" ordinal="1">
-          <str>1. Det här är en övergångsbestämmelse.</str>
+          <str>Det här är en övergångsbestämmelse.</str>
         </Listelement><Listelement id="L9999:998N2" ordinal="2">
-          <str>2. Med två punkter</str>
+          <str>Med två punkter</str>
         </Listelement>
       </NumreradLista>
     </Overgangsbestammelse>

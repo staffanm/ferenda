@@ -11,7 +11,7 @@
           </Tabellcell>
         </Tabellrad><Tabellrad>
           <Tabellcell>
-            <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Biobank">Biobank</LinkSubject>
+            <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/begrepp/Biobank">Biobank</LinkSubject>
           </Tabellcell><Tabellcell>
             <str>Biologiskt material från en eller flera människor som samlas.</str>
           </Tabellcell>

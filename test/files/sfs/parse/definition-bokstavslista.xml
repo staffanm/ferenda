@@ -4,8 +4,7 @@
       <str>I denna förordning avses med</str>
       <Bokstavslista>
         <Listelement id="P2S1Na" ordinal="a">
-          <str>a) </str>
-          <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Statligt_reglerad_anställning">statligt reglerad anställning</LinkSubject>
+          <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/begrepp/Statligt_reglerad_anställning">statligt reglerad anställning</LinkSubject>
           <str>: sådan statlig eller annan anställning.</str>
         </Listelement>
       </Bokstavslista>

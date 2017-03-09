@@ -6,11 +6,11 @@
       <str> kan ingå i garantin, täcka den enskildes arbetsutbud inom garantin och omfatta</str>
       <Strecksatslista>
         <Listelement id="P6S1N1" ordinal="1">
-          <str>- fördjupad kartläggning,</str>
+          <str>fördjupad kartläggning,</str>
         </Listelement><Listelement id="P6S1N2" ordinal="2">
-          <str>- studie- och yrkesvägledning, och</str>
+          <str>studie- och yrkesvägledning, och</str>
         </Listelement><Listelement id="P6S1N3" ordinal="3">
-          <str>- jobbsökaraktiviteter med coachning.</str>
+          <str>jobbsökaraktiviteter med coachning.</str>
         </Listelement>
       </Strecksatslista>
     </Stycke><Stycke id="P6S2">
@@ -19,9 +19,9 @@
       <str> kombineras med</str>
       <Strecksatslista>
         <Listelement id="P6S2N1" ordinal="1">
-          <str>- arbetspraktik, och</str>
+          <str>arbetspraktik, och</str>
         </Listelement><Listelement id="P6S2N2" ordinal="2">
-          <str>- utbildning.</str>
+          <str>utbildning.</str>
         </Listelement>
       </Strecksatslista>
     </Stycke>

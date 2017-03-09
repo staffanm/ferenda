@@ -4,17 +4,17 @@
       <str>Skyldig att betala mervärdesskatt (skattskyldig) är</str>
       <NumreradLista>
         <Listelement id="P2S1N1" ordinal="1">
-          <str>1. för sådan omsättning som anges i </str>
+          <str>för sådan omsättning som anges i </str>
           <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P1S1N1">1 § första stycket 1</LinkSubject>
           <str>, om inte annat följer av 2-4 c: den som omsätter varan eller tjänsten,</str>
         </Listelement><Listelement id="P2S1N2" ordinal="2">
-          <str>2. för omsättning som anges i </str>
+          <str>för omsättning som anges i </str>
           <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P1S1N1">1 § första stycket 1</LinkSubject>
           <str> av sådana tjänster som avses i </str>
           <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K5P7">5 kap. 7 §</LinkSubject>
           <str>, om den som omsätter tjänsten är en utländsk företagare och förvärvaren är en näringsidkare: den som förvärvar tjänsten,</str>
         </Listelement><Listelement id="P2S1N3" ordinal="3">
-          <str>3. för omsättning som anges i </str>
+          <str>för omsättning som anges i </str>
           <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P1S1N1">1 § första stycket 1</LinkSubject>
           <str> av sådana varor som avses i </str>
           <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K5">5 kap.</LinkSubject>
@@ -34,17 +34,17 @@
           <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P7a">7 a §§</LinkSubject>
           <str>, om den som omsätter varan eller tjänsten är en utländsk företagare och förvärvaren är registrerad till mervärdesskatt här: den som förvärvar varan eller tjänsten,</str>
         </Listelement><Listelement id="P2S1N4" ordinal="4">
-          <str>4. för sådan efterföljande omsättning inom landet som avses i </str>
+          <str>för sådan efterföljande omsättning inom landet som avses i </str>
           <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K3P30bS1">3 kap. 30 b § första stycket</LinkSubject>
           <str>: den till vilken omsättningen görs,</str>
         </Listelement><Listelement id="P2S1N4a" ordinal="4a">
-          <str>4 a. för omsättning som anges i </str>
+          <str>för omsättning som anges i </str>
           <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P1S1N1">1 § första stycket 1</LinkSubject>
           <str> mellan näringsidkare som är eller ska vara registrerade till mervärdesskatt här, av guldmaterial eller halvfärdiga produkter med en finhalt av minst 325 tusendelar eller av investeringsguld om den som omsätter guldet är skattskyldig enligt </str>
           <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K3P10b">3 kap. 10 b §</LinkSubject>
           <str>: den som förvärvar varan,</str>
         </Listelement><Listelement id="P2S1N4b" ordinal="4b">
-          <str>4 b. för omsättning som anges i </str>
+          <str>för omsättning som anges i </str>
           <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P1S1N1">1 § första stycket 1</LinkSubject>
           <str> av sådana tjänster som avses i </str>
           <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P2S2">andra stycket</LinkSubject>
@@ -53,13 +53,13 @@
           <str> i denna paragraf: den som förvärvar tjänsten, om denne är</str>
           <Strecksatslista>
             <Listelement id="P2S1N4bN1" ordinal="1">
-              <str>- en näringsidkare som i sin verksamhet inte endast tillfälligt tillhandahåller sådana tjänster, eller</str>
+              <str>en näringsidkare som i sin verksamhet inte endast tillfälligt tillhandahåller sådana tjänster, eller</str>
             </Listelement><Listelement id="P2S1N4bN2" ordinal="2">
-              <str>- en annan näringsidkare som tillhandahåller en näringsidkare som avses i första strecksatsen sådana tjänster,</str>
+              <str>en annan näringsidkare som tillhandahåller en näringsidkare som avses i första strecksatsen sådana tjänster,</str>
             </Listelement>
           </Strecksatslista>
         </Listelement><Listelement id="P2S1N4c" ordinal="4c">
-          <str>4 c. för annan omsättning som anges i </str>
+          <str>för annan omsättning som anges i </str>
           <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P1S1N1">1 § första stycket 1</LinkSubject>
           <str> än som avses i </str>
           <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P2S1N2">första stycket 2</LinkSubject>
@@ -81,18 +81,18 @@
           <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P2d">2 d §</LinkSubject>
           <str>,</str>
         </Listelement><Listelement id="P2S1N5" ordinal="5">
-          <str>5. för sådant förvärv som anges i </str>
+          <str>för sådant förvärv som anges i </str>
           <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P1S1N2">1 § första stycket 2</LinkSubject>
           <str>: den som förvärvar varan, och</str>
         </Listelement><Listelement id="P2S1N6" ordinal="6">
-          <str>6. för import av varor</str>
+          <str>för import av varor</str>
           <Bokstavslista>
             <Listelement id="P2S1N6Na" ordinal="a">
-              <str>a) om en tullskuld uppkommer i Sverige till följd av importen: den som är skyldig att betala tullen,</str>
+              <str>om en tullskuld uppkommer i Sverige till följd av importen: den som är skyldig att betala tullen,</str>
             </Listelement><Listelement id="P2S1N6Nb" ordinal="b">
-              <str>b) om importen avser en gemenskapsvara eller om varan ska förtullas i Sverige men inte är belagd med tull: den som skulle ha varit skyldig att betala tullen om varan hade varit tullbelagd,</str>
+              <str>om importen avser en gemenskapsvara eller om varan ska förtullas i Sverige men inte är belagd med tull: den som skulle ha varit skyldig att betala tullen om varan hade varit tullbelagd,</str>
             </Listelement><Listelement id="P2S1N6Nc" ordinal="c">
-              <str>c) om skyldighet att betala tull med anledning av importen uppkommer, eller skulle ha uppkommit om varan hade varit belagd med tull, i ett annat EG-land till följd av att ett sådant mellanstatligt enhetstillstånd som avses i </str>
+              <str>om skyldighet att betala tull med anledning av importen uppkommer, eller skulle ha uppkommit om varan hade varit belagd med tull, i ett annat EG-land till följd av att ett sådant mellanstatligt enhetstillstånd som avses i </str>
               <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/2000:1281#K4P24S2">4 kap. 24 § andra stycket tullagen (2000:1281)</LinkSubject>
               <str> åberopas: innehavaren av tillståndet.</str>
             </Listelement>
@@ -103,29 +103,29 @@
       <str>Första stycket 4 b gäller</str>
       <NumreradLista>
         <Listelement id="P2S2N1" ordinal="1">
-          <str>1. sådana tjänster avseende fastighet, byggnad eller anläggning som kan hänföras till</str>
+          <str>sådana tjänster avseende fastighet, byggnad eller anläggning som kan hänföras till</str>
           <Strecksatslista>
             <Listelement id="P2S2N1N1" ordinal="1">
-              <str>- mark- och grundarbeten,</str>
+              <str>mark- och grundarbeten,</str>
             </Listelement><Listelement id="P2S2N1N2" ordinal="2">
-              <str>- bygg- och anläggningsarbeten,</str>
+              <str>bygg- och anläggningsarbeten,</str>
             </Listelement><Listelement id="P2S2N1N3" ordinal="3">
-              <str>- bygginstallationer,</str>
+              <str>bygginstallationer,</str>
             </Listelement><Listelement id="P2S2N1N4" ordinal="4">
-              <str>- slutbehandling av byggnader, eller</str>
+              <str>slutbehandling av byggnader, eller</str>
             </Listelement><Listelement id="P2S2N1N5" ordinal="5">
-              <str>- uthyrning av bygg- och anläggningsmaskiner med förare,</str>
+              <str>uthyrning av bygg- och anläggningsmaskiner med förare,</str>
             </Listelement>
           </Strecksatslista>
         </Listelement><Listelement id="P2S2N2" ordinal="2">
-          <str>2. byggstädning, och</str>
+          <str>byggstädning, och</str>
         </Listelement><Listelement id="P2S2N3" ordinal="3">
-          <str>3. uthyrning av arbetskraft för sådana aktiviteter som avses i 1 och 2.</str>
+          <str>uthyrning av arbetskraft för sådana aktiviteter som avses i 1 och 2.</str>
         </Listelement>
       </NumreradLista>
     </Stycke><Stycke id="P2S3">
       <str>Med tullskuld och gemenskapsvara förstås detsamma som i </str>
-      <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/ext/celex/31992R2913">rådets förordning (EEG) nr 2913/92 av den 12 oktober 1992</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/ext/celex/31992R2913">rådets förordning (EEG) nr 2913/92 av den 12 oktober 1992</LinkSubject>
       <str> om inrättandet av en tullkodex för gemenskapen.</str>
     </Stycke><Stycke id="P2S4">
       <str>Särskilda bestämmelser om vem som i vissa fall är skattskyldig finns i </str>

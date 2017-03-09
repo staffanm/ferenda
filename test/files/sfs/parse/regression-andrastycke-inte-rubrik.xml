@@ -4,16 +4,16 @@
       <str>I denna lag finns föreskrifter om</str>
       <Strecksatslista>
         <Listelement id="P1S1N1" ordinal="1">
-          <str>- lagens innehåll och tillämpningsområde samt allmänna bestämmelser,</str>
+          <str>lagens innehåll och tillämpningsområde samt allmänna bestämmelser,</str>
         </Listelement><Listelement id="P1S1N2" ordinal="2">
-          <str>- överprövning, skadestånd m.m.</str>
+          <str>överprövning, skadestånd m.m.</str>
         </Listelement>
       </Strecksatslista>
     </Stycke><Stycke id="P1S2">
       <str>Till lagen hör följande bilagor</str>
       <Strecksatslista>
         <Listelement id="P1S2N1" ordinal="1">
-          <str>- Förteckning över byggentreprenadkontrakt (bilaga 1)</str>
+          <str>Förteckning över byggentreprenadkontrakt (bilaga 1)</str>
         </Listelement>
       </Strecksatslista>
     </Stycke>

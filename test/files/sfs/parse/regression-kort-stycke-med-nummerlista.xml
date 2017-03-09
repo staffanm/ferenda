@@ -4,14 +4,14 @@
       <str>En paragraf som har</str>
       <NumreradLista>
         <Listelement id="P1S1N1" ordinal="1">
-          <str>1. en inledande nummerlista</str>
+          <str>en inledande nummerlista</str>
         </Listelement>
       </NumreradLista>
     </Stycke><Stycke id="P1S2">
       <str>samt ett kort andra stycke med</str>
       <NumreradLista>
         <Listelement id="P1S2N1" ordinal="1">
-          <str>1. En avslutande nummerlista</str>
+          <str>En avslutande nummerlista</str>
         </Listelement>
       </NumreradLista>
     </Stycke><Stycke id="P1S3">

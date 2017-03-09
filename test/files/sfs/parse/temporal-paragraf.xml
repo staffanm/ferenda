@@ -1,6 +1,6 @@
 <Forfattning>
-  <Paragraf id="P4" ordinal="4" upphor="datetime.datetime(2007, 4, 1, 0, 0)">
-    <Stycke id="P4S1">
+  <Paragraf ordinal="4" upphor="datetime.datetime(2007, 4, 1, 0, 0)">
+    <Stycke>
       <str>Här är den gamla lydelsen.</str>
     </Stycke>
   </Paragraf>

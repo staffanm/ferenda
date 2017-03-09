@@ -4,7 +4,7 @@
       <str>Den som smädar annan genom kränkande tillmäle eller beskyllning eller genom annat skymfligt beteende mot honom, dömes, om gärningen ej är belagd med straff enligt 1 eller </str>
       <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P2">2 §</LinkSubject>
       <str>, för </str>
-      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Förolämpning">förolämpning</LinkSubject>
+      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/begrepp/Förolämpning">förolämpning</LinkSubject>
       <str> till böter.</str>
     </Stycke>
   </Paragraf>

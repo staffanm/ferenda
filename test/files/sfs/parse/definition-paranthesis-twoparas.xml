@@ -2,7 +2,7 @@
   <Paragraf id="P5" ordinal="5">
     <Stycke id="P5S1">
       <str>Från fonden skall lämnas ersättning (</str>
-      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Författarpenning">författarpenning</LinkSubject>
+      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/begrepp/Författarpenning">författarpenning</LinkSubject>
       <str>).</str>
     </Stycke><Stycke id="P5S2">
       <str>Andra stycket skall tillämpas. </str>

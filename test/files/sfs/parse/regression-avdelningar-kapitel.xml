@@ -1,19 +1,19 @@
 <Forfattning>
   <Avdelning id="A1" ordinal="1" rubrik="AVD. I SKATTEFRIA INKOMSTER OCH INTE AVDRAGSGILLA UTGIFTER">
-    <Kapitel id="K1" ordinal="1" rubrik="1 kap. Inkomster som är skattefria">
-      <Rubrik id="K1R1">Innehåll</Rubrik>
-      <Paragraf id="K1P1" ordinal="1">
-        <Stycke id="K1P1S1">
+    <Kapitel id="K8" ordinal="8" rubrik="8 kap. Inkomster som är skattefria">
+      <Rubrik id="K8R1">Innehåll</Rubrik>
+      <Paragraf id="K8P1" ordinal="1">
+        <Stycke id="K8P1S1">
           <str>I detta kapitel finns bestämmelser om att vissa inkomster är skattefria vid inkomstbeskattningen.</str>
         </Stycke>
       </Paragraf>
     </Kapitel>
   </Avdelning>
   <Avdelning id="A2" ordinal="2" rubrik="AVD. II KAPITALVINSTER OCH KAPITALFÖRLUSTER">
-    <Kapitel id="K2" ordinal="2" rubrik="2 kap. Grundläggande bestämmelser om kapitalvinster och kapitalförluster">
-      <Rubrik id="K2R1">Innehåll</Rubrik>
-      <Paragraf id="K2P1" ordinal="1">
-        <Stycke id="K2P1S1">
+    <Kapitel id="K44" ordinal="44" rubrik="44 kap. Grundläggande bestämmelser om kapitalvinster och kapitalförluster">
+      <Rubrik id="K44R1">Innehåll</Rubrik>
+      <Paragraf id="K44P1" ordinal="1">
+        <Stycke id="K44P1S1">
           <str>I detta kapitel finns de grundläggande bestämmelserna om kapitalvinster och kapitalförluster.</str>
         </Stycke>
       </Paragraf>
