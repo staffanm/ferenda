@@ -2723,6 +2723,17 @@ class DV(SwedishLegalSource):
                       identificator=lambda x, y, z: None),
                 ] + self.standardfacets
 
+    def _relate_fulltext_resources(self, body):
+        res = []
+        uris = set()
+        for r in body.findall(".//*[@about]"):
+            if r.get("class") == "bodymeta":
+                continue
+            if r.get("about") not in uris:
+                uris.add(r.get("about"))
+                res.append(r)
+        return [body] + res
+
     _relate_fulltext_value_cache = {}
     def _relate_fulltext_value(self, facet, resource, desc):
         def rootlabel(desc):
