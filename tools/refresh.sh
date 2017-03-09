@@ -1,10 +1,11 @@
-#! /bin/sh
-# echo "removing old generated files"
-# rm -r data/*/parsed
-# rm -r data/*/distilled
-# rm -r data/*/annotations
-# rm -r data/*/generated
-# rm -r data/*/toc
+#! /bin/bash
+echo "removing old generated files"
+#rm -r data/{dv,keyword,mediawiki,sfs,jo,jk,arn,myndprax}/parsed
+rm -r data/*/parsed
+rm -r data/*/distilled
+rm -r data/*/annotations
+rm -r data/*/generated
+rm -r data/*/toc
 set -e  # fail immediately on error
 echo "resetting fulltextindex"
 ./ferenda-build.py devel destroyindex

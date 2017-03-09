@@ -16,6 +16,7 @@ import os
 import sys
 import re
 import codecs
+import unicodedata
 from io import BytesIO, StringIO, BufferedIOBase
 
 from layeredconfig import LayeredConfig, Defaults
@@ -571,7 +572,12 @@ class SwedishLegalSource(DocumentRepository):
         patchpath = patchstore.path(basefile, "patches", ".patch")
         descpath = patchstore.path(basefile, "patches", ".desc")
         if not os.path.exists(patchpath):
-            return fp
+            if os.path.exists(unicodedata.normalize("NFD", patchpath)):
+                self.log.warning("%s: Found patch, but had to use NFD normalization for filename" % basefile)
+                patchpath = unicodedata.normalize("NFD", patchpath)
+                descpath = unicodedata.normalize("NFD", descpath)
+            else:
+                return fp
         self.log.warning("%s: Applying patch %s" % (basefile, patchpath))
         from ferenda.thirdparty.patchit import PatchSet, PatchSyntaxError, PatchConflictError
         binarystream = False
