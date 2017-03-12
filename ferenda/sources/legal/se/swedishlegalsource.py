@@ -1046,7 +1046,8 @@ class SwedishLegalSource(DocumentRepository):
                             dimension_label="label",
                             dimension_type="value",
                             multiple_values=False,
-                            indexingtype=fulltextindex.Label(boost=16)),
+                            indexingtype=fulltextindex.Label(boost=16),
+                            pagetitle='Alla %(selected)s:ar'),
                       Facet(DCTERMS.creator,
                             use_for_toc=False,
                             use_for_feed=False,
@@ -1163,7 +1164,9 @@ class SwedishLegalSource(DocumentRepository):
     def toc_item_title(self, row):
         return row.get('dcterms_title', '(Titel saknas)')
 
-        
+
+    news_feedsets_main_label = "Samtliga dokument"
+
     def frontpage_content(self, primary=False):
         if not self.config.tabs:
             self.log.debug("%s: Not doing frontpage content (config has tabs=False)" % self.alias)

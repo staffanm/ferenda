@@ -443,7 +443,7 @@ Facet.defaults = {RDF.type: {
     'selector': Facet.resourcelabel_or_qname,
     'identificator': Facet.term,
     'dimension_type': "term",
-                      'pagetitle': 'All %(selected)s documents'},
+    'pagetitle': 'All %(selected)s documents'},
                   DCTERMS.title: {
                       'indexingtype': fulltextindex.Text(boost=4),
                       'toplevel_only': False,

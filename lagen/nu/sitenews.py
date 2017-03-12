@@ -7,3 +7,5 @@ class Sitenews(BaseSitenews):
         else:
             return []
 
+    news_feedsets_main_label = "Nyheter om webbtjänsten"
+    toc_title = "Alla nyhetsflöden"

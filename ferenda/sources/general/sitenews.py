@@ -81,6 +81,7 @@ class Sitenews(DocumentRepository):
     def facets(self):
         return [Facet(DCTERMS.issued)]
 
+    toc_title = "All news feeds"
     def toc(self, otherrepos):
         documentlist = []
         # create just one single page: no leftnav, contains only a sort-of nested list 
@@ -92,7 +93,16 @@ class Sitenews(DocumentRepository):
             # row = {'alias': repo.alias,
             #        'uri': repo.dataset_uri(feed=True)}
             # item = self.toc_item('alias', row)
-            item = repo.alias
+            tabs = repo.tabs()
+            if tabs:
+                item = tabs[0][0]
+            else:
+                # item = repo.alias
+                #
+                # if a repo doesn't provide any tabs, it's probably
+                # mostly for internal use (like static and mediawiki
+                # -- let's just skip it
+                continue
             documentlist.append((item, feeds))
             feedsets = repo.news_feedsets(repo.news_facet_entries(),
                                           repo.facets())
@@ -107,7 +117,7 @@ class Sitenews(DocumentRepository):
                                                        feed=".atom")}
                     item = self.toc_item('title', row)
                     feeds.append(item)
-        self.toc_generate_page(None, None, documentlist, [], "index", title="All news feeds")
+        self.toc_generate_page(None, None, documentlist, [], "index", title=self.toc_title)
 
     def toc_item(self, binding, row):
         return [A([Img(alt="Atom feed",

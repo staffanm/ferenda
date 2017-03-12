@@ -3027,6 +3027,9 @@ WHERE {
                 fp.write(s)
         return ret
 
+
+    news_feedsets_main_label = "All documents"
+    
     def news_feedsets(self, data, facets):
         """Calculate the set of needed feedsets based on facets and instance
         values in the data
@@ -3037,7 +3040,6 @@ WHERE {
         :returns: A list of Feedset objects
 
         """
-
         qname_graph = self.make_graph()
         res = []
         for facet in facets:
@@ -3085,7 +3087,7 @@ WHERE {
         # finally add the built-in All feedset, which has only one feed.
         res.append(Feedset(label="All",
                            feeds=[Feed(slug="main",
-                                       title="All documents",
+                                       title=self.news_feedsets_main_label,
                                        binding=None,
                                        value=None)]))
 

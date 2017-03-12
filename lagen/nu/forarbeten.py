@@ -89,6 +89,7 @@ WHERE {
                 # self.log.error("Row for %s has unrecognized type %s" % (row['uri'], row['rdf_type']))
         return [Facet(RDF.type,
                       selector=select,
+                      pagetitle="Alla %(selected)s",
                       identificator=ident),
                 Facet(RPUBL.arsutgava,
                       indexingtype=fulltextindex.Label(),
@@ -148,6 +149,8 @@ WHERE {
             res[(binding, value)] = [self.toc_item(binding, row)
                                      for row in s]
         return res
+
+    news_feedsets_main_label = "Samtliga förarbeten"
 
     def frontpage_content_body(self):
         # we could either count the number of items

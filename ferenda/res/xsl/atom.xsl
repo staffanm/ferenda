@@ -19,13 +19,13 @@ Note: this template expects Atom 1.0, outputs HTML5
   <xsl:param name="fixedtoc" select="true()"/>
   <xsl:param name="content-under-pagetitle" select="false()"/>
   <xsl:template name="pagetitle">
-    <h1>News feed based on <xsl:value-of select="local-name()"/>.</h1>
+    <h1><xsl:value-of select="atom:title"/></h1>
   </xsl:template>
   <xsl:template name="bodyclass">feed</xsl:template>
   <xsl:template name="headmetadata"/>
   <xsl:template name="linkalternate"/>
   <xsl:template name="metarobots"/>
-  <xsl:template name="headtitle">News for <xsl:value-of select="atom:title"/> (<xsl:value-of select="name()"/>)</xsl:template>
+  <xsl:template name="headtitle"><xsl:value-of select="atom:title"/> (<xsl:value-of select="name()"/>)</xsl:template>
 
   <xsl:template match="atom:feed">
     <html>

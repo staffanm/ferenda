@@ -218,6 +218,8 @@ class LNKeyword(keyword.Keyword, SameAs):
         except IndexError: # ok the list is done
             return ul
             
+    news_feedsets_main_label = "Alla nya och ändrade begrepp"
+
 
     def tabs(self):
         return [("Begrepp", self.dataset_uri())]

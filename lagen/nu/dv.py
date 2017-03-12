@@ -168,6 +168,18 @@ class DV(OrigDV, SameAs):
             return row['rpubl_referatrubrik'][:1000] + "..."
         return row['rpubl_referatrubrik']
 
+    # FIXME: data to construct this should be in
+    # swedishlegalsource.ttl (RH/RK makes it a little more difficult)"
+    slug_to_title = {"nja": "NJA (Högsta domstolen)",
+                     "hfd": "HFD (Högsta förvaltningsdomstolen)",
+                     "ad": "AD (Arbetsdomstolen)",
+                     "md": "MD (Marknadsdomstolen)",
+                     "mig": "MIÖD (Migrationsöverdomstolen)",
+                     "mod": "MÖD (Mark- och miljööverdomstolen)", 
+                     "ra": "RÅ (Regeringsrätten)",
+                     "rh": "RH (Hovrätterna)",
+                     "rk": "RK (Kammarrätterna)"}
+
     def news_feedsets(self, data, facets):
         # works pretty much the same as toc_pagesets, but returns ONE
         # feedset (not several) that has one feed per publisher
@@ -177,9 +189,7 @@ class DV(OrigDV, SameAs):
             feedid = row['rpubl_rattsfallspublikation']
             if feedid not in feeds:
                 slug = Facet.term(row, 'rpubl_rattsfallspublikation')
-                term = Facet.resourcelabel(row, 'rpubl_rattsfallspublikation',
-                                           self.commondata)
-                title = facet.label % {'term': term}
+                title = "Rättsfall från %s" % self.slug_to_title[slug]
                 feeds[feedid] = Feed(slug=slug,
                                      title=title,
                                      binding='rpubl_rattsfallspublikation',
@@ -190,9 +200,14 @@ class DV(OrigDV, SameAs):
                         feeds=feeds),
                 Feedset(label="All",
                         feeds=[Feed(slug="main",
-                                    title="All documents",
+                                    title="Samtliga rättsfall",
                                     binding=None,
                                     value=None)])]
+
+    def news_item(self, binding, entry):
+        entry['summary'] = entry['rpubl_referatrubrik']
+        entry['title'] = entry['dcterms_identifier']
+        return entry
 
     def tabs(self):
         return [("Rättsfall", self.dataset_uri())]

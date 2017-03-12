@@ -1875,7 +1875,13 @@ WHERE {
             # "Lag (1994:1920) om allm\xe4n l\xf6neavgift" => "A"
             return forfattningskey(row, binding, resource_graph)[0].upper()
 
-        return [Facet(RDF.type),
+        def typelabel(row, binding, resource_graph):
+            return {str(RPUBL.Lag): "lagar",
+                    str(RPUBL.Forordning): "förordningar"}[row[binding]]
+
+        return [Facet(RDF.type,
+                      pagetitle="Alla %(selected)s",
+                      selector=typelabel),
                 Facet(RPUBL.arsutgava,
                       use_for_toc=True,
                       label="Ordnade efter utgivnings\xe5r",
@@ -1942,5 +1948,7 @@ WHERE {
                 res.append(row['titel'][:idx])
         res.append(Link(title, uri=row['uri']))
         return res
+
+    news_feedsets_main_label = "Samtliga författningar"
 
 

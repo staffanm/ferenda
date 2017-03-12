@@ -207,9 +207,10 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
                       indexingtype=fulltextindex.Label(),
                       selector_descending=True,
                       use_for_toc=True),
-                Facet(RDF.type, use_for_toc=False),
+                Facet(RDF.type, use_for_toc=False, use_for_feed=False),
                 Facet(DCTERMS.title, use_for_toc=False),
-                Facet(DCTERMS.publisher, use_for_toc=False),
+                Facet(DCTERMS.publisher, use_for_toc=False,
+                      pagetitle="Författningar utgivna av %(selected)s"),
                 Facet(DCTERMS.identifier)] + self.standardfacets
 
     def toc_pagesets(self, data, facets):
@@ -280,6 +281,8 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
             res[(binding, value)] = [self.toc_item(binding, row)
                                      for row in s]
         return res
+
+    news_feedsets_main_label = "Samtliga föreskrifter"
 
     def tabs(self):
         return [("Föreskrifter", self.dataset_uri())]
