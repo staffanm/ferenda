@@ -184,7 +184,7 @@
 
   <xsl:template match="xhtml:div[@class='domslut']">
     <div>
-      <h3>Domskäl</h3>
+      <h3>Domslut</h3>
       <xsl:apply-templates/>
     </div>
   </xsl:template>
