@@ -1498,7 +1498,7 @@ class SFS(Trips):
         # "R\xe4ttsinformationsf\xf6rordning (1999:175)"
         specifics = {}
         for row in inboundlinks:
-            if not (row['uri'].startswith("http://") or row['uri'].startswith("http://")):
+            if not (row['uri'].startswith(("http://", "https://"))):
                 # we once had a condition where some rows were like 
                 # {'lagrum': 'https://lagen.nu/sfs/1998:204#L2015:589', 'uri': 'b0'}
                 # so we make "sure" uri is a URI
@@ -1682,12 +1682,9 @@ class SFS(Trips):
                         (uri, fragment) = (inbound[i]['uri'], None)
 
                     # 1) if the baseuri differs from the previous one,
-                    # create a new dcterms:references node. FIXME:
-                    # shouldn't we use dcterms:isReferencedBy (or does
-                    # that not exist? well rpubl:isLagrumFor doesn't
-                    # either...)
+                    # create a new dcterms:isReferencedBy node
                     if uri != prev_uri:
-                        references_node = etree.Element(ns("dcterms:references"))
+                        references_node = etree.Element(ns("dcterms:isReferencedBy"))
                         # 1.1) if the baseuri is the same as the uri
                         # for the law we're generating, place it first
                         if uri == baseuri:
@@ -1717,7 +1714,6 @@ class SFS(Trips):
                     inbound_node.set(ns("rdf:about"), inbound[i]['uri'])
                     id_node = etree.SubElement(inbound_node, ns("dcterms:identifier"))
                     id_node.text = self.display_title(inbound[i]['uri'], form)
-
                     prev_uri = uri
 
             if 'changes' in stuff[l]:
@@ -1781,6 +1777,22 @@ class SFS(Trips):
                                        'item' not in parts):
                 res += "%s %s " % (parts[field], label)
 
+        # Special hack: handle references from ändrings-SFS, eg
+        # "http://rinfo.lagrummet.se/publ/sfs/1998:204#L1998:204N3"
+        # (legaluri should be able to parse out this information
+        if not res and "#L" in uri:
+            changesfs = uri.split("#L")[1]
+            changeloc = changepara = None
+            if "S" in changesfs:
+                changesfs, changepara = changesfs.split("S")
+            if "N" in changesfs:
+                changesfs, changeloc = changesfs.split("N")
+            res += "övg. best. SFS %s" % changesfs
+            if changepara:
+                res += " %s st" % changepara
+            if changeloc:
+                res += " %s p" % changeloc
+                
         if form == "absolute":
             if parts['law'] not in self._document_name_cache:
                 if "#" in uri:

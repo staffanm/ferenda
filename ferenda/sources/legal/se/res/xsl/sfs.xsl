@@ -183,7 +183,7 @@
     <xsl:param name="uri"/>
     <!-- plocka fram referenser kring/till denna paragraf -->
     <xsl:variable name="rattsfall" select="$sfsannotations/rdf:Description[@rdf:about=$uri]/rpubl:isLagrumFor/rdf:Description"/>
-    <xsl:variable name="inbound"   select="$sfsannotations/rdf:Description[@rdf:about=$uri]/dcterms:references"/>
+    <xsl:variable name="inbound"   select="$sfsannotations/rdf:Description[@rdf:about=$uri]/dcterms:isReferencedBy"/>
     <xsl:variable name="kommentar" select="$sfsannotations/rdf:Description[@rdf:about=$uri]/dcterms:description/xhtml:div/*"/>
     <xsl:variable name="forfattningskommentar" select="$sfsannotations/rdf:Description[@rdf:about=$uri]/rinfoex:forfattningskommentar/xhtml:div/*"/>
     <xsl:variable name="inford"    select="$sfsannotations/rdf:Description[@rdf:about=$uri]/rpubl:isEnactedBy"/>
@@ -249,10 +249,22 @@
 	  </xsl:call-template>
 	</xsl:if>
 	<xsl:if test="$inbound">
+	  <xsl:variable name="inbound-markup">
+	    <ul>
+	      <xsl:for-each select="$inbound">
+		<li>
+		  <xsl:for-each select="rdf:Description">
+		    <a href="{@rdf:about}"><xsl:value-of select="dcterms:identifier"/></a>
+		    <xsl:if test="position() != last()">, </xsl:if>
+		  </xsl:for-each>
+		</li>
+	      </xsl:for-each>
+	    </ul>
+	  </xsl:variable>
 	  <xsl:call-template name="aside-annotations-panel">
 	    <xsl:with-param name="title">Lagrumshänvisningar hit</xsl:with-param>
 	    <xsl:with-param name="badgecount" select="count($inbound/rdf:Description)"/>
-	    <xsl:with-param name="nodeset" select="$inbound"/>
+	    <xsl:with-param name="nodeset" select="ext:node-set($inbound-markup)"/>
 	    <xsl:with-param name="panelid" select="$panelid"/>
 	    <xsl:with-param name="paneltype">l</xsl:with-param>
 	    <xsl:with-param name="expanded" select="not($kommentar or $forfattningskommentar or $myndfs or $rattsfall)"/>
