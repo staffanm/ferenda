@@ -13,10 +13,11 @@ from bs4 import BeautifulSoup
 import requests
 import requests.exceptions
 from rdflib import Literal, URIRef
-from rdflib.namespace import DCTERMS
+from rdflib.namespace import DCTERMS, FOAF
 
 # My own stuff
 from ferenda import util
+from ferenda.errors import DownloadError
 from ferenda.elements import Body
 from ferenda.decorators import downloadmax, recordlastdownload
 from . import FixedLayoutSource, FixedLayoutStore, RPUBL
@@ -64,6 +65,8 @@ class ARN(FixedLayoutSource):
 
     @recordlastdownload
     def download(self, basefile=None):
+        if basefile:
+            raise DownloadError("Downloading single basefiles is not supported")
         self.session = requests.Session()
         resp = self.session.get(self.start_url)
         soup = BeautifulSoup(resp.text, "lxml")
@@ -252,6 +255,12 @@ class ARN(FixedLayoutSource):
                                          # stuff from the document
                                          # later.
         return attribs
+
+    def polish_metadata(self, attribs, infer_nodes=True):
+        resource = super(ARN, self).polish_metadata(attribs, infer_nodes)
+        # add a known foaf:name for the publisher to our polished graph
+        resource.value(DCTERMS.publisher).add(FOAF.name, Literal("Allmänna reklamationsnämnden", lang="sv"))
+        return resource
 
     def infer_identifier(self, basefile):
         return "ARN %s" % basefile

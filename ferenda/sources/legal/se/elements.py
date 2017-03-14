@@ -377,7 +377,6 @@ class Meta(CompoundElement):
     pass
 
 
-
 class AnonStycke(Paragraph):
     pass
 

@@ -9,7 +9,6 @@
 		xmlns:rinfoex="http://lagen.nu/terms#"
 		xmlns:bibo="http://purl.org/ontology/bibo/"
 		xmlns:ext="http://exslt.org/common"
-		xml:space="preserve"
 		exclude-result-prefixes="xhtml rdf">
 
   <xsl:import href="annotations-panel.xsl"/>
@@ -40,10 +39,11 @@
 
   <xsl:template name="aside-annotations">
     <xsl:param name="uri"/>
+    <xsl:variable name="publisheruri" select="//xhtml:link[@rel='dcterms:publisher']/@href"/>
     <xsl:variable name="metadata">
       <dl class="dl-horizontal">
 	<dt>Myndighet</dt>
-	<dd><xsl:value-of select="//xhtml:link[@rel='dcterms:publisher']/@href"/></dd>
+	<dd><xsl:value-of select="//xhtml:meta[@property='foaf:name' and @about=$publisheruri]/@content"/></dd>
 	<dt>Beslutdatum</dt>
 	<dd><xsl:value-of select="//xhtml:meta[@property='rpubl:beslutsdatum']/@content"/></dd>
 	<dt>Diarienummer</dt>
@@ -140,10 +140,14 @@
   
   <!-- default template: translate everything from whatever namespace
        it's in (usually the XHTML1.1 NS) into the default namespace
-       NOTE: It removes any attributes not accounted for otherwise
        -->
   <xsl:template match="*">
-    <xsl:element name="{local-name(.)}"><xsl:apply-templates select="node()"/></xsl:element>
+    <xsl:element name="{name()}">
+      <xsl:apply-templates select="@*|node()"/>
+    </xsl:element>
+  </xsl:template>
+  <xsl:template match="@*">
+    <xsl:copy><xsl:apply-templates/></xsl:copy>
   </xsl:template>
 
   <!-- toc handling (do nothing) -->

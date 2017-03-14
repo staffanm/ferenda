@@ -12,13 +12,14 @@ from datetime import datetime, timedelta
 import lxml.html
 import requests
 from rdflib import Literal, URIRef
-from rdflib.namespace import SKOS, XSD, DCTERMS
+from rdflib.namespace import SKOS, XSD, DCTERMS, FOAF
 from bs4 import BeautifulSoup
 
 # My own stuff
-from ferenda import FSMParser
+from ferenda import FSMParser, DocumentEntry
 from ferenda import decorators
 from ferenda.elements import Body, Paragraph
+from ferenda.errors import DownloadError
 from . import RPUBL
 from .fixedlayoutsource import FixedLayoutSource, FixedLayoutStore
 from .swedishlegalsource import UnorderedSection
@@ -73,7 +74,16 @@ class JO(FixedLayoutSource):
 
     @decorators.action
     @decorators.recordlastdownload
-    def download(self, basefile=None):
+    def download(self, basefile=None, url=None):
+        if basefile:
+            if not url:
+                entry = DocumentEntry(self.store.documententry_path(basefile))
+                url = entry.orig_url
+            if url:
+                return self.download_single(basefile, url)
+            else:
+                raise DownloadError("%s doesn't support downloading single basefiles w/o page URL" %
+                                    self.__class__.__name__)
         self.session = requests.session()
         if ('lastdownload' in self.config and
                 self.config.lastdownload and
@@ -153,6 +163,17 @@ class JO(FixedLayoutSource):
         #    print("FIXME: we should do something with this BeautifulSoup data")
         d = self.metadata_from_basefile(basefile)
         return d
+
+
+    def polish_metadata(self, attribs, infer_nodes=True):
+        resource = super(JO, self).polish_metadata(attribs, infer_nodes)
+        # add a known foaf:name for the publisher to our polished graph
+        # FIXME/NOTE: In swedishlegalsource.ttl, the foaf:name is
+        # given as Riksdagens ombudsmän (and thus is used in TOC
+        # generation). I think that "Justitieombudsmannen" is better.
+        resource.value(DCTERMS.publisher).add(FOAF.name, Literal("Justitieombudsmannen", lang="sv"))
+        return resource
+
 
     def postprocess_doc(self, doc):
         def helper(node, meta):
@@ -264,7 +285,10 @@ class JO(FixedLayoutSource):
             return p
 
         def make_datum(parser):
-            d = [str(parser.reader.next())]
+            datestr = str(parser.reader.next()).strip()
+            year = int(datestr.split("-")[0])
+            assert 2100 > year > 1970, "Year in %s doesn't look valid" % datestr
+            d = [datestr]
             return Meta(d, predicate=RPUBL.avgorandedatum,
                         datatype=XSD.date)
 

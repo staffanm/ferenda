@@ -10,7 +10,8 @@ from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
-from rdflib.namespace import SKOS, DCTERMS
+from rdflib import Literal
+from rdflib.namespace import SKOS, DCTERMS, FOAF
 
 from . import SwedishLegalSource, SwedishLegalStore, RPUBL
 from .elements import *
@@ -152,6 +153,12 @@ class JK(SwedishLegalSource):
                   "rpubl:diarienummer": diarienummer,
                   "dcterms:identifier": self.infer_identifier(diarienummer)})
         return a
+
+    def polish_metadata(self, attribs, infer_nodes=True):
+        resource = super(JK, self).polish_metadata(attribs, infer_nodes)
+        # add a known foaf:name for the publisher to our polished graph
+        resource.value(DCTERMS.publisher).add(FOAF.name, Literal("Justitiekanslern", lang="sv"))
+        return resource
     
     def extract_body(self, fp, basefile):
         # NB: extract_head already did this (so the fp will have been
