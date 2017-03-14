@@ -167,14 +167,14 @@ class WSGIApp(OrigWSGIApp):
             queryparams['issued'] = str(y)
 
         if pager['totalresults'] == 1:
-            resulthead = "1 träff"
+            title = "1 träff"
         else:
-            resulthead = "%s träffar" % pager['totalresults']
-        resulthead += " för '%s'" % queryparams.get("q")
+            title = "%s träffar" % pager['totalresults']
+        title += " för '%s'" % queryparams.get("q")
 
-        doc = self._search_create_page(resulthead)
+        body = html.Body()
         if hasattr(res, 'aggregations'):
-            doc.body.append(self._search_render_facets(res.aggregations, queryparams, environ))
+            body.append(self._search_render_facets(res.aggregations, queryparams, environ))
         for r in res:
             if 'label' not in r:
                 label = r['uri']
@@ -193,14 +193,14 @@ class WSGIApp(OrigWSGIApp):
             if 'innerhits' in r:
                 for innerhit in r['innerhits']:
                     rendered_hit.append(self._search_render_innerhit(innerhit))
-            doc.body.append(rendered_hit)
+            body.append(rendered_hit)
         pagerelem = self._search_render_pager(pager, queryparams,
                                               environ['PATH_INFO'])
-        doc.body.append(html.Div([
+        body.append(html.Div([
             html.P(["Träff %(firstresult)s-%(lastresult)s "
                     "av %(totalresults)s" % pager]), pagerelem],
                                  **{'class':'pager'}))
-        data = self._search_transform_doc(doc)
+        data = self._transform(title, body, environ, template="xsl/search.xsl")
         return self._return_response(data, start_response)
 
     def _search_render_innerhit(self, innerhit):
@@ -280,3 +280,5 @@ class WSGIApp(OrigWSGIApp):
                                                 html.UL(facetgroup)]))
         return html.Div(facetgroups, **{'class': 'facets'})
 
+    exception_heading = "Något fel är trasigt"
+    exception_description = "Något gick snett när sidan skulle visas. Nedanstående information kan användas av webbbplatsens ansvarige för att felsöka problemet."

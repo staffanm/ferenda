@@ -9,7 +9,7 @@ from collections import defaultdict, OrderedDict, Counter, Iterable
 from datetime import date, datetime
 from io import BytesIO
 from operator import itemgetter
-from wsgiref.util import FileWrapper
+from wsgiref.util import FileWrapper, request_uri
 from urllib.parse import parse_qsl, urlencode
 import inspect
 import json
@@ -21,6 +21,7 @@ import re
 import sys
 
 from rdflib import URIRef, Namespace, Literal, Graph
+from rdflib.namespace import DCTERMS
 from lxml import etree
 from layeredconfig import LayeredConfig, Defaults, INIFile
 
@@ -65,10 +66,7 @@ class WSGIApp(object):
     # Main entry point
 
     def __call__(self, environ, start_response):
-        from wsgiref.util import request_uri
         import logging
-        import traceback
-        from pprint import pformat
         log = logging.getLogger("wsgiapp")
         path = environ['PATH_INFO']
         url = request_uri(environ)
@@ -83,27 +81,7 @@ class WSGIApp(object):
             else:
                 return self.static(environ, start_response)
         except Exception:
-            exc_type, exc_value, tb = sys.exc_info()
-            exception_data = str(exc_type) + ": " + str(exc_value)
-            tbstr = "\n".join(traceback.format_exception(exc_type, exc_value, tb))
-            msg = """500 Internal Server Error
-
-%s
-
-----------------
-request_uri: %s
-QUERY_STRING: %s
-PATH_INFO: %s
-sys.path: %r
-os.getcwd(): %s
-----------------
-Environ: %s
-
-            """ % (tbstr, url, environ['QUERY_STRING'], environ['PATH_INFO'], sys.path, os.getcwd(), pformat(environ))
-            msg = msg.encode('ascii', errors='replace')
-            return self._return_response(msg, start_response,
-                                         status="500 Internal Server Error",
-                                         contenttype="text/plain")
+            return self.exception(environ, start_response)
 
     ################################################################
     # WSGI methods
@@ -115,28 +93,26 @@ Environ: %s
         res, pager = self._search_run_query(queryparams)
         
         if pager['totalresults'] == 1:
-            resulthead = "1 match"
+            title = "1 match"
         else:
-            resulthead = "%s matches" % pager['totalresults']
-        resulthead += " for '%s'" % queryparams.get("q")
-
-        doc = self._search_create_page(resulthead)
-
+            title = "%s matches" % pager['totalresults']
+        title += " for '%s'" % queryparams.get("q")
+        body = Body()
         for r in res:
             if not 'dcterms_title' in r or r['dcterms_title'] is None:
                 r['dcterms_title'] = r['uri']
             if r.get('dcterms_identifier', False):
                 r['dcterms_title'] = r['dcterms_identifier'] + ": " + r['dcterms_title']
-            doc.body.append(html.Div(
+            body.append(html.Div(
                 [html.H2([elements.Link(r['dcterms_title'], uri=r['uri'])]),
                  r.get('text', '')], **{'class': 'hit'}))
         pagerelem = self._search_render_pager(pager, queryparams,
                                               environ['PATH_INFO'])
-        doc.body.append(html.Div([
+        body.append(html.Div([
             html.P(["Results %(firstresult)s-%(lastresult)s "
                     "of %(totalresults)s" % pager]), pagerelem],
                                  **{'class':'pager'}))
-        data = self._search_transform_doc(doc)
+        data = self._transform(title, body, environ, template="xsl/search.xsl")
         return self._return_response(data, start_response)
 
     def _return_response(self, data, start_response, status="200 OK",
@@ -249,14 +225,59 @@ Examined %s repos.
                 iterdata = FileWrapper(fp)
         # logging.getLogger("wsgi").info("Abt to return response")
         return self._return_response(iterdata, start_response, status, mimetype, length)
-#        length = str(length)
-#        start_response(self._str(status), [
-#            (self._str("Content-Type"), self._str(mimetype)),
-#            (self._str("Content-Length"), self._str(length))
-#        ])
-#        return iterdata
-        # FIXME: How can we make sure fp.close() is called, regardless of
-        # whether it's a real fileobject or a BytesIO object?
+
+
+    exception_heading = "Something is broken"
+    exception_description = "Something went wrong when showing the page. Below is some troubleshooting information intended for the webmaster."
+    def exception(self, environ, start_response):
+        import traceback
+        from pprint import pformat
+        exc_type, exc_value, tb = sys.exc_info()
+        tblines = traceback.format_exception(exc_type, exc_value, tb)
+        tbstr = "\n".join(tblines)
+        # render the error
+        title = tblines[-1]
+        body = html.Body([
+            html.Div([html.H1(self.exception_heading),
+                      html.P([self.exception_description]),
+                      html.H2("Traceback"),
+                      html.Pre([tbstr]),
+                      html.H2("Variables"),
+                      html.Pre(["request_uri: %s\nos.getcwd(): %s" % (request_uri(environ), os.getcwd())]),
+                      html.H2("sys.path"),
+                      html.Pre([pformat(sys.path)]),
+                      html.H2("os.environ"),
+                      html.Pre([pformat(environ)])
+        ])])
+        msg = self._transform(title, body, environ)
+        return self._return_response(msg, start_response,
+                                     status="500 Internal Server Error",
+                                     contenttype="text/html")
+
+    def _transform(self, title, body, environ, template="xsl/error.xsl"):
+        fakerepo = self.repos[0]
+        doc = fakerepo.make_document()
+        doc.uri = request_uri(environ)
+        doc.meta.add((URIRef(doc.uri),
+                      DCTERMS.title,
+                      Literal(title, lang="sv")))
+        doc.body = body
+        xhtml = fakerepo.render_xhtml_tree(doc)
+        conffile = os.sep.join([self.config.documentroot, 'rsrc',
+                                'resources.xml'])
+        transformer = Transformer('XSLT', template, "xsl",
+                                  resourceloader=fakerepo.resourceloader,
+                                  config=conffile)
+        urltransform = None
+        if 'develurl' in self.config:
+            urltransform = fakerepo.get_url_transform_func(
+                develurl=self.config.develurl)
+        depth = len(doc.uri.split("/")) - 3
+        tree = transformer.transform(xhtml, depth,
+                                     uritransform=urltransform)
+        return etree.tostring(tree, encoding="utf-8")
+        
+        
 
     ################################################################
     # API Helper methods
@@ -640,16 +661,6 @@ Examined %s repos.
         res, pager = idx.query(query, pagenum=pagenum, **qpcopy)
         return res, pager
 
-    def _search_create_page(self, resulthead):
-        # Creates simple XHTML result page
-        repo = self.repos[0]
-        doc = repo.make_document()
-        doc.uri = "http://example.org/"
-        doc.meta.add((URIRef(doc.uri),
-                      Namespace(util.ns['dcterms']).title,
-                      Literal(resulthead, lang="en")))
-        doc.body = elements.Body()
-        return doc
 
     def _search_render_pager(self, pager, queryparams, path_info):
         # Create some HTML code for the pagination. FIXME: This should
@@ -678,26 +689,6 @@ Examined %s repos.
             pages.append(html.LI([html.A(["»"], href=url)]))
 
         return html.UL(pages, **{'class': 'pagination'})
-                       
-    def _search_transform_doc(self, doc):
-        # Transform that XHTML into HTML5
-        conffile = os.sep.join([self.config.documentroot, 'rsrc',
-                                'resources.xml'])
-        transformer = Transformer('XSLT', "xsl/search.xsl", "xsl",
-                                  resourceloader=self.resourceloader,
-                                  config=conffile)
-        # '/mysearch/' = depth 1
-        depth = len(self.config.searchendpoint.split("/")) - 2
-        repo = DocumentRepository(url=self.config.url)
-        # we must take develurl into account
-        urltransform = None
-        if 'develurl' in self.config:
-            urltransform = repo.get_url_transform_func(
-                develurl=self.config.develurl)
-        tree = transformer.transform(repo.render_xhtml_tree(doc), depth,
-                                     uritransform=urltransform)
-        data = transformer.t.html5_doctype_workaround(etree.tostring(tree))
-        return data
     
     def _str(self, s, encoding="ascii"):
         """If running under python2, return byte string version of the
