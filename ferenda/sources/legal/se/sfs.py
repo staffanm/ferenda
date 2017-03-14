@@ -29,6 +29,7 @@ from ferenda import DocumentEntry, TripleStore
 from ferenda import TextReader, Facet
 from ferenda.sources.legal.se import legaluri
 from ferenda import util
+from ferenda.elements.html import UL, LI, Body
 from ferenda.errors import FerendaException, DocumentRemovedError, ParseError
 from .legalref import LegalRef, LinkSubject
 from . import Trips, SwedishCitationParser, RPUBL, SwedishLegalStore, RINFOEX
@@ -1947,7 +1948,17 @@ WHERE {
             if idx:
                 res.append(row['titel'][:idx])
         res.append(Link(title, uri=row['uri']))
-        return res
+        return LI(res)
+
+    def toc_generate_page_body(self, documentlist, nav):
+        # SFS, unlike most other documents, should not be presented in
+        # a dl list <dt> = identifier and <dd> = title. Instead we use
+        # a straight ul list
+        return Body([nav,
+                     UL(documentlist, **{'class': 'dl-horizontal',
+                                         'role':'main'})
+        ])
+
 
     news_feedsets_main_label = "Samtliga författningar"
 

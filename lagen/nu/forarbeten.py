@@ -44,12 +44,12 @@ PREFIX rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
 
 SELECT DISTINCT ?uri ?rdf_type ?dcterms_title ?dcterms_identifier ?rpubl_utrSerie ?rpubl_arsutgava
 WHERE {
-    ?uri rdf:type ?type .
+    ?uri rdf:type ?type ;
+        rpubl:arsutgava ?rpubl_arsutgava ;
+        dcterms:title ?dcterms_title . 
     OPTIONAL { ?uri rdf:type ?rdf_type . }
-    OPTIONAL { ?uri dcterms:title ?dcterms_title . }
     OPTIONAL { ?uri dcterms:identifier ?dcterms_identifier . }
     OPTIONAL { ?uri rpubl:utrSerie ?rpubl_utrSerie . }
-    OPTIONAL { ?uri rpubl:arsutgava ?rpubl_arsutgava . }
     FILTER (?type in (rpubl:Kommittedirektiv, rpubl:Utredningsbetankande, rpubl:Proposition)) .
 } """
 

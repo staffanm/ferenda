@@ -35,7 +35,7 @@ from ferenda import (DocumentRepository, DocumentStore, FSMParser,
                      Transformer, DocumentEntry)
 from ferenda import util, fulltextindex
 from ferenda.sources.legal.se.legalref import Link, LegalRef, RefParseError
-from ferenda.elements.html import A, H1, H2, H3, P, Strong, Pre, Div, Body
+from ferenda.elements.html import A, H1, H2, H3, P, Strong, Pre, Div, Body, DL, DT, DD
 from ferenda.elements import serialize, Section, Body, CompoundElement, UnicodeElement, Preformatted
 from ferenda.pdfreader import Page, BaseTextDecoder, Textelement
 from ferenda.pdfreader import PDFReader
@@ -98,7 +98,7 @@ class SwedishLegalHandler(RequestHandler):
             # have it, but for some reason it hasn't been generated.
             request_uri = self.request_uri(environ)
             basefile = self.repo.basefile_from_uri(request_uri)
-            assert basefile, "Cannot derive basefile from %s" % uri
+            assert basefile, "Cannot derive basefile from %s" % request_uri
             entrypath = self.repo.store.documententry_path(basefile)
             if os.path.exists(entrypath):
                 # We have the resource but cannot for some reason
@@ -1151,12 +1151,20 @@ class SwedishLegalSource(DocumentRepository):
 
     def facets(self):
         return super(SwedishLegalSource, self).facets() + self.standardfacets
+
+    def toc_generate_page_body(self, documentlist, nav):
+
+        # the complicated list comprehension flattens a nested list --
+        # maybe we should use itertools.chain instead
+        dl = DL([d for tup in documentlist for d in tup], **{'class': 'dl-horizontal',
+                                                             'role':'main'})
+        return Body([nav,
+                     dl
+        ])
         
     def toc_item(self, binding, row):
-        # the default toc listing uses <b>identifier</b>: title, with
-        # only identifier being a link. Should work for most doctypes.
-        return [Strong([Link(self.toc_item_identifier(row), uri=row['uri'])]),
-                ": ", self.toc_item_title(row)]
+        return [DT([Link(self.toc_item_identifier(row), uri=row['uri'])]),
+                DD([self.toc_item_title(row)])]
 
     def toc_item_identifier(self, row):
         return row.get('dcterms_identifier', '(ID saknas)')

@@ -38,6 +38,20 @@ div.forfattningskommentar {
 body.frontpage td {
     display: block;
 }
+body.frontpage td ul {
+    padding-left: 20px;
+}
+body.frontpage td li {
+    list-style: none;
+}
+
+body.toc dl.dl-horizontal dt {
+    width: 150px;
+}
+body.toc dl.dl-horizontal dd {
+    margin-left: 160px;
+}
+
 
 @media only screen and (min-width: 480px) {
     body.frontpage td {
