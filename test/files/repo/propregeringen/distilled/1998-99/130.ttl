@@ -36,7 +36,7 @@
               <p>omsättning på minst 20 prisbasbelopp som huvudregel utgör bokslutsföretag (i andra stycket finns ett undantag från denna huvudregel). Begreppet ”nettoomsättning” är avsett att ha samma innebörd som i <a href="https://lagen.nu/1995:1554#K3P12" rel="dcterms:references">3 kap. 12 § årsredovisningslagen</a>. Det innebär att nettoomsättningen omfattar intäkter från försålda varor och utförda tjänster som ingår i företagets normala verksamhet. Avdrag skall göras för lämnade rabatter, mervärdesskatt och annan skatt som är direkt knuten till omsättningen.</p>
               <p>I <i>punkten 3</i> definieras begreppet verksamhet. Vad som faller under</p>
               <p>begreppet <i>närings</i>verksamhet utvecklas närmare i kommentaren till 2 kap. 6 §.</p>
-              <span class="sidbrytning" height="1263" id="sid114" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=113" width="894"/>
+              <span class="sidbrytning" height="1263" id="sid377" src="https://lagen.nu/prop/1998/99:130/sid377.png" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-1> ;
@@ -50,7 +50,7 @@
               <p>(Paragrafen saknar motsvarighet i kommitténs förslag. Jfr 1 kap. 3 § i promemorian 1.)</p>
               <p>I flera avseenden, särskilt när det gäller kretsen av bokföringsskyldiga,</p>
               <p>gör lagen åtskillnad på fysiska personer och juridiska personer. Ett dödsbo är en juridisk person men har i bokföringshänseende ansetts böra behandlas på samma sätt som en fysisk person. Denna paragraf innehåller därför en bestämmelse om att det i fråga om dödsbon gäller samma regler som för fysiska personer. Det får bl.a. till följd att ett dödsbo är bokföringsskyldigt enbart om det bedriver näringsverksamhet (jfr 2 kap. 6 §).</p>
-              <span class="sidbrytning" height="1263" id="sid194" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=193" width="894"/>
+              <span class="sidbrytning" height="1263" id="sid457" src="https://lagen.nu/prop/1998/99:130/sid457.png" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-1> .
@@ -61,7 +61,7 @@
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 1 kap. 1 § i kommitténs förslag.)</p>
-              <span class="sidbrytning" height="1263" id="sid195" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=194" width="894"/>
+              <span class="sidbrytning" height="1263" id="sid458" src="https://lagen.nu/prop/1998/99:130/sid458.png" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
@@ -124,7 +124,7 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 1 kap. 6 § i kommitténs förslag.)</p>
               <p>Ändringen i <i>andra stycket</i> är av redaktionell natur.</p>
-              <span class="sidbrytning" height="1263" id="sid198" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=197" width="894"/>
+              <span class="sidbrytning" height="1263" id="sid461" src="https://lagen.nu/prop/1998/99:130/sid461.png" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
@@ -154,7 +154,7 @@
               <p><i>Första stycket </i>(tidigare det andra) har jämkats redaktionellt.</p>
               <p>I<i> andra stycket</i> (tidigare det tredje) regleras när det i årsredovis-</p>
               <p>ningen skall ingå en finansieringsanalys. Bestämmelsen anknyter till samma kriterier som avgör om ett företag är skyldigt att ha en auktoriserad revisor (se bl.a. <a href="https://lagen.nu/2005:551#K10P12" rel="dcterms:references">10 kap. 12 § aktiebolagslagen</a> [1975:1385]). Hittills har det skett genom en hänvisning till bestämmelserna i bl.a. <a href="https://lagen.nu/2005:551" rel="dcterms:references">aktiebolagslagen</a>. Den tekniken framstår emellertid som mindre lämplig i och med att <a href="https://lagen.nu/1995:1554" rel="dcterms:references">årsredovisningslagen</a> blir tillämplig på flera olika slag av juridiska personer. De aktuella kriterierna har i stället preciserats i paragrafen. Dessa kriterier överensstämmer i stort med de kriterier som finns i <a href="https://lagen.nu/2005:551#K10P12" rel="dcterms:references">10 kap. 12 § aktiebolagslagen</a>. En generell tillämpning av dessa kritierier på alla de företagsformer som kan vara skyldiga att upprätta årsredovisning har dock ansetts få alltför vittgående konsekvenser. Bl.a. skulle det leda till att också större ideella föreningar som inte bedriver näringsverksamhet tvingades att upprätta finansieringsanalys, trots att</p>
-              <span class="sidbrytning" height="1263" id="sid199" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=198" width="894"/>
+              <span class="sidbrytning" height="1263" id="sid462" src="https://lagen.nu/prop/1998/99:130/sid462.png" width="894"/>
               <p>det knappast torde finnas något egentligt behov av detta. Punkten 1 har därför utformats så att det endast är i näringsdrivande verksamhetsformer som företaget kan bli skyldigt att upprätta finansieringsanalys för det fall att balansomslutningen överskrider det i lagen angivna gränsvärdet.</p>
               <p>En annan skillnad i förhållande till <a href="https://lagen.nu/2005:551" rel="dcterms:references">aktiebolagslagen</a> är att begreppet</p>
               <p>”fastställda balansräkningar” har ersatts med ”balansräkningarna”. Skälet till det är att det i vissa slag av företag, t.ex. handelsbolag och stiftelser, inte förekommer någon fastställelse av balansräkningen. De balansräkningar som avses är dock fortfarande de balansräkningar som ingår i företagets årsredovisningar eller årsbokslut.</p>
@@ -245,7 +245,7 @@
               <p>(Jfr 3 kap. 12 § i kommitténs förslag.)</p>
               <p>Paragrafen har tidigare betecknats som 3 kap. 8 §. Ändringen är av</p>
               <p>samma slag som i 2 kap. 3 §.</p>
-              <span class="sidbrytning" height="1263" id="sid205" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=204" width="894"/>
+              <span class="sidbrytning" height="1263" id="sid468" src="https://lagen.nu/prop/1998/99:130/sid468.png" width="894"/>
               <p>
                 <i>Extraordinära intäkter och kostnader</i>
               </p>
@@ -296,7 +296,7 @@
               <p>(Jfr 3 kap. 6 § i kommitténs förslag.)</p>
               <p>Med hänsyn till att lagens tillämpningsområde inte längre är begränsat</p>
               <p>till företagsformer som typiskt sett är inriktade på näringsverksamhet har ordet ”rörelse” i <i>andra stycket</i> bytts ut mot ”verksamhet”. </p>
-              <span class="sidbrytning" height="1263" id="sid202" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=201" width="894"/>
+              <span class="sidbrytning" height="1263" id="sid465" src="https://lagen.nu/prop/1998/99:130/sid465.png" width="894"/>
               <p>
                 <i>Jämförelsetal</i>
               </p>
@@ -340,7 +340,7 @@
               <p>(Jfr 3 kap. 4 § i kommitténs förslag.)</p>
               <p>Bestämmelsen är ny och innehåller, liksom 6 §, en särskild bestäm-</p>
               <p>melse avseende ekonomiska föreningar. Bestämmelsen har tidigare funnits i 9 kap. 6 § andra stycket andra meningen föreningslagen.</p>
-              <span class="sidbrytning" height="1263" id="sid203" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=202" width="894"/>
+              <span class="sidbrytning" height="1263" id="sid466" src="https://lagen.nu/prop/1998/99:130/sid466.png" width="894"/>
               <p>
                 <i>Större periodiseringsposter</i>
               </p>
@@ -440,7 +440,7 @@
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 4 kap. 7 § i kommitténs förslag.)</p>
-              <span class="sidbrytning" height="1263" id="sid207" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=206" width="894"/>
+              <span class="sidbrytning" height="1263" id="sid470" src="https://lagen.nu/prop/1998/99:130/sid470.png" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
@@ -462,7 +462,7 @@
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 5 kap. 1 § i kommitténs förslag.)</p>
-              <span class="sidbrytning" height="1263" id="sid209" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=208" width="894"/>
+              <span class="sidbrytning" height="1263" id="sid472" src="https://lagen.nu/prop/1998/99:130/sid472.png" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
@@ -549,7 +549,7 @@
               <p>(Jfr 5 kap.18 § i kommitténs förslag.)</p>
               <p>Paragrafen har tidigare betecknats 5 kap. 17 §. Ändringen är av samma</p>
               <p>slag som ändringen i 2 kap. 3 §.</p>
-              <span class="sidbrytning" height="1263" id="sid213" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=212" width="894"/>
+              <span class="sidbrytning" height="1263" id="sid476" src="https://lagen.nu/prop/1998/99:130/sid476.png" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
@@ -692,7 +692,7 @@
               <p>(Jfr 6 kap. 2 § första stycket i kommitténs förslag.)</p>
               <p>Paragrafen, som innehåller bestämmelser om förslag till vinst-</p>
               <p>dispositioner, har hittills enbart varit tillämplig på aktiebolag. Tillämpningsområdet har nu vidgats till att även omfatta ekonomiska föreningar. Motsvarande bestämmelser för ekonomiska föreningar har hittills funnits i 9 kap. 9 § tredje stycket och 11 § fjärde stycket tredje meningen föreningslagen.</p>
-              <span class="sidbrytning" height="1263" id="sid215" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=214" width="894"/>
+              <span class="sidbrytning" height="1263" id="sid478" src="https://lagen.nu/prop/1998/99:130/sid478.png" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
@@ -759,7 +759,7 @@
               <p>(Jfr 7 kap. 10 § i kommitténs förslag.)</p>
               <p>Paragrafen har tidigare betecknats 7 kap. 9 §. Ändringarna är av samma</p>
               <p>slag som ändringen i 2 kap. 3 §.</p>
-              <span class="sidbrytning" height="1263" id="sid221" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=220" width="894"/>
+              <span class="sidbrytning" height="1263" id="sid484" src="https://lagen.nu/prop/1998/99:130/sid484.png" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
@@ -788,7 +788,7 @@
               <p>Paragrafen har tidigare betecknats 7 kap. 12 §. Ändringen i <i>andra</i></p>
               <p><i>stycket</i> utgör en anpassning till en ändrad paragrafnumrering, medan</p>
               <p>ändringen i <i>tredje stycket</i> är av samma slag som ändringen i 2 kap. 3 §.</p>
-              <span class="sidbrytning" height="1263" id="sid222" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=221" width="894"/>
+              <span class="sidbrytning" height="1263" id="sid485" src="https://lagen.nu/prop/1998/99:130/sid485.png" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
@@ -827,7 +827,7 @@
               <p>sådana dispensfrågor som avses i paragrafen skall prövas av Patent- och registreringsverket. En motsvarande ändring har gjorts i 5 kap. 9 §. Skälen till ändringen har behandlats i kommentaren till den paragrafen.</p>
               <p>Paragrafen har också justerats med hänsyn till den ändrade paragraf-</p>
               <p>numreringen i kapitlet.</p>
-              <span class="sidbrytning" height="1263" id="sid223" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=222" width="894"/>
+              <span class="sidbrytning" height="1263" id="sid486" src="https://lagen.nu/prop/1998/99:130/sid486.png" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
@@ -876,7 +876,7 @@
               <p>(Jfr 7 kap. 21 § i kommitténs förslag.)</p>
               <p>Paragrafen har hittills betecknats 7 kap. 20 §. Ändringen utgörs enbart</p>
               <p>av en anpassning till den nya paragrafnumreringen i kapitlet.</p>
-              <span class="sidbrytning" height="1263" id="sid224" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=223" width="894"/>
+              <span class="sidbrytning" height="1263" id="sid487" src="https://lagen.nu/prop/1998/99:130/sid487.png" width="894"/>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
@@ -964,7 +964,7 @@
               <p>(Jfr 7 kap. 3 § i kommitténs förslag.)</p>
               <p>Paragrafen saknar motsvarighet i det tidigare 7 kap. och innehåller ett</p>
               <p>viktigt undantag från skyldigheten att upprätta koncernredovisning. För företag som hittills har omfattats av 1980 års årsredovisningslag eller <a href="https://lagen.nu/1994:1220" rel="dcterms:references">stiftelselagen</a> innebär den att skyldigheten att upprätta koncernredovisning får i huvudsak samma omfattning som den hittills har haft (jfr 3 kap. 1 § 1980 års årsredovisningslag och <a href="https://lagen.nu/1994:1220#K3P7" rel="dcterms:references">3 kap. 7 § stiftelselagen</a>). För aktiebolag innebär bestämmelsen däremot en väsentlig förändring, såtillvida</p>
-              <span class="sidbrytning" height="1263" id="sid218" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=217" width="894"/>
+              <span class="sidbrytning" height="1263" id="sid481" src="https://lagen.nu/prop/1998/99:130/sid481.png" width="894"/>
               <p>att koncernredovisning inte behöver upprättas lika ofta som hittills har varit fallet. Frågan har behandlats i <a href="https://lagen.nu/prop/1998/99:130#S16-1" rel="dcterms:references">avsnitt 16.1</a>.</p>
               <p>Enligt <i>första stycket</i> behöver ett moderföretag inte upprätta någon</p>
               <p>koncernredovisning om omfattningen på koncernens verksamhet på moderföretagets balansdag inte överstiger två särskilt angivna gränsvärden. Dessa gränsvärden är tio anställda respektive 24 miljoner kronor i balansomslutning. Båda värdena skall beräknas för koncernen som helhet. Så snart ett av värdena överskrids, skall moderföretaget upprätta en koncernredovisning.</p>
@@ -1010,7 +1010,7 @@
               <p>(Jfr 7 kap. 4 § i kommitténs förslag.)</p>
               <p>Paragrafen har tidigare betecknats 7 kap. 3 §. Av paragrafens <i>andra stycke</i> framgår vilka moderföretag som måste </p>
               <p>upprätta en finansieringsanalys. Bestämmelsen anknyter till samma kriterier som avgör om moderbolaget i en koncern är skyldigt att ha en auktoriserad revisor (se <a href="https://lagen.nu/1975:1385#K10P13" rel="dcterms:references">10 kap. 13 § aktiebolagslagen</a> [1975:1385]). Hittills har det skett genom en hänvisning till bestämmelsen i <a href="https://lagen.nu/1975:1385" rel="dcterms:references">aktiebolagslagen</a>. Den tekniken framstår emellertid som mindre lämplig i och med att <a href="https://lagen.nu/1995:1554" rel="dcterms:references">årsredovisningslagens</a> tillämpningsområde utsträcks till att omfatta flera olika slag av juridiska personer. De aktuella kriterierna har i stället preciserats i paragrafen. Av skäl som har återgetts i kommentaren till den motsvarande bestämmelsen i 2 kap. 1 § har dock skyldigheten att upprätta finansieringsanalys på grund av balansomslutningens</p>
-              <span class="sidbrytning" height="1263" id="sid219" src="https://lagen.nu/prop/1998/99:130?attachment=ny-bokforingslag-m.m.pdf&amp;repo=propregeringen&amp;dir=downloaded&amp;format=png&amp;page=218" width="894"/>
+              <span class="sidbrytning" height="1263" id="sid482" src="https://lagen.nu/prop/1998/99:130/sid482.png" width="894"/>
               <p>storlek begränsats till de fall då något av koncernföretagen bedriver näringsverksamhet. Härigenom undantas bl.a. ideella föreningar som är moderföreningar i större koncerner men som varken själva eller genom sina dotterföretag bedriver någon näringsverksamhet från kravet på finansieringsanalys.</p>
               <p>En skillnad i förhållande till <a href="https://lagen.nu/1975:1385#K10P13" rel="dcterms:references">10 kap. 13 § aktiebolagslagen</a> är att, såvitt</p>
               <p>gäller punkten 1, begreppet ”fastställda koncernbalansräkningar” ersatts av ordet ”balansräkningarna”. Beträffande skälen till detta, se författningskommentaren till 2 kap. 1 §.</p>

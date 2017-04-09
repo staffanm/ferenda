@@ -450,6 +450,7 @@ class SwedishLegalSource(DocumentRepository):
         # "https://lagen.nu/sfs/2013:1127/konsolidering/2014:117" => "2013:1127/konsolidering/2014:117"
         # "https://lagen.nu/sfs/1736:0123_1" => "1736:0123 1"
         # "https://lagen.nu/utr/sou/2009:91?attachment=fingeravtryck-i-uppehallstillstand-sou-200991&repo=souregeringen&dir=downloaded" => "2009:91"
+        # "https://lagen.nu/utr/sou/2009:91/sid42.png" => "2009:91"
         # Subclasses with more specific rules should override, call
         # this through super(), and then sanitize basefile afterwards.
         base = self.urispace_base
@@ -461,6 +462,8 @@ class SwedishLegalSource(DocumentRepository):
             uri = uri.replace(self.config.develurl, self.config.url)
         if '?' in uri:
             uri = uri.split("?")[0]
+        if '/sid' in uri and uri.endswith(".png"):
+            uri = uri.split("/sid")[0]
         if uri.startswith(base) and uri[len(base)+1:].startswith(self.urispace_segment):
             offset = 2 if self.urispace_segment else 1
             basefile = uri[len(base) + len(self.urispace_segment) + offset:]

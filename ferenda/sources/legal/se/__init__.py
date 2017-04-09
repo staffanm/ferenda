@@ -3,7 +3,7 @@ from rdflib import Namespace
 RPUBL = Namespace('http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#')
 URISPACE = Namespace('http://rinfo.lagrummet.se/sys/uri/space#')
 RINFOEX = Namespace("http://lagen.nu/terms#")
-from .swedishlegalsource import SwedishLegalSource, SwedishLegalStore, SwedishCitationParser
+from .swedishlegalsource import SwedishLegalSource, SwedishLegalStore, SwedishLegalHandler, SwedishCitationParser
 from .fixedlayoutsource import FixedLayoutStore, FixedLayoutSource
 from .offtryck import Offtryck
 from .regeringen import Regeringen

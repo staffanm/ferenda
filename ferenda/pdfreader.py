@@ -128,6 +128,9 @@ class PDFReader(CompoundElement):
             self._textdecoder = textdecoder
 
 
+        # FIXME: For testing, we'd like to avoid this conversation if
+        # we already have the real_convertedfile that we'll end up
+        # with, in order to not convert to PDF needlessly
         if convert_to_pdf:
             newfilename = workdir + os.sep + \
                 os.path.splitext(os.path.basename(filename))[0] + ".pdf"
@@ -159,7 +162,6 @@ class PDFReader(CompoundElement):
             real_convertedfile = convertedfile + ".bz2"
         else:
             real_convertedfile = convertedfile
-        # print("filename: %s (%s), convertedfile: %s (%s), real_convertedfile: %s (%s)" % (filename, os.path.exists(filename), convertedfile, os.path.exists(convertedfile), real_convertedfile, os.path.exists(real_convertedfile)))
         tmpfilename = os.sep.join([workdir, basename])
         # copying the filename to the workdir is only needed if we use
         # PDFReader._pdftohtml
@@ -927,7 +929,8 @@ class StreamingPDFReader(PDFReader):
 
             # check if result is empty (has no content in any text node, except outline nodes)
             try:
-                tree = etree.parse(open(convertedfile.replace(".bz2", "")))
+                with open(convertedfile.replace(".bz2", "")) as fp:
+                    tree = etree.parse(fp)
                 for bad in tree.findall("outline"):
                     bad.getparent().remove(bad)
                 if not etree.tostring(tree, method="text", encoding="utf-8").strip():
@@ -1044,11 +1047,11 @@ class Page(CompoundElement, OrdinalElement):
 
     def __str__(self):
         textexcerpt = " ".join([str(x) for x in self])
-        return "Page %d (%d x %d): '%s...'" % (
+        return "Page %s (%d x %d): '%s...'" % (
             self.number, self.width, self.height, str(textexcerpt[:40]))
 
     def __repr__(self):
-        return '<%s %d (%dx%d): %d textboxes>' % (self.__class__.__name__,
+        return '<%s %s (%dx%d): %d textboxes>' % (self.__class__.__name__,
                                                   self.number, self.width, self.height,
                                                   len(self))
 

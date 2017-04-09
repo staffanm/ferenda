@@ -5,9 +5,10 @@ from __future__ import (absolute_import, division,
 from builtins import *
 
 # stdlib
+import os
 import logging
 import json
-from collections import Counter
+from collections import Counter, OrderedDict
 from io import BytesIO
 from itertools import chain
 from math import floor, ceil
@@ -73,6 +74,16 @@ class PDFAnalyzer(object):
 
     """
 
+    pagination_min_size = 6
+    """The minimum size (in points) that a page number can be. Used to
+    distinguish page numbers from footnote numbers, which are typically
+    set in miniscule sizes.
+
+    """
+    # FIXME: This should be (re-)set dynamically by observing the
+    # actual metrics. offtryck.py uses {count,analyze}_styles to pick
+    # a size smaller than 'default'
+
     def __init__(self, pdf):
         # FIXME: in time, we'd like to make it possible to specify
         # multiple pdf files (either because a single logical document
@@ -80,6 +91,8 @@ class PDFAnalyzer(object):
         # analyze a bunch of docs in one go).
         self.pdf = pdf
         self.scanned_source = False
+        self.log = logging.getLogger("pdfanalyze")
+
 
     @cached_property
     def documents(self):
@@ -95,6 +108,125 @@ class PDFAnalyzer(object):
 
         """
         return [(0, len(self.pdf), 'main')]
+
+
+    def paginate(self, paginatepath=None, force=False):
+        """Attempt to identify the real page number from pagination numbers on the page"""
+
+        if (not force and
+                paginatepath and
+                util.outfile_is_newer([self.pdf.filename], paginatepath)):
+            with open(paginatepath) as fp:
+                return json.load(fp)
+
+        guesses = []
+        mapping = OrderedDict()
+        currentpage = 0
+        misguess = 0
+        lastpagenumber = 0
+        for idx, page in enumerate(self.pdf):
+            physical = "%s#page=%s" % (page.src.split(os.sep)[-1], page.number)
+            pageskip = page.number - lastpagenumber
+            lastpagenumber = page.number
+            if isinstance(currentpage, int):
+                currentpage += pageskip
+            elif util.is_roman(currentpage):
+                lower = currentpage.islower()
+                currentpage = util.to_roman(util.from_roman(currentpage)+pageskip, lower=lower)
+                if lower:
+                    currentpage = currentpage.lower()
+            pageguess = self.guess_pagenumber(page, currentpage)
+            if pageguess is None:
+                if len(page) > 0:
+                    self.log.warning("physical page %s (%s): Can't guess pagenumber" % (idx,physical))
+                else:  # it's ok for completely blank pages not to have pagenumbers
+                    pass
+                guesses.append((physical, currentpage))
+                # page.number = None
+            else:
+                if pageguess != currentpage:
+                    if isinstance(currentpage, str) or isinstance(pageguess, str):
+                        # don't try to handle the case where the
+                        # expected pagenumber uses roman numerals and
+                        # the guessed pagenumbers uses arabic numerals
+                        # (ie int)
+                        self.log.warning("physical page %s (%s): Assumed page number %s, guess_pagenumber returned %s" % (idx, physical, currentpage, pageguess))
+                    elif (currentpage - pageguess) != misguess:
+                        # a not-to-uncommon error is that a page might
+                        # lack pagination, but at the same time contain a
+                        # numbered heading. This will cause a double
+                        # mis-guess when the next page resumes
+                        # pagination. Try to adapt to this.  FIXME: this
+                        # logic is too complicated with state variables
+                        # and all.
+                        self.log.warning("physical page %s (%s): Expected page number %s, guess_pagenumber returned %s" % (idx, physical, currentpage, pageguess))
+                        misguess = pageguess - currentpage
+                        guesses.append((physical, pageguess))
+                    else:
+                        self.log.warning("Never mind, physical page %s (%s): guess_pagenumber now returns %s so all is as it should" % (idx, physical, pageguess))
+                        prevphysical = guesses.pop()[0]
+                        mapping[prevphysical] = pageguess-1
+                        mapping[physical] = pageguess
+                        misguess = 0
+                else:
+                    misguess = 0
+
+                mapping[physical] = pageguess
+                currentpage = pageguess  # FIXME: if reasonable. Also: handle roman numerals
+        for idx, pageguess in guesses:
+            mapping[idx] = pageguess
+
+        if paginatepath:
+            util.ensure_dir(paginatepath)
+            with open(paginatepath, "w") as fp:
+                s = json.dumps(mapping, indent=4, separators=(', ', ': '))
+                fp.write(s)
+        return mapping
+    
+    
+    def guess_pagenumber(self, page, probable_pagenumber=1):
+        candidates = self.guess_pagenumber_candidates(page, probable_pagenumber)
+        if len(candidates) > 0:
+            return self.guess_pagenumber_select(candidates, probable_pagenumber)
+        # else: return None
+
+
+    def guess_pagenumber_candidates(self, page, probable_pagenumber):
+        candidates = []
+        for box in self.guess_pagenumber_boxes(page):
+            for el in box:
+                el = el.strip()
+                if el.isdigit() and len(el) < 5:
+                    candidates.append(int(el))
+                # the first few pages might use roman numerals
+                elif ((page.number == 1 or util.is_roman(probable_pagenumber)) and
+                      util.is_roman(el)):
+                    candidates.append(el)  # yes, use "iv" instead of 4
+        return candidates
+
+
+    def guess_pagenumber_boxes(self, page):
+        """Return a suitable number of textboxes to scan for a possible page number. """
+        # General logic: The pagenumber is probably among the first 5
+        # or last 5 boxes on the page, but only boxes larger than a
+        # certain size are eligible (to filter out footnote numbers)
+        return [b for b in list(reversed(page))[:5] + list(page)[:5] if b.font.size >= self.pagination_min_size]
+
+
+    def guess_pagenumber_select(self, candidates, probable_pagenumber):
+        # now select the most probable candidate
+        try:
+            # return the first candidate that is not smaller than
+            # the predicted pagenumber. But what if we've
+            # miscalculated the very first page (eg thought that
+            # it was page 4 when in reality it was page 1) --
+            # every subsequent (correctly numbered) page will drop
+            # into the no suitable candidate clause.
+            return next(c for c in sorted(candidates) if c >= probable_pagenumber)
+        except TypeError:  # candidates contained a roman numeral maybe?
+            return candidates[0]
+        except StopIteration: # no suitable candidate?
+            return None
 
     def metrics(self, metricspath=None, plotpath=None,
                 startpage=0, pagecount=None, force=False):
@@ -203,6 +335,8 @@ class PDFAnalyzer(object):
 
         counters = self.setup_horizontal_counters()
         for pagenumber, textbox in self.textboxes(startpage, pagecount):
+            if util.is_roman(pagenumber):
+                pagenumber = util.from_roman(pagenumber)
             self.count_horizontal_textbox(pagenumber, textbox, counters)
         for page in self.pdf[startpage:startpage + pagecount]:
             counters['pagewidth'][page.width] += 1
@@ -389,6 +523,14 @@ class PDFAnalyzer(object):
         largestyles = [x for x in sortedstyles if
                        (self.fontsize_key(x) > self.fontsize_key(ds) and
                         styles[x] > significantuse)]
+        # smallest font with significant usage and same family as
+        # default, yet significantly smaller (half size or smaller): probably FootNote
+        # Reference Style (fnrs)
+        fnrs = next(iter([x for x in reversed(sortedstyles) if (styles[x] > significantuse and
+                                                           x[0] == ds[0] and
+                                                           x[1] <= (ds[1] / 2))]), None)
+        if fnrs:
+            styledefs['footnoteref'] = self.fontdict(fnrs)
 
         for style in ('h1', 'h2', 'h3'):
             if largestyles:  # any left?
@@ -416,7 +558,6 @@ class PDFAnalyzer(object):
         for k, v in metrics.items():
             if isinstance(v, dict):
                 styles[(v['family'], v['size'])] = k
-        log = logging.getLogger("pdfanalyze")
         packet = None
         output = PyPDF2.PdfFileWriter()
         fp = open(self.pdf.filename, "rb")
@@ -444,7 +585,7 @@ class PDFAnalyzer(object):
                         new_page = new_pdf.getPage(0)
                         existing_page.mergePage(new_page)
                     except Exception as e:
-                        log.error("Couldn't merge page %s: %s: %s" % (pageidx, type(e), e))
+                        self.log.error("Couldn't merge page %s: %s: %s" % (pageidx, type(e), e))
                     output.addPage(existing_page)
 
                     # alternate way: merge the existing page on top of
@@ -461,7 +602,7 @@ class PDFAnalyzer(object):
                 mb = existing_page.mediaBox
                 horizontal_scale = float(mb.getHeight()) / tb.height
                 vertical_scale = float(mb.getWidth()) / tb.width
-                log.debug(
+                self.log.debug(
                     "Loaded page %s - Scaling %s, %s" %
                     (pageidx, horizontal_scale, vertical_scale))
                 packet = BytesIO()
@@ -530,7 +671,7 @@ class PDFAnalyzer(object):
         outputStream = open(outfilename, "wb")
         output.write(outputStream)
         outputStream.close()
-        log.debug("wrote %s" % outfilename)
+        self.log.debug("wrote %s" % outfilename)
         fp.close()
 
     def plot(self, filename, margincounters, stylecounters, metrics):
@@ -584,8 +725,7 @@ class PDFAnalyzer(object):
 
         util.ensure_dir(filename)
         plt.savefig(filename, dpi=150)
-        log = logging.getLogger("pdfanalyze")
-        log.debug("wrote %s" % filename)
+        self.log.debug("wrote %s" % filename)
 
     def plot_margins(self, subplots, margin_counters, metrics,
                      pagewidth, pageheight):

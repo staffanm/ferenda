@@ -329,10 +329,9 @@ class Riksdagen(Offtryck, FixedLayoutSource):
             parser = "ocr" if ".hocr." in util.name_from_fp(fp) else "xml"
             reader = StreamingPDFReader().read(fp, parser=parser)
             identifier = self.canonical_uri(basefile)
-            baseuri = "%s?repo=%s&dir=downloaded&format=png&attachment=index.pdf" % (identifier, self.alias)
-            # this will have returned a fully-loaded PDFReader document
+            pdffile = self.store.downloaded_path(basefile, attachment="index.pdf")
             for page in reader:
-                page.src = "%s&page=%s" % (baseuri, (page.number - 1))
+                page.src = pdffile
             return reader
         else:
             # fp points to a HTML file, which we can use directly.

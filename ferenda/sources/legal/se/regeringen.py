@@ -25,10 +25,27 @@ from ferenda.decorators import recordlastdownload, downloadmax
 from ferenda.elements import Section, Link, Body, CompoundElement
 from ferenda.pdfreader import PDFReader, Textbox, Textelement, Page, BaseTextDecoder
 from ferenda.errors import DocumentRemovedError, DownloadError, DocumentSkippedError
-from . import SwedishLegalSource, Offtryck, RPUBL
+from . import SwedishLegalSource, SwedishLegalStore, Offtryck, RPUBL
 from .legalref import LegalRef
 from .elements import PreambleSection, UnorderedSection, Forfattningskommentar, Sidbrytning, VerbatimSection
+from .decoders import OffsetDecoder1d, OffsetDecoder20, DetectingDecoder
 
+
+class RegeringenStore(SwedishLegalStore):
+    # override to make sure pdf attachments are returned in logical order
+    def list_attachments(self, basefile, action, version=None):
+        if action == "downloaded":
+            repo = Regeringen()
+            repo.store.datadir=self.datadir
+            for pdffile, label in repo.sourcefiles(basefile):
+                attachment = os.path.basename(pdffile) + ".pdf"
+                pdffile = self.downloaded_path(basefile, attachment=attachment)
+                if os.path.exists(pdffile):
+                    yield attachment
+                # else:
+                #     self.log.warning("%s: Attachment %s doesn't exist!")
+        else:
+             return super(RegeringenStore, self).list_attachments(basefile, action, version)  
 
 
 class Regeringen(Offtryck):
@@ -41,7 +58,8 @@ class Regeringen(Offtryck):
     SKRIVELSE = 1330
     SOU = 1331
     SO = 1332
-    
+
+    documentstore_class = RegeringenStore
     document_type = None  # subclasses must override
     start_url = "http://www.regeringen.se/Filter/RssFeed"
     downloaded_suffix = ".html"  # override PDFDocumentRepository
@@ -543,9 +561,10 @@ class Regeringen(Offtryck):
             return [x[0] for x in cleanfiles]
 
 
-    # returns a list of (PDFReader, metrics) tuples, one for each PDF
+    # returns a concatenated PDF reader containing all sub-PDF readers.
     def read_pdfs(self, basefile, pdffiles, identifier=None):
         reader = None
+        mapping = {}
         for pdffile in pdffiles:
             basepath = pdffile.split("/")[-1]
             pdf_path = self.store.downloaded_path(basefile,
@@ -553,12 +572,47 @@ class Regeringen(Offtryck):
             intermed_path = self.store.intermediate_path(basefile,
                                                          attachment=basepath)
             intermediate_dir = os.path.dirname(intermed_path)
+            subreader = self.parse_pdf(pdf_path, intermediate_dir, basefile)
             if not reader:
-                reader = self.parse_pdf(pdf_path, intermediate_dir, basefile)
+                reader = subreader
             else:
-                reader += self.parse_pdf(pdf_path, intermediate_dir, basefile)
+                reader += subreader
         return reader
 
+    def parse_pdf(self, pdffile, intermediatedir, basefile):
+        # By default, don't create and manage PDF backgrounds files
+        # (takes forever, we don't use them yet)
+        if self.config.compress == "bz2":
+            keep_xml = "bz2"
+        else:
+            keep_xml = True
+        tup = (self.document_type, basefile)
+        default_decoder = (DetectingDecoder, None)
+        # This just just a list of known different encoding
+        # schemes. FIXME: try to find out whether all Ds documents should
+        # use the (non-decoding) BaseTextDecoder
+        alternate_decoders = {(self.PROPOSITION, "1997/98:44"): (OffsetDecoder20, "Datalagskommittén"),
+                              (self.DS, "2004:46"): (BaseTextDecoder, None)}
+
+        decoding_class, decoder_arg = alternate_decoders.get(tup, default_decoder)
+        convert_to_pdf = not pdffile.lower().endswith(".pdf")
+        pdf = PDFReader(filename=pdffile,
+                        workdir=intermediatedir,
+                        images=self.config.pdfimages,
+                        convert_to_pdf=convert_to_pdf,
+                        keep_xml=keep_xml,
+                        textdecoder=decoding_class(decoder_arg))
+        if pdf.is_empty():
+            self.log.warning("PDF file %s had no textcontent, trying OCR" % pdffile)
+            pdf = PDFReader(filename=pdffile,
+                            workdir=intermediatedir,
+                            images=self.config.pdfimages,
+                            keep_xml=keep_xml,
+                            ocr_lang="swe")
+        identifier = self.canonical_uri(basefile)
+        for page in pdf:
+            page.src = pdffile
+        return pdf
 
     def toc(self, otherrepos=None):
         self.log.debug(

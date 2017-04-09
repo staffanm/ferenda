@@ -28,7 +28,6 @@ from ferenda.errors import ParseError, DocumentSkippedError
 
 from . import SwedishLegalSource, RPUBL
 from .legalref import Link, LegalRef, RefParseError
-from .decoders import OffsetDecoder1d, OffsetDecoder20, DetectingDecoder
 from .elements import *
 
 class Offtryck(SwedishLegalSource):
@@ -123,7 +122,8 @@ class Offtryck(SwedishLegalSource):
             b.append(Preformatted([p.replace("\n"," ")]))
         return b
     
-    def get_parser(self, basefile, sanitized, initialstate=None, startpage=None, pagecount=None):
+    def get_parser(self, basefile, sanitized, initialstate=None,
+                   startpage=None, pagecount=None):
         """should return a function that gets any iterable (the output
         from tokenize) and returns a ferenda.elements.Body object.
         
@@ -181,6 +181,7 @@ class Offtryck(SwedishLegalSource):
             gluefunc = self.get_gluefunc(basefile, analyzer)
             analyzer.drawboxes(pdfdebug_path, gluefunc,
                                metrics=metrics)
+
         if self.document_type == self.PROPOSITION:
             preset = 'proposition'
         elif self.document_type == self.SOU:
@@ -348,9 +349,12 @@ class Offtryck(SwedishLegalSource):
         # parts
         sanitized.analyzer.gluefunc = gluefunc
         documents = sanitized.analyzer.documents
+
+        
         
         if len(documents) > 1:
             self.log.debug("%s: segmented into docs %s" % (basefile, documents))
+        self.paginate(sanitized, basefile)
         for (startpage, pagecount, tag) in documents:
             if tag == 'main':
                 initialstate['pageno'] -= 1  # argh....
@@ -424,6 +428,39 @@ class Offtryck(SwedishLegalSource):
             allbody += body[:]
         return allbody
 
+
+    def paginate(self, sanitized, basefile):
+        """Use a PDF analyzer to determine probable pagenumbering, then set
+        the page numbers of the PDFReader object according to that
+
+        """
+        analyzer = sanitized.analyzer
+        pagemapping_path = self.store.path(basefile, 'intermediate',
+                                            '.pagemapping.json')
+        if not os.path.exists(pagemapping_path) or self.config.force:
+            # But in order to find out font sizes, we do a minimal
+            # metrics calculation to find out probable foootnoteref
+            # size. Page numbers must be larger than those.
+            styles = analyzer.analyze_styles(analyzer.count_styles(0, len(sanitized)))
+            if 'footnoteref' in styles:
+                analyzer.pagination_min_size = styles['footnoteref']['size'] + 1
+
+        pagemapping = analyzer.paginate(paginatepath=pagemapping_path,
+                                        force=self.config.force)
+        # apply the pagenumbers to the pdf object in a 2-step process
+        # - first map the PDFReader pages to the physical pages in ine
+        # or more pdf files
+        filemapping = {}
+        for idx, page in enumerate(sanitized):
+            filemapping[(page.src.split("/")[-1], str(page.number))] = idx
+        baseuri = self.canonical_uri(basefile)
+        # then assign the analyzed pagenumbers
+        for k, v in pagemapping.items():
+            pdffile, pp = k.split("#page=")
+            idx = filemapping[(pdffile, pp)]
+            sanitized[idx].number = v
+            sanitized[idx].src = "%s/sid%s.png" % (baseuri, v)
+        
 
     def postprocess_doc(self, doc):
         # loop through the textboxes on page 1 try to find
@@ -606,41 +643,6 @@ class Offtryck(SwedishLegalSource):
             return identifier
 
 
-    def parse_pdf(self, pdffile, intermediatedir, basefile):
-        # By default, don't create and manage PDF backgrounds files
-        # (takes forever, we don't use them yet)
-        if self.config.compress == "bz2":
-            keep_xml = "bz2"
-        else:
-            keep_xml = True
-        tup = (self.document_type, basefile)
-        default_decoder = (DetectingDecoder, None)
-        # This just just a list of known different encoding
-        # schemes. FIXME: try to find out whether all Ds documents should
-        # use the (non-decoding) BaseTextDecoder
-        alternate_decoders = {(self.PROPOSITION, "1997/98:44"): (OffsetDecoder20, "Datalagskommittén"),
-                              (self.DS, "2004:46"): (BaseTextDecoder, None)}
-
-        decoding_class, decoder_arg = alternate_decoders.get(tup, default_decoder)
-        pdf = PDFReader(filename=pdffile,
-                        workdir=intermediatedir,
-                        images=self.config.pdfimages,
-                        keep_xml=keep_xml,
-                        textdecoder=decoding_class(decoder_arg))
-        if pdf.is_empty():
-            self.log.warning("PDF file %s had no textcontent, trying OCR" % pdffile)
-            pdf = PDFReader(filename=pdffile,
-                            workdir=intermediatedir,
-                            images=self.config.pdfimages,
-                            keep_xml=keep_xml,
-                            ocr_lang="swe")
-        identifier = self.canonical_uri(basefile)
-        baseuri = "%s?attachment=%s&repo=%s&dir=downloaded&format=png" % (identifier, os.path.basename(pdffile), self.alias)
-        for page in pdf:
-            page.src = "%s&page=%s" % (baseuri, (page.number - 1))
-        return pdf
-
-
     def get_pdf_analyzer(self, reader):
         if self.document_type == self.KOMMITTEDIREKTIV:
             from ferenda.sources.legal.se.direktiv import DirAnalyzer
@@ -657,6 +659,7 @@ class Offtryck(SwedishLegalSource):
         else:
             cls = PDFAnalyzer
         analyzer = cls(reader)
+
         if ".hocr." in reader.filename:
             analyzer.scanned_source = True
         return analyzer
@@ -1572,7 +1575,11 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     def skip_pagebreak(parser):
         # increment pageno
         state.page = parser.reader.next()
-        state.pageno = state.page.number
+        try:
+            state.pageno = int(state.page.number)
+        except ValueError as e:  # state.page.number was probably a roman numeral (typed as string)
+            state.pageno = 0  # or maybe convert roman numeral to int?
+        
         sb = Sidbrytning(width=state.page.width,
                          height=state.page.height,
                          src=state.page.src,

@@ -5,15 +5,54 @@ from builtins import *
 
 from collections import OrderedDict
 import os
+import re
+import json
 
 from rdflib import URIRef
 from rdflib.namespace import DCTERMS
 
-from . import SwedishLegalStore, SwedishLegalSource
+from . import SwedishLegalStore, SwedishLegalSource, SwedishLegalHandler
 from ferenda import util
-from ferenda.errors import DocumentRemovedError
+from ferenda import CompositeRepository
+from ferenda.errors import DocumentRemovedError, RequestHandlerError
 from ferenda.pdfreader import StreamingPDFReader
 
+
+class FixedLayoutHandler(SwedishLegalHandler):
+    def get_pathfunc(self, environ, basefile, params, contenttype, suffix):
+        if basefile and suffix == "png":
+            # OK, this is a request for a particular page. Map this to
+            # correct repo, dir and attachment and set those params
+            pi = environ['PATH_INFO']
+            pageno = pi[pi.index("/sid")+4:-(len(suffix)+1)]
+            if pageno.isdigit():
+                pageno = int(pageno)
+            
+            if isinstance(self.repo, CompositeRepository):
+                for subrepo in self.repo.subrepos:
+                    repo = self.repo.get_instance(subrepo)
+                    if os.path.exists(repo.store.downloaded_path(basefile)):
+                        break
+                else:
+                    raise RequestHandlerError("%s: No subrepo has downloaded this basefile" % basefile)
+            else:
+                repo = self.repo
+            params['repo'] = repo.alias
+            params['dir'] = "downloaded"
+            pagemapping_path = repo.store.path(basefile, 'intermediate','.pagemapping.json')
+            with open(pagemapping_path) as fp:
+                pagemap = json.load(fp)
+            # invert the map (only keep the first -- hmm, maybe pagemap isn't ordered?)
+            invertedmap = {}
+            for k, v in pagemap.items():
+                if v not in invertedmap:
+                    invertedmap[v] = k
+            attachment, pp = invertedmap[pageno].split("#page=")
+            params['attachment'] = attachment
+            params['page'] = str(int(pp) - 1)  # pp is 1-based, but RequestHandler.get_pathfunc expects 0-based
+            params['format'] = 'png'
+        return super(FixedLayoutHandler, self).get_pathfunc(environ, basefile, params, contenttype, suffix)
+    
 
 class FixedLayoutStore(SwedishLegalStore):
     """Handles storage of fixed-layout documents (either PDF or
@@ -84,6 +123,7 @@ class FixedLayoutSource(SwedishLegalSource):
 
     downloaded_suffix = ".pdf"
     documentstore_class = FixedLayoutStore
+    requesthandler_class = FixedLayoutHandler
     
     def downloaded_to_intermediate(self, basefile):
         # force just the conversion part of the PDF handling

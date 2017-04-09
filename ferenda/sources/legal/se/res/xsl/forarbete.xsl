@@ -261,15 +261,7 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
 	<li class="active"><a href="#{@id}-text" class="view-text">Sida <xsl:value-of select="substring(@id,4)"/></a></li>
 	<li><a href="#{@id}-img" class="view-img"><span class="glyphicon glyphicon-picture">&#160;</span>Original</a></li>
       </ul>
-      <img data-src="{@src}" class="facsimile"/>
-      <!--
-      <p class="sidbrytning"><i>Sida <xsl:value-of select="substring(@id,4)"/></i>
-      <button type="button" class="view-facsimile pull-left">
- 	<span>Visa faksimil</span>
- 	<span style="display: none">Visa text</span>
-      </button>
-      </p>
-      -->
+      <a href="{@src}" class="facsimile"><img data-src="{@src}"/></a>
     </div>
     <xsl:variable name="uri"><xsl:value-of select="//@about"/>#<xsl:value-of select="@id"/></xsl:variable>
     <xsl:call-template name="aside-annotations">

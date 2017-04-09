@@ -47,7 +47,7 @@ $(document).ready(function () {
 	navtabs.find("li:nth-child(1)").removeClass("active");
 	navtabs.find("li:nth-child(2)").addClass("active");
 	/* on-demand load facsimileimage and show */
-	navtabs.siblings(".facsimile").each(function(idx) {
+        navtabs.siblings(".facsimile").children("img").each(function(idx) {
 	    this.src = $(this).attr('data-src');
 	    $(this).show();
 	})
@@ -56,7 +56,7 @@ $(document).ready(function () {
 	navtabs = $(this).parents("ul")
 	navtabs.find("li:nth-child(1)").addClass("active");
 	navtabs.find("li:nth-child(2)").removeClass("active");
-	navtabs.siblings(".facsimile").hide();
+        navtabs.siblings(".facsimile").children("img").hide();
 	$(this).parents("div.sida").nextUntil("div.sida").show();
 	if ($(this).parents("div.sida").siblings("div.sida").length == 0) {
 	    nextsectionstart = $(this).parents("div.toplevel").next().find("section *").first();

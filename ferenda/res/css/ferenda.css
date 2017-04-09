@@ -455,7 +455,7 @@ body.toc article ul li ul li {
 
 
 /* PART 2.6: Misc styling */
-img.facsimile { 
+a.facsimile img { 
     display: none;
     border-left: 1px solid #ddd;
     border-right: 1px solid #ddd;

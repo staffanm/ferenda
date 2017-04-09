@@ -108,6 +108,42 @@ class PropAnalyzer(PDFAnalyzer):
                 documents.append([pageidx, 1, currentdoc])
         return documents
 
+    def guess_pagenumber_select(self, candidates, probable_pagenumber):
+        if self.scanned_source:
+            # try to avoid assuming that smudges and crap equals
+            # lower-case L and other things that might be interpreted
+            # as roman numeral
+            if util.is_roman(candidates[0]) and str(probable_pagenumber) == "1":
+                return 1  # Do not interpret a single 'l' as roman 50
+                          # -- it's probably a badly OCR:ed '
+            else:
+                # be a little more conservative with what a good guess
+                # is compared to PDFAnalyzer.guess_pagenumber_select:
+                # only accept the smallest candidate larger-or-equal
+                # to the probable_pagenumber -- but not if it's a
+                # too-large gap. Also, assume no roman numerals
+                try:
+                    return next(c for c in sorted(candidates) if c >= probable_pagenumber and c <= probable_pagenumber * 2)
+                except StopIteration: # no suitable candidate
+                    return None
+                
+        # otherwise fall back to superclass implementation
+        return super(PropAnalyzer, self).guess_pagenumber_select(candidates, probable_pagenumber)
+                          
+    def guess_pagenumber_boxes(self, page):
+        """Return a suitable number of textboxes to scan for a possible page number. """
+        if self.scanned_source:
+            # For scanned source, the default strategy works so-so
+            # (many OCR errors may result in misinterpreting things as
+            # pagenumbers) so we also take into account the text box
+            # property. Only select thin boxes (less than 1/50th of
+            # the page width) -- page numbers should stand by
+            # themselves and naturally be pretty thin
+            return [b for b in list(reversed(page))[:5] + list(page)[:5] if b.width < page.width/50]
+        else:
+            return super(PropAnalyzer, self).guess_pagenumber_boxes(page)
+
+
     def metrics(self, metricspath=None, plotpath=None, startpage=0,
                 pagecount=None, force=False):
         docsegments = self.documents
@@ -516,7 +552,11 @@ class PropTrips(Trips, Offtryck, FixedLayoutSource):
             # fp is opened in bytestream mode
             return TextReader(string=fp.read().decode("utf-8"))
         else:
-            return super(PropTrips, self).extract_body(fp, basefile)
+            reader = super(PropTrips, self).extract_body(fp, basefile)
+            pdffile = self.store.downloaded_path(basefile, attachment="index.pdf")
+            for page in reader:
+                page.src = pdffile
+            return reader
 
     def sanitize_body(self, rawbody):
         if isinstance(rawbody, TextReader):

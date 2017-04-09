@@ -25,6 +25,8 @@ from email.utils import parsedate_tz
 from ast import literal_eval
 from urllib.parse import urlsplit, urlunsplit
 
+from docutils.utils import roman
+
 from . import errors
 
 # We should reorganize this, maybe in util.File, util.String, and so on...
@@ -689,7 +691,7 @@ def switch_locale(newlocale="C", category=locale.LC_TIME):
         locale.setlocale(category, oldlocale)
 
 
-# Example code from http://www.diveintopython.org/
+        
 def from_roman(s):
     """convert Roman numeral to integer.
 
@@ -697,26 +699,20 @@ def from_roman(s):
     1984
 
     """
-    roman_numeral_map = (('M', 1000),
-                         ('CM', 900),
-                         ('D', 500),
-                         ('CD', 400),
-                         ('C', 100),
-                         ('XC', 90),
-                         ('L', 50),
-                         ('XL', 40),
-                         ('X', 10),
-                         ('IX', 9),
-                         ('V', 5),
-                         ('IV', 4),
-                         ('I', 1))
-    result = 0
-    index = 0
-    for numeral, integer in roman_numeral_map:
-        while s[index:index + len(numeral)] == numeral:
-            result += integer
-            index += len(numeral)
-    return result
+    if s.islower():
+        s = s.upper()
+    return roman.fromRoman(s)
+
+def to_roman(i, lower=False):
+    s = roman.toRoman(i)
+    if lower:
+        s = s.lower()
+    return s
+    
+def is_roman(s):
+    if not isinstance(s, str):
+        return False
+    return roman.romanNumeralPattern.match(s.upper()) is not None
 
 
 def title_sortkey(s):
