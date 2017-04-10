@@ -26,16 +26,19 @@
 	      encoding='utf-8'
 	      indent="yes"/>
 
+
+
+  <!--
   <xsl:template match="/">
-    <!-- this is a ugly workaround required to get the proper html5
+    this is a ugly workaround required to get the proper html5
          doctype *and* the pre-rootnode conditional IE comments needed
          for the h5bp template. Strip the <remove-this-tag> start and end
-         tags as a postprocessing step. -->
+         tags as a postprocessing step.
     <remove-this-tag>
       <xsl:apply-templates/>
     </remove-this-tag>
   </xsl:template>
-      
+  -->
   <xsl:template match="xhtml:html">
     <html>
     <xsl:apply-templates/>

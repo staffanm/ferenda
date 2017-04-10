@@ -294,25 +294,27 @@ class XSLTTransform(TransformerEngine):
 
     # nativedata = lxml.etree
     def native_to_file(self, nativedata, outfile):
-        res = self.html5_doctype_workaround(
-            etree.tostring(nativedata, pretty_print=self.format, encoding="utf-8"))
+        # res = self.html5_doctype_workaround(
+        #     etree.tostring(nativedata, pretty_print=self.format, encoding="utf-8"))
+        res = etree.tostring(nativedata, pretty_print=self.format, encoding="utf-8")
         util.ensure_dir(outfile)
         with open(outfile, "wb") as fp:
             fp.write(res)
 
-    @staticmethod
-    def html5_doctype_workaround(indata):
-        # FIXME: This is horrible
-        if indata.startswith(b"<remove-this-tag>"):
-            found = False
-            endidx = -1
-            while not found:
-                if indata[endidx] == b"<" or indata[endidx] == 60:
-                    found = True
-                else:
-                    endidx -= 1
-            indata = b"<!DOCTYPE html>\n" + indata[17:endidx].strip()
-        return indata
+# not needed anymore since using Bootstrap instead of H5BP
+#    @staticmethod
+#    def html5_doctype_workaround(indata):
+#        # FIXME: This is horrible
+#        if indata.startswith(b"<remove-this-tag>"):
+#            found = False
+#            endidx = -1
+#            while not found:
+#                if indata[endidx] == b"<" or indata[endidx] == 60:
+#                    found = True
+#                else:
+#                    endidx -= 1
+#            indata = b"<!DOCTYPE html>\n" + indata[17:endidx].strip()
+#        return indata
 
     def file_to_native(self, infile):
         return etree.parse(infile)

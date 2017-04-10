@@ -2902,7 +2902,8 @@ WHERE {
             depth,
             uritransform=urltransform)
 
-        fixed = transformer.t.html5_doctype_workaround(etree.tostring(tree, pretty_print=True, encoding="utf-8"))
+        # fixed = transformer.t.html5_doctype_workaround(etree.tostring(tree, pretty_print=True, encoding="utf-8"))
+        fixed = etree.tostring(tree, pretty_print=True, encoding="utf-8")
 
         # with self.store.open(effective_basefile, 'toc', '.html', "wb") as fp:
         util.ensure_dir(outfile)

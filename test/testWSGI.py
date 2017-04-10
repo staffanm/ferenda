@@ -788,7 +788,6 @@ class Search(WSGI):
                             {'Content-Type': 'text/html; charset=utf-8'},
                             None,
                             status, headers, None)
-
         t = etree.parse(BytesIO(content))
         css = t.findall("head/link[@rel='stylesheet']")
         self.assertEqual(len(css), 3) # bootstrap, bootstrap-theme, ferenda and sfs (?!)

@@ -97,7 +97,7 @@ class WSGIApp(object):
         else:
             title = "%s matches" % pager['totalresults']
         title += " for '%s'" % queryparams.get("q")
-        body = Body()
+        body = html.Body()
         for r in res:
             if not 'dcterms_title' in r or r['dcterms_title'] is None:
                 r['dcterms_title'] = r['uri']
