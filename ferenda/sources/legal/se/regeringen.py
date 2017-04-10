@@ -45,7 +45,8 @@ class RegeringenStore(SwedishLegalStore):
                 # else:
                 #     self.log.warning("%s: Attachment %s doesn't exist!")
         else:
-             return super(RegeringenStore, self).list_attachments(basefile, action, version)  
+            for attachment in super(RegeringenStore, self).list_attachments(basefile, action, version):
+                yield attachment
 
 
 class Regeringen(Offtryck):
