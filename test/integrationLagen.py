@@ -125,9 +125,16 @@ class TestSearch(TestLagen):
     def test_faceted_search(self):
         totalhits = self.totalhits(BeautifulSoup(self.get(
             self.baseurl + "search/?q=personuppgift").text, "lxml"))
-        soup = BeautifulSoup(self.get(self.baseurl + "search/?q=personuppgift&repo=dv").text,
+        soup = BeautifulSoup(self.get(self.baseurl + "search/?q=personuppgift&type=dv").text,
                              "lxml")
         self.assertLess(self.totalhits(soup), totalhits)
+        # for some reason, this search keyword yields ghost hits when using faceting
+        totalhits = self.totalhits(BeautifulSoup(self.get(
+            self.baseurl + "search/?q=avtal").text, "lxml"))
+        soup = BeautifulSoup(self.get(self.baseurl + "search/?q=avtal&type=dv").text,
+                             "lxml")
+        self.assertLess(self.totalhits(soup), totalhits)
+
         # go on and test that the facets in the navbar is as they should
 
     def test_sfs_title(self):

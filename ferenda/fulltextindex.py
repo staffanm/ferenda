@@ -697,6 +697,8 @@ class ElasticSearchIndex(RemoteIndex):
                                 # 5.*
 
     fragment_size = 150
+    # a list of fieldnames (possibly with boost factors)
+    default_fields = ("label^3", "text")
 
     def __init__(self, location, repos):
         self._writer = None
@@ -784,8 +786,8 @@ class ElasticSearchIndex(RemoteIndex):
         self._writer.write(b"\n")
 
     def _query_payload(self, q, pagenum=1, pagelen=10, ac_query=False, **kwargs):
-        if kwargs.get("repo"):
-            types = [kwargs.get("repo")]
+        if kwargs.get("type"):
+            types = [kwargs.get("type")]
         else:
             types = [repo.alias for repo in self._repos if repo.config.relate]
 
@@ -806,12 +808,11 @@ class ElasticSearchIndex(RemoteIndex):
         for k, v in kwargs.items():
             if isinstance(v, SearchModifier):
                 continue
-            if k in ("type", "repo"):  # FIXME: maybe should only be "repo"
+            if k in ("type", "repo"):
                 k = "_type"
             elif isinstance(schema[k], Resource):
                 # also map k to "%s.iri" % k if k is Resource
                 k += ".iri"
-
             if isinstance(v, str) and "*" in v:
                 # if v contains "*", make it a {'regexp': '.*/foo'} instead of a {'term'}
                 # also transform * to .* and escape '#' and '.'
@@ -839,9 +840,9 @@ class ElasticSearchIndex(RemoteIndex):
         if q and not ac_query:
             # NOTE: we need to specify highlight parameters for each
             # subquery when using has_child, see
-            # https://github.com/elastic/elasticsearch/issues/14999
-            match['fields'] = ["label^3", # boost label (title) 3x compared to text
-                               "text"]
+            # https://github.com/elastic/elasticsearch/issues/14999 --
+            # still seems to be an issue with ES5.*
+            match['fields'] = self.default_fields
             match['query'] = q
             match['default_operator'] = "and"
             highlight = {'fields': {'text': {},
@@ -855,13 +856,10 @@ class ElasticSearchIndex(RemoteIndex):
             # matching each possible _child type (until someone solves
             # http://stackoverflow.com/questions/38946547 for me)
             submatches = [{"simple_query_string": deepcopy(match)}]
-            if kwargs.get("repo"):
-                reponames = [kwargs.get("repo")]
-            else:
-                reponames = [repo.alias for repo in self._repos if repo.config.relate]
-            for reponame in reponames:
+
+            for t in types:
                 submatches.append(
-                    {"has_child": {"type": reponame + "_child",
+                    {"has_child": {"type": t + "_child",
                                    "inner_hits": inner_hits,
                                    "query": {"simple_query_string": deepcopy(match)}
                     }})
@@ -882,6 +880,13 @@ class ElasticSearchIndex(RemoteIndex):
                 match["bool"]["filter"] = filters[0]
         payload = {'query': match,
                    'aggs': self._aggregation_payload()}
+        if q and "filter" in match["bool"]:
+            # fixes staffanm/lagen.nu#69 by making sure that documents
+            # that matches the filter query but does not score
+            # anything in the should query aren't counted. This
+            # shouldn't be used in AC queries since they only use
+            # filters, not freetext query parameters
+            payload["min_score"] = 0.01  
         # Don't include the full text of every document in every hit
         if not ac_query:
             payload['_source'] = {self.term_excludes: ['text']}

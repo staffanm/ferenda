@@ -305,6 +305,7 @@ class CustomQuery(object):
         
     def test_repo_limited_freetext(self):
         self.load(custom_dataset)
+        self.index.default_fields = ("dcterms_title^3", "text")
         res, pager = self.index.query('first', repo='repo1')
         self.assertEqual(len(res),2)
         self.assertEqual(res[0]['dcterms_identifier'], 'R1 D1') # contains the term 'first' twice
