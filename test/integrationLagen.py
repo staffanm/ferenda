@@ -3,6 +3,9 @@
 # This fixture does a bunch of real HTTP request against a selected
 # server (determined by the environment variable FERENDA_TESTURL,
 # which is http://localhost:8080/
+#
+# When running against a local instance, it's important that this has
+# been initialized with the documents in lagen/nux
 
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
@@ -23,10 +26,11 @@ from rdflib.namespace import DCTERMS
 
 # own
 from ferenda.elements import Link, serialize
+from ferenda.testutil import FerendaTestCase
 from lagen.nu import SFS, LNKeyword
 from lagen.nu.wsgiapp import WSGIApp
 
-class TestLagen(unittest.TestCase):
+class TestLagen(unittest.TestCase, FerendaTestCase):
 
     baseurl = os.environ.get("FERENDA_TESTURL", "http://localhost:8080/")
 
@@ -85,6 +89,191 @@ class TestPatching(TestLagen):
         res.raise_for_status()                              # req succeded
         self.assertEqual(-1, res.text.find(needle))         # sensitive name is removed
         self.assertTrue(res.text.index("alert alert-warning patchdescription")) # patching is advertised
+
+class TestConNeg(TestLagen):
+    # this basically mirrors testWSGI.ConNeg
+    def test_basic(self):
+        res = self.get(self.baseurl + "1991:1469")
+        self.assertEqual(200, res.status_code)
+        self.assertEqual("text/html; charset=utf-8", res.headers['Content-Type'])
+
+    def test_xhtml(self):
+        res = self.get(self.baseurl + "1991:1469",
+                       headers={'Accept': 'application/xhtml+xml'})
+        self.assertEqual(200, res.status_code)
+        self.assertEqual("application/xhtml+xml", res.headers['Content-Type'])
+        # variation: use file extension
+        res = self.get(self.baseurl + "1991:1469.xhtml")
+        self.assertEqual(200, res.status_code)
+        self.assertEqual("application/xhtml+xml", res.headers['Content-Type'])
+
+    def test_rdf(self):
+        # basic test 3: accept: application/rdf+xml -> RDF statements (in XML)
+        res = self.get(self.baseurl + "1991:1469",
+                       headers={'Accept': 'application/rdf+xml'})
+        self.assertEqual(200, res.status_code)
+        self.assertEqual("application/rdf+xml", res.headers['Content-Type'])
+        # variation: use file extension
+        res = self.get(self.baseurl + "1991:1469.rdf")
+        self.assertEqual(200, res.status_code)
+        self.assertEqual("application/rdf+xml", res.headers['Content-Type'])
+
+    def test_ntriples(self):
+        # transform test 4: accept: text/plain -> RDF statements (in NTriples)
+
+        # get the untransformed data to compare with
+        g = Graph().parse(data=self.get(self.baseurl + "1991:1469.rdf").text)
+        res = self.get(self.baseurl + "1991:1469",
+                       headers={'Accept': 'text/plain'})
+        self.assertEqual(200, res.status_code)
+        self.assertEqual("text/plain", res.headers['Content-Type'])
+        got = Graph().parse(data=res.content, format="nt")
+        self.assertEqualGraphs(g, got)
+
+        # variation: use file extension
+        res = self.get(self.baseurl + "1991:1469.nt")
+        self.assertEqual(200, res.status_code)
+        self.assertEqual("text/plain", res.headers['Content-Type'])
+        got = Graph()
+        got.parse(data=res.content, format="nt")
+        self.assertEqualGraphs(g, got)
+
+    def test_turtle(self):
+        # transform test 5: accept: text/turtle -> RDF statements (in Turtle)
+        g = Graph().parse(data=self.get(self.baseurl + "1991:1469.rdf").text)
+        res = self.get(self.baseurl + "1991:1469",
+                       headers={'Accept': 'text/turtle'})
+        self.assertEqual(200, res.status_code)
+        self.assertEqual("text/turtle", res.headers['Content-Type'])
+        got = Graph().parse(data=res.content, format="turtle")
+        self.assertEqualGraphs(g, got)
+
+        # variation: use file extension
+        res = self.get(self.baseurl + "1991:1469.ttl")
+        self.assertEqual(200, res.status_code)
+        self.assertEqual("text/turtle", res.headers['Content-Type'])
+        got = Graph()
+        got.parse(data=res.content, format="turtle")
+        self.assertEqualGraphs(g, got)
+
+    def test_json(self):
+        # transform test 6: accept: application/json -> RDF statements (in JSON-LD)
+        g = Graph().parse(data=self.get(self.baseurl + "1991:1469.rdf").text)
+        res = self.get(self.baseurl + "1991:1469",
+                       headers={'Accept': 'application/json'})
+        self.assertEqual(200, res.status_code)
+        self.assertEqual("application/json", res.headers['Content-Type'])
+        got = Graph().parse(data=res.text, format="json-ld")
+        self.assertEqualGraphs(g, got)
+
+        # variation: use file extension
+        res = self.get(self.baseurl + "1991:1469.json")
+        self.assertEqual(200, res.status_code)
+        self.assertEqual("application/json", res.headers['Content-Type'])
+        got = Graph()
+        got.parse(data=res.text, format="json-ld")
+        self.assertEqualGraphs(g, got)
+
+    def test_unacceptable(self):
+        res = self.get(self.baseurl + "1991:1469",
+                       headers={'Accept': 'application/pdf'})
+        self.assertEqual(res.status_code, 406)
+        self.assertEqual("text/html; charset=utf-8", res.headers['Content-Type'])
+
+        # variation: unknown file extension should also be unacceptable
+        res = self.get(self.baseurl + "1991:1469.pdf")
+        self.assertEqual(res.status_code, 406)
+        self.assertEqual("text/html; charset=utf-8", res.headers['Content-Type'])
+
+    def test_extended_rdf(self):
+        # extended test 6: accept: "/data" -> extended RDF statements
+        g = Graph().parse(data=self.get(self.baseurl + "1991:1469/data.rdf").text)
+        
+        res = self.get(self.baseurl + "1991:1469/data",
+                       headers={'Accept': 'application/rdf+xml'})
+        self.assertEqual(200, res.status_code)
+        self.assertEqual("application/rdf+xml", res.headers['Content-Type'])
+        got = Graph().parse(data=res.text)
+        self.assertEqualGraphs(g, got)
+
+    def test_extended_ntriples(self):
+        # extended test 7: accept: "/data" + "text/plain" -> extended
+        # RDF statements in NTriples
+        g = Graph().parse(data=self.get(self.baseurl + "1991:1469/data.rdf").text)
+        res = self.get(self.baseurl + "1991:1469/data",
+                     headers={'Accept': 'text/plain'})
+        self.assertEqual(200, res.status_code)
+        self.assertEqual("text/plain", res.headers['Content-Type'])
+        got = Graph().parse(data=res.text, format="nt")
+        self.assertEqualGraphs(g, got)
+        # variation: use file extension
+        res = self.get(self.baseurl + "1991:1469/data.nt")
+        self.assertEqual(200, res.status_code)
+        self.assertEqual("text/plain", res.headers['Content-Type'])
+        got = Graph().parse(data=res.text, format="nt")
+        self.assertEqualGraphs(g, got)
+
+    def test_extended_turtle(self):
+        # extended test 7: accept: "/data" + "text/turtle" -> extended
+        # RDF statements in Turtle
+        g = Graph().parse(data=self.get(self.baseurl + "1991:1469/data.rdf").text)
+        res = self.get(self.baseurl + "1991:1469/data",
+                     headers={'Accept': 'text/turtle'})
+        self.assertEqual(200, res.status_code)
+        self.assertEqual("text/turtle", res.headers['Content-Type'])
+        got = Graph().parse(data=res.content, format="turtle")
+        self.assertEqualGraphs(g, got)
+        # variation: use file extension
+        res = self.get(self.baseurl + "1991:1469/data.ttl")
+        self.assertEqual(200, res.status_code)
+        self.assertEqual("text/turtle", res.headers['Content-Type'])
+        got = Graph().parse(data=res.content, format="turtle")
+        self.assertEqualGraphs(g, got)
+
+    def test_dataset_html(self):
+        res = self.get(self.baseurl  + "dataset/sfs")
+        self.assertTrue(res.status_code, 200)
+        self.assertEqual("text/html; charset=utf-8", res.headers['Content-Type'])
+
+    def test_dataset_html_param(self):
+        res = self.get(self.baseurl  + "dataset/sfs?titel=P")
+        self.assertTrue(res.status_code, 200)
+        self.assertEqual("text/html; charset=utf-8", res.headers['Content-Type'])
+        self.assertIn('Författningar som börjar på "P"', res.text)
+
+    def test_dataset_ntriples(self):
+        res = self.get(self.baseurl  + "dataset/sfs",
+                       headers={'Accept': 'text/plain'})
+        self.assertTrue(res.status_code, 200)
+        self.assertEqual("text/plain", res.headers['Content-Type'])
+        Graph().parse(data=res.text, format="nt")
+        res = self.get(self.baseurl  + "dataset/sfs.nt")
+        self.assertTrue(res.status_code, 200)
+        self.assertEqual("text/plain", res.headers['Content-Type'])
+        Graph().parse(data=res.text, format="nt")
+
+    def test_dataset_turtle(self):
+        res = self.get(self.baseurl  + "dataset/sfs",
+                       headers={'Accept': 'text/turtle'})
+        self.assertTrue(res.status_code, 200)
+        self.assertEqual("text/turtle", res.headers['Content-Type'])
+        Graph().parse(data=res.text, format="turtle")
+        res = self.get(self.baseurl  + "dataset/sfs.ttl")
+        self.assertTrue(res.status_code, 200)
+        self.assertEqual("text/turtle", res.headers['Content-Type'])
+        Graph().parse(data=res.text, format="turtle")
+
+    def test_dataset_xml(self):
+        res = self.get(self.baseurl  + "dataset/sfs",
+                       headers={'Accept': 'application/rdf+xml'})
+        self.assertTrue(res.status_code, 200)
+        self.assertEqual("application/rdf+xml", res.headers['Content-Type'])
+        Graph().parse(data=res.text)
+        res = self.get(self.baseurl  + "dataset/sfs.rdf")
+        self.assertTrue(res.status_code, 200)
+        self.assertEqual("application/rdf+xml", res.headers['Content-Type'])
+        Graph().parse(data=res.text)
+
 
 class TestAnnotations(TestLagen):
 
@@ -207,7 +396,9 @@ class TestAutocomplete(TestLagen):
         self.assertEqual(hits[0]['label'], "Prop. 1997/98:44")
         self.assertEqual(hits[0]['desc'], "Personuppgiftslag")
 
-
+# this is a local test, don't need to run it if we're running the test
+# suite against a remote server
+@unittest.skipIf(os.environ.get("FERENDA_TESTURL"), "Testing remote server")
 class TestACExpand(unittest.TestCase):
 
     def setUp(self):

@@ -210,7 +210,7 @@ class Fileserving(WSGI):
         self.env['PATH_INFO'] = '/'
         status, headers, content = self.call_wsgi(self.env)
         self.assertResponse("200 OK",
-                            {'Content-Type': 'text/html'},
+                            {'Content-Type': 'text/html; charset=utf-8'},
                             b'<h1>index.html</h1>',
                             status, headers, content)
 
@@ -219,7 +219,7 @@ class Fileserving(WSGI):
         status, headers, content = self.call_wsgi(self.env)
         msg = '<h1>404</h1>\n\nThe path /nonexistent not found at %s/nonexistent.\n\nExamined 1 repos.\n\n<pre>base: (unknown reason)\n</pre>\n' % self.datadir
         self.assertResponse("404 Not Found",
-                            {'Content-Type': 'text/html'},
+                            {'Content-Type': 'text/html; charset=utf-8'},
                             msg.encode(),
                             status, headers, content)
 
@@ -392,7 +392,7 @@ class Parameters(WSGI):
         self.env["PATH_INFO"] = "/dataset/base?title=a"
         status, headers, content = self.call_wsgi(self.env)
         want = ["200 OK",
-                {'Content-Type': 'text/html'},
+                {'Content-Type': 'text/html; charset=utf-8'},
                 tocdata]
         self.assertResponse(want[0], want[1], want[2],
                             status, headers, content)
@@ -411,9 +411,6 @@ class Parameters(WSGI):
                 tocdata]
         self.assertResponse(want[0], want[1], want[2],
                             status, headers, content)
-        
-
-
 
 
 class ConNeg(WSGI):
@@ -427,7 +424,7 @@ class ConNeg(WSGI):
         # typical of a real-life browse
         status, headers, content = self.call_wsgi(self.env)
         self.assertResponse("200 OK",
-                            {'Content-Type': 'text/html'},
+                            {'Content-Type': 'text/html; charset=utf-8'},
                             util.readfile(self.repo.store.generated_path("123/a"), "rb"),
                             status, headers, content)
 
@@ -444,7 +441,6 @@ class ConNeg(WSGI):
         self.env["PATH_INFO"] += ".xhtml"
         status, headers, content = self.call_wsgi(self.env)
         self.assertResponse(want[0], want[1], want[2], status, headers, content)
-        
 
     def test_rdf(self):
         # basic test 3: accept: application/rdf+xml -> RDF statements (in XML)
@@ -544,7 +540,7 @@ class ConNeg(WSGI):
         self.env['HTTP_ACCEPT'] = 'application/pdf'
         status, headers, content = self.call_wsgi(self.env)
         want = ["406 Not Acceptable",
-                {'Content-Type': 'text/html'},
+                {'Content-Type': 'text/html; charset=utf-8'},
                 None]
         self.assertResponse(want[0], want[1], want[2],
                             status, headers, None)
@@ -640,7 +636,7 @@ class ConNeg(WSGI):
         self.env['PATH_INFO'] = "/dataset/base"
         status, headers, content = self.call_wsgi(self.env)
         self.assertResponse("200 OK",
-                            {'Content-Type': 'text/html'},
+                            {'Content-Type': 'text/html; charset=utf-8'},
                             b'<h1>TOC for base</h1>',
                             status, headers, content)
 
@@ -649,7 +645,7 @@ class ConNeg(WSGI):
         self.env['QUERY_STRING'] = "title=a"
         status, headers, content = self.call_wsgi(self.env)
         self.assertResponse("200 OK",
-                            {'Content-Type': 'text/html'},
+                            {'Content-Type': 'text/html; charset=utf-8'},
                             b'<h1>Title starting with "a"</h1>',
                             status, headers, content)
 

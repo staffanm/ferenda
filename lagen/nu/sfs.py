@@ -42,6 +42,8 @@ class SFS(OrigSFS, SameAs):
             basefile = basefile.split("/")[0]
             if "#" in basefile:
                 basefile = basefile.split("#", 1)[0]
+            elif "." in basefile:
+                basefile = basefile.split(".", 1)[0]
             return basefile
         else:
             return super(SFS, self).basefile_from_uri(uri)

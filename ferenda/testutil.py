@@ -63,7 +63,7 @@ class FerendaTestCase(object):
         :param got: The actual graph, as an :py:class:`~rdflib.graph.Graph`
                     object or the filename of a serialized graph
         :param exact: Whether to require that the graphs are exactly alike
-                      (True) or only if all triples in want exists in got
+                      (True) or only if all triples in `want` exists in `got`
                       (False)
         :type  exact: bool
         """

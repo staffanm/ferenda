@@ -119,6 +119,9 @@ class WSGIApp(object):
                          contenttype="text/html; charset=utf-8", length=None):
         if length is None:
             length = len(data)
+        if contenttype == "text/html":
+            # add explicit charset if not provided by caller (it isn't by default)
+            contenttype = "text/html; charset=utf-8"
         # logging.getLogger("wsgi").info("Calling start_response")
         start_response(self._str(status), [
             (self._str("X-WSGI-app"), self._str("ferenda")),

@@ -170,7 +170,7 @@ class RequestHandler(object):
             basefile = None
             tmpuri = uri
             if "." in uri.split("/")[-1]:
-                tmpuri = tmpuri.rsplit(".")[0]
+                tmpuri = tmpuri.rsplit(".", 1)[0]
             if querystring:
                 tmpuri += "?" + querystring
             params = self.dataset_params_from_uri(tmpuri)
@@ -214,7 +214,7 @@ class RequestHandler(object):
             preferred = httpheader.acceptable_content_type(accept,
                                                            available)
         contenttype = None
-        if accept in self._mimemap:
+        if accept != "text/html" and accept in self._mimemap:
             contenttype = accept
         elif suffix in self._mimesuffixes:
             contenttype = self._mimesuffixes[suffix]

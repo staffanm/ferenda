@@ -1,0 +1,26 @@
+# import into a initalized instance with
+# ./ferenda-build.py devel copyrepos bigdata ../lagen/nu/res/scripts/testdata.txt 
+ds 2001:62
+dv HDO/Ö367-01_1 # a case that needs patching
+dv HDO/Ö6229-14
+dv HDO/B3594-14 # Tystnadsplikt, TF
+dv HFD/4453-10
+dv HFD/4970-14
+mediawiki Missbruksmodellen
+mediawiki Personuppgift
+mediawiki Sekundär_sekretessbestämmelse
+myndfs difs/2010:1
+myndfs difs/2013:1
+prop 1997/98:44
+prop 2000/01:105
+prop 2005/06:173
+sfs 1998:1191 # PUF
+sfs 1998:204
+sfs 1949:105 # TF because why not
+sfs 1991:1469 # YGL because same
+sou 1997:39 # regeringen, multipart
+sou 2004:6
+jo 4171-2011
+jk 2081-03-42
+dir 2016:15
+

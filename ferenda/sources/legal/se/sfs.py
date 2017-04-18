@@ -1784,9 +1784,9 @@ class SFS(Trips):
             changesfs = uri.split("#L")[1]
             changeloc = changepara = None
             if "S" in changesfs:
-                changesfs, changepara = changesfs.split("S")
+                changesfs, changepara = changesfs.split("S", 1)
             if "N" in changesfs:
-                changesfs, changeloc = changesfs.split("N")
+                changesfs, changeloc = changesfs.split("N", 1)
             res += "övg. best. SFS %s" % changesfs
             if changepara:
                 res += " %s st" % changepara
