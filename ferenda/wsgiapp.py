@@ -67,9 +67,29 @@ class WSGIApp(object):
 
     def __call__(self, environ, start_response):
         import logging
+        profiling = 'profilepath' in self.config
+        if profiling:
+            import cProfile
+            import pstats
+            import codecs
+            pr = cProfile.Profile()
+            pr.enable()
+
+        # FIXME: Under py2, values in environ are bytestrings, not
+        # unicode strings, leading to random crashes throughout the
+        # codebase when PATH_INFO or QUERY_STRING contains non-ascii
+        # characters and being used with unicode strings (eg
+        # "environ['PATH_INFO'].startswith(<unicodestring>)"). We
+        # clean environ by decoding all bytestrings asap, ie
+        # here. However, this causes request_uri (which expects
+        # bytestrings in environ under py2) to fail...
+
         log = logging.getLogger("wsgiapp")
         path = environ['PATH_INFO']
+        if not isinstance(path, str):
+            path = path.decode("utf-8")
         url = request_uri(environ)
+        qs = environ['QUERY_STRING']
         self.log.info("Starting process for %s (path_info=%s, query_string=%s)" % (url, path, environ['QUERY_STRING']))
         # FIXME: routing infrastructure -- could be simplified?
         try:
@@ -82,6 +102,16 @@ class WSGIApp(object):
                 return self.static(environ, start_response)
         except Exception:
             return self.exception(environ, start_response)
+        finally:
+            if profiling:
+                pr.disable()
+                sortby = 'cumulative'
+                with codecs.open(self.config.profilepath, mode="a", encoding="utf-8") as fp:
+                    fp.write("="*80 + "\n")
+                    fp.write(url + "\n")
+                    fp.write("Accept: %s\n\n" % environ.get("HTTP_ACCEPT"))
+                    ps = pstats.Stats(pr, stream=fp).sort_stats(sortby)
+                    ps.print_stats()
 
     ################################################################
     # WSGI methods
@@ -126,7 +156,7 @@ class WSGIApp(object):
         start_response(self._str(status), [
             (self._str("X-WSGI-app"), self._str("ferenda")),
             (self._str("Content-Type"), self._str(contenttype)),
-            (self._str("Content-Length"), self._str(str(length))),
+            (self._str("Content-Length"), self._str("%s" % length)),
         ])
         
         if isinstance(data, Iterable) and not isinstance(data, bytes):
@@ -156,7 +186,10 @@ class WSGIApp(object):
         :py:func:`~ferenda.Manager.api`
 
         """
-        fullpath = self.config.documentroot + environ['PATH_INFO']
+        path = environ['PATH_INFO']
+        if not isinstance(path, str):
+            path = path.decode("utf-8")
+        fullpath = self.config.documentroot + path
         # we start by asking all repos "do you handle this path"?
         # default impl is to say yes if 1st seg == self.alias and the
         # rest can be treated as basefile yielding a existing
@@ -166,8 +199,8 @@ class WSGIApp(object):
         # means no.
         fp = None
         reasons = OrderedDict()
-        if not((environ['PATH_INFO'].startswith("/rsrc") or
-                environ['PATH_INFO'] == "/robots.txt")
+        if not((path.startswith("/rsrc") or
+                path == "/robots.txt")
                and os.path.exists(fullpath)):
             for repo in self.repos:
                 supports = repo.requesthandler.supports(environ)
@@ -188,11 +221,11 @@ class WSGIApp(object):
         if not fp:
             if self.config.legacyapi:  # rewrite the path to some resources. FIXME:
                           # shouldn't hardcode the "rsrc" path of the path
-                if environ['PATH_INFO'] == "/json-ld/context.json":
+                if path == "/json-ld/context.json":
                     fullpath = self.config.documentroot + "/rsrc/api/context.json"
-                elif environ['PATH_INFO'] == "/var/terms":
+                elif path == "/var/terms":
                     fullpath = self.config.documentroot + "/rsrc/api/terms.json"
-                elif environ['PATH_INFO'] == "/var/common":
+                elif path == "/var/common":
                     fullpath = self.config.documentroot + "/rsrc/api/common.json"
             if os.path.isdir(fullpath):
                 fullpath = fullpath + "index.html"
@@ -215,7 +248,7 @@ Examined %s repos.
 
 <pre>%s
 </pre>
-""" % (environ['PATH_INFO'],
+""" % (path,
        fullpath,
        len(self.repos),
        reasonmsg)

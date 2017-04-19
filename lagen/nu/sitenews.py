@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from ferenda.sources.general import Sitenews as BaseSitenews
 
 class Sitenews(BaseSitenews):

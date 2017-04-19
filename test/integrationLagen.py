@@ -252,6 +252,10 @@ class TestConNeg(TestLagen):
         self.assertEqual("text/plain", res.headers['Content-Type'])
         Graph().parse(data=res.text, format="nt")
 
+    # NOTE: Converting the entire SFS dataset to different
+    # representations and then parsing the result (twice for each
+    # test) is costly -- maybe we could use eg the sitenews dataset
+    # for this?
     def test_dataset_turtle(self):
         res = self.get(self.baseurl  + "dataset/sfs",
                        headers={'Accept': 'text/turtle'})

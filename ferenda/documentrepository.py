@@ -415,7 +415,7 @@ class DocumentRepository(object):
             if hasattr(cls, "alias"):
                 commonpath = "extra/%s.ttl" % cls.alias
                 if self.resourceloader.exists(commonpath):
-                    with self.resourceloader.open(commonpath) as fp:
+                    with self.resourceloader.open(commonpath, binary=True) as fp:
                         cd.parse(data=fp.read(), format="turtle")                 
         return cd
 
