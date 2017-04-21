@@ -268,11 +268,8 @@ class SOUKB(Offtryck, PDFDocumentRepository):
     def extract_body(self, fp, basefile):
         reader = StreamingPDFReader()
         reader.read(fp)
-        identifier = self.canonical_uri(basefile)
-        baseuri = "%s?repo=%s&dir=downloaded&format=png" % (identifier, self.alias)
         for page in reader:
-            page.src = "%s&page=%s" % (baseuri, (page.number - 1))
-
+            page.src = "index.pdf"  # FIXME: don't hardcode the filename
         return reader
     
         

@@ -291,8 +291,8 @@ class RequestHandler(object):
                     if not baseattach:
                         baseattach = "page_error.png"
                     outfile = repo.store.intermediate_path(basefile, attachment=baseattach)
-                    errormsg = str(e).replace("\n", "\\n")
-                    cmdline = "convert  label:'%s' %s" % (errormsg, outfile)
+                    errormsg = str(e).replace("\n", "\\n").replace("'", "\\'")
+                    cmdline = 'convert  label:"%s" %s' % (errormsg, outfile)
                     util.runcmd(cmdline, require_success=True)
                 method = partial(repo.store.intermediate_path, attachment=baseattach)
                 return method  # we really don't want to partial()
@@ -393,10 +393,14 @@ class RequestHandler(object):
 
     def prep_request(self, environ, path, data, contenttype):
         if path and os.path.exists(path):
+            status = 200
+            # FIXME: This is a horrible hack
+            if path.endswith("page_error.png"):
+                status = 500
             fp = open(path, 'rb')
             return (fp,
                     os.path.getsize(path),
-                    200,
+                    status,
                     contenttype)
         elif data:
             return (BytesIO(data),
