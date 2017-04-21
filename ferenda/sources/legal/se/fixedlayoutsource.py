@@ -124,7 +124,13 @@ class FixedLayoutSource(SwedishLegalSource):
     downloaded_suffix = ".pdf"
     documentstore_class = FixedLayoutStore
     requesthandler_class = FixedLayoutHandler
-    
+
+    @classmethod
+    def get_default_options(cls):
+        opts = super(FixedLayoutSource, cls).get_default_options()
+        opts['imgfiles'] = ['img/spinner.gif']
+        return opts
+
     def downloaded_to_intermediate(self, basefile):
         # force just the conversion part of the PDF handling
         downloaded_path = self.store.downloaded_path(basefile)
