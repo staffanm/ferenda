@@ -280,10 +280,12 @@ Examined %s repos.
                       html.Pre([tbstr]),
                       html.H2("Variables"),
                       html.Pre(["request_uri: %s\nos.getcwd(): %s" % (request_uri(environ), os.getcwd())]),
+                      html.H2("environ"),
+                      html.Pre([pformat(environ)]),
                       html.H2("sys.path"),
                       html.Pre([pformat(sys.path)]),
                       html.H2("os.environ"),
-                      html.Pre([pformat(environ)])
+                      html.Pre([pformat(dict(os.environ))])
         ])])
         msg = self._transform(title, body, environ)
         return self._return_response(msg, start_response,

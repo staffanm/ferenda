@@ -460,7 +460,9 @@ a.facsimile img {
     border-left: 1px solid #ddd;
     border-right: 1px solid #ddd;
     width: 100%;
+    min-height: 140px;
     padding: 10px;
+    background: url('/rsrc/img/spinner.gif') no-repeat center; /* shown while loading real img */
 }
 
 body.frontpage nav#toc ul > li > ul {

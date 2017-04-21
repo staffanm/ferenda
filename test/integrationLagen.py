@@ -65,12 +65,27 @@ class TestPaths(TestLagen):
     def test_specific_dv(self):
         self.assert200(self.baseurl + "dom/nja/2015s180") # basefile HDO/Ö6229-14
 
+    def test_specific_sou(self):
+        self.assert200(self.baseurl + "utr/sou/1997:39")
+
+    def test_specific_prop(self):
+        self.assert200(self.baseurl + "prop/1997/98:44")
+
     def test_specific_keyword(self):
         self.assert200(self.baseurl + "begrepp/Personuppgift")
         
     def test_specific_keyword_tricky(self):
         self.assert200(self.baseurl + "begrepp/Sekundär_sekretessbestämmelse")
 
+    def test_facsimile_page(self):
+        res = self.get(self.baseurl + "utr/sou/1997:39/sid557.png")
+        self.assertEqual(200, res.status_code)
+        self.assertEqual("image/png", res.headers["Content-Type"])
+        # assert trough first 8 bytes (magic number) that this really
+        # is a legit png
+        import binascii
+        self.assertEqual(b"89504e470d0a1a0a", binascii.hexlify(res.content[:8]))
+        
 
 class TestPages(TestLagen):
     def test_frontpage_links(self):
@@ -84,6 +99,7 @@ class TestPages(TestLagen):
 class TestPatching(TestLagen):
 
     def test_file_has_been_patched(self):
+        # the encoding parameter might be a py3-ism
         needle = codecs.encode("Fjrebgrp", encoding="rot13")# rot13 of a sensitive name
         res = self.get(self.baseurl + "dom/nja/2002s35")    # case containing sensitive info
         res.raise_for_status()                              # req succeded
@@ -257,23 +273,23 @@ class TestConNeg(TestLagen):
     # test) is costly -- maybe we could use eg the sitenews dataset
     # for this?
     def test_dataset_turtle(self):
-        res = self.get(self.baseurl  + "dataset/sfs",
+        res = self.get(self.baseurl  + "dataset/sitenews",
                        headers={'Accept': 'text/turtle'})
         self.assertTrue(res.status_code, 200)
         self.assertEqual("text/turtle", res.headers['Content-Type'])
         Graph().parse(data=res.text, format="turtle")
-        res = self.get(self.baseurl  + "dataset/sfs.ttl")
+        res = self.get(self.baseurl  + "dataset/sitenews.ttl")
         self.assertTrue(res.status_code, 200)
         self.assertEqual("text/turtle", res.headers['Content-Type'])
         Graph().parse(data=res.text, format="turtle")
 
     def test_dataset_xml(self):
-        res = self.get(self.baseurl  + "dataset/sfs",
+        res = self.get(self.baseurl  + "dataset/sitenews",
                        headers={'Accept': 'application/rdf+xml'})
         self.assertTrue(res.status_code, 200)
         self.assertEqual("application/rdf+xml", res.headers['Content-Type'])
         Graph().parse(data=res.text)
-        res = self.get(self.baseurl  + "dataset/sfs.rdf")
+        res = self.get(self.baseurl  + "dataset/sitenews.rdf")
         self.assertTrue(res.status_code, 200)
         self.assertEqual("application/rdf+xml", res.headers['Content-Type'])
         Graph().parse(data=res.text)

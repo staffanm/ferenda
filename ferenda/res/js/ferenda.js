@@ -48,8 +48,8 @@ $(document).ready(function () {
 	navtabs.find("li:nth-child(2)").addClass("active");
 	/* on-demand load facsimileimage and show */
         navtabs.siblings(".facsimile").children("img").each(function(idx) {
-	    this.src = $(this).attr('data-src');
-	    $(this).show();
+           this.src = $(this).attr('data-src');
+           $(this).show();
 	})
     });
   $('div.sida a.view-text').click(function() {
