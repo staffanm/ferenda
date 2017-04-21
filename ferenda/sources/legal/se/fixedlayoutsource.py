@@ -27,14 +27,21 @@ class FixedLayoutHandler(SwedishLegalHandler):
             pageno = pi[pi.index("/sid")+4:-(len(suffix)+1)]
             if pageno.isdigit():
                 pageno = int(pageno)
-            
             if isinstance(self.repo, CompositeRepository):
                 for subrepo in self.repo.subrepos:
                     repo = self.repo.get_instance(subrepo)
                     if os.path.exists(repo.store.downloaded_path(basefile)):
                         break
                 else:
-                    raise RequestHandlerError("%s: No subrepo has downloaded this basefile" % basefile)
+                    # force the first available subrepo to get the file
+                    self.repo.download(basefile)
+                    for subrepo in self.repo.subrepos:
+                        repo = self.repo.get_instance(subrepo)
+                        if os.path.exists(repo.store.downloaded_path(basefile)):
+                            break
+                    else:
+                        raise RequestHandlerError("%s: No subrepo has downloaded this basefile" % basefile)
+                
             else:
                 repo = self.repo
             params['repo'] = repo.alias
