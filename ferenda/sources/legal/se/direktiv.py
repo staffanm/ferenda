@@ -327,7 +327,7 @@ class DirektivStore(CompositeStore, SwedishLegalStore):
 
 
 # Does parsing, generating etc from base files:
-class Direktiv(CompositeRepository, SwedishLegalSource):
+class Direktiv(CompositeRepository, FixedLayoutSource):
 
     "A composite repository containing ``DirTrips``, ``DirAsp`` and ``DirRegeringen``."""
     subrepos = DirRegeringen, DirAsp, DirTrips
