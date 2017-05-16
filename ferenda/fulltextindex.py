@@ -325,6 +325,11 @@ class Between(SearchModifier):
         self.max = max
 
 
+class RegexString(str):
+    # Parameters of this type are interpreted as using regexp
+    # semantics, not globbing semantics. I.e. "foo.*" instead of "foo*"
+    pass
+
 class Results(list):
     # this is just so that we can add arbitrary attributes to a
     # list-like object.
@@ -813,7 +818,9 @@ class ElasticSearchIndex(RemoteIndex):
             elif isinstance(schema[k], Resource):
                 # also map k to "%s.iri" % k if k is Resource
                 k += ".iri"
-            if isinstance(v, str) and "*" in v:
+            if isinstance(v, RegexString):
+                filterregexps[k] = str(v)
+            elif isinstance(v, str) and "*" in v:
                 # if v contains "*", make it a {'regexp': '.*/foo'} instead of a {'term'}
                 # also transform * to .* and escape '#' and '.'
                 filterregexps[k] = v.replace(".", "\\.").replace("#", "\\#").replace("*", ".*")
@@ -837,34 +844,37 @@ class ElasticSearchIndex(RemoteIndex):
         match = {}
         inner_hits = {"_source": {self.term_excludes: "text"}}
         highlight = None
-        if q and not ac_query:
-            # NOTE: we need to specify highlight parameters for each
-            # subquery when using has_child, see
-            # https://github.com/elastic/elasticsearch/issues/14999 --
-            # still seems to be an issue with ES5.*
-            match['fields'] = self.default_fields
-            match['query'] = q
-            match['default_operator'] = "and"
-            highlight = {'fields': {'text': {},
-                                    'label': {}},
-                         'fragment_size': self.fragment_size,
-                         'number_of_fragments': 2
-            }
-            inner_hits["highlight"] = highlight
+        if q:
+            if not ac_query:
+                # NOTE: we need to specify highlight parameters for each
+                # subquery when using has_child, see
+                # https://github.com/elastic/elasticsearch/issues/14999 --
+                # still seems to be an issue with ES5.*
+                match['fields'] = self.default_fields
+                match['query'] = q
+                match['default_operator'] = "and"
+                highlight = {'fields': {'text': {},
+                                        'label': {}},
+                             'fragment_size': self.fragment_size,
+                             'number_of_fragments': 2
+                }
+                inner_hits["highlight"] = highlight
 
-            # now, explode the match query into a big OR query for
-            # matching each possible _child type (until someone solves
-            # http://stackoverflow.com/questions/38946547 for me)
-            submatches = [{"simple_query_string": deepcopy(match)}]
+                # now, explode the match query into a big OR query for
+                # matching each possible _child type (until someone solves
+                # http://stackoverflow.com/questions/38946547 for me)
+                submatches = [{"simple_query_string": deepcopy(match)}]
 
-            for t in types:
-                submatches.append(
-                    {"has_child": {"type": t + "_child",
-                                   "inner_hits": inner_hits,
-                                   "query": {"simple_query_string": deepcopy(match)}
-                    }})
-
-            match = {"bool": {"should": submatches}}
+                for t in types:
+                    submatches.append(
+                        {"has_child": {"type": t + "_child",
+                                       "inner_hits": inner_hits,
+                                       "query": {"simple_query_string": deepcopy(match)}
+                        }})
+                match = {"bool": {"should": submatches}}
+            else:
+                # ac_query -- need to work in inner_hits somehow
+                pass
         else:
             match = {"bool": {}}
 
@@ -878,8 +888,9 @@ class ElasticSearchIndex(RemoteIndex):
                 match["bool"]["filter"] = {"bool": {"must": filters}}
             else:
                 match["bool"]["filter"] = filters[0]
-        payload = {'query': match,
-                   'aggs': self._aggregation_payload()}
+        payload = {'query': match}
+        if not ac_query:
+            payload['aggs'] = self._aggregation_payload()
         if q and "filter" in match["bool"]:
             # fixes staffanm/lagen.nu#69 by making sure that documents
             # that matches the filter query but does not score
@@ -1153,7 +1164,6 @@ class ElasticSearch2x (ElasticSearchIndex):
             elif isinstance(schema[k], Resource):
                 # also map k to "%s.iri" % k if k is Resource
                 k += ".iri"
-
             if isinstance(v, str) and "*" in v:
                 # if v contains "*", make it a {'regexp': '.*/foo'} instead of a {'term'}
                 # also transform * to .*

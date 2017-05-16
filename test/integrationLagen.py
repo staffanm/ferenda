@@ -258,20 +258,16 @@ class TestConNeg(TestLagen):
         self.assertIn('Författningar som börjar på "P"', res.text)
 
     def test_dataset_ntriples(self):
-        res = self.get(self.baseurl  + "dataset/sfs",
+        res = self.get(self.baseurl  + "dataset/sitenews",
                        headers={'Accept': 'text/plain'})
         self.assertTrue(res.status_code, 200)
         self.assertEqual("text/plain", res.headers['Content-Type'])
         Graph().parse(data=res.text, format="nt")
-        res = self.get(self.baseurl  + "dataset/sfs.nt")
+        res = self.get(self.baseurl  + "dataset/sitenews.nt")
         self.assertTrue(res.status_code, 200)
         self.assertEqual("text/plain", res.headers['Content-Type'])
         Graph().parse(data=res.text, format="nt")
 
-    # NOTE: Converting the entire SFS dataset to different
-    # representations and then parsing the result (twice for each
-    # test) is costly -- maybe we could use eg the sitenews dataset
-    # for this?
     def test_dataset_turtle(self):
         res = self.get(self.baseurl  + "dataset/sitenews",
                        headers={'Accept': 'text/turtle'})
@@ -294,6 +290,18 @@ class TestConNeg(TestLagen):
         self.assertEqual("application/rdf+xml", res.headers['Content-Type'])
         Graph().parse(data=res.text)
 
+
+    def test_facsimile_page_ie_accept(self):
+        # IE uses this accept header, which triggered a 406 error from wsgiapp
+        # res = self.get(self.baseurl + "utr/sou/1997:39/sid557.png",
+        res = self.get(self.baseurl + "dir/2016:15/sid1.png",
+                       headers={'Accept': "text/html, application/xhtml+xml, image/jxr, */*"})
+        self.assertEqual(200, res.status_code)
+        self.assertEqual("image/png", res.headers["Content-Type"])
+        # assert trough first 8 bytes (magic number) that this really
+        # is a legit png
+        import binascii
+        self.assertEqual(b"89504e470d0a1a0a", binascii.hexlify(res.content[:8]))
 
 class TestAnnotations(TestLagen):
 
@@ -404,17 +412,30 @@ class TestAutocomplete(TestLagen):
         res = self.get(self.baseurl + "api/?q=NJA+2015+s+1&_ac=true",
                        headers={'Accept': 'application/json'})
         hits = res.json()
-        self.assertEqual(hits[0]['url'], self.baseurl + "dom/nja/2015s166") # FIXME: not first hit when tested against full dataset 
-        self.assertEqual(hits[0]['label'], "NJA 2015 s. 166")
-        self.assertEqual(hits[0]['desc'], "Brott mot tystnadsplikten enligt tryckfrihetsförordningen.")
+        wantedhit = None
+        for hit in hits:
+            if hit['url'] == self.baseurl + "dom/nja/2015s166":
+                wantedhit = hit
+        self.assertTrue(wantedhit)
+        self.assertEqual(wantedhit['label'], "NJA 2015 s. 166")
+        self.assertEqual(wantedhit['desc'], "Brott mot tystnadsplikten enligt tryckfrihetsförordningen.")
         
     def test_basic_prop(self):
         res = self.get(self.baseurl + "api/?q=prop+1997&_ac=true",
                        headers={'Accept': 'application/json'})
         hits = res.json()
-        self.assertEqual(hits[0]['url'], self.baseurl + "prop/1997/98:44") # FIXME: Not first hit when tested against full dataset 
-        self.assertEqual(hits[0]['label'], "Prop. 1997/98:44")
-        self.assertEqual(hits[0]['desc'], "Personuppgiftslag")
+        wantedhit = None
+        self.assertLessEqual(len(hits), 10) # return at most 10 hits
+        for hit in hits:
+            if hit['url'] == self.baseurl + "prop/1997/98:44":
+                wantedhit = hit
+            # for this kind of query, only documents, not doc
+            # fragments (pages) should be returned
+            self.assertFalse("#sid" in hit['url'], "%s is page fragment not doc" % hit['url'])
+        # make sure the doc we want is among the 10 
+        self.assertTrue(wantedhit)
+        self.assertEqual(wantedhit['label'], "Prop. 1997/98:44")
+        self.assertEqual(wantedhit['desc'], "Personuppgiftslag")
 
 # this is a local test, don't need to run it if we're running the test
 # suite against a remote server
@@ -447,6 +468,35 @@ class TestACExpand(unittest.TestCase):
     def test_chapterless_expand_prefixed_sections(self):
         self.assertEqual(self.wsgiapp.expand_partial_ref("PUL 3"),
                          "https://lagen.nu/1998:204#P3")
+
+    def test_prop_start(self):
+        self.assertEqual(self.wsgiapp.expand_partial_ref("prop"),
+                         "https://lagen.nu/prop/")
+
+    def test_prop_incomplete_year(self):
+        self.assertEqual(self.wsgiapp.expand_partial_ref("prop 199"),
+                         "https://lagen.nu/prop/199")
+
+    def test_prop_year(self):
+        self.assertEqual(self.wsgiapp.expand_partial_ref("prop 1997"),
+                         "https://lagen.nu/prop/1997")
+
+    def test_prop_missing_num(self):
+        self.assertEqual(self.wsgiapp.expand_partial_ref("prop 1997/98:"),
+                         "https://lagen.nu/prop/1997/98:")
+
+    def test_prop_complete(self):
+        self.assertEqual(self.wsgiapp.expand_partial_ref("prop 1997/98:44"),
+                         "https://lagen.nu/prop/1997/98:44")
+
+    def test_prop_missing_page(self):
+        self.assertEqual(self.wsgiapp.expand_partial_ref("prop 1997/98:44 s"),
+                         "https://lagen.nu/prop/1997/98:44#sid")
+
+    def test_prop_complete(self):
+        self.assertEqual(self.wsgiapp.expand_partial_ref("prop 1997/98:44 s. 12"),
+                         "https://lagen.nu/prop/1997/98:44#sid12")
+
 
 class TestKeywordToc(unittest.TestCase):
     maxDiff = None

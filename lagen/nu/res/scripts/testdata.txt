@@ -6,12 +6,14 @@ dv HDO/Ö6229-14
 dv HDO/B3594-14 # Tystnadsplikt, TF
 dv HFD/4453-10
 dv HFD/4970-14
+dv HDO/Ö3938-14
 mediawiki Missbruksmodellen
 mediawiki Personuppgift
 mediawiki Sekundär_sekretessbestämmelse
 myndfs difs/2010:1
 myndfs difs/2013:1
 prop 1997/98:44
+prop 1997/98:160
 prop 2000/01:105
 prop 2005/06:173
 sfs 1998:1191 # PUF

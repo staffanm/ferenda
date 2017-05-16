@@ -10,6 +10,7 @@ import json
 
 from rdflib import URIRef
 from rdflib.namespace import DCTERMS
+from lxml import etree
 
 from . import SwedishLegalStore, SwedishLegalSource, SwedishLegalHandler
 from ferenda import util
@@ -173,7 +174,18 @@ class FixedLayoutSource(SwedishLegalSource):
     def _extract_plaintext(self, resource, resources):
         about = resource.get("about") 
         if not about or "#sid" not in about:
-            return super(FixedLayoutSource, self)._extract_plaintext(resource, resources)
+            # this should mean a document-level resource. Since
+            # resources in this case will be a bunch of sidbrytning
+            # <spans> with no content of their own, the default
+            # strategy of _extract_plaintext will yield the entire
+            # document. In this case, instead yield everything up to
+            # the first section.
+            assert("#" not in about)
+            nodes = resource.xpath("*[not(preceding::h:div[@class='section'])]",
+                                   namespaces={'h': 'http://www.w3.org/1999/xhtml'})
+            plaintext = util.normalize_space(" ".join([etree.tostring(n,
+                                                                      method="text",
+                                                                      encoding="utf-8").decode("utf-8") for n in nodes]))
         else:
             # select all text content contained in the first 4 <p>
             # tags following the pagebreak -- this should typically
@@ -184,7 +196,7 @@ class FixedLayoutSource(SwedishLegalSource):
             plaintext = util.normalize_space(" ".join(nodes))
             if not plaintext:
                 plaintext = "(Sid %s saknar text)" % about.split("#sid")[1]
-            return plaintext
+        return plaintext
 
     def _relate_fulltext_resources(self, body):
         res = super(FixedLayoutSource, self)._relate_fulltext_resources(body)
@@ -192,7 +204,7 @@ class FixedLayoutSource(SwedishLegalSource):
         # also: add every page (the pagebreak element)
         for r in body.findall(".//*[@class='sidbrytning']"):
             res.append(r)
-        return res
+        return res[:10] # only process first 10 resources for debugging
 
     def _relate_fulltext_value_label(self, resourceuri, rooturi, desc):
         if "#sid" not in resourceuri:

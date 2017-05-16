@@ -18,7 +18,7 @@ from rdflib.namespace import SKOS, FOAF, DCTERMS, RDF, RDFS
 from ferenda import WSGIApp as OrigWSGIApp
 from ferenda import elements
 from ferenda.elements import html
-from ferenda.fulltextindex import Between
+from ferenda.fulltextindex import Between, RegexString
 from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda.sources.legal.se import SwedishCitationParser
 
@@ -61,67 +61,119 @@ class WSGIApp(OrigWSGIApp):
         if querystring.endswith("_ac=true"):
             uri = self.expand_partial_ref(q)
             if uri:
-                param['uri'] = uri.lower() + "*"
+                param['uri'] = uri.lower()
+                # in some cases we want [^#]* instead of .*
+                if "#" in uri:
+                    param['uri'] += "*" # glob
+                else:
+                    # prefer document-level resources, not page/section resources
+                    param['uri'] = RegexString(param['uri'] + "[^#]*")
             else:
                 # normalize any page reference ("nja 2015 s 42" => "nja 2015 s. 42")
                 q = q.lower()
-                q = re.sub("\s*s\s*(\d)", " s. \\1", q)
-                q = re.sub("^prop\s+", "prop. ", q)
+                q = re.sub(r"\s*s\s*(\d)", " s. \\1", q)
+                q = re.sub(r"^prop(\s+|$)", "prop. ", q)
                 param['label'] = q + "*"
             q = None
         return q, param, pagenum, pagelen, stats
 
     def expand_partial_ref(self, partial_ref):
-        # "TF" => "1 kap. tryckfrihetsförordningen: Om tryckfrihet"
-        #         "2 kap. tryckfrihetsförordningen: Om allmänna handlingars offentlighet"
-        # (https://lagen.nu/1949:105#K <- TF [1:1] -> https://lagen.nu/1949:105#K1P1 - "1P1")
-        #
-        # "TF 1" => "1 kap. tryckfrihetsförordningen: Om tryckfrihet"
-        #           "10 kap. tryckfrihetsförordningen: Om särskilda tvångsmedel"
-        # (https://lagen.nu/1949:105#K1 <- TF 1[:1] -> https://lagen.nu/1949:105#K1P1 - "P1"))
-        #
-        # "TF 1:" => "1 kap. 1 § tryckfrihetsförordningen: Med tryckfrihets förstås..."
-        #            "1 kap. 2 § tryckfrihetsförordningen: Någon tryckningen föregående..."
-        # (https://lagen.nu/1949:105#K1P <- TF 1:[1] -> https://lagen.nu/1949:105#K1P1 - "1")
-        # 
-        # "TF 1:1" => "1 kap. 1 § tryckfrihetsförordningen: Med tryckfrihets förstås..."
-        #             "1 kap. 10 § tryckfrihetsförordningen: Denna förordning är inte..."
-        # (https://lagen.nu/1949:105#K1P1 <- TF 1:1)
-        # 
-        # "PUL 3" => "3 § personuppgiftslag: I denna lag används följande beteckningar..."
-        #            "30 § personuppgiftslagen: Ett personuppgiftsbiträde och den eller..."
-        # (https://lagen.nu/1998:204#P3" <- "PUL 3 §"
-
-
-        m = re.match("(%s) *(\d*\:?\d*)$" % self.lagforkortningar_regex, partial_ref, re.IGNORECASE) 
-        if not m:
-            return
-        law, part = m.groups()
-        paragrafmode = law.lower() in self.paragraflag
-        if part:
-            if paragrafmode:
-                extra = " §"
-                remove = 0
-            else:
-                if ":" in part:
-                    chap, sect = part.split(":")
-                    if sect:
-                        extra = ""
-                        remove = 0
-                    else:
-                        extra = "1"
-                        remove = 1
+        if partial_ref.lower().startswith(("prop", "ds", "sou", "dir")):
+            q = partial_ref
+            # normalize ref prior to parsing
+            q = re.sub(r"\s*s\s*(\d)", " s. \\1", q)
+            q = re.sub(r"^prop(\s+|$)", "prop. ", q)
+            segments = q.strip().split(" ")
+            remove = 0
+            if len(segments) < 2:
+                # "Prop." => ("prop") => .append("1999/00:1") => https://…/prop/"
+                segments.append("1999/00:1")
+                remove = 9
+            elif len(segments) < 3:
+                if segments[-1].endswith("/"):
+                    # "Prop. 1997/"=>("prop.", "1997/") => +"00:1" -> …/prop/1997/00:1 - 4
+                    segments[-1] += "00:1"
+                    remove = 4
+                elif segments[-1].endswith(":"):
+                    # "Prop. 1997/98:"=>("prop.", "1997/98:") => +"1"
+                    segments[-1] += "1"
+                    remove = 1
+                elif segments[-1].isdigit():
+                    # right-pad with zero
+                    remove = 4 - len(segments[-1])
+                    segments[-1] += "0" * remove + "/00:1"
+                    remove += 5
                 else:
-                    extra = ":1"
-                    remove = 2
+                    # "Prop. 1997/98:12"=> "prop.", "1997/98:12")
+                    pass
+            elif len(segments):
+                if segments[-1] == "":
+                    segments.extend(("s.", "1"))
+                # "Prop. 1997/98:12 " => ("prop.", "1997/98:12", "")
+                elif not segments[-1].isdigit():
+                    # "Prop. 1997/98:12 s."  => ("prop.", "1997/98:12", "s.")
+                    segments.append("1")
+                    remove = 1
+                else:
+                    # "Prop. 1997/98:12 s. 1"  => ("prop.", "1997/98:12", "s.", "1")
+                    pass
+            partial_ref = " ".join(segments)
+
         else:
-            if paragrafmode:
-                extra = " 1 §"
-                remove = 1
+            # "TF" => "1 kap. tryckfrihetsförordningen: Om tryckfrihet"
+            #         "2 kap. tryckfrihetsförordningen: Om allmänna handlingars offentlighet"
+            # (https://lagen.nu/1949:105#K <- TF [1:1] -> https://lagen.nu/1949:105#K1P1 - "1P1")
+            #
+            # "TF 1" => "1 kap. tryckfrihetsförordningen: Om tryckfrihet"
+            #           "10 kap. tryckfrihetsförordningen: Om särskilda tvångsmedel"
+            # (https://lagen.nu/1949:105#K1 <- TF 1[:1] -> https://lagen.nu/1949:105#K1P1 - "P1"))
+            #
+            # "TF 1:" => "1 kap. 1 § tryckfrihetsförordningen: Med tryckfrihets förstås..."
+            #            "1 kap. 2 § tryckfrihetsförordningen: Någon tryckningen föregående..."
+            # (https://lagen.nu/1949:105#K1P <- TF 1:[1] -> https://lagen.nu/1949:105#K1P1 - "1")
+            # 
+            # "TF 1:1" => "1 kap. 1 § tryckfrihetsförordningen: Med tryckfrihets förstås..."
+            #             "1 kap. 10 § tryckfrihetsförordningen: Denna förordning är inte..."
+            # (https://lagen.nu/1949:105#K1P1 <- TF 1:1)
+            # 
+            # "PUL 3" => "3 § personuppgiftslag: I denna lag används följande beteckningar..."
+            #            "30 § personuppgiftslagen: Ett personuppgiftsbiträde och den eller..."
+            # (https://lagen.nu/1998:204#P3" <- "PUL 3 §"
+
+
+            m = re.match("(%s) *(\d*\:?\d*)$" % self.lagforkortningar_regex, partial_ref, re.IGNORECASE) 
+            if not m:
+                return
+            law, part = m.groups()
+            paragrafmode = law.lower() in self.paragraflag
+            if part:
+                if paragrafmode:
+                    extra = " §"
+                    remove = 0
+                else:
+                    if ":" in part:
+                        chap, sect = part.split(":")
+                        if sect:
+                            extra = ""
+                            remove = 0
+                        else:
+                            extra = "1"
+                            remove = 1
+                    else:
+                        extra = ":1"
+                        remove = 2
             else:
-                extra =  " 1:1"
-                remove = 3
-        partial_ref += extra
+                if paragrafmode:
+                    extra = " 1 §"
+                    remove = 1
+                else:
+                    extra =  " 1:1"
+                    remove = 3
+            partial_ref += extra
+
+        # now partial_ref is appropriately padded, and remove is
+        # initialized to account for removing characters from the
+        # resulting URI. Lets convert to URI
         res = self.parser.parse_string(partial_ref)
         uri = ""
         if hasattr(res[0], 'uri'):
