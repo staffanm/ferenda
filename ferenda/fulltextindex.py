@@ -911,7 +911,7 @@ class ElasticSearchIndex(RemoteIndex):
         return relurl, json.dumps(payload, indent=4, default=util.json_default_date)
 
     def _aggregation_payload(self):
-        aggs = {'type': {'terms': {'field': '_type'}}}
+        aggs = {'type': {'terms': {'field': '_type', 'size': 100}}}
         for repo in self._repos:
             if not repo.config.relate:
                 continue
@@ -925,7 +925,7 @@ class ElasticSearchIndex(RemoteIndex):
                                                   'format': 'yyyy',
                                                   'min_doc_count': 1}}
                     else:
-                        agg = {'terms': {'field': facet.dimension_label}}
+                        agg = {'terms': {'field': facet.dimension_label, 'size': 100}}
                     aggs[facet.dimension_label] = agg
         return aggs
 

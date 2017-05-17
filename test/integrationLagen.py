@@ -439,7 +439,7 @@ class TestAutocomplete(TestLagen):
 
 # this is a local test, don't need to run it if we're running the test
 # suite against a remote server
-@unittest.skipIf(os.environ.get("FERENDA_TESTURL"), "Testing remote server")
+@unittest.skipIf(os.environ.get("FERENDA_TESTURL"), "Not testing against local dev server")
 class TestACExpand(unittest.TestCase):
 
     def setUp(self):
@@ -497,6 +497,30 @@ class TestACExpand(unittest.TestCase):
         self.assertEqual(self.wsgiapp.expand_partial_ref("prop 1997/98:44 s. 12"),
                          "https://lagen.nu/prop/1997/98:44#sid12")
 
+
+@unittest.skipIf(":8080" in os.environ.get("FERENDA_TESTURL", "http://localhost:8080"), "Not testing against dev server")
+class TestNginxServing(TestLagen):
+
+    def assertNginx(self, url):
+        res = self.get(url)
+        self.assertIsNone(res.headers.get("X-WSGI-app"), "%s wasn't served by nginx directly" % url)
+
+    def assertWsgi(self, url):
+        res = self.get(url)
+        self.assertEqual("ferenda", res.headers.get("X-WSGI-app"), "%s wasn't served by the WSGI app" % url)
+
+    def test_frontpage(self):
+        self.assertNginx(self.baseurl)
+
+    def test_doc(self):
+        self.assertNginx(self.baseurl + "dom/nja/2015s180")
+
+    def test_toc(self):
+        self.assertNginx(self.baseurl + "dataset/dv")
+
+    def test_search(self):
+        self.assertWsgi(self.baseurl + "search/?q=personuppgift")
+    
 
 class TestKeywordToc(unittest.TestCase):
     maxDiff = None
