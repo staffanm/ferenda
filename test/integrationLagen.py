@@ -409,9 +409,10 @@ class TestAutocomplete(TestLagen):
         self.assertEqual(hits[0]['label'], "Tryckfrihetsförordning (1949:105)")
 
     def test_basic_dv(self):
-        res = self.get(self.baseurl + "api/?q=NJA+2015+s+1&_ac=true",
+        res = self.get(self.baseurl + "api/?q=NJA+2015+s+16&_ac=true",
                        headers={'Accept': 'application/json'})
         hits = res.json()
+        from pudb import set_trace; set_trace()
         wantedhit = None
         for hit in hits:
             if hit['url'] == self.baseurl + "dom/nja/2015s166":
@@ -421,7 +422,6 @@ class TestAutocomplete(TestLagen):
         self.assertEqual(wantedhit['desc'], "Brott mot tystnadsplikten enligt tryckfrihetsförordningen.")
         
     def test_basic_prop(self):
-        from pudb import set_trace; set_trace()
         res = self.get(self.baseurl + "api/?q=prop+1997/98:4&_ac=true",
                        headers={'Accept': 'application/json'})
         hits = res.json()
