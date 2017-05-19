@@ -421,7 +421,8 @@ class TestAutocomplete(TestLagen):
         self.assertEqual(wantedhit['desc'], "Brott mot tystnadsplikten enligt tryckfrihetsförordningen.")
         
     def test_basic_prop(self):
-        res = self.get(self.baseurl + "api/?q=prop+1997&_ac=true",
+        from pudb import set_trace; set_trace()
+        res = self.get(self.baseurl + "api/?q=prop+1997/98:4&_ac=true",
                        headers={'Accept': 'application/json'})
         hits = res.json()
         wantedhit = None
