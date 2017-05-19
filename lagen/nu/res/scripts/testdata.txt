@@ -10,6 +10,7 @@ dv HDO/Ö3938-14
 mediawiki Missbruksmodellen
 mediawiki Personuppgift
 mediawiki Sekundär_sekretessbestämmelse
+mediawiki SFS/1949:105
 myndfs difs/2010:1
 myndfs difs/2013:1
 prop 1997/98:44

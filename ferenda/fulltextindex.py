@@ -162,7 +162,7 @@ class FulltextIndex(object):
         """Returns the number of currently indexed (non-deleted) documents."""
         raise NotImplementedError  # pragma: no cover
 
-    def query(self, q=None, pagenum=1, pagelen=10, **kwargs):
+    def query(self, q=None, pagenum=1, pagelen=10, ac_query=False, exclude_types=None, **kwargs):
         """Perform a free text query against the full text index, optionally
            restricted with parameters for individual fields.
 
@@ -493,7 +493,7 @@ class WhooshIndex(FulltextIndex):
     def doccount(self):
         return self.index.doc_count()
 
-    def query(self, q=None, pagenum=1, pagelen=10, **kwargs):
+    def query(self, q=None, pagenum=1, pagelen=10, ac_query=False, exclude_types=None, **kwargs):
         # 1: Filter on all specified fields (exact or by using ranges)
         filter = []
         for k, v in kwargs.items():
@@ -640,8 +640,8 @@ class RemoteIndex(FulltextIndex):
             res = requests.get(self.location + relurl)
         return self._decode_count_result(res)
 
-    def query(self, q=None, pagenum=1, pagelen=10, ac_query=False, **kwargs):
-        relurl, payload = self._query_payload(q, pagenum, pagelen, ac_query, **kwargs)
+    def query(self, q=None, pagenum=1, pagelen=10, ac_query=False, exclude_types=None, **kwargs):
+        relurl, payload = self._query_payload(q, pagenum, pagelen, ac_query, exclude_types, **kwargs)
         if payload:
             # print("query: POST %s:\n%s" % (self.location + relurl, payload))
             res = requests.post(self.location + relurl, payload)
@@ -790,7 +790,7 @@ class ElasticSearchIndex(RemoteIndex):
         self._writer.write(payload.encode("utf-8"))
         self._writer.write(b"\n")
 
-    def _query_payload(self, q, pagenum=1, pagelen=10, ac_query=False, **kwargs):
+    def _query_payload(self, q, pagenum=1, pagelen=10, ac_query=False, exclude_types=None, **kwargs):
         if kwargs.get("type"):
             types = [kwargs.get("type")]
         else:
@@ -888,6 +888,10 @@ class ElasticSearchIndex(RemoteIndex):
                 match["bool"]["filter"] = {"bool": {"must": filters}}
             else:
                 match["bool"]["filter"] = filters[0]
+            if exclude_types:
+                match["bool"]["must_not"] = []
+                for exclude_type in exclude_types:
+                    match["bool"]["must_not"].append({"type": {"value": exclude_type}})
         payload = {'query': match}
         if not ac_query:
             payload['aggs'] = self._aggregation_payload()
@@ -897,7 +901,9 @@ class ElasticSearchIndex(RemoteIndex):
             # anything in the should query aren't counted. This
             # shouldn't be used in AC queries since they only use
             # filters, not freetext query parameters
-            payload["min_score"] = 0.01  
+            payload["min_score"] = 0.01
+
+        
         # Don't include the full text of every document in every hit
         if not ac_query:
             payload['_source'] = {self.term_excludes: ['text']}

@@ -5,7 +5,7 @@
 # which is http://localhost:8080/
 #
 # When running against a local instance, it's important that this has
-# been initialized with the documents in lagen/nux
+# been initialized with the documents in lagen/nu/res/scripts/testdata.txt
 
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)

@@ -485,10 +485,12 @@ Examined %s repos.
         q, param, pagenum, pagelen, stats = self.parse_parameters(
             environ['QUERY_STRING'], idx)
         ac_query = environ['QUERY_STRING'].endswith("_ac=true")
+        exclude_types = environ.get('exclude_types', None)
         res, pager = idx.query(q=q,
                                pagenum=pagenum,
                                pagelen=pagelen,
-                               ac_query=ac_query, 
+                               ac_query=ac_query,
+                               exclude_types=exclude_types,
                                **param)
         mangled = self.mangle_results(res, ac_query)
         # 3.1 create container for results

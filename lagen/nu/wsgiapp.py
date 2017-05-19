@@ -184,6 +184,8 @@ class WSGIApp(OrigWSGIApp):
         
     def query(self, environ):
         ac_query = environ['QUERY_STRING'].endswith("_ac=true")
+        if ac_query:
+            environ['exclude_types'] = ('mediawiki', 'mediawiki_child')
         res = super(WSGIApp, self).query(environ)
         if ac_query:
             return res['items']
