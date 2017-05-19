@@ -261,7 +261,8 @@ class API(WSGI):
                 'rdf_type': 'bibo:Standard', # FIXME: should be http://purl.org/ontology/bibo/Standard -- but requires that self.repos in wsgiapp is set up
                 'pagenum': 1,
                 'pagelen': 10,
-                'ac_query': False}
+                'ac_query': False,
+                'exclude_types': None}
         with patch('ferenda.wsgiapp.FulltextIndex', **config):
             status, headers, content = self.call_wsgi(self.env)
             config['connect.return_value'].query.assert_called_once_with(**want)
@@ -287,7 +288,8 @@ class API(WSGI):
                 'rdf_type': '*Standard', # should be bibo:Standard or even http://purl.org/ontology/bibo/Standard, but requires proper context handling to work
                 'pagenum': 1,
                 'pagelen': 10,
-                'ac_query': False}
+                'ac_query': False,
+                'exclude_types': None}
 
         with patch('ferenda.wsgiapp.FulltextIndex', **config):
             status, headers, content = self.call_wsgi(self.env)
