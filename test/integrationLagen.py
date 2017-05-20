@@ -412,7 +412,6 @@ class TestAutocomplete(TestLagen):
         res = self.get(self.baseurl + "api/?q=NJA+2015+s+16&_ac=true",
                        headers={'Accept': 'application/json'})
         hits = res.json()
-        from pudb import set_trace; set_trace()
         wantedhit = None
         for hit in hits:
             if hit['url'] == self.baseurl + "dom/nja/2015s166":
