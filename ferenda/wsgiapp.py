@@ -390,7 +390,7 @@ Examined %s repos.
         res = {"type": "DataSet",
                "slices": []
                }
-        for k, v in slices.items():
+        for k, v in sorted(slices.items()):
             observations = []
             for ok, ov in sorted(v.items()):
                 observations.append({ok[0]: ok[1],
@@ -492,6 +492,7 @@ Examined %s repos.
                                ac_query=ac_query,
                                exclude_types=exclude_types,
                                **param)
+        from pudb import set_trace; set_trace()
         mangled = self.mangle_results(res, ac_query)
         # 3.1 create container for results
         res = {"startIndex": pager['firstresult'] - 1,
@@ -550,7 +551,8 @@ Examined %s repos.
             mangled.append(mangledhit)
         return mangled
 
-    def mangle_result(self, hit):
+    def mangle_result(self, hit, ac_query=False):
+        from pudb import set_trace; set_trace()
         return hit
 
     def parse_parameters(self, querystring, idx):

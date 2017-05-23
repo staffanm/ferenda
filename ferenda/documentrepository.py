@@ -2128,14 +2128,18 @@ parsed document path to that documents dependency file."""
             data = json.load(open(cachepath))
         else:
             data = self.facet_select(self.facet_query(self.dataset_uri()))
-            # make sure the dataset contains no duplicate entries (as determined by URI)
-            uris = set()
+            # make sure the dataset contains no duplicate entries --
+            # note that it's not enough to check for row['uri']
+            # uniqueness, as multiple rows can share uri but differ in
+            # other values (if multiple_values = True for that facet)
+            rows = set()
             dupes = []
             for idx, row in enumerate(list(data)):
-                if row['uri'] not in uris:
-                    uris.add(row['uri'])
+                t = tuple(sorted(row.items())) # maybe use t.__hash__() to save space?
+                if t not in rows:
+                    rows.add(t)
                 else:
-                    self.log.warning("faceted_data: found duplicate of uri %s at #%s" % (row['uri'], idx))
+                    self.log.warning("faceted_data: found duplicate row (uri %s) at #%s" % (row['uri'], idx))
                     dupes.append(idx)
             for idx in reversed(dupes):
                 self.log.warning("faceted_data: popping %s" % idx)

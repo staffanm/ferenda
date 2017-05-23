@@ -308,6 +308,7 @@ class FusekiCurl(Fuseki):
                  "Skipping Sesame tests")    
 class Sesame(TripleStoreTestCase, unittest.TestCase):
     storetype = "SESAME"
+    storelocation = "http://localhost:8080/rdf4j-server"
     @classmethod
     def setUpClass(cls):
         # start up tomcat/sesame on port 8080
@@ -324,7 +325,7 @@ class Sesame(TripleStoreTestCase, unittest.TestCase):
             subprocess.check_call("catalina.sh stop > /dev/null", shell=True)
 
     def setUp(self):
-        self.store = TripleStore.connect(self.storetype, "http://localhost:8080/openrdf-sesame", "ferenda")
+        self.store = TripleStore.connect(self.storetype, self.storelocation, "ferenda")
         self.store.clear()
         self.loader = self.store
 
@@ -334,7 +335,7 @@ class Sesame(TripleStoreTestCase, unittest.TestCase):
 
 class SesameCurl(Sesame):
     def setUp(self):
-        self.store = TripleStore.connect(self.storetype, "http://localhost:8080/openrdf-sesame", "ferenda", curl=True)
+        self.store = TripleStore.connect(self.storetype, self.storelocation, "ferenda", curl=True)
         self.store.clear()
         self.loader = self.store
 

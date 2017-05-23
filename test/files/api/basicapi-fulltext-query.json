@@ -11,7 +11,7 @@
             },
             "dcterms_title": "Example",
             "matches": {
-                "text": "<em class=\"match\">tail</em> end of the main document"
+                "text": " This is part of the main document, but not of any sub-resource. This is the <em class=\"match\">tail</em> end of the main document"
             },
             "rdf_type": "http://purl.org/ontology/bibo/Standard",
             "iri": "http://example.org/base/123/a"

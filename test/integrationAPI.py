@@ -76,7 +76,8 @@ class BasicAPI(object):
         self.env['QUERY_STRING'] = "q=tail"
         res = self.call_wsgi(self.env)[2].decode("utf-8")
         got = json.loads(res)
-        want = json.load(open(self.fulltext_query_want))
+        with open(self.fulltext_query_want) as fp:
+            want = json.load(fp)
         # FIXME: Whoosh and ElasticSearch has slightly different ideas
         # on how to highlight matching snippets.
         if isinstance(self, WhooshBase):
@@ -91,7 +92,8 @@ class BasicAPI(object):
     def test_faceted_query(self):
         self.env['QUERY_STRING'] = self.faceted_query
         got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
-        want = json.load(open(self.faceted_query_want))
+        with open(self.faceted_query_want) as fp:
+            want = json.load(fp)
         # FIXME: Whoosh (and our own fulltextindex.IndexedType
         # objects) cannot handle a pure date field (always converted
         # to DateTime). Adjust expectations.
@@ -107,7 +109,8 @@ class BasicAPI(object):
         self.env['QUERY_STRING'] = self.complex_query
         res = self.call_wsgi(self.env)[2].decode("utf-8")
         got = json.loads(res)
-        want = json.load(open(self.complex_query_want))
+        with open(self.complex_query_want) as fp:
+            want = json.load(fp)
         # FIXME: See above
         if isinstance(self, WhooshBase):
             fld = 'issued' if self.app.config.legacyapi else 'dcterms_issued'
@@ -227,7 +230,12 @@ class AdvancedAPI(object):
                              indexlocation=self.indexlocation)
             self.repos.append(repo)
 
-        for repo in self.repos:
+        # NOTE: calling repo.relate(basefile, self.repos) will reorder
+        # self.repos in MRU order. This is for efficency, but might
+        # cause a change in the list we iterate over. So by wrapping
+        # in list(), we create a temporary list that won't be
+        # reordered.
+        for repo in list(self.repos):
             for basefile in "a", "b", "c", "d":
                 util.ensure_dir(repo.store.parsed_path(basefile))
                 # Put files in place: parsed
