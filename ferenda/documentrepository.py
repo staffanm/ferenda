@@ -2004,8 +2004,7 @@ parsed document path to that documents dependency file."""
                 kwargs = {}
                 for facet in self.facets():
                     k, v = self._relate_fulltext_value(facet, resource, desc)
-                    if v:
-
+                    if v is not None:
                         if k is None:
                             k = qname_graph.qname(facet.rdftype).replace(":", "_")
                         kwargs[k] = v

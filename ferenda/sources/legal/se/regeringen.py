@@ -514,6 +514,8 @@ class Regeringen(Offtryck):
         """Given a list of (pdffile, linktext) tuples, return only those pdf
         files we need to parse (by filtering out duplicates etc).
         """
+        # NOTE: Any change to this logic should add a new testcase to
+        # test/integrationRegeringen.SelectPDFs
         cleanfiles = []
 
         # FIXME: For some documents, the split into different document
@@ -521,7 +523,6 @@ class Regeringen(Offtryck):
         # SOU 2016:32, which has 3 docs but only the first one (which
         # contains the second one in it's entirety, even though you
         # can't tell) should be selected...
-
         # 1. Simplest case: One file obviously contains all of the text
         for pdffile, linktext in pdffiles:
             if "hela dokumentet" in linktext or "hela betänkandet" in linktext:
@@ -548,8 +549,10 @@ class Regeringen(Offtryck):
             for pdffile, linktext in cleanfiles:
                 # strip away the last filetype + size paranthesis
                 linktext = re.sub(" \(pdf [\d\,]+ [kM]B\)", "", linktext)
-                # and if we remove the commonprefix (and possibly identifier), do we end up with nothing?
-                if linktext.replace(commonprefix, "") == "":
+                # and if we remove the commonprefix, do we end up with
+                # nothing (or something identifier-like)?
+                remainder = linktext.replace(commonprefix, "")
+                if remainder == "" or re.match(r"(SOU|Ds|Prop\.?) \d+(|/\d+):\d+$", remainder):
                     # then this is probably a complete file
                     if labels:
                         pdffile = pdffile, linktext

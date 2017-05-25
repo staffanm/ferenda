@@ -2,11 +2,14 @@
     "type": "DataSet",
     "slices": [
 	{
-	    "dimension": "rdf_type",
-            "observations": [
-		{"count": 3,
-		 "term": "bibo:Standard"}
-	    ]
+	    "dimension": "dcterms_issued",
+	    "observations": [ {
+		"count": 1, 
+		"year": "2013"
+	    }, {
+		"count": 2, 
+		"year": "2014"
+	    } ]
 	},
 	{
 	    "dimension": "dcterms_publisher",
@@ -18,13 +21,10 @@
 		"ref": "http://example.org/publisher/B"
 	    } ]
 	}, {
-	    "dimension": "dcterms_issued",
-	    "observations": [ {
-		"count": 1, 
-		"year": "2013"
-	    }, {
-		"count": 2, 
-		"year": "2014"
-	    } ]
+	    "dimension": "rdf_type",
+            "observations": [
+		{"count": 3,
+		 "term": "bibo:Standard"}
+	    ]
 	} ]
 }

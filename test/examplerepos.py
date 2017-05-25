@@ -71,7 +71,6 @@ class DocRepo2(DocRepo1):
                   ('ex', 'http://example.org/vocab/')]
     rdf_type = URIRef('http://example.org/vocab/MainType')
     def is_april_fools(self, row, binding, resource_graph):
-        from pudb import set_trace; set_trace()
         d = row[binding]
         # during relate_fulltext, row[binding] may be an actual datetime
         if not isinstance(d, date):

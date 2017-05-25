@@ -476,7 +476,6 @@ Examined %s repos.
         return dimension_label, observations
 
     def query(self, environ):
-
         # this is needed -- but the connect call shouldn't neccesarily
         # have to call exists() (one HTTP call)
         idx = FulltextIndex.connect(self.config.indextype,
@@ -492,7 +491,6 @@ Examined %s repos.
                                ac_query=ac_query,
                                exclude_types=exclude_types,
                                **param)
-        from pudb import set_trace; set_trace()
         mangled = self.mangle_results(res, ac_query)
         # 3.1 create container for results
         res = {"startIndex": pager['firstresult'] - 1,
@@ -533,6 +531,8 @@ Examined %s repos.
                     if "_" in k:
                         # drop prefix (dcterms_issued -> issued)
                         k = k.split("_", 1)[1]
+                    elif k == "innerhits":
+                        continue  # the legacy API has no support for nested/inner hits
                 if k == "uri":
                     k = "iri"
                     # change eg https://lagen.nu/1998:204 to
@@ -552,7 +552,6 @@ Examined %s repos.
         return mangled
 
     def mangle_result(self, hit, ac_query=False):
-        from pudb import set_trace; set_trace()
         return hit
 
     def parse_parameters(self, querystring, idx):

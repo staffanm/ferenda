@@ -2,7 +2,7 @@
 
 # This fixture does a bunch of real HTTP request against a selected
 # server (determined by the environment variable FERENDA_TESTURL,
-# which is http://localhost:8080/
+# which is http://localhost:8000/ by default)
 #
 # When running against a local instance, it's important that this has
 # been initialized with the documents in lagen/nu/res/scripts/testdata.txt
@@ -32,7 +32,7 @@ from lagen.nu.wsgiapp import WSGIApp
 
 class TestLagen(unittest.TestCase, FerendaTestCase):
 
-    baseurl = os.environ.get("FERENDA_TESTURL", "http://localhost:8080/")
+    baseurl = os.environ.get("FERENDA_TESTURL", "http://localhost:8000/")
 
     def assert_status(self, url, code):
         res = requests.get(url, headers={'Accept': 'text/html'})
@@ -368,11 +368,11 @@ class TestAutocomplete(TestLagen):
     def test_basic_sfs(self):
         res = self.get(self.baseurl + "api/?q=3+§+personuppgiftslag&_ac=true",
                        headers={'Accept': 'application/json'})
-        # returns eg [{'url': 'http://localhost:8080/1998:204#P3',
+        # returns eg [{'url': 'http://localhost:8000/1998:204#P3',
         #              'label': '3 § personuppgiftslagen',
         #              'desc': 'I denna lag används följande '
         #                      'beteckningar med nedan angiven...'},
-        #             {'url': 'http://localhost:8080/dom/nja/2015s180',
+        #             {'url': 'http://localhost:8000/dom/nja/2015s180',
         #              'desc': 'NJA 2015 s. 180', # NB! Is :identifier not :title
         #              'label': 'Lagring av personuppgifter '
         #                       '(domstols dagboksblad) i dator har'
@@ -498,7 +498,7 @@ class TestACExpand(unittest.TestCase):
                          "https://lagen.nu/prop/1997/98:44#sid12")
 
 
-@unittest.skipIf(":8080" in os.environ.get("FERENDA_TESTURL", "http://localhost:8080"), "Not testing against dev server")
+@unittest.skipIf(":8000" in os.environ.get("FERENDA_TESTURL", "http://localhost:8000"), "Not testing against dev server")
 class TestNginxServing(TestLagen):
 
     def assertNginx(self, url):

@@ -72,7 +72,7 @@
                 <rpubl:lopnummer>20</rpubl:lopnummer>
 		<rinfoex:sid>
 		  <rinfoex:Sida>
-                    <rpubl:sidnummer>42</rpubl:sidnummer>
+                    <rinfoex:sidnummer>42</rinfoex:sidnummer>
 		  </rinfoex:Sida>
 		</rinfoex:sid>
             </rpubl:Proposition>

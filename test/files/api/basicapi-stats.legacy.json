@@ -2,11 +2,14 @@
     "type": "DataSet",
     "slices": [
 	{
-	    "dimension": "type",
-            "observations": [
-		{"count": 3,
-		 "term": "Standard"}
-	    ]
+	    "dimension": "issued",
+	    "observations": [ {
+		"count": 1, 
+		"year": "2013"
+	    }, {
+		"count": 2, 
+		"year": "2014"
+	    } ]
 	},
 	{
 	    "dimension": "publisher",
@@ -18,13 +21,10 @@
 		"ref": "http://example.org/publisher/B"
 	    } ]
 	}, {
-	    "dimension": "issued",
-	    "observations": [ {
-		"count": 1, 
-		"year": "2013"
-	    }, {
-		"count": 2, 
-		"year": "2014"
-	    } ]
+	    "dimension": "type",
+            "observations": [
+		{"count": 3,
+		 "term": "Standard"}
+	    ]
 	} ]
 }

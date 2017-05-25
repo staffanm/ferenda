@@ -125,7 +125,6 @@ class TripleStoreTestCase(FerendaTestCase):
                 SELECT ?name
                 WHERE  { GRAPH <http://example.org/actors> { ?uri foaf:name ?name .
                         ?uri owl:sameAs <http://live.dbpedia.org/resource/Kevin_Bacon> } }"""
-
         p = self.store.select(sq,"python")
         self.assertIsInstance(p[0]['name'], str)
         self.assertEqual(p,[{'name':'Kevin Bacon'}])

@@ -115,6 +115,7 @@ class BasicAPI(object):
         if isinstance(self, WhooshBase):
             fld = 'issued' if self.app.config.legacyapi else 'dcterms_issued'
             want['items'][0][fld] += "T00:00:00"
+            want['items'][0].pop('innerhits', None)  # remove innerhits if present
         self.assertEqual(want, got)
 
 class BasicLegacyAPI(BasicAPI):
@@ -156,7 +157,7 @@ class FusekiBase():
 
 class SesameBase():
     storetype = 'SESAME'
-    storelocation = 'http://localhost:8080/openrdf-sesame'
+    storelocation = "http://localhost:8080/rdf4j-server"
     storerepository = 'ferenda'
 
 # Then the actual testcases are created by combining base classes

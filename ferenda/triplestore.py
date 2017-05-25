@@ -518,6 +518,8 @@ class RemoteStore(TripleStore):
         return "%s/%s/query" % (self.location, self.repository)
 
     def _run_curl(self, options):
+        if "<" in options["url"]:
+            options["url"] = options["url"].replace("<", "%3C").replace(">", "%3E")
         if options['method'] == 'GET':
             cmd = 'curl -o "%(filename)s" --header "Accept:%(accept)s" "%(url)s"' % options
         elif options['method'] == 'POST':
@@ -544,7 +546,8 @@ class SesameStore(RemoteStore):
             # Therefore, we convert it to nt prior to posting
             g = Graph()
             g.parse(data=data, format="turtle")
-            data = g.serialize(format="nt")
+            format="nt"
+            data = g.serialize(format=format)
         super(SesameStore, self).add_serialized(data, format, context)
 
     def triple_count(self, context=None):

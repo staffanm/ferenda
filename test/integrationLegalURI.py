@@ -71,7 +71,6 @@ class Coinstruct(unittest.TestCase):
             if not any([list(rg.predicates(subject, x)) for x in subjects]):
                 rootnode = subject
                 break
-            
         coined_uri = coinstruct_from_graph(resourcegraph, rootnode, self.minter)
         self.assertEqual(uri, coined_uri)
 
