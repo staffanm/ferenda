@@ -50,6 +50,10 @@ class DirAnalyzer(PDFAnalyzer):
             h2 = None
         else:
             (ts, dummy, h1, h2) = styles
+            if h2 == ds:  # what we thought was h2 was really the
+                          # default style, meaning no h2:s are used in
+                          # the doc
+                h2 = None
 
         styledefs['title'] = self.fontdict(ts)
         styledefs['h1'] = self.fontdict(h1)
