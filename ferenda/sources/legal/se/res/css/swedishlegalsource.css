@@ -37,6 +37,7 @@ div.forfattningskommentar {
 
 body.frontpage td {
     display: block;
+    font-size: 14px;  /* default UA stylesheet for tables use medium font size in tables */
 }
 body.frontpage td ul {
     padding-left: 20px;

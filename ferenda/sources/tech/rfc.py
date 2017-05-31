@@ -625,6 +625,7 @@ class RFC(DocumentRepository):
                     # converted to a regular date, as we're missing
                     # the date information. Use xsd:gYearMonth.
                     dt = datetime.strptime(line, "%B %Y")
+                from pudb import set_trace; set_trace()    
                 d = util.gYearMonth(dt.year, dt.month)
                 desc.value(self.ns['dcterms'].issued, str(d),
                            datatype=XSD.gYearMonth)

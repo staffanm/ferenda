@@ -20,7 +20,8 @@ from cached_property import cached_property
 # own
 from ferenda import util
 from ferenda import PDFReader, FSMParser, Describer, Facet
-from ferenda.elements import Link, Body, CompoundElement, Preformatted
+from ferenda.elements import (Link, Body, CompoundElement,
+                              Preformatted, UnorderedList, ListItem)
 from ferenda.elements.html import P
 from ferenda.pdfreader import BaseTextDecoder, Page, Textbox
 from ferenda.decorators import newstate
@@ -223,9 +224,28 @@ class Offtryck(SwedishLegalSource):
                 sizematch = lambda p, n: p.font.size == n.font.size
                 # allow for slight variations in vert align since
                 # left margin in practice is not always straight.
-                alignmatch = lambda p, n: abs(p.left - n.left) <= 2 
+                alignmatch = lambda p, n: abs(p.left - n.left) <= 2  
                 valignmatch = lambda p, n: p.bottom == n.bottom
+            strtextbox = str(textbox).strip()
+            strprevbox = str(prevbox).strip()
+            strnextbox = str(nextbox).strip()
+            if strnextbox == "–" or strprevbox == "–":
+                # dir 2016:15 page 15: a textbox with a single hyphen
+                # uses different fontsize
+                sizematch = lambda p, n: True
+            # A bullet always signals the start of a new chunk
+            if strnextbox.startswith(("\u2022", "\uf0b7")):
+                return False
             familymatch = lambda p, n: p.font.family == n.font.family
+            # allow for more if prevbox starts with a bullet and
+            # nextbox startswith lowercase, allow for a large indent
+            # (but not hanging indent)
+            if strtextbox.startswith(("\u2022", "\uf0b7")) and strnextbox[0].islower():
+                alignmatch = lambda p, n: n.left - p.left < 30
+            if strtextbox.startswith("\uf0b7"):
+                # U+F0B7 is Private use -- probably using symbol font
+                # for bullet. Just accept any font family change
+                familymatch = lambda p, n: True
             # numbered section headings can have large space between
             # the leading number and the rest of the heading, and the
             # top/bottom of the leading number box might differ from
@@ -245,15 +265,12 @@ class Offtryck(SwedishLegalSource):
 
             # Any line that ONLY contains a section reference should probably
             # be interpreted as a header
-            strprevbox = str(prevbox).strip()
             if re.match("(\d+ kap. |)\d+( \w|) §$", strprevbox) and prevbox.bottom <= nextbox.top:
                 return False
-
 
             # these text locutions indicate a new paragraph (normally, this is
             # also catched by the conditions below, but if prevbox is unusally
             # short (one line) they might not catch it.:
-            strnextbox = str(nextbox).strip() 
             if re.match("Skälen för (min bedömning|mitt förslag): ", strnextbox):
                 return False
             if re.match("\d\. +", strnextbox):  # item in ordered list
@@ -271,12 +288,14 @@ class Offtryck(SwedishLegalSource):
             if (sizematch(textbox, nextbox) and
                 familymatch(textbox, nextbox) and
                 textbox.top + textbox.height + linespacing > nextbox.top and
-                prevbox.left < nextbox.right and
+                (prevbox.left < nextbox.right or
+                 textbox.left < parindent * 2 + nextbox.left) and
                 (valignmatch(prevbox, nextbox) or  # compare baseline, not topline
-                 alignmatch(prevbox, nextbox) or
-                 (parindent * 2 >= (prevbox.left - nextbox.left) >= parindent)
+                 alignmatch(prevbox, nextbox) or # compare previous line to next
+                 alignmatch(textbox, nextbox) or # compare entire glued box so far to next
+                 (parindent * 2 >= (prevbox.left - nextbox.left) >= parindent) or
+                 (parindent * 2 >= (textbox.left - nextbox.left) >= parindent)
                  )):
-
                 # if the two boxes are on the same line, but have a
                 # wide space between them, the nextbox is probably a
                 # pagenumber
@@ -284,7 +303,6 @@ class Offtryck(SwedishLegalSource):
                     (nextbox.left - textbox.right) > 50 and
                     len(strnextbox) < 10):
                     return False
-
                 return True
 
         return offtryck_gluefunc
@@ -1349,6 +1367,16 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         if ordinal:
             return headingtype == "h3" and ordinal.count(".") == 2
 
+    def is_bulletlist(parser):
+        chunk = parser.reader.peek()
+        strchunk = str(chunk)
+        # different ways of representing bullet points -- U+2022 is
+        # BULLET, while U+F0B7 is a private use codepoint, which,
+        # using the Symbol font, appears to produce something
+        # bullet-like in dir 2016:15
+        if strchunk.startswith(("\u2022", "\uf0b7")):
+            return True
+
     def is_appendix(parser):
         def is_appendix_header(chunk):
             if isinstance(chunk, Page):
@@ -1488,6 +1516,22 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     def make_unorderedsubsection(parser):
         s = UnorderedSection(title=str(parser.reader.next()).strip())
         return parser.make_children(s)
+
+    @newstate('bulletlist')
+    def make_bulletlist(parser):
+        ul = UnorderedList()
+        ul.append(make_listitem(parser))
+        return parser.make_children(ul)
+
+    def make_listitem(parser):
+        s = str(parser.reader.next())
+        # assume text before first space is the bullet
+        if " " in s:
+            s = s.split(" ",1)[1]
+        else:
+            from pudb import set_trace; set_trace()
+            print("what?")
+        return ListItem(s)
 
     @newstate('appendix')
     def make_appendix(parser):
@@ -1693,6 +1737,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                    is_preamblesection,
                    is_unorderedsection,
                    is_unorderedsubsection,
+                   is_bulletlist,
                    is_paragraph]
     if preset == "proposition":
         recognizers.insert(0, is_proprubrik)
@@ -1709,6 +1754,9 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     p.set_transitions({(commonstates, is_nonessential): (skip_nonessential, None),
                        (commonstates, is_pagebreak): (skip_pagebreak, None),
                        (commonstates, is_paragraph): (make_paragraph, None),
+                       (commonstates, is_bulletlist): (make_bulletlist, "bulletlist"),
+                       ("bulletlist", is_paragraph): (False, None),
+                       ("bulletlist", is_bulletlist): (make_listitem, None),
                        ("body", is_appendix): (make_appendix, "appendix"),
                        ("body", is_preamblesection): (make_preamblesection, "preamblesection"),
                        ("body", is_prophuvudrubrik): (make_frontmatter, "frontmatter"),

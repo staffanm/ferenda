@@ -969,8 +969,7 @@
               <p>Enligt <i>första stycket</i> behöver ett moderföretag inte upprätta någon</p>
               <p>koncernredovisning om omfattningen på koncernens verksamhet på moderföretagets balansdag inte överstiger två särskilt angivna gränsvärden. Dessa gränsvärden är tio anställda respektive 24 miljoner kronor i balansomslutning. Båda värdena skall beräknas för koncernen som helhet. Så snart ett av värdena överskrids, skall moderföretaget upprätta en koncernredovisning.</p>
               <p>Av bestämmelsen i <i>andra stycket</i> följer att undantaget i paragrafens</p>
-              <p>första stycke inte gäller om något av koncernföretagen har sina aktier eller andra skuldebrev inregistrerade vid en börs i Sverige eller någon annan stat inom EES. Företag som är noterade vid en börs utan att vara inregistrerade – t.ex. OTC-bolag – omfattas inte av bestämmelsen (jfr 5 kap. 1 § och 6 kap. 1 § lagen [1992:543]om börs- och clearing-</p>
-              <p>verksamhet).</p>
+              <p>första stycke inte gäller om något av koncernföretagen har sina aktier eller andra skuldebrev inregistrerade vid en börs i Sverige eller någon annan stat inom EES. Företag som är noterade vid en börs utan att vara inregistrerade – t.ex. OTC-bolag – omfattas inte av bestämmelsen (jfr 5 kap. 1 § och 6 kap. 1 § lagen [1992:543]om börs- och clearingverksamhet).</p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> ;

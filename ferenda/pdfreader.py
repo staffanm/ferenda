@@ -19,6 +19,7 @@ from lxml.builder import ElementMaker
 from layeredconfig import LayeredConfig, Defaults
 
 from ferenda import util, errors
+from ferenda.fsmparser import Peekable
 from .elements import UnicodeElement
 from .elements import CompoundElement
 from .elements import OrdinalElement
@@ -397,6 +398,7 @@ class PDFReader(CompoundElement):
                 # element is numeric and way smaller than the
                 # others. in that case, set it's tag to "sup" (for
                 # superscript)
+                
                 if len(textelements):
                     avgheight = sum([x.height for x in textelements]) // len(textelements)
                     if textelements[0].strip().isdigit() and textelements[0].height <= avgheight / 2:
@@ -564,7 +566,8 @@ class PDFReader(CompoundElement):
 
             assert pageelement.tag == "page", "Got <%s>, expected <page>" % page.tag
             after_footnote = False
-            for element in pageelement:
+            peekable_pageelements = Peekable(pageelement)
+            for element in peekable_pageelements:
                 if element.tag == 'fontspec':
                     fontid = int(element.attrib['id'])
                     # make sure we always deal with a basic dict (not
@@ -614,30 +617,65 @@ class PDFReader(CompoundElement):
                             # bytestring instead of a unicode
                             # string
                             elementtext = elementtext.decode()
-                        if (lastfont.family == thisfont['family'] and
-                            lastfont.size > thisfont['size'] and
-                            abs(page[-1].right - int(attribs['left'])) < 3 and
-                            elementtext and
-                            elementtext.isdigit()):
-                            # add to existing Textbox (removing font
-                            # styling info and also dimensions) as "sup"
-                            # also removes element.tail which shouldn't be
-                            # anything
-                            assert not element.tail.strip(), "Assumed element.tail to be empty, was in fact '%s'" % element.tail
+                        # is this a footnote marker (either in main text or footnote area?
+                        if (elementtext and
+                            elementtext.isdigit() and
+                            lastfont.family == thisfont['family'] and
+                            lastfont.size > thisfont['size']):
 
                             if elementlink:
-                                # NOTE: "s" means "sup", not strikethrough...
-                                page[-1].append(LinkedTextelement(str(elementtext),
-                                                                  uri=elementlink,
-                                                                  tag="s"))
+                                # NOTE: "s" means "sup" for
+                                # LinkedTextelement, not
+                                # strikethrough...
+                                el = LinkedTextelement(str(elementtext),
+                                                       uri=elementlink,
+                                                       tag="s")
                             else:
-                                page[-1].append(Textelement(str(elementtext), tag="sup"))
-                            
-                            page[-1].right = int(attribs['left']) + int(attribs['width'])
-                            page[-1].width = page[-1].right - page[-1].left
-                            after_footnote = True
-                            continue
-                        
+                                el = Textelement(str(elementtext), tag="sup")
+
+                            # is it in the main text, ie immediately
+                            # following the last textbox? Then append it to that textbox 
+                            if abs(page[-1].right - int(attribs['left'])) < 3:
+                                page[-1].append(el)
+                                page[-1].right = int(attribs['left']) + int(attribs['width'])
+                                page[-1].width = page[-1].right - page[-1].left
+                                after_footnote = True
+                                continue
+                            # or is it part of the footer, ie very close to the left margin?
+                            elif min([x.left for x in page]) - int(attribs['left']) < 3:
+                                # then create a new textbox and let
+                                # the after_footnote magic append more
+                                # textboxes to it. Note: we don't use
+                                # the small font used in the footnote
+                                # marker, but rather peek at the
+                                # normal-sized font that immediately
+                                # follows. Also the box placement and
+                                # height is determined by the
+                                # following element
+                                try:
+                                    nextel = peekable_pageelements.peek()
+                                    attribs['fontspec'] = self.fontspec
+                                    attribs['fontid'] = int(nextel.attrib['font'])
+                                    attribs['top'] = nextel.attrib['top']
+                                    attribs['height'] = nextel.attrib['height']
+                                    attribs['pdf'] = self
+                                    del attribs['font']
+                                    b = Textbox(**attribs)
+                                    b.append(el)
+                                    page.append(b)
+                                    after_footnote = True
+                                    continue
+                                except StopIteration:
+                                    # this means the footnote-like
+                                    # thing was the very last thing on
+                                    # the page -- it's more likely to
+                                    # be a page number. process it
+                                    # like a normal element
+                                    pass
+                            else:
+                                self.log.warning("Text element %s looks like a footnote "
+                                                 "marker, but not in main text nor footer "
+                                                 "area")
                         elif (after_footnote and
                               lastfont.family == thisfont['family'] and
                               lastfont.size == thisfont['size'] and

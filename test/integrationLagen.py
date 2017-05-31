@@ -85,7 +85,15 @@ class TestPaths(TestLagen):
         # is a legit png
         import binascii
         self.assertEqual(b"89504e470d0a1a0a", binascii.hexlify(res.content[:8]))
-        
+
+
+    def test_feed_html(self):
+        self.assert200(self.baseurl + "dataset/sitenews/feed")
+        self.assert200(self.baseurl + "dataset/sfs/feed?rdf_type=type/forordning")
+
+    def test_feed_atom(self):
+        self.assert200(self.baseurl + "dataset/sitenews/feed.atom")
+        self.assert200(self.baseurl + "dataset/sfs/feed.atom?rdf_type=type/forordning")
 
 class TestPages(TestLagen):
     def test_frontpage_links(self):
@@ -302,6 +310,7 @@ class TestConNeg(TestLagen):
         # is a legit png
         import binascii
         self.assertEqual(b"89504e470d0a1a0a", binascii.hexlify(res.content[:8]))
+
 
 class TestAnnotations(TestLagen):
 
