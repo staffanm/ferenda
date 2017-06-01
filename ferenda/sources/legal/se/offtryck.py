@@ -1526,11 +1526,8 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     def make_listitem(parser):
         s = str(parser.reader.next())
         # assume text before first space is the bullet
-        if " " in s:
-            s = s.split(" ",1)[1]
-        else:
-            from pudb import set_trace; set_trace()
-            print("what?")
+        assert " " in s, "No space after bullet in '%s'" % s
+        s = s.split(" ",1)[1]
         return ListItem(s)
 
     @newstate('appendix')

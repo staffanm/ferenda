@@ -56,6 +56,7 @@ class Keyword(DocumentRepository):
     """  # FIXME be more comprehensible
     alias = "keyword"
     downloaded_suffix = ".txt"
+    download_archive = False
     documentstore_class = KeywordStore
     xslt_template = "xsl/keyword.xsl"
     rdf_type = Namespace(util.ns['skos']).Concept
@@ -206,7 +207,10 @@ class Keyword(DocumentRepository):
         # http://download.wikimedia.org/svwiki/latest/svwiki-latest-all-titles-in-ns0.gz
         # -- term set "wikipedia"
         filename = self.store.datadir + "/downloaded/wikititles.gz"
-        updated = self.download_if_needed(self.config.wikipediatitles, None, filename=filename)
+        
+        updated = self.download_if_needed(self.config.wikipediatitles, None,
+                                          archive=self.download_archive,
+                                          filename=filename)
         with gzip.open(filename, mode='rt', encoding="utf-8") as fp:
             # to avoid creating a term for every page on wikipedia,
             # only register those terms that have already been
