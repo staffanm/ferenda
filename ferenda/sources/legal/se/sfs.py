@@ -518,8 +518,6 @@ class SFS(Trips):
         if konsolidering is True:
             uri = uri.rsplit("/", 1)[0]
         computed_basefile = self.basefile_from_uri(uri)
-
-        basefile = basefile.replace("_", " ") # For reasons
         assert basefile == computed_basefile, "%s -> %s -> %s" % (basefile, uri, computed_basefile)
         # end temporary code
         return uri
@@ -680,7 +678,7 @@ class SFS(Trips):
                                "1998:808", "1962:700", "1942:740", "1981:774",
                                "2010:110", "1949:105", "1810:0926", "1974:152",
                                "2014:801", "1991:1469")
-                    if basefile not in val and not basefile in special:
+                    if basefile.replace("_", " ") not in val and not basefile in special:
                         self.log.warning(
                             "%s: Base SFS %s not in title %r" % (basefile,
                                                                  basefile,
@@ -1089,8 +1087,11 @@ class SFS(Trips):
 
     def construct_id(self, node, state):
         def not_in_force(para):
-            return ((hasattr(para, 'upphor') and datetime.now() > para.upphor) or
-                    (hasattr(para, 'ikrafttrader') and datetime.now() < para.ikrafttrader))
+            # in some cases, a para might have a 'upphor' or
+            # 'ikrafttrader' attribute that is a string, not a date
+            # (typically "den dag regeringen bestämmer")
+            return ((hasattr(para, 'upphor') and isinstance(para.upphor, datetime) and datetime.now() > para.upphor) or
+                    (hasattr(para, 'ikrafttrader') and isinstance(para.ikrafttrader, datetime) and datetime.now() < para.ikrafttrader))
                 
         # copy our state (no need for copy.deepcopy as state shouldn't
         # use nested dicts)
