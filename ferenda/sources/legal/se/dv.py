@@ -146,9 +146,10 @@ class DV(SwedishLegalSource):
                         path = urlparse(m.group(1)).path
                         if path in paths:
                             # turns out this happens for around 700
-                            # files. Could shave some time of a parse
-                            # --all by only parsing the first basefile
-                            # with a given path?
+                            # files that have differing names but
+                            # identical content. Could shave some time
+                            # of a parse --all by only parsing the
+                            # first basefile with a given path?
                             # 
                             # log.warning("Path %s is already in map" % path)
                             continue
