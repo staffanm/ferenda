@@ -371,6 +371,38 @@ class ParseXML(unittest.TestCase):
         self.assertEqual("Document title ", str(pdf[0][0]))
 
 
+    def test_multiple_textelements(self):
+        pdf = self._parse_xml("""
+<fontspec id="1" size="5" family="X" color="#00000"/>
+<text top="0" left="0" width="23" height="13" font="1"><b>foo</b> <b>bar</b></text>
+""")
+        self.assertEqual("foobar", str(pdf[0][0]))
+        # test that Textelement.__add__ inserts a space correctly
+        self.assertEqual('<Textelement tag="b">foo bar</Textelement>',
+                         serialize(pdf[0][0][0] + pdf[0][0][1]).strip())
+        want = """
+<Textbox bottom="13" fontid="1" height="13" left="0" lines="0" right="23" top="0" width="23">
+  <Textelement tag="b">foo</Textelement>
+  <Textelement tag="b">bar</Textelement>
+</Textbox>
+"""
+        self.assertEqual(want[1:], serialize(pdf[0][0]))
+
+        # 2nd test, with leading non-tagged Textelement
+        pdf = self._parse_xml("""
+<fontspec id="0" size="5" family="X" color="#00000"/>
+<text top="374" left="508" width="211" height="14" font="0">näringsidkaren <i>en</i> <i>varning. En var-</i></text>
+""")
+        want = """
+<Textbox bottom="388" fontid="0" height="14" left="508" lines="0" right="719" top="374" width="211">
+  <Textelement>näringsidkaren </Textelement>
+  <Textelement tag="i">en</Textelement>
+  <Textelement tag="i">varning. En var-</Textelement>
+</Textbox>
+"""
+        self.assertEqual(want[1:], serialize(pdf[0][0]))
+
+        
     def test_footnote(self):
         pdf = self._parse_xml("""
 <fontspec id="7" size="14" family="TROYEM+OriginalGaramondBT-Roman" color="#000000"/>

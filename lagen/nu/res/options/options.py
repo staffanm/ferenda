@@ -1,12 +1,14 @@
 {
     ("utr/sou", "2008:35"): "skip",  # very atypical report
     ("utr/ds", "2002:34"): "skip",   # 2-column report, uninteresting
-    ("utr/sou", "2002:11"): "skip",  # -""-
+    ("utr/sou", "2002:11"): "skip",  #            -""-
     ("utr/ds", "2007:30"): "skip",   # atypical report in english
-    ("utr/ds", "2014:32"): "skip",   # -""-
-    ("utr/ds", "2008:73"): "skip",   # -""-
-    ("utr/ds", "2008:82"): "skip",   # -""-            in swedish
-    ("utr/ds", "2014:111"): "skip",   # -""-            in swedish
+    ("utr/ds", "2014:32"): "skip",   #            -""-
+    ("utr/ds", "2009:631"): "skip",  #            -""-
+    ("utr/ds", "2008:73"): "skip",   #            -""-
+    ("utr/ds", "2008:82"): "skip",   #       -""-      in swedish
+    ("utr/ds", "2014:111"): "skip",  #            -""-            
+    ("utr/ds", "2005:55"): "skip",   #            -""-            
     # some ridiculusly large document (statsbudget) have little legal
     # importance. Just process the metadata
     ("prop", "1971:1"): "metadataonly",

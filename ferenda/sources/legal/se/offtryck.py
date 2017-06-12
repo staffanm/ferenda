@@ -92,16 +92,6 @@ class Offtryck(SwedishLegalSource):
         a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":", 1)
         return a
 
-    blacklist = set([(SOU, "2008:35"),  # very atypical report
-                     (DS, "2002:34"),   # 2-column report, uninteresting
-                     (SOU, "2002:11"),  # -""-
-                     (DS, "2007:30"),   # atypical report in english
-                     (DS, "2014:32"),   # -""-
-                     (DS, "2008:73"),   # -""-
-                     (DS, "2008:82"),   # -""-            in swedish
-                     # (DS, "2004:46"),   # -""-            in swedish
-                    ])
-
     def sanitize_body(self, rawbody):
         sanitized = super(Offtryck, self).sanitize_body(rawbody)
         if isinstance(sanitized, PDFReader):
@@ -246,6 +236,9 @@ class Offtryck(SwedishLegalSource):
                 # U+F0B7 is Private use -- probably using symbol font
                 # for bullet. Just accept any font family or size change
                 sizematch = lambda p, n: True
+                # also acccept a slight mismatch in vertical align because of reasons
+                valignmatch = lambda p, n: abs(p.bottom - n.bottom) <= 1
+                
             # numbered section headings can have large space between
             # the leading number and the rest of the heading, and the
             # top/bottom of the leading number box might differ from
@@ -1527,9 +1520,12 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
 
     def make_listitem(parser):
         s = str(parser.reader.next())
-        # assume text before first space is the bullet
-        assert " " in s, "No space after bullet in '%s'" % s
-        s = s.split(" ",1)[1]
+        if " " in s:
+            # assume text before first space is the bullet
+            s = s.split(" ",1)[1]
+        else:
+            # assume the bullet is a single char
+            s = s[1:]
         return ListItem(s)
 
     @newstate('appendix')
