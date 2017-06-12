@@ -233,19 +233,19 @@ class Offtryck(SwedishLegalSource):
                 # dir 2016:15 page 15: a textbox with a single hyphen
                 # uses different fontsize
                 sizematch = lambda p, n: True
-            # A bullet always signals the start of a new chunk
-            if strnextbox.startswith(("\u2022", "\uf0b7")):
+            # A bullet (or dash) always signals the start of a new chunk
+            if strnextbox.startswith(("\u2022", "\uf0b7", "−")):
                 return False
-            familymatch = lambda p, n: p.font.family == n.font.family
+            familymatch = lambda p, n: p.font.family in ("Symbol", n.font.family)
             # allow for more if prevbox starts with a bullet and
             # nextbox startswith lowercase, allow for a large indent
             # (but not hanging indent)
-            if strtextbox.startswith(("\u2022", "\uf0b7")) and strnextbox[0].islower():
+            if strtextbox.startswith(("\u2022", "\uf0b7", "−")) and strnextbox[0].islower():
                 alignmatch = lambda p, n: n.left - p.left < 30
             if strtextbox.startswith("\uf0b7"):
                 # U+F0B7 is Private use -- probably using symbol font
-                # for bullet. Just accept any font family change
-                familymatch = lambda p, n: True
+                # for bullet. Just accept any font family or size change
+                sizematch = lambda p, n: True
             # numbered section headings can have large space between
             # the leading number and the rest of the heading, and the
             # top/bottom of the leading number box might differ from
@@ -1373,8 +1373,10 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         # different ways of representing bullet points -- U+2022 is
         # BULLET, while U+F0B7 is a private use codepoint, which,
         # using the Symbol font, appears to produce something
-        # bullet-like in dir 2016:15
-        if strchunk.startswith(("\u2022", "\uf0b7")):
+        # bullet-like in dir 2016:15. "−" is used in dir 2011:84, but
+        # is maybe semantically different from a bulleted list (a
+        # "dashed list")?
+        if strchunk.startswith(("\u2022", "\uf0b7", "−")):
             return True
 
     def is_appendix(parser):

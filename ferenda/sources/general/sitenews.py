@@ -14,7 +14,26 @@ from ferenda.elements.html import elements_from_soup, Div, DL, DT, DD, Img, A
 from ferenda.decorators import managedparsing
 
 class Sitenews(DocumentRepository):
-    """Generates a set of news documents from a single txt file"""
+    """Generates a set of news documents from a single text file.
+
+    This is a simple way of creating a feed of news about the site
+    itself, with permalinks for individual posts and a Atom feed for
+    subscribing in a feed reader.
+
+    The text file is loaded by `ferenda.ResourceLoader`, so it can be
+    placed in any resource directory for any repo used. By default,
+    the resource name is "static/sitenews.txt" but this can be changed
+    with `config.newsfile`
+
+    The text file should be structured with each post/entry having a
+    header line, followed by a empty line, then the body of the
+    post. The body ends when a new header line (or EOF) is
+    encountered. The header line should be formatted like `<ISO 8859-1
+    datetime> <Entry title>`.
+
+    The body should be a regular HTML fragment.
+
+    """
 
     alias = "sitenews"
     downloaded_suffix = ".txt"

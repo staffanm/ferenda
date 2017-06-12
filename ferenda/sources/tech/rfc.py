@@ -11,6 +11,7 @@ import requests
 import requests.exceptions
 
 from rdflib import URIRef, Graph, XSD
+from rdflib.term import _PythonToXSD
 from pyparsing import Word, CaselessLiteral, Optional, nums
 
 from ferenda import DocumentRepository
@@ -625,9 +626,17 @@ class RFC(DocumentRepository):
                     # converted to a regular date, as we're missing
                     # the date information. Use xsd:gYearMonth.
                     dt = datetime.strptime(line, "%B %Y")
-                from pudb import set_trace; set_trace()    
                 d = util.gYearMonth(dt.year, dt.month)
-                desc.value(self.ns['dcterms'].issued, str(d),
+                # rdflib.term now misconverts XSD.gYearMonth to a
+                # YYYY-MM-DD string, when we really want a YYYY-MM
+                # string. Install a custom converter to handle
+                # this. (We can't use the official rdflib.term.bind
+                # API, since it installs the converter last, so that
+                # the (incorrect) date converter is run first
+                # (util.gYearMonth derives from date))
+                if _PythonToXSD[0][0] != util.gYearMonth:
+                    _PythonToXSD.insert(0, (util.gYearMonth, (str, XSD.gYearMonth)))
+                desc.value(self.ns['dcterms'].issued, d,
                            datatype=XSD.gYearMonth)
             else:
                 # company affiliation - include that separate from

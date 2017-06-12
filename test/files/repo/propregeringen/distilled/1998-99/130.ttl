@@ -283,7 +283,7 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Paragrafen saknar motsvarighet i kommitténs förslag.)</p>
               <p>Som en följd av att 1 kap. 1 § har fått en ny lydelse har den tidigare bi-</p>
-              <p>lagan 1 till lagen kunnat utmönstras. De bilagor som tidigare har betecknats 2–4 har därför erhållit beteckningarna 1–3. Detta har föranlett ändringar i förevarande paragrafs <i>första stycke. </i></p>
+              <p>lagan 1 till lagen kunnat utmönstras. De bilagor som tidigare har betecknats 2–4 har därför erhållit beteckningarna 1–3. Detta har föranlett ändringar i förevarande paragrafs <i>första stycke.</i></p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> .
@@ -295,7 +295,7 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 3 kap. 6 § i kommitténs förslag.)</p>
               <p>Med hänsyn till att lagens tillämpningsområde inte längre är begränsat</p>
-              <p>till företagsformer som typiskt sett är inriktade på näringsverksamhet har ordet ”rörelse” i <i>andra stycket</i> bytts ut mot ”verksamhet”. </p>
+              <p>till företagsformer som typiskt sett är inriktade på näringsverksamhet har ordet ”rörelse” i <i>andra stycket</i> bytts ut mot ”verksamhet”.</p>
               <span class="sidbrytning" height="1263" id="sid465" src="https://lagen.nu/prop/1998/99:130/sid465.png" width="894"/>
               <p>
                 <i>Jämförelsetal</i>
@@ -636,7 +636,7 @@
               <p>Ändringen i <i>första stycket</i> är av samma slag som ändringen i 2 kap. 3 §</p>
               <p>m.fl. paragrafer.</p>
               <p>Av bestämmelserna i 7 kap. 3 § framgår att ett moderföretag under</p>
-              <p>vissa förhållanden inte behöver upprätta någon koncernredovisning. När detta undantag utnyttjas, skall moderföretaget, enligt <i>andra stycket, </i>lämna upplysning om internvinster på transaktioner som har företagits inom koncernen<i>. </i>Frågan har behandlats i <a href="https://lagen.nu/prop/1998/99:130#S16-2" rel="dcterms:references">avsnitt 16.2</a>. Med begreppet ”transaktioner inom koncernen” förstås varje koncernintern överlåtelse av varor, tjänster, anläggningstillgångar eller annat. Begreppet internvinster har samma innebörd som i 7 kap. 13 §.</p>
+              <p>vissa förhållanden inte behöver upprätta någon koncernredovisning. När detta undantag utnyttjas, skall moderföretaget, enligt <i>andra stycket,</i>lämna upplysning om internvinster på transaktioner som har företagits inom koncernen<i>. </i>Frågan har behandlats i <a href="https://lagen.nu/prop/1998/99:130#S16-2" rel="dcterms:references">avsnitt 16.2</a>. Med begreppet ”transaktioner inom koncernen” förstås varje koncernintern överlåtelse av varor, tjänster, anläggningstillgångar eller annat. Begreppet internvinster har samma innebörd som i 7 kap. 13 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> ;
@@ -649,7 +649,7 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 5 kap. 8 § i kommitténs förslag.)</p>
               <p>Ändringarna i paragrafen utgör följdändringar till den nya bokförings-</p>
-              <p>lagen eller till andra ändringar i <a href="https://lagen.nu/1995:1554" rel="dcterms:references">årsredovisningslagen</a>. Ordet bolag har bytts ut mot företag. <i>Första stycket</i> har också formulerats om för att dess innebörd skall bli klarare. I <i>första stycket 2 </i>har ordet ”årsredovisning” lagts till, eftersom den nya <a href="https://lagen.nu/1999:000" rel="dcterms:references">bokföringslagen</a> innebär att bokföringen kan avslutas med ett årsbokslut <i>eller</i> en årsredovisning. </p>
+              <p>lagen eller till andra ändringar i <a href="https://lagen.nu/1995:1554" rel="dcterms:references">årsredovisningslagen</a>. Ordet bolag har bytts ut mot företag. <i>Första stycket</i> har också formulerats om för att dess innebörd skall bli klarare. I <i>första stycket 2 </i>har ordet ”årsredovisning” lagts till, eftersom den nya <a href="https://lagen.nu/1999:000" rel="dcterms:references">bokföringslagen</a> innebär att bokföringen kan avslutas med ett årsbokslut <i>eller</i> en årsredovisning.</p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> ;
@@ -912,7 +912,7 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 7 kap. 26 § i kommitténs förslag.)</p>
               <p>Paragrafen har tidigare betecknats 7 kap. 25 §. Ändringen i <i>första</i></p>
-              <p><i>stycket</i> är av samma slag som ändringen i 2 kap. 3 §.<i>7 kap. 27 § </i></p>
+              <p><i>stycket</i> är av samma slag som ändringen i 2 kap. 3 §.<i>7 kap. 27 §</i></p>
               <p>(Jfr 7 kap. 27 § i kommitténs förslag.)</p>
               <p>Paragrafen har tidigare betecknats 7 kap. 26 §. Ändringen utgör enbart</p>
               <p>en anpassning till den ändrade paragrafnumreringen i kapitlet.</p>
@@ -932,14 +932,14 @@
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 7 kap. 8 § i kommitténs förslag.)</p>
-              <p>Paragrafen har tidigare betecknats 7 kap. 7 §. I <i>första stycket</i> har gjorts en ändring av samma slag som den som har </p>
+              <p>Paragrafen har tidigare betecknats 7 kap. 7 §. I <i>första stycket</i> har gjorts en ändring av samma slag som den som har</p>
               <p>gjorts i bl.a. 2 kap. 3 §. Stycket har också – liksom <i>andra– fjärde</i></p>
               <p><i>styckena</i> – justerats med hänsyn till att andra paragrafer, till vilka texten</p>
               <p>hänvisar, har fått ändrad beteckning.</p>
               <p>I <i>andra stycket</i> har namnet på den rubrik under vilken kapital-</p>
               <p>andelsfonden skall tas upp angetts mera fullständigt än hittills. Någon ändring i sak är inte åsyftad.</p>
               <p>Av paragrafens första stycke följer att bl.a. 3 kap. 11 § skall tillämpas</p>
-              <p>vid upprättandet av koncernresultaträkningen. Det finns alltså ett utrymme för att – med de begränsningar och under de villkor som anges i 3 kap. 11 § – slå samman poster i resultaträkningen. Enligt <i>fjärde </i></p>
+              <p>vid upprättandet av koncernresultaträkningen. Det finns alltså ett utrymme för att – med de begränsningar och under de villkor som anges i 3 kap. 11 § – slå samman poster i resultaträkningen. Enligt <i>fjärde</i></p>
               <p><i>stycket</i> gäller dock en begränsning för regelns användning utöver de</p>
               <p>begränsningar som anges i 3 kap. 11 §. Sammanslagning av poster i koncernresultaträkningen får sålunda inte ske om balansomslutningen respektive antalet anställda i <i>koncernen</i> överstiger de gränsvärden som anges i 4 § andra stycket.</p>
             </div>
@@ -1007,7 +1007,7 @@
     dcterms:description """
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 7 kap. 4 § i kommitténs förslag.)</p>
-              <p>Paragrafen har tidigare betecknats 7 kap. 3 §. Av paragrafens <i>andra stycke</i> framgår vilka moderföretag som måste </p>
+              <p>Paragrafen har tidigare betecknats 7 kap. 3 §. Av paragrafens <i>andra stycke</i> framgår vilka moderföretag som måste</p>
               <p>upprätta en finansieringsanalys. Bestämmelsen anknyter till samma kriterier som avgör om moderbolaget i en koncern är skyldigt att ha en auktoriserad revisor (se <a href="https://lagen.nu/1975:1385#K10P13" rel="dcterms:references">10 kap. 13 § aktiebolagslagen</a> [1975:1385]). Hittills har det skett genom en hänvisning till bestämmelsen i <a href="https://lagen.nu/1975:1385" rel="dcterms:references">aktiebolagslagen</a>. Den tekniken framstår emellertid som mindre lämplig i och med att <a href="https://lagen.nu/1995:1554" rel="dcterms:references">årsredovisningslagens</a> tillämpningsområde utsträcks till att omfatta flera olika slag av juridiska personer. De aktuella kriterierna har i stället preciserats i paragrafen. Av skäl som har återgetts i kommentaren till den motsvarande bestämmelsen i 2 kap. 1 § har dock skyldigheten att upprätta finansieringsanalys på grund av balansomslutningens</p>
               <span class="sidbrytning" height="1263" id="sid482" src="https://lagen.nu/prop/1998/99:130/sid482.png" width="894"/>
               <p>storlek begränsats till de fall då något av koncernföretagen bedriver näringsverksamhet. Härigenom undantas bl.a. ideella föreningar som är moderföreningar i större koncerner men som varken själva eller genom sina dotterföretag bedriver någon näringsverksamhet från kravet på finansieringsanalys.</p>

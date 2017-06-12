@@ -106,10 +106,11 @@ Document repositories
 .. toctree::
    :maxdepth: 2
 
-   docrepo/static
    docrepo/keyword
    docrepo/mediawiki
+   docrepo/sitenews
    docrepo/skeleton
+   docrepo/static
    docrepo/tech
    docrepo/legal-eu
    docrepo/legal-se

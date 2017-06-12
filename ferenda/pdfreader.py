@@ -60,6 +60,8 @@ class PDFReader(CompoundElement):
     # properties and methods relating to the initialization of the
     # PDFReader object
 
+    detect_footnotes = True
+
     def __init__(self,
                  pages=None,
                  filename=None,
@@ -206,7 +208,7 @@ class PDFReader(CompoundElement):
         # step 1: find the number of pages
         cmd = "pdfinfo %s" % tmppdffile
         (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
-        m = re.search("Pages:\s+(\d+)", stdout)
+        m = re.search(r"Pages:\s+(\d+)", stdout)
         number_of_pages = int(m.group(1))
         self.log.debug("%(root)s.pdf has %(number_of_pages)s pages" % locals())
         # step 2: extract the images (should be one per page), 10
@@ -332,7 +334,7 @@ class PDFReader(CompoundElement):
             os.unlink(tmppdffile)
             assert not os.path.exists(tmppdffile), "tmppdffile still there:" + tmppdffile
 
-    dims = "bbox (?P<left>\d+) (?P<top>\d+) (?P<right>\d+) (?P<bottom>\d+)"
+    dims = r"bbox (?P<left>\d+) (?P<top>\d+) (?P<right>\d+) (?P<bottom>\d+)"
     re_dimensions = re.compile(dims).search
 
     def _parse_hocr(self, fp, dummy=None):
@@ -454,9 +456,7 @@ class PDFReader(CompoundElement):
                        "CID Type 0C (OT)": "CIDType0C(OT)",
                        "CID TrueType": "CIDTrueType",
                        "CID TrueType (OT)": "CIDTrueType(OT)"}
-
         fontinfofile = filename.replace(".bz2", "") + ".fontinfo"
-        
         # print("Looking for %s (%s)" % (fontinfofile, os.path.exists(fontinfofile)))
         if os.path.exists(fontinfofile):
             with open(fontinfofile) as fp:
@@ -528,229 +528,81 @@ class PDFReader(CompoundElement):
             self.log.debug("BeautifulSoup workaround successful")
 
         assert root.tag == "pdf2xml", "Unexpected root node from pdftohtml -xml: %s" % root.tag
-
         # We're experimenting with a auto-detecting decoder, which
         # needs a special API call in order to do the detection. If
         # this turns out to be a good idea we'll rework it into an
         # official subclass of BaseTextDecoder (maybe
         # AnalyzingTextDecoder) and test with isinstance
-
         if hasattr(self._textdecoder, 'analyze_font'):
             self._analyze_font_encodings(root, fontinfo)
-
-        # for each page element
         for pageelement in root:
+            lastbox = None
             if pageelement.tag == "outline":
-                # FIXME: we want to do something with this information
+                # FIXME: We should do something with this information
                 continue
-            elif isinstance(pageelement, etree._Comment):
-                # NOTE: comments are never created by pdftohtml, but
+            elif pageelement.tag is etree.Comment:
+                # NOTE: Comments are never created by pdftohtml, but
                 # might be present in testcases
                 continue
-            page = Page(number=int(pageelement.attrib['number']),  # alwaysint?
-                        width=int(pageelement.attrib['width']),
-                        height=int(pageelement.attrib['height']),
+            assert pageelement.tag == "page", "Got <%s>, expected <page>" % page.tag
+            page = Page(number=int(pageelement.get('number')),  # alwaysint?
+                        width=int(pageelement.get('width')),
+                        height=int(pageelement.get('height')),
                         src=None,
                         background=None)
             basename = os.path.splitext(filename)[0]
             if filename.endswith(".bz2"):
                 basename = os.path.splitext(basename)[0]
-            
             background = "%s%03d.png" % (
                 basename, page.number)
-
             # Reasons this file might not exist: it was blank and
             # therefore removed, or We're running under RepoTester
             if os.path.exists(background):
                 page.background = background
-
-            assert pageelement.tag == "page", "Got <%s>, expected <page>" % page.tag
             after_footnote = False
             peekable_pageelements = Peekable(pageelement)
             for element in peekable_pageelements:
+                if element.tag is etree.Comment:
+                    continue
+                if element.tag == 'image':
+                    # FIXME: do something clever with these
+                    continue
                 if element.tag == 'fontspec':
-                    fontid = int(element.attrib['id'])
-                    # make sure we always deal with a basic dict (not
-                    # lxml.etree._Attrib) where all keys are str
-                    # object (not bytes)
-                    fspec = dict([(k, str(v)) for k, v in element.attrib.items()])
-                    # then make it more usable
-                    fspec['size'] = int(fspec['size'])
-                    if fontinfo.get(fspec['family']):
-                        # Commmon values: MacRoman, WinAnsi, Custom
-                        fspec['encoding'] = fontinfo[fspec['family']]['encoding']
-                    if "+" in fspec['family']:
-                        fspec['family'] = fspec['family'].split("+", 1)[1]
-                    self.fontspec[fontid] = fspec
-                    
-                elif element.tag == 'text':
-                    # eliminate "empty" textboxes
-                    if element.text and txt(
-                            element.text).strip() == "" and not element.getchildren():
-                        # print "Skipping empty box"
-                        continue
-                    attribs = dict(element.attrib)
-                    if len(page) > 0:
-                        # detect footnote markers in running text, glue
-                        # these to form a big textbox with multiple
-                        # textelements, where footnote markers are tagged
-                        # as "sup" (similar to what _parse_hocr does)
-                        lastfont = page[-1].font
-                        try:
-                            thisfont = self.fontspec[int(attribs['font'])]
-                        except KeyError as e:
-                            raise e
-
-                        elementtext = None
-                        elementlink = None
-                        
-                        if element.text:
-                            elementtext = element.text
-                        elif len(element) and element[0].tag == "a":
-                            elementtext = element[0].text
-                            elementlink = element[0].get("href")
-
-                        if elementtext and not isinstance(elementtext, str):
-                            # this can happen on py2 -- if a
-                            # particular element contains no
-                            # non-ascii chars, it's returned as a
-                            # bytestring instead of a unicode
-                            # string
-                            elementtext = elementtext.decode()
-                        # is this a footnote marker (either in main text or footnote area?
-                        if (elementtext and
-                            elementtext.isdigit() and
-                            lastfont.family == thisfont['family'] and
-                            lastfont.size > thisfont['size']):
-
-                            if elementlink:
-                                # NOTE: "s" means "sup" for
-                                # LinkedTextelement, not
-                                # strikethrough...
-                                el = LinkedTextelement(str(elementtext),
-                                                       uri=elementlink,
-                                                       tag="s")
-                            else:
-                                el = Textelement(str(elementtext), tag="sup")
-
-                            # is it in the main text, ie immediately
-                            # following the last textbox? Then append it to that textbox 
-                            if abs(page[-1].right - int(attribs['left'])) < 3:
-                                page[-1].append(el)
-                                page[-1].right = int(attribs['left']) + int(attribs['width'])
-                                page[-1].width = page[-1].right - page[-1].left
-                                after_footnote = True
-                                continue
-                            # or is it part of the footer, ie very close to the left margin?
-                            elif min([x.left for x in page]) - int(attribs['left']) < 3:
-                                # then create a new textbox and let
-                                # the after_footnote magic append more
-                                # textboxes to it. Note: we don't use
-                                # the small font used in the footnote
-                                # marker, but rather peek at the
-                                # normal-sized font that immediately
-                                # follows. Also the box placement and
-                                # height is determined by the
-                                # following element
-                                try:
-                                    nextel = peekable_pageelements.peek()
-                                    attribs['fontspec'] = self.fontspec
-                                    attribs['fontid'] = int(nextel.attrib['font'])
-                                    attribs['top'] = nextel.attrib['top']
-                                    attribs['height'] = nextel.attrib['height']
-                                    attribs['pdf'] = self
-                                    del attribs['font']
-                                    b = Textbox(**attribs)
-                                    b.append(el)
-                                    page.append(b)
-                                    after_footnote = True
-                                    continue
-                                except StopIteration:
-                                    # this means the footnote-like
-                                    # thing was the very last thing on
-                                    # the page -- it's more likely to
-                                    # be a page number. process it
-                                    # like a normal element
-                                    pass
-                            else:
-                                self.log.warning("Text element %s looks like a footnote "
-                                                 "marker, but not in main text nor footer "
-                                                 "area")
-                        elif (after_footnote and
-                              lastfont.family == thisfont['family'] and
-                              lastfont.size == thisfont['size'] and
-                              page[-1].top == int(attribs['top']) and
-                              page[-1].height == int(attribs['height']) and
-                              abs(page[-1].right - int(attribs['left'])) < 3): 
-                            assert not element.tail.strip(), "Assumed element.tail to be empty, was in fact '%s'" % element.tail
-                            if elementlink:
-                                page[-1].append(LinkedTextelement(elementtext,
-                                                                  uri=elementlink, tag=None))
-                            else:
-                                page[-1].append(Textelement(elementtext, tag=None))
-                            page[-1].right = int(attribs['left']) + int(attribs['width'])
-                            page[-1].width = page[-1].right - page[-1].left
-                            if len(element) and element[0].tail:
-                                page[-1].append(Textelement(element[0].tail, tag=None))
-                            after_footnote = False
-                            continue
-                        after_footnote = False
-                    # all textboxes share the same fontspec dict
-                    attribs['fontspec'] = self.fontspec
-                    attribs['fontid'] = int(attribs['font'])
-                    attribs['pdf'] = self
-                    del attribs['font']
-                    b = Textbox(**attribs)
-                    if element.text and element.text.strip():
-                        b.append(Textelement(txt(element.text), tag=None))
-                    # The below loop could be done recursively to
-                    # support arbitrarily deep nesting (if we change
-                    # Textelement to be a non-unicode derived type),
-                    # but pdftohtml should not create such XML (there
-                    # is no such data in the PDF file)
-                    for child in element:
-                        if child.tag == "a":
-                            tags = ""
-                            text = child.text
-                            # NOTE: This doesn't handle an arbitrary
-                            # sequence of elements and subelements,
-                            # only a simple
-                            # <a><b><i>text...</i></b></a> construct.
-                            grandchildren = child.getchildren()
-                            if grandchildren != []:
-                                tags += grandchildren[0].tag
-                                text = grandchildren[0].text
-                                greatgrandchildren = grandchildren[0].getchildren()
-                                if greatgrandchildren != []:
-                                    text = grandchildren[0].text
-                                    tags += greatgrandchildren[0].tag
-                            if not tags:  # change from "" to None
-                                tags = None 
-                            b.append(LinkedTextelement(txt(text), uri=child.get("href"), tag=tags))
-                            if child.tail and child.tail.strip():
-                                b.append(Textelement(txt(child.tail), tag=None))
-                        else:
-                            grandchildren = child.getchildren()
-                            # special handling of the <i><b> construct
-                            if grandchildren != []:
-                                if child.text and child.text.strip():
-                                    b.append(Textelement(txt(child.text), tag=child.tag))
-                                b.append(Textelement(
-                                    txt(" ".join([x.text or '' for x in grandchildren if x.text.strip()])), tag="ib"))
-                                if grandchildren[0].tail:
-                                    b.append(Textelement(txt(grandchildren[0].tail), tag=child.tag))
-                                if child.tail:
-                                    b.append(Textelement(txt(child.tail), tag=None))
-                            else:
-                                if child.text.strip():
-                                    b.append(
-                                        Textelement(txt(child.text), tag=child.tag))
-                                if child.tail and child.tail.strip():
-                                    b.append(Textelement(txt(child.tail), tag=None))
-                    if element.tail and element.tail.strip():  # can this happen?
-                        b.append(Textelement(txt(element.tail), tag=None))
-                    b.lines = 1
-                    box = self._textdecoder(b, self.fontspec)
+                    self._parse_xml_add_fontspec(element, fontinfo, self.fontspec)
+                    continue
+                assert element.tag == 'text', "Got <%s>, expected <text>" % element.tag
+                # eliminate "empty" textboxes
+                if element.text and txt(
+                        element.text).strip() == "" and not element.getchildren():
+                    # print "Skipping empty box"
+                    continue
+                if len(page) > 0:
+                    lastbox = page[-1]
+                try:
+                    nextelement = peekable_pageelements.peek()
+                except StopIteration:
+                    nextelement = None
+                box = self._parse_xml_make_textbox(element, nextelement, after_footnote,
+                                                   lastbox, page)
+                if box is None: # might consist entirely of empty,
+                                # therefore skipped, textelements.
+                    continue
+                # we need to distinguish between inline footnote
+                # markers (should go with preceeding textbox):
+                if hasattr(box, 'merge-with-current'):
+                    delattr(box, 'merge-with-current')
+                    page[-1] = page[-1] + box
+                    after_footnote = True
+                # and footer footnote markers (should create a new
+                # textbox):
+                elif len(box) and box[0].tag and (box[0].tag.endswith(("sup", "s"))):
+                    page.append(box)
+                    after_footnote = True
+                elif (after_footnote and
+                      abs(page[-1].right - box.left) < 3):
+                    page[-1] = page[-1] + box
+                    after_footnote = False
+                else:
                     page.append(box)
             # done reading the page
             self.append(page)
@@ -758,6 +610,157 @@ class PDFReader(CompoundElement):
         self.log.debug("PDFReader initialized: %d pages, %d fontspecs" %
                        (len(self), len(self.fontspec)))
         
+
+    def _parse_xml_make_textbox(self, element, nextelement, after_footnote, lastbox, page):
+        textelements = self._parse_xml_make_textelement(element)
+        attribs = dict(element.attrib)
+        thisfont = self.fontspec[int(element.get('font'))]
+        lastfont = lastbox.font if lastbox else None
+        if self.detect_footnotes:
+            if (len(textelements) and
+                textelements[0].isdigit() and
+                lastfont and
+                lastfont.family == thisfont['family'] and
+                lastfont.size > thisfont['size']):
+                # this must be a footnote -- alter tag to show that it
+                # should be rendered with superscript
+                if textelements[0].tag is None:
+                    textelements[0].tag = ""
+                if isinstance(textelements[0], LinkedTextelement):
+                    textelements[0].tag += "s"
+                else:
+                    textelements[0].tag = "sup"
+            
+                # is it in the main text, ie immediately
+                # following the last textbox? Then append it to that textbox 
+                if abs(lastbox.right - int(attribs['left'])) < 3:
+                    # return a Box that the caller will merge with current
+                    attribs['fontid'] = attribs.pop('font')
+                    attribs['merge-with-current'] = True
+                    return Textbox(textelements, **attribs)
+                elif min([x.left for x in page]) - int(attribs['left']) < 3:
+                    # then create a new textbox and let
+                    # the after_footnote magic append more
+                    # textboxes to it. Note: we don't use
+                    # the small font used in the footnote
+                    # marker, but rather peek at the
+                    # normal-sized font that immediately
+                    # follows. Also the box placement and
+                    # height is determined by the
+                    # following element
+                    if nextelement is not None:
+                        attribs['fontspec'] = self.fontspec
+                        attribs['fontid'] = int(nextelement.attrib['font'])
+                        attribs['top'] = nextelement.attrib['top']
+                        attribs['height'] = nextelement.attrib['height']
+                        attribs['pdf'] = self
+                        del attribs['font']
+                        return self._textdecoder(Textbox(textelements, **attribs),
+                                                 self.fontspec)
+                else:
+                    self.log.warning("Text element %s looks like a footnote "
+                                     "marker, but not in main text nor footer "
+                                     "area")
+        elif (after_footnote and
+              lastfont.family == thisfont['family'] and
+              lastfont.size == thisfont['size'] and
+              lastbox.top == int(attribs['top']) and
+              lastbox.height == int(attribs['height']) and
+              abs(lastbox.right - int(attribs['left'])) < 3):
+            lastbox.append(self._parse_xml_make_textelement(element))
+            after_footnote = False
+        after_footnote = False
+        # all textboxes share the same fontspec dict
+        attribs['fontspec'] = self.fontspec
+        attribs['fontid'] = int(attribs['font'])
+        attribs['pdf'] = self
+        del attribs['font']
+        return self._textdecoder(Textbox(textelements, **attribs), self.fontspec)
+
+    ws_trans = str.maketrans("\n\t\xa0", "   ")
+
+    def _parse_xml_make_textelement(self, element, **origkwargs):
+        # the complication is that a hierarchical sequence of tags
+        # should be converted to a list of 
+        # 
+        # case 1: plain text -> Textelement
+        # case 2: tag = a -> LinkedTextelement
+        # case 3: tab=b/i -> Textelement, tag=...
+        # case 4: tag=b + tag=i -> Textelement, tag=bi
+
+        # complicated cases:
+        # TE = Textelement
+        # LTE = LinkedTextelement
+        # 
+        # 1: <text>Here <b>is <i> some <a href="...">text</a></i></b></text>
+        #     -> <b>is <i> some <a href="...">text</a></i></b>
+        #       -> <i> some <a href="...">text</a></i>, tag="b"
+        #         -> <a href="...">text</a>, tag="bi"
+        #    -> (TE("Here"), TE("is", tag="b"), TE("some", tag="bi"), LTE("text", tag="bi", uri="..."))
+        # 2: <text><b><i><a href="...">1</a></i>/<b></text>
+        #    -> LTE("1", tag="bis", uri="..."), footnote=True (shld caller determine that?)
+        # 3: <text><b></i>that </i> is </b> complicated</text>, after_footnote=True
+        #    -> TextElement("that", tag="bi"), TE("is", tag="i"), TE("complicated"), 
+        # 4: <text>2</text>
+        #    -> TE("2", tag="sup")
+        #
+        def cleantag(kwargs):
+            # returns the "a" tag from a tag string, if present (w/o
+            # altering the original kwargs)
+            kwargscopy = dict(kwargs)
+            if "a" in kwargs.get("tag", ""):
+                kwargscopy["tag"] = kwargscopy["tag"].replace("a", "")
+            if kwargscopy["tag"] == "":
+                kwargscopy["tag"] = None
+            return kwargscopy
+
+        def normspace(txt):
+            # like util.normalize_space, but preserves a single leading/trailing space
+            txt = txt.translate(self.ws_trans)
+            startspace = " " if txt.startswith(" ") else ""
+            endspace = " " if txt.endswith(" ") and len(txt) > 1 else ""
+            return startspace + util.normalize_space(txt) + endspace
+        
+        res = []
+        cls = origcls = Textelement
+        origtag = None
+        kwargs = dict(origkwargs)
+        if 'tag' not in kwargs:
+            kwargs['tag'] = ""
+        if element.tag == "a":
+            cls = LinkedTextelement
+            kwargs['uri'] = element.get("href")
+            kwargs['tag'] = (kwargs.get('tag', '') + element.tag)
+        elif element.tag in ("b", "i"):
+            if "a" in kwargs.get('tag', ''):
+                cls = LinkedTextelement
+            kwargs['tag'] += element.tag
+        else:
+            assert element.tag == "text", "Got <%s>, expected <{text,b,i,a}> " % element.tag
+        if element.text and (element.text.strip() or element.tag == "a"):
+            res.append(cls(normspace(element.text), **cleantag(kwargs)))
+        for child in element:
+            res.extend(self._parse_xml_make_textelement(child, **kwargs))
+        if element.tail and element.tail.strip():
+            res.append(origcls(normspace(element.tail), **cleantag(origkwargs)))
+        return res
+    
+
+    def _parse_xml_add_fontspec(self, element, fontinfo, fontspec):
+        fontid = int(element.attrib['id'])
+        # make sure we always deal with a basic dict (not
+        # lxml.etree._Attrib) where all keys are str
+        # object (not bytes)
+        fspec = dict([(k, str(v)) for k, v in element.attrib.items()])
+        # then make it more usable
+        fspec['size'] = int(fspec['size'])
+        if fontinfo.get(fspec['family']):
+            # Commmon values: MacRoman, WinAnsi, Custom
+            fspec['encoding'] = fontinfo[fspec['family']]['encoding']
+        if "+" in fspec['family']:
+            fspec['family'] = fspec['family'].split("+", 1)[1]
+        fontspec[fontid] = fspec
+
 
     def _analyze_font_encodings(self, root, fontinfo):
         encoded_fontids = {}
@@ -1201,13 +1204,25 @@ all text in a Textbox has the same font and size.
                 c = c + e
         # it MIGHT be the case that we need to merge c with the last
         # Textelement added to res iff their tags match
-        if len(res) and c.tag == res[-1].tag and type(c) == type(res[-1]):
+        if len(res) and c and c.tag == res[-1].tag and type(c) == type(res[-1]):
             res[-1] = res[-1] + c
-        else:
+        elif c:
             res.append(c)
         return res
 
     def __iadd__(self, other):
+        self.top = min(self.top, other.top)
+        self.left = min(self.left, other.left)
+        self.width = max(self.left + self.width,
+                         other.left + other.width) - self.left
+        self.height = max(self.top + self.height,
+                          other.top + other.height) - self.top
+        self.right = self.left + self.width
+        self.bottom = self.top + self.height
+        self.lines += other.lines
+        if self.bottom > other.top + (other.height / 2):
+            # self and other is really on the same line
+            self.lines -= 1
         if len(self):
             c = self.pop()
         else:
@@ -1221,17 +1236,8 @@ all text in a Textbox has the same font and size.
                 # c = e
             else:
                 c = c + e
-        self.append(c)
-        self.top = min(self.top, other.top)
-        self.left = min(self.left, other.left)
-        self.width = max(self.left + self.width,
-                         other.left + other.width) - self.left
-        self.height = max(self.top + self.height,
-                          other.top + other.height) - self.top
-        self.lines += other.lines
-        if self.bottom <= other.top:
-            # self and other is really on the same line
-            self.lines -= 1
+        if c:
+            self.append(c)
         return self
 #
 #    def append(self, thing):

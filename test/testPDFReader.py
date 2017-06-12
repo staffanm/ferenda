@@ -18,7 +18,7 @@ from lxml import etree
 from ferenda.compat import unittest
 from ferenda import errors, util
 from ferenda.testutil import FerendaTestCase
-from ferenda.elements import LinkSubject
+from ferenda.elements import serialize, LinkSubject
 
 # SUT
 from ferenda import PDFReader
@@ -216,42 +216,7 @@ class Read(unittest.TestCase):
                          util.normalize_space(str(reader[0][1])))
 
 
-    def test_links(self):
-        # for this file, we don't even have a real PDF file, just some
-        # copypasted excerpts from an intermediate XML file
-        self._copy_sample()
-        reader = PDFReader(filename="test/files/pdfreader/links.pdf",
-                           workdir=self.datadir)
-        page = reader[0]
-        self.assertIsInstance(page[2][0], LinkedTextelement)
-        self.assertEqual("1", page[2][0])
-        self.assertEqual("b", page[2][0].tag)
-        self.assertEqual("nya-avfallsregler-ds-200937.html#7", page[2][0].uri)
 
-        self.assertIsInstance(page[10][0], LinkedTextelement)
-        self.assertEqual("2.1", page[10][0])
-        self.assertEqual(None, page[10][0].tag)
-        self.assertEqual("nya-avfallsregler-ds-200937.html#9", page[10][0].uri)
-
-
-    def test_linked_footnote(self):
-        # this is like test_links
-        self._copy_sample()
-        reader = PDFReader(filename="test/files/pdfreader/linked-footnote.pdf",
-                           workdir=self.datadir)
-        page = reader[0]
-        self.assertIsInstance(page[0][0], Textelement)
-        self.assertEqual("bindande verkan för det allmänna.", page[0][0])
-
-        self.assertIsInstance(page[0][1], LinkedTextelement)
-        self.assertEqual("7", page[0][1])
-        self.assertEqual("s", page[0][1].tag)
-
-        self.assertIsInstance(page[0][2], LinkedTextelement)
-        self.assertEqual(" ", page[0][2])
-
-        self.assertIsInstance(page[0][3], Textelement)
-        self.assertEqual("Bestämmelsen kan således inte ", page[0][3])
 
 
 class Decoding(unittest.TestCase):
@@ -364,23 +329,33 @@ class Decoding(unittest.TestCase):
                          str(page[2]))         # other encoding (0x20
         
         
-class TestParseXML(unittest.TestCase):
-
-    def test_grandchildren(self):
+class ParseXML(unittest.TestCase):
+    maxDiff = None
+    
+    def _parse_xml(self, xmlfrag):
         pdf = PDFReader(pages=True)
         pdf.fontspec = {}
         pdf._textdecoder = BaseTextDecoder()
-        xmlfp = BytesIO(b"""<?xml version="1.0" encoding="UTF-8"?>
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE pdf2xml SYSTEM "pdf2xml.dtd">
 <pdf2xml producer="poppler" version="0.24.3">
-<page number="18" position="absolute" top="0" left="0" height="1263" width="892">
-	<fontspec id="12" size="11" family="TimesNewRomanPS-BoldItalicMT" color="#000000"/>
-<text top="270" left="278" width="450" height="12" font="12"><i><b>52 par</b>  Sanktionsavgiften ska </i></text>
+<page number="1" position="absolute" top="0" left="0" height="750" width="500">
+%s
 </page>
-</pdf2xml>""")
+</pdf2xml>""" % xmlfrag
+        xmlfp = BytesIO(xml.encode("utf-8"))
         xmlfp.name = "dummy.xml"
-
         pdf._parse_xml(xmlfp)
+        return pdf
+
+
+    def test_grandchildren(self):
+        pdf = self._parse_xml("""
+<fontspec id="12" size="11" family="TimesNewRomanPS-BoldItalicMT" color="#000000"/>
+<text top="270" left="278" width="450" height="12" font="12">
+   <i><b>52 par</b> Sanktionsavgiften ska </i>
+</text>
+""")
         textbox = pdf[0][0]
         self.assertIsInstance(textbox, Textbox)
         self.assertEqual(len(textbox), 2)
@@ -389,8 +364,164 @@ class TestParseXML(unittest.TestCase):
         self.assertEqual(textbox[1].tag, "i")
         self.assertEqual(textbox[1], " Sanktionsavgiften ska ")
 
-    # FIXME: write more testcases here
-    
+    def test_whitespace_normalization(self):
+        pdf = self._parse_xml("""
+<fontspec id="0" size="21" family="CCQUSK+Calibri-Bold" color="#345a8a"/>
+<text top="146" left="135" width="155" height="29" font="0"><b>Document	  title	  </b></text>""")
+        self.assertEqual("Document title ", str(pdf[0][0]))
+
+
+    def test_footnote(self):
+        pdf = self._parse_xml("""
+<fontspec id="7" size="14" family="TROYEM+OriginalGaramondBT-Roman" color="#000000"/>
+<fontspec id="15" size="7" family="TROYEM+OriginalGaramondBT-Roman" color="#000000"/>
+<text top="830" left="85" width="241" height="20" font="7">bindande verkan för det allmänna.</text>
+<text top="829" left="327" width="5" height="12" font="15">7</text>
+<text top="830" left="332" width="227" height="20" font="7">Bestämmelsen kan således inte </text>""")
+        want = """
+<Page height="750" number="1" width="500">
+  <Textbox bottom="850" fontid="7" height="21" left="85" lines="-2" right="559" top="829" width="474">
+    <Textelement>bindande verkan för det allmänna.</Textelement>
+    <Textelement tag="sup">7</Textelement>
+    <Textelement>Bestämmelsen kan således inte </Textelement>
+  </Textbox>
+</Page>
+"""
+        self.assertEqual(want[1:],
+                         serialize(pdf[0]))
+
+
+    def test_footnote_lineending(self):
+        pdf = self._parse_xml("""
+<fontspec id="0" size="13" family="GGKKGC+TimesNewRomanPSMT" color="#000000"/>
+<fontspec id="4" size="13" family="GGKKID+TimesNewRomanPS-ItalicMT" color="#000000"/>
+<fontspec id="7" size="7" family="GGKKGC+TimesNewRomanPSMT" color="#000000"/>
+<text top="161" left="291" width="401" height="17" font="0">Härigenom föreskrivs i fråga om mervärdesskattelagen (1994:200)</text>
+<text top="159" left="692" width="5" height="11" font="7">7</text>
+<text top="161" left="697" width="4" height="17" font="0"> </text>
+<text top="178" left="291" width="249" height="17" font="4"><i>dels</i> att 1 kap. 12 § ska upphöra att gälla, </text>
+""")
+        want = """
+<Page height="750" number="1" width="500">
+  <Textbox bottom="178" fontid="0" height="19" left="291" lines="-1" right="697" top="159" width="406">
+    <Textelement>Härigenom föreskrivs i fråga om mervärdesskattelagen (1994:200)</Textelement>
+    <Textelement tag="sup">7</Textelement>
+  </Textbox>
+  <Textbox bottom="195" fontid="4" height="17" left="291" lines="0" right="540" top="178" width="249">
+    <Textelement tag="i">dels</Textelement>
+    <Textelement> att 1 kap. 12 § ska upphöra att gälla, </Textelement>
+  </Textbox>
+</Page>
+"""
+        self.assertEqual(want[1:],
+                         serialize(pdf[0]))
+
+
+    def test_linked_footnote(self):
+        pdf = self._parse_xml("""
+<fontspec id="7" size="14" family="TROYEM+OriginalGaramondBT-Roman" color="#000000"/>
+<fontspec id="15" size="7" family="TROYEM+OriginalGaramondBT-Roman" color="#000000"/>
+<text top="830" left="85" width="241" height="20" font="7">bindande verkan för det allmänna.</text>
+<text top="829" left="327" width="5" height="12" font="15"><a href="unik-kunskap-genom-registerforskning-sou-201445.html#120">7</a></text>
+<text top="830" left="332" width="227" height="20" font="7"><a href="unik-kunskap-genom-registerforskning-sou-201445.html#120"> </a>Bestämmelsen kan således inte </text>
+""")
+        want = """
+<Page height="750" number="1" width="500">
+  <Textbox bottom="850" fontid="7" height="21" left="85" lines="-2" right="559" top="829" width="474">
+    <Textelement>bindande verkan för det allmänna.</Textelement>
+    <LinkedTextelement tag="s" uri="unik-kunskap-genom-registerforskning-sou-201445.html#120">7</LinkedTextelement>
+    <LinkedTextelement uri="unik-kunskap-genom-registerforskning-sou-201445.html#120"> </LinkedTextelement>
+    <Textelement>Bestämmelsen kan således inte </Textelement>
+  </Textbox>
+</Page>
+"""
+        self.assertEqual(want[1:],
+                         serialize(pdf[0]))
+        
+
+    def test_footnote_footer(self):
+        pdf = self._parse_xml("""
+<fontspec id="7" size="14" family="TROYEM+OriginalGaramondBT-Roman" color="#000000"/>
+<fontspec id="15" size="7" family="TROYEM+OriginalGaramondBT-Roman" color="#000000"/>
+<fontspec id="16" size="10" family="TROYEM+OriginalGaramondBT-Roman" color="#000000"/>
+<fontspec id="17" size="5" family="TROYEM+OriginalGaramondBT-Roman" color="#000000"/>
+<text top="849" left="85" width="472" height="20" font="7">ligga till grund för några individuella rättigheter. I 2 kap. 4 och 5 §§ </text>
+<text top="891" left="85" width="4" height="9" font="17">7</text>
+<text top="891" left="89" width="258" height="15" font="16"> Prop. 1975/76:209 s. 128, prop. 2009/10:80 s. 173. </text>
+""")
+        want = """
+<Page height="750" number="1" width="500">
+  <Textbox bottom="869" fontid="7" height="20" left="85" lines="0" right="557" top="849" width="472">
+    <Textelement>ligga till grund för några individuella rättigheter. I 2 kap. 4 och 5 §§ </Textelement>
+  </Textbox>
+  <Textbox bottom="906" fontid="16" height="15" left="85" lines="-1" right="347" top="891" width="262">
+    <Textelement tag="sup">7</Textelement>
+    <Textelement> Prop. 1975/76:209 s. 128, prop. 2009/10:80 s. 173. </Textelement>
+  </Textbox>
+</Page>
+"""
+        self.assertEqual(want[1:],
+                         serialize(pdf[0]))
+
+
+    def test_links(self):
+        pdf = self._parse_xml("""
+<fontspec id="6" size="14" family="CNMEID+TradeGothic,Bold" color="#000000"/>
+<fontspec id="8" size="14" family="CNMEIF+OrigGarmndBT" color="#000000"/>
+<text top="310" left="81" width="10" height="20" font="6"><a href="nya-avfallsregler-ds-200937.html#7"><b>1</b></a></text>
+<text top="384" left="81" width="21" height="20" font="8"><a href="nya-avfallsregler-ds-200937.html#9">2.1</a></text>
+
+""")
+        page = pdf[0]
+        self.assertIsInstance(page[0][0], LinkedTextelement)
+        self.assertEqual("1", page[0][0])
+        self.assertEqual("b", page[0][0].tag)
+        self.assertEqual("nya-avfallsregler-ds-200937.html#7", page[0][0].uri)
+
+        self.assertIsInstance(page[1][0], LinkedTextelement)
+        self.assertEqual("2.1", page[1][0])
+        self.assertEqual(None, page[1][0].tag)
+        self.assertEqual("nya-avfallsregler-ds-200937.html#9", page[1][0].uri)
+
+
+    def test_comment(self):
+        pdf = self._parse_xml("""
+<fontspec id="1" size="11" family="TimesNewRomanPS" color="#000000"/>
+<text top="270" left="278" width="450" height="12" font="1">First line</text>
+<!-- comments like this won't appear in real pdf2xml output, but might appear
+     in test cases -->
+<text top="290" left="278" width="450" height="12" font="1">Second line</text>
+""")
+        want = """
+<Page height="750" number="1" width="500">
+  <Textbox bottom="282" fontid="1" height="12" left="278" lines="0" right="728" top="270" width="450">
+    <Textelement>First line</Textelement>
+  </Textbox>
+  <Textbox bottom="302" fontid="1" height="12" left="278" lines="0" right="728" top="290" width="450">
+    <Textelement>Second line</Textelement>
+  </Textbox>
+</Page>
+"""
+        self.assertEqual(want[1:],
+                         serialize(pdf[0]))
+
+
+    def test_empty(self):
+        pdf = self._parse_xml("""
+<fontspec id="3" size="11" family="TimesNewRomanPS" color="#000000"/>
+<text top="686" left="148" width="4" height="18" font="3">
+  <b> </b>
+</text>
+""")
+        want = """
+<Page height="750" number="1" width="500">
+  <Textbox bottom="704" fontid="3" height="18" left="148" lines="0" right="152" top="686" width="4" />
+</Page>
+"""
+        self.assertEqual(want[1:],
+                         serialize(pdf[0]))
+        
+
 
 class AsXHTML(unittest.TestCase, FerendaTestCase):
 
@@ -472,3 +603,41 @@ class AsXHTML(unittest.TestCase, FerendaTestCase):
 """
         self._test_asxhtml(want, body)
                         
+
+
+class Elements(unittest.TestCase):
+    maxDiff = None
+    def test_addboxes(self):
+        box1 = Textbox([Textelement("hey ", tag=None)], fontid=None, top=0, left=0, width=50, height=10, lines=1)
+        box2 = Textbox([Textelement("ho", tag=None)], fontid=None, top=0, left=50, width=40, height=10, lines=1)
+        
+        combinedbox = box1 + box2
+        want = """
+<Textbox bottom="10" fontid="0" height="10" left="0" lines="1" right="90" top="0" width="90">
+  <Textelement>hey ho</Textelement>
+</Textbox>
+"""
+        self.assertEqual(want[1:],
+                         serialize(combinedbox))
+        # make sure __iadd__ performs like __add__
+        box1 += box2
+        self.assertEqual(want[1:],
+                         serialize(box1))
+        
+
+    def test_add_different_types(self):
+        box1 = Textbox([Textelement("hey", tag=None)], fontid=None, top=0, left=0, width=50, height=10, lines=1)
+        box2 = Textbox([LinkedTextelement("1", tag="s", uri="foo.html")], fontid=None, top=0, left=50, width=5, height=10, lines=1)
+        combinedbox = box1 + box2
+        want = """
+<Textbox bottom="10" fontid="0" height="10" left="0" lines="1" right="55" top="0" width="55">
+  <Textelement>hey</Textelement>
+  <LinkedTextelement tag="s" uri="foo.html">1</LinkedTextelement>
+</Textbox>
+"""
+        self.assertEqual(want[1:],
+                         serialize(combinedbox))
+        # make sure __iadd__ performs like __add__
+        box1 += box2
+        self.assertEqual(want[1:],
+                         serialize(box1))
