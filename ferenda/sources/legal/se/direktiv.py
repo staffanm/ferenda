@@ -272,7 +272,7 @@ class DirAsp(FixedLayoutSource):
         return a
 
     def infer_identifier(self, basefile):
-        return "Dir %s" % basefile
+        return "Dir. %s" % basefile
 
     def postprocess_doc(self, doc):
         next_is_title = False

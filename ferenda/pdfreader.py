@@ -677,7 +677,10 @@ class PDFReader(CompoundElement):
         del attribs['font']
         return self._textdecoder(Textbox(textelements, **attribs), self.fontspec)
 
-    ws_trans = str.maketrans("\n\t\xa0", "   ")
+    import string
+    ws_trans = {ord("\n"): " ",
+                ord("\t"): " ",
+                ord("\xa0"): " "}
 
     def _parse_xml_make_textelement(self, element, **origkwargs):
         # the complication is that a hierarchical sequence of tags
@@ -716,6 +719,9 @@ class PDFReader(CompoundElement):
 
         def normspace(txt):
             # like util.normalize_space, but preserves a single leading/trailing space
+            if not isinstance(txt, str): # under py2, element.text can
+                                         # sometimes be a bytestring?
+                txt = txt.decode()
             txt = txt.translate(self.ws_trans)
             startspace = " " if txt.startswith(" ") else ""
             endspace = " " if txt.endswith(" ") and len(txt) > 1 else ""

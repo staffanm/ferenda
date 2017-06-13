@@ -647,6 +647,16 @@ class Offtryck(SwedishLegalSource):
                    self.SO: "%s %s:%s"}
         try:
             parts = re.split("[\.:/ ]+", identifier.strip())
+            id_template = pattern[self.document_type]
+            # do we have enough parts for our template?
+            if len(parts) == id_template.count("%s") - 1:
+                # we're probably missing the first part (eg "Prop",
+                # "Ds") and so what we have is a basefile-like
+                # thing. Reconstruct the first part.
+                parts.insert(0, re.split("[\.:/ ]+", self.infer_identifier(identifier))[0])
+            # make sure the initial char is capitalized (this is
+            # preferred to .capitalize() for strings that should be
+            # all-caps, eg "SOU"
             parts[0] = parts[0][0].upper() + parts[0][1:]
             return pattern[self.document_type] % tuple(parts)
         except:
