@@ -327,6 +327,7 @@ class Offtryck(SwedishLegalSource):
         #   a PDFAnalyzer subclass instance as a property on the
         #   sanitized object (normally a PDFReader or
         #   StreamingPDFReader)
+        # - read doc-specific options specified in res/options/options.py
         options = self.get_parse_options(basefile)
         if options == "skip":
             raise DocumentSkippedError("%s: Skipped because of options.py" % basefile,
