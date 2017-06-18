@@ -323,8 +323,9 @@ class Riksdagen(Offtryck, FixedLayoutSource):
         # fp can now be a pointer to a hocr file, a pdf2xml file,
         # a html file or a StringIO object containing html taken
         # from index.xml
+        options = self.get_parse_options(basefile)
         if (os.path.exists(pdffile) and
-            self.get_parse_options(basefile) != "metadataonly"):
+            options != "metadataonly"):
             fp = self.parse_open(basefile)
             parser = "ocr" if ".hocr." in util.name_from_fp(fp) else "xml"
             reader = StreamingPDFReader().read(fp, parser=parser)
