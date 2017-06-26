@@ -38,6 +38,27 @@ class SOUAnalyzer(PDFAnalyzer):
 
     gluefunc = None
 
+    def guess_pagenumber(self, page, probable_pagenumber=1):
+        candidate = super(SOUAnalyzer, self).guess_pagenumber(page, probable_pagenumber)
+        if self.scanned_source:
+            # KB scans have predictable page numbering -- the first
+            # three pdf pages are fake cover, real cover and inlay --
+            # the logical page 1 starts at physical page 4
+            if candidate is None:
+                if probable_pagenumber == 4 and not hasattr(self, 'paginate_cover_accounted'):
+                    self.paginate_cover_accounted = True
+                    return 1
+                else:
+                    return candidate
+            elif candidate - probable_pagenumber > 1000:
+                # it's generally not common with large jumps in
+                # pagenumbering. this is probably a year printed at
+                # the bottom of the page
+                return None
+        return candidate
+            
+            
+
     @cached_property
     def documents(self):
         def titleish(page):
