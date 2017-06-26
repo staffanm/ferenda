@@ -1,0 +1,63 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://lagen.nu/dom/nja/1992s55#HDO> dcterms:creator "HD"@sv ;
+    dcterms:isPartOf <https://lagen.nu/dom/nja/1992s55> ;
+    dcterms:references <https://lagen.nu/1942:740>,
+        <https://lagen.nu/1942:740#K13P3S2>,
+        <https://lagen.nu/1942:740#K50P26>,
+        <https://lagen.nu/dom/nja/1982s95>,
+        <https://lagen.nu/dom/nja/1986s655>,
+        <https://lagen.nu/dom/nja/1989s47> .
+
+<https://lagen.nu/dom/nja/1992s55#HSB> dcterms:creator "HovR:n över Skåne och Blekinge"@sv ;
+    dcterms:isPartOf <https://lagen.nu/dom/nja/1992s55> .
+
+<https://lagen.nu/dom/nja/1992s55#TTR> dcterms:creator "Trelleborgs TR"@sv ;
+    dcterms:isPartOf <https://lagen.nu/dom/nja/1992s55> .
+
+<https://lagen.nu/begrepp/Nytt_yrkande> rdfs:label "Nytt yrkande" .
+
+<https://lagen.nu/begrepp/Tredskodom> rdfs:label "Tredskodom" .
+
+<https://lagen.nu/begrepp/Återvinning> rdfs:label "Återvinning" .
+
+<https://lagen.nu/dom/hd/T50-91/1992-02-14> a rpubl:VagledandeDomstolsavgorande ;
+    dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
+    dcterms:subject <https://lagen.nu/begrepp/Nytt_yrkande>,
+        <https://lagen.nu/begrepp/Tredskodom>,
+        <https://lagen.nu/begrepp/Återvinning> ;
+    dcterms:title "Sedan återvinning sökts efter tredskodom, har borgenären ansetts inte vara berättigad att med stöd av 13 kap 3 § 1 st 3 RB framställa nytt yrkande, trots att yrkandet stödde sig på väsentligen samma grund som det ursprungligen framställda."@sv ;
+    rpubl:avgorandedatum "1992-02-14"^^xsd:date ;
+    rpubl:domsnummer "DT96-92" ;
+    rpubl:lagrum <https://lagen.nu/1942:740#K13P3S1N3> ;
+    rpubl:malnummer "T50-91" ;
+    rpubl:rattsfallshanvisning <https://lagen.nu/dom/nja/1982s95>,
+        <https://lagen.nu/dom/nja/1989s47> ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/t50-91/1992-02-14> .
+
+<https://lagen.nu/dom/nja/1992s55?repo=dv&dir=downloaded> rdfs:label "NJA 1992 s. 55"@sv .
+
+<https://lagen.nu/org/2008/hogsta-domstolen> foaf:name "Högsta domstolen" .
+
+<https://lagen.nu/dom/nja/1992s55> a rpubl:Rattsfallsreferat ;
+    dcterms:bibliographicCitation "NJA 1992:9" ;
+    dcterms:identifier "NJA 1992 s. 55" ;
+    dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
+    rpubl:arsutgava "1992" ;
+    rpubl:lopnummer "9" ;
+    rpubl:rattsfallspublikation <https://lagen.nu/dataset/nja> ;
+    rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/hd/T50-91/1992-02-14> ;
+    rpubl:referatrubrik "Sedan återvinning sökts efter tredskodom, har borgenären ansetts inte vara berättigad att med stöd av 13 kap 3 § 1 st 3 RB framställa nytt yrkande, trots att yrkandet stödde sig på väsentligen samma grund som det ursprungligen framställda."@sv ;
+    rpubl:sidnummer "55" ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rf/nja/1992/s_55> ;
+    prov:wasDerivedFrom <https://lagen.nu/dom/nja/1992s55?repo=dv&dir=downloaded> ;
+    prov:wasGeneratedBy "lagen.nu.dv.DV" .
+

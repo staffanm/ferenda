@@ -124,6 +124,9 @@ class TestInstans(TestDVParserBase):
         self.t({'court': 'HD'},
                'H.T. (ombud advokaten O.R.) sökte revision och yrkade att HD '
                'måtte fastställa TR:ns dom i huvudsaken')
+        self.t({'court': 'HD'},
+               'K.B. sökte revision och yrkade, såsom hans talan fick förstås,'
+               ' att HD skulle ogilla statens talan.')
         self.t({'court': True},
                'Såväl Broschyrbolaget (ombud advokaten G.R.) som Sperlingsholm'
                ' sökte revision. ')
@@ -303,7 +306,11 @@ class TestInstans(TestDVParserBase):
         self.t({},
                "HD fastställer överklagade beslutet")
 
-        
+        # when a paragraph starts with "Domskäl.", the following
+        # sentence is probably more of a recap, not a new instance.
+        self.t({},
+               "Domskäl. Staten ansökte vid Trelleborgs TR om betalningsföreläggande mot K.B. och yrkade")
+
 class TestDom(TestDVParserBase):
     method = "is_dom"
 

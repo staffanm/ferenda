@@ -1630,7 +1630,7 @@ class DV(SwedishLegalSource):
              'court': ('REG', 'HFD')},
             {'name': 'hd-revision',
              're': '(?P<karanden>[\w\.\(\)\- ]+) sökte revision och yrkade(,'
-                   'i första hand,|,|) att (?P<court>HD|)',
+                   'i första hand,|, såsom hans talan fick förstås,|,|) att (?P<court>HD|)',
              'method': 'match',
              'type': ('instans',),
              'court': ('HDO',)},
@@ -1873,6 +1873,8 @@ class DV(SwedishLegalSource):
         # that the sentence before can't end in a single capital
         # letter.
         def split_sentences(text):
+            # if text.startswith("Domskäl. Staten ansökte vid Trelleborgs TR "):
+            #     from pudb import set_trace; set_trace()
             text = util.normalize_space(text)
             text += " "
             return [x.strip() for x in re.split("(?<![A-ZÅÄÖ])\. (?=[A-ZÅÄÖ]|$)", text)]
@@ -1894,8 +1896,17 @@ class DV(SwedishLegalSource):
                 # the needed sentence is usually 1st or 2nd
                 # (occassionally 3rd), searching more yields risk of
                 # false positives.
+                sentences = split_sentences(strchunk)[:3]
 
-                for sentence in split_sentences(strchunk)[:3]:
+                # In rare cases (HDO/T50-91_1) a chunk might be a
+                # Domskäl, but the second sentence looks like the
+                # start of an Instans. Since recognizers come in a
+                # particular order, is_instans is run before
+                # is_domskal, we must detect this false positive
+                domskal_match = matchers['domskal'][matchersname['domskal'].index('domskal')]
+                if domskal_match(sentences[0]):
+                    return res
+                for sentence in sentences:
                     for (r, rname) in zip(matchers['instans'], matchersname['instans']):
                         m = r(sentence)
                         if m:
