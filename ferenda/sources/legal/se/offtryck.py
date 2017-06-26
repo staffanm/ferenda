@@ -777,7 +777,7 @@ class Offtryck(SwedishLegalSource):
         prevnode = None
         # self.log.debug("Finding commentary for %s" % law)
         for idx, subnode in enumerate(section):
-            if not isinstance(subnode, (Textbox, Sidbrytning)):
+            if not isinstance(subnode, (Textbox, Sidbrytning, UnorderedList)):
                 raise ValueError("_find_commentary_for_law: Got a %s instead of a Textbox or Sidbrytning, this indicates broken parsing" % type(subnode))
             text = str(subnode).strip()
             # self.log.debug("Examining %s..." % text[:60])
@@ -1526,19 +1526,30 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
 
     @newstate('bulletlist')
     def make_bulletlist(parser):
-        ul = UnorderedList()
-        ul.append(make_listitem(parser))
-        return parser.make_children(ul)
+        ul = UnorderedList(top=None, left=None, bottom=None, right=None, width=None, height=None, font=None)
+        li = make_listitem(parser)
+        ul.append(li)
+        ret = parser.make_children(ul)
+        ret.top = min([li.top for li in ret])
+        # ret.left = min([li.left for li in ret])
+        ret.bottom = max([li.bottom for li in ret])
+        # ret.right = max([li.right for li in ret])
+        # ret.width = ret.right - ret.left
+        ret.height = ret.bottom - ret.top
+        ret.font = ret[0].font
+        return ret
 
     def make_listitem(parser):
-        s = str(parser.reader.next())
+        chunk = parser.reader.next()
+        s = str(chunk)
         if " " in s:
             # assume text before first space is the bullet
             s = s.split(" ",1)[1]
         else:
             # assume the bullet is a single char
             s = s[1:]
-        return ListItem(s)
+        return ListItem([s], top=chunk.top, left=chunk.left, right=chunk.right, bottom=chunk.bottom,
+                        width=chunk.width, height=chunk.height, font=chunk.font)
 
     @newstate('appendix')
     def make_appendix(parser):
