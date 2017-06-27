@@ -778,7 +778,7 @@ class Offtryck(SwedishLegalSource):
         # self.log.debug("Finding commentary for %s" % law)
         for idx, subnode in enumerate(section):
             if not isinstance(subnode, (Textbox, Sidbrytning, UnorderedList)):
-                raise ValueError("_find_commentary_for_law: Got a %s instead of a Textbox or Sidbrytning, this indicates broken parsing" % type(subnode))
+                raise ValueError("_find_commentary_for_law: Got a %s instead of a Textbox/Sidbrytning/UnorderedList, this indicates broken parsing" % type(subnode))
             text = str(subnode).strip()
             # self.log.debug("Examining %s..." % text[:60])
             if reexamine_state:  # meaning the previous node was

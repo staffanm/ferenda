@@ -20,9 +20,8 @@ from layeredconfig import LayeredConfig, Defaults
 
 from ferenda import util, errors
 from ferenda.fsmparser import Peekable
-from .elements import UnicodeElement
-from .elements import CompoundElement
-from .elements import OrdinalElement
+from ferenda.elements import serialize
+from ferenda.elements import UnicodeElement, CompoundElement, OrdinalElement
 
 E = ElementMaker(namespace="http://www.w3.org/1999/xhtml",
                  nsmap={None: "http://www.w3.org/1999/xhtml"})
@@ -658,9 +657,9 @@ class PDFReader(CompoundElement):
                         return self._textdecoder(Textbox(textelements, **attribs),
                                                  self.fontspec)
                 else:
-                    self.log.warning("Text element %s looks like a footnote "
+                    self.log.warning("Text element %s (%s) looks like a footnote "
                                      "marker, but not in main text nor footer "
-                                     "area")
+                                     "area" % (serialize(textelements[0]).strip(), attribs))
         elif (after_footnote and
               lastfont.family == thisfont['family'] and
               lastfont.size == thisfont['size'] and
