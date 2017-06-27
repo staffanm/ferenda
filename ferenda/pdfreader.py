@@ -1286,15 +1286,18 @@ all text in a Textbox has the same font and size.
         if prevpart is not None:
             children.append(self._cleanstring(prevpart))
 
-        cssclass = 'textbox fontspec%s' % self.fontid
-        element = E("p", {'class': cssclass}, *children)
+        attribs = {}    
+        if hasattr(self, 'fontid'):
+            attribs['class'] = 'textbox fontspec%s' % self.fontid 
+        element = E("p", attribs, *children)
         # FIXME: we should output these positioned style attributes
         # only when the resulting document is being serialized in a
         # positioned fashion (and probably also the textbox/fontspec
-        # attributes). 
-        element.set(
-            'style', 'top: %spx; left: %spx; height: %spx; width: %spx' %
-            (self.top, self.left, self.height, self.width))
+        # attributes).
+        if hasattr(self, 'top') and hasattr(self, 'left'):
+            element.set(
+                'style', 'top: %spx; left: %spx; height: %spx; width: %spx' %
+                (self.top, self.left, self.height, self.width))
         return element
 
     def _cleanstring(self, thing):

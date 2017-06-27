@@ -279,6 +279,13 @@ class ARN(FixedLayoutSource):
         return reader.textboxes(gluecondition)
 
     def postprocess_doc(self, doc):
+        import pudb; pu.db
+        for box in doc.body:
+            del box.top
+            del box.left
+            del box.width
+            del box.height
+            del box.fontid
         if not doc.meta.value(URIRef(doc.uri), DCTERMS.title):
             # The title of the document wasn't in the HTML
             # fragment. Use first line of the document instead (and
