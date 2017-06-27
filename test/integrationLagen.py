@@ -95,6 +95,15 @@ class TestPaths(TestLagen):
         self.assert200(self.baseurl + "dataset/sitenews/feed.atom")
         self.assert200(self.baseurl + "dataset/sfs/feed.atom?rdf_type=type/forordning")
 
+    def test_attached_css(self):
+        res = self.get(self.baseurl + "difs/2013:1")
+        self.assertEqual(200, res.status_code)
+        self.assertEqual("text/html; charset=utf-8", res.headers["Content-Type"])
+        self.assertIn('<link rel="stylesheet" href="/difs/2013:1?dir=parsed&amp;attachment=index.css"/>', res.text[:1200])
+        res = self.get(self.baseurl + "difs/2013:1?dir=parsed&attachment=index.css")
+        self.assertEqual(200, res.status_code)
+        self.assertEqual("text/css", res.headers["Content-Type"])
+
 class TestPages(TestLagen):
     def test_frontpage_links(self):
         # <a> elements should have a href attribute (you'd think that
