@@ -16,7 +16,7 @@ from rdflib.namespace import SKOS, FOAF, DCTERMS, RDF, RDFS
 
 # own
 from ferenda import WSGIApp as OrigWSGIApp
-from ferenda import elements
+from ferenda import elements, util
 from ferenda.elements import html
 from ferenda.fulltextindex import Between, RegexString
 from ferenda.sources.legal.se.legalref import LegalRef
@@ -44,11 +44,10 @@ class WSGIApp(OrigWSGIApp):
         for s, o in graph.subject_objects(DCTERMS.alternate):
             basefile = sfsrepo.basefile_from_uri(str(s))
             distilledpath = sfsrepo.store.distilled_path(basefile)
-            if os.path.exists(distilledpath):
-                sg = Graph().parse(distilledpath)
-                firstpara = URIRef(str(s) + "#P1")
-                if sg.value(firstpara, RDF.type):
-                    self.paragraflag.append(str(o).lower())
+            firstpara_uri = str(s) + "#P1"
+            needle = '<rpubl:Paragraf rdf:about="%s">' % firstpara_uri
+            if os.path.exists(distilledpath) and needle in util.readfile(distilledpath):
+                self.paragraflag.append(str(o).lower())
         self.lagnamn = [str(o) for s, o in graph.subject_objects(RDFS.label)]
         self.lagforkortningar_regex = "|".join(sorted(self.lagforkortningar, key=len, reverse=True))
             
