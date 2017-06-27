@@ -279,7 +279,6 @@ class ARN(FixedLayoutSource):
         return reader.textboxes(gluecondition)
 
     def postprocess_doc(self, doc):
-        import pudb; pu.db
         for box in doc.body:
             del box.top
             del box.left
