@@ -1873,8 +1873,6 @@ class DV(SwedishLegalSource):
         # that the sentence before can't end in a single capital
         # letter.
         def split_sentences(text):
-            # if text.startswith("Domskäl. Staten ansökte vid Trelleborgs TR "):
-            #     from pudb import set_trace; set_trace()
             text = util.normalize_space(text)
             text += " "
             return [x.strip() for x in re.split("(?<![A-ZÅÄÖ])\. (?=[A-ZÅÄÖ]|$)", text)]

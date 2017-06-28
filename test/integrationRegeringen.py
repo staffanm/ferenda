@@ -51,11 +51,19 @@ class SelectPDFs(unittest.TestCase):
                 ["a"])
         
 
-
     def test_delar(self):
         self._t([("4ab56c4e.pdf", "En digital agenda, SOU 2014:13 (del 1 av 2) (pdf 2,3 MB)"),
                  ("e265db7c.pdf", "En digital agenda, SOU 2014:13 (del 2 av 2) (pdf 1,4 MB)")],
                 ["4ab56c4e.pdf", "e265db7c.pdf"])
+
+    def test_delar_alternate_versions_and_more(self):
+        self._t([('a', 'Utredningens pressmeddelande:"En genomgripande förändring för försäkrings- och tjänstepensionsbranschen" (pdf 106 kB)'),
+                 ('b', 'Rörelsereglering för försäkring och tjänstepension, del 1, kapitel 1-24 och bilaga 2 Europaparlamentets och rådets dirketiv 2009/138/EG, SOU 2011:68 (pdf 7 MB)'),
+                 ('c', 'Rörelsereglering för försäkring och tjänstepension, del 1, kapitel 1-24, SOU 2011:68 (pdf 4 MB)'),
+                 ('d', 'Rörelsereglering för försäkring och tjänstepension, del 2, SOU 2011:68 (pdf 3 MB)'),
+                 ('e', 'Bilaga 2 Europaparlamentets och rådets dirketiv 2009/138/EG (pdf 3 MB)'),
+                 ('f', 'Rättelseblad: Rörelsereglering för försäkring och tjänstepension, del 1, SOU 2011:68 (pdf 130 kB)')],
+                ["b", "d"])
 
     def test_sammanfattning(self):
         self._t([("0a086bba.pdf", "Unga som varken arbetar, SOU 2013:74 (pdf 2,2 MB)"),
@@ -88,3 +96,4 @@ class SelectPDFs(unittest.TestCase):
                 [("4ab56c4e.pdf", "En digital agenda, SOU 2014:13 (del 1 av 2) (pdf 2,3 MB)"),
                  ("e265db7c.pdf", "En digital agenda, SOU 2014:13 (del 2 av 2) (pdf 1,4 MB)")],
                 True)
+

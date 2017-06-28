@@ -205,9 +205,18 @@ class Offtryck(SwedishLegalSource):
             if (hasattr(prevbox, 'parid') and hasattr(nextbox, 'parid') and
                 prevbox.parid == nextbox.parid):
                 return True
+            strtextbox = str(textbox).strip()
+            strprevbox = str(prevbox).strip()
+            strnextbox = str(nextbox).strip()
             if scanned_source:
-                # allow for slight change in fontsize and vert align.
-                sizematch = lambda p, n: abs(p.font.size - n.font.size) <= 1
+                # allow for slight change in fontsize and vert
+                # align. Allow for more change if nextbox is a single
+                # char, as font size calculation is highly unreliable
+                # in these cases
+                if len(strnextbox) == 1:
+                    sizematch = lambda p, n: abs(p.font.size - n.font.size) <= 4
+                else:
+                    sizematch = lambda p, n: abs(p.font.size - n.font.size) <= 1
                 alignmatch = lambda p, n: abs(p.left - n.left) <= 2
                 valignmatch = lambda p, n: abs(p.bottom - n.bottom) <= 3 or abs(p.top - n.top) <= 3
             else:
@@ -216,9 +225,7 @@ class Offtryck(SwedishLegalSource):
                 # left margin in practice is not always straight.
                 alignmatch = lambda p, n: abs(p.left - n.left) <= 2  
                 valignmatch = lambda p, n: p.bottom == n.bottom
-            strtextbox = str(textbox).strip()
-            strprevbox = str(prevbox).strip()
-            strnextbox = str(nextbox).strip()
+
             if strnextbox == "–" or strprevbox == "–":
                 # dir 2016:15 page 15: a textbox with a single hyphen
                 # uses different fontsize
@@ -362,8 +369,6 @@ class Offtryck(SwedishLegalSource):
         # parts
         sanitized.analyzer.gluefunc = gluefunc
         documents = sanitized.analyzer.documents
-
-        
         
         if len(documents) > 1:
             self.log.debug("%s: segmented into docs %s" % (basefile, documents))
@@ -412,10 +417,10 @@ class Offtryck(SwedishLegalSource):
                         # parsing the bulk of the text.
                         self.refparser._legalrefparser.currentlynamedlaws.update(self.sfsparser.currentlynamedlaws)
                     body = self.refparser.parse_recursive(body)
-            elif tag == 'frontmatter':
-                # Frontmatter is defined as pages with no meaningful
-                # content (cover page, edition notice, half title and
-                # other crap) -- we can just skip them
+            elif tag in ('frontmatter', 'endregister'):
+                # Frontmatter and endregister is defined as pages with
+                # no meaningful content (cover page, edition notice,
+                # half title and other crap) -- we can just skip them
                 body = []
             else:
                 # copy pages verbatim -- make no attempt to glue
@@ -790,7 +795,7 @@ class Offtryck(SwedishLegalSource):
                 # indicates section starting with eg "<i>Första
                 # stycket</i> innehåller..." FIXME: this should be
                 # detected by self._is_commentstart now.
-                if hasattr(subnode, '__getitem__') and (subnode[0].tag == "i"):
+                if isinstance(subnode, Textbox) and hasattr(subnode, '__getitem__') and (subnode[0].tag == "i"):
                     parsestate = "commenttext"
                 elif self._is_headerlike(text):
                     parsestate = "acttext"
@@ -1431,8 +1436,8 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             ("Prop. 1987/88:69" > parser.current_identifier)):
             extended_topmargin = metrics.pageheight / 5
             placement = lambda c: c.bottom < extended_topmargin
-        elif parser.current_identifier.startswith("Ds"):
-            # For Ds it always appears in the topmargin
+        elif parser.current_identifier.startswith(("Ds", "SOU")):
+            # For Ds/SOU it always appears in the topmargin
             placement = lambda c: c.bottom <= metrics.topmargin
         else:
             placement = lambda c: c.right < metrics_leftmargin() or c.left > metrics_rightmargin()

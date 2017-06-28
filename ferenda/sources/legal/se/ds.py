@@ -38,16 +38,17 @@ class DsAnalyzer(PDFAnalyzer):
                 currentdoc = "main"
                 documents[0][-1] = "main"
             pgtitle = titleish(page)
-            if pgtitle is not None:
-                # The normal title indicating that the real content
-                # starts is Innehåll, but eg Ds 2009:55 (which is
-                # atypical) uses Innehållsförteckning.
-                if str(pgtitle).strip() in ("Innehåll", "Innehållsförteckning"):
-                    currentdoc = "main"
-                elif re.match("Till \w+minister ", str(pgtitle).strip()):
-                    currentdoc = "main"
-                elif re.match("Departementsserien \d+", str(pgtitle).strip()):
-                    currentdoc = 'endregister'
+            if currentdoc == 'frontmatter':
+                if pgtitle is not None:
+                    # The normal title indicating that the real content
+                    # starts is Innehåll, but eg Ds 2009:55 (which is
+                    # atypical) uses Innehållsförteckning.
+                    if str(pgtitle).strip() in ("Innehåll", "Innehållsförteckning", "Innehåll del 2"):
+                        currentdoc = "main"
+                    elif re.match("Till \w+minister ", str(pgtitle).strip()):
+                        currentdoc = "main"
+            if re.match("Departementsserien \d+", str(pgtitle).strip()):
+                currentdoc = 'endregister'
             styles = self.count_styles(pageidx, 1)
             # find the most dominant style on the page. If it uses the
             # EU font (even if it's the second most dominant), it's a

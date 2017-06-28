@@ -39,33 +39,29 @@ class SOUAnalyzer(PDFAnalyzer):
     gluefunc = None
 
     def guess_pagenumber(self, page, probable_pagenumber=1):
-        candidate = super(SOUAnalyzer, self).guess_pagenumber(page, probable_pagenumber)
         if self.scanned_source:
             # KB scans have predictable page numbering -- the first
             # three pdf pages are fake cover, real cover and inlay --
-            # the logical page 1 starts at physical page 4
-            if candidate is None:
-                if probable_pagenumber == 4 and not hasattr(self, 'paginate_cover_accounted'):
-                    self.paginate_cover_accounted = True
-                    return 1
-                else:
-                    return candidate
-            elif candidate - probable_pagenumber > 1000:
-                # it's generally not common with large jumps in
-                # pagenumbering. this is probably a year printed at
-                # the bottom of the page
+            # the logical page 1 starts at physical page 4. Assume no
+            # breaks in pagination, since the actual pagenumber is
+            # rarely (if ever) included in the actual OCR information
+            # (!)
+            if probable_pagenumber == 4 and not hasattr(self, 'paginate_cover_accounted'):
+                self.paginate_cover_accounted = True
+                return 1
+            else:
                 return None
-        return candidate
-            
+        else:
+            return super(SOUAnalyzer, self).guess_pagenumber(page, probable_pagenumber)
             
 
     @cached_property
     def documents(self):
-        def titleish(page):
+        def titleish(pageidx):
             # return the largest text element found on the page (first
             # one in case of a tie) -- that's probably the title on
             # the page
-            iterator = self.pdf.textboxes(self.gluefunc, startpage=page.number-1, pagecount=1) if self.gluefunc else page
+            iterator = self.pdf.textboxes(self.gluefunc, startpage=pageidx, pagecount=1) if self.gluefunc else self.pdf[pageidx]
             candidate = None
             for te in iterator:
                 if candidate is None or str(te)[0].isupper() and te.font.size > candidate.font.size:
@@ -73,27 +69,51 @@ class SOUAnalyzer(PDFAnalyzer):
             return candidate
         documents = []
         currentdoc = 'frontmatter'
+        prev_pagesrc = None
+        pageidx_offset = 0
         for pageidx, page in enumerate(self.pdf):
+            # FIXME: Generalize this way of detecting a multi-volume
+            # document (as opposed to a single document split into
+            # multiple PDF files).
+            if page.src != prev_pagesrc and 'del-2' in page.src:
+                if currentdoc == 'endregister' and len(page.as_plaintext()) < 1000:
+                    # this is probably a single document split into two
+                    currentdoc = 'main' # maybe 
+                else:
+                    # this is probably a multi-volume document 
+                    currentdoc = 'frontmatter'
+                pageidx_offset = pageidx
             # Sanity check: 
-            if pageidx > 8 and currentdoc == 'frontmatter':
+            if pageidx - pageidx_offset > 8 and currentdoc == 'frontmatter':
                 logging.getLogger("pdfanalyze").warning("missed the transition from frontmatter to main")
                 # act as there never was any frontmatter -- all pages
                 # are considered part of the main content.
                 currentdoc = "main"
                 documents[0][-1] = "main"
-            if currentdoc == 'frontmatter':
-                pgtitle = titleish(page)
-                if pgtitle is not None:
-                    pgtitle = str(pgtitle).strip()
-                    if re.match("(Till [sS]|S)tatsrådet ", pgtitle):
-                        currentdoc = "main"
-                    elif pgtitle in ("Innehåll", "Innehållsförteckning"):
-                        currentdoc = "main"
+            pgtitle = titleish(pageidx)
+            if pgtitle is not None:
+                pgtitle = str(pgtitle).strip()
+                if re.match("(Till [sS]|S)tatsrådet ", pgtitle):
+                    currentdoc = "main"
+                elif pgtitle in ("Innehåll", "Innehållsförteckning", "Innehåll del 2"):
+                    currentdoc = "main"
+                elif re.match("Statens offentliga utredningar \d+", str(pgtitle).strip()):
+                    currentdoc = 'endregister'
+            styles = self.count_styles(pageidx, 1)
+            # find the most dominant style on the page. If it uses the
+            # EU font (even if it's the second most dominant), it's a
+            # separate section.
+            if styles and [s for s in self.count_styles(pageidx, 1).most_common(2) if s[0][0].startswith("EUAlbertina")]:
+                currentdoc = 'eudok'
+            elif currentdoc == "eudok":
+                currentdoc == "main" ## CONTINUE
+            
             # update the current document segment tuple or start a new one
             if documents and documents[-1][2] == currentdoc:
                 documents[-1][1] += 1
             else:
                 documents.append([pageidx, 1, currentdoc])
+            prev_pagesrc = page.src
         return documents
 
 

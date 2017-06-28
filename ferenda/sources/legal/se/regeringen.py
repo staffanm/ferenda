@@ -532,10 +532,9 @@ class Regeringen(Offtryck):
 
         # 2. Filter out obviously extraneous files
         for pdffile, linktext in pdffiles:
-            if (linktext.startswith("Sammanfattning ") or
-                    linktext.startswith("Remisslista") or
-                    linktext.startswith("Remissammanställning") or
-                    linktext.startswith("Sammanställning över remiss") or
+            if (linktext.startswith(("Sammanfattning ", "Remisslista", "Remissammanställning",
+                                     "Sammanställning över remiss",
+                                     "Utredningens pressmeddelande", "Rättelseblad")) or
                     "emissinstanser" in linktext):
                 pass  # don't add to cleanfiles
             else:
@@ -545,6 +544,13 @@ class Regeringen(Offtryck):
         # files with split-up content
         linktexts = [x[1] for x in cleanfiles]
         commonprefix = os.path.commonprefix(linktexts)
+        if commonprefix == "":
+            # try again without the last file
+            commonprefix = os.path.commonprefix(linktexts[:-1])
+            if commonprefix:
+                # last file is probably safe to skip
+                linktexts = linktexts[:-1]
+                cleanfiles = cleanfiles[:-1]
         if commonprefix:
             for pdffile, linktext in cleanfiles:
                 # strip away the last filetype + size paranthesis
@@ -557,6 +563,20 @@ class Regeringen(Offtryck):
                     if labels:
                         pdffile = pdffile, linktext
                     return [pdffile]
+
+        if commonprefix.endswith(" del "):
+            parts = set()
+            cleanerfiles = []
+            # only return unique parts (ie only the first "del 1", not any other
+            # special versions of "del 1"
+            for pdffile, linktext in cleanfiles:
+                remainder = linktext.replace(commonprefix, "")
+                part = remainder[0]  # assume max 9 parts
+                if part in parts:
+                    continue
+                cleanerfiles.append((pdffile, linktext))
+                parts.add(part)
+            cleanfiles = cleanerfiles
 
         # 4. Base case: We return it all
         if labels:
