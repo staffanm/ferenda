@@ -103,7 +103,8 @@ class Avdelning(CompoundElement, OrdinalElement):
             # definitioner" 
             segments = self.rubrik.split(". ", 1)
             segments[0] = segments[0].replace("AVDELNING ", "")
-            segments[1] = segments[1].capitalize()
+            if len(segments) >= 2:
+                segments[1] = segments[1].capitalize()
             attrs['abbr'] = ". ".join(segments)
 
         elif self.rubrik.startswith("AVD. "):

@@ -1,6 +1,6 @@
---- data/sfs/intermediate/1987/230.txt	2012-05-23 20:41:11.000000000 +0200
-+++ /tmp/tmp2OcOLU	2012-05-23 20:40:36.000000000 +0200
-@@ -259,8 +259,8 @@
+--- data/sfs/intermediate/1987/230.txt
++++ /tmp/tmpka2rqnp2
+@@ -272,8 +272,8 @@ Borttagning av avstavningar
  maken.
  
  Domstolen får, när makarna inte varaktigt bor tillsammans, förplikta en av
@@ -11,7 +11,7 @@
  när samlevnaden upphörde. Avtal som efter domstolens beslut ingås med tredje
  man om egendomen inskränker inte nyttjanderätten till bohaget.
  
-@@ -341,8 +341,8 @@
+@@ -354,8 +354,8 @@
  4. egendom som en make har ärvt och som enligt testamente av arvlåtaren
  skall vara mottagarens enskilda,
  
@@ -22,7 +22,7 @@
  lagen (1993:931) om individuellt pensionssparande som tecknats av någon annan
  än den andra maken med det villkoret att egendomen skall vara mottagarens
  enskilda,
-@@ -419,7 +419,9 @@
+@@ -432,7 +432,9 @@
  2. avhända sig, pantsätta, hyra ut eller på annat sätt med nyttjanderätt
  upplåta annan egendom som utgör makarnas gemensamma bostad, eller
  
@@ -33,7 +33,7 @@
  gäller inte bostad eller bohag som är den ena makens enskilda egendom enligt
  2 § första stycket 2--4. En make får inte heller utan den andra makens
  samtycke avhända sig, låta inteckna, hyra ut eller på annat sätt med
-@@ -1248,8 +1250,8 @@
+@@ -1255,8 +1257,8 @@
  bodelningshandingen skall anges vad en make i dessa avseenden har att
  iaktta.
  
@@ -44,7 +44,7 @@
  
  9 § Bestämmelserna om särskilda rättsmedel i 58 och 59 kap.
  rättegångsbalken skall tillämpas i fråga om bodelning som förrättats
-@@ -1327,8 +1329,8 @@
+@@ -1334,8 +1336,8 @@
  inte är lagfarna domare skall få handlägga enkla ärenden enligt 17
  kap. 1 §. Lag (1996:243).
  
@@ -55,7 +55,7 @@
  
  Övergångsbestämmelser
  
-@@ -1364,8 +1366,8 @@
+@@ -1371,8 +1373,8 @@
  ikraftträdandet skall göras av skattemyndigheten.
  
  3. I fråga om överklagande av sådant beslut av pastorsämbetet eller av präst
@@ -66,9 +66,3 @@
  
  1993:130
  
-@@ -1463,4 +1465,4 @@
- 1. Denna lag träder i kraft den 1 oktober 2011.
- 
- 2. Äldre föreskrifter gäller om en ansökan eller anmälan har
--kommit in till tingsrätten före ikraftträdandet.
-+kommit in till tingsrätten före ikraftträdandet.

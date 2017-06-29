@@ -1,15 +1,15 @@
---- data\sfs\intermediate\1932\131.txt	2008-09-04 01:22:51.672000000 +0200
-+++ data\sfs\intermediate\1932\131-mod.txt	2008-09-06 21:42:38.884000000 +0200
-@@ -13,7 +13,7 @@
+--- data/sfs/intermediate/1932/131.txt
++++ /tmp/tmpfuqtss5o
+@@ -22,7 +22,7 @@ Formatteringsändringar av vissa kapitelrubriker, tilläggning av borttappad rubrik för 13 kap.
  
- 
+ ----------------------------------------------------------------
  
 -1 kap. Om utställande av check och om checkens form.
 +1 kap. Om utställande av check och om checkens form
  
  1 § Check skall innehålla:
  
-@@ -113,7 +113,7 @@
+@@ -122,7 +122,7 @@
  ej åberopas emot checkinnehavaren, med mindre han vid checkens
  förvärvande var i ond tro eller förfor med grov vårdslöshet.
  
@@ -18,7 +18,7 @@
  
  14 § Check, som är ställd till viss man, med eller utan uttryckligt
  angivande av att den gäller "till order", må medelst påskrift överlåtas
-@@ -510,7 +510,7 @@
+@@ -519,7 +519,7 @@
  därmed likställt bestyrkande, skall ej anses såsom hinder, varom i denna
  paragraf sägs.
  
@@ -27,7 +27,7 @@
  
  49 § Den, som vill draga check gällande till order eller till viss man
  och betalbar utom riket, må utställa checken i flera lika lydande
-@@ -528,14 +528,14 @@
+@@ -537,14 +537,14 @@
  ock annan, som senare överlåtit checkexemplar, svare för varje
  utelöpande exemplar som är försett med hans namnteckning.
  
@@ -44,7 +44,7 @@
  
  52 § Fordran, som tillkommer checkinnehavare mot överlåtare, utställaren
  och övriga checkgäldenärer, vare preskriberad sex månader från utgången
-@@ -588,7 +588,7 @@
+@@ -597,7 +597,7 @@
  åtgärden företages inom en månad efter hindrets upphörande.
  Lag (2006:676).
  
@@ -53,7 +53,7 @@
  
  54 § Såsom bank anses i denna lag, förutom envar som får driva
  bankrörelse, även kreditmarknadsföretag samt bolag eller annan
-@@ -621,7 +621,7 @@
+@@ -630,7 +630,7 @@
  fordringsägarens skada göra vinst, motsvarande checksumman, där
  fordringen förfaller.
  
@@ -62,18 +62,18 @@
  
  58 § Svensk medborgares behörighet att ingå checkförbindelse varde, ändå
  att han ej här i riket hade hemvist eller att förbindelsen är ingången
-@@ -704,6 +704,8 @@
+@@ -712,6 +712,8 @@
+ till efterrättelse, och är ej innehållet i den främmande lagen för
  rätten känt, äge rätten förelägga part att i sådant hänseende förebringa
  utredning.
- 
-+13 kap. Om protest och om rättegång i checkmål
 +
++13 kap. Om protest och rättegång i checkmål
+ 
  66 § Protest tas upp av Kronofogdemyndigheten, av en särskild
  förrättningsman som länsstyrelsen förordnar eller av notarius
- publicus. Lag (2006:676).
-@@ -742,7 +744,7 @@
+@@ -751,7 +753,7 @@
  
- 73 § Upphör att gälla genom lag (1981:813).
+ 73 § Har upphävts genom lag (1981:813).
  
 -14 kap. Straffbestämmelser.
 +14 kap. Straffbestämmelser
