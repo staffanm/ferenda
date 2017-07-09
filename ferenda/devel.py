@@ -5,6 +5,7 @@ from builtins import *
 import builtins
 
 from ast import literal_eval
+from bz2 import BZ2File
 from collections import OrderedDict
 from difflib import unified_diff
 from itertools import islice
@@ -222,9 +223,13 @@ class Devel(object):
         repo = self._repo_from_alias(alias)
         # 2. find out if there is an intermediate file or downloaded
         # file for basefile
-        if os.path.exists(repo.store.intermediate_path(basefile)):
+        from pudb import set_trace; set_trace()
+        intermediatepath = repo.store.intermediate_path(basefile)
+        if repo.config.compress == "bz2":
+            intermediatepath += ".bz2"
+        if os.path.exists(intermediatepath):
             stage = "intermediate"
-            outfile = repo.store.intermediate_path(basefile)
+            outfile = intermediatepath
         else:
             stage = "download"
             outfile = repo.store.downloaded_path(basefile)
@@ -234,10 +239,12 @@ class Devel(object):
         with os.fdopen(fileno, "wb") as fp:
             fp.write(util.readfile(outfile, mode="rb"))
 
-        # 2.1 if intermediate: stash a copy, run
+        # 2.1 if intermediate: after stashing a copy of the
+        # intermediate file, delete the original and run
         # parse(config.force=True) to regenerate the intermediate file
         if stage == "intermediate":
             repo.config.force = True
+            util.robust_remove(intermediatepath)
             try:
                 repo.parse(basefile)
             except:
@@ -255,11 +262,17 @@ class Devel(object):
 
         # Assume that intermediate files use the same encoding as
         # source files
+        from pudb import set_trace; set_trace()
+        if repo.config.compress == "bz2":
+            opener = BZ2File
+        else:
+            opener = open
         encoding = repo.source_encoding
-        with codecs.open(outfile, encoding=encoding) as fp:
-            outfile_lines = fp.readlines()
-        with codecs.open(stash, encoding=encoding) as fp:
-            stash_lines = fp.readlines()
+
+        with opener(outfile) as fp:
+            outfile_lines = [l.decode(encoding) for l in fp.readlines()]
+        with opener(stash) as fp:
+            stash_lines = [l.decode(encoding) for l in fp.readlines()]
         difflines = list(unified_diff(outfile_lines,
                                       stash_lines,
                                       outfile,
