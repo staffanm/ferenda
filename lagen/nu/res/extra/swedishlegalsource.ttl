@@ -170,6 +170,11 @@
     skos:altLabel "AD"@sv ;
     skos:prefLabel "Arbetsdomstolen"@sv .
 
+<https://lagen.nu/dataset/pmod> a rpubl:Rattsfallspublikation ;
+    owl:sameAs <http://rinfo.lagrummet.se/serie/rf/pmd> ;
+    skos:altLabel "PMÖD"@sv ;
+    skos:prefLabel "Patent- och marknadsöverdomstolen"@sv .
+
 <https://lagen.nu/dataset/affs> a rpubl:Forfattningssamling ;
     dcterms:publisher <https://lagen.nu/org/2014/arbetsformedlingen> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/affs> ;
@@ -1033,6 +1038,7 @@
 
 <https://lagen.nu/org/2008/marknadsdomstolen> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/marknadsdomstolen> ;
+    rdfs:comment "Ersatt av patent- och marknadsöverdomstolen?"@sv ;
     foaf:name "Marknadsdomstolen"@sv .
 
 <https://lagen.nu/org/2008/migrationsoverdomstolen> a foaf:Organization ;
@@ -1797,3 +1803,6 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/statens_jordbruksverk> ;
     foaf:name "Statens jordbruksverk"@sv .
 
+<https://lagen.nu/org/2017/patent-_och_marknadsoverdomstolen> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/patent-_och_marknadsöverdomstolen> ;
+    foaf:name "Patent- och marknadsöverdomstolen"@sv .

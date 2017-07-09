@@ -1752,8 +1752,8 @@ class DV(SwedishLegalSource):
             return {}
 
         def is_instans(parser, chunk=None):
-            """Determines whether the current position starts a new instans part of the report
-.
+            """Determines whether the current position starts a new instans part
+            of the report.
 
             """
             chunk = parser.reader.peek()
@@ -2030,7 +2030,6 @@ class DV(SwedishLegalSource):
             strchunk = str(chunk)
             idata = analyze_instans(strchunk)
             # idata may be {} if the special toplevel rule in is_instans applied
-
             if 'complete' in idata:
                 i = Instans(court=strchunk)
                 court = strchunk
@@ -2038,8 +2037,8 @@ class DV(SwedishLegalSource):
                 i = Instans([chunk], court=idata['court'])
                 court = idata['court']
             else:
-                i = Instans([chunk], court=None)
-                court = ""
+                i = Instans([chunk], court=parser.defaultcourt)
+                court = parser.defaultcourt
 
             # FIXME: ugly hack, but is_instans needs access to this
             # object...
@@ -2247,6 +2246,9 @@ class DV(SwedishLegalSource):
         # only NJA and MD cases (distinguished by the first three
         # chars of basefile) can have ordered paragraphs
         p.has_ordered_paras = basefile[:3] in ('HDO', 'MDO')
+        # In some cases it's difficult to determine court from document alone.
+        p.defaultcourt = {'PMD': 'Patent- och marknadsöverdomstolen',
+                          'MMD': 'Mark- och miljööverdomstolen'}.get(basefile.split("/")[0])
         # return p
         return p.parse
 
@@ -2425,6 +2427,9 @@ class DV(SwedishLegalSource):
         "Högsta domstolen": "HDO",
         "HD": "HDO",
         "arbetsdomstolen": "ADO",
+        "Mark- och miljööverdomstolen": "MMD",
+        "Patentbesvärsrätten": "PBR",
+        "Patent- och marknadsöverdomstolen": "PMÖD",
 
         # for when the type of court, but not the specific court, is given
         "HovR:n": "HovR",
@@ -2572,7 +2577,6 @@ class DV(SwedishLegalSource):
         "Omsorgsnämnden i Trollhättans kommun": "OMS",
         "Oskarshamns TR": "TOS",
         "Oskarshamns tingsrätt": "TOS",
-        "Patentbesvärsrätten": "PBR",
         "Piteå TR": "TPI",
         "Polismyndigheten": "POL",
         "RTV": "RTV",

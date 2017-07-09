@@ -528,6 +528,7 @@ class SwedishLegalSource(DocumentRepository):
         if not fp.closed:
             fp.close()
         self.postprocess_doc(doc)
+        # self.validate_doc(doc)
         self.parse_entry_update(doc)
         # print(doc.meta.serialize(format="turtle").decode("utf-8"))
         return True
