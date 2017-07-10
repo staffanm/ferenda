@@ -2039,6 +2039,8 @@ class DV(SwedishLegalSource):
             else:
                 i = Instans([chunk], court=parser.defaultcourt)
                 court = parser.defaultcourt
+                if court is None:
+                    court = "" # we might need to calculate the courts len() below
 
             # FIXME: ugly hack, but is_instans needs access to this
             # object...
