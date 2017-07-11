@@ -846,10 +846,12 @@ class DV(SwedishLegalSource):
             # keep in sync like above
             re_notisstart = re.compile(
                 "[\w\: ]*Lnr:(?P<court>\w+) ?(?P<year>\d+) ?not ?(?P<ordinal>\d+)")
-            re_malnr = re.compile(r"[AD]: ?(?P<malnr>\d+\-\d+)")
+            re_malnr = re.compile(r"[AD][:-] ?(?P<malnr>\d+\-\d+)")
             # the avgdatum regex attempts to include valid dates, eg
-            # not "2770-71-12"
-            re_avgdatum = re.compile(r"[AD]: ?(?P<avgdatum>\d{2,4}\-[01]\d\-\d{2})")
+            # not "2770-71-12".It's also somewhat tolerant of
+            # formatting mistakes, eg accepts " :03-06-16" instead of
+            # "A:03-06-16"
+            re_avgdatum = re.compile(r"[AD ]: ?(?P<avgdatum>\d{2,4}\-[01]\d\-\d{2})")
             re_sokord = re.compile("Uppslagsord: ?(?P<sokord>.*)", flags=re.DOTALL)
             re_lagrum = re.compile("Lagrum: ?(?P<lagrum>.*)", flags=re.DOTALL)
             # headers consists of the first five or six
@@ -1202,7 +1204,7 @@ class DV(SwedishLegalSource):
         m = date_regex.match(head["Avgörandedatum"])
         if m:
             if len(m.group(1)) < 4:
-                if int(m.group(1) <= '80'):  # '80-01-01' => '1980-01-01',
+                if int(m.group(1)) >= 80:  # '80-01-01' => '1980-01-01',
                     year = '19' + m.group(1)
                 else:                     # '79-01-01' => '2079-01-01',
                     year = '20' + m.group(1)
@@ -1259,7 +1261,7 @@ class DV(SwedishLegalSource):
                     subres.append(capitalize(subs))
                 else:
                     if idx + 1 != len(substrings):
-                        self.log.warning("%: Found probable description '%r' in sökord, but not at last position")
+                        self.log.warning("%s: Found probable description %r in sökord, but not at last position" % (basefile, subs))
                     descs.append(capitalize(subs))
             res.append(tuple(subres))
         if descs:
@@ -1502,8 +1504,11 @@ class DV(SwedishLegalSource):
         uri = self.canonical_uri(basefile)
         return str(g.value(URIRef(uri), DCTERMS.identifier))
         
+    def parse_body_parseconfigs(self):
+        return ("default", "simple")
+
     # @staticmethod
-    def get_parser(self, basefile, sanitized):
+    def get_parser(self, basefile, sanitized, parseconfig="default"):
         re_courtname = re.compile(
             "^(Högsta domstolen|Hovrätten (över|för)[A-ZÅÄÖa-zåäö ]+|([A-ZÅÄÖ][a-zåäö]+ )(tingsrätt|hovrätt))(|, mark- och miljödomstolen|, Mark- och miljööverdomstolen)$")
 
@@ -2158,17 +2163,6 @@ class DV(SwedishLegalSource):
                 return False, None
 
         p = FSMParser()
-        p.set_recognizers(is_delmal,
-                          is_endmeta,
-                          is_instans,
-                          is_dom,
-                          is_betankande,
-                          is_domskal,
-                          is_domslut,
-                          is_skiljaktig,
-                          is_tillagg,
-                          is_heading,
-                          is_paragraph)
         # "dom" should not really be a commonstate (it should
         # theoretically alwawys be followed by domskal or maybe
         # domslut) but in some cases, the domskal merges with the
@@ -2186,68 +2180,89 @@ class DV(SwedishLegalSource):
             "skiljaktig",
             "tillagg")
 
-        p.set_transitions({
-            ("body", is_delmal): (make_delmal, "delmal"),
-            ("body", is_instans): (make_instans, "instans"),
-            ("body", is_endmeta): (make_endmeta, "endmeta"),
-            ("delmal", is_instans): (make_instans, "instans"),
-            ("delmal", is_delmal): (False, None),
-            ("delmal", is_endmeta): (False, None),
-            ("instans", is_betankande): (make_betankande, "betankande"),
-            ("instans", is_domslut): (make_domslut, "domslut"),
-            ("instans", is_dom): (make_dom, "dom"),
-            ("instans", is_instans): (False, None),
-            ("instans", is_skiljaktig): (make_skiljaktig, "skiljaktig"),
-            ("instans", is_tillagg): (make_tillagg, "tillagg"),
-            ("instans", is_delmal): (False, None),
-            ("instans", is_endmeta): (False, None),
-            # either (make_domskal, "domskal") or (False, None)
-            ("betankande", is_domskal): transition_domskal,
-            ("betankande", is_domslut): (make_domslut, "domslut"),
-            ("betankande", is_dom): (False, None),
-            ("__done__", is_domskal): (False, None),
-            ("__done__", is_skiljaktig): (False, None),
-            ("__done__", is_tillagg): (False, None),
-            ("__done__", is_delmal): (False, None),
-            ("__done__", is_endmeta): (False, None),
-            ("__done__", is_domslut): (make_domslut, "domslut"),
-            ("dom", is_domskal): (make_domskal, "domskal"),
-            ("dom", is_domslut): (make_domslut, "domslut"),
-            ("dom", is_instans): (False, None),
-            ("dom", is_skiljaktig): (False, None),  # Skiljaktig mening is not considered
-            # part of the dom, but rather an appendix
-            ("dom", is_tillagg): (False, None),
-            ("dom", is_endmeta): (False, None),
-            ("dom", is_delmal): (False, None),
-            ("domskal", is_delmal): (False, None),
-            ("domskal", is_domslut): (False, None),
-            ("domskal", is_instans): (False, None),
-            ("domslut", is_delmal): (False, None),
-            ("domslut", is_instans): (False, None),
-            ("domslut", is_domskal): (False, None),
-            ("domslut", is_skiljaktig): (False, None),
-            ("domslut", is_tillagg): (False, None),
-            ("domslut", is_endmeta): (False, None),
-            ("domslut", is_dom): (False, None),
-            ("skiljaktig", is_domslut): (False, None),
-            ("skiljaktig", is_instans): (False, None),
-            ("skiljaktig", is_skiljaktig): (False, None),
-            ("skiljaktig", is_tillagg): (False, None),
-            ("skiljaktig", is_delmal): (False, None),
-            ("skiljaktig", is_endmeta): (False, None),
-            ("tillagg", is_tillagg): (False, None),
-            ("tillagg", is_delmal): (False, None),
-            ("tillagg", is_endmeta): (False, None),
-            ("endmeta", is_paragraph): (make_paragraph, None),
-            (commonstates, is_heading): (make_heading, None),
-            (commonstates, is_paragraph): (make_paragraph, None),
-        })
+
+        if parseconfig == "simple":
+            p.set_recognizers(is_paragraph)
+            p.set_transitions({
+                ("body", is_paragraph): (make_paragraph, None)
+                })
+            p.has_ordered_paras = False
+        else:
+            p.set_recognizers(is_delmal,
+                              is_endmeta,
+                              is_instans,
+                              is_dom,
+                              is_betankande,
+                              is_domskal,
+                              is_domslut,
+                              is_skiljaktig,
+                              is_tillagg,
+                              is_heading,
+                              is_paragraph)
+            p.set_transitions({
+                ("body", is_delmal): (make_delmal, "delmal"),
+                ("body", is_instans): (make_instans, "instans"),
+                ("body", is_endmeta): (make_endmeta, "endmeta"),
+                ("delmal", is_instans): (make_instans, "instans"),
+                ("delmal", is_delmal): (False, None),
+                ("delmal", is_endmeta): (False, None),
+                ("instans", is_betankande): (make_betankande, "betankande"),
+                ("instans", is_domslut): (make_domslut, "domslut"),
+                ("instans", is_dom): (make_dom, "dom"),
+                ("instans", is_instans): (False, None),
+                ("instans", is_skiljaktig): (make_skiljaktig, "skiljaktig"),
+                ("instans", is_tillagg): (make_tillagg, "tillagg"),
+                ("instans", is_delmal): (False, None),
+                ("instans", is_endmeta): (False, None),
+                # either (make_domskal, "domskal") or (False, None)
+                ("betankande", is_domskal): transition_domskal,
+                ("betankande", is_domslut): (make_domslut, "domslut"),
+                ("betankande", is_dom): (False, None),
+                ("__done__", is_domskal): (False, None),
+                ("__done__", is_skiljaktig): (False, None),
+                ("__done__", is_tillagg): (False, None),
+                ("__done__", is_delmal): (False, None),
+                ("__done__", is_endmeta): (False, None),
+                ("__done__", is_domslut): (make_domslut, "domslut"),
+                ("dom", is_domskal): (make_domskal, "domskal"),
+                ("dom", is_domslut): (make_domslut, "domslut"),
+                ("dom", is_instans): (False, None),
+                ("dom", is_skiljaktig): (False, None),  # Skiljaktig mening is not considered
+                # part of the dom, but rather an appendix
+                ("dom", is_tillagg): (False, None),
+                ("dom", is_endmeta): (False, None),
+                ("dom", is_delmal): (False, None),
+                ("domskal", is_delmal): (False, None),
+                ("domskal", is_domslut): (False, None),
+                ("domskal", is_instans): (False, None),
+                ("domslut", is_delmal): (False, None),
+                ("domslut", is_instans): (False, None),
+                ("domslut", is_domskal): (False, None),
+                ("domslut", is_skiljaktig): (False, None),
+                ("domslut", is_tillagg): (False, None),
+                ("domslut", is_endmeta): (False, None),
+                ("domslut", is_dom): (False, None),
+                ("skiljaktig", is_domslut): (False, None),
+                ("skiljaktig", is_instans): (False, None),
+                ("skiljaktig", is_skiljaktig): (False, None),
+                ("skiljaktig", is_tillagg): (False, None),
+                ("skiljaktig", is_delmal): (False, None),
+                ("skiljaktig", is_endmeta): (False, None),
+                ("tillagg", is_tillagg): (False, None),
+                ("tillagg", is_delmal): (False, None),
+                ("tillagg", is_endmeta): (False, None),
+                ("endmeta", is_paragraph): (make_paragraph, None),
+                (commonstates, is_heading): (make_heading, None),
+                (commonstates, is_paragraph): (make_paragraph, None),
+            })
+            # only NJA and MD cases (distinguished by the first three
+            # chars of basefile) can have ordered paragraphs
+            p.has_ordered_paras = basefile[:3] in ('HDO', 'MDO')
+        # parser configuration that is identical between the 'default'
+        # and 'simple' parser
         p.initial_state = "body"
         p.initial_constructor = make_body
         p.debug = os.environ.get('FERENDA_FSMDEBUG', False)
-        # only NJA and MD cases (distinguished by the first three
-        # chars of basefile) can have ordered paragraphs
-        p.has_ordered_paras = basefile[:3] in ('HDO', 'MDO')
         # In some cases it's difficult to determine court from document alone.
         p.defaultcourt = {'PMD': 'Patent- och marknadsöverdomstolen',
                           'MMD': 'Mark- och miljööverdomstolen'}.get(basefile.split("/")[0])

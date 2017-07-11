@@ -183,7 +183,7 @@ class JK(SwedishLegalSource):
         return main.find_all(lambda x: x.name and x.get_text().strip())
 
 
-    def get_parser(self, basefile, sanitized_body):
+    def get_parser(self, basefile, sanitized_body, parseconfig="default"):
         # a typical decision structure:
 
         # [h1] Justitiekanslerns beslut

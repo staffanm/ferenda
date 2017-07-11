@@ -76,7 +76,6 @@ class Tabellcell(CompoundElement):
     tagname = "td"
 
 
-    
 class Avdelning(CompoundElement, OrdinalElement):
     tagname = "div"
     fragment_label = "A"
@@ -464,11 +463,15 @@ class UnorderedSection(CompoundElement):
     counter = 0
     uri = None
 
-    def as_xhtml(self, uri, parent_uri=None):
+    def compute_uri(self, baseuri):
         if not self.uri:
-            self.__class__.counter += 1
             # note that this becomes a document-global running counter
-            self.uri = uri + "#US%s" % self.__class__.counter
+            self.__class__.counter += 1
+            self.uri = baseuri + "#US%s" % self.__class__.counter
+        return self.uri
+
+    def as_xhtml(self, uri, parent_uri=None):
+        self.uri = self.compute_uri(uri)
         element = super(UnorderedSection, self).as_xhtml(uri, parent_uri)
         element.set('property', 'dcterms:title')
         element.set('content', self.title)
@@ -479,14 +482,18 @@ class UnorderedSection(CompoundElement):
 class Forfattningskommentar(CompoundElement):
     tagname = "div"
     classname = "forfattningskommentar"
+
+    def compute_uri(self, baseuri):
+        if self.comment_on:
+            return baseuri + "#kommentar-" + self.comment_on.rsplit("/")[-1]
     
     def as_xhtml(self, uri, parent_uri=None):
         if not self.uri and self.comment_on:
             # FIXME: this will normally create fragments with
             # extra fragments, ie
-            # 'https://lagen.nu/prop/2013/14:34#2010:1846#P52' --
+            # 'https://lagen.nu/prop/2013/14:34#kommentar-2010:1846#P52' --
             # is that even legal?
-            self.uri = uri + "#kommentar-" + self.comment_on.rsplit("/")[-1]
+            self.uri = self.compute_uri(uri)
         element = super(Forfattningskommentar, self).as_xhtml(uri, parent_uri)
         element.set("typeof", "rinfoex:Forfattningskommentar")
         if self.comment_on:
@@ -522,10 +529,12 @@ class Appendix(SectionalElement):
     tagname = "div"
     classname = "appendix"
 
+    def compute_uri(self, baseuri):
+        return baseuri + "#B%s" % self.ordinal
+
     def as_xhtml(self, uri, parent_uri=None):
         if not self.uri:
-            self.uri = uri + "#B%s" % self.ordinal
-
+            self.uri = self.compute_uri(uri)
         return super(Appendix, self).as_xhtml(uri, parent_uri)
 
 

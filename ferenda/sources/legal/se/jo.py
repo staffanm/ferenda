@@ -199,7 +199,7 @@ class JO(FixedLayoutSource):
                     textbox.top + textbox.height + linespacing >= nextbox.top)
         return reader.textboxes(gluecondition)
 
-    def get_parser(self, basefile, sanitized):
+    def get_parser(self, basefile, sanitized, parseconfig="default"):
         def is_heading(parser):
             return parser.reader.peek().font.size == 17
 

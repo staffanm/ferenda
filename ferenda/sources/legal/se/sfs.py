@@ -1349,7 +1349,7 @@ class SFS(Trips):
             ]
         return None  # run only on root element
 
-    def get_parser(self, basefile, sanitized):
+    def get_parser(self, basefile, sanitized, parseconfig="default"):
         # this should work something like offtryck_parser
         from .sfs_parser import make_parser
         return make_parser(sanitized, basefile, self.log, self.trace)

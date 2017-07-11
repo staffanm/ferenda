@@ -16,6 +16,7 @@ import os
 import sys
 import re
 import codecs
+import collections
 import unicodedata
 from io import BytesIO, StringIO, BufferedIOBase
 
@@ -26,6 +27,7 @@ from rdflib.namespace import DCTERMS, SKOS, FOAF, RDFS
 BIBO = Namespace("http://purl.org/ontology/bibo/")
 OLO = Namespace("http://purl.org/ontology/olo/core#")
 from six import text_type as str
+import six
 import bs4
 from cached_property import cached_property
 from lxml import etree
@@ -33,7 +35,7 @@ from lxml import etree
 from ferenda import (DocumentRepository, DocumentStore, FSMParser,
                      CitationParser, Describer, Facet, RequestHandler,
                      Transformer, DocumentEntry)
-from ferenda import util, fulltextindex
+from ferenda import util, fulltextindex, errors
 from ferenda.sources.legal.se.legalref import Link, LegalRef, RefParseError
 from ferenda.elements.html import A, H1, H2, H3, P, Strong, Pre, Div, Body, DL, DT, DD
 from ferenda.elements import serialize, Section, Body, CompoundElement, UnicodeElement, Preformatted
@@ -762,22 +764,59 @@ class SwedishLegalSource(DocumentRepository):
         return []
 
 
+    def parse_body_parseconfigs(self):
+        return ("default",)
+    
     def parse_body(self, fp, basefile):
         rawbody = self.extract_body(fp, basefile)
         sanitized = self.sanitize_body(rawbody)
-        parser = self.get_parser(basefile, sanitized)
-        tokenstream = self.tokenize(sanitized)
-        body = parser(tokenstream)
-        for func, initialstate in self.visitor_functions(basefile):
-            # could be functions for assigning URIs to particular
-            # nodes, extracting keywords from text etc. Note: finding
-            # references in text with LegalRef is done afterwards
-            self.visit_node(body, func, initialstate)
-        self._serialize_unparsed(body, basefile)
-        if self.config.parserefs and self.parse_types:
-            # self.refparser.reset()
-            body = self.refparser.parse_recursive(body)
-        return body
+        lastexception = None
+        for parseconfig in self.parse_body_parseconfigs():
+            try:
+                parser = self.get_parser(basefile, sanitized, parseconfig)
+                tokenstream = self.tokenize(sanitized)
+                body = parser(tokenstream)
+                for func, initialstate in self.visitor_functions(basefile):
+                    # could be functions for assigning URIs to particular
+                    # nodes, extracting keywords from text etc. Note: finding
+                    # references in text with LegalRef is done afterwards
+                    self.visit_node(body, func, initialstate)
+                self._serialize_unparsed(body, basefile)
+                if self.config.parserefs and self.parse_types:
+                    # self.refparser.reset()
+                    body = self.refparser.parse_recursive(body)
+                self.validate_body(body, basefile)  # Throws exception if invalid
+                return body
+            except Exception as e:
+                errmsg = str(e)
+                loc = util.location_exception(e)
+                self.log.error("%s: Parsing with config '%s' failed: %s (%s)" %
+                               (basefile, parseconfig, errmsg, loc))
+                lastexception = e
+                pass # 
+        else:
+            raise lastexception
+
+    def validate_body(self, body, basefile):
+        ids = set()
+        def find_ids(node):
+            id = None
+            if hasattr(node, 'uri') and node.uri:
+                id = node.uri
+            elif hasattr(node, 'compute_uri'):
+                id = node.compute_uri(self.canonical_uri(basefile))
+            if id:
+                if id in ids:
+                    raise errors.InvalidTree("%s: Encountered %s twice" % (basefile, id))
+                ids.add(id)
+            for thing in node:
+                if (isinstance(thing, collections.Iterable) and
+                    not isinstance(thing, six.string_types)):
+                    find_ids(thing)
+        find_ids(body)
+        if self.max_resources and len(ids) > self.max_resources:
+            raise errors.InvalidTree("%s: Found over %s ids (%s), that's probably not right" % (basefile, self.max_resources, len(ids)))
+        return True
 
     def _serialize_unparsed(self, body, basefile):
         # FIXME: special hack depending on undocument config
@@ -824,7 +863,7 @@ class SwedishLegalSource(DocumentRepository):
         """
         return rawbody
 
-    def get_parser(self, basefile, sanitized, initialstate=None):
+    def get_parser(self, basefile, sanitized, initialstate=None, parseconfig="default"):
         """should return a function that gets any iterable (the output
         from tokenize) and returns a ferenda.elements.Body object.
         

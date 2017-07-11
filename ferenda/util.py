@@ -710,7 +710,7 @@ def to_roman(i, lower=False):
     return s
     
 def is_roman(s):
-    if not isinstance(s, str):
+    if not isinstance(s, str) or len(s) == 0:
         return False
     return roman.romanNumeralPattern.match(s.upper()) is not None
 

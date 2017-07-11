@@ -29,6 +29,7 @@ import json
 import logging
 import re
 import inspect
+import unicodedata
 import xml.etree.cElementTree as ET
 import sys
 from collections import OrderedDict
@@ -185,8 +186,13 @@ properties (such as ordinal label, date of enactment, etc)."""
         
         # elements with no actual text gets stripped
         if str(self).strip():
-            # remove any Ctrl-C's (0x03) that might have been present in the source
-            res.text = str(self).translate({3: None})
+            # remove any control characters that might have been
+            # present in the source
+            newstring = ""
+            for char in str(self):
+                if unicodedata.category(char) != "Cc":
+                    newstring += char
+            res.text = newstring
             return res
         else:
             return None

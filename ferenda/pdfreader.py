@@ -570,7 +570,7 @@ class PDFReader(CompoundElement):
                     self._parse_xml_add_fontspec(element, fontinfo, self.fontspec)
                     continue
                 assert element.tag == 'text', "Got <%s>, expected <text>" % element.tag
-                # eliminate "empty" textboxes
+                # eliminate "empty" textboxes, including "<text><i> </i></text>\n"
                 if element.text and txt(
                         element.text).strip() == "" and not element.getchildren():
                     # print "Skipping empty box"
@@ -1197,8 +1197,9 @@ all text in a Textbox has the same font and size.
                       lines=lines)
 
         # add all Textelement objects, concatenating adjacent TE:s if
-        # their tags match. 
-        c = Textelement(tag=self[0].tag)
+        # their tags match.
+        tag = None if len(self) == 0 else self[0].tag
+        c = Textelement(tag=tag)
         for e in itertools.chain(self, other):
             if e.tag != c.tag:
                 if c:

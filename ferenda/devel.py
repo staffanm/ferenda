@@ -223,7 +223,6 @@ class Devel(object):
         repo = self._repo_from_alias(alias)
         # 2. find out if there is an intermediate file or downloaded
         # file for basefile
-        from pudb import set_trace; set_trace()
         intermediatepath = repo.store.intermediate_path(basefile)
         if repo.config.compress == "bz2":
             intermediatepath += ".bz2"
@@ -262,7 +261,6 @@ class Devel(object):
 
         # Assume that intermediate files use the same encoding as
         # source files
-        from pudb import set_trace; set_trace()
         if repo.config.compress == "bz2":
             opener = BZ2File
         else:

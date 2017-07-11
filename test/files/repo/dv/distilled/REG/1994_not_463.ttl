@@ -1,4 +1,5 @@
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -13,7 +14,7 @@
     rpubl:arsutgava "1994" ;
     rpubl:lopnummer "463" ;
     rpubl:rattsfallspublikation <https://lagen.nu/dataset/ra> ;
-    rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/regr/2655-1992/2094-07-07> ;
+    rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/regr/2655-1992/1994-07-07> ;
     rpubl:referatrubrik "Ansökan av Åsa F.-S. om återställande av försutten tid för att överklaga en dom ang. disciplinansvar"@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rf/ra/1994/not/463> ;
     prov:wasDerivedFrom <https://lagen.nu/dom/ra/1994/not/463?repo=dv&dir=downloaded> ;
@@ -27,15 +28,17 @@
 
 <https://lagen.nu/dom/ra/1994/not/463?repo=dv&dir=downloaded> rdfs:label "RÅ 1994 not 463"@sv .
 
-<https://lagen.nu/dom/regr/2655-1992/2094-07-07> a rpubl:VagledandeDomstolsavgorande ;
+<https://lagen.nu/dom/regr/2655-1992/1994-07-07> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringsratten> ;
     dcterms:subject <https://lagen.nu/begrepp/Återställande_av_försutten_tid>,
         <https://lagen.nu/begrepp/Återställande_av_försutten_tid//Avslag_(psykisk_insufficiens)>,
         <https://lagen.nu/begrepp/Återställande_av_försutten_tid//Psykisk_insufficiens_(avslag)> ;
     dcterms:title "Ansökan av Åsa F.-S. om återställande av försutten tid för att överklaga en dom ang. disciplinansvar"@sv ;
-    rpubl:avgorandedatum "2094-07-07"^^xsd:date ;
+    rpubl:avgorandedatum "1994-07-07"^^xsd:date ;
     rpubl:malnummer "2655-1992" ;
-    owl:sameAs <http://rinfo.lagrummet.se/publ/dom/regr/2655-1992/2094-07-07> .
+    owl:sameAs <http://rinfo.lagrummet.se/publ/dom/regr/2655-1992/1994-07-07> .
+
+<https://lagen.nu/org/2008/regeringsratten> foaf:name "Regeringsrätten" .
 
 <https://lagen.nu/begrepp/Återställande_av_försutten_tid> rdfs:label "Återställande av försutten tid" .
 

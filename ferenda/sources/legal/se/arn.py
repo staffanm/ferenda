@@ -265,7 +265,7 @@ class ARN(FixedLayoutSource):
     def infer_identifier(self, basefile):
         return "ARN %s" % basefile
 
-    def get_parser(self, basefile, sanitized):
+    def get_parser(self, basefile, sanitized, parseconfig="default"):
         return lambda stream: Body(list(stream))
 
     def tokenize(self, reader):

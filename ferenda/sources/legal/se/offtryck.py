@@ -113,8 +113,12 @@ class Offtryck(SwedishLegalSource):
             b.append(Preformatted([p.replace("\n"," ")]))
         return b
     
+
+    def parse_body_parseconfigs(self):
+        return ("default", "noappendix", "simple")
+
     def get_parser(self, basefile, sanitized, initialstate=None,
-                   startpage=None, pagecount=None):
+                   startpage=None, pagecount=None, parseconfig="default"):
         """should return a function that gets any iterable (the output
         from tokenize) and returns a ferenda.elements.Body object.
         
@@ -126,6 +130,7 @@ class Offtryck(SwedishLegalSource):
         If your docrepo requires a FSMParser-created parser, you should
         instantiate and return it here.
         """
+        # FIXME: we should return textparser iff parseconfig=="textparser"
         if not isinstance(sanitized, PDFReader):
             return self.textparser
 
@@ -186,7 +191,7 @@ class Offtryck(SwedishLegalSource):
         parser = offtryck_parser(basefile, metrics=metrics, preset=preset,
                                  identifier=self.infer_identifier(basefile),
                                  debug=os.environ.get('FERENDA_FSMDEBUG', 0),
-                                 initialstate=initialstate)
+                                 initialstate=initialstate, parseconfig=parseconfig)
         return parser.parse
 
 
@@ -325,26 +330,31 @@ class Offtryck(SwedishLegalSource):
         # this version of parse_body knows how to:
         #
         # - look up document-specific options (eg "skip",
-        #   "metadataonly", "plainparse") from a resource file (used
-        #   to blacklist old files with no relevance today, or handle
-        #   otherwise difficult documents.
+        #   "metadataonly", "plainparse") from the resource file
+        #   res/options/options.py (used to blacklist old files with
+        #   no relevance today, or handle otherwise difficult
+        #   documents.
         # - use an appropriate analyzer to segment documents into
         #   subdocs and use the appropritate parsing method on each
         #   subdoc. NOTE: this requires that sanitize_body has set up
         #   a PDFAnalyzer subclass instance as a property on the
         #   sanitized object (normally a PDFReader or
         #   StreamingPDFReader)
-        # - read doc-specific options specified in res/options/options.py
+        # - handle the case when a document is not available as a PDF,
+        #   only in simple HTML/plaintext, and use a simpler parser
         options = self.get_parse_options(basefile)
         if options == "skip":
             raise DocumentSkippedError("%s: Skipped because of options.py" % basefile,
                                        dummyfile=self.store.parsed_path(basefile))
         elif options == "metadataonly":
             return Preformatted("Dokumentttext saknas (se originaldokument)")
-            
         # elif options == "simple":
         #     do something else smart
-        
+
+        # FIXME: Both the "simple" case and the "plaintext" case below
+        # should be folded into the parse_body_parseconfigs()
+        # mechanism (and maybe options.py should influence which
+        # parserconfig(s) are tried.
         rawbody = self.extract_body(fp, basefile)
         sanitized = self.sanitize_body(rawbody)
         if not hasattr(sanitized, 'analyzer') or isinstance(sanitized, BeautifulSoup):
@@ -358,126 +368,149 @@ class Offtryck(SwedishLegalSource):
             if self.config.parserefs and self.parse_types:
                 body = self.refparser.parse_recursive(body)
             return body
+        lastexception = None
+        physicalmap = [(page.src, page.number) for page in sanitized]
+        for parseconfig in self.parse_body_parseconfigs():
+            try:
+                allbody = Body()
+                initialstate = {'pageno': 1}
+                serialized = False
+                gluefunc = self.get_gluefunc(basefile, sanitized.analyzer)
+                # FIXME: temporary non-API workaround -- need to figure out
+                # what PDFAnalyzer.documents really need in terms of
+                # doc-specific magic in order to reliably separate document
+                # parts
+                sanitized.analyzer.gluefunc = gluefunc
+                documents = sanitized.analyzer.documents
 
-        allbody = Body()
-        initialstate = {'pageno': 1}
-        serialized = False
-        gluefunc = self.get_gluefunc(basefile, sanitized.analyzer)
-        # FIXME: temporary non-API workaround -- need to figure out
-        # what PDFAnalyzer.documents really need in terms of
-        # doc-specific magic in order to reliably separate document
-        # parts
-        sanitized.analyzer.gluefunc = gluefunc
-        documents = sanitized.analyzer.documents
-        
-        if len(documents) > 1:
-            self.log.debug("%s: segmented into docs %s" % (basefile, documents))
-        self.paginate(sanitized, basefile)
-        for (startpage, pagecount, tag) in documents:
-            if tag == 'main':
-                initialstate['pageno'] -= 1  # argh....
-                parser = self.get_parser(basefile, sanitized, initialstate,
-                                         startpage, pagecount)
-                tokenstream = sanitized.textboxes(gluefunc,
-                                                  pageobjects=True,
-                                                  startpage=startpage,
-                                                  pagecount=pagecount)
-                body = parser(tokenstream)
-                for func, initialstate in self.visitor_functions(basefile):
-                    # could be functions for assigning URIs to particular
-                    # nodes, extracting keywords from text etc. Note: finding
-                    # references in text with LegalRef is done afterwards
-                    self.visit_node(body, func, initialstate)
-                # For documents with more than one subdocument, only
-                # serialize the first (presumably most important) part
-                if not serialized:
-                    self._serialize_unparsed(body, basefile)
-                    serialized = True
+                if len(documents) > 1:
+                    self.log.debug("%s: segmented into docs %s" % (basefile, documents))
+                self.paginate(sanitized, physicalmap, basefile, parseconfig)
+                for (startpage, pagecount, tag) in documents:
+                    if tag == 'main':
+                        initialstate['pageno'] -= 1  # argh....
+                        parser = self.get_parser(basefile, sanitized, initialstate,
+                                                 startpage, pagecount,
+                                                 parseconfig=parseconfig)
+                        tokenstream = sanitized.textboxes(gluefunc,
+                                                          pageobjects=True,
+                                                          startpage=startpage,
+                                                          pagecount=pagecount)
+                        body = parser(tokenstream)
+                        for func, initialstate in self.visitor_functions(basefile):
+                            # could be functions for assigning URIs to particular
+                            # nodes, extracting keywords from text etc. Note: finding
+                            # references in text with LegalRef is done afterwards
+                            self.visit_node(body, func, initialstate)
+                        # For documents with more than one subdocument, only
+                        # serialize the first (presumably most important) part
+                        if not serialized:
+                            self._serialize_unparsed(body, basefile)
+                            serialized = True
 
-                # print("%s: self.config.parserefs: %s, self.parse_types: %s" %
-                #       (basefile, self.config.parserefs, self.parse_types))
-                if self.config.parserefs and self.parse_types:
-                    # FIXME: There should be a cleaner way of telling
-                    # refparser the base uri (or similar) for the
-                    # document
-                    if self.document_type == self.PROPOSITION:
-                        self.refparser._currentattribs = {
-                            "type": RPUBL.Proposition,
-                            "year": basefile.split(":")[0],
-                            "no": basefile.split(":")[1]
-                        }
-                        if 'kommittensbetankande' in initialstate:
-                            self.refparser._legalrefparser.kommittensbetankande = initialstate['kommittensbetankande']
-                        else:
-                            self.refparser._legalrefparser.kommittensbetankande = None
-                    if hasattr(self, 'sfsparser'):
-                        # the parsing of section titles by
-                        # find_commentary might have picked up some
-                        # IDs for some named laws. Reuse these when
-                        # parsing the bulk of the text.
-                        self.refparser._legalrefparser.currentlynamedlaws.update(self.sfsparser.currentlynamedlaws)
-                    body = self.refparser.parse_recursive(body)
-            elif tag in ('frontmatter', 'endregister'):
-                # Frontmatter and endregister is defined as pages with
-                # no meaningful content (cover page, edition notice,
-                # half title and other crap) -- we can just skip them
-                body = []
-            else:
-                # copy pages verbatim -- make no attempt to glue
-                # textelements together, parse references etc. In
-                # effect, this will yield pages full of absolute
-                # positioned textboxes that don't reflow etc
-                s = VerbatimSection()
-                for relidx, page in enumerate(sanitized[startpage:startpage+pagecount]):
-                    sb = Sidbrytning(ordinal=initialstate['pageno']+relidx,
-                                     width=page.width,
-                                     height=page.height,
-                                     src=page.src)
-                    s.append(sb)
-                    s.append(page)
-                body = Body([s])
-            # regardless of wether we used real parsing or verbatim
-            # copying, we need to update the current page number
-            lastpagebreak = self._find_subnode(body, Sidbrytning)
-            if lastpagebreak is None:
-                initialstate['pageno'] = 1
-            else:
-                initialstate['pageno'] = lastpagebreak.ordinal + 1
-            allbody += body[:]
-        return allbody
+                        # print("%s: self.config.parserefs: %s, self.parse_types: %s" %
+                        #       (basefile, self.config.parserefs, self.parse_types))
+                        if self.config.parserefs and self.parse_types:
+                            # FIXME: There should be a cleaner way of telling
+                            # refparser the base uri (or similar) for the
+                            # document
+                            if self.document_type == self.PROPOSITION:
+                                self.refparser._currentattribs = {
+                                    "type": RPUBL.Proposition,
+                                    "year": basefile.split(":")[0],
+                                    "no": basefile.split(":")[1]
+                                }
+                                if 'kommittensbetankande' in initialstate:
+                                    self.refparser._legalrefparser.kommittensbetankande = initialstate['kommittensbetankande']
+                                else:
+                                    self.refparser._legalrefparser.kommittensbetankande = None
+                            if hasattr(self, 'sfsparser'):
+                                # the parsing of section titles by
+                                # find_commentary might have picked up some
+                                # IDs for some named laws. Reuse these when
+                                # parsing the bulk of the text.
+                                self.refparser._legalrefparser.currentlynamedlaws.update(self.sfsparser.currentlynamedlaws)
+                            body = self.refparser.parse_recursive(body)
+                    elif tag in ('frontmatter', 'endregister'):
+                        # Frontmatter and endregister is defined as pages with
+                        # no meaningful content (cover page, edition notice,
+                        # half title and other crap) -- we can just skip them
+                        body = []
+                    else:
+                        # copy pages verbatim -- make no attempt to glue
+                        # textelements together, parse references etc. In
+                        # effect, this will yield pages full of absolute
+                        # positioned textboxes that don't reflow etc
+                        s = VerbatimSection()
+                        for relidx, page in enumerate(sanitized[startpage:startpage+pagecount]):
+                            sb = Sidbrytning(ordinal=initialstate['pageno']+relidx,
+                                             width=page.width,
+                                             height=page.height,
+                                             src=page.src)
+                            s.append(sb)
+                            s.append(page)
+                        body = Body([s])
+                    # regardless of wether we used real parsing or verbatim
+                    # copying, we need to update the current page number
+                    lastpagebreak = self._find_subnode(body, Sidbrytning)
+                    if lastpagebreak is None:
+                        initialstate['pageno'] = 1
+                    else:
+                        initialstate['pageno'] = lastpagebreak.ordinal + 1
+                    allbody += body[:]
+                self.validate_body(body, basefile)  # Throws exception if invalid
+                return allbody
+            except Exception as e:
+                errmsg = str(e)
+                loc = util.location_exception(e)
+                self.log.error("%s: Parsing with config '%s' failed: %s (%s)" %
+                               (basefile, parseconfig, errmsg, loc))
+                lastexception = e
+                pass
+        else:
+            raise lastexception
 
 
-    def paginate(self, sanitized, basefile):
+    def paginate(self, sanitized, physicalmap, basefile, parseconfig):
         """Use a PDF analyzer to determine probable pagenumbering, then set
         the page numbers of the PDFReader object according to that
 
         """
-        analyzer = sanitized.analyzer
-        pagemapping_path = self.store.path(basefile, 'intermediate',
-                                            '.pagemapping.json')
-        if not os.path.exists(pagemapping_path) or self.config.force:
-            # But in order to find out font sizes, we do a minimal
-            # metrics calculation to find out probable foootnoteref
-            # size. Page numbers must be larger than those.
-            styles = analyzer.analyze_styles(analyzer.count_styles(0, len(sanitized)))
-            if 'footnoteref' in styles:
-                analyzer.pagination_min_size = styles['footnoteref']['size'] + 1
-
-        pagemapping = analyzer.paginate(paginatepath=pagemapping_path,
-                                        force=self.config.force)
-        # apply the pagenumbers to the pdf object in a 2-step process
-        # - first map the PDFReader pages to the physical pages in ine
-        # or more pdf files
-        filemapping = {}
-        for idx, page in enumerate(sanitized):
-            filemapping[(page.src.split("/")[-1], str(page.number))] = idx
+        # NOTE: this mutates the passed-in `sanitized` document.
         baseuri = self.canonical_uri(basefile)
-        # then assign the analyzed pagenumbers
-        for k, v in pagemapping.items():
-            pdffile, pp = k.split("#page=")
-            idx = filemapping[(pdffile, pp)]
-            sanitized[idx].number = v
-            sanitized[idx].src = "%s/sid%s.png" % (baseuri, v)
+        pagemapping_path = self.store.path(basefile, 'intermediate',
+                                           '.pagemapping.json')
+        if parseconfig == "simple":
+            # redo the pagination to use physical page numbers. maybe
+            # fix the json file at pagemapping_path as well?
+            for idx, page in enumerate(sanitized):
+                sanitized[idx].number = idx + 1
+                sanitized[idx].src = "%s/sid%s.png" % (basefile, idx+1)
+        else:
+            analyzer = sanitized.analyzer
+            if not os.path.exists(pagemapping_path) or self.config.force:
+                # But in order to find out font sizes, we do a minimal
+                # metrics calculation to find out probable foootnoteref
+                # size. Page numbers must be larger than those.
+                styles = analyzer.analyze_styles(analyzer.count_styles(0, len(sanitized)))
+                if 'footnoteref' in styles:
+                    analyzer.pagination_min_size = styles['footnoteref']['size'] + 1
+
+            pagemapping = analyzer.paginate(paginatepath=pagemapping_path,
+                                            force=self.config.force)
+            # apply the pagenumbers to the pdf object in a 2-step process
+            # 1. first map the PDFReader pages to the physical pages in ine
+            #    or more pdf files
+            filemapping = {}
+            for idx, pagetuple in enumerate(physicalmap):
+                pagesrc, pagenumber = pagetuple
+                filemapping[(pagesrc.split("/")[-1], str(pagenumber))] = idx
+            # 2. then assign the analyzed pagenumbers
+            for k, v in pagemapping.items():
+                pdffile, pp = k.split("#page=")
+                idx = filemapping[(pdffile, pp)]
+                sanitized[idx].number = v
+                sanitized[idx].src = "%s/sid%s.png" % (baseuri, v)
         
 
     def postprocess_doc(self, doc):
@@ -667,7 +700,7 @@ class Offtryck(SwedishLegalSource):
             parts[0] = parts[0][0].upper() + parts[0][1:]
             return pattern[self.document_type] % tuple(parts)
         except:
-            self.log.warning("Couldn't sanitize identifier %s" % identifier)
+            self.log.warning("Couldn't sanitize identifier '%s'" % identifier)
             return identifier
 
 
@@ -1132,7 +1165,7 @@ class Offtryck(SwedishLegalSource):
         
 
 def offtryck_parser(basefile="0", metrics=None, preset=None,
-                    identifier=None, debug=False, initialstate=None):
+                    identifier=None, debug=False, initialstate=None, parseconfig="default"):
     # First: merge the metrics we're provided with with a set of
     # defaults (for fallback), and wrap them in a LayeredConfig
     # structure
@@ -1762,6 +1795,10 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                    is_unorderedsubsection,
                    is_bulletlist,
                    is_paragraph]
+    if parseconfig == "noappendix":
+        recognizers.remove(is_appendix)
+    elif parseconfig == "simple":
+        recognizers = [is_pagebreak, is_paragraph]
     if preset == "proposition":
         recognizers.insert(0, is_proprubrik)
         recognizers.insert(0, is_prophuvudrubrik)

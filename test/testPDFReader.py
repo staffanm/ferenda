@@ -216,9 +216,6 @@ class Read(unittest.TestCase):
                          util.normalize_space(str(reader[0][1])))
 
 
-
-
-
 class Decoding(unittest.TestCase):
 
     def setUp(self):
@@ -554,6 +551,33 @@ class ParseXML(unittest.TestCase):
                          serialize(pdf[0]))
         
 
+    def test_after_footnote_tag(self):
+        # minimized version of Prop 2011/12:60 p 147. It seems to be
+        # the empty italized textelement, combined with the
+        # after_footnote context, that caused a crash
+        pdf = self._parse_xml("""
+	<fontspec id="0" size="12" family="Times New Roman" color="#000000"/>
+	<fontspec id="4" size="12" family="Times New Roman,Italic" color="#000000"/>
+	<fontspec id="9" size="7" family="Times New Roman" color="#000000"/>
+<text top="63" left="283" width="37" height="13" font="0">20 a §</text>
+<text top="60" left="320" width="5" height="9" font="9">4</text>
+<text top="442" left="304" width="4" height="13" font="4"><i> </i></text>
+<text top="460" left="306" width="41" height="13" font="4"><i>20 b § </i></text>
+""")
+        # make sure that empty element is removed completely
+        want = """
+<Page height="750" number="1" width="500">
+  <Textbox bottom="76" fontid="0" height="16" left="283" lines="-1" right="325" top="60" width="42">
+    <Textelement>20 a §</Textelement>
+    <Textelement tag="sup">4</Textelement>
+  </Textbox>
+  <Textbox bottom="473" fontid="4" height="31" left="304" lines="0" right="347" top="442" width="43">
+    <Textelement tag="i">20 b § </Textelement>
+  </Textbox>
+</Page>
+"""
+        self.assertEqual(want[1:], serialize(pdf[0]))
+        
 
 class AsXHTML(unittest.TestCase, FerendaTestCase):
 

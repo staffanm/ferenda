@@ -564,11 +564,11 @@ class PropTrips(Trips, Offtryck, FixedLayoutSource):
         else:
             return super(PropTrips, self).sanitize_body(rawbody)
 
-    def get_parser(self, basefile, sanitized, initialstate=None, startpage=None, pagecount=None):
+    def get_parser(self, basefile, sanitized, initialstate=None, startpage=None, pagecount=None, parseconfig="default"):
         if isinstance(sanitized, TextReader):
             return self.textparser
         else:
-            return super(PropTrips, self).get_parser(basefile, sanitized, initialstate)
+            return super(PropTrips, self).get_parser(basefile, sanitized, initialstate, startpage, pagecount, parseconfig=parseconfig)
 
     def tokenize(self, reader):
         if isinstance(reader, TextReader):
