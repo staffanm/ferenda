@@ -458,7 +458,7 @@ class Offtryck(SwedishLegalSource):
                     else:
                         initialstate['pageno'] = lastpagebreak.ordinal + 1
                     allbody += body[:]
-                self.validate_body(body, basefile)  # Throws exception if invalid
+                self.validate_body(allbody, basefile)  # Throws exception if invalid
                 return allbody
             except Exception as e:
                 errmsg = str(e)
