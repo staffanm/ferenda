@@ -463,8 +463,8 @@ class Offtryck(SwedishLegalSource):
             except Exception as e:
                 errmsg = str(e)
                 loc = util.location_exception(e)
-                self.log.error("%s: Parsing with config '%s' failed: %s (%s)" %
-                               (basefile, parseconfig, errmsg, loc))
+                self.log.warning("%s: Parsing with config '%s' failed: %s (%s)" %
+                                 (basefile, parseconfig, errmsg, loc))
                 lastexception = e
                 pass
         else:
