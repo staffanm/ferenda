@@ -267,9 +267,9 @@ class Devel(object):
             opener = open
         encoding = repo.source_encoding
 
-        with opener(outfile) as fp:
+        with opener(outfile, mode="rb") as fp:
             outfile_lines = [l.decode(encoding) for l in fp.readlines()]
-        with opener(stash) as fp:
+        with opener(stash, mode="rb") as fp:
             stash_lines = [l.decode(encoding) for l in fp.readlines()]
         difflines = list(unified_diff(outfile_lines,
                                       stash_lines,
