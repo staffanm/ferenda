@@ -37,10 +37,10 @@ class RegeringenStore(SwedishLegalStore):
         if action == "downloaded":
             repo = Regeringen()
             repo.store.datadir=self.datadir
-            for pdffile, label in repo.sourcefiles(basefile):
-                attachment = os.path.basename(pdffile) + ".pdf"
-                pdffile = self.downloaded_path(basefile, attachment=attachment)
-                if os.path.exists(pdffile):
+            for filename, label in repo.sourcefiles(basefile):
+                attachment = os.path.basename(filename) + ".pdf"
+                filename = self.downloaded_path(basefile, attachment=attachment)
+                if os.path.exists(filename):
                     yield attachment
                 # else:
                 #     self.log.warning("%s: Attachment %s doesn't exist!")
@@ -168,7 +168,7 @@ class Regeringen(Offtryck):
                 self.urlmap[url] = identifier_node.text
             else:
                 self.urlmap[url] = None
-            doclabels = [x[1] for x in self.find_pdf_links(soup, None, labels=True)]
+            doclabels = [x[2] for x in self.find_doc_links(soup, None)]
         for candidate in identifier + doclabels:
             m = self.re_basefile_strict.search(candidate)
             if m: 
@@ -213,7 +213,7 @@ class Regeringen(Offtryck):
             if not url:  # remote_url failed
                 return
         filename = self.store.downloaded_path(basefile)  # just the html page
-        updated = pdfupdated = False
+        updated = filesupdated = False
         created = not os.path.exists
         if (not os.path.exists(filename) or self.config.refresh):
             existed = os.path.exists(filename)
@@ -230,27 +230,28 @@ class Regeringen(Offtryck):
 
             soup = BeautifulSoup(codecs.open(filename, encoding=self.source_encoding), "lxml")
             cnt = 0
-            pdffiles = self.find_pdf_links(soup, basefile)
-            if pdffiles:
-                for pdffile in pdffiles:
-                    pdfurl = urljoin(url, pdffile)
-                    basepath = pdffile.split("/")[-1]
-                    pdffilename = self.store.downloaded_path(basefile, attachment=basepath)
-                    if not pdffilename.lower().endswith(".pdf"):
-                        pdffilename += ".pdf"
-                    if self.download_if_needed(pdfurl, basefile, filename=pdffilename):
-                        pdfupdated = True
+            selected_files = self.find_doc_links(soup, basefile)
+            if selected_files:
+                from pudb import set_trace; set_trace()
+                for (filename, filetype,label) in selected_files:
+                    fileurl = urljoin(url, filename)
+                    basepath = filename.split("/")[-1]
+                    filename = self.store.downloaded_path(basefile, attachment=basepath)
+                    if not filename.lower().endswith(".pdf"):
+                        filename += ".%s" % filetype
+                    if self.download_if_needed(fileurl, basefile, filename=filename):
+                        filesupdated = True
                         self.log.debug(
-                            "    %s is new or updated" % pdffilename)
+                            "    %s is new or updated" % filename)
                     else:
-                        self.log.debug("    %s is unchanged" % pdffilename)
+                        self.log.debug("    %s is unchanged" % filename)
             else:
                 self.log.warning(
-                    "%s (%s) has no downloadable PDF files" % (basefile, url))
-            if updated or pdfupdated:
+                    "%s (%s) has no downloadable files" % (basefile, url))
+            if updated or filesupdated:
                 pass
             else:
-                self.log.debug("%s and all PDF files are unchanged" % filename)
+                self.log.debug("%s and all files are unchanged" % filename)
         else:
             self.log.debug("%s: %s already exists" % (basefile, filename))
 
@@ -259,12 +260,12 @@ class Regeringen(Offtryck):
         entry.orig_url = url
         if created:
             entry.orig_created = now
-        if updated or pdfupdated:
+        if updated or filesupdated:
             entry.orig_updated = now
         entry.orig_checked = now
         entry.save()
 
-        return updated or pdfupdated
+        return updated or filesupdated
 
     def sanitize_metadata(self, a, basefile):
         # trim space
@@ -471,15 +472,16 @@ class Regeringen(Offtryck):
         # reset global state
         PreambleSection.counter = 0
         UnorderedSection.counter = 0
-        pdffiles = [x + ("" if x.lower().endswith(".pdf") else ".pdf") for x in self.find_pdf_links(self._rawbody, basefile)]
-        if not pdffiles:
+        
+        filenames = [f + ("" if f.lower().endswith(".pdf") else "."+t) for f,t,l in self.find_doc_links(self._rawbody, basefile)]
+        if not filenames:
             self.log.error(
                 "%s: No PDF documents found, can't parse anything (returning placeholder)" % basefile)
             return ["[Dokumenttext saknas]"]
         
         # read a list of pdf files and return a contatenated PDFReader
         # object (where do we put metrics? On the PDFReader itself?
-        return self.read_pdfs(basefile, pdffiles, self._identifier)
+        return self.read_pdfs(basefile, filenames, self._identifier)
 
 
     def sourcefiles(self, basefile, resource=None):
@@ -488,7 +490,7 @@ class Regeringen(Offtryck):
         # FIXME: We might want to trim the labels here, eg to shorten
         # "En digital agenda, SOU 2014:13 (del 2 av 2) (pdf 1,4 MB)"
         # to something more display friendly.
-        return self.find_pdf_links(soup, basefile, labels=True)
+        return [(f, l) for (f, t, l) in self.find_doc_links(soup, basefile)]
 
     def source_url(self, basefile):
         # this source does not have any predictable URLs, so we try to
@@ -496,26 +498,35 @@ class Regeringen(Offtryck):
         entry = DocumentEntry(self.store.documententry_path(basefile))
         return entry.orig_url
 
-    def find_pdf_links(self, soup, basefile, labels=False):
-        pdffiles = []
+    def find_doc_links(self, soup, basefile):
+        from pudb import set_trace; set_trace()
+        files = []
         docsection = soup.find('ul', 'list--Block--icons')
-        pdflink = re.compile("/(contentassets|globalassets)/")
+        filelink = re.compile("/(contentassets|globalassets)/")
         if docsection:
-            for link in docsection.find_all("a", href=pdflink):
-                pdffiles.append((link["href"], link.string))
-        selected = self.select_pdfs(pdffiles, labels)
-        if not labels:
-            self.log.debug(
-                "selected %s out of %d pdf files" %
-                (", ".join(selected), len(pdffiles)))
+            for link in docsection.find_all("a", href=filelink):
+                files.append((link["href"], link.string))
+        selected = self.select_files(files)
+        self.log.debug(
+            "selected %s out of %d files" %
+            (", ".join([x[0] for x in selected]), len(files)))
         return selected
 
-    def select_pdfs(self, pdffiles, labels=False):
-        """Given a list of (pdffile, linktext) tuples, return only those pdf
-        files we need to parse (by filtering out duplicates etc).
+    def select_files(self, files):
+        """Given a list of (fileurl, linktext) tuples, return only the
+        file/those files that make up the main document that make we
+        need to parse (by filtering out duplicates, files not part of
+        the main document etc).
+
+        The files are returned as a list of (fileurl, filetype, label)
+        tuples.
+
         """
+        def guess_type(label):
+            return "doc" if "(doc " in label else "pdf"
+            
         # NOTE: Any change to this logic should add a new testcase to
-        # test/integrationRegeringen.SelectPDFs
+        # test/integrationRegeringen.SelectFiles
         cleanfiles = []
 
         # FIXME: For some documents, the split into different document
@@ -524,21 +535,21 @@ class Regeringen(Offtryck):
         # contains the second one in it's entirety, even though you
         # can't tell) should be selected...
         # 1. Simplest case: One file obviously contains all of the text
-        for pdffile, linktext in pdffiles:
+        for filename, linktext in files:
             if "hela dokumentet" in linktext or "hela betänkandet" in linktext:
-                if labels:
-                    pdffile = pdffile, linktext
-                return [pdffile]  # we're immediately done
+                # we're immediately done
+                return [(filename, guess_type(linktext), linktext)]
+
 
         # 2. Filter out obviously extraneous files
-        for pdffile, linktext in pdffiles:
+        for filename, linktext in files:
             if (linktext.startswith(("Sammanfattning ", "Remisslista", "Remissammanställning",
                                      "Sammanställning över remiss",
                                      "Utredningens pressmeddelande", "Rättelseblad")) or
                     "emissinstanser" in linktext):
                 pass  # don't add to cleanfiles
             else:
-                cleanfiles.append((pdffile, linktext))
+                cleanfiles.append((filename, linktext))
 
         # 3. Attempt to see if we have one complete file + several
         # files with split-up content
@@ -552,45 +563,42 @@ class Regeringen(Offtryck):
                 linktexts = linktexts[:-1]
                 cleanfiles = cleanfiles[:-1]
         if commonprefix:
-            for pdffile, linktext in cleanfiles:
+            for filename, linktext in cleanfiles:
                 # strip away the last filetype + size paranthesis
-                linktext = re.sub(" \(pdf [\d\,]+ [kM]B\)", "", linktext)
+                linktext = re.sub(" \((pdf|doc) [\d\,]+ [kM]B\)", "", linktext)
                 # and if we remove the commonprefix, do we end up with
                 # nothing (or something identifier-like)?
                 remainder = linktext.replace(commonprefix, "")
                 if remainder == "" or re.match(r"(SOU|Ds|Prop\.?) \d+(|/\d+):\d+$", remainder):
                     # then this is probably a complete file
-                    if labels:
-                        pdffile = pdffile, linktext
-                    return [pdffile]
+                    return [(filename, guess_type(linktext), linktext)]
 
         if commonprefix.endswith(" del "):
             parts = set()
             cleanerfiles = []
             # only return unique parts (ie only the first "del 1", not any other
             # special versions of "del 1"
-            for pdffile, linktext in cleanfiles:
+            for filename, linktext in cleanfiles:
                 remainder = linktext.replace(commonprefix, "")
                 part = remainder[0]  # assume max 9 parts
                 if part in parts:
                     continue
-                cleanerfiles.append((pdffile, linktext))
+                cleanerfiles.append((filename, linktext))
                 parts.add(part)
             cleanfiles = cleanerfiles
 
-        # 4. Base case: We return it all
-        if labels:
-            return cleanfiles
-        else:
-            return [x[0] for x in cleanfiles]
+        # add filetype information based on labels (basically, assume
+        # pdf if not obviously doc)
+        cleanfiles = [(f, guess_type(l), l) for (f, l) in cleanfiles]
+        return cleanfiles
 
 
     # returns a concatenated PDF reader containing all sub-PDF readers.
-    def read_pdfs(self, basefile, pdffiles, identifier=None):
+    def read_pdfs(self, basefile, files, identifier=None):
         reader = None
         mapping = {}
-        for pdffile in pdffiles:
-            basepath = pdffile.split("/")[-1]
+        for filename in files:
+            basepath = filename.split("/")[-1]
             pdf_path = self.store.downloaded_path(basefile,
                                                   attachment=basepath)
             intermed_path = self.store.intermediate_path(basefile,
@@ -603,7 +611,7 @@ class Regeringen(Offtryck):
                 reader += subreader
         return reader
 
-    def parse_pdf(self, pdffile, intermediatedir, basefile):
+    def parse_pdf(self, filename, intermediatedir, basefile):
         # By default, don't create and manage PDF backgrounds files
         # (takes forever, we don't use them yet)
         if self.config.compress == "bz2":
@@ -619,23 +627,23 @@ class Regeringen(Offtryck):
                               (self.DS, "2004:46"): (BaseTextDecoder, None)}
 
         decoding_class, decoder_arg = alternate_decoders.get(tup, default_decoder)
-        convert_to_pdf = not pdffile.lower().endswith(".pdf")
-        pdf = PDFReader(filename=pdffile,
+        convert_to_pdf = not filename.lower().endswith(".pdf")
+        pdf = PDFReader(filename=filename,
                         workdir=intermediatedir,
                         images=self.config.pdfimages,
                         convert_to_pdf=convert_to_pdf,
                         keep_xml=keep_xml,
                         textdecoder=decoding_class(decoder_arg))
         if pdf.is_empty():
-            self.log.warning("PDF file %s had no textcontent, trying OCR" % pdffile)
-            pdf = PDFReader(filename=pdffile,
+            self.log.warning("PDF file %s had no textcontent, trying OCR" % filename)
+            pdf = PDFReader(filename=filename,
                             workdir=intermediatedir,
                             images=self.config.pdfimages,
                             keep_xml=keep_xml,
                             ocr_lang="swe")
         identifier = self.canonical_uri(basefile)
         for page in pdf:
-            page.src = pdffile
+            page.src = filename
         return pdf
 
     def toc(self, otherrepos=None):

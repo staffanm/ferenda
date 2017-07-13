@@ -12,13 +12,24 @@ from ferenda.compat import unittest
 from ferenda.sources.legal.se import Regeringen
 
 
-class SelectPDFs(unittest.TestCase):
+class SelectFiles(unittest.TestCase):
 
     def setUp(self):
         self.repo = Regeringen()
 
-    def _t(self, data, want, labels=False):
-        got = self.repo.select_pdfs(data, labels)
+    def _t(self, data, want, compare="f"):
+        got = self.repo.select_files(data)
+
+        if compare == "f":
+            # only compare the file part of resulting tuples
+            filter = lambda f, t, l: f
+        elif compare == "fl":
+            # compare file and label
+            filter = lambda f, t, l: (f, l)
+        elif compare == "t":
+            # compare only type
+            filter = lambda f, t, l: t
+        got = [filter(tup[0], tup[1], tup[2]) for tup in got]
         self.assertEqual(want, got)
         
     def test_single(self):
@@ -88,12 +99,21 @@ class SelectPDFs(unittest.TestCase):
     def test_single_label(self):
         self._t([("74a82f1a.pdf", "Ut ur skuldfällan, SOU 2013:72 (pdf 3,9 MB)"),],
                 [("74a82f1a.pdf", "Ut ur skuldfällan, SOU 2013:72 (pdf 3,9 MB)")],
-                True)
+                compare="fl")
 
     def test_delar_label(self):
         self._t([("4ab56c4e.pdf", "En digital agenda, SOU 2014:13 (del 1 av 2) (pdf 2,3 MB)"),
                  ("e265db7c.pdf", "En digital agenda, SOU 2014:13 (del 2 av 2) (pdf 1,4 MB)")],
                 [("4ab56c4e.pdf", "En digital agenda, SOU 2014:13 (del 1 av 2) (pdf 2,3 MB)"),
                  ("e265db7c.pdf", "En digital agenda, SOU 2014:13 (del 2 av 2) (pdf 1,4 MB)")],
-                True)
+                compare="fl")
 
+
+    def test_filetype(self):
+        self._t([("a", "Bättre skola genom mer attraktiva skolprofessioner, Dir. 2016:76 (pdf 284 kB)")],
+                ["pdf"],
+                compare="t")
+
+        self._t([("a", "Dir. 2011:70 (doc 147 kB)")],
+                ["doc"],
+                compare="t")
