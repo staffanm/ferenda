@@ -22,7 +22,7 @@
   <xsl:variable name="configuration" select="document($configurationfile)/configuration"/>
   <xsl:include href="nav-search-form.xsl"/>
   <xsl:output method="html"
-	      doctype-public="about:legacy-compat"
+	      doctype-system="about:legacy-compat"
 	      omit-xml-declaration="yes"
 	      encoding='utf-8'
 	      indent="yes"/>
