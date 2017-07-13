@@ -530,7 +530,6 @@ class SwedishLegalSource(DocumentRepository):
         if not fp.closed:
             fp.close()
         self.postprocess_doc(doc)
-        # self.validate_doc(doc)
         self.parse_entry_update(doc)
         # print(doc.meta.serialize(format="turtle").decode("utf-8"))
         return True
@@ -801,7 +800,13 @@ class SwedishLegalSource(DocumentRepository):
         ids = set()
         def find_ids(node):
             id = None
-            if hasattr(node, 'uri') and node.uri:
+            # for compatibility with
+            # DocumentRepository.render_xhtml_validate, only process
+            # nodes that are rendered as <divs>. Stycke and
+            # Listelement aren't
+            if (hasattr(node, 'uri') and
+                node.uri and
+                not isinstance(node, (Stycke, Listelement))):
                 id = node.uri
             elif hasattr(node, 'compute_uri'):
                 id = node.compute_uri(self.canonical_uri(basefile))
