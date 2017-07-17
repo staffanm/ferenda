@@ -15,7 +15,7 @@ from lxml import etree
 from . import SwedishLegalStore, SwedishLegalSource, SwedishLegalHandler
 from ferenda import util
 from ferenda import CompositeRepository
-from ferenda.errors import DocumentRemovedError, RequestHandlerError
+from ferenda.errors import DocumentRemovedError, RequestHandlerError, PDFFileIsEmpty
 from ferenda.pdfreader import StreamingPDFReader
 
 
@@ -148,13 +148,23 @@ class FixedLayoutSource(SwedishLegalSource):
         convert_to_pdf = not downloaded_path.endswith(".pdf")
         keep_xml = "bz2" if self.config.compress == "bz2" else True
         reader = StreamingPDFReader()
-        return reader.convert(filename=downloaded_path,
-                              workdir=intermediate_dir,
-                              images=self.config.pdfimages,
-                              convert_to_pdf=convert_to_pdf,
-                              keep_xml=keep_xml,
-                              ocr_lang=ocr_lang)
-
+        try:
+            return reader.convert(filename=downloaded_path,
+                                  workdir=intermediate_dir,
+                                  images=self.config.pdfimages,
+                                  convert_to_pdf=convert_to_pdf,
+                                  keep_xml=keep_xml,
+                                  ocr_lang=ocr_lang)
+        except PDFFileIsEmpty as e:
+            self.log.warning("%s: %s was empty, attempting OCR" % (basefile, downloaded_path))
+            ocr_lang = "swe" # reasonable guess
+            return reader.convert(filename=downloaded_path,
+                                  workdir=intermediate_dir,
+                                  images=self.config.pdfimages,
+                                  convert_to_pdf=convert_to_pdf,
+                                  keep_xml=keep_xml,
+                                  ocr_lang=ocr_lang)
+            
     def extract_head(self, fp, basefile):
         # at this point, fp points to the PDF file itself, which is
         # hard to extract metadata from. We just let extract_metadata
@@ -165,7 +175,11 @@ class FixedLayoutSource(SwedishLegalSource):
         return self.metadata_from_basefile(basefile)
     
     def extract_body(self, fp, basefile):
-        reader = StreamingPDFReader().read(fp)
+        # If we can asssume that the fp is a hOCR HTML file and not a
+        # PDF2XML file, use alternate parser. FIXME: There ought to be
+        # a cleaner way than guessing based on filename
+        parser = "ocr" if ".hocr." in util.name_from_fp(fp) else "xml"
+        reader = StreamingPDFReader().read(fp, parser=parser)
         if reader.is_empty():
             raise DocumentRemovedError(dummyfile=self.store.parsed_path(basefile))
         else:

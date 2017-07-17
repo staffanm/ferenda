@@ -750,7 +750,8 @@ class MyndFskrBase(FixedLayoutSource):
             assert isinstance(doc.body, PDFReader), "doc.body is %s, not PDFReader -- still need to access fontspecs etc" % type(doc.body)
             for spec in list(doc.body.fontspec.values()):
                 fp.write(".fontspec%s {font: %spx %s; color: %s;}\n" %
-                         (spec['id'], spec['size'], spec['family'], spec['color']))
+                         (spec['id'], spec['size'], spec['family'],
+                          spec.get('color', 'black')))
 
             # 2 Copy all created png files to their correct locations
             for cnt, page in enumerate(doc.body):

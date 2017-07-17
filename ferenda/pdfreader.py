@@ -419,6 +419,7 @@ class PDFReader(CompoundElement):
                         # None was found, create a new
                 if not fontid:
                     fontid = str(len(self.fontspec))  # start at 0
+                    fontspec['id'] = fontid
                     self.fontspec[fontid] = fontspec
 
                 # finally create the box and add all our elements
@@ -981,7 +982,7 @@ class StreamingPDFReader(PDFReader):
                     bad.getparent().remove(bad)
                 if not etree.tostring(tree, method="text", encoding="utf-8").strip():
                     os.unlink(convertedfile.replace(".bz2", ""))
-                    raise errors.PDFFileIsEmpty(filename)
+                    raise errors.PDFFileIsEmpty("%s contains no text" % filename)
             except etree.XMLSyntaxError as e:
                 # this means pdftohtml created incorrect markup. This
                 # probably means that the doc is nonempty, which is
