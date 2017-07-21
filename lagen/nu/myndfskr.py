@@ -39,6 +39,20 @@ class MyndFskrHandler(RequestHandler):
         fs = chain.from_iterable([self.repo.get_instance(cls).forfattningssamlingar() for cls in self.repo.subrepos])
         return segment in fs
 
+    def get_pathfunc(self, environ, basefile, params, contenttype, suffix):
+        if basefile and suffix == "png":
+            # fill params so that RequestHandler.get_pathfunc can do
+            # its page-extracting thing
+            # 
+            # FIXME: Maybe the first segment isn't always equal to the
+            # correct repo name?
+            params["repo"] = environ["PATH_INFO"].split("/")[1]
+            params["dir"] = "downloaded"
+            # ".../sid4.png" => "3" (because 0-based) 
+            params["page"] = str(int(environ["PATH_INFO"].split("/sid")[1][:-4])-1)
+            params["format"] = suffix
+        return super(MyndFskrHandler, self).get_pathfunc(environ, basefile, params, contenttype, suffix)
+
 
 class MyndFskr(CompositeRepository, SwedishLegalSource):
     alias = "myndfs"
@@ -96,6 +110,9 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
         if 'cssfiles' not in opts:
             opts['cssfiles'] = []
         opts['cssfiles'].append('css/pdfview.css')
+        if 'jsfiles' not in opts:
+            opts['jsfiles'] = []
+        opts['jsfiles'].append('js/pdfviewer.js')
         return opts
 
     def metadata_from_basefile(self, basefile):
@@ -113,6 +130,8 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
     def basefile_from_uri(self, uri):
         # FIXME: Adapted from
         # ferenda.sources.legal.MyndFskrBase.metadata_from_basefile
+        if '/sid' in uri and uri.endswith(".png"):
+            uri = uri.split("/sid")[0]
         basefile = super(MyndFskr, self).basefile_from_uri(uri)
         if basefile and basefile.count("/") == 1:
             basefile = basefile.replace("-", "")

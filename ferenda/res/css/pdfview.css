@@ -3,9 +3,14 @@
     position: relative; /* needed for contained div.annotations to be absolutely positioned relative to this container */
 }
 
+.page .nav-tabs {
+    border-bottom: none /* override bootstrap defaults because top of pdfpage acts as bottom
+   of nav tabs instead */
+}
+
 .pdfpage {
     background: #fff;
-    border: solid 1px black;
+    border: solid 1px #ddd;
     position:relative;
     margin-bottom: 1em;
 }

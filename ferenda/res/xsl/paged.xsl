@@ -29,16 +29,14 @@ It's a generic template for paged content (assumes a bunch of <div class="pdfpag
 
   <xsl:template match="xhtml:div[@class='pdfpage']">
     <div class="page">
-      <ul class="viewcontrol">
-	<li><a href="#" onClick="alert('doSomething')">Text</a></li>
-	<li><a href="#" onClick="alert('doSomethingElse')">Image</a></li>
+      <!-- Nav tabs -->
+      <ul class="nav nav-tabs">
+	<li class="active"><a href="#{@id}-text" class="view-text"><xsl:value-of select="@id"/></a></li>
+	<li><a href="#{@id}-img" class="view-img"><span class="glyphicon glyphicon-picture">&#160;</span>Original</a></li>
       </ul>
       <div class="pdfpage" id="{@id}" style="{@style}">
+	<a href="{@src}" class="facsimile"><img data-src="{@src}"/></a>
 	<xsl:apply-templates/>
-      </div>
-      <div class="image" style="display: none;">
-	<p> image goes here</p>
-	<!-- add neccessary code to on-demand-load a PNG version of the page -->
       </div>
       <!--
       <div class="annotations">

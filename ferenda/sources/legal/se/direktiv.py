@@ -45,7 +45,12 @@ class DirAnalyzer(PDFAnalyzer):
         # 5th largest (same size as body text but italic): h2
         styles = sorted(styles.keys(), key=self.fontsize_key,
                         reverse=True)[1:5]
-        if len(styles) < 4: # might be the case if no h2:s are ever used
+        if len(styles) < 3: # only happens for dir 1991:49, which do
+                            # not use any header styles except ts
+            (ts, dummy) = styles
+            h1 = None
+            h2 = None
+        elif len(styles) < 4: # might be the case if no h2:s are ever used
             (ts, dummy, h1) = styles
             h2 = None
         else:
@@ -56,7 +61,8 @@ class DirAnalyzer(PDFAnalyzer):
                 h2 = None
 
         styledefs['title'] = self.fontdict(ts)
-        styledefs['h1'] = self.fontdict(h1)
+        if h1:
+            styledefs['h1'] = self.fontdict(h1)
         if h2:
             styledefs['h2'] = self.fontdict(h2)
         return styledefs

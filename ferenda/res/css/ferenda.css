@@ -460,9 +460,16 @@ a.facsimile img {
     border-left: 1px solid #ddd;
     border-right: 1px solid #ddd;
     width: 100%;
+    height: 100%;
     min-height: 140px;
     padding: 10px;
     background: url('/rsrc/img/spinner.gif') no-repeat center; /* shown while loading real img */
+}
+
+/* the tab over a facsimile page, allowing you to toggle OCR/original renderings */
+div.page ul li a {
+    padding: 5px 15px;
+    font-size: smaller;
 }
 
 body.frontpage nav#toc ul > li > ul {

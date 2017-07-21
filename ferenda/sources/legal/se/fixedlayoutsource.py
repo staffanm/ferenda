@@ -180,6 +180,9 @@ class FixedLayoutSource(SwedishLegalSource):
         # a cleaner way than guessing based on filename
         parser = "ocr" if ".hocr." in util.name_from_fp(fp) else "xml"
         reader = StreamingPDFReader().read(fp, parser=parser)
+        baseuri = self.canonical_uri(basefile)
+        for page in reader:
+            page.src = "%s/sid%s.png" % (baseuri, page.number)
         if reader.is_empty():
             raise DocumentRemovedError(dummyfile=self.store.parsed_path(basefile))
         else:

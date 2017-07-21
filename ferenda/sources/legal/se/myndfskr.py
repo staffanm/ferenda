@@ -80,6 +80,9 @@ class MyndFskrBase(FixedLayoutSource):
         if 'cssfiles' not in opts:
             opts['cssfiles'] = []
         opts['cssfiles'].append('css/pdfview.css')
+        if 'jsfiles' not in opts:
+            opts['jsfiles'] = []
+        opts['jsfiles'].append('js/pdfviewer.js')
         return opts
 
     def forfattningssamlingar(self):
@@ -1202,7 +1205,7 @@ class MSBFS(MyndFskrBase):
         return ["msbfs", "srvfs", "kbmfs", "säifs"]
 
     # this repo has basefiles eg "säifs/2000:6" but the uri will be on
-    # the form "...saeifs/2000:6" so we do a special-case transform
+    # the form "../saeifs/2000:6" so we do a special-case transform
     def basefile_from_uri(self, uri):
         uri = uri.replace("/saeifs/", "/säifs/")
         return super(MyndFskrBase, self).basefile_from_uri(uri)

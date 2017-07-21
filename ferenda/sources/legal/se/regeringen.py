@@ -232,7 +232,6 @@ class Regeringen(Offtryck):
             cnt = 0
             selected_files = self.find_doc_links(soup, basefile)
             if selected_files:
-                from pudb import set_trace; set_trace()
                 for (filename, filetype,label) in selected_files:
                     fileurl = urljoin(url, filename)
                     basepath = filename.split("/")[-1]
@@ -499,7 +498,6 @@ class Regeringen(Offtryck):
         return entry.orig_url
 
     def find_doc_links(self, soup, basefile):
-        from pudb import set_trace; set_trace()
         files = []
         docsection = soup.find('ul', 'list--Block--icons')
         filelink = re.compile("/(contentassets|globalassets)/")
