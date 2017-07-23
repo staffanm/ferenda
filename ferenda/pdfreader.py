@@ -983,14 +983,14 @@ class StreamingPDFReader(PDFReader):
                 if not etree.tostring(tree, method="text", encoding="utf-8").strip():
                     os.unlink(convertedfile.replace(".bz2", ""))
                     raise errors.PDFFileIsEmpty("%s contains no text" % filename)
-            except etree.XMLSyntaxError as e:
+            except (etree.XMLSyntaxError, UnicodeDecodeError) as e:
                 # this means pdftohtml created incorrect markup. This
                 # probably means that the doc is nonempty, which is
                 # all we care about at this point. At a later stage
                 # (in _parse_xml), a workaround will be applied to the
                 # document on the fly.
                 pass
-            
+#            
             if keep_xml == "bz2":
                 with open(convertedfile.replace(".bz2", ""), mode="rb") as rfp:
                     # BZ2File supports the with statement in py27+,

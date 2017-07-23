@@ -511,6 +511,11 @@ class PDFAnalyzer(object):
         styledefs = {}
 
         # default style: the one that's most common
+        if not styles:
+            # if our document segment contains absolutely no text
+            # (might be the case if a segment consists solely of
+            # scanned, non-ocr pages (more common than you'd like...)
+            return styledefs
         ds = styles.most_common(1)[0][0]
         styledefs['default'] = self.fontdict(ds)
 

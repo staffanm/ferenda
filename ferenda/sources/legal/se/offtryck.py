@@ -9,16 +9,18 @@ import re
 import json
 import difflib
 import ast
+import collections
 
 # 3rd party
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
 from rdflib.namespace import DCTERMS
+import six
 from bs4 import BeautifulSoup
 from cached_property import cached_property
 
 # own
-from ferenda import util
+from ferenda import util, errors
 from ferenda import PDFReader, FSMParser, Describer, Facet
 from ferenda.elements import (Link, Body, CompoundElement,
                               Preformatted, UnorderedList, ListItem)
@@ -471,6 +473,20 @@ class Offtryck(SwedishLegalSource):
             raise lastexception
 
 
+    def validate_body(self, body, basefile):
+        # add an extra test to check for empty forfattningskommentarer
+        super(Offtryck, self).validate_body(body, basefile)
+        def validate_forfattningskommentar(node):
+            if isinstance(node, Forfattningskommentar) and len(node) == 0:
+                raise errors.InvalidTree("%s: Kommentar for %s has no content" %
+                                         (basefile, getattr(node, 'comment_on', '(Unknown)')))
+            else:
+                for thing in node:
+                    if (isinstance(thing, collections.Iterable) and
+                        not isinstance(thing, six.string_types)):
+                        validate_forfattningskommentar(thing)
+        validate_forfattningskommentar(body)
+                                
     def paginate(self, sanitized, physicalmap, basefile, parseconfig):
         """Use a PDF analyzer to determine probable pagenumbering, then set
         the page numbers of the PDFReader object according to that

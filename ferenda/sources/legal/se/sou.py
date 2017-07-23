@@ -293,15 +293,19 @@ class SOUKB(Offtryck, PDFDocumentRepository):
         title = sourcegraph.value(subject=rooturi, predicate=DC.title)
         issued = sourcegraph.value(subject=rooturi, predicate=DC.date)
         if isinstance(issued, str):
-            assert len(issued) == 4, "expected issued date as single 4-digit year, got %s" % issued
-            issued = Literal(util.gYear(int(issued)), datatype=XSD.gYear)
+            # sometimes dc:date is weird like "1976[1974]" (SOU 1974:42)
+            if len(issued) == 4:
+                issued = Literal(util.gYear(int(issued)), datatype=XSD.gYear)
+            else:
+                self.log.warning("expected issued date as single 4-digit year, got %s" % issued)
         attribs = self.metadata_from_basefile(basefile)
         attribs["dcterms:title"] = title
-        attribs["dcterms:issued"] = issued
+        if issued:
+            attribs["dcterms:issued"] = issued
         return attribs
 
     def sanitize_metadata(self, props, doc):
-        if 'dcterms:title' in props and " : betänkande" in props['dcterms:title']:
+        if props.get('dcterms:title') and " : betänkande" in props['dcterms:title']:
             props['dcterms:title'] = props['dcterms:title'].rsplit(" : ")[0]
         return props
             
