@@ -1283,7 +1283,16 @@ class SwedishLegalSource(DocumentRepository):
             datestr = re.sub("([a-z])(\d)", "\\1 \\2", datestr)
             datestr = re.sub("(\d)([a-z])", "\\1 \\2", datestr)
             components = datestr.split()
-            year = int(components[-1])
+            try:
+                year = int(components[-1])
+            except ValueError as e:
+                # the last part couldn't be parsed as a year, maybe
+                # because datestring didn't include a year (eg. "6
+                # mars" instead of "6 mars 2013"). If we don't have a
+                # year, we can't produce a date. Raising a ValueError
+                # is reasonable here.
+                raise e
+            
             if len(components) >= 2:
                 if components[-2].endswith("."):
                     components[-2] = components[-2][:-1]

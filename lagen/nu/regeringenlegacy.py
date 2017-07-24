@@ -45,13 +45,14 @@ class RegeringenLegacy(Regeringen):
                              # if this is falsy, which will be good
                              # enough. No need to warn.
         definitions = content.find("dl", "definitions")
+        ansvarig = None
         if definitions:
             for dt in definitions.find_all("dt"):
                 key = dt.get_text(strip=True)
                 value = dt.find_next_sibling("dd").get_text(strip=True)
-                if key == "Utgiven:":
+                if key in ("Utgiven:", "Publication date:"):
                     utgiven = self.parse_swedish_date(value)
-                elif key == "Avsändare:":
+                elif key in ("Avsändare:",):
                     ansvarig = value 
 
         sammanfattning = None
@@ -75,6 +76,8 @@ class RegeringenLegacy(Regeringen):
         utgarFran = []
         for elementid in elements:
             box = content.find(id=elementid)
+            if not box:
+                continue
             for listitem in box.find_all("li"):
                 if not listitem.find("span", "info"):
                     continue
@@ -132,9 +135,10 @@ class RegeringenLegacy(Regeringen):
         a.update({'dcterms:title': title,
                   'dcterms:identifier': identifier,
                   'dcterms:issued': utgiven,
-                  'rpubl:utgarFran': utgarFran,
-                  'rpubl:departement': ansvarig
+                  'rpubl:utgarFran': utgarFran
         })
+        if ansvarig:
+            a["rpubl:departement"] = ansvarig
         if seealso:
             a["rdfs:seeAlso"] = seealso
         if sammanfattning:
@@ -142,8 +146,8 @@ class RegeringenLegacy(Regeringen):
         return a
     
     
-    def find_pdf_links(self, soup, basefile, labels=False):
-        pdffiles = []
+    def find_doc_links(self, soup, basefile):
+        files = []
         docsection = soup.find('div', 'doc')
         if docsection:
             for li in docsection.find_all("li", "pdf"):
@@ -152,10 +156,9 @@ class RegeringenLegacy(Regeringen):
                 if not m:
                     continue
                 pdfbasefile = m.group(1)
-                pdffiles.append((pdfbasefile, link.string))
-        selected = self.select_pdfs(pdffiles, labels)
-        if not labels:
-            self.log.debug("selected %s out of %d pdf files" % (", ".join(selected), len(pdffiles)))
+                files.append((pdfbasefile, link.string))
+        selected = self.select_files(files)
+        self.log.debug("selected %s out of %d pdf files" % (", ".join([x[0] for x in selected]), len(files)))
         return selected
 
     def source_url(self, basefile):

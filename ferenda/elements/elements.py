@@ -183,19 +183,20 @@ properties (such as ordinal label, date of enactment, etc)."""
         res = super(UnicodeElement, self).as_xhtml(uri, parent_uri)
         if self.classname is not None:
             res.set('class', self.classname)
-        
-        # elements with no actual text gets stripped
         if str(self).strip():
-            # remove any control characters that might have been
-            # present in the source
-            newstring = ""
-            for char in str(self):
-                if unicodedata.category(char) != "Cc":
-                    newstring += char
-            res.text = newstring
+            res.text = self.clean_string()
             return res
         else:
             return None
+
+    def clean_string(self):
+        # remove any control characters that might have been
+        # present in the source
+        newstring = ""
+        for char in str(self):
+            if unicodedata.category(char) != "Cc":
+                newstring += char
+        return newstring
 
     def __str__(self):
         if sys.version_info[0] < 3:

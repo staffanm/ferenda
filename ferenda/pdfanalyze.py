@@ -6,6 +6,7 @@ from builtins import *
 
 # stdlib
 import os
+import re
 import logging
 import json
 from collections import Counter, OrderedDict
@@ -196,7 +197,11 @@ class PDFAnalyzer(object):
         for box in self.guess_pagenumber_boxes(page):
             for el in box:
                 el = el.strip()
-                if el.isdigit() and len(el) < 5:
+                # Check if el is a traditional number what can be
+                # converted to an int. .isdigit(), .isnumeric() and
+                # .isdecimal() all match too much (eg. superscript
+                # numbers, numbers in non-western scripts etc)
+                if re.match('[0-9]+$', el) and len(el) < 5:
                     candidates.append(int(el))
                 # the first few pages might use roman numerals
                 elif ((page.number == 1 or util.is_roman(probable_pagenumber)) and

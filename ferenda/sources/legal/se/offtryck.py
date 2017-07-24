@@ -636,8 +636,12 @@ class Offtryck(SwedishLegalSource):
                 datestr = str_element[13:]
                 if datestr.endswith("."):
                     datestr = datestr[:-1]
-                pubdate = self.parse_swedish_date(datestr)
-                _check_differing(d, self.ns['dcterms'].issued, pubdate)
+                try:
+                    pubdate = self.parse_swedish_date(datestr)
+                    _check_differing(d, self.ns['dcterms'].issued, pubdate)
+                except ValueError:
+                    # eg datestr might be an incomplete date like "6 mars" (w/o year)
+                    pass
                 issued_found = True
 
             if (isinstance(element, Sidbrytning) or

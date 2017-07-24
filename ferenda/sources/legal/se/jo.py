@@ -159,9 +159,14 @@ class JO(FixedLayoutSource):
         return "JO dnr %s" % basefile.replace("/", "-")
         
     def extract_metadata(self, rawhead, basefile):
-        # if rawhead:
-        #    print("FIXME: we should do something with this BeautifulSoup data")
         d = self.metadata_from_basefile(basefile)
+        for label, key in {"Ämbetsberättelse": 'dcterms:bibliographicCitation',
+                           "Beslutsdatum": 'dcterms:issued',
+                           "Diarienummer": 'rpubl:diarienummer'}.items():
+            labelnode = rawhead.find(text=re.compile("%s:" % label))
+            if labelnode:
+                d[key] = labelnode.next_sibling.text.strip()
+        d["dcterms:title"] = rawhead.find("h2").text.strip()
         return d
 
 
@@ -287,10 +292,13 @@ class JO(FixedLayoutSource):
         def make_datum(parser):
             datestr = str(parser.reader.next()).strip()
             year = int(datestr.split("-")[0])
-            assert 2100 > year > 1970, "Year in %s doesn't look valid" % datestr
-            d = [datestr]
-            return Meta(d, predicate=RPUBL.avgorandedatum,
-                        datatype=XSD.date)
+            if 2100 > year > 1970:
+                d = [datestr]
+                return Meta(d, predicate=RPUBL.avgorandedatum,
+                            datatype=XSD.date)
+            else:
+                self.log.warning("Year in %s doesn't look valid" % datestr)
+                return None
 
         def make_dnr(parser):
             ds = [x for x in str(parser.reader.next()).strip().split(" ")]

@@ -399,11 +399,12 @@ class PDFReader(CompoundElement):
                 # element is numeric and way smaller than the
                 # others. in that case, set it's tag to "sup" (for
                 # superscript)
+                if len(textelements) == 0:
+                    continue # the box didn't contain any real text, only lines of whitespace
                 
-                if len(textelements):
-                    avgheight = sum([x.height for x in textelements]) // len(textelements)
-                    if textelements[0].strip().isdigit() and textelements[0].height <= avgheight / 2:
-                        textelements[0].tag = "sup"
+                avgheight = sum([x.height for x in textelements]) // len(textelements)
+                if textelements[0].strip().isdigit() and textelements[0].height <= avgheight / 2:
+                    textelements[0].tag = "sup"
 
                 # Now that we know all text elements that should be in
                 # the Textbox, we can guess the font size.
@@ -1351,7 +1352,7 @@ class Textelement(UnicodeElement):
     def as_xhtml(self, uri, parent_uri=None):
         if self.tag in ("ib", "bi"):
             return E(self.tag[0], {},
-                     E(self.tag[1], {}, str(self)))
+                     E(self.tag[1], {}, self.clean_string()))
         else:
             return super(Textelement, self).as_xhtml(uri, parent_uri)
 

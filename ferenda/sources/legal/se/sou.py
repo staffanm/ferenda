@@ -294,10 +294,12 @@ class SOUKB(Offtryck, PDFDocumentRepository):
         issued = sourcegraph.value(subject=rooturi, predicate=DC.date)
         if isinstance(issued, str):
             # sometimes dc:date is weird like "1976[1974]" (SOU 1974:42)
-            if len(issued) == 4:
-                issued = Literal(util.gYear(int(issued)), datatype=XSD.gYear)
-            else:
+            if len(issued) != 4:
                 self.log.warning("expected issued date as single 4-digit year, got %s" % issued)
+                # fall back on an approximation based on the basefile
+                issued = basefile.split(":")[0]
+            issued = Literal(util.gYear(int(issued)), datatype=XSD.gYear)
+                
         attribs = self.metadata_from_basefile(basefile)
         attribs["dcterms:title"] = title
         if issued:
