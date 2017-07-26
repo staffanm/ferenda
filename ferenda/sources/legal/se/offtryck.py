@@ -1379,7 +1379,9 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
 
     def is_section(parser):
         (ordinal, headingtype, title) = analyze_sectionstart(parser)
-        
+        if getattr(parser, 'in_forfattningsforslag', False) and ordinal and title.startswith("Förslag till"):
+            return False
+
         if "...." in title:  # probably a line in a TOC
             return False
 
@@ -1389,7 +1391,6 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             return False
 
         if ordinal:
-            # analyze_sectionstart(parser)
             return headingtype == "h1" and ordinal.count(".") == 0
 
     def is_subsection(parser):
@@ -1563,6 +1564,13 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     @newstate('preamblesection')
     def make_preamblesection(parser):
         s = PreambleSection(title=str(parser.reader.next()).strip())
+        if s.title == "Författningsförslag":
+            # If the starting Författningsförslag section is
+            # unnumbered, the contained individual författningsförslag
+            # will be level-1 numbered, but they are not real level-1
+            # sections and will be contradicted by later true level-1
+            # sections.
+            parser.in_forfattningsforslag = True
         if s.title in ("Innehållsförteckning", "Innehåll"):
             parser.make_children(s)  # throw away -- FIXME: should we
                                      # really do that right in the
@@ -1570,7 +1578,9 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                                      # until postprocess_doc?
             return None
         else:
-            return parser.make_children(s)
+            ps = parser.make_children(s)
+            parser.in_forfattningsforslag = False
+            return ps
 
     @newstate('unorderedsection')
     def make_unorderedsection(parser):

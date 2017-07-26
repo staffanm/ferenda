@@ -29,6 +29,8 @@ class SelectFiles(unittest.TestCase):
         elif compare == "t":
             # compare only type
             filter = lambda f, t, l: t
+        elif compare == "ft":
+            filter = lambda f, t, l: (f, t)
         got = [filter(tup[0], tup[1], tup[2]) for tup in got]
         self.assertEqual(want, got)
         
@@ -96,6 +98,7 @@ class SelectFiles(unittest.TestCase):
                  ("d838f8a5.pdf", "Lista över remissinstanser (pdf 42 kB)")],
                 ["57313bec.pdf"])
         
+
     def test_single_label(self):
         self._t([("74a82f1a.pdf", "Ut ur skuldfällan, SOU 2013:72 (pdf 3,9 MB)"),],
                 [("74a82f1a.pdf", "Ut ur skuldfällan, SOU 2013:72 (pdf 3,9 MB)")],
@@ -117,3 +120,17 @@ class SelectFiles(unittest.TestCase):
         self._t([("a", "Dir. 2011:70 (doc 147 kB)")],
                 ["doc"],
                 compare="t")
+
+    def test_filetype_and_lattlast(self):
+        self._t([('/49be8a',
+                  'Samlat, genomtänkt och uthålligt? En utvärdering av regeringens nationella handlingsplan för mänskliga rättigheter 2006-2009, SOU 2011:29 (doc 1 MB)'),
+                 ('/b5b667',
+                  'Samlat, genomtänkt och uthålligt? En utvärdering av regeringens nationella handlingsplan för mänskliga rättigheter 2006-2009, lättläst version, SOU 2011:29 (doc 168 kB)')],
+                [('/49be8a', 'doc')],
+                compare="ft")
+
+    def test_twofiles_no_commonprefix(self):
+        self._t([('missiv-t.o.m.-kapitel-5', 'Missiv, t.o.m. kapitel 5 (pdf 1 MB)'),
+                 ('kapitel-6-13-samt-bilagor', 'Kapitel 6-13, samt bilagor (pdf 1 MB)')],
+                ['missiv-t.o.m.-kapitel-5', 'kapitel-6-13-samt-bilagor'])
+        

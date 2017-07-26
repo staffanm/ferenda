@@ -544,7 +544,8 @@ class Regeringen(Offtryck):
             if (linktext.startswith(("Sammanfattning ", "Remisslista", "Remissammanställning",
                                      "Sammanställning över remiss",
                                      "Utredningens pressmeddelande", "Rättelseblad")) or
-                    "emissinstanser" in linktext):
+                "emissinstanser" in linktext or
+                "lättläst version" in linktext):
                 pass  # don't add to cleanfiles
             else:
                 cleanfiles.append((filename, linktext))
@@ -553,7 +554,7 @@ class Regeringen(Offtryck):
         # files with split-up content
         linktexts = [x[1] for x in cleanfiles]
         commonprefix = os.path.commonprefix(linktexts)
-        if commonprefix == "":
+        if commonprefix == "" and len(cleanfiles) > 2:
             # try again without the last file
             commonprefix = os.path.commonprefix(linktexts[:-1])
             if commonprefix:

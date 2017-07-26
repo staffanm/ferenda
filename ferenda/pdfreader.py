@@ -322,8 +322,11 @@ class PDFReader(CompoundElement):
             # and look for if the xml file wasn't created.
             if stderr and not os.path.exists(xmlfile):
                 raise errors.ExternalCommandError(stderr)
-
-            cmd = "pdffonts %s > %s.fontinfo" % (tmppdffile, xmlfile)
+            fontinfofile = "%s.fontinfo" % xmlfile
+            maxlen = os.statvfs(os.path.dirname(fontinfofile)).f_namemax
+            if maxlen < len(os.path.basename(fontinfofile)):
+                fontinfofile = os.path.dirname(fontinfofile) + os.sep + os.path.basename(fontinfofile)[:maxlen]
+            cmd = "pdffonts %s > %s" % (tmppdffile, fontinfofile)
             self.log.debug("Getting font info: %s" % cmd)
             (returncode, stdout, stderr) = util.runcmd(cmd,
                                                        require_success=True)

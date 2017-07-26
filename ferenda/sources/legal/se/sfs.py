@@ -642,8 +642,14 @@ class SFS(Trips):
         changes = [d]
         for c in content.findAll('div', 'result-inner-sub-box-container'):
             d = OrderedDict()
-            d[u'SFS-nummer'] = c.find('div',
-                                      'result-inner-sub-box-header').text.split("SFS ")[1].strip()
+            sfsnr = c.find('div',
+                           'result-inner-sub-box-header').text.split("SFS ")[1].strip()
+            # Since we can't patch errors in register pages yet, we
+            # handle this annoying error in code:
+            if basefile == "1993:1637" and sfsnr == "1993:1446":
+                sfsnr = "1993:1646"
+            assert util.numcmp(sfsnr, basefile) >= 0, "change SFS %s is smaller than basefile SFS %s, that can't be right" % (sfsnr, basefile)
+            d[u'SFS-nummer'] = sfsnr
             for row in c.findAll('div', 'result-inner-sub-box'):
                 key, val = row.text.split(":", 1)
                 d[key.strip()] = util.normalize_space(val)
