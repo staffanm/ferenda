@@ -1443,14 +1443,29 @@ class DV(SwedishLegalSource):
         idx = len(self.urispace_base) + len(self.urispace_segment) + 2
         # FIXME: when re-parsing, this causes duplicate entries in the
         # mapfile (this is OK by apache, but not by nginx)
-        with codecs.open(mapfile, "a", encoding="utf-8") as fp:
-            if self.config.mapfiletype == "nginx":
-                fp.write("%s\t/dv/generated/%s.html;\n" % (urlparse(doc.uri).path,
-                                                           doc.basefile))
-            else:
-                fp.write("%s\t%s\n" % (doc.uri[idx:], doc.basefile))
-            if hasattr(self, "_basefilemap"):
-                delattr(self, "_basefilemap")
+        if self.config.mapfiletype == "nginx":
+            path = urlparse(doc.uri).path
+        else:
+            path = doc.uri[idx:]
+
+        append_path = True
+        if os.path.exists(mapfile):
+            with codecs.open(mapfile, encoding="utf-8") as fp:
+                for line in fp:
+                    mapped_path, dummy = line.split("\t", 1)
+                    if mapped_path == path:
+                        append_path = False
+                        self.log.warning("%s: Not appending path %s to uri.map" % (doc.basefile, path))
+                        break
+        if append_path:
+            with codecs.open(mapfile, "a", encoding="utf-8") as fp:
+                if self.config.mapfiletype == "nginx":
+                    fp.write("%s\t/dv/generated/%s.html;\n" % (path,
+                                                               doc.basefile))
+                else:
+                    fp.write("%s\t%s\n" % (path, doc.basefile))
+                if hasattr(self, "_basefilemap"):
+                    delattr(self, "_basefilemap")
 
         # NB: This cannot be made to work 100% as there is not a 1:1
         # mapping between basefiles and URIs since multiple basefiles

@@ -1183,7 +1183,7 @@ class MIGRFS(MyndFskrBase):
 
 class MPRTFS(MyndFskrBase):
     alias = "mprtfs"
-    start_url = "http://www.radioochtv.se/sv/blanketter--publikationer/foreskrifter/"
+    start_url = "http://www.mprt.se/sv/blanketter--publikationer/foreskrifter/"
     basefile_regex = "^(?P<basefile>(MPRTFS|MRTVFS|RTVFS) \d+:\d+)$"
     document_url_regex = None
     def forfattningssamlingar(self):
@@ -1216,12 +1216,6 @@ class MSBFS(MyndFskrBase):
         doc.make_links_absolute(self.start_url)
         form = doc.forms[0]
         data=dict(form.fields)
-        # remove some fields that aren't sent by any real browser
-        del data['ctl00$ContentArea$MainContentArea$ctl02$ctl00$ctl04$ctl00$ctl00']
-        del data['ctl00$ContentArea$MainContentArea$ctl02$ctl00$ctl06$SearchFormBox$ctl00$ctl00']
-        del data['ctl00$ContentArea$MainContentArea$ctl02$ctl00$ctl06$SearchFormBox$ctl00$ctl01']
-        del data['ctl00$ShoppingCart$Button1']
-        del data['ctl00$SiteTop$SiteQuickSearch$cmdSearch']
         data['ctl00$ContentArea$MainContentArea$ctl02$ctl00$ctl06$SearchFormBox$ctl00$cboValidDate'] = ''
         data['ctl00$SiteTop$SiteQuickSearch$txtSearch'] = ''
         data['ctl00$ContentArea$MainContentArea$ctl02$ctl00$ctl04$ctl00$txtSearch'] = ''

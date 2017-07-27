@@ -160,13 +160,14 @@ class JO(FixedLayoutSource):
         
     def extract_metadata(self, rawhead, basefile):
         d = self.metadata_from_basefile(basefile)
-        for label, key in {"Ämbetsberättelse": 'dcterms:bibliographicCitation',
-                           "Beslutsdatum": 'dcterms:issued',
-                           "Diarienummer": 'rpubl:diarienummer'}.items():
-            labelnode = rawhead.find(text=re.compile("%s:" % label))
-            if labelnode:
-                d[key] = labelnode.next_sibling.text.strip()
-        d["dcterms:title"] = rawhead.find("h2").text.strip()
+        if rawhead:  # sometimes there's no headnote.html
+            for label, key in {"Ämbetsberättelse": 'dcterms:bibliographicCitation',
+                               "Beslutsdatum": 'dcterms:issued',
+                               "Diarienummer": 'rpubl:diarienummer'}.items():
+                labelnode = rawhead.find(text=re.compile("%s:" % label))
+                if labelnode:
+                    d[key] = labelnode.next_sibling.text.strip()
+            d["dcterms:title"] = rawhead.find("h2").text.strip()
         return d
 
 

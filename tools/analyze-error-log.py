@@ -18,16 +18,16 @@ def analyze_log(filename, listerrors=False):
                 if module == "root":
                     module = message.split(" ", 1)[0]
                 modules[module] += 1
-            m = re.search("\([\w/]+.py:\d+\)", message)
-            if m:
-                location = m.group(0)
-                locations[location] += 1
-                if location not in locationmsg:
-                    locationmsg[location] = message.strip()
-            if listerrors:
-                m = re.match("([\w\.]+) (\w+) ([^ ]*) failed", message)
+                m = re.search("\([\w/]+.py:\d+\)", message)
                 if m:
-                    errors.append((m.group(1), m.group(3)))
+                    location = m.group(0)
+                    locations[location] += 1
+                    if location not in locationmsg:
+                        locationmsg[location] = message.strip()
+                if listerrors:
+                    m = re.match("([\w\.]+) (\w+) ([^ ]*) failed", message)
+                    if m:
+                        errors.append((m.group(1), m.group(3)))
     if listerrors:
         for repo, basefile in errors:
             print(repo,basefile)
