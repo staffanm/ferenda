@@ -113,6 +113,12 @@ class TestPages(TestLagen):
         firstlink = soup.article.a
         self.assertTrue(firstlink.get("href"))
 
+    def test_frontpage_disabled_links(self):
+        res = self.get(self.baseurl)
+        soup = BeautifulSoup(res.text, "lxml")
+        for link in soup.find_all("a"):
+            self.assertNotIn("invalid-link", link.attrs.get('class', []), "Link %s marked as invalid (not in DB)" % link.text)
+
 class TestPatching(TestLagen):
 
     def test_file_has_been_patched(self):
