@@ -26,8 +26,8 @@ from . import Regeringen, SwedishLegalSource, FixedLayoutSource, SwedishLegalSto
 
 
 class SOUAnalyzer(PDFAnalyzer):
-    # SOU running headers can contain quite a bit of text, 2 %
-    header_significance_threshold = 0.02
+    # SOU running headers can contain quite a bit of text, 3% (60 chars for avg page of 2000)
+    header_significance_threshold = 0.03
     # footers less so (but more than the default .2%), 1 %
     footer_significance_threshold = 0.01
 

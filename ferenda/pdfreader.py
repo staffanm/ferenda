@@ -531,6 +531,7 @@ class PDFReader(CompoundElement):
             root = etree.parse(xmlfp).getroot()[0][0]
             self.log.debug("BeautifulSoup workaround successful")
 
+        
         assert root.tag == "pdf2xml", "Unexpected root node from pdftohtml -xml: %s" % root.tag
         # We're experimenting with a auto-detecting decoder, which
         # needs a special API call in order to do the detection. If
@@ -752,6 +753,12 @@ class PDFReader(CompoundElement):
         for child in element:
             res.extend(self._parse_xml_make_textelement(child, **kwargs))
         if element.tail and element.tail.strip():
+            if element.text and element.text.strip() == "":
+                # even though we've skipped an empty tag like "<i>
+                # </i>", we record the fact that we've done so, since
+                # it is useful for some unreliable font family
+                # heuristics
+                origkwargs['skippedempty'] = element.tag
             res.append(origcls(normspace(element.tail), **cleantag(origkwargs)))
         return res
     

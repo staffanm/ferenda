@@ -56,7 +56,7 @@ class TestGlue(unittest.TestCase):
         self._f('<fontspec id="6" size="14" family="MAPPGJ+TT9Eo00" color="#000000"/>')
         textbox = self._p('<text top="288" left="85" width="468" height="17" font="2">Det är nu hög tid att göra en kraftsamling för informationsförsörj-</text>')
         prevbox = self._p('<text top="307" left="85" width="252" height="17" font="2">ningen till forskning och utbildning.</text>')
-        self.assertTrue(self.gluefunc(prevbox, prevbox, textbox))
+        self.assertTrue(self.gluefunc(textbox, prevbox, textbox))
         textbox = textbox + prevbox
         nextbox = self._p('<text top="304" left="337" width="220" height="21" font="6"><i> </i>Den tekniska utvecklingen går </text>')
         self.assertTrue(self.gluefunc(textbox, nextbox, prevbox))

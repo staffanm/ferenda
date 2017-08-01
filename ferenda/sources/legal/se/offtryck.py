@@ -199,6 +199,23 @@ class Offtryck(SwedishLegalSource):
 
     def get_gluefunc(self, basefile, analyzer):
         scanned_source = analyzer.scanned_source
+
+        def unreliable_familymatch(prevbox, nextbox):
+            # older native (non-scanned) pdfs from regeringen.se
+            # contains very unreliable font information sometimes
+            if getattr(nextbox[0], 'skippedempty', None):
+                # usually within a textbox that contains some initial
+                # empty italic or bold textelement. PDFReader filtes
+                # out such empty elements, but tells us that we did
+                # through the skippedempty attribute
+                return True
+            elif len(prevbox) > 1 and prevbox[0].tag == "b" and re.match("\d+(| \w) §", prevbox[0]) and nextbox[0][0].islower():
+                # looks like the start of a paragraph? See if nextbox
+                # looks like the continuation of a sentence (ie not
+                # starting with a capital letter)
+                return True
+            else:
+                return prevbox.font.family in ("Symbol", nextbox.font.family)
         
         def offtryck_gluefunc(textbox, nextbox, prevbox):
             # linespacing = nextbox.font.size / 2
@@ -240,7 +257,12 @@ class Offtryck(SwedishLegalSource):
             # A bullet (or dash) always signals the start of a new chunk
             if strnextbox.startswith(("\u2022", "\uf0b7", "−")):
                 return False
-            familymatch = lambda p, n: p.font.family in ("Symbol", n.font.family)
+
+            if scanned_source:
+                familymatch = lambda p, n: p.font.family == n.font.family
+            else:
+                familymatch = unreliable_familymatch
+            
             # allow for more if prevbox starts with a bullet and
             # nextbox startswith lowercase, allow for a large indent
             # (but not hanging indent)
