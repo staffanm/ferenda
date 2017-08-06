@@ -2362,7 +2362,6 @@ WHERE {
                               {'basefile': basefile}):
                 conffile = os.path.abspath(
                     os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
-
                 if self.xslt_template.startswith("/"):
                     templatedir = "."
                 elif "/" in self.xslt_template:

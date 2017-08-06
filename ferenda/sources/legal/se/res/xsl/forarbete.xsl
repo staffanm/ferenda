@@ -273,7 +273,7 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
 
 
   <!-- remove these empty elements (often <i/> or <span/> tags) -->
-  <xsl:template match="xhtml:span|xhtml:i[not(text())]">
+  <xsl:template match="xhtml:span|xhtml:i[not(string())]">
   </xsl:template>
   <!-- default template: translate everything from whatever namespace
        it's in (usually the XHTML1.1 NS) into the default namespace

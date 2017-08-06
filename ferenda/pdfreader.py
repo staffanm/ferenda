@@ -417,10 +417,11 @@ class PDFReader(CompoundElement):
                 # find any previous definition of this fontspec
                 fontid = None
                 for specid, spec in self.fontspec.items():
-                    if fontspec == spec:
+                    if (fontspec['size'] == spec['size'] and
+                        fontspec['family'] == spec['family']):
                         fontid = specid
-
-                        # None was found, create a new
+                        
+                # None was found, create a new
                 if not fontid:
                     fontid = str(len(self.fontspec))  # start at 0
                     fontspec['id'] = fontid
@@ -611,7 +612,6 @@ class PDFReader(CompoundElement):
                     page.append(box)
             # done reading the page
             self.append(page)
-        self.fontspec = self._textdecoder.fontspecs(self.fontspec)
         self.log.debug("PDFReader initialized: %d pages, %d fontspecs" %
                        (len(self), len(self.fontspec)))
         
@@ -631,7 +631,7 @@ class PDFReader(CompoundElement):
                 # should be rendered with superscript
                 if textelements[0].tag is None:
                     textelements[0].tag = ""
-                if isinstance(textelements[0], LinkedTextelement):
+                if isinstance(textelements[0], LinkedTextelement) or textelements[0].tag:
                     textelements[0].tag += "s"
                 else:
                     textelements[0].tag = "sup"
@@ -776,7 +776,7 @@ class PDFReader(CompoundElement):
             fspec['encoding'] = fontinfo[fspec['family']]['encoding']
         if "+" in fspec['family']:
             fspec['family'] = fspec['family'].split("+", 1)[1]
-        fontspec[fontid] = fspec
+        fontspec[fontid] = self._textdecoder.fontspec(fspec)
 
 
     def _analyze_font_encodings(self, root, fontinfo):
@@ -1360,9 +1360,20 @@ class Textelement(UnicodeElement):
             return "span"
 
     def as_xhtml(self, uri, parent_uri=None):
-        if self.tag in ("ib", "bi"):
-            return E(self.tag[0], {},
-                     E(self.tag[1], {}, self.clean_string()))
+        if self.tag and len(self.tag) > 1 and self.tag != "sup":
+            # first create a list of elements
+            tagmap = {"s": "sup",
+                      "b": "b",
+                      "i": "i",
+                      "a": "a"}
+            tags = [E(tagmap[x]) for x in self.tag]
+            # then place the text content in the last one
+            tags[-1].text = self.clean_string()
+            # then nest them
+            for idx, tag in enumerate(tags):
+                if idx < len(tags) - 1:
+                    tag.append(tags[idx+1])
+            return tags[0]
         else:
             return super(Textelement, self).as_xhtml(uri, parent_uri)
 
@@ -1424,18 +1435,13 @@ class LinkedTextelement(Textelement):
     tagname = property(_get_tagname)
 
     def as_xhtml(self, uri, parent_uri=None):
-        if self.tag:
-            taglist = "a" + self.tag
+        prevtag = self.tag
+        if self.tag is None:
+            self.tag = "a"
         else:
-            taglist = "a"
-        element = None
-        for tag in reversed(taglist):
-            if tag == "s":  # since every subtag must a single char...
-                tag = "sup"
-            if element is None:
-                element = E(tag, {}, str(self))
-            else:
-                element = E(tag, {}, element)
+            self.tag = "a" + self.tag
+        element = super(LinkedTextelement, self).as_xhtml(uri, parent_uri)
+        self.tag = prevtag
         element.set("href", self.uri)
         return element
 
@@ -1453,5 +1459,5 @@ class BaseTextDecoder(object):
     def __call__(self, textbox, fontspecs):
         return textbox
 
-    def fontspecs(self, fontspecs):
-        return fontspecs
+    def fontspec(self, fontspec):
+        return fontspec

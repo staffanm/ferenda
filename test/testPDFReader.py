@@ -325,14 +325,15 @@ class Decoding(unittest.TestCase):
         self.assertEqual("Skälen för regeringens bedömning och förslag",
                          str(page[2]))         # other encoding (0x20
         
-        
+
+
 class ParseXML(unittest.TestCase):
     maxDiff = None
     
-    def _parse_xml(self, xmlfrag):
+    def _parse_xml(self, xmlfrag, decoding_class=BaseTextDecoder):
         pdf = PDFReader(pages=True)
         pdf.fontspec = {}
-        pdf._textdecoder = BaseTextDecoder()
+        pdf._textdecoder = decoding_class()
         xml = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE pdf2xml SYSTEM "pdf2xml.dtd">
 <pdf2xml producer="poppler" version="0.24.3">
@@ -342,6 +343,7 @@ class ParseXML(unittest.TestCase):
 </pdf2xml>""" % xmlfrag
         xmlfp = BytesIO(xml.encode("utf-8"))
         xmlfp.name = "dummy.xml"
+                                                     
         pdf._parse_xml(xmlfp)
         return pdf
 
@@ -492,6 +494,35 @@ class ParseXML(unittest.TestCase):
         self.assertEqual(want[1:],
                          serialize(pdf[0]))
 
+
+    def test_italic_superscript_unreliable_font(self):
+        # the thing here is that font 2 and font 7 really has the same
+        # font family.
+        # ferenda.sources.legal.se.decoders.OffsetDecoder1d knows this
+        # since it's hard-coded. The main problem is that the
+        # OffsetDecoder1d.fontspecs methods (that aliases the fonts)
+        # is run after PDFReader._parse_xml. Maybe we need to make
+        # ._parse_xml call into the given textdecoder for each
+        # fontspec tag it encounters?
+        from ferenda.sources.legal.se.decoders import OffsetDecoder1d
+        pdf = self._parse_xml("""
+<fontspec id="2" size="14" family="MAMMBB+TT5Eo00" color="#000000"/>
+<fontspec id="7" size="7" family="MBAAAC+TTA1o00" color="#000000"/>
+<text top="552" left="340" width="372" height="17" font="2">intressant om 50 år föreslås att projektet Kulturarw</text>
+<text top="549" left="712" width="5" height="13" font="7"><i>3</i></text>
+<text top="552" left="717" width="98" height="17" font="2"> får fortsätta </text>
+        """, OffsetDecoder1d)
+        want = """
+<Page height="750" number="1" width="500">
+  <Textbox bottom="569" fontid="2" height="20" left="340" lines="-2" right="815" top="549" width="475">
+    <Textelement>intressant om 50 år föreslås att projektet Kulturarw</Textelement>
+    <Textelement tag="is">3</Textelement>
+    <Textelement> får fortsätta </Textelement>
+  </Textbox>
+</Page>
+"""
+        self.assertEqual(want[1:],
+                         serialize(pdf[0]))
 
     def test_links(self):
         pdf = self._parse_xml("""
@@ -656,6 +687,16 @@ class AsXHTML(unittest.TestCase, FerendaTestCase):
         
         want = """
 <p xmlns="http://www.w3.org/1999/xhtml" class="textbox fontspec0" style="top: 0px; left: 0px; height: 100px; width: 100px">normal<a href="http://example.org/">link</a><sup>footnote marker</sup><a href="http://example.org/"><sup>linked footnote marker</sup></a></p>
+"""
+        self._test_asxhtml(want, body)
+
+    def test_superscripts(self):
+        body = Textbox([Textelement("1", tag="sup"),
+                        Textelement("2", tag="is"),
+                        Textelement("3", tag="bis")],
+                       top=0, left=0, width=100, height=100, fontid=0)
+        want = """
+<p xmlns="http://www.w3.org/1999/xhtml" class="textbox fontspec0" style="top: 0px; left: 0px; height: 100px; width: 100px"><sup>1</sup><i><sup>2</sup></i><b><i><sup>3</sup></i></b></p>
 """
         self._test_asxhtml(want, body)
                         

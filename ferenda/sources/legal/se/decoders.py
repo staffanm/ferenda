@@ -66,7 +66,7 @@ class OffsetDecoder1d(BaseTextDecoder):
                                            tag=subpart.tag)
         return textbox
 
-    def fontspecs(self, fontspecs):
+    def fontspec(self, fontspec):
         # Fonts in Propositioner get handled wierdly by pdf2xml --
         # sometimes they come out as "Times New Roman,Italic",
         # sometimes they come out as "TimesNewRomanPS-ItalicMT". Might
@@ -75,20 +75,24 @@ class OffsetDecoder1d(BaseTextDecoder):
         # be more consistent. NOTE: This might be totally unneccesary
         # now that we use PDFAnalyzer to determine likely fonts for
         # headers etc.
-        for key, val in fontspecs.items():
-            if 'family' in val:
-                # Times New Roman => TimesNewRomanPSMT
-                # Times New Roman,Italic => TimesNewRomanPS-ItalicMT
-                if val['family'] == "Times New Roman":
-                    val['family'] = "TimesNewRomanPSMT"
-                if val['family'] == "Times New Roman,Italic":
-                    val['family'] = "TimesNewRomanPS-ItalicMT"
-                # Not 100% sure abt these last two
-                if val['family'] == "Times New Roman,Bold":
-                    val['family'] = "TimesNewRomanPS-BoldMT"
-                if val['family'] == "Times New Roman,BoldItalic":
-                    val['family'] = "TimesNewRomanPS-BoldItalicMT"
-        return fontspecs
+        if 'family' in fontspec:
+            # Times New Roman => TimesNewRomanPSMT
+            # Times New Roman,Italic => TimesNewRomanPS-ItalicMT
+            if fontspec['family'] == "Times New Roman":
+                fontspec['family'] = "TimesNewRomanPSMT"
+            if fontspec['family'] == "Times New Roman,Italic":
+                fontspec['family'] = "TimesNewRomanPS-ItalicMT"
+            # Not 100% sure abt these last two
+            if fontspec['family'] == "Times New Roman,Bold":
+                fontspec['family'] = "TimesNewRomanPS-BoldMT"
+            if fontspec['family'] == "Times New Roman,BoldItalic":
+                fontspec['family'] = "TimesNewRomanPS-BoldItalicMT"
+            # only found in sou 2003:129 -- uses totally different
+            # family name for superscripts, but in reality is same
+            # font.
+            if fontspec['family'] == "TTA1o00":  
+                fontspec['family'] = "TT5Eo00"
+        return fontspec
         
         
 
