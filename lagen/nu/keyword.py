@@ -188,7 +188,10 @@ class LNKeyword(keyword.Keyword, SameAs):
             prefixlen = len(prefix)
             if prefixlen:
                 prefixlen += 1 # removes extra "»", but not if rootsegments is empty
-            return [Link(linktext[prefixlen:], uri=item[0].uri)]
+            if linktext[prefixlen:]:
+                return [Link(linktext[prefixlen:], uri=item[0].uri)]
+            else:
+                return []
 
         ul = UnorderedList()
         doc = documentlist.pop(0)

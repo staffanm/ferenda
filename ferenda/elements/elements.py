@@ -533,6 +533,8 @@ class Link(UnicodeElement):
 
     def as_xhtml(self, uri, parent_uri=None):
         element = super(Link, self).as_xhtml(uri, parent_uri)
+        if element is None:  # might happen if UnicodeElement determines that this has no text content
+            return None
         if hasattr(self, 'uri'):
             element.set('href', self.uri)
         return element

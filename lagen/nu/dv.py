@@ -103,7 +103,7 @@ class DV(OrigDV, SameAs):
     _rattsfallspublikation_order = ("Högsta domstolen", "Hovrätterna",
                                     "Högsta förvaltningsdomstolen", "Regeringsrätten",
                                     "Kammarrätterna", "Arbetsdomstolen", "Marknadsdomstolen", 
-                                    "Mark- och miljööverdomstolen", "Migrationsöverdomstolen")
+                                    "Mark- och miljööverdomstolen", "Migrationsöverdomstolen", "Patent- och marknadsöverdomstolen")
     def toc_pagesets(self, data, facets):
         # our primary facet is RPUBL.rattsfallspublikation, but we
         # need to create one pageset for each value thereof.
@@ -133,6 +133,8 @@ class DV(OrigDV, SameAs):
                                          value=value))
 
         # make sure pagesets are returned in the preferred, arbitrary order specified by _rattsfallspublikation_order
+        for x in pagesetdict.values():
+            assert x.label in self._rattsfallspublikation_order, "%s not in _rattsfallspublikation_order" % x.label
         return sorted(list(pagesetdict.values()), key=lambda x: self._rattsfallspublikation_order.index(x.label))
 
     def toc_select_for_pages(self, data, pagesets, facets):
@@ -176,6 +178,7 @@ class DV(OrigDV, SameAs):
                      "md": "MD (Marknadsdomstolen)",
                      "mig": "MIÖD (Migrationsöverdomstolen)",
                      "mod": "MÖD (Mark- och miljööverdomstolen)", 
+                     "pmod": "PMÖD (Patent- och marknadsöverdomstolen)",
                      "ra": "RÅ (Regeringsrätten)",
                      "rh": "RH (Hovrätterna)",
                      "rk": "RK (Kammarrätterna)"}
