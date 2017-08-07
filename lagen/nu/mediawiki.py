@@ -217,6 +217,12 @@ class LNSemantics(wiki.WikiSemantics):
         el = super(LNSemantics, self).internal_link(ast)
         return el
 
+    def external_link(self, ast):
+        el = super(LNSemantics, self).external_link(ast)
+        if el.get("href", "").startswith("https://lagen.nu/om/"):
+            el.set("href", el.get("href").replace(".html", ""))
+        return el
+
     def heading(self, ast):
         el = super(LNSemantics, self).heading(ast)
         # <h2><span class="mw-headline" id="[[:Kategori:Familjerätt|Familjerätt]]">
