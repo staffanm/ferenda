@@ -30,14 +30,17 @@ from urllib.parse import urlsplit
 from wsgiref.simple_server import make_server
 import argparse
 import builtins
+import cProfile
 import codecs
 import configparser
 import copy
 import inspect
 import importlib
+import io
 import logging
 import multiprocessing
 import os
+import pstats
 import shutil
 import stat
 import subprocess
@@ -87,7 +90,8 @@ DEFAULT_CONFIG = {'loglevel': 'DEBUG',
                   'fulltextindex': True,
                   'removeinvalidlinks': True,
                   'serverport': 5555,
-                  'authkey': b'secret'}
+                  'authkey': b'secret',
+                  'profile': False}
 
 
 def makeresources(repos,
@@ -394,6 +398,7 @@ def run(argv, config=None, subcall=False):
                  prefixed with ``--``, e.g. ``--loglevel=INFO``, or
                  positional arguments to the specified action).
     """
+
     if not config:
         config = _load_config(_find_config_file(), argv)
         alias = getattr(config, 'alias', None)
@@ -401,7 +406,12 @@ def run(argv, config=None, subcall=False):
     else:
         alias = argv[0]
         action = argv[1]
-        
+    if config and config.profile and not subcall:
+        pr = cProfile.Profile()
+        pr.enable()
+    else:
+        pr = None
+
     log = setup_logger(level=config.loglevel, filename=None)
     # if logfile is set to True (the default), autogenerate logfile
     # name from current datetime. Otherwise assume logfile is set to
@@ -478,9 +488,6 @@ Disallow: /-/
 """)
                 log.info("Wrote %s" % robotstxt)
                 return Resources(repos, **args).make()
-
-            
-
             elif action == 'frontpage':
                 repoclasses = _classes_from_classname(enabled, classname)
                 args = _setup_frontpage_args(config, argv)
@@ -533,6 +540,20 @@ Disallow: /-/
                 else:
                     return _run_class(enabled, argv, config)
     finally:
+        if pr:
+            pr.disable()
+            if isinstance(config.profile, str):
+                # gotta be a filename. Dump profile data to disk
+                pr.dump_stats(config.profile)
+                print("Profiling information dumped to %s" % config.profile)
+            else:
+                s = io.StringIO()
+                sortby = 'cumulative'
+                ps = pstats.Stats(pr, stream=s).sort_stats('cumulative')
+                # select the top 10 calls not part of manager.py or decorators.py
+                restrictions = ('^(?!.*(manager|decorators).py:)', 10)
+                ps.print_stats(20)
+                print(s.getvalue())            
         if not subcall:
             _shutdown_buildserver()
             shutdown_logger()

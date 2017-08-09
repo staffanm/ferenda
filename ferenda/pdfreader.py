@@ -17,6 +17,7 @@ import unicodedata
 from lxml import etree
 from lxml.builder import ElementMaker
 from layeredconfig import LayeredConfig, Defaults
+from cached_property import cached_property
 
 from ferenda import util, errors
 from ferenda.fsmparser import Peekable
@@ -1323,7 +1324,7 @@ all text in a Textbox has the same font and size.
         return newstring
                 
 
-    @property
+    @cached_property
     def font(self):
         if self.fontid is not None:
             return LayeredConfig(Defaults(self._fontspec[self.fontid]))
