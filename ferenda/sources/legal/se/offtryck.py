@@ -232,6 +232,8 @@ class Offtryck(SwedishLegalSource):
             strtextbox = str(textbox).strip()
             strprevbox = str(prevbox).strip()
             strnextbox = str(nextbox).strip()
+            #if strprevbox == "1 Förslag":
+            #    from pudb import set_trace; set_trace()
             if scanned_source:
                 # allow for slight change in fontsize and vert
                 # align. Allow for more change if nextbox is a single
@@ -323,7 +325,8 @@ class Offtryck(SwedishLegalSource):
                  alignmatch(prevbox, nextbox) or # compare previous line to next
                  alignmatch(textbox, nextbox) or # compare entire glued box so far to next
                  (parindent * 2 >= (prevbox.left - nextbox.left) >= parindent) or
-                 (parindent * 2 >= (textbox.left - nextbox.left) >= parindent)
+                 (parindent * 2 >= (textbox.left - nextbox.left) >= parindent) or
+                 (re.match(r"\d\s+[A-ZÅÄÖ]", strtextbox) and nextbox.left - textbox.left < parindent * 4) # hanging indent (numbered) heading
                  )):
                 # if the two boxes are on the same line, but have a
                 # wide space between them, the nextbox is probably a
