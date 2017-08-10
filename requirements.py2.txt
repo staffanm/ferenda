@@ -28,6 +28,6 @@ twine
 psutil
 layeredconfig
 # grako -- doesn't support 2.6 at all
-responses
+responses<0.6.0 # newer versions don't support 2.6
 importlib
 langdetect

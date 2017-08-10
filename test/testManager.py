@@ -904,6 +904,7 @@ imgfiles = []
                                       defaults={'loglevel': 'CRITICAL',
                                                 'logfile': None,
                                                 'datadir': 'data',
+                                                'profile': False,
                                                 'test': {'hello': 'world'}})
         with patch('ferenda.manager._load_config', return_value=ourcfg):
             instcfg = manager.run(argv)

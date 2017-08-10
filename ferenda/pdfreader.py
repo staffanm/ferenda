@@ -1324,7 +1324,7 @@ all text in a Textbox has the same font and size.
         return newstring
                 
 
-    @cached_property
+    @property
     def font(self):
         if self.fontid is not None:
             return LayeredConfig(Defaults(self._fontspec[self.fontid]))
