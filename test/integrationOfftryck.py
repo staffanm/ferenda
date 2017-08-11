@@ -14,7 +14,17 @@ from lxml import etree
 from ferenda.sources.legal.se import Offtryck
 
 
-class TestGlue(unittest.TestCase):
+class Utils(object):
+    def _f(self, xmlstr):
+        # parse a number of fontspecs
+        root = etree.fromstring(xmlstr)
+        self.pdfreader._parse_xml_add_fontspec(root, {}, self.pdfreader.fontspec)
+
+    def _p(self, xmlstr):
+        root = etree.fromstring(xmlstr)
+        return self.pdfreader._parse_xml_make_textbox(root, None, None, None, None)
+
+class TestGlue(unittest.TestCase, Utils):
     scanned_source = False
 
     def setUp(self):
@@ -27,16 +37,6 @@ class TestGlue(unittest.TestCase):
         self.pdfreader._textdecoder = lambda x, y: x
         self.pdfreader._textdecoder.fontspec = lambda x: x
         
-    def _f(self, xmlstr):
-        # parse a number of fontspecs
-        root = etree.fromstring(xmlstr)
-        self.pdfreader._parse_xml_add_fontspec(root, {}, self.pdfreader.fontspec)
-
-    def _p(self, xmlstr):
-        root = etree.fromstring(xmlstr)
-        return self.pdfreader._parse_xml_make_textbox(root, None, None, None, None)
-        
-
     def test_basic_glue(self):
         self._f('<fontspec id="2" size="14" family="MAMMBB+TT5Eo00" color="#000000"/>')
         prevbox = self._p('<text top="288" left="85" width="468" height="17" font="2">Det är nu hög tid att göra en kraftsamling för informationsförsörj-</text>')
@@ -106,9 +106,23 @@ class TestGlue(unittest.TestCase):
         p2box = self._p('<text top="466" left="128" width="129" height="15" font="3">Utredaren ska bl.a. </text>')
         self.assertFalse(self.gluefunc(p1box1 + p1box2, p2box, p1box2))
 
+class TestDecodeAndGlue(unittest.TestCase, Utils):
+
+    def setUp(self):
+        # create a mock analyzer
+        analyzer = PDFAnalyzer(None)
+        analyzer.scanned_source = False
+        self.gluefunc = Offtryck().get_gluefunc('basefile', analyzer)
+        self.pdfreader = PDFReader()
+        self.pdfreader.fontspec = {}
+        from ferenda.sources.legal.se.decoders import OffsetDecoder20
+        self.pdfreader._textdecoder = OffsetDecoder20()
+
     def test_hanging_indent_paragraphs_with_italics(self):
         self._f('<fontspec id="0" size="16" family="Times-Roman" color="#000000"/>')
         self._f('<fontspec id="3" size="16" family="EENIOA+Times.New.Roman.Kursiv0104" color="#000000"/>')
+        self.pdfreader.fontspec[3]["encoding"] = "Custom"
+        self.pdfreader.fontspec[0]["encoding"] = "WinAnsi"
         prevbox = self._p('<text top="498" left="106" width="531" height="24" font="3"><i>2IKSPOLISSTYRELSEN </i>har föreslagit att syftet enligt EG-direktivet att</text>')
         nextbox = self._p('<text top="525" left="85" width="553" height="17" font="0">åstadkomma ett fritt flöde av personuppgifter mellan medlemsstaterna i</text>')
         self.assertTrue(self.gluefunc(prevbox, nextbox, prevbox))
