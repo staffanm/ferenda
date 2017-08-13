@@ -21,16 +21,21 @@
     dcterms:title "Uppdraget"@sv ;
     bibo:chapter "1"@sv .
 
-<https://lagen.nu/utr/sou/2013:75#S2-1> a bibo:DocumentPart ;
-    dcterms:isPartOf <https://lagen.nu/utr/sou/2013:75#S2> ;
+<https://lagen.nu/utr/sou/2013:75#S2-1-1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/utr/sou/2013:75#S2-1> ;
     dcterms:references <https://lagen.nu/utr/sou/2012:18> ;
-    dcterms:title "Regeringens målbild för e-förvaltningen"@sv ;
-    bibo:chapter "2.1"@sv .
+    dcterms:title "E-förvaltning – en definition"@sv ;
+    bibo:chapter "2.1.1"@sv .
 
 <https://lagen.nu/utr/sou/2013:75#S2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/utr/sou/2013:75> ;
     dcterms:title "Bakgrund och nuläge"@sv ;
     bibo:chapter "2"@sv .
+
+<https://lagen.nu/utr/sou/2013:75#S2-1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/utr/sou/2013:75#S2> ;
+    dcterms:title "Regeringens målbild för e-förvaltningen"@sv ;
+    bibo:chapter "2.1"@sv .
 
 <https://lagen.nu/utr/sou/2013:75?attachment=organisering-av-framtidens-e-forvaltning-sou-201375&repo=souregeringen&dir=downloaded> rdfs:label "Organisering av framtidens e-förvaltning (SOU 2013:75) (pdf 846 kB)"@sv .
 

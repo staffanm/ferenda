@@ -190,11 +190,12 @@ properties (such as ordinal label, date of enactment, etc)."""
             return None
 
     def clean_string(self):
-        # remove any control characters that might have been
-        # present in the source
+        # remove any control characters (except TAB, CR or LF as these
+        # are allowed in XML) that might have been present in the
+        # source
         newstring = ""
         for char in str(self):
-            if unicodedata.category(char) != "Cc":
+            if char in ('\r', '\n', '\t') or unicodedata.category(char) != "Cc":
                 newstring += char
         return newstring
 

@@ -19,24 +19,25 @@
     dcterms:title ""@sv ;
     bibo:chapter "1"@sv .
 
+<https://lagen.nu/prop/1987/88:155#FF2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155#PS2> ;
+    dcterms:references <https://lagen.nu/1962:700>,
+        <https://lagen.nu/1962:700#K23>,
+        <https://lagen.nu/1973:289#P21>,
+        <https://lagen.nu/1988:000> ;
+    dcterms:title "Förslag till       Lag om ändring i datalagen (1973:289)"@sv ;
+    bibo:chapter "2"@sv .
+
+<https://lagen.nu/prop/1987/88:155#FF3> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155#PS2> ;
+    dcterms:references <https://lagen.nu/1931:152>,
+        <https://lagen.nu/1962:700> ;
+    dcterms:title "Förslag till       Lag om ändring i sekretesslagen (1980: 100)"@sv ;
+    bibo:chapter "3"@sv .
+
 <https://lagen.nu/prop/1987/88:155#PS1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1987/88:155> ;
     dcterms:title "Propositionens huvudsakliga innehåll"@sv .
-
-<https://lagen.nu/prop/1987/88:155#PS2> a bibo:DocumentPart ;
-    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155> ;
-    dcterms:references <https://lagen.nu/1931:152>,
-        <https://lagen.nu/1942:740>,
-        <https://lagen.nu/1942:740#K15>,
-        <https://lagen.nu/1942:740#K15P5>,
-        <https://lagen.nu/1942:740#K15P8>,
-        <https://lagen.nu/1962:700>,
-        <https://lagen.nu/1962:700#K23>,
-        <https://lagen.nu/1962:700#K36>,
-        <https://lagen.nu/1973:289>,
-        <https://lagen.nu/1973:289#P21>,
-        <https://lagen.nu/1988:000> ;
-    dcterms:title "Propositionens lagförslag PFOP- 1987/381155       1 Förslag till"@sv .
 
 <https://lagen.nu/prop/1987/88:155#S2-1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1987/88:155#S2> ;
@@ -112,6 +113,17 @@
 
 <https://lagen.nu/prop/1987/88:155?attachment=index.pdf&repo=propriksdagen&dir=downloaded> rdfs:label "Prop. 1987/88:155"@sv .
 
+<https://lagen.nu/prop/1987/88:155#PS2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155> ;
+    dcterms:references <https://lagen.nu/1942:740>,
+        <https://lagen.nu/1942:740#K15>,
+        <https://lagen.nu/1942:740#K15P5>,
+        <https://lagen.nu/1942:740#K15P8>,
+        <https://lagen.nu/1962:700>,
+        <https://lagen.nu/1962:700#K23>,
+        <https://lagen.nu/1962:700#K36> ;
+    dcterms:title "Propositionens lagförslag PFOP- 1987/381155       1 Förslag till"@sv .
+
 <https://lagen.nu/prop/1987/88:155#S4> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1987/88:155> ;
     dcterms:title "Specialmotivering"@sv ;
@@ -135,11 +147,11 @@
     prov:wasGeneratedBy "lagen.nu.propositioner.PropRiksdagen" .
 
 [] a bibo:DocumentPart ;
-    dcterms:title "Beslut"@sv .
-
-[] a bibo:DocumentPart ;
     dcterms:references <https://lagen.nu/1973:289>,
         <https://lagen.nu/1980:100>,
         <https://lagen.nu/prop/1972:5#sid483> ;
     dcterms:title "Anmälan av lagrådsyttrande"@sv .
+
+[] a bibo:DocumentPart ;
+    dcterms:title "Beslut"@sv .
 

@@ -465,7 +465,7 @@ class RFC(DocumentRepository):
         # docstring = re.sub('.\b','',docstring)
         cleanparagraphs = (re.sub('.\b', '', x) for x in
                            reader.getiterator(reader.readparagraph))
-
+        
         parser = self.get_parser(doc.basefile)
 
         if not self.config.fsmdebug:

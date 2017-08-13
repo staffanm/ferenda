@@ -34,6 +34,14 @@ from .legalref import Link, LegalRef, RefParseError
 from .elements import *
 
 class Offtryck(SwedishLegalSource):
+    """This is a common mixin-type class for all document types in
+    "Offentliga trycket" (kommittedirektiv, kommittébetänkanden and
+    propositioner), regardless of source or physical file format. It
+    should be used in multiple inheritance together with a repo-type
+    class.
+
+    """
+
     DS = "ds"
     FORORDNINGSMOTIV = "fm"
     KOMMITTEDIREKTIV = "dir"
@@ -1404,7 +1412,9 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
 
     def is_section(parser):
         (ordinal, headingtype, title) = analyze_sectionstart(parser)
-        if getattr(parser, 'in_forfattningsforslag', False) and ordinal and title.startswith("Förslag till"):
+        if (getattr(parser, 'in_forfattningsforslag', False) and
+            ordinal and
+            re.match("Förslag(|et) [tl]ill", title)):
             return False
 
         if "...." in title:  # probably a line in a TOC
@@ -1455,6 +1465,11 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         (ordinal, headingtype, title) = analyze_sectionstart(parser)
         if ordinal:
             return headingtype == "h3" and ordinal.count(".") == 2
+
+    def is_forfattningsforslag(parser):
+        (ordinal, headingtype, title) = analyze_sectionstart(parser)
+        if getattr(parser, 'in_forfattningsforslag', False) and ordinal and title.startswith("Förslag till"):
+            return True  # don't even bother checking heading size 
 
     def is_bulletlist(parser):
         chunk = parser.reader.peek()
@@ -1588,8 +1603,15 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
 
     @newstate('preamblesection')
     def make_preamblesection(parser):
-        s = PreambleSection(title=str(parser.reader.next()).strip())
-        if s.title == "Författningsförslag":
+        chunk = parser.reader.next()
+        title = str(chunk).strip()
+        s = PreambleSection(title=title)
+        # normally the entire title should be either of these, but due
+        # to OCR problems additional text (like the "Prop. YYYY/YY:NN"
+        # in the margin) might be part of the chunk). Let's try to be
+        # inclusive here, we've already determined that this is a
+        # preamblesection.
+        if title.startswith(("Författningsförslag", "Propositionens lagförslag")):
             # If the starting Författningsförslag section is
             # unnumbered, the contained individual författningsförslag
             # will be level-1 numbered, but they are not real level-1
@@ -1723,6 +1745,13 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             s = PseudoSection(title=str(title))
         return parser.make_children(s)
 
+    @newstate('forfattningsforslag')
+    def make_forfattningsforslag(parser):
+        chunk = parser.reader.next()
+        ordinal, headingtype, title = analyze_sectionstart(parser, chunk)
+        s = Forfattningsforslag(ordinal=ordinal, title=title)
+        return parser.make_children(s)
+
     def skip_nonessential(parser):
         parser.reader.next()
         return None
@@ -1748,6 +1777,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     # title "a kap. Referensland för...")
     re_sectionstart = re.compile("^(\d[\.\d]*) +([A-ZÅÄÖ].*)$").match
 
+
     def analyze_sectionstart(parser, chunk=None):
         """returns (ordinal, headingtype, text) if it looks like a section
         heading, (None, None, chunk) otherwise.
@@ -1755,19 +1785,40 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         """
         if not chunk:
             chunk = parser.reader.peek()
-        found = False
+        strchunk = str(chunk)
+        # 1. clean up indata
+        if metrics.scanned_source:
+            if strchunk.startswith("l "): # probable OCR mistake
+                strchunk = "1" + strchunk[1:]
+            # "3. 12" -> "3.12" FIXME: Generalize to handle phantom
+            # spaces in other places (3- or 4 level section headings)
+            strchunk = re.sub("(\d+)\.\s+(\d+)", r"\1.\2", strchunk)
+
+        m = re_sectionstart(strchunk)
+        if not m:
+            return (None, None, chunk)
+        
+        ordinal = m.group(1).rstrip(".")
+        title = m.group(2).strip()
+        headingtype = "h" + str(ordinal.count(".") + 1)
 
         # make sure the font is bigger than default.  NOTE: Old
         # propositioner have section headers in the same size as the
         # default text, so we dial down the required min size in that
         # case.
         min_size = metrics.default.size
-        if (parser.current_identifier.startswith("Prop.") and
-            ("Prop. 1987/88:1" > parser.current_identifier)):
+
+        # in two cases we can accept a header size that is equal to
+        # default font size: Firstly if it's a level 3 header (which
+        # uses 14pt font in modern SOU templates) or if it's a old
+        # proposition (that also uses small fontsizes in headings)
+        if (headingtype == 'h3' or
+            (parser.current_identifier.startswith("Prop.") and
+             ("Prop. 1987/88:1" > parser.current_identifier))):
             min_size -= 1
+
         if chunk.font.size <= min_size:
             return (None, None, chunk)
-        strchunk = str(chunk).strip()
         if ((strchunk.endswith(".") and not 
              (strchunk.endswith("m.m.") or
               strchunk.endswith("m. m.") or
@@ -1780,46 +1831,16 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             strchunk.endswith("-")):
             # sections doesn't end like that
             return (None, None, chunk)
+        # looks like we've made it!
+        return (ordinal, headingtype, title)
 
-        if metrics.scanned_source:
-            if strchunk.startswith("l "): # probable OCR mistake
-                strchunk = "1" + strchunk[1:]
-            # "3. 12" -> "3.12" FIXME: Generalize to handle phantom
-            # spaces in other places (3- or 4 level section headings)
-            strchunk = re.sub("(\d+)\.\s+(\d+)", r"\1.\2", strchunk)
-
-            if re.match("\d Förslag(|et) [tl]ill", strchunk):
-                # this is a pattern prevalent in older propositioner
-                # (eg 1972:105) where the text starts with something
-                # that looks like numbered sections (numbered from 1
-                # onwards), that really is a form of preamble
-                # containing only Lagförslag, and then continues with
-                # real sections (again numbered from 1
-                # onwards). Attempt to detect these faux-sections:
-                # NB: This is likely an overbroad heuristic.
-                return (None, None, chunk)
-        if (chunk.font.size < metrics.h1.size and
-            parser._state_stack[-1] == 'preamblesection' and
-            re.match("\d Förslag(|et) till", strchunk)):
-            # similar to above, but occurs in some modern documents
-            # (ds 2008:68). only when heading size is less than whats
-            # identified as h1, though. FIXME: should probably be
-            # moved to is_section?
-            return (None, None, chunk)
-        m = re_sectionstart(strchunk)
-        if m:
-            ordinal = m.group(1).rstrip(".")
-            title = m.group(2)
-            headingtype = "h" + str(ordinal.count(".") + 1)
-            return (ordinal, headingtype, title.strip())
-        else:
-            return (None, found, chunk)
 
     def metrics_leftmargin():
         if state.pageno % 2 == 0:  # even page
             return metrics.leftmargin_even
         else:
             return metrics.leftmargin
+
 
     def metrics_rightmargin():
         if state.pageno % 2 == 0:  # even page
@@ -1846,6 +1867,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                    is_subsection,
                    is_subsubsection,
                    is_preamblesection,
+                   is_forfattningsforslag,
                    is_unorderedsection,
                    is_unorderedsubsection,
                    is_bulletlist,
@@ -1862,7 +1884,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         recognizers.insert(5, is_protokollsutdrag)
     p.set_recognizers(*recognizers)
 
-    commonstates = ("body", "frontmatter", "preamblesection", "protokollsutdrag", "section",
+    commonstates = ("body", "frontmatter", "preamblesection", "forfattningsforslag", "protokollsutdrag", "section",
                     "subsection", "unorderedsection", "unorderedsubsection", "subsubsection",
                     "appendix")
     commonbodystates = commonstates[1:]
@@ -1883,8 +1905,13 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                        ("frontmatter", is_preamblesection): (False, None),
                        
                        ("preamblesection", is_preamblesection): (False, None),
+                       ("preamblesection", is_forfattningsforslag): (make_forfattningsforslag, "forfattningsforslag"),
                        ("preamblesection", is_section): (False, None),
                        ("preamblesection", is_appendix): (False, None),
+
+                       ("forfattningsforslag", is_forfattningsforslag): (False, None),
+                       ("forfattningsforslag", is_section): (False, None),
+                       ("forfattningsforslag", is_preamblesection): (False, None),
 
                        ("protokollsutdrag", is_protokollsutdrag): (False, None),
                        ("protokollsutdrag", is_appendix): (False, None),

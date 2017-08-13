@@ -427,6 +427,12 @@ class Avsnitt(SectionalElement):
     def compute_uri(self, baseuri):
         return baseuri + "#S%s" % self.ordinal.replace(".", "-")
     
+
+class Forfattningsforslag(SectionalElement):
+    classname = "section" 
+    def compute_uri(self, baseuri):
+        return baseuri + "#FF%s" % self.ordinal.replace(".", "-")
+    
     
 class PseudoSection(CompoundElement):
     # used when we really want to use a Section, but can't since we
