@@ -320,11 +320,11 @@ class SFS(Trips):
             self.log.debug('    Found no change act')
             return grundforf
 
-        m = re.search('<a href="/sfst?bet=([^"]+)"', text)
+        m = re.search('<a href="/sfst\?bet=([^"]+)"', text)
         if m:
-            grundforf.append(m.groups(1))
+            grundforf.append(m.group(1))
             self.log.debug('    Found change act (to %s)' %
-                           m.groups(1))
+                           m.group(1))
             return grundforf
         else:
             # If a single change act changed multiple base acts. This

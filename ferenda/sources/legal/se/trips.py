@@ -126,8 +126,17 @@ class Trips(SwedishLegalSource):
                 existing,
                 encoding=self.source_encoding), "lxml")
         new_soup = BeautifulSoup(util.readfile(new, encoding=self.source_encoding), "lxml")
+        # exactly how we determine difference depends on page
+        # type. SFS register pages must be handled differently.
+        if "/register/" in existing:
+            existing = existing_soup.find("div", "search-results-content")
+            new = new_soup.find("div", "search-results-content")
+        else:
+            existing = existing_soup.find("div", "body-text")
+            new = new_soup.find("div", "body-text")
+            assert new, "new file (compared to %s) has no expected content" % existing
         try:
-            return existing_soup.pre != new_soup.pre
+            return existing != new
         except RuntimeError: # can happen with at least v4.4.1 of beautifulsoup
             return True
 
