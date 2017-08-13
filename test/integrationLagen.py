@@ -470,56 +470,58 @@ class TestACExpand(unittest.TestCase):
         self.wsgiapp = WSGIApp(repos=[SFS(datadir="tng.lagen.nu/data")])
 
     def test_expand_shortname(self):
-        self.assertEqual(self.wsgiapp.expand_partial_ref("TF"),
-                         "https://lagen.nu/1949:105#K")
+        self.assertEqual("https://lagen.nu/1949:105#K",
+                         self.wsgiapp.expand_partial_ref("TF"))
 
     def test_expand_chapters(self):
-        self.assertEqual(self.wsgiapp.expand_partial_ref("TF 1"),
-                         "https://lagen.nu/1949:105#K1")
+        self.assertEqual("https://lagen.nu/1949:105#K1",
+                         self.wsgiapp.expand_partial_ref("TF 1"))
 
     def test_expand_all_sections(self):
-        self.assertEqual(self.wsgiapp.expand_partial_ref("TF 1:"),
-                         "https://lagen.nu/1949:105#K1P")
+        self.assertEqual("https://lagen.nu/1949:105#K1P",
+                         self.wsgiapp.expand_partial_ref("TF 1:"))
 
     def test_expand_prefixed_sections(self):
-        self.assertEqual(self.wsgiapp.expand_partial_ref("TF 1:1"),
-                         "https://lagen.nu/1949:105#K1P1")
+        self.assertEqual("https://lagen.nu/1949:105#K1P1",
+                         self.wsgiapp.expand_partial_ref("TF 1:1"))
 
     def test_chapterless_expand_all_sections(self):
-        self.assertEqual(self.wsgiapp.expand_partial_ref("PUL"),
-                         "https://lagen.nu/1998:204#P")
+        self.assertTrue(os.path.exists("tng.lagen.nu/data/sfs/distilled/1998/204.rdf"))
+        self.assertEqual("https://lagen.nu/1998:204#P",
+                         self.wsgiapp.expand_partial_ref("PUL"))
 
     def test_chapterless_expand_prefixed_sections(self):
-        self.assertEqual(self.wsgiapp.expand_partial_ref("PUL 3"),
-                         "https://lagen.nu/1998:204#P3")
+        self.assertTrue(os.path.exists("tng.lagen.nu/data/sfs/distilled/1998/204.rdf"))
+        self.assertEqual("https://lagen.nu/1998:204#P3",
+                         self.wsgiapp.expand_partial_ref("PUL 3"))
 
     def test_prop_start(self):
-        self.assertEqual(self.wsgiapp.expand_partial_ref("prop"),
-                         "https://lagen.nu/prop/")
+        self.assertEqual("https://lagen.nu/prop/",
+                         self.wsgiapp.expand_partial_ref("prop"))
 
     def test_prop_incomplete_year(self):
-        self.assertEqual(self.wsgiapp.expand_partial_ref("prop 199"),
-                         "https://lagen.nu/prop/199")
+        self.assertEqual("https://lagen.nu/prop/199",
+                         self.wsgiapp.expand_partial_ref("prop 199"))
 
     def test_prop_year(self):
-        self.assertEqual(self.wsgiapp.expand_partial_ref("prop 1997"),
-                         "https://lagen.nu/prop/1997")
+        self.assertEqual("https://lagen.nu/prop/1997",
+                         self.wsgiapp.expand_partial_ref("prop 1997"))
 
     def test_prop_missing_num(self):
-        self.assertEqual(self.wsgiapp.expand_partial_ref("prop 1997/98:"),
-                         "https://lagen.nu/prop/1997/98:")
+        self.assertEqual("https://lagen.nu/prop/1997/98:",
+                         self.wsgiapp.expand_partial_ref("prop 1997/98:"))
 
     def test_prop_complete(self):
-        self.assertEqual(self.wsgiapp.expand_partial_ref("prop 1997/98:44"),
-                         "https://lagen.nu/prop/1997/98:44")
+        self.assertEqual("https://lagen.nu/prop/1997/98:44",
+                         self.wsgiapp.expand_partial_ref("prop 1997/98:44"))
 
     def test_prop_missing_page(self):
-        self.assertEqual(self.wsgiapp.expand_partial_ref("prop 1997/98:44 s"),
-                         "https://lagen.nu/prop/1997/98:44#sid")
+        self.assertEqual("https://lagen.nu/prop/1997/98:44#sid",
+                         self.wsgiapp.expand_partial_ref("prop 1997/98:44 s"))
 
     def test_prop_complete(self):
-        self.assertEqual(self.wsgiapp.expand_partial_ref("prop 1997/98:44 s. 12"),
-                         "https://lagen.nu/prop/1997/98:44#sid12")
+        self.assertEqual("https://lagen.nu/prop/1997/98:44#sid12",
+                         self.wsgiapp.expand_partial_ref("prop 1997/98:44 s. 12"))
 
 
 @unittest.skipIf(":8000" in os.environ.get("FERENDA_TESTURL", "http://localhost:8000"), "Not testing against dev server")
