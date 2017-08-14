@@ -1443,7 +1443,8 @@ class LinkedTextelement(Textelement):
             self.tag = "a" + self.tag
         element = super(LinkedTextelement, self).as_xhtml(uri, parent_uri)
         self.tag = prevtag
-        element.set("href", self.uri)
+        if element is not None:
+            element.set("href", self.uri)
         return element
 
     def __add__(self, other):

@@ -501,7 +501,10 @@ class Offtryck(SwedishLegalSource):
                 self.log.warning("%s: Parsing with config '%s' failed: %s (%s)" %
                                  (basefile, parseconfig, errmsg, loc))
                 lastexception = e
-                pass
+                # "reset" the sanatized body since the parsing process might have mutated it
+                fp.seek(0)
+                rawbody = self.extract_body(fp, basefile)
+                sanitized = self.sanitize_body(rawbody)
         else:
             raise lastexception
 

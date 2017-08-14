@@ -701,6 +701,15 @@ class AsXHTML(unittest.TestCase, FerendaTestCase):
         self._test_asxhtml(want, body)
                         
 
+    def test_empty_removal(self):
+        body = Textbox([LinkedTextelement("  ", uri="index.html#24", tag=None),
+                        Textelement("23", tag=None)],
+                       top=0, left=0, width=100, height=100, fontid=0)
+        want = """
+<p xmlns="http://www.w3.org/1999/xhtml" class="textbox fontspec0" style="top: 0px; left: 0px; height: 100px; width: 100px">23</p>
+"""
+        self._test_asxhtml(want, body)
+                        
 
 class Elements(unittest.TestCase):
     maxDiff = None
