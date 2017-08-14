@@ -92,6 +92,10 @@ class KeywordContainsDescription(errors.FerendaException):
         self.keywords = keywords
         self.descriptions = descriptions
 
+class DuplicateReferatDoc(errors.DocumentRemovedError):
+    pass
+
+        
 class DV(SwedishLegalSource):
 
     """Handles legal cases, in report form, from primarily final instance courts.
@@ -1454,9 +1458,20 @@ class DV(SwedishLegalSource):
                 for line in fp:
                     mapped_path, dummy = line.split("\t", 1)
                     if mapped_path == path:
-                        append_path = False
-                        self.log.warning("%s: Not appending path %s to uri.map" % (doc.basefile, path))
-                        break
+                        # This means that another, previously parsed,
+                        # basefile already maps to the same URI (eg
+                        # because a referat of multiple dom documents
+                        # occur as several different (identical)
+                        # basefiles.
+                        try:
+                            # convert dummy (generated path) to a basefile if possible
+                            dummy = dummy.split("/",3)[-1].split(".")[0]
+                        except:
+                            pass # just use dummy as-is
+                        raise DuplicateReferatDoc(dummy, dummyfile=self.store.parsed_path(doc.basefile))
+                        # append_path = False
+                        # self.log.warning("%s: Not appending path %s to uri.map" % (doc.basefile, path))
+                        # break
         if append_path:
             with codecs.open(mapfile, "a", encoding="utf-8") as fp:
                 if self.config.mapfiletype == "nginx":
