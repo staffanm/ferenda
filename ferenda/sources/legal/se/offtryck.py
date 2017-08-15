@@ -501,8 +501,11 @@ class Offtryck(SwedishLegalSource):
                 self.log.warning("%s: Parsing with config '%s' failed: %s (%s)" %
                                  (basefile, parseconfig, errmsg, loc))
                 lastexception = e
-                # "reset" the sanatized body since the parsing process might have mutated it
-                fp.seek(0)
+                # "reset" the sanitized body since the parsing process might have mutated it
+                if fp.closed:  # pdfreader.parse closes the fp given to it, we'll have to re-open it
+                    fp = self.parse_open(basefile)
+                else:
+                    fp.seek(0)
                 rawbody = self.extract_body(fp, basefile)
                 sanitized = self.sanitize_body(rawbody)
         else:
