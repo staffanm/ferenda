@@ -220,7 +220,10 @@ class LNSemantics(wiki.WikiSemantics):
     def external_link(self, ast):
         el = super(LNSemantics, self).external_link(ast)
         if el.get("href", "").startswith("https://lagen.nu/om/"):
-            el.set("href", el.get("href").replace(".html", ""))
+            newlink = el.get("href").replace(".html", "")
+            if newlink.endswith("/om/"):
+                newlink += "index"
+            el.set("href", newlink)
         return el
 
     def heading(self, ast):
