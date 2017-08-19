@@ -275,11 +275,14 @@ class LNSettings(wiki.WikiSettings):
         # uri = super(LNSettings, self).make_url(name, **kwargs)
         if name[1].startswith("SFS/"):
             basefile = name[1][4:]
-            if " " in basefile: # sometimes it seems mwparser returns
-                                # "SFS/1957:390 Lagen (1957:390) om
-                                # fiskearrenden" instead of just
-                                # "SFS/1957:390"
-                basefile = basefile.split(" ")[0]
+            # sometimes it seems mwparser returns "SFS/1957:390 Lagen
+            # (1957:390) om fiskearrenden" instead of just
+            # "SFS/1957:390". However, we must handle "SFS/1845:50
+            # s.1" correctly
+            if " " in basefile: 
+                root, extra = basefile.split(" ",1)
+                if not re.match(r"s\.\d+$", extra):
+                    basefile = root
             uri = self.make_sfs_url(basefile)
         else:
             if name[0].prefix == "user":
