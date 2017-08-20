@@ -186,7 +186,8 @@ nav[data-toggle='toc'].affix {
 }
 
 .row-offcanvas-left.active .sidebar-offcanvas {
-  left: 0;
+    left: 0;
+    overflow-y: auto;
 }
  
 .sidebar-offcanvas nav {
@@ -198,16 +199,18 @@ nav[data-toggle='toc'].affix {
 }
 
 .slidebutton {
-  position: absolute;
+  position: fixed;
   width: 40px;
-  right: -24px;
+  left: -24px;
   top: 50vh;
   height: 40px;
   border-radius: 20px;
   padding: 2px;
   background: #000;
 }
-
+.active .slidebutton {
+    left: 178px;
+}
 .inner-slidebutton {
   width:36px;
   height:36px;
