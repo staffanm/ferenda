@@ -9,6 +9,7 @@ from bz2 import BZ2File
 from collections import OrderedDict
 from difflib import unified_diff
 from itertools import islice
+from io import BytesIO
 from tempfile import mkstemp
 from operator import attrgetter
 import codecs
@@ -18,15 +19,23 @@ import os
 import random
 import shutil
 import sys
+import traceback
+from wsgiref.util import request_uri
+from urllib.parse import parse_qsl
 
-from rdflib import Graph, URIRef, RDF
-from layeredconfig import LayeredConfig
+from rdflib import Graph, URIRef, RDF, Literal
+from rdflib.namespace import DCTERMS
+from layeredconfig import LayeredConfig, Defaults
 from lxml import etree
+from ferenda.thirdparty.patchit import PatchSet, PatchSyntaxError, PatchConflictError
 
 from ferenda.compat import Mock
 from ferenda import (TextReader, TripleStore, FulltextIndex, WSGIApp,
-                     CompositeRepository, DocumentEntry, Transformer)
+                     DocumentRepository, CompositeRepository,
+                     DocumentEntry, Transformer, RequestHandler,
+                     ResourceLoader)
 from ferenda.elements import serialize
+from ferenda.elements.html import Body, P, H1, H2, Form, Textarea, Input, Label, Button, Textarea, Br, Div, A, Pre
 from ferenda import decorators, util
 
 class DummyStore(object):
@@ -38,6 +47,175 @@ class DummyStore(object):
         return []  # pragma: no cover
 
 
+class DevelHandler(RequestHandler):
+
+    def supports(self, environ):
+        return environ['PATH_INFO'].startswith("/devel/")
+
+    def handle(self, environ):
+        segments = [x for x in environ['PATH_INFO'].split("/") if x]
+        if segments[1] == "patch":
+            if environ['REQUEST_METHOD'] == 'POST':
+                reqbody = environ['wsgi.input'].read(int(environ.get('CONTENT_LENGTH', 0)))
+                params = dict(parse_qsl(reqbody.decode("utf-8")))
+            else:
+                params = dict(parse_qsl(environ['QUERY_STRING']))
+            body = self.handle_patch(environ, params)
+            res = self._render("mkpatch", body, request_uri(environ))
+            length = len(res)
+            fp = BytesIO(res)
+            return fp, length, 200, "text/html"
+        else:
+            raise ValueError("DevelHandler can't handle path %s" % environ['PATH_INFO'])
+
+    def _render(self, title, body, uri, template="xsl/generic.xsl", datadir="data", develurl=None):
+        fakerepo = DocumentRepository(datadir=datadir)
+        doc = fakerepo.make_document()
+        doc.uri = uri
+        doc.meta.add((URIRef(doc.uri),
+                      DCTERMS.title,
+                      Literal(title, lang="sv")))
+        doc.body = body
+        xhtml = fakerepo.render_xhtml_tree(doc)
+        documentroot = 'data' # FIXME: find out this in a proper way
+        conffile = os.sep.join([datadir, 'rsrc',
+                                'resources.xml'])
+        transformer = Transformer('XSLT', template, "xsl",
+                                  resourceloader=fakerepo.resourceloader,
+                                  config=conffile)
+        urltransform = None
+        if develurl:
+            urltransform = fakerepo.get_url_transform_func(
+                develurl=develurl)
+        depth = len(doc.uri.split("/")) - 3
+        tree = transformer.transform(xhtml, depth,
+                                     uritransform=urltransform)
+        return etree.tostring(tree, encoding="utf-8")
+
+    def handle_patch(self, environ, params):
+        def open_intermed_text(repo, basefile, mode="rb"):
+            intermediatepath = repo.store.intermediate_path(basefile)
+            opener = open
+            if repo.config.compress == "bz2":
+                intermediatepath += ".bz2"
+                opener = BZ2File
+            if os.path.exists(intermediatepath):
+                stage = "intermediate"
+                outfile = intermediatepath
+            else:
+                stage = "download"
+                outfile = repo.store.downloaded_path(basefile)
+            fp = opener(outfile, mode)
+            return fp
+
+        if not params:
+            # start page: list available patches maybe? form with repo names and textbox for basefile?
+            res = Body([
+                Div([
+                    H2(["Create a new patch"]),
+                    Form([
+                        Div([
+                            Label(["repo"], **{'for': 'repo'}),
+                            Input(**{'type':"text", 'id': "repo", 'name': "repo", 'class': "form-control"}),
+                            Label(["basefile"], **{'for': 'basefile'}),
+                            Input(**{'type':"text", 'id': "basefile", 'name': "basefile", 'class': "form-control"})],
+                            **{'class': 'form-group'}),
+                        Button(["Create"], **{'type': "submit", 'class': "btn btn-default"})],
+                     action=environ['PATH_INFO'], method="GET")
+                ])])
+            return res
+        else:
+            alias = params['repo']
+            basefile = params['basefile']
+            repo = self.repo._repo_from_alias(alias)
+            patchstore = repo.documentstore_class(repo.config.patchdir +
+                                                  os.sep + repo.alias)
+            patchpath = patchstore.path(basefile, "patches", ".patch")
+            descpath = patchstore.path(basefile, "patches", ".desc")
+            if environ['REQUEST_METHOD'] == 'POST':
+                fp = open_intermed_text(repo, basefile, mode="wb")
+                # FIXME: Convert CRLF -> LF. We should determine from
+                # existing intermed file what the correct lineending
+                # convention is
+                fp.write(params['filecontents'].replace("\r\n", "\n").encode(repo.source_encoding))
+                fp.close()
+                self.repo.mkpatch(alias, basefile, params['description'])
+                patchcontent = util.readfile(patchpath)
+                res = Body([
+                    Div([
+                        H2(["patch generated at %s" % patchpath]),
+                        P("Contents of the new patch"),
+                        Pre([util.readfile(patchpath)])])])
+                return res
+            else:
+                print("load up intermediate file, display it in a textarea + textbox for patchdescription")
+                fp = open_intermed_text(repo, basefile)
+                outfile = util.name_from_fp(fp)
+                text = fp.read().decode(repo.source_encoding)
+                fp.close
+                patchdescription = None
+                if os.path.exists(patchpath) and params.get('ignoreexistingpatch') != 'true':
+                    ignorepatchlink = "%s?%s&ignoreexistingpatch=true" % (environ['PATH_INFO'], environ['QUERY_STRING'])
+                    with codecs.open(patchpath, 'r', encoding=repo.source_encoding) as pfp:
+                        if repo.config.patchformat == 'rot13':
+                            pfp = StringIO(codecs.decode(pfp.read(), "rot13"))
+                        try:
+                            ps = PatchSet.from_stream(pfp)
+                            text = "\n".join(ps.patches[0].merge(text.split("\n")))
+                            if ps.patches[0].hunks[0].comment:
+                                patchdescription = ps.patches[0].hunks[0].comment
+                            elif os.path.exists(descpath):
+                                patchdescription = util.readfile(descpath)
+                            else:
+                                patchdescription = ""
+                            instructions = Div([
+                                P(["Existing patch at %s has been applied (" % patchpath,
+                                   A("ignore existing patch", href=ignorepatchlink), ")"]),
+                                P("Contents of that patch, for reference"),
+                                Pre([util.readfile(patchpath)])])
+                        except (PatchSyntaxError, PatchConflictError) as e:
+                            exc_type, exc_value, tb = sys.exc_info()
+                            tblines = traceback.format_exception(exc_type, exc_value, tb)
+                            tbstr = "\n".join(tblines)
+                            instructions = Div([
+                                P(["Existing patch at %s could not be applied (" % patchpath,
+                                   A("ignore existing patch", href=ignorepatchlink), ")"]),
+                                P("The error was:"),
+                                Pre([tbstr])
+                                ])
+                            patchdescription = ""
+                else:
+                    instructions = P(["Change the original data as needed"])
+
+                # the extra \n before filecontents text is to
+                # compensate for a missing \n introduced by the
+                # textarea tag
+                res = Body([
+                    H2(["Editing %s" % outfile]),
+                    instructions,
+                    Div([
+                        Form([Textarea(["\n"+text], **{'id': 'filecontents',
+                                                  'name': 'filecontents',
+                                                  'cols': '80',
+                                                  'rows': '60',
+                                                  'class': 'form-control'}),
+                              Br(),
+                              Div([
+                                  Label(["Description of patch"], **{'for': 'description'}),
+                                  Input(**{'id':'description',
+                                           'name': 'description',
+                                           'value': patchdescription,
+                                           'class': 'form-control'})
+                                  ], **{'class': 'form-group'}),
+                              Input(id="repo", type="hidden", name="repo", value=alias),
+                              Input(id="basefile", type="hidden", name="basefile", value=basefile),
+                              Button(["Create patch"], **{'type': 'submit',
+                                                          'class': 'btn btn-default'})],
+                             action=environ['PATH_INFO'], method="POST"
+                             )])])
+                             
+                return res
+        # return fp, length, status, mimetype
 class Devel(object):
 
     """Collection of utility commands for developing docrepos.
@@ -222,7 +400,8 @@ class Devel(object):
         # 1. initialize the docrepo indicated by "alias"
         repo = self._repo_from_alias(alias)
         # 2. find out if there is an intermediate file or downloaded
-        # file for basefile
+        # file for basefile. FIXME: unify this with open_intermed_text
+        # in handle_patch
         intermediatepath = repo.store.intermediate_path(basefile)
         if repo.config.compress == "bz2":
             intermediatepath += ".bz2"
@@ -245,7 +424,9 @@ class Devel(object):
             repo.config.force = True
             util.robust_remove(intermediatepath)
             try:
+                repo.config.ignorepatch = True
                 repo.parse(basefile)
+                repo.config.ignorepatch = False
             except:
                 # maybe this throws an error (hopefully after creating
                 # the intermediate file)? may be the reason for
@@ -782,12 +963,17 @@ class Devel(object):
     # pragma: no cover comments.
     def __init__(self, config=None, **kwargs):
         self.store = DummyStore(None)
+        if config is None:
+            config = LayeredConfig(Defaults(kwargs))
         self.config = config
+        self.requesthandler = DevelHandler(self)
 
     documentstore_class = DummyStore
     downloaded_suffix = ".html"
     storage_policy = "file"
-
+    ns = {}
+    resourceloader = ResourceLoader()
+    
     @classmethod
     def get_default_options(cls):
         return {}  # pragma: no cover
@@ -812,6 +998,12 @@ class Devel(object):
 
     def status(self):
         pass  # pragma: no cover
+
+    def tabs(self):
+        return []
+
+    def footer(self):
+        return []
 
     @classmethod
     def setup(cls, action, config, *args, **kwargs):

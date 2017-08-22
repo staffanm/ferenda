@@ -239,27 +239,15 @@ class WSGIApp(object):
                 fp = open(fullpath, "rb")
                 iterdata = FileWrapper(fp)
             else:
-                reasonmsg = "\n".join(["%s: %s" % (k, reasons[k]) for k in reasons])
-                msg = """<h1>404</h1>
-
-The path %s not found at %s.
-
-Examined %s repos.
-
-<pre>%s
-</pre>
-""" % (path,
-       fullpath,
-       len(self.repos),
-       reasonmsg)
-
-
                 mimetype = "text/html"
+                reasonmsg = "\n".join(["%s: %s" % (k, reasons[k]) for k in reasons])
+                msgbody = html.Body([html.H1("Document not found"),
+                                     html.P(["The path %s was not found at %s" % (path, fullpath)]),
+                                     html.P(["Examined %s repos" % (len(self.repos))]),
+                                     html.Pre([reasonmsg])])
+                iterdata = self._transform("404 Not found", msgbody, environ)
                 status = "404 Not Found"
-                length = len(msg.encode('utf-8'))
-                fp = BytesIO(msg.encode('utf-8'))
-                iterdata = FileWrapper(fp)
-        # logging.getLogger("wsgi").info("Abt to return response")
+                length = None
         return self._return_response(iterdata, start_response, status, mimetype, length)
 
 

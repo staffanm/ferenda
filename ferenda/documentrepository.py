@@ -523,6 +523,7 @@ class DocumentRepository(object):
             'primaryfrontpage': False,
             'frontpagefeed': False,
             'removeinvalidlinks': True,
+            'ignorepatch': False,
             'class': cls.__module__ + "." + cls.__name__,
             # FIXME: These only make sense at a global level, and
             # furthermore are duplicated in manager._load_config. We
@@ -1271,6 +1272,9 @@ with the *config* object as single parameter.
         """
 
         # 1. do we have a patch?
+        if self.config.ignorepatch is True:
+            return text, None
+            
         patchstore = self.documentstore_class(self.config.patchdir + os.sep + self.alias)
         patchpath = patchstore.path(basefile, "patches", ".patch")
         descpath = patchstore.path(basefile, "patches", ".desc")

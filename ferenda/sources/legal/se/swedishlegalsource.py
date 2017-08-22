@@ -570,7 +570,9 @@ class SwedishLegalSource(DocumentRepository):
     def patch_if_needed(self, fp, basefile):
         """Override of DocumentRepository.patch_if_needed with different,
         streamier API."""
-        
+
+        if self.config.ignorepatch is True:
+            return fp
         # 1. do we have a patch?
         patchstore = self.documentstore_class(self.config.patchdir +
                                               os.sep + self.alias)
@@ -622,10 +624,14 @@ class SwedishLegalSource(DocumentRepository):
         into some suitable intermediate format and returns an open file
         to that intermediate format (if any).
         
-        The default implementation does not do any conversation, simply
-        opens downloaded_path. Any source that actuallyhou uses
+        The default implementation does not do any conversation,
+        simply opens downloaded_path. Any source that actually uses
         intermediate files should override this.
-        
+
+        An overriding implementation should also save the result to a
+        suitable intermediate file, so that this doesn't have to be
+        redone.
+
         """
         return open(self.store.downloaded_path(basefile))
 

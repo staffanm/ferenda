@@ -1488,12 +1488,10 @@ class DV(SwedishLegalSource):
         # equivalent though). Examples:
         # HDO/B883-81_1 -> https://lagen.nu/rf/nja/1982s350 -> HDO/B882-81_1
         # HFD/1112-14 -> https://lagen.nu/rf/hfd/2014:35 -> HFD/1113-14
-        #
-        # We might be able to minimize errors by simply refusing to
-        # parse one of the two basefiles (assuming that they are
-        # equivalent) if self._basefilemap tells us that there is
-        # another (and that that one is parsed)
-        computed_basefile = self.basefile_from_uri(doc.uri)
+        # 
+        # However, we detect that above and throw a
+        # DuplicateReferatDoc error for the second (or third, or
+        # fourth...) basefile encountered.
         assert doc.basefile == computed_basefile, "%s -> %s -> %s" % (doc.basefile, doc.uri, computed_basefile)
 
         # remove empty Instans objects (these can happen when both a

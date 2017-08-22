@@ -10,6 +10,7 @@ import os
 import re
 from urllib.parse import quote, urljoin
 import codecs
+from bz2 import BZ2File
 
 import requests
 import lxml.html
@@ -149,7 +150,6 @@ class Trips(SwedishLegalSource):
         return a
 
     def _extract_text(self, basefile, attachment=None):
-        intermediate_path = self.store.path(basefile, 'intermediate', '.txt')
         if not attachment and self.store.storage_policy == "dir":
             attachment = "index.html"
         soup = BeautifulSoup(util.readfile(self.store.downloaded_path(
@@ -164,13 +164,16 @@ class Trips(SwedishLegalSource):
         # the body of the text uses CRLF, but the header uses only
         # LF. Convert to only LF.
         txt = txt.replace("\r", "")
-        util.writefile(intermediate_path, txt,
-                       encoding=self.source_encoding)
-        # I'm not sure whether we should return a binary or text fp,
-        # but since this is used by the main parse() logic (which
-        # demands binary fp's)...
-        # return codecs.open(intermediate_path,
-        #                   encoding=self.source_encoding)
-        return open(intermediate_path, "rb")
+        
+        intermediate_path = self.store.path(basefile, 'intermediate', '.txt')
 
+        if self.config.compress == "bz2":
+            intermediate_path += ".bz2"
+            opener = BZ2File
+        else:
+            opener = open
 
+        fp = opener(intermediate_path, "wb")
+        fp.write(txt.encode(self.source_encoding))
+        fp.close()
+        return opener(intermediate_path, "rb")

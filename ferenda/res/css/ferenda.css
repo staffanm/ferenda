@@ -510,6 +510,13 @@ body.statusreport p.alert {
     margin: 2px;
     display: inline;
 }
+/* only used in the devel/patch web UI */
+textarea {
+    font-size: 12px !important;
+    font-family: monospace;
+    white-space: nowrap;
+    overflow: auto;
+}
 
 /* in bootstrap, all headers by default have font-weight 500, which renders as bold on Chrome/FF, but as normal on (at least some versions of) IE. Specify that we really want a bold heading. */
 h1, h2, h3, h4, h5, h6 {

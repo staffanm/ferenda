@@ -832,7 +832,9 @@ def _setup_classnames(enabled, classname):
     # "w3c" => ['ferenda.sources.tech.W3Standards']
     # "all" => ['ferenda.sources.tech.W3Standards', 'ferenda.sources.tech.RFC']
     if classname == "all":
-        return [v for v in enabled.values() if v != 'ferenda.Devel']
+        # wonder why we filtered out ferenda.Devel -- does it cause problems with "./ferenda-build.py all [action]" ?
+        # return [v for v in enabled.values() if v != 'ferenda.Devel']
+        return enabled.values()
     else:
         if classname in enabled:
             classname = enabled[classname]
@@ -1641,6 +1643,7 @@ def _setup_runserver_args(config, inifilename):
         config_as_dict = dict(
             [(k, getattr(instconfig, k)) for k in instconfig])
         inst = cls(**config_as_dict)
+        inst.config._parent = config
         repos.append(inst)
 
     # for repo in repos:
