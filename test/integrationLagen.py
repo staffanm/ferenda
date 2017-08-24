@@ -116,6 +116,15 @@ class TestPages(TestLagen):
     def test_frontpage_disabled_links(self):
         res = self.get(self.baseurl)
         soup = BeautifulSoup(res.text, "lxml")
+        local = not os.environ.get("FERENDA_TESTURL")
+        if local:
+            # don't test for broken links in the main content area
+            # since there will be many (in local testing we only
+            # download a small subset of laws and other resources, and
+            # the main content area contains links to other
+            # resources. Thus, in this testing scenario, they're
+            # expected to be missing
+            soup.find("div", "section-wrapper").decompose()
         for link in soup.find_all("a"):
             self.assertNotIn("invalid-link", link.attrs.get('class', []), "Link %s marked as invalid (not in DB)" % link.text)
 
@@ -378,6 +387,7 @@ class TestSearch(TestLagen):
 
         # go on and test that the facets in the navbar is as they should
 
+
     def test_sfs_title(self):
         soup = BeautifulSoup(self.get(self.baseurl + "search/?q=personuppgiftslag").text,
                              "lxml")
@@ -407,7 +417,20 @@ class TestSearch(TestLagen):
         hit = soup.find("section", "hit")
         self.assertTrue(hit)
         
+    def test_scoring(self):
+        # really a regression test -- this query should never match anything other than prop/sou/dir
+        soup = BeautifulSoup(self.get(self.baseurl + "search/?q=bulvanutredningen").text,
+                             "lxml")
+        hits = soup.find_all("section", "hit")
+        self.assertTrue(hits)
+        for hit in hits:
+            self.assertTrue(hit.b.a.get("href").startswith(("/prop/", "/dir/", "/utr/sou/")),
+                            "%s isn't prop/dir/sou" % hit.b.a.get("href"))
         
+        
+
+
+
 
 class TestAutocomplete(TestLagen):
     def test_basic_sfs(self):

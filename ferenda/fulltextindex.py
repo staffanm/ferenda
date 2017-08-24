@@ -877,8 +877,11 @@ class ElasticSearchIndex(RemoteIndex):
                                        "query": {"simple_query_string": deepcopy(match)}
                         }})
                 if boost_types:
+                    boost_functions = []
                     for _type, boost in boost_types:
-                        submatches.append({"term": {"_type": {"value": _type, "boost": boost}}})
+                        boost_functions.append({"filter": {"term": {"_type": _type}},
+                                                "weight": boost})
+                    
                 match = {"bool": {"should": submatches}}
             else:
                 # ac_query -- need to work in inner_hits somehow
@@ -900,7 +903,12 @@ class ElasticSearchIndex(RemoteIndex):
                 match["bool"]["must_not"] = []
                 for exclude_type in exclude_types:
                     match["bool"]["must_not"].append({"type": {"value": exclude_type}})
-        payload = {'query': match}
+
+        if boost_types:
+            payload = {'query': {'function_score': {'functions': boost_functions,
+                                                    'query': match}}}
+        else:
+            payload = {'query': match}
         if not ac_query:
             payload['aggs'] = self._aggregation_payload()
         if q and "filter" in match["bool"]:
