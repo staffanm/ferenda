@@ -172,7 +172,7 @@ class Trips(SwedishLegalSource):
             opener = BZ2File
         else:
             opener = open
-
+        util.ensure_dir(intermediate_path)
         fp = opener(intermediate_path, "wb")
         fp.write(txt.encode(self.source_encoding))
         fp.close()

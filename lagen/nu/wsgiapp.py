@@ -68,11 +68,14 @@ class WSGIApp(OrigWSGIApp):
                     # prefer document-level resources, not page/section resources
                     param['uri'] = RegexString(param['uri'] + "[^#]*")
             else:
-                # normalize any page reference ("nja 2015 s 42" => "nja 2015 s. 42")
+                # normalize any page reference ("nja 2015 s 42" =>
+                # "nja 2015 s. 42") and search in the multi_field
+                # label.keyword, which uses different analyzer than
+                # the main label field.
                 q = q.lower()
                 q = re.sub(r"\s*s\s*(\d)", " s. \\1", q)
                 q = re.sub(r"^prop(\s+|$)", "prop. ", q)
-                param['label'] = q + "*"
+                param['label.keyword'] = q + "*"
             q = None
         return q, param, pagenum, pagelen, stats
 

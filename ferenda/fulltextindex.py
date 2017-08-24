@@ -677,7 +677,9 @@ class ElasticSearchIndex(RemoteIndex):
                     (Label(),
                      {"type": "keyword"}),  # repo, basefile
                     (Label(boost=16),
-                     {"type": "text", "boost": 16.0, "analyzer": "lowercase_keyword"}),  # identifier
+                     {"type": "text", "boost": 16.0, "analyzer": "my_analyzer", "fields": {
+                         "keyword": {"type": "text", "analyzer": "lowercase_keyword"}
+                     }}),  # identifier
                     (Text(boost=4),
                      {"type": "text", "boost": 4.0}),  # title
                     (Text(boost=2),
@@ -790,12 +792,12 @@ class ElasticSearchIndex(RemoteIndex):
         self._writer.write(payload.encode("utf-8"))
         self._writer.write(b"\n")
 
-    def _query_payload(self, q, pagenum=1, pagelen=10, ac_query=False, exclude_types=None, **kwargs):
+    def _query_payload(self, q, pagenum=1, pagelen=10, ac_query=False,
+                       exclude_types=None, **kwargs):
         if kwargs.get("type"):
             types = [kwargs.get("type")]
         else:
             types = [repo.alias for repo in self._repos if repo.config.relate]
-
         if ac_query:
             relurl = "_search?from=%s&size=%s" % ((pagenum - 1) * pagelen,
                                                   pagelen)
@@ -815,6 +817,8 @@ class ElasticSearchIndex(RemoteIndex):
                 continue
             if k in ("type", "repo"):
                 k = "_type"
+            elif k.endswith(".keyword"):
+                pass  # leave as-is, don't try to look this up in schema
             elif isinstance(schema[k], Resource):
                 # also map k to "%s.iri" % k if k is Resource
                 k += ".iri"
@@ -853,6 +857,7 @@ class ElasticSearchIndex(RemoteIndex):
                 match['fields'] = self.default_fields
                 match['query'] = q
                 match['default_operator'] = "and"
+                match['analyzer'] = 'my_analyzer'
                 highlight = {'fields': {'text': {},
                                         'label': {}},
                              'fragment_size': self.fragment_size,
@@ -1201,6 +1206,7 @@ class ElasticSearch2x (ElasticSearchIndex):
             match['fields'] = ["label", "text"]
             match['query'] = q
             match['default_operator'] = "and"
+            match['analyzer'] = "my_analyzer"
             highlight = {'fields': {'text': {},
                                     'label': {}},
                          'fragment_size': 150,

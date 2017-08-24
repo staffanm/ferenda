@@ -381,11 +381,31 @@ class TestSearch(TestLagen):
     def test_sfs_title(self):
         soup = BeautifulSoup(self.get(self.baseurl + "search/?q=personuppgiftslag").text,
                              "lxml")
-        # examine if the first hit is the SFS with that exact
-        # title. NB: The SFS should rank above prop 1997/98:44 which
-        # has the exact same title. We do this by boosting the sfs index.
+        # examine if the first hit is the SFS with that exact title
+        # (well, actually a title that starts with the exact same
+        # string). NB: The SFS should rank above prop 1997/98:44 which
+        # has the exact same title. We do this by boosting the sfs
+        # index.
         hit = soup.find("section", "hit")
         self.assertEqual(hit.b.a.get("href"), "/1998:204")
+
+    def test_stemming(self):
+        # "bulvanutredning" never occurs in the plain text, but
+        # "bulvanutredningen" does. Check if proper stemming has been
+        # applied when indexing
+        soup = BeautifulSoup(self.get(self.baseurl + "search/?q=bulvanutredning").text,
+                             "lxml")
+        hit = soup.find("section", "hit")
+        self.assertTrue(hit)
+
+        # also, check that the query itself is properly stemmed. It'd
+        # be weird if "bulvanutredningen" yielded no hits as the exact
+        # word occurs in the text.
+        soup = BeautifulSoup(self.get(self.baseurl + "search/?q=bulvanutredningen").text,
+                             "lxml")
+        hit = soup.find("section", "hit")
+        self.assertTrue(hit)
+        
         
 
 class TestAutocomplete(TestLagen):

@@ -78,6 +78,7 @@ class Keyword(DocumentRepository):
         # extra functions -- subclasses can add / remove from this
         self.termset_funcs = [self.download_termset_mediawiki,
                               self.download_termset_wikipedia]
+        # self.termset_funcs = []
 
 
     @classmethod

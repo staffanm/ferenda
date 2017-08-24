@@ -1005,6 +1005,12 @@ class Devel(object):
     def footer(self):
         return []
 
+    def facets(self):
+        return []
+
+    def basefile_from_uri(self, uri):
+        return None
+
     @classmethod
     def setup(cls, action, config, *args, **kwargs):
         pass  # pragma: no cover

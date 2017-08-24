@@ -677,11 +677,16 @@ class WSGIApp(object):
         query = queryparams.get('q')
         if isinstance(query, bytes):  # happens on py26
             query = query.decode("utf-8")  # pragma: no cover
-        query += "*"  # we use a simple_query_string query by default,
-                      # and we probably want to do a prefix query (eg
-                      # "personuppgiftslag" should match a label field
-                      # containing "personuppgiftslag (1998:204)",
-                      # therefore the "*"
+#        query += "*"  # we use a simple_query_string query by default,
+#                      # and we probably want to do a prefix query (eg
+#                      # "personuppgiftslag" should match a label field
+#                      # containing "personuppgiftslag (1998:204)",
+#                      # therefore the "*"
+#
+#        # maybe not, though -- seems to conflict with
+#        # stemming/indexing, ie "bulvanutredningen*" doesn't match the
+#        # indexed "bulvanutredningen" (which has been stemmed to
+#        # "bulvanutredning"
         pagenum = int(queryparams.get('p', '1'))
         qpcopy = dict(queryparams)
         for x in ('q', 'p'):
