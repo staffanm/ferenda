@@ -1492,6 +1492,7 @@ class DV(SwedishLegalSource):
         # However, we detect that above and throw a
         # DuplicateReferatDoc error for the second (or third, or
         # fourth...) basefile encountered.
+        computed_basefile = self.basefile_from_uri(doc.uri)
         assert doc.basefile == computed_basefile, "%s -> %s -> %s" % (doc.basefile, doc.uri, computed_basefile)
 
         # remove empty Instans objects (these can happen when both a

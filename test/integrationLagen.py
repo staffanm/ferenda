@@ -386,7 +386,8 @@ class TestSearch(TestLagen):
         # string). NB: The SFS should rank above prop 1997/98:44 which
         # has the exact same title. We do this by boosting the sfs
         # index.
-        hit = soup.find("section", "hit")
+        hits = soup.find_all("section", "hit")
+        hit = hits[0]
         self.assertEqual(hit.b.a.get("href"), "/1998:204")
 
     def test_stemming(self):

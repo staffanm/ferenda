@@ -105,9 +105,9 @@ class Sitenews(DocumentRepository):
         documentlist = []
         # create just one single page: no leftnav, contains only a sort-of nested list 
         for repo in [self] + otherrepos:
-            qname_graph = repo.make_graph()
             if not repo.config.tabs:
                 continue
+            qname_graph = repo.make_graph()
             feeds = []
             # row = {'alias': repo.alias,
             #        'uri': repo.dataset_uri(feed=True)}

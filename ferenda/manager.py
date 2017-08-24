@@ -80,6 +80,8 @@ DEFAULT_CONFIG = {'loglevel': 'DEBUG',
                   'relate': True,
                   'download': True,
                   'tabs': True,
+                  'primaryfrontpage': False,
+                  'frontpagefeed': False,
                   'sitename': 'MySite',
                   'sitedescription': 'Just another Ferenda site',
                   'cssfiles': ['css/ferenda.css'],
@@ -1374,15 +1376,15 @@ def _run_class_with_basefile(clbl, basefile, kwargs, command,
     try:
         return clbl(basefile, **kwargs)
     except errors.DocumentRemovedError as e:
+        errmsg = str(e)
+        getlog().error("%s %s %s failed! %s" %
+                       (alias, command, basefile, errmsg))
         if hasattr(e, 'dummyfile') and e.dummyfile:
             if not os.path.exists(e.dummyfile):
                 util.writefile(e.dummyfile, "")
             return None  # is what DocumentRepository.parse returns
             # when everyting's ok
         else:
-            errmsg = str(e)
-            getlog().error("%s %s %s failed! %s" %
-                           (alias, command, basefile, errmsg))
             exc_type, exc_value, tb = sys.exc_info()
             return exc_type, exc_value, traceback.extract_tb(tb)
     except Exception as e:

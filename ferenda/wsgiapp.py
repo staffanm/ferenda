@@ -473,11 +473,13 @@ class WSGIApp(object):
             environ['QUERY_STRING'], idx)
         ac_query = environ['QUERY_STRING'].endswith("_ac=true")
         exclude_types = environ.get('exclude_types', None)
+        boost_types = environ.get('boost_types', None)
         res, pager = idx.query(q=q,
                                pagenum=pagenum,
                                pagelen=pagelen,
                                ac_query=ac_query,
                                exclude_types=exclude_types,
+                               boost_types=boost_types,
                                **param)
         mangled = self.mangle_results(res, ac_query)
         # 3.1 create container for results
@@ -670,7 +672,7 @@ class WSGIApp(object):
         queryparams = OrderedDict(parse_qsl(querystring))
         return queryparams
     
-    def _search_run_query(self, queryparams):
+    def _search_run_query(self, queryparams, boost_types=None):
         idx = FulltextIndex.connect(self.config.indextype,
                                     self.config.indexlocation,
                                     self.repos)
@@ -692,7 +694,7 @@ class WSGIApp(object):
         for x in ('q', 'p'):
             if x in qpcopy:
                 del qpcopy[x]
-        res, pager = idx.query(query, pagenum=pagenum, **qpcopy)
+        res, pager = idx.query(query, pagenum=pagenum, boost_types=boost_types, **qpcopy)
         return res, pager
 
 

@@ -640,8 +640,8 @@ class RemoteIndex(FulltextIndex):
             res = requests.get(self.location + relurl)
         return self._decode_count_result(res)
 
-    def query(self, q=None, pagenum=1, pagelen=10, ac_query=False, exclude_types=None, **kwargs):
-        relurl, payload = self._query_payload(q, pagenum, pagelen, ac_query, exclude_types, **kwargs)
+    def query(self, q=None, pagenum=1, pagelen=10, ac_query=False, exclude_types=None, boost_types=None, **kwargs):
+        relurl, payload = self._query_payload(q, pagenum, pagelen, ac_query, exclude_types, boost_types, **kwargs)
         if payload:
             # print("query: POST %s:\n%s" % (self.location + relurl, payload))
             res = requests.post(self.location + relurl, payload)
@@ -793,7 +793,7 @@ class ElasticSearchIndex(RemoteIndex):
         self._writer.write(b"\n")
 
     def _query_payload(self, q, pagenum=1, pagelen=10, ac_query=False,
-                       exclude_types=None, **kwargs):
+                       exclude_types=None, boost_types=None, **kwargs):
         if kwargs.get("type"):
             types = [kwargs.get("type")]
         else:
@@ -876,6 +876,9 @@ class ElasticSearchIndex(RemoteIndex):
                                        "inner_hits": inner_hits,
                                        "query": {"simple_query_string": deepcopy(match)}
                         }})
+                if boost_types:
+                    for _type, boost in boost_types:
+                        submatches.append({"term": {"_type": {"value": _type, "boost": boost}}})
                 match = {"bool": {"should": submatches}}
             else:
                 # ac_query -- need to work in inner_hits somehow

@@ -188,6 +188,7 @@ class WSGIApp(OrigWSGIApp):
         ac_query = environ['QUERY_STRING'].endswith("_ac=true")
         if ac_query:
             environ['exclude_types'] = ('mediawiki', 'mediawiki_child')
+        # environ['boost_types'] = [('sfs', 10)]
         res = super(WSGIApp, self).query(environ)
         if ac_query:
             return res['items']
@@ -219,7 +220,8 @@ class WSGIApp(OrigWSGIApp):
             y = int(queryparams['issued'])
             queryparams['issued'] = Between(datetime(y, 1, 1),
                                             datetime(y, 12, 31, 23, 59, 59))
-        res, pager = self._search_run_query(queryparams)
+        boost_types = [("sfs", 10)]
+        res, pager = self._search_run_query(queryparams, boost_types=boost_types)
         if y:
             queryparams['issued'] = str(y)
 
