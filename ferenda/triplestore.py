@@ -448,7 +448,10 @@ class RemoteStore(TripleStore):
         else:
             headers['Accept'] = self._contenttype[format]
         try:
-            results = requests.get(url, headers=headers, data=query)
+            try:
+                results = requests.get(url, headers=headers, data=query)
+            except UnicodeEncodeError:
+                results = requests.get(url, headers=headers, data=query.encode("utf-8"))
             results.raise_for_status()
             if format == "python":
                 return self._sparql_results_to_list(results.content)

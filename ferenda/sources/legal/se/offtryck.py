@@ -380,7 +380,7 @@ class Offtryck(SwedishLegalSource):
             raise DocumentSkippedError("%s: Skipped because of options.py" % basefile,
                                        dummyfile=self.store.parsed_path(basefile))
         elif options == "metadataonly":
-            return Preformatted("Dokumentttext saknas (se originaldokument)")
+            return Body([Preformatted("Dokumenttext saknas (se originaldokument)")])
         # elif options == "simple":
         #     do something else smart
 

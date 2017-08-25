@@ -28,6 +28,8 @@ class KeywordStore(DocumentStore):
     def basefile_to_pathfrag(self, basefile):
         # Shard all files under initial letter, eg "Avtal" => "A/Avtal"
         first = basefile[0]
+        # then encode ":" because it messes with the filesystem (maybe?)
+        basefile = basefile.replace(":", "%3A")
         return "%s/%s" % (first, basefile)
 
     def pathfrag_to_basefile(self, pathfrag):
@@ -35,7 +37,7 @@ class KeywordStore(DocumentStore):
         # strings in NFD (decompsed), ie 'å' is split into 'a' and
         # COMBINING CHARACTER RING (or whatever it's called. We need
         # them in NFC, where 'å' is a single character.
-        pathfrag = unicodedata.normalize("NFC", pathfrag)
+        pathfrag = unicodedata.normalize("NFC", pathfrag).replace("%3A",":")
         first, basefile = pathfrag.split("/", 1)
         return basefile
 

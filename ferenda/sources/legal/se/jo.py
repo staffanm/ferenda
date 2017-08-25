@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 
 # My own stuff
 from ferenda import FSMParser, DocumentEntry
-from ferenda import decorators
+from ferenda import decorators, util
 from ferenda.elements import Body, Paragraph
 from ferenda.errors import DownloadError
 from . import RPUBL
@@ -166,8 +166,8 @@ class JO(FixedLayoutSource):
                                "Diarienummer": 'rpubl:diarienummer'}.items():
                 labelnode = rawhead.find(text=re.compile("%s:" % label))
                 if labelnode:
-                    d[key] = labelnode.next_sibling.text.strip()
-            d["dcterms:title"] = rawhead.find("h2").text.strip()
+                    d[key] = util.normalize_space(labelnode.next_sibling.text)
+            d["dcterms:title"] = util.normalize_space(rawhead.find("h2").text)
         return d
 
 
@@ -188,6 +188,8 @@ class JO(FixedLayoutSource):
                     kwargs = {'lang': getattr(subnode, 'lang', None),
                               'datatype': getattr(subnode, 'datatype', None)}
                     for s in subnode:
+                        if doc.meta.value(URIRef(doc.uri), subnode.predicate):
+                            continue
                         l = Literal(s, **kwargs)
                         meta.add((URIRef(doc.uri), subnode.predicate, l))
                     node.remove(subnode)
@@ -195,7 +197,9 @@ class JO(FixedLayoutSource):
                     helper(subnode, meta)
         helper(doc.body, doc.meta)
         d = doc.meta.value(URIRef(doc.uri), RPUBL.avgorandedatum)
-        if d:
+        # only use the dcterms:issued value from the document if we
+        # don't already have one from the metadata
+        if d and not doc.meta.value(URIRef(doc.uri), DCTERMS.issued):
             doc.meta.add((URIRef(doc.uri), DCTERMS.issued, d))
 
     def tokenize(self, reader):
