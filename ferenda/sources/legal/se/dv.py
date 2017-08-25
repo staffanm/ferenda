@@ -1281,13 +1281,13 @@ class DV(SwedishLegalSource):
 
     @cached_property
     def rattsfall_parser(self):
-        return SwedishCitationParser(LegalRef(LegalRef.RATTSFALL),
+        return SwedishCitationParser(LegalRef(LegalRef.RATTSFALL, LegalRef.EURATTSFALL),
                                      self.minter,
                                      self.commondata)
 
     @cached_property
     def lagrum_parser(self):
-        return SwedishCitationParser(LegalRef(LegalRef.LAGRUM),
+        return SwedishCitationParser(LegalRef(LegalRef.LAGRUM, LegalRef.EULAGSTIFTNING),
                                        self.minter,
                                        self.commondata)
 
@@ -1393,11 +1393,11 @@ class DV(SwedishLegalSource):
             # (links, linktexts and unlinked text)
             elif label == "Lagrum":
                 for i in value:  # better be list not string
-                    if (re.search("\d+/\d+/(EU|EG|EEG)", i) or
-                        re.search("\((EU|EG|EEG)\) nr \d+/\d+", i) or
-                        " direktiv" in i or " förordning" in i):
-                        self.log.warning("%s(%s): Lagrum ref to EULaw: '%s'" %
-                                         (head.get("Referat"), head.get("Målnummer"), i))
+#                    if (re.search("\d+/\d+/(EU|EG|EEG)", i) or
+#                        re.search("\((EU|EG|EEG)\) nr \d+/\d+", i) or
+#                        " direktiv" in i or " förordning" in i):
+#                        self.log.warning("%s(%s): Lagrum ref to EULaw: '%s'" %
+#                                         (head.get("Referat"), head.get("Målnummer"), i))
                     self._bodymeta[label].append(self.lagrum_parser.parse_string(i,
                                                  predicate="rpubl:lagrum"))
             elif label == "Rättsfall":
