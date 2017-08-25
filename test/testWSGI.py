@@ -217,10 +217,13 @@ class Fileserving(WSGI):
     def test_not_found(self):
         self.env['PATH_INFO'] = '/nonexistent'
         status, headers, content = self.call_wsgi(self.env)
-        msg = '<h1>404</h1>\n\nThe path /nonexistent not found at %s/nonexistent.\n\nExamined 1 repos.\n\n<pre>base: (unknown reason)\n</pre>\n' % self.datadir
+        # 404 pages now come with a full set of chrome, not suitable
+        # for a byte-for-byte comparison. Just chech that the status
+        # is 404.
+        content = None 
         self.assertResponse("404 Not Found",
                             {'Content-Type': 'text/html; charset=utf-8'},
-                            msg.encode(),
+                            None,
                             status, headers, content)
 
 
@@ -262,6 +265,7 @@ class API(WSGI):
                 'pagenum': 1,
                 'pagelen': 10,
                 'ac_query': False,
+                'boost_types': None,
                 'exclude_types': None}
         with patch('ferenda.wsgiapp.FulltextIndex', **config):
             status, headers, content = self.call_wsgi(self.env)
@@ -289,6 +293,7 @@ class API(WSGI):
                 'pagenum': 1,
                 'pagelen': 10,
                 'ac_query': False,
+                'boost_types': None,
                 'exclude_types': None}
 
         with patch('ferenda.wsgiapp.FulltextIndex', **config):
