@@ -1468,10 +1468,11 @@ class DV(SwedishLegalSource):
                             dummy = dummy.split("/",3)[-1].split(".")[0]
                         except:
                             pass # just use dummy as-is
-                        raise DuplicateReferatDoc(dummy, dummyfile=self.store.parsed_path(doc.basefile))
-                        # append_path = False
+                        if doc.basefile != dummy:
+                            raise DuplicateReferatDoc(dummy, dummyfile=self.store.parsed_path(doc.basefile))
                         # self.log.warning("%s: Not appending path %s to uri.map" % (doc.basefile, path))
-                        # break
+                        append_path = False
+                        break
         if append_path:
             with codecs.open(mapfile, "a", encoding="utf-8") as fp:
                 if self.config.mapfiletype == "nginx":

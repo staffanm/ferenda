@@ -1366,7 +1366,11 @@ class LegalRef:
         attributes['year'] = year
         attributes['serial'] = '%04d' % int(attributes['serial'])
         attributes['descriptor'] = descriptormap[attributes['decision']]
-        res = self.attributes_to_resource(attributes)
+        # FIXME: the COIN urispace definition can't handle rdf
+        # properties for year/serial/descriptor, only the composite
+        # celexNumber -- so we create that here instead.
+        celexnumber = "6%(year)sC%(descriptor)s%(serial)s" % (attributes)
+        res = self.attributes_to_resource({'celex': celexnumber})
         return self.minter.space.coin_uri(res)
 
     #
