@@ -9,7 +9,7 @@ from bz2 import BZ2File
 from collections import OrderedDict
 from difflib import unified_diff
 from itertools import islice
-from io import BytesIO
+from io import BytesIO, StringIO
 from tempfile import mkstemp
 from operator import attrgetter
 import codecs
@@ -31,9 +31,9 @@ from ferenda.thirdparty.patchit import PatchSet, PatchSyntaxError, PatchConflict
 
 from ferenda.compat import Mock
 from ferenda import (TextReader, TripleStore, FulltextIndex, WSGIApp,
-                     DocumentRepository, CompositeRepository,
-                     DocumentEntry, Transformer, RequestHandler,
-                     ResourceLoader)
+                     Document, DocumentRepository,
+                     CompositeRepository, DocumentEntry, Transformer,
+                     RequestHandler, ResourceLoader)
 from ferenda.elements import serialize
 from ferenda.elements.html import Body, P, H1, H2, Form, Textarea, Input, Label, Button, Textarea, Br, Div, A, Pre
 from ferenda import decorators, util
@@ -61,32 +61,31 @@ class DevelHandler(RequestHandler):
             else:
                 params = dict(parse_qsl(environ['QUERY_STRING']))
             body = self.handle_patch(environ, params)
-            res = self._render("mkpatch", body, request_uri(environ))
+            res = self._render("mkpatch", body, request_uri(environ), self.repo.config)
             length = len(res)
             fp = BytesIO(res)
             return fp, length, 200, "text/html"
         else:
             raise ValueError("DevelHandler can't handle path %s" % environ['PATH_INFO'])
 
-    def _render(self, title, body, uri, template="xsl/generic.xsl", datadir="data", develurl=None):
-        fakerepo = DocumentRepository(datadir=datadir)
-        doc = fakerepo.make_document()
+    def _render(self, title, body, uri, config, template="xsl/generic.xsl"):
+        repo = DocumentRepository(config=config)
+        doc = repo.make_document()
         doc.uri = uri
         doc.meta.add((URIRef(doc.uri),
                       DCTERMS.title,
                       Literal(title, lang="sv")))
         doc.body = body
-        xhtml = fakerepo.render_xhtml_tree(doc)
-        documentroot = 'data' # FIXME: find out this in a proper way
-        conffile = os.sep.join([datadir, 'rsrc',
+        xhtml = repo.render_xhtml_tree(doc)
+        documentroot = repo.config.datadir
+        conffile = os.sep.join([documentroot, 'rsrc',
                                 'resources.xml'])
         transformer = Transformer('XSLT', template, "xsl",
-                                  resourceloader=fakerepo.resourceloader,
+                                  resourceloader=repo.resourceloader,
                                   config=conffile)
         urltransform = None
-        if develurl:
-            urltransform = fakerepo.get_url_transform_func(
-                develurl=develurl)
+        if repo.config.develurl:
+            urltransform = repo.get_url_transform_func(develurl=repo.config.develurl)
         depth = len(doc.uri.split("/")) - 3
         tree = transformer.transform(xhtml, depth,
                                      uritransform=urltransform)
@@ -107,6 +106,11 @@ class DevelHandler(RequestHandler):
                 outfile = repo.store.downloaded_path(basefile)
             fp = opener(outfile, mode)
             return fp
+        def format_exception():
+            exc_type, exc_value, tb = sys.exc_info()
+            tblines = traceback.format_exception(exc_type, exc_value, tb)
+            tbstr = "\n".join(tblines)
+            return tbstr
 
         if not params:
             # start page: list available patches maybe? form with repo names and textbox for basefile?
@@ -131,21 +135,49 @@ class DevelHandler(RequestHandler):
             patchstore = repo.documentstore_class(repo.config.patchdir +
                                                   os.sep + repo.alias)
             patchpath = patchstore.path(basefile, "patches", ".patch")
-            descpath = patchstore.path(basefile, "patches", ".desc")
             if environ['REQUEST_METHOD'] == 'POST':
-                fp = open_intermed_text(repo, basefile, mode="wb")
+                # fp = open_intermed_text(repo, basefile, mode="wb")
                 # FIXME: Convert CRLF -> LF. We should determine from
                 # existing intermed file what the correct lineending
                 # convention is
-                fp.write(params['filecontents'].replace("\r\n", "\n").encode(repo.source_encoding))
-                fp.close()
-                self.repo.mkpatch(alias, basefile, params['description'])
-                patchcontent = util.readfile(patchpath)
-                res = Body([
-                    Div([
-                        H2(["patch generated at %s" % patchpath]),
-                        P("Contents of the new patch"),
-                        Pre([util.readfile(patchpath)])])])
+                # fp.write(params['filecontents'].replace("\r\n", "\n").encode(repo.source_encoding))
+                # fp.close()
+                self.repo.mkpatch(repo, basefile, params.get('description',''),
+                                  params['filecontents'].replace("\r\n", "\n"))
+                log = []
+                if params.get('parse') == "true":
+                    repo.config.force = True
+                    log.append(P(["Parsing %s" % basefile]))
+                    try:
+                        repo.parse(basefile)
+                        log.append(P(["Parsing successful"]))
+                    except Exception:
+                        log.append(Pre([format_exception()]))
+                        params['generate'] = "false"
+
+                if params.get('generate') == "true":
+                    repo.config.force = True
+                    repo.generate(basefile)
+                    log.append(P(["Generating %s" % basefile]))
+                    try:
+                        repo.generate(basefile)
+                        log.append(P(["Generation successful: ",
+                                     A([basefile], href=repo.canonical_uri(basefile))]))
+                    except Exception:
+                        log.append(Pre([format_exception()]))
+
+                if os.path.exists(patchpath):
+                    patchcontent = util.readfile(patchpath)
+                    res = Body([
+                        Div([
+                            H2(["patch generated at %s" % patchpath]),
+                            P("Contents of the new patch"),
+                            Pre([util.readfile(patchpath)])]),
+                        Div(log)])
+                else:
+                    res = Body([
+                        Div([H2(["patch was not generated"])]),
+                        Div(log)])
                 return res
             else:
                 print("load up intermediate file, display it in a textarea + textbox for patchdescription")
@@ -164,8 +196,6 @@ class DevelHandler(RequestHandler):
                             text = "\n".join(ps.patches[0].merge(text.split("\n")))
                             if ps.patches[0].hunks[0].comment:
                                 patchdescription = ps.patches[0].hunks[0].comment
-                            elif os.path.exists(descpath):
-                                patchdescription = util.readfile(descpath)
                             else:
                                 patchdescription = ""
                             instructions = Div([
@@ -174,14 +204,11 @@ class DevelHandler(RequestHandler):
                                 P("Contents of that patch, for reference"),
                                 Pre([util.readfile(patchpath)])])
                         except (PatchSyntaxError, PatchConflictError) as e:
-                            exc_type, exc_value, tb = sys.exc_info()
-                            tblines = traceback.format_exception(exc_type, exc_value, tb)
-                            tbstr = "\n".join(tblines)
                             instructions = Div([
                                 P(["Existing patch at %s could not be applied (" % patchpath,
                                    A("ignore existing patch", href=ignorepatchlink), ")"]),
                                 P("The error was:"),
-                                Pre([tbstr])
+                                Pre([format_exception()])
                                 ])
                             patchdescription = ""
                 else:
@@ -197,7 +224,7 @@ class DevelHandler(RequestHandler):
                         Form([Textarea(["\n"+text], **{'id': 'filecontents',
                                                   'name': 'filecontents',
                                                   'cols': '80',
-                                                  'rows': '60',
+                                                  'rows': '30',
                                                   'class': 'form-control'}),
                               Br(),
                               Div([
@@ -207,6 +234,26 @@ class DevelHandler(RequestHandler):
                                            'value': patchdescription,
                                            'class': 'form-control'})
                                   ], **{'class': 'form-group'}),
+                              Div([
+                                  Label([
+                                      Input(**{'type': 'checkbox',
+                                               'id': 'parse',
+                                               'name': 'parse',
+                                               'checked': 'checked',
+                                               'value': 'true',
+                                               'class': 'form-check-input'}),
+                                      "Parse resulting file"], **{'class': 'form-check-label'})],
+                                  **{'class': 'form-check'}),
+                              Div([
+                                  Label([
+                                      Input(**{'type': 'checkbox',
+                                               'id': 'generate',
+                                               'name': 'generate',
+                                               'checked': 'checked',
+                                               'value': 'true',
+                                               'class': 'form-check-input'}),
+                                      "Generate HTML from results of parse"], **{'class': 'form-check-label'})],
+                                  **{'class': 'form-check'}),
                               Input(id="repo", type="hidden", name="repo", value=alias),
                               Input(id="basefile", type="hidden", name="basefile", value=basefile),
                               Button(["Create patch"], **{'type': 'submit',
@@ -373,7 +420,7 @@ class Devel(object):
 
 
     @decorators.action
-    def mkpatch(self, alias, basefile, description):
+    def mkpatch(self, alias, basefile, description, patchedtext=None):
         """Create a patch file from downloaded or intermediate files. Before
         running this tool, you should hand-edit the intermediate
         file. If your docrepo doesn't use intermediate files, you
@@ -398,9 +445,13 @@ class Devel(object):
 
         """
         # 1. initialize the docrepo indicated by "alias"
-        repo = self._repo_from_alias(alias)
+        # alias might sometimes be the initialized repo so check for that first...
+        if isinstance(alias, str):
+            repo = self._repo_from_alias(alias)
+        else:
+            repo = alias 
         # 2. find out if there is an intermediate file or downloaded
-        # file for basefile. FIXME: unify this with open_intermed_text
+        # file for basefile. FIXME: unify this with open_intermed_patchedtext
         # in handle_patch
         intermediatepath = repo.store.intermediate_path(basefile)
         if repo.config.compress == "bz2":
@@ -412,31 +463,49 @@ class Devel(object):
             stage = "download"
             outfile = repo.store.downloaded_path(basefile)
 
-        # 2.1 stash a copy
-        fileno, stash = mkstemp()
-        with os.fdopen(fileno, "wb") as fp:
-            fp.write(util.readfile(outfile, mode="rb"))
-
-        # 2.1 if intermediate: after stashing a copy of the
-        # intermediate file, delete the original and run
-        # parse(config.force=True) to regenerate the intermediate file
-        if stage == "intermediate":
-            repo.config.force = True
-            util.robust_remove(intermediatepath)
-            try:
-                repo.config.ignorepatch = True
-                repo.parse(basefile)
-                repo.config.ignorepatch = False
-            except:
-                # maybe this throws an error (hopefully after creating
-                # the intermediate file)? may be the reason for
-                # patching in the first place?
-                pass
-
-        # 2.2 if only downloaded: stash a copy, run download_single(config.refresh=True)
+        if patchedtext:
+            # If we provide the new patchedtext as a parameter (assumed to be
+            # unicode patchedtext, not bytestring, the existing intermediate
+            # file is assumed to be untouched
+            patchedtext_lines = patchedtext.split("\n")
+            patchedtext_path = ""
         else:
-            repo.config.refresh = True
-            repo.download_single(basefile)
+            # but if we don't, the existing intermediate file is
+            # assumed to be edited in-place, and we need to stash it
+            # away, then regenerate a pristine version of the
+            # intermediate file
+            fileno, patchedtext_path = mkstemp()
+            with os.fdopen(fileno, "wb") as fp:
+                patchedtext_lines = util.readfile(outfile, encoding=repo.source_encoding).split("\n")
+                fp.write("\n".join(patchedtext_lines), encoding=repo.source_encoding)
+
+            # 2.1 if intermediate: after stashing a copy of the
+            # intermediate file, delete the original and run
+            # parse(config.force=True) to regenerate the intermediate file
+            if stage == "intermediate":
+                repo.config.force = True
+                util.robust_remove(intermediatepath)
+                try:
+                    repo.config.ignorepatch = True
+                    repo.parse(basefile)
+                    repo.config.ignorepatch = False
+                except:
+                    # maybe this throws an error (hopefully after creating
+                    # the intermediate file)? may be the reason for
+                    # patching in the first place?
+                    pass
+            # 2.2 if only downloaded: stash a copy, run download_single(config.refresh=True)
+            else:
+                repo.config.refresh = True
+                repo.download_single(basefile)
+
+        # 2.9 re-add line endings to patchedtext_lines
+        if patchedtext_lines[-1] == "":  # remove last phantom line
+                                         # caused by splitting
+                                         # "foo\nbar\n" -- this should
+                                         # only be two lines!
+            patchedtext_lines.pop()
+        patchedtext_lines = [x + "\n" for x in patchedtext_lines]
 
         # 3. calculate the diff using difflib.
 
@@ -447,16 +516,14 @@ class Devel(object):
         else:
             opener = open
         encoding = repo.source_encoding
-
         with opener(outfile, mode="rb") as fp:
             outfile_lines = [l.decode(encoding) for l in fp.readlines()]
-        with opener(stash, mode="rb") as fp:
-            stash_lines = [l.decode(encoding) for l in fp.readlines()]
         difflines = list(unified_diff(outfile_lines,
-                                      stash_lines,
+                                      patchedtext_lines,
                                       outfile,
-                                      stash))
-        os.unlink(stash)
+                                      patchedtext_path))
+        if patchedtext_path and os.path.exists(patchedtext_path):
+            os.unlink(patchedtext_path)
         # 4. calculate place of patch using docrepo.store.
         patchstore = repo.documentstore_class(repo.config.patchdir +
                                               os.sep + repo.alias)

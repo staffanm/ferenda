@@ -304,7 +304,7 @@ class CompoundElement(AbstractElement, list):
         # type+name for html.Input, and rows+cols for html.Textarea
         for stdattr in ('class', 'id', 'dir', 'lang', 'src',
                         'href', 'name', 'alt', 'role', 'typeof',
-                        'datatype', 'property', 'rel', 'about', 'action', 'method', 'for', 'type', 'name', 'value', 'rows', 'cols'):
+                        'datatype', 'property', 'rel', 'about', 'action', 'method', 'for', 'type', 'name', 'value', 'rows', 'cols', 'checked'):
             if hasattr(self, stdattr) and getattr(self, stdattr):
                 attrs[stdattr] = getattr(self, stdattr)
 

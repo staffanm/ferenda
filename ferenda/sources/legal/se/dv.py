@@ -864,8 +864,11 @@ class DV(SwedishLegalSource):
             done = False
             while not done and iterator:
                 line = iterator[0].get_text().strip()
-                # can possibly be "Not 1a." (RÅ 1994 not 1) or "Not. 109." (RÅ 1998 not 109)
-                if re.match("Not(is|)\.? \d+[abc]?\.? ", line):
+                # can possibly be "Not 1a." (RÅ 1994 not 1) or
+                # "Not. 109." (RÅ 1998 not 109). There might be a
+                # space separating the notis from the next sentence,
+                # but there might also not be!
+                if re.match("Not(is|)\.? \d+[abc]?\.? ?", line):
                     done = True
                     if ". - " in line[:2000]:
                         # Split out "Not 56" and the first
@@ -874,6 +877,9 @@ class DV(SwedishLegalSource):
                         rubr = line.split(". - ", 1)[0]
                         rubr = re.sub("Not(is|)\.? \d+[abc]?\.? ", "", rubr)
                         head['Rubrik'] = rubr
+                    else:
+                        if line.endswith("Notisen har utgått."):
+                            raise errors.DocumentRemovedError(basefile, dummyfile=self.store.parsed_path(basefile))
                 else:
                     tmp = iterator.pop(0)
                     if tmp.get_text().strip():
