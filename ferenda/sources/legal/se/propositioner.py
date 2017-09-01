@@ -548,7 +548,7 @@ class PropTrips(Trips, Offtryck, FixedLayoutSource):
         return attribs
     
     def extract_body(self, fp, basefile):
-        if util.name_from_fp(fp).endswith(".txt"):
+        if util.name_from_fp(fp).endswith((".txt", ".txt.bz2")):
             # fp is opened in bytestream mode
             return TextReader(string=fp.read().decode("utf-8"))
         else:

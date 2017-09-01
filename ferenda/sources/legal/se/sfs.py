@@ -1633,12 +1633,14 @@ class SFS(Trips):
                     shortdesc = m.group()
                     # then, make sure all tags are ended properly
                     soup = BeautifulSoup(shortdesc, "html.parser")
-                    # insert an ellipsis in the right place (the very last NavigableString)
-                    navstrings = list(soup.find_all("p"))
-                    # get the last non-empty NavigableString
-                    navstrings = [x for x in navstrings if "".join(x.strings)]
-                    if navstrings:
-                        navstrings[-1].replace_with(str(navstrings[-1]) + "...")
+                    # insert an ellipsis in the right place (the very last Tag)
+                    tags = list(soup.find_all("p"))
+                    # get the last non-empty Tag
+                    tags = [x for x in tags if "".join(x.strings)]
+                    if tags:
+                        # Take the last string in the tag and append ellipsis
+                        navstring = list(tags[-1].strings)[-1]
+                        navstring.replace_with(str(navstring) + "...")
                     # then convert back to markup and strip any default namespacing
                     shortdesc = str(soup).replace(' xmlns="http://www.w3.org/1999/xhtml"', '')
             link = '<b><a href="%s">%s</a></b>: ' % (row['kommentar'], row['prop'])

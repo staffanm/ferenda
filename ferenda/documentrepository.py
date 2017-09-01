@@ -3184,19 +3184,34 @@ WHERE {
         objects.
 
         """
+        from ferenda import CompositeRepository
         directory = os.path.sep.join((self.config.datadir, self.alias, "entries"))
         for basefile in self.store.list_basefiles_for("news"):
             path = self.store.documententry_path(basefile)
-            entry = DocumentEntry(path)
+            try:
+                entry = DocumentEntry(path)
+            except Exception as e:
+                self.log.warning("%s: Couldn't load entry: %s" % (basefile, e))
+                continue
             dirty = False
             if not entry.published:
                 # not published -> shouldn't be in feed
                 continue
-
+            if entry.status.get('parse', {}).get('success') == "removed":
+                # document has been removed -> shouldn't be in
+                # feed. FIXME: a lot of composite repos have not
+                # updated this field even though they should have
+                continue
             if not os.path.exists(self.store.distilled_path(basefile)):
-                self.log.warning("%s: No distilled file at %s, skipping" %
-                                 (basefile,
-                                  self.store.distilled_path(basefile)))
+
+                if (not isinstance(self, CompositeRepository) and
+                    not (os.path.exists(self.store.downloaded_path(basefile)) or
+                         os.path.exists(self.store.intermediate_path(basefile)))):
+                    self.log.warning("%s: Entry file for %s probably stale" % (self.store.documententry_path(basefile), basefile))
+                else:
+                    self.log.warning("%s: No distilled file at %s, skipping" %
+                                     (basefile,
+                                      self.store.distilled_path(basefile)))
                 continue
             # make sure common (and needed) properties are in fact set
             if not entry.id or ('forceid' in self.config and
