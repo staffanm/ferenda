@@ -142,6 +142,9 @@ class DV(SwedishLegalSource):
             with codecs.open(mapfile + ".new", "w", encoding="utf-8") as fp:
                 paths = set()
                 for f in util.list_dirs(parsed_dir, ".xhtml"):
+                    if not os.path.getsize(f):
+                        # skip empty files
+                        continue
                     # get basefile from f in the simplest way
                     basefile = f[len(parsed_dir) + 1:-6]
                     head = codecs.open(f, encoding='utf-8').read(1024)
