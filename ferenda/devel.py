@@ -477,7 +477,7 @@ class Devel(object):
             fileno, patchedtext_path = mkstemp()
             with os.fdopen(fileno, "wb") as fp:
                 patchedtext_lines = util.readfile(outfile, encoding=repo.source_encoding).split("\n")
-                fp.write("\n".join(patchedtext_lines), encoding=repo.source_encoding)
+                fp.write("\n".join(patchedtext_lines).encode(repo.source_encoding))
 
             # 2.1 if intermediate: after stashing a copy of the
             # intermediate file, delete the original and run
