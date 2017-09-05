@@ -1,0 +1,10 @@
+--- data/sfs/intermediate/2010/110.txt.bz2
++++ 
+@@ -5631,6 +5631,7 @@ Korrigering av styckeindelning i 28:6
+ 
+ 3. är egenföretagare och har en sjukpenninggrundande inkomst som
+ består av endast inkomst av annat förvärvsarbete.
++
+ Om sjukpenning till en familjehemsförälder ska beräknas på
+ grundval av en sjukpenninggrundande inkomst som omfattar
+ ersättning för vården, ska sjukpenning som motsvarar denna

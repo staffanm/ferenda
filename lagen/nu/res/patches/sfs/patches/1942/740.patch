@@ -1,0 +1,17 @@
+--- data/sfs/intermediate/1942/740.txt.bz2
++++ 
+@@ -9594,11 +9594,14 @@ Korrigerat formattering av 54:8
+ invändningen mot tingsrättens behörighet grundas på en
+ omständighet som högre rätt självmant skall beakta vid ett
+ överklagande. Lag (1994:1034).
++
+ 8 § Ett beslut får inte överklagas, om hovrätten i beslutet
++
+ 1. prövat en fråga om jäv mot domare i tingsrätt,
+ 
+ 2. prövat en till hovrätten överklagad fråga som avses i 49 kap. 5 §
+ 7 eller 9 eller 7 § eller
++
+ 3. meddelat prövningstillstånd. Lag (1994:1034).
+ 
+ 9 § Prövningstillstånd krävs för att Högsta domstolen skall

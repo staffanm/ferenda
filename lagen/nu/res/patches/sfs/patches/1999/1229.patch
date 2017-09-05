@@ -1,0 +1,54 @@
+--- data/sfs/intermediate/1999/1229.txt.bz2
++++ 
+@@ -14954,6 +14954,7 @@ Korrigerad formattering av strecksatslistor i 44:12-13, styckeindelning i 44:21 samt tabell i 63:3
+ underliggande tillgångar eller av kursindex eller liknande.
+ 
+ 12 § Med option avses en rätt för innehavaren att
++
+ - förvärva eller avyttra aktier, obligationer eller andra
+ tillgångar till ett bestämt pris, eller
+ 
+@@ -14965,6 +14966,7 @@
+ Huvudregel
+ 
+ 13 § Kapitalvinsten ska beräknas som skillnaden mellan
++
+ - ersättningen för den avyttrade tillgången eller för den
+ utfärdade förpliktelsen minskad med utgifterna för avyttringen
+ eller utfärdandet, och
+@@ -15033,6 +15035,7 @@
+ avyttrats vid tidpunkten för utnyttjandet. Lag (2007:1419).
+ 
+ Tillgångar som förvärvas genom arv, gåva m.m.
++
+ 21 § Om en tillgång förvärvas genom arv, testamente, gåva,
+ bodelning eller på liknande sätt, inträder förvärvaren i den
+ tidigare ägarens skattemässiga situation.
+@@ -20375,15 +20378,19 @@
+                                 procent av det belopp med vilket
+                                 den fastställda förvärvsinkomsten
+                                 överstiger 0,99 prisbasbelopp
++
+ överstiger 2,72 men inte
+ 3,11 prisbasbelopp              0,77 prisbasbelopp
++
+ överstiger 3,11 men inte
+ 7,88 prisbasbelopp              0,77 prisbasbelopp minskat med
+                                 10 procent av det belopp med
+                                 vilket den fastställda
+                                 förvärvsinkomsten överstiger
+                                 3,11 prisbasbelopp
++
+ överstiger 7,88 prisbasbelopp   0,293 prisbasbelopp
++
+ Lag (2011:1256).
+ 
+ 3 a § För dem som vid beskattningsårets ingång har fyllt 65
+@@ -20428,6 +20435,7 @@
+ 
+ överstiger 12,43
+ prisbasbelopp                   0,422 prisbasbelopp
++
+ Lag (2015:775).
+ 
+ 4 § För dem som är obegränsat skattskyldiga bara under en del

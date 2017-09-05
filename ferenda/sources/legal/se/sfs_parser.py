@@ -738,9 +738,10 @@ def make_parser(reader, basefile, log, trace):
                 "isRubrik (%s): starts with lower-case" % (p[:50]))
             return False
 
-        # trace['rubrik'].debug("isRubrik: p=%s" % p)
-        # it shouldn't be too long, but some headlines are insanely verbose
-        if len(p) > 110:
+        # trace['rubrik'].debug("isRubrik: p=%s" % p) it shouldn't be
+        # too long, but some headlines are insanely verbose (the
+        # longest found yet is above 2:15 IL
+        if len(p) > 135:
             trace['rubrik'].debug("isRubrik (%s): too long" % (p[:50]))
             return False
 
