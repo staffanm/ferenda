@@ -47,9 +47,10 @@ class MyndFskrHandler(RequestHandler):
             # FIXME: Maybe the first segment isn't always equal to the
             # correct repo name?
             params["repo"] = environ["PATH_INFO"].split("/")[1]
-            params["dir"] = "downloaded"
-            # ".../sid4.png" => "3" (because 0-based) 
-            params["page"] = str(int(environ["PATH_INFO"].split("/sid")[1][:-4])-1)
+            if "dir" not in params:
+                params["dir"] = "downloaded"
+                # ".../sid4.png" => "3" (because 0-based) 
+                params["page"] = str(int(environ["PATH_INFO"].split("/sid")[1][:-4])-1)
             params["format"] = suffix
         return super(MyndFskrHandler, self).get_pathfunc(environ, basefile, params, contenttype, suffix)
 

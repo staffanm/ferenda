@@ -284,7 +284,6 @@ class RequestHandler(object):
                         cmdline = "pdftoppm -f %s -singlefile -png %s %s" % (int(params["page"])+1, sourcefile, outfile.replace(".png",".tmp"))
                         util.runcmd(cmdline, require_success=True)
                         cmdline = "convert %s -trim %s" % (outfile.replace(".png", ".tmp.png"), outfile)
-                        print("running %s" % cmdline)
                         util.runcmd(cmdline, require_success=True)
                         os.unlink(outfile.replace(".png", ".tmp.png"))
                 except Exception as e:

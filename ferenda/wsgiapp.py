@@ -90,7 +90,7 @@ class WSGIApp(object):
             path = path.decode("utf-8")
         url = request_uri(environ)
         qs = environ['QUERY_STRING']
-        self.log.info("Starting process for %s (path_info=%s, query_string=%s)" % (url, path, environ['QUERY_STRING']))
+        # self.log.info("Starting process for %s (path_info=%s, query_string=%s)" % (url, path, environ['QUERY_STRING']))
         # FIXME: routing infrastructure -- could be simplified?
         try:
             if path.startswith(self.config.searchendpoint):
