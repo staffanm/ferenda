@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2016-12-03T22:05:29.938361
+# Automatically transformed from sources at 2017-09-11T07:31:56.591585
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -169,11 +169,6 @@
     owl:sameAs <http://rinfo.lagrummet.se/serie/rf/ad> ;
     skos:altLabel "AD"@sv ;
     skos:prefLabel "Arbetsdomstolen"@sv .
-
-<https://lagen.nu/dataset/pmod> a rpubl:Rattsfallspublikation ;
-    owl:sameAs <http://rinfo.lagrummet.se/serie/rf/pmd> ;
-    skos:altLabel "PMÖD"@sv ;
-    skos:prefLabel "Patent- och marknadsöverdomstolen"@sv .
 
 <https://lagen.nu/dataset/affs> a rpubl:Forfattningssamling ;
     dcterms:publisher <https://lagen.nu/org/2014/arbetsformedlingen> ;
@@ -641,6 +636,11 @@
     skos:altLabel "PFS"@sv ;
     skos:prefLabel "Pensionsmyndighetens författningssamling"@sv .
 
+<https://lagen.nu/dataset/pmod> a rpubl:Rattsfallspublikation ;
+    owl:sameAs <http://rinfo.lagrummet.se/serie/rf/pmd> ;
+    skos:altLabel "PMÖD"@sv ;
+    skos:prefLabel "Patent- och marknadsöverdomstolen"@sv .
+
 <https://lagen.nu/dataset/prvfs> a rpubl:Forfattningssamling ;
     dcterms:publisher <https://lagen.nu/org/2014/patent-_och_registreringsverket> ;
     rdfs:seeAlso <http://www.prv.se/om_prv/styrdokument/forfattningssamling/start.html> ;
@@ -820,6 +820,9 @@
     skos:prefLabel "Statens offentliga utredningar"@sv .
 
 <https://lagen.nu/dataset/srvfs> a rpubl:Forfattningssamling ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/mfbfs> ;
+    dcterms:publisher <https://lagen.nu/org/2016/statens-raddningsverk> ;
+    rdfs:comment "Har ersatts av MSBFS."@sv ;
     rdfs:seeAlso <http://www.srv.se/templates/SRV_AreaPage____524.aspx> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/srvfs> ;
     skos:altLabel "SRVFS"@sv ;
@@ -1037,8 +1040,8 @@
     foaf:name "Kulturdepartementet"@sv .
 
 <https://lagen.nu/org/2008/marknadsdomstolen> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/marknadsdomstolen> ;
     rdfs:comment "Ersatt av patent- och marknadsöverdomstolen?"@sv ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/marknadsdomstolen> ;
     foaf:name "Marknadsdomstolen"@sv .
 
 <https://lagen.nu/org/2008/migrationsoverdomstolen> a foaf:Organization ;
@@ -1379,9 +1382,9 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/lantbruksstyrelsen> ;
     foaf:name "Lantbruksstyrelsen"@sv .
 
-<https://lagen.nu/org/2016/statens-raddningsverk> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/statens_raeddningsverk> ;
-    foaf:name "Statens räddningsverk"@sv .
+<https://lagen.nu/org/2017/patent-_och_marknadsoverdomstolen> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/patent-_och_marknadsöverdomstolen> ;
+    foaf:name "Patent- och marknadsöverdomstolen"@sv .
 
 <https://lagen.nu/org/2008/domstolsverket> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/domstolsverket> ;
@@ -1775,6 +1778,10 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/myndigheten_foer_press_radio_och_tv> ;
     foaf:name "Myndigheten för press, radio och tv"@sv .
 
+<https://lagen.nu/org/2016/statens-raddningsverk> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/statens_raeddningsverk> ;
+    foaf:name "Statens räddningsverk"@sv .
+
 <https://lagen.nu/org/2008/forsakringskassan> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/foersaekringskassan> ;
     foaf:name "Försäkringskassan"@sv .
@@ -1803,6 +1810,3 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/statens_jordbruksverk> ;
     foaf:name "Statens jordbruksverk"@sv .
 
-<https://lagen.nu/org/2017/patent-_och_marknadsoverdomstolen> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/patent-_och_marknadsöverdomstolen> ;
-    foaf:name "Patent- och marknadsöverdomstolen"@sv .

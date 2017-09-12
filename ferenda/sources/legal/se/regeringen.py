@@ -214,7 +214,7 @@ class Regeringen(Offtryck):
                 return
         filename = self.store.downloaded_path(basefile)  # just the html page
         updated = filesupdated = False
-        created = not os.path.exists
+        created = not os.path.exists(filename)
         if (not os.path.exists(filename) or self.config.refresh):
             existed = os.path.exists(filename)
             updated = self.download_if_needed(url, basefile, filename=filename)

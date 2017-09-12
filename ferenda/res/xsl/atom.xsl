@@ -11,7 +11,6 @@ Note: this template expects Atom 1.0, outputs HTML5
 		xmlns:dcterms="http://purl.org/dc/terms/"
 		xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
-		xml:space="preserve"
 		exclude-result-prefixes="xhtml rdf atom">
 
   <xsl:include href="base.xsl"/>
@@ -33,13 +32,33 @@ Note: this template expects Atom 1.0, outputs HTML5
       <xsl:call-template name="htmlbody"/>
     </html>
   </xsl:template>
-  
+
+  <xsl:template name="convert-linebreaks">
+    <xsl:param name="plaintext" select="."/>
+    <xsl:choose><xsl:when test="not(contains($plaintext, '&#xA;'))">
+	<xsl:value-of select="$plaintext"/>
+      </xsl:when>
+      <xsl:otherwise>
+	<xsl:value-of select="substring-before($plaintext, '&#xA;')"/>
+	<br />
+	<xsl:call-template name="convert-linebreaks">
+          <xsl:with-param name="plaintext" select="substring-after($plaintext, '&#xA;')"/>
+	</xsl:call-template>
+      </xsl:otherwise>
+    </xsl:choose>
+  </xsl:template>  
+
   <xsl:template match="atom:entry">
     <section>
       <a href="{atom:id}"><h2><xsl:value-of select="atom:title"/></h2></a>
-      <small><xsl:value-of select="substring(atom:published,1,10)"/> <xsl:value-of select="substring(atom:published,12,5)"/></small>
+      <!-- just include the date, not the time, in the human-readable version -->
+      <small><xsl:value-of select="substring(atom:published,1,10)"/></small>
       <p>
-	<xsl:value-of select="atom:summary" disable-output-escaping="yes"/>
+	<!-- summary is a plaintext tag. Convert linebreaks to <br/>
+	     tags when displaying in HTML -->
+	<xsl:call-template name="convert-linebreaks">
+	  <xsl:with-param name="plaintext" select="atom:summary"/>
+	</xsl:call-template>
       </p>
     </section>
   </xsl:template>

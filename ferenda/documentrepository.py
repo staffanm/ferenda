@@ -2128,7 +2128,8 @@ parsed document path to that documents dependency file."""
                 os.path.exists(cachepath) and
                 util.outfile_is_newer([dumppath], cachepath)):
             self.log.debug("Loading faceted_data from %s" % cachepath)
-            data = json.load(open(cachepath))
+            hook = util.make_json_date_object_hook('dcterms_issued')
+            data = json.load(open(cachepath), object_hook=hook)
         else:
             data = self.facet_select(self.facet_query(self.dataset_uri()))
             # make sure the dataset contains no duplicate entries --
@@ -2153,7 +2154,7 @@ parsed document path to that documents dependency file."""
             util.ensure_dir(cachepath)
             with open(cachepath, "w") as fp:
                 self.log.debug("Saving faceted_data to %s" % cachepath)
-                s = json.dumps(data, indent=4, separators=(', ', ': '))
+                s = json.dumps(data, indent=4, separators=(', ', ': '), default=util.json_default_date)
                 fp.write(s)
             if os.path.getsize(cachepath) == 0:
                 util.robust_remove(cachepath)
@@ -2933,7 +2934,6 @@ WHERE {
         repository.
 
         """
-
         feedindex = self.store.resourcepath("news/main.atom")
         faceted_data = self.store.resourcepath("toc/faceted_data.json")
         if (not self.config.force) and util.outfile_is_newer([faceted_data], feedindex):
@@ -2941,7 +2941,7 @@ WHERE {
             return
 
         params = {}
-        # faceted_data employs caching
+        # news_facet_entries employs caching
         with util.logtime(self.log.debug,
                           "news: selected %(rowcount)s decorated rows (%(elapsed).3f sec)",
                           params):
@@ -3021,8 +3021,12 @@ WHERE {
                 # where the browser-ready file is published wich may or
                 # may not be identical to the canonical URI of the
                 # document).
+                #
+                # also, orig_updated (the date when the source doc was
+                # last updated) might be more interesting than updated
+                # (the last time anything happended with the entry)
                 for prop in ('updated', 'published', 'basefile', 'title',
-                             'summary', 'content', 'link', 'url'):
+                             'summary', 'content', 'link', 'url', 'orig_updated', 'orig_created'):
                     d[prop] = getattr(entry, prop)
                 ret.append(d)
             ret = sorted(ret, key=keyfunc, reverse=reverse)
@@ -3100,6 +3104,17 @@ WHERE {
 
         return res
 
+    def news_entrysort_key(self):
+        """Return a function that can act as a keyfunc in a sorted() call to
+        sort your entries in whatever way suitable. The keyfunc takes
+        three values (row, binding, resource_graph).
+
+        Only really used for the main feedset? The other feedsets,
+        based on facets, use that facets keyfunc.
+
+        """
+        return lambda row, binding, resource_graph: row[self.news_sortkey]        
+
     def news_select_for_feeds(self, data, feedsets, facets):
         """Go through all data rows (each row representing a document)
         and, for each newsfeed, select those document entries that are to
@@ -3125,7 +3140,7 @@ WHERE {
             facets.append(Facet(rdftype=RDFS.Resource,  # all the things
                                 identificator=lambda x, y, z: None,
                                 selector=lambda x, y, z: None,
-                                key=lambda row, binding, resource_graph: row[self.news_sortkey],
+                                key=self.news_entrysort_key(),
                                 key_descending=True))
         for feedset, facet in zip(feedsets, facets):
             documents = defaultdict(list)
@@ -3147,11 +3162,14 @@ WHERE {
                         keyfunc = functools.partial(facet.key,
                                                     binding=binding,
                                                     resource_graph=self.commondata)
-                        s = sorted(documents[key],
-                                   key=keyfunc,
-                                   reverse=facet.key_descending)
-                        feed.entries = [self.news_item(binding, entry)
-                                        for entry in s]
+                        # format each entry first
+                        entries = [self.news_item(binding, entry)
+                                   for entry in documents[key]]
+
+                        # then sort them later (so that formatting may affect sort critera)
+                        feed.entries = sorted(entries,
+                                              key=keyfunc,
+                                              reverse=facet.key_descending)
         return feedsets
 
     # it's possible this should be a property on a Facet object like
@@ -3354,14 +3372,18 @@ WHERE {
             if nextarchive:
                 contents.append(E.link({'rel': 'next-archive',
                                         'href': nextarchive}))
-
             for entry in entries:
                 assert isinstance(entry, dict)
+                published_key = 'published'
+                updated_key = 'updated'
+                summary = entry['summary']
+                if summary is None:
+                    summary = ''
                 entrynodes = [E.title(entry['title']),
-                              E.summary(str(entry['summary'])),
+                              E.summary(summary),
                               E.id(entry['uri']),
-                              E.published(util.rfc_3339_timestamp(entry['published'])),
-                              E.updated(util.rfc_3339_timestamp(entry['updated'])),
+                              E.published(util.rfc_3339_timestamp(entry[published_key])),
+                              E.updated(util.rfc_3339_timestamp(entry[updated_key])),
                               E.link({'href': util.relurl(entry['url'], feedurl)})]
                 if entry['link']:
                     node = E.link({'rel': 'alternate',

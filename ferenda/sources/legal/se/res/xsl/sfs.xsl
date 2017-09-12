@@ -447,7 +447,7 @@
 	  <dd><a href="xhtml:span[@rel='rpubl:genomforDirektiv']/@href"><xsl:value-of select="xhtml:span[@rel='rpubl:genomforDirektiv']/xhtml:span/@content"/></a></dd>
 	</xsl:if>
 	<xsl:if test="xhtml:span[@property='rpubl:ikrafttradandedatum']">
-	  <dt>Omfattning</dt>
+	  <dt>Ikraftträder</dt>
 	  <dd><xsl:value-of select="xhtml:span[@property='rpubl:ikrafttradandedatum']/@content"/></dd>
 	</xsl:if>
       </dl>

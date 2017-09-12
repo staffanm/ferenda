@@ -1151,12 +1151,21 @@ class Offtryck(SwedishLegalSource):
                 if isinstance(res, cls):
                     return res
 
+    def parse_entry_summary(self, doc):
+        summary = doc.meta.value(URIRef(doc.uri), DCTERMS.abstract)
+        if not summary:
+            summary = ""
+            # try to find a summary in the body text instead
+            for section in doc.body:
+                if hasattr(section, 'title') and section.title == "Sammanfattning":
+                    # just use the first three paras for summary
+                    return "\n\n".join([str(x) for x in section[:3]])
+        return str(summary)
 
     def facets(self):
         return super(Offtryck, self).facets() + [Facet(DCTERMS.title,
                                                        toplevel_only=False)]
                 
-
     def create_external_resources(self, doc):
 
         """Optionally create external files that go together with the
@@ -1207,6 +1216,7 @@ class Offtryck(SwedishLegalSource):
 
             fp.write("#page%03d { background: url('%s');}\n" %
                      (cnt, os.path.basename(dest)))
+
 
     def tabs(self):
         if self.config.tabs:

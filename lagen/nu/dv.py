@@ -5,6 +5,7 @@ from builtins import *
 
 from collections import Counter
 from operator import attrgetter, index
+from datetime import datetime, time
 
 from rdflib import RDF, URIRef, BNode, Graph, Literal
 from rdflib.namespace import DCTERMS, OWL, RDFS
@@ -184,10 +185,20 @@ class DV(OrigDV, SameAs):
                      "rk": "RK (Kammarrätterna)"}
 
     def news_feedsets(self, data, facets):
+        # Start by mangling the keyfunc in the existing facets so that
+        # feeds will be sorted by 'rpubl_avgorandedatum' (aliased by
+        # feed_item to 'published') -- this'll probably not end
+        # well...
+        for facet in facets:
+            facet.key = lambda row, binding, resource_graph: row[self.news_sortkey]
+            facet.key_descending = True
+
         # works pretty much the same as toc_pagesets, but returns ONE
         # feedset (not several) that has one feed per publisher
         feeds = {}
         facet = facets[0]  # should be the RPUBL.rattsfallspublikation one
+
+
         for row in data:
             feedid = row['rpubl_rattsfallspublikation']
             if feedid not in feeds:
@@ -207,9 +218,12 @@ class DV(OrigDV, SameAs):
                                     binding=None,
                                     value=None)])]
 
+    news_sortkey = 'published'  
     def news_item(self, binding, entry):
         entry['summary'] = entry['rpubl_referatrubrik']
         entry['title'] = entry['dcterms_identifier']
+        if entry.get("rpubl_avgorandedatum"):
+            entry['published'] = datetime.combine(entry["rpubl_avgorandedatum"], time())
         return entry
 
     def tabs(self):

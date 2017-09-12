@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2016-09-05T20:58:04.307629
+# Automatically transformed from sources at 2017-09-11T07:24:19.078256
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -199,8 +199,6 @@ rpubl:Skrivelse space:abbrSlug "skr" .
 
 <https://lagen.nu/dataset/nutfs> space:abbrSlug "nutfs" .
 
-<https://lagen.nu/dataset/pmod> space:abbrSlug "pmod" .
-
 <https://lagen.nu/dataset/prvfs> space:abbrSlug "prvfs" .
 
 <https://lagen.nu/dataset/ptfs> space:abbrSlug "ptsfs" .
@@ -325,4 +323,3 @@ rpubl:Skrivelse space:abbrSlug "skr" .
 
 <https://lagen.nu/org/2014/statens_ansvarsnamnd> space:abbrSlug "san" .
 
-<https://lagen.nu/org/2017/patent-_och_marknadsoverdomstolen> space:abbrSlug "pmod" . 

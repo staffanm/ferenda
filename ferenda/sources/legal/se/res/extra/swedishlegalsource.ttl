@@ -1,4 +1,4 @@
-# Automatically concatenated from sources at 2016-12-03T22:03:07.556178
+# Automatically concatenated from sources at 2017-09-11T07:31:55.831068
 
 @prefix : <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
 @prefix bibo: <http://purl.org/ontology/bibo/> .
@@ -913,6 +913,9 @@
     skos:prefLabel "Socialstyrelsens författningssamling"@sv .
 
 <http://rinfo.lagrummet.se/serie/fs/srvfs> a :Forfattningssamling ;
+    dct:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/mfbfs> ;
+    dct:publisher <http://rinfo.lagrummet.se/org/statens_raeddningsverk> ;
+    rdfs:comment "Har ersatts av MSBFS."@sv ;
     rdfs:seeAlso <http://www.srv.se/templates/SRV_AreaPage____524.aspx> ;
     skos:altLabel "SRVFS"@sv ;
     skos:prefLabel "Statens räddningsverks författningssamling"@sv .
@@ -1297,6 +1300,9 @@
 
 <http://rinfo.lagrummet.se/org/statens_kulturraad> a foaf:Organization ;
     foaf:name "Statens kulturråd"@sv .
+
+<http://rinfo.lagrummet.se/org/statens_raeddningsverk> a foaf:Organization ;
+    foaf:name "Statens räddningsverk"@sv .
 
 <http://rinfo.lagrummet.se/org/statens_skolverk> a foaf:Organization ;
     foaf:name "Statens skolverk"@sv .

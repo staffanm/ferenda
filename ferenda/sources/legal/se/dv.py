@@ -2753,6 +2753,7 @@ class DV(SwedishLegalSource):
             return (util.uri_leaf(row['rpubl_rattsfallspublikation']),
                     row['rpubl_arsutgava'])
 
+        # FIXME: This isn't used anymore -- when was it used and by which facet?
         def mykey(row, binding, resource_graph=None):
             if binding == "main":
                 # we'd really like
@@ -2791,7 +2792,21 @@ class DV(SwedishLegalSource):
                       # usable by wsgi.stats
                       # key=  # FIXME add useful key method for sorting docs
                       identificator=lambda x, y, z: None),
+                Facet(RPUBL.avgorandedatum,  # we need this data when
+                                             # creating feeds, but not
+                                             # to sort/group by
+                      use_for_toc=False,
+                      use_for_feed=False)
                 ] + self.standardfacets
+
+    def facet_query(self, context):
+        query = super(DV, self).facet_query(context)
+        # FIXME: This is really hacky, but the rpubl:avgorandedatum
+        # that we need is not a property of the root resource, but
+        # rather a linked resource. So we postprocess the query to get
+        # at that linked resource
+        return query.replace("?uri rpubl:avgorandedatum ?rpubl_avgorandedatum",
+                             "?uri rpubl:referatAvDomstolsavgorande ?domuri . ?domuri rpubl:avgorandedatum ?rpubl_avgorandedatum")
 
     def _relate_fulltext_resources(self, body):
         res = []

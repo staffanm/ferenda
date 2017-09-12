@@ -1047,10 +1047,10 @@ class SFS(Trips):
         if (forfattningsrubrik.startswith('Lag ') or
             (forfattningsrubrik.endswith('lag') and
              not forfattningsrubrik.startswith('F\xf6rordning')) or
-            forfattningsrubrik.endswith('balk')):
-            return self.ns['rpubl'].Lag
+            forfattningsrubrik.endswith(('balk', 'Tryckfrihetsf\xf6rordning'))):
+            return RPUBL.Lag
         else:
-            return self.ns['rpubl'].Forordning
+            return RPUBL.Forordning
 
     def _find_utfardandedatum(self, sfsnr):
         # FIXME: Code to instantiate a SFSTryck object and muck about goes here
@@ -1375,11 +1375,34 @@ class SFS(Trips):
 
     def parse_entry_title(self, doc):
         # should use eg Lag (2015:667) om ändring i lagen (2015:220) om blahonga
-        return super(SFS, self).parse_entry_title(doc)
+        # which is the last registerpost
+        regpost = doc.body[-1][-1]
+        reguri = URIRef(regpost.uri)
+        # assert that the dcterms:title contains a change SFS number
+        # (or the base SFS number if new).
+        title = str(regpost.meta.value(reguri, DCTERMS.title))
+        if not re.search(r'\(\d+:\d+\)', title):
+            title = "Ändring (%s:%s) %s" % (regpost.meta.value(reguri, RPUBL.arsutgava),
+                                            regpost.meta.value(reguri, RPUBL.lopnummer),
+                                            title)
+        return title
     
     def parse_entry_summary(self, doc):
         # should use eg. omfattning (if change) + förarbeten
-        return "Omfattning: Ändrat 5 §, Ny 6 a §\n\n"
+        regpost = doc.body[-1][-1]
+        andrar = regpost.meta.value(URIRef(regpost.uri), RPUBL.andrar)
+        ikraft = regpost.meta.value(URIRef(regpost.uri), RPUBL.ikrafttradandedatum)
+        forarb = list(regpost.meta.objects(URIRef(regpost.uri), RPUBL.forarbete))
+        summary = ""
+        if andrar:
+            summary += "Omfattning: %s\n" % andrar
+        if ikraft:
+            summary += "Ikraftträder: %s\n" % ikraft
+        if forarb:
+            display = ", ".join([regpost.meta.value(x, DCTERMS.identifier) for x in forarb])
+            summary += "Förarbeten: %s\n" % display
+        return summary
+
     
     _document_name_cache = {}
     _query_template_cache = {}
@@ -1903,9 +1926,19 @@ WHERE {
             return {str(RPUBL.Lag): "lagar",
                     str(RPUBL.Forordning): "förordningar"}[row[binding]]
 
+        def updated_sfs_key(row, binding, resource_graph):
+            # "Lag (2017:542) om ändring i rättegångsbalken" => (2017, 542)
+            # "Lag (2016:727) om ändring i lagen (2014:434) om ändring i patentlagen (1967:837)" => (2016, 727)
+
+            # probably need to wrap this in a try/except and provide a
+            # sensible base value for when it fails
+            return tuple(int(x) for x in re.search(r'(\d+):(\d+)', row['title']).groups())
+
         return [Facet(RDF.type,
                       pagetitle="Alla %(selected)s",
-                      selector=typelabel),
+                      selector=typelabel,
+                      key=updated_sfs_key,
+                      key_descending=True),
                 Facet(RPUBL.arsutgava,
                       use_for_toc=True,
                       label="Ordnade efter utgivnings\xe5r",
@@ -1983,6 +2016,9 @@ WHERE {
         ])
 
 
-    news_feedsets_main_label = "Samtliga författningar"
+    news_feedsets_main_label = "Alla författningar"
 
-
+    def news_entrysort_key(self):
+        def updated_sfs_key(row, binding, resource_graph):
+            return tuple(int(x) for x in re.search(r'(\d+):(\d+)', row['title']).groups())
+        return updated_sfs_key

@@ -576,8 +576,9 @@ class MyndFskrBase(FixedLayoutSource):
         fs = self.lookup_resource(pub, SKOS.altLabel)
         desc.rel(RPUBL.forfattningssamling, fs)
         # publisher for the series == publisher for the document
-        desc.rel(DCTERMS.publisher,
-                 self.commondata.value(fs, DCTERMS.publisher))
+        publisher = self.commondata.value(fs, DCTERMS.publisher)
+        assert publisher, "Found no publisher for fs %s" % fs
+        desc.rel(DCTERMS.publisher, publisher)
 
         desc.value(RPUBL.arsutgava, year)
         desc.value(RPUBL.lopnummer, ordinal)

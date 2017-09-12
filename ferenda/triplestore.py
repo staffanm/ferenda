@@ -6,6 +6,7 @@ from builtins import *
 from io import BytesIO, StringIO
 from xml.sax import SAXParseException
 from urllib.parse import quote
+from datetime import datetime
 import logging
 import os
 import re
@@ -505,6 +506,26 @@ class RemoteStore(TripleStore):
                 # print element.tag # should be "binding"
                 key = element.attrib['name']
                 value = str(element[0].text)
+                datatype = element[0].get("datatype")
+                if datatype:
+                    if datatype == "http://www.w3.org/2001/XMLSchema#date":
+                        value = datetime.strptime(value, "%Y-%m-%d").date()
+                    elif datatype == "http://www.w3.org/2001/XMLSchema#dateTime":
+                        if "." in value: # contains microseconds
+                            format = "%Y-%m-%dT%H:%M:%S.%f"
+                        else:
+                            format = "%Y-%m-%dT%H:%M:%S"
+                        value = datetime.strptime(value, format)
+                    elif datatype == "http://www.w3.org/1999/02/22-rdf-syntax-ns#XMLLiteral":
+                        pass  # we could convert it to eg an
+                              # elementtree or a Dom node or a
+                              # BeautifulSoup object ... but since
+                              # there are many options, let the caller
+                              # do that
+                    else:
+                        # FIXME: we should add support for other types
+                        # as we encounter them
+                        raise ValueError("Can't convert string to datatype %s" % datatype)
                 d[key] = value
             res.append(d)
         return res

@@ -4,8 +4,10 @@ from __future__ import (absolute_import, division,
 from builtins import *
 
 from collections import Counter
+from datetime import datetime, time
 
 from rdflib import RDF
+from rdflib.namespace import DCTERMS
 
 from ferenda import util, fulltextindex
 from ferenda import Facet, TocPageset, TocPage
@@ -42,13 +44,14 @@ class Forarbeten(FacadeSource, SwedishLegalSource):
 PREFIX dcterms: <http://purl.org/dc/terms/>
 PREFIX rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
 
-SELECT DISTINCT ?uri ?rdf_type ?dcterms_title ?dcterms_identifier ?rpubl_utrSerie ?rpubl_arsutgava
+SELECT DISTINCT ?uri ?rdf_type ?dcterms_title ?dcterms_identifier ?dcterms_issued ?rpubl_utrSerie ?rpubl_arsutgava
 WHERE {
     ?uri rdf:type ?type ;
         rpubl:arsutgava ?rpubl_arsutgava ;
         dcterms:title ?dcterms_title . 
     OPTIONAL { ?uri rdf:type ?rdf_type . }
     OPTIONAL { ?uri dcterms:identifier ?dcterms_identifier . }
+    OPTIONAL { ?uri dcterms:issued ?dcterms_issued . }
     OPTIONAL { ?uri rpubl:utrSerie ?rpubl_utrSerie . }
     FILTER (?type in (rpubl:Kommittedirektiv, rpubl:Utredningsbetankande, rpubl:Proposition)) .
 } """
@@ -151,6 +154,19 @@ WHERE {
         return res
 
     news_feedsets_main_label = "Samtliga förarbeten"
+    news_sortkey = 'published'  # will contain actual publication
+                                # date, not some random date in the
+                                # near past when the entry was last
+                                # modified
+    def news_item(self, binding, entry):
+        entry['title'] = "%(dcterms_identifier)s: %(dcterms_title)s" % entry
+        if entry.get("dcterms_issued"):
+            # entry["dcterms_issued"] is a date, but
+            # entry["published"] expects a datetime. Create one with
+            # time set to midnight
+            entry["published"] = datetime.combine(entry["dcterms_issued"], time())
+        return entry
+
 
     def frontpage_content_body(self):
         # we could either count the number of items
