@@ -4,6 +4,7 @@ from __future__ import (absolute_import, division,
 from builtins import *
 
 from collections import Counter
+from datetime import datetime, time
 
 from rdflib import URIRef
 from rdflib.namespace import DCTERMS, FOAF
@@ -112,6 +113,14 @@ WHERE {
             res[(binding, value)] = [self.toc_item(binding, row)
                                      for row in s]
         return res
+
+    news_sortkey = "published"
+    def news_item(self, binding, entry):
+        entry['summary'] = entry['dcterms_title']
+        entry['title'] = entry['dcterms_identifier']
+        entry['published'] = datetime.combine(entry['dcterms_issued'], time())
+        return entry
+
 
     def frontpage_content_body(self):
         c = Counter([row['dcterms_publisher'] for row in self.faceted_data()])

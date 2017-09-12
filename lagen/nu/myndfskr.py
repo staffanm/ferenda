@@ -302,6 +302,13 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
         return res
 
     news_feedsets_main_label = "Samtliga föreskrifter"
+    news_sortkey = "orig_created"
+    def news_item(self, binding, entry):
+        entry['title'] = "%s: %s" % (entry['dcterms_identifier'], entry['dcterms_title'])
+        # FIXME: Set entry|'published'] to rpubl_utkomFranTrycket when available
+        entry['published'] = entry['orig_created']
+        return entry
+
 
     def tabs(self):
         return [("Föreskrifter", self.dataset_uri())]
