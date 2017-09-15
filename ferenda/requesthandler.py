@@ -127,7 +127,6 @@ class RequestHandler(object):
 
             if basefile is None:
                 return None
-            
             if 'format' in params:
                 suffix = params['format']
             else:

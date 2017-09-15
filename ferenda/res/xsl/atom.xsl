@@ -53,13 +53,21 @@ Note: this template expects Atom 1.0, outputs HTML5
       <a href="{atom:id}"><h2><xsl:value-of select="atom:title"/></h2></a>
       <!-- just include the date, not the time, in the human-readable version -->
       <small><xsl:value-of select="substring(atom:published,1,10)"/></small>
-      <p>
-	<!-- summary is a plaintext tag. Convert linebreaks to <br/>
-	     tags when displaying in HTML -->
-	<xsl:call-template name="convert-linebreaks">
-	  <xsl:with-param name="plaintext" select="atom:summary"/>
-	</xsl:call-template>
-      </p>
+	<xsl:choose>
+	  <xsl:when test="atom:summary/@type='html'">
+	    <!-- summary is HTML fragment. Output it as-is -->
+	    <xsl:value-of select="atom:summary" disable-output-escaping="yes"/>
+	  </xsl:when>
+	  <xsl:otherwise>
+	    <!-- summary is a plaintext tag. Convert linebreaks to <br/>
+		 tags when displaying in HTML -->
+	    <p>
+	      <xsl:call-template name="convert-linebreaks">
+		<xsl:with-param name="plaintext" select="atom:summary"/>
+	      </xsl:call-template>
+	    </p>
+	  </xsl:otherwise>
+	</xsl:choose>
     </section>
   </xsl:template>
 

@@ -305,7 +305,10 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
     news_feedsets_main_label = "Samtliga föreskrifter"
     news_sortkey = "orig_created"
     def news_item(self, binding, entry):
-        entry['title'] = "%s: %s" % (entry['dcterms_identifier'], entry['dcterms_title'])
+        if entry["orig_created"] is None:
+            self.log.warning("%s: No orig_created found" % entry["basefile"])
+            entry["orig_created"] = entry["published"]
+        entry['title'] = "%s: %s" % (entry['dcterms_identifier'], entry.get('dcterms_title', '(Titel saknas)'))
         # FIXME: Set entry|'published'] to rpubl_utkomFranTrycket when available
         entry['published'] = entry['orig_created']
         return entry

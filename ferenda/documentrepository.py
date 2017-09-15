@@ -3029,7 +3029,12 @@ WHERE {
                              'summary', 'content', 'link', 'url', 'orig_updated', 'orig_created'):
                     d[prop] = getattr(entry, prop)
                 ret.append(d)
-            ret = sorted(ret, key=keyfunc, reverse=reverse)
+            # is there any point to sorting at this time, as
+            # news_select_for_feeds will sort the entries for each
+            # feed (and that will have access to entries after
+            # news_item have processed each, possibly recreating
+            # missing values needed for sorting...)
+            # ret = sorted(ret, key=keyfunc, reverse=reverse)
             util.ensure_dir(cachepath)
             with open(cachepath, "w") as fp:
                 self.log.debug("Saving faceted_entries to %s" % cachepath)
@@ -3379,8 +3384,16 @@ WHERE {
                 summary = entry['summary']
                 if summary is None:
                     summary = ''
+                if isinstance(summary, Literal) and summary.datatype == RDF.XMLLiteral:
+                    datatype = "html" # not xhtml -- that requires
+                                      # proper namespacing and stuff,
+                                      # with html we just throw
+                                      # encoded, possibly ill-formed
+                                      # tag soup in the tree
+                else:
+                    datatype = "text"
                 entrynodes = [E.title(entry['title']),
-                              E.summary(summary),
+                              E.summary({'type': datatype}, summary),
                               E.id(entry['uri']),
                               E.published(util.rfc_3339_timestamp(entry[published_key])),
                               E.updated(util.rfc_3339_timestamp(entry[updated_key])),

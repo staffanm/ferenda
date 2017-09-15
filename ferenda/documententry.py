@@ -14,6 +14,9 @@ import logging
 import os
 import sys
 
+from rdflib import Literal
+from rdflib.namespace import RDF
+
 from ferenda import util
 from ferenda.errors import DocumentRemovedError
 
@@ -112,6 +115,9 @@ class DocumentEntry(object):
                                                        'status.relate.date',
                                                        'status.generate.date')
                 d = json.load(fp, object_hook=hook)
+            if 'summary_type' in d and d['summary_type'] == "html":
+                d['summary'] = Literal(d['summary'], datatype=RDF.XMLLiteral)
+                del d['summary_type']
             self.__dict__.update(d)
             self._path = path
         else:
@@ -169,6 +175,9 @@ class DocumentEntry(object):
         for (k, v) in self.__dict__.items():
             if k[0] != "_":
                 d[k] = v
+        if isinstance(self.summary, Literal) and self.summary.datatype == RDF.XMLLiteral:
+            d["summary_type"] = "html"
+
         util.ensure_dir(path)
         with open(path, "w") as fp:
             s = json.dumps(d, default=util.json_default_date, indent=2,

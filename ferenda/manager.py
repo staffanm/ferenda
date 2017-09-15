@@ -233,6 +233,7 @@ def runserver(repos,
               apiendpoint="/api/",
               searchendpoint="/search/",
               url="http://localhost:8000/",
+              develurl=None,
               indextype="WHOOSH",
               indexlocation="data/whooshindex",
               legacyapi=False):
@@ -264,6 +265,7 @@ def runserver(repos,
               'indextype': indextype,
               'indexlocation': indexlocation,
               'legacyapi': legacyapi,
+              'develurl': develurl,
               'repos': repos}
     try:
         inifile = _find_config_file()
@@ -280,10 +282,7 @@ def make_wsgi_app(inifile=None, **kwargs):
 
     :param inifile: The full path to a ``ferenda.ini`` configuration file
     :type inifile: str
-    :param \*\*kwargs: Configuration values for the wsgi app (must
-                         include ``documentroot``, ``apiendpoint`` and
-                         ``searchendpoint``). Only used if ``inifile``
-                         is not provided.
+    :param \*\*kwargs: Configuration values for the wsgi app, overrides those in `inifile`.
     :returns: A WSGI application
     :rtype: callable
 
@@ -292,23 +291,20 @@ def make_wsgi_app(inifile=None, **kwargs):
         assert os.path.exists(
             inifile), "INI file %s doesn't exist (relative to %s)" % (inifile, os.getcwd())
         config = _load_config(inifile)
-        args = _setup_runserver_args(config, inifile)
-        args['inifile'] = inifile
+        if not kwargs:
+            kwargs = _setup_runserver_args(config, inifile)
+        kwargs['inifile'] = inifile
         # make it possible to specify a different class that implements
         # the wsgi application
         classname = getattr(config, "wsgiappclass", "ferenda.WSGIApp")
-        cls = _load_class(classname)
     else:
-        args = kwargs  # sanity check: is documentroot, searchendpoint and
-        # apiendpoint defined?
-        cls = WSGIApp
-
+        classname = "ferenda.WSGIApp"
+    cls = _load_class(classname)
     # if we have an inifile, we should provide that instead of the
     # **args we've got from _setup_runserver_args()
-    repos = args['repos']
-    del args['repos']
-
-    return cls(repos, **args)
+    repos = kwargs['repos']
+    del kwargs['repos']
+    return cls(repos, **kwargs)
 
 
 loglevels = {'DEBUG': logging.DEBUG,
@@ -1628,11 +1624,14 @@ def _setup_runserver_args(config, inifilename):
     :rtype: dict
 
     """
+    
     if 'develurl' in config:
         url = config.develurl
+        develurl = config.develurl
     else:
         url = config.url
-
+        develurl = None
+        
     port = urlsplit(url).port or 80
     relativeroot = os.path.join(os.path.dirname(inifilename), config.datadir)
 
@@ -1655,6 +1654,7 @@ def _setup_runserver_args(config, inifilename):
             'apiendpoint':    config.apiendpoint,
             'searchendpoint': config.searchendpoint,
             'url':            config.url,
+            'develurl':       develurl,
             'indextype':      config.indextype,
             'indexlocation':  config.indexlocation,
             'legacyapi':      config.legacyapi,

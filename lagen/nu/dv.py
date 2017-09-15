@@ -220,7 +220,11 @@ class DV(OrigDV, SameAs):
 
     news_sortkey = 'published'  
     def news_item(self, binding, entry):
-        entry['summary'] = entry['rpubl_referatrubrik']
+        if entry.get('rpubl_referatrubrik'):
+            entry['summary'] = entry['rpubl_referatrubrik']
+        else:
+            entry['summary'] = "(Referatrubrik saknas)"  # like toc_item_title does
+            self.log.warning("%s: No rpubl_referatrubrik found" % entry['basefile'])
         entry['title'] = entry['dcterms_identifier']
         if entry.get("rpubl_avgorandedatum"):
             entry['published'] = datetime.combine(entry["rpubl_avgorandedatum"], time())

@@ -516,12 +516,12 @@ class RemoteStore(TripleStore):
                         else:
                             format = "%Y-%m-%dT%H:%M:%S"
                         value = datetime.strptime(value, format)
+                    elif datatype == "http://www.w3.org/2001/XMLSchema#gYear":
+                        value = util.gYear(value[:4])
+                    elif datatype == "http://www.w3.org/2001/XMLSchema#gYearMonth":
+                        value = util.gYearMonth(value[:7])
                     elif datatype == "http://www.w3.org/1999/02/22-rdf-syntax-ns#XMLLiteral":
-                        pass  # we could convert it to eg an
-                              # elementtree or a Dom node or a
-                              # BeautifulSoup object ... but since
-                              # there are many options, let the caller
-                              # do that
+                        value = Literal(value, datatype=RDF.XMLLiteral)
                     else:
                         # FIXME: we should add support for other types
                         # as we encounter them
