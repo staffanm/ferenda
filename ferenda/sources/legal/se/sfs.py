@@ -1932,7 +1932,10 @@ WHERE {
 
             # probably need to wrap this in a try/except and provide a
             # sensible base value for when it fails
-            return tuple(int(x) for x in re.search(r'(\d+):(\d+)', row['title']).groups())
+            try:
+                return tuple(int(x) for x in re.search(r'(\d+):(\d+)', row['title']).groups())
+            except AttributeError: # the regex didn't match, eg "Ändring (1899:bih. 25) Skrivelsen (1899:bih. 25) angående sättet..."
+                return (0, 0)
 
         return [Facet(RDF.type,
                       pagetitle="Alla %(selected)s",
@@ -2020,5 +2023,8 @@ WHERE {
 
     def news_entrysort_key(self):
         def updated_sfs_key(row, binding, resource_graph):
-            return tuple(int(x) for x in re.search(r'(\d+):(\d+)', row['title']).groups())
+            try:
+                return tuple(int(x) for x in re.search(r'(\d+):(\d+)', row['title']).groups())
+            except AttributeError: # the regex didn't match, eg "Ändring (1899:bih. 25) Skrivelsen (1899:bih. 25) angående sättet..."
+                return (0, 0)
         return updated_sfs_key
