@@ -220,6 +220,9 @@ class PDFAnalyzer(object):
 
     def guess_pagenumber_select(self, candidates, probable_pagenumber):
         # now select the most probable candidate
+        if probable_pagenumber in candidates:
+            # this is particularly important if it's a roman numeral 
+            return probable_pagenumber
         try:
             # return the first candidate that is not smaller than
             # the predicted pagenumber. But what if we've

@@ -92,11 +92,16 @@ section#top h1 {
 }
 
 h2 {
-    font-size: 1.1em;
+    font-size: 1.2em;
     margin-top: 10px;
 }
 
 h3 {
+    font-size: 1.1em;
+    margin-top: 10px;
+}
+
+h4 {
     font-size: 1em;
     font-weight: normal;
     font-style: italic;

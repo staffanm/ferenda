@@ -806,7 +806,7 @@ class Offtryck(SwedishLegalSource):
         sectiontext = util.normalize_space(str(node))
         m = re.search("(SOU|Ds) (\d+:\d+)", sectiontext)
         if m:
-            state['kommittensbetankande'] = m.group(1)
+            state['kommittensbetankande'] = m.group(2)
         else:
             self.log.warning("Could not find reference to kommmittens betankande")
         return None
@@ -1444,6 +1444,8 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
 
     def is_subsection(parser):
         (ordinal, headingtype, title) = analyze_sectionstart(parser)
+        if "...." in title:  # probably a line in a TOC
+            return False
         if ordinal:
             return headingtype == "h2" and ordinal.count(".") == 1
 
@@ -1477,6 +1479,8 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
 
     def is_subsubsection(parser):
         (ordinal, headingtype, title) = analyze_sectionstart(parser)
+        if "...." in title:  # probably a line in a TOC
+            return False
         if ordinal:
             return headingtype == "h3" and ordinal.count(".") == 2
 
