@@ -520,6 +520,8 @@ class RemoteStore(TripleStore):
                         value = util.gYear(value[:4])
                     elif datatype == "http://www.w3.org/2001/XMLSchema#gYearMonth":
                         value = util.gYearMonth(value[:7])
+                    elif datatype == "http://www.w3.org/2001/XMLSchema#integer":
+                        value = int(value)
                     elif datatype == "http://www.w3.org/1999/02/22-rdf-syntax-ns#XMLLiteral":
                         value = Literal(value, datatype=RDF.XMLLiteral)
                     else:
