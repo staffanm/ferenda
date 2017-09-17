@@ -16,7 +16,7 @@ import os
 import unittest
 import codecs
 import re
-
+from urllib.parse import urljoin
 
 # 3rdparty
 import requests
@@ -127,6 +127,16 @@ class TestPages(TestLagen):
             soup.find("div", "section-wrapper").decompose()
         for link in soup.find_all("a"):
             self.assertNotIn("invalid-link", link.attrs.get('class', []), "Link %s marked as invalid (not in DB)" % link.text)
+
+    def test_css_link(self):
+        for link in ("", "dom/nja/2015s180", "dom/hfd/2015/not/1"):
+            url = self.baseurl + link
+            res = self.get(url)
+            soup = BeautifulSoup(res.text, "lxml")
+            cssref = soup.find("link", rel="stylesheet", href=re.compile("ferenda.css$"))['href']
+            cssurl = urljoin(url, cssref)
+            self.assertEqual(self.baseurl + "rsrc/css/ferenda.css",
+                             cssurl, "Error for %s" % url)
 
 class TestPatching(TestLagen):
 

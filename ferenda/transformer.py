@@ -145,9 +145,10 @@ class Transformer(object):
                            uritransform))
 
     def transform_file(self, infile, outfile,
-                       parameters=None, uritransform=None):
+                       parameters=None, uritransform=None, depth=None):
         """Accepts two filenames, reads from *infile*, writes to *outfile*."""
-        depth = self._depth(os.path.dirname(outfile),
+        if depth is None:
+            depth = self._depth(os.path.dirname(outfile),
                             self.documentroot + os.sep + "index.html")
         helpful = os.environ.get('FERENDA_TRANSFORMDEBUG', False)
         if helpful:

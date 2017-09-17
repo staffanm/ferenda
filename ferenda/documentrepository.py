@@ -13,7 +13,7 @@ from itertools import chain
 from operator import itemgetter
 from tempfile import mkstemp
 from wsgiref.handlers import format_date_time as format_http_date
-from urllib.parse import quote, unquote, parse_qsl
+from urllib.parse import quote, unquote, parse_qsl, urlparse
 import builtins
 import locale
 import calendar
@@ -2388,8 +2388,20 @@ WHERE {
                 elif 'develurl' in self.config:
                     transformargs['develurl'] = self.config.develurl
                 urltransform = self.get_url_transform_func(**transformargs)
+                if self.config.staticsite:
+                    depth = None
+                else:
+                    # since the URI for a document does not have to
+                    # have any correspondance to where the underlying
+                    # file for the document is situated, we must take
+                    # the URI into account when relative paths are
+                    # constructed with the depth argument to
+                    # transform_file
+                    urlparse(self.canonical_uri(basefile)).path[1:-1].count("/") 
+                    depth = urlparse(self.canonical_uri(basefile)).path[1:-1].count("/")
+
                 transformer.transform_file(infile, outfile,
-                                           params, urltransform)
+                                           params, urltransform, depth)
 
             # At this point, outfile may appear untouched if it already
             # existed and wasn't actually changed. But this will cause the
