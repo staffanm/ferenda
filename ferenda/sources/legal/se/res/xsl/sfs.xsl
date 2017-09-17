@@ -303,7 +303,7 @@
   <xsl:template match="xhtml:p[@typeof='rinfoex:Stycke']">
     <div class="row" about="{//html/@about}#{@id}">
       <section id="{@id}" class="col-sm-7">
-	<xsl:apply-templates mode="in-paragraf"/>
+	<xsl:apply-templates/>
       </section>
       <xsl:call-template name="aside-annotations">
 	<xsl:with-param name="uri" select="@about"/>
@@ -555,6 +555,10 @@
       </ul>
     </xsl:if>
     </li>
+  </xsl:template>
+
+  <xsl:template match="xhtml:div[@typeof='rinfoex:Bilaga']" mode="toc">
+    <li><a href="#{@id}"><xsl:value-of select="xhtml:h1"/></a></li>
   </xsl:template>
 
   <xsl:template match="xhtml:div[@class='register']" mode="toc">

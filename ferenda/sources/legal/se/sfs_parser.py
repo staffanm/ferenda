@@ -460,7 +460,6 @@ def make_parser(reader, basefile, log, trace):
     def makeBilaga():  # svenska: bilaga
         rubrik = reader.readparagraph()
         (rubrik, upphor, ikrafttrader) = andringsDatum(rubrik)
-
         kwargs = {'rubrik': rubrik}
         if upphor:
             kwargs['upphor'] = upphor

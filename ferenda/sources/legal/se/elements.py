@@ -246,12 +246,17 @@ class Overgangsbestammelse(CompoundElement, OrdinalElement):
 
 class Bilaga(CompoundElement):
     fragment_label = "B"
-
+    tagname = "div"
+    typeof = "rinfoex:Bilaga"
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get("id", None)
         self.uri = kwargs.get("uri", None)
         super(Bilaga, self).__init__(*args, **kwargs)
 
+    def as_xhtml(self, uri=None, parent_uri=None):
+        res = super(Bilaga, self).as_xhtml(uri, parent_uri)
+        res.insert(0, E('h1', self.rubrik))
+        return res
 
 class Register(CompoundElement):
     """Innehåller lite metadata om en grundförfattning och dess
