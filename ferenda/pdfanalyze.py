@@ -201,7 +201,11 @@ class PDFAnalyzer(object):
                 # converted to an int. .isdigit(), .isnumeric() and
                 # .isdecimal() all match too much (eg. superscript
                 # numbers, numbers in non-western scripts etc)
-                if re.match('[0-9]+$', el) and len(el) < 5:
+                #
+                # Also, don't include something that is more likely to
+                # be a year, unless we've already seen a lot of
+                # legitimate pages running up to this.
+                if re.match('[0-9]+$', el) and int(el) < 1900 or probable_pagenumber >= 1900:
                     candidates.append(int(el))
                 # the first few pages might use roman numerals
                 elif ((page.number == 1 or util.is_roman(probable_pagenumber)) and
