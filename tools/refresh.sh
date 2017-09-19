@@ -1,14 +1,14 @@
 #! /bin/bash
-#echo "removing old generated files"
+echo "removing old generated files"
 #rm -r data/*/parsed
 #rm -r data/*/distilled
 #rm -r data/*/annotations
 #rm -r data/*/generated
 #rm -r data/*/toc
 set -e  # fail immediately on error
-#echo "resetting fulltextindex"
+echo "resetting fulltextindex"
 #./ferenda-build.py devel destroyindex
-#echo "resetting triplestore"
+echo "resetting triplestore"
 #./ferenda-build.py devel clearstore
 echo "updating git sources"
 git pull -q
@@ -21,5 +21,3 @@ echo "running smoketests"
 FERENDA_TESTURL=http://i7-ferenda.lagen.nu/ tools/test.sh integrationLagen
 echo "deploying to remote"
 fab -H colo.tomtebo.org -f tools/fabfile.py deploy
-
-

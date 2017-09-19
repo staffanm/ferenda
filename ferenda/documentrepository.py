@@ -3003,7 +3003,10 @@ WHERE {
                 util.outfile_is_newer(dependencies, cachepath)):
 
             self.log.debug("Loading faceted_entries from %s" % cachepath)
-            datehook = util.make_json_date_object_hook('published', 'updated')
+            # FIXME: Individual repos must be responsible for which
+            # fields (apart from published/updated) that might contain
+            # dates/datetimes
+            datehook = util.make_json_date_object_hook('published', 'updated', 'dcterms_issued', 'rpubl_avgorandedatum')
             ret = json.load(open(cachepath),
                             object_hook=datehook)
         else:

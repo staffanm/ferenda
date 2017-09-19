@@ -116,9 +116,15 @@ WHERE {
 
     news_sortkey = "published"
     def news_item(self, binding, entry):
-        entry['summary'] = entry['dcterms_title']
+        if entry.get('dcterms_title'):
+            entry['summary'] = entry['dcterms_title']
+        else:
+            entry['summary'] = "(Rubrik saknas)" 
+            self.log.warning("%s: No dcterms_title found" % entry['basefile'])
         entry['title'] = entry['dcterms_identifier']
-        entry['published'] = datetime.combine(entry['dcterms_issued'], time())
+        if 'dcterms_issued' in entry:
+            entry['published'] = datetime.combine(entry['dcterms_issued'], time())
+            # otherwise leave entry['published'] as-is
         return entry
 
 

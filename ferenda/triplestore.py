@@ -13,9 +13,7 @@ import re
 import tempfile
 import xml.etree.cElementTree as ET
 
-from rdflib import URIRef
-from rdflib import Graph
-from rdflib import ConjunctiveGraph
+from rdflib import URIRef, Literal, Graph, ConjunctiveGraph, RDF
 import requests
 import requests.exceptions
 import pyparsing

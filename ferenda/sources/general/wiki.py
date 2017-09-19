@@ -267,7 +267,7 @@ class MediaWiki(DocumentRepository):
         return element
 
     @classmethod
-    def generate_all_setup(cls, config):
+    def generate_all_setup(cls, config, *args, **kwargs):
         # This is not a document repository that produces its own
         # pages -- rather, it creates description metadata (through
         # download/parse/relate) that other repos (primarily Keyword)

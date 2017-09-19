@@ -75,4 +75,4 @@ def deploy():
     copy_elastic()  # requires password b/c of sudo() so we do it first
     git_pull()
     copy_files()
-    upload_rdf()
+    # upload_rdf()

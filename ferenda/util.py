@@ -802,7 +802,11 @@ def make_json_date_object_hook(*fields):
                         # no fractional part
                         d[key] = strp(d[key], '%Y-%m-%dT%H:%M:%S')
                     except:
-                        pass
+                        try:
+                            # date, no time part -- return a date object in this case
+                            d[key] = strp(d[key], "%Y-%m-%d").date()
+                        except:
+                            pass
         return d
     return myhook
 
