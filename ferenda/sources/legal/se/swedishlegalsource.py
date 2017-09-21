@@ -8,18 +8,20 @@ from builtins import *
 
 from bz2 import BZ2File
 from datetime import datetime, date
+from io import BytesIO, StringIO, BufferedIOBase
 from urllib.parse import quote, unquote
 from wsgiref.util import request_uri
+import ast
+import codecs
+import collections
 import logging
 import operator
 import os
-import sys
 import re
-import codecs
-import collections
+import sys
 import unicodedata
-from io import BytesIO, StringIO, BufferedIOBase
 
+# 3rd party
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
 from rdflib.resource import Resource
@@ -32,6 +34,7 @@ import bs4
 from cached_property import cached_property
 from lxml import etree
 
+# own
 from ferenda import (DocumentRepository, DocumentStore, FSMParser,
                      CitationParser, Describer, Facet, RequestHandler,
                      Transformer, DocumentEntry)
@@ -245,10 +248,12 @@ class SwedishLegalSource(DocumentRepository):
         if self.alias != "sfs" and self.resourceloader.exists("extra/sfs.ttl"):
             with self.resourceloader.open("extra/sfs.ttl") as fp:
                 cd.parse(data=fp.read(), format="turtle")
+        filter = SwedishCitationParser.FILTER_LAW if self.alias == "sfs" else SwedishCitationParser.FILTER_ALL
         return SwedishCitationParser(LegalRef(*self.parse_types),
                                      self.minter,
                                      cd,
-                                     allow_relative=self.parse_allow_relative)
+                                     allow_relative=self.parse_allow_relative,
+                                     filter=filter)
     
     @property
     def urispace_base(self):
@@ -475,6 +480,19 @@ class SwedishLegalSource(DocumentRepository):
                 basefile = basefile.split("#", 1)[0]
             return basefile
 
+    @cached_property
+    def parse_options(self):
+        # we use a file with python literals rather than json because
+        # comments
+        if self.resourceloader.exists("options/options.py"):
+            with self.resourceloader.open("options/options.py") as fp:
+                return ast.literal_eval(fp.read())
+        else:
+            return {}
+    
+    def get_parse_options(self, basefile):
+        return self.parse_options.get((self.urispace_segment, basefile), None)
+    
     @action
     @managedparsing
     def parse(self, doc):
@@ -516,6 +534,11 @@ class SwedishLegalSource(DocumentRepository):
 
         """
         # reset some global state
+        options = self.get_parse_options(doc.basefile)
+        if options == "skip":
+            raise DocumentSkippedError("%s: Skipped because of options.py" % basefile,
+                                       dummyfile=self.store.parsed_path(basefile))
+
         UnorderedSection.counter = 0
         PreambleSection.counter = 0
         self.refparser._legalrefparser.namedlaws = {}
@@ -526,7 +549,10 @@ class SwedishLegalSource(DocumentRepository):
         doc.uri = str(resource.identifier)
         if resource.value(DCTERMS.title):
             doc.lang = resource.value(DCTERMS.title).language
-        doc.body = self.parse_body(fp, doc.basefile)
+        if options == "metadataonly":
+            doc.body = Body([Preformatted("Dokumenttext saknas (se originaldokument)")])
+        else:
+            doc.body = self.parse_body(fp, doc.basefile)
         if not fp.closed:
             fp.close()
         self.postprocess_doc(doc)
@@ -1354,7 +1380,10 @@ class SwedishLegalSource(DocumentRepository):
 # grammars.
 class SwedishCitationParser(CitationParser):
 
-    def __init__(self, legalrefparser, minter, commondata, allow_relative=False):
+    FILTER_LAW = re.compile(r'(§§?|\bkap\b|\bstycket\b|[Ll]agens?\b|\bLag \(\b|[Ff]örordningens?\b|\bFörordning \(|balkens?\b|\(EG\)|\(EEG\)|\(EU\))')
+    FILTER_ALL = re.compile(r'(§§?|\b[Pp]rop\b|\bSOU\b|\bDs\b|\bbet\b|\bNJA\b|\bHFD\b|\bRÅ\b|\bRH\b|\bAD\b|\bJO\b|\bMIG\b|\bkap\b|\bstycket\b|[Ll]agens?\b|\bLag \(\b|[Ff]örordningens?\b|\bFörordning \(|balkens?\b|\(EG\)|\(EEG\)|\(EU\)|\b3\d{4}L\d{4}\b|\(\d{4}:\d+\)|\bavsnitt\b|\bAct\b)')
+
+    def __init__(self, legalrefparser, minter, commondata, allow_relative=False, filter=None):
         assert isinstance(minter, URIMinter)
         assert isinstance(commondata, Graph)
         self._legalrefparser = legalrefparser
@@ -1363,19 +1392,24 @@ class SwedishCitationParser(CitationParser):
         self._allow_relative = allow_relative
         self.reset()
         self.log = logging.getLogger("scp")
+        self.seen_strings = 0
+        self.parsed_strings = 0
+        self.found_refs = 0
+        # self.filter = None
+        self.filter = filter
 
     def reset(self):
         self._legalrefparser.reset()
         self._currenturl = None
         self._currentattribs = None
-        
 
     def parse_recursive(self, part, predicate="dcterms:references"):
         if hasattr(part, 'about'):
             self._currenturl = part.about
         elif hasattr(part, 'uri') and not isinstance(part, (Link, A)):
             self._currenturl = part.uri
-        if isinstance(part, (Link, A, H1, H2, H3, DokumentRubrik, Preformatted, Pre)):
+        if isinstance(part, (Link, A, H1, H2, H3, Preformatted, Pre, Rubrik, PropRubrik,
+                             UpphavtKapitel, UpphavdParagraf)):
             # don't process text that's already a link (or a heading)
             if isinstance(part, str):  # caller expects a list
                 return [part]
@@ -1384,10 +1418,9 @@ class SwedishCitationParser(CitationParser):
         else:
             return super(SwedishCitationParser, self).parse_recursive(part, predicate)
 
+    # needles = ['§', 'prop.', 'SOU', 'Ds', 'NJA', 'HFD', 'lagen', 'Lagen', 'örordningen', 'balken', 'Act', 'avsnitt', 'bet.']
+    # if not any(needle in string for needle in self.needles):
     def parse_string(self, string, predicate="dcterms:references"):
-        from ferenda.sources.legal.se.sfs import UpphavtKapitel, UpphavdParagraf
-        if isinstance(string, (UpphavtKapitel, UpphavdParagraf)):
-            return [string]
         # basic normalization without stripping (NOTE: this messes up
         # Preformatted sections, so parse_recursive avoids calling
         # this for those). FIXME: We should remove this normalization,
@@ -1395,6 +1428,13 @@ class SwedishCitationParser(CitationParser):
         # other parts rely on this normalization for the time being
         # (parts of the test suite fails without). We should fix that.
         string = string.replace("\r\n", " ").replace("\n", " ").replace("\x00","")
+
+        self.seen_strings += 1
+
+        # first, do a quick check to see if we even need to parse
+        if self.filter and not self.filter.search(string):
+            return [string]
+        self.parsed_strings += 1
 
         # transform self._currenturl => attributes.
         # FIXME: we should maintain a self._current_baseuri_attributes
@@ -1418,12 +1458,14 @@ class SwedishCitationParser(CitationParser):
             if attributes[k] is None:
                 del attributes[k]
         try:
-            return self._legalrefparser.parse(string,
+            res = self._legalrefparser.parse(string,
                                               minter=self._minter,
                                               metadata_graph=self._commondata,
                                               baseuri_attributes=attributes,
                                               predicate=predicate,
                                               allow_relative=self._allow_relative)
+            self.found_refs += len([x for x in res if isinstance(x, Link)])
+            return res
         except RefParseError as e:
             self.log.error(e)
             return [string]

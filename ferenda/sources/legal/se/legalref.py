@@ -8,6 +8,7 @@ import os
 import sys
 import re
 from datetime import date 
+from functools import lru_cache
 
 # thirdparty
 from simpleparse.parser import Parser
@@ -753,7 +754,20 @@ class LegalRef:
                     "diarienr": RPUBL.diarienummer
                     }
 
+
+    def attributes_to_uri(self, attributes, rest=()):
+        # make attributes into a hashable equivalent of a dict, so we
+        # can use lru_cache
+        tupleattributes = tuple(sorted(attributes.items()))
+        return self.tuple_to_uri(tupleattributes, rest)
+
+    @lru_cache(maxsize=None, typed=True)
+    def tuple_to_uri(self, tupleattributes, rest):
+        resource = self.attributes_to_resource(tupleattributes, rest)
+        return self.minter.space.coin_uri(resource)
+    
     def attributes_to_resource(self, attributes, rest=()):
+        attributes = dict(attributes)
         g = Graph()
         b = BNode()
         current = b
@@ -802,7 +816,7 @@ class LegalRef:
         for (p, o) in rest:
             g.add((current, p, o))
         return g.resource(b)
-    
+
     def sfs_format_uri(self, attributes):
         if 'law' not in attributes and not self.allow_relative:
             return None
@@ -854,9 +868,8 @@ class LegalRef:
         abbrSlug = rg.value(predicate=RDF.type, object=RDF.Property)
         fsuri = rg.value(predicate=abbrSlug, object=Literal("sfs"))
         assert fsuri, "Couldn't find URI for forfattningssamling 'sfs'"
-        rest = [(RPUBL.forfattningssamling, fsuri)]
-        res = self.attributes_to_resource(attributes, rest)
-        return self.minter.space.coin_uri(res)
+        rest = ((RPUBL.forfattningssamling, fsuri),)
+        return self.attributes_to_uri(attributes, rest)
 
     def format_ChapterSectionRefs(self, root):
         assert(root.tag == 'ChapterSectionRefs')
@@ -1212,7 +1225,6 @@ class LegalRef:
         # do the thing
         return [self.format_generic_link(root, uriformatter=self.forarbete_format_uri)]
         
-
     def forarbete_format_uri(self, attributes):
         a = attributes
         if (hasattr(self, 'betankanderef') and self.betankanderef):
@@ -1280,8 +1292,7 @@ class LegalRef:
         # for relative refs, we need to fill a['type'], a['year'],
         # a['no'] from self.baseuri_attributes (and we need to make
         # sure baseuri_attributes is populated
-        res = self.attributes_to_resource(a)
-        return self.minter.space.coin_uri(res)
+        return self.attributes_to_uri(a)
 
     #
     # KOD FÖR EULAGSTIFTNING
@@ -1325,8 +1336,7 @@ class LegalRef:
             if 'underartikel' in attributes:
                 fixed['artikel'] += ".%s" % attributes['underartikel']
 
-        res = self.attributes_to_resource(fixed)
-        return self.minter.space.coin_uri(res)
+        return self.attributes_to_uri(fixed)
 
 
     # KOD FÖR RATTSFALL
@@ -1343,10 +1353,9 @@ class LegalRef:
                      'rattsfall', 'domstol'):
             if crap in attributes:
                 del attributes[crap]
-        res = self.attributes_to_resource(attributes)
-        return self.minter.space.coin_uri(res)
+        return self.attributes_to_uri(attributes)
 
-    #
+
     # KOD FÖR EURÄTTSFALL
     def eurattsfall_format_uri(self, attributes):
         descriptormap = {'C': 'J',  # Judgment of the Court
@@ -1370,10 +1379,8 @@ class LegalRef:
         # properties for year/serial/descriptor, only the composite
         # celexNumber -- so we create that here instead.
         celexnumber = "6%(year)sC%(descriptor)s%(serial)s" % (attributes)
-        res = self.attributes_to_resource({'celex': celexnumber})
-        return self.minter.space.coin_uri(res)
+        return self.attributes_to_uri({'celex': celexnumber})
 
-    #
     #
     # KOD FÖR MYNDIGHETSBESLUT
     def myndighetsbeslut_format_uri(self, attributes):
@@ -1403,9 +1410,7 @@ class LegalRef:
             # there is no myndighet in the collected attributes - we
             # won't be able to create a URI from this
             return None
-        res = self.attributes_to_resource(attributes)
-        uri = self.minter.space.coin_uri(res)
-        return uri
+        return self.attributes_to_uri(attributes)
 
 
 class NodeTree:

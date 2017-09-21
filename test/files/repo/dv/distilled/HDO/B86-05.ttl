@@ -1,4 +1,5 @@
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -61,9 +62,12 @@
         <https://lagen.nu/1976:633>,
         <https://lagen.nu/1976:633#P1S3> ;
     rpubl:malnummer "B86-05" ;
+    rpubl:rattsfallshanvisning <https://lagen.nu/ext/celex/61989CJ0358> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/b86-05/2007-04-04> .
 
 <https://lagen.nu/dom/nja/2007s227?repo=dv&dir=downloaded> rdfs:label "NJA 2007 s. 227"@sv .
+
+<https://lagen.nu/org/2008/hogsta-domstolen> foaf:name "Högsta domstolen" .
 
 <https://lagen.nu/dom/nja/2007s227> a rpubl:Rattsfallsreferat ;
     dcterms:bibliographicCitation "NJA 2007:32" ;

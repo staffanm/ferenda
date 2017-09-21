@@ -8,9 +8,7 @@ import os
 import re
 import json
 import difflib
-import ast
 import collections
-
 # 3rd party
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
@@ -345,28 +343,10 @@ class Offtryck(SwedishLegalSource):
 
         return offtryck_gluefunc
 
-    @cached_property
-    def parse_options(self):
-        # we use a file with python literals rather than json because
-        # comments
-        if self.resourceloader.exists("options/options.py"):
-            with self.resourceloader.open("options/options.py") as fp:
-                return ast.literal_eval(fp.read())
-        else:
-            return {}
-    
-    def get_parse_options(self, basefile):
-        return self.parse_options.get((self.urispace_segment, basefile), None)
-    
 
     def parse_body(self, fp, basefile):
         # this version of parse_body knows how to:
         #
-        # - look up document-specific options (eg "skip",
-        #   "metadataonly", "plainparse") from the resource file
-        #   res/options/options.py (used to blacklist old files with
-        #   no relevance today, or handle otherwise difficult
-        #   documents.
         # - use an appropriate analyzer to segment documents into
         #   subdocs and use the appropritate parsing method on each
         #   subdoc. NOTE: this requires that sanitize_body has set up
@@ -375,14 +355,6 @@ class Offtryck(SwedishLegalSource):
         #   StreamingPDFReader)
         # - handle the case when a document is not available as a PDF,
         #   only in simple HTML/plaintext, and use a simpler parser
-        options = self.get_parse_options(basefile)
-        if options == "skip":
-            raise DocumentSkippedError("%s: Skipped because of options.py" % basefile,
-                                       dummyfile=self.store.parsed_path(basefile))
-        elif options == "metadataonly":
-            return Body([Preformatted("Dokumenttext saknas (se originaldokument)")])
-        # elif options == "simple":
-        #     do something else smart
 
         # FIXME: Both the "simple" case and the "plaintext" case below
         # should be folded into the parse_body_parseconfigs()
@@ -464,6 +436,11 @@ class Offtryck(SwedishLegalSource):
                                 # parsing the bulk of the text.
                                 self.refparser._legalrefparser.currentlynamedlaws.update(self.sfsparser.currentlynamedlaws)
                             body = self.refparser.parse_recursive(body)
+                            seen = self.refparser.seen_strings
+                            proc = self.refparser.parsed_strings
+                            refs = self.refparser.found_refs
+                            cacheinfo = self.refparser._legalrefparser.tuple_to_uri.cache_info()
+                            self.log.info("refparser: Seen %s, processed %s (%s %%) - found %s refs (%s coin calls were avoided)" % (seen, proc, (proc / seen) * 100, refs, cacheinfo.hits))
                     elif tag in ('frontmatter', 'endregister'):
                         # Frontmatter and endregister is defined as pages with
                         # no meaningful content (cover page, edition notice,

@@ -239,7 +239,6 @@
     dcterms:isPartOf <https://lagen.nu/dom/nja/2014s499#II> ;
     dcterms:references <https://lagen.nu/1972:207>,
         <https://lagen.nu/1975:635#P6>,
-        <https://lagen.nu/2006:10>,
         <https://lagen.nu/2008:567>,
         <https://lagen.nu/2008:567#K1P4>,
         <https://lagen.nu/2008:567#K2P13S1>,

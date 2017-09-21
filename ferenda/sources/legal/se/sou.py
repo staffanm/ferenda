@@ -125,7 +125,6 @@ class SOURegeringen(Regeringen):
     re_urlbasefile_lax = re.compile("statens-offentliga-utredningar/\d+/\d+/.*?(\d{4})_?(\d+)")
     rdf_type = RPUBL.Utredningsbetankande
     document_type = Regeringen.SOU
-
     def canonical_uri(self, basefile):
         year, ordinal = basefile.split(":")
         attrib = {'rpubl:arsutgava': year,

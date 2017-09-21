@@ -245,10 +245,6 @@ class Riksdagen(Offtryck, FixedLayoutSource):
 
     def downloaded_to_intermediate(self, basefile):
         # first check against our "blacklist-light":
-        if self.get_parse_options(basefile) == "metadataonly":
-            self.log.warning("%s: Will only process metadata, creating placeholder for body text" % basefile)
-            # nb: tokenize() depends on the text being enclosed in <pre> tags
-            return StringIO("<pre>Dokumenttext saknas (se originaldokument)</pre>")
         downloaded_path = self.store.downloaded_path(basefile,
                                                      attachment="index.pdf")
         downloaded_path_html = self.store.downloaded_path(basefile,
@@ -323,9 +319,7 @@ class Riksdagen(Offtryck, FixedLayoutSource):
         # fp can now be a pointer to a hocr file, a pdf2xml file,
         # a html file or a StringIO object containing html taken
         # from index.xml
-        options = self.get_parse_options(basefile)
-        if (os.path.exists(pdffile) and
-            options != "metadataonly"):
+        if os.path.exists(pdffile):
             fp = self.parse_open(basefile)
             parser = "ocr" if ".hocr." in util.name_from_fp(fp) else "xml"
             reader = StreamingPDFReader().read(fp, parser=parser)

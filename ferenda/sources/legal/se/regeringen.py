@@ -297,18 +297,6 @@ class Regeringen(Offtryck):
 
 
     def extract_head(self, fp, basefile):
-        # Some documents are just beyond usable and/or completely
-        # uninteresting from a legal information point of view. We
-        # keep a hardcoded black list to skip these. This is the
-        # earliest point at which we can check against that blacklist.
-        # FIXME: we should have a no-semantic-parse fallback that does
-        # no analysis, just attempts to create a viewable
-        # page-oriented HTML representation of the PDF. Maybe that
-        # fallback should even be part of
-        # ferenda.PDFDocumentRepository
-        if self.get_parse_options(basefile) == "skip":
-            raise DocumentSkippedError("%s is blacklisted" % basefile,
-                                       dummyfile=self.store.parsed_path(basefile))
         soup = BeautifulSoup(fp.read(), "lxml")
         self._rawbody = soup.body
         return self._rawbody.find(id="content")

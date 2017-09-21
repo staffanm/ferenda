@@ -58,7 +58,8 @@
         <https://lagen.nu/dom/nja/2005s856>,
         <https://lagen.nu/dom/nja/2006s467>,
         <https://lagen.nu/dom/nja/2008s946>,
-        <https://lagen.nu/dom/ra/2000:65> ;
+        <https://lagen.nu/dom/ra/2000:65>,
+        <https://lagen.nu/ext/celex/62004CJ0436> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/b5498-09/2010-03-31> .
 
 <https://lagen.nu/dom/nja/2010s168#II/HDO> dcterms:creator "Högsta domstolen"@sv ;

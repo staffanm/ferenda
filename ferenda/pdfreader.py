@@ -818,7 +818,7 @@ class PDFReader(CompoundElement):
     def is_empty(self):
         return 0 == sum([len(x) for x in self])
 
-    def textboxes(self, gluefunc=None, pageobjects=False, keepempty=False, startpage=0, pagecount=None):
+    def textboxes(self, gluefunc=None, pageobjects=False, keepempty=False, startpage=0, pagecount=None, cache=True):
         """Return an iterator of the textboxes available.
 
         ``gluefunc`` should be a callable that is called with
@@ -831,6 +831,10 @@ class PDFReader(CompoundElement):
 
         If ``keepempty``, process and return textboxes that have no
         text content (these are filtered out by default)
+
+        If ``cache``, store the resulting list of textboxes for each
+        page and return it the next time.
+
         """
         textbox = None
         prevbox = None
@@ -845,25 +849,39 @@ class PDFReader(CompoundElement):
         for page in pages:
             if pageobjects:
                 yield page
-            for nextbox in page:
-                if not (keepempty or str(nextbox).strip()):
-                    continue
-                if not textbox:  # MUST glue
-                    textbox = nextbox
-                else:
-                    if glue(textbox, nextbox, prevbox):
-                        # can't modify textbox in place -- this messes
-                        # things up if we want/need to run textboxes()
-                        # twice. Must create a new one.
-                        # textbox += nextbox
-                        textbox = textbox + nextbox
-                    else:
+            if cache:
+                if page._textboxes_cache is not None:
+                    # reuse the existing cache
+                    # print("Reusing cache for page %s" % page.number)
+                    for textbox in page._textboxes_cache:
                         yield textbox
+                else:
+                    # print("Setting up cache for page %s" % page.number)
+                    page._textboxes_cache = []
+            if not cache or not page._textboxes_cache:
+                for nextbox in page:
+                    if not (keepempty or str(nextbox).strip()):
+                        continue
+                    if not textbox:  # MUST glue
                         textbox = nextbox
-                prevbox = nextbox
-            if textbox:
-                yield textbox
-                textbox = None
+                    else:
+                        if glue(textbox, nextbox, prevbox):
+                            # can't modify textbox in place -- this messes
+                            # things up if we want/need to run textboxes()
+                            # twice. Must create a new one.
+                            # textbox += nextbox
+                            textbox = textbox + nextbox
+                        else:
+                            if cache:
+                                page._textboxes_cache.append(textbox)
+                            yield textbox
+                            textbox = nextbox
+                    prevbox = nextbox
+                if textbox:
+                    if cache:
+                        page._textboxes_cache.append(textbox)
+                    yield textbox
+            textbox = None
 
     def median_box_width(self, threshold=0):
         """Returns the median box width of all pages."""
@@ -1046,6 +1064,10 @@ class Page(CompoundElement, OrdinalElement):
     tagname = "div"
     classname = "pdfpage"
     margins = None
+
+    def __init__(self, *args, **kwargs):
+        self._textboxes_cache = None
+        super(Page, self).__init__(*args, **kwargs)
 
     @property
     def id(self):
@@ -1324,7 +1346,7 @@ all text in a Textbox has the same font and size.
         return newstring
                 
 
-    @property
+    @cached_property
     def font(self):
         if self.fontid is not None:
             return LayeredConfig(Defaults(self._fontspec[self.fontid]))

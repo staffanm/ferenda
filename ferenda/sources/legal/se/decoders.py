@@ -184,14 +184,20 @@ class OffsetDecoder20(OffsetDecoder1d):
                 textbox = super(OffsetDecoder20, self).__call__(textbox, fontspecs)
                 # then add the previously procesed elements
                 textbox[:] = decoded + textbox[:]
-            textbox.fontid = newfontid
+            if newfontid != textbox.fontid:
+                # invalidate the cached property
+                del textbox.__dict__['font']
+                textbox.fontid = newfontid
         else:
             textbox = super(OffsetDecoder20, self).__call__(textbox, fontspecs)
             # again, if one or more textelements have an "i" tag, the
             # font for the entire textbox probably shouldn't be
             # specced as an italic ("Kursiv")
             if textbox.font.family == "Times.New.Roman.Kursiv0104" and "i" in [x.tag for x in textbox]:
-                textbox.fontid = self.find_fontid(fontspecs, "Times-Roman", textbox.font.size)
+                newfontid = self.find_fontid(fontspecs, "Times-Roman", textbox.font.size)
+                # invalidate the cached property
+                del textbox.__dict__['font']
+                textbox.fontid = newfontid
         return textbox
 
     def find_fontid(self, fontspecs, family, size):

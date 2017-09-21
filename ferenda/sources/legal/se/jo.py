@@ -188,8 +188,12 @@ class JO(FixedLayoutSource):
                     kwargs = {'lang': getattr(subnode, 'lang', None),
                               'datatype': getattr(subnode, 'datatype', None)}
                     for s in subnode:
-                        if doc.meta.value(URIRef(doc.uri), subnode.predicate):
-                            continue
+                        # A meta node for pred rpubl:diarienummer
+                        # might have two str nodes -- we must not skip
+                        # one
+                        #
+                        # if doc.meta.value(URIRef(doc.uri), subnode.predicate):
+                        #     continue
                         l = Literal(s, **kwargs)
                         meta.add((URIRef(doc.uri), subnode.predicate, l))
                     node.remove(subnode)

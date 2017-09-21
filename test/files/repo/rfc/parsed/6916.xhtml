@@ -1,22 +1,22 @@
 <?xml version='1.0' encoding='utf-8'?>
-<html xmlns:bibo="http://purl.org/ontology/bibo/" xmlns:rfc="http://example.org/ontology/rfc/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:prov="http://www.w3.org/ns/prov#" xmlns:dcterms="http://purl.org/dc/terms/" xmlns="http://www.w3.org/1999/xhtml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd" xml:lang="en" version="XHTML+RDFa 1.1">
+<html xmlns:bibo="http://purl.org/ontology/bibo/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:prov="http://www.w3.org/ns/prov#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:rfc="http://example.org/ontology/rfc/" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns="http://www.w3.org/1999/xhtml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd" version="XHTML+RDFa 1.1" xml:lang="en">
   <head about="http://localhost:8000/res/rfc/6916">
-    <meta xml:lang="" property="rfc:bcpnumber" content="182"/>
-    <meta xml:lang="" property="dcterms:creator" content="R. Gagliano"/>
-    <meta xml:lang="" property="dcterms:creator" content="S. Kent"/>
-    <meta xml:lang="" property="dcterms:creator" content="S. Turner"/>
-    <meta xml:lang="" property="dcterms:identifier" content="RFC 6916"/>
-    <meta xml:lang="" property="dcterms:issn" content="2070-1721"/>
-    <meta datatype="xsd:gYearMonth" property="dcterms:issued" content="2013-04"/>
-    <link href="http://localhost:8000/ext/ietf" rel="dcterms:publisher"/>
-    <meta xml:lang="" property="dcterms:rightsHolder" content="BBN Technologies"/>
-    <meta xml:lang="" property="dcterms:rightsHolder" content="Cisco Systems"/>
-    <meta xml:lang="" property="dcterms:rightsHolder" content="IECA, Inc."/>
-    <link href="http://localhost:8000/dataset/rfc/best-current-practice" rel="dcterms:subject"/>
+    <meta property="rfc:bcpnumber" content="182" xml:lang=""/>
+    <meta property="dcterms:creator" content="R. Gagliano" xml:lang=""/>
+    <meta property="dcterms:creator" content="S. Kent" xml:lang=""/>
+    <meta property="dcterms:creator" content="S. Turner" xml:lang=""/>
+    <meta property="dcterms:identifier" content="RFC 6916" xml:lang=""/>
+    <meta property="dcterms:issn" content="2070-1721" xml:lang=""/>
+    <meta property="dcterms:issued" content="2013-04" datatype="xsd:gYearMonth"/>
+    <link rel="dcterms:publisher" href="http://localhost:8000/ext/ietf"/>
+    <meta property="dcterms:rightsHolder" content="BBN Technologies" xml:lang=""/>
+    <meta property="dcterms:rightsHolder" content="Cisco Systems" xml:lang=""/>
+    <meta property="dcterms:rightsHolder" content="IECA, Inc." xml:lang=""/>
+    <link rel="dcterms:subject" href="http://localhost:8000/dataset/rfc/best-current-practice"/>
     <title property="dcterms:title">Algorithm Agility Procedure for the Resource Public Key Infrastructure (RPKI)</title>
-    <meta xml:lang="en" property="bibo:shortTitle" content="RPKI Algorithm Agility"/>
-    <link href="http://example.org/ontology/rfc/BCP" rel="rdf:type"/>
-    <meta xml:lang="" property="prov:wasGeneratedBy" content="ferenda.sources.tech.rfc.RFC"/>
+    <meta property="bibo:shortTitle" content="RPKI Algorithm Agility" xml:lang="en"/>
+    <link rel="rdf:type" href="http://example.org/ontology/rfc/BCP"/>
+    <meta property="prov:wasGeneratedBy" content="ferenda.sources.tech.rfc.RFC" xml:lang=""/>
   </head>
   <body about="http://localhost:8000/res/rfc/6916">
     <div class="preamblesection" property="dcterms:title" content="Abstract" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#PS1">
@@ -32,9 +32,9 @@
       <p>This document is subject to BCP 78 and the IETF Trust's Legal Provisions Relating to IETF Documents (http://trustee.ietf.org/license-info) in effect on the date of publication of this document. Please review these documents carefully, as they describe your rights and restrictions with respect to this document. Code Components extracted from this document must include Simplified BSD License text as described in <a href="#S4" rel="dcterms:references">Section 4.</a>e of the Trust Legal Provisions and are provided without warranty as described in the Simplified BSD License.</p>
     </div>
     <div class="section" property="dcterms:title" content="Introduction" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#S1">
-      <span href="http://localhost:8000/res/rfc/6916" rel="dcterms:isPartOf"/>
-      <span content="RFC 6916, section 1" property="dcterms:identifier" about="http://localhost:8000/res/rfc/6916#S1"/>
-      <span content="1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6916#S1"/>
+      <span rel="dcterms:isPartOf" href="http://localhost:8000/res/rfc/6916"/>
+      <span about="http://localhost:8000/res/rfc/6916#S1" property="dcterms:identifier" content="RFC 6916, section 1"/>
+      <span about="http://localhost:8000/res/rfc/6916#S1" property="bibo:chapter" content="1"/>
       <pre>   The Resource Public Key Infrastructure (RPKI) must accommodate
    transitions between the public keys used by Certification Authorities
    (CAs).  Transitions of this sort are usually termed "key rollover".
@@ -56,15 +56,15 @@
       <p>For each algorithm transition, an additional document (the algorithm transition timetable) MUST be published (as a BCP) to define the dates for each milestone defined in this document. It will define dates for the phase transitions consistent with the descriptions provided in <a href="#S4" rel="dcterms:references">Section 4.</a> It also will describe how the RPKI community will measure the readiness of CAs and RPs to transition to each phase. CAs publish certificates, CRLs, and other signed objects under the new algorithm suite as the transition progresses. This provides visibility into the deployment of the new algorithm suite, enabling the community to evaluate deployment progress. The transition procedure allows CAs to remove old certificates, CRLs, and signed products after the twilight date, which provides the ability to observe and measure the withdrawal of the old algorithm suite. Thus, the phases defined in this document enable the community to evaluate the progress of the transition. The timetable document will also describe procedures to amend the timetable if problems arise in implementing later phases of the transition. It is RECOMMENDED that the timetable document be developed by representatives of the RPKI community, e.g., IANA, Internet Registries, and network operators.</p>
     </div>
     <div class="section" property="dcterms:title" content="Requirements Notation" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#S2">
-      <span href="http://localhost:8000/res/rfc/6916" rel="dcterms:isPartOf"/>
-      <span content="RFC 6916, section 2" property="dcterms:identifier" about="http://localhost:8000/res/rfc/6916#S2"/>
-      <span content="2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6916#S2"/>
+      <span rel="dcterms:isPartOf" href="http://localhost:8000/res/rfc/6916"/>
+      <span about="http://localhost:8000/res/rfc/6916#S2" property="dcterms:identifier" content="RFC 6916, section 2"/>
+      <span about="http://localhost:8000/res/rfc/6916#S2" property="bibo:chapter" content="2"/>
       <p>The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", "NOT RECOMMENDED" and "OPTIONAL" in this document are to be interpreted as described in <a href="http://localhost:8000/res/rfc/2119" rel="dcterms:references">[RFC2119]</a>.</p>
     </div>
     <div class="section" property="dcterms:title" content="Terminology" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#S3">
-      <span href="http://localhost:8000/res/rfc/6916" rel="dcterms:isPartOf"/>
-      <span content="RFC 6916, section 3" property="dcterms:identifier" about="http://localhost:8000/res/rfc/6916#S3"/>
-      <span content="3" property="bibo:chapter" about="http://localhost:8000/res/rfc/6916#S3"/>
+      <span rel="dcterms:isPartOf" href="http://localhost:8000/res/rfc/6916"/>
+      <span about="http://localhost:8000/res/rfc/6916#S3" property="dcterms:identifier" content="RFC 6916, section 3"/>
+      <span about="http://localhost:8000/res/rfc/6916#S3" property="bibo:chapter" content="3"/>
       <p>This document assumes that the reader is familiar with the terms and concepts described in "Internet X.509 Public Key Infrastructure Certificate and Certificate Revocation List (CRL) Profile" <a href="http://localhost:8000/res/rfc/5280" rel="dcterms:references">[RFC5280]</a>, "X.509 Extensions for IP Addresses and AS Identifiers" <a href="http://localhost:8000/res/rfc/3779" rel="dcterms:references">[RFC3779]</a>, and "A Profile for Resource Certificate Repository Structure" <a href="http://localhost:8000/res/rfc/6481" rel="dcterms:references">[RFC6481]</a>. Additional terms and conventions used in examples are provided below.</p>
       <pre>   Algorithm migration:  A planned transition from one signature and
                hash algorithm to a new signature and hash algorithm.</pre>
@@ -104,14 +104,14 @@
                same parent CA certificate</pre>
     </div>
     <div class="section" property="dcterms:title" content="Key Rollover Steps for Algorithm Migration" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#S4">
-      <span href="http://localhost:8000/res/rfc/6916" rel="dcterms:isPartOf"/>
-      <span content="RFC 6916, section 4" property="dcterms:identifier" about="http://localhost:8000/res/rfc/6916#S4"/>
-      <span content="4" property="bibo:chapter" about="http://localhost:8000/res/rfc/6916#S4"/>
+      <span rel="dcterms:isPartOf" href="http://localhost:8000/res/rfc/6916"/>
+      <span about="http://localhost:8000/res/rfc/6916#S4" property="dcterms:identifier" content="RFC 6916, section 4"/>
+      <span about="http://localhost:8000/res/rfc/6916#S4" property="bibo:chapter" content="4"/>
       <p>The "current" RPKI algorithm suite (Suite A) is defined in the RPKI CP document, by reference to <a href="http://localhost:8000/res/rfc/6485" rel="dcterms:references">[RFC6485]</a>. When a migration of the RPKI algorithm suite is needed, the first step MUST be an update of <a href="http://localhost:8000/res/rfc/6485" rel="dcterms:references">[RFC6485]</a> to define the new algorithm suite. The algorithm transition timeline document MUST also be published (as a BCP) to inform the community of the dates selected for milestones in the transition process, as described in <a href="#S4.1" rel="dcterms:references">Section 4.1.</a></p>
       <div class="subsection" property="dcterms:title" content="Milestones Definition" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#S4.1">
-        <span href="http://localhost:8000/res/rfc/6916#S4" rel="dcterms:isPartOf"/>
-        <span content="RFC 6916, section 4.1" property="dcterms:identifier" about="http://localhost:8000/res/rfc/6916#S4.1"/>
-        <span content="4.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6916#S4.1"/>
+        <span rel="dcterms:isPartOf" href="http://localhost:8000/res/rfc/6916#S4"/>
+        <span about="http://localhost:8000/res/rfc/6916#S4.1" property="dcterms:identifier" content="RFC 6916, section 4.1"/>
+        <span about="http://localhost:8000/res/rfc/6916#S4.1" property="bibo:chapter" content="4.1"/>
         <pre>   CA Ready Algorithm B Date:  After this date, all non-leaf CAs MUST be
                ready to process a request from a child CA to issue a
                certificate under the Algorithm Suite B.  All CAs
@@ -133,9 +133,9 @@
                publication points.</pre>
       </div>
       <div class="subsection" property="dcterms:title" content="Process Overview" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#S4.2">
-        <span href="http://localhost:8000/res/rfc/6916#S4" rel="dcterms:isPartOf"/>
-        <span content="RFC 6916, section 4.2" property="dcterms:identifier" about="http://localhost:8000/res/rfc/6916#S4.2"/>
-        <span content="4.2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6916#S4.2"/>
+        <span rel="dcterms:isPartOf" href="http://localhost:8000/res/rfc/6916#S4"/>
+        <span about="http://localhost:8000/res/rfc/6916#S4.2" property="dcterms:identifier" content="RFC 6916, section 4.2"/>
+        <span about="http://localhost:8000/res/rfc/6916#S4.2" property="bibo:chapter" content="4.2"/>
         <p>The migration process described in this document involves a series of steps that MUST be executed in chronological order by CAs and RPs. The only milestone at which both CAs and RPs take action at the same time is the EOL Date. Due to the decentralized nature of the RPKI infrastructure, it is expected that an algorithm transition will span several years.</p>
         <pre>   In order to facilitate the transition, CAs will start issuing
    certificates using Algorithm B in a hierarchical, top-down fashion.
@@ -179,9 +179,9 @@
         <p>Two situations have been identified that motivate pausing or rolling back the transition process. The first situation arises if the RPKI community is not ready to make the transition. For example, many CAs might not be prepared to issue signed products under Suite B, or many RPs might not be ready to process Suite B products. Under these circumstances, the timetable MUST be reissued, postponing the date for the phase in question and pushing back the dates for later phases. The other situation arises if, during the transition, serious concerns arise about the security of the Suite B algorithms. Such concerns would motivate terminating the transition and rolling back signed products, i.e., reverting to Suite A. In this case, the timetable MUST be republished, and the RPKI algorithm document MUST be superseded. The phase descriptions below allude to these two situations, as appropriate.</p>
       </div>
       <div class="subsection" property="dcterms:title" content="Phase 0" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#S4.3">
-        <span href="http://localhost:8000/res/rfc/6916#S4" rel="dcterms:isPartOf"/>
-        <span content="RFC 6916, section 4.3" property="dcterms:identifier" about="http://localhost:8000/res/rfc/6916#S4.3"/>
-        <span content="4.3" property="bibo:chapter" about="http://localhost:8000/res/rfc/6916#S4.3"/>
+        <span rel="dcterms:isPartOf" href="http://localhost:8000/res/rfc/6916#S4"/>
+        <span about="http://localhost:8000/res/rfc/6916#S4.3" property="dcterms:identifier" content="RFC 6916, section 4.3"/>
+        <span about="http://localhost:8000/res/rfc/6916#S4.3" property="bibo:chapter" content="4.3"/>
         <p>Phase 0 is the steady-state phase of the process; throughout this phase, Algorithm Suite A is the only supported algorithm suite in the RPKI. Phase 0 is also the steady state for the RPKI.</p>
         <p>During Phase 0, CAs X, Y, and Z are required to generate signed product sets using only Algorithm Suite A. Also, RPs are required to validate signed product sets issued using only Algorithm Suite A.</p>
         <p>The following figure shows an example of the structure of signed objects in the repository, indicating the algorithm suites in use and showing the relationships between three CAs (X, Y, and Z) that form a certification chain. Vertical alignment in the figure indicates objects signed by the same CA using the same private key. The differences in horizontal indentation also represent the use of different publication points for objects signed by different CAs. The characters "|-&gt;" are used for visualization purposes for both the signing relationship and the publication point change. For example, the objects CA-Y-Certificate-Algorithm-Suite-A, CA-X-CRL-Algorithm- Suite-A, and CA-X-Signed-Objects-Algorithm-Suite-A are all signed using the private key corresponding to CA-X-Certificate-Algorithm- Suite-A and published at CA X's corresponding publication point.</p>
@@ -196,16 +196,16 @@
            |-&gt; CA-X-Signed-Objects-Algorithm-Suite-A</pre>
         <p>Note: Cert-XA represents the certificate for CA X, which is signed using Algorithm Suite A.</p>
         <div class="subsubsection" property="dcterms:title" content="Milestone 1" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#S4.3.1">
-          <span href="http://localhost:8000/res/rfc/6916#S4.3" rel="dcterms:isPartOf"/>
-          <span content="RFC 6916, section 4.3.1" property="dcterms:identifier" about="http://localhost:8000/res/rfc/6916#S4.3.1"/>
-          <span content="4.3.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6916#S4.3.1"/>
+          <span rel="dcterms:isPartOf" href="http://localhost:8000/res/rfc/6916#S4.3"/>
+          <span about="http://localhost:8000/res/rfc/6916#S4.3.1" property="dcterms:identifier" content="RFC 6916, section 4.3.1"/>
+          <span about="http://localhost:8000/res/rfc/6916#S4.3.1" property="bibo:chapter" content="4.3.1"/>
           <p>The first milestone initiates the migration process. It updates <a href="http://localhost:8000/res/rfc/6485" rel="dcterms:references">[RFC6485]</a> with the following definitions for the RPKI:</p>
-          <ul>
+          <ul type="disc">
             <li>Algorithm Suite A</li>
             <li>Algorithm Suite B</li>
           </ul>
           <p>Additionally, the new algorithm transition timeline document MUST be published with the following information:</p>
-          <ul>
+          <ul type="disc">
             <li>CA Ready Algorithm B Date</li>
             <li>CA Go Algorithm B Date</li>
             <li>RP Ready Algorithm B Date</li>
@@ -217,9 +217,9 @@
         </div>
       </div>
       <div class="subsection" property="dcterms:title" content="Phase 1" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#S4.4">
-        <span href="http://localhost:8000/res/rfc/6916#S4" rel="dcterms:isPartOf"/>
-        <span content="RFC 6916, section 4.4" property="dcterms:identifier" about="http://localhost:8000/res/rfc/6916#S4.4"/>
-        <span content="4.4" property="bibo:chapter" about="http://localhost:8000/res/rfc/6916#S4.4"/>
+        <span rel="dcterms:isPartOf" href="http://localhost:8000/res/rfc/6916#S4"/>
+        <span about="http://localhost:8000/res/rfc/6916#S4.4" property="dcterms:identifier" content="RFC 6916, section 4.4"/>
+        <span about="http://localhost:8000/res/rfc/6916#S4.4" property="bibo:chapter" content="4.4"/>
         <p>Phase 1 starts at the CA Ready Algorithm B Date. During Phase 1, all non-leaf CAs MUST be ready to process a request from a child CA to issue or revoke a certificate using Algorithm Suite B. If it is determined that a substantial number of CAs are not ready, the algorithm transition timeline document MUST be reissued, as noted in <a href="#S4.2" rel="dcterms:references">Section 4.2.</a> However, CAs that are capable of issuing Suite B certificates may continue to do so, if requested by their child CAs. As this phase does not require any RPs to process signed objects under Suite B, and since Suite B product sets SHOULD be stored at independent publication points, there is no adverse impact on RPs. If the Suite B algorithm is deemed unsuitable, the algorithm transition timeline and the algorithm specification documents MUST be replaced, and Algorithm Suite B MUST be deprecated using the process described in <a href="#S10" rel="dcterms:references">Section 10.</a></p>
         <p>Because the transition will happen using a hierarchical, top-down model, a child CA will be able to issue certificates using Algorithm Suite B only after its parent CA has issued its own. The RPKI provisioning protocol can identify if a parent CA is capable of issuing certificates using Algorithm Suite B and can identify the corresponding algorithm suite in each Certificate Signing Request (CSR; see <a href="#S5" rel="dcterms:references">Section 5</a>). During much of this phase, the Suite B product tree will be incomplete, i.e., not all CAs will have issued products under Suite B. Thus, for production purposes, RPs MUST fetch and validate only Suite A products. Suite B products should be fetched and processed only for testing purposes.</p>
         <p>The following figure shows the status of repository entries for the three example CAs during this phase. Two distinct certificate chains are maintained, and CA Z has not yet requested any material using Algorithm Suite B.</p>
@@ -240,9 +240,9 @@
            |-&gt; CA-X-Signed-Objects-Algorithm-Suite-B</pre>
       </div>
       <div class="subsection" property="dcterms:title" content="Phase 2" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#S4.5">
-        <span href="http://localhost:8000/res/rfc/6916#S4" rel="dcterms:isPartOf"/>
-        <span content="RFC 6916, section 4.5" property="dcterms:identifier" about="http://localhost:8000/res/rfc/6916#S4.5"/>
-        <span content="4.5" property="bibo:chapter" about="http://localhost:8000/res/rfc/6916#S4.5"/>
+        <span rel="dcterms:isPartOf" href="http://localhost:8000/res/rfc/6916#S4"/>
+        <span about="http://localhost:8000/res/rfc/6916#S4.5" property="dcterms:identifier" content="RFC 6916, section 4.5"/>
+        <span about="http://localhost:8000/res/rfc/6916#S4.5" property="bibo:chapter" content="4.5"/>
         <p>Phase 2 starts at the CA Go Algorithm B Date. At the start of this phase, each signed product set MUST be available using both Algorithm Suite A and Algorithm Suite B. Thus, prior to the start of this phase, every CA MUST ensure that there is a Suite B product corresponding to each Suite A product that the CA has issued. Throughout this phase, each CA MUST maintain this correspondence. During this phase, RPs MUST be prepared to validate sets issued using Algorithm Suite A and MAY be prepared to validate sets issued using the Algorithm Suite B.</p>
         <pre>   If it is determined that a substantial number of CAs are not ready,
    the algorithm transition timeline document MUST be reissued, as noted
@@ -279,9 +279,9 @@
            |-&gt; CA-X-Signed-Objects-Algorithm-Suite-B</pre>
       </div>
       <div class="subsection" property="dcterms:title" content="Phase 3" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#S4.6">
-        <span href="http://localhost:8000/res/rfc/6916#S4" rel="dcterms:isPartOf"/>
-        <span content="RFC 6916, section 4.6" property="dcterms:identifier" about="http://localhost:8000/res/rfc/6916#S4.6"/>
-        <span content="4.6" property="bibo:chapter" about="http://localhost:8000/res/rfc/6916#S4.6"/>
+        <span rel="dcterms:isPartOf" href="http://localhost:8000/res/rfc/6916#S4"/>
+        <span about="http://localhost:8000/res/rfc/6916#S4.6" property="dcterms:identifier" content="RFC 6916, section 4.6"/>
+        <span about="http://localhost:8000/res/rfc/6916#S4.6" property="bibo:chapter" content="4.6"/>
         <pre>   Phase 3 starts at the RP Ready Algorithm B Date.  During this phase,
    all signed product sets are available using both algorithm suites,
    and all RPs MUST be able to validate them.  (The correspondence
@@ -294,9 +294,9 @@
         <p>There are no changes to the CA behavior throughout this phase.</p>
       </div>
       <div class="subsection" property="dcterms:title" content="Phase 4" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#S4.7">
-        <span href="http://localhost:8000/res/rfc/6916#S4" rel="dcterms:isPartOf"/>
-        <span content="RFC 6916, section 4.7" property="dcterms:identifier" about="http://localhost:8000/res/rfc/6916#S4.7"/>
-        <span content="4.7" property="bibo:chapter" about="http://localhost:8000/res/rfc/6916#S4.7"/>
+        <span rel="dcterms:isPartOf" href="http://localhost:8000/res/rfc/6916#S4"/>
+        <span about="http://localhost:8000/res/rfc/6916#S4.7" property="dcterms:identifier" content="RFC 6916, section 4.7"/>
+        <span about="http://localhost:8000/res/rfc/6916#S4.7" property="bibo:chapter" content="4.7"/>
         <p>Phase 4 starts at the Twilight Date. At that date, Algorithm A is labeled as "old" and the Algorithm B is labeled as "current".</p>
         <p>During this phase, all signed product sets MUST be issued using Algorithm Suite B and MAY be issued using Algorithm Suite A. All signed products sets issued using Suite B MUST be published at their corresponding publication points. Signed products sets issued using Suite A might not be available at their corresponding publication points. Every RP MUST validate signed product sets using Suite B. RPs MAY validate signed product sets using Suite A. However, RPs SHOULD NOT assume that the collection of Suite A product sets is complete. Thus, RPs SHOULD make use of only Suite B products sets. (See <a href="#S6" rel="dcterms:references">Section 6</a> for further details.)</p>
         <p>If it is determined that many RPs are not capable of processing the new algorithm suite, the algorithm transition timeline document MUST be reissued, pushing back the date for this and the next milestone. The document MUST require the CA not to remove Suite A product sets if this phase is delayed. If Algorithm Suite B is deemed unsuitable, the algorithm transition timeline and the algorithm specification documents MUST be replaced, Algorithm Suite B MUST be deprecated using the process described in <a href="#S10" rel="dcterms:references">Section 10</a>, and CAs MUST NOT remove Suite A product sets. At this stage, RPs are still capable of processing Suite A signed products, so the RPKI is still viable.</p>
@@ -318,20 +318,20 @@
            |-&gt; CA-X-Signed-Objects-Algorithm-Suite-B</pre>
       </div>
       <div class="subsection" property="dcterms:title" content="Return to Phase 0" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#S4.8">
-        <span href="http://localhost:8000/res/rfc/6916#S4" rel="dcterms:isPartOf"/>
-        <span content="RFC 6916, section 4.8" property="dcterms:identifier" about="http://localhost:8000/res/rfc/6916#S4.8"/>
-        <span content="4.8" property="bibo:chapter" about="http://localhost:8000/res/rfc/6916#S4.8"/>
+        <span rel="dcterms:isPartOf" href="http://localhost:8000/res/rfc/6916#S4"/>
+        <span about="http://localhost:8000/res/rfc/6916#S4.8" property="dcterms:identifier" content="RFC 6916, section 4.8"/>
+        <span about="http://localhost:8000/res/rfc/6916#S4.8" property="bibo:chapter" content="4.8"/>
         <p>The EOL Date triggers the return to Phase 0 (steady state). At this point, the old algorithm suite, Algorithm Suite A, MUST be deprecated using the process described in <a href="#S10" rel="dcterms:references">Section 10.</a></p>
         <p>This phase closes the loop, as the new algorithm suite (Algorithm Suite B) is now the only required algorithm suite in RPKI. From this point forward, this suite is referred to as Algorithm Suite A.</p>
         <p>If it is determined that many RPs are not capable of processing the new algorithm suite, the algorithm transition timeline document MUST be reissued, pushing back the date for this milestone.</p>
       </div>
     </div>
     <div class="section" property="dcterms:title" content="Support for Multiple Algorithms in the RPKI Provisioning Protocol" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#S5">
-      <span href="http://localhost:8000/res/rfc/6916" rel="dcterms:isPartOf"/>
-      <span content="RFC 6916, section 5" property="dcterms:identifier" about="http://localhost:8000/res/rfc/6916#S5"/>
-      <span content="5" property="bibo:chapter" about="http://localhost:8000/res/rfc/6916#S5"/>
+      <span rel="dcterms:isPartOf" href="http://localhost:8000/res/rfc/6916"/>
+      <span about="http://localhost:8000/res/rfc/6916#S5" property="dcterms:identifier" content="RFC 6916, section 5"/>
+      <span about="http://localhost:8000/res/rfc/6916#S5" property="bibo:chapter" content="5"/>
       <p>The migration described in this document is a top-down process where two synchronization issues need to be solved between child and parent CAs:</p>
-      <ul>
+      <ul type="disc">
         <li>A child CA needs to identify which algorithm suites are supported
       by its parent CA.</li>
         <li>A child CA needs to signal which algorithm suite should be used by
@@ -356,9 +356,9 @@
       <p>Upon receipt of a certificate request from a child CA, a parent CA will verify the PoP of the private key. If a child CA requests the issuing of a certificate using an algorithm suite that does not match a resource class, the PoP validation will fail and the request will not be performed.</p>
     </div>
     <div class="section" property="dcterms:title" content="Validation of Multiple Instances of Signed Products" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#S6">
-      <span href="http://localhost:8000/res/rfc/6916" rel="dcterms:isPartOf"/>
-      <span content="RFC 6916, section 6" property="dcterms:identifier" about="http://localhost:8000/res/rfc/6916#S6"/>
-      <span content="6" property="bibo:chapter" about="http://localhost:8000/res/rfc/6916#S6"/>
+      <span rel="dcterms:isPartOf" href="http://localhost:8000/res/rfc/6916"/>
+      <span about="http://localhost:8000/res/rfc/6916#S6" property="dcterms:identifier" content="RFC 6916, section 6"/>
+      <span about="http://localhost:8000/res/rfc/6916#S6" property="bibo:chapter" content="6"/>
       <p>During Phases 1, 2, 3, and 4, two algorithm suites will be valid simultaneously in RPKI. In this section, we describe the RP behavior when validating corresponding signed products using different algorithm suites.</p>
       <p>During Phase 1, two corresponding instances MAY be available for each signed product, one signed under Algorithm Suite A and one under Algorithm Suite B. As noted in <a href="#S4.4" rel="dcterms:references">Section 4.4</a>, in this phase there is a preference for Suite A product sets. All products are available under Suite A, while only some products may be available under Suite B. For production purposes, an RP MAY fetch and validate only Suite A products. Suite B products SHOULD be fetched and validated only for test purposes. When product sets exist under both suites, they should yield equivalent results, to facilitate testing. (It is not possible to directly compare Suite A and Suite B product sets, because certificates, CRLs, and manifests will appear syntactically</p>
       <p>different. However, the output of the process, i.e., the ROA payloads -- Autonomous System number and address prefix data -- SHOULD match, modulo timing issues.)</p>
@@ -367,29 +367,29 @@
       <p>During Phase 4, only Suite B product sets are required to be present for all RPKI entities, as per <a href="#S4.7" rel="dcterms:references">Section 4.7.</a> Thus, RPs SHOULD retrieve and validate only these product sets. Retrieval of Suite A products sets may yield an incomplete set of signed products and is NOT RECOMMENDED.</p>
     </div>
     <div class="section" property="dcterms:title" content="Revocation" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#S7">
-      <span href="http://localhost:8000/res/rfc/6916" rel="dcterms:isPartOf"/>
-      <span content="RFC 6916, section 7" property="dcterms:identifier" about="http://localhost:8000/res/rfc/6916#S7"/>
-      <span content="7" property="bibo:chapter" about="http://localhost:8000/res/rfc/6916#S7"/>
+      <span rel="dcterms:isPartOf" href="http://localhost:8000/res/rfc/6916"/>
+      <span about="http://localhost:8000/res/rfc/6916#S7" property="dcterms:identifier" content="RFC 6916, section 7"/>
+      <span about="http://localhost:8000/res/rfc/6916#S7" property="bibo:chapter" content="7"/>
       <p>The algorithm migration process mandates the maintenance of two parallel but equivalent certification hierarchies during Phases 2 and 3 of the process. During these phases, a CA MUST revoke and request revocation of certificates consistently under both algorithm suites. When not performing a key rollover operation (as described in <a href="#S8" rel="dcterms:references">Section 8</a>), a CA requesting the revocation of its certificate during these two phases MUST perform that request for both algorithm suites (A and B). A non-leaf CA SHOULD NOT verify that its child CAs comply with this requirement. Note that a CA MUST request revocation of its certificate relative to a specific algorithm suite using the mechanism described in <a href="#S5" rel="dcterms:references">Section 5</a></p>
       <p>During Phase 1, a CA that revokes a certificate under Suite A SHOULD revoke the corresponding certificate under Suite B if that certificate exists. During Phase 4, a CA that revokes a certificate under Suite B SHOULD revoke the corresponding certificate under Suite A if that certificate exists.</p>
       <p>During Phase 1, a CA may revoke certificates under Suite B without revoking them under Suite A, since the Suite B products are for test purposes. During Phase 4, a CA may revoke certificates issued under Suite A without revoking them under Suite B, since Suite A products are being deprecated.</p>
     </div>
     <div class="section" property="dcterms:title" content="Key Rollover" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#S8">
-      <span href="http://localhost:8000/res/rfc/6916" rel="dcterms:isPartOf"/>
-      <span content="RFC 6916, section 8" property="dcterms:identifier" about="http://localhost:8000/res/rfc/6916#S8"/>
-      <span content="8" property="bibo:chapter" about="http://localhost:8000/res/rfc/6916#S8"/>
+      <span rel="dcterms:isPartOf" href="http://localhost:8000/res/rfc/6916"/>
+      <span about="http://localhost:8000/res/rfc/6916#S8" property="dcterms:identifier" content="RFC 6916, section 8"/>
+      <span about="http://localhost:8000/res/rfc/6916#S8" property="bibo:chapter" content="8"/>
       <p>Key rollover (without algorithm changes) is effected independently for each algorithm suite and MUST follow the process described in <a href="http://localhost:8000/res/rfc/6489" rel="dcterms:references">[RFC6489]</a>.</p>
     </div>
     <div class="section" property="dcterms:title" content="Repository Structure" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#S9">
-      <span href="http://localhost:8000/res/rfc/6916" rel="dcterms:isPartOf"/>
-      <span content="RFC 6916, section 9" property="dcterms:identifier" about="http://localhost:8000/res/rfc/6916#S9"/>
-      <span content="9" property="bibo:chapter" about="http://localhost:8000/res/rfc/6916#S9"/>
+      <span rel="dcterms:isPartOf" href="http://localhost:8000/res/rfc/6916"/>
+      <span about="http://localhost:8000/res/rfc/6916#S9" property="dcterms:identifier" content="RFC 6916, section 9"/>
+      <span about="http://localhost:8000/res/rfc/6916#S9" property="bibo:chapter" content="9"/>
       <p>The two parallel hierarchies that will exist during the transition process SHOULD have independent publications points. The repository structures for each algorithm suite are described in <a href="http://localhost:8000/res/rfc/6481" rel="dcterms:references">[RFC6481]</a>.</p>
     </div>
     <div class="section" property="dcterms:title" content="Deprecating an Algorithm Suite" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#S10">
-      <span href="http://localhost:8000/res/rfc/6916" rel="dcterms:isPartOf"/>
-      <span content="RFC 6916, section 10" property="dcterms:identifier" about="http://localhost:8000/res/rfc/6916#S10"/>
-      <span content="10" property="bibo:chapter" about="http://localhost:8000/res/rfc/6916#S10"/>
+      <span rel="dcterms:isPartOf" href="http://localhost:8000/res/rfc/6916"/>
+      <span about="http://localhost:8000/res/rfc/6916#S10" property="dcterms:identifier" content="RFC 6916, section 10"/>
+      <span about="http://localhost:8000/res/rfc/6916#S10" property="bibo:chapter" content="10"/>
       <p>To deprecate an algorithm suite, the following process MUST be executed by every CA in the RPKI:</p>
       <pre>   1.  Each CA MUST cease issuing certificates under the suite.  This
        means that any request for a CA certificate from a child will be
@@ -419,24 +419,24 @@
       <p>CAs in the RPKI hierarchy may become aware of the deprecation of the algorithm suite at different times and may execute the procedure above asynchronously relative to one another. Thus, for example, a CA may request revocation of its CA certificate, only to learn that the certificate has already been revoked by the issuing CA. The revocation of a CA certificate makes the CRL and manifest issued under it incapable of validation. The asynchronous execution of this procedure likely will result in transient "inconsistencies" among the publication points associated with the deprecated algorithm suite. However, these inconsistencies should yield "fail-safe" results, i.e., the objects signed under the deprecated suite should be rejected by RPs.</p>
     </div>
     <div class="section" property="dcterms:title" content="Security Considerations" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#S11">
-      <span href="http://localhost:8000/res/rfc/6916" rel="dcterms:isPartOf"/>
-      <span content="RFC 6916, section 11" property="dcterms:identifier" about="http://localhost:8000/res/rfc/6916#S11"/>
-      <span content="11" property="bibo:chapter" about="http://localhost:8000/res/rfc/6916#S11"/>
+      <span rel="dcterms:isPartOf" href="http://localhost:8000/res/rfc/6916"/>
+      <span about="http://localhost:8000/res/rfc/6916#S11" property="dcterms:identifier" content="RFC 6916, section 11"/>
+      <span about="http://localhost:8000/res/rfc/6916#S11" property="bibo:chapter" content="11"/>
       <p>An algorithm transition in RPKI should be a very infrequent event, and it requires wide community consensus. The events that may lead to an algorithm transition may be related to a weakness of the cryptographic strength of the algorithm suite in use by RPKI, which is normal to happen over time. The procedures described in this document mean that it will take years to complete an algorithm transition. During that time, the RPKI system will be vulnerable to any cryptographic weakness that may have triggered this procedure (e.g., a downgrade attack).</p>
       <p>This document does not describe an emergency mechanism for algorithm migration. Due to the distributed nature of RPKI and the very large number of CAs and RPs, the authors do not believe it is feasible to effect an emergency algorithm migration procedure.</p>
       <p>If a CA does not complete its migration to the new algorithm suite as described in this document (after the EOL of the "old" algorithm suite), its signed product set will no longer be valid. Consequently, the RPKI may, at the end of Phase 4, have a smaller number of valid signed products than before starting the process. Conversely, an RP that does not follow this process will lose the ability to validate signed products issued under the new algorithm</p>
       <p>suite. The resulting incomplete view of routing information from the RPKI (as a result of a failure by CAs or RPs to complete the transition) could degrade routing in the public Internet.</p>
     </div>
     <div class="section" property="dcterms:title" content="Acknowledgements" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#S12">
-      <span href="http://localhost:8000/res/rfc/6916" rel="dcterms:isPartOf"/>
-      <span content="RFC 6916, section 12" property="dcterms:identifier" about="http://localhost:8000/res/rfc/6916#S12"/>
-      <span content="12" property="bibo:chapter" about="http://localhost:8000/res/rfc/6916#S12"/>
+      <span rel="dcterms:isPartOf" href="http://localhost:8000/res/rfc/6916"/>
+      <span about="http://localhost:8000/res/rfc/6916#S12" property="dcterms:identifier" content="RFC 6916, section 12"/>
+      <span about="http://localhost:8000/res/rfc/6916#S12" property="bibo:chapter" content="12"/>
       <p>The authors would like to acknowledge the work of the SIDR working group co-chairs (Sandra Murphy, Chris Morrow, and Alexey Melnikov) as well as the contributions given by Geoff Huston, Arturo Servin, Brian Weis, Terry Manderson, Brian Dickson, David Black, and Danny McPherson.</p>
     </div>
     <div class="section" property="dcterms:title" content="Normative References" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6916#S13">
-      <span href="http://localhost:8000/res/rfc/6916" rel="dcterms:isPartOf"/>
-      <span content="RFC 6916, section 13" property="dcterms:identifier" about="http://localhost:8000/res/rfc/6916#S13"/>
-      <span content="13" property="bibo:chapter" about="http://localhost:8000/res/rfc/6916#S13"/>
+      <span rel="dcterms:isPartOf" href="http://localhost:8000/res/rfc/6916"/>
+      <span about="http://localhost:8000/res/rfc/6916#S13" property="dcterms:identifier" content="RFC 6916, section 13"/>
+      <span about="http://localhost:8000/res/rfc/6916#S13" property="bibo:chapter" content="13"/>
       <pre>   <a href="http://localhost:8000/res/rfc/2119" rel="dcterms:references">[RFC2119]</a>  Bradner, S., "Key words for use in RFCs to Indicate
               Requirement Levels", BCP 14, <a href="http://localhost:8000/res/rfc/2119" rel="dcterms:references">RFC 2119</a>, March 1997.</pre>
       <pre>   <a href="http://localhost:8000/res/rfc/3779" rel="dcterms:references">[RFC3779]</a>  Lynn, C., Kent, S., and K. Seo, "X.509 Extensions for IP
