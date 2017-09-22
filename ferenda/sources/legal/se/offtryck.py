@@ -435,12 +435,22 @@ class Offtryck(SwedishLegalSource):
                                 # IDs for some named laws. Reuse these when
                                 # parsing the bulk of the text.
                                 self.refparser._legalrefparser.currentlynamedlaws.update(self.sfsparser.currentlynamedlaws)
+
+                            hits_before = self.refparser._legalrefparser.tuple_to_uri.cache_info().hits
                             body = self.refparser.parse_recursive(body)
                             seen = self.refparser.seen_strings
                             proc = self.refparser.parsed_strings
                             refs = self.refparser.found_refs
-                            cacheinfo = self.refparser._legalrefparser.tuple_to_uri.cache_info()
-                            self.log.info("refparser: Seen %s, processed %s (%s %%) - found %s refs (%s coin calls were avoided)" % (seen, proc, (proc / seen) * 100, refs, cacheinfo.hits))
+                            hits = self.refparser._legalrefparser.tuple_to_uri.cache_info().hits - hits_before
+                            if refs:
+                                avoided = (hits/refs)
+                            else:
+                                avoided = 1
+                            self.log.info("refparser: Seen %s, processed %s (%.3f %%) - "
+                                          "found %s refs. %s coin calls (%.3f %%) were avoided)" %
+                                          (seen, proc, (proc / seen) * 100, refs,
+                                           hits, avoided * 100))
+                            self.refparser.reset()
                     elif tag in ('frontmatter', 'endregister'):
                         # Frontmatter and endregister is defined as pages with
                         # no meaningful content (cover page, edition notice,

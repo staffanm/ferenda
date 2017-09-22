@@ -668,7 +668,7 @@ class SwedishLegalSource(DocumentRepository):
         rawhead = self.extract_head(fp, basefile)
         attribs = self.extract_metadata(rawhead, basefile)
         # examine fp to see if we have a patchdescription
-        if hasattr(fp, 'patchdescription') and 'patchdescription' not in attribs:
+        if getattr(fp, 'patchdescription', None) and 'patchdescription' not in attribs:
             # FIXME: we shouldn't use rinfoex: in canonical code. Is
             # there anything in prov: or somewhere else that could be
             # used to signify description of a patch?
@@ -1402,6 +1402,12 @@ class SwedishCitationParser(CitationParser):
         self._legalrefparser.reset()
         self._currenturl = None
         self._currentattribs = None
+        # various perf counters
+        self.seen_strings = 0
+        self.parsed_strings = 0
+        self.found_refs = 0
+        
+        
 
     def parse_recursive(self, part, predicate="dcterms:references"):
         if hasattr(part, 'about'):

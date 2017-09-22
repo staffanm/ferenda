@@ -11,6 +11,7 @@ from io import StringIO
 import os
 import re
 import json
+from functools import partial
 
 import requests
 import requests.exceptions
@@ -244,56 +245,73 @@ class Riksdagen(Offtryck, FixedLayoutSource):
                 "  %s: %s and all associated files unchanged" % (basefile, xmlfile))
 
     def downloaded_to_intermediate(self, basefile):
-        # first check against our "blacklist-light":
-        downloaded_path = self.store.downloaded_path(basefile,
-                                                     attachment="index.pdf")
-        downloaded_path_html = self.store.downloaded_path(basefile,
-                                                          attachment="index.html")
-        if not os.path.exists(downloaded_path):
-            if os.path.exists(downloaded_path_html):
-                # attempt to parse HTML instead
-                return open(downloaded_path_html)
-            else:
-                # just grab the HTML from the XML file itself...
-                tree = etree.parse(self.store.downloaded_path(basefile))
-                html = tree.getroot().find("dokument").find("html")
-            if html is not None:
-                return StringIO(html.text)
-            else:
-                return StringIO("<html><h1>Dokumenttext saknas</h1></html>")
 
-        intermediate_path = self.store.intermediate_path(basefile)
-        intermediate_path += ".bz2" if self.config.compress == "bz2" else ""
-        # if a compressed bz2 file is > 5 MB, it's just too damn big
-        if os.path.exists(intermediate_path) and os.path.getsize(intermediate_path) > 5*1024*1024:
-            raise ParseError("%s: %s is just too damn big (%s bytes)" % 
-                             (basefile, intermediate_path, 
-                              os.path.getsize(intermediate_path)))
-        intermediate_dir = os.path.dirname(intermediate_path)
-        convert_to_pdf = not downloaded_path.endswith(".pdf")
-        keep_xml = "bz2" if self.config.compress == "bz2" else True
-        reader = StreamingPDFReader()
-        try:
-            res = reader.convert(filename=downloaded_path,
-                                 workdir=intermediate_dir,
-                                 images=self.config.pdfimages,
-                                 convert_to_pdf=convert_to_pdf,
-                                 keep_xml=keep_xml)
-        except errors.PDFFileIsEmpty:
-            self.log.debug("%s: PDF had no textcontent, trying OCR" % basefile)
-            res = reader.convert(filename=downloaded_path,
-                                 workdir=intermediate_dir,
-                                 images=self.config.pdfimages,
-                                 convert_to_pdf=convert_to_pdf,
-                                 keep_xml=keep_xml,
-                                 ocr_lang="swe")
-        intermediate_path = self.store.intermediate_path(basefile)
-        intermediate_path += ".bz2" if self.config.compress == "bz2" else ""
-        if os.path.getsize(intermediate_path) > 20*1024*1024:
-            raise errors.ParseError("%s: %s (after conversion) is just too damn big (%s Mbytes)" % 
-                                    (basefile, intermediate_path, 
-                                     os.path.getsize(intermediate_path) / (1024*1024)))
-        return res
+        def lazy_downloaded_to_intermediate(basefile):
+            downloaded_path = self.store.downloaded_path(basefile,
+                                                         attachment="index.pdf")
+            downloaded_path_html = self.store.downloaded_path(basefile,
+                                                              attachment="index.html")
+            if not os.path.exists(downloaded_path):
+                if os.path.exists(downloaded_path_html):
+                    # attempt to parse HTML instead
+                    return open(downloaded_path_html)
+                else:
+                    # just grab the HTML from the XML file itself...
+                    tree = etree.parse(self.store.downloaded_path(basefile))
+                    html = tree.getroot().find("dokument").find("html")
+                if html is not None:
+                    return StringIO(html.text)
+                else:
+                    return StringIO("<html><h1>Dokumenttext saknas</h1></html>")
+
+            intermediate_path = self.store.intermediate_path(basefile)
+            intermediate_path += ".bz2" if self.config.compress == "bz2" else ""
+            # if a compressed bz2 file is > 5 MB, it's just too damn big
+            if os.path.exists(intermediate_path) and os.path.getsize(intermediate_path) > 5*1024*1024:
+                raise ParseError("%s: %s is just too damn big (%s bytes)" % 
+                                 (basefile, intermediate_path, 
+                                  os.path.getsize(intermediate_path)))
+            intermediate_dir = os.path.dirname(intermediate_path)
+            convert_to_pdf = not downloaded_path.endswith(".pdf")
+            keep_xml = "bz2" if self.config.compress == "bz2" else True
+            reader = StreamingPDFReader()
+            try:
+                res = reader.convert(filename=downloaded_path,
+                                     workdir=intermediate_dir,
+                                     images=self.config.pdfimages,
+                                     convert_to_pdf=convert_to_pdf,
+                                     keep_xml=keep_xml)
+            except errors.PDFFileIsEmpty:
+                self.log.debug("%s: PDF had no textcontent, trying OCR" % basefile)
+                res = reader.convert(filename=downloaded_path,
+                                     workdir=intermediate_dir,
+                                     images=self.config.pdfimages,
+                                     convert_to_pdf=convert_to_pdf,
+                                     keep_xml=keep_xml,
+                                     ocr_lang="swe")
+            intermediate_path = self.store.intermediate_path(basefile)
+            intermediate_path += ".bz2" if self.config.compress == "bz2" else ""
+            if os.path.getsize(intermediate_path) > 20*1024*1024:
+                raise errors.ParseError("%s: %s (after conversion) is just too damn big (%s Mbytes)" % 
+                                        (basefile, intermediate_path, 
+                                         os.path.getsize(intermediate_path) / (1024*1024)))
+            return res
+
+        class lazyfile(object):
+            def __init__(self, constructor):
+                self.constructor = constructor
+                self.fp = None
+                self.patchdescription = None
+                self.closed = True
+
+            def __getattr__(self, name):
+                if self.fp is None:
+                    self.fp = self.constructor()
+                    self.patchdescription = self.fp.patchdescription
+                return getattr(self.fp, name)
+
+        return lazyfile(partial(lazy_downloaded_to_intermediate, basefile))
+                
 
     def metadata_from_basefile(self, basefile):
         a = super(Riksdagen, self).metadata_from_basefile(basefile)
