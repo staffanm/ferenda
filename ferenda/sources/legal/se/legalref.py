@@ -7,8 +7,16 @@ import logging
 import os
 import sys
 import re
-from datetime import date 
-from functools import lru_cache
+from datetime import date
+try:
+    from functools import lru_cache
+except ImportError:
+    # define a null decorator instead -- note that this one doesn't implement the cache_info() function on the decorated method
+    def lru_cache(*args, **kwargs):
+        def dummy(func, *args, **kwargs):
+            return func
+        return dummy
+
 
 # thirdparty
 from simpleparse.parser import Parser

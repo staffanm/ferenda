@@ -231,17 +231,25 @@ class Decoding(unittest.TestCase):
                          self.datadir + os.sep + fname)
 
     def test_1d_encoding(self):
-        try:
-            from ferenda.sources.legal.se.decoders import OffsetDecoder1d
-            reader = PDFReader(filename="test/files/pdfreader/custom-encoding.pdf",
-                               workdir=self.datadir,
-                               textdecoder=OffsetDecoder1d())
-        except errors.ExternalCommandError as e:
-            print("test_custom_encoding got ExternalCommandError %s, copying sample and retrying" % e)
-            self._copy_sample()
-            reader = PDFReader(filename="test/files/pdfreader/custom-encoding.pdf",
-                               workdir=self.datadir,
-                               textdecoder=OffsetDecoder1d())
+        # since version 0.57.0, pdftohtml silently discards some
+        # invalid characters from output. Problem is, we have a font
+        # with custom encoding, in wich 0x03 (ctrl-c) represent
+        # space. pdftohtml 0.57+ drops this character before we get a
+        # chance to read and decode it. Until we can do something
+        # about recent pdftohtml versions, we make sure that this test
+        # uses pre-generated output from an older version.
+        from ferenda.sources.legal.se.decoders import OffsetDecoder1d
+        #try:
+        #    from pudb import set_trace; set_trace()
+        #    reader = PDFReader(filename="test/files/pdfreader/custom-encoding.pdf",
+        #                       workdir=self.datadir,
+        #                       textdecoder=OffsetDecoder1d())
+        #except errors.ExternalCommandError as e:
+        #    print("test_custom_encoding got ExternalCommandError %s, copying sample and retrying" % e)
+        self._copy_sample()
+        reader = PDFReader(filename="test/files/pdfreader/custom-encoding.pdf",
+                           workdir=self.datadir,
+                           textdecoder=OffsetDecoder1d())
         # textbox 5 and 6 uses a font with a custom encoding, make
         # sure that this is properly decoded.
         tbs = list(reader.textboxes())
