@@ -35,6 +35,7 @@ import sys
 from collections import OrderedDict
 
 
+from layeredconfig import LayeredConfig
 from lxml.builder import ElementMaker
 from rdflib import Graph, Namespace, Literal, URIRef
 import pyparsing
@@ -735,6 +736,11 @@ def __serialize_json(node):
                 val = node.__dict__[key]
                 if val is None:
                     continue
+                elif isinstance(val, LayeredConfig):  # FIXME: this is an
+                                                      # ugly hack to avoid
+                                                      # problems with
+                                                      # pdfreader.TextBox.font
+                    continue
                 elif isinstance(val, logging.Logger):
                     continue
                 e[key] = __serialize_json(val)
@@ -877,6 +883,11 @@ def __serialize_xml(node, serialize_hidden_attrs=False):
                 continue
             if (isinstance(val, (str, bytes))):
                 e.set(key, native(val))
+            elif isinstance(val, LayeredConfig):  # FIXME: this is an
+                                                  # ugly hack to avoid
+                                                  # problems with
+                                                  # pdfreader.TextBox.font
+                continue
             else:
                 e.set(key, repr(val))
 

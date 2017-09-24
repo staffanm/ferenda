@@ -245,7 +245,8 @@ class Main(unittest.TestCase, FerendaTestCase):
         self.assertEqual(json.loads(want), json.loads(got))
         self.assertEqual(mock_get.call_count, 2)
 
-        want = json.loads(rf("test/files/triplestore/select-results-python.json"))
+        want = json.loads(rf("test/files/triplestore/select-results-python.json"),
+                          object_hook=util.make_json_date_object_hook("issued"))
         got = store.select("the-query", format="python")
         self.assertEqual(want, got)
         self.assertEqual(mock_get.call_count, 3)
