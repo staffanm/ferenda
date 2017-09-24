@@ -3,7 +3,7 @@ from __future__ import (absolute_import, division,
                         unicode_literals, print_function)
 from builtins import *
 
-from datetime import datetime
+from datetime import date, datetime
 
 from rdflib import URIRef, Namespace
 from rdflib.namespace import RDF, RDFS, DC, SKOS, FOAF, DCTERMS
@@ -165,13 +165,15 @@ class Facet(object):
         >>> Facet.year(row, "dcterms_issued")
         '1859'
         """
-        datestring = row[binding]
-        # assume a date(time) like '2014-06-05T12:00:00', '2014-06-05'
-        # or even '2014-06'
-        formatstring = {19: "%Y-%m-%dT%H:%M:%S",
-                        10: "%Y-%m-%d",
-                        7: "%Y-%m"}[len(datestring)]
-        d = datetime.strptime(datestring, formatstring)
+        d = row[binding]
+        if not isinstance(d, (datetime, date)):
+            datestring = d
+            # assume a date(time) like '2014-06-05T12:00:00', '2014-06-05'
+            # or even '2014-06'
+            formatstring = {19: "%Y-%m-%dT%H:%M:%S",
+                            10: "%Y-%m-%d",
+                            7: "%Y-%m"}[len(datestring)]
+            d = datetime.strptime(datestring, formatstring)
         return str(d.year)
 
     @classmethod
