@@ -10,6 +10,7 @@ environment:
       LXML: "tools/win32/lxml-3.7.3.win32-py3.4.exe"
       LXML_WHEEL: "lxml-3.7.3-cp34-none-win32.whl"
       REQUIREMENTS: "requirements.py3.txt"
+      PYTHONPATH: "."      
 init:
   - "ECHO %PYTHON%"
   - "ECHO %LXML%"
@@ -20,7 +21,6 @@ install:
   - "%PYTHON%/python.exe c:/get-pip.py"
   - "%PYTHON%/Scripts/pip.exe -q install wheel"
   - "%PYTHON%/Scripts/wheel.exe convert %LXML%"
-  - "dir"
   - "%PYTHON%/Scripts/wheel.exe install %LXML_WHEEL%"
   - "%PYTHON%/Scripts/pip.exe -q install -r %REQUIREMENTS%"
 test_script:
