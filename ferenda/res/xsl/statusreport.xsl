@@ -55,12 +55,13 @@
     </h1>
     <h2 data-toc-skip="true">
       <xsl:value-of select="$total"/> total documents
+    </h2>
+    <p>
       <small>
 	<xsl:value-of select="round(($failed div $total) * 100)"/> % failed,
 	<xsl:value-of select="round(($warnings div $total) * 100)"/> % warnings
       </small>
-    </h2>
-
+    </p>
     <div class="control-panel">
       <button onclick="$('div.alert-success').toggle()">show/hide successes</button>
       <button onclick="$('div.alert-warning').toggle()">show/hide warnings</button>
@@ -84,13 +85,17 @@
     <xsl:variable name="total" select="count(basefile)"/>
     <xsl:variable name="failed" select="count(basefile[action/@success='False'])"/>
     <xsl:variable name="warnings" select="count(basefile[action/warnings])"/>
+    <xsl:variable name="duration" select="sum(basefile/action/@duration)"/>
     <h2>
       <xsl:value-of select="@alias"/>
-      <small> - 
-	<xsl:value-of select="round(($failed div $total) * 100)"/> % failed,
-	<xsl:value-of select="round(($warnings div $total) * 100)"/> % warnings
-      </small>
     </h2>
+    <p>
+    <small>
+	<xsl:value-of select="round(($failed div $total) * 100)"/> % failed,
+	<xsl:value-of select="round(($warnings div $total) * 100)"/> % warnings,
+	<xsl:value-of select="round($duration * 100 div $total) div 100"/> s avg parse time
+    </small>
+    </p>
     <div class="basefiles">
       <xsl:apply-templates/>
     </div>

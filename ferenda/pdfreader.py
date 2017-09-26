@@ -170,8 +170,6 @@ class PDFReader(CompoundElement):
         # PDFReader._pdftohtml
 
         if not util.outfile_is_newer([filename], real_convertedfile):
-            if "custom-encoding" in filename:
-                print("%s: Doing real conversion" % filename)
             util.copy_if_different(filename, tmpfilename)
             # this is the expensive operation
             res = converter(tmpfilename, workdir, **converter_extra)
@@ -187,8 +185,6 @@ class PDFReader(CompoundElement):
             else:  # keep_xml = True
                 pass
         else:
-            if "custom-encoding" in filename:
-                print("%s: Using pre-converted file" % filename)
             # print("outfile_is_newer returned True: real_convertedfile: %s (%s)" % (real_convertedfile, os.path.exists(real_convertedfile)))
             pass
         if not os.path.exists(real_convertedfile):
