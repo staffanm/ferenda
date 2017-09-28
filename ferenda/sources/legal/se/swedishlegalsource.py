@@ -536,8 +536,8 @@ class SwedishLegalSource(DocumentRepository):
         # reset some global state
         options = self.get_parse_options(doc.basefile)
         if options == "skip":
-            raise errors.DocumentSkippedError("%s: Skipped because of options.py" % basefile,
-                                              dummyfile=self.store.parsed_path(basefile))
+            raise errors.DocumentSkippedError("%s: Skipped because of options.py" % doc.basefile,
+                                              dummyfile=self.store.parsed_path(doc.basefile))
 
         UnorderedSection.counter = 0
         PreambleSection.counter = 0
