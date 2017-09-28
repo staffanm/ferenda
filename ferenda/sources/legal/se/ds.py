@@ -24,9 +24,15 @@ class DsAnalyzer(PDFAnalyzer):
     @cached_property
     def documents(self):
         def titleish(page):
-            for textelement in page:
-                if textelement.font.size >= 18: # Ds 2009:55 uses size 18. The normal is 26.
-                    return textelement
+            # return the largest text element found on the page (first
+            # one in case of a tie) -- that's probably the title on
+            # the page
+            iterator = self.pdf.textboxes(self.gluefunc, startpage=pageidx, pagecount=1) if self.gluefunc else self.pdf[pageidx]
+            candidate = None
+            for te in iterator:
+                if candidate is None or str(te)[0].isupper() and te.font.size > candidate.font.size:
+                    candidate = te
+            return candidate
         documents = []
         mainstyles = Counter()
         currentdoc = 'frontmatter'
@@ -40,10 +46,12 @@ class DsAnalyzer(PDFAnalyzer):
             pgtitle = titleish(page)
             if currentdoc == 'frontmatter':
                 if pgtitle is not None:
-                    # The normal title indicating that the real content
-                    # starts is Innehåll, but eg Ds 2009:55 (which is
-                    # atypical) uses Innehållsförteckning.
-                    if str(pgtitle).strip() in ("Innehåll", "Innehållsförteckning", "Innehåll del 2"):
+                    # The normal title indicating that the real
+                    # content starts is Innehåll, but eg Ds 2009:55
+                    # (which is atypical) uses
+                    # Innehållsförteckning. Older Ds:es (2001:62)
+                    # might use "INNEHÅLLSFÖRTECKNING"...
+                    if str(pgtitle).strip().capitalize() in ("Innehåll", "Innehållsförteckning", "Innehåll del 2"):
                         currentdoc = "main"
                     elif re.match("Till \w+minister ", str(pgtitle).strip()):
                         currentdoc = "main"

@@ -1207,7 +1207,7 @@ class DV(SwedishLegalSource):
                 # I don't really know if this turns out to be a good
                 # idea, but let's try it
                 if "Rubrik" in head and "_not_" in basefile:
-                    self.log.warning("%s: Changing rubrik %s -> %s (is that better?)" % (basefile, head["Rubrik"], rubrik))
+                    self.log.debug("%s: Changing rubrik %s -> %s (is that better?)" % (basefile, head["Rubrik"], rubrik))
                     head["Rubrik"] = rubrik
             head["Sökord"] = res
 

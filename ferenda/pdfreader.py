@@ -664,9 +664,9 @@ class PDFReader(CompoundElement):
                         return self._textdecoder(Textbox(textelements, **attribs),
                                                  self.fontspec)
                 else:
-                    self.log.warning("Text element %s (%s) looks like a footnote "
-                                     "marker, but not in main text nor footer "
-                                     "area" % (serialize(textelements[0]).strip(), attribs))
+                    self.log.debug("Text element %s (%s) looks like a footnote "
+                                   "marker, but not in main text nor footer "
+                                   "area" % (serialize(textelements[0]).strip(), attribs))
         elif (after_footnote and
               lastfont.family == thisfont['family'] and
               lastfont.size == thisfont['size'] and

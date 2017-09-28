@@ -446,10 +446,10 @@ class Offtryck(SwedishLegalSource):
                                 avoided = (hits/refs)
                             else:
                                 avoided = 1
-                            self.log.info("refparser: Seen %s, processed %s (%.3f %%) - "
-                                          "found %s refs. %s coin calls (%.3f %%) were avoided)" %
-                                          (seen, proc, (proc / seen) * 100, refs,
-                                           hits, avoided * 100))
+                            self.log.debug("refparser: Seen %s, processed %s (%.3f %%) - "
+                                           "found %s refs. %s coin calls (%.3f %%) were avoided)" %
+                                           (seen, proc, (proc / seen) * 100, refs,
+                                            hits, avoided * 100))
                             self.refparser.reset()
                     elif tag in ('frontmatter', 'endregister'):
                         # Frontmatter and endregister is defined as pages with
@@ -1027,9 +1027,9 @@ class Offtryck(SwedishLegalSource):
                                                                 uri=None,
                                                                 label="Författningskommentar till %s %s" % (reftext, lawname))
                         if parsestate != "commenttext":
-                            self.log.debug("%s, comment on %s, parsestate was '%s', "
-                                           "setting to 'commenttext'" %
-                                           (state['basefile'], comment_on, parsestate))
+                            #self.log.debug("%s, comment on %s, parsestate was '%s', "
+                            #               "setting to 'commenttext'" %
+                            #               (state['basefile'], comment_on, parsestate))
                             parsestate = "commenttext"
                         # the URI to the above Forfattningskommentar is
                         # dynamically constructed in
@@ -1115,11 +1115,14 @@ class Offtryck(SwedishLegalSource):
                                    baseuri_attributes=attributes,
                                    allow_relative=True)
         links = [n for n in res if isinstance(n, Link)]
-        if len(links) != 1:
+        if not len(links):
             self.log.warning("%s: _parse_uri_from_text found %s links in '%s',"
                              "expected single link" %
                              (basefile, len(links), text))
             return None
+
+        # if one OR MORE links found, use the first one (eg if text is
+        # "8-10 §§", return only the uri for "8 §"
         return links[0].uri
 
 

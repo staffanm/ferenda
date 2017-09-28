@@ -139,7 +139,7 @@ class PDFAnalyzer(object):
             pageguess = self.guess_pagenumber(page, currentpage)
             if pageguess is None:
                 if len(page) > 0:
-                    self.log.warning("physical page %s (%s): Can't guess pagenumber" % (idx,physical))
+                    self.log.debug("physical page %s (%s): Can't guess pagenumber" % (idx,physical))
                 else:  # it's ok for completely blank pages not to have pagenumbers
                     pass
                 guesses.append((physical, currentpage))
