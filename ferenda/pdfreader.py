@@ -1235,6 +1235,9 @@ all text in a Textbox has the same font and size.
         # their tags match.
         tag = None if len(self) == 0 else self[0].tag
         c = Textelement(tag=tag)
+        # possibly add a space instead of a missing newline
+        if self and other and self[-1].tag != other[0].tag and not self[-1].endswith(" "):
+            self.append(Textelement(" ", tag=self[-1].tag))
         for e in itertools.chain(self, other):
             if e.tag != c.tag:
                 if c:
@@ -1407,7 +1410,7 @@ class Textelement(UnicodeElement):
         # space at the end of lines to that they can be concatenated,
         # but some (later) versions omit this, requiring us to add a
         # extra space to avoid mashing words together.
-        if len(self) and not (self.endswith(" ") or self.endswith("-")):
+        if len(self) and not (self.endswith(" ") or self.endswith("-") or other == " "):
             extraspace = " "
         else:
             extraspace = ""

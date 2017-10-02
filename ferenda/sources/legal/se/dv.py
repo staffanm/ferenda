@@ -1874,8 +1874,9 @@ class DV(SwedishLegalSource):
 
         def is_betankande(parser):
             strchunk = str(parser.reader.peek())
-            return strchunk == "Målet avgjordes efter föredragning."
-
+            return strchunk in ("Målet avgjordes efter föredragning.",
+                                "HD avgjorde målet efter föredragning.")
+        
         def is_dom(parser):
             strchunk = str(parser.reader.peek())
             res = analyze_dom(strchunk)

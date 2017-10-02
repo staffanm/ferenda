@@ -330,7 +330,7 @@ class Offtryck(SwedishLegalSource):
                  alignmatch(textbox, nextbox) or # compare entire glued box so far to next
                  (parindent * 2 >= (prevbox.left - nextbox.left) >= parindent) or
                  (parindent * 2 >= (textbox.left - nextbox.left) >= parindent) or
-                 (re.match(r"\d\s+[A-ZÅÄÖ]", strtextbox) and nextbox.left - textbox.left < parindent * 4) # hanging indent (numbered) heading
+                 (re.match(r"[\d\.]+\s+[A-ZÅÄÖ]", strtextbox) and nextbox.left - textbox.left < parindent * 5) # hanging indent (numbered) heading -- FIXME: we'd like to increase the parindent multiplier depending on the len of the initial number
                  )):
                 # if the two boxes are on the same line, but have a
                 # wide space between them, the nextbox is probably a
@@ -876,7 +876,9 @@ class Offtryck(SwedishLegalSource):
                     parsestate = "commenttext"
                 elif self._is_headerlike(text):
                     parsestate = "acttext"
-                elif re.match("\d+(| \w) §", text) and not self._is_commentstart(str(section[idx+1])):
+                elif (re.match("\d+(| \w) §", text) and
+                      len(section) > idx+1 and
+                      not self._is_commentstart(str(section[idx+1]))):
                     parsestate = "acttext"
                 elif self._is_commentstart(text):
                     parsestate = "commenttext"
@@ -1070,6 +1072,11 @@ class Offtryck(SwedishLegalSource):
     def _is_headerlike(self, text):
         # headers are less than 100 chars and do not end with a period
         # or other non-hederish thing
+        if text == 'Bestämmelse Kommentarerna finns i avsnitt':
+            # This is a table heading (not real header) type of thing
+            # occurring in SOU 2017:66, but similar constructs might
+            # appear elsewhere.
+            return False
         return (len(text) < 100 and
                 (len(text) < 2 or
                  (text[-1] not in  (".", ")") and text[-2:] not in (" i", " §"))))

@@ -31,7 +31,16 @@ class TestDVParserBase(unittest.TestCase):
             self.fail("Could not find a recognizer function named %s" % self.method)
         self.assertEqual(want, f(p))
     
+class TestBetankande(TestDVParserBase):
+    method = "is_betankande"
 
+    def test_basic(self):
+        self.t(True,
+               "Målet avgjordes efter föredragning.")
+
+    def test_alternative(self):
+        self.t(True,
+               "HD avgjorde målet efter föredragning.")
 
 class TestInstans(TestDVParserBase):
     method = "is_instans"

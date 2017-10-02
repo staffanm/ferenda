@@ -636,7 +636,7 @@
               <p>Ändringen i <i>första stycket</i> är av samma slag som ändringen i 2 kap. 3 §</p>
               <p>m.fl. paragrafer.</p>
               <p>Av bestämmelserna i 7 kap. 3 § framgår att ett moderföretag under</p>
-              <p>vissa förhållanden inte behöver upprätta någon koncernredovisning. När detta undantag utnyttjas, skall moderföretaget, enligt <i>andra stycket,</i>lämna upplysning om internvinster på transaktioner som har företagits inom koncernen<i>. </i>Frågan har behandlats i <a href="https://lagen.nu/prop/1998/99:130#S16-2" rel="dcterms:references">avsnitt 16.2</a>. Med begreppet ”transaktioner inom koncernen” förstås varje koncernintern överlåtelse av varor, tjänster, anläggningstillgångar eller annat. Begreppet internvinster har samma innebörd som i 7 kap. 13 §.</p>
+              <p>vissa förhållanden inte behöver upprätta någon koncernredovisning. När detta undantag utnyttjas, skall moderföretaget, enligt <i>andra stycket, </i>lämna upplysning om internvinster på transaktioner som har företagits inom koncernen<i>. </i>Frågan har behandlats i <a href="https://lagen.nu/prop/1998/99:130#S16-2" rel="dcterms:references">avsnitt 16.2</a>. Med begreppet ”transaktioner inom koncernen” förstås varje koncernintern överlåtelse av varor, tjänster, anläggningstillgångar eller annat. Begreppet internvinster har samma innebörd som i 7 kap. 13 §.</p>
             </div>
           """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/1998/99:130#S25-16> ;
@@ -912,7 +912,7 @@
             <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
               <p>(Jfr 7 kap. 26 § i kommitténs förslag.)</p>
               <p>Paragrafen har tidigare betecknats 7 kap. 25 §. Ändringen i <i>första</i></p>
-              <p><i>stycket</i> är av samma slag som ändringen i 2 kap. 3 §.<i>7 kap. 27 §</i></p>
+              <p><i>stycket</i> är av samma slag som ändringen i 2 kap. 3 §. <i>7 kap. 27 §</i></p>
               <p>(Jfr 7 kap. 27 § i kommitténs förslag.)</p>
               <p>Paragrafen har tidigare betecknats 7 kap. 26 §. Ändringen utgör enbart</p>
               <p>en anpassning till den ändrade paragrafnumreringen i kapitlet.</p>
