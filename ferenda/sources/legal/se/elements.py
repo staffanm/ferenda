@@ -496,7 +496,7 @@ class Forfattningskommentar(CompoundElement):
 
     def compute_uri(self, baseuri):
         if self.comment_on:
-            return baseuri + "#kommentar-" + self.comment_on.rsplit("/")[-1]
+            return baseuri + "#kommentar-" + self.comment_on.rsplit("/")[-1].replace("#", "/")
     
     def as_xhtml(self, uri, parent_uri=None):
         if not self.uri and self.comment_on:
@@ -528,9 +528,12 @@ class Forfattningskommentar(CompoundElement):
             # also wrap everything* in a <div about="{comment_on}
             # property="dcterms:description"
             # datatype="rdf:XMLLiteral">
-            element.append(E("div", div, {'property': 'dcterms:description',
-                                          'datatype':'rdf:XMLLiteral'}))
-            
+            # element.append(E("div", div, {'property': 'dcterms:description',
+            #                               'datatype':'rdf:XMLLiteral'}))
+            element.append(div)
+        else:
+            from pudb import set_trace; set_trace()
+            print("comment_on not set")
         if hasattr(self, "title"):
             element.set("content", self.title)
         

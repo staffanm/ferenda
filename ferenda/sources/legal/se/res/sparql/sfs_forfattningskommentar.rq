@@ -7,14 +7,12 @@ SELECT DISTINCT ?lagrum ?kommentar ?prop ?desc
 WHERE  {
   {
     ?kommentar rinfoex:kommentarTill ?lagrum;
-               dcterms:description ?desc;
                dcterms:isPartOf+ ?propuri .
     ?propuri dcterms:identifier ?prop ;
              rdf:type rpubl:Proposition .
     FILTER(STRSTARTS(STR(?lagrum), "%(uri)s"))
   } UNION {
     ?kommentar rinfoex:kommentarTill ?lagrum;
-               dcterms:description ?desc;
                dcterms:isPartOf+ ?propuri .
     ?propuri dcterms:identifier ?prop ;
              rdf:type rpubl:Proposition .

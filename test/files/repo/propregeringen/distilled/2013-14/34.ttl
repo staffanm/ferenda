@@ -1,4 +1,3 @@
-@prefix : <http://www.w3.org/1999/xhtml> .
 @prefix bibo: <http://purl.org/ontology/bibo/> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
@@ -9,7 +8,6 @@
 @prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix xsi: <http://www.w3.org/2001/XMLSchema-instance> .
 
 <https://lagen.nu/prop/2013/14:34#B1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2013/14:34> ;
@@ -61,31 +59,17 @@
     dcterms:title "Ett stärkt konsumentskydd vid kreditgivning"@sv ;
     bibo:chapter "4"@sv .
 
-<https://lagen.nu/prop/2013/14:34#kommentar-2010:1846#P51> a rinfoex:Forfattningskommentar ;
+<https://lagen.nu/prop/2013/14:34#kommentar-2010:1846/P51> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 51 § konsumentkreditlagen (2010:1846)"@sv ;
     rinfoex:kommentarTill <https://lagen.nu/2010:1846#P51> ;
-    dcterms:description """
-            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>I paragrafen regleras de ingripanden som Konsumentverket kan göra vid bristande kreditprövningar. I paragrafen införs en bestämmelse om att en varning som huvudregel ska förenas med en sanktionsavgift. Det är också nytt att förutsättningarna för när Konsumentverket får förelägga en näringsidkare att upphöra med att lämna krediter anges uttryckligen. Även paragrafens struktur ändras så att den mest ingripande sanktionen kommer sist. Övervägandena finns i <a href="https://lagen.nu/prop/2013/14:34#S5-1" rel="dcterms:references">avsnitt 5.1</a> och <a href="https://lagen.nu/prop/2013/14:34#S6" rel="dcterms:references">6</a>. </p>
-              <p>I <i>första stycket </i>första meningen regleras Konsumentverkets möjlighet att, liksom enligt hittillsvarande ordning, besluta om varning för näringsidkare som brister i kreditprövningarna i samband med beviljandet av krediter. Näringsidkarens skyldigheter i detta avseende framgår av 12 § (se <a href="https://lagen.nu/prop/2009/10:242#sid99" rel="dcterms:references">prop. 2009/10:242 s. 99</a> f.). I en andra mening anges att varningen som huvudregel ska kombineras med en sanktionsavgift. Detta är nytt. Avgiften tillfaller staten. Någon avgift ska dock inte tas ut i ringa fall. Vad som utgör en ringa överträdelse får bedömas med hänsyn till omständigheterna i varje enskilt fall. I allmänhet bör det handla om situationer där det är fråga om att endast några enstaka kreditprövningar har underlåtits eller varit bristfälliga. Det kan i dessa fall vara fråga om så bagatellartade överträdelser, i vart fall när det handlar om mindre belopp, att själva varningen kan anses vara en tillräckligt ingripande åtgärd. </p>
-              <span class="sidbrytning" height="1263" id="sid18" src="https://lagen.nu/prop/2013/14:34/sid18.png" width="892"/>
-            </div>
-          """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/2013/14:34#US1> ;
     dcterms:references <https://lagen.nu/prop/2009/10:242#sid99>,
         <https://lagen.nu/prop/2013/14:34#S5-1>,
         <https://lagen.nu/prop/2013/14:34#S6> .
 
-<https://lagen.nu/prop/2013/14:34#kommentar-2010:1846#P52> a rinfoex:Forfattningskommentar ;
+<https://lagen.nu/prop/2013/14:34#kommentar-2010:1846/P52> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 52 § konsumentkreditlagen (2010:1846)"@sv ;
     rinfoex:kommentarTill <https://lagen.nu/2010:1846#P52> ;
-    dcterms:description """
-            <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-              <p>Paragrafen, som är ny, innehåller regler för hur sanktionsavgiftens storlek ska bestämmas. Övervägandena finns i <a href="https://lagen.nu/prop/2013/14:34#S5-2" rel="dcterms:references">avsnitt 5.2</a>. </p>
-              <p>I <i>första stycket</i> anges inom vilka beloppsgränser sanktionsavgiften kan bestämmas. Det lägsta beloppet är femtusen kronor och det högsta beloppet är tio miljoner kronor. </p>
-              <span class="sidbrytning" height="1263" id="sid19" src="https://lagen.nu/prop/2013/14:34/sid19.png" width="892"/>
-            </div>
-          """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/2013/14:34#US1> ;
     dcterms:references <https://lagen.nu/prop/2013/14:34#S5-2> .
 

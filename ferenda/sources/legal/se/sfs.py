@@ -1627,7 +1627,15 @@ class SFS(Trips):
                                                 None,  # need both prop and sfs contexts
                                                 "forfattningskommentarer",
                                                 extra)
+        # FIXME: We shouldn't import lagen.nu specific packages, but
+        # we need this particular class to get it's correctly
+        # config:ed URISpace definition
+        from lagen.nu import Propositioner
+        proprepo = Propositioner(url=self.config.url,
+                                 develurl=self.config.develurl,
+                                 datadir=self.config.datadir)
         seen_comments = {}
+        descriptions = {}
         for row in forf_kommentar:
             if row['kommentar'] in seen_comments:
                 self.log.warning("Recieved duplicate comment for %s ('%s', previously '%s')" % (
@@ -1647,11 +1655,24 @@ class SFS(Trips):
 
             if not lagrum in stuff:
                 stuff[lagrum] = {}
-            shortdesc = util.normalize_space(row['desc'])
+            descfile = proprepo.store.parsed_path(proprepo.basefile_from_uri(row['kommentar']))
+            if descfile not in descriptions:
+                descriptions[descfile] = {}
+                tree = etree.parse(descfile)
+                for desc in tree.findall(".//{http://www.w3.org/1999/xhtml}div[@class='forfattningskommentar']"):
+                    about = desc.get("about")
+                    if basefile not in about:
+                        continue
+                    descriptions[descfile][about] = desc.find("{http://www.w3.org/1999/xhtml}div")
+
+            descnode = descriptions[descfile][row['kommentar']]
+            shortdesc = etree.tostring(descnode, encoding="utf-8").decode()
+            # remove start and end div
+            shortdesc = shortdesc[shortdesc.index(">")+1:shortdesc.rindex("<")].strip()
             shortdesclen = self.config.shortdesclen
             if len(shortdesc) > shortdesclen:
                 # first split the (markup) string at the best word boundary
-                m = re.match('(.{%d,}?\S)\s'%shortdesclen, shortdesc)
+                m = re.match('(.{%d,}?\S)\s'%shortdesclen, shortdesc, re.DOTALL)
                 if m:
                     shortdesc = m.group()
                     # then, make sure all tags are ended properly
@@ -1664,8 +1685,7 @@ class SFS(Trips):
                         # Take the last string in the tag and append ellipsis
                         navstring = list(tags[-1].strings)[-1]
                         navstring.replace_with(str(navstring) + "...")
-                    # then convert back to markup and strip any default namespacing
-                    shortdesc = str(soup).replace(' xmlns="http://www.w3.org/1999/xhtml"', '')
+                    shortdesc = str(soup)    
             link = '<b><a href="%s">%s</a></b>: ' % (row['kommentar'], row['prop'])
             if 'kommentar' not in stuff[lagrum]:
                 stuff[lagrum]['kommentar'] = ""
