@@ -1211,8 +1211,17 @@ all text in a Textbox has the same font and size.
                                             self.left, self.top,
                                             fontinfo,
                                             s)
-
     def __add__(self, other):
+
+        def different_tags(self, other):
+            # None, {b, i} => True
+            # None, s => False
+            # {b, i}, {bs, is} => False
+            # b, bi => True
+            selftag = getattr(self, 'tag', '').replace("s", "")
+            othertag = getattr(other, 'tag', '').replace("s", "")
+            return selftag != othertag
+        
         # expand dimensions
         top = min(self.top, other.top)
         left = min(self.left, other.left)
@@ -1235,8 +1244,11 @@ all text in a Textbox has the same font and size.
         # their tags match.
         tag = None if len(self) == 0 else self[0].tag
         c = Textelement(tag=tag)
-        # possibly add a space instead of a missing newline
-        if self and other and self[-1].tag != other[0].tag and not self[-1].endswith(" "):
+        # possibly add a space instead of a missing newline -- but
+        # not before superscript elements
+        if (self and other and
+            different_tags(self, other) and 
+            not self[-1].endswith(" ")):
             self.append(Textelement(" ", tag=self[-1].tag))
         for e in itertools.chain(self, other):
             if e.tag != c.tag:
