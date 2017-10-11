@@ -10,3 +10,4 @@ class Sitenews(BaseSitenews):
 
     news_feedsets_main_label = "Nyheter om webbtjänsten"
     toc_title = "Alla nyhetsflöden"
+    readmore_label = "(läs mer)"

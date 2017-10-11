@@ -3,7 +3,6 @@
 Note: this template expects Atom 1.0, outputs HTML5
 -->
 <xsl:stylesheet version="1.0"
-		xmlns="http://www.w3.org/1999/xhtml"
 		xmlns:atom="http://www.w3.org/2005/Atom"
 		xmlns:xhtml="http://www.w3.org/1999/xhtml"
 		xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
@@ -50,7 +49,7 @@ Note: this template expects Atom 1.0, outputs HTML5
 
   <xsl:template match="atom:entry">
     <section>
-      <a href="{atom:id}"><h2><xsl:value-of select="atom:title"/></h2></a>
+      <h2><a href="{atom:id}"><xsl:value-of select="atom:title"/></a></h2>
       <!-- just include the date, not the time, in the human-readable version -->
       <small><xsl:value-of select="substring(atom:published,1,10)"/></small>
 	<xsl:choose>

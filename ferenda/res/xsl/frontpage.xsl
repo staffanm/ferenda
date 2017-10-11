@@ -51,7 +51,8 @@ It's a generic template for any kind of content
   <!-- toc handling for atom feeds -->
   <xsl:template match="xhtml:div" mode="toc">
     <xsl:if test="$feedfile">
-      <xsl:for-each select="document($feedfile)/atom:feed/atom:entry">
+      <!-- only select the first 8 entries -->
+      <xsl:for-each select="document($feedfile)/atom:feed/atom:entry[not(position() > 8)]">
 	<li>
 	  <a href="{atom:id}"><xsl:value-of select="atom:title"/></a>
 	  <ul><li>

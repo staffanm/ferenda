@@ -107,9 +107,11 @@ class Transformer(object):
             adapted_config = self.t.getconfig(self.config, depth)
         else:
             adapted_config = None
-        outdata = self.t.transform(indata, adapted_config, parameters)
+        outdata = self.t.transform(indata, adapted_config, parameters).getroot()
+        if self.t.reparse:
+            outdata = etree.fromstring(etree.tostring(outdata))
         if uritransform:
-            self._transform_links(outdata.getroot(), uritransform)
+            self._transform_links(outdata, uritransform)
         return outdata
 
     def _transform_links(self, tree, uritransform):
@@ -203,6 +205,14 @@ class XSLTTransform(TransformerEngine):
         assert os.path.exists(worktemplate)
         parser = etree.XMLParser(remove_blank_text=self.format)
         xsltree = etree.parse(worktemplate, parser)
+
+        # if the XSLT transform contained <xsl:value-of
+        # disable-output-escaping="yes"/> nodes, the result of such
+        # transforms will not be proper lxml elements but rather a
+        # .tail string on the previous element. That's bad because
+        # uritransform can't get at it. Therefore, if needed, we
+        # re-parse it.
+        self.reparse = xsltree.find(".//*[@disable-output-escaping='yes']") is not None
         try:
             self._transformer = etree.XSLT(xsltree)
         except etree.XSLTParseError as e:

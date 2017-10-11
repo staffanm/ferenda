@@ -1,7 +1,12 @@
 2016-11-18 07:41:00 Ny version på gång
 
-<p>Efter många års tystnad är nu nästa version av lagen.nu på
-gång!</p>
+<p>Efter många års tystnad är nu nästa version av lagen.nu på gång! Nu
+finns förarbeten, myndighetspraxis och många myndigheters
+författningssamlingar med i tjänsten. </p>
+
+<p>Det finns även en inbyggd sökfunktion med mer precisa sökningar. Se
+mer under <a href="http://ferenda.lagen.nu/om/nytt.html">Vad är
+nytt?</a></p>
 
 2009-10-11 16:31:00 Välkommen till nya versionen!
 

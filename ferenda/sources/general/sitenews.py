@@ -41,6 +41,7 @@ class Sitenews(DocumentRepository):
     namespaces = ['rdf', 'rdfs', 'xsd', 'xsi', 'dcterms', 'prov', 'schema']
     sparql_annotations = None
     news_sortkey = 'published'
+    readmore_label = 'Read more...'
 
     @classmethod
     def get_default_options(cls):
@@ -96,6 +97,18 @@ class Sitenews(DocumentRepository):
         entry.published = published
         entry.save()
         return True
+
+    def parse_entry_summary(self, doc):
+        summary = doc.meta.value(URIRef(doc.uri), DCTERMS.abstract)
+        if len(doc.body[0]) > 1:
+            from pudb import set_trace; set_trace()
+            if self.readmore_label:
+                permalink = self.canonical_uri(doc.basefile)
+                readmore_link = " <a href='%s'>%s</a>" % (permalink, self.readmore_label)
+                summarytext = summary.replace("</p>", "%s</p>" % readmore_link)
+            summary = Literal(summarytext, datatype=summary.datatype)
+        return summary
+
 
     def facets(self):
         return [Facet(DCTERMS.issued)]
