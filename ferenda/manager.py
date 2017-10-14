@@ -1083,7 +1083,7 @@ def _build_worker(jobqueue, resultqueue, clientname):
     """
     # create the inst with a default config
     # (_instantiate_class will try to read ferenda.ini)
-    inst = None
+    insts = {}
     logstream = StringIO()
     log = getlog()
     log.debug("Client: [pid %s] _build_worker ready to process job queue" % os.getpid())
@@ -1097,15 +1097,15 @@ def _build_worker(jobqueue, resultqueue, clientname):
             # getlog().debug("Client: Got SHUTDOWN signal")
             # kill the entire thing
             raise Exception("OK we're done now")
-        if inst is None:
-            inst = _instantiate_and_configure(job['classname'],
-                                              job['config'],
-                                              logstream,
-                                              clientname)
+        if job['classname'] not in insts:
+            insts[job['classname']] = _instantiate_and_configure(job['classname'],
+                                                                 job['config'],
+                                                                 logstream,
+                                                                 clientname)
             # need to get hold of log as well
         # log.debug("Client: [pid %s] Starting job %s %s %s" % (os.getpid(), job['classname'], job['command'], job['basefile']))
         # Do the work
-        clbl = getattr(inst, job['command'])
+        clbl = getattr(insts[job['classname']], job['command'])
         # kwargs = job['kwargs']   # if we ever support that
         kwargs = {}
         # proctitle = re.sub(" [now: .*]$", "", getproctitle())

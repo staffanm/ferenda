@@ -628,6 +628,11 @@ class Testrepo2(Testrepo):
     def callstore(self):
         return self.store.custommethod()
 
+    @decorators.action
+    def pid(self, arg):
+        arg, pid = super(Testrepo2, self).pid(arg)
+        return ("repo2:" + arg, pid)
+
 """)
         util.writefile(tempdir+"/test.js", "// test.js code goes here")
         util.writefile(tempdir+"/test.css", "/* test.css code goes here */")
@@ -1036,6 +1041,41 @@ if __name__ == '__main__':
             # compare sets instead of lists
             self.assertEqual(set(args), set(["arg1", "myarg", "arg2"]))
             self.assertEqual(3, len(set(pids)))
+        finally:
+            foo.terminate()
+            bar.terminate()
+
+    @unittest.skipIf(sys.platform == "win32", "Queueless server mode not supported on Windows")
+    def test_server_all(self):
+        # run multiple repos, one after the other, on the same method
+        # and make sure the different methods are run.
+        self._enable_repos()
+        # create two out-of-process clients
+        foo = Popen(['python', 'ferenda-build.py', 'all',
+                     'buildclient', '--clientname=foo', '--processes=2'],
+                    stderr=PIPE)
+        bar = Popen(['python', 'ferenda-build.py', 'all',
+                     'buildclient', '--clientname=bar', '--processes=2'],
+                    stderr=PIPE)
+        try:
+            # run an in-process server
+            argv = ["all", "pid", "--all", "--buildserver"]
+            res = manager.run(argv)
+            # we should have two main sets of results, the first from
+            # Testrepo, the second from Testrepo2
+            self.assertEqual(2, len(res))
+            
+            # same tests as for RunMultiproc.test_run_single_all
+            args1 = [x[0] for x in res[0]]
+            pids1 = [x[1] for x in res[0]]
+            self.assertEqual(set(args1), set(["arg1", "myarg", "arg2"]))
+            self.assertEqual(3, len(set(pids1)))
+
+            args2 = [x[0] for x in res[1]]
+            pids2 = [x[1] for x in res[1]]
+            self.assertEqual(set(args2), set(["repo2:arg1", "repo2:myarg", "repo2:arg2"]))
+            self.assertEqual(3, len(set(pids2)))
+            
         finally:
             foo.terminate()
             bar.terminate()
