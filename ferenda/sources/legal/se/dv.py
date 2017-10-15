@@ -541,7 +541,7 @@ class DV(SwedishLegalSource):
             soup = BeautifulSoup(util.readfile(intermediatefile), "lxml")
             p_tag = "para"
             xmlns = ''
-        iterator = soup.find_all(p_tag)
+        iterator = soup.find_all(p_tag, limit=2147483647)
         basefile = None
         fp = None
         avd_p = None
@@ -822,7 +822,7 @@ class DV(SwedishLegalSource):
         else:
             ptag = "para", "w:p"
 
-        iterator = soup.find_all(ptag)
+        iterator = soup.find_all(ptag, limit=2147483647)
         if coll == "HDO":
             # keep this in sync w extract_notis
             re_notisstart = re.compile(
@@ -933,7 +933,7 @@ class DV(SwedishLegalSource):
             if filetype == "doc":
                 subiterator = node
             elif filetype == "docx":
-                subiterator = node.find_all("w:r")
+                subiterator = node.find_all("w:r", limit=2147483647)
             for part in subiterator:
                 if part.name:
                     t = part.get_text()
@@ -1017,7 +1017,7 @@ class DV(SwedishLegalSource):
                 if not textnodes:
                     continue
                 items = []
-                for textnode in textnodes.find_all('w:t'):
+                for textnode in textnodes.find_all('w:t', limit=2147483647):
                     t = textnode.get_text(strip=True)
                     if t:
                         items.append(t)
@@ -1027,9 +1027,9 @@ class DV(SwedishLegalSource):
         # The main text body of the verdict
         body = []
         for p in soup.find(text=re.compile('EFERAT')).find_parent(
-                'w:tr').find_next_sibling('w:tr').find_all('w:p'):
+                'w:tr').find_next_sibling('w:tr').find_all('w:p', limit=2147483647):
             ptext = ''
-            for e in p.find_all("w:t"):
+            for e in p.find_all("w:t", limit=2147483647):
                 ptext += e.string
             body.append(ptext)
 
@@ -2349,14 +2349,14 @@ class DV(SwedishLegalSource):
         # <w:t>tum</w:t>"). Attempt to join these
         #
         # FIXME: This could be a part of simplify_ooxml instead.
-        for p in soup.find_all("w:p"):
+        for p in soup.find_all("w:p", limit=2147483647):
             current_r = None
-            for r in p.find_all("w:r"):
+            for r in p.find_all("w:r", limit=2147483647):
                 # find out if formatting instructions (bold, italic)
                 # are identical
                 if current_r and current_r.find("w:rpr") == r.find("w:rpr"):
                     # ok, merge
-                    ts = list(current_r.find_all("w:t"))
+                    ts = list(current_r.find_all("w:t", limit=2147483647))
                     assert len(ts) == 1, "w:r should not contain exactly one w:t"
                     ns = ts[0].string
                     ns.replace_with(str(ns) + r.find("w:t").string)
