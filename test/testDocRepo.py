@@ -922,41 +922,6 @@ class Repo(RepoTester):
         self.assertEqual(2,
                          len(list(util.list_dirs(self.datadir, '.txt'))))
 
-
-    def test_status(self):
-        want  = """
-Status for document repository 'base' (ferenda.documentrepository.DocumentRepository)
- download: None.
- parse: None.
- generated: None.
-""".strip()
-        with patch("builtins.print") as printmock:
-            self.repo.status()
-        got = "\n".join([x[1][0] for x in printmock.mock_calls])
-        self.assertEqual(want,got)
-
-        # test both status and get_status in one swoop.
-        for basefile in range(1,13):
-            util.writefile(self.repo.store.downloaded_path(str(basefile)),
-                           "downloaded %s" % basefile)
-        for basefile in range(1,9):
-            util.writefile(self.repo.store.parsed_path(str(basefile)),
-                           "parsed %s" % basefile)
-        for basefile in range(1,5):
-            util.writefile(self.repo.store.generated_path(str(basefile)),
-                           "generated %s" % basefile)
-
-        want  = """
-Status for document repository 'base' (ferenda.documentrepository.DocumentRepository)
- download: 12, 11, 10... (9 more)
- parse: 8, 7, 6... (5 more) Todo: 12, 11, 10... (1 more)
- generated: 4, 3, 2... (1 more) Todo: 8, 7, 6... (1 more)
-""".strip()
-        with patch("builtins.print") as printmock:
-            self.repo.status()
-        got = "\n".join([x[1][0] for x in printmock.mock_calls])
-        self.assertEqual(want,got)
-
     def test_tabs(self):
         # base test - if using rdftype of foaf:Document, in that case
         # we'll use .alias

@@ -72,7 +72,8 @@ class DocumentRepository(object):
     downloading, parsing and generation behaviour.
 
     :param \*\*kwargs: Any named argument overrides any
-                   similarly-named configuration file parameter.
+                   similarly-named :ref:`configuration` file
+                   parameter.
 
     Example:
 
@@ -142,14 +143,13 @@ class DocumentRepository(object):
     #
     # general class properties
     # FIXME: Duplicated in documentstore -- how do we unify?
-    downloaded_suffix = ".html"
-    """File suffix for the main document format. Determines the suffix
-    of downloaded files."""
+    alias = "base"
+    """A short name for the class, used by the command line
+    ``ferenda-build.py`` tool. Also determines where to store
+    downloaded, parsed and generated files. When you subclass
+    :py:class:`~ferenda.DocumentRepository` you *must* override
+    this."""
 
-    download_archive = True
-    """TBD"""
-
-    # FIXME: Duplicated in documentstore -- how do we unify?
     storage_policy = "file"
     """Some repositories have documents in several formats, documents
     split amongst several files or embedded resources. If
@@ -160,12 +160,6 @@ class DocumentRepository(object):
     :py:meth:`ferenda.DocumentStore.path` (and therefore
     all other ``*_path`` methods)"""
 
-    alias = "base"
-    """A short name for the class, used by the command line
-    ``ferenda-build.py`` tool. Also determines where to store
-    downloaded, parsed and generated files. When you subclass
-    :py:class:`~ferenda.DocumentRepository` you *must* override
-    this."""
 
     namespaces = [
         'rdf',
@@ -193,31 +187,25 @@ class DocumentRepository(object):
 
     """
 
-    required_predicates = [RDF.type]
-    """A list of RDF predicates that should be present in the outdata. If
-    any of these are missing from the result of
-    :py:meth:`~ferenda.DocumentRepository.parse`, a warning is
-    logged. You can add to this list as a form of simple validation of
-    your parsed data.
-
-    """
-
-    max_resources = 1000
-    """The maximum number of sub-resources (as defined by having a
-    specific URI) that documents in this repo can have. This is
-    checked in a validation step at the end of parse. If set to None,
-    no validation of the number of resources is done.
-
-    """
-
     collate_locale = None
-    """TBD"""
+    """The locale to be used for sorting (collating). This affects TOCs, see
+    :ref:`toc-sorting`."""
+
+    loadpath = None
+    """If defined (by default it's ``None``), this should be a list of
+    directories that takes precedence over the loadpath given by the
+    current config."""
+
+    lang = "en"
+    """The language (expressed as a two-letter ISO 639-1 code) which the
+    source documents are assumed to be written in (unless otherwise
+    specified), and the language which output document should use."""
+
 
     #
     # download() related class properties
 
     start_url = "http://example.org/"
-
     """The main entry page for the remote web store of documents. May
     be a list of documents, a search form or whatever. If it's
     something more complicated than a simple list of documents, you
@@ -247,18 +235,38 @@ class DocumentRepository(object):
     named group ``basefile``, just like
     :py:data:`~ferenda.DocumentRepository.document_url_template`."""
 
+    downloaded_suffix = ".html"
+    """File suffix for the main document format. Determines the suffix
+    of downloaded files."""
+
+    download_archive = True
+    """If ``True`` (the default), any attempt by download_single to
+    download a basefile that already exists will cause the old version
+    to be archived. See :ref:`keyconcept-archiving`.
+    """
+
     download_iterlinks = True
-    """TBW"""
+    """If ``True`` (the default),
+    :py:meth:`~ferenda.DocumentRepository.download_get_basefiles`
+    will be called with an iterator that returns (element,
+    attribute, link, pos) tuples (like ``lxml.etree.iterlinks()``
+    does). Othervise, it will be called with the downloaded index page
+    as a string."""
+
 
     download_accept_404 = False
-    """TBW"""
+    """If ``True`` (default: ``False``), any 404 HTTP error encountered
+    during download will NOT raise and error. Instead, the download
+    process will just move on to the next identified basefile."""
 
     download_reverseorder = False
-    """TBW"""
+    """It ``True`` (default: ``False``), download_get_basefiles will
+    process recieved basefiles in reverse order."""
 
-    loadpath = None
-    """TBW"""
-    #
+    source_encoding = "utf-8"
+    """The character set that the source documents use (if
+    applicable)."""
+
     # parse() specific class properties
     rdf_type = Namespace(util.ns['foaf']).Document
     """The RDF type of the documents you are handling (expressed as a
@@ -274,14 +282,20 @@ class DocumentRepository(object):
 
     """
 
-    source_encoding = "utf-8"
-    """The character set that the source HTML documents use (if
-    applicable)."""
+    required_predicates = [RDF.type]
+    """A list of RDF predicates that should be present in the outdata. If
+    any of these are missing from the result of
+    :py:meth:`~ferenda.DocumentRepository.parse`, a warning is
+    logged. You can add to this list as a form of simple validation of
+    your parsed data.
 
-    lang = "en"
-    """The language which the source documents are assumed to be
-    written in (unless otherwise specified), and the language which
-    output document should use."""
+    """
+
+    max_resources = 1000
+    """The maximum number of sub-resources (as defined by having a
+    specific URI) that documents in this repo can have. This is
+    checked in a validation step at the end of parse. If set to None,
+    no validation of the number of resources is done."""
 
     # css selectors, handled by BeautifulSoup's select() method
     parse_content_selector = "body"
@@ -308,16 +322,21 @@ class DocumentRepository(object):
     """A template SPARQL CONSTRUCT query for document annotations."""
 
     sparql_expect_results = True
-    # TBD
+    """If ``True`` (the default) and the ``sparql_annotations_query``
+    doesn't return any results, issue a warning."""
 
-    # FIXME: Sphinx really wants to treat this class as a reference,
-    # but cannot resolve it
     documentstore_class = DocumentStore
-#    """Class that implements the :class:`~ferenda.DocumentStore` interface."""
-
+    """Class that implements the :class:`~ferenda.DocumentStore`
+    interface. If you want to customize how this repo stores files, you
+    can create a subclass of :class:`~ferenda.DocumentStore` and then set
+    this attribute to that class in your docrepo."""
 
     requesthandler_class = RequestHandler
-#    """Class that implements the :class:`~ferenda.RequestHandler` interface."""
+    """Class that implements the :class:`~ferenda.RequestHandler`
+    interface. If you want to customize how this repo serves its contents
+    over HTTP(S), you can create a subclass of
+    :class:`~ferenda.RequestHandler` and set this attribute to that class
+    in your docrepo."""
 
     def __init__(self, config=None, **kwargs):
         """See :py:class:`~ferenda.DocumentRepository`."""
@@ -3491,6 +3510,7 @@ WHERE {
         :type primary: bool
         :return: the XHTML fragment
         :rtype: str
+
         If primary is true, . If primary is false, the caller only expects a
         smaller amount of content (like a smaller presentation of the
         repository and the document it contains).
@@ -3507,47 +3527,6 @@ WHERE {
                 % (self.dataset_uri(), self.alias, qname,
                    len(list(self.store.list_basefiles_for("_postgenerate")))))
 
-    def status(self, basefile=None, samplesize=3):
-        """Prints out some basic status information about this repository."""
-        print = builtins.print
-        print("Status for document repository '%s' (%s)" %
-              (self.alias, getattr(self.config, 'class')))
-        s = self.get_status()
-        for step in s.keys():  # odict
-            exists = s[step]['exists']
-            todo = s[step]['todo']
-            exists_sample = ", ".join(exists[:samplesize])
-            exists_more = len(exists) - samplesize
-            todo_sample = ", ".join(todo[:samplesize])
-            todo_more = len(todo) - samplesize
-
-            if not exists_sample:
-                exists_sample = "None"
-            if exists_more > 0:
-                exists_more_label = ".. (%s more)" % exists_more
-            else:
-                exists_more_label = ""
-
-            if todo_more > 0:
-                todo_more_label = ".. (%s more)" % todo_more
-            else:
-                todo_more_label = ""
-
-            if step == 'download':
-                print(" download: %s.%s" % (exists_sample, exists_more_label))
-            else:
-                if todo_sample:
-                    print(" %s: %s.%s Todo: %s.%s" % (step, exists_sample, exists_more_label,
-                                                      todo_sample, todo_more_label))
-                else:
-                    print(" %s: %s.%s" % (step, exists_sample, exists_more_label))
-
-        # alias and classname
-        # $ ./ferenda-build.py w3c status
-        # Status for document repository 'w3c' (w3cstandards.W3Cstandards)
-        # downloaded: rdb-direct-mapping r2rml ... (141 more)
-        # parsed: None (143 needs parsing)
-        # generated: None (143 needs generating)
     def get_status(self):
         """Returns basic data about the state about this repository, used by
         :meth:`~ferenda.DocumentRepository.status`. Returns a dict of
@@ -3632,6 +3611,10 @@ WHERE {
         Works like :meth:`~ferenda.DocumentRepository.tabs`, but
         normally returns an empty list. The repo
         :class:`ferenda.sources.general.Static` is an exception.
+
+        :returns: (link text, link destination) tuples
+        :rtype: list
+
         """
         return []
 

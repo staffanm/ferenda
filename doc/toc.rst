@@ -24,6 +24,8 @@ each document, you'll get basic "Sorted by title" and "Sorted by date
 of publication" TOCs for free. 
 
 
+.. _toc-sorting:
+
 Defining facets for grouping and sorting
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

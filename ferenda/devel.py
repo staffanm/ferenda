@@ -1063,9 +1063,6 @@ class Devel(object):
     def news(self, otherrepos):
         pass  # pragma: no cover
 
-    def status(self):
-        pass  # pragma: no cover
-
     def tabs(self):
         return []
 

@@ -274,6 +274,50 @@ def runserver(repos,
     httpd = make_server('', port, make_wsgi_app(inifile, **kwargs))
     httpd.serve_forever()
 
+def status(repo, samplesize=3):
+    """Prints out some basic status information about this repository."""
+    print = builtins.print
+    if not hasattr(repo, 'get_status'):
+        return
+    print("Status for document repository '%s' (%s)" %
+          (repo.alias, getattr(repo.config, 'class')))
+    s = repo.get_status()
+    for step in s.keys():  # odict
+        exists = s[step]['exists']
+        todo = s[step]['todo']
+        exists_sample = ", ".join(exists[:samplesize])
+        exists_more = len(exists) - samplesize
+        todo_sample = ", ".join(todo[:samplesize])
+        todo_more = len(todo) - samplesize
+
+        if not exists_sample:
+            exists_sample = "None"
+        if exists_more > 0:
+            exists_more_label = ".. (%s more)" % exists_more
+        else:
+            exists_more_label = ""
+
+        if todo_more > 0:
+            todo_more_label = ".. (%s more)" % todo_more
+        else:
+            todo_more_label = ""
+
+        if step == 'download':
+            print(" download: %s.%s" % (exists_sample, exists_more_label))
+        else:
+            if todo_sample:
+                print(" %s: %s.%s Todo: %s.%s" % (step, exists_sample, exists_more_label,
+                                                  todo_sample, todo_more_label))
+            else:
+                print(" %s: %s.%s" % (step, exists_sample, exists_more_label))
+        # alias and classname
+        # $ ./ferenda-build.py w3c status
+        # Status for document repository 'w3c' (w3cstandards.W3Cstandards)
+        # downloaded: rdb-direct-mapping r2rml ... (141 more)
+        # parsed: None (143 needs parsing)
+        # generated: None (143 needs generating)
+    
+
 
 def make_wsgi_app(inifile=None, **kwargs):
     """Creates a callable object that can act as a WSGI application by
@@ -486,6 +530,13 @@ Disallow: /-/
 """)
                 log.info("Wrote %s" % robotstxt)
                 return Resources(repos, **args).make()
+            elif action == 'status':
+                repoclasses = _classes_from_classname(enabled, classname)
+                args = _setup_makeresources_args(config)
+                for cls in repoclasses:
+                    inst = _instantiate_class(cls, config, argv)
+                    status(inst)
+
             elif action == 'frontpage':
                 repoclasses = _classes_from_classname(enabled, classname)
                 args = _setup_frontpage_args(config, argv)
