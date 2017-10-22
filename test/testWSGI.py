@@ -325,7 +325,8 @@ class API(WSGI):
         self.app.repos[0].faceted_data = Mock(return_value=self.fakedata)
         status, headers, content = self.call_wsgi(self.env)
         got = json.loads(content.decode("utf-8"))
-        want = json.load(open("test/files/api/basicapi-stats.json"))
+        with open("test/files/api/basicapi-stats.json") as fp:
+            want = json.load(fp)
         self.assertEqual(want, got)
 
     def test_stats_legacy(self):

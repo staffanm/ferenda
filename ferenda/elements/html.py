@@ -40,7 +40,6 @@ def elements_from_soup(soup,
     if soup.name in remove_tags:
         return None
     if soup.name not in _tagmap:
-        # self.log.warning("Can't render %s" % soup.name)
         log.warning("Can't render %s" % soup.name)
         return None
     attrs = {}

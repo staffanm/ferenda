@@ -27,6 +27,7 @@ from ferenda.errors import *
 
 
 # The main system under test (SUT)
+from test.quiet import silence
 from ferenda import DocumentRepository
 from ferenda.testutil import RepoTester
 
@@ -460,15 +461,17 @@ class Repo(RepoTester):
             # test8: 404 Not Found / catch something
             url_location = "test/files/base/downloaded/non-existent"
             with self.assertRaises(requests.exceptions.HTTPError):
-                d.download_if_needed("http://example.org/document",
-                                     "example")
+                with silence():
+                    d.download_if_needed("http://example.org/document",
+                                         "example")
             mock_get.reset_mock()
 
             # test9: ConnectionError
             mock_get.side_effect = requests.exceptions.ConnectionError
-            self.assertFalse(d.download_if_needed("http://example.org/document",
-                                                  "example",
-                                                  sleep=0))
+            with silence():
+                self.assertFalse(d.download_if_needed("http://example.org/document",
+                                                      "example",
+                                                      sleep=0))
             self.assertEqual(mock_get.call_count, 5)
             mock_get.reset_mock()
 
@@ -483,7 +486,6 @@ class Repo(RepoTester):
     def test_remote_url(self):
         d = DocumentRepository()
         d.config = LayeredConfig(Defaults(DocumentRepository.get_default_options()),
-                                 INIFile("ferenda.ini"),
                                  cascade=True)
         self.assertEqual(d.remote_url("123/a"), "http://example.org/docs/123/a.html")
         self.assertEqual(d.remote_url("123:a"), "http://example.org/docs/123%3Aa.html")
@@ -500,7 +502,6 @@ class Repo(RepoTester):
         # title and lang tags work
         d = DocumentRepository(loglevel="CRITICAL", datadir=self.datadir)
         config = LayeredConfig(Defaults(DocumentRepository.get_default_options()),
-                               INIFile("ferenda.ini"),
                                cascade=True)
         config.datadir = self.datadir
         d.config = config
@@ -648,9 +649,11 @@ class Repo(RepoTester):
         with self.assertRaises(ParseError):
             d.parse_document_from_soup(soup,doc)
 
-        # test 4: selector that matches more than one thing
+        # test 4: selector that matches more than one thing -- this'll
+        # log a warning which we silence
         d.parse_content_selector = "div"
-        d.parse_document_from_soup(soup,doc)
+        with silence():
+            d.parse_document_from_soup(soup,doc)
 
         self.assertEqual(serialize(doc.body),"""<Div id="header">
   <H1>

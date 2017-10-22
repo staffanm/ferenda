@@ -17,6 +17,8 @@ from ferenda.compat import Mock, MagicMock
 from ferenda import util
 from ferenda.testutil import RepoTester
 
+from test.quiet import silence
+
 # SUT
 from ferenda import Facet, Feedset, Feed, DocumentEntry, Describer
 
@@ -160,12 +162,16 @@ class News(RepoTester):
 
         # entries w/o published date and w/o distilled file should not
         # be published, but w/o title is OK
-        self.assertEqual(len(list(self.repo.news_entries())),
-                         23)
+        with silence():  # avoid warnings about stale entry files
+                         # since the downloaded and intermediate file
+                         # is missing, which would exist in a real
+                         # scenario
+            self.assertEqual(len(list(self.repo.news_entries())),
+                             23)
 
-        # also make sure that corresponding faceted_entries do not
-        # show these non-published entries
-        self.assertEqual(len(self.repo.news_facet_entries()), 23)
+            # also make sure that corresponding faceted_entries do not
+            # show these non-published entries
+            self.assertEqual(len(self.repo.news_facet_entries()), 23)
 
     def test_republishsource(self):
         self.repo.config.republishsource = True
@@ -384,10 +390,10 @@ class Feedsets(RepoTester):
         got = self.repo.news_select_for_feeds(self.results2, self.feedsets, self.facets)
         # last feedset (main) should have one single feed and it
         # should contain all entries.
-        self.assertEquals(len(got[-1].feeds), 1)
-        self.assertEquals(len(got[-1].feeds[0].entries), 4)
-        self.assertEquals("http://example.org/articles/pm14907713",
+        self.assertEqual(len(got[-1].feeds), 1)
+        self.assertEqual(len(got[-1].feeds[0].entries), 4)
+        self.assertEqual("http://example.org/articles/pm14907713",
                           got[-1].feeds[0].entries[0]['uri'])
-        self.assertEquals("http://example.org/articles/pm942051",
+        self.assertEqual("http://example.org/articles/pm942051",
                           got[-1].feeds[0].entries[3]['uri'])
 

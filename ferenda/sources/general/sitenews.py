@@ -101,7 +101,6 @@ class Sitenews(DocumentRepository):
     def parse_entry_summary(self, doc):
         summary = doc.meta.value(URIRef(doc.uri), DCTERMS.abstract)
         if len(doc.body[0]) > 1:
-            from pudb import set_trace; set_trace()
             if self.readmore_label:
                 permalink = self.canonical_uri(doc.basefile)
                 readmore_link = " <a href='%s'>%s</a>" % (permalink, self.readmore_label)

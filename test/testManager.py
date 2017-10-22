@@ -25,39 +25,8 @@ from ferenda.testutil import RepoTester, FerendaTestCase
 from ferenda import manager, decorators, util, errors
 from ferenda import (DocumentRepository, DocumentStore,
                      ResourceLoader, Resources)
+from test.quiet import quiet
 
-
-def quiet():
-    """Ensures that anything called by the test method won't output
-    anything, either by logging statements or calls to print()."""
-    # extra ceremony to work with unittest
-    def outer(f, *args, **kwargs):
-        @functools.wraps(f)
-        def test_wrapper(self):
-            l = logging.getLogger()
-            for h in l.handlers:
-                if isinstance(h, logging.StreamHandler):
-                    break
-                tmp = None
-            else:
-                fileno, tmp = tempfile.mkstemp()
-                l.addHandler(logging.FileHandler(tmp))
-                h = logging.StreamHandler()
-                h.setLevel(logging.CRITICAL)
-                h.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s",
-                                                 datefmt="%H:%M:%S"))
-                l.addHandler(h)
-            prevlevel = l.level
-            l.setLevel(logging.CRITICAL)
-            with patch('builtins.print') as printmock:
-                ret = f(self, *args, **kwargs)
-            # assert l.level == logging.CRITICAL, "Someone messed with the root logger level"
-            l.setLevel(prevlevel)
-            h.setLevel(prevlevel) # otherwise it'll be the default logging.WARNING i think
-            os.unlink(tmp)
-            return ret
-        return test_wrapper
-    return outer
 
 
 class staticmockstore(DocumentStore):
@@ -721,10 +690,7 @@ class Run(RunBase, unittest.TestCase):
                 argv = ["test", "invalid"]
                 self.assertEqual(manager.run(argv), None)
 
-                # # test4: specify no method -- no, that's now an error
-                # argv = ["test"]
-                # self.assertEqual(manager.run(argv), None)
-
+    @quiet()
     def test_run_single_errors(self):
         self._enable_repos()
         argv = ["test", "errmethod", "--all"]
@@ -983,6 +949,7 @@ Available modules:
  * test2: [Undocumented]"""
         self.assertEqual(got, want)
         
+    @quiet()
     def test_runserver(self):
         self._enable_repos()
         m = Mock()
@@ -1015,10 +982,11 @@ class RunMultiproc(RunBase, unittest.TestCase):
         # assert that all pids are unique
         self.assertEqual(3, len(set(pids)))
 
+    @quiet()
     def test_run_single_all_multiprocessing_fail(self):
         self._enable_repos()
         # print("running multiproc for pid %s, datadir %s" % (os.getpid(), self.tempdir))
-        argv = ["test","errmethod","--all", "--processes=3"]
+        argv = ["test","errmethod","--all", "--processes=3", "--loglevel=CRITICAL"]
         res = manager.run(argv)
         # this doesn't test that errors get reported immediately
         # (which they do)

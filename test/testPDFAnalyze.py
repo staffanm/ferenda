@@ -54,7 +54,7 @@ class Analyze(unittest.TestCase):
     def test_analyze_hmargins(self):
         hcounters = self.analyzer.count_horizontal_margins(0, 3)
         hmetrics = self.analyzer.analyze_horizontal_margins(hcounters)
-        self.assertEquals({'leftmargin': 135,
+        self.assertEqual({'leftmargin': 135,
                            'leftmargin_even': 108,
                            'pagewidth': 892,
                            'rightmargin': 780,

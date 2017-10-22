@@ -1,1 +1,1 @@
-{"error":"IndexMissingException[[ferenda] missing]","status":404}
+{"error":{"root_cause":[{"type":"index_not_found_exception","reason":"no such index","resource.type":"index_or_alias","resource.id":"ferenda","index_uuid":"_na_","index":"ferenda"}],"type":"index_not_found_exception","reason":"no such index","resource.type":"index_or_alias","resource.id":"ferenda","index_uuid":"_na_","index":"ferenda"},"status":404}

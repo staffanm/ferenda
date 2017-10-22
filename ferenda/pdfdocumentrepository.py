@@ -30,7 +30,7 @@ class PDFDocumentRepository(DocumentRepository):
     def parse(self, doc):
         reader = self.pdfreader_from_basefile(doc.basefile)
         self.parse_from_pdfreader(reader, doc)
-        # return doc
+        self.parse_entry_update(doc)
         return True
 
     def pdfreader_from_basefile(self, basefile):

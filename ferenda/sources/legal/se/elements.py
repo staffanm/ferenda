@@ -532,7 +532,6 @@ class Forfattningskommentar(CompoundElement):
             #                               'datatype':'rdf:XMLLiteral'}))
             element.append(div)
         else:
-            from pudb import set_trace; set_trace()
             print("comment_on not set")
         if hasattr(self, "title"):
             element.set("content", self.title)

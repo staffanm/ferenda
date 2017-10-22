@@ -5,8 +5,10 @@ from builtins import *
 
 from datetime import datetime
 from copy import copy
+import builtins
 import collections
 import json
+import re
 import os
 import sys
 import shutil
@@ -16,7 +18,7 @@ from lxml import etree
 from rdflib import Graph
 from bs4 import BeautifulSoup
 
-from ferenda.compat import unittest, Mock
+from ferenda.compat import unittest, Mock, patch
 from ferenda import util
 from ferenda import DocumentRepository
 
@@ -424,7 +426,11 @@ class TestRepo(unittest.TestCase, testutil.FerendaTestCase):
                        "<p>This is doc A</p>")
         util.writefile(self.datadir+"/parsed/a.xhtml",  "")
         os.environ["FERENDA_SET_TESTFILE"] = "1"
-        self._runtest()
+        with patch("builtins.print") as printmock:
+            self._runtest()
+        output = printmock.mock_calls[0][1][0]
+        output = re.sub("'[^']*'", "''", output, 1)
+        self.assertEqual("Overwriting '' with result of parse ('a')", output)
         del os.environ["FERENDA_SET_TESTFILE"]
         self.assertEqualXML(self.expected_xhtml,
                             util.readfile(self.datadir+"/parsed/a.xhtml"))
@@ -457,7 +463,8 @@ class TestRepo(unittest.TestCase, testutil.FerendaTestCase):
                        "<p>This is doc A</p>")
         util.writefile(self.datadir+"/distilled/a.ttl",  "")
         os.environ["FERENDA_SET_TESTFILE"] = "1"
-        self._runtest()
+        with patch("builtins.print") as printmock:
+            self._runtest()
         del os.environ["FERENDA_SET_TESTFILE"]
         self.assertEqual(self.expected_ttl,
                          util.readfile(self.datadir+"/distilled/a.ttl"))

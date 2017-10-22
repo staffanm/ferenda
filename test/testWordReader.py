@@ -15,6 +15,8 @@ from lxml import etree
 from ferenda.compat import unittest
 from ferenda.errors import ExternalCommandError
 
+from test.quiet import silence
+
 # SUT
 from ferenda import WordReader
 
@@ -68,8 +70,9 @@ class Read(unittest.TestCase):
     def test_mislabeled(self):
         path = self.datadir + os.sep + "out.xml"
         try:
-            out, type = self.reader.read("test/files/wordreader/mislabeled.doc",
-                                         path)
+            with silence():
+                out, type = self.reader.read("test/files/wordreader/mislabeled.doc",
+                                             path)
             self.assertEqual(out, path)
             self.assertEqual(type, "docx")
             self.assertTrue(os.path.exists(path))

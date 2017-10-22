@@ -240,7 +240,6 @@ class Decoding(unittest.TestCase):
         # uses pre-generated output from an older version.
         from ferenda.sources.legal.se.decoders import OffsetDecoder1d
         #try:
-        #    from pudb import set_trace; set_trace()
         #    reader = PDFReader(filename="test/files/pdfreader/custom-encoding.pdf",
         #                       workdir=self.datadir,
         #                       textdecoder=OffsetDecoder1d())

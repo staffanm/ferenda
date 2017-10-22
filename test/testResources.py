@@ -18,7 +18,7 @@ from examplerepos import staticmockclass, staticmockclass2, staticmockclass3
 # SUT
 from ferenda import Resources
 
-
+from test.quiet import silence
 
 class Make(unittest.TestCase, FerendaTestCase):
     def setUp(self):
@@ -241,10 +241,11 @@ class=testManager.staticmockclass2
                 'js':[s.join(['rsrc', 'js','test.js'])],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
         }
-        got = Resources([test], self.tempdir+os.sep+'rsrc',
-                        cssfiles=[],
-                        jsfiles=[],
-                        imgfiles=[]).make(api=False)
+        with silence():
+            got = Resources([test], self.tempdir+os.sep+'rsrc',
+                            cssfiles=[],
+                            jsfiles=[],
+                            imgfiles=[]).make(api=False)
         self.assertEqual(want,got)
 
     # def test_scss_transform(self):
@@ -276,21 +277,25 @@ class BaseAPI(RepoTester):
                          'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
                          'owl': 'http://www.w3.org/2002/07/owl#',
                          'skos': 'http://www.w3.org/2004/02/skos/core#'})
-
-        got = Resources([self.repo], self.datadir + "/data/rsrc",
-                        legacyapi=True).make(css=False, js=False, img=False, xml=False, api=True)
+        with silence():
+            got = Resources([self.repo], self.datadir + "/data/rsrc",
+                            legacyapi=True).make(css=False, js=False, img=False, xml=False, api=True)
         s = os.sep
         want = {'json': [s.join(['rsrc','api','context.json']),
                          s.join(['rsrc','api','common.json']),
                          s.join(['rsrc','api','terms.json'])]}
         self.assertEqual(want, got)
 
-        got  = json.load(open(self.datadir + "/data/rsrc/api/context.json"))
-        want = json.load(open("test/files/api/jsonld-context.json"))
+        with open(self.datadir + "/data/rsrc/api/context.json") as fp:
+            got  = json.load(fp)
+        with open("test/files/api/jsonld-context.json") as fp:
+            want = json.load(fp)
         self.assertEqual(want, got)
 
-        got  = json.load(open(self.datadir + "/data/rsrc/api/terms.json"))
-        want = json.load(open("test/files/api/var-terms.json"))
+        with open(self.datadir + "/data/rsrc/api/terms.json") as fp:
+            got  = json.load(fp)
+        with open("test/files/api/var-terms.json") as fp:
+            want = json.load(fp)
         self.assertEqual(want, got)
 
         got  = json.load(open(self.datadir + "/data/rsrc/api/common.json"))

@@ -358,7 +358,8 @@ class DocumentRepository(object):
         logname = self.alias
         # alternatively (nonambigious and helpful for debugging, but verbose)
         # logname = self.__class__.__module__+"."+self.__class__.__name__
-        self.log = self._setup_logger(logname)
+        # self.log = self._setup_logger(logname)
+        self.log = logging.getLogger(logname)
 
         self.ns = {}
         for ns in self.namespaces:
@@ -449,6 +450,7 @@ class DocumentRepository(object):
 
     @config.setter
     def config(self, config):
+        """TBD"""
         self._config = config
         self.store = self.documentstore_class(
             config.datadir + os.sep + self.alias,
@@ -800,6 +802,7 @@ with the *config* object as single parameter.
         return updated
 
     def download_get_first_page(self):
+        """TBD"""
         resp = self.session.get(self.start_url)
         return resp
 
@@ -1009,6 +1012,7 @@ with the *config* object as single parameter.
         return updated
 
     def download_name_file(self, tmpfile, basefile, assumedfile):
+        """TBD"""
         return assumedfile
 
     def download_is_different(self, existing, new):
@@ -1169,6 +1173,8 @@ with the *config* object as single parameter.
         title = doc.meta.value(URIRef(doc.uri), DCTERMS.title)
         if title:
             return str(title)
+        else:
+            return "Doc %s" % doc.basefile
 
     def parse_entry_summary(self, doc):
         """Construct a useful summary for the document, like it's dcterms:abstract,
@@ -1607,6 +1613,7 @@ with the *config* object as single parameter.
         return xhtmldoc
 
     def render_xhtml_validate(self, xhtmldoc):
+        """TBD"""
         # the default validator makes sure we haven't created
         # duplicate sub-resources, and that we haven't created too
         # many resources.
@@ -1672,7 +1679,8 @@ with the *config* object as single parameter.
         docstore = DocumentStore(config.datadir + os.sep + cls.alias)
         dumppath = docstore.resourcepath("distilled/dump.nt")
 
-        log = cls._setup_logger(cls.alias)
+        # log = cls._setup_logger(cls.alias)
+        log = logging.getLogger(cls.alias)
 
         # check if we need to work at all.
         xhtmlfiles = (docstore.distilled_path(x)
@@ -1745,7 +1753,8 @@ with the *config* object as single parameter.
 
         """
         # FIXME: should use dataset_uri(), but that's a instancemethod
-        log = cls._setup_logger(cls.alias)
+        # log = cls._setup_logger(cls.alias)
+        log = logging.getLogger(cls.alias)
 
         context = "%sdataset/%s" % (config.url, cls.alias)
         docstore = DocumentStore(config.datadir + os.sep + cls.alias)
@@ -3619,17 +3628,18 @@ WHERE {
         return []
 
 
-    @staticmethod
-    def _setup_logger(logname):
-        log = logging.getLogger(logname)
-        if log.handlers == []:
-            if hasattr(logging, 'NullHandler'):
-                log.addHandler(logging.NullHandler())
-            else:  # pragma: no cover
-                # py26 compatibility
-                class NullHandler(logging.Handler):
-
-                    def emit(self, record):
-                        pass
-                log.addHandler(NullHandler())
-        return log
+#    @staticmethod
+#    def _setup_logger(logname):
+#        log = logging.getLogger(logname)
+#        if log.handlers == []:
+#            if hasattr(logging, 'NullHandler'):
+#                log.addHandler(logging.NullHandler())
+#            else:  # pragma: no cover
+#                # py26 compatibility
+#                class NullHandler(logging.Handler):
+#
+#                    def emit(self, record):
+#                        pass
+#                log.addHandler(NullHandler())
+#        return log
+#

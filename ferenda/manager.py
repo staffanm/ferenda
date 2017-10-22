@@ -418,11 +418,17 @@ def shutdown_logger():
     """Shuts down the configured logger. In particular, closes any
     FileHandlers, which is needed on win32."""
 
-    l = logging.getLogger()  # get the root logger
-    for existing_handler in list(l.handlers):
-        if isinstance(existing_handler, logging.FileHandler):
-            existing_handler.close()
-        l.removeHandler(existing_handler)
+    # we only close handles on win32. This is because this works badly
+    # in conjunction with the quiet decorator, which sets up a
+    # /dev/null-like FileHandler, which shouldn't be removed,
+    # particularly not for tests that call run() twice or more. So we
+    # only close handles if we need it.
+    if sys.platform == "win32":
+        l = logging.getLogger()  # get the root logger
+        for existing_handler in list(l.handlers):
+            if isinstance(existing_handler, logging.FileHandler):
+                existing_handler.close()
+            l.removeHandler(existing_handler)
 
 
 def run(argv, config=None, subcall=False):
@@ -779,7 +785,7 @@ def _load_config(filename=None, argv=None, defaults=None):
     global config_loaded
     if config_loaded is not False:
         # assert config_loaded is False, "load_config called more than once!"
-        getlog().critical("load_config called more than once!")
+        getlog().error("load_config called more than once!")
     
     if not defaults:
         defaults = copy.deepcopy(DEFAULT_CONFIG)

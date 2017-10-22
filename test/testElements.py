@@ -21,6 +21,7 @@ from ferenda.elements import (serialize, deserialize, AbstractElement,
                               PredicateElement, Body, Section, Paragraph,
                               Link, html)
 from ferenda import elements as el
+from test.quiet import quiet
 
 
 class Main(unittest.TestCase):
@@ -115,6 +116,7 @@ class Main(unittest.TestCase):
         self.assertEqual(b'<abstractelement xmlns="http://www.w3.org/1999/xhtml"/>',
                          etree.tostring(x.as_xhtml()))
 
+    @quiet()
     def test_compound(self):
         x = CompoundElement(["hello", "world"], id="42", foo="bar")
         x.foo = "baz"
@@ -200,7 +202,8 @@ class Main(unittest.TestCase):
         # self.assertEqual(str(y), "Räksmörgås")
         # self.assertEqual(repr(y),
         #                  "Link('Räksmörgås', uri=http://example.org/)")
-        
+
+    @quiet()
     def test_elements_from_soup(self):
         soup = BeautifulSoup("""<html>
 <head>

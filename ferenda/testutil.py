@@ -7,6 +7,7 @@ from builtins import *
 
 from difflib import unified_diff
 from io import BytesIO
+import builtins
 import codecs
 import logging
 import filecmp
@@ -652,6 +653,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         """
         basefile = self.filename_to_basefile(downloaded_file)
         self.repo.parse(basefile)
+        print = builtins.print
         if 'FERENDA_SET_TESTFILE' in os.environ:
             print("Overwriting %r with result of parse (%r)" % (rdf_file, basefile))
             g = rdflib.Graph()
@@ -707,6 +709,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             cProfile.runctx("runtest()", globals(), locals(), sort="cumtime")
         else:
             runtest()
+        print = builtins.print
         if 'FERENDA_SET_TESTFILE' in os.environ:
             print("Overwriting %r with result of parse (%r)" % (xhtml_file, basefile))
             util.robust_rename(xhtml_file, xhtml_file + "~")

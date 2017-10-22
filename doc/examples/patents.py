@@ -17,12 +17,14 @@ from ferenda.decorators import managedparsing
 
 class XMLPatents(DocumentRepository):
     alias = "patxml"
-
+    required_predicates = []
+    
     def download(self, basefile = None):
         download_from_api()
 
     @managedparsing
     def parse(self,doc):
+        self.parse_entry_update(doc)
         return self.transform_patent_xml_to_xhtml(doc)
 
 class HTMLPatents(DocumentRepository):
