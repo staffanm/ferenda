@@ -160,6 +160,8 @@ class DV(SwedishLegalSource):
                             # 
                             # log.warning("Path %s is already in map" % path)
                             continue
+                        assert path
+                        assert basefile
                         if config.mapfiletype == "nginx":
                             fp.write("%s\t/dv/generated/%s.html;\n" % (path, basefile))
                         else:
@@ -1309,7 +1311,6 @@ class DV(SwedishLegalSource):
     # create nice RDF from the sanitized metadata
     def polish_metadata(self, head):
 
-
         def ref_to_uri(ref):
             nodes = self.rattsfall_parser.parse_string(ref)
             assert isinstance(nodes[0], Link), "Can't make URI from '%s'" % ref
@@ -1483,6 +1484,8 @@ class DV(SwedishLegalSource):
                         append_path = False
                         break
         if append_path:
+            assert path
+            assert doc.basefile
             with codecs.open(mapfile, "a", encoding="utf-8") as fp:
                 if self.config.mapfiletype == "nginx":
                     fp.write("%s\t/dv/generated/%s.html;\n" % (path,
