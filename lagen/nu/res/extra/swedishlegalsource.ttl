@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2017-09-11T07:31:56.591585
+# Automatically transformed from sources at 2017-10-24T10:23:18.803363
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -637,15 +637,14 @@
     skos:prefLabel "Pensionsmyndighetens författningssamling"@sv .
 
 <https://lagen.nu/dataset/pmod> a rpubl:Rattsfallspublikation ;
-    owl:sameAs <http://rinfo.lagrummet.se/serie/rf/pmd> ;
+    owl:sameAs <http://rinfo.lagrummet.se/serie/rf/pmod> ;
     skos:altLabel "PMÖD"@sv ;
     skos:prefLabel "Patent- och marknadsöverdomstolen"@sv .
 
 <https://lagen.nu/dataset/prvfs> a rpubl:Forfattningssamling ;
     dcterms:publisher <https://lagen.nu/org/2014/patent-_och_registreringsverket> ;
     rdfs:seeAlso <http://www.prv.se/om_prv/styrdokument/forfattningssamling/start.html> ;
-    owl:sameAs <http://rinfo.lagrummet.se/serie/fs/prvfs>,
-        <http://rinfo.lagrummet.se/serie/fs/ptfs> ;
+    owl:sameAs <http://rinfo.lagrummet.se/serie/fs/prvfs> ;
     skos:altLabel "PRVFS"@sv ;
     skos:prefLabel "Patent- och registreringsverkets författningssamling"@sv .
 
@@ -1383,7 +1382,7 @@
     foaf:name "Lantbruksstyrelsen"@sv .
 
 <https://lagen.nu/org/2017/patent-_och_marknadsoverdomstolen> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/patent-_och_marknadsöverdomstolen> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/patent-_och_marknadsoeverdomstolen> ;
     foaf:name "Patent- och marknadsöverdomstolen"@sv .
 
 <https://lagen.nu/org/2008/domstolsverket> a foaf:Organization ;

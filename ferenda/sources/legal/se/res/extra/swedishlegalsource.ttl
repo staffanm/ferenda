@@ -1,4 +1,4 @@
-# Automatically concatenated from sources at 2017-09-11T07:31:55.831068
+# Automatically concatenated from sources at 2017-10-24T10:20:44.664571
 
 @prefix : <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
 @prefix bibo: <http://purl.org/ontology/bibo/> .
@@ -211,6 +211,9 @@
 
 <http://rinfo.lagrummet.se/org/oeverklagandenaemnden_foer_studiestod> a foaf:Organization ;
     foaf:name "Överklagandenämnden för studiestöd"@sv .
+
+<http://rinfo.lagrummet.se/org/patent-_och_marknadsoeverdomstolen> a foaf:Organization ;
+    foaf:name "Patent- och marknadsöverdomstolen"@sv .
 
 <http://rinfo.lagrummet.se/org/patentbesvaersraetten> a foaf:Organization ;
     foaf:name "Patentbesvärsrätten"@sv .
@@ -1038,6 +1041,10 @@
 <http://rinfo.lagrummet.se/serie/rf/nja> a :Rattsfallspublikation ;
     skos:altLabel "NJA"@sv ;
     skos:prefLabel "Nytt Juridiskt Arkiv"@sv .
+
+<http://rinfo.lagrummet.se/serie/rf/pmod> a :Rattsfallspublikation ;
+    skos:altLabel "PMÖD"@sv ;
+    skos:prefLabel "Patent- och marknadsöverdomstolen"@sv .
 
 <http://rinfo.lagrummet.se/serie/rf/rh> a :Rattsfallspublikation ;
     skos:altLabel "RH"@sv ;

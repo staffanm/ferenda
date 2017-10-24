@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2017-10-24T10:08:10.613064
+# Automatically transformed from sources at 2017-10-24T10:20:45.792168
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -26,8 +26,6 @@ rpubl:Kommittedirektiv space:abbrSlug "dir" .
 rpubl:Proposition space:abbrSlug "prop" .
 
 rpubl:Skrivelse space:abbrSlug "skr" .
-
-<http://rinfo.lagrummet.se/serie/rf/pmod> space:abbrSlug "pmod" .
 
 <https://lagen.nu/dataset/01fs> space:abbrSlug "01fs" .
 
@@ -200,6 +198,8 @@ rpubl:Skrivelse space:abbrSlug "skr" .
 <https://lagen.nu/dataset/nrr> space:abbrSlug "nrr" .
 
 <https://lagen.nu/dataset/nutfs> space:abbrSlug "nutfs" .
+
+<https://lagen.nu/dataset/pmod> space:abbrSlug "pmod" .
 
 <https://lagen.nu/dataset/prvfs> space:abbrSlug "prvfs" .
 
