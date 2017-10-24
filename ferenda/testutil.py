@@ -655,7 +655,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         self.repo.parse(basefile)
         print = builtins.print
         if 'FERENDA_SET_TESTFILE' in os.environ:
-            print("Overwriting %r with result of parse (%r)" % (rdf_file, basefile))
+            print("Overwriting '%s' with result of parse ('%s')" % (rdf_file, basefile))
             g = rdflib.Graph()
             g.parse(data=util.readfile(self.repo.store.distilled_path(basefile)))
             util.robust_rename(rdf_file, rdf_file + "~")
@@ -711,7 +711,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             runtest()
         print = builtins.print
         if 'FERENDA_SET_TESTFILE' in os.environ:
-            print("Overwriting %r with result of parse (%r)" % (xhtml_file, basefile))
+            print("Overwriting '%s' with result of parse ('%s')" % (xhtml_file, basefile))
             util.robust_rename(xhtml_file, xhtml_file + "~")
             shutil.copy2(self.repo.store.parsed_path(basefile), xhtml_file)
             return
