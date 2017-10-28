@@ -887,19 +887,19 @@ imgfiles = []
         # Make sure configuration values gets stored properly in the instance created by run()
         self._enable_repos()
 
-        self.assertEqual(".html",               manager.run(['test','inspect','downloaded_suffix']))
-        self.assertEqual("file",                manager.run(['test','inspect','storage_policy']))
-        self.assertEqual(self.tempdir,          manager.run(['test','inspect','config', 'datadir']))
-        self.assertEqual(".html",               manager.run(['test','inspect','store', 'downloaded_suffix']))
-        self.assertEqual("file",                manager.run(['test','inspect','store', 'storage_policy']))
+        self.assertEqual(".html",               manager.run(['test', 'inspect', 'downloaded_suffix']))
+        self.assertEqual("file",                manager.run(['test', 'inspect', 'storage_policy']))
+        self.assertEqual(self.tempdir,          manager.run(['test', 'inspect', 'config', 'datadir']))
+        self.assertEqual([".html"],             manager.run(['test', 'inspect', 'store', 'downloaded_suffixes']))
+        self.assertEqual("file",                manager.run(['test', 'inspect', 'store', 'storage_policy']))
         self.assertEqual(self.tempdir+os.sep+"test",  manager.run(['test','inspect','store', 'datadir']))
         
-        self.assertEqual(".txt",                 manager.run(['test2','inspect','downloaded_suffix']))
-        self.assertEqual("dir",                  manager.run(['test2','inspect','storage_policy']))
-        self.assertEqual(self.tempdir,           manager.run(['test2','inspect','config', 'datadir']))
-        self.assertEqual(".txt",                 manager.run(['test2','inspect','downloaded_suffix']))
-        self.assertEqual("dir",                  manager.run(['test2','inspect','storage_policy']))
-        self.assertEqual(self.tempdir+os.sep+"test2",  manager.run(['test2','inspect','store', 'datadir']))
+        self.assertEqual(".txt",                 manager.run(['test2', 'inspect', 'downloaded_suffix']))
+        self.assertEqual("dir",                  manager.run(['test2', 'inspect', 'storage_policy']))
+        self.assertEqual(self.tempdir,           manager.run(['test2', 'inspect', 'config', 'datadir']))
+        self.assertEqual([".txt"],                 manager.run(['test2', 'inspect', 'store', 'downloaded_suffixes']))
+        self.assertEqual("dir",                  manager.run(['test2', 'inspect', 'store','storage_policy']))
+        self.assertEqual(self.tempdir+os.sep+"test2",  manager.run(['test2', 'inspect', 'store', 'datadir']))
         
     def test_config_init(self):
         # make sure that the sub-config object created by run() is

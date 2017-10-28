@@ -352,7 +352,7 @@ class DocumentRepository(object):
         
         # should documentstore have a connection to self, ie
         # self.store = DocumentStore(basedir, self) ?
-        self.store.downloaded_suffix = self.downloaded_suffix
+        self.store.downloaded_suffixes = [self.downloaded_suffix]
         self.store.storage_policy = self.storage_policy
 
         logname = self.alias
@@ -454,7 +454,6 @@ class DocumentRepository(object):
         self._config = config
         self.store = self.documentstore_class(
             config.datadir + os.sep + self.alias,
-            downloaded_suffix=self.downloaded_suffix,
             storage_policy=self.storage_policy)
 
     def lookup_resource(self, label, predicate=FOAF.name, cutoff=0.8, warn=True):

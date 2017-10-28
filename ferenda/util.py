@@ -290,38 +290,6 @@ nor ends with whitespace.
     return ' '.join(string.replace("\xa0", " ").split())
 
 # util.File
-
-
-def list_dirs_slow(d, suffix=None, reverse=False):
-    """A generator that works much like :py:func:`os.listdir`, only recursively (and only returns files, not directories).
-
-    :param d: The directory to start in
-    :type d: str
-    :param suffix: Only return files with the given suffix
-    :type suffix: str
-    :param reverse: Returns result sorted in reverse alphabetic order
-    :param type:
-    :returns: the full path (starting from d) of each matching file
-    :rtype: generator
-
-    """
-    # inspired by http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/161542
-    directories = [d]
-    while directories:
-        d = directories.pop()
-        if not os.path.exists(d):
-            continue
-        for f in sorted(os.listdir(d), key=split_numalpha, reverse=reverse):
-            f = "%s%s%s" % (d, os.path.sep, f)
-            if os.path.isdir(f):
-                directories.insert(0, f)
-            elif os.path.isfile:
-                if suffix and not f.endswith(suffix):
-                    continue
-                else:
-                    yield f
-
-
 def list_dirs(d, suffix=None, reverse=False):
     """A generator that works much like :py:func:`os.listdir`, only
     recursively (and only returns files, not directories).

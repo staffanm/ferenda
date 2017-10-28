@@ -27,7 +27,6 @@ class Store(unittest.TestCase):
         path = self.datadir+"/"+path
         return path.replace('/', '\\') if os.sep == '\\' else path
 
-
     def test_open(self):
         wanted_filename = self.store.path("basefile", "maindir", ".suffix")
         with self.store.open("basefile", "maindir", ".suffix", "w") as fp:
@@ -38,6 +37,11 @@ class Store(unittest.TestCase):
                          "This is the data")
         mtime = os.stat(wanted_filename).st_mtime
 
+        # make sure that the open method also can be used
+        with self.store.open("basefile", "maindir", ".suffix") as fp:
+            self.assertEqual("This is the data",
+                             fp.read())
+
         # make sure writing identical content does not actually write
         # a new file
         time.sleep(.1) # just to get a different mtime
@@ -45,6 +49,20 @@ class Store(unittest.TestCase):
             fp.write("This is the data")
         self.assertEqual(os.stat(wanted_filename).st_mtime,
                          mtime)
+
+    def test_open_binary(self):
+        wanted_filename = self.store.path("basefile", "maindir", ".suffix")
+        # the smallest possible PNG image
+        bindata = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82'
+        with self.store.open("basefile", "maindir", ".suffix", "wb") as fp:
+            fp.write(bindata)
+
+        mimetype = util.runcmd("file -b --mime-type %s" % wanted_filename)[1]
+        self.assertEqual("image/png", mimetype.strip())
+
+        # make sure that the open method also can be used
+        with self.store.open("basefile", "maindir", ".suffix", "rb") as fp:
+            self.assertEqual(bindata, fp.read())
 
     
     def test_path(self):
@@ -290,6 +308,64 @@ class Store(unittest.TestCase):
                                                          "2")),
                          attachments_2)
 
+
+class Compression(unittest.TestCase):
+    compression = None
+    expected_suffix = ""
+    expected_mimetype = "text/plain"
+    dummytext = """For applications that require data compression, the functions in this module allow compression and decompression, using the zlib library. The zlib library has its own home page at http://www.zlib.net. There are known incompatibilities between the Python module and versions of the zlib library earlier than 1.1.3; 1.1.3 has a security vulnerability, so we recommend using 1.1.4 or later.
+
+zlib’s functions have many options and often need to be used in a particular order. This documentation doesn’t attempt to cover all of the permutations; consult the zlib manual at http://www.zlib.net/manual.html for authoritative information.
+
+For reading and writing .gz files see the gzip module.
+"""
+    
+    def p(self,path):
+        path = self.datadir+"/"+path
+        return path.replace('/', '\\') if os.sep == '\\' else path
+
+    def setUp(self):
+        self.datadir = tempfile.mkdtemp()
+        self.store = DocumentStore(self.datadir, compression=self.compression)
+
+    def test_intermediate_path(self):
+        self.assertEqual(self.p("intermediate/123/a.xml" + self.expected_suffix),
+                         self.store.intermediate_path('123/a'))
+
+    def test_intermediate_path_selectsuffix(self):
+        self.store.intermediate_suffixes = [".html", ".xhtml"]
+        util.writefile(self.p("intermediate/123/a.html"), self.dummytext)
+        self.assertEqual(self.p("intermediate/123/a.html") + self.expected_suffix,
+                         self.store.intermediate_path('123/a'))
+
+    def test_open_intermediate_path(self):
+        self.store.intermediate_suffixes = [".html", ".xhtml"]
+        with self.store.open_intermediate("123/a", mode="w", suffix=".xhtml") as fp:
+            fp.write(self.dummytext)
+        filename = self.p("intermediate/123/a.xhtml" + self.expected_suffix)
+        self.assertTrue(os.path.exists(filename))
+        mimetype = util.runcmd("file -b --mime-type %s" % filename)[1]
+        self.assertEqual(self.expected_mimetype, mimetype.strip())
+        with self.store.open_intermediate("123/a") as fp:
+            # note, open_intermediate should open the file with the
+            # the .xhtml suffix automatically
+            self.assertEqual(self.dummytext, fp.read())
+
+class GzipCompression(Compression):
+    compression = "gz"
+    expected_suffix = ".gz"
+    expected_mimetype = "application/x-gzip"
+
+class Bzip2Compression(Compression):
+    compression = "bz2"
+    expected_suffix = ".bz2"
+    expected_mimetype = "application/x-bzip2"
+
+class XzCompression(Compression):
+    compression = "xz"
+    expected_suffix = ".xz"
+    expected_mimetype = "application/x-xz"
+    
 
 import doctest
 from ferenda import documentstore

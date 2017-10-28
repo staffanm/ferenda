@@ -7,28 +7,24 @@ from contextlib import contextmanager
 from tempfile import NamedTemporaryFile
 import filecmp
 import os
+import codecs
 import shutil
 from urllib.parse import quote, unquote
+from gzip import GzipFile
+from bz2 import BZ2File
+from lzma import LZMAFile
 
 from ferenda import util
 from ferenda import errors
 
 
 class DocumentStore(object):
-
-    invalid_suffixes = [".invalid"]
-
-    """
-    Unifies handling of reading and writing of various data files
+    """Unifies handling of reading and writing of various data files
     during the ``download``, ``parse`` and ``generate`` stages.
 
     :param datadir: The root directory (including docrepo path
                     segment) where files are stored.
     :type datadir: str
-    :param downloaded_suffix: File suffix for the main source document
-                              format. Determines the suffix of
-                              downloaded files.
-    :type downloaded_suffix: str
     :param storage_policy: Some repositories have documents in several
                            formats, documents split amongst several
                            files or embedded resources. If
@@ -41,21 +37,77 @@ class DocumentStore(object):
                            (and therefore all other ``*_path``
                            methods)
     :type storage_policy: str
+    :param compression: Which compression method to use when storing
+                        files. Can be ``None`` (no compression),
+                        ``"gz"``, ``"bz2"``, ``"xz"`` or ``True``
+                        (select best compression method, currently
+                        xz). NB: This only affects
+                        :py:meth:`~ferenda.DocumentStore.intermediate_path`
+                        and
+                        :py:meth:`~ferenda.DocumentStore.open_intermediate`.
+    :type compression: str
+
     """
-    def __init__(self, datadir, downloaded_suffix=".html", storage_policy="file"):
+    compression = None
+    downloaded_suffixes = [".html"]
+    intermediate_suffixes = [".xml"]
+    invalid_suffixes = [".invalid"]
+    
+    def __init__(self, datadir, storage_policy="file", compression=None):
         self.datadir = datadir  # docrepo.datadir + docrepo.alias
-        self.downloaded_suffix = downloaded_suffix
         self.storage_policy = storage_policy
+        assert self.storage_policy in ("dir", "file")
+        self.compression = compression
 
     @contextmanager
-    def _open(self, filename, mode):
-        if "w" in mode:
-            fp = NamedTemporaryFile(mode, delete=False)
+    def _open(self, filename, mode, compression=None):
+        suffix = self._compressed_suffix()
+
+        def wrap_fp(fp):
+            if suffix == ".gz":
+                fp = GzipFile(fileobj=fp, mode=mode)
+            elif suffix == ".bz2":
+                fp = BZ2File(fp, mode=mode)
+            elif suffix == ".xz":
+                fp = LZMAFile(fp, mode=mode)
+            if suffix and "b" not in mode:
+                # If mode is not binary (and we expect to be able to
+                # write() str values, not bytes), need need to create
+                # an additional encoding wrapper. That encoder can
+                # probably use UTF-8 without any need for additional
+                # configuration
+                if "w" in mode:
+                    wrap = codecs.getwriter("utf-8")
+                else:
+                    wrap = codecs.getreader("utf-8")
+                fp = wrap(fp)
             fp.realname = filename
+            return fp
+
+        def opener():
+            if suffix == ".gz":
+                return GzipFile
+            elif suffix == ".bz2":
+                return BZ2File
+            elif suffix == ".xz":
+                return LZMAFile
+            else:
+                return open  # or io.open?
+    
+        if "w" in mode:
+            if suffix:
+                # We ignore the mode when creating the temporary file
+                # and use the the default "w+b" so that we can create
+                # compressed (binary) data. The wrapped fp can take
+                # care of str->binary conversions
+                tempmode = "w+b"
+            else:
+                tempmode = mode
+            fp = wrap_fp(NamedTemporaryFile(mode=tempmode, delete=False))
             try:
                 yield fp
             finally:
-                tempname = fp.name
+                tempname = util.name_from_fp(fp)
                 fp.close()
                 if not os.path.exists(filename) or not filecmp.cmp(tempname, filename):
                     util.ensure_dir(filename)
@@ -65,8 +117,13 @@ class DocumentStore(object):
         else:
             if "a" in mode and not os.path.exists(filename):
                 util.ensure_dir(filename)
-
-            fp = open(filename, mode)
+            if suffix:
+                # compressed files must always be read as binary -
+                # wrap_fp takes care of bytes->str conversion
+                tempmode = "rb"
+            else:
+                tempmode = mode
+            fp = wrap_fp(open(filename, tempmode))
             try:
                 yield fp
             finally:
@@ -157,15 +214,25 @@ class DocumentStore(object):
                     "Can't add attachments (name %s) if "
                     "storage_policy != 'dir'" % attachment)
             segments[-1] += suffix
+        path = "/".join(segments)
+        if os.sep != "/":
+            path = path.replace("/", os.sep)
+        
+        return path + self._compressed_suffix()
 
-        unixpath = "/".join(segments)
-        if os.sep == "/":
-            return unixpath
+    def _compressed_suffix(self):
+        """Returns a suitable suffix (including leading dot, eg ".bz2") for
+        the selected compression method."""
+        if self.compression is True: # select best compression
+            return ".xz"
+        elif self.compression in ("xz", "bz2", "gz"): # valid compression identifiers
+            return "." + self.compression
         else:
-            return unixpath.replace("/", os.sep)
+            return ""
 
     @contextmanager
-    def open(self, basefile, maindir, suffix, mode="r", version=None, attachment=None):
+    def open(self, basefile, maindir, suffix, mode="r",
+             version=None, attachment=None, compression=None):
         """Context manager that opens files for reading or writing. The
         parameters are the same as for
         :meth:`~ferenda.DocumentStore.path`, and the note is
@@ -183,18 +250,12 @@ class DocumentStore(object):
 
         """
         filename = self.path(basefile, maindir, suffix, version, attachment)
-        fp = NamedTemporaryFile(mode, delete=False)
-        fp.realname = filename
-        try:
+        with self._open(filename, mode, compression) as fp:
             yield fp
-        finally:
-            tempname = fp.name
-            fp.close()
-            if not os.path.exists(filename) or not filecmp.cmp(tempname, filename):
-                util.ensure_dir(filename)
-                shutil.move(tempname, filename)
-            else:
-                os.unlink(tempname)
+
+    def _compressed_opener(self, mode):
+        suffix = self._compressed_suffix()
+        return self._opener[suffix]
 
     def list_basefiles_for(self, action, basedir=None):
         """Get all available basefiles that can be used for the
@@ -211,41 +272,36 @@ class DocumentStore(object):
         :returns: All available basefiles
         :rtype: generator
         """
+        def prepend_index(suffixes):
+            prepend = self.storage_policy == "dir"
+            # If each document is stored in a separate directory
+            # (storage_policy = "dir"), there is usually other
+            # auxillary files (attachments and whatnot) in that
+            # directory as well. Make sure we only yield a single file
+            # from each directory. By convention, the main file is
+            # called index.html, index.pdf or whatever.
+            return [os.sep + "index" + s if prepend else s for s in suffixes]
+                    
         if not basedir:
             basedir = self.datadir
         directory = None
         if action == "parse":
             directory = os.path.sep.join((basedir, "downloaded"))
-            if self.storage_policy == "dir":
-                # If each document is stored in a separate directory,
-                # there is usually other auxillary files (attachments
-                # and whatnot) in that directory as well. Make sure we
-                # only yield a single file from each directory. By
-                # convention, the main file is called index.html,
-                # index.pdf or whatever.
-                # print("storage_policy dir: %s" % self.storage_policy)
-                suffix = os.sep + "index" + self.downloaded_suffix
-            else:
-                # print("storage_policy file: %s" % self.storage_policy)
-                suffix = self.downloaded_suffix
+            suffixes = prepend_index(self.downloaded_suffixes)
         elif action == "relate":
             directory = os.path.sep.join((basedir, "distilled"))
-            suffix = ".rdf"
+            suffixes = [".rdf"]
         elif action == "generate":
             directory = os.path.sep.join((basedir, "parsed"))
-            if self.storage_policy == "dir":
-                suffix = os.sep + "index.xhtml"
-            else:
-                suffix = ".xhtml"
+            suffixes = prepend_index([".xhtml"])
         elif action == "news":
             directory = os.path.sep.join((basedir, "entries"))
-            suffix = ".json"
-
+            suffixes = [".json"]
         # FIXME: fake action, needed for get_status. replace with
         # something more elegant
         elif action in ("_postgenerate"):
             directory = os.path.sep.join((basedir, "generated"))
-            suffix = ".html"
+            suffixes = [".html"]
 
         if not directory:
             raise ValueError("No directory calculated for action %s" % action)
@@ -254,14 +310,20 @@ class DocumentStore(object):
             return
 
         # FIXME: Some stores need a more sophisticated way of filtering than this.
-        for x in util.list_dirs(directory, suffix, reverse=True):
+        for x in util.list_dirs(directory, suffixes, reverse=True):
             # ignore empty files placed by download (which may
             # have done that in order to avoid trying to
             # re-download nonexistent resources)
             if os.path.exists(x) and os.path.getsize(x) > 0 and not x.endswith(".root.json"):
                 # get a pathfrag from full path
                 # suffixlen = len(suffix) if self.storage_policy == "file" else len(suffix) + 1
-                suffixlen = len(suffix)
+                suffixlen = 0
+                for s in suffixes:
+                    if x.endswith(s):
+                        suffixlen = len(s)
+                        break
+                else:
+                    raise ValueError("%s doesn't end with a valid suffix (%s)" % x, ", ".join(suffixes))
                 x = x[len(directory) + 1:-suffixlen]
                 yield self.pathfrag_to_basefile(x)
 
@@ -347,14 +409,14 @@ class DocumentStore(object):
         # places throughout the code. Should subclasses be able to
         # control suffixes beyond the simple self.downloaded_suffix
         # mechanism?
-        suffixmap = {'downloaded': self.downloaded_suffix,
-                     'parsed': '.xhtml',
-                     'generated': '.html'}
-        mainfile = "index" + suffixmap[action]
+        suffixmap = {'downloaded': self.downloaded_suffixes,
+                     'parsed': ['.xhtml'],
+                     'generated': ['.html']}
+        mainfiles = ["index" + s for s in suffixmap[action]]
         for x in util.list_dirs(directory, reverse=False):
             # /datadir/base/downloaded/basefile/attachment.txt => attachment.txt
             x = x[len(directory) + 1:]
-            if x != mainfile:
+            if x not in mainfiles:
                 if not [suffix for suffix in self.invalid_suffixes if x.endswith(suffix)]:
                     yield x
 
@@ -451,8 +513,12 @@ class DocumentStore(object):
         :returns: The full filesystem path
         :rtype:   str
         """
-        return self.path(basefile, 'downloaded',
-                         self.downloaded_suffix, version, attachment)
+        for suffix in self.downloaded_suffixes:
+            path = self.path(basefile, "downloaded", suffix, version, attachment)
+            if os.path.exists(path):
+                return path
+            else:
+                return self.path(basefile, 'downloaded', self.downloaded_suffixes[0], version, attachment)
 
     def open_downloaded(self, basefile, mode="r", version=None, attachment=None):
         """Opens files for reading and writing,
@@ -479,7 +545,7 @@ class DocumentStore(object):
         return self.path(basefile, 'entries', '.json', version,
                          storage_policy="file")
 
-    def intermediate_path(self, basefile, version=None, attachment=None):
+    def intermediate_path(self, basefile, version=None, attachment=None, suffix=None):
         """Get the full path for the main intermediate file for the given
         basefile (and optionally archived version).
 
@@ -492,17 +558,24 @@ class DocumentStore(object):
         :returns: The full filesystem path
         :rtype:   str
         """
-        return self.path(basefile, 'intermediate', '.xml', version, attachment)
+        if suffix:
+            return self.path(basefile, 'intermediate', suffix, version, attachment)
+        for suffix in self.intermediate_suffixes:
+            path = self.path(basefile, 'intermediate', suffix, version, attachment)
+            if os.path.exists(path):
+                return path
+        else:
+            return self.path(basefile, 'intermediate', self.intermediate_suffixes[0], version, attachment)
 
     def open_intermediate(self, basefile, mode="r", version=None,
-                          attachment=None):
+                          attachment=None, suffix=None):
         """Opens files for reading and writing,
         c.f. :meth:`~ferenda.DocumentStore.open`. The parameters are
         the same as for
         :meth:`~ferenda.DocumentStore.intermediate_path`.
         """
-        filename = self.intermediate_path(basefile, version, attachment)
-        return self._open(filename, mode)
+        filename = self.intermediate_path(basefile, version, attachment, suffix)
+        return self._open(filename, mode, self.compression)
 
     def parsed_path(self, basefile, version=None, attachment=None):
         """Get the full path for the parsed XHTML file for the given
