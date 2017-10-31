@@ -252,6 +252,9 @@ class DV(SwedishLegalSource):
                 try:
                     with codecs.open(mapfile, encoding="utf-8") as fp:
                         for line in fp:
+                            if "\t" not in line:
+                                # corrupted line?
+                                continue
                             uriseg, bf = re.match(regex, line).groups()
                             self._basefilemap[uriseg] = bf.strip()
                 except FileNotFoundError:
@@ -1466,6 +1469,9 @@ class DV(SwedishLegalSource):
         if os.path.exists(mapfile):
             with codecs.open(mapfile, encoding="utf-8") as fp:
                 for line in fp:
+                    if "\t" not in line:
+                        # corrupted line?
+                        continue
                     mapped_path, dummy = line.split("\t", 1)
                     if mapped_path == path:
                         # This means that another, previously parsed,
