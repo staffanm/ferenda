@@ -9,6 +9,7 @@ import filecmp
 import os
 import codecs
 import shutil
+import unicodedata
 from urllib.parse import quote, unquote
 from gzip import GzipFile
 from bz2 import BZ2File
@@ -16,6 +17,120 @@ from lzma import LZMAFile
 
 from ferenda import util
 from ferenda import errors
+
+
+def _compressed_suffix(compression):
+    """Returns a suitable suffix (including leading dot, eg ".bz2") for
+    the selected compression method."""
+    if compression is True: # select best compression -- but is xz always the best?
+        return ".xz"
+    elif compression in ("xz", "bz2", "gz"): # valid compression identifiers
+        return "." + compression
+    else:
+        return ""
+
+class _open(object):
+    """This class can work both as a context manager and as a substitute
+    for a straight open() call. Most of the time you want to use it as
+    a context manager ("with _open(...) as fp:"), but sometimes you
+    need to open a file in one function, return it and let the
+    reciever close the file when done.
+
+    """
+
+    def __enter__(self):
+        return self.fp  # this is what's returned as the fp in "with
+                        # _open(...) as fp".
+
+    def __exit__(self, *args):
+        self.close(*args)
+        
+    def __init__(self, filename, mode, compression=None):
+        self.filename = filename
+        self.mode = mode
+        self.compression = compression
+        suffix = _compressed_suffix(compression)
+        def wrap_fp(fp):
+            if suffix == ".gz":
+                fp = GzipFile(fileobj=fp, mode=mode)
+            elif suffix == ".bz2":
+                fp = BZ2File(fp, mode=mode)
+            elif suffix == ".xz":
+                fp = LZMAFile(fp, mode=mode)
+            if suffix and "b" not in mode:
+                # If mode is not binary (and we expect to be able to
+                # write() str values, not bytes), need need to create
+                # an additional encoding wrapper. That encoder can
+                # probably use UTF-8 without any need for additional
+                # configuration
+                if "r" in mode and "w" in mode:
+                    fp = StreamReaderWriter(fp, codecs.getreader("utf-8"),
+                                            codecs.getwriter("utf-8"))
+                elif "w" in mode:
+                    fp = codecs.getwriter("utf-8")(fp)
+                else:
+                    fp = codecs.getreader("utf-8")(fp)
+            fp.realname = filename
+            return fp
+
+        def opener():
+            if suffix == ".gz":
+                return GzipFile
+            elif suffix == ".bz2":
+                return BZ2File
+            elif suffix == ".xz":
+                return LZMAFile
+            else:
+                return open  # or io.open?
+    
+        if "w" in mode:
+            if suffix:
+                # We ignore the mode when creating the temporary file
+                # and use the the default "w+b" so that we can create
+                # compressed (binary) data. The wrapped fp can take
+                # care of str->binary conversions
+                tempmode = "w+b"
+            else:
+                tempmode = mode
+            self.fp = wrap_fp(NamedTemporaryFile(mode=tempmode, delete=False))
+        else:
+            if "a" in mode and not os.path.exists(filename):
+                util.ensure_dir(filename)
+            if suffix:
+                # compressed files must always be read as binary -
+                # wrap_fp takes care of bytes->str conversion
+                tempmode = "rb"
+            else:
+                tempmode = mode
+            util.ensure_dir(filename)
+            self.fp = wrap_fp(open(filename, tempmode))
+
+    def close(self, *args, **kwargs):
+        if "w" in self.mode:
+            tempname = util.name_from_fp(self.fp)
+            ret = self.fp.close()
+            if not os.path.exists(self.filename) or not filecmp.cmp(tempname, self.filename):
+                util.ensure_dir(self.filename)
+                shutil.move(tempname, self.filename)
+            else:
+                os.unlink(tempname)
+            return ret
+        else:
+            return self.fp.close()
+
+    def read(self, *args, **kwargs):
+        return self.fp.read(*args, **kwargs)
+
+    def write(self, *args, **kwargs):
+        return self.fp.write(*args, **kwargs)
+
+    def seek(self, *args, **kwargs):
+        return self.fp.seek(*args, **kwargs)
+
+    def tell(self, *args, **kwargs):
+        return self.fp.tell(*args, **kwargs)
+
+
 
 
 class DocumentStore(object):
@@ -59,75 +174,6 @@ class DocumentStore(object):
         assert self.storage_policy in ("dir", "file")
         self.compression = compression
 
-    @contextmanager
-    def _open(self, filename, mode, compression=None):
-        suffix = self._compressed_suffix()
-
-        def wrap_fp(fp):
-            if suffix == ".gz":
-                fp = GzipFile(fileobj=fp, mode=mode)
-            elif suffix == ".bz2":
-                fp = BZ2File(fp, mode=mode)
-            elif suffix == ".xz":
-                fp = LZMAFile(fp, mode=mode)
-            if suffix and "b" not in mode:
-                # If mode is not binary (and we expect to be able to
-                # write() str values, not bytes), need need to create
-                # an additional encoding wrapper. That encoder can
-                # probably use UTF-8 without any need for additional
-                # configuration
-                if "w" in mode:
-                    wrap = codecs.getwriter("utf-8")
-                else:
-                    wrap = codecs.getreader("utf-8")
-                fp = wrap(fp)
-            fp.realname = filename
-            return fp
-
-        def opener():
-            if suffix == ".gz":
-                return GzipFile
-            elif suffix == ".bz2":
-                return BZ2File
-            elif suffix == ".xz":
-                return LZMAFile
-            else:
-                return open  # or io.open?
-    
-        if "w" in mode:
-            if suffix:
-                # We ignore the mode when creating the temporary file
-                # and use the the default "w+b" so that we can create
-                # compressed (binary) data. The wrapped fp can take
-                # care of str->binary conversions
-                tempmode = "w+b"
-            else:
-                tempmode = mode
-            fp = wrap_fp(NamedTemporaryFile(mode=tempmode, delete=False))
-            try:
-                yield fp
-            finally:
-                tempname = util.name_from_fp(fp)
-                fp.close()
-                if not os.path.exists(filename) or not filecmp.cmp(tempname, filename):
-                    util.ensure_dir(filename)
-                    shutil.move(tempname, filename)
-                else:
-                    os.unlink(tempname)
-        else:
-            if "a" in mode and not os.path.exists(filename):
-                util.ensure_dir(filename)
-            if suffix:
-                # compressed files must always be read as binary -
-                # wrap_fp takes care of bytes->str conversion
-                tempmode = "rb"
-            else:
-                tempmode = mode
-            fp = wrap_fp(open(filename, tempmode))
-            try:
-                yield fp
-            finally:
-                fp.close()
 
     # TODO: Maybe this is a worthwhile extension to the API? Could ofc
     # easily be done everywhere where a non-document related path is
@@ -217,20 +263,8 @@ class DocumentStore(object):
         path = "/".join(segments)
         if os.sep != "/":
             path = path.replace("/", os.sep)
-        
-        return path + self._compressed_suffix()
+        return path
 
-    def _compressed_suffix(self):
-        """Returns a suitable suffix (including leading dot, eg ".bz2") for
-        the selected compression method."""
-        if self.compression is True: # select best compression
-            return ".xz"
-        elif self.compression in ("xz", "bz2", "gz"): # valid compression identifiers
-            return "." + self.compression
-        else:
-            return ""
-
-    @contextmanager
     def open(self, basefile, maindir, suffix, mode="r",
              version=None, attachment=None, compression=None):
         """Context manager that opens files for reading or writing. The
@@ -250,12 +284,8 @@ class DocumentStore(object):
 
         """
         filename = self.path(basefile, maindir, suffix, version, attachment)
-        with self._open(filename, mode, compression) as fp:
-            yield fp
+        return _open(filename, mode, compression)
 
-    def _compressed_opener(self, mode):
-        suffix = self._compressed_suffix()
-        return self._opener[suffix]
 
     def list_basefiles_for(self, action, basedir=None):
         """Get all available basefiles that can be used for the
@@ -461,6 +491,11 @@ class DocumentStore(object):
         :returns: The resulting basefile
         :rtype: str
         """
+        # Pathfrags on MacOS, coming from the file system, are unicode
+        # strings in NFD (decompsed), ie 'å' is split into 'a' and
+        # COMBINING CHARACTER RING (or whatever it's called. We need
+        # them in NFC, where 'å' is a single character.
+        pathfrag = unicodedata.normalize("NFC", pathfrag)
         if os.sep == "\\":
             pathfrag = pathfrag.replace("\\", "/")
         return unquote(pathfrag.replace('/%', '%'))
@@ -517,8 +552,8 @@ class DocumentStore(object):
             path = self.path(basefile, "downloaded", suffix, version, attachment)
             if os.path.exists(path):
                 return path
-            else:
-                return self.path(basefile, 'downloaded', self.downloaded_suffixes[0], version, attachment)
+        else:
+            return self.path(basefile, 'downloaded', self.downloaded_suffixes[0], version, attachment)
 
     def open_downloaded(self, basefile, mode="r", version=None, attachment=None):
         """Opens files for reading and writing,
@@ -529,7 +564,7 @@ class DocumentStore(object):
         """
 
         filename = self.downloaded_path(basefile, version, attachment)
-        return self._open(filename, mode)
+        return _open(filename, mode)
 
     def documententry_path(self, basefile, version=None):
         """Get the full path for the documententry JSON file for the given
@@ -559,13 +594,17 @@ class DocumentStore(object):
         :rtype:   str
         """
         if suffix:
-            return self.path(basefile, 'intermediate', suffix, version, attachment)
+            return self.path(basefile, 'intermediate', suffix + _compressed_suffix(self.compression),
+                             version, attachment)
         for suffix in self.intermediate_suffixes:
-            path = self.path(basefile, 'intermediate', suffix, version, attachment)
+            path = self.path(basefile, 'intermediate', suffix + _compressed_suffix(self.compression),
+                             version, attachment)
             if os.path.exists(path):
                 return path
         else:
-            return self.path(basefile, 'intermediate', self.intermediate_suffixes[0], version, attachment)
+            suffix = self.intermediate_suffixes[0]
+            return self.path(basefile, 'intermediate', suffix + _compressed_suffix(self.compression),
+                             version, attachment)
 
     def open_intermediate(self, basefile, mode="r", version=None,
                           attachment=None, suffix=None):
@@ -575,7 +614,7 @@ class DocumentStore(object):
         :meth:`~ferenda.DocumentStore.intermediate_path`.
         """
         filename = self.intermediate_path(basefile, version, attachment, suffix)
-        return self._open(filename, mode, self.compression)
+        return _open(filename, mode, self.compression)
 
     def parsed_path(self, basefile, version=None, attachment=None):
         """Get the full path for the parsed XHTML file for the given
@@ -603,7 +642,7 @@ class DocumentStore(object):
 
         """
         filename = self.parsed_path(basefile, version, attachment)
-        return self._open(filename, mode)
+        return _open(filename, mode)
 
     def serialized_path(self, basefile, version=None, attachment=None):
         """Get the full path for the serialized JSON file for the given
@@ -627,7 +666,7 @@ class DocumentStore(object):
 
         """
         filename = self.serialized_path(basefile, version)
-        return self._open(filename, mode)
+        return _open(filename, mode)
 
     def distilled_path(self, basefile, version=None):
         """Get the full path for the distilled RDF/XML file for the given
@@ -651,7 +690,7 @@ class DocumentStore(object):
 
         """
         filename = self.distilled_path(basefile, version)
-        return self._open(filename, mode)
+        return _open(filename, mode)
 
     def generated_path(self, basefile, version=None, attachment=None):
         """Get the full path for the generated file for the given
@@ -680,7 +719,7 @@ class DocumentStore(object):
 #
 #        """
 #        filename = self.generated_path(basefile, version, attachment)
-#        return self._open(filename, mode)
+#        return _open(filename, mode)
 
     def annotation_path(self, basefile, version=None):
         """Get the full path for the annotation file for the given
@@ -702,7 +741,7 @@ class DocumentStore(object):
         the same as for
         :meth:`~ferenda.DocumentStore.annotation_path`."""
         filename = self.annotation_path(basefile, version)
-        return self._open(filename, mode)
+        return _open(filename, mode)
 
     def dependencies_path(self, basefile):
         """Get the full path for the dependency file for the given
@@ -721,7 +760,7 @@ class DocumentStore(object):
         the same as for
         :meth:`~ferenda.DocumentStore.dependencies_path`."""
         filename = self.dependencies_path(basefile)
-        return self._open(filename, mode)
+        return _open(filename, mode)
 
     def atom_path(self, basefile):
         """Get the full path for the atom file for the given

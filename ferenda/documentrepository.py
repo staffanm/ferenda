@@ -347,12 +347,15 @@ class DocumentRepository(object):
         else:
             self._config = config
         if not hasattr(self, 'store'):
-            self.store = self.documentstore_class(self.config.datadir + os.sep + self.alias)
+            self.store = self.documentstore_class(self.config.datadir + os.sep + self.alias, compression=self.config.compress)
         self.requesthandler = self.requesthandler_class(self)
         
-        # should documentstore have a connection to self, ie
-        # self.store = DocumentStore(basedir, self) ?
-        self.store.downloaded_suffixes = [self.downloaded_suffix]
+        # allow this docrepo to override a particular property of its
+        # docstore if the repo (but not the store) has customized it
+        # (this allows us to only create a custom repo, not a custom
+        # store, in many cases).
+        if self.downloaded_suffix != ".html" and self.store.downloaded_suffixes == [".html"]:
+            self.store.downloaded_suffixes = [self.downloaded_suffix]
         self.store.storage_policy = self.storage_policy
 
         logname = self.alias
