@@ -5,7 +5,6 @@ from .describer import Describer
 from .pdfreader import PDFReader
 from .pdfanalyze import PDFAnalyzer
 from .textreader import TextReader
-from .wordreader import WordReader
 from .triplestore import TripleStore
 from .fulltextindex import FulltextIndex
 from .documententry import DocumentEntry
@@ -24,6 +23,7 @@ from .documentrepository import DocumentRepository
 from .pdfdocumentrepository import PDFDocumentRepository
 from .compositerepository import CompositeRepository, CompositeStore
 from .resources import Resources
+from .wordreader import WordReader
 from .wsgiapp import WSGIApp
 from .devel import Devel
 # gets pulled into setup.py and docs/conf.py -- but appveyor.yml is separate

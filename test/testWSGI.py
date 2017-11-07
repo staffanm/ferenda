@@ -15,6 +15,7 @@ from rdflib import Graph
 
 from ferenda.compat import Mock, patch
 from ferenda import manager, util, fulltextindex
+from ferenda.documentstore import _open
 from ferenda.elements import html
 from ferenda.testutil import RepoTester
 
@@ -133,7 +134,7 @@ class WSGI(RepoTester): # base class w/o tests
             store = self.repo.store
         g = Graph()
         g.parse(data=util.readfile(inpath, encoding="utf-8"), format="turtle")
-        with store._open(outpath, "wb") as fp:
+        with _open(outpath, "wb") as fp:
             fp.write(g.serialize(format="pretty-xml"))
         return g
 

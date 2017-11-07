@@ -1270,6 +1270,7 @@ def _queue_jobs(manager, iterable, inst, classname, command):
              LayeredConfig.get(inst.config, k))):
             client_config[k] = LayeredConfig.get(inst.config, k)
     log.debug("Server: Extra config for clients is %r" % client_config)
+    idx = -1
     for idx, basefile in enumerate(iterable):
         job = {'basefile': basefile,
                'classname': classname,
@@ -1279,13 +1280,15 @@ def _queue_jobs(manager, iterable, inst, classname, command):
         # print("putting %r into jobqueue" %  job)
         jobqueue.put(job)
     number_of_jobs = idx + 1
+    res = []
+    if number_of_jobs == 0:
+        return res
     log.debug("Server: Put %s jobs into job queue" % number_of_jobs)
     # FIXME: only one of the clients will read this DONE package, and
     # we have no real way of knowing how many clients there will be
     # (they can come and go at will). Didn't think this one through...
     jobqueue.put("DONE")
     numres = 0
-    res = []
     while numres < number_of_jobs:
         r = resultqueue.get()
         if isinstance(r['result'], tuple) and r['result'][0] == _WrappedKeyboardInterrupt:

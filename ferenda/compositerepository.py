@@ -14,11 +14,11 @@ from ferenda.decorators import updateentry
 class CompositeStore(DocumentStore):
     """Custom store for CompositeRepository objects."""
 
-    def __init__(self, datadir, downloaded_suffix=".html",
+    def __init__(self, datadir,
                  storage_policy="file",
+                 compression=None,
                  docrepo_instances=None):
         self.datadir = datadir  # docrepo.datadir + docrepo.alias
-        self.downloaded_suffix = downloaded_suffix
         self.storage_policy = storage_policy
         if not docrepo_instances:
             docrepo_instances = OrderedDict()
@@ -107,9 +107,10 @@ class CompositeRepository(DocumentRepository):
         cls = self.documentstore_class
 
         self.store = cls(self.config.datadir + os.sep + self.alias,
-                         downloaded_suffix=self.downloaded_suffix,
                          storage_policy=self.storage_policy,
                          docrepo_instances=self._instances)
+        if self.downloaded_suffix != ".html" and self.store.downloaded_suffixes == [".html"]:
+            self.store.downloaded_suffixes = [self.downloaded_suffix]
 
 
     @classmethod

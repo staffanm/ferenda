@@ -33,10 +33,10 @@ class Read(unittest.TestCase):
     def test_doc(self):
         path = self.datadir + os.sep + "out.xml"
         try:
-            out, type = self.reader.read("test/files/wordreader/sample.doc",
-                                         path)
-            self.assertEqual(out, path)
-            self.assertEqual(type, "doc")
+            with open(path, "wb") as fp:
+                filetype = self.reader.read("test/files/wordreader/sample.doc",
+                                            fp)
+            self.assertEqual(filetype, "doc")
             self.assertTrue(os.path.exists(path))
             tree = etree.parse(path)
             self.assertEqual("book", tree.getroot().tag)
@@ -45,10 +45,10 @@ class Read(unittest.TestCase):
 
             # test that spaces in filename work (requires more cmdline quoting)
             os.unlink(path)
-            out, type = self.reader.read("test/files/wordreader/spaces in filename.doc",
-                                         path)
-            self.assertEqual(out, path)
-            self.assertEqual(type, "doc")
+            with open(path, "wb") as fp:
+                filetype = self.reader.read("test/files/wordreader/spaces in filename.doc",
+                                            fp)
+            self.assertEqual(filetype, "doc")
         except ExternalCommandError as e:
             raise unittest.SkipTest("Antiword does not seem to be installed")
         
@@ -56,10 +56,10 @@ class Read(unittest.TestCase):
 
     def test_docx(self):
         path = self.datadir + os.sep + "out.xml"
-        out, type = self.reader.read("test/files/wordreader/sample.docx",
-                                     path)
-        self.assertEqual(out, path)
-        self.assertEqual(type, "docx")
+        with open(path, "wb") as fp:
+            filetype = self.reader.read("test/files/wordreader/sample.docx",
+                                        fp)
+        self.assertEqual(filetype, "docx")
         self.assertTrue(os.path.exists(path))
         tree = etree.parse(path)
         self.assertEqual("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document",
@@ -71,10 +71,10 @@ class Read(unittest.TestCase):
         path = self.datadir + os.sep + "out.xml"
         try:
             with silence():
-                out, type = self.reader.read("test/files/wordreader/mislabeled.doc",
-                                             path)
-            self.assertEqual(out, path)
-            self.assertEqual(type, "docx")
+                with open(path, "wb") as fp:
+                    filetype = self.reader.read("test/files/wordreader/mislabeled.doc",
+                                                fp)
+            self.assertEqual(filetype, "docx")
             self.assertTrue(os.path.exists(path))
             tree = etree.parse(path)
             self.assertEqual("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document",

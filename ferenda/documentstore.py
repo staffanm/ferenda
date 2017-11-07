@@ -121,6 +121,9 @@ class _open(object):
     def read(self, *args, **kwargs):
         return self.fp.read(*args, **kwargs)
 
+    def readlines(self, *args, **kwargs):
+        return self.fp.readlines(*args, **kwargs)
+
     def write(self, *args, **kwargs):
         return self.fp.write(*args, **kwargs)
 
@@ -130,7 +133,13 @@ class _open(object):
     def tell(self, *args, **kwargs):
         return self.fp.tell(*args, **kwargs)
 
+    @property
+    def closed(self):
+        return self.fp.closed
 
+    @property
+    def name(self):
+        return self.fp.name
 
 
 class DocumentStore(object):

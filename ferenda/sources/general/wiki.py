@@ -38,11 +38,7 @@ class MediaWikiStore(DocumentStore):
         return basefile.replace(":", os.sep).replace(" ", "_")
 
     def pathfrag_to_basefile(self, pathfrag):
-        # This unicode normalization turns "a" + U+0308 (COMBINING
-        # DIAERESIS) into a honest 'ä'. This is an issue on mac file
-        # systems. FIXME: should this be a part of
-        # DocumentStore.pathfrag_to_basefile?
-        return unicodedata.normalize("NFC", pathfrag.replace("_", " ").replace(os.sep, ":"))
+        return super(MediaWikiStore, self).pathfrag_to_basefile(pathfrag).replace("_", " ").replace(os.sep, ":")
 
 
 class MediaWiki(DocumentRepository):

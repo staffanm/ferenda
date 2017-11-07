@@ -1,8 +1,30 @@
-from fabric.api import run, local, cd, sudo
+from fabric.api import env, run, local, cd, sudo, settings
 from fabric.contrib.project import rsync_project
 from datetime import datetime
 
 # run with eg. fab -H localhost,i7,colo.tomtebo.org -f tools/fabfile.py doccount
+
+macaddress = {
+    "nate": "00:25:64:BA:BF:0E",
+    "sophie": "00:1A:A0:C3:CE:D1",
+    "alec": "64:66:B3:04:59:00",
+    "parker": "78:2B:CB:96:33:53"
+}
+
+env.hosts = ["nate", "sophie", "alec", "parker"]
+env.skip_bad_hosts = True
+
+def shutdown():
+    with settings(warn_only=True):
+        result = run('sudo shutdown -h now')
+
+def wakeup():
+    local("echo Waking %s" % env.host)
+    local("wakeonlan %s" % macaddress[env.host])
+
+def ping():
+    with settings(warn_only=True):
+        local("ping -c 1 %s|head -2" % env.host)
 
 def doccount():
     run("curl -s http://localhost:9200/lagen/_count?pretty=true|grep count")

@@ -28,24 +28,10 @@ from .legalref import LegalRef
 
 
 class RiksdagenStore(FixedLayoutStore):
-    downloaded_suffix = ".xml"
-    doctypes = OrderedDict([(".xml", b''),
-                            (".pdf", b''),
-                            (".html", b'')])
-
-    def intermediate_path(self, basefile, version=None, attachment=None):
-        candidate = None
-        if attachment:
-            return super(RiksdagenStore, self).intermediate_path(basefile, version, attachment)
-        
-        for suffix in (".hocr.html.bz2", ".hocr.html", ".xml", ".xml.bz2"):
-            candidate = self.path(basefile, "intermediate", suffix)
-            if os.path.exists(candidate):
-                break
-        if not candidate:
-            return self.path(basefile, "intermediate", ".xml")
-        else:
-            return candidate.replace(".bz2", "")
+    doctypes = OrderedDict([(".pdf", b''),
+                            (".html", b''),
+                            (".xml", b'')])
+    intermediate_suffixes = [".xml", ".hocr.html"]
 
 class Riksdagen(Offtryck, FixedLayoutSource):
     BILAGA = "bilaga"
@@ -263,14 +249,7 @@ class Riksdagen(Offtryck, FixedLayoutSource):
                     return StringIO(html.text)
                 else:
                     return StringIO("<html><h1>Dokumenttext saknas</h1></html>")
-
             intermediate_path = self.store.intermediate_path(basefile)
-            intermediate_path += ".bz2" if self.config.compress == "bz2" else ""
-            # if a compressed bz2 file is > 5 MB, it's just too damn big
-            if os.path.exists(intermediate_path) and os.path.getsize(intermediate_path) > 5*1024*1024:
-                raise ParseError("%s: %s is just too damn big (%s bytes)" % 
-                                 (basefile, intermediate_path, 
-                                  os.path.getsize(intermediate_path)))
             intermediate_dir = os.path.dirname(intermediate_path)
             convert_to_pdf = not downloaded_path.endswith(".pdf")
             keep_xml = "bz2" if self.config.compress == "bz2" else True
@@ -281,16 +260,22 @@ class Riksdagen(Offtryck, FixedLayoutSource):
                                      images=self.config.pdfimages,
                                      convert_to_pdf=convert_to_pdf,
                                      keep_xml=keep_xml)
-            except errors.PDFFileIsEmpty:
-                self.log.debug("%s: PDF had no textcontent, trying OCR" % basefile)
+            except (errors.PDFFileIsEmpty, errors.ExternalCommandError) as e:
+                if isinstance(e, errors.ExternalCommandError):
+                    self.log.debug("%s: PDF file conversion failed: %s" % (basefile, str(e).split("\n")[0]))
+                    # if PDF file conversion fails, it'll probaby fail
+                    # again when we try OCR, but maybe there will
+                    # exist a cached intermediate file that allow us
+                    # to get data without even looking at the PDF file
+                    # again.
+                elif isinstance(e, errors.PDFFileIsEmpty):
+                    self.log.debug("%s: PDF had no textcontent, trying OCR" % basefile)
                 res = reader.convert(filename=downloaded_path,
                                      workdir=intermediate_dir,
                                      images=self.config.pdfimages,
                                      convert_to_pdf=convert_to_pdf,
                                      keep_xml=keep_xml,
                                      ocr_lang="swe")
-            intermediate_path = self.store.intermediate_path(basefile)
-            intermediate_path += ".bz2" if self.config.compress == "bz2" else ""
             if os.path.getsize(intermediate_path) > 20*1024*1024:
                 raise errors.ParseError("%s: %s (after conversion) is just too damn big (%s Mbytes)" % 
                                         (basefile, intermediate_path, 

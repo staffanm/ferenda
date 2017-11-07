@@ -209,18 +209,19 @@ class PropTripsStore(FixedLayoutStore):
     # 1999/94 and 1994/95 has only plaintext (wrapped in .html)
     # 1995/96 to 2006/07 has plaintext + doc
     # 2007/08 onwards has plaintext, doc and pdf
-    downloaded_suffix = ".html"
-    doctypes = OrderedDict([(".pdf", b'%PDF'),
-                            (".doc", b'\xd0\xcf\x11\xe0'),
-                            (".docx", b'PK\x03\x04'),
+    doctypes = OrderedDict([(".html", b'<!DO'),
                             (".wpd", b'\xffWPC'),
-                            (".html", b'<!DO')])
+                            (".docx", b'PK\x03\x04'),
+                            (".doc", b'\xd0\xcf\x11\xe0'),
+                            (".pdf", b'%PDF')])
 
-    def intermediate_path(self, basefile):
+    def intermediate_path(self, basefile, version=None, attachment=None, suffix=None):
+        # we need to select a suitable intermediate suffix based upon
+        # the downloaded suffix (pdf->xml, html->txt)
         if self.downloaded_path(basefile).endswith(".html"):
             return self.path(basefile, "intermediate", ".txt")
         else:
-            return super(PropTripsStore, self).intermediate_path(basefile)
+            return super(PropTripsStore, self).intermediate_path(basefile, version, attachment, suffix)
 
 
 # We derive from Trips for downloading, from FixedLayoutSource for

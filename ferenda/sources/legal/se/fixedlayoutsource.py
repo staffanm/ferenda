@@ -70,46 +70,14 @@ class FixedLayoutStore(SwedishLegalStore):
 
     """
 
-    downloaded_suffix = ".pdf"  # this is the default
     doctypes = OrderedDict([(".wpd", b'\xffWPC'),
                             (".doc", b'\xd0\xcf\x11\xe0'),
                             (".docx", b'PK\x03\x04'),
                             (".rtf", b'{\\rt'),
                             (".pdf", b'%PDF')])
-
-    def downloaded_path(self, basefile, version=None, attachment=None,
-                        suffix=None):
-        if not suffix:
-            for s in self.doctypes:
-                if os.path.exists(self.path(basefile, "downloaded", s)):
-                    suffix = s
-                    break
-            else:
-                suffix = self.downloaded_suffix
-        return self.path(basefile, "downloaded", suffix, version, attachment)
-
-    def list_basefiles_for(self, action, basedir=None):
-        if not basedir:
-            basedir = self.datadir
-        if action == "parse":
-            yielded = set()
-            d = os.path.sep.join((basedir, "downloaded"))
-            if not os.path.exists(d):
-                return
-            for x in util.list_dirs(d, self.doctypes.keys()):
-                suffix = "/index" + os.path.splitext(x)[1]
-                if not x.endswith(suffix):
-                    continue  # this means we've recieved some
-                              # attachment, not the main file
-                pathfrag = x[len(d) + 1:-len(suffix)]
-                basefile = self.pathfrag_to_basefile(pathfrag)
-                if basefile not in yielded:
-                    yielded.add(basefile)
-                    yield basefile
-        else:
-            for x in super(FixedLayoutStore,
-                           self).list_basefiles_for(action, basedir):
-                yield x
+    @property
+    def downloaded_suffixes(self):
+        return list(reversed(self.doctypes.keys()))
 
     def guess_type(self, fp, basefile):
         start = fp.tell()

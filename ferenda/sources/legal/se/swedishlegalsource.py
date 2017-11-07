@@ -66,10 +66,6 @@ class SwedishLegalStore(DocumentStore):
         # "2012/152"    => "2012:152"
         return pathfrag.replace("/", ":").replace("-", "/")
 
-    def intermediate_path(self, basefile, version=None, attachment=None):
-        return self.path(basefile, "intermediate", ".xml", version=version,
-                         attachment=attachment)
-
 
 # used instead of False when we need to provide more information (yet
 # still evaluate to False in a bool context)
@@ -572,15 +568,6 @@ class SwedishLegalSource(DocumentRepository):
         """
         # 1. check if intermediate_path exists
         intermediate_path = self.store.intermediate_path(basefile)
-        # FIXME: This name mangling should be done by
-        # FixedLayoutSource somehow. However, the API for
-        # StreamingPDFReader should first be adapted so that
-        # intermediate_file is specified (maybe alongside of workdir).
-        if self.config.compress == "bz2":
-            intermediate_path += ".bz2"
-            opener = BZ2File
-        else:
-            opener = open
         if not os.path.exists(intermediate_path):
             # 2. if not, call code
             #    parse_convert_to_intermediate(basefile) to convert
@@ -589,7 +576,7 @@ class SwedishLegalSource(DocumentRepository):
             fp = self.downloaded_to_intermediate(basefile)
         else:
             # 3. recieve intermediate_path as open file (binary?)
-            fp = opener(intermediate_path, "rb")
+            fp = self.store.open_intermediate(basefile)
         # 4. call patch_if_needed, recieve as open file (binary?)
         return self.patch_if_needed(fp, basefile)
 
@@ -635,7 +622,9 @@ class SwedishLegalSource(DocumentRepository):
 
         # perform the patching, return the result as a stream, and add
         # an attribute with the description
-        patchedtext = "\n".join(ps.patches[0].merge(fp.readlines(keepends=False)))
+        lines = [l.decode().rstrip() for l in fp.readlines()]
+        patchedlines = ps.patches[0].merge(lines)
+        patchedtext = "\n".join(patchedlines)
         if binarystream:
             fp = BytesIO(patchedtext.encode(self.source_encoding))
         else:

@@ -156,6 +156,9 @@ def name_from_fp(fp):
         return fp.name
     elif hasattr(fp, '_fp'):
         return fp._fp.name
+    elif hasattr(fp, 'fp'):
+        # the documentstore._open class
+        return name_from_fp(fp.fp)
     else:
         raise ValueError("Can't find name of open file %r" % fp)
   

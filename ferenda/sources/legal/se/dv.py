@@ -49,43 +49,14 @@ class DVStore(DocumentStore):
 
     """Customized DocumentStore.
     """
-
+    downloaded_suffixes = [".docx", ".doc"]
+    
     def basefile_to_pathfrag(self, basefile):
         return basefile
 
     def pathfrag_to_basefile(self, pathfrag):
         return pathfrag
 
-    def downloaded_path(self, basefile, version=None, attachment=None,
-                        suffix=None):
-        if not suffix:
-            if os.path.exists(self.path(basefile, "downloaded", ".doc")):
-                suffix = ".doc"
-            elif os.path.exists(self.path(basefile, "downloaded", ".docx")):
-                suffix = ".docx"
-            else:
-                suffix = self.downloaded_suffix
-        return self.path(basefile, "downloaded", suffix, version, attachment)
-
-    def intermediate_path(self, basefile, version=None, attachment=None):
-        return self.path(basefile, "intermediate", ".xml")
-
-    def list_basefiles_for(self, action, basedir=None):
-        if not basedir:
-            basedir = self.datadir
-        if action == "parse":
-            # Note: This pulls everything into memory before first
-            # value is yielded. A more nifty variant is at
-            # http://code.activestate.com/recipes/491285/
-            d = os.path.sep.join((basedir, "downloaded"))
-            for x in sorted(itertools.chain(util.list_dirs(d, ".doc"),
-                                            util.list_dirs(d, ".docx"))):
-                suffix = os.path.splitext(x)[1]
-                pathfrag = x[len(d) + 1:-len(suffix)]
-                yield self.pathfrag_to_basefile(pathfrag)
-        else:
-            for x in super(DVStore, self).list_basefiles_for(action, basedir):
-                yield x
 
 class KeywordContainsDescription(errors.FerendaException):
     def __init__(self, keywords, descriptions):
@@ -358,7 +329,7 @@ class DV(SwedishLegalSource):
                     absolute_url = urljoin(url, link)
                     self.log.debug('Fetching %s to %s' % (link, localpath))
                     resp = requests.get(absolute_url)
-                    with self.store._open(localpath, "wb") as fp:
+                    with self.store.open(basefile, "downloaded/zips", ".zip", "wb") as fp:
                         fp.write(resp.content)
                     self.process_zipfile(localpath)
 
@@ -497,14 +468,9 @@ class DV(SwedishLegalSource):
             tmpfunc = lambda x: str(int(x.group(0)) - 1)
             prev_basefile = re.sub('\d+$', tmpfunc, basefile)
             prev_path = self.store.intermediate_path(prev_basefile)
-            if self.config.compress == "bz2":
-                prev_path += ".bz2"
-                opener = BZ2File
-            else:
-                opener = open
             avd_p = None
             if os.path.exists(prev_path):
-                with opener(prev_path, "rb") as fp:
+                with self.store.open_intermediate(prev_basefile, "rb") as fp:
                     soup = BeautifulSoup(fp.read(), "lxml")
                 tmp = soup.find(["w:p", "para"])
                 if re_avdstart.match(tmp.get_text().strip()):
@@ -534,16 +500,14 @@ class DV(SwedishLegalSource):
             re_avdstart = None
         created = untouched = 0
         intermediatefile = os.path.splitext(docfile)[0] + ".xml"
-        r = WordReader()
-        intermediatefile, filetype = r.read(docfile, intermediatefile)
+        with open(intermediatefile, "wb") as fp:
+            filetype = WordReader().read(docfile, fp)
+        
+        soup = BeautifulSoup(util.readfile(intermediatefile), "lxml")
         if filetype == "docx":
-            self._simplify_ooxml(intermediatefile, pretty_print=False)
-            soup = BeautifulSoup(util.readfile(intermediatefile), "lxml")
-            soup = self._merge_ooxml(soup)
             p_tag = "w:p"
             xmlns = ' xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
         else:
-            soup = BeautifulSoup(util.readfile(intermediatefile), "lxml")
             p_tag = "para"
             xmlns = ''
         iterator = soup.find_all(p_tag, limit=2147483647)
@@ -586,26 +550,16 @@ class DV(SwedishLegalSource):
                 self.log.info("%s: Extracting from %s file" % (basefile, filetype))
                 created += 1
                 downloaded_path = self.store.path(basefile, 'downloaded', '.' + filetype)
-                with self.store._open(downloaded_path, "w"):
+                util.ensure_dir(downloaded_path)
+                with open(downloaded_path, "w"):
                     pass  # just create an empty placeholder file --
                           # parse_open will load the intermediate file
                           # anyway.
                 if fp:
                     fp.write(b"</body>\n")
                     fp.close()
-                    # FIXME: do we even need to run _simplify_ooxml on
-                    # the constructed intermediate file, seeming as
-                    # we've already run it on the main file?
-                    if filetype == "docx":
-                        self._simplify_ooxml(previous_intermediate_path)
                 util.ensure_dir(self.store.intermediate_path(basefile))
-
-                intermediate_path = self.store.intermediate_path(basefile)
-                if self.config.compress == "bz2":
-                    intermediate_path += ".bz2"
-                    fp = BZ2File(intermediate_path, "wb")
-                else: 
-                    fp = open(intermediate_path, "wb")
+                fp = self.store.open_intermediate(basefile, mode="wb")
                 bodytag = '<body%s>' % xmlns 
                 fp.write(bodytag.encode("utf-8"))
                 if filetype != "docx":
@@ -621,9 +575,6 @@ class DV(SwedishLegalSource):
         if fp:  # should always be the case
             fp.write(b"</body>\n")
             fp.close()
-            # FIXME: see above abt the need for running _simplify_ooxml
-            if filetype == "docx":
-                self._simplify_ooxml(intermediate_path)
         else:
             self.log.error("%s/%s: No notis were extracted (%s)" %
                            (coll, year, docfile))
@@ -646,16 +597,13 @@ class DV(SwedishLegalSource):
         return None
 
     def parse_open(self, basefile, attachment=None):
+        
         intermediate_path = self.store.intermediate_path(basefile)
-        if self.config.compress == "bz2":
-            intermediate_path += ".bz2"
-            opener = BZ2File
-        else:
-            opener = open
+
         if not os.path.exists(intermediate_path):
             fp = self.downloaded_to_intermediate(basefile)
         else:
-            fp = opener(intermediate_path, "rb")
+            fp = self.store.open_intermediate(basefile, "rb")
             # Determine if the previously-created intermediate files
             # came from .doc or OOXML (.docx) sources by sniffing the
             # first bytes.
@@ -679,24 +627,17 @@ class DV(SwedishLegalSource):
             raise errors.ParseError("%s: Downloaded file %s is empty, %s should have "
                                     "been created by download() but is missing!" %
                                     (basefile, docfile, intermediatefile))
-        intermediatefile = self.store.intermediate_path(basefile)
-        intermediatefile, filetype = WordReader().read(docfile,
-                                                       intermediatefile)
-        if filetype == "docx":
-            self._simplify_ooxml(intermediatefile)
-        if self.config.compress == "bz2":
-            with open(intermediatefile, mode="rb") as rfp:
-                # BZ2File supports the with statement in py27+,
-                # but we support py2.6
-                wfp = BZ2File(intermediatefile+".bz2", "wb")
-                wfp.write(rfp.read())
-                wfp.close()
-            os.unlink(intermediatefile)
-            fp = BZ2File(intermediatefile + ".bz2")
-        else:
-            fp = open(intermediatefile)
-        self.filetype = filetype
-        return fp
+        wr = WordReader()
+        fp = self.store.open_intermediate(basefile, mode="wb")
+        self.filetype = wr.read(docfile, fp, simplify=True)
+        # FIXME: Do something with filetype if it's not what we expect
+        fp.close()
+        if hasattr(fp, 'utime'):
+            os.utime(self.store.intermediate_path(basefile), (fp.utime, fp.utime))
+        # re-open in read mode -- since we can't open a compressed
+        # file in read-write mode
+        return self.store.open_intermediate(basefile, mode="rb")
+        
 
     def extract_head(self, fp, basefile):
         filetype = self.filetype
@@ -823,7 +764,6 @@ class DV(SwedishLegalSource):
         if filetype == "docx":
             ptag = "w:p", "para" # support intermediate files with a
                                  # mix of OOXML/DocBook
-            soup = self._merge_ooxml(soup)
         else:
             ptag = "para", "w:p"
 
@@ -981,10 +921,7 @@ class DV(SwedishLegalSource):
 
     def parse_ooxml(self, text, basefile):
         soup = BeautifulSoup(text, "lxml")
-        soup = self._merge_ooxml(soup)
-
         head = {}
-
         # Högst uppe på varje domslut står domstolsnamnet ("Högsta
         # domstolen") följt av referatnumret ("NJA 1987
         # s. 113").
@@ -1010,8 +947,8 @@ class DV(SwedishLegalSource):
                     self.log.warning("%s: Couldn't find field %r" % (basefile, key))
                 continue
 
-            txt = node.find_next("w:t").find_parent("w:p").get_text(strip=True)
-            if txt:  # skippa fält med tomma strängen-värden
+            txt = "".join([n.get_text() for n in node.find_next("w:t").find_parent("w:p").find_all("w:t", limit=2147483647)])
+            if txt.strip():  # skippa fält med tomma strängen-värden (eller bara whitespace)
                 head[key] = txt
 
         # Hitta sammansatta metadata i sidhuvudet
@@ -2317,62 +2254,6 @@ class DV(SwedishLegalSource):
                           'MMD': 'Mark- och miljööverdomstolen'}.get(basefile.split("/")[0])
         # return p
         return p.parse
-
-    def _simplify_ooxml(self, filename, pretty_print=True):
-        # simplify the horrendous mess that is OOXML through simplify-ooxml.xsl
-        if filename.endswith(".bz2"):
-            opener = BZ2File
-        else:
-            opener = open
-        with opener(filename, "rb") as fp:
-            data = fp.read()
-            # in some rare cases, the value \xc2\x81 (utf-8 for
-            # control char) is used where "Å" (\xc3\x85) should be
-            # used. 
-            if b"\xc2\x81" in data:
-                self.log.warning("Working around control char x81 in text data")
-                data = data.replace(b"\xc2\x81", b"\xc3\x85")
-            intree = etree.parse(BytesIO(data))
-            # intree = etree.parse(fp)
-        if not hasattr(self, 'ooxml_transform'):
-            fp = self.resourceloader.openfp("xsl/simplify-ooxml.xsl")
-            self.ooxml_transform = etree.XSLT(etree.parse(fp))
-        fp.close()
-        resulttree = self.ooxml_transform(intree)
-        with opener(filename, "wb") as fp:
-            fp.write(
-                etree.tostring(
-                    resulttree,
-                    pretty_print=pretty_print,
-                    encoding="utf-8"))
-
-    def _merge_ooxml(self, soup):
-        # this is a similar step to _simplify_ooxml, but merges w:p
-        # elements in a BeautifulSoup tree. This step probably should
-        # be performed through XSL and be put in _simplify_ooxml as
-        # well.
-        # The soup now contains a simplified version of OOXML where
-        # lot's of nonessential tags has been stripped. However, the
-        # central w:p tag often contains unneccessarily splitted
-        # subtags (eg "<w:t>Avgörand</w:t>...<w:t>a</w:t>...
-        # <w:t>tum</w:t>"). Attempt to join these
-        #
-        # FIXME: This could be a part of simplify_ooxml instead.
-        for p in soup.find_all("w:p", limit=2147483647):
-            current_r = None
-            for r in p.find_all("w:r", limit=2147483647):
-                # find out if formatting instructions (bold, italic)
-                # are identical
-                if current_r and current_r.find("w:rpr") == r.find("w:rpr"):
-                    # ok, merge
-                    ts = list(current_r.find_all("w:t", limit=2147483647))
-                    assert len(ts) == 1, "w:r should not contain exactly one w:t"
-                    ns = ts[0].string
-                    ns.replace_with(str(ns) + r.find("w:t").string)
-                    r.decompose()
-                else:
-                    current_r = r
-        return soup
 
     # FIXME: Get this information from self.commondata and the slugs
     # file. However, that data does not contain lower-level

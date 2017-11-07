@@ -50,6 +50,14 @@ class Store(unittest.TestCase):
         self.assertEqual(os.stat(wanted_filename).st_mtime,
                          mtime)
 
+        # make sure normal
+        fp = self.store.open("basefile", "maindir", ".suffix", "w")
+        fp.write("This is the new data")
+        fp.close()
+        self.assertEqual(util.readfile(wanted_filename),
+                         "This is the new data")
+        
+
     def test_open_binary(self):
         wanted_filename = self.store.path("basefile", "maindir", ".suffix")
         # the smallest possible PNG image

@@ -11,10 +11,14 @@ import logging
 import os
 import textwrap
 import xml.etree.cElementTree as ET
+from lxml import etree
 import zipfile
+from io import BytesIO
+
+import bs4
 
 from ferenda import errors, util
-
+from ferenda import ResourceLoader
 
 class WordReader(object):
 
@@ -26,55 +30,51 @@ class WordReader(object):
 
     log = logging.getLogger(__name__)
 
-    def read(self, wordfile, intermediatefile):
+    def read(self, wordfile, intermediatefp, simplify=True):
         """Converts the word file to a more easily parsed format.
 
         :param wordfile: Path to original docfile
-        :param intermediatefile: Where to store the more parseable file
-        :returns: name of parseable file, filetype (either "doc" or "docx")
-        :rtype: tuple
+        :param intermediatefp: An open filehandle to write the more parseable file to
+        :returns: filetype (either "doc" or "docx")
+        :rtype: str
 
         """
+        # guess at filetype. note that file suffixes are not always truthful!
         filetype = "docx" if wordfile.endswith("docx") else "doc"
 
         # Parsing is a two step process: First extract some version of
         # the text from the binary blob (either through running
         # antiword for old-style doc documents, or by unzipping
         # document.xml, for new-style docx documents)
-        if not os.path.exists(intermediatefile):
+        if "r" in intermediatefp.mode:
+            # sniff the intermediate to see if its a
+            # docbook or a OOXML file
+            start = intermediatefp.read(1024)
+            intermediatefp.seek(0)
+            if 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"':
+                filetype = "docx" 
+        else:
             if filetype == "docx":
-                self.word_to_ooxml(wordfile, intermediatefile)
+                self.word_to_ooxml(wordfile, intermediatefp, simplify)
             else:
                 try:
-                    self.word_to_docbook(wordfile, intermediatefile)
+                    self.word_to_docbook(wordfile, intermediatefp)
                 except errors.ExternalCommandError as e:
                     if "not a Word Document" in str(e):
                         # Some .doc files are .docx with wrong suffix
                         self.log.info("%s: Retrying as OOXML" % wordfile)
-                        self.word_to_ooxml(wordfile, intermediatefile)
+                        self.word_to_ooxml(wordfile, intermediatefp, simplify)
                         filetype = "docx"
                     else:
                         raise e
-        else:
-            # sniff the intermediatefile to see if its a
-            # docbook or a OOXML file
-            if filetype == "doc":
-                with codecs.open(intermediatefile, encoding="utf-8") as fp:
-                    if 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"' in fp.read(
-                            1024):
-                        filetype = "docx"
+        return filetype
 
-            pass
-        return (intermediatefile, filetype)
-
-    def word_to_docbook(self, indoc, outdoc):
+    def word_to_docbook(self, indoc, outfp):
         """Convert a old Word document (.doc) to a pseudo-docbook file through antiword."""
         tmpfile = mktemp()
         indoc = os.path.normpath(indoc)
         wrapper = textwrap.TextWrapper(break_long_words=False,
                                        width=72)
-
-        util.ensure_dir(outdoc)
         if " " in indoc:
             indoc = '"%s"' % indoc
         cmd = "antiword -x db %s > %s" % (indoc, tmpfile)
@@ -90,6 +90,7 @@ class WordReader(object):
             raise errors.ExternalCommandError(
                 "Docbook conversion failed: %s" % stderr.strip())
 
+        # wrap long lines in the docbook output. Maybe should be configurable?
         tree = ET.parse(tmpfile)
         if hasattr(tree, 'iter'):
             iterator = tree.iter()
@@ -105,27 +106,76 @@ class WordReader(object):
                         replacement += wrapper.fill(p) + "\n\n"
 
                 element.text = replacement.strip()
-
-        tree.write(outdoc, encoding="utf-8")
+        tree.write(outfp, encoding="utf-8")
         os.unlink(tmpfile)
 
-    def word_to_ooxml(self, indoc, outdoc):
+    def word_to_ooxml(self, indoc, outfp, simplify):
         """Extracts the raw OOXML file from a modern Word document (.docx)."""
         name = "word/document.xml"
         zipf = zipfile.ZipFile(indoc, "r")
         assert name in zipf.namelist(), "No %s in zipfile %s" % (name, indoc)
         data = zipf.read(name)
-        util.ensure_dir(outdoc)
-        with open(outdoc, "wb") as fp:
-            fp.write(data)
-
-        # FIXME: We need to reimplement this old function (which ran
-        # tidy on the outfile) with an internal lxml based thingy
-        # util.indent_xml_file(outdoc)
+        if simplify:
+            data = self._merge_ooxml(self._simplify_ooxml(data)).encode("utf-8")
+        outfp.write(data)
         zi = zipf.getinfo(name)
         dt = datetime(*zi.date_time)
         ts = mktime(dt.timetuple())
-        os.utime(outdoc, (ts, ts))
+        outfp.utime = ts
+
+    def _simplify_ooxml(self, data, pretty_print=True):
+        # simplify the horrendous mess that is OOXML through
+        # simplify-ooxml.xsl. Returns a formatted XML stream as a
+        # bytestring.
+
+        # in some rare cases, the value \xc2\x81 (utf-8 for
+        # control char) is used where "Å" (\xc3\x85) should be
+        # used. 
+        if b"\xc2\x81" in data:
+            self.log.warning("Working around control char x81 in text data")
+            data = data.replace(b"\xc2\x81", b"\xc3\x85")
+        intree = etree.parse(BytesIO(data))
+            # intree = etree.parse(fp)
+        if not hasattr(self, 'ooxml_transform'):
+            fp = ResourceLoader().openfp("xsl/simplify-ooxml.xsl")
+            self.ooxml_transform = etree.XSLT(etree.parse(fp))
+        fp.close()
+        resulttree = self.ooxml_transform(intree)
+        return etree.tostring(
+            resulttree,
+            pretty_print=pretty_print,
+            encoding="utf-8")
+
+    def _merge_ooxml(self, data):
+        # this is a similar step to _simplify_ooxml, but merges w:p
+        # elements in a BeautifulSoup tree. This step probably should
+        # be performed through XSL and be put in _simplify_ooxml as
+        # well.
+        # The soup now contains a simplified version of OOXML where
+        # lot's of nonessential tags has been stripped. However, the
+        # central w:p tag often contains unneccessarily splitted
+        # subtags (eg "<w:t>Avgörand</w:t>...<w:t>a</w:t>...
+        # <w:t>tum</w:t>"). Attempt to join these
+        #
+        # FIXME: This could be a part of simplify_ooxml instead.
+        soup = bs4.BeautifulSoup(data, "lxml")
+        for p in soup.find_all("w:p", limit=2147483647):
+            current_r = None
+            for r in p.find_all("w:r", limit=2147483647):
+                # find out if formatting instructions (bold, italic)
+                # are identical
+                if current_r and current_r.find("w:rpr") == r.find("w:rpr"):
+                    # ok, merge
+                    ts = list(current_r.find_all("w:t", limit=2147483647))
+                    assert len(ts) == 1, "w:r should not contain exactly one w:t"
+                    ns = ts[0].string
+                    ns.replace_with(str(ns) + r.find("w:t").string)
+                    r.decompose()
+                else:
+                    current_r = r
+        # make sure output is pretty-printed
+        return soup.find("w:document").prettify()
+
 
 # hard to test, hard to get working, will always be platform
 # dependent, but saved here for posterity

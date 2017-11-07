@@ -330,8 +330,6 @@ class DirRegeringen(Regeringen):
 
 # inherit list_basefiles_for from CompositeStore, basefile_to_pathfrag
 # from SwedishLegalStore)
-
-
 class DirektivStore(CompositeStore, SwedishLegalStore):
     pass
 
