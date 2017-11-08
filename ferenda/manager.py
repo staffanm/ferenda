@@ -40,6 +40,7 @@ import io
 import logging
 import multiprocessing
 import os
+import pickle
 import pstats
 import shutil
 import stat
@@ -95,6 +96,25 @@ DEFAULT_CONFIG = {'loglevel': 'DEBUG',
                   'authkey': b'secret',
                   'profile': False}
 
+class MarshallingHandler(logging.Handler):
+    def __init__(self, records):
+        self.records = records
+        super(MarshallingHandler, self).__init__()
+        
+    def emit(self, record):
+        self.records.append(self.marshal(record))
+
+    def marshal(self, record): 
+        # Based on SocketHandler.makePickle
+        ei = record.exc_info
+        if ei:
+            # just to get traceback text into record.exc_text ...
+            dummy = self.format(record)
+        d = dict(record.__dict__)
+        d['msg'] = record.getMessage()
+        d['args'] = None
+        d['exc_info'] = None
+        return pickle.dumps(d, 1)
 
 def makeresources(repos,
                   resourcedir="data/rsrc",
@@ -464,7 +484,12 @@ def run(argv, config=None, subcall=False):
     # if logfile is set to True (the default), autogenerate logfile
     # name from current datetime. Otherwise assume logfile is set to
     # the desired file name of the log
-    if config.logfile and subcall is False:
+    if config.logfile and subcall is False and action != "buildclient":
+        # when running as buildclient, we don't want to each client to
+        # create a logfile of their own. Instead, client nodes collect
+        # log entries during each run and pass them as part of the
+        # result. the buildserver then writes logs to a central
+        # logfile.
         if isinstance(config.logfile, bool):
             logfile = "%s/logs/%s.log" % (
                 config.datadir, datetime.now().strftime("%Y%m%d-%H%M%S"))
@@ -1141,9 +1166,9 @@ def _build_worker(jobqueue, resultqueue, clientname):
     # create the inst with a default config
     # (_instantiate_class will try to read ferenda.ini)
     insts = {}
-    logstream = StringIO()
     log = getlog()
     log.debug("Client: [pid %s] _build_worker ready to process job queue" % os.getpid())
+    logrecords = []
     while True:
         job = jobqueue.get()  # get() blocks -- wait until a job or the
         # DONE/SHUTDOWN signal comes
@@ -1157,7 +1182,7 @@ def _build_worker(jobqueue, resultqueue, clientname):
         if job['classname'] not in insts:
             insts[job['classname']] = _instantiate_and_configure(job['classname'],
                                                                  job['config'],
-                                                                 logstream,
+                                                                 logrecords,
                                                                  clientname)
             # need to get hold of log as well
         # log.debug("Client: [pid %s] Starting job %s %s %s" % (os.getpid(), job['classname'], job['command'], job['basefile']))
@@ -1174,18 +1199,16 @@ def _build_worker(jobqueue, resultqueue, clientname):
                                        wrapctrlc=True)
         setproctitle(proctitle)
         log.debug("Client: [pid %s] %s finished: %s" % (os.getpid(), job['basefile'], res))
-        logtext = logstream.getvalue()
-        logstream.truncate(0)
-        logstream.seek(0)
         outdict = {'basefile': job['basefile'],
                    'result':  res,
-                   'log': logtext,
+                   'log': list(logrecords),
                    'client': clientname}
+        logrecords[:] = []
         resultqueue.put(outdict)
         # log.debug("Client: [pid %s] Put '%s' on the queue" % (os.getpid(), outdict['result']))
 
 
-def _instantiate_and_configure(classname, config, logstream, clientname):
+def _instantiate_and_configure(classname, config, logrecords, clientname):
     log = getlog()
     log.debug(
         "Client: [pid %s] instantiating and configuring %s" %
@@ -1200,13 +1223,9 @@ def _instantiate_and_configure(classname, config, logstream, clientname):
     if clientname:
         # log.debug("Client: [pid %s] Setting up log" % os.getpid())
         log = setup_logger(inst.config.loglevel)
-        for handler in log.handlers:
+        for handler in list(log.handlers):
             log.removeHandler(handler)
-        handler = logging.StreamHandler(logstream)
-        fmt = clientname + " %(asctime)s %(name)s %(levelname)s %(message)s"
-        formatter = logging.Formatter(fmt, datefmt="%H:%M:%S")
-        handler.setFormatter(formatter)
-        handler.setLevel(loglevels[inst.config.loglevel])
+        handler = MarshallingHandler(logrecords)
         log.addHandler(handler)
         log.setLevel(loglevels[inst.config.loglevel])
     # log.debug("Client: [pid %s] Log is configured" % os.getpid())
@@ -1301,8 +1320,8 @@ def _queue_jobs(manager, iterable, inst, classname, command):
                 r)
             print("".join(traceback.format_list(r['result'][2])))
         else:
-            for line in [x.strip() for x in r['log'].split("\n") if x.strip()]:
-                print("   %s" % line)
+            for record in r['log']:
+                _log_record(record, r['client'], log)
             log.debug(
                 "Server: client %(client)s processed %(basefile)s: Result (%(result)s): OK" %
                 r)
@@ -1318,6 +1337,11 @@ def _queue_jobs(manager, iterable, inst, classname, command):
     # manager.shutdown()
 
 
+def _log_record(marshalled_record, clientname, log):
+    record = logging.makeLogRecord(pickle.loads(marshalled_record))
+    record.msg = "[%s] %s" % (clientname, record.msg)
+    log.handle(record)
+                            
 buildmanager = None
 if sys.version_info[0] < 3:
     jobqueue_id = b'jobqueue'
