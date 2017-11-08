@@ -19,7 +19,7 @@ standard_library.install_aliases()
 from future.utils import bytes_to_native_str
 
 # stdlib
-from collections import OrderedDict
+from collections import OrderedDict, Counter
 from datetime import datetime
 from io import StringIO
 from logging import getLogger as getlog
@@ -71,7 +71,7 @@ from ferenda.compat import MagicMock
 
 DEFAULT_CONFIG = {'loglevel': 'DEBUG',
                   'logfile': True,
-                  'processes': 1,
+                  'processes': '1',
                   'datadir': 'data',
                   'force': False,
                   'downloadmax': nativeint,
@@ -532,11 +532,9 @@ def run(argv, config=None, subcall=False):
             elif action == 'buildclient':
                 args = _setup_buildclient_args(config)
                 return runbuildclient(**args)
-
             elif action == 'buildqueue':
                 args = _setup_buildqueue_args(config)
                 return runbuildqueue(**args)
-
             elif action == 'makeresources':
                 repoclasses = _classes_from_classname(enabled, classname)
                 args = _setup_makeresources_args(config)
@@ -1016,7 +1014,8 @@ def _run_class(enabled, argv, config):
                     #   buildclients connect (and read results from a
                     #   similar resultqueue)
                     res = _queuejobs_to_queue(iterable, inst, classname, action)
-                elif inst.config.processes > 1:
+                elif inst.config.processes != '1':
+                    processes = _process_count(inst.config.processes)
                     # - start a number of processess which read from a
                     #   shared jobqueue, and send jobs to that queue (and
                     #   read results from a shared resultqueue)
@@ -1025,7 +1024,7 @@ def _run_class(enabled, argv, config):
                         inst,
                         classname,
                         action,
-                        config,
+                        processes,
                         argv)
                 else:
                     # - run the jobs, one by one, in the current process
@@ -1071,8 +1070,9 @@ def runbuildclient(clientname,
 
     done = False
     # _run_jobqueue_multiprocessing > _build_worker might throw an exception,
+    # which is how we exit
+    print("%s starting up buildclient with %s processes" % (clientname, processes))
     while not done:
-                     # which is how we exit
         manager = _make_client_manager(serverhost,
                                        serverport,
                                        authkey)
@@ -1170,8 +1170,15 @@ def _build_worker(jobqueue, resultqueue, clientname):
     log.debug("Client: [pid %s] _build_worker ready to process job queue" % os.getpid())
     logrecords = []
     while True:
-        job = jobqueue.get()  # get() blocks -- wait until a job or the
-        # DONE/SHUTDOWN signal comes
+        try:
+            job = jobqueue.get()  # get() blocks -- wait until a job or the
+                                  # DONE/SHUTDOWN signal comes
+            
+        except EOFError as e:
+            print("%s: couln't get a new job from the queue, buildserver probably done?" % 
+                os.getpid())
+            return
+                                  
         if job == "DONE":  # or a more sensible value
             # getlog().debug("Client: [pid %s] Got DONE signal" % os.getpid())
             return  # back to runbuildclient
@@ -1204,7 +1211,11 @@ def _build_worker(jobqueue, resultqueue, clientname):
                    'log': list(logrecords),
                    'client': clientname}
         logrecords[:] = []
-        resultqueue.put(outdict)
+        try:
+            resultqueue.put(outdict)
+        except EOFError as e:
+            print("%s: result of %s %s %s couldn't be put on resultqueue" % (
+                os.getpid(), job['classname'], job['command'], job['basefile']))
         # log.debug("Client: [pid %s] Put '%s' on the queue" % (os.getpid(), outdict['result']))
 
 
@@ -1308,6 +1319,8 @@ def _queue_jobs(manager, iterable, inst, classname, command):
     # (they can come and go at will). Didn't think this one through...
     jobqueue.put("DONE")
     numres = 0
+    res = []
+    clients = Counter()
     while numres < number_of_jobs:
         r = resultqueue.get()
         if isinstance(r['result'], tuple) and r['result'][0] == _WrappedKeyboardInterrupt:
@@ -1325,17 +1338,19 @@ def _queue_jobs(manager, iterable, inst, classname, command):
             log.debug(
                 "Server: client %(client)s processed %(basefile)s: Result (%(result)s): OK" %
                 r)
+        if 'client' in r:
+            clients[r['client']] += 1
         if 'result' in r:
             res.append(r['result'])
         numres += 1
-    log.debug("Server: %s tasks processed" % numres)
+
+    clientstats = ", ".join(["%s: %s jobs" % (k, v) for k,v in clients.items()])
+    print("Server: %s tasks processed. %s" % (numres, clientstats))
     return res
     # sleep(1)
-
     # don't shut this down --- the toplevel manager.run call must do
     # that
     # manager.shutdown()
-
 
 def _log_record(marshalled_record, clientname, log):
     record = logging.makeLogRecord(pickle.loads(marshalled_record))
@@ -1403,10 +1418,10 @@ def _shutdown_buildserver():
         sleep(1)
 
 
-def _parallelizejobs(iterable, inst, classname, command, config, argv):
+def _parallelizejobs(iterable, inst, classname, command, processes, argv):
     jobqueue = multiprocessing.Queue()
     resultqueue = multiprocessing.Queue()
-    procs = _start_multiprocessing(jobqueue, resultqueue, inst.config.processes, None)
+    procs = _start_multiprocessing(jobqueue, resultqueue, processes, None)
     try:
         basefiles = __queue_jobs_nomanager(jobqueue, iterable, inst, classname, command)
         res = _process_resultqueue(resultqueue, basefiles, procs, jobqueue, None)
@@ -1772,6 +1787,13 @@ def _setup_frontpage_args(config, argv):
             'repos': repos}
 
 
+def _process_count(setting):
+    if setting == 'auto':
+        return multiprocessing.cpu_count()
+    else:
+        return int(setting)
+    
+
 def _setup_buildclient_args(config):
     import socket
     return {'clientname': LayeredConfig.get(config, 'clientname',
@@ -1779,8 +1801,7 @@ def _setup_buildclient_args(config):
             'serverhost': LayeredConfig.get(config, 'serverhost', '127.0.0.1'),
             'serverport': LayeredConfig.get(config, 'serverport', 5555),
             'authkey':    LayeredConfig.get(config, 'authkey', 'secret'),
-            'processes':  LayeredConfig.get(config, 'processes',
-                                            multiprocessing.cpu_count())
+            'processes':  _process_count(LayeredConfig.get(config, 'processes'))
             }
 
 

@@ -22,6 +22,6 @@ echo "creating statusreport"
 ./ferenda-build.py devel statusreport
 cd ..
 echo "running smoketests"
-FERENDA_TESTURL=http://i7-ferenda.lagen.nu/ tools/test.sh integrationLagen
+FERENDA_TESTURL=http://nate/ tools/test.sh integrationLagen
 echo "deploying to remote"
 fab -H colo.tomtebo.org -f tools/fabfile.py deploy

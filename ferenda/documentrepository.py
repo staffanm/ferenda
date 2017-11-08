@@ -525,7 +525,7 @@ class DocumentRepository(object):
             'datadir': 'data',
             'patchdir': 'patches',
             'patchformat': 'default',
-            'processes': 1,
+            'processes': '1',
             'force': False,
             'parseforce': False,
             'serializejson': False,
