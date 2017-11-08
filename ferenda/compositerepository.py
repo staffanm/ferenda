@@ -5,6 +5,7 @@ from builtins import *
 
 import os
 import time
+import logging
 from collections import defaultdict, OrderedDict
 
 from ferenda import DocumentRepository, DocumentStore
@@ -81,7 +82,17 @@ class CompositeRepository(DocumentRepository):
             # if we don't have a config object yet, the created
             # instance is just temporary -- don't save it
             if hasattr(self, '_config'):
+                # if the composite object has loglevel INFO, make the
+                # subrepo have a slightly higher loglevel to avoid
+                # creating almost-duplicate logging entries like:
+                #
+                # <time> subrepo1 INFO basefile: parse OK (2.42 sec)
+                # <time> comprepo INFO basefile: parse OK (2.52 sec)
+                if (self.log.getEffectiveLevel() == logging.INFO and
+                    inst.log.getEffectiveLevel() == logging.INFO):
+                    inst.log.setLevel(inst.log.getEffectiveLevel() + 1)
                 self._instances[instanceclass] = inst
+                
             return inst
         else:
             return self._instances[instanceclass]
@@ -218,7 +229,7 @@ class CompositeRepository(DocumentRepository):
                 basefile = ret
 
             self.copy_parsed(basefile, inst)
-            self.log.info("%(basefile)s OK (%(elapsed).3f sec)",
+            self.log.info("%(basefile)s parse OK (%(elapsed).3f sec)",
                           {'basefile': basefile,
                            'elapsed': time.time() - start})
             return ret
