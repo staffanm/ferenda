@@ -49,7 +49,11 @@ import sys
 import tempfile
 import traceback
 import warnings
-
+try:
+    BrokenPipeError
+except NameError:
+    import socket
+    BrokenPipeError = socket.error
 
 # 3rd party
 import requests
@@ -1173,9 +1177,8 @@ def _build_worker(jobqueue, resultqueue, clientname):
         try:
             job = jobqueue.get()  # get() blocks -- wait until a job or the
                                   # DONE/SHUTDOWN signal comes
-            
-        except EOFError as e:
-            print("%s: couln't get a new job from the queue, buildserver probably done?" % 
+        except BrokenPipeError as e:
+            print("%s: Couldn't get a new job from the queue, buildserver probably done?" % 
                 os.getpid())
             return
                                   
@@ -1213,8 +1216,11 @@ def _build_worker(jobqueue, resultqueue, clientname):
         logrecords[:] = []
         try:
             resultqueue.put(outdict)
+            if clientname:
+                sys.stdout.write(".")
+                sys.stdout.flush()
         except EOFError as e:
-            print("%s: result of %s %s %s couldn't be put on resultqueue" % (
+            print("%s: Result of %s %s %s couldn't be put on resultqueue" % (
                 os.getpid(), job['classname'], job['command'], job['basefile']))
         # log.debug("Client: [pid %s] Put '%s' on the queue" % (os.getpid(), outdict['result']))
 
@@ -1313,7 +1319,7 @@ def _queue_jobs(manager, iterable, inst, classname, command):
     res = []
     if number_of_jobs == 0:
         return res
-    log.debug("Server: Put %s jobs into job queue" % number_of_jobs)
+    log.info("Server: Put %s jobs into job queue" % number_of_jobs)
     # FIXME: only one of the clients will read this DONE package, and
     # we have no real way of knowing how many clients there will be
     # (they can come and go at will). Didn't think this one through...
@@ -1322,7 +1328,11 @@ def _queue_jobs(manager, iterable, inst, classname, command):
     res = []
     clients = Counter()
     while numres < number_of_jobs:
+        if numres == 0:
+            print("About to get the first result")
         r = resultqueue.get()
+        if numres == 0:
+            print("Got the first result")
         if isinstance(r['result'], tuple) and r['result'][0] == _WrappedKeyboardInterrupt:
             raise KeyboardInterrupt()
         elif isinstance(r['result'], tuple) and isinstance(r['result'], Exception):
@@ -1345,7 +1355,7 @@ def _queue_jobs(manager, iterable, inst, classname, command):
         numres += 1
 
     clientstats = ", ".join(["%s: %s jobs" % (k, v) for k,v in clients.items()])
-    print("Server: %s tasks processed. %s" % (numres, clientstats))
+    log.info("Server: %s tasks processed. %s" % (numres, clientstats))
     return res
     # sleep(1)
     # don't shut this down --- the toplevel manager.run call must do

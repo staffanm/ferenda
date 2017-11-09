@@ -8,7 +8,7 @@ hämtas fran DV:s (ickepublika) FTP-server, eller fran lagen.nu."""
 # system libraries (incl six-based renames)
 from bz2 import BZ2File
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from ftplib import FTP
 from io import BytesIO
 from time import mktime
@@ -28,6 +28,14 @@ import requests
 import lxml.html
 from lxml import etree
 from bs4 import BeautifulSoup, NavigableString
+try:
+    # this is a optional dependency that only works on py3 and which
+    # is only needed when multiple processes write to a single shared
+    # file (generated/uri.map) over NFS
+    from flufl.lock import Lock
+except ImportError:
+    Lock = None
+
 
 # my libs
 from ferenda import (Document, DocumentStore, Describer, WordReader, FSMParser, Facet)
@@ -222,11 +230,13 @@ class DV(SwedishLegalSource):
                 mapfile = self.store.path("uri", "generated", ".map")
                 try:
                     with codecs.open(mapfile, encoding="utf-8") as fp:
-                        for line in fp:
-                            if "\t" not in line:
+                        for lineno, line in enumerate(fp):
+                            match = re.match(regex, line)
+                            if not match:
+                                self.log.error("Line %s corrupted: '%s'" % (lineno+1, line[:-1]))
                                 # corrupted line?
                                 continue
-                            uriseg, bf = re.match(regex, line).groups()
+                            uriseg, bf = match.groups()
                             self._basefilemap[uriseg] = bf.strip()
                 except FileNotFoundError:
                     self.log.error("Couldn't find %s, probably need to run ./ferenda-build.py dv relate --all" % mapfile)
@@ -1395,13 +1405,10 @@ class DV(SwedishLegalSource):
         mapfile = self.store.path("uri", "generated", ".map")
         util.ensure_dir(mapfile)
         idx = len(self.urispace_base) + len(self.urispace_segment) + 2
-        # FIXME: when re-parsing, this causes duplicate entries in the
-        # mapfile (this is OK by apache, but not by nginx)
         if self.config.mapfiletype == "nginx":
             path = urlparse(doc.uri).path
         else:
             path = doc.uri[idx:]
-
         append_path = True
         if os.path.exists(mapfile):
             with codecs.open(mapfile, encoding="utf-8") as fp:
@@ -1429,12 +1436,21 @@ class DV(SwedishLegalSource):
         if append_path:
             assert path
             assert doc.basefile
-            with codecs.open(mapfile, "a", encoding="utf-8") as fp:
-                if self.config.mapfiletype == "nginx":
-                    fp.write("%s\t/dv/generated/%s.html;\n" % (path,
-                                                               doc.basefile))
-                else:
-                    fp.write("%s\t%s\n" % (path, doc.basefile))
+            lock = None
+            try:
+                if Lock:
+                    lock = Lock(mapfile, lifetime = timedelta(seconds=3))
+                    lock.lock()
+                    self.log.info("aquired lock %s" % lock)
+                with codecs.open(mapfile, "a", encoding="utf-8") as fp:
+                    if self.config.mapfiletype == "nginx":
+                        fp.write("%s\t/dv/generated/%s.html;\n" % (path,
+                                                                   doc.basefile))
+                    else:
+                        fp.write("%s\t%s\n" % (path, doc.basefile))
+            finally:
+                if lock:
+                    lock.unlock()
                 if hasattr(self, "_basefilemap"):
                     delattr(self, "_basefilemap")
 
