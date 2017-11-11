@@ -1445,7 +1445,7 @@ class DV(SwedishLegalSource):
                 except:
                     basefile = filename
                 if doc.basefile != basefile:
-                    raise DuplicateReferatDoc(dummy, dummyfile=self.store.parsed_path(doc.basefile))
+                    raise DuplicateReferatDoc(basefile, dummyfile=self.store.parsed_path(doc.basefile))
                 return False
 
 

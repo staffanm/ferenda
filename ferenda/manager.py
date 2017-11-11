@@ -1177,7 +1177,7 @@ def _build_worker(jobqueue, resultqueue, clientname):
         try:
             job = jobqueue.get()  # get() blocks -- wait until a job or the
                                   # DONE/SHUTDOWN signal comes
-        except BrokenPipeError as e:
+        except (EOFError, BrokenPipeError) as e:
             print("%s: Couldn't get a new job from the queue, buildserver probably done?" % 
                 os.getpid())
             return
@@ -1232,10 +1232,7 @@ def _instantiate_and_configure(classname, config, logrecords, clientname):
         (os.getpid(), classname))
     inst = _instantiate_class(_load_class(classname))
     if hasattr(inst, 'clientname'):
-        print("Setting clientname in inst")
         inst.clientname = clientname
-    else:
-        print("Not setting clientname in inst")
     for k, v in config.items():
         # log.debug("Client: [pid %s] setting config value %s to %r" % (os.getpid(), k, v))
         LayeredConfig.set(inst.config, k, v)

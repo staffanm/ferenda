@@ -72,6 +72,8 @@ class InteExisterandeSFS(DocumentRemovedError):
     
 class SFSDocumentStore(SwedishLegalStore):
 
+    intermediate_suffixes = [".txt"]
+
     # some extra methods for SFSR pages and semi-hidden metadata pages. 
     # FIXME: These should probably be handled as attachments instead of custom methods, even if that 
     # means we need to set storage_policy = "dir"
@@ -84,10 +86,6 @@ class SFSDocumentStore(SwedishLegalStore):
 
     def metadata_path(self, basefile):
         return self.path(basefile, "metadata", ".html")
-
-    # Override to ensure that intermediate files use .txt suffix (not .xml)
-    def intermediate_path(self, basefile, version=None, attachment=None):
-        return self.path(basefile, "intermediate", ".txt")
 
 
 class SFS(Trips):

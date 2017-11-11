@@ -8,7 +8,7 @@ if [ "$1" = "-f" ]; then
    rm -r data/*/toc
    set -e  # fail immediately on error
    echo "resetting fulltextindex"
-   ./ferenda-build.py devel destroyindex
+   # ./ferenda-build.py devel destroyindex
    echo "resetting triplestore"
    ./ferenda-build.py devel clearstore
 fi
