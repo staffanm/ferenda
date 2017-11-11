@@ -1231,6 +1231,11 @@ def _instantiate_and_configure(classname, config, logrecords, clientname):
         "Client: [pid %s] instantiating and configuring %s" %
         (os.getpid(), classname))
     inst = _instantiate_class(_load_class(classname))
+    if hasattr(inst, 'clientname'):
+        print("Setting clientname in inst")
+        inst.clientname = clientname
+    else:
+        print("Not setting clientname in inst")
     for k, v in config.items():
         # log.debug("Client: [pid %s] setting config value %s to %r" % (os.getpid(), k, v))
         LayeredConfig.set(inst.config, k, v)
@@ -1328,11 +1333,7 @@ def _queue_jobs(manager, iterable, inst, classname, command):
     res = []
     clients = Counter()
     while numres < number_of_jobs:
-        if numres == 0:
-            print("About to get the first result")
         r = resultqueue.get()
-        if numres == 0:
-            print("Got the first result")
         if isinstance(r['result'], tuple) and r['result'][0] == _WrappedKeyboardInterrupt:
             raise KeyboardInterrupt()
         elif isinstance(r['result'], tuple) and isinstance(r['result'], Exception):

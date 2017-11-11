@@ -15,6 +15,7 @@ from time import mktime
 from urllib.parse import urljoin, urlparse
 import codecs
 import itertools
+import logging
 import os
 import re
 import tempfile
@@ -101,7 +102,8 @@ class DV(SwedishLegalSource):
     sparql_annotations = "sparql/dv-annotations.rq"
     sparql_expect_results = False
     xslt_template = "xsl/dv.xsl"
-
+    clientname = None
+    
     @classmethod
     def relate_all_setup(cls, config, *args, **kwargs):
         # FIXME: If this was an instancemethod, we could use
@@ -109,11 +111,16 @@ class DV(SwedishLegalSource):
         parsed_dir = os.path.sep.join([config.datadir, 'dv', 'parsed'])
         mapfile = os.path.sep.join(
             [config.datadir, 'dv', 'generated', 'uri.map'])
-        log = cls._setup_logger(cls.alias)
+        log = logging.getLogger(cls.alias)
         if (not util.outfile_is_newer(util.list_dirs(parsed_dir, ".xhtml"), mapfile)) or config.force:
             re_xmlbase = re.compile('<head about="([^"]+)"')
             log.info("Creating uri.map file")
             cnt = 0
+            # also remove any uri-<client>-<pid>.map files that might be laying around
+            for m in util.list_dirs(os.path.dirname(mapfile), ".map"):
+                if m == mapfile:
+                    continue
+                util.robust_remove(m)
             util.robust_remove(mapfile + ".new")
             util.ensure_dir(mapfile)
             # FIXME: Not sure utf-8 is the correct codec for us -- it
@@ -131,13 +138,7 @@ class DV(SwedishLegalSource):
                     if m:
                         path = urlparse(m.group(1)).path
                         if path in paths:
-                            # turns out this happens for around 700
-                            # files that have differing names but
-                            # identical content. Could shave some time
-                            # of a parse --all by only parsing the
-                            # first basefile with a given path?
-                            # 
-                            # log.warning("Path %s is already in map" % path)
+                            log.warning("Path %s is already in map" % path)
                             continue
                         assert path
                         assert basefile
@@ -216,30 +217,22 @@ class DV(SwedishLegalSource):
     # override to account for the fact that there is no 1:1
     # correspondance between basefiles and uris
     def basefile_from_uri(self, uri):
+        def build_basefilemap(path, filename):
+            if self.config.mapfiletype == "nginx":
+                # chop of leading "/dom/"
+                path = path[len(self.urispace_segment)+2:]
+                # /dv/generated/HDO/T-254.html; => HDO/T-254
+                filename = filename[14:-6]
+            self._basefilemap[path] = filename
+        
         basefile = super(DV, self).basefile_from_uri(uri)
         # the "basefile" at this point is just the remainder of the
         # URI (eg "nja/1995s362"). Create a lookup table to find the
         # real basefile (eg "HDO/Ö463-95_1")
         if basefile:
             if not hasattr(self, "_basefilemap"):
-                if self.config.mapfiletype == "nginx":
-                    regex = "/%s/(.*)\t/dv/generated/(.*).html;" % self.urispace_segment
-                else:
-                    regex = "(.*)\t(.*)"
                 self._basefilemap = {}
-                mapfile = self.store.path("uri", "generated", ".map")
-                try:
-                    with codecs.open(mapfile, encoding="utf-8") as fp:
-                        for lineno, line in enumerate(fp):
-                            match = re.match(regex, line)
-                            if not match:
-                                self.log.error("Line %s corrupted: '%s'" % (lineno+1, line[:-1]))
-                                # corrupted line?
-                                continue
-                            uriseg, bf = match.groups()
-                            self._basefilemap[uriseg] = bf.strip()
-                except FileNotFoundError:
-                    self.log.error("Couldn't find %s, probably need to run ./ferenda-build.py dv relate --all" % mapfile)
+                self.readmapfile(build_basefilemap)
             if basefile in self._basefilemap:
                 return self._basefilemap[basefile]
             else:
@@ -256,6 +249,33 @@ class DV(SwedishLegalSource):
                 if court not in self.expected_cases or self.expected_cases[court] <= year:
                     self.log.warning("%s: Could not find corresponding basefile" % uri)
                 return None
+
+    def readmapfile(self, callback):
+        mapfile = self.store.path("uri", "generated", ".map")
+        util.ensure_dir(mapfile)
+        if self.clientname:
+            mapfiles = list(util.list_dirs(os.path.dirname(mapfile), ".map"))
+        else:
+            mapfiles = [mapfile]
+
+        if self.config.mapfiletype == "nginx":
+            regex = "/%s/(.*)\t/dv/generated/(.*).html;" % self.urispace_segment
+        else:
+            idx = len(self.urispace_base) + len(self.urispace_segment) + 2
+            regex = "(.*)\t(.*)"
+
+        append_path = True
+        for mapfile in mapfiles:
+            if os.path.exists(mapfile):
+                with codecs.open(mapfile, encoding="utf-8") as fp:
+                    for line in fp:
+                        path, filename = line.strip().split("\t", 1)
+                        ret = callback(path, filename)
+                        if ret is not None:
+                            return ret
+                        
+
+                    
 
     def download(self, basefile=None):
         if basefile is not None:
@@ -1071,7 +1091,11 @@ class DV(SwedishLegalSource):
                          'NJA': '%(type)s %(year)s s. %(ordinal)s',
                          None: '%(type)s %(year)s:%(ordinal)s'
                          }
-
+        # 0. strip whitespace
+        for k, v in head.items():
+            if isinstance(v, str):
+                head[k] = v.strip()
+        
         # 1. Attempt to fix missing Referat
         if not head.get("Referat"):
             # For some courts (MDO, ADO) it's possible to reconstruct a missing
@@ -1402,57 +1426,52 @@ class DV(SwedishLegalSource):
             domdesc.value(RDFS.label, "»".join(keyword), lang=self.lang)
 
     def postprocess_doc(self, doc):
-        mapfile = self.store.path("uri", "generated", ".map")
-        util.ensure_dir(mapfile)
-        idx = len(self.urispace_base) + len(self.urispace_segment) + 2
         if self.config.mapfiletype == "nginx":
             path = urlparse(doc.uri).path
         else:
             path = doc.uri[idx:]
-        append_path = True
-        if os.path.exists(mapfile):
-            with codecs.open(mapfile, encoding="utf-8") as fp:
-                for line in fp:
-                    if "\t" not in line:
-                        # corrupted line?
-                        continue
-                    mapped_path, dummy = line.split("\t", 1)
-                    if mapped_path == path:
-                        # This means that another, previously parsed,
-                        # basefile already maps to the same URI (eg
-                        # because a referat of multiple dom documents
-                        # occur as several different (identical)
-                        # basefiles.
-                        try:
-                            # convert dummy (generated path) to a basefile if possible
-                            dummy = dummy.split("/",3)[-1].split(".")[0]
-                        except:
-                            pass # just use dummy as-is
-                        if doc.basefile != dummy:
-                            raise DuplicateReferatDoc(dummy, dummyfile=self.store.parsed_path(doc.basefile))
-                        # self.log.warning("%s: Not appending path %s to uri.map" % (doc.basefile, path))
-                        append_path = False
-                        break
-        if append_path:
-            assert path
-            assert doc.basefile
-            lock = None
-            try:
-                if Lock:
-                    lock = Lock(mapfile, lifetime = timedelta(seconds=3))
-                    lock.lock()
-                    self.log.info("aquired lock %s" % lock)
-                with codecs.open(mapfile, "a", encoding="utf-8") as fp:
-                    if self.config.mapfiletype == "nginx":
-                        fp.write("%s\t/dv/generated/%s.html;\n" % (path,
-                                                                   doc.basefile))
-                    else:
-                        fp.write("%s\t%s\n" % (path, doc.basefile))
-            finally:
-                if lock:
-                    lock.unlock()
-                if hasattr(self, "_basefilemap"):
-                    delattr(self, "_basefilemap")
+
+        def map_append_needed(mapped_path, filename):
+            if mapped_path == path:
+                # This means that a previously parsed, basefile
+                # already maps to the same URI (eg because a referat
+                # of multiple dom documents occur as several different
+                # (identical) basefiles. If it's a different basefile
+                # (and not just the same parsed twice), raise
+                # DuplicateReferatDoc
+                try:
+                    # convert generated path to a basefile if possible
+                    basefile = filename.split("/",3)[-1].split(".")[0]
+                except:
+                    basefile = filename
+                if doc.basefile != basefile:
+                    raise DuplicateReferatDoc(dummy, dummyfile=self.store.parsed_path(doc.basefile))
+                return False
+
+
+        # the result of readmapfile can be either False (the case in
+        # question already appeared in the uri.map file(s), or None
+        # (the case was not found anywhere -- we should
+        # append it to the appropriate uri.map file)
+        append_needed = self.readmapfile(map_append_needed)
+        if append_needed is not False:
+            if self.clientname:
+                # in a distributed setting, use a
+                # uri-<clientname>-<pid>.map, eg
+                # "uri-sophie-4435.map", to avoid corruption of a
+                # single file by multiple writer, or slowness due to
+                # lock contention.
+                mapfile = self.store.path("uri", "generated", ".%s.%s.map" % (self.clientname, os.getpid()))
+            else:
+                mapfile = self.store.path("uri", "generated", ".map")
+            with codecs.open(mapfile, "a", encoding="utf-8") as fp:
+                if self.config.mapfiletype == "nginx":
+                    fp.write("%s\t/dv/generated/%s.html;\n" % (path,
+                                                               doc.basefile))
+                else:
+                    fp.write("%s\t%s\n" % (path, doc.basefile))
+            if hasattr(self, "_basefilemap"):
+                delattr(self, "_basefilemap")
 
         # NB: This cannot be made to work 100% as there is not a 1:1
         # mapping between basefiles and URIs since multiple basefiles
