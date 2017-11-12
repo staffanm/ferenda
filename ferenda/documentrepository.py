@@ -1838,9 +1838,13 @@ with the *config* object as single parameter.
         if not(reltriples or reldependencies or relfulltext):
             self.log.debug("%s: skipped relate" % basefile)
             return
+        timings = {'basefile': basefile,
+                   'e_triples': 0,
+                   'e_deps': 0,
+                   'e_fulltext': 0}
         with util.logtime(self.log.info,
-                          "%(basefile)s: relate OK (%(elapsed).3f sec)",
-                          {'basefile': basefile}):
+                          "%(basefile)s: relate OK (%(elapsed).3f sec) [%(e_triples).3f/%(e_deps).3f/%(e_fulltext).3f]",
+                          timings):
 
             # If using the Bulk upload feature, append to the temporary
             # file that is to be bulk uploaded (see relate_all_setup)
@@ -1857,20 +1861,26 @@ with the *config* object as single parameter.
                         fp.write(g.serialize(format="nt"))
                     values['triplecount'] = len(g)
             else:
+                start = time.time()
                 if self.config.force and reltriples:
                     self.relate_triples(basefile)
                     entry.indexed_ts = datetime.now()
                 elif reltriples:
                     self.relate_triples(basefile, removesubjects=True)
                     entry.indexed_ts = datetime.now()
+                timings['e_triples'] = time.time() - start
             # When otherrepos = [], should we still provide self as one repo? Yes.
             if self not in otherrepos:
                 otherrepos.append(self)
             if reldependencies:
+                start = time.time()
                 self.relate_dependencies(basefile, otherrepos)
+                timings['e_deps'] = time.time() - start
                 entry.indexed_dep = datetime.now()
             if self.config.fulltextindex and relfulltext:
+                start = time.time()
                 self.relate_fulltext(basefile, otherrepos)
+                timings['e_fulltext'] = time.time() - start
                 entry.indexed_ft = datetime.now()
         entry.save()
 
@@ -1904,9 +1914,11 @@ with the *config* object as single parameter.
                            'dataset': self.dataset_uri(),
                            'rdffile': self.store.distilled_path(basefile),
                            'triplestore': self.config.storelocation}):
-            with open(self.store.distilled_path(basefile), "rb") as fp:
-                data = fp.read()
-            ts.add_serialized(data, format="xml", context=self.dataset_uri())
+            #with open(self.store.distilled_path(basefile), "rb") as fp:
+            #    data = fp.read()
+            #ts.add_serialized(data, format="xml", context=self.dataset_uri())
+            ts.add_serialized_file(self.store.distilled_path(basefile), format="xml",
+                                   context=self.dataset_uri())
 
     def _get_fulltext_indexer(self, repos, batchoptimize=False):
         if not hasattr(self, '_fulltextindexer'):
