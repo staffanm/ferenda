@@ -88,8 +88,11 @@ class CompositeRepository(DocumentRepository):
                 #
                 # <time> subrepo1 INFO basefile: parse OK (2.42 sec)
                 # <time> comprepo INFO basefile: parse OK (2.52 sec)
+                #
+                # Although not if the subrepo itself has subrepos
                 if (self.log.getEffectiveLevel() == logging.INFO and
-                    inst.log.getEffectiveLevel() == logging.INFO):
+                    inst.log.getEffectiveLevel() == logging.INFO and
+                    not isinstance(inst, CompositeRepository)):
                     inst.log.setLevel(inst.log.getEffectiveLevel() + 1)
                 self._instances[instanceclass] = inst
                 
