@@ -1231,8 +1231,7 @@ def _instantiate_and_configure(classname, config, logrecords, clientname):
         "Client: [pid %s] instantiating and configuring %s" %
         (os.getpid(), classname))
     inst = _instantiate_class(_load_class(classname))
-    if hasattr(inst, 'clientname'):
-        inst.clientname = clientname
+    inst.config.clientname = clientname
     for k, v in config.items():
         # log.debug("Client: [pid %s] setting config value %s to %r" % (os.getpid(), k, v))
         LayeredConfig.set(inst.config, k, v)

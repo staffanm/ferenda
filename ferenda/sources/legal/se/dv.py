@@ -102,8 +102,7 @@ class DV(SwedishLegalSource):
     sparql_annotations = "sparql/dv-annotations.rq"
     sparql_expect_results = False
     xslt_template = "xsl/dv.xsl"
-    clientname = None
-    
+
     @classmethod
     def relate_all_setup(cls, config, *args, **kwargs):
         # FIXME: If this was an instancemethod, we could use
@@ -253,7 +252,7 @@ class DV(SwedishLegalSource):
     def readmapfile(self, callback):
         mapfile = self.store.path("uri", "generated", ".map")
         util.ensure_dir(mapfile)
-        if self.clientname:
+        if self.config.clientname:
             mapfiles = list(util.list_dirs(os.path.dirname(mapfile), ".map"))
         else:
             mapfiles = [mapfile]
@@ -1455,13 +1454,13 @@ class DV(SwedishLegalSource):
         # append it to the appropriate uri.map file)
         append_needed = self.readmapfile(map_append_needed)
         if append_needed is not False:
-            if self.clientname:
+            if self.config.clientname:
                 # in a distributed setting, use a
                 # uri-<clientname>-<pid>.map, eg
                 # "uri-sophie-4435.map", to avoid corruption of a
                 # single file by multiple writer, or slowness due to
                 # lock contention.
-                mapfile = self.store.path("uri", "generated", ".%s.%s.map" % (self.clientname, os.getpid()))
+                mapfile = self.store.path("uri", "generated", ".%s.%s.map" % (self.config.clientname, os.getpid()))
             else:
                 mapfile = self.store.path("uri", "generated", ".map")
             with codecs.open(mapfile, "a", encoding="utf-8") as fp:

@@ -547,6 +547,8 @@ class DocumentRepository(object):
             'frontpagefeed': False,
             'removeinvalidlinks': True,
             'ignorepatch': False,
+            'clientname': '',
+            'bulktripleload': False,
             'class': cls.__module__ + "." + cls.__name__,
             # FIXME: These only make sense at a global level, and
             # furthermore are duplicated in manager._load_config. We
@@ -1772,7 +1774,18 @@ with the *config* object as single parameter.
 
         # If using the Bulk upload functionality (see
         # relate_all_setup), do the actual bulk upload.
-        if os.path.exists(temppath):
+        if config.bulktripleload:
+            with open(temppath, "wb") as fp:
+                filecount = 0
+                for filename in os.listdir(os.path.dirname(dumppath)):
+                    if not filename.endswith(".nt") or filename == "dump.nt":
+                        continue
+                    filecount += 1
+                    filename = os.path.dirname(dumppath) + os.sep + filename
+                    with open(filename, "rb") as ffp:
+                        fp.write(ffp.read())
+                    util.robust_remove(filename)
+            log.debug("Concatenated %s nt files into %s" % (filecount, temppath))
             with util.logtime(log.info,
                               "Loaded %(triplecount)s triples to context %(context)s from %(tempfile)s (%(elapsed).3f sec)",
                               values):
@@ -1848,8 +1861,9 @@ with the *config* object as single parameter.
 
             # If using the Bulk upload feature, append to the temporary
             # file that is to be bulk uploaded (see relate_all_setup)
-            nttemp = self.store.resourcepath("distilled/_dump.nt")
-            if os.path.exists(nttemp) and 'all' in self.config:
+            self.log.debug("%s: About to start: %s" % (basefile, self.config.bulktripleload))
+            if self.config.bulktripleload:
+                nttemp = self.store.resourcepath("distilled/dump.%s.%s.nt" % (self.config.clientname, os.getpid()))
                 values = {'basefile': basefile,
                           'nttemp': nttemp}
                 with util.logtime(self.log.debug,
