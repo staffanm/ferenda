@@ -148,6 +148,12 @@ class SOUKB(Offtryck, PDFDocumentRepository):
     document_type = SOU = True
     PROPOSITION = DS = KOMMITTEDIREKTIV = False
 
+    @classmethod
+    def get_default_options(cls):
+        opts = super(SOUKB, cls).get_default_options()
+        opts['ocr'] = False
+        return opts
+
     
     def download(self, basefile=None):
         if basefile:
@@ -273,10 +279,13 @@ class SOUKB(Offtryck, PDFDocumentRepository):
         intermediate_dir = os.path.dirname(intermediate_path)
         keep_xml = "bz2" if self.config.compress == "bz2" else True
         reader = StreamingPDFReader()
-        return reader.convert(filename=self.store.downloaded_path(basefile),
-                              workdir=intermediate_dir,
-                              images=self.config.pdfimages,
-                              keep_xml=keep_xml)
+        kwargs = {'filename': self.store.downloaded_path(basefile),
+                  'workdir': intermediate_dir,
+                  'images': self.config.pdfimages,
+                  'keep_xml': keep_xml}
+        if self.config.ocr:
+            kwargs['ocr_lang'] = 'swe'
+        return reader.convert(**kwargs)
 
     def extract_head(self, fp, basefile):
         return None  # "rawhead" is never used
@@ -313,7 +322,8 @@ class SOUKB(Offtryck, PDFDocumentRepository):
 
     def extract_body(self, fp, basefile):
         reader = StreamingPDFReader()
-        reader.read(fp)
+        parser = "ocr" if self.config.ocr else "xml"
+        reader.read(fp, parser=parser)
         for page in reader:
             page.src = "index.pdf"  # FIXME: don't hardcode the filename
         return reader
