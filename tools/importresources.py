@@ -217,6 +217,7 @@ def mapspace(base, dest):
             strtemplate = strtemplate.replace("_s_{sidnummer}",
                                               "_s._{sidnummer}")
             strtemplate = strtemplate.replace("/rf/", "/dom/")
+            strtemplate = strtemplate.replace("/utr/{serie}/", "/{serie}/")
             o = rdflib.Literal(strtemplate)
         elif p == COIN.fragmentTemplate and o[1] == "_":
             # "p_{paragrafnummer}" => "P{paragrafnummer}"

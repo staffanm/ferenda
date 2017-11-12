@@ -143,7 +143,7 @@ class SOUKB(Offtryck, PDFDocumentRepository):
     start_url = "http://regina.kb.se/sou/"
     download_reverseorder = True
     rdf_type = RPUBL.Utredningsbetankande
-    urispace_segment = "utr/sou"
+    urispace_segment = "sou"
     # A bit nonsensical, but required for SwedishLegalSource.get_parser
     document_type = SOU = True
     PROPOSITION = DS = KOMMITTEDIREKTIV = False
@@ -344,7 +344,7 @@ class SOU(CompositeRepository, FixedLayoutSource):
     alias = "sou"
     rdf_type = RPUBL.Utredningsbetankande
     subrepos = (SOURegeringen, SOUKB)
-    urispace_segment = "utr/sou"
+    urispace_segment = "sou"
     documentstore_class = SOUStore
     xslt_template = "xsl/forarbete.xsl"
     sparql_annotations = "sparql/describe-with-subdocs.rq"

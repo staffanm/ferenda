@@ -92,7 +92,7 @@ class Ds(Regeringen):
     re_urlbasefile_lax = re.compile("departementsserien-och-promemorior/\d+/\d+/ds-?(\d{4})_?(\d+)")
     rdf_type = RPUBL.Utredningsbetankande
     document_type = Regeringen.DS
-    urispace_segment = "utr/ds"
+    urispace_segment = "ds"
 
     # NB: The same logic as in
     # ferenda.sources.legal.se.{Regeringen,Riksdagen}.metadata_from_basefile

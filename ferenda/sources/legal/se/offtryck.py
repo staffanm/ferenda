@@ -90,8 +90,8 @@ class Offtryck(SwedishLegalSource):
     @property
     def urispace_segment(self):
         return {self.PROPOSITION: "prop",
-                self.DS: "utr/ds",
-                self.SOU: "utr/sou",
+                self.DS: "ds",
+                self.SOU: "sou",
                 self.KOMMITTEDIREKTIV: "dir"}.get(self.document_type)
 
 

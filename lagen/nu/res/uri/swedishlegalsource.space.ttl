@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2017-01-01T21:18:50.361500
+# Automatically transformed from sources at 2017-11-14T09:02:35.680625
 
 @prefix : <http://rinfo.lagrummet.se/sys/uri/space#> .
 @prefix coin: <http://purl.org/court/def/2009/coin#> .
@@ -26,7 +26,7 @@ space: a coin:URISpace ;
                     coin:variable "serie" ],
                 [ coin:property rpubl:arsutgava ],
                 [ coin:property rpubl:lopnummer ] ;
-            coin:uriTemplate "/utr/{serie}/{arsutgava}:{lopnummer}" ],
+            coin:uriTemplate "/{serie}/{arsutgava}:{lopnummer}" ],
         [ coin:binding [ coin:property rpubl:rattsfallspublikation ;
                     coin:slugFrom space:abbrSlug ;
                     coin:variable "serie" ],
