@@ -2,6 +2,7 @@
 devtools.py
 *.pyc
 *.log
+@eaDir
 .DS_Store
 /defaultDB/
 /ferendaDB/

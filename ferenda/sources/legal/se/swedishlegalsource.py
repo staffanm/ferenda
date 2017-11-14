@@ -622,8 +622,10 @@ class SwedishLegalSource(DocumentRepository):
 
         # perform the patching, return the result as a stream, and add
         # an attribute with the description
-        lines = [l.decode().rstrip() for l in fp.readlines()]
-        patchedlines = ps.patches[0].merge(lines)
+        # lines = [l.decode().rstrip() for l in fp.readlines()]
+        lines = [l.rstrip("\n") for l in fp.readlines()]
+        import pudb; pu.db
+        patchedlines = list(ps.patches[0].merge(lines))
         patchedtext = "\n".join(patchedlines)
         if binarystream:
             fp = BytesIO(patchedtext.encode(self.source_encoding))

@@ -575,18 +575,6 @@ class SFS(Trips):
                                                  dummyfile=self.store.parsed_path(basefile))
         return self._extract_text(basefile)
 
-#  I think maybe SwedishLegalSource.patch_if_needed does all this now?
-#
-#    def patch_if_needed(self, fp, basefile):
-#        fp = super(SFS, self).patch_if_needed(fp, basefile)
-#        # find out if patching occurred and record the patch description
-#        # (maybe this should only be done in the lagen.nu.SFS subclass?
-#        # the canonical SFS repo should maybe not have patches?)
-#        if None and patchdesc:
-#            desc.value(self.ns['rinfoex'].patchdescription,
-#                       patchdesc)
-#        return fp
-
     def extract_head(self, fp, basefile):
         """Parsear ut det SFSR-registret som inneh\xe5ller alla \xe4ndringar
         i lagtexten fr\xe5n HTML-filer"""
@@ -1618,6 +1606,7 @@ class SFS(Trips):
         g = Graph().parse(self.store.distilled_path(basefile))
         title = str(g.value(URIRef(self.canonical_uri(basefile)), DCTERMS.title))
         tempuri = self.temp_sfs_uri(title)
+        tempsfs = tempuri.rsplit("/", 1)[1]
         extra = {'tempuri': tempuri}
         forf_kommentar = self.time_store_select(store,
                                                 "sparql/sfs_forfattningskommentar.rq",
@@ -1659,7 +1648,7 @@ class SFS(Trips):
                 tree = etree.parse(descfile)
                 for desc in tree.findall(".//{http://www.w3.org/1999/xhtml}div[@class='forfattningskommentar']"):
                     about = desc.get("about")
-                    if basefile not in about:
+                    if basefile not in about and tempsfs not in about:
                         continue
                     descriptions[descfile][about] = desc.find("{http://www.w3.org/1999/xhtml}div")
 

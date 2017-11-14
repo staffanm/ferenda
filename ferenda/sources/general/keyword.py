@@ -33,7 +33,7 @@ class KeywordStore(DocumentStore):
         return "%s/%s" % (first, basefile)
 
     def pathfrag_to_basefile(self, pathfrag):
-        pathfrag = super(MediaWikiStore, self).replace("%3A",":")
+        pathfrag = super(KeywordStore, self).pathfrag_to_basefile(pathfrag).replace("%3A",":")
         first, basefile = pathfrag.split("/", 1)
         return basefile
 

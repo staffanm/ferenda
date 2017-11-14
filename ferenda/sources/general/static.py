@@ -112,8 +112,8 @@ class Static(DocumentRepository):
         self._config = config
         self.store = self.documentstore_class(
             config.datadir + os.sep + self.alias,
-            downloaded_suffix=self.downloaded_suffix,
-            storage_policy=self.storage_policy)
+            storage_policy=self.storage_policy,
+            compression=self.config.compress)
         self.store.staticdir = staticdir
         
     def download(self):
