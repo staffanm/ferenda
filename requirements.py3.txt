@@ -27,4 +27,3 @@ layeredconfig
 grako
 responses
 langdetect
-flufl.lock

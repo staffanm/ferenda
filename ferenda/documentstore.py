@@ -13,7 +13,11 @@ import unicodedata
 from urllib.parse import quote, unquote
 from gzip import GzipFile
 from bz2 import BZ2File
-from lzma import LZMAFile
+try:
+    from lzma import LZMAFile
+except ImportError:
+    LZMAFile = None
+
 
 from ferenda import util
 from ferenda import errors

@@ -823,7 +823,8 @@ class Repo(RepoTester):
                                          'force': False,
                                          'storetype': 'a',
                                          'storelocation': 'b',
-                                         'storerepository': 'c'}))
+                                         'storerepository': 'c',
+                                         'bulktripleload': False}))
         self.assertTrue(self.repoclass.relate_all_teardown(config))
         self.assertTrue(mock_store.connect.called)
         self.assertTrue(mock_store.connect.return_value.get_serialized_file.called)

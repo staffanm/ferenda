@@ -353,7 +353,7 @@ For reading and writing .gz files see the gzip module.
         filename = self.p("intermediate/123/a.xhtml" + self.expected_suffix)
         self.assertTrue(os.path.exists(filename))
         mimetype = util.runcmd("file -b --mime-type %s" % filename)[1]
-        self.assertEqual(self.expected_mimetype, mimetype.strip())
+        self.assertIn(mimetype.strip(), self.expected_mimetype)
         with self.store.open_intermediate("123/a") as fp:
             # note, open_intermediate should open the file with the
             # the .xhtml suffix automatically
@@ -362,17 +362,17 @@ For reading and writing .gz files see the gzip module.
 class GzipCompression(Compression):
     compression = "gz"
     expected_suffix = ".gz"
-    expected_mimetype = "application/x-gzip"
+    expected_mimetype = ("application/x-gzip", "application/gzip")
 
 class Bzip2Compression(Compression):
     compression = "bz2"
     expected_suffix = ".bz2"
-    expected_mimetype = "application/x-bzip2"
+    expected_mimetype = ("application/x-bzip2",)
 
 class XzCompression(Compression):
     compression = "xz"
     expected_suffix = ".xz"
-    expected_mimetype = "application/x-xz"
+    expected_mimetype = ("application/x-xz",)
     
 
 import doctest

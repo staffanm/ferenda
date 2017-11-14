@@ -1928,11 +1928,11 @@ with the *config* object as single parameter.
                            'dataset': self.dataset_uri(),
                            'rdffile': self.store.distilled_path(basefile),
                            'triplestore': self.config.storelocation}):
-            #with open(self.store.distilled_path(basefile), "rb") as fp:
-            #    data = fp.read()
-            #ts.add_serialized(data, format="xml", context=self.dataset_uri())
-            ts.add_serialized_file(self.store.distilled_path(basefile), format="xml",
-                                   context=self.dataset_uri())
+            with open(self.store.distilled_path(basefile), "rb") as fp:
+                data = fp.read()
+            ts.add_serialized(data, format="xml", context=self.dataset_uri())
+            #ts.add_serialized_file(self.store.distilled_path(basefile), format="xml",
+            #                       context=self.dataset_uri())
 
     def _get_fulltext_indexer(self, repos, batchoptimize=False):
         if not hasattr(self, '_fulltextindexer'):
