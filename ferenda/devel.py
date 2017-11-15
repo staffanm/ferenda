@@ -193,7 +193,9 @@ class DevelHandler(RequestHandler):
                             pfp = StringIO(codecs.decode(pfp.read(), "rot13"))
                         try:
                             ps = PatchSet.from_stream(pfp)
-                            text = "\n".join(ps.patches[0].merge(text.split("\n")))
+                            lines = text.split("\n"))
+                            offsets = ps.patches[0].adjust(lines)
+                            text = "\n".join(ps.patches[0].merge(lines))
                             if ps.patches[0].hunks[0].comment:
                                 patchdescription = ps.patches[0].hunks[0].comment
                             else:
@@ -201,8 +203,10 @@ class DevelHandler(RequestHandler):
                             instructions = Div([
                                 P(["Existing patch at %s has been applied (" % patchpath,
                                    A("ignore existing patch", href=ignorepatchlink), ")"]),
-                                P("Contents of that patch, for reference"),
+                                P(["Contents of that patch, for reference"]),
                                 Pre([util.readfile(patchpath)])])
+                            if any(offsets):
+                                instructions.append(P("Patch did not apply cleanly, the following adjustments were made: %s" % offsets))
                         except (PatchSyntaxError, PatchConflictError) as e:
                             instructions = Div([
                                 P(["Existing patch at %s could not be applied (" % patchpath,
