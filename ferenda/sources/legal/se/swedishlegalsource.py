@@ -621,7 +621,7 @@ class SwedishLegalSource(DocumentRepository):
 
         # perform the patching, return the result as a stream, and add
         # an attribute with the description
-        lines = [l.rstrip() for l in fp.readlines()]
+        lines = [l.rstrip("\n") for l in fp.readlines()]
         offsets = ps.patches[0].adjust(lines)
         if any(offsets):
             self.log.warning("Patch source ranges had to be adjusted: %s" % offsets)

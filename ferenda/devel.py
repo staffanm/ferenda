@@ -193,7 +193,7 @@ class DevelHandler(RequestHandler):
                             pfp = StringIO(codecs.decode(pfp.read(), "rot13"))
                         try:
                             ps = PatchSet.from_stream(pfp)
-                            lines = text.split("\n"))
+                            lines = text.split("\n")
                             offsets = ps.patches[0].adjust(lines)
                             text = "\n".join(ps.patches[0].merge(lines))
                             if ps.patches[0].hunks[0].comment:

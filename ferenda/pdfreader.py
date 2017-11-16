@@ -579,8 +579,9 @@ class PDFReader(CompoundElement):
                     continue
                 assert element.tag == 'text', "Got <%s>, expected <text>" % element.tag
                 # eliminate "empty" textboxes, including "<text><i> </i></text>\n"
-                if element.text and txt(
-                        element.text).strip() == "" and not element.getchildren():
+                if (((element.text and txt(element.text).strip() == "") or
+                     (element.text is None)) and
+                    not element.getchildren()):
                     # print "Skipping empty box"
                     continue
                 if len(page) > 0:
