@@ -151,7 +151,7 @@ class SOUKB(Offtryck, PDFDocumentRepository):
     @classmethod
     def get_default_options(cls):
         opts = super(SOUKB, cls).get_default_options()
-        opts['ocr'] = False
+        opts['ocr'] = True
         return opts
 
     
