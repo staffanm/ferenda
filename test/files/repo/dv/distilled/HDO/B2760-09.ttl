@@ -87,8 +87,8 @@
     dcterms:references <https://lagen.nu/1962:700#K16P14>,
         <https://lagen.nu/1962:700#K30P3S2N2>,
         <https://lagen.nu/1994:1000>,
-        <https://lagen.nu/utr/sou/2006:11>,
-        <https://lagen.nu/utr/sou/2008:124> .
+        <https://lagen.nu/sou/2006:11>,
+        <https://lagen.nu/sou/2008:124> .
 
 <https://lagen.nu/dom/nja/2011s45#TUD> dcterms:creator "Uddevalla tingsrätt"@sv ;
     dcterms:isPartOf <https://lagen.nu/dom/nja/2011s45> ;

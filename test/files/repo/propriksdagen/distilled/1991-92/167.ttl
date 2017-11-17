@@ -64,7 +64,7 @@
 <https://lagen.nu/prop/1991/92:167#S1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
     dcterms:references <https://lagen.nu/1981:1361>,
-        <https://lagen.nu/utr/ds/1991:68> ;
+        <https://lagen.nu/ds/1991:68> ;
     dcterms:title "Inledning"@sv ;
     bibo:chapter "1"@sv .
 
@@ -120,7 +120,7 @@
         <https://lagen.nu/1990:931>,
         <https://lagen.nu/1991:980>,
         <https://lagen.nu/prop/1971:86#sid66>,
-        <https://lagen.nu/utr/sou/1987:58#sid441> ;
+        <https://lagen.nu/sou/1987:58#sid441> ;
     dcterms:title "Undantag från hemförsäljningslagen för vissa prestationer"@sv ;
     bibo:chapter "3.6"@sv .
 
@@ -160,7 +160,7 @@
         <https://lagen.nu/prop/1971:86#sid90>,
         <https://lagen.nu/prop/1981/82:40#sid24>,
         <https://lagen.nu/prop/1981/82:40#sid35>,
-        <https://lagen.nu/utr/sou/1979:76> ;
+        <https://lagen.nu/sou/1979:76> ;
     dcterms:title "Specialmotiverin g"@sv ;
     bibo:chapter "5"@sv .
 

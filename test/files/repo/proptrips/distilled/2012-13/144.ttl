@@ -57,7 +57,7 @@
         <https://lagen.nu/prop/2000/01:127>,
         <https://lagen.nu/prop/2012/13:144#S3-1>,
         <https://lagen.nu/rskr/2001/02:2>,
-        <https://lagen.nu/utr/sou/2010:73> ;
+        <https://lagen.nu/sou/2010:73> ;
     dcterms:title "En ändrad inriktning"@sv ;
     bibo:chapter "3.3"@sv .
 

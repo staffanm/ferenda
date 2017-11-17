@@ -137,7 +137,7 @@
         <https://lagen.nu/1973:289>,
         <https://lagen.nu/2008:579>,
         <https://lagen.nu/prop/1987/88:155#S2-3>,
-        <https://lagen.nu/utr/sou/1983:52> ;
+        <https://lagen.nu/sou/1983:52> ;
     dcterms:title "om skydd för företagshemligheter"@sv ;
     rpubl:arsutgava "1987/88" ;
     rpubl:lopnummer "155" ;
