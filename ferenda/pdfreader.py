@@ -10,6 +10,7 @@ import itertools
 import logging
 import os
 import re
+import shutil
 import tempfile
 import warnings
 import unicodedata
@@ -202,8 +203,15 @@ class PDFReader(CompoundElement):
             os.unlink(convertedfile)
         return res
 
-    def _tesseract(self, tmppdffile, workdir, lang, hocr=True):
-        root = os.path.splitext(os.path.basename(tmppdffile))[0]
+    def _tesseract(self, pdffile, workdir, lang, hocr=True):
+        root = os.path.splitext(os.path.basename(pdffile))[0]
+
+        # step 0: copy the pdf into a temp dir (which is probably on
+        # local disk, saving us some network traffic if the pdf file
+        # is huge and on a NFS mount somewhere)
+        tmpdir = tempfile.mkdtemp()
+        tmppdffile = os.sep.join([tmpdir, os.path.basename(pdffile)])
+        util.copy_if_different(pdffile, tmppdffile)
 
         # step 1: find the number of pages
         cmd = "pdfinfo %s" % tmppdffile
@@ -219,36 +227,35 @@ class PDFReader(CompoundElement):
             topage = min((i + 1) * 10, number_of_pages)
             if frompage > topage:
                 continue
-            cmd = "pdfimages -png -p -f %(frompage)s -l %(topage)s %(tmppdffile)s %(workdir)s/%(root)s" % locals(
+            cmd = "pdfimages -all -p -f %(frompage)s -l %(topage)s %(tmppdffile)s %(tmpdir)s/%(root)s" % locals(
             )
             self.log.debug("- running " + cmd)
             (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
-            # step 2.1: Combine the recently extracted images (which
-            # are always png) into a new tif (so that we add 10 pages
-            # at a time to the tif, as imagemagick can create a number
-            # of pretty large files for each page, so converting 200
-            # images will fill 10 G of your temp space -- which we'd
-            # like to avoid)
-            cmd = "convert %(workdir)s/%(root)s-*.png -compress Zip %(workdir)s/%(root)s-tmp%(idx)04d.tif" % locals(
+            # step 2.1: convert and combine the recently extracted
+            # images (which can be ppm, jpg, ccitt or whatever) into a
+            # new tif (so that we add 10 pages at a time to the tif,
+            # as imagemagick can create a number of pretty large files
+            # for each page, so converting 200 images will fill 10 G
+            # of your temp space -- which we'd like to avoid)
+            cmd = "convert %(tmpdir)s/%(root)s-* -compress Zip %(tmpdir)s/%(root)s_tmp%(idx)04d.tif" % locals(
             )
             self.log.debug("- running " + cmd)
             (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
-            # step 2.2: Remove png files now that they're in the .tif
-            for f in glob("%(workdir)s/%(root)s-*.png" % locals()):
+            # step 2.2: Remove extracted image files now that they're in the .tif
+            for f in glob("%(tmpdir)s/%(root)s-*" % locals()):
                 os.unlink(f)
 
         # Step 3: Combine all the 10-page tifs into a giant tif using tiffcp
-        cmd = "tiffcp -c zip %(workdir)s/%(root)s-tmp*.tif %(workdir)s/%(root)s.tif" % locals()
+        cmd = "tiffcp -c zip %(tmpdir)s/%(root)s_tmp*.tif %(tmpdir)s/%(root)s.tif" % locals()
         self.log.debug("- running " + cmd)
         (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
-
         # Step 3: OCR the giant tif file to create a .hocr.html file
         # Note that -psm 1 (automatic page segmentation with
         # orientation and script detection) requires the installation
         # of tesseract-ocr-3.01.osd.tar.gz
         usehocr = "hocr" if hocr else ""
         suffix = ".hocr" if hocr else ""
-        cmd = "tesseract %(workdir)s/%(root)s.tif %(workdir)s/%(root)s%(suffix)s -l %(lang)s -psm 1 %(usehocr)s" % locals(
+        cmd = "tesseract %(tmpdir)s/%(root)s.tif %(tmpdir)s/%(root)s%(suffix)s -l %(lang)s -psm 1 %(usehocr)s" % locals(
         )
         self.log.debug("running " + cmd)
         (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
@@ -257,15 +264,14 @@ class PDFReader(CompoundElement):
         # suffix, while earlier versions add a automatic .html. Other
         # parts of the code expects the .html suffix, so we check to
         # see if we have new-tesseract behaviour and compensate.
-        if os.path.exists("%(workdir)s/%(root)s%(suffix)s.hocr" % locals()):
-            util.robust_rename("%(workdir)s/%(root)s%(suffix)s.hocr" % locals(),
-                               "%(workdir)s/%(root)s%(suffix)s.html" % locals())
-                               
+        if os.path.exists("%(tmpdir)s/%(root)s%(suffix)s.hocr" % locals()):
+            util.robust_rename("%(tmpdir)s/%(root)s%(suffix)s.hocr" % locals(),
+                               "%(tmpdir)s/%(root)s%(suffix)s.html" % locals())
         
-        # Step 5: Cleanup (the main .tif file can stay)
-        os.unlink(tmppdffile)
-        for f in glob("%(workdir)s/%(root)s-tmp*.tif" % locals()):
-            os.unlink(f)
+        # Step 5: Move our hOCR file to the workdir, then cleanup
+        util.robust_rename("%(tmpdir)s/%(root)s%(suffix)s.html" % locals(),
+                           "%(workdir)s/%(root)s%(suffix)s.html" % locals())
+        shutil.rmtree(tmpdir)        
 
     def _pdftohtml(self, tmppdffile, workdir, images):
         root = os.path.splitext(os.path.basename(tmppdffile))[0]
@@ -579,8 +585,9 @@ class PDFReader(CompoundElement):
                     continue
                 assert element.tag == 'text', "Got <%s>, expected <text>" % element.tag
                 # eliminate "empty" textboxes, including "<text><i> </i></text>\n"
-                if element.text and txt(
-                        element.text).strip() == "" and not element.getchildren():
+                if (((element.text and txt(element.text).strip() == "") or
+                     (element.text is None)) and
+                    not element.getchildren()):
                     # print "Skipping empty box"
                     continue
                 if len(page) > 0:
@@ -991,16 +998,19 @@ class StreamingPDFReader(PDFReader):
         if ocr_lang:
             converter = self._tesseract
             converter_extra = {'lang': ocr_lang}
+            tmpfilename = filename
         else:
             converter = self._pdftohtml
             converter_extra = {'images': images}
+            tmpfilename = os.sep.join([workdir, os.path.basename(filename)])
 
-        tmpfilename = os.sep.join([workdir, os.path.basename(filename)])
         # copying the filename to the workdir is only needed if we use
         # PDFReader._pdftohtml
 
         if not util.outfile_is_newer([filename], convertedfile):
-            util.copy_if_different(filename, tmpfilename)
+            if not ocr_lang:
+                # this is somewhat expensive and not really needed when converter is tesseract
+                util.copy_if_different(filename, tmpfilename)
             # this is the expensive operation
             converter(tmpfilename, workdir, **converter_extra)
 
@@ -1020,7 +1030,6 @@ class StreamingPDFReader(PDFReader):
                 # (in _parse_xml), a workaround will be applied to the
                 # document on the fly.
                 pass
-#            
             if keep_xml == "bz2":
                 with open(convertedfile.replace(".bz2", ""), mode="rb") as rfp:
                     # BZ2File supports the with statement in py27+,

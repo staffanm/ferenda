@@ -66,6 +66,44 @@ class Hunk(object):
             symbol = self.operation_symbol_map[symbol]
         self.operations.append(self.Operation(symbol, text))
 
+    def adjust(self, lines):
+        """Adjust the source_range of Hunk based on it's context lines.
+
+        :param lines: collection of lines for the entire source text
+        :type lines: list
+        :returns: offset compared to existing source_range
+        """
+        done = False
+        offset = 0
+        while self.source_range[0] + offset >= 0 and self.source_range[1] + offset <= len(lines):
+            if self.match(lines, offset):
+                done = True
+                break
+            offset = -offset
+            if self.match(lines, offset):
+                done = True
+                break
+            offset = -offset + 1
+        if not done:
+            raise PatchConflictError('Cannot match context lines')
+        self.source_range = tuple([x + offset for x in self.source_range])
+        return offset
+
+    def match(self, lines, offset):
+        """Check if the context lines at a particular offset matches the source text"""
+        # maybe we should read from front and back until we encounter our first non OP_EQUAL? 
+        for idx, (symbol, text) in enumerate(self.operations):
+            if symbol == self.OP_INSERT:
+                offset -= 1
+            elif symbol == self.OP_DELETE:
+                offset += 0
+            else:  # self.OP_EQUAL, i.e. a context line
+                lineidx = self.source_range[0] - 1 + offset + idx
+                if lineidx < 0 or lineidx >= len(lines) or lines[lineidx] != text:
+                    return False
+        return True
+            
+        
     def merge(self, lines):
         """Merge Hunk into `lines`.
 
@@ -85,7 +123,7 @@ class Hunk(object):
                     raise PatchConflictError('Unexpected end of stream')
 
                 if line != text:
-                    raise PatchConflictError('patch conflict')
+                    raise PatchConflictError('patch conflict: Expected %r, got %r' % (line, text))
                 if symbol == Hunk.OP_EQUAL:
                     yield line
 
@@ -122,6 +160,16 @@ class Patch(object):
 
         for line in lines_enumerator:
             yield line
+
+    def adjust(self, lines):
+        """Adjust the source_range of all hunks, to allow for inexact matching as long as any context lines still fit."""
+        offset = 0
+        offsets = []
+        for hunk in self.hunks:
+            hunk.source_range = tuple([x+offset for x in hunk.source_range])
+            offset = hunk.adjust(lines)
+            offsets.append(offset)
+        return offsets
 
 
 class PatchSet(object):

@@ -583,7 +583,6 @@ class SwedishLegalSource(DocumentRepository):
     def patch_if_needed(self, fp, basefile):
         """Override of DocumentRepository.patch_if_needed with different,
         streamier API."""
-
         if self.config.ignorepatch is True:
             return fp
         # 1. do we have a patch?
@@ -624,8 +623,10 @@ class SwedishLegalSource(DocumentRepository):
         # an attribute with the description
         # lines = [l.decode().rstrip() for l in fp.readlines()]
         lines = [l.rstrip("\n") for l in fp.readlines()]
-        import pudb; pu.db
-        patchedlines = list(ps.patches[0].merge(lines))
+        offsets = ps.patches[0].adjust(lines)
+        if any(offsets):
+            self.log.warning("Patch source ranges had to be adjusted: %s" % offsets)
+        patchedlines = ps.patches[0].merge(lines)
         patchedtext = "\n".join(patchedlines)
         if binarystream:
             fp = BytesIO(patchedtext.encode(self.source_encoding))

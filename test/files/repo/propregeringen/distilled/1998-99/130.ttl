@@ -446,8 +446,8 @@
         <https://lagen.nu/prop/1975:104#sid156>,
         <https://lagen.nu/prop/1998/99:130#S11-1>,
         <https://lagen.nu/prop/1998/99:130#S12-1>,
-        <https://lagen.nu/utr/sou/1973:57#sid102>,
-        <https://lagen.nu/utr/sou/1973:57#sid103> ;
+        <https://lagen.nu/sou/1973:57#sid102>,
+        <https://lagen.nu/sou/1973:57#sid103> ;
     dcterms:title "Förslaget till bokföringslag"@sv ;
     bibo:chapter "25.1"@sv .
 

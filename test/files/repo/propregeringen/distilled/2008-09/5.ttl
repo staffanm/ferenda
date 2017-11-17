@@ -22,8 +22,8 @@
     rpubl:arsutgava "2008/09" ;
     rpubl:departement <https://lagen.nu/org/2008/arbetsmarknadsdepartementet> ;
     rpubl:lopnummer "5" ;
-    rpubl:utgarFran <https://lagen.nu/utr/ds/2008:24>,
-        <https://lagen.nu/utr/sou/2007:43> ;
+    rpubl:utgarFran <https://lagen.nu/ds/2008:24>,
+        <https://lagen.nu/sou/2007:43> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/prop/2008/09:5> ;
     prov:wasDerivedFrom <https://lagen.nu/prop/2008/09:5?attachment=battre-genomforande-av-egs-byggplatsdirektiv-prop.-2008095&repo=propregeringen&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.propositioner.PropRegeringen" .

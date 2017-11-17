@@ -51,7 +51,7 @@
     rpubl:lopnummer "51" ;
     rpubl:utgarFran <https://lagen.nu/dir/2010:35>,
         <https://lagen.nu/dir/2012:3>,
-        <https://lagen.nu/utr/sou/2012:95> ;
+        <https://lagen.nu/sou/2012:95> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/prop/2013/14:51> ;
     prov:wasDerivedFrom <https://lagen.nu/prop/2013/14:51?attachment=forstarkt-skydd-mot-frammande-makts-underrattelseverksamhet-prop.-20131451&repo=propregeringen&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.propositioner.PropRegeringen" .

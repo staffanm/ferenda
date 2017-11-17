@@ -254,7 +254,7 @@
         <https://lagen.nu/prop/2007/08:95#sid488>,
         <https://lagen.nu/prop/2008/08:95#sid391>,
         <https://lagen.nu/prop/2008/08:95#sid398>,
-        <https://lagen.nu/utr/sou/2010:87> .
+        <https://lagen.nu/sou/2010:87> .
 
 <https://lagen.nu/begrepp/Diskriminering> rdfs:label "Diskriminering" .
 

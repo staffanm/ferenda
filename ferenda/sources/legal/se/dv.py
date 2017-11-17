@@ -1428,6 +1428,7 @@ class DV(SwedishLegalSource):
         if self.config.mapfiletype == "nginx":
             path = urlparse(doc.uri).path
         else:
+            idx = len(self.urispace_base) + len(self.urispace_segment) + 2
             path = doc.uri[idx:]
 
         def map_append_needed(mapped_path, filename):

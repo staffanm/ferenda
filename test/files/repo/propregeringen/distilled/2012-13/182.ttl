@@ -20,7 +20,7 @@
         <https://lagen.nu/2009:400>,
         <https://lagen.nu/2010:1932>,
         <https://lagen.nu/prop/2009/10:237#sid96>,
-        <https://lagen.nu/utr/ds/2011:46> ;
+        <https://lagen.nu/ds/2011:46> ;
     dcterms:title "Ärendet och dess beredning"@sv ;
     bibo:chapter "3"@sv .
 
@@ -44,7 +44,7 @@
     rpubl:arsutgava "2012/13" ;
     rpubl:departement <https://lagen.nu/org/2008/justitiedepartementet> ;
     rpubl:lopnummer "182" ;
-    rpubl:utgarFran <https://lagen.nu/utr/ds/2011:46> ;
+    rpubl:utgarFran <https://lagen.nu/ds/2011:46> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/prop/2012/13:182> ;
     prov:wasDerivedFrom <https://lagen.nu/prop/2012/13:182?attachment=internationell-delgivning.-prop.-201213182&repo=propregeringen&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.propositioner.PropRegeringen" .

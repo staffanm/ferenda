@@ -1330,7 +1330,9 @@ with the *config* object as single parameter.
         else:
             desc = "(No patch description available)"
         try:
-            stream = ps.patches[0].merge(text.split("\n"))
+            lines = text.split("\n")
+            ps.patches[0].adjust(lines)
+            stream = ps.patches[0].merge(lines)
             return "\n".join(stream), desc
         except PatchConflictError as e:
             raise errors.PatchError(e)

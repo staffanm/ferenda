@@ -106,7 +106,7 @@
     rpubl:arsutgava "2013/14" ;
     rpubl:departement <https://lagen.nu/org/2008/justitiedepartementet> ;
     rpubl:lopnummer "34" ;
-    rpubl:utgarFran <https://lagen.nu/utr/ds/2013:17> ;
+    rpubl:utgarFran <https://lagen.nu/ds/2013:17> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/prop/2013/14:34> ;
     prov:wasDerivedFrom <https://lagen.nu/prop/2013/14:34?attachment=sanktionsavgift-vid-bristande-kreditprovningar-prop.-20131434&repo=propregeringen&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.propositioner.PropRegeringen" .

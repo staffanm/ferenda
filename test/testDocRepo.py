@@ -1709,6 +1709,24 @@ class Patch(RepoTester):
   </p>
   </body>
 """
+
+    sourcedoc2 = """<body>
+  <h1>Basic document</h1>
+  <p>
+    This is some unchanged text.
+    1: And some more again
+    2: And some more again
+    Extra lines added to make sure offsets are wrong,
+    and that the inexact matching detection can cope.
+    3: And some more again
+    4: And some more again
+    (to make sure we use two separate hunks)
+    This is text that will be changed.
+  </p>
+  </body>
+"""
+
+
     targetdoc = """<body>
   <h1>Patched document</h1>
   <p>
@@ -1738,6 +1756,24 @@ class Patch(RepoTester):
   </p>
   </body>
 """
+
+    # matches sourcedoc2
+    targetdoc3 = """<body>
+  <h1>Patched document</h1>
+  <p>
+    This is some unchanged text.
+    1: And some more again
+    2: And some more again
+    Extra lines added to make sure offsets are wrong,
+    and that the inexact matching detection can cope.
+    3: And some more again
+    4: And some more again
+    (to make sure we use two separate hunks)
+    This is text that has changed.
+  </p>
+  </body>
+"""
+
     
     def setUp(self):
         super(Patch, self).setUp()
@@ -1897,7 +1933,31 @@ It can span several lines."""
         self.assertEqual(self.targetdoc2, result)
         self.repo.source_encoding = "utf-8"
         
-
+    def test_inexact_patch(self):
+        patchpath = self.patchstore.path("123/a", "patches", ".patch")
+        util.ensure_dir(patchpath)
+        with open(patchpath, "w") as fp:
+            fp.write("""--- basic.txt	2013-06-13 09:16:37.000000000 +0200
++++ changed.txt	2013-06-13 09:16:39.000000000 +0200
+@@ -1,5 +1,5 @@ Editorial edit
+ <body>
+-  <h1>Basic document</h1>
++  <h1>Patched document</h1>
+   <p>
+     This is some unchanged text.
+     1: And some more again
+@@ -7,6 +7,6 @@
+     3: And some more again
+     4: And some more again
+     (to make sure we use two separate hunks)
+-    This is text that will be changed.
++    This is text that has changed.
+   </p>
+   </body>
+""")
+        result, desc = self.repo.patch_if_needed("123/a", self.sourcedoc2)
+        self.assertEqual(self.targetdoc3, result)
+        
 
 # Add doctests in the module
 from ferenda import documentrepository
