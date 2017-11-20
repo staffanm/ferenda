@@ -66,6 +66,8 @@ class TestPaths(TestLagen):
         self.assert200(self.baseurl + "dom/nja/2015s180") # basefile HDO/Ö6229-14
 
     def test_specific_sou(self):
+        self.assert200(self.baseurl + "sou/1997:39")
+        # test old-style URI (for a while)
         self.assert200(self.baseurl + "utr/sou/1997:39")
 
     def test_specific_prop(self):
@@ -78,7 +80,7 @@ class TestPaths(TestLagen):
         self.assert200(self.baseurl + "begrepp/Sekundär_sekretessbestämmelse")
 
     def test_facsimile_page(self):
-        res = self.get(self.baseurl + "utr/sou/1997:39/sid557.png")
+        res = self.get(self.baseurl + "sou/1997:39/sid557.png")
         self.assertEqual(200, res.status_code)
         self.assertEqual("image/png", res.headers["Content-Type"])
         # assert trough first 8 bytes (magic number) that this really
@@ -86,6 +88,9 @@ class TestPaths(TestLagen):
         import binascii
         self.assertEqual(b"89504e470d0a1a0a", binascii.hexlify(res.content[:8]))
 
+        # assert that the old-style URI still works (for a time)
+        res = self.get(self.baseurl + "utr/sou/1997:39/sid557.png")
+        self.assertEqual(200, res.status_code)
 
     def test_feed_html(self):
         self.assert200(self.baseurl + "dataset/sitenews/feed")

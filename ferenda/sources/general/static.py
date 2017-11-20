@@ -31,13 +31,13 @@ class StaticStore(DocumentStore):
 
     def downloaded_path(self, basefile, version=None, attachment=None):
         segments = [self.staticdir,
-                    self.basefile_to_pathfrag(basefile) + self.downloaded_suffix]
+                    self.basefile_to_pathfrag(basefile) + self.downloaded_suffixes[0]]
         return "/".join(segments).replace("/", os.sep)
 
     def list_basefiles_for(self, action, basedir=None):
         if action == "parse":
-            for x in util.list_dirs(self.staticdir, self.downloaded_suffix):
-                pathfrag = x[len(self.staticdir) + 1:-len(self.downloaded_suffix)]
+            for x in util.list_dirs(self.staticdir, self.downloaded_suffixes[0]):
+                pathfrag = x[len(self.staticdir) + 1:-len(self.downloaded_suffixes[0])]
                 yield self.pathfrag_to_basefile(pathfrag)
         else:
             for x in super(StaticStore, self).list_basefiles_for(action, basedir):
