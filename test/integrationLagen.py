@@ -397,7 +397,6 @@ class TestSearch(TestLagen):
 
         # go on and test that the facets in the navbar is as they should
 
-
     def test_sfs_title(self):
         soup = BeautifulSoup(self.get(self.baseurl + "search/?q=personuppgiftslag").text,
                              "lxml")
@@ -434,13 +433,22 @@ class TestSearch(TestLagen):
         hits = soup.find_all("section", "hit")
         self.assertTrue(hits)
         for hit in hits:
-            self.assertTrue(hit.b.a.get("href").startswith(("/prop/", "/dir/", "/utr/sou/")),
+            self.assertTrue(hit.b.a.get("href").startswith(("/prop/", "/dir/", "/sou/")),
                             "%s isn't prop/dir/sou" % hit.b.a.get("href"))
         
+    def test_innerhits(self):
+        soup = BeautifulSoup(self.get(self.baseurl + "search/?q=personuppgiftsbiträde&type=sou&issued=2017").text, "lxml") # should match SOU 2017:66
+        firsthit = soup.find_all("section", "hit")[0]
+        # assert that the hit has no content apart FROM innerhits
+        maintext = "".join([x.get_text().strip() for x in firsthit.find_all("p", class_=False)])
+        self.assertEqual("", maintext)
+        innerhits = soup.find_all("p", "innerhit")
+        self.assertTrue(len(innerhits))
+        for innerhit in innerhits:
+            link = innerhit.a.get("href")
+            self.assertIn("#S",link, "link %s doesn't look section-y" % link)
+            self.assertNotIn("(beteckning saknas)", innerhit.a.text)
         
-
-
-
 
 class TestAutocomplete(TestLagen):
     def test_basic_sfs(self):

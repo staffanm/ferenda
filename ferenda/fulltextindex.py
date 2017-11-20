@@ -598,7 +598,7 @@ class WhooshIndex(FulltextIndex):
 
 
 class RemoteIndex(FulltextIndex):
-
+    defaultheaders = {}
     # The only real implementation of RemoteIndex has its own exists
     # implementation, no need for a general fallback impl.
     # def exists(self):
@@ -607,7 +607,7 @@ class RemoteIndex(FulltextIndex):
     def create(self, repos):
         relurl, payload = self._create_schema_payload(repos)
         # print("\ncreate: PUT %s\n%s\n" % (self.location + relurl, payload))
-        res = requests.put(self.location + relurl, payload)
+        res = requests.put(self.location + relurl, payload, headers=self.defaultheaders)
         try:
             res.raise_for_status()
         except Exception as e:
@@ -626,7 +626,7 @@ class RemoteIndex(FulltextIndex):
         relurl, payload = self._update_payload(
             uri, repo, basefile, text, **kwargs)
         # print("update: PUT %s\n%s\n" % (self.location + relurl, payload[:80]))
-        res = requests.put(self.location + relurl, payload)
+        res = requests.put(self.location + relurl, payload, headers=self.defaultheaders)
         try:
             res.raise_for_status()
         except requests.exceptions.HTTPError as e:
@@ -635,7 +635,7 @@ class RemoteIndex(FulltextIndex):
     def doccount(self):
         relurl, payload = self._count_payload()
         if payload:
-            res = requsts.post(self.location + relurl, payload)
+            res = requsts.post(self.location + relurl, payload, headers=self.defaultheaders)
         else:
             res = requests.get(self.location + relurl)
         return self._decode_count_result(res)
@@ -644,7 +644,7 @@ class RemoteIndex(FulltextIndex):
         relurl, payload = self._query_payload(q, pagenum, pagelen, ac_query, exclude_types, boost_types, **kwargs)
         if payload:
             # print("query: POST %s:\n%s" % (self.location + relurl, payload))
-            res = requests.post(self.location + relurl, payload)
+            res = requests.post(self.location + relurl, payload, headers=self.defaultheaders)
             # print("Recieved:\n%s" % (json.dumps(res.json(),indent=4)))
         else:
             res = requests.get(self.location + relurl)
@@ -671,6 +671,9 @@ class RemoteIndex(FulltextIndex):
 
     
 class ElasticSearchIndex(RemoteIndex):
+    defaultheaders = {"Content-Type": "application/json"}
+
+
     # maps our field classes to concrete ES field properties
     fieldmapping = ((Identifier(),
                      {"type": "text", "store": True, "analyzer": "lowercase_keyword"}),  # uri -- using type=text with analyzer=keyword (instead of type=keyword) enables us to use regex queries on this field, which is nice for autocomplete
@@ -719,7 +722,7 @@ class ElasticSearchIndex(RemoteIndex):
         if not self._writer:
             return  # no pending changes to commit
         self._writer.seek(0)
-        res = requests.put(self.location + "/_bulk", data=self._writer)
+        res = requests.put(self.location + "/_bulk", data=self._writer, headers=self.defaultheaders)
         self._writer.close()
         self._writer = None
         try:
@@ -874,20 +877,27 @@ class ElasticSearchIndex(RemoteIndex):
                     submatches.append(
                         {"has_child": {"type": t + "_child",
                                        "inner_hits": inner_hits,
-                                       "query": {"simple_query_string": deepcopy(match)}
-                        }})
-                if boost_types:
-                    boost_functions = []
-                    for _type, boost in boost_types:
-                        boost_functions.append({"filter": {"term": {"_type": _type}},
-                                                "weight": boost})
-                    
+                                       "query": {
+                                           "bool": {
+                                               "must": {"simple_query_string": deepcopy(match)},
+                                               # some documents are put into the index
+                                               # purely to support ac_query
+                                               # (autocomplete). We don't need them in
+                                               # our main search results.
+                                               "must_not": {"term": {"role": "autocomplete"}}
+                                               }}}})
                 match = {"bool": {"should": submatches}}
             else:
                 # ac_query -- need to work in inner_hits somehow
                 pass
         else:
             match = {"bool": {}}
+
+        if boost_types:
+            boost_functions = []
+            for _type, boost in boost_types:
+                boost_functions.append({"filter": {"term": {"_type": _type}},
+                                        "weight": boost})
 
         if filterterms or filterregexps or filterranges:
             filters = []
@@ -896,9 +906,9 @@ class ElasticSearchIndex(RemoteIndex):
                              ("range", filterranges)):
                 filters.extend([{key: {k: v}} for (k, v) in val.items()])
             if len(filters) > 1:
-                match["bool"]["filter"] = {"bool": {"must": filters}}
+                match["bool"]["must"] = {"bool": {"must": filters}}
             else:
-                match["bool"]["filter"] = filters[0]
+                match["bool"]["must"] = filters[0]
             if exclude_types:
                 match["bool"]["must_not"] = []
                 for exclude_type in exclude_types:

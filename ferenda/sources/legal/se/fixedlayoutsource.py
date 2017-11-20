@@ -175,7 +175,11 @@ class FixedLayoutSource(SwedishLegalSource):
         res = super(FixedLayoutSource, self)._relate_fulltext_resources(body)
         # also: add every page (the pagebreak element)
         for r in body.findall(".//*[@class='sidbrytning']"):
-            res.append(r)
+            # each entry in the resource list may be a (resource,
+            # extrametadata) tuple. The extrametadata is assumed to be
+            # appended to by the caller as dictated by facets, then
+            # passed as kwargs to FulltextIndex.update.
+            res.append((r, {"role": "autocomplete"}))
         return res
 
     def _relate_fulltext_value_label(self, resourceuri, rooturi, desc):

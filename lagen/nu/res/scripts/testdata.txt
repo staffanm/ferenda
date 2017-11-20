@@ -24,6 +24,7 @@ sfs 1949:105 # TF because why not
 sfs 1991:1469 # YGL because same
 sou 1997:39 # regeringen, multipart
 sou 2004:6
+sou 2017:66
 jo 4171-2011
 jk 2081-03-42
 dir 2016:15

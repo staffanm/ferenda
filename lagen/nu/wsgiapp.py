@@ -188,7 +188,7 @@ class WSGIApp(OrigWSGIApp):
         ac_query = environ['QUERY_STRING'].endswith("_ac=true")
         if ac_query:
             environ['exclude_types'] = ('mediawiki', 'mediawiki_child')
-        # environ['boost_types'] = [('sfs', 10)]
+        environ['boost_types'] = [('sfs', 10)]
         res = super(WSGIApp, self).query(environ)
         if ac_query:
             return res['items']

@@ -626,9 +626,7 @@ class DV(SwedishLegalSource):
         return None
 
     def parse_open(self, basefile, attachment=None):
-        
         intermediate_path = self.store.intermediate_path(basefile)
-
         if not os.path.exists(intermediate_path):
             fp = self.downloaded_to_intermediate(basefile)
         else:

@@ -2044,6 +2044,13 @@ parsed document path to that documents dependency file."""
             body = tree.find(".//{http://www.w3.org/1999/xhtml}body")
             resources = self._relate_fulltext_resources(body)
             for resource in resources:
+                if isinstance(resource, tuple):
+                    # new-style API -- each resource may be
+                    # accompanied with a default metadata dict
+                    resource, kwargs = resource
+                else:
+                    # old-style API
+                    kwargs = {}
                 if resource.tag == "{http://www.w3.org/1999/xhtml}head":
                     continue
                 about = resource.get('about')
@@ -2062,7 +2069,6 @@ parsed document path to that documents dependency file."""
                     repo = repo.decode()     # pragma: no cover
                 plaintext = util.normalize_space(self._extract_plaintext(resource, resources))
                 # print("%s -> %s" % (resource.get("about"), plaintext))
-                kwargs = {}
                 for facet in self.facets():
                     k, v = self._relate_fulltext_value(facet, resource, desc)
                     if v is not None:
@@ -2136,10 +2142,14 @@ parsed document path to that documents dependency file."""
     def _extract_plaintext(self, node, resources):
         # helper to extract any text from a elementtree node,
         # excluding subnodes that are resources themselves (as
-        # determined by _relate_fulltext_resources)
+        # determined by _relate_fulltext_resources).  (Also, exclude
+        # verbatim nodes -- these are almost by definition not part of
+        # the enclosing resource, but rather something that we haven't
+        # been able to model as a proper sub-resource (eg. verbatim
+        # appendicies)
         plaintext = node.text if node.text else ""
         for subnode in node:
-            if subnode not in resources:
+            if subnode not in resources and subnode.get("class") != "verbatim":
                 plaintext += self._extract_plaintext(subnode, resources)
         if node.tail:
             plaintext += node.tail

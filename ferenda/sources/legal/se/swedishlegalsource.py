@@ -28,6 +28,7 @@ from rdflib.resource import Resource
 from rdflib.namespace import DCTERMS, SKOS, FOAF, RDFS
 BIBO = Namespace("http://purl.org/ontology/bibo/")
 OLO = Namespace("http://purl.org/ontology/olo/core#")
+XHV = Namespace("http://www.w3.org/1999/xhtml/vocab#")
 from six import text_type as str
 import six
 import bs4
@@ -600,7 +601,7 @@ class SwedishLegalSource(DocumentRepository):
         self.log.warning("%s: Applying patch %s" % (basefile, patchpath))
         from ferenda.thirdparty.patchit import PatchSet, PatchSyntaxError, PatchConflictError
         binarystream = False
-        if isinstance(fp, BufferedIOBase): # binary stream, won't play nice with patchit
+        if "b" in fp.mode: # binary stream, won't play nice with patchit
             fp = codecs.getreader(self.source_encoding)(fp)
             binarystream = True
         with codecs.open(patchpath, 'r', encoding=self.source_encoding) as pfp:
@@ -1134,7 +1135,17 @@ class SwedishLegalSource(DocumentRepository):
                             toplevel_only=False,
                             dimension_label="issued",
                             dimension_type="year",
-                            multiple_values=False)]
+                            multiple_values=False),
+                      Facet(XHV.role,
+                            use_for_toc=False,
+                            use_for_feed=False,
+                            toplevel_only=False,
+                            dimension_label="role",
+                            dimension_type="value",
+                            multiple_values=False,
+                            indexingtype=fulltextindex.Label()
+                            )]
+
 
 
     _relate_fulltext_value_cache = {}
@@ -1187,7 +1198,6 @@ class SwedishLegalSource(DocumentRepository):
         else:
             return super(SwedishLegalSource, self)._relate_fulltext_value(facet, resource, desc)
 
-
     def _relate_fulltext_value_label(self, resourceuri, rooturi, desc):
         if desc.getvalues(DCTERMS.title):
             if desc.getvalues(BIBO.chapter):
@@ -1220,6 +1230,7 @@ class SwedishLegalSource(DocumentRepository):
         #     # reason. Uniquify this rdfs:label by using the
         #     # URI fragment
         #     v = "%s, %s" % (v, resourceuri.split("#", 1)[1])
+        return v
 
     def facets(self):
         return super(SwedishLegalSource, self).facets() + self.standardfacets
