@@ -4,6 +4,7 @@ from __future__ import (absolute_import, division,
 from builtins import *
 
 import os
+import sys
 import shutil
 import tempfile
 import time
@@ -364,11 +365,13 @@ class GzipCompression(Compression):
     expected_suffix = ".gz"
     expected_mimetype = ("application/x-gzip", "application/gzip")
 
+# @unittest.skipIf(sys.version_info < (3, 0, 0), "BZ2File can't wrap existing file objects in py2")
 class Bzip2Compression(Compression):
     compression = "bz2"
     expected_suffix = ".bz2"
     expected_mimetype = ("application/x-bzip2",)
 
+@unittest.skipIf(sys.version_info < (3, 0, 0), "LZMAFile not available in py2")
 class XzCompression(Compression):
     compression = "xz"
     expected_suffix = ".xz"

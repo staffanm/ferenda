@@ -7,12 +7,17 @@ from contextlib import contextmanager
 from tempfile import NamedTemporaryFile
 import filecmp
 import os
+import sys
 import codecs
 import shutil
 import unicodedata
 from urllib.parse import quote, unquote
 from gzip import GzipFile
-from bz2 import BZ2File
+try:
+    # the special py2 backported version of BZ2File, that can wrap existing fileobjects
+    from bz2file import BZ2File
+except ImportError:
+    from bz2 import BZ2File
 try:
     from lzma import LZMAFile
 except ImportError:
@@ -58,10 +63,16 @@ class _open(object):
             if suffix == ".gz":
                 fp = GzipFile(fileobj=fp, mode=mode)
             elif suffix == ".bz2":
-                fp = BZ2File(fp, mode=mode)
+                try:
+                    fp = BZ2File(fp, mode=mode)
+                except TypeError:
+                    if sys.version_info < (3, 0, 0):
+                        raise NotImplementedError("built-in BZ2File is partially broken in python 2, install bz2file from pypi or use a compression setting other than 'bz2'")
+                    else:
+                        raise
             elif suffix == ".xz":
                 fp = LZMAFile(fp, mode=mode)
-            if suffix and "b" not in mode:
+            if (suffix or sys.version_info < (3,)) and "b" not in mode:
                 # If mode is not binary (and we expect to be able to
                 # write() str values, not bytes), need need to create
                 # an additional encoding wrapper. That encoder can
@@ -72,7 +83,7 @@ class _open(object):
                                             codecs.getwriter("utf-8"))
                 elif "w" in mode:
                     fp = codecs.getwriter("utf-8")(fp)
-                else:
+                elif suffix:
                     fp = codecs.getreader("utf-8")(fp)
             fp.realname = filename
             return fp

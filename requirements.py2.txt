@@ -31,3 +31,4 @@ layeredconfig
 responses<0.6.0 # newer versions don't support 2.6
 importlib
 langdetect
+bz2file   # backport
