@@ -1002,6 +1002,7 @@ class RunMultiproc(RunBase, unittest.TestCase):
             manager.run(argv)
 
 
+@unittest.skipIf(sys.version_info < (2, 7), "Distributed mode not supported under Python 2.6")
 class RunDistributed(RunBase, unittest.TestCase):
     def setUp(self):
         self.startcwd = os.getcwd()
