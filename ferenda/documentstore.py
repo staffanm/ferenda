@@ -5,7 +5,9 @@ from builtins import *
 
 from contextlib import contextmanager
 from tempfile import NamedTemporaryFile
+import json
 import filecmp
+import operator
 import os
 import sys
 import codecs
@@ -311,7 +313,7 @@ class DocumentStore(object):
         return _open(filename, mode, compression)
 
 
-    def list_basefiles_for(self, action, basedir=None):
+    def list_basefiles_for(self, action, basedir=None, force=True):
         """Get all available basefiles that can be used for the
         specified action.
 
@@ -363,12 +365,41 @@ class DocumentStore(object):
         if not os.path.exists(directory):
             return
 
-        # FIXME: Some stores need a more sophisticated way of filtering than this.
+        # if we have information about how long each basefile took the
+        # last time, use that to yield the most demanding basefiles
+        # first. This improves throughput when processing files in
+        # paralel
+        durations_path = self.path(".durations", "entries", ".json", storage_policy="file")
+        if os.path.exists(durations_path):
+            with open(durations_path) as fp:
+                durations = json.load(fp)[action]
+        else:
+            durations = {}
+        yielded_paths = set()
+        for basefile, duration in sorted(durations.items(), key=operator.itemgetter(1), reverse=True):
+            if duration == -1 and not force:
+                # maybe skip files that will raise DocumentRemovedError ?
+                pass
+            else:
+                # make sure the underlying file really still exists
+                path = None
+                if action == "parse":
+                    path = self.downloaded_path(basefile)
+                elif action == "relate":
+                    path = self.distilled_path(basefile)
+                elif action == "generate":
+                    path = self.parsed_path(basefile)
+                if os.path.exists(path):
+                    yielded_paths.add(path)
+                    yield basefile 
+        
         for x in util.list_dirs(directory, suffixes, reverse=True):
             # ignore empty files placed by download (which may
             # have done that in order to avoid trying to
             # re-download nonexistent resources)
-            if os.path.exists(x) and os.path.getsize(x) > 0 and not x.endswith(".root.json"):
+            if x in yielded_paths:
+                continue
+            if os.path.exists(x) and os.path.getsize(x) > 0 and not x.endswith((".root.json", ".durations.json")):
                 # get a pathfrag from full path
                 # suffixlen = len(suffix) if self.storage_policy == "file" else len(suffix) + 1
                 suffixlen = 0

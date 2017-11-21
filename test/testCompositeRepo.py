@@ -171,5 +171,6 @@ class TestExtrabase(RepoTester):
         self.assertEqual("Hello world from mixin", got)
 
     def test_super(self):
+        from pudb import set_trace; set_trace()
         got = self.repo.qualified_class_name()
         self.assertEqual("Q:testCompositeRepo.SubrepoBSubclass", got)

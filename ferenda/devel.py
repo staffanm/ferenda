@@ -6,7 +6,7 @@ import builtins
 
 from ast import literal_eval
 from bz2 import BZ2File
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from difflib import unified_diff
 from itertools import islice
 from io import BytesIO, StringIO
@@ -14,6 +14,7 @@ from tempfile import mkstemp
 from operator import attrgetter
 import codecs
 import inspect
+import json
 import logging
 import os
 import random
@@ -955,6 +956,7 @@ class Devel(object):
                 continue
             repo_el = etree.SubElement(root, "repo", {"alias": repo.alias})
             successcnt = warncnt = failcnt = removecnt = errcnt = 0
+            durations = defaultdict(dict)
             for basefile in basefiles:
                 # sys.stdout.write(".")
                 # print("%s/%s" % (repo.alias, basefile))
@@ -979,6 +981,7 @@ class Devel(object):
                     continue
                 if "parse" in entry.status and "success" in entry.status["parse"] and entry.status["parse"]["success"] == "removed":
                     log.debug("%s/%s: document was removed in parse" % (repo.alias, basefile))
+                    durations["parse"][basefile] = -1
                     continue
                 doc_el = etree.SubElement(repo_el, "basefile",
                                           {"id": basefile})
@@ -994,9 +997,16 @@ class Devel(object):
                         # this special truthy value indicates that
                         # everything went as OK as it could, but the
                         # actual document doesn't exist (anymore) so we
-                        # don't feature it in our overview
+                        # don't feature it in our overview.
+                        #
+                        # FIXME: Can this ever be reached, seemingly
+                        # as we check for entry.status.parse.success
+                        # == "removed" above, and no other action
+                        # could produce a removed status?
+                        durations[action][basefile] = -1
                         removecnt += 1
                         continue
+                    durations[action][basefile] = status["duration"]
                     action_el = etree.SubElement(doc_el, "action",
                                                  {"id": action,
                                                   "success": str(status["success"]),
@@ -1015,6 +1025,8 @@ class Devel(object):
                             opt_el = etree.SubElement(action_el, optional)
                             opt_el.text = status[optional]
             log.info("%s: %s processed, %s ok (%s w/ warnings), %s failed, %s removed. %s corrupted entries." % (repo.alias, len(basefiles), successcnt, warncnt, failcnt, removecnt, errcnt))
+            with open(repo.store.path(".durations", "entries", ".json", storage_policy="file"), "w") as fp:
+                json.dump(durations, fp, indent=4)
         conffile = os.path.abspath(
             os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
         resourceloader = [x.resourceloader for x in repos if hasattr(x, 'resourceloader')][0]
