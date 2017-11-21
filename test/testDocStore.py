@@ -365,7 +365,6 @@ class GzipCompression(Compression):
     expected_suffix = ".gz"
     expected_mimetype = ("application/x-gzip", "application/gzip")
 
-# @unittest.skipIf(sys.version_info < (3, 0, 0), "BZ2File can't wrap existing file objects in py2")
 class Bzip2Compression(Compression):
     compression = "bz2"
     expected_suffix = ".bz2"
