@@ -29,6 +29,7 @@ class Ds(CompositeRepository, FixedLayoutSource):
     alias = "ds"
     subrepos = DsRegeringen, DsRegeringenLegacy
     urispace_segment = "ds"
+    urispace_segment_legacy = "utr/ds"
     documentstore_class = DsStore
     xslt_template = "xsl/forarbete.xsl"
     sparql_annotations = "sparql/describe-with-subdocs.rq"

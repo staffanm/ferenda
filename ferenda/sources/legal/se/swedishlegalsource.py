@@ -83,13 +83,19 @@ class SupportsResult(int):
 
 class SwedishLegalHandler(RequestHandler):
     def supports(self, environ):
-        if environ['PATH_INFO'].startswith("/dataset/"):
+        pathinfo = environ['PATH_INFO']
+        if pathinfo.startswith("/dataset/"):
             return super(SwedishLegalHandler, self).supports(environ)
-        
-        res = environ['PATH_INFO'].startswith("/" + self.repo.urispace_segment + "/")
+        res = pathinfo.startswith("/" + self.repo.urispace_segment + "/")
         if not res:
-            res =  SupportsResult(reason="'%s' didn't start with '/%s/'" % (environ['PATH_INFO'], 
-                                                                           self.repo.urispace_segment))
+            if (hasattr(self.repo, 'urispace_segment_legacy') and
+                pathinfo.startswith("/" + self.repo.urispace_segment_legacy + "/")):
+                environ['PATH_INFO'] = pathinfo.replace(self.repo.urispace_segment_legacy,
+                                                        self.repo.urispace_segment)
+                return True
+            else:
+                res =  SupportsResult(reason="'%s' didn't start with '/%s/'" %
+                                      (pathinfo, self.repo.urispace_segment))
         return res
         
     def prep_request(self, environ, path, data, contenttype):

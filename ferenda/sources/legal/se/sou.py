@@ -355,6 +355,7 @@ class SOU(CompositeRepository, FixedLayoutSource):
     rdf_type = RPUBL.Utredningsbetankande
     subrepos = (SOURegeringen, SOUKB)
     urispace_segment = "sou"
+    urispace_segment_legacy = "utr/sou"
     documentstore_class = SOUStore
     xslt_template = "xsl/forarbete.xsl"
     sparql_annotations = "sparql/describe-with-subdocs.rq"
