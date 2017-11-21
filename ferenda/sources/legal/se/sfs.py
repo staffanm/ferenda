@@ -643,17 +643,20 @@ class SFS(Trips):
         g = self.make_graph()  # used for qname lookup only
         for rowdict in changes:
             docuri = self.canonical_uri(rowdict['SFS-nummer'])
-            parts = rowdict['SFS-nummer'].split(":")
+            arsutgava, lopnummer = rowdict['SFS-nummer'].split(":", 1)
+            # sanitize: "51 s. 7" => "51_s.7" (to match how normal basefiles are constructed)
+            lopnummer = lopnummer.replace("s. ", "s.").replace("bih. ", "bih.").replace(" ", "_")
             d[docuri] = {
                 "dcterms:publisher": "Regeringskansliet",
-                "rpubl:arsutgava": parts[0],
+                "rpubl:arsutgava": arsutgava,
                 "rpubl:beslutadAv": "Regeringskansliet",
                 "rpubl:forfattningssamling": "SFS",
-                "rpubl:lopnummer": parts[1]
+                "rpubl:lopnummer": lopnummer
             }
             for key, val in list(rowdict.items()):
                 if key == 'SFS-nummer':
                     (arsutgava, lopnummer) = val.split(":")
+                    lopnummer = lopnummer.replace("s. ", "s.").replace("bih. ", "bih.").replace(" ", "_")
                     d[docuri]["dcterms:identifier"] = "SFS " + val
                     d[docuri]["rpubl:arsutgava"] = arsutgava
                     d[docuri]["rpubl:lopnummer"] = lopnummer
