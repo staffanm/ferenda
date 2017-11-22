@@ -8,6 +8,7 @@ dv HFD/4453-10
 dv HFD/4970-14
 dv HDO/Ö3938-14
 dv HFD/2015_not_1
+dv REG/6970-09 # complicated OOXML structure that needs to be simplified
 mediawiki Missbruksmodellen
 mediawiki Personuppgift
 mediawiki Sekundär_sekretessbestämmelse
@@ -22,6 +23,7 @@ sfs 1998:1191 # PUF
 sfs 1998:204
 sfs 1949:105 # TF because why not
 sfs 1991:1469 # YGL because same
+sfs 1909:53_s.7 # atypical basefile
 sou 1997:39 # regeringen, multipart
 sou 2004:6
 sou 2017:66

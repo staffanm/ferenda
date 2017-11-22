@@ -18,10 +18,11 @@ from rdflib import RDF, Graph
 from rdflib.namespace import DCTERMS, SKOS
 
 from . import RPUBL, RINFOEX, SwedishLegalSource, FixedLayoutSource
-from .swedishlegalsource import SwedishCitationParser
+from .swedishlegalsource import SwedishCitationParser, SwedishLegalStore
 from ferenda import TextReader, Describer, Facet, PDFReader, DocumentEntry
 from ferenda import util, decorators, errors, fulltextindex
 from ferenda.elements import Body, Page, Preformatted, Link
+from ferenda.elements.html import elements_from_soup
 from ferenda.sources.legal.se.legalref import LegalRef
 
 PROV = Namespace(util.ns['prov'])
@@ -310,8 +311,8 @@ class MyndFskrBase(FixedLayoutSource):
             os.rename(old_dir, new_dir)
         
         doc.body = self.parse_body(fp, doc.basefile)
-
-        doc.body.tagname = "body"
+        if getattr(doc.body, 'tagname', None) != "body":
+            doc.body.tagname = "body"
         doc.body.uri = doc.uri
         self.postprocess_doc(doc)
         self.parse_entry_update(doc)
@@ -744,6 +745,10 @@ class MyndFskrBase(FixedLayoutSource):
     # do that? SHould this function do things depending on config.pdfimages?
     def create_external_resources(self, doc):
         resources = []
+        if isinstance(doc.body, Body):
+            # document wasn't derived from a PDF file, probably from HTML instead
+            return resources
+        
         cssfile = self.store.parsed_path(doc.basefile, attachment="index.css")
         urltransform = self.get_url_transform_func([self], os.path.dirname(cssfile),
                                                    develurl=self.config.develurl)
@@ -886,6 +891,10 @@ class DIFS(MyndFskrBase):
     # def sanitize_text(self, text, basefile):
 
 
+class DVFSStore(SwedishLegalStore):
+    # DVFS are available as HTML, not PDF (which FixedLayoutSource assumes)
+    pass
+    
 class DVFS(MyndFskrBase):
     alias = "dvfs"
     start_url = "http://www.domstol.se/Ladda-ner--bestall/Verksamhetsstyrning/DVFS/DVFS1/"
@@ -896,6 +905,7 @@ class DVFS(MyndFskrBase):
     basefile_regex = "^\s*(?P<basefile>\d{4}:\d+)"
     download_rewrite_url = True
     download_formid = "aspnetForm"
+    documentstore_class = DVFSStore
 
     def remote_url(self, basefile):
         if "/" in basefile:
@@ -932,20 +942,30 @@ class DVFS(MyndFskrBase):
         resp = self.session.send(req, allow_redirects=True)
         return resp
 
-    def textreader_from_basefile(self, basefile):
-        infile = self.store.downloaded_path(basefile)
-        soup = BeautifulSoup(util.readfile(infile), "lxml")
+    def maintext_from_soup(self, soup):
         main = soup.find("div", id="readme")
         if main:
             main.find("div", "rs_skip").decompose()
-            maintext = main.get_text("\n\n", strip=True)
-            outfile = self.store.path(basefile, 'intermediate', '.txt')
-            util.writefile(outfile, maintext)
-            return TextReader(string=maintext)
+            return main
         elif soup.find("title").text == "Sveriges Domstolar - 404":
             e = errors.DocumentRemovedError()
             e.dummyfile = self.store.parsed_path(basefile)
             raise e
+
+    def textreader_from_basefile(self, basefile):
+        infile = self.store.downloaded_path(basefile)
+        soup = BeautifulSoup(util.readfile(infile), "lxml")
+        main = self.maintext_from_soup(soup)
+        maintext = main.get_text("\n\n", strip=True)
+        return TextReader(string=maintext)
+
+    def parse_open(self, basefile):
+        return self.store.open_downloaded(basefile)
+
+    def parse_body(self, fp, basefile):
+        main = self.maintext_from_soup(BeautifulSoup(fp, "lxml"))
+        return Body([elements_from_soup(main)],
+                    uri=None)
 
     def fwdtests(self):
         t = super(DVFS, self).fwdtests()
