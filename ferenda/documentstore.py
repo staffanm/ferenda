@@ -370,11 +370,12 @@ class DocumentStore(object):
         # first. This improves throughput when processing files in
         # paralel
         durations_path = self.path(".durations", "entries", ".json", storage_policy="file")
+        durations = {}
         if os.path.exists(durations_path):
             with open(durations_path) as fp:
-                durations = json.load(fp)[action]
-        else:
-            durations = {}
+                d = json.load(fp)
+                if action in d:
+                    durations = d[action]
         yielded_paths = set()
         for basefile, duration in sorted(durations.items(), key=operator.itemgetter(1), reverse=True):
             if duration == -1 and not force:

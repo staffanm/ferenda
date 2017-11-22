@@ -926,12 +926,13 @@ class DV(SwedishLegalSource):
                             line.append(Em([t]))
                 # ooxml
                 elif filetype == "docx" and part.find("w:rpr") and part.find("w:rpr").find(["w:b", "w:i"]):
-                    if part.rpr.b:
+                    rpr = part.find("w:rpr")
+                    if rpr.find("w:b"):
                         if line and isinstance(line[-1], Strong):
                             line[-1][-1] += t
                         else:
                             line.append(Strong([t]))
-                    elif part.rpr.i:
+                    elif rpr.find("w:i"):
                         if line and isinstance(line[-1], Em):
                             line[-1][-1] += t
                         else:
