@@ -100,7 +100,7 @@ class DocumentEntry(object):
     #           'etag': '234242323424'}]
 
     def __init__(self, path=None):
-        if path and os.path.exists(path):
+        if path and os.path.exists(path) and os.path.getsize(path) > 0:
             with open(path) as fp:
                 hook = util.make_json_date_object_hook('orig_created',
                                                        'orig_updated',
@@ -121,6 +121,8 @@ class DocumentEntry(object):
             self.__dict__.update(d)
             self._path = path
         else:
+            if os.path.exists(path):
+                logging.getLogger("documententry").warning("%s exists but is empty" % path)
             self.id = None
             self.basefile = None
             self.orig_updated = None

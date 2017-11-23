@@ -1,11 +1,13 @@
---- qngn/qi/vagrezrqvngr/ZB̈Q/Z2557-10.kzy.om2
-+++ /ine/sbyqref/le/kdkjilaf6eq00x0d438xtze40000tc/G/gzcm8065b59
-@@ -116,7 +116,7 @@ Xbeevtrenq qnghzsbeznggrevat
-         <j:gp>
-           <j:c>
-             <j:e>
--              <j:g>2011 03-23</j:g>
-+              <j:g>2011-03-23</j:g>
-             </j:e>
-           </j:c>
-         </j:gp>
+--- data/dv/intermediate/MÖD/M2557-10.xml.bz2
++++ /var/folders/yr/xqxwvyns6rd00k0q438kgmr40000gp/T/tmpz8065o59
+@@ -116,7 +116,7 @@ Korrigerad datumformattering
+     <w:tc>
+       <w:p>
+         <w:r>
+           <w:t>
+-            2011 03-23
++            2011-03-23
+           </w:t>
+         </w:r>
+       </w:p>
+     </w:tc>

@@ -40,7 +40,7 @@ except ImportError:
 
 # my libs
 from ferenda import (Document, DocumentStore, Describer, WordReader, FSMParser, Facet)
-from ferenda.decorators import newstate
+from ferenda.decorators import newstate, action
 from ferenda import util, errors, fulltextindex
 from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda.elements import (Body, Paragraph, CompoundElement, OrdinalElement,
@@ -381,6 +381,7 @@ class DV(SwedishLegalSource):
             self.log.info("%s: Processing..." % zipfilename)
             self.process_zipfile(zipfilename)
 
+    @action
     def process_zipfile(self, zipfilename):
         """Extract a named zipfile into appropriate documents"""
         removed = replaced = created = untouched = 0
@@ -807,7 +808,7 @@ class DV(SwedishLegalSource):
             header = iterator.pop(0), iterator[0]  # need to re-read the second line later
             curryear = m['year']
             currmonth = self.swedish_months[header[0].get_text().strip().lower()]
-            secondline = header[-1].get_text().strip()
+            secondline = util.normalize_space(header[-1].get_text())
             m = re_notisstart.match(secondline)
             if m:
                 head["Rubrik"] = secondline[m.end():].strip()
@@ -878,7 +879,7 @@ class DV(SwedishLegalSource):
         else:
             raise errors.ParseError("Unsupported: %s" % coll)
         for node in header:
-            t = node.get_text()
+            t = util.normalize_space(node.get_text())
             # if not malnr, avgdatum found, look for those
             for fld, key, rex in (('Målnummer', 'malnr', re_malnr),
                                   ('Avgörandedatum', 'avgdatum', re_avgdatum),
