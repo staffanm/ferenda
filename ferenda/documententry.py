@@ -10,6 +10,7 @@ from traceback import format_tb
 import datetime
 import hashlib
 import json
+from json.decoder import JSONDecodeError
 import logging
 import os
 import sys
@@ -114,7 +115,16 @@ class DocumentEntry(object):
                                                        'status.parse.date',
                                                        'status.relate.date',
                                                        'status.generate.date')
-                d = json.load(fp, object_hook=hook)
+                try:
+                    d = json.load(fp, object_hook=hook)
+                except JSONDecodeError as e:
+                    if e.msg == "Extra data":
+                        logging.getLogger("documententry").warning("%s exists but has extra data from pos %s" % (path, e.pos))
+                        fp.seek(0)
+                        jsondata = fp.read(e.pos)
+                        d = json.loads(jsondata, object_hook=hook)
+                    else:
+                        raise e
             if 'summary_type' in d and d['summary_type'] == "html":
                 d['summary'] = Literal(d['summary'], datatype=RDF.XMLLiteral)
                 del d['summary_type']
