@@ -327,8 +327,10 @@ class Regeringen(Offtryck):
         # 0). So we just grab text and use parse_swedish_date later
         # on.
         utgiven = content.find("span", "published").time.text
+        
+        # find ansvarig departement
         try:
-            ansvarig = content.find("p", "media--publikations__sender").a.text
+            ansvarig = content.find("p", "media--publikations__sender").find("a", text=re.compile("departement", re.I)).text
         except AttributeError:
             if self.rdf_type != RPUBL.Kommittedirektiv:  # postprocess_doc has us covered
                 self.log.warning("%s: No ansvarig departement found" % basefile)
