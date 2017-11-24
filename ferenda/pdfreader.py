@@ -507,7 +507,8 @@ class PDFReader(CompoundElement):
             # complicated) to change these to xml numeric character
             # references
             newfp = BytesIO()
-            bytebuffer = bytes(xmlfp.read())
+            buffer = xmlfp.read()
+            bytebuffer = bytes(buffer.encode("utf-8"))
             for b in bytebuffer:
                 # leave some control chars as-is (CR/LF but not TAB)
                 if b < 0x20 and b not in (0xa, 0xd):
