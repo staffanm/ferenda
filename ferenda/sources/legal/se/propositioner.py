@@ -40,8 +40,10 @@ class PropAnalyzer(PDFAnalyzer):
 
     @cached_property
     def documents(self):
-        def boxmatch(page, textpattern):
-            for box in page.boundingbox(bottom=page.height / 5):
+        def boxmatch(page, textpattern, bb=None):
+            if bb is None:
+                bb = page.boundingbox(bottom=page.height / 5)
+            for box in bb:
                 m = re.match(textpattern, str(box))
                 if m:
                     return m.group(1)
@@ -80,6 +82,8 @@ class PropAnalyzer(PDFAnalyzer):
                     # plus it's not possible to identify appendicies
                     # by differing page dimensions
                     currentdoc = "main"
+                elif pageidx == 0 and boxmatch(page, "(REGERINGENS PROPOSITION)", page.boundingbox(top=page.height * 0.8)):
+                    currentdoc = "frontmatter"
                 else:
                     if (pagedims['pageheight'] and
                         (abs(pagedims['pageheight'].top() - page.height) > 1 or
@@ -92,8 +96,15 @@ class PropAnalyzer(PDFAnalyzer):
                         # mean external appendix. In Prop 2015/16:195,
                         # which is split in 4 pdfs (2 logical volumes)
                         # it's just an artifact due to the 2nd pdf
-                        # being properly cropped while the 1st isn't.
-                        currentdoc = 'appendix'
+                        # being properly cropped while the 1st
+                        # isn't. In prop 2008/09:140, which
+                        # uncharacteristically includes frontmatter, a
+                        # dimension change signals the change from
+                        # frontmatter to main
+                        if currentdoc == "frontmatter":
+                            currentdoc = "main"
+                        else:
+                            currentdoc = 'appendix'
                     else:
                         currentdoc = 'main'
                         currentappendix = appendix
@@ -155,21 +166,24 @@ class PropAnalyzer(PDFAnalyzer):
         else:
             r = []
             exclude = []
-            for startpage, pagecount, tag in docsegments:
+            mainidx = None
+            for idx, (startpage, pagecount, tag) in enumerate(docsegments):
                 r.append(super(PropAnalyzer,
                                  self).metrics(startpage=startpage,
                                                pagecount=pagecount))
                 if tag != 'main':
                     exclude.extend(list(range(startpage, startpage+pagecount)))
-        r[0]['excludedpages'] = exclude
+                elif mainidx is None:
+                    mainidx = idx
+        r[mainidx]['excludedpages'] = exclude
         # since we don't pass metricspath to super().metrics, that
         # func does not create a metrics.json cache file. So we
         # generate that now (using the same data as we return)
         util.ensure_dir(metricspath)
         with open(metricspath, "w") as fp:
-            s = json.dumps(r[0], indent=4, separators=(', ', ': '), sort_keys=True)
+            s = json.dumps(r[mainidx], indent=4, separators=(', ', ': '), sort_keys=True)
             fp.write(s)
-        return r[0]
+        return r[mainidx]
 
     def count_styles(self, startpage, pagecount):
         # we should avoid counting the styles on the front page, as
@@ -219,7 +233,8 @@ class PropTripsStore(FixedLayoutStore):
         # we need to select a suitable intermediate suffix based upon
         # the downloaded suffix (pdf->xml, html->txt)
         if self.downloaded_path(basefile).endswith(".html"):
-            return self.path(basefile, "intermediate", ".txt")
+            from ferenda.documentstore import _compressed_suffix
+            return self.path(basefile, "intermediate", ".txt" + _compressed_suffix(self.compression))
         else:
             return super(PropTripsStore, self).intermediate_path(basefile, version, attachment, suffix)
 
@@ -550,8 +565,11 @@ class PropTrips(Trips, Offtryck, FixedLayoutSource):
     
     def extract_body(self, fp, basefile):
         if util.name_from_fp(fp).endswith((".txt", ".txt.bz2")):
-            # fp is opened in bytestream mode
-            return TextReader(string=fp.read().decode("utf-8"))
+            bodystring = fp.read()
+            if isinstance(bodystring, bytes):
+                # fp is opened in bytestream mode
+                bodystring = bodystring.decode("utf-8")
+            return TextReader(string=bodystring)
         else:
             reader = super(PropTrips, self).extract_body(fp, basefile)
             pdffile = self.store.downloaded_path(basefile, attachment="index.pdf")

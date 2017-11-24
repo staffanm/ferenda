@@ -446,9 +446,13 @@ class Offtryck(SwedishLegalSource):
                                 avoided = (hits/refs)
                             else:
                                 avoided = 1
+                            if seen:
+                                processed_percent = (proc / seen) * 100
+                            else:
+                                processed_percent = 0
                             self.log.debug("refparser: Seen %s, processed %s (%.3f %%) - "
                                            "found %s refs. %s coin calls (%.3f %%) were avoided)" %
-                                           (seen, proc, (proc / seen) * 100, refs,
+                                           (seen, proc, processed_percent, refs,
                                             hits, avoided * 100))
                             self.refparser.reset()
                     elif tag in ('frontmatter', 'endregister'):

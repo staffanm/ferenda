@@ -131,7 +131,7 @@ class DocumentEntry(object):
             self.__dict__.update(d)
             self._path = path
         else:
-            if os.path.exists(path):
+            if path and os.path.exists(path):
                 logging.getLogger("documententry").warning("%s exists but is empty" % path)
             self.id = None
             self.basefile = None

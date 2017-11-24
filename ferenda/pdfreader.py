@@ -508,8 +508,10 @@ class PDFReader(CompoundElement):
             # references
             newfp = BytesIO()
             buffer = xmlfp.read()
-            bytebuffer = bytes(buffer.encode("utf-8"))
-            for b in bytebuffer:
+            if not isinstance(buffer, bytes):
+                self.log.warning("File %s was opened in text, not binary mode" % util.name_from_fp(xmlfp))
+                buffer = bytes(buffer.encode("utf-8"))
+            for b in buffer:
                 # leave some control chars as-is (CR/LF but not TAB)
                 if b < 0x20 and b not in (0xa, 0xd):
                     # note: We don't use real xml numeric character
@@ -1085,7 +1087,11 @@ class Page(CompoundElement, OrdinalElement):
         # single PDF file, not multiple (see
         # pdfdocumentrepository.create_external_resources to
         # understand why)
-        return "page%03d" % self.number
+        if isinstance(self.number, str):
+            # if the page number is a roman numeral, there is no usable way of padding it
+            return "page%s" % self.number
+        else:
+            return "page%03d" % self.number
 
     # text: can be string, re obj or callable (gets called with the box obj)
     # fontsize: can be int or callable
