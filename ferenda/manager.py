@@ -23,7 +23,7 @@ from collections import OrderedDict, Counter
 from datetime import datetime
 from io import StringIO
 from logging import getLogger as getlog
-from multiprocessing.managers import SyncManager
+from multiprocessing.managers import SyncManager, RemoteError
 from queue import Queue
 from time import sleep
 from urllib.parse import urlsplit
@@ -58,6 +58,7 @@ except NameError:
 # 3rd party
 import requests
 import requests.exceptions
+import lxml.etree
 from layeredconfig import (LayeredConfig, Defaults, INIFile, Commandline,
                            Environment)
 try:  # optional module
@@ -119,6 +120,9 @@ class MarshallingHandler(logging.Handler):
         d['args'] = None
         d['exc_info'] = None
         return pickle.dumps(d, 1)
+
+class ParseErrorWrapper(errors.FerendaException): pass
+
 
 def makeresources(repos,
                   resourcedir="data/rsrc",
@@ -1220,6 +1224,18 @@ def _build_worker(jobqueue, resultqueue, clientname):
             if clientname:
                 sys.stdout.write(".")
                 sys.stdout.flush()
+
+#        except RemoteError as e:
+#            # This happened when the result was an lxml.etree.ParseError
+#            # exception, as that one couldn't be pickled and unpickled without
+#            # problems. So we wrapped it in a ParseErrorWrapper at one end and
+#            # unwrapped it on the other end, so now there's no need for this hack.
+#            print("%s: Catastrophic failure (RemoteError)" % job['basefile'])
+#            resultqueue.put({'basefile': job['basefile'],
+#                             'result': None,
+#                             'log': list(logrecords),
+#                             'client': clientname})
+#            print("%s: Put a fake entry instead, and carrying on" % job['basefile'])
         except EOFError as e:
             print("%s: Result of %s %s %s couldn't be put on resultqueue" % (
                 os.getpid(), job['classname'], job['command'], job['basefile']))
@@ -1333,9 +1349,13 @@ def _queue_jobs(manager, iterable, inst, classname, command):
         r = resultqueue.get()
         if isinstance(r['result'], tuple) and r['result'][0] == _WrappedKeyboardInterrupt:
             raise KeyboardInterrupt()
-        elif isinstance(r['result'], tuple) and isinstance(r['result'], Exception):
+        elif isinstance(r['result'], tuple) and isinstance(r['result'][0], Exception):
             r['except_type'] = r['result'][0]
             r['except_value'] = r['result'][1]
+            if r['except_type'] == ParseErrorWrapper:
+                code, line, column, message = r['except_value'].split("|", 3)
+                r['except_type'] = lxml.etree.ParseError
+                r['except_value'] = lxml.etree.ParseError(message, code, line, column)
             log.error(
                 "Server: %(client)s failed %(basefile)s: %(except_type)s: %(except_value)s" %
                 r)
@@ -1490,6 +1510,24 @@ def _run_class_with_basefile(clbl, basefile, kwargs, command,
         else:
             exc_type, exc_value, tb = sys.exc_info()
             return exc_type, exc_value, traceback.extract_tb(tb)
+    except lxml.etree.ParseError:
+        # one wierdness: If exc_type is lxml.etree.ParseError,
+        # that exception expects to be initialized with 5
+        # arguments ( with %s" % job['basefile'])(self, message,
+        # code, line, column). The default unserialization doesn't
+        # seem to support that, calling the constructor with only
+        # 2 args (self, message). So if we get that particular
+        # error, stuff the extra args in the message of our own
+        # substitute exception.
+        # 
+        # FIXME: Maybe this could be done by registering custom
+        # picklers for ParseError objects, see the copyreg module
+        # and https://stackoverflow.com/a/25994232/2718243
+        exc_type, exc_value, tb = sys.exc_info()
+        exc_type = ParseErrorWrapper
+        msg = "%s|%s|%s|%s" % (exc_value.code, exc_value.lineno, exc_value.position[1], exc_value.msg)
+        exc_value = ParseErrorWrapper(msg)
+        return exc_type, exc_value, traceback.extract_tb(tb)
     except Exception as e:
         if 'bdb.BdbQuit' in str(type(e)):
             raise
