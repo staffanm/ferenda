@@ -413,6 +413,8 @@ class TestSearch(TestLagen):
         hits = soup.find_all("section", "hit")
         hit = hits[0]
         self.assertEqual(hit.b.a.get("href"), "/1998:204")
+        for hit in hits:
+            self.assertNotRegex(hit.b.a.text, "SFS \d+:\d+", "placeholder title used instead of real SFS title")
 
     def test_stemming(self):
         # "bulvanutredning" never occurs in the plain text, but
@@ -451,7 +453,7 @@ class TestSearch(TestLagen):
         self.assertTrue(len(innerhits))
         for innerhit in innerhits:
             link = innerhit.a.get("href")
-            self.assertIn("#S",link, "link %s doesn't look section-y" % link)
+            self.assertTrue("#S" in link or "#B" in link or "#kommentar" in link,  "link %s doesn't look section-y" % link)
             self.assertNotIn("(beteckning saknas)", innerhit.a.text)
         
 

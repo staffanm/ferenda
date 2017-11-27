@@ -10,7 +10,10 @@ from traceback import format_tb
 import datetime
 import hashlib
 import json
-from json.decoder import JSONDecodeError
+try:
+    from json.decoder import JSONDecodeError
+except ImportError:
+    JSONDecodeError = ValueError  # what json on python < 3.5 uses instead
 import logging
 import os
 import sys

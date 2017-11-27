@@ -921,15 +921,17 @@ class ElasticSearchIndex(RemoteIndex):
             payload = {'query': match}
         if not ac_query:
             payload['aggs'] = self._aggregation_payload()
-        if q and "filter" in match["bool"]:
+        if q and "must" in match["bool"]:
             # fixes staffanm/lagen.nu#69 by making sure that documents
-            # that matches the filter query but does not score
-            # anything in the should query aren't counted. This
-            # shouldn't be used in AC queries since they only use
-            # filters, not freetext query parameters
-            payload["min_score"] = 0.01
-
-        
+            # that matches the filter query (as a must clause) but
+            # does not score anything in the should query aren't
+            # counted. This shouldn't be used in AC queries since they
+            # only use filters, not freetext query parameters
+            #
+            # since we express our filter as a must clause (not a
+            # filter clause) it will add 1 to the score. We therefore
+            # require something more than just 1 in score.
+            payload["min_score"] = 1.01
         # Don't include the full text of every document in every hit
         if not ac_query:
             payload['_source'] = {self.term_excludes: ['text']}

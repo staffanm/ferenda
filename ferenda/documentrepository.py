@@ -1874,6 +1874,9 @@ with the *config* object as single parameter.
                                   values):
                     data = open(self.store.distilled_path(basefile), "rb").read()
                     g = Graph().parse(data=data)
+                    if hasattr(self, '_document_name_cache'):
+                        # special hack to speed up SFS.display_title when relating all documents from scratch
+                        self._document_name_cache[basefile] = str(g.value(URIRef(self.canonical_uri(basefile)), DCTERMS.title))
                     with open(nttemp, "ab") as fp:
                         fp.write(g.serialize(format="nt"))
                     values['triplecount'] = len(g)
