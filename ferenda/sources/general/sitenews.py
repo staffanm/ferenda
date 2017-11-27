@@ -137,8 +137,10 @@ class Sitenews(DocumentRepository):
             documentlist.append((item, feeds))
             feedsets = repo.news_feedsets(repo.news_facet_entries(),
                                           repo.facets())
+            feedcnt = 0
             for feedset in feedsets:
                 for feed in feedset.feeds:
+                    feedcnt += 1
                     row = {'title': feed.title,
                            'uri': repo.dataset_uri(param=feed.binding,
                                                    value=feed.slug,
@@ -148,6 +150,8 @@ class Sitenews(DocumentRepository):
                                                        feed=".atom")}
                     item = self.toc_item('title', row)
                     feeds.append(item)
+            self.log.info("sitenews.toc: Added %s feeds in %s feedsets for %s" %
+                          (feedcnt, len(feedsets), repo.alias))
         self.toc_generate_page(None, None, documentlist, [], "index", title=self.toc_title)
 
     def toc_item(self, binding, row):

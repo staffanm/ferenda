@@ -26,6 +26,7 @@ import json
 import logging
 import logging.handlers
 import os
+import pickle
 import re
 import socket
 import sys
@@ -3138,57 +3139,70 @@ WHERE {
         :returns: A list of Feedset objects
 
         """
-        qname_graph = self.make_graph()
-        res = []
-        for facet in facets:
-            if not facet.use_for_feed:
-                continue
-            selector_values = {}
-            selector_fragments = {}
-            selector = facet.selector
-            if facet.dimension_label:
-                binding = facet.dimension_label
-                term = facet.dimension_label
-            else:
-                binding = qname_graph.qname(facet.rdftype).replace(":", "_")
-                term = util.uri_leaf(facet.rdftype)
+        cachepath = self.store.resourcepath("feed/feedsets.pickle")
+        dependencies = chain([self.store.resourcepath("feed/faceted_entries.json")],
+                             util.list_dirs(self.store.resourcepath("feed"), ".atom"))
+        if ((not self.config.force) and
+                os.path.exists(cachepath) and
+                util.outfile_is_newer(dependencies, cachepath)):
+            self.log.debug("loading pickled feedsets from %s" % cachepath)
+            with open(cachepath, "rb") as fp:
+                return pickle.load(fp)
+        else:
+            qname_graph = self.make_graph()
+            res = []
+            for facet in facets:
+                if not facet.use_for_feed:
+                    continue
+                selector_values = {}
+                selector_fragments = {}
+                selector = facet.selector
+                if facet.dimension_label:
+                    binding = facet.dimension_label
+                    term = facet.dimension_label
+                else:
+                    binding = qname_graph.qname(facet.rdftype).replace(":", "_")
+                    term = util.uri_leaf(facet.rdftype)
 
-            feedset = Feedset(label=facet.label % {'term': term},
-                              feeds=[],
-                              predicate=facet.rdftype)
+                feedset = Feedset(label=facet.label % {'term': term},
+                                  feeds=[],
+                                  predicate=facet.rdftype)
 
-            for row in data:
-                try:
-                    selected = facet.selector(row, binding, self.commondata)
-                    selector_values[selected] = True
-                    selector_fragments[selected] = facet.identificator(
-                        row,
-                        binding,
-                        self.commondata)
-                except KeyError:  # as e:
-                    # this will happen a lot on simple selector
-                    # functions when handed incomplete data
-                    pass
-            
-            for value in sorted(
-                    list(selector_values.keys()), reverse=facet.selector_descending):
-                urlfragment = selector_fragments[value]
-                slug = term + "/" + urlfragment.lower()
-                title = facet.pagetitle % {'term': term,
-                                           'selected': value}
-                feedset.feeds.append(Feed(slug=slug,
-                                          title=title,
-                                          binding=binding,
-                                          value=urlfragment))
-            res.append(feedset)
+                for row in data:
+                    try:
+                        selected = facet.selector(row, binding, self.commondata)
+                        selector_values[selected] = True
+                        selector_fragments[selected] = facet.identificator(
+                            row,
+                            binding,
+                            self.commondata)
+                    except KeyError:  # as e:
+                        # this will happen a lot on simple selector
+                        # functions when handed incomplete data
+                        pass
 
-        # finally add the built-in All feedset, which has only one feed.
-        res.append(Feedset(label="All",
-                           feeds=[Feed(slug="main",
-                                       title=self.news_feedsets_main_label,
-                                       binding=None,
-                                       value=None)]))
+                for value in sorted(
+                        list(selector_values.keys()), reverse=facet.selector_descending):
+                    urlfragment = selector_fragments[value]
+                    slug = term + "/" + urlfragment.lower()
+                    title = facet.pagetitle % {'term': term,
+                                               'selected': value}
+                    feedset.feeds.append(Feed(slug=slug,
+                                              title=title,
+                                              binding=binding,
+                                              value=urlfragment))
+                res.append(feedset)
 
+            # finally add the built-in All feedset, which has only one feed.
+            res.append(Feedset(label="All",
+                               feeds=[Feed(slug="main",
+                                           title=self.news_feedsets_main_label,
+                                           binding=None,
+                                           value=None)]))
+            # and then, cache the results (can't use json for this, but pickle is acceptable
+            util.ensure_dir(cachepath)
+            with open(cachepath, "wb") as fp:
+                pickle.dump(res, fp, pickle.HIGHEST_PROTOCOL)
         return res
 
     def news_entrysort_key(self):
