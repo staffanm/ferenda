@@ -15,8 +15,9 @@ from html.parser import HTMLParser
 from urllib.parse import quote, unquote
 
 # 3rdparty libs
-from rdflib import URIRef, Literal, RDF, Graph, BNode
+from rdflib import URIRef, Literal, RDF, Graph, BNode, Namespace
 from rdflib.namespace import DCTERMS, SKOS, RDFS
+from rdflib.extras.describer import Describer
 from lxml import etree
 from bs4 import BeautifulSoup
 import requests
@@ -524,8 +525,11 @@ class SFS(Trips):
         basefile = super(SFS, self).basefile_from_uri(uri)
         if not basefile:
             return
-        # remove any possible "/konsolidering/2015:123" trailing info
-        basefile = basefile.split("/")[0]
+        # remove any possible "/konsolidering/2015:123" trailing
+        # info (unless the trailing info is /data, which is
+        # specially handled by RequestHandler.lookup_resource
+        if not basefile.endswith(("/data", "/data.rdf", "/data.ttl", "/data.nt")):
+            basefile = basefile.split("/")[0]
         if "#" in basefile:
             basefile = basefile.split("#", 1)[0]
         # "1874:26 s.11" -> <https://lagen.nu/sfs/1874:26_s.11> -> "1874:26 s.11"
@@ -1799,6 +1803,40 @@ class SFS(Trips):
         with self.store.open_annotation(basefile, mode="wb") as fp:
             fp.write(treestring)
         return self.store.annotation_path(basefile)
+
+    def annotation_file_to_graph(self, annotation_file):
+        # since our custom built annotation files aren't really proper
+        # GRIT XML files, we'll have to use this custom converter to
+        # get proper RDF from them.
+        def uriref(qname):
+            # assume qname uses the "{uri}local" syntax for namespaced things
+            uri, local = qname.split("}")  # uri will now start with '{'
+            return Namespace(uri[1:])[local]
+        rdf_description = "{%s}Description" % util.ns['rdf']
+        rdf_about = "{%s}about" % util.ns['rdf']
+        dcterms_description = "{%s}description" % util.ns['dcterms']
+        graph = self.make_graph()
+        desc = Describer(graph)
+        with open(annotation_file, "rb") as fp:
+            intree = etree.parse(fp)
+        for subjectnode in intree.getroot():
+            assert subjectnode.tag == rdf_description
+            desc.about(subjectnode.get(rdf_about))
+            for predicatenode in subjectnode:
+                for objectnode in predicatenode:
+                    if objectnode.tag == rdf_description:
+                        objecturi = objectnode.get(rdf_about)
+                        with desc.rel(uriref(predicatenode.tag), objecturi):
+                            for subpredicatenode in objectnode:
+                                desc.value(uriref(subpredicatenode.tag), subpredicatenode.text)
+                    elif predicatenode.tag == dcterms_description: # the content is XMLLiteral
+                        # lit = "desc for %s goes here" % subjectnode.get(rdf_about)
+                        lit = Literal(etree.tostring(objectnode), datatype=RDF.XMLLiteral)
+                        desc.value(uriref(predicatenode.tag), lit)
+                    else:
+                        with desc.rel(uriref(predicatenode.tag)):
+                            desc.value(uriref(objectnode.tag), objectnode.text)
+        return graph
 
     def display_title(self, uri, form="absolute"):
         # "https://lagen.nu/2010:1770#K1P2S1" =>

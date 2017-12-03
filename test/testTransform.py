@@ -63,6 +63,19 @@ class Transform(RepoTester):
             <infile>Document title</infile>
         </output>""", util.readfile(base+"outfile.xml"))
 
+    def test_transform_space_fileparam(self):
+        base = self.datadir+os.sep
+        t = self._setup_files(paramfile="shrimp sandwich.xml")
+        t.transform_file(base+"infile.xml", base+"outfile.xml",
+                         {'value':'blahonga',
+                          'file':base+'shrimp sandwich.xml'})
+        self.assertEqualXML("""
+        <output>
+            <paramvalue>blahonga</paramvalue>
+            <paramfile><node key='value'><subnode>textnode</subnode></node></paramfile>
+            <infile>Document title</infile>
+        </output>""", util.readfile(base+"outfile.xml"))
+
 
     # FIXME: We should isolate parts of the tests in
     # testDocRepo.Generate, testDocRepo.TOC and testWSGI.Search that

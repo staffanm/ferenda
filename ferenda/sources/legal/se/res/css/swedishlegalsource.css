@@ -108,6 +108,12 @@ h4 {
     margin-top: 10px;
 }
 
+h4.panel-title {
+    font-size: 10pt;
+    font-style: normal;
+    font-weight: 500;
+}
+
 .invalid-link:hover:after {
     content: "Dokumentet finns inte i databasen";
 }

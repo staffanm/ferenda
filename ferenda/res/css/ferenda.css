@@ -319,6 +319,12 @@ div.panel-group > div.panel > div.panel-heading {
 h4.panel-title {
 	font-size: 10pt;
 }
+/* to make the badge neat while smaller so it fits in a .panel-title */
+.badge {
+    font-size: 8pt;
+    border-radius: 6px;
+    padding: 2px 5px;
+}
 .panel-group .panel+.panel {
 	margin-top: 0;
 }
@@ -548,6 +554,15 @@ h1, h2, h3, h4, h5, h6 {
     color: black;
     font-size: smaller;
 }
+
+/* in some cases, table styles specified by bootstrap are inexplicably
+   overridden by the user-agent stylesheet. Specify the same stuff
+   again... */
+table {
+    font-size: 14px;
+    line-height: 1.42857143;
+}
+
 /* PART 3: Footer */
 footer nav {
     text-align: center;

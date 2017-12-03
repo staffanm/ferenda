@@ -27,6 +27,7 @@ from rdflib.namespace import DCTERMS
 # own
 from ferenda.elements import Link, serialize
 from ferenda.testutil import FerendaTestCase
+from ferenda.sources.legal.se import RPUBL
 from lagen.nu import SFS, LNKeyword
 from lagen.nu.wsgiapp import WSGIApp
 
@@ -354,15 +355,31 @@ class TestConNeg(TestLagen):
 class TestAnnotations(TestLagen):
 
     def test_inbound_links(self):
-        res = self.get(self.baseurl + "1998:204/data",
+        res = self.get(self.baseurl + "1949:105/data",
                        headers={'Accept': 'application/rdf+xml'})
         graph = Graph().parse(data=res.text, format="xml")
-        resource = graph.resource(URIRef("https://lagen.nu/1998:204"))
-        self.assertEqual(str(resource.value(DCTERMS.title)), "Personuppgiftslag (1998:204)")
-        # TODO: assert something about inbound relations (PUF, DIFS,
-        # prop 2005/06:44, some legal case)
+        resource = graph.resource(URIRef("https://lagen.nu/1949:105"))
+        self.assertEqual(str(resource.value(DCTERMS.title)), "Tryckfrihetsförordning (1949:105)")
+        # Assert a few things about inbound relations
+        resource = graph.resource(URIRef("https://lagen.nu/1949:105#K3P3"))
+        self.assertEqual("NJA 2015 s. 166",
+                         str(resource.value(RPUBL.isLagrumFor).value(DCTERMS.identifier)))
+        resource2 = next(x for x in resource.objects(DCTERMS.isReferencedBy) if x._identifier == URIRef("https://lagen.nu/1991:1469#K10P1S5"))
+        self.assertEqual("10 kap. 1 § 5 st Yttrandefrihetsgrundlag (1991:1469)",
+                         str(resource2.value(DCTERMS.identifier)))
+        self.assertIn("Anonymiteten skyddas genom att",
+                      resource.value(DCTERMS.description))
+        
+    def test_wiki_comments(self):
+        res = self.get(self.baseurl + "1949:105")
+        # make sure the wiki commentary is weaved in. NOTE: if the
+        # wiki commentary changes, this test has to be updated.
+        self.assertIn("Hemsidor, bloggar och innehållet i andra databaser", res.text)
 
-
+    def test_wiki_concept(self):
+        res = self.get(self.baseurl + "begrepp/Sekundär_sekretessbestämmelse")
+        self.assertNotIn("Beskrivning saknas!", res.text)
+        
 class TestSearch(TestLagen):
 
     def totalhits(self, soup):

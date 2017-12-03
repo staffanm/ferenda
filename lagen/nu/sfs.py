@@ -34,12 +34,20 @@ class SFSHandler(SwedishLegalHandler):
 
 class SFS(OrigSFS, SameAs):
     requesthandler_class = SFSHandler
+    
     def basefile_from_uri(self, uri):
+        # this is a special version of
+        # ferenda.sources.legal.se.SFS.basefile_from_uri that can
+        # handle URIs with basefile directly under root, eg
+        # <http://example.org/1992:123>
         if (uri.startswith(self.urispace_base) and
             re.match("\d{4}\:", uri[len(self.urispace_base)+1:])):
             basefile = uri[len(self.urispace_base)+1:]
-            # remove any possible "/konsolidering/2015:123" trailing info
-            basefile = basefile.split("/")[0]
+            # remove any possible "/konsolidering/2015:123" trailing
+            # info (unless the trailing info is /data, which is
+            # specially handled by RequestHandler.lookup_resource
+            if not basefile.endswith(("/data", "/data.rdf", "/data.ttl", "/data.nt")):
+                basefile = basefile.split("/")[0]
             if "#" in basefile:
                 basefile = basefile.split("#", 1)[0]
             elif basefile.endswith((".rdf", ".xhtml", ".json", ".nt", ".ttl")):

@@ -32,8 +32,6 @@ if [ -n "$@" ]
 then
     PYTHONPATH=test python $PYTHONWARNINGS -m unittest $UNITTESTOPTS $@
 else
-    # When running the entire suite, exit at first failure (-f) in
-    # order to not have to wait three minutes.
     python $PYTHONWARNINGS -m unittest discover $UNITTESTOPTS test
     python -V
 fi

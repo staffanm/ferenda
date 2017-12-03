@@ -270,22 +270,24 @@ class XSLTTransform(TransformerEngine):
         removefiles = []
         for key, value in parameters.items():
             if key.endswith("file") and value:
-                if all(ord(c) < 128 for c in value):
-                    # IF the file name contains ONLY ascii chars, we can
-                    # use it directly. However, we need to relativize path
-                    # of file relative to the XSL file we'll be using. The
-                    # mechanism could be clearer...
+                if all(ord(c) < 128 and c != " " for c in value):
+                    # IF the file name contains ONLY ascii chars and
+                    # no spaces, we can use it directly. However, we
+                    # need to relativize path of file relative to the
+                    # XSL file we'll be using. The mechanism could be
+                    # clearer...
                     value = os.path.relpath(value, self.templdir)
                 else:
-                    # If the filename contains non-ascii characters,
-                    # any attempt to eg "document($annotationfile)" in
-                    # the XSLT document will silently fail. Seriously,
-                    # fuck lxml's error handling. In this case, copy
-                    # it to a temp file (in the temporary templdir,
-                    # with ascii filename) and use that.
+                    # If the filename contains non-ascii characters or
+                    # space, any attempt to eg
+                    # "document($annotationfile)" in the XSLT document
+                    # will silently fail. Seriously, fuck lxml's error
+                    # handling. In this case, copy it to a temp file
+                    # (in the temporary templdir, with ascii filename)
+                    # and use that.
                     contents = util.readfile(value)
                     value = os.path.basename(value)
-                    value = "".join(c for c in value if ord(c) < 128)
+                    value = "".join(c for c in value if ord(c) < 128 and c != " ")
                     removefiles.append(self.templdir+os.sep+value)
                     util.writefile(self.templdir+os.sep+value, contents)
                 if os.sep == "\\":
