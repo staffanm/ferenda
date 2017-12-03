@@ -362,8 +362,12 @@ class TestAnnotations(TestLagen):
         self.assertEqual(str(resource.value(DCTERMS.title)), "Tryckfrihetsförordning (1949:105)")
         # Assert a few things about inbound relations
         resource = graph.resource(URIRef("https://lagen.nu/1949:105#K3P3"))
+
+        # see if an expected legal case + inbound statute reference is
+        # as expected
+        resource2 = next(x for x in resource.objects(RPUBL.isLagrumFor) if x._identifier == URIRef("https://lagen.nu/dom/nja/2015s166"))
         self.assertEqual("NJA 2015 s. 166",
-                         str(resource.value(RPUBL.isLagrumFor).value(DCTERMS.identifier)))
+                         str(resource2.value(DCTERMS.identifier)))
         resource2 = next(x for x in resource.objects(DCTERMS.isReferencedBy) if x._identifier == URIRef("https://lagen.nu/1991:1469#K10P1S5"))
         self.assertEqual("10 kap. 1 § 5 st Yttrandefrihetsgrundlag (1991:1469)",
                          str(resource2.value(DCTERMS.identifier)))
