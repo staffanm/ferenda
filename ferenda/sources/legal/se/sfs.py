@@ -601,10 +601,17 @@ class SFS(Trips):
             # return bytes or unicode strings. This seem to be a
             # problem in BZ2File (or how we use it). Just roll with it.
             textheader = textheader.decode(self.source_encoding, errors="ignore")
+            encode = True
+        else:
+            encode = False
 
         idx = textheader.index("-"*64)
         header = textheader[:idx]
-        fp.seek(len(header.encode("utf-8")) + 66)
+        if encode:
+            offset = len(header.encode("utf-8"))
+        else:
+            offset = len(header)
+        fp.seek(offset + 66) # the extra 66 for the dividing ruler made of hyphens + newlines
         return soup, header
 
     def extract_metadata(self, datatuple, basefile):

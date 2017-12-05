@@ -144,6 +144,19 @@ class TestPages(TestLagen):
             self.assertEqual(self.baseurl + "rsrc/css/ferenda.css",
                              cssurl, "Error for %s" % url)
 
+    def test_sfs_outline(self):
+        res = self.get(self.baseurl + "1998:204")
+        soup = BeautifulSoup(res.text, "lxml")
+        firstoutline = soup.find("nav", id="toc").find("li")
+        # make sure the outline navigation is as expected and hasn't
+        # been mangled (the SFS is a patched one, which has been known
+        # to cause problems eg with parsing starting a few too many
+        # bytes into the source text.
+        self.assertIn('Allmänna bestämmelser', firstoutline.a.text)
+        subheadings = firstoutline.find_all("li")
+        self.assertEqual(3, len(subheadings))
+        self.assertIn('Definitioner', subheadings[-1].a.text)
+            
 class TestPatching(TestLagen):
 
     def test_file_has_been_patched(self):
