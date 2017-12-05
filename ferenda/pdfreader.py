@@ -511,6 +511,10 @@ class PDFReader(CompoundElement):
             if not isinstance(buffer, bytes):
                 self.log.warning("File %s was opened in text, not binary mode" % util.name_from_fp(xmlfp))
                 buffer = bytes(buffer.encode("utf-8"))
+            else:
+                # convert to a py3 style bytes() object (one that
+                # returns ints, not strs, when iterating over it)
+                buffer = bytes(buffer)
             for b in buffer:
                 # leave some control chars as-is (CR/LF but not TAB)
                 if b < 0x20 and b not in (0xa, 0xd):
