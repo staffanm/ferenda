@@ -1861,47 +1861,54 @@ with the *config* object as single parameter.
         with util.logtime(self.log.info,
                           "%(basefile)s: relate OK (%(elapsed).3f sec) [%(e_triples).3f/%(e_deps).3f/%(e_fulltext).3f]",
                           timings):
+            # first, load fulltextindex, then add dependencies, lastly
+            # load triplestore. fulltextindex is slightly more picky
+            # abt types (it requires date fields to actually be dates,
+            # not random strings), which keeps us from entering
+            # mistyped info into the triplestore.
 
-            # If using the Bulk upload feature, append to the temporary
-            # file that is to be bulk uploaded (see relate_all_setup)
-            self.log.debug("%s: About to start: %s" % (basefile, self.config.bulktripleload))
-            if self.config.bulktripleload:
-                nttemp = self.store.resourcepath("distilled/dump.%s.%s.nt" % (self.config.clientname, os.getpid()))
-                values = {'basefile': basefile,
-                          'nttemp': nttemp}
-                with util.logtime(self.log.debug,
-                                  "%(basefile)s: Added %(triplecount)s triples to %(nttemp)s (%(elapsed).3f sec)",
-                                  values):
-                    data = open(self.store.distilled_path(basefile), "rb").read()
-                    g = Graph().parse(data=data)
-                    if hasattr(self, '_document_name_cache'):
-                        # special hack to speed up SFS.display_title when relating all documents from scratch
-                        self._document_name_cache[basefile] = str(g.value(URIRef(self.canonical_uri(basefile)), DCTERMS.title))
-                    with open(nttemp, "ab") as fp:
-                        fp.write(g.serialize(format="nt"))
-                    values['triplecount'] = len(g)
-            else:
-                start = time.time()
-                if self.config.force and reltriples:
-                    self.relate_triples(basefile)
-                    entry.indexed_ts = datetime.now()
-                elif reltriples:
-                    self.relate_triples(basefile, removesubjects=True)
-                    entry.indexed_ts = datetime.now()
-                timings['e_triples'] = time.time() - start
             # When otherrepos = [], should we still provide self as one repo? Yes.
             if self not in otherrepos:
                 otherrepos.append(self)
-            if reldependencies:
-                start = time.time()
-                self.relate_dependencies(basefile, otherrepos)
-                timings['e_deps'] = time.time() - start
-                entry.indexed_dep = datetime.now()
+
             if self.config.fulltextindex and relfulltext:
                 start = time.time()
                 self.relate_fulltext(basefile, otherrepos)
                 timings['e_fulltext'] = time.time() - start
                 entry.indexed_ft = datetime.now()
+
+            if reldependencies:
+                start = time.time()
+                self.relate_dependencies(basefile, otherrepos)
+                timings['e_deps'] = time.time() - start
+                entry.indexed_dep = datetime.now()
+            if reltriples:
+                # If using the Bulk upload feature, append to the temporary
+                # file that is to be bulk uploaded (see relate_all_setup)
+                if self.config.bulktripleload:
+                    nttemp = self.store.resourcepath("distilled/dump.%s.%s.nt" % (self.config.clientname, os.getpid()))
+                    values = {'basefile': basefile,
+                              'nttemp': nttemp}
+                    with util.logtime(self.log.debug,
+                                      "%(basefile)s: Added %(triplecount)s triples to %(nttemp)s (%(elapsed).3f sec)",
+                                      values):
+                        data = open(self.store.distilled_path(basefile), "rb").read()
+                        g = Graph().parse(data=data)
+                        if hasattr(self, '_document_name_cache'):
+                            # special hack to speed up SFS.display_title when relating all documents from scratch
+                            self._document_name_cache[basefile] = str(g.value(URIRef(self.canonical_uri(basefile)), DCTERMS.title))
+                        with open(nttemp, "ab") as fp:
+                            fp.write(g.serialize(format="nt"))
+                        values['triplecount'] = len(g)
+                else:
+                    start = time.time()
+                    if self.config.force:
+                        self.relate_triples(basefile)
+                        entry.indexed_ts = datetime.now()
+                    else:
+                        self.relate_triples(basefile, removesubjects=True)
+                        entry.indexed_ts = datetime.now()
+                    timings['e_triples'] = time.time() - start
         entry.save()
 
     def _get_triplestore(self, **kwargs):

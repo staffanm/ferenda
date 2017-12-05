@@ -6,9 +6,10 @@ if [ "$1" = "-f" ]; then
    rm -r data/*/annotations
    rm -r data/*/generated
    rm -r data/*/toc
+   rm -r data/*/feed
    set -e  # fail immediately on error
    echo "resetting fulltextindex"
-   # ./ferenda-build.py devel destroyindex
+   ./ferenda-build.py devel destroyindex
    echo "resetting triplestore"
    ./ferenda-build.py devel clearstore
 fi

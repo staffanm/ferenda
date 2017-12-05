@@ -1,4 +1,4 @@
-from fabric.api import env, run, local, cd, sudo, settings
+from fabric.api import env, run, local, cd, sudo, settings, hosts
 from fabric.contrib.project import rsync_project
 from datetime import datetime
 
@@ -92,7 +92,7 @@ def upload_rdf():
     with cd("~/www/ferenda.lagen.nu"):
         run("~/.virtualenvs/lagen.nu/bin/python ./ferenda-build.py all relate --all --upload")
 
-
+@hosts('colo.tomtebo.org')
 def deploy():
     copy_elastic()  # requires password b/c of sudo() so we do it first
     git_pull()

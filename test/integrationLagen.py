@@ -505,6 +505,12 @@ class TestAutocomplete(TestLagen):
         res = self.get(self.baseurl + "api/?q=TF+2:&_ac=true",
                        headers={'Accept': 'application/json'})
         hits = res.json()
+        # for idx, h in enumerate(hits):
+        #     print(idx+1, h['url'])
+        # We assume that the first section retrieved will be section 1
+        # ("2 kap 1 §"). This requires that the search returns hits in
+        # the same order that they were indexed in, which might not
+        # always be guaranteed.
         self.assertEqual(hits[0]['url'], self.baseurl + "1949:105#K2P1")
         self.assertEqual(hits[0]['label'], "2 kap. 1 § Tryckfrihetsförordning (1949:105)")
         self.assertTrue(hits[0]['desc'].startswith("Till främjande av ett fritt meningsutbyte"))

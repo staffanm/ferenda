@@ -167,6 +167,9 @@ class JO(FixedLayoutSource):
                 labelnode = rawhead.find(text=re.compile("%s:" % label))
                 if labelnode:
                     d[key] = util.normalize_space(labelnode.next_sibling.text)
+            # this data might contain spurious spaces due to <span
+            # class="Definition"> tags -- see eg 3128-2002. Data in
+            # the document is preferable
             d["dcterms:title"] = util.normalize_space(rawhead.find("h2").text)
         return d
 
@@ -194,6 +197,15 @@ class JO(FixedLayoutSource):
                         #
                         # if doc.meta.value(URIRef(doc.uri), subnode.predicate):
                         #     continue
+
+                        # But if we find a dcterms:title, we throw the
+                        # old one (probably gotten from the
+                        # headnote.html) out, as it's probably lower
+                        # quality
+                        if subnode.predicate == DCTERMS.title:
+                            oldtitle = doc.meta.value(URIRef(doc.uri), DCTERMS.title)
+                            if oldtitle:
+                                doc.meta.remove((URIRef(doc.uri), DCTERMS.title, oldtitle))
                         l = Literal(s, **kwargs)
                         meta.add((URIRef(doc.uri), subnode.predicate, l))
                     node.remove(subnode)
@@ -302,6 +314,7 @@ class JO(FixedLayoutSource):
             datestr = str(parser.reader.next()).strip()
             year = int(datestr.split("-")[0])
             if 2100 > year > 1970:
+                parser.remove_recognizer(is_datum)
                 d = [datestr]
                 return Meta(d, predicate=RPUBL.avgorandedatum,
                             datatype=XSD.date)
@@ -310,6 +323,7 @@ class JO(FixedLayoutSource):
                 return None
 
         def make_dnr(parser):
+            parser.remove_recognizer(is_dnr)
             ds = [x for x in str(parser.reader.next()).strip().split(" ")]
             return Meta(ds, predicate=RPUBL.diarienummer)
 

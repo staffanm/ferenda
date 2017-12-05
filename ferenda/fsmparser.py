@@ -50,6 +50,9 @@ class FSMParser():
         chunks. Recognizers are tried in the order specified here."""
         self.recognizers = args
 
+    def remove_recognizer(self, recognizer):
+        self.recognizers = tuple(x for x in self.recognizers if x != recognizer)
+
     def set_transitions(self, transitions):
         """Set the transition table for the state matchine.
 
