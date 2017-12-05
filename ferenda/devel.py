@@ -44,7 +44,7 @@ class DummyStore(object):
     def __init__(self, path, **kwargs):
         pass  # pragma: no cover
 
-    def list_basefiles_for(self, action, basedir=None):
+    def list_basefiles_for(self, action, basedir=None, force=True):
         return []  # pragma: no cover
 
 

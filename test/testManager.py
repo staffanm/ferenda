@@ -31,7 +31,7 @@ from test.quiet import quiet
 
 class staticmockstore(DocumentStore):
 
-    def list_basefiles_for(cls, action):
+    def list_basefiles_for(cls, action, basedir=None, force=True):
         return ["arg1", "myarg", "arg2"]
 
 
@@ -523,7 +523,7 @@ from ferenda import DocumentRepository, DocumentStore
 from ferenda import decorators, errors
 
 class Teststore(DocumentStore):
-    def list_basefiles_for(cls,action):
+    def list_basefiles_for(cls, action, basedir=None, force=True):
         return ["arg1","myarg","arg2"]
         
 class Testrepo(DocumentRepository):
@@ -615,7 +615,7 @@ class CustomStore(DocumentStore):
     def custommethod(self):
         return "CustomStore OK"
 
-    def list_basefiles_for(cls,action):
+    def list_basefiles_for(cls, action, basedir=None, force=True):
         return ["arg1","myarg","arg2"]
 
 class Testrepo2(Testrepo):

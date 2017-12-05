@@ -87,7 +87,7 @@ def parseifneeded(f):
         # can only be used sensibly with the .parse() function.
         force = (self.config.force is True or
                  self.config.parseforce is True)
-        if not force and not self.parseneeded(basefile):
+        if not force and not self.store.needed(basefile, "parse"):
             self.log.debug("%s: Skipped", basefile)
             return True  # Signals that everything is OK
         else:

@@ -8,7 +8,7 @@ import os
 import datetime
 from ferenda.compat import unittest, Mock, MagicMock, patch
 
-from ferenda import DocumentRepository, Document
+from ferenda import DocumentRepository, DocumentStore, Document
 from ferenda.errors import DocumentRemovedError, ParseError
 # SUT
 from ferenda.decorators import (timed, parseifneeded, render, handleerror,
@@ -46,7 +46,7 @@ class Decorators(unittest.TestCase):
         # mockdoc.basefile="1234"
         mockbasefile = "1234"
         mockrepo = Mock()
-        mockrepo.parseneeded = DocumentRepository().parseneeded
+        mockrepo.store.needed = DocumentStore(datadir='fake').needed
         mockrepo.called = False
         mockrepo.config.force = False
         # test 1: Outfile is newer - the parseifneeded decorator

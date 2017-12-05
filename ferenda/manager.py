@@ -1001,7 +1001,7 @@ def _run_class(enabled, argv, config):
             kwargs['otherrepos'] = otherrepos
 
         if 'all' in inst.config and inst.config.all is True:
-            iterable = inst.store.list_basefiles_for(action)
+            iterable = inst.store.list_basefiles_for(action, force=inst.config.force)
             res = []
             # semi-magic handling
             kwargs['currentrepo'] = inst

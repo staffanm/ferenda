@@ -26,7 +26,7 @@ class CompositeStore(DocumentStore):
         self.docrepo_instances = docrepo_instances
         self.basefiles = defaultdict(set)
 
-    def list_basefiles_for(self, action, basedir=None):
+    def list_basefiles_for(self, action, basedir=None, force=True):
         if not basedir:
             basedir = self.datadir
         # if action in ("parse", "news"): # NB: since symlinks from
@@ -37,14 +37,14 @@ class CompositeStore(DocumentStore):
         if action in ("parse"): 
             documents = set()
             for cls, inst in self.docrepo_instances.items():
-                for basefile in inst.store.list_basefiles_for(action):
+                for basefile in inst.store.list_basefiles_for(action, force=force):
                     self.basefiles[cls].add(basefile)
                     if basefile not in documents:
                         documents.add(basefile)
                         yield basefile
         else:
             for basefile in super(CompositeStore,
-                                  self).list_basefiles_for(action):
+                                  self).list_basefiles_for(action, basedir, force):
                 yield basefile
 
 

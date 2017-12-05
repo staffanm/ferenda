@@ -125,7 +125,7 @@ class DocRepo3(DocRepo1):
 
 
 class staticmockstore(DocumentStore):
-    def list_basefiles_for(cls,action):
+    def list_basefiles_for(cls, action, basedir, force):
         return ["arg1","myarg","arg2"]
 
 class staticmockclass(DocumentRepository):

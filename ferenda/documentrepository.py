@@ -58,6 +58,7 @@ from ferenda import (Describer, TripleStore, FulltextIndex, Document,
 from ferenda.elements import (Body, Link,
                               UnorderedList, ListItem, Paragraph)
 from ferenda.elements.html import elements_from_soup
+from ferenda.documentstore import Relate
 # establish two central RDF Namespaces at the top level
 DCTERMS = Namespace(util.ns['dcterms'])
 PROV = Namespace(util.ns['prov'])
@@ -1836,22 +1837,10 @@ with the *config* object as single parameter.
             return False
         entry = DocumentEntry(self.store.documententry_path(basefile))
         if self.config.force:
-            reltriples = True
-            reldependencies = True
-            relfulltext = True
+            relate = Relate(True, True, True)
         else:
-            def newer(filename, dt):
-                if not os.path.exists(filename):
-                    return False
-                elif not dt:  # has never been indexed
-                    return True
-                else:
-                    return datetime.fromtimestamp(os.stat(filename).st_mtime) > dt
-            reltriples = newer(self.store.distilled_path(basefile), entry.indexed_ts)
-            reldependencies = newer(self.store.distilled_path(basefile), entry.indexed_dep)
-            relfulltext = newer(self.store.parsed_path(basefile), entry.indexed_ft)
-
-        if not(reltriples or reldependencies or relfulltext):
+            relate = self.store.needed(basefile, "relate")
+        if not(relate.triples or relate.dependencies or relate.fulltext):
             self.log.debug("%s: skipped relate" % basefile)
             return
         timings = {'basefile': basefile,
@@ -1871,18 +1860,18 @@ with the *config* object as single parameter.
             if self not in otherrepos:
                 otherrepos.append(self)
 
-            if self.config.fulltextindex and relfulltext:
+            if self.config.fulltextindex and relate.fulltext:
                 start = time.time()
                 self.relate_fulltext(basefile, otherrepos)
                 timings['e_fulltext'] = time.time() - start
                 entry.indexed_ft = datetime.now()
 
-            if reldependencies:
+            if relate.dependencies:
                 start = time.time()
                 self.relate_dependencies(basefile, otherrepos)
                 timings['e_deps'] = time.time() - start
                 entry.indexed_dep = datetime.now()
-            if reltriples:
+            if relate.triples:
                 # If using the Bulk upload feature, append to the temporary
                 # file that is to be bulk uploaded (see relate_all_setup)
                 if self.config.bulktripleload:

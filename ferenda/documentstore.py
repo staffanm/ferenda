@@ -4,6 +4,7 @@ from __future__ import (absolute_import, division,
 from builtins import *
 
 from contextlib import contextmanager
+from collections import namedtuple
 from tempfile import NamedTemporaryFile
 import json
 import filecmp
@@ -158,6 +159,11 @@ class _open(object):
     def name(self):
         return self.fp.name
 
+Relate = namedtuple('Relate', ['fulltext', 'dependencies', 'triples'])
+# make this namedtuple class work in a bool context: False iff all
+# elements are falsy
+Relate.__bool__ = lambda self: any(self)
+                   
 
 class DocumentStore(object):
     """Unifies handling of reading and writing of various data files
@@ -313,6 +319,41 @@ class DocumentStore(object):
         return _open(filename, mode, compression)
 
 
+    def needed(self, basefile, action):
+        # if this function is even called, it means that force is not
+        # true (or ferenda-build.py has not been called with a single
+        # basefile, which is an implied force)
+        if action == "parse":
+            infile = self.downloaded_path(basefile)
+            outfile = self.parsed_path(basefile)
+            return not util.outfile_is_newer([infile], outfile)
+        elif action == "relate":
+            entry = DocumentEntry(self.store.documententry_path(basefile))
+            def newer(filename, dt):
+                if not os.path.exists(filename):
+                    return False
+                elif not dt:  # has never been indexed
+                    return True
+                else:
+                    return datetime.fromtimestamp(os.stat(filename).st_mtime) > dt
+            return Relate(fulltext=newer(self.store.parsed_path(basefile), entry.indexed_ft),
+                          triples=newer(self.store.distilled_path(basefile), entry.indexed_ts),
+                          dependencies=newer(self.store.distilled_path(basefile), entry.indexed_dep))
+        elif action == "generate":
+            infile = self.store.parsed_path(basefile)
+            annotations = self.store.annotation_path(basefile)
+            if os.path.exists(self.store.dependencies_path(basefile)):
+                deptxt = util.readfile(self.store.dependencies_path(basefile))
+                dependencies = deptxt.strip().split("\n")
+            else:
+                dependencies = []
+            dependencies.extend((infile, annotations))
+            outfile = self.store.generated_path(basefile)
+            return util.outfile_is_newer(dependencies, outfile)
+        else:
+            # custom actions will need to override needed and provide logic there
+            return True  
+
     def list_basefiles_for(self, action, basedir=None, force=True):
         """Get all available basefiles that can be used for the
         specified action.
@@ -379,7 +420,10 @@ class DocumentStore(object):
         yielded_paths = set()
         for basefile, duration in sorted(durations.items(), key=operator.itemgetter(1), reverse=True):
             if duration == -1 and not force:
-                # maybe skip files that will raise DocumentRemovedError ?
+                # Skip files that will raise DocumentRemovedError ?
+                pass
+            elif not force and not self.needed(basefile, action):
+                # Skip files for which no action will be performed
                 pass
             else:
                 # make sure the underlying file really still exists
