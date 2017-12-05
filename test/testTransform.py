@@ -50,6 +50,34 @@ class Transform(RepoTester):
             <infile>Document title</infile>
         </output>""", util.readfile(base+"outfile.xml"))
 
+    def test_doctype(self):
+        base = self.datadir+os.sep
+        util.ensure_dir(base+"teststyle-doctype.xslt")
+        with open(base+"teststyle-doctype.xslt","w") as fp:
+            fp.write("""<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+    <xsl:output method="html"
+	        doctype-system="about:legacy-compat"
+	        omit-xml-declaration="yes"
+	        encoding='utf-8'
+	        indent="yes"/>
+    <xsl:template match="/">
+      <html>
+        <head>
+          <title><xsl:value-of select="/doc/title"/></title>
+        </head>
+        <body>
+          <h1>hello world</h1>
+        </body>
+      </html>
+    </xsl:template>
+</xsl:stylesheet>
+""")
+        with open(base+"infile.xml","w") as fp:
+            fp.write("""<doc><title>Document title</title></doc>""")
+        t = Transformer("XSLT", base+"teststyle-doctype.xslt", "xsl", None, "")
+        t.transform_file(base+"infile.xml", base+"outfile.xml")
+        self.assertTrue(util.readfile(base+"outfile.xml").startswith('<!DOCTYPE html SYSTEM "about:legacy-compat">'))
+
     def test_transform_nonascii_fileparam(self):
         base = self.datadir+os.sep
         t = self._setup_files(paramfile="räksmörgås.xml")

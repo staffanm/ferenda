@@ -7,6 +7,7 @@ from tempfile import mkdtemp, NamedTemporaryFile
 import os
 import shutil
 import re
+from io import BytesIO
 
 from lxml import etree
 from lxml.etree import XSLT
@@ -107,11 +108,11 @@ class Transformer(object):
             adapted_config = self.t.getconfig(self.config, depth)
         else:
             adapted_config = None
-        outdata = self.t.transform(indata, adapted_config, parameters).getroot()
+        outdata = self.t.transform(indata, adapted_config, parameters)
         if self.t.reparse:
-            outdata = etree.fromstring(etree.tostring(outdata))
+            outdata = etree.parse(BytesIO(etree.tostring(outdata)))
         if uritransform:
-            self._transform_links(outdata, uritransform)
+            self._transform_links(outdata.getroot(), uritransform)
         return outdata
 
     def _transform_links(self, tree, uritransform):
