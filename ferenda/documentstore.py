@@ -16,6 +16,7 @@ import shutil
 import unicodedata
 from urllib.parse import quote, unquote
 from gzip import GzipFile
+from datetime import datetime
 try:
     # the special py2 backported version of BZ2File, that can wrap existing fileobjects
     from bz2file import BZ2File
@@ -29,6 +30,7 @@ except ImportError:
 
 from ferenda import util
 from ferenda import errors
+from ferenda import DocumentEntry
 
 
 def _compressed_suffix(compression):
@@ -328,7 +330,7 @@ class DocumentStore(object):
             outfile = self.parsed_path(basefile)
             return not util.outfile_is_newer([infile], outfile)
         elif action == "relate":
-            entry = DocumentEntry(self.store.documententry_path(basefile))
+            entry = DocumentEntry(self.documententry_path(basefile))
             def newer(filename, dt):
                 if not os.path.exists(filename):
                     return False
@@ -336,19 +338,19 @@ class DocumentStore(object):
                     return True
                 else:
                     return datetime.fromtimestamp(os.stat(filename).st_mtime) > dt
-            return Relate(fulltext=newer(self.store.parsed_path(basefile), entry.indexed_ft),
-                          triples=newer(self.store.distilled_path(basefile), entry.indexed_ts),
-                          dependencies=newer(self.store.distilled_path(basefile), entry.indexed_dep))
+            return Relate(fulltext=newer(self.parsed_path(basefile), entry.indexed_ft),
+                          triples=newer(self.distilled_path(basefile), entry.indexed_ts),
+                          dependencies=newer(self.distilled_path(basefile), entry.indexed_dep))
         elif action == "generate":
-            infile = self.store.parsed_path(basefile)
-            annotations = self.store.annotation_path(basefile)
-            if os.path.exists(self.store.dependencies_path(basefile)):
-                deptxt = util.readfile(self.store.dependencies_path(basefile))
+            infile = self.parsed_path(basefile)
+            annotations = self.annotation_path(basefile)
+            if os.path.exists(self.dependencies_path(basefile)):
+                deptxt = util.readfile(self.dependencies_path(basefile))
                 dependencies = deptxt.strip().split("\n")
             else:
                 dependencies = []
             dependencies.extend((infile, annotations))
-            outfile = self.store.generated_path(basefile)
+            outfile = self.generated_path(basefile)
             return util.outfile_is_newer(dependencies, outfile)
         else:
             # custom actions will need to override needed and provide logic there
