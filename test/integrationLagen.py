@@ -170,28 +170,28 @@ class TestPatching(TestLagen):
 class TestConNeg(TestLagen):
     # this basically mirrors testWSGI.ConNeg
     def test_basic(self):
-        res = self.get(self.baseurl + "1991:1469")
+        res = self.get(self.baseurl + "1998:204")
         self.assertEqual(200, res.status_code)
         self.assertEqual("text/html; charset=utf-8", res.headers['Content-Type'])
 
     def test_xhtml(self):
-        res = self.get(self.baseurl + "1991:1469",
+        res = self.get(self.baseurl + "1998:204",
                        headers={'Accept': 'application/xhtml+xml'})
         self.assertEqual(200, res.status_code)
         self.assertEqual("application/xhtml+xml", res.headers['Content-Type'])
         # variation: use file extension
-        res = self.get(self.baseurl + "1991:1469.xhtml")
+        res = self.get(self.baseurl + "1998:204.xhtml")
         self.assertEqual(200, res.status_code)
         self.assertEqual("application/xhtml+xml", res.headers['Content-Type'])
 
     def test_rdf(self):
         # basic test 3: accept: application/rdf+xml -> RDF statements (in XML)
-        res = self.get(self.baseurl + "1991:1469",
+        res = self.get(self.baseurl + "1998:204",
                        headers={'Accept': 'application/rdf+xml'})
         self.assertEqual(200, res.status_code)
         self.assertEqual("application/rdf+xml", res.headers['Content-Type'])
         # variation: use file extension
-        res = self.get(self.baseurl + "1991:1469.rdf")
+        res = self.get(self.baseurl + "1998:204.rdf")
         self.assertEqual(200, res.status_code)
         self.assertEqual("application/rdf+xml", res.headers['Content-Type'])
 
@@ -199,8 +199,8 @@ class TestConNeg(TestLagen):
         # transform test 4: accept: text/plain -> RDF statements (in NTriples)
 
         # get the untransformed data to compare with
-        g = Graph().parse(data=self.get(self.baseurl + "1991:1469.rdf").text)
-        res = self.get(self.baseurl + "1991:1469",
+        g = Graph().parse(data=self.get(self.baseurl + "1998:204.rdf").text)
+        res = self.get(self.baseurl + "1998:204",
                        headers={'Accept': 'text/plain'})
         self.assertEqual(200, res.status_code)
         self.assertEqual("text/plain", res.headers['Content-Type'])
@@ -208,7 +208,7 @@ class TestConNeg(TestLagen):
         self.assertEqualGraphs(g, got)
 
         # variation: use file extension
-        res = self.get(self.baseurl + "1991:1469.nt")
+        res = self.get(self.baseurl + "1998:204.nt")
         self.assertEqual(200, res.status_code)
         self.assertEqual("text/plain", res.headers['Content-Type'])
         got = Graph()
@@ -217,8 +217,8 @@ class TestConNeg(TestLagen):
 
     def test_turtle(self):
         # transform test 5: accept: text/turtle -> RDF statements (in Turtle)
-        g = Graph().parse(data=self.get(self.baseurl + "1991:1469.rdf").text)
-        res = self.get(self.baseurl + "1991:1469",
+        g = Graph().parse(data=self.get(self.baseurl + "1998:204.rdf").text)
+        res = self.get(self.baseurl + "1998:204",
                        headers={'Accept': 'text/turtle'})
         self.assertEqual(200, res.status_code)
         self.assertEqual("text/turtle", res.headers['Content-Type'])
@@ -226,7 +226,7 @@ class TestConNeg(TestLagen):
         self.assertEqualGraphs(g, got)
 
         # variation: use file extension
-        res = self.get(self.baseurl + "1991:1469.ttl")
+        res = self.get(self.baseurl + "1998:204.ttl")
         self.assertEqual(200, res.status_code)
         self.assertEqual("text/turtle", res.headers['Content-Type'])
         got = Graph()
@@ -235,8 +235,8 @@ class TestConNeg(TestLagen):
 
     def test_json(self):
         # transform test 6: accept: application/json -> RDF statements (in JSON-LD)
-        g = Graph().parse(data=self.get(self.baseurl + "1991:1469.rdf").text)
-        res = self.get(self.baseurl + "1991:1469",
+        g = Graph().parse(data=self.get(self.baseurl + "1998:204.rdf").text)
+        res = self.get(self.baseurl + "1998:204",
                        headers={'Accept': 'application/json'})
         self.assertEqual(200, res.status_code)
         self.assertEqual("application/json", res.headers['Content-Type'])
@@ -244,7 +244,7 @@ class TestConNeg(TestLagen):
         self.assertEqualGraphs(g, got)
 
         # variation: use file extension
-        res = self.get(self.baseurl + "1991:1469.json")
+        res = self.get(self.baseurl + "1998:204.json")
         self.assertEqual(200, res.status_code)
         self.assertEqual("application/json", res.headers['Content-Type'])
         got = Graph()
@@ -252,21 +252,21 @@ class TestConNeg(TestLagen):
         self.assertEqualGraphs(g, got)
 
     def test_unacceptable(self):
-        res = self.get(self.baseurl + "1991:1469",
+        res = self.get(self.baseurl + "1998:204",
                        headers={'Accept': 'application/pdf'})
         self.assertEqual(res.status_code, 406)
         self.assertEqual("text/html; charset=utf-8", res.headers['Content-Type'])
 
         # variation: unknown file extension should also be unacceptable
-        res = self.get(self.baseurl + "1991:1469.pdf")
+        res = self.get(self.baseurl + "1998:204.pdf")
         self.assertEqual(res.status_code, 406)
         self.assertEqual("text/html; charset=utf-8", res.headers['Content-Type'])
 
     def test_extended_rdf(self):
         # extended test 6: accept: "/data" -> extended RDF statements
-        g = Graph().parse(data=self.get(self.baseurl + "1991:1469/data.rdf").text)
+        g = Graph().parse(data=self.get(self.baseurl + "1998:204/data.rdf").text)
         
-        res = self.get(self.baseurl + "1991:1469/data",
+        res = self.get(self.baseurl + "1998:204/data",
                        headers={'Accept': 'application/rdf+xml'})
         self.assertEqual(200, res.status_code)
         self.assertEqual("application/rdf+xml", res.headers['Content-Type'])
@@ -276,15 +276,15 @@ class TestConNeg(TestLagen):
     def test_extended_ntriples(self):
         # extended test 7: accept: "/data" + "text/plain" -> extended
         # RDF statements in NTriples
-        g = Graph().parse(data=self.get(self.baseurl + "1991:1469/data.rdf").text)
-        res = self.get(self.baseurl + "1991:1469/data",
+        g = Graph().parse(data=self.get(self.baseurl + "1998:204/data.rdf").text)
+        res = self.get(self.baseurl + "1998:204/data",
                      headers={'Accept': 'text/plain'})
         self.assertEqual(200, res.status_code)
         self.assertEqual("text/plain", res.headers['Content-Type'])
         got = Graph().parse(data=res.text, format="nt")
         self.assertEqualGraphs(g, got)
         # variation: use file extension
-        res = self.get(self.baseurl + "1991:1469/data.nt")
+        res = self.get(self.baseurl + "1998:204/data.nt")
         self.assertEqual(200, res.status_code)
         self.assertEqual("text/plain", res.headers['Content-Type'])
         got = Graph().parse(data=res.text, format="nt")
@@ -293,15 +293,15 @@ class TestConNeg(TestLagen):
     def test_extended_turtle(self):
         # extended test 7: accept: "/data" + "text/turtle" -> extended
         # RDF statements in Turtle
-        g = Graph().parse(data=self.get(self.baseurl + "1991:1469/data.rdf").text)
-        res = self.get(self.baseurl + "1991:1469/data",
+        g = Graph().parse(data=self.get(self.baseurl + "1998:204/data.rdf").text)
+        res = self.get(self.baseurl + "1998:204/data",
                      headers={'Accept': 'text/turtle'})
         self.assertEqual(200, res.status_code)
         self.assertEqual("text/turtle", res.headers['Content-Type'])
         got = Graph().parse(data=res.content, format="turtle")
         self.assertEqualGraphs(g, got)
         # variation: use file extension
-        res = self.get(self.baseurl + "1991:1469/data.ttl")
+        res = self.get(self.baseurl + "1998:204/data.ttl")
         self.assertEqual(200, res.status_code)
         self.assertEqual("text/turtle", res.headers['Content-Type'])
         got = Graph().parse(data=res.content, format="turtle")
@@ -468,14 +468,14 @@ class TestSearch(TestLagen):
         self.assertTrue(hit)
         
     def test_scoring(self):
-        # really a regression test -- this query should never match anything other than prop/sou/dir
+        # really a regression test -- this query should never match anything other than prop/sou/ds/dir
         soup = BeautifulSoup(self.get(self.baseurl + "search/?q=bulvanutredningen").text,
                              "lxml")
         hits = soup.find_all("section", "hit")
         self.assertTrue(hits)
         for hit in hits:
-            self.assertTrue(hit.b.a.get("href").startswith(("/prop/", "/dir/", "/sou/")),
-                            "%s isn't prop/dir/sou" % hit.b.a.get("href"))
+            self.assertTrue(hit.b.a.get("href").startswith(("/prop/", "/dir/", "/sou/", "/ds/")),
+                            "%s isn't prop/dir/sou/ds" % hit.b.a.get("href"))
         
     def test_innerhits(self):
         soup = BeautifulSoup(self.get(self.baseurl + "search/?q=personuppgiftsbiträde&type=sou&issued=2017").text, "lxml") # should match SOU 2017:66

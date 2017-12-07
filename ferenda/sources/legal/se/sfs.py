@@ -1899,11 +1899,16 @@ class SFS(Trips):
                     self._document_name_cache[parts[
                         'law']] = changes[0]['title']
                 else:
-                    self._document_name_cache[parts[
-                        'law']] = "SFS %s" % parts['law']
-                    # print "Cache miss for %s (%s)" % (parts['law'],
-                    #                              self._document_name_cache[parts['law']])
-
+                    basefile = self.basefile_from_uri(uri)
+                    # the metadata hasn't been placed in the triple store yet. but maybe it exists on disk in a RDF file?
+                    with self.store.open_distilled(basefile, "rb") as fp:
+                        g = Graph().parse(fp)
+                    title = g.value(URIRef(self.canonical_uri(basefile)), DCTERMS.title)
+                    if not title:
+                        title = "SFS %s" % parts['law']
+                        # print("Cache miss for %s (%s)" % (parts['law'],
+                        #                                   self._document_name_cache[parts['law']]))
+                    self._document_name_cache[parts['law']] = str(title)
             res += self._document_name_cache[parts['law']]
             return res
         elif form == "relative":
