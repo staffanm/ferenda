@@ -10,6 +10,19 @@ from rdflib import URIRef
 
 from ferenda import DocumentRepository
 from ferenda.elements import CompoundElement, OrdinalElement
+from . import EURLex
+
+class EURLexTreaties(EURLex):
+    alias = "eurlextreaties"
+    # only select treaties dealing with principles, objectives and
+    # tasks of the treaties. These resources are available both in
+    # complete document form (around 30-40 docs) and split up as
+    # articles (around 2000 other resources). Need to find some way of
+    # filtering out the crap.
+    query_template = "SELECT CELLAR_ID, TI_DISPLAY, DN, DD WHERE DTS_SUBDOM = TREATIES AND CT_CODED = PRIN"
+    
+
+
 
 # More TODO: create test/files/repo/eut/source/all.json like
 # {'http://eur-lex.europa.eu/LexUriServ/LexUriServ.do?uri=OJ:C:2008:115:0001:01:EN:HTML': 'treaties.html'}
@@ -87,7 +100,7 @@ class ListItem(CompoundElement):
     rdf_type = URIRef(vocab_uri + "ListItem")
 
 
-class EurlexTreaties(DocumentRepository):
+class OldEurlexTreaties(DocumentRepository):
 
     """Handles the foundation treaties of the European union."""
     # overrides of superclass variables

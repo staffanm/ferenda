@@ -1,3 +1,5 @@
 # flake8: noqa
-from .eurlexcaselaw import EurlexCaselaw
-from .eurlextreaties import EurlexTreaties
+from .eurlex import EURLex
+from .acts import EURLexActs
+from .caselaw import EURLexCaselaw
+from .treaties import EURLexTreaties

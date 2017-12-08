@@ -261,6 +261,9 @@ class DocumentRepository(object):
     during download will NOT raise and error. Instead, the download
     process will just move on to the next identified basefile."""
 
+    download_accept_406 = False
+    # same
+    
     download_reverseorder = False
     """It ``True`` (default: ``False``), download_get_basefiles will
     process recieved basefiles in reverse order."""
@@ -789,6 +792,13 @@ with the *config* object as single parameter.
                                                     link)
                 except requests.exceptions.HTTPError as e:
                     if self.download_accept_404 and e.response.status_code == 404:
+                        self.log.error("%s: %s %s" % (basefile, link, e))
+                        ret = False
+                    elif self.download_accept_406 and e.response.status_code == 406:
+                        # The Eurlex CELLAR service sometimes return
+                        # this (if a doc is not available in our
+                        # wanted language, I think?) and we'd like to
+                        # distinguish this from a 404 error
                         self.log.error("%s: %s %s" % (basefile, link, e))
                         ret = False
                     else:

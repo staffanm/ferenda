@@ -11,13 +11,19 @@ from rdflib import Graph
 from ferenda import DocumentRepository
 from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda.elements import Paragraph
+from . import EURLex
+
+class EURLexCaselaw(EURLex):
+    alias = "eurlexcaselaw"
+    # only select judgments and AG opinions
+    query_template = "SELECT CELLAR_ID, TI_DISPLAY, DN, DD WHERE (FM_CODED = JUDG OR FM_CODED = OPIN_AG) AND DD >= 01/01/2017 <= 31/12/2017 ORDER BY DD ASC"
+    
+
 
 # FIXME: 2008.json, containing a handful of cases, some which should not be fetched, and one continuation link.
 #        A few downloaded/62008CN0028.html (abbreviated)
 #        Corresponding parsed/62008CN0028.xhtml and distilled/62008CN0028.ttl
-
-
-class EurlexCaselaw(DocumentRepository):
+class OldEurlexCaselaw(DocumentRepository):
 
     """Handles all case law from the European Court of Justice (ECJ)."""
     alias = "ecj"  # European Court of Justice
