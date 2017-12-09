@@ -6,6 +6,7 @@ from builtins import *
 # A abstract base class for fetching and parsing documents
 # (particularly preparatory works) from regeringen.se
 import os
+from time import sleep
 import re
 import codecs
 import json
@@ -108,6 +109,7 @@ class Regeringen(Offtryck):
         try: 
             for basefile, url in self.download_get_basefiles(params):
                 try:
+                    # sleep(0.5)  # regeringen.se has a tendency to throw 400 errors, maybe because we're too quick?
                     self.download_single(basefile, url)
                 except requests.exceptions.HTTPError as e:
                     if self.download_accept_404 and e.response.status_code == 404:
@@ -191,6 +193,12 @@ class Regeringen(Offtryck):
             searchurl = self.start_url + "?" + qsparams
             self.log.debug("Loading page #%s" % params.get('page', 1))
             resp = self.session.get(searchurl)
+            if resp.status_code >= 400:
+                self.log.warning("GET %s returned 400, pausing and retrying..." % searchurl)
+                sleep(0.5)
+                # avoid using the established session, maybe it'll help?
+                resp = requests.get(searchurl)
+
             tree = lxml.etree.fromstring(resp.text)
             done = True
             for item in tree.findall(".//item"):

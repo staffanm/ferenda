@@ -986,7 +986,7 @@ with the *config* object as single parameter.
         if response.status_code == 304:
             self.log.debug("%s: 304 Not modified" % url)
             return False  # ie not updated
-        elif response.status_code > 400:
+        elif response.status_code >= 400:
             self.log.error("Failed to retrieve %s" % url)
             response.raise_for_status()
 
