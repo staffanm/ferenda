@@ -903,7 +903,7 @@ with the *config* object as single parameter.
 
         return updated
 
-    def _addheaders(self, filename=None):
+    def _addheaders(self, url, filename=None):
         headers = {"User-agent": self.config.useragent}
         if filename:
             # we set both if-none-match and if-modified-since if we
@@ -945,9 +945,9 @@ with the *config* object as single parameter.
             assumedfilename = filename
         if self.config.conditionalget:
             # sets if-none-match and/or if-modified-since headers
-            headers = self._addheaders(assumedfilename)
+            headers = self._addheaders(url, assumedfilename)
         else:
-            headers = self._addheaders()
+            headers = self._addheaders(url)
 
         fileno, tmpfile = mkstemp()
         fp = os.fdopen(fileno)
@@ -962,6 +962,7 @@ with the *config* object as single parameter.
         try:
             while (not fetched) and (remaining_attempts > 0):
                 try:
+                    import pudb; pu.db
                     response = self.session.get(url, headers=headers, timeout=10)
                     fetched = True
                 # socket.timeout ought to be caught by requests and

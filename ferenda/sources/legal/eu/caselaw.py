@@ -16,7 +16,8 @@ from . import EURLex
 class EURLexCaselaw(EURLex):
     alias = "eurlexcaselaw"
     # only select judgments and AG opinions
-    query_template = "SELECT CELLAR_ID, TI_DISPLAY, DN, DD WHERE (FM_CODED = JUDG OR FM_CODED = OPIN_AG) AND DD >= 01/01/2017 <= 31/12/2017 ORDER BY DD ASC"
+    # query_template = "SELECT CELLAR_ID, TI_DISPLAY, DN, DD WHERE (FM_CODED = JUDG OR FM_CODED = OPIN_AG) ORDER BY DD ASC"
+    query_template = "(FM_CODED = JUDG OR FM_CODED = OPIN_AG) ORDER BY DD ASC"
     
 
 
