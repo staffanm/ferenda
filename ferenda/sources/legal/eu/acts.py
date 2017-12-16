@@ -1,3 +1,5 @@
+import re
+
 from . import EURLex
 
 class EURLexActs(EURLex):
@@ -9,5 +11,7 @@ class EURLexActs(EURLex):
     # of crap) Unfortunately, we also need teh (DTT = R OR DTT = L)
     # clause (only select requlations or directives) or we'll get a
     # bunch of differnent crap (in sector 6, ie ECJ, and other)
-    query_template = "SELECT CELLAR_ID, TI_DISPLAY, DN, DD WHERE DTS_SUBDOM = EU_LAW_ALL AND (DTT = R OR DTT = L) AND DD >= 01/01/2017 <= 31/12/2017 ORDER BY DD ASC"
+    # expertquery_template = "SELECT CELLAR_ID, TI_DISPLAY, DN, DD WHERE DTS_SUBDOM = EU_LAW_ALL AND (DTT = R OR DTT = L) AND DD >= 01/01/2017 <= 31/12/2017 ORDER BY DD ASC"
+    expertquery_template = "DTS_SUBDOM = EU_LAW_ALL AND (DTT = R OR DTT = L)"
+    celexfilter = re.compile("(3\d{4}[RL]\d{4})$").match
     

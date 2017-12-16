@@ -19,8 +19,9 @@ class EURLexTreaties(EURLex):
     # complete document form (around 30-40 docs) and split up as
     # articles (around 2000 other resources). Need to find some way of
     # filtering out the crap.
-    query_template = "SELECT CELLAR_ID, TI_DISPLAY, DN, DD WHERE DTS_SUBDOM = TREATIES AND CT_CODED = PRIN"
-    
+    expertquery_template = "DTS_SUBDOM = TREATIES AND CT_CODED = PRIN"
+    celexfilter = re.compile("(1\d{4}[A-Z]{1,2})/TXT$").match
+
 
 
 

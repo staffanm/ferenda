@@ -815,3 +815,33 @@ def base27decode(num):
     b = 27
     return ((num == 0) and base27alphabet[0] ) or (base27decode(num // b ).lstrip(base27alphabet[0]) + base27alphabet[num % b])
 
+
+def robust_fetch(method, url, logger, attempts=5, pause=1, *args, **kwargs):
+    fetched = False
+    try:
+        while (not fetched) and (attempts > 0):
+            try:
+                response = method(url, *args, **kwargs)
+                fetched = True
+            except (requests.exceptions.ConnectionError,
+                        requests.exceptions.Timeout,
+                        socket.timeout) as e:
+                    logger.warning(
+                        "Failed to fetch %s: err %s (%s remaining attempts)" %
+                        (url, e, remaining_attempts))
+                    remaining_attempts -= 1
+                    time.sleep(sleep)
+        if not fetched:
+            logger.error("Failed to fetch %s, giving up" % url)
+            raise e
+    except requests.exceptions.RequestException as e:
+            self.log.error("Failed to fetch %s: error %s" % (url, e))
+            raise e
+    if response.status_code == 304:
+        self.log.debug("%s: 304 Not modified" % url)
+        return False  # ie not updated
+    elif response.status_code >= 400:
+        self.log.error("Failed to retrieve %s" % url)
+        response.raise_for_status()
+    else:
+        return response

@@ -16,10 +16,14 @@ from . import EURLex
 class EURLexCaselaw(EURLex):
     alias = "eurlexcaselaw"
     # only select judgments and AG opinions
-    # query_template = "SELECT CELLAR_ID, TI_DISPLAY, DN, DD WHERE (FM_CODED = JUDG OR FM_CODED = OPIN_AG) ORDER BY DD ASC"
-    query_template = "(FM_CODED = JUDG OR FM_CODED = OPIN_AG) ORDER BY DD ASC"
-    
-
+    # expertquery_template = "SELECT CELLAR_ID, TI_DISPLAY, DN, DD WHERE (FM_CODED = JUDG OR FM_CODED = OPIN_AG) ORDER BY DD ASC"
+    expertquery_template = "(FM_CODED = JUDG OR FM_CODED = OPIN_AG)"
+    contenttype = "text/html"  # legal cases OUGHT to be available as
+                               # xhtml, and the "branch notice"
+                               # indicates that they are, but in
+                               # reality they're not.
+    downloaded_suffix = ".html"
+    celexfilter = re.compile("(6\d{4}[A-Z]{2}\d{4})$").match
 
 # FIXME: 2008.json, containing a handful of cases, some which should not be fetched, and one continuation link.
 #        A few downloaded/62008CN0028.html (abbreviated)

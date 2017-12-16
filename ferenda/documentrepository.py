@@ -781,8 +781,10 @@ with the *config* object as single parameter.
         else:
             source = resp.text
         for (basefile, link) in self.download_get_basefiles(source):
+            downloaded_path = self.store.downloaded_path(basefile)
             if (refresh or
-                    (not os.path.exists(self.store.downloaded_path(basefile)))):
+                not os.path.exists(downloaded_path) or
+                os.path.getsize(downloaded_path) == 0):
                 ret = None
                 try:
                     ret = DocumentEntry.updateentry(self.download_single,
@@ -878,7 +880,7 @@ with the *config* object as single parameter.
         created = False
 
         filename = self.store.downloaded_path(basefile)
-        created = not os.path.exists(filename)
+        created = not os.path.exists(filename) or os.path.getsize(filename) == 0
         # util.print_open_fds()
         
         if self.download_if_needed(url, basefile, archive=self.download_archive):
@@ -918,7 +920,7 @@ with the *config* object as single parameter.
                 headers["If-modified-since"] = format_http_date(stamp)
         return headers
 
-    def download_if_needed(self, url, basefile, archive=True, filename=None, sleep=1):
+    def download_if_needed(self, url, basefile, archive=True, filename=None, sleep=1, extraheaders=None):
         """Downloads a remote resource to a local file. If a different
         version is already in place, archive that old version.
 
@@ -943,11 +945,14 @@ with the *config* object as single parameter.
             assumedfilename = self.store.downloaded_path(basefile)
         else:
             assumedfilename = filename
+
         if self.config.conditionalget:
             # sets if-none-match and/or if-modified-since headers
             headers = self._addheaders(url, assumedfilename)
         else:
             headers = self._addheaders(url)
+        if extraheaders:
+            headers.update(extraheaders)
 
         fileno, tmpfile = mkstemp()
         fp = os.fdopen(fileno)
@@ -957,39 +962,13 @@ with the *config* object as single parameter.
         # called repeatedly, we take extra precautions in the event of
         # temporary network failures etc. Try 5 times with 1 second
         # pause inbetween before giving up.
-        fetched = False
-        remaining_attempts = 5
-        try:
-            while (not fetched) and (remaining_attempts > 0):
-                try:
-                    import pudb; pu.db
-                    response = self.session.get(url, headers=headers, timeout=10)
-                    fetched = True
-                # socket.timeout ought to be caught by requests and
-                # repackaged as requests.exceptions.Timeout, but in
-                # one case it wasn't
-                except (requests.exceptions.ConnectionError,
-                        requests.exceptions.Timeout,
-                        socket.timeout) as e:
-                    self.log.warning(
-                        "Failed to fetch %s: err %s (%s remaining attempts)" %
-                        (url, e, remaining_attempts))
-                    remaining_attempts -= 1
-                    time.sleep(sleep)
 
-            if not fetched:
-                self.log.error("Failed to fetch %s, giving up" % url)
-                return False
-        # handles other errors except ConnectionError
-        except requests.exceptions.RequestException as e:
-            self.log.error("Failed to fetch %s: error %s" % (url, e))
-            raise e
-        if response.status_code == 304:
-            self.log.debug("%s: 304 Not modified" % url)
-            return False  # ie not updated
-        elif response.status_code >= 400:
-            self.log.error("Failed to retrieve %s" % url)
-            response.raise_for_status()
+        # FIXME: replace with util.robust_fetch
+        try:
+            response = util.robust_fetch(self.session.get, url, self.log, headers=headers, timeout=10)
+        except Exception:
+            # robust_fetch has already logged this error, we simply quit
+            return False
 
         with open(tmpfile, "wb") as fp:
             fp.write(response.content)
