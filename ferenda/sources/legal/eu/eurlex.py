@@ -81,9 +81,15 @@ class EURLex(DocumentRepository):
 """ % (self.config.username, self.config.password, escape(query, quote=False), page, self.pagesize, self.lang)
         headers = {'Content-Type': 'application/soap+xml; charset=utf-8; action="http://eur-lex.europa.eu/EURLexWebService/doQuery"',
                    'SOAPAction': '"http://eur-lex.europa.eu/EURLexWebService/doQuery"'}
-        return self.session.post('http://eur-lex.europa.eu/EURLexWebService',
-                                 data=envelope,
-                                 headers=headers)
+        res = self.session.post('http://eur-lex.europa.eu/EURLexWebService',
+                                data=envelope,
+                                headers=headers)
+        if res.status_code == 500:
+            tree = etree.parse(BytesIO(res.content))
+            statuscode = tree.find(".//{http://www.w3.org/2003/05/soap-envelope}Subcode")[0].text
+            statusmsg = tree.find(".//{http://www.w3.org/2003/05/soap-envelope}Text").text
+            raise errors.DownloadError("%s: %s" % (statuscode, statusmsg))
+        return res
         
     def construct_expertquery(self, query_template):
         if 'lastdownload' in self.config and not self.config.refresh:
@@ -217,6 +223,7 @@ class EURLex(DocumentRepository):
                 try:
                     title = result.find(".//{http://eur-lex.europa.eu/search}EXPRESSION_TITLE")[0].text
                 except TypeError:
+                    self.log.info("%s: Lacks title, the resource might not be available in %s" % (cellarid, self.lang))
                     continue # if we don't have a title, we probably don't have this resource in the required language
                 celex = result.find(".//{http://eur-lex.europa.eu/search}ID_CELEX")[0].text
                 match = self.celexfilter(celex)
