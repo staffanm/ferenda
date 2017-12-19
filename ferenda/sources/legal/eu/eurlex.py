@@ -1,6 +1,6 @@
-# base class that abstracts acess to the EUR-Lex web services and the Cellar repository. Uses CELEX ids for basefiles, but stores them sharded per year
-# from zeep import Client
-# from zeep.wsse.username import UsernameToken
+# base class that abstracts acess to the EUR-Lex web services and the
+# Cellar repository. Uses CELEX ids for basefiles, but stores them
+# sharded per year
 from lxml import etree
 from io import BytesIO
 import requests
@@ -8,7 +8,10 @@ import os
 import re
 from math import ceil
 from html import escape
+import email
+import tempfile
 
+import requests
 from bs4 import BeautifulSoup
 from rdflib import Graph, Namespace, URIRef
 from rdflib.resource import Resource
@@ -34,6 +37,27 @@ class EURLexStore(DocumentStore):
         return basefile
     
 
+# this implements some common request.Response properties/methods so
+# that it can be used in plpace of a real request.Response object
+class FakeResponse(object):
+
+    def __init__(self, status_code, text, headers):
+        self.status_code = status_code
+        self.text = text
+        self.headers = headers
+
+    @property
+    def content(self):
+        default = "text/html; encoding=utf-8"
+        encoding = self.headers.get("Content-type", default).split("encoding=")[1]
+        return self.text.encode(encoding)
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise ValueError(self.status_code)
+        
+        
+    
 class EURLex(DocumentRepository):
     alias = "eurlex"
     start_url = "http://eur-lex.europa.eu/eurlex-ws?wsdl"
@@ -53,6 +77,9 @@ class EURLex(DocumentRepository):
     def get_default_options(cls):
         opts = super(EURLex, cls).get_default_options()
         opts['languages'] = ['eng']
+        opts['curl'] = True  # if True, the web service is called
+                              # with command-line curl, not the
+                              # requests module (avoids timeouts)
         return opts
 
     def dump_graph(self, celexid, graph):
@@ -60,6 +87,10 @@ class EURLex(DocumentRepository):
             fp.write(graph.serialize(format="ttl"))
 
     def query_webservice(self, query, page):
+        # this is the only soap template we'll need, so we include it
+        # verbatim to avoid having a dependency on a soap module like
+        # zeep.
+        endpoint = 'http://eur-lex.europa.eu/EURLexWebService'
         envelope = """<soap-env:Envelope xmlns:soap-env="http://www.w3.org/2003/05/soap-envelope">
   <soap-env:Header>
     <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
@@ -80,10 +111,36 @@ class EURLex(DocumentRepository):
 </soap-env:Envelope>
 """ % (self.config.username, self.config.password, escape(query, quote=False), page, self.pagesize, self.lang)
         headers = {'Content-Type': 'application/soap+xml; charset=utf-8; action="http://eur-lex.europa.eu/EURLexWebService/doQuery"',
-                   'SOAPAction': '"http://eur-lex.europa.eu/EURLexWebService/doQuery"'}
-        res = self.session.post('http://eur-lex.europa.eu/EURLexWebService',
-                                data=envelope,
-                                headers=headers)
+                   'SOAPAction': 'http://eur-lex.europa.eu/EURLexWebService/doQuery'}
+        if self.config.curl:
+            # dump the envelope to a tempfile
+            headerstr = ""
+            for k, v in headers.items():
+                assert "'" not in v  # if it is, we need to work on escaping it
+                headerstr += " --header '%s: %s'" % (k, v)
+            with tempfile.NamedTemporaryFile() as fp:
+                fp.write(envelope.encode("utf-8"))
+                fp.flush()
+                envelopename = fp.name
+                headerfiledesc, headerfilename = tempfile.mkstemp()
+                cmd = 'curl -X POST -D %(headerfilename)s --data-binary "@%(envelopename)s" %(headerstr)s %(endpoint)s' % locals()
+                (ret, stdout, stderr) = util.runcmd(cmd)
+            headerfp = os.fdopen(headerfiledesc)
+            header = headerfp.read()
+            headerfp.close()
+            util.robust_remove(headerfilename)
+            status, headers = header.split('\n', 1)
+            prot, code, msg = status.split(" ", 2)
+            headers = dict(email.message_from_string(headers).items())
+            res = FakeResponse(int(code), stdout, headers)
+        else:
+            res = util.robust_fetch(self.session.post, url
+                                    , self.log,
+                                    raise_for_status=False,
+                                    data=envelope,
+                                    headers=headers,
+                                    timeout=10)
+            
         if res.status_code == 500:
             tree = etree.parse(BytesIO(res.content))
             statuscode = tree.find(".//{http://www.w3.org/2003/05/soap-envelope}Subcode")[0].text
@@ -102,11 +159,15 @@ class EURLex(DocumentRepository):
         return self.query_webservice(self.construct_expertquery(self.expertquery_template), 1)
 
     def get_treenotice_graph(self, cellarurl, celexid):
+        # avoid HTTP call if we already have the data
+        if os.path.exists(self.store.intermediate_path(celexid, suffix=".ttl")):
+            self.log.info("%s: Opening existing TTL file" % celexid)
+            with self.store.open_intermediate(celexid, suffix=".ttl") as fp:
+                return Graph().parse(data=fp.read(), format="ttl")
         # FIXME: read the rdf-xml data line by line and construct a
         # graph by regex-parsing interesting lines with a very simple
         # state machine, rather than doing a full parse, to speed
         # things up
-        # resp = self.session.get(cellarurl,headers={"Accept": "application/rdf+xml;notice=tree"}, timeout=10)
         resp = util.robust_fetch(self.session.get, cellarurl, self.log, headers={"Accept": "application/rdf+xml;notice=tree"}, timeout=10)
         if not resp:
             return None
@@ -117,7 +178,7 @@ class EURLex(DocumentRepository):
         return graph
     
     def find_manifestation(self, cellarid, celexid):
-        cellarurl = "http://publications.europa.eu/resource/cellar/%s?language=swe" % cellarid
+        cellarurl = "http://publications.europa.eu/resource/cellar/%s?language=%s" % (cellarid, self.languages[0])
         graph = self.get_treenotice_graph(cellarurl, celexid)
         if graph is None:
             return None, None, None, None
@@ -167,11 +228,20 @@ class EURLex(DocumentRepository):
                     for t in ("fmx4", "xhtml", "html", "pdf", "pdfa1a"):
                         if t in candidateitem:
                             item = candidateitem[t]
-                            return lang, t, str(item.value(CMR.manifestationMimeType)), str(item.identifier)
+                            mimetype = str(item.value(CMR.manifestationMimeType))
+                            self.log.info("%s: Has manifestation %s (%s) in language %s" % (celexid, t,mimetype, lang))
+                            # we might need this even outside of
+                            # debugging (eg when downloading
+                            # eurlexcaselaw, the main document lacks
+                            # keywords, classifications, instruments
+                            # cited etc.
+                            self.dump_graph(celexid, graph) 
+                            return lang, t, mimetype, str(item.identifier)
                 else:
                     if candidateitem:
                         self.log.warning("%s: Language %s had no suitable manifestations" %
                                          (celexid, lang))
+        self.log.warning("%s: No language (tried %s) had any suitable manifestations" % (celexid, ", ".join(candidateexpressions.keys())))
         self.dump_graph(celexid, graph)
         return None, None, None, None
 
@@ -219,21 +289,27 @@ class EURLex(DocumentRepository):
                 processedhits += 1
                 cellarid = result.find(".//{http://eur-lex.europa.eu/search}reference").text
                 cellarid = re.split("[:_]", cellarid)[2]
-                # cellarid = result.find(".//{http://eur-lex.europa.eu/search}IDENTIFIER").text
+                celex = result.find(".//{http://eur-lex.europa.eu/search}ID_CELEX")[0].text
                 try:
                     title = result.find(".//{http://eur-lex.europa.eu/search}EXPRESSION_TITLE")[0].text
                 except TypeError:
-                    self.log.info("%s: Lacks title, the resource might not be available in %s" % (cellarid, self.lang))
-                    continue # if we don't have a title, we probably don't have this resource in the required language
-                celex = result.find(".//{http://eur-lex.europa.eu/search}ID_CELEX")[0].text
+                    self.log.info("%s: Lacks title, the resource might not be available in %s" % (celex, self.lang))
                 match = self.celexfilter(celex)
                 if not match:
                     self.log.info("%s: Not matching current filter, skipping" % celex)
                     continue
                 celex = match.group(1)
                 self.log.debug("%3s: %s %.55s %s" % (idx + 1, celex, title, cellarid))
-                cellarurl = "http://publications.europa.eu/resource/cellar/%s?language=swe" % cellarid
-                yield celex, cellarurl
+                lang, filetype, mimetype, url = self.find_manifestation(cellarid, celex)
+                if filetype:
+                    # FIXME: This is an ugly way of making sure the downloaded
+                    # file gets the right suffix (due to
+                    # DocumentStore.downloaded_path choosing a filename from among
+                    # several possible suffixes based on what file already exists
+                    downloaded_path = self.store.path(celex, 'downloaded', '.'+filetype)
+                    if not os.path.exists(downloaded_path):
+                        util.writefile(downloaded_path, "")
+                    yield celex, url
             page += 1
             done = processedhits >= totalhits
             if not done:

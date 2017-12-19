@@ -15,6 +15,7 @@ import os
 import posixpath
 import re
 import shutil
+import socket
 import string
 import subprocess
 import sys
@@ -26,6 +27,7 @@ from ast import literal_eval
 from urllib.parse import urlsplit, urlunsplit
 
 from docutils.utils import roman
+import requests.exceptions
 
 from . import errors
 
@@ -816,8 +818,9 @@ def base27decode(num):
     return ((num == 0) and base27alphabet[0] ) or (base27decode(num // b ).lstrip(base27alphabet[0]) + base27alphabet[num % b])
 
 
-def robust_fetch(method, url, logger, attempts=5, pause=1, *args, **kwargs):
+def robust_fetch(method, url, logger, attempts=5, pause=1, raise_for_status=True, *args, **kwargs):
     fetched = False
+    lastexception = None
     try:
         while (not fetched) and (attempts > 0):
             try:
@@ -828,20 +831,22 @@ def robust_fetch(method, url, logger, attempts=5, pause=1, *args, **kwargs):
                         socket.timeout) as e:
                     logger.warning(
                         "Failed to fetch %s: err %s (%s remaining attempts)" %
-                        (url, e, remaining_attempts))
-                    remaining_attempts -= 1
-                    time.sleep(sleep)
+                        (url, e, attempts))
+                    attempts -= 1
+                    time.sleep(pause)
+                    lastexception = e
         if not fetched:
             logger.error("Failed to fetch %s, giving up" % url)
-            raise e
+            if lastexception:
+                raise lastexception
     except requests.exceptions.RequestException as e:
-            self.log.error("Failed to fetch %s: error %s" % (url, e))
+            logger.error("Failed to fetch %s: error %s" % (url, e))
             raise e
     if response.status_code == 304:
-        self.log.debug("%s: 304 Not modified" % url)
+        logger.debug("%s: 304 Not modified" % url)
         return False  # ie not updated
-    elif response.status_code >= 400:
-        self.log.error("Failed to retrieve %s" % url)
+    elif raise_for_status and response.status_code >= 400:
+        logger.error("Failed to retrieve %s" % url)
         response.raise_for_status()
     else:
         return response

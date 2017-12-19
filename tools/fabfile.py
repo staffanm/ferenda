@@ -8,10 +8,11 @@ macaddress = {
     "nate": "00:25:64:BA:BF:0E",
     "sophie": "00:1A:A0:C3:CE:D1",
     "alec": "64:66:B3:04:59:00",
-    "parker": "78:2B:CB:96:33:53"
+    "parker": "78:2B:CB:96:33:53",
+    "eliot": "10:C3:7B:6D:D9:50"
 }
 
-env.hosts = ["nate", "sophie", "alec", "parker"]
+env.hosts = ["nate", "sophie", "alec", "parker", "eliot"]
 env.skip_bad_hosts = True
 
 def shutdown():
