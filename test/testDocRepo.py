@@ -161,9 +161,8 @@ class Repo(RepoTester):
         
         # test2: create 2 out of 3 files. make sure download_single is
         # hit only for the remaining file.
-        util.ensure_dir(self.datadir+"/base/downloaded/123/a.html")
-        open(self.datadir+"/base/downloaded/123/a.html","w").close()
-        open(self.datadir+"/base/downloaded/123/b.html","w").close()
+        util.writefile(self.datadir+"/base/downloaded/123/a.html", "dummy")
+        util.writefile(self.datadir+"/base/downloaded/123/b.html", "dummy")
 
         with open("%s/files/base/downloaded/index.htm" % os.path.dirname(__file__)) as fp:
             mockresponse.text = fp.read()
@@ -186,8 +185,7 @@ class Repo(RepoTester):
         
         # test4: set refresh = False, create the 3rd file, make sure
         # download returns false as nothing changed
-        util.ensure_dir(self.datadir+"/base/downloaded/124/a.html")
-        open(self.datadir+"/base/downloaded/124/a.html","w").close()
+        util.writefile(self.datadir+"/base/downloaded/123/a.html", "dummy")
         d.download_single.return_value = False
         d.config.refresh = False
         with patch.object(d.session, 'get', return_value=mockresponse):
@@ -825,6 +823,7 @@ class Repo(RepoTester):
                                          'storelocation': 'b',
                                          'storerepository': 'c',
                                          'bulktripleload': False}))
+
         self.assertTrue(self.repoclass.relate_all_teardown(config))
         self.assertTrue(mock_store.connect.called)
         self.assertTrue(mock_store.connect.return_value.get_serialized_file.called)

@@ -818,7 +818,8 @@ def base27decode(num):
     return ((num == 0) and base27alphabet[0] ) or (base27decode(num // b ).lstrip(base27alphabet[0]) + base27alphabet[num % b])
 
 
-def robust_fetch(method, url, logger, attempts=5, pause=1, raise_for_status=True, *args, **kwargs):
+def robust_fetch(method, url, logger, attempts=5, sleep=1, raise_for_status=True,
+                 *args, **kwargs):
     fetched = False
     lastexception = None
     try:
@@ -833,12 +834,13 @@ def robust_fetch(method, url, logger, attempts=5, pause=1, raise_for_status=True
                         "Failed to fetch %s: err %s (%s remaining attempts)" %
                         (url, e, attempts))
                     attempts -= 1
-                    time.sleep(pause)
+                    time.sleep(sleep)
                     lastexception = e
         if not fetched:
             logger.error("Failed to fetch %s, giving up" % url)
-            if lastexception:
-                raise lastexception
+            # if lastexception:
+            #     raise lastexception
+            return False
     except requests.exceptions.RequestException as e:
             logger.error("Failed to fetch %s: error %s" % (url, e))
             raise e

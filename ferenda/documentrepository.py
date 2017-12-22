@@ -958,18 +958,14 @@ with the *config* object as single parameter.
         fp = os.fdopen(fileno)
         fp.close()
 
-        # Since this part, containing the actual HTTP request call, is
-        # called repeatedly, we take extra precautions in the event of
-        # temporary network failures etc. Try 5 times with 1 second
-        # pause inbetween before giving up.
+        # Take extra precautions in the event of temporary network
+        # failures etc -- try 5 times with 1 second pause inbetween
+        # before giving up.
+        response = util.robust_fetch(self.session.get, url, self.log,
+                                     sleep=sleep, headers=headers, timeout=10)
 
-        # FIXME: replace with util.robust_fetch
-        try:
-            response = util.robust_fetch(self.session.get, url, self.log, headers=headers, timeout=10)
-        except Exception:
-            # robust_fetch has already logged this error, we simply quit
+        if response is False:  # not modified
             return False
-
         with open(tmpfile, "wb") as fp:
             fp.write(response.content)
 
