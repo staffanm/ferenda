@@ -1,11 +1,11 @@
 Betatestning av nya versionen av lagen.nu
 =========================================
 
-Du som läser det här har fått en inbjudan att testa den kommande
+Du som läser det här har fått möjlighet att testa den kommande
 versionen av lagen.nu.
 
 Utåt sett har det inte hänt mycket med tjänsten sedan
-dess. Uppdaterade lagar och nya rättsfall har strömmat in, men i
+2009. Uppdaterade lagar och nya rättsfall har strömmat in, men i
 övrigt har den sett ut och funkat likadant hela tiden. Den största
 förändringen var kanske när den anpassades 2015 så att den är
 någotsånär användbar från en mobiltelefon eller surfplatta.
@@ -13,10 +13,6 @@ någotsånär användbar från en mobiltelefon eller surfplatta.
 Men bakom kulisserna har jag jobbat på i några år med att göra en
 nästa version. Pga heltidsarbete och småbarnsförälderliv har det tagit
 sin tid. Men nu finns den tillgänglig i en första testversion.
-
-Testversionen finns på http://ferenda.lagen.nu/. Länken är inte
-hemlig, men jag ser helst att den inte sprids just nu. Det finns även
-en beskrivning av vad som är `nytt jämfört med dagens tjänst <nytt>`_.
 
 Du får gärna testa runt tjänsten. Jag är särskilt intresserade av det
 allmänna intryck. Är det enkelt/snabbt att hitta det du vill, när du
@@ -48,7 +44,7 @@ hanterar liknande informationssamlingar, fast kanske på helt andra
 områden (se http://ferenda.readthedocs.io/en/stable/ och
 https://github.com/staffanm/ferenda/ ). Det finns även ett REST-API
 till vilket man kan ställa frågor om vilka dokument som finns inom
-vissa kriterier, och få svar i JSON-format. Det är mestadels
-odokumenterat, men följer i stort API:t för det offentliga
+vissa kriterier, och få svar i JSON-format. Det är än så länge
+mestadels odokumenterat, men följer i stort API:t för det offentliga
 rättsinformationssystemet (se
 http://dev.lagrummet.se/dokumentation/#intro-vidareutnyttjare )
