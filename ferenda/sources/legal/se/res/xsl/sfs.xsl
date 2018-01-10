@@ -159,23 +159,61 @@
   </xsl:template>
 
   <xsl:template match="xhtml:div[@typeof='rpubl:Paragraf']">
-    <div class="row" about="{//html/@about}#{@id}">
-      <section id="{@id}" class="col-sm-7">
-	<xsl:apply-templates mode="in-paragraf"/>
-      </section>
-      <xsl:call-template name="aside-annotations">
-	<xsl:with-param name="uri" select="@about"/>
-      </xsl:call-template>
-    </div>
+    <xsl:variable name="andringsmarkering">
+      <xsl:if test="xhtml:span[@rel='rinfoex:upphor']">
+	<p class="andringsdatum">/Upphör att gälla U: <xsl:value-of select="xhtml:span[@rel='rinfoex:upphor']/@content"/>/</p>
+      </xsl:if>
+      <xsl:if test="xhtml:span[@rel='rinfoex:ikrafttrader']">
+	<p class="andringsdatum">/Träder i kraft I: <xsl:value-of select="xhtml:span[@rel='rinfoex:ikrafttrader']/@content"/>/</p>
+      </xsl:if>
+    </xsl:variable>
+
+    <xsl:if test="@id">
+      <div class="row" about="{//html/@about}#{@id}">
+	<section id="{@id}" class="col-sm-7">
+	  <xsl:copy-of select="$andringsmarkering"/>
+	  <xsl:apply-templates mode="in-paragraf"/>
+	</section>
+	<xsl:call-template name="aside-annotations">
+	  <xsl:with-param name="uri" select="@about"/>
+	</xsl:call-template>
+      </div>
+    </xsl:if>
+    <xsl:if test="not(@id)">
+      <div class="row">
+	<section class="col-sm-7 ej-ikraft">
+	  <xsl:copy-of select="$andringsmarkering"/>
+	  <xsl:apply-templates mode="in-paragraf" select="xhtml:p"/>
+	</section>
+      </div>
+    </xsl:if>
   </xsl:template>
+
 
 
   <!-- this should only match elements w/o @about -->
   <xsl:template match="xhtml:h2[not(@about)]|xhtml:h3[not(@about)]">
+    <xsl:variable name="andringsmarkering">
+      <xsl:if test="xhtml:span[@rel='rinfoex:upphor']">
+	<p class="andringsdatum">/Upphör att gälla U: <xsl:value-of select="xhtml:span[@rel='rinfoex:upphor']/@content"/>/</p>
+      </xsl:if>
+      <xsl:if test="xhtml:span[@rel='rinfoex:ikrafttrader']">
+	<p class="andringsdatum">/Träder i kraft I: <xsl:value-of select="xhtml:span[@rel='rinfoex:ikrafttrader']/@content"/>/</p>
+      </xsl:if>
+    </xsl:variable>
     <div class="row">
-      <section id="{@id}" class="col-sm-7">
-	<xsl:element name="{local-name(.)}"><xsl:apply-templates/></xsl:element>
-      </section>
+      <xsl:if test="@id">
+	<section id="{@id}" class="col-sm-7">
+	  <xsl:copy-of select="$andringsmarkering"/>
+	  <xsl:element name="{local-name(.)}"><xsl:apply-templates/></xsl:element>
+	</section>
+      </xsl:if>
+      <xsl:if test="not(@id)">
+	<section class="col-sm-7 ej-ikraft">
+	  <xsl:copy-of select="$andringsmarkering"/>
+	  <xsl:element name="{local-name(.)}"><xsl:apply-templates/></xsl:element>
+	</section>
+      </xsl:if>
     </div>
   </xsl:template>
 
@@ -317,15 +355,25 @@
 	<xsl:when test="substring-after(@id,'S') = '1'"><xsl:if
 	test="substring-after(@id,'K')">K<xsl:value-of
 	select="substring-before(substring-after(@id,'K'),'P')"/></xsl:if></xsl:when>
-	<xsl:otherwise>S<xsl:value-of select="substring-after(@id,'S')"/></xsl:otherwise>
+	<xsl:when test="@id">S<xsl:value-of select="substring-after(@id,'S')"/></xsl:when>
+	<xsl:otherwise/>
       </xsl:choose>
     </xsl:variable>
     <p id="{@id}" about="{//html/@about}#{@id}">
+      <!-- marker can be empty if the Stycke has no @id (which is the
+           case for Stycke in a Paragraf which is not in force -->
       <xsl:if test="$marker != ''">
 	<a href="#{@id}" title="Permalänk till detta stycke"><img class="platsmarkor" src="../../../rsrc/img/{$marker}.png"/></a>
       </xsl:if>
       <xsl:if test="xhtml:span[@class='paragrafbeteckning']">
-	<a href="#{@id}" class="paragrafbeteckning" title="Permalänk till detta stycke"><xsl:value-of  select="xhtml:span[@class='paragrafbeteckning']"/></a>&#160;
+	<xsl:choose>
+	  <xsl:when test="$marker != ''">
+	    <a href="#{@id}" class="paragrafbeteckning" title="Permalänk till detta stycke"><xsl:value-of select="xhtml:span[@class='paragrafbeteckning']"/></a>&#160;
+	  </xsl:when>
+	  <xsl:otherwise>
+	    <xsl:value-of select="xhtml:span[@class='paragrafbeteckning']"/>&#160;
+	  </xsl:otherwise>
+	</xsl:choose>
       </xsl:if>
       <xsl:apply-templates/>
     </p>
@@ -460,6 +508,7 @@
   <!-- remove spans which only purpose is to contain RDFa data -->
   <xsl:template match="xhtml:span[@property and @content and not(text())]"/>
   <xsl:template match="xhtml:span[@rel and @href and not(text())]"/>
+  <xsl:template match="xhtml:span"/>
 
   <!-- defaultregler: översätt allt från xht2 till xht1-namespace, men inga ändringar i övrigt
   -->
@@ -476,11 +525,14 @@
   <xsl:template match="a|a" mode="in-paragraf">
     <xsl:call-template name="link"/>
   </xsl:template>
+
+
   <xsl:template match="*" mode="in-paragraf">
     <xsl:element name="{name()}">
       <xsl:apply-templates select="@*|node()" mode="in-paragraf"/>
     </xsl:element>
   </xsl:template>
+
   <xsl:template match="@*" mode="in-paragraf">
     <xsl:copy><xsl:apply-templates/></xsl:copy>
   </xsl:template>
@@ -545,16 +597,20 @@
     <xsl:variable name="firstpara" select="$subparas[1]/@content"/><!-- select="$subparas[first()]/@content"/> -->
     <xsl:variable name="lastpara" select="$subparas[last()]/@content"/><!-- select="$subparas[last()]/@content"/> -->
     <xsl:variable name="scope"><!-- either '4 §' or '4-6 §§' -->
-      <xsl:value-of select="$firstpara"/>&#160;<xsl:if test="$firstpara != $lastpara">- <xsl:value-of select="$lastpara"/> §</xsl:if>§</xsl:variable>
-    <li><a href="#{@id}"><xsl:value-of select="."/> (<xsl:value-of select="$scope"/>)</a>
-    <xsl:if test="$subheadings">
-      <ul class="nav">
-	<xsl:for-each select="$subheadings">
-	  <li><a href="#{@id}"><xsl:value-of select="."/></a></li>
-	</xsl:for-each>
-      </ul>
+    <xsl:value-of select="$firstpara"/>&#160;<xsl:if test="$firstpara != $lastpara">- <xsl:value-of select="$lastpara"/> §</xsl:if>§</xsl:variable>
+    <xsl:if test="@id">
+      <li><a href="#{@id}"><xsl:value-of select="."/> (<xsl:value-of select="$scope"/>)</a>
+      <xsl:if test="$subheadings">
+	<ul class="nav">
+	  <xsl:for-each select="$subheadings">
+	    <xsl:if test="@id">
+	      <li><a href="#{@id}"><xsl:value-of select="."/></a></li>
+	    </xsl:if>
+	  </xsl:for-each>
+	</ul>
+      </xsl:if>
+      </li>
     </xsl:if>
-    </li>
   </xsl:template>
 
   <xsl:template match="xhtml:div[@typeof='rinfoex:Bilaga']" mode="toc">

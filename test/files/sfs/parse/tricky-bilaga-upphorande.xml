@@ -16,8 +16,6 @@
     </Overgangsbestammelse>
   </Overgangsbestammelser>
   <Bilaga id="B1" rubrik="Bilaga 1" upphor="den dag regeringen bestämmer">
-    <Stycke id="B1S1">
-      <str>Avtal mellan de nordiska länderna för att undvika dubbelbeskattning beträffande skatter på inkomst och på förmögenhet</str>
-    </Stycke>
+    <Rubrik id="B1R1">Avtal mellan de nordiska länderna för att undvika dubbelbeskattning beträffande skatter på inkomst och på förmögenhet</Rubrik>
   </Bilaga>
 </Forfattning>

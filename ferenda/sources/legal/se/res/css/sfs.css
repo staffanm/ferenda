@@ -17,9 +17,23 @@
     margin-bottom: 6pt;
 }
 
-.upphavdparagraf, .upphavtkapitel {
-    font-size: smaller;
+
+.upphavdparagraf, .upphavtkapitel, .andringsdatum, .ej-ikraft {
+    font-size: small;
     font-style: italic;
+    color: #999;
+}
+.andringsdatum + h2, .andringsdatum + h3 {
+    margin-top: 0;
+}
+
+.andringsdatum {
+    margin-bottom: 0;
+}
+
+.ej-ikraft table {
+    font-size: small; /* otherwise the specific "font-size: 14px" styling for table in
+                         ferenda.css overrides */
 }
 
 ol.numreradlista, ol.bokstavslista, ul.strecksatslista { list-style: none; }
@@ -39,7 +53,7 @@ ol.bokstavslista > li:before {
 }
 ul.strecksatslista > li:before {
     content: "- ";
-}
+p}
 
 td {
     vertical-align: top;

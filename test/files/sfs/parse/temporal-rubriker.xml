@@ -1,6 +1,6 @@
 <Forfattning>
   <Rubrik upphor="datetime.datetime(2008, 3, 1, 0, 0)">Anmälan för registrering</Rubrik>
-  <Rubrik id="R2" ikrafttrader="datetime.datetime(2008, 3, 1, 0, 0)" type="underrubrik">Anmälan för registrering m.m.</Rubrik>
+  <Rubrik id="R2" ikrafttrader="datetime.datetime(2008, 3, 1, 0, 0)">Anmälan för registrering m.m.</Rubrik>
   <Paragraf ordinal="5" upphor="datetime.datetime(2008, 3, 1, 0, 0)">
     <Stycke>
       <str>Anmälan för registrering görs skriftligen hos Bolagsverket (</str>

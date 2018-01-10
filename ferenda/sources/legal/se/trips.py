@@ -164,16 +164,7 @@ class Trips(SwedishLegalSource):
         # the body of the text uses CRLF, but the header uses only
         # LF. Convert to only LF.
         txt = txt.replace("\r", "")
-        
-        intermediate_path = self.store.path(basefile, 'intermediate', '.txt')
+        with self.store.open_intermediate(basefile, mode="wb") as fp:
+            fp.write(txt.encode(self.source_encoding))
+        return self.store.open_intermediate(basefile, "rb")
 
-        if self.config.compress == "bz2":
-            intermediate_path += ".bz2"
-            opener = BZ2File
-        else:
-            opener = open
-        util.ensure_dir(intermediate_path)
-        fp = opener(intermediate_path, "wb")
-        fp.write(txt.encode(self.source_encoding))
-        fp.close()
-        return opener(intermediate_path, "rb")

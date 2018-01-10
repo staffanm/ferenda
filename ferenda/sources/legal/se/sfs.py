@@ -595,22 +595,9 @@ class SFS(Trips):
         if notfound:
             raise InteExisterandeSFS(str(notfound))
         textheader = fp.read(2048)
-        if not isinstance(textheader, str):
-            # Depending on whether the fp is opened through standard
-            # open() or bz2.BZ2File() in self.parse_open(), it might
-            # return bytes or unicode strings. This seem to be a
-            # problem in BZ2File (or how we use it). Just roll with it.
-            textheader = textheader.decode(self.source_encoding, errors="ignore")
-            encode = True
-        else:
-            encode = False
-
         idx = textheader.index("-"*64)
         header = textheader[:idx]
-        if encode:
-            offset = len(header.encode("utf-8"))
-        else:
-            offset = len(header)
+        offset = len(header.encode("utf-8"))
         fp.seek(offset + 66) # the extra 66 for the dividing ruler made of hyphens + newlines
         return soup, header
 
@@ -1092,12 +1079,6 @@ class SFS(Trips):
     }
 
     def construct_id(self, node, state):
-        def not_in_force(para):
-            # in some cases, a para might have a 'upphor' or
-            # 'ikrafttrader' attribute that is a string, not a date
-            # (typically "den dag regeringen bestämmer")
-            return ((hasattr(para, 'upphor') and isinstance(para.upphor, datetime) and datetime.now() > para.upphor) or
-                    (hasattr(para, 'ikrafttrader') and isinstance(para.ikrafttrader, datetime) and datetime.now() < para.ikrafttrader))
                 
         # copy our state (no need for copy.deepcopy as state shouldn't
         # use nested dicts)
@@ -1149,8 +1130,8 @@ class SFS(Trips):
                 # a change act), only use a URI for the version
                 # currently in force to avoid having two nodes with
                 # identical @about.
-                if uri not in state['uris'] and (not isinstance(node, (Paragraf, Kapitel, Rubrik)) or
-                                                 not not_in_force(node)):
+                if uri not in state['uris'] and (not isinstance(node, Tidsbestamd) or
+                                                 node.in_effect()):
                     node.uri = uri
                     state['uris'].add(uri)
                 else:
@@ -1173,6 +1154,7 @@ class SFS(Trips):
     # NB: these are redefinitions of regex objects in sfs_parser.py
     re_SearchSfsId = re.compile(r'\((\d{4}:\d+)\)').search
     re_DottedNumber = re.compile(r'^(\d+ ?\w?)\. ')
+    re_ChangeNote = re.compile(r'(Lag|Förordning) \(\d{4}:\d+\)\.?$')
     re_Bokstavslista = re.compile(r'^(\w)\) ')
     re_definitions = re.compile(
         r'^I (lagen|f\xf6rordningen|balken|denna lag|denna f\xf6rordning|denna balk|denna paragraf|detta kapitel) (avses med|betyder|anv\xe4nds f\xf6ljande)').match
@@ -1183,6 +1165,7 @@ class SFS(Trips):
     re_parantesdef = re.compile(r'\(([\w ]{3,50})\)\.', re.UNICODE).search
     re_loptextdef = re.compile(
         r'^Med ([\w ]{3,50}) (?:avses|f\xf6rst\xe5s) i denna (f\xf6rordning|lag|balk)', re.UNICODE).search
+
     def find_definitions(self, element, find_definitions):
         if not isinstance(element, CompoundElement):
             return None
@@ -1224,14 +1207,15 @@ class SFS(Trips):
                 termdelimiter = ":"
 
                 if isinstance(element, Tabellrad):
-                    # only the first cell can be a definition, and
-                    # only if it's not the text "Beteckning". So for
-                    # the reminder of this func, we switch context to
-                    # not the element itself but rather the first
-                    # cell.
+                    # only the first cell can be a term, and only if
+                    # it's not the text "Beteckning" (or "Begrepp",
+                    # only used in SFS 2009:400). So for the reminder
+                    # of this func, we switch context to not the
+                    # element itself but rather the first cell.
                     element = elementtext 
                     elementtext = element[0]
-                    if elementtext != "Beteckning":
+                    if (elementtext not in ("Beteckning", "Begrepp") and
+                        not self.re_ChangeNote.match(elementtext)):
                         term = elementtext
                         self.log.debug(
                             '"%s" \xe4r nog en definition (1)' % term)

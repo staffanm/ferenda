@@ -3,6 +3,8 @@ from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 from builtins import *
 
+from datetime import datetime
+
 from lxml.builder import ElementMaker
 
 from ferenda.elements import (CompoundElement, OrdinalElement,
@@ -12,7 +14,43 @@ from ferenda.elements import (CompoundElement, OrdinalElement,
 E = ElementMaker(namespace="http://www.w3.org/1999/xhtml")
 
 
-class Forfattning(CompoundElement, TemporalElement):
+class Tidsbestamd(TemporalElement):
+    def in_effect(self, date=None):
+        if date is None:
+            date = datetime.now()
+        # in some cases, a para might have a 'upphor' or
+        # 'ikrafttrader' attribute that is a string, not a date
+        # (typically "den dag regeringen bestämmer")
+        upphor = getattr(self, 'upphor', None)
+        ikrafttrader = getattr(self, 'ikrafttrader', None)
+        return ((isinstance(upphor, datetime) and date < upphor) or
+                (isinstance(ikrafttrader, datetime) and date > ikrafttrader) or
+                (isinstance(upphor, (type(None), str)) and
+                 isinstance(ikrafttrader, (type(None), str))))
+
+
+    def as_xhtml(self, uri=None, parent_uri=None, res=None):
+        if res is None:
+            res = super(Tidsbestamd, self).as_xhtml(parent_uri, parent_uri)
+        # this mixin class only wants to add some optional
+        # rinfoex:upphor / rinfoex:ikrafttrader triples
+        for property in ('upphor', 'ikrafttrader'):
+            p = getattr(self, property, None)
+            if p:
+                if isinstance(p, datetime):
+                    attrs = {'content': p.strftime("%Y-%m-%m"),
+                             'datatype': 'xsd:date'}
+                else:
+                    # träder i kraft: den dag regeringen bestämmer
+                    attrs = {'content': p}
+                attrs['rel'] =  'rinfoex:%s' % property
+                # FIXME: for Rubrik nodes, this code will run before
+                # UnicodeElement.as_xhtml, which results in the span
+                # appearing after the text. Ah well.
+                res.insert(0, E('span', **attrs))
+        return res
+
+class Forfattning(CompoundElement, Tidsbestamd):
     """Grundklass för en konsoliderad författningstext."""
     tagname = "body"
     classname = "konsolideradforfattning"
@@ -21,7 +59,7 @@ class Forfattning(CompoundElement, TemporalElement):
 # något annat (det förekommer "aldrig" en hänvisning i en
 # rubriktext). Den ärver alltså från UnicodeElement, inte
 # CompoundElement.
-class Rubrik(UnicodeElement, TemporalElement):
+class Rubrik(UnicodeElement, Tidsbestamd):
     """En rubrik av något slag - kan vara en huvud- eller underrubrik
     i löptexten, en kapitelrubrik, eller något annat"""
 
@@ -68,7 +106,7 @@ class Tabell(CompoundElement):
     tagname = "table"
 
 
-class Tabellrad(CompoundElement, TemporalElement):
+class Tabellrad(CompoundElement, Tidsbestamd):
     tagname = "tr"
 
 
@@ -147,7 +185,7 @@ class UpphavtKapitel(UnicodeElement, OrdinalElement):
     platshållare"""
 
 
-class Kapitel(CompoundElement, OrdinalElement):
+class Kapitel(CompoundElement, OrdinalElement, Tidsbestamd):
     fragment_label = "K"
     tagname = "div"
     typeof = "rpubl:Kapitel"  # FIXME: This is qname string, not
@@ -180,7 +218,7 @@ class UpphavtKapitel(UnicodeElement, OrdinalElement):
 
 # en paragraf har inget "eget" värde, bara ett nummer och ett eller
 # flera stycken
-class Paragraf(CompoundElement, OrdinalElement):
+class Paragraf(CompoundElement, OrdinalElement, Tidsbestamd):
     fragment_label = "P"
     tagname = "div"
     typeof = "rpubl:Paragraf"  # FIXME: see above
@@ -190,19 +228,35 @@ class Paragraf(CompoundElement, OrdinalElement):
         self.uri = kwargs.get("uri", None)
         super(Paragraf, self).__init__(*args, **kwargs)
 
-    def as_xhtml(self, uri=None, parent_uri=None):
-        res = super(Paragraf, self).as_xhtml(uri, parent_uri)
+    def as_xhtml(self, uri=None, parent_uri=None, res=None):
+        if res is None:
+            res = super(Paragraf, self).as_xhtml(uri, parent_uri)
         res.attrib.update({"property": "rpubl:paragrafnummer",
                            "content": self.ordinal})
-        # NOTE: we insert the paragrafbeteckning within the first
-        # stycke (res[0] is a dcterms:isPartOf <span>, res[1] is the
-        # first Stycke). This makes XSLT rendering easier and is
-        # probably not semantically incorrect.
-        idx = 1 if len(res) > 1 else 0
-        res[idx].insert(0, E('span', {'class': 'paragrafbeteckning'}, self.ordinal + " §"))
+
+        # FIXME: Not sure how to make sure the mixin
+        # Tidsbestamd.as_xhtml method be called, since the primary
+        # base class (CompoundElement) cannot itself call super() in
+        # order to call a "sibling" class. Also, we need to get the
+        # partially-constructed etree node to Tidsbestamd.as_xhtml
+        # somehow.This will probably work, even if it's wrong.
+        Tidsbestamd.as_xhtml(self, uri, parent_uri, res)
+
+        # NOTE: we insert the paragrafbeteckning within the first real
+        # stycke (res[0] might be is a dcterms:isPartOf <span>, res[1]
+        # might be a rinfoex:upphor <span>, etc).  This makes XSLT
+        # rendering easier and is probably not semantically incorrect.
+        for child in res:
+            if child.tag in ("{http://www.w3.org/1999/xhtml}p",
+                             "{http://www.w3.org/1999/xhtml}h2",
+                             "{http://www.w3.org/1999/xhtml}h3"):
+                span = E('span', {'class': 'paragrafbeteckning'}, self.ordinal + " §")
+                if child.text:
+                    span.tail = child.text
+                    child.text = None
+                child.insert(0, span)
+                break
         return res
-
-
 
 # kan innehålla nästlade numrerade listor
 class Listelement(CompoundElement, OrdinalElement):

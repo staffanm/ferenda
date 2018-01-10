@@ -226,7 +226,7 @@ def make_parser(reader, basefile, log, trace):
         elif state['current_headline_level'] == 1:
             state['current_headline_level'] = 2
 
-        h = Rubrik(line, **kwargs)
+        h = Rubrik(util.normalize_space(line), **kwargs)
         return h
 
     def makeUpphavdParagraf():
@@ -728,7 +728,6 @@ def make_parser(reader, basefile, log, trace):
             indirect = False
         else:
             indirect = True
-
         trace['rubrik'].debug("isRubrik (%s): indirect=%s" % (
             p[:50], indirect))
 
@@ -801,8 +800,10 @@ def make_parser(reader, basefile, log, trace):
 
         # if this headline is followed by a second headline, that
         # headline and all subsequent headlines should be regardes as
-        # sub-headlines
-        if (not indirect) and isRubrik(nextp):
+        # sub-headlines -- unless this headline has andringsDatum
+        # information (since then it's probably a case of the "same"
+        # heading having new wording from a certain date)
+        if (not indirect) and isRubrik(nextp) and andringsDatum(p)[0] == p:
             state['current_headline_level'] = 1
 
         # ok, all tests passed, this might be a headline!
@@ -921,8 +922,16 @@ def make_parser(reader, basefile, log, trace):
                 trace['tabell'].debug(
                     "isTabell('%s'): Alla rader korta, undersöker undantag" % (p[:20]))
 
+                # generellt undantag: är detta en paragraf? Om den
+                # inte har kolumnindelning och ser ut att vara en
+                # paragrafinlednig, även om den har korta rader
+                if '  ' not in lines[0] and isParagraf(p):
+                    trace['tabell'].debug(
+                        "isTabell('%s'): Är nog en ny paragraf" % (p[:20]))
+                    return False
+
                 # generellt undantag: Om en tabells första rad har
-                # enbart vänsterkolumn M\XE5STE den följas av en
+                # enbart vänsterkolumn MÅSTE den följas av en
                 # spaltindelad rad - annars är det nog bara två korta
                 # stycken, ett kort stycke följt av kort rubrik, eller
                 # liknande.
@@ -935,8 +944,8 @@ def make_parser(reader, basefile, log, trace):
                 except IOError:
                     p3 = ''
                 if not assumeTable and not isTabell(p2,
-                                                         assumeTable=True,
-                                                         requireColumns=True):
+                                                    assumeTable=True,
+                                                    requireColumns=True):
                     trace['tabell'].debug(
                         "isTabell('%s'): generellt undantag från alla rader korta-regeln" % (p[:20]))
                     return False

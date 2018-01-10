@@ -185,7 +185,13 @@ properties (such as ordinal label, date of enactment, etc)."""
         if self.classname is not None:
             res.set('class', self.classname)
         if str(self).strip():
-            res.text = self.clean_string()
+            s = self.clean_string()
+            if len(res): # if there are already nodes, eg <span>
+                          # nodes inserted by a mixin, insert text
+                          # after those nodes
+                res[-1].tail = s
+            else:
+                res.text = s
             return res
         else:
             return None
@@ -343,7 +349,10 @@ class CompoundElement(AbstractElement, list):
 
         # for each childen that is a string, make sure it doesn't
         # contain any XML illegal characters
-        return E(self.tagname, attrs, *children)
+        res = E(self.tagname, attrs, *children)
+        return res
+    
+    
 
     def _span(self, subj, pred, obj, graph=None):
         """Returns any triple as a span element with rdfa attributes. Object
