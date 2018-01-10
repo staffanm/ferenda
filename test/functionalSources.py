@@ -14,6 +14,7 @@ from ferenda.sources.general import Keyword, Skeleton  # MediaWiki
 from lagen.nu import LNMediaWiki as MediaWiki
 
 from ferenda.sources.tech import RFC, W3Standards, PEP
+from ferenda.sources.legal.eu import EURLexCaselaw, EURLexTreaties, EURLexActs
 from ferenda.sources.legal.se import (Direktiv, JK, Kommitte, MyndFskrBase,
                                       Propositioner, Regeringen, Riksdagen,
                                       SwedishLegalSource)
@@ -27,7 +28,7 @@ from lagen.nu.sou import SOURegeringen, SOUKB
 from lagen.nu.ds import DsRegeringen
 
 for cls in (Keyword, Skeleton, MediaWiki, RFC, W3Standards, PEP,
-            ARN, Direktiv, Ds, DV, JK,
+            EURLexCaselaw, EURLexTreaties, EURLexActs, ARN, Direktiv, Ds, DV, JK,
             JO, Kommitte, MyndFskrBase, Propositioner, Regeringen,
             Riksdagen, SwedishLegalSource, PropRegeringen,
             PropRiksdagen, PropTrips, DirTrips, DirRegeringen,

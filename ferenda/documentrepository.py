@@ -1858,9 +1858,14 @@ with the *config* object as single parameter.
                 timings['e_deps'] = time.time() - start
                 entry.indexed_dep = datetime.now()
             if relate.triples:
-                # If using the Bulk upload feature, append to the temporary
-                # file that is to be bulk uploaded (see relate_all_setup)
-                if self.config.bulktripleload:
+                # If using the Bulk upload feature, append to the
+                # temporary file that is to be bulk uploaded (see
+                # relate_all_setup).
+                #
+                # Exception: In order to make relate of a single basefile
+                # meaningful (ie when self.config.all is False), we'd
+                # like to insert into the db right away in those cases.
+                if self.config.bulktripleload and self.config.all:  
                     nttemp = self.store.resourcepath("distilled/dump.%s.%s.nt" % (self.config.clientname, os.getpid()))
                     values = {'basefile': basefile,
                               'nttemp': nttemp}

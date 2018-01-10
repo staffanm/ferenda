@@ -42,6 +42,7 @@ import multiprocessing
 import os
 import pickle
 import pstats
+import signal
 import shutil
 import stat
 import subprocess
@@ -475,7 +476,14 @@ def run(argv, config=None, subcall=False):
                  prefixed with ``--``, e.g. ``--loglevel=INFO``, or
                  positional arguments to the specified action).
     """
-
+    # make the process print useful information when ctrl-T is pressed
+    # (only works on Mac and BSD, who support SIGINFO)
+    if hasattr(signal, 'SIGINFO'):
+        signal.signal(signal.SIGINFO, _siginfo_handler)
+    # or when the SIGUSR1 signal is sent ("kill -SIGUSR1 <pid>")
+    if hasattr(signal, 'SIGUSR1'):
+        signal.signal(signal.SIGUSR1, _siginfo_handler)
+    
     if not config:
         config = _load_config(_find_config_file(), argv)
         alias = getattr(config, 'alias', None)
@@ -1236,6 +1244,18 @@ def _build_worker(jobqueue, resultqueue, clientname):
 #                             'log': list(logrecords),
 #                             'client': clientname})
 #            print("%s: Put a fake entry instead, and carrying on" % job['basefile'])
+
+#        except AttributeError as e:
+#            print("%s: Catastrophic error (AttributeError)" % job['basefile'])
+#            # this is probably a "Can't pickle local object
+#            # 'RDFXMLHandler.reset.<locals>.<lambda>'" error --
+#            # similar to the difficulties of pickling ParseErrors
+#            # above
+#            resultqueue.put({'basefile': job['basefile'],
+#                             'result': None,
+#                             'log': list(logrecords),
+#                             'client': clientname})
+#            print("%s: Put a fake entry instead, and carrying on" % job['basefile'])
         except EOFError as e:
             print("%s: Result of %s %s %s couldn't be put on resultqueue" % (
                 os.getpid(), job['classname'], job['command'], job['basefile']))
@@ -1345,8 +1365,17 @@ def _queue_jobs(manager, iterable, inst, classname, command):
     numres = 0
     res = []
     clients = Counter()
+    signal.signal(signal.SIGALRM, _resultqueue_get_timeout)
+    # FIXME: be smart about how long we wait before timing out the resultqueue.get() call
+    timeout_length = 180 
     while numres < number_of_jobs:
-        r = resultqueue.get()
+        try:
+            r = resultqueue.get()
+        except TimeoutError:
+            log.critical("Encountered timeout when trying to get result from queue. Wrapping up, we're done here")
+            numres = number_of_jobs
+            continue
+        signal.alarm(timeout_length)
         if isinstance(r['result'], tuple) and r['result'][0] == _WrappedKeyboardInterrupt:
             raise KeyboardInterrupt()
         elif isinstance(r['result'], tuple) and isinstance(r['result'][0], Exception):
@@ -1372,6 +1401,8 @@ def _queue_jobs(manager, iterable, inst, classname, command):
             res.append(r['result'])
         numres += 1
 
+    # ok, now we don't need to worry about timeouts anymore
+    signal.alarm(0)
     clientstats = ", ".join(["%s: %s jobs" % (k, v) for k,v in clients.items()])
     log.info("Server: %s tasks processed. %s" % (numres, clientstats))
     return res
@@ -1462,6 +1493,7 @@ def _process_resultqueue(resultqueue, basefiles, procs, jobqueue, clientname):
     res = {}
     queuelength = len(basefiles)
     log = getlog()
+    signal.signal(signal.SIGALRM, _resultqueue_get_timeout)
     for i in range(queuelength):
         # check if all procs are still alive?
         all_alive = True
@@ -1479,6 +1511,13 @@ def _process_resultqueue(resultqueue, basefiles, procs, jobqueue, clientname):
             procs.append(newp)
         try:
             r = resultqueue.get()
+            # after we recieve the first result, we expect to find new
+            # results at least every n seconds until we're done. If
+            # we're stalled longer than that, it probably means that
+            # some client have failed sending us a result on the
+            # queue
+            # FIXME: be smart about selecting a suitable timeout
+            signal.alarm(180)
             if isinstance(r['result'], tuple) and r['result'][0] == _WrappedKeyboardInterrupt:
                 raise KeyboardInterrupt()
             res[r['basefile']] = r['result']
@@ -1490,10 +1529,35 @@ def _process_resultqueue(resultqueue, basefiles, procs, jobqueue, clientname):
             # positional arguments (2 given)"
             log.error("result could not be decoded: %s" % e)
             # now we'll have a basefile without a result -- maybe we should indicate somehow
+    signal.alarm(0)
     # return the results in the same order as they were queued. If we miss a result for a particular 
     return [res.get(x, {'basefile': x, 'result': False, 'log': 'CATASTROPHIC ERROR (couldnt decode result from client)', 'client': 'unknown'}) for x in basefiles]
 
+def _resultqueue_get_timeout(signum, frame):
+    # get a list of sent jobs and recieved results. determine which
+    # are missing, and report. Then blow up in spectacular fashion, or
+    # preferably do something that'll allow us to cancel the
+    # resultqueue.get() call
+    print("_resultqueue_get_timeout called! pid: %s" % os.getpid())
+    raise TimeoutError()
 
+
+def _siginfo_handler(signum, frame):
+    # walk up to the calling frame in manager (or any other ferenda code)
+    while "ferenda" not in frame.f_code.co_filename:
+        frame = frame.f_back
+        if frame is None:
+            print("_siginfo_handler: couldn't find ferenda code in the current stack")
+    # at this point, we can maybe print general info abt current
+    # frame, and for some locations/functions maybe a status (ie
+    # recieved x out of y expected results). Mostly information useful
+    # in determining why the process is stuck...  an alternative to
+    # this might just be to drop into p(u)db
+    print("In %s (%s:%s)" % (frame.f_code.co_name, frame.f_code.co_filename, frame.f_lineno))
+    if frame.f_code.co_name == "_queue_jobs":
+        print("Queued %s jobs, recieved %s results" % (frame.f_locals['number_of_jobs'], len(frame.f_locals['res'])))
+    
+    
 def _run_class_with_basefile(clbl, basefile, kwargs, command,
                              alias="(unknown)", wrapctrlc=False):
     try:

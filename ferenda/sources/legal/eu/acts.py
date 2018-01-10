@@ -13,5 +13,6 @@ class EURLexActs(EURLex):
     # bunch of differnent crap (in sector 6, ie ECJ, and other)
     # expertquery_template = "SELECT CELLAR_ID, TI_DISPLAY, DN, DD WHERE DTS_SUBDOM = EU_LAW_ALL AND (DTT = R OR DTT = L) AND DD >= 01/01/2017 <= 31/12/2017 ORDER BY DD ASC"
     expertquery_template = "DTS_SUBDOM = EU_LAW_ALL AND (DTT = R OR DTT = L)"
-    celexfilter = re.compile("(3\d{4}[RL]\d{4})$").match
+    # Match 31960R0009 and 31960R0009(01)
+    celexfilter = re.compile("(3\d{4}[RL]\d{4}(|\(\d+\)))$").match
     
