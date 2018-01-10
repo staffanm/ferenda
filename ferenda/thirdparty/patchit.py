@@ -89,7 +89,7 @@ class Hunk(object):
         self.source_range = tuple([x + offset for x in self.source_range])
         return offset
 
-    def match(self, lines, offset):
+    def match(self, lines, offset, fuzz=0):
         """Check if the context lines at a particular offset matches the source text"""
         # maybe we should read from front and back until we encounter our first non OP_EQUAL? 
         for idx, (symbol, text) in enumerate(self.operations):
@@ -167,7 +167,7 @@ class Patch(object):
         offsets = []
         for hunk in self.hunks:
             hunk.source_range = tuple([x+offset for x in hunk.source_range])
-            offset = hunk.adjust(lines)
+            offset = hunk.adjust(lines) + offset
             offsets.append(offset)
         return offsets
 
