@@ -597,7 +597,7 @@ class SFS(Trips):
         textheader = fp.read(2048)
         idx = textheader.index("-"*64)
         header = textheader[:idx]
-        offset = len(header.encode("utf-8"))
+        offset = len(header)
         fp.seek(offset + 66) # the extra 66 for the dividing ruler made of hyphens + newlines
         return soup, header
 
@@ -1877,7 +1877,7 @@ class SFS(Trips):
                     store,
                     "sparql/sfs_title.rq",
                     uri,
-                    None # self.dataset_uri()
+                    self.dataset_uri()
                 )
                 if changes:
                     self._document_name_cache[parts[

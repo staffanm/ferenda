@@ -1403,8 +1403,9 @@ def _queue_jobs(manager, iterable, inst, classname, command):
 
     # ok, now we don't need to worry about timeouts anymore
     signal.alarm(0)
-    clientstats = ", ".join(["%s: %s jobs" % (k, v) for k,v in clients.items()])
-    log.info("Server: %s tasks processed. %s" % (numres, clientstats))
+    # sort clients on name, not number of jobs
+    clientstats = ", ".join(["%s: %s jobs" % (k, v) for k,v in sorted(clients.items())])
+    log.info("Server: %s jobs processed. %s" % (numres, clientstats))
     return res
     # sleep(1)
     # don't shut this down --- the toplevel manager.run call must do

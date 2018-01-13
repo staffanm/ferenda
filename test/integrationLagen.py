@@ -46,10 +46,13 @@ class TestLagen(unittest.TestCase, FerendaTestCase):
     def assert404(self, url):
         return self.assert_status(url, 404)
 
-    def get(self, url, **kwargs):
+    def get(self, url, raise_for_status=False, **kwargs):
         if 'headers' not in kwargs:
             kwargs['headers']={'Accept': 'text/html'}
-        return requests.get(url, **kwargs)
+        res = requests.get(url, **kwargs)
+        if raise_for_status:
+            res.raise_for_status()
+        return res
     
 
 class TestPaths(TestLagen):
@@ -368,7 +371,7 @@ class TestConNeg(TestLagen):
 class TestAnnotations(TestLagen):
 
     def test_inbound_links(self):
-        res = self.get(self.baseurl + "1949:105/data",
+        res = self.get(self.baseurl + "1949:105/data", True,
                        headers={'Accept': 'application/rdf+xml'})
         graph = Graph().parse(data=res.text, format="xml")
         resource = graph.resource(URIRef("https://lagen.nu/1949:105"))

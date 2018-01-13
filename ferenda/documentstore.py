@@ -13,6 +13,7 @@ import os
 import sys
 import codecs
 import shutil
+import stat
 import unicodedata
 from urllib.parse import quote, unquote
 from gzip import GzipFile
@@ -132,6 +133,11 @@ class _open(object):
             if not os.path.exists(self.filename) or not filecmp.cmp(tempname, self.filename):
                 util.ensure_dir(self.filename)
                 shutil.move(tempname, self.filename)
+                # since _open uses NamedTemporaryFile, which creates
+                # files only readable by the creating user, we need to
+                # set more liberal permissions. FIXME: This should
+                # respect os.umask()
+                os.chmod(self.filename, stat.S_IRUSR|stat.S_IWUSR|stat.S_IRGRP|stat.S_IWGRP|stat.S_IROTH)
             else:
                 os.unlink(tempname)
             return ret
@@ -148,7 +154,19 @@ class _open(object):
         return self.fp.write(*args, **kwargs)
 
     def seek(self, *args, **kwargs):
-        return self.fp.seek(*args, **kwargs)
+        if isinstance(self.fp, codecs.Codec):
+            # we can't just call seek() since the Codec class will
+            # pass that call to the underlying stream, which might be
+            # using a encoded bytestream. Since 10 str-level
+            # characters might correspond to maybe 13 byte-level bytes
+            # (due to utf-8 encoding overhead), we won't end up where
+            # we expect. This workaround is costly, but should be
+            # correct.
+            self.fp.seek(0)
+            data = self.fp.read(chars=args[0])
+            return None
+        else:
+            return self.fp.seek(*args, **kwargs)
 
     def tell(self, *args, **kwargs):
         return self.fp.tell(*args, **kwargs)
@@ -214,6 +232,10 @@ class DocumentStore(object):
     # needed.
     def resourcepath(self, resourcename):
         return self.datadir + os.sep + resourcename.replace("/", os.sep)
+
+    def open_resource(self, resourcename, mode="r"):
+        filename = self.resourcepath(resourcename)
+        return _open(filename, mode)
 
     def path(self, basefile, maindir, suffix, version=None, attachment=None,
              storage_policy=None):
@@ -351,7 +373,7 @@ class DocumentStore(object):
                 dependencies = []
             dependencies.extend((infile, annotations))
             outfile = self.generated_path(basefile)
-            return util.outfile_is_newer(dependencies, outfile)
+            return not util.outfile_is_newer(dependencies, outfile)
         else:
             # custom actions will need to override needed and provide logic there
             return True  
@@ -380,7 +402,26 @@ class DocumentStore(object):
             # from each directory. By convention, the main file is
             # called index.html, index.pdf or whatever.
             return [os.sep + "index" + s if prepend else s for s in suffixes]
-                    
+
+        def trim_documententry(basefile):
+            # if the path (typically for the distilled or
+            # parsed file) is a 0-size file, the following
+            # steps should not be carried out. But since
+            # they at some point might have done that
+            # anyway, we're left with a bunch of stale
+            # error reports in the entry files. As a
+            # one-time-thing, try to blank out irrelevant
+            # sections.
+            entry = DocumentEntry(self.documententry_path(basefile))
+            sections = {'parse': ['parse', 'relate', 'generate'],
+                        'relate': ['relate', 'generate'],
+                        'generate': ['generate']}.get(action, {})
+            for section in sections:
+                print("%s: action %s. Deleting section %s" % (basefile, action, section))
+                if section in entry.status:
+                    del entry.status[section]
+            entry.save()
+        
         if not basedir:
             basedir = self.datadir
         directory = None
@@ -438,7 +479,10 @@ class DocumentStore(object):
                     path = self.parsed_path(basefile)
                 if os.path.exists(path):
                     yielded_paths.add(path)
-                    yield basefile 
+                    if os.path.getsize(path) > 0:
+                        yield basefile
+                    else:
+                        trim_documententry(basefile)
         
         for x in util.list_dirs(directory, suffixes, reverse=True):
             # ignore empty files placed by download (which may
@@ -446,7 +490,7 @@ class DocumentStore(object):
             # re-download nonexistent resources)
             if x in yielded_paths:
                 continue
-            if os.path.exists(x) and os.path.getsize(x) > 0 and not x.endswith((".root.json", ".durations.json")):
+            if os.path.exists(x) and not x.endswith((".root.json", ".durations.json")):
                 # get a pathfrag from full path
                 # suffixlen = len(suffix) if self.storage_policy == "file" else len(suffix) + 1
                 suffixlen = 0
@@ -456,8 +500,12 @@ class DocumentStore(object):
                         break
                 else:
                     raise ValueError("%s doesn't end with a valid suffix (%s)" % x, ", ".join(suffixes))
-                x = x[len(directory) + 1:-suffixlen]
-                yield self.pathfrag_to_basefile(x)
+                pathfrag = x[len(directory) + 1:-suffixlen]
+                basefile = self.pathfrag_to_basefile(pathfrag)
+                if os.path.getsize(x) > 0:
+                    yield basefile
+                else:
+                    trim_documententry(basefile)
 
     def list_versions(self, basefile, action=None):
         """Get all archived versions of a given basefile.

@@ -29,6 +29,7 @@ import os
 import pickle
 import re
 import socket
+import stat
 import sys
 import time
 import unicodedata
@@ -1406,15 +1407,12 @@ with the *config* object as single parameter.
                 fp.write(res)
             raise errors.InvalidTree("%s. Invalid tree saved as %s.invalid" % (err, outfile))
 
-        fileno, tmpfile = mkstemp()
-        fp = os.fdopen(fileno)
-        fp.close()
-        with open(tmpfile, "wb") as fp:
+        with self.store.open_parsed(doc.basefile, mode="wb") as fp:
             fp.write(res)
-        util.replace_if_different(tmpfile, outfile)
-        # it's a bit nonsensical to first use replace_if_different and
-        # then go ahead and update the timestamp, but it helps those
-        # cases where a file gets parsed again and again and again.
+        # it's a bit nonsensical to first use _open (which leaves the
+        # target file untouched if the contents don't change) and then
+        # go ahead and update the timestamp, but it helps those cases
+        # where a file gets parsed again and again and again.
         os.utime(outfile, None)  # update access/modified timestamp
         return res
 
@@ -2380,6 +2378,7 @@ WHERE {
         # the proper place to handle this complexity is probably
         # here.
         infile = self.store.parsed_path(basefile)
+        
         annotations = self.store.annotation_path(basefile)
         if os.path.exists(self.store.dependencies_path(basefile)):
             deptxt = util.readfile(self.store.dependencies_path(basefile))
@@ -3505,13 +3504,12 @@ WHERE {
                                  pretty_print=True,
                                  xml_declaration=True,
                                  encoding='utf-8')
-            fileno, tmpfile = mkstemp()
-            fp = os.fdopen(fileno)
-            fp.close()
-            # tmpfile = mkstemp()[1]
-            with open(tmpfile, "wb") as fp:
+            with self.store.open_resource("feed/%s%s.atom" % (slug, suffix), mode="wb") as fp:
                 fp.write(res)
-            util.replace_if_different(tmpfile, feedfile)
+            # FIXME: temporary workaround of the issue that
+            # self.store._open creates files readably only by the
+            # creating user
+            os.chmod(feedfile, stat.S_IRUSR|stat.S_IWUSR|stat.S_IRGRP|stat.S_IWGRP|stat.S_IROTH)
             return feedfile
 
         assert isinstance(entries, list), 'entries should be a list, not %s' % type(entries)
