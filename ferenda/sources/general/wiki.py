@@ -155,7 +155,7 @@ class MediaWiki(DocumentRepository):
     def download_single(self, basefile):
         # download a single term, for speed
         url = self.config.mediawikiexport % {'basefile': basefile}
-        self.download_if_needed(url, basefile)
+        self.download_if_needed(url, basefile, archive=self.download_archive)
 
     re_anchors = re.compile('(<a.*?</a>)', re.DOTALL)
     re_anchor = re.compile('<a[^>]*>(.*)</a>', re.DOTALL)
