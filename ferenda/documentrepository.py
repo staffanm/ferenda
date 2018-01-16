@@ -2513,7 +2513,7 @@ WHERE {
         
         def simple_transform(url):
             if url.startswith(self.config.url):
-                if base_transform(url) is False:
+                if base_transform(url, "generated_path") is False:
                     return False
                 # convert eg.
                 # "https://lagen.nu/dom/md/2014:2?repo=dv&attachment=1.pdf"
@@ -2542,9 +2542,9 @@ WHERE {
             else:
                 return url
 
-        def base_transform(url):
+        def base_transform(url, method="documententry_path"):
             if remove_missing:
-                path = getpath(url, repos)
+                path = getpath(url, repos, method)
                 if path and not (os.path.exists(path) and os.path.getsize(path) > 0):
                     return False
             return url
