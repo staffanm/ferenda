@@ -934,6 +934,13 @@ class Regressions(TestLagen):
     # otherwise untestable, but the testable things are written as
     # test cases here
 
+    def test_sfs_source(self):
+        # issue 1 b
+        res = self.get(self.baseurl + "2002:562")
+        soup = BeautifulSoup(res.text, "lxml")
+        dep = soup.find("dt", text="Departement").find_next_sibling("dd")
+        self.assertEqual("Näringsdepartementet RS N", dep.text)
+
     def test_facsimiles(self):
         # issue 3 
         for urlseg, pages in (("prop/2004/05:147", [36, 48]),
@@ -1001,4 +1008,14 @@ class Regressions(TestLagen):
                 if isinstance(node, str):
                     continue
                 self.assertIn("row", node.get("class", []))
+
+    def test_komdir_toc(self):
+        # issue 8
+        for year in ("2017", "2016", "2015", "2014"):
+            res = self.get(self.baseurl + "dataset/forarbeten?dir=" + year)
+            res.raise_for_status()
+            soup = BeautifulSoup(res.text, "lxml")
+            from pudb import set_trace; set_trace()
+            for link in soup.find("article").find_all("a"):
+                self.assertRegexpMatches(link.text, "^Dir. \d{4}:\d+$")
 
