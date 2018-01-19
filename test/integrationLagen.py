@@ -923,3 +923,82 @@ class TestKeywordToc(unittest.TestCase):
   </UnorderedList>
 </Div>
 """)
+
+
+# the local dev environment, as specified by
+# lagen/nu/res/scripts/testdata.txt, doesn't have all these documents
+@unittest.skipIf(":8000" in os.environ.get("FERENDA_TESTURL", "http://localhost:8000"), "Not testing against dev server")
+class Regressions(TestLagen):
+    # this is really a testcase built from a extensive bug report,
+    # containing 9 numbered issues. Some of those are suggestions or
+    # otherwise untestable, but the testable things are written as
+    # test cases here
+
+    def test_facsimiles(self):
+        # issue 3 
+        for urlseg, pages in (("prop/2004/05:147", [36, 48]),
+                              ("prop/1997/98:177", [18, 30, 32]),
+                              ("prop/1997/98:179", [57, 58, 43]),
+                              ("prop/2007/08:95", [56, 295, 296]),
+                              ("prop/1998/99:90", [18, 23]),
+                              ("prop/1996/97:141", [19])):
+            for page in pages:
+                url = self.baseurl + urlseg + "/sid%s.png" % page
+                self.assert200(url)
+
+    def test_format(self):
+        # issue 4
+        for urlseg in ("prop/1994/95:76",
+                       "prop/1994/95:93",
+                       "prop/1994/95:89",
+                       "prop/1994/95:102",
+                       "prop/1994/95:115",
+                       "prop/1993/94:65",
+                       "prop/1993/94:67",
+                       "prop/1993/94:242"):
+            res = self.get(self.baseurl + urlseg)
+            res.raise_for_status()
+            self.assertTrue("<pre>" not in res.text)
+
+    def test_missing_pages(self):
+        # issue 5: "I prop. 1992/93:30 saknas s. 18–30. Prop. 1996/97:106 är ofullständig (har bara två sidor)"
+        for urlseg in ("prop/1992/93:30",
+                       "prop/1996/97:106",
+                       "prop/1988/89:150",   # NB: These 2 are budget 
+                       "prop. 1991/92:100"): # propositions, left out by design
+            res = self.get(self.baseurl + urlseg)
+            res.raise_for_status()
+            soup = BeautifulSoup(res.text, "lxml")
+            pages = soup.find_all("div", "sida")
+            # any prop should have at least 10 pages
+            self.assertGreater(len(pages), 10)
+            # make sure there are no missing pages (might be too
+            # demanding, since we actually remove TOC pages
+            # intentionally)
+            pagenum = 1
+            for page in pages:
+                self.assertEqual(str(pagenum), page.get("id")[3:])
+
+    def test_missing_docs(self):
+        # issue 6
+        for urlseg in ("prop/1992/93:40",
+                       "prop/1991/92:155",
+                       "prop/1973:90",
+                       "prop/1996/97:72",
+                       "prop/1995/96:79", # left out by design since noone refers to it
+                       "prop/2007/08:85"):
+            self.assert200(self.baseurl + urlseg)
+
+    def test_format_dir(self):
+        # issue 7
+        for urlseg in ("dir/1987:42",
+                       "dir/1987:7"):
+            res = self.get(self.baseurl + urlseg)
+            res.raise_for_status()
+            soup = BeautifulSoup(res.text, "lxml")
+            # directly underneath <article> there should be no nodes w/o class "row"
+            for node in soup.find("article").children:
+                if isinstance(node, str):
+                    continue
+                self.assertIn("row", node.get("class", []))
+

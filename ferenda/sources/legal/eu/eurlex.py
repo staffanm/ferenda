@@ -318,6 +318,9 @@ class EURLex(DocumentRepository):
                 result.raise_for_status()
                 source = result.text
 
+    def tabs(self):
+        return []
+
 #    def _addheaders(self, url, filename=None):
 #        headers = super(EURLex, self)._addheaders(filename)
 #        headers["Accept"] = self.contenttype

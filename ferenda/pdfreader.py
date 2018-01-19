@@ -145,7 +145,7 @@ class PDFReader(CompoundElement):
                 self.log.debug("%s: Converting to PDF: %s" % (filename, cmdline))
                 (ret, stdout, stderr) = util.runcmd(
                     cmdline, require_success=True)
-                filename = newfilename
+            filename = newfilename
 
         assert os.path.exists(filename), "PDF %s not found" % filename
         basename = os.path.basename(filename)
@@ -998,7 +998,7 @@ class StreamingPDFReader(PDFReader):
                 self.log.debug("%s: Converting to PDF: %s" % (filename, cmdline))
                 (ret, stdout, stderr) = util.runcmd(
                     cmdline, require_success=True)
-                filename = newfilename
+            filename = newfilename
 
         assert os.path.exists(filename), "PDF %s not found" % filename
         convertedfile = self.intermediate_filename(filename, ocr_lang, keep_xml)
