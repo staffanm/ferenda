@@ -719,7 +719,7 @@ class SwedishLegalSource(DocumentRepository):
         # even though our attributes are sanitized, plain-str objects
         # might need conversion (language-tagged literals, typed
         # literals, lookups from a label to a URIRef...)
-        for k in attribs:
+        for k in list(attribs):
             islist = isinstance(attribs[k], (list, tuple))
             if islist:
                 values = attribs[k]
@@ -752,7 +752,18 @@ class SwedishLegalSource(DocumentRepository):
                     result.append(URIRef(value))
                 elif k in ("dcterms:creator", "dcterms:publisher",
                            "rpubl:beslutadAv", "rpubl:departement"):
-                    result.append(self.lookup_resource(value))
+                    # FIXME: This is not good OO
+                    if hasattr(self, 'sanitize_departement'):
+                        sanitized_value = self.sanitize_departement(value)
+                    else:
+                        sanitized_value = value
+                    uri = self.lookup_resource(sanitized_value)
+                    result.append(self.lookup_resource(sanitized_value))
+                    # then add <uri> rdf:label <value>
+                    if hasattr(self, 'sanitize_departement'):
+                        g = Graph()
+                        g.add((URIRef(uri), RDFS.label, Literal(value, lang="sv")))
+                        attribs[uri] = g.resource(URIRef(uri))
                 elif k in ("rpubl:forfattningssamling"):
                     result.append(self.lookup_resource(value, SKOS.altLabel))
                 elif k in ("dcterms:subject"):

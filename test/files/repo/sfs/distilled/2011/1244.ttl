@@ -9,10 +9,12 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <https://lagen.nu/2011:1244#A1> a rinfoex:Avdelning ;
-    rinfoex:avdelningsnummer "1"@sv .
+    rinfoex:avdelningsnummer "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2011:1244> .
 
 <https://lagen.nu/2011:1244#A2> a rinfoex:Avdelning ;
-    rinfoex:avdelningsnummer "2"@sv .
+    rinfoex:avdelningsnummer "2"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2011:1244> .
 
 <https://lagen.nu/2011:1244#K15P1S1N1> rinfoex:punkt "1"@sv ;
     dcterms:isPartOf <https://lagen.nu/2011:1244#K15P1S1> ;
@@ -58,6 +60,7 @@
 <https://lagen.nu/2011:1244/konsolidering> owl:sameAs <https://lagen.nu/2011:1244/konsolidering/2016:64> .
 
 <https://lagen.nu/2011:1244#K15> a rpubl:Kapitel ;
+    dcterms:isPartOf <https://lagen.nu/2011:1244> ;
     rpubl:kapitelnummer "15"@sv .
 
 <https://lagen.nu/2011:1244#K15P1> a rpubl:Paragraf ;
@@ -118,6 +121,22 @@
 <https://lagen.nu/rskr/2011/12:28> a rinfoex:Riksdagsskrivelse ;
     dcterms:identifier "rskr. 2011/12:28" .
 
+<https://lagen.nu/2011:1244#K1> a rpubl:Kapitel ;
+    dcterms:isPartOf <https://lagen.nu/2011:1244> ;
+    rpubl:kapitelnummer "1"@sv .
+
+<https://lagen.nu/2011:1244#K4> a rpubl:Kapitel ;
+    dcterms:isPartOf <https://lagen.nu/2011:1244> ;
+    rpubl:kapitelnummer "4"@sv .
+
+<https://lagen.nu/org/2008/finansdepartementet> rdfs:label "Finansdepartementet S3"@sv .
+
+<https://lagen.nu/2011:1244#K2> a rpubl:Kapitel ;
+    dcterms:isPartOf <https://lagen.nu/2011:1244> ;
+    rpubl:kapitelnummer "2"@sv .
+
+<https://lagen.nu/org/2008/regeringskansliet> rdfs:label "Regeringskansliet"@sv .
+
 <https://lagen.nu/2011:1244> a rpubl:Lag ;
     dcterms:identifier "SFS 2011:1244" ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
@@ -140,15 +159,6 @@
     rpubl:ikrafttradandedatum "2012-01-01"^^xsd:date ;
     rpubl:lopnummer "1244" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2011:1244> .
-
-<https://lagen.nu/2011:1244#K1> a rpubl:Kapitel ;
-    rpubl:kapitelnummer "1"@sv .
-
-<https://lagen.nu/2011:1244#K4> a rpubl:Kapitel ;
-    rpubl:kapitelnummer "4"@sv .
-
-<https://lagen.nu/2011:1244#K2> a rpubl:Kapitel ;
-    rpubl:kapitelnummer "2"@sv .
 
 <https://lagen.nu/2011:1244#K1P1> a rpubl:Paragraf ;
     dcterms:isPartOf <https://lagen.nu/2011:1244#K1> ;

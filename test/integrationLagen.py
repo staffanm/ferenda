@@ -1015,7 +1015,6 @@ class Regressions(TestLagen):
             res = self.get(self.baseurl + "dataset/forarbeten?dir=" + year)
             res.raise_for_status()
             soup = BeautifulSoup(res.text, "lxml")
-            from pudb import set_trace; set_trace()
             for link in soup.find("article").find_all("a"):
                 self.assertRegexpMatches(link.text, "^Dir. \d{4}:\d+$")
 

@@ -110,7 +110,7 @@
     <xsl:variable name="regpost" select="//xhtml:div[@class='registerpost'][1]"/>
     <dl id="refs-dokument" class="dl-horizontal">
       <dt>Departement</dt>
-      <dd><xsl:value-of select="substring-after(//xhtml:link[@rel='dcterms:creator']/@href, '/2008/')"/></dd>
+      <dd><xsl:value-of select="//xhtml:meta[@about=//xhtml:link[@rel='dcterms:creator']/@href]/@content"/></dd>
       <dt>Utfärdad</dt>
       <dd><xsl:value-of select="//xhtml:meta[@property='rpubl:utfardandedatum']/@content"/></dd>
       <dt>Ändring införd</dt>

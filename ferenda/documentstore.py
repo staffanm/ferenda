@@ -417,7 +417,6 @@ class DocumentStore(object):
                         'relate': ['relate', 'generate'],
                         'generate': ['generate']}.get(action, {})
             for section in sections:
-                print("%s: action %s. Deleting section %s" % (basefile, action, section))
                 if section in entry.status:
                     del entry.status[section]
             entry.save()

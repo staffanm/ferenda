@@ -851,15 +851,15 @@ class SFS(Trips):
         for k in attribs:
             if isinstance(attribs[k], dict):
                 attribs[k] = self.sanitize_metadata(attribs[k], basefile)
-            elif k in ("dcterms:creator", "rpubl:departement"):
-                attribs[k] = self.sanitize_departement(attribs[k])
+            # we call sanitize_departement in polish_metadata instead
+            # elif k in ("dcterms:creator", "rpubl:departement"):
+            #     attribs[k] = self.sanitize_departement(attribs[k])
         return attribs
 
     def sanitize_departement(self, val):
         # to avoid "Assuming that" warnings, autoremove sub-org ids,
         # ie "Finansdepartementet S3" -> "Finansdepartementet"
         # loop until done to handle "Justitiedepartementet DOM, L5 och \xc5"
-
         cleaned = None
         while True:
             cleaned = re.sub(",? (och|[A-Z\xc5\xc4\xd6\d]{1,5})$", "", val)
