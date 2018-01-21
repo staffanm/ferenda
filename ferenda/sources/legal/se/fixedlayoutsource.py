@@ -31,10 +31,15 @@ class FixedLayoutHandler(SwedishLegalHandler):
             if isinstance(self.repo, CompositeRepository):
                 for subrepo in self.repo.subrepos:
                     repo = self.repo.get_instance(subrepo)
-                    if os.path.exists(repo.store.downloaded_path(basefile)):
+                    if (os.path.exists(repo.store.downloaded_path(basefile)) and
+                        os.path.exists(repo.store.path(basefile, 'intermediate','.pagemapping.json'))):
                         break
                 else:
                     # force the first available subrepo to get the file
+                    # FIXME: It'd be great if we could force the
+                    # subrepo who has the pagemapping file to
+                    # download, but the CompositeRepository API
+                    # doesn't allow that
                     self.repo.download(basefile)
                     for subrepo in self.repo.subrepos:
                         repo = self.repo.get_instance(subrepo)

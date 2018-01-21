@@ -972,7 +972,7 @@ class Regressions(TestLagen):
         for urlseg in ("prop/1992/93:30",
                        "prop/1996/97:106",
                        "prop/1988/89:150",   # NB: These 2 are budget 
-                       "prop. 1991/92:100"): # propositions, left out by design
+                       "prop/1991/92:100"): # propositions, left out by design
             res = self.get(self.baseurl + urlseg)
             res.raise_for_status()
             soup = BeautifulSoup(res.text, "lxml")
