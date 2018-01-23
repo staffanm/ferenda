@@ -150,6 +150,13 @@ class Trips(SwedishLegalSource):
         return a
 
     def _extract_text(self, basefile, attachment=None):
+        txt = self._extract_text_inner(basefile, atttachment)
+        with self.store.open_intermediate(basefile, mode="wb") as fp:
+            fp.write(txt.encode(self.source_encoding))
+        return self.store.open_intermediate(basefile, "rb")
+
+
+    def _extract_text_inner(self, basefile, attachment=None):
         if not attachment and self.store.storage_policy == "dir":
             attachment = "index.html"
         soup = BeautifulSoup(util.readfile(self.store.downloaded_path(
@@ -164,7 +171,5 @@ class Trips(SwedishLegalSource):
         # the body of the text uses CRLF, but the header uses only
         # LF. Convert to only LF.
         txt = txt.replace("\r", "")
-        with self.store.open_intermediate(basefile, mode="wb") as fp:
-            fp.write(txt.encode(self.source_encoding))
-        return self.store.open_intermediate(basefile, "rb")
-
+        return txt
+        

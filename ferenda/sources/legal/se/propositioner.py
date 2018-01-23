@@ -220,7 +220,7 @@ class PropRegeringen(Regeringen):
         return attribs
 
 class PropTripsStore(FixedLayoutStore):
-    # 1999/94 and 1994/95 has only plaintext (wrapped in .html)
+    # 1993/94 and 1994/95 has only plaintext (wrapped in .html)
     # 1995/96 to 2006/07 has plaintext + doc
     # 2007/08 onwards has plaintext, doc and pdf
     doctypes = OrderedDict([(".html", b'<!DO'),
@@ -532,12 +532,7 @@ class PropTrips(Trips, Offtryck, FixedLayoutSource):
     def extract_head(self, fp, basefile):
         # get metadata from plaintext html even if we have doc/pdf,
         # since plaintext is easiest to extract basic metadata from
-        txtfp = self._extract_text(basefile)
-        # since txtfp is binary, there's always a chance that the
-        # 1000th byte is the first of a two-or-more-bytes char in the
-        # UTF-8 encoding. We therefore ignore all decoding errors.
-        txt = txtfp.read(1000).decode(self.source_encoding, errors="ignore")
-        txtfp.close()
+        txt = self._extract_text_inner(basefile)[:1000]
         return txt.split("-"*64)[0]
 
     def extract_metadata(self, rawheader, basefile):

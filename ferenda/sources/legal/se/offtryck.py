@@ -1411,7 +1411,15 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                              'Propositionens lagförslag', # is preamble in older props
                              'Författningsförslag',       # and also eg Ds 2008:68
                              'Referenser',                 # more like PostambleSection (eg SOU 2007:72 p 377)
-                             'Förkortningar'
+                             'Förkortningar',
+                             # not really a preamblesection, but for
+                             # mid-90:s propositioner, we can't get a
+                             # good digital version that has numbered
+                             # headings which is_section
+                             # requires. This at least lets us avoid
+                             # getting everything mixed up with
+                             # Innehållsförteckning:
+                             'Förslag till riksdagsbeslut' 
         ):
             if txt.startswith(validheading):
                 return True

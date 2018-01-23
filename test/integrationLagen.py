@@ -948,7 +948,9 @@ class Regressions(TestLagen):
                               ("prop/1997/98:179", [57, 58, 43]),
                               ("prop/2007/08:95", [56, 295, 296]),
                               ("prop/1998/99:90", [18, 23]),
-                              ("prop/1996/97:141", [19])):
+                              ("prop/1996/97:141", [19]),
+                              ("prop/1996/97:106", [22]) # based in index.wpd, not a PDF
+        ):
             for page in pages:
                 url = self.baseurl + urlseg + "/sid%s.png" % page
                 self.assert200(url)
@@ -971,8 +973,9 @@ class Regressions(TestLagen):
         # issue 5: "I prop. 1992/93:30 saknas s. 18–30. Prop. 1996/97:106 är ofullständig (har bara två sidor)"
         for urlseg in ("prop/1992/93:30",
                        "prop/1996/97:106",
-                       "prop/1988/89:150",   # NB: These 2 are budget 
-                       "prop/1991/92:100"): # propositions, left out by design
+                       # "prop/1988/89:150",   # NB: These 2 are budget 
+                       # "prop/1991/92:100"
+        ): # propositions, left out by design
             res = self.get(self.baseurl + urlseg)
             res.raise_for_status()
             soup = BeautifulSoup(res.text, "lxml")
