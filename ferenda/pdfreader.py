@@ -227,7 +227,10 @@ class PDFReader(CompoundElement):
             topage = min((i + 1) * 10, number_of_pages)
             if frompage > topage:
                 continue
-            cmd = "pdfimages -all -p -f %(frompage)s -l %(topage)s %(tmppdffile)s %(tmpdir)s/%(root)s" % locals(
+            # if the PDF contains embedded JPG images, extract them
+            # as-is. Other embedded formats (JPEG2000, JBIG2, CCITT)
+            # are converted to PNG.
+            cmd = "pdfimages -png -j -p -f %(frompage)s -l %(topage)s %(tmppdffile)s %(tmpdir)s/%(root)s" % locals(
             )
             self.log.debug("- running " + cmd)
             (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
@@ -237,8 +240,7 @@ class PDFReader(CompoundElement):
             # as imagemagick can create a number of pretty large files
             # for each page, so converting 200 images will fill 10 G
             # of your temp space -- which we'd like to avoid)
-            cmd = "convert %(tmpdir)s/%(root)s-* -compress Zip %(tmpdir)s/%(root)s_tmp%(idx)04d.tif" % locals(
-            )
+            cmd = "convert %(tmpdir)s/%(root)s-* -compress Zip %(tmpdir)s/%(root)s_tmp%(idx)04d.tif" % locals()
             self.log.debug("- running " + cmd)
             (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
             # step 2.2: Remove extracted image files now that they're in the .tif

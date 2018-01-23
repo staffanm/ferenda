@@ -199,31 +199,24 @@ class CompositeRepository(DocumentRepository):
 
         start = time.time()
         ret = False
-        for c in self.subrepos:
-            inst = self.get_instance(c)
-            if (basefile in self.store.basefiles[c] or
-                os.path.exists(inst.store.downloaded_path(basefile))):
-                try:
-                    # each parse method should be smart about whether
-                    # to re-parse or not (i.e. use the @managedparsing
-                    # decorator).
-                    ret = inst.parse(basefile)
-                # Any error thrown (errors.ParseError or something
-                # else) means we try next subrepo -- unless we want to
-                # fail fast with a nice stacktrace during debugging.
-                except Exception as e:
-                    if self.config.failfast:
-                        raise
-                    else:
-                        self.log.debug("%s: parse with %s failed: %s" %
-                                       (basefile,
-                                        inst.qualified_class_name(),
-                                        str(e)))
-                        ret = False
-                if ret:
-                    break
-
-
+        for inst in self.get_preferred_instances(basefile):
+            try:
+                ret = inst.parse(basefile)
+            # Any error thrown (errors.ParseError or something
+            # else) means we try next subrepo -- unless we want to
+            # fail fast with a nice stacktrace during debugging.
+            except Exception as e:
+                if self.config.failfast:
+                    raise
+                else:
+                    self.log.debug("%s: parse with %s failed: %s" %
+                                   (basefile,
+                                    inst.qualified_class_name(),
+                                    str(e)))
+                    ret = False
+            if ret:
+                break
+            
         if ret:
             if ret is not True and ret != basefile:
                 # this is a signal that parse discovered
@@ -250,6 +243,13 @@ class CompositeRepository(DocumentRepository):
                     "No available instance (out of %s) had basefile %s" %
                     (len(self.subrepos), basefile))
                 
+
+    def get_preferred_instances(self, basefile):
+        for c in self.subrepos:
+            inst = self.get_instance(c)
+            if (basefile in self.store.basefiles[c] or
+                os.path.exists(inst.store.downloaded_path(basefile))):
+                yield(inst)
 
     def copy_parsed(self, basefile, instance):
         # If the distilled and parsed links are recent, assume that

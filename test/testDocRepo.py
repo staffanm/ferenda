@@ -688,7 +688,7 @@ class Repo(RepoTester):
         doc.meta += headmeta
         doc.lang = None
         
-        outfile = self.datadir + "/test.xhtml"
+        outfile = self.datadir + "/base/parsed/basefile.xhtml"
         self.repo.render_xhtml(doc, outfile)
         want = """<html xmlns="http://www.w3.org/1999/xhtml"
                         xmlns:bibo="http://purl.org/ontology/bibo/"
@@ -755,7 +755,7 @@ class Repo(RepoTester):
         doc.meta += headmeta
         doc.lang = None
         
-        outfile = self.datadir + "/test.xhtml"
+        outfile = self.datadir + "/base/parsed/basefile.xhtml"
         self.repo.render_xhtml(doc, outfile)
         want = """<html xmlns="http://www.w3.org/1999/xhtml"
                         xmlns:bibo="http://purl.org/ontology/bibo/"

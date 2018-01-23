@@ -187,7 +187,6 @@
 <https://lagen.nu/prop/1991/92:167> a rpubl:Proposition ;
     dcterms:identifier "Prop. 1991/92:167" ;
     dcterms:issued "1992-01-01"^^xsd:date ;
-    dcterms:references <https://lagen.nu/1981:1361> ;
     dcterms:title "om den svenska hemförsäljningslagens anpassning till EG:s regelverk "@sv ;
     rpubl:arsutgava "1991/92" ;
     rpubl:lopnummer "167" ;
@@ -195,4 +194,3 @@
     prov:alternateOf <http://www.riksdagen.se/sv/Dokument-Lagar/Forslag/Propositioner-och-skrivelser/_GF03167/?text=true> ;
     prov:wasDerivedFrom <https://lagen.nu/prop/1991/92:167?attachment=index.pdf&repo=propriksdagen&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.propositioner.PropRiksdagen" .
-

@@ -1,0 +1,351 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rinfoex: <http://lagen.nu/terms#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://lagen.nu/1994:200#A1> a rinfoex:Avdelning ;
+    rinfoex:avdelningsnummer "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200> .
+
+<https://lagen.nu/1994:200#K13P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K13P1> ;
+    dcterms:references <https://lagen.nu/1994:200#K13P28a>,
+        <https://lagen.nu/1994:200#K13P6>,
+        <https://lagen.nu/1994:200#L2014:940>,
+        <https://lagen.nu/2000:46>,
+        <https://lagen.nu/2011:1244>,
+        <https://lagen.nu/2011:1244#K26>,
+        <https://lagen.nu/2011:1245> .
+
+<https://lagen.nu/1994:200#K13P6S1N1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K13P6S1> ;
+    dcterms:references <https://lagen.nu/1994:200#K1P2S1N1> .
+
+<https://lagen.nu/1994:200#K13P6S1N2> rinfoex:punkt "2"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K13P6S1> ;
+    dcterms:references <https://lagen.nu/1994:200#K1P2S1N2> .
+
+<https://lagen.nu/1994:200#K13P6S1N3> rinfoex:punkt "3"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K13P6S1> .
+
+<https://lagen.nu/1994:200#K13P6S1N4> rinfoex:punkt "4"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K13P6S1> ;
+    dcterms:references <https://lagen.nu/1994:200#L2016:261> .
+
+<https://lagen.nu/1994:200#K19P1S1N1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K19P1S1> .
+
+<https://lagen.nu/1994:200#K19P1S1N2> rinfoex:punkt "2"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K19P1S1> .
+
+<https://lagen.nu/1994:200#K1P1S1N3> rinfoex:punkt "3"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P1S1> .
+
+<https://lagen.nu/1994:200#K1P1S2> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P1> ;
+    dcterms:references <https://lagen.nu/1994:200#K2>,
+        <https://lagen.nu/1994:200#K2a>,
+        <https://lagen.nu/1994:200#K3>,
+        <https://lagen.nu/1994:200#K4>,
+        <https://lagen.nu/1994:200#K5> .
+
+<https://lagen.nu/1994:200#K1P1S3> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P1> ;
+    dcterms:references <https://lagen.nu/1994:200#L2013:368> .
+
+<https://lagen.nu/1994:200#K1P2S1N1a> rinfoex:punkt "1a"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S1> ;
+    dcterms:references <https://lagen.nu/1994:200#K1P1S1N1>,
+        <https://lagen.nu/ext/celex/32006L0112>,
+        <https://lagen.nu/ext/celex/32008L0008> .
+
+<https://lagen.nu/1994:200#K1P2S1N2N1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S1N2> .
+
+<https://lagen.nu/1994:200#K1P2S1N2N2> rinfoex:punkt "2"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S1N2> .
+
+<https://lagen.nu/1994:200#K1P2S1N2N3> rinfoex:punkt "3"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S1N2> ;
+    dcterms:references <https://lagen.nu/1994:200#K4P8> .
+
+<https://lagen.nu/1994:200#K1P2S1N3> rinfoex:punkt "3"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S1> ;
+    dcterms:references <https://lagen.nu/1994:200#K1P1S1N1>,
+        <https://lagen.nu/1994:200#K5>,
+        <https://lagen.nu/1994:200#K5P2c>,
+        <https://lagen.nu/1994:200#K5P2d> .
+
+<https://lagen.nu/1994:200#K1P2S1N4> rinfoex:punkt "4"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S1> ;
+    dcterms:references <https://lagen.nu/1994:200#K3P30bS1> .
+
+<https://lagen.nu/1994:200#K1P2S1N4a> rinfoex:punkt "4a"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S1> ;
+    dcterms:references <https://lagen.nu/1994:200#K1P1S1N1>,
+        <https://lagen.nu/1994:200#K3P10b> .
+
+<https://lagen.nu/1994:200#K1P2S1N4bN1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S1N4b> .
+
+<https://lagen.nu/1994:200#K1P2S1N4bN2> rinfoex:punkt "2"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S1N4b> .
+
+<https://lagen.nu/1994:200#K1P2S1N4c> rinfoex:punkt "4c"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S1> ;
+    dcterms:references <https://lagen.nu/1994:200#K1P1S1N1>,
+        <https://lagen.nu/1994:200#K1P2d>,
+        <https://lagen.nu/1994:200#K3>,
+        <https://lagen.nu/1994:200#K3P3S2>,
+        <https://lagen.nu/1994:200#K3P3S3>,
+        <https://lagen.nu/1994:200#K5P8> .
+
+<https://lagen.nu/1994:200#K1P2S1N4d> rinfoex:punkt "4d"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S1> ;
+    dcterms:references <https://lagen.nu/1994:200#K1P1S1N1>,
+        <https://lagen.nu/1994:200#K1P2S1N2>,
+        <https://lagen.nu/ext/celex/32003L0087#3> .
+
+<https://lagen.nu/1994:200#K1P2S1N4e> rinfoex:punkt "4e"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S1> ;
+    dcterms:references <https://lagen.nu/1994:200#K1P1S1N1>,
+        <https://lagen.nu/1994:200#K1P2S3> .
+
+<https://lagen.nu/1994:200#K1P2S1N5> rinfoex:punkt "5"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S1> ;
+    dcterms:references <https://lagen.nu/1994:200#K1P1S1N2> .
+
+<https://lagen.nu/1994:200#K1P2S1N6Na> rinfoex:punkt "a"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S1N6> .
+
+<https://lagen.nu/1994:200#K1P2S1N6Nb> rinfoex:punkt "b"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S1N6> .
+
+<https://lagen.nu/1994:200#K1P2S1N6Nc> rinfoex:punkt "c"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S1N6> .
+
+<https://lagen.nu/1994:200#K1P2S2N1N1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S2N1> .
+
+<https://lagen.nu/1994:200#K1P2S2N1N2> rinfoex:punkt "2"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S2N1> .
+
+<https://lagen.nu/1994:200#K1P2S2N1N3> rinfoex:punkt "3"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S2N1> .
+
+<https://lagen.nu/1994:200#K1P2S2N1N4> rinfoex:punkt "4"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S2N1> .
+
+<https://lagen.nu/1994:200#K1P2S2N1N5> rinfoex:punkt "5"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S2N1> .
+
+<https://lagen.nu/1994:200#K1P2S2N2> rinfoex:punkt "2"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S2> .
+
+<https://lagen.nu/1994:200#K1P2S2N3> rinfoex:punkt "3"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S2> .
+
+<https://lagen.nu/1994:200#K1P2S3N1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S3> .
+
+<https://lagen.nu/1994:200#K1P2S3N2> rinfoex:punkt "2"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S3> .
+
+<https://lagen.nu/1994:200#K1P2S3N3> rinfoex:punkt "3"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S3> .
+
+<https://lagen.nu/1994:200#K1P2S3N4> rinfoex:punkt "4"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S3> .
+
+<https://lagen.nu/1994:200#K1P2S3N5> rinfoex:punkt "5"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S3> .
+
+<https://lagen.nu/1994:200#K1P2S3N6> rinfoex:punkt "6"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S3> .
+
+<https://lagen.nu/1994:200#K1P2S3N7> rinfoex:punkt "7"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S3> .
+
+<https://lagen.nu/1994:200#K1P2S3N8> rinfoex:punkt "8"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S3> .
+
+<https://lagen.nu/1994:200#K1P2S3N9> rinfoex:punkt "9"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S3> .
+
+<https://lagen.nu/1994:200#K1P2S4> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2> ;
+    dcterms:references <https://lagen.nu/1994:200#K1P2S1> .
+
+<https://lagen.nu/1994:200#K1P2S5> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2> ;
+    dcterms:references <https://lagen.nu/ext/celex/32013R0952#5> .
+
+<https://lagen.nu/1994:200#K1P2S6> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2> ;
+    dcterms:references <https://lagen.nu/1994:200#K6>,
+        <https://lagen.nu/1994:200#K9>,
+        <https://lagen.nu/1994:200#K9c>,
+        <https://lagen.nu/1994:200#L2016:261> .
+
+<https://lagen.nu/1994:200#L1994:200N1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#L1994:200> ;
+    dcterms:references <https://lagen.nu/1968:430>,
+        <https://lagen.nu/1991:119> .
+
+<https://lagen.nu/1994:200#L1994:200N2> rinfoex:punkt "2"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#L1994:200> ;
+    dcterms:references <https://lagen.nu/1994:200#K17>,
+        <https://lagen.nu/1994:200#L1994:473> .
+
+<https://lagen.nu/1994:200#L1994:200N3> rinfoex:punkt "3"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#L1994:200> ;
+    dcterms:references <https://lagen.nu/1968:430> .
+
+<https://lagen.nu/1994:200#L1994:200N4> rinfoex:punkt "4"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#L1994:200> .
+
+<https://lagen.nu/1994:200#L1994:200N7> rinfoex:punkt "7"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#L1994:200> ;
+    dcterms:references <https://lagen.nu/1968:430> .
+
+<https://lagen.nu/1994:200#L1994:200N8> rinfoex:punkt "8"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#L1994:200> ;
+    dcterms:references <https://lagen.nu/1994:200#K20P9>,
+        <https://lagen.nu/1994:200#L1994:473> .
+
+<https://lagen.nu/1994:200/konsolidering> owl:sameAs <https://lagen.nu/1994:200/konsolidering/2016:261> .
+
+<https://lagen.nu/1994:200#K13P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K13> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/1994:200#K19> a rpubl:Kapitel ;
+    dcterms:isPartOf <https://lagen.nu/1994:200> ;
+    rpubl:kapitelnummer "19"@sv .
+
+<https://lagen.nu/1994:200#K19P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K19> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/1994:200#K1P1S1N2> rinfoex:punkt "2"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P1S1> .
+
+<https://lagen.nu/1994:200#K1P2S1N1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S1> ;
+    dcterms:references <https://lagen.nu/1994:200#K1P1S1N1> .
+
+<https://lagen.nu/1994:200/konsolidering/2016:261> a rpubl:KonsolideradGrundforfattning ;
+    rinfoex:omtryck "https://lagen.nu/2000:500" ;
+    dcterms:creator <https://lagen.nu/org/2008/finansdepartementet> ;
+    dcterms:identifier "SFS 1994:200 i lydelse enligt SFS 2016:261" ;
+    dcterms:issued "1994-03-30"^^xsd:date ;
+    dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:title "Mervärdesskattelag (1994:200)"@sv ;
+    rpubl:ikrafttradandedatum "1994-07-01"^^xsd:date ;
+    rpubl:konsoliderar <https://lagen.nu/1994:200> ;
+    rpubl:konsolideringsunderlag <https://lagen.nu/1994:200>,
+        <https://lagen.nu/2016:261> ;
+    rpubl:utfardandedatum "1994-03-30"^^xsd:date ;
+    rdfs:comment "Rättelseblad 2011:1253 har iakttagits." ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1994:200/konsolidering/1994-03-30> ;
+    prov:wasGeneratedBy "lagen.nu.sfs.SFS" .
+
+<https://lagen.nu/bet/1993/94:SkU29> a rinfoex:Utskottsbetankande ;
+    dcterms:identifier "bet. 1993/94:SkU29" .
+
+<https://lagen.nu/prop/1993/94:99> a rpubl:Proposition ;
+    dcterms:identifier "Prop. 1993/94:99" .
+
+<https://lagen.nu/rskr/1993/94:170> a rinfoex:Riksdagsskrivelse ;
+    dcterms:identifier "rskr. 1993/94:170" .
+
+<https://lagen.nu/1994:200#K1> a rpubl:Kapitel ;
+    dcterms:isPartOf <https://lagen.nu/1994:200> ;
+    rpubl:kapitelnummer "1"@sv .
+
+<https://lagen.nu/1994:200#K13> a rpubl:Kapitel ;
+    dcterms:isPartOf <https://lagen.nu/1994:200> ;
+    rpubl:kapitelnummer "13"@sv .
+
+<https://lagen.nu/1994:200#K13P6> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K13> ;
+    rpubl:paragrafnummer "6"@sv .
+
+<https://lagen.nu/1994:200#K19P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K19P1> ;
+    dcterms:references <https://lagen.nu/1994:200#K10>,
+        <https://lagen.nu/1994:200#K19P12>,
+        <https://lagen.nu/1994:200#K19P6> .
+
+<https://lagen.nu/1994:200#K1P2S1N4b> rinfoex:punkt "4b"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S1> ;
+    dcterms:references <https://lagen.nu/1994:200#K1P1S1N1>,
+        <https://lagen.nu/1994:200#K1P2S1N2>,
+        <https://lagen.nu/1994:200#K1P2S2> .
+
+<https://lagen.nu/org/2008/finansdepartementet> rdfs:label "Finansdepartementet S2"@sv .
+
+<https://lagen.nu/1994:200#K1P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/1994:200#K1P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P1> .
+
+<https://lagen.nu/1994:200#K1P2S1N6> rinfoex:punkt "6"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S1> .
+
+<https://lagen.nu/org/2008/regeringskansliet> rdfs:label "Regeringskansliet"@sv .
+
+<https://lagen.nu/1994:200#K13P6S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K13P6> ;
+    dcterms:references <https://lagen.nu/1994:200#K13P15>,
+        <https://lagen.nu/1994:200#K13P7> .
+
+<https://lagen.nu/1994:200#K1P2S2> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2> .
+
+<https://lagen.nu/1994:200#K1P2S2N1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S2> .
+
+<https://lagen.nu/1994:200#K1P2> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1> ;
+    rpubl:paragrafnummer "2"@sv .
+
+<https://lagen.nu/1994:200#K1P2S1N2> rinfoex:punkt "2"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2S1> ;
+    dcterms:references <https://lagen.nu/1994:200#K1P1S1N1>,
+        <https://lagen.nu/1994:200#K5P5> .
+
+<https://lagen.nu/1994:200#L1994:200> dcterms:isPartOf <https://lagen.nu/1994:200> .
+
+<https://lagen.nu/1994:200> a rpubl:Lag ;
+    dcterms:identifier "SFS 1994:200" ;
+    dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:title "Mervärdesskattelag (1994:200)"@sv ;
+    rpubl:arsutgava "1994" ;
+    rpubl:beslutadAv <https://lagen.nu/org/2008/regeringskansliet> ;
+    rpubl:departement <https://lagen.nu/org/2008/finansdepartementet> ;
+    rpubl:forarbete <https://lagen.nu/bet/1993/94:SkU29>,
+        <https://lagen.nu/prop/1993/94:99>,
+        <https://lagen.nu/rskr/1993/94:170> ;
+    rpubl:forfattningssamling <https://lagen.nu/dataset/sfs> ;
+    rpubl:ikrafttradandedatum "1994-07-01"^^xsd:date ;
+    rpubl:lopnummer "200" ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1994:200> .
+
+<https://lagen.nu/1994:200#K1P1S1N1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P1S1> .
+
+<https://lagen.nu/1994:200#K1P2S3> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2> ;
+    dcterms:references <https://lagen.nu/ext/celex/31987R2658> .
+
+<https://lagen.nu/1994:200#K1P2S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1994:200#K1P2> .
+

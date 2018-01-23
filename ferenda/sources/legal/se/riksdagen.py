@@ -276,6 +276,8 @@ class Riksdagen(Offtryck, FixedLayoutSource):
                                      convert_to_pdf=convert_to_pdf,
                                      keep_xml=keep_xml,
                                      ocr_lang="swe")
+                # now the intermediate path endswith .hocr.html.bz2, not .xml.bz2 
+                intermediate_path = self.store.intermediate_path(basefile)
             if os.path.getsize(intermediate_path) > 20*1024*1024:
                 raise errors.ParseError("%s: %s (after conversion) is just too damn big (%s Mbytes)" % 
                                         (basefile, intermediate_path, 

@@ -1,0 +1,590 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rinfoex: <http://lagen.nu/terms#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://lagen.nu/2010:110#AA> a rinfoex:Avdelning ;
+    rinfoex:avdelningsnummer "A"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110> .
+
+<https://lagen.nu/2010:110#AB> a rinfoex:Avdelning ;
+    rinfoex:avdelningsnummer "B"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110> .
+
+<https://lagen.nu/2010:110#AC> a rinfoex:Avdelning ;
+    rinfoex:avdelningsnummer "C"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110> .
+
+<https://lagen.nu/2010:110#AD> a rinfoex:Avdelning ;
+    rinfoex:avdelningsnummer "D"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110> .
+
+<https://lagen.nu/2010:110#AE> a rinfoex:Avdelning ;
+    rinfoex:avdelningsnummer "E"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110> .
+
+<https://lagen.nu/2010:110#AF> a rinfoex:Avdelning ;
+    rinfoex:avdelningsnummer "F"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110> .
+
+<https://lagen.nu/2010:110#AG> a rinfoex:Avdelning ;
+    rinfoex:avdelningsnummer "G"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110> .
+
+<https://lagen.nu/2010:110#AH> a rinfoex:Avdelning ;
+    rinfoex:avdelningsnummer "H"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110> .
+
+<https://lagen.nu/2010:110#K104P1S1N1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K104P1S1> ;
+    dcterms:references <https://lagen.nu/2010:110#K108> .
+
+<https://lagen.nu/2010:110#K104P1S1N2> rinfoex:punkt "2"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K104P1S1> ;
+    dcterms:references <https://lagen.nu/2010:110#K115> .
+
+<https://lagen.nu/2010:110#K104P1S1N3> rinfoex:punkt "3"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K104P1S1> ;
+    dcterms:references <https://lagen.nu/2010:110#K117> .
+
+<https://lagen.nu/2010:110#K105P1S1N1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K105P1S1> ;
+    dcterms:references <https://lagen.nu/2010:110#K106> .
+
+<https://lagen.nu/2010:110#K105P1S1N2> rinfoex:punkt "2"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K105P1S1> ;
+    dcterms:references <https://lagen.nu/2010:110#K107> .
+
+<https://lagen.nu/2010:110#K105P1S1N3> rinfoex:punkt "3"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K105P1S1> ;
+    dcterms:references <https://lagen.nu/2010:110#K108> .
+
+<https://lagen.nu/2010:110#K1P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K1P1> ;
+    dcterms:subject <https://lagen.nu/begrepp/Socialförsäkringen> .
+
+<https://lagen.nu/2010:110#K1P2S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K1P2> .
+
+<https://lagen.nu/2010:110#K1P2S2> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K1P2> .
+
+<https://lagen.nu/2010:110#K23P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K23P1> .
+
+<https://lagen.nu/2010:110#K23P2S1N1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K23P2S1> .
+
+<https://lagen.nu/2010:110#K24P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K24P1> ;
+    dcterms:references <https://lagen.nu/2010:110#K25> .
+
+<https://lagen.nu/2010:110#K24P1S2N1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K24P1S2> ;
+    dcterms:references <https://lagen.nu/2010:110#K26> .
+
+<https://lagen.nu/2010:110#K24P1S2N2> rinfoex:punkt "2"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K24P1S2> ;
+    dcterms:references <https://lagen.nu/2010:110#K28> .
+
+<https://lagen.nu/2010:110#K24P1S2N3> rinfoex:punkt "3"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K24P1S2> ;
+    dcterms:references <https://lagen.nu/2010:110#K28a>,
+        <https://lagen.nu/2010:110#L2011:1513> .
+
+<https://lagen.nu/2010:110#K24P2S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K24P2> .
+
+<https://lagen.nu/2010:110#K29P1S1N1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K29P1S1> ;
+    dcterms:references <https://lagen.nu/2010:110#K30> .
+
+<https://lagen.nu/2010:110#K29P1S1N2> rinfoex:punkt "2"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K29P1S1> ;
+    dcterms:references <https://lagen.nu/2010:110#K31> .
+
+<https://lagen.nu/2010:110#K29P1S1N3> rinfoex:punkt "3"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K29P1S1> ;
+    dcterms:references <https://lagen.nu/2010:110#K31a>,
+        <https://lagen.nu/2010:110#L2011:1513> .
+
+<https://lagen.nu/2010:110#K29P2S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K29P2> ;
+    dcterms:subject <https://lagen.nu/begrepp/Arbetslivsinriktad_rehabilitering> .
+
+<https://lagen.nu/2010:110#K2P1S1N1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K2P1S1> ;
+    dcterms:references <https://lagen.nu/2010:110#K2P2> .
+
+<https://lagen.nu/2010:110#K2P1S1N2> rinfoex:punkt "2"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K2P1S1> ;
+    dcterms:references <https://lagen.nu/2010:110#K2P3>,
+        <https://lagen.nu/2010:110#K2P4> .
+
+<https://lagen.nu/2010:110#K2P1S1N3> rinfoex:punkt "3"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K2P1S1> ;
+    dcterms:references <https://lagen.nu/2010:110#K2P5> .
+
+<https://lagen.nu/2010:110#K2P1S1N4> rinfoex:punkt "4"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K2P1S1> ;
+    dcterms:references <https://lagen.nu/2010:110#K2P10>,
+        <https://lagen.nu/2010:110#K2P6> .
+
+<https://lagen.nu/2010:110#K2P1S1N5> rinfoex:punkt "5"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K2P1S1> ;
+    dcterms:references <https://lagen.nu/2010:110#K2P11>,
+        <https://lagen.nu/2010:110#K2P17>,
+        <https://lagen.nu/2010:110#L2012:834> .
+
+<https://lagen.nu/2010:110#K2P2S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K2P2> .
+
+<https://lagen.nu/2010:110#K2P2S2> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K2P2> .
+
+<https://lagen.nu/2010:110#K2P2S3> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K2P2> .
+
+<https://lagen.nu/2010:110#K32P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K32P1> ;
+    dcterms:references <https://lagen.nu/2010:110#K33> .
+
+<https://lagen.nu/2010:110#K32P1S2N1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K32P1S2> ;
+    dcterms:references <https://lagen.nu/2010:110#K37> .
+
+<https://lagen.nu/2010:110#K33P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K33P1> ;
+    dcterms:references <https://lagen.nu/2010:110#K33P2>,
+        <https://lagen.nu/2010:110#K33P4> .
+
+<https://lagen.nu/2010:110#K38P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K38P1> ;
+    dcterms:references <https://lagen.nu/2010:110#K39> .
+
+<https://lagen.nu/2010:110#K39P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K39P1> ;
+    dcterms:references <https://lagen.nu/2010:110#K39P2> .
+
+<https://lagen.nu/2010:110#K39P2S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K39P2> .
+
+<https://lagen.nu/2010:110#K39P2S2> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K39P2> ;
+    dcterms:references <https://lagen.nu/2010:110#K88> .
+
+<https://lagen.nu/2010:110#K39P3S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K39P3> .
+
+<https://lagen.nu/2010:110#K39P6S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K39P6> ;
+    dcterms:references <https://lagen.nu/2010:110#K39>,
+        <https://lagen.nu/2010:110#K42>,
+        <https://lagen.nu/2010:110#K42P12>,
+        <https://lagen.nu/2010:110#K42P7> .
+
+<https://lagen.nu/2010:110#K3P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K3P1> ;
+    dcterms:references <https://lagen.nu/2010:110#K4> .
+
+<https://lagen.nu/2010:110#K3P1S2N1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K3P1S2> ;
+    dcterms:references <https://lagen.nu/2010:110#K5> .
+
+<https://lagen.nu/2010:110#K3P1S2N2> rinfoex:punkt "2"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K3P1S2> ;
+    dcterms:references <https://lagen.nu/2010:110#K6> .
+
+<https://lagen.nu/2010:110#K3P1S2N3> rinfoex:punkt "3"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K3P1S2> ;
+    dcterms:references <https://lagen.nu/2010:110#K7> .
+
+<https://lagen.nu/2010:110#K45P1S1N1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K45P1S1> ;
+    dcterms:references <https://lagen.nu/2010:110#K46>,
+        <https://lagen.nu/2010:110#K47> .
+
+<https://lagen.nu/2010:110#K48P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K48P1> .
+
+<https://lagen.nu/2010:110#K4P10S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K4P10> ;
+    dcterms:references <https://lagen.nu/2010:110#K4P9>,
+        <https://lagen.nu/2010:110#K4P9S1N15>,
+        <https://lagen.nu/2010:110#K4P9S1N16>,
+        <https://lagen.nu/2010:110#L2011:1513> .
+
+<https://lagen.nu/2010:110#K4P1S1N1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K4P1S1> ;
+    dcterms:references <https://lagen.nu/2010:110#K4P2> .
+
+<https://lagen.nu/2010:110#K4P1S1N2> rinfoex:punkt "2"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K4P1S1> ;
+    dcterms:references <https://lagen.nu/2010:110#K4P3>,
+        <https://lagen.nu/2010:110#K4P4> .
+
+<https://lagen.nu/2010:110#K4P1S1N3> rinfoex:punkt "3"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K4P1S1> ;
+    dcterms:references <https://lagen.nu/2010:110#K4P5> .
+
+<https://lagen.nu/2010:110#K4P9S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K4P9> .
+
+<https://lagen.nu/2010:110#K4P9S2> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K4P9> ;
+    dcterms:references <https://lagen.nu/2010:110#K103>,
+        <https://lagen.nu/2010:110#K103e>,
+        <https://lagen.nu/2010:110#K12>,
+        <https://lagen.nu/2010:110#K16>,
+        <https://lagen.nu/2010:110#K19>,
+        <https://lagen.nu/2010:110#K21>,
+        <https://lagen.nu/2010:110#K22>,
+        <https://lagen.nu/2010:110#K28a>,
+        <https://lagen.nu/2010:110#K31a>,
+        <https://lagen.nu/2010:110#K37>,
+        <https://lagen.nu/2010:110#K50>,
+        <https://lagen.nu/2010:110#K51>,
+        <https://lagen.nu/2010:110#K52>,
+        <https://lagen.nu/2010:110#K71>,
+        <https://lagen.nu/2010:110#K73>,
+        <https://lagen.nu/2010:110#K74>,
+        <https://lagen.nu/2010:110#K85>,
+        <https://lagen.nu/2010:110#K98>,
+        <https://lagen.nu/2010:110#L2011:1513> .
+
+<https://lagen.nu/2010:110#K53P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K53P1> .
+
+<https://lagen.nu/2010:110#K62P19S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K62P19> .
+
+<https://lagen.nu/2010:110#K62P1S1N1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K62P1S1> ;
+    dcterms:references <https://lagen.nu/2010:110#K62P2>,
+        <https://lagen.nu/2010:110#K62P4> .
+
+<https://lagen.nu/2010:110#K62P1S1N2> rinfoex:punkt "2"@sv ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K62P1S1> ;
+    dcterms:references <https://lagen.nu/2010:110#K62P5>,
+        <https://lagen.nu/2010:110#K62P8> .
+
+<https://lagen.nu/2010:110#K62P20S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K62P20> ;
+    dcterms:references <https://lagen.nu/2010:110#K62P17>,
+        <https://lagen.nu/2010:110#K62P9> .
+
+<https://lagen.nu/2010:110#K75P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K75P1> ;
+    dcterms:subject <https://lagen.nu/begrepp/Efterlevandeförmåner> .
+
+<https://lagen.nu/2010:110#K8P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K8P1> ;
+    dcterms:subject <https://lagen.nu/begrepp/Familjeförmåner> .
+
+<https://lagen.nu/2010:110#K93P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K93P1> ;
+    dcterms:subject <https://lagen.nu/begrepp/Bostadsstöd> .
+
+<https://lagen.nu/2010:110/konsolidering> owl:sameAs <https://lagen.nu/2010:110/konsolidering/2016:28> .
+
+<https://lagen.nu/2010:110#K104> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "104"@sv .
+
+<https://lagen.nu/2010:110#K104P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K104> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/2010:110#K105> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "105"@sv .
+
+<https://lagen.nu/2010:110#K105P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K105> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/2010:110#K1P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K1> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/2010:110#K23P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K23> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/2010:110#K23P2> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K23> ;
+    rpubl:paragrafnummer "2"@sv .
+
+<https://lagen.nu/2010:110#K23P2S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K23P2> .
+
+<https://lagen.nu/2010:110#K24P2> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K24> ;
+    rpubl:paragrafnummer "2"@sv .
+
+<https://lagen.nu/2010:110#K29P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K29> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/2010:110#K29P2> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K29> ;
+    rpubl:paragrafnummer "2"@sv .
+
+<https://lagen.nu/2010:110#K2P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K2> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/2010:110#K3> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "3"@sv .
+
+<https://lagen.nu/2010:110#K32> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "32"@sv .
+
+<https://lagen.nu/2010:110#K32P1S2> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K32P1> .
+
+<https://lagen.nu/2010:110#K33P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K33> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/2010:110#K38> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "38"@sv .
+
+<https://lagen.nu/2010:110#K38P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K38> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/2010:110#K39P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K39> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/2010:110#K39P3> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K39> ;
+    rpubl:paragrafnummer "3"@sv .
+
+<https://lagen.nu/2010:110#K39P6> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K39> ;
+    rpubl:paragrafnummer "6"@sv .
+
+<https://lagen.nu/2010:110#K45> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "45"@sv .
+
+<https://lagen.nu/2010:110#K45P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K45> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/2010:110#K45P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K45P1> .
+
+<https://lagen.nu/2010:110#K48> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "48"@sv .
+
+<https://lagen.nu/2010:110#K48P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K48> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/2010:110#K4P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K4> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/2010:110#K4P10> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K4> ;
+    rpubl:paragrafnummer "10"@sv .
+
+<https://lagen.nu/2010:110#K53> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "53"@sv .
+
+<https://lagen.nu/2010:110#K53P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K53> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/2010:110#K62P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K62> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/2010:110#K62P19> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K62> ;
+    rpubl:paragrafnummer "19"@sv .
+
+<https://lagen.nu/2010:110#K62P20> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K62> ;
+    rpubl:paragrafnummer "20"@sv .
+
+<https://lagen.nu/2010:110#K75> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "75"@sv .
+
+<https://lagen.nu/2010:110#K75P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K75> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/2010:110#K8> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "8"@sv .
+
+<https://lagen.nu/2010:110#K8P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K8> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/2010:110#K93> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "93"@sv .
+
+<https://lagen.nu/2010:110#K93P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K93> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/2010:110/konsolidering/2016:28> a rpubl:KonsolideradGrundforfattning ;
+    rinfoex:senastHamtad "2016-03-04T00:18:08.395591"^^xsd:dateTime ;
+    rinfoex:senastKontrollerad "2016-09-25T22:15:39.347753"^^xsd:dateTime ;
+    dcterms:creator <https://lagen.nu/org/2008/socialdepartementet> ;
+    dcterms:identifier "SFS 2010:110 i lydelse enligt SFS 2016:28" ;
+    dcterms:issued "2010-05-19"^^xsd:date ;
+    dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:title "Socialförsäkringsbalk (2010:110)"@sv ;
+    rpubl:ikrafttradandedatum "2011-01-01"^^xsd:date ;
+    rpubl:konsoliderar <https://lagen.nu/2010:110> ;
+    rpubl:konsolideringsunderlag <https://lagen.nu/2010:110>,
+        <https://lagen.nu/2010:343>,
+        <https://lagen.nu/2016:28> ;
+    rpubl:utfardandedatum "2010-03-04"^^xsd:date ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2010:110/konsolidering/2010-05-19> ;
+    prov:wasGeneratedBy "lagen.nu.sfs.SFS" .
+
+<https://lagen.nu/2010:343> a rpubl:Lag ;
+    dcterms:identifier "SFS 2010:343" ;
+    dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:title "Lag (2010:343) om ändring i socialförsäkringsbalken"@sv ;
+    rpubl:andrar "ändr. 27 kap. 22, 26 §§; ny 27 kap. 28 a §" ;
+    rpubl:arsutgava "2010" ;
+    rpubl:beslutadAv <https://lagen.nu/org/2008/regeringskansliet> ;
+    rpubl:ersatter <https://lagen.nu/2010:110#K27>,
+        <https://lagen.nu/2010:110#K27P22>,
+        <https://lagen.nu/2010:110#K27P26> ;
+    rpubl:forarbete <https://lagen.nu/bet/2009/10:TU17>,
+        <https://lagen.nu/prop/2009/10:161>,
+        <https://lagen.nu/rskr/2009/10:253> ;
+    rpubl:forfattningssamling <https://lagen.nu/dataset/sfs> ;
+    rpubl:ikrafttradandedatum "2011-02-01"^^xsd:date ;
+    rpubl:inforsI <https://lagen.nu/2010:110#K27P28a> ;
+    rpubl:lopnummer "343" ;
+    rpubl:utfardandedatum "2010-05-19"^^xsd:date ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2010:343> .
+
+<https://lagen.nu/bet/2009/10:SfU11> a rinfoex:Utskottsbetankande ;
+    dcterms:identifier "bet. 2009/10:SfU11" .
+
+<https://lagen.nu/bet/2009/10:TU17> a rinfoex:Utskottsbetankande ;
+    dcterms:identifier "bet. 2009/10:TU17" .
+
+<https://lagen.nu/prop/2008/09:200> a rpubl:Proposition ;
+    dcterms:identifier "Prop. 2008/09:200" .
+
+<https://lagen.nu/prop/2009/10:161> a rpubl:Proposition ;
+    dcterms:identifier "Prop. 2009/10:161" .
+
+<https://lagen.nu/rskr/2009/10:194> a rinfoex:Riksdagsskrivelse ;
+    dcterms:identifier "rskr. 2009/10:194" .
+
+<https://lagen.nu/rskr/2009/10:253> a rinfoex:Riksdagsskrivelse ;
+    dcterms:identifier "rskr. 2009/10:253" .
+
+<https://lagen.nu/2010:110#K1> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "1"@sv .
+
+<https://lagen.nu/2010:110#K1P2> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K1> ;
+    rpubl:paragrafnummer "2"@sv .
+
+<https://lagen.nu/2010:110#K2> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "2"@sv .
+
+<https://lagen.nu/2010:110#K23> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "23"@sv .
+
+<https://lagen.nu/2010:110#K24> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "24"@sv .
+
+<https://lagen.nu/2010:110#K24P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K24> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/2010:110#K29> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "29"@sv .
+
+<https://lagen.nu/2010:110#K32P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K32> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/2010:110#K33> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "33"@sv .
+
+<https://lagen.nu/2010:110#K3P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K3> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/2010:110#K62P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K62P1> .
+
+<https://lagen.nu/org/2008/socialdepartementet> rdfs:label "Socialdepartementet"@sv .
+
+<https://lagen.nu/2010:110#K104P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K104P1> .
+
+<https://lagen.nu/2010:110#K105P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K105P1> .
+
+<https://lagen.nu/2010:110#K24P1S2> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K24P1> .
+
+<https://lagen.nu/2010:110#K29P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K29P1> .
+
+<https://lagen.nu/2010:110#K39P2> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K39> ;
+    rpubl:paragrafnummer "2"@sv .
+
+<https://lagen.nu/2010:110#K3P1S2> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K3P1> .
+
+<https://lagen.nu/2010:110#K4P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K4P1> .
+
+<https://lagen.nu/2010:110#K4P9> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K4> ;
+    rpubl:paragrafnummer "9"@sv .
+
+<https://lagen.nu/2010:110#K62> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "62"@sv .
+
+<https://lagen.nu/2010:110#K2P2> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K2> ;
+    rpubl:paragrafnummer "2"@sv .
+
+<https://lagen.nu/2010:110#K4> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "4"@sv .
+
+<https://lagen.nu/2010:110#K2P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/2010:110#K2P1> .
+
+<https://lagen.nu/org/2008/regeringskansliet> rdfs:label "Regeringskansliet"@sv .
+
+<https://lagen.nu/2010:110#K39> a rpubl:Kapitel ;
+    rpubl:kapitelnummer "39"@sv .
+
+<https://lagen.nu/2010:110> a rpubl:Lag ;
+    dcterms:identifier "SFS 2010:110" ;
+    dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:title "Socialförsäkringsbalk (2010:110)"@sv ;
+    rpubl:arsutgava "2010" ;
+    rpubl:beslutadAv <https://lagen.nu/org/2008/regeringskansliet> ;
+    rpubl:departement <https://lagen.nu/org/2008/socialdepartementet> ;
+    rpubl:forarbete <https://lagen.nu/bet/2009/10:SfU11>,
+        <https://lagen.nu/prop/2008/09:200>,
+        <https://lagen.nu/rskr/2009/10:194> ;
+    rpubl:forfattningssamling <https://lagen.nu/dataset/sfs> ;
+    rpubl:ikrafttradandedatum "2011-01-01"^^xsd:date ;
+    rpubl:lopnummer "110" ;
+    rpubl:utfardandedatum "2010-03-16"^^xsd:date ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2010:110> .
+

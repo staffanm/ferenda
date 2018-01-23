@@ -1511,6 +1511,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                               # below
             txt = str(chunk).strip()
             return (chunk.font.size == metrics.h1.size and (txt.startswith("Bilaga ") or txt.startswith("Bilagor")))
+
         def is_implicit_appendix(chunk):
             # The technique of starting a new appendix without stating
             # so in the margin on the first page of the appendix
@@ -1523,39 +1524,82 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                     return True
                 return False
 
+        def is_mashed_header(chunk):
+            # For scanned sources, a header and the "Bilaga \d" label
+            # in the margin might mashing together
+            # 1. text larger than default
+            if chunk.font.size <= metrics.default.size:
+                return False
+            # 2. preferably first part of the page (or the top 15% of page)
+            if chunk.bottom  > state.page.height * 0.15:
+                return False
+            # 3. endswith "Bilaga \d" (or has it towards the end, for
+            # the case of a three-line heading like:
+            # 
+            #   Header header heder head header   Prop yyyy/yy:nn
+            #   head header head header header    Bilaga 2
+            #   heading header head
+            #
+            # (it's always more complicated, eg with a five-line heading)
+            txtchunk = str(chunk).strip()
+            txtlen = len(txtchunk)
+            m = re.search("Bilaga \d", txtchunk)
+            if m and (m.end() == txtlen or
+                      txtlen > 140 and m.start() > 120):
+                return True
+
         chunk = parser.reader.peek()
         txtchunk = util.normalize_space(str(chunk))
-        if ".." in txtchunk:  # probably a line in a TOC
+        # Sanity check 1: a header can't be longer than a certain number of characters
+        if metrics.scanned_source:
+            # high likelyhood of heading bleeding into the margin
+            # where "Bilaga 1" appears, therefore we need to accept a
+            # longer chunk.
+            #
+            # Bilaga 5 of prop 1992/93:30 has 262 characters...
+            maxlen = 270
+        else:
+            maxlen = 100
+        if len(txtchunk) > maxlen:
             return False
-        if len(txtchunk) > 100:  # sanity check -- should normally be a lot less
+
+        # Sanity check 2: Differentiate between a proper header and
+        # the reference to a header in the TOC (indicated by a string
+        # of "...")
+        if ".." in txtchunk:  
             return False
+        
+        is_header = False
         if not state.appendixstarted:
             if is_appendix_header(chunk):
-                return True
+                is_header = True
             elif is_implicit_appendix(chunk):
-                return True
+                is_header = True
+            elif metrics.scanned_source and is_mashed_header(chunk):
+                is_header = True
 
         # check that the chunk in question is not too big
-        tolerance = 2 if metrics.scanned_source else 0
-        if metrics.default.size + tolerance < chunk.font.size:
-            return False
+        if not is_header:
+            tolerance = 2 if metrics.scanned_source else 0
+            if metrics.default.size + tolerance < chunk.font.size:
+                return False
 
-        # check that the chunk is placed in the correct margin
-        # NOTE: in some cases (prop 1972:105 p 145 and generally
-        # everything before prop 1987/88:69) the "Bilaga" margin
-        # header appears in the (extended) topmargin, not in the
-        # leftmargin. 
-        if (parser.current_identifier.startswith("Prop.") and
-            ("Prop. 1987/88:69" > parser.current_identifier)):
-            extended_topmargin = metrics.pageheight / 5
-            placement = lambda c: c.bottom < extended_topmargin
-        elif parser.current_identifier.startswith(("Ds", "SOU")):
-            # For Ds/SOU it always appears in the topmargin
-            placement = lambda c: c.bottom <= metrics.topmargin
-        else:
-            placement = lambda c: c.right < metrics_leftmargin() or c.left > metrics_rightmargin()
+            # check that the chunk is placed in the correct margin
+            # NOTE: in some cases (prop 1972:105 p 145 and generally
+            # everything before prop 1987/88:69) the "Bilaga" margin
+            # header appears in the (extended) topmargin, not in the
+            # leftmargin. 
+            if (parser.current_identifier.startswith("Prop.") and
+                ("Prop. 1987/88:69" > parser.current_identifier)):
+                extended_topmargin = metrics.pageheight / 5
+                placement = lambda c: c.bottom < extended_topmargin
+            elif parser.current_identifier.startswith(("Ds", "SOU")):
+                # For Ds/SOU it always appears in the topmargin
+                placement = lambda c: c.bottom <= metrics.topmargin
+            else:
+                placement = lambda c: c.right < metrics_leftmargin() or c.left > metrics_rightmargin()
 
-        if placement(chunk):
+        if is_header or placement(chunk):
             # NOTE: filter out indications of nested
             # appendicies (eg "Bilaga 5 till RSVs skrivelse")
             m = re.search("Bilaga( \d+| I| l|$)(?!(\d| *till))", txtchunk)
@@ -1691,11 +1735,11 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         # headline-like title, or by the sidenote in the
         # margin. Find out which it is, and plan accordingly.
         done = False
+        title = None
         # First, find either an indicator of the appendix number, or
         # calculate our own
         chunk = parser.reader.next()
         strchunk = str(chunk)
-
         # correct OCR mistake
         if state.appendixno and state.appendixno > 1 and strchunk.startswith("Bilaga ll-"):
             strchunk = strchunk.replace("Bilaga ll-", "Bilaga 4")
@@ -1706,6 +1750,16 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             if match in ("I", "l"):   # correct for OCR mistake
                 match = "1" 
             state.appendixno = int(match)
+            # If the text "Bilaga \d" doesn't occur at the start of
+            # this chunk, whatever comes before it might be the real
+            # title (maybe, at least in mashed-together scanned
+            # sources).
+            if metrics.scanned_source and m.start() > 0:
+                title = str(chunk)[:m.start()].strip()
+                # sanity check -- what comes before might be the prop
+                # identifier in the margin
+                if len(title) < 20 and title.lower().startswith("prop."):
+                    title = None
             chunk = None  # make sure this chunk doesn't go into spill below
         else:
             # this probably mean that we have an implicit appendix (se
@@ -1716,22 +1770,22 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                 state.appendixno = 1
 
         # next up, read the page to find the appendix title
-        spill = []  # save everyting we read up until the appendix 
-        while not done:
-            if isinstance(chunk, Page):
-                title = ""
-                done = True
-            if isinstance(chunk, Textbox) and int(chunk.font.size) >= metrics.h2.size:
-                title = str(chunk).strip()
-                chunk = None
-                done = True
-            if not done:
-                if chunk and not is_nonessential(parser, chunk):
-                    spill.append(chunk)
-                chunk = parser.reader.next()
-        if chunk and not isinstance(chunk, Page):
-            spill.append(chunk)
-                
+        spill = []  # save everyting we read up until the appendix
+        if title is None:
+            while not done:
+                if isinstance(chunk, Page):
+                    title = ""
+                    done = True
+                if isinstance(chunk, Textbox) and int(chunk.font.size) >= metrics.h2.size:
+                    title = str(chunk).strip()
+                    chunk = None
+                    done = True
+                if not done:
+                    if chunk and not is_nonessential(parser, chunk):
+                        spill.append(chunk)
+                    chunk = parser.reader.next()
+            if chunk and not isinstance(chunk, Page):
+                spill.append(chunk)
         s = Appendix(title=title,
                      ordinal=str(state.appendixno),
                      uri=None)
@@ -1804,7 +1858,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         """
         if not chunk:
             chunk = parser.reader.peek()
-        strchunk = str(chunk)
+        strchunk = str(chunk).strip()
         # 1. clean up indata
         if metrics.scanned_source:
             if strchunk.startswith("l "): # probable OCR mistake
@@ -1812,6 +1866,9 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             # "3. 12" -> "3.12" FIXME: Generalize to handle phantom
             # spaces in other places (3- or 4 level section headings)
             strchunk = re.sub("(\d+)\.\s+(\d+)", r"\1.\2", strchunk)
+
+            # "1 1 Hemställan" -> "11 Hemställan"
+            strchunk = re.sub("^(\d+) (\d+)(?= +[A-ZÅÄÖ])", r"\1\2", strchunk)
 
         m = re_sectionstart(strchunk)
         if not m:
@@ -1838,18 +1895,29 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
 
         if chunk.font.size <= min_size:
             return (None, None, chunk)
+
+        # sections doesn't end like this
         if ((strchunk.endswith(".") and not 
              (strchunk.endswith("m.m.") or
               strchunk.endswith("m. m.") or
               strchunk.endswith("m.fl.") or
               strchunk.endswith("m. fl."))) or
             strchunk.endswith(",") or
-            strchunk.endswith("och") or
-            strchunk.endswith("eller") or
+            strchunk.endswith(" och") or
+            strchunk.endswith(" eller") or
             strchunk.endswith(":") or
             strchunk.endswith("-")):
-            # sections doesn't end like that
             return (None, None, chunk)
+
+        # final sanity check -- how long can a heading really be (we
+        # have similar check in sfs_parser.py:isRubrik (which has a
+        # threshold of 135 chars -- we allow somewhat longer
+        # here. We'll primarily reach this when a paragraph is
+        # interrupted by a pagebreak, and thus not end with a period
+        # or other punctuation which we detect above.
+        if len(title) > 200:
+            return (None, None, chunk)
+        
         # looks like we've made it!
         return (ordinal, headingtype, title)
 

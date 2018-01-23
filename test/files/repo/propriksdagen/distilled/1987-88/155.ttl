@@ -132,12 +132,6 @@
 <https://lagen.nu/prop/1987/88:155> a rpubl:Proposition ;
     dcterms:identifier "Prop. 1987/88:155" ;
     dcterms:issued "2008-06-13"^^xsd:date ;
-    dcterms:references <https://lagen.nu/1931:152>,
-        <https://lagen.nu/1962:700>,
-        <https://lagen.nu/1973:289>,
-        <https://lagen.nu/2008:579>,
-        <https://lagen.nu/prop/1987/88:155#S2-3>,
-        <https://lagen.nu/sou/1983:52> ;
     dcterms:title "om skydd för företagshemligheter"@sv ;
     rpubl:arsutgava "1987/88" ;
     rpubl:lopnummer "155" ;
@@ -145,13 +139,3 @@
     prov:alternateOf <http://www.riksdagen.se/sv/Dokument-Lagar/Forslag/Propositioner-och-skrivelser/_GB03155/?text=true> ;
     prov:wasDerivedFrom <https://lagen.nu/prop/1987/88:155?attachment=index.pdf&repo=propriksdagen&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.propositioner.PropRiksdagen" .
-
-[] a bibo:DocumentPart ;
-    dcterms:references <https://lagen.nu/1973:289>,
-        <https://lagen.nu/1980:100>,
-        <https://lagen.nu/prop/1972:5#sid483> ;
-    dcterms:title "Anmälan av lagrådsyttrande"@sv .
-
-[] a bibo:DocumentPart ;
-    dcterms:title "Beslut"@sv .
-

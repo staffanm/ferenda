@@ -629,8 +629,11 @@ class Protokollsutdrag(CompoundElement):
     def as_xhtml(self, uri, parent_uri=None):
         element = super(Protokollsutdrag, self).as_xhtml(uri, parent_uri)
         # do not add @property='dcterms:title' as we don't want to
-        # create a RDF triple out of this
+        # create a RDF triple out of this. But we kind of have to set
+        # rdf:type = bibo:DocumentPart (to make xsl/forarbete.xsl
+        # create proper TOC)
         element.set('content', self.title)
+        element.set('typeof', 'bibo:DocumentPart')
         return element
 
 # FIXME: This ought to be not needed anymore now that we use

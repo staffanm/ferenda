@@ -1,0 +1,27 @@
+{
+    "bottommargin": 777, 
+    "default": {
+        "family": "unknown", 
+        "size": 8
+    }, 
+    "h1": {
+        "family": "unknown", 
+        "size": 13
+    }, 
+    "h2": {
+        "family": "unknown", 
+        "size": 12
+    }, 
+    "h3": {
+        "family": "unknown", 
+        "size": 11
+    }, 
+    "leftmargin": 40, 
+    "leftmargin_even": 30, 
+    "pageheight": 842, 
+    "pagewidth": 546, 
+    "rightmargin": 400, 
+    "rightmargin_even": 400, 
+    "scanned_source": true, 
+    "topmargin": 37
+}

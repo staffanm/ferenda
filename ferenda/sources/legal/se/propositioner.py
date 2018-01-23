@@ -635,3 +635,25 @@ class Propositioner(CompositeRepository, FixedLayoutSource):
         else:
             return []
 
+    # For a certain repo, download_path might return *.wpd (good) or
+    # *.html (bad, because unformatted plaintext). If it returns bad,
+    # we should continue with other repos that might have
+    # *.pdf. HOWEVER, if no other repo has it in any format, we'll
+    # have to accept the repo that has it as *.html.
+    #
+    # NOTE: This implementation does not make use of the
+    # self.store.basefiles[c] cache, since that only keeps track of
+    # which repos has which basefiles, not the format/quality of the
+    # source.
+    def get_preferred_instances(self, basefile):
+        backups = []
+        for c in self.subrepos:
+            inst = self.get_instance(c)
+            source_candidate = inst.store.downloaded_path(basefile)
+            if os.path.exists(source_candidate):
+                if source_candidate.endswith(".html"):
+                    backups.append(inst)
+                else:
+                    yield(inst)
+        for inst in backups:
+            yield(inst)
