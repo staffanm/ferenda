@@ -991,12 +991,13 @@ class Regressions(TestLagen):
 
     def test_missing_docs(self):
         # issue 6
-        for urlseg in ("prop/1992/93:40",
-                       "prop/1991/92:155",
+        for urlseg in ("prop/1992/93:40",  # left out by design since noone refers to it
+                       "prop/1991/92:155", # left out by design since noone refers to it
                        "prop/1973:90",
                        "prop/1996/97:72",
-                       "prop/1995/96:79", # left out by design since noone refers to it
-                       "prop/2007/08:85"):
+                       "prop/1995/96:79",  # left out by design since noone refers to it
+                       # "prop/2007/08:85",  # does this one even exist?
+        ):
             self.assert200(self.baseurl + urlseg)
 
     def test_format_dir(self):

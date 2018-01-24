@@ -150,7 +150,7 @@ class Trips(SwedishLegalSource):
         return a
 
     def _extract_text(self, basefile, attachment=None):
-        txt = self._extract_text_inner(basefile, atttachment)
+        txt = self._extract_text_inner(basefile, attachment)
         with self.store.open_intermediate(basefile, mode="wb") as fp:
             fp.write(txt.encode(self.source_encoding))
         return self.store.open_intermediate(basefile, "rb")

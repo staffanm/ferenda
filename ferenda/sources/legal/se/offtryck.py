@@ -931,14 +931,15 @@ class Offtryck(SwedishLegalSource):
                 skipheader = True
                 offset = 1
                 reftext = text
-                while isinstance(section[idx+offset], Sidbrytning):
-                    offset += 1
-                if state['defaultsize'] >= section[idx+offset].font.size + 2:
-                    parsestate = "acttext"
-                    comment_start = False
-                    skipheader = False
-                else:
-                    comment_start = True
+                if len(section) > idx+offset:
+                    while isinstance(section[idx+offset], Sidbrytning):
+                        offset += 1
+                    if state['defaultsize'] >= section[idx+offset].font.size + 2:
+                        parsestate = "acttext"
+                        comment_start = False
+                        skipheader = False
+                    else:
+                        comment_start = True
 
             elif re.match("\d+ kap. +[^\d]", text):  # eg "4 kap. Om domare"
                 # self.log.debug("...detecting chapter header with title, no section")

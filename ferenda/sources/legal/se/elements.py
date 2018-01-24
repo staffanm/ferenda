@@ -460,6 +460,9 @@ class Sidbrytning(OrdinalElement):
     def as_plaintext(self):
         return "\n\n"
 
+class Strecksatselement(CompoundElement):
+    tagname = "li"
+
 class PreambleSection(CompoundElement):
     tagname = "div"
     classname = "preamblesection"

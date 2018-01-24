@@ -18,12 +18,12 @@ import requests
 
 from . import (SwedishLegalSource, SwedishLegalStore, FixedLayoutSource,
                Trips, Regeringen, RPUBL, Offtryck)
-from .elements import Sidbrytning
+from .elements import *
 from ferenda import CompositeRepository, CompositeStore
 from ferenda import TextReader
 from ferenda import util
-from ferenda import PDFAnalyzer, Facet
-from ferenda.decorators import downloadmax, recordlastdownload
+from ferenda import PDFAnalyzer, Facet, FSMParser
+from ferenda.decorators import downloadmax, recordlastdownload, newstate
 from ferenda.elements import Body, Heading, ListItem, Paragraph
 from ferenda.errors import DocumentRemovedError
 from ferenda.compat import urljoin
@@ -108,7 +108,7 @@ class DirTrips(Trips):
             textheader = textheader.decode(self.source_encoding, errors="ignore")
         idx = textheader.index("-"*64)
         header = textheader[:idx]
-        fp.seek(len(header.encode("utf-8")) + 66)
+        fp.seek(len(header) + 66)
         return header
 
     def extract_metadata(self, rawheader, basefile):  # -> dict
@@ -146,7 +146,9 @@ class DirTrips(Trips):
 
 
     def extract_body(self, fp, basefile):
-        rawtext = fp.read().decode(self.source_encoding)
+        rawtext = fp.read()
+        if isinstance(rawtext, bytes): # happens when creating the intermediate file
+            rawtext = rawtext.decode(self.source_encoding)
         # remove whitespace on otherwise empty lines
         rawtext = re.sub("\n\t\n", "\n\n", rawtext)
         reader = TextReader(string=rawtext,
@@ -155,53 +157,123 @@ class DirTrips(Trips):
     
 
     def get_parser(self, basefile, sanitized, parseconfig="default"):
-        # FIXME: this should be rewritten as a FSMParser
-        def guess_type(p, current_type):
-            if not p:  # empty string
-                return None
-            # complex heading detection heuristics: Starts with a capital
-            # or a number, and doesn't end with a period (except in some
-            # cases).
-            elif ((re.match("^\d+", p)
-                   or p[0].lower() != p[0])
-                  and not (p.endswith(".") and
-                           not (p.endswith("m.m.") or
-                                p.endswith("m. m.") or
-                                p.endswith("m.fl.") or
-                                p.endswith("m. fl.")))):
-                return Heading
-            elif p.startswith("--"):
-                return ListItem
-            elif (p[0].upper() != p[0]):
-                return Continuation  # magic value, used to glue together
-                # paragraphs that have been
-                # inadvertently divided.
+
+        def is_header(parser):
+            p = parser.reader.peek()
+            # older direktiv sources start with dir number
+            if re.match(r'Dir\.? \d{4}:\d+$', p):
+                return False
+            return (headerlike(p) and 
+                    not is_strecksats(parser, parser.reader.peek(2)))
+
+        def is_strecksats(parser, chunk=None):
+            if chunk is None:
+                chunk = parser.reader.peek()
+            return chunk.startswith(("--", "- "))
+
+        def is_section(parser):
+            (ordinal, headingtype, title) = analyze_sectionstart(parser)
+            if ordinal:
+                return headingtype == "h1"
+
+        def is_subsection(parser):
+            (ordinal, headingtype, title) = analyze_sectionstart(parser)
+            if ordinal:
+                return headingtype == "h2"
+
+        def is_paragraph(parser):
+            return True
+
+        @newstate('body')
+        def make_body(parser):
+            return parser.make_children(Body())
+
+        @newstate('section')
+        def make_section(parser):
+            chunk = parser.reader.next()
+            ordinal, headingtype, title = analyze_sectionstart(parser, chunk)
+            s = Avsnitt(ordinal=ordinal, title=title)
+            return parser.make_children(s)
+
+        @newstate('strecksats')
+        def make_strecksatslista(parser):
+            ul = Strecksatslista()
+            li = make_listitem(parser)
+            ul.append(li)
+            res = parser.make_children(ul)
+            return res
+
+        def make_listitem(parser):
+            chunk = parser.reader.next()
+            s = str(chunk)
+            if " " in s:
+                # assume text before first space is the bullet
+                s = s.split(" ",1)[1]
             else:
-                return Paragraph
+                # assume the bullet is a single char
+                s = s[1:]
+            return Strecksatselement([s])
 
-        def parse(tokenstream):
-            current_type = None
-            body = Body()
-            for p in tokenstream:
-                new_type = guess_type(p, current_type)
-                # if not new_type == None:
-                #    print "Guessed %s for %r" % (new_type.__name__,p[:20])
-                if new_type is None:
-                    pass
-                elif new_type == Continuation and len(body) > 0:
-                    # Don't create a new text node, add this text to the last
-                    # text node created
-                    para = body.pop()
-                    para.append(p)
-                    body.append(para)
-                else:
-                    if new_type == Continuation:
-                        new_type = Paragraph
-                    body.append(new_type([p]))
-                    current_type = new_type
-            return body
-        return parse
+        def make_header(parser):
+            return Heading([parser.reader.next()])
+        
+        def make_paragraph(parser):
+            return Paragraph([parser.reader.next()])
 
+        @newstate('unorderedsection')
+        def make_unorderedsection(parser):
+            s = UnorderedSection(title=parser.reader.next().strip())
+            return parser.make_children(s)
+            
+        def headerlike(p):
+            return (p[0].lower() != p[0]
+                    and len(p) < 150
+                    and not (p.endswith(".") and
+                             not (p.endswith("m.m.") or
+                                  p.endswith("m. m.") or
+                                  p.endswith("m.fl.") or
+                                  p.endswith("m. fl."))))
+
+        re_sectionstart = re.compile("^(\d[\.\d]*) +([A-ZÅÄÖ].*)$").match
+        def analyze_sectionstart(parser, chunk=None):
+            """returns (ordinal, headingtype, text) if it looks like a section
+            heading, (None, None, chunk) otherwise."""
+            if chunk is None:
+                chunk = parser.reader.peek()
+            m = re_sectionstart(chunk)
+            if m and headerlike(m.group(2)):
+                return (m.group(1),
+                        "h" + str(m.group(1).count(".") + 1),
+                        m.group(2).strip())
+            else:
+                return None, None, chunk
+
+        p = FSMParser()
+        recognizers = [is_section,
+                       is_subsection,
+                       is_header,
+                       is_strecksats,
+                       is_paragraph]
+        p.set_recognizers(*recognizers)
+        commonstates = ("body", "section", "subsection", "unorderedsection")
+        p.set_transitions({(commonstates, is_paragraph): (make_paragraph, None),
+                           (commonstates, is_strecksats): (make_strecksatslista, "strecksats"),
+                           (commonstates, is_header): (make_unorderedsection, "unorderedsection"),
+                           (commonstates, is_section): (make_section, "section"),
+                           
+                           ("unorderedsection", is_header): (False, None),
+                           ("unorderedsection", is_section): (False, None),
+                           ("strecksats", is_paragraph): (False, None),
+                           ("strecksats", is_strecksats): (make_listitem, None),
+                           ("section", is_header): (False, None),
+                           ("section", is_section): (False, None),
+                           ("section", is_subsection): (make_section, "subsection"),
+                           ("subsection", is_subsection): (False, None),
+                           ("subsection", is_section): (False, None)})
+        p.initial_state = "body"
+        p.initial_constructor = make_body
+        p.debug = os.environ.get('FERENDA_FSMDEBUG', False)
+        return p.parse
 
     def tokenize(self, reader):
         return reader.getiterator(reader.readparagraph)
@@ -321,12 +393,18 @@ class DirRegeringen(Regeringen):
     document_type = Regeringen.KOMMITTEDIREKTIV
 
     def sanitize_identifier(self, identifier):
+        if not identifier:
+            return identifier # allow infer_identifier to do it's magic later
         # "Dir.1994:111" -> "Dir. 1994:111"
         if re.match("Dir.\d+", identifier):
             identifier = "Dir. " + identifier[4:]
         if not identifier.startswith("Dir. "):
             identifier = "Dir. " + identifier
         return Literal(identifier)
+    
+
+    def infer_identifier(self, basefile):
+        return "Dir. %s" % basefile
 
 # inherit list_basefiles_for from CompositeStore, basefile_to_pathfrag
 # from SwedishLegalStore)

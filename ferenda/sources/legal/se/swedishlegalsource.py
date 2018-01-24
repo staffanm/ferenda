@@ -552,7 +552,14 @@ class SwedishLegalSource(DocumentRepository):
         if resource.value(DCTERMS.title):
             doc.lang = resource.value(DCTERMS.title).language
         if options == "metadataonly":
-            doc.body = Body([Preformatted("Dokumenttext saknas (se originaldokument)")])
+            # FIXME: It'd be nice (and probably not incorrect) if
+            # these special placeholder documents could be sent with
+            # status code 404, not 200, since the actual document is
+            # in fact not found.
+            doc.body = Body([PreambleSection([
+                P(["Detta dokument har begränsad juridisk betydelse, så dess innehåll har inte tagits med här. Du kan hitta originaldokumentet från dess källa genom länken till höger."]),
+                P(["Om du tycker att dokumentet bör tas med, ", A("hör gärna av dig!", href="/om/kontakt")])
+            ], title='Dokumenttext saknas')])
         else:
             doc.body = self.parse_body(fp, doc.basefile)
         if not fp.closed:
