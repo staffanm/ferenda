@@ -321,7 +321,7 @@ class Regeringen(Offtryck):
         else:
             identifier_node = content.find("span", "h1-vignette")
             if identifier_node:
-                identifier = identifier_node.text
+                identifier = identifier_node.text.strip()
             else:
                 identifier = ""  # infer_metadata calls
                                  # infer_identifier if this is falsy,
@@ -343,7 +343,7 @@ class Regeringen(Offtryck):
             if self.rdf_type != RPUBL.Kommittedirektiv:  # postprocess_doc has us covered
                 self.log.warning("%s: No ansvarig departement found" % basefile)
             ansvarig = None
-        s = content.find("div", "has-wordExplanation")
+        s = content.find(("div","p"), "has-wordExplanation")
         for a in s.find_all("a"):  # links in summary are extra tacked-on bogus
             a.decompose()
         sammanfattning = " ".join(s.strings)

@@ -137,6 +137,8 @@ class DirTrips(Trips):
         return Literal(rubrik, lang="sv")
 
     def sanitize_identifier(self, identifier):
+        if not identifier:
+            return identifier # allow infer_identifier to do it's magic later
         # "Dir.1994:111" -> "Dir. 1994:111"
         if re.match("Dir.\d+", identifier):
             identifier = "Dir. " + identifier[4:]
