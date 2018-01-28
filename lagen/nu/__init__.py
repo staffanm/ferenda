@@ -1,7 +1,7 @@
 from .sameas import SameAs
+from .sfs import SFS
 from .keyword import LNKeyword
 from .mediawiki import LNMediaWiki
-from .sfs import SFS
 from .dv import DV
 from .arn import ARN
 from .myndfskr import MyndFskr as MyndFskr

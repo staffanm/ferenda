@@ -146,8 +146,6 @@
 <https://lagen.nu/1992:18> rdfs:label "produktansvarslagen" .
 <https://lagen.nu/1992:191> dcterms:alternate "Avgift" .
 <https://lagen.nu/1992:497> rdfs:label "lönegarantilagen" .
-<https://lagen.nu/1992:830> rdfs:label "konsumentkreditlagen" ; dcterms:alternate "KKrL" .
-<https://lagen.nu/1992:859> rdfs:label "läkemedelslagen" .
 <https://lagen.nu/1993:1617> dcterms:alternate "OL" .
 <https://lagen.nu/1993:1617> rdfs:label "ordningslagen" .
 <https://lagen.nu/1993:1684> rdfs:label "postlagen" .
@@ -157,7 +155,6 @@
 <https://lagen.nu/1994:1000> rdfs:label "lotterilagen" .
 <https://lagen.nu/1994:1009> rdfs:label "sjölagen" ; dcterms:alternate "SjöL" .
 <https://lagen.nu/1994:1220> rdfs:label "stiftelselagen" .
-<https://lagen.nu/1994:1738> rdfs:label "alkohollagen" .
 <https://lagen.nu/1994:193> dcterms:alternate "IURF" .
 <https://lagen.nu/1994:200> rdfs:label "mervärdesskattelagen" ; dcterms:alternate "ML" .
 <https://lagen.nu/1994:260> dcterms:alternate "LOA" .
@@ -234,3 +231,6 @@
 <https://lagen.nu/2009:600> rdfs:label "språklagen" .
 <https://lagen.nu/2009:865> rdfs:label "kommissionslagen" .
 <https://lagen.nu/2010:110> rdfs:label "socialförsäkringsbalken" .
+<https://lagen.nu/2010:1622> rdfs:label "alkohollagen" .
+<https://lagen.nu/2010:1846> rdfs:label "konsumentkreditlagen" ; dcterms:alternate "KKrL" .
+<https://lagen.nu/2015:315> rdfs:label "läkemedelslagen" .

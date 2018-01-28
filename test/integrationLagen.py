@@ -970,6 +970,7 @@ class Regressions(TestLagen):
             self.assertTrue("<pre>" not in res.text)
 
     def test_missing_pages(self):
+        import pudb; pu.db
         # issue 5: "I prop. 1992/93:30 saknas s. 18–30. Prop. 1996/97:106 är ofullständig (har bara två sidor)"
         for urlseg in ("prop/1992/93:30",
                        "prop/1996/97:106",
@@ -987,7 +988,8 @@ class Regressions(TestLagen):
             # intentionally)
             pagenum = 1
             for page in pages:
-                self.assertEqual(str(pagenum), page.get("id")[3:])
+                self.assertEqual(str(pagenum), page.get("id")[3:], urlseg)
+                pagenum += 1
 
     def test_missing_docs(self):
         # issue 6
@@ -1000,7 +1002,7 @@ class Regressions(TestLagen):
         ):
             self.assert200(self.baseurl + urlseg)
 
-    def test_format_dir(self):
+    def test_identifier_formats(self):
         # issue 7
         for urlseg in ("dir/1987:42",
                        "dir/1987:7"):
@@ -1013,12 +1015,24 @@ class Regressions(TestLagen):
                     continue
                 self.assertIn("row", node.get("class", []))
 
-    def test_komdir_toc(self):
+    def test_toc(self):
         # issue 8
-        for year in ("2017", "2016", "2015", "2014"):
-            res = self.get(self.baseurl + "dataset/forarbeten?dir=" + year)
-            res.raise_for_status()
-            soup = BeautifulSoup(res.text, "lxml")
-            for link in soup.find("article").find_all("a"):
-                self.assertRegexpMatches(link.text, "^Dir. \d{4}:\d+$")
+        errors = []
+        for doctype, startyear, regex in (("dir", 1987, "^Dir\. (19|20)\d{2}:[1-9]\d*$"),
+                                          ("ds", 1993, "^Ds (19|20)\d{2}:[1-9]\d*$"),
+                                          ("sou", 1922, "^SOU (19|20)\d{2}:[1-9]\d*$"),
+                                          ("prop", 1971, "^Prop\. (19|20)\d{2}(|/\d{2}|/2000):[1-9]\d*$")):
+            for year in range(startyear, 2018):
+                if doctype == "prop" and year > 1975:
+                    nextyear = "2000" if year == 2000 else str(year)[2:]
+                    year = "%s/%s" % (year - 1, nextyear)
+                res = self.get(self.baseurl + "dataset/forarbeten?%s=%s" % (doctype, year))
+                res.raise_for_status()
+                soup = BeautifulSoup(res.text, "lxml")
+                for link in soup.find("article").find_all("a"):
+                    # self.assertRegexpMatches(link.text, regex)
+                    if not re.match(regex, link.text):
+                        errors.append("%s/%s: %s" % (doctype, year, link.text))
+        self.maxDiff = None
+        self.assertEqual([], errors)
 

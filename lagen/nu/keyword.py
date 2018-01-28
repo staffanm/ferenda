@@ -17,8 +17,8 @@ from ferenda import TripleStore, Facet, RequestHandler
 from ferenda.elements import Body, UnorderedList, ListItem, Link
 from ferenda.elements.html import Div, H2
 from ferenda.sources.general import keyword
-from ferenda.sources.legal.se import SwedishLegalSource, SFS
-from . import SameAs  # for the keyword_uri implementation
+from ferenda.sources.legal.se import SwedishLegalSource
+from . import SameAs, SFS  # for the keyword_uri implementation
 
 class LNKeywordHandler(RequestHandler):
     def supports(self, environ):

@@ -25,5 +25,5 @@ cd ..
 echo "running smoketests"
 FERENDA_TESTURL=http://eliot/ tools/test.sh integrationLagen
 echo "deploying to remote"
-# FIXME: this MUST be run on the ES host (nate). If hostname != nate then ssh nate -e "..."
-fab -H colo.tomtebo.org -f tools/fabfile.py deploy
+# This MUST be run on the ES host (nate).
+ssh nate "cd wds/ferenda && fab -H colo.tomtebo.org -f tools/fabfile.py deploy"

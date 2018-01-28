@@ -176,11 +176,24 @@ class Transformer(object):
                 log.warning(
                     "self.config not set, cannot construct equivalent xsltproc command line")
 
-        self.t.native_to_file(self.transform(self.t.file_to_native(infile),
-                                             depth,
-                                             parameters,
-                                             uritransform),
-                              outfile)
+        placeholder = False
+        if not os.path.exists(outfile):
+            # create a placeholder so that the code to mark
+            # non-existing files as invalid doesn't get tripped up by
+            # self-references
+            util.ensure_dir(outfile)
+            util.writefile(outfile, "placeholder")
+            placeholder = True
+        try:
+            self.t.native_to_file(self.transform(self.t.file_to_native(infile),
+                                                 depth,
+                                                 parameters,
+                                                 uritransform),
+                                  outfile)
+        except Exception as e:
+            if placeholder and util.readfile(outfile) == "placeholder":
+                util.robust_remove(outfile)
+            raise
 
     def _depth(self, outfiledir, root):
         # NB: root must be a file in the root dir

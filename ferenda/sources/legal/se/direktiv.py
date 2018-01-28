@@ -29,6 +29,35 @@ from ferenda.errors import DocumentRemovedError
 from ferenda.compat import urljoin
 from ferenda.pdfreader import Page
 
+def dir_sanitize_identifier(identifier):
+    # common sanitizer for all purposes
+    if not identifier:
+        return identifier # allow infer_identifier to do it's magic later
+    if identifier.startswith("Direktiv "):
+        identifier = identifier.replace("Direktiv ", "Dir. ")
+    if identifier.startswith("Dir. dir. "):
+        identifier = identifier.replace("dir. ", "")
+    if identifier.startswith("Dir "):
+        identifier = identifier.replace("Dir ", "Dir. ")
+    if identifier.startswith("dir."):
+        identifier = identifier.replace("dir.", "Dir.")
+    if identifier.startswith("Dir:"):
+        identifier = identifier.replace("Dir:", "Dir.")
+    # "Dir.1994:111" -> "Dir. 1994:111"
+    if re.match("Dir\.\d+", identifier):
+        identifier = "Dir. " + identifier[4:]
+    # Dir. 2006.44 -> Dir. 2006:44
+    if re.match("Dir\. \d+\.\d+", identifier):
+        # replace the rightmost . with a :
+        identifier = identifier[::-1].replace(".", ":", 1)[::-1]
+    if not identifier.startswith("Dir. "):
+        identifier = "Dir. " + identifier
+    if not re.match("Dir\. (19|20)\d{2}:[1-9]\d*", identifier):
+        raise ValueError("Irregular identifier %s (after mangling)" %  identifier)
+    return Literal(identifier)
+
+
+
 # custom style analyzer
 class DirAnalyzer(PDFAnalyzer):
     # direktiv has no footers
@@ -79,6 +108,7 @@ class DirTrips(Trips):
     start_url = "http://rkrattsbaser.gov.se/dir/adv?sort=asc"
     document_url_template = "http://rkrattsbaser.gov.se/dir?bet=%(basefile)s"
     rdf_type = RPUBL.Kommittedirektiv
+    urispace_segment = "dir"
 
     @recordlastdownload
     def download(self, basefile=None):
@@ -130,21 +160,14 @@ class DirTrips(Trips):
             d["dcterms:issued"] = d["rpubl:beslutsdatum"]  # best we can do
         return d
     
+    def sanitize_identifier(self, identifier):
+        return dir_sanitize_identifier(identifier)
+        
     def sanitize_rubrik(self, rubrik):
         if rubrik == "Utgår":
             raise DocumentRemovedError()
         rubrik = re.sub("^/r2/ ", "", rubrik)
         return Literal(rubrik, lang="sv")
-
-    def sanitize_identifier(self, identifier):
-        if not identifier:
-            return identifier # allow infer_identifier to do it's magic later
-        # "Dir.1994:111" -> "Dir. 1994:111"
-        if re.match("Dir.\d+", identifier):
-            identifier = "Dir. " + identifier[4:]
-        if not identifier.startswith("Dir. "):
-            identifier = "Dir. " + identifier
-        return Literal(identifier)
 
 
     def extract_body(self, fp, basefile):
@@ -281,10 +304,6 @@ class DirTrips(Trips):
         return reader.getiterator(reader.readparagraph)
 
 
-    def canonical_uri(self, basefile):
-        return self.config.url + "res/dir/" + basefile
-
-
 class DirAsp(FixedLayoutSource):
     """Downloads Direktiv in PDF format from http://rkrattsdb.gov.se/kompdf/"""
 
@@ -395,15 +414,7 @@ class DirRegeringen(Regeringen):
     document_type = Regeringen.KOMMITTEDIREKTIV
 
     def sanitize_identifier(self, identifier):
-        if not identifier:
-            return identifier # allow infer_identifier to do it's magic later
-        # "Dir.1994:111" -> "Dir. 1994:111"
-        if re.match("Dir.\d+", identifier):
-            identifier = "Dir. " + identifier[4:]
-        if not identifier.startswith("Dir. "):
-            identifier = "Dir. " + identifier
-        return Literal(identifier)
-    
+        return dir_sanitize_identifier(identifier)
 
     def infer_identifier(self, basefile):
         return "Dir. %s" % basefile

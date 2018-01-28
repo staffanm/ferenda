@@ -742,7 +742,20 @@ class SFS(Trips):
                             if "rpubl:forarbete" not in d[docuri]:
                                 d[docuri]["rpubl:forarbete"] = []
                             d[docuri]["rpubl:forarbete"].append(node.uri)
-                            d[node.uri] = {"dcterms:identifier": str(node)}
+                            # forarbten are typically written with
+                            # lower case ("prop. 1987/88:85"), but
+                            # since we rdf model this as the
+                            # forarbete:s dcterms:identifier, we get
+                            # one version in the triple store with
+                            # lower case and one version that's
+                            # capitalized ("Prop. 1987/88:85", from
+                            # parsing the actual forarbete. So we
+                            # normalize here. 
+                            identifier = util.ucfirst(str(node))
+                            if identifier.startswith("Prop"):
+                                from .propositioner import prop_sanitize_identifier
+                                identifier = prop_sanitize_identifier(identifier)
+                            d[node.uri] = {"dcterms:identifier": identifier}
                 elif key == 'CELEX-nr':
                     for celex in re.findall('3\d{2,4}[LR]\d{4}', val):
                         b = BNode()

@@ -2545,6 +2545,11 @@ WHERE {
         def base_transform(url, method="documententry_path"):
             if remove_missing:
                 path = getpath(url, repos, method)
+                # If the file being transformed contains references to
+                # itself, this will return False even when it
+                # shouldn't. As a workaround,
+                # Transformer.transform_file now creates a placeholder
+                # file before transform_links is run
                 if path and not (os.path.exists(path) and os.path.getsize(path) > 0):
                     return False
             return url

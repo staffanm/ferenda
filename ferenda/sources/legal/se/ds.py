@@ -14,7 +14,11 @@ from ferenda import PDFAnalyzer
 from ferenda.errors import ParseError
 from . import Regeringen, Offtryck, RPUBL 
 
-
+def ds_sanitize_identifier(identifier):
+    if not re.match("Ds (19|20)\d{2}:[1-9]\d*"):
+        raise ValueError("Irregular identifier %s (after mangling)" %  identifier)
+    return Literal(identifier)
+    
 class DsAnalyzer(PDFAnalyzer):
     # NOTE: The cutoff used to be 0.5% but it turns out that in
     # particular h2's can be quite rare, occuring maybe two times

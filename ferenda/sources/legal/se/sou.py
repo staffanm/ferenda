@@ -25,6 +25,11 @@ from ferenda.pdfreader import StreamingPDFReader
 from . import Regeringen, SwedishLegalSource, FixedLayoutSource, SwedishLegalStore, Offtryck, RPUBL
 
 
+def sou_sanitize_identifier(identifier):
+    if not re.match("SOU (19|20)\d{2}:[1-9]\d*"):
+        raise ValueError("Irregular identifier %s (after mangling)" %  identifier)
+    return Literal(identifier)
+
 class SOUAnalyzer(PDFAnalyzer):
     # SOU running headers can contain quite a bit of text, 3% (60 chars for avg page of 2000)
     header_significance_threshold = 0.03

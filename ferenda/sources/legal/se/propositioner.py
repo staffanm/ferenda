@@ -30,6 +30,16 @@ from . import (Trips, NoMoreLinks, Regeringen, Riksdagen,
                SwedishLegalSource, SwedishLegalStore, RPUBL, Offtryck)
 from .fixedlayoutsource import FixedLayoutStore, FixedLayoutSource
 
+def prop_sanitize_identifier(identifier):
+    if identifier.startswith("prop"):
+        identifier = util.ucfirst(identifier)
+    if identifier.startswith("PROP"):
+        identifier = identifier.replace("PROP", "Prop")
+    if identifier.startswith("Prop "):
+        identifier = identifier.replace("Prop ", "Prop. ")
+    if not re.match(r"^Prop\. (19|20)\d{2}(|/\d{2}|/2000):[1-9]\d*$", identifier):
+        raise ValueError("Irregular identifier %s" % identifier)
+    return Literal(identifier)
 
 class PropAnalyzer(PDFAnalyzer):
 
@@ -218,6 +228,10 @@ class PropRegeringen(Regeringen):
         if "/" not in y:
             attribs['rpubl:arsutgava'] = "%s/%s" % (y[:4], y[4:])
         return attribs
+
+    def sanitize_identifier(self, identifier):
+        return prop_sanitize_identifier(identifier)
+
 
 class PropTripsStore(FixedLayoutStore):
     # 1993/94 and 1994/95 has only plaintext (wrapped in .html)
@@ -519,6 +533,9 @@ class PropTrips(Trips, Offtryck, FixedLayoutSource):
             sanitized = basefile
         return sanitized
 
+    def sanitize_identifier(self, identifier):
+        return prop_sanitize_identifier(identifier)
+
     # FixedLayoutSource.downloaded_to_intermediate will always convert
     # things to pdf, even html files. But if we only have html
     # (eg. plaintext, we should work with that)
@@ -596,6 +613,8 @@ class PropRiksdagen(Riksdagen):
     rdf_type = RPUBL.Proposition
     document_type = Riksdagen.PROPOSITION
 
+    def sanitize_identifier(self, identifier):
+        return prop_sanitize_identifier(identifier)
 
 # inherit list_basefiles_for from CompositeStore, basefile_to_pathfrag
 # from SwedishLegalStore)
@@ -646,7 +665,7 @@ class Propositioner(CompositeRepository, FixedLayoutSource):
             inst = self.get_instance(c)
             source_candidate = inst.store.downloaded_path(basefile)
             if os.path.exists(source_candidate):
-                if source_candidate.endswith(".html"):
+                if c.alias != "propregeringen" and source_candidate.endswith(".html"):
                     backups.append(inst)
                 else:
                     yield(inst)

@@ -1010,6 +1010,11 @@ def _run_class(enabled, argv, config):
 
         if 'all' in inst.config and inst.config.all is True:
             iterable = inst.store.list_basefiles_for(action, force=inst.config.force)
+            if action == "parse" and not inst.config.force:
+                # if we don't need to parse all basefiles, let's not
+                # even send jobs out to buildclients if we can avoid
+                # it
+                iterable = (x for x in iterable if inst.parseneeded(x))
             res = []
             # semi-magic handling
             kwargs['currentrepo'] = inst
@@ -1333,6 +1338,7 @@ def _queue_jobs(manager, iterable, inst, classname, command):
     jobqueue = manager.jobqueue()
     resultqueue = manager.resultqueue()
     log = getlog()
+    processing = set()
     # we'd like to just provide those config parameters that diff from
     # the default (what the client will already have), ie.  those set
     # by command line parameters (or possibly env variables)
@@ -1353,11 +1359,12 @@ def _queue_jobs(manager, iterable, inst, classname, command):
                'config': client_config}
         # print("putting %r into jobqueue" %  job)
         jobqueue.put(job)
+        processing.add(basefile)
     number_of_jobs = idx + 1
     res = []
     if number_of_jobs == 0:
         return res
-    log.info("Server: Put %s jobs into job queue" % number_of_jobs)
+    log.info("Server: Put %s (%s) jobs into job queue" % (number_of_jobs, len(processing)))
     # FIXME: only one of the clients will read this DONE package, and
     # we have no real way of knowing how many clients there will be
     # (they can come and go at will). Didn't think this one through...
@@ -1372,10 +1379,17 @@ def _queue_jobs(manager, iterable, inst, classname, command):
         try:
             r = resultqueue.get()
         except TimeoutError:
-            log.critical("Encountered timeout when trying to get result from queue. Wrapping up, we're done here")
+            log.critical("Timeout: %s jobs not processed (%s)" % (len(processing), ", ".join(processing)))
             numres = number_of_jobs
             continue
         signal.alarm(timeout_length)
+        if r['basefile'] not in processing:
+            log.info("%s not found in processing (%s)" % (r['basefile'], ", ".join(processing)))
+        processing.remove(r['basefile'])  # or .discard()? but if a
+                                          # recieved job is not in the
+                                          # processing set, something
+                                          # is probably wrong
+            
         if isinstance(r['result'], tuple) and r['result'][0] == _WrappedKeyboardInterrupt:
             raise KeyboardInterrupt()
         elif isinstance(r['result'], tuple) and isinstance(r['result'][0], Exception):
