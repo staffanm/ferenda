@@ -8,6 +8,19 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
+<https://lagen.nu/1915:218#L1987:329S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1915:218#L1987:329> ;
+    dcterms:references <https://lagen.nu/1915:218#P31> .
+
+<https://lagen.nu/1915:218#L1994:1513N1> rinfoex:punkt "1"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1915:218#L1994:1513> .
+
+<https://lagen.nu/1915:218#L1994:1513N2> rinfoex:punkt "2"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1915:218#L1994:1513> .
+
+<https://lagen.nu/1915:218#L1994:1513N3> rinfoex:punkt "3"@sv ;
+    dcterms:isPartOf <https://lagen.nu/1915:218#L1994:1513> .
+
 <https://lagen.nu/1915:218#P10S1> a rinfoex:Stycke ;
     dcterms:isPartOf <https://lagen.nu/1915:218#P10> .
 
@@ -34,22 +47,43 @@
 <https://lagen.nu/1915:218/konsolidering> owl:sameAs <https://lagen.nu/1915:218/konsolidering/1994:1513> .
 
 <https://lagen.nu/1915:218#K2> a rpubl:Kapitel ;
+    dcterms:isPartOf <https://lagen.nu/1915:218/konsolidering/1994:1513> ;
     rpubl:kapitelnummer "2"@sv .
 
-<https://lagen.nu/1915:218/konsolidering/1994:1513> a rpubl:KonsolideradGrundforfattning ;
-    dcterms:creator <https://lagen.nu/org/2008/justitiedepartementet> ;
-    dcterms:identifier "SFS 1915:218 i lydelse enligt SFS 1994:1513" ;
-    dcterms:issued "1994-12-31"^^xsd:date ;
+<https://lagen.nu/1915:218#L1987:329> dcterms:isPartOf <https://lagen.nu/1987:329> .
+
+<https://lagen.nu/bet/1994/95:LU5> a rinfoex:Utskottsbetankande ;
+    dcterms:identifier "Bet. 1994/95:LU5" .
+
+<https://lagen.nu/prop/1986/87:72> a rpubl:Proposition ;
+    dcterms:identifier "Prop. 1986/87:72" .
+
+<https://lagen.nu/prop/1994/95:17> a rpubl:Proposition ;
+    dcterms:identifier "Prop. 1994/95:17" .
+
+<https://lagen.nu/rskr/1994/95:76> a rinfoex:Riksdagsskrivelse ;
+    dcterms:identifier "Rskr. 1994/95:76" .
+
+<https://lagen.nu/1915:218> a rpubl:Lag ;
+    dcterms:identifier "SFS 1915:218" ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
     dcterms:title "Lag (1915:218) om avtal och andra rättshandlingar på förmögenhetsrättens område"@sv ;
+    rpubl:arsutgava "1915" ;
+    rpubl:beslutadAv <https://lagen.nu/org/2008/regeringskansliet> ;
+    rpubl:departement <https://lagen.nu/org/2008/justitiedepartementet> ;
+    rpubl:forfattningssamling <https://lagen.nu/dataset/sfs> ;
     rpubl:ikrafttradandedatum "1916-01-01"^^xsd:date ;
-    rpubl:konsoliderar <https://lagen.nu/1915:218> ;
-    rpubl:konsolideringsunderlag <https://lagen.nu/1915:218>,
-        <https://lagen.nu/1987:329>,
-        <https://lagen.nu/1994:1513> ;
-    rpubl:utfardandedatum "1915-06-11"^^xsd:date ;
-    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1915:218/konsolidering/1994-12-31> ;
-    prov:wasGeneratedBy "lagen.nu.sfs.SFS" .
+    rpubl:lopnummer "218" ;
+    rpubl:utfardandedatum "1915-12-31"^^xsd:date ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1915:218> .
+
+<https://lagen.nu/1915:218#K1> a rpubl:Kapitel ;
+    dcterms:isPartOf <https://lagen.nu/1915:218/konsolidering/1994:1513> ;
+    rpubl:kapitelnummer "1"@sv .
+
+<https://lagen.nu/1915:218#P10> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/1915:218#K2> ;
+    rpubl:paragrafnummer "10"@sv .
 
 <https://lagen.nu/1987:329> a rpubl:Lag ;
     dcterms:identifier "SFS 1987:329" ;
@@ -83,33 +117,9 @@
     rpubl:utfardandedatum "1994-12-31"^^xsd:date ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1994:1513> .
 
-<https://lagen.nu/bet/1994/95:LU5> dcterms:identifier "bet. 1994/95:LU5" .
+<https://lagen.nu/org/2008/justitiedepartementet> rdfs:label "Justitiedepartementet L2"@sv .
 
-<https://lagen.nu/prop/1986/87:72> dcterms:identifier "Prop. 1986/87:72" .
-
-<https://lagen.nu/prop/1994/95:17> dcterms:identifier "Prop. 1994/95:17" .
-
-<https://lagen.nu/rskr/1994/95:76> dcterms:identifier "rskr. 1994/95:76" .
-
-<https://lagen.nu/1915:218> a rpubl:Lag ;
-    dcterms:identifier "SFS 1915:218" ;
-    dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
-    dcterms:title "Lag (1915:218) om avtal och andra rättshandlingar på förmögenhetsrättens område"@sv ;
-    rpubl:arsutgava "1915" ;
-    rpubl:beslutadAv <https://lagen.nu/org/2008/regeringskansliet> ;
-    rpubl:departement <https://lagen.nu/org/2008/justitiedepartementet> ;
-    rpubl:forfattningssamling <https://lagen.nu/dataset/sfs> ;
-    rpubl:ikrafttradandedatum "1916-01-01"^^xsd:date ;
-    rpubl:lopnummer "218" ;
-    rpubl:utfardandedatum "1915-12-31"^^xsd:date ;
-    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1915:218> .
-
-<https://lagen.nu/1915:218#K1> a rpubl:Kapitel ;
-    rpubl:kapitelnummer "1"@sv .
-
-<https://lagen.nu/1915:218#P10> a rpubl:Paragraf ;
-    dcterms:isPartOf <https://lagen.nu/1915:218#K2> ;
-    rpubl:paragrafnummer "10"@sv .
+<https://lagen.nu/1915:218#L1994:1513> dcterms:isPartOf <https://lagen.nu/1994:1513> .
 
 <https://lagen.nu/1915:218#P1> a rpubl:Paragraf ;
     dcterms:isPartOf <https://lagen.nu/1915:218#K1> ;
@@ -118,4 +128,21 @@
 <https://lagen.nu/1915:218#P2> a rpubl:Paragraf ;
     dcterms:isPartOf <https://lagen.nu/1915:218#K1> ;
     rpubl:paragrafnummer "2"@sv .
+
+<https://lagen.nu/1915:218/konsolidering/1994:1513> a rpubl:KonsolideradGrundforfattning ;
+    dcterms:creator <https://lagen.nu/org/2008/justitiedepartementet> ;
+    dcterms:identifier "SFS 1915:218 i lydelse enligt SFS 1994:1513" ;
+    dcterms:issued "1994-12-31"^^xsd:date ;
+    dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:title "Lag (1915:218) om avtal och andra rättshandlingar på förmögenhetsrättens område"@sv ;
+    rpubl:ikrafttradandedatum "1916-01-01"^^xsd:date ;
+    rpubl:konsoliderar <https://lagen.nu/1915:218> ;
+    rpubl:konsolideringsunderlag <https://lagen.nu/1915:218>,
+        <https://lagen.nu/1987:329>,
+        <https://lagen.nu/1994:1513> ;
+    rpubl:utfardandedatum "1915-06-11"^^xsd:date ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1915:218/konsolidering/1994-12-31> ;
+    prov:wasGeneratedBy "lagen.nu.sfs.SFS" .
+
+<https://lagen.nu/org/2008/regeringskansliet> rdfs:label "Regeringskansliet"@sv .
 

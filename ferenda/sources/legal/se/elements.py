@@ -611,13 +611,13 @@ class Appendix(SectionalElement):
 # in older propositioner, the document is typically structured as
 # PreambleSection("Propositionens huvudsakliga innehåll")
 # PreambleSection("Propositionens lagförslag")
-# ProtokollsUtdrag("Justitiedepartementet")
+# Protokollsutdrag("Justitiedepartementet")
 #   Section("1 Inledning")
 #   Section("2 Allmän motivering")
 #     Section("2.1 Allmänna utgångspunkter")
 #  ...
-# ProtokollsUtdrag("Lagrådet")
-# ProtokollsUtdrag("Justitiedepartementet")
+# Protokollsutdrag("Lagrådet")
+# Protokollsutdrag("Justitiedepartementet")
 #
 # meaning this is three protocol excerpts after another: the first
 # (the main one) being the proposition to lagrådet, the second
@@ -629,7 +629,12 @@ class Appendix(SectionalElement):
 class Protokollsutdrag(CompoundElement):
     tagname = "div"
     classname = "protokollsutdrag"
+    counter = 0
+    uri = None
     def as_xhtml(self, uri, parent_uri=None):
+        if not self.uri:
+            self.__class__.counter += 1
+            self.uri = uri + "#PU%s" % self.__class__.counter
         element = super(Protokollsutdrag, self).as_xhtml(uri, parent_uri)
         # do not add @property='dcterms:title' as we don't want to
         # create a RDF triple out of this. But we kind of have to set

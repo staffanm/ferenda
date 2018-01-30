@@ -25,14 +25,14 @@
         <https://lagen.nu/1962:700#K23>,
         <https://lagen.nu/1973:289#P21>,
         <https://lagen.nu/1988:000> ;
-    dcterms:title "Förslag till       Lag om ändring i datalagen (1973:289)"@sv ;
+    dcterms:title "Förslag till Lag om ändring i datalagen (1973:289)"@sv ;
     bibo:chapter "2"@sv .
 
 <https://lagen.nu/prop/1987/88:155#FF3> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1987/88:155#PS2> ;
     dcterms:references <https://lagen.nu/1931:152>,
         <https://lagen.nu/1962:700> ;
-    dcterms:title "Förslag till       Lag om ändring i sekretesslagen (1980: 100)"@sv ;
+    dcterms:title "Förslag till Lag om ändring i sekretesslagen (1980: 100)"@sv ;
     bibo:chapter "3"@sv .
 
 <https://lagen.nu/prop/1987/88:155#PS1> a bibo:DocumentPart ;
@@ -82,13 +82,13 @@
     bibo:chapter "4.2"@sv .
 
 <https://lagen.nu/prop/1987/88:155#S5> a bibo:DocumentPart ;
-    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155#PU1> ;
     dcterms:references <https://lagen.nu/1973:289> ;
     dcterms:title "Hemställan"@sv ;
     bibo:chapter "5"@sv .
 
 <https://lagen.nu/prop/1987/88:155#S6> a bibo:DocumentPart ;
-    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155#PU1> ;
     dcterms:title "Beslut"@sv ;
     bibo:chapter "6"@sv .
 
@@ -100,7 +100,7 @@
 <http://www.riksdagen.se/sv/Dokument-Lagar/Forslag/Propositioner-och-skrivelser/_GB03155/?text=true> rdfs:label "Källa"@sv .
 
 <https://lagen.nu/prop/1987/88:155#S2> a bibo:DocumentPart ;
-    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155#PU1> ;
     dcterms:title "Allmän motivering"@sv ;
     bibo:chapter "2"@sv .
 
@@ -125,7 +125,7 @@
     dcterms:title "Propositionens lagförslag PFOP- 1987/381155       1 Förslag till"@sv .
 
 <https://lagen.nu/prop/1987/88:155#S4> a bibo:DocumentPart ;
-    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1987/88:155#PU1> ;
     dcterms:title "Specialmotivering"@sv ;
     bibo:chapter "4"@sv .
 

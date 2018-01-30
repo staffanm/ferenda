@@ -543,6 +543,7 @@ class SwedishLegalSource(DocumentRepository):
         # reset some global state
         UnorderedSection.counter = 0
         PreambleSection.counter = 0
+        Protokollsutdrag.counter = 0
         self.refparser._legalrefparser.namedlaws = {}
         fp = self.parse_open(doc.basefile)
         # maybe the fp now contains a .patchdescription?

@@ -1519,15 +1519,31 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                               # function with .peek(2) and .peek(3)
                               # below
             txt = str(chunk).strip()
-            return (chunk.font.size == metrics.h1.size and (txt.startswith("Bilaga ") or txt.startswith("Bilagor")))
+            if (chunk.font.size == metrics.h1.size and (txt.startswith("Bilaga ") or txt.startswith("Bilagor"))):
+                if txt.startswith("Bilaga "):
+                    # assume that whatever follows is a number -- if
+                    # not, this is not a proper appendix header anyway
+                    return int(re.split(r"[ \:]")[1])
+                else:
+                    return True 
 
         def is_implicit_appendix(chunk):
             # The technique of starting a new appendix without stating
             # so in the margin on the first page of the appendix
             # occurs in some older props, eg Prop 1997/98:18
-            txt = str(chunk).strip()
-            if chunk.font.size == metrics.h1.size:
-                if txt in ("Promemorians lagförslag", "Lagrådsremissens lagförslag", "Lagrådets yttrande"):
+
+            # 1. Has to be on the top 15% of page
+            if chunk.bottom  > state.page.height * 0.15:
+                  return False
+
+            # 2. Has to be set in a h1 font (with some tolerances
+            # because of scanned material
+            tolerance = 2 if metrics.scanned_source else 0
+            if abs(chunk.font.size - metrics.h1.size) <= tolerance:
+
+                # 3. Has to match one of a few standardized appendicies headings.
+                txt = str(chunk).strip()
+                if txt in ("Promemorians lagförslag", "Lagrådsremissens lagförslag", "Lagrådets yttrande", "Lagrådet"):
                     return True
                 elif txt.startswith("Förteckning över remissinstanser"):
                     return True
@@ -1537,7 +1553,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             # For scanned sources, a header and the "Bilaga \d" label
             # in the margin might mashing together
             # 1. text larger than default
-            if chunk.font.size <= metrics.default.size:
+            if abs(chunk.font.size - metrics.default.size) <= 1:
                 return False
             # 2. preferably first part of the page (or the top 15% of page)
             if chunk.bottom  > state.page.height * 0.15:
@@ -1552,10 +1568,12 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             # (it's always more complicated, eg with a five-line heading)
             txtchunk = str(chunk).strip()
             txtlen = len(txtchunk)
-            m = re.search("Bilaga \d", txtchunk)
+            m = re.search("Bilaga (\d+)", txtchunk)
+            # an indicator of mashed-ness is that the textbox sticks outside of the margins (maybe we should only check the rightmargin?)
             if m and (m.end() == txtlen or
-                      txtlen > 140 and m.start() > 120):
-                return True
+                      metrics_leftmargin() > chunk.left or 
+                      metrics_rightmargin() < chunk.right):
+                return int(m.group(1))
 
         chunk = parser.reader.peek()
         txtchunk = util.normalize_space(str(chunk))
@@ -1580,15 +1598,14 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         
         is_header = False
         if not state.appendixstarted:
-            if is_appendix_header(chunk):
-                is_header = True
-            elif is_implicit_appendix(chunk):
-                is_header = True
-            elif metrics.scanned_source and is_mashed_header(chunk):
-                is_header = True
+            is_header = is_appendix_header(chunk)
+            if not is_header:
+                is_header = is_implicit_appendix(chunk)
+                if not is_header and metrics.scanned_source:
+                    is_header = is_mashed_header(chunk)
 
-        # check that the chunk in question is not too big
         if not is_header:
+            # check that the chunk in question is not too big
             tolerance = 2 if metrics.scanned_source else 0
             if metrics.default.size + tolerance < chunk.font.size:
                 return False
@@ -1608,37 +1625,48 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             else:
                 placement = lambda c: c.right < metrics_leftmargin() or c.left > metrics_rightmargin()
 
-        if is_header or placement(chunk):
-            # NOTE: filter out indications of nested
-            # appendicies (eg "Bilaga 5 till RSVs skrivelse")
-            m = re.search("Bilaga( \d+| I| l|$)(?!(\d| *till))", txtchunk)
-            if m:
-                if m.group(1):
-                    match = m.group(1).strip()
-                    if match in ("I", "l"):   # correct for OCR mistake
-                        match = "1" 
-                    ordinal = int(match)
-                else:
-                    ordinal = 1
-                if ordinal == state.appendixno:
-                    # this is just one more page of the appendix
-                    # currently being processed
-                    state.appendixstarted = True
-                else:
-                    # OK, this can very well be an appendix, but just
-                    # to be sure, keep reading to see if we have a
-                    # Appendix-like heading as well
-                    try:
-                        if (is_appendix_header(parser.reader.peek(2)) or
-                            is_appendix_header(parser.reader.peek(3))):
-                            state.appendixno = ordinal
-                            return False
-                        else:
+            if placement(chunk):
+                # NOTE: filter out indications of nested
+                # appendicies (eg "Bilaga 5 till RSVs skrivelse")
+                m = re.search("Bilaga( \d+| I| l|$)(?!(\d| *till))", txtchunk)
+                if m:
+                    if m.group(1):
+                        match = m.group(1).strip()
+                        if match in ("I", "l"):   # correct for OCR mistake
+                            match = "1" 
+                        ordinal = int(match)
+                    else:
+                        ordinal = 1
+                    if ordinal == state.appendixno:
+                        # this is just one more page of the appendix
+                        # currently being processed
+                        state.appendixstarted = True
+                    else:
+                        # OK, this can very well be an appendix, but just
+                        # to be sure, keep reading to see if we have a
+                        # Appendix-like heading as well
+                        try:
+                            if (is_appendix_header(parser.reader.peek(2)) or
+                                is_appendix_header(parser.reader.peek(3))):
+                                state.appendixno = ordinal
+                                return False
+                            else:
+                                return True
+                        except StopIteration:
+                            # So no more document? this might be a very
+                            # short appendix...
                             return True
-                    except StopIteration:
-                        # So no more document? this might be a very
-                        # short appendix...
-                        return True
+        else:  # is_header = True
+
+            if isinstance(is_header, int) and is_header == state.appendixno:
+                # this is just one more page of the appendix
+                # currently being processed
+                state.appendixstarted = True
+            else:
+                # should we do something about state.appendixno?
+                # (ie. increment by one, or possibly more in the
+                # is_appendix_header or is_mashed_header cases?)
+                return True
 
     def is_paragraph(parser):
         return True
@@ -1764,7 +1792,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             # title (maybe, at least in mashed-together scanned
             # sources).
             if metrics.scanned_source and m.start() > 0:
-                title = str(chunk)[:m.start()].strip()
+                title = util.normalize_space(str(chunk)[:m.start()])
                 # sanity check -- what comes before might be the prop
                 # identifier in the margin
                 if len(title) < 20 and title.lower().startswith("prop."):
@@ -1786,7 +1814,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                     title = ""
                     done = True
                 if isinstance(chunk, Textbox) and int(chunk.font.size) >= metrics.h2.size:
-                    title = str(chunk).strip()
+                    title = util.normalize_space(str(chunk))
                     chunk = None
                     done = True
                 if not done:
@@ -1928,7 +1956,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             return (None, None, chunk)
         
         # looks like we've made it!
-        return (ordinal, headingtype, title)
+        return (ordinal, headingtype, util.normalize_space(title))
 
 
     def metrics_leftmargin():

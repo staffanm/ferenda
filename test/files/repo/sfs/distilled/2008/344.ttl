@@ -90,16 +90,16 @@
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2013:647> .
 
 <https://lagen.nu/bet/2007/08:SfU8> a rinfoex:Utskottsbetankande ;
-    dcterms:identifier "bet. 2007/08:SfU8" .
+    dcterms:identifier "Bet. 2007/08:SfU8" .
 
 <https://lagen.nu/bet/2009/10:SfU8> a rinfoex:Utskottsbetankande ;
-    dcterms:identifier "bet. 2009/10:SfU8" .
+    dcterms:identifier "Bet. 2009/10:SfU8" .
 
 <https://lagen.nu/bet/2012/13:SfU8> a rinfoex:Utskottsbetankande ;
-    dcterms:identifier "bet. 2012/13:SfU8" .
+    dcterms:identifier "Bet. 2012/13:SfU8" .
 
 <https://lagen.nu/bet/2012/13:SoU20> a rinfoex:Utskottsbetankande ;
-    dcterms:identifier "bet. 2012/13:SoU20" .
+    dcterms:identifier "Bet. 2012/13:SoU20" .
 
 <https://lagen.nu/prop/2007/08:105> a rpubl:Proposition ;
     dcterms:identifier "Prop. 2007/08:105" .
@@ -114,16 +114,16 @@
     dcterms:identifier "Prop. 2012/13:125" .
 
 <https://lagen.nu/rskr/2007/08:199> a rinfoex:Riksdagsskrivelse ;
-    dcterms:identifier "rskr. 2007/08:199" .
+    dcterms:identifier "Rskr. 2007/08:199" .
 
 <https://lagen.nu/rskr/2009/10:133> a rinfoex:Riksdagsskrivelse ;
-    dcterms:identifier "rskr. 2009/10:133" .
+    dcterms:identifier "Rskr. 2009/10:133" .
 
 <https://lagen.nu/rskr/2012/13:230> a rinfoex:Riksdagsskrivelse ;
-    dcterms:identifier "rskr. 2012/13:230" .
+    dcterms:identifier "Rskr. 2012/13:230" .
 
 <https://lagen.nu/rskr/2012/13:274> a rinfoex:Riksdagsskrivelse ;
-    dcterms:identifier "rskr. 2012/13:274" .
+    dcterms:identifier "Rskr. 2012/13:274" .
 
 <https://lagen.nu/org/2008/justitiedepartementet> rdfs:label "Justitiedepartementet L7"@sv .
 

@@ -19,6 +19,7 @@ from lxml import etree
 import requests
 from layeredconfig import LayeredConfig
 from cached_property import cached_property
+from rdflib import Literal
 from rdflib.namespace import DCTERMS
 
 from ferenda import util
@@ -37,6 +38,8 @@ def prop_sanitize_identifier(identifier):
         identifier = identifier.replace("PROP", "Prop")
     if identifier.startswith("Prop "):
         identifier = identifier.replace("Prop ", "Prop. ")
+    if not identifier.startswith("Prop. "):
+        identifier = "Prop. " + identifier
     if not re.match(r"^Prop\. (19|20)\d{2}(|/\d{2}|/2000):[1-9]\d*$", identifier):
         raise ValueError("Irregular identifier %s" % identifier)
     return Literal(identifier)

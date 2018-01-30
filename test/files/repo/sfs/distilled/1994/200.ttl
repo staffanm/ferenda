@@ -256,13 +256,13 @@
     prov:wasGeneratedBy "lagen.nu.sfs.SFS" .
 
 <https://lagen.nu/bet/1993/94:SkU29> a rinfoex:Utskottsbetankande ;
-    dcterms:identifier "bet. 1993/94:SkU29" .
+    dcterms:identifier "Bet. 1993/94:SkU29" .
 
 <https://lagen.nu/prop/1993/94:99> a rpubl:Proposition ;
     dcterms:identifier "Prop. 1993/94:99" .
 
 <https://lagen.nu/rskr/1993/94:170> a rinfoex:Riksdagsskrivelse ;
-    dcterms:identifier "rskr. 1993/94:170" .
+    dcterms:identifier "Rskr. 1993/94:170" .
 
 <https://lagen.nu/1994:200#K1> a rpubl:Kapitel ;
     dcterms:isPartOf <https://lagen.nu/1994:200> ;

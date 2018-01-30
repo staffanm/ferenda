@@ -28,7 +28,7 @@
 
 <https://lagen.nu/prop/1991/92:167#B5> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
-    dcterms:title "Förteckning över remissinstanser som har yttrat sig över       departementspromemorian Den svenska hemförsäljnings-       lagens anpassning till EG:s regelverk, Ds 1991:68"@sv ;
+    dcterms:title "Förteckning över remissinstanser som har yttrat sig över departementspromemorian Den svenska hemförsäljnings- lagens anpassning till EG:s regelverk, Ds 1991:68"@sv ;
     bibo:chapter "5"@sv .
 
 <https://lagen.nu/prop/1991/92:167#B6> a bibo:DocumentPart ;
@@ -62,14 +62,14 @@
     dcterms:title "Propositionens huvudsakliga innehåll"@sv .
 
 <https://lagen.nu/prop/1991/92:167#S1> a bibo:DocumentPart ;
-    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#PU1> ;
     dcterms:references <https://lagen.nu/1981:1361>,
         <https://lagen.nu/ds/1991:68> ;
     dcterms:title "Inledning"@sv ;
     bibo:chapter "1"@sv .
 
 <https://lagen.nu/prop/1991/92:167#S2> a bibo:DocumentPart ;
-    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#PU1> ;
     dcterms:references <https://lagen.nu/1981:1361> ;
     dcterms:title "EG-reglemas införlivande i svensk rätt"@sv ;
     bibo:chapter "2"@sv .
@@ -146,13 +146,13 @@
     bibo:chapter "3.9"@sv .
 
 <https://lagen.nu/prop/1991/92:167#S4> a bibo:DocumentPart ;
-    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#PU1> ;
     dcterms:references <https://lagen.nu/1981:1361> ;
     dcterms:title "Upprättat lagförslag"@sv ;
     bibo:chapter "4"@sv .
 
 <https://lagen.nu/prop/1991/92:167#S5> a bibo:DocumentPart ;
-    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#PU1> ;
     dcterms:references <https://lagen.nu/1981:1361>,
         <https://lagen.nu/1988:1385>,
         <https://lagen.nu/1990:931>,
@@ -165,13 +165,13 @@
     bibo:chapter "5"@sv .
 
 <https://lagen.nu/prop/1991/92:167#S6> a bibo:DocumentPart ;
-    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#PU1> ;
     dcterms:references <https://lagen.nu/1981:1361> ;
     dcterms:title "Hemställan"@sv ;
     bibo:chapter "6"@sv .
 
 <https://lagen.nu/prop/1991/92:167#S7> a bibo:DocumentPart ;
-    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#PU1> ;
     dcterms:title "Beslut"@sv ;
     bibo:chapter "7"@sv .
 
@@ -179,8 +179,12 @@
 
 <https://lagen.nu/prop/1991/92:167?attachment=index.pdf&repo=propriksdagen&dir=downloaded> rdfs:label "Prop. 1991/92:167"@sv .
 
-<https://lagen.nu/prop/1991/92:167#S3> a bibo:DocumentPart ;
+<https://lagen.nu/prop/1991/92:167#PU1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:references <https://lagen.nu/1981:1361> .
+
+<https://lagen.nu/prop/1991/92:167#S3> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#PU1> ;
     dcterms:title "Behovet av ändringar i hemförsäljningslagen"@sv ;
     bibo:chapter "3"@sv .
 
@@ -194,3 +198,4 @@
     prov:alternateOf <http://www.riksdagen.se/sv/Dokument-Lagar/Forslag/Propositioner-och-skrivelser/_GF03167/?text=true> ;
     prov:wasDerivedFrom <https://lagen.nu/prop/1991/92:167?attachment=index.pdf&repo=propriksdagen&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.propositioner.PropRiksdagen" .
+

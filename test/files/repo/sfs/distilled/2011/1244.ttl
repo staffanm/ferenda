@@ -97,7 +97,7 @@
     prov:wasGeneratedBy "lagen.nu.sfs.SFS" .
 
 <https://lagen.nu/bet/2011/12:SkU3> a rinfoex:Utskottsbetankande ;
-    dcterms:identifier "bet. 2011/12:SkU3" .
+    dcterms:identifier "Bet. 2011/12:SkU3" .
 
 <https://lagen.nu/ext/celex/32003L0048> rpubl:celexNummer "32003L0048" .
 
@@ -119,7 +119,7 @@
     dcterms:identifier "Prop. 2010/11:165" .
 
 <https://lagen.nu/rskr/2011/12:28> a rinfoex:Riksdagsskrivelse ;
-    dcterms:identifier "rskr. 2011/12:28" .
+    dcterms:identifier "Rskr. 2011/12:28" .
 
 <https://lagen.nu/2011:1244#K1> a rpubl:Kapitel ;
     dcterms:isPartOf <https://lagen.nu/2011:1244> ;

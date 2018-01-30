@@ -472,10 +472,10 @@
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2010:343> .
 
 <https://lagen.nu/bet/2009/10:SfU11> a rinfoex:Utskottsbetankande ;
-    dcterms:identifier "bet. 2009/10:SfU11" .
+    dcterms:identifier "Bet. 2009/10:SfU11" .
 
 <https://lagen.nu/bet/2009/10:TU17> a rinfoex:Utskottsbetankande ;
-    dcterms:identifier "bet. 2009/10:TU17" .
+    dcterms:identifier "Bet. 2009/10:TU17" .
 
 <https://lagen.nu/prop/2008/09:200> a rpubl:Proposition ;
     dcterms:identifier "Prop. 2008/09:200" .
@@ -484,10 +484,10 @@
     dcterms:identifier "Prop. 2009/10:161" .
 
 <https://lagen.nu/rskr/2009/10:194> a rinfoex:Riksdagsskrivelse ;
-    dcterms:identifier "rskr. 2009/10:194" .
+    dcterms:identifier "Rskr. 2009/10:194" .
 
 <https://lagen.nu/rskr/2009/10:253> a rinfoex:Riksdagsskrivelse ;
-    dcterms:identifier "rskr. 2009/10:253" .
+    dcterms:identifier "Rskr. 2009/10:253" .
 
 <https://lagen.nu/2010:110#K1> a rpubl:Kapitel ;
     rpubl:kapitelnummer "1"@sv .

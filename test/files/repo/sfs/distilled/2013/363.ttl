@@ -39,7 +39,7 @@
     prov:wasGeneratedBy "lagen.nu.sfs.SFS" .
 
 <https://lagen.nu/bet/2012/13:MJU14> a rinfoex:Utskottsbetankande ;
-    dcterms:identifier "bet. 2012/13:MJU14" .
+    dcterms:identifier "Bet. 2012/13:MJU14" .
 
 <https://lagen.nu/ext/celex/32004R0882> rpubl:celexNummer "32004R0882" .
 
@@ -49,7 +49,7 @@
     dcterms:identifier "Prop. 2012/13:55" .
 
 <https://lagen.nu/rskr/2012/13:210> a rinfoex:Riksdagsskrivelse ;
-    dcterms:identifier "rskr. 2012/13:210" .
+    dcterms:identifier "Rskr. 2012/13:210" .
 
 <https://lagen.nu/2013:363#P1S1> a rinfoex:Stycke ;
     dcterms:isPartOf <https://lagen.nu/2013:363#P1> .

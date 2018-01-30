@@ -90,10 +90,10 @@
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2010:448> .
 
 <https://lagen.nu/bet/1994/95:FoeU1> a rinfoex:Utskottsbetankande ;
-    dcterms:identifier "bet. 1994/95:FöU1" .
+    dcterms:identifier "Bet. 1994/95:FöU1" .
 
 <https://lagen.nu/bet/2009/10:FoeU8> a rinfoex:Utskottsbetankande ;
-    dcterms:identifier "bet. 2009/10:FöU8" .
+    dcterms:identifier "Bet. 2009/10:FöU8" .
 
 <https://lagen.nu/prop/1994/95:6> a rpubl:Proposition ;
     dcterms:identifier "Prop. 1994/95:6" .
@@ -102,10 +102,10 @@
     dcterms:identifier "Prop. 2009/10:160" .
 
 <https://lagen.nu/rskr/1994/95:78> a rinfoex:Riksdagsskrivelse ;
-    dcterms:identifier "rskr. 1994/95:78" .
+    dcterms:identifier "Rskr. 1994/95:78" .
 
 <https://lagen.nu/rskr/2009/10:269> a rinfoex:Riksdagsskrivelse ;
-    dcterms:identifier "rskr. 2009/10:269" .
+    dcterms:identifier "Rskr. 2009/10:269" .
 
 <https://lagen.nu/1994:1809> a rpubl:Lag ;
     dcterms:identifier "SFS 1994:1809" ;
