@@ -970,7 +970,6 @@ class Regressions(TestLagen):
             self.assertTrue("<pre>" not in res.text)
 
     def test_missing_pages(self):
-        import pudb; pu.db
         # issue 5: "I prop. 1992/93:30 saknas s. 18–30. Prop. 1996/97:106 är ofullständig (har bara två sidor)"
         for urlseg in ("prop/1992/93:30",
                        "prop/1996/97:106",

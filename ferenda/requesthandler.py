@@ -6,10 +6,12 @@
 from wsgiref.util import request_uri
 import re
 import os
+import sys
 from io import BytesIO
 from functools import partial
 from urllib.parse import urlparse, unquote, parse_qsl
 import mimetypes
+import traceback
 
 from rdflib import Graph
 from ferenda.thirdparty import httpheader
@@ -254,6 +256,7 @@ class RequestHandler(object):
 
         if "dir" in params:
             method = {'downloaded': repo.store.downloaded_path,
+                      'intermediate': repo.store.intermediate_path,
                       'parsed': repo.store.parsed_path}[params["dir"]]
             if "page" in params and "format" in params:
                 baseparam = "-size 400x300 -pointsize 12 -gravity center"
@@ -289,7 +292,8 @@ class RequestHandler(object):
                     if not baseattach:
                         baseattach = "page_error.png"
                     outfile = repo.store.intermediate_path(basefile, attachment=baseattach)
-                    errormsg = str(e).replace("\n", "\\n").replace("'", "\\'")
+                    errormsg = "%s\n%s: %s" % ("".join(traceback.format_tb(sys.exc_info()[2])), e.__class__.__name__, str(e))
+                    errormsg = errormsg.replace("\n", "\\n").replace("'", "\\'")
                     cmdline = 'convert  label:"%s" %s' % (errormsg, outfile)
                     util.runcmd(cmdline, require_success=True)
                 method = partial(repo.store.intermediate_path, attachment=baseattach)

@@ -159,7 +159,8 @@ class PDFReader(CompoundElement):
         else:
             suffix = ".xml"
             converter = self._pdftohtml
-            converter_extra = {'images': images}
+            converter_extra = {'images': images,
+                               'keeppdffile': convert_to_pdf}
             parser = self._parse_xml
         convertedfile = os.sep.join([workdir, stem + suffix])
         if keep_xml == "bz2":
@@ -275,7 +276,7 @@ class PDFReader(CompoundElement):
                            "%(workdir)s/%(root)s%(suffix)s.html" % locals())
         shutil.rmtree(tmpdir)        
 
-    def _pdftohtml(self, tmppdffile, workdir, images):
+    def _pdftohtml(self, tmppdffile, workdir, images, keeppdffile):
         root = os.path.splitext(os.path.basename(tmppdffile))[0]
         try:
             if images:
@@ -342,8 +343,9 @@ class PDFReader(CompoundElement):
             # print("3: ran %s (%s), stdout %r, stderr %r" % (cmd, returncode, stdout, stderr))
             # print("contents of %s is now %r" % (workdir, os.listdir(workdir)))
         finally:
-            os.unlink(tmppdffile)
-            assert not os.path.exists(tmppdffile), "tmppdffile still there:" + tmppdffile
+            if not keeppdffile:
+                os.unlink(tmppdffile)
+                assert not os.path.exists(tmppdffile), "tmppdffile still there:" + tmppdffile
 
     dims = r"bbox (?P<left>\d+) (?P<top>\d+) (?P<right>\d+) (?P<bottom>\d+)"
     re_dimensions = re.compile(dims).search
@@ -1010,7 +1012,8 @@ class StreamingPDFReader(PDFReader):
             tmpfilename = filename
         else:
             converter = self._pdftohtml
-            converter_extra = {'images': images}
+            converter_extra = {'images': images,
+                               'keeppdffile': convert_to_pdf}
             tmpfilename = os.sep.join([workdir, os.path.basename(filename)])
 
         # copying the filename to the workdir is only needed if we use

@@ -51,7 +51,6 @@ class FixedLayoutHandler(SwedishLegalHandler):
             else:
                 repo = self.repo
             params['repo'] = repo.alias
-            params['dir'] = "downloaded"
             pagemapping_path = repo.store.path(basefile, 'intermediate','.pagemapping.json')
             with open(pagemapping_path) as fp:
                 pagemap = json.load(fp)
@@ -62,6 +61,12 @@ class FixedLayoutHandler(SwedishLegalHandler):
                     invertedmap[v] = k
             attachment, pp = invertedmap[pageno].split("#page=")
             params['attachment'] = attachment
+            for candidatedir in ('downloaded', 'intermediate'):
+                if os.path.exists(repo.store.path(basefile, candidatedir, '.dummy', attachment=attachment)):
+                    params['dir'] = candidatedir
+                    break
+            else:
+                raise RequestHandlerError("%s: Cannot find %s in any %s directory" % (basefile, attachment, repo.alias))
             params['page'] = str(int(pp) - 1)  # pp is 1-based, but RequestHandler.get_pathfunc expects 0-based
             params['format'] = 'png'
         return super(FixedLayoutHandler, self).get_pathfunc(environ, basefile, params, contenttype, suffix)

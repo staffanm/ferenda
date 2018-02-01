@@ -120,26 +120,29 @@ class Trips(SwedishLegalSource):
 #        return super(Trips, self).download_single(basefile)
 #
     def download_is_different(self, existing, new):
-        # load both existing and new into a BeautifulSoup object, then
-        # compare the first <pre> element
-        existing_soup = BeautifulSoup(
-            util.readfile(
-                existing,
-                encoding=self.source_encoding), "lxml")
-        new_soup = BeautifulSoup(util.readfile(new, encoding=self.source_encoding), "lxml")
-        # exactly how we determine difference depends on page
-        # type. SFS register pages must be handled differently.
-        if "/register/" in existing:
-            existing = existing_soup.find("div", "search-results-content")
-            new = new_soup.find("div", "search-results-content")
+        if existing.endswith(".html"):
+            # load both existing and new into a BeautifulSoup object, then
+            # compare the first <pre> element
+            existing_soup = BeautifulSoup(
+                util.readfile(
+                    existing,
+                    encoding=self.source_encoding), "lxml")
+            new_soup = BeautifulSoup(util.readfile(new, encoding=self.source_encoding), "lxml")
+            # exactly how we determine difference depends on page
+            # type. SFS register pages must be handled differently.
+            if "/register/" in existing:
+                existing = existing_soup.find("div", "search-results-content")
+                new = new_soup.find("div", "search-results-content")
+            else:
+                existing = existing_soup.find("div", "body-text")
+                new = new_soup.find("div", "body-text")
+                assert new, "new file (compared to %s) has no expected content" % existing
+            try:
+                return existing != new
+            except RuntimeError: # can happen with at least v4.4.1 of beautifulsoup
+                return True
         else:
-            existing = existing_soup.find("div", "body-text")
-            new = new_soup.find("div", "body-text")
-            assert new, "new file (compared to %s) has no expected content" % existing
-        try:
-            return existing != new
-        except RuntimeError: # can happen with at least v4.4.1 of beautifulsoup
-            return True
+            return super(Trips, self).download_is_different(existing, new)
 
     def remote_url(self, basefile):
         return self.document_url_template % {'basefile': quote(basefile)}

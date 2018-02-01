@@ -1,4 +1,4 @@
 sudo launchctl unload /Library/LaunchDaemons/org.apache.jena.fuskei.plist 
-sudo rm  /opt/apache-jena-fuseki-2.3.1/run/databases/lagen/tdb.lock
-sudo rm /opt/apache-jena-fuseki-2.3.1/run/system/tdb.lock 
+sudo rm  /opt/apache-jena-fuseki-2.6.0/run/databases/lagen/tdb.lock
+sudo rm /opt/apache-jena-fuseki-2.6.0/run/system/tdb.lock 
 sudo launchctl load /Library/LaunchDaemons/org.apache.jena.fuskei.plist 
