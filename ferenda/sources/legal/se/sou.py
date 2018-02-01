@@ -26,7 +26,7 @@ from . import Regeringen, SwedishLegalSource, FixedLayoutSource, SwedishLegalSto
 
 
 def sou_sanitize_identifier(identifier):
-    if not re.match("SOU (19|20)\d{2}:[1-9]\d*"):
+    if not re.match("SOU (19|20)\d{2}:[1-9]\d*", identifier):
         raise ValueError("Irregular identifier %s (after mangling)" %  identifier)
     return Literal(identifier)
 
@@ -138,6 +138,9 @@ class SOURegeringen(Regeringen):
                   'rdf:type': self.rdf_type}
         resource = self.attributes_to_resource(attrib)
         return self.minter.space.coin_uri(resource) 
+
+    def sanitize_identifier(self, identifier):
+        return sou_sanitize_identifier(identifier)
 
 
 class SOUKB(Offtryck, PDFDocumentRepository):
@@ -323,8 +326,10 @@ class SOUKB(Offtryck, PDFDocumentRepository):
         if props.get('dcterms:title') and " : betänkande" in props['dcterms:title']:
             props['dcterms:title'] = props['dcterms:title'].rsplit(" : ")[0]
         return props
-            
 
+    def sanitize_identifier(self, identifier):
+        return sou_sanitize_identifier(identifier)
+    
     def extract_body(self, fp, basefile):
         reader = StreamingPDFReader()
         parser = "ocr" if self.config.ocr else "xml"
@@ -332,7 +337,6 @@ class SOUKB(Offtryck, PDFDocumentRepository):
         for page in reader:
             page.src = "index.pdf"  # FIXME: don't hardcode the filename
         return reader
-    
         
     def sanitize_body(self, rawbody):
         sanitized = super(SOUKB, self).sanitize_body(rawbody)

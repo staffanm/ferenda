@@ -173,6 +173,9 @@ class DirRegeringenLegacy(RegeringenLegacy, SameAs, DirRegeringen):
 class SOURegeringenLegacy(RegeringenLegacy, SameAs, SOURegeringen):
     alias = "souregeringen.legacy"
 
+    def sanitize_identifier(self, identifier):
+        from ferenda.sources.legal.se.sou import sou_sanitize_identifier
+        return sou_sanitize_identifier(identifier)
 
 class DsRegeringenLegacy(RegeringenLegacy, SameAs, Ds):
     alias = "dsregeringen.legacy"

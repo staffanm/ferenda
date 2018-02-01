@@ -16,7 +16,9 @@ from ferenda.errors import ParseError
 from . import Regeringen, Offtryck, RPUBL 
 
 def ds_sanitize_identifier(identifier):
-    if not re.match("Ds (19|20)\d{2}:[1-9]\d*"):
+    if identifier.startswith("DS "):
+        identifier = identifier.replace("DS ", "Ds ")
+    if not re.match("Ds (19|20)\d{2}:[1-9]\d*", identifier):
         raise ValueError("Irregular identifier %s (after mangling)" %  identifier)
     return Literal(identifier)
     
@@ -106,3 +108,6 @@ class Ds(Regeringen):
         a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":", 1)
         a["rpubl:utrSerie"] = self.lookup_resource("Ds", SKOS.altLabel)
         return a
+
+    def sanitize_identifier(self, identifier):
+        return ds_sanitize_identifier(identifier)

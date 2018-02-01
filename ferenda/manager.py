@@ -1384,12 +1384,8 @@ def _queue_jobs(manager, iterable, inst, classname, command):
             continue
         signal.alarm(timeout_length)
         if r['basefile'] not in processing:
-            log.info("%s not found in processing (%s)" % (r['basefile'], ", ".join(processing)))
-        processing.remove(r['basefile'])  # or .discard()? but if a
-                                          # recieved job is not in the
-                                          # processing set, something
-                                          # is probably wrong
-            
+            log.warning("%s not found in processing (%s)" % (r['basefile'], ", ".join(processing)))
+        processing.discard(r['basefile'])
         if isinstance(r['result'], tuple) and r['result'][0] == _WrappedKeyboardInterrupt:
             raise KeyboardInterrupt()
         elif isinstance(r['result'], tuple) and isinstance(r['result'][0], Exception):

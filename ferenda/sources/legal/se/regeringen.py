@@ -136,6 +136,10 @@ class Regeringen(Offtryck):
         "http://www.regeringen.se/rattsdokument/departementsserien-och-promemorior/2000/01/ds-2000681/",  # Ds 2000:68
         "http://www.regeringen.se/rattsdokument/departementsserien-och-promemorior/1999/01/ds-1999241/",  # Ds 1999:24 -- in english
         "http://www.regeringen.se/rattsdokument/departementsserien-och-promemorior/1998/01/ds-1998141/",  # Ds 1998:14
+        "http://www.regeringen.se/rattsdokument/departementsserien-och-promemorior/2015/12/"
+        "andringar-i-rennaringsforordningen-1993384/",  # mistaken for a DS when it's really a unpublished PM
+        "http://www.regeringen.se/rattsdokument/departementsserien-och-promemorior/2015/12/"
+        "andring-av-bestammelserna-om-ratt-till-bistand-i-lagen-1994137-om-mottagande-av-asylsokande-m.fl/" # same
     ])
                     
     def attribs_from_url(self, url):

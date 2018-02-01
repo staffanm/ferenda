@@ -971,11 +971,9 @@ class Regressions(TestLagen):
 
     def test_missing_pages(self):
         # issue 5: "I prop. 1992/93:30 saknas s. 18–30. Prop. 1996/97:106 är ofullständig (har bara två sidor)"
-        for urlseg in ("prop/1992/93:30",
-                       "prop/1996/97:106",
-                       # "prop/1988/89:150",   # NB: These 2 are budget 
-                       # "prop/1991/92:100"
-        ): # propositions, left out by design
+        for urlseg, expected_missing in (
+                ("prop/1992/93:30", []),
+                ("prop/1996/97:106", [3,])):
             res = self.get(self.baseurl + urlseg)
             res.raise_for_status()
             soup = BeautifulSoup(res.text, "lxml")
@@ -987,7 +985,10 @@ class Regressions(TestLagen):
             # intentionally)
             pagenum = 1
             for page in pages:
-                self.assertEqual(str(pagenum), page.get("id")[3:], urlseg)
+                if pagenum in expected_missing:
+                    pagenum += 1
+                else:
+                    self.assertEqual(str(pagenum), page.get("id")[3:], urlseg)
                 pagenum += 1
 
     def test_missing_docs(self):
@@ -1018,7 +1019,7 @@ class Regressions(TestLagen):
         # issue 8
         errors = []
         for doctype, startyear, regex in (("dir", 1987, "^Dir\. (19|20)\d{2}:[1-9]\d*$"),
-                                          ("ds", 1993, "^Ds (19|20)\d{2}:[1-9]\d*$"),
+                                          ("ds", 1995, "^Ds (19|20)\d{2}:[1-9]\d*$"),
                                           ("sou", 1922, "^SOU (19|20)\d{2}:[1-9]\d*$"),
                                           ("prop", 1971, "^Prop\. (19|20)\d{2}(|/\d{2}|/2000):[1-9]\d*$")):
             for year in range(startyear, 2018):
@@ -1031,7 +1032,7 @@ class Regressions(TestLagen):
                 for link in soup.find("article").find_all("a"):
                     # self.assertRegexpMatches(link.text, regex)
                     if not re.match(regex, link.text):
-                        errors.append("%s/%s: %s" % (doctype, year, link.text))
+                        errors.append("%s/%s: %s (%s)" % (doctype, year, link.text, link.get("href")))
         self.maxDiff = None
         self.assertEqual([], errors)
 
