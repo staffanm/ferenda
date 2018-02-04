@@ -23,10 +23,10 @@ from ferenda import (PDFAnalyzer, CompositeRepository, DocumentEntry,
 from ferenda import util, decorators
 from ferenda.pdfreader import StreamingPDFReader
 from . import Regeringen, SwedishLegalSource, FixedLayoutSource, SwedishLegalStore, Offtryck, RPUBL
-
+from .swedishlegalsource import lazyread
 
 def sou_sanitize_identifier(identifier):
-    if not re.match("SOU (19|20)\d{2}:[1-9]\d*", identifier):
+    if not re.match("SOU (19|20)\d{2}:[1-9]\d*$", identifier):
         raise ValueError("Irregular identifier %s (after mangling)" %  identifier)
     return Literal(identifier)
 
@@ -282,6 +282,7 @@ class SOUKB(Offtryck, PDFDocumentRepository):
         attrib["rpubl:utrSerie"] = self.lookup_resource("SOU", SKOS.altLabel)
         return attrib
 
+    @lazyread
     def downloaded_to_intermediate(self, basefile):
         intermediate_path = self.store.intermediate_path(basefile)
         intermediate_dir = os.path.dirname(intermediate_path)

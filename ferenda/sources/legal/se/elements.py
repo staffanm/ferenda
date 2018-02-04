@@ -639,8 +639,10 @@ class Protokollsutdrag(CompoundElement):
         # do not add @property='dcterms:title' as we don't want to
         # create a RDF triple out of this. But we kind of have to set
         # rdf:type = bibo:DocumentPart (to make xsl/forarbete.xsl
-        # create proper TOC)
+        # create proper TOC). And _relate_fulltext_value_label is
+        # surprised if we lack title
         element.set('content', self.title)
+        element.set('property', 'dcterms:title')
         element.set('typeof', 'bibo:DocumentPart')
         return element
 

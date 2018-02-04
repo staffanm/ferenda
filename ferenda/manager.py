@@ -1228,6 +1228,7 @@ def _build_worker(jobqueue, resultqueue, clientname):
         setproctitle(proctitle)
         log.debug("Client: [pid %s] %s finished: %s" % (os.getpid(), job['basefile'], res))
         outdict = {'basefile': job['basefile'],
+                   'alias': job['alias'],
                    'result':  res,
                    'log': list(logrecords),
                    'client': clientname}
@@ -1335,6 +1336,8 @@ def __queue_jobs_nomanager(jobqueue, iterable, inst, classname, command):
 
 
 def _queue_jobs(manager, iterable, inst, classname, command):
+    def format_tupleset(s):
+        return ", ".join(("%s:%s" % (t[0], t[1])) for t in s)
     jobqueue = manager.jobqueue()
     resultqueue = manager.resultqueue()
     log = getlog()
@@ -1359,33 +1362,35 @@ def _queue_jobs(manager, iterable, inst, classname, command):
                'config': client_config}
         # print("putting %r into jobqueue" %  job)
         jobqueue.put(job)
-        processing.add(basefile)
-    number_of_jobs = idx + 1
+        processing.add((inst.alias,basefile))
     res = []
-    if number_of_jobs == 0:
+    numres = 0
+    if len(processing) == 0:
         return res
-    log.info("Server: Put %s (%s) jobs into job queue" % (number_of_jobs, len(processing)))
+    log.info("%s: Put %s jobs into job queue" % (inst.alias, len(processing)))
     # FIXME: only one of the clients will read this DONE package, and
     # we have no real way of knowing how many clients there will be
     # (they can come and go at will). Didn't think this one through...
-    jobqueue.put("DONE")
-    numres = 0
+    # jobqueue.put("DONE")
     res = []
     clients = Counter()
     signal.signal(signal.SIGALRM, _resultqueue_get_timeout)
     # FIXME: be smart about how long we wait before timing out the resultqueue.get() call
-    timeout_length = 180 
-    while numres < number_of_jobs:
+    timeout_length = 300 
+    while len(processing) > 0:
         try:
             r = resultqueue.get()
         except TimeoutError:
-            log.critical("Timeout: %s jobs not processed (%s)" % (len(processing), ", ".join(processing)))
-            numres = number_of_jobs
+            log.critical("Timeout: %s jobs not processed (%s)" % (len(processing), format_tupleset(processing)))
+            processing.clear()
             continue
         signal.alarm(timeout_length)
-        if r['basefile'] not in processing:
-            log.warning("%s not found in processing (%s)" % (r['basefile'], ", ".join(processing)))
-        processing.discard(r['basefile'])
+        if (r['alias'], r['basefile']) not in processing:
+            if r['alias'] == inst.alias:
+                log.warning("%s not found in processing (%s)" % (r['basefile'], format_tupleset(processing)))
+            else:
+                log.warning("%s from repo %s was straggling, better late than never" % (r['basefile'], r['alias']))
+        processing.discard((r['alias'], r['basefile']))
         if isinstance(r['result'], tuple) and r['result'][0] == _WrappedKeyboardInterrupt:
             raise KeyboardInterrupt()
         elif isinstance(r['result'], tuple) and isinstance(r['result'][0], Exception):
@@ -1407,7 +1412,7 @@ def _queue_jobs(manager, iterable, inst, classname, command):
                 r)
         if 'client' in r:
             clients[r['client']] += 1
-        if 'result' in r:
+        if 'result' in r and r['alias'] == inst.alias:
             res.append(r['result'])
         numres += 1
 
@@ -1415,7 +1420,7 @@ def _queue_jobs(manager, iterable, inst, classname, command):
     signal.alarm(0)
     # sort clients on name, not number of jobs
     clientstats = ", ".join(["%s: %s jobs" % (k, v) for k,v in sorted(clients.items())])
-    log.info("Server: %s jobs processed. %s" % (numres, clientstats))
+    log.info("%s: %s jobs processed. %s" % (inst.alias, numres, clientstats))
     return res
     # sleep(1)
     # don't shut this down --- the toplevel manager.run call must do

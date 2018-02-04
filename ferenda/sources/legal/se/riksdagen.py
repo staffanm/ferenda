@@ -25,6 +25,7 @@ from ferenda.pdfreader import StreamingPDFReader
 from .fixedlayoutsource import FixedLayoutSource, FixedLayoutStore
 from . import Offtryck
 from .legalref import LegalRef
+from .swedishlegalsource import Lazyfile
 
 
 class RiksdagenStore(FixedLayoutStore):
@@ -284,20 +285,7 @@ class Riksdagen(Offtryck, FixedLayoutSource):
                                          os.path.getsize(intermediate_path) / (1024*1024)))
             return res
 
-        class lazyfile(object):
-            def __init__(self, constructor):
-                self.constructor = constructor
-                self.fp = None
-                self.patchdescription = None
-                self.closed = True
-
-            def __getattr__(self, name):
-                if self.fp is None:
-                    self.fp = self.constructor()
-                    self.patchdescription = self.fp.patchdescription
-                return getattr(self.fp, name)
-
-        return lazyfile(partial(lazy_downloaded_to_intermediate, basefile))
+        return Lazyfile(partial(lazy_downloaded_to_intermediate, basefile))
                 
 
     def metadata_from_basefile(self, basefile):

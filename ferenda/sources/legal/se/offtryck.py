@@ -1523,7 +1523,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                 if txt.startswith("Bilaga "):
                     # assume that whatever follows is a number -- if
                     # not, this is not a proper appendix header anyway
-                    return int(re.split(r"[ \:]")[1])
+                    return int(re.split(r"[ \:]", txt)[1])
                 else:
                     return True 
 

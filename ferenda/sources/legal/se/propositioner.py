@@ -38,8 +38,14 @@ def prop_sanitize_identifier(identifier):
         identifier = identifier.replace("PROP", "Prop")
     if identifier.startswith("Prop "):
         identifier = identifier.replace("Prop ", "Prop. ")
+    if "\xa0" in identifier: # Non-breakable space
+        identifier = identifier.replace("\xa0", " ")
     if not identifier.startswith("Prop. "):
         identifier = "Prop. " + identifier
+    # identify and correct the not-uncommon "2009/2010:87" pattern (should be 2009/10:87)
+    m = re.search(r"(\d{4})/(\d{4}):(\d+)$", identifier)
+    if m and m.group(2) != "2000" and int(m.group(1)) == int(m.group(2)) - 1:
+        identifier = identifier.replace(m.group(2), m.group(2)[-2:])
     if not re.match(r"^Prop\. (19|20)\d{2}(|/\d{2}|/2000):[1-9]\d*$", identifier):
         raise ValueError("Irregular identifier %s" % identifier)
     return Literal(identifier)

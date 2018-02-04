@@ -37,7 +37,7 @@ class TestLagen(unittest.TestCase, FerendaTestCase):
 
     def assert_status(self, url, code):
         res = requests.get(url, headers={'Accept': 'text/html'})
-        self.assertEqual(res.status_code, code)
+        self.assertEqual(res.status_code, code, url)
         return res
     
     def assert200(self, url):

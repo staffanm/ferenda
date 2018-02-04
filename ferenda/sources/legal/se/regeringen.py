@@ -321,7 +321,14 @@ class Regeringen(Offtryck):
         # the longest possible id, "Prop. 1999/2000:123", is 19 chars
         if len(title) < 20 and title.endswith(basefile):
             identifier = title
-            title = ""  # FIXME: hunt for title amongst the PDF file links
+            title = ""
+            # maybe the real title is hiding in the ingress of the page?
+            alttitle = content.find("p", "ingress")
+            if alttitle:
+                alttitle = alttitle.text.strip()
+                # some basic heuristics to determine if this is likely to be a title
+                if alttitle.startswith("Tilläggsdirektiv") or len(alttitle) > 120:
+                    title = alttitle
         else:
             identifier_node = content.find("span", "h1-vignette")
             if identifier_node:

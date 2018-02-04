@@ -8,6 +8,7 @@ from builtins import *
 
 from bz2 import BZ2File
 from datetime import datetime, date
+from functools import partial, wraps
 from io import BytesIO, StringIO, BufferedIOBase
 from urllib.parse import quote, unquote
 from wsgiref.util import request_uri
@@ -80,7 +81,30 @@ class SupportsResult(int):
     def __bool__(self):
         return False
 
+class Lazyfile(object):
 
+    def __init__(self, constructor):
+        self.constructor = constructor
+        self.fp = None
+        self.patchdescription = None
+        self.closed = True
+
+    def __getattr__(self, name):
+        if self.fp is None:
+            self.fp = self.constructor()
+            self.patchdescription = self.fp.patchdescription
+        return getattr(self.fp, name)
+
+    
+def lazyread(f):
+    """Don't call the wrapped function until someone actually tries to read from the fp that it should return."""
+    @wraps(f)
+    def wrapper(self, basefile):
+        p = partial(f, self, basefile)
+        fp = Lazyfile(p)
+        return fp
+    return wrapper
+    
 class SwedishLegalHandler(RequestHandler):
     def supports(self, environ):
         pathinfo = environ['PATH_INFO']

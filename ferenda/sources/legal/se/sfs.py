@@ -754,8 +754,13 @@ class SFS(Trips):
                             identifier = util.ucfirst(str(node))
                             if identifier.startswith("Prop"):
                                 from .propositioner import prop_sanitize_identifier
-                                identifier = prop_sanitize_identifier(identifier)
-                            d[node.uri] = {"dcterms:identifier": identifier}
+                                try:
+                                    identifier = prop_sanitize_identifier(identifier)
+                                except ValueError:
+                                    self.log.warning("%s: Could not sanitize irregular identifier %s" % (basefile, identifier))
+                                    identifier = None
+                            if identifier:
+                                d[node.uri] = {"dcterms:identifier": identifier}
                 elif key == 'CELEX-nr':
                     for celex in re.findall('3\d{2,4}[LR]\d{4}', val):
                         b = BNode()
@@ -1014,14 +1019,17 @@ class SFS(Trips):
                 graph.add(triple)
                 doc.meta.remove(triple)
                 if p.identifier == RPUBL.forarbete:
-                    triple = (o, DCTERMS.identifier,
-                              doc.meta.value(o, DCTERMS.identifier))
-                    graph.add(triple)
-                    trash.add(triple)
-                    triple = (o, RDF.type,
-                              doc.meta.value(o, RDF.type))
-                    graph.add(triple)
-                    trash.add(triple)
+                    forarb_identifier = doc.meta.value(o, DCTERMS.identifier)
+                    if forarb_identifier: # not always the case, eg if the forarbete had an irregular identifier
+                        triple = (o, DCTERMS.identifier,
+                                  forarb_identifier)
+                        graph.add(triple)
+                        trash.add(triple)
+                    forarb_type = doc.meta.value(o, RDF.type)
+                    if forarb_type:
+                        triple = (o, RDF.type, forarb_type)
+                        graph.add(triple)
+                        trash.add(triple)
                 elif p.identifier == RPUBL.genomforDirektiv:
                     triple = (o, RPUBL.celexNummer,
                               doc.meta.value(o, RPUBL.celexNummer))

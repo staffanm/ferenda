@@ -506,7 +506,8 @@ class DocumentRepository(object):
 
         fuzz = difflib.get_close_matches(label, resources.keys(), 1, cutoff)
         if fuzz:
-            if warn:
+            # even if we want warnings, we don't want warnings for case changes
+            if warn and label.lower() != fuzz[0].lower():
                 self.log.warning("Assuming that '%s' should be '%s'?" %
                                  (label, fuzz[0]))
             return URIRef(resources[fuzz[0]])
