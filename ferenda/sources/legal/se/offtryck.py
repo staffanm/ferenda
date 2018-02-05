@@ -637,12 +637,15 @@ class Offtryck(SwedishLegalSource):
             if not identifier_found and hasattr(self, 're_basefile_lax'):
                 m = self.re_basefile_lax.search(str_element)
                 if m:
-                    _check_differing(
-                        d,
-                        self.ns['dcterms'].identifier,
-                        "Prop. " +
-                        m.group(1))
-                    identifier_found = True
+                    try:
+                        # even identifiers inside of the document can be irregular
+                        new_identifier = "Prop. " + m.group(1)
+                        identifier = self.sanitize_identifier(new_identifier)
+                        _check_differing(d, DCTERMS.identifier, identifier)
+                        identifier_found = True
+                    except ValueError:
+                        self.log.warning("%s: Irregular identifier %s in document" %
+                                         (doc.basefile, m.group(1)))
 
             # dcterms:title FIXME: The fontsize comparison should be
             # done with respect to the resulting metrics (which we
