@@ -388,7 +388,7 @@ loglevels = {'DEBUG': logging.DEBUG,
 
 
 def setup_logger(level='INFO', filename=None,
-                 logformat="%(asctime)s %(name)s %(levelname)s %(message)s",
+                 logformat="%(asctime)s %(name)s %(levelname)s %(message)s (%(filename)s:%(lineno)d)",
                  datefmt="%H:%M:%S"):
     """Sets up the logging facilities and creates the module-global log
     object as a root logger.

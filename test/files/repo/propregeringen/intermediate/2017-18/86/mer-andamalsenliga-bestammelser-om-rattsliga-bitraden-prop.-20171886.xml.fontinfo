@@ -1,0 +1,11 @@
+name                                 type              encoding         emb sub uni object ID
+------------------------------------ ----------------- ---------------- --- --- --- ---------
+TimesNewRomanPSMT                    TrueType          WinAnsi          no  no  no       5  0
+TimesNewRomanPS-ItalicMT             TrueType          WinAnsi          no  no  no      10  0
+BCDEEE+Calibri                       TrueType          WinAnsi          yes yes no      17  0
+ArialMT                              TrueType          WinAnsi          no  no  no      88  0
+TimesNewRomanPSMT                    CID TrueType      Identity-H       yes no  yes    106  0
+TimesNewRomanPS-BoldMT               TrueType          WinAnsi          no  no  no     160  0
+TimesNewRomanPS-ItalicMT             CID TrueType      Identity-H       yes no  yes    176  0
+TimesNewRomanPS-BoldItalicMT         TrueType          WinAnsi          no  no  no     199  0
+BCDFEE+Calibri-Bold                  TrueType          WinAnsi          yes yes no     233  0

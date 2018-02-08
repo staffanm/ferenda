@@ -32,6 +32,8 @@ from . import (Trips, NoMoreLinks, Regeringen, Riksdagen,
 from .fixedlayoutsource import FixedLayoutStore, FixedLayoutSource
 
 def prop_sanitize_identifier(identifier):
+    if not identifier:
+        return identifier # allow infer_identifier to do it's magic later
     if identifier.startswith("prop"):
         identifier = util.ucfirst(identifier)
     if identifier.startswith("PROP"):

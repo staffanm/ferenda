@@ -26,6 +26,8 @@ from . import Regeringen, SwedishLegalSource, FixedLayoutSource, SwedishLegalSto
 from .swedishlegalsource import lazyread
 
 def sou_sanitize_identifier(identifier):
+    if not identifier:
+        return identifier # allow infer_identifier to do it's magic later
     if not re.match("SOU (19|20)\d{2}:[1-9]\d*$", identifier):
         raise ValueError("Irregular identifier %s (after mangling)" %  identifier)
     return Literal(identifier)

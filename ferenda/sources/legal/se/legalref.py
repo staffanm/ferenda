@@ -31,8 +31,6 @@ from ferenda.elements import Link, LinkSubject
 from ferenda.thirdparty.coin import URIMinter
 from . import RPUBL, RINFOEX
 
-log = logging.getLogger('lr')
-
 # Lite om hur det hela funkar: Att hitta referenser i löptext är en
 # tvåstegsprocess.
 #
@@ -93,14 +91,17 @@ class LegalRef:
         r'\|(lagens?|balkens?|förordningens?|formens?|ordningens?|kungörelsens?|stadgans?)')
     re_xmlcharref = re.compile("&#\d+;")
 
-    def __init__(self, *args):
+    def __init__(self, *args, **kwargs):
         if not os.path.sep in __file__:
             scriptdir = os.getcwd()
         else:
            scriptdir = os.path.dirname(__file__)
         resourceloader = ResourceLoader(scriptdir)
         fname = resourceloader.filename
-        
+        if 'logger' in kwargs:
+            self.log = kwargs['logger']
+        else:
+            self.log = logging.getLogger('lr')
         self.roots = []
         self.uriformatter = {}
         self.decl = ""
@@ -341,7 +342,7 @@ class LegalRef:
             self.currentlaw = None
 
         if taglist[-1] != len(indata):
-            # log.error('Problem (%d:%d) with %r / %r' % (
+            # self.log.error('Problem (%d:%d) with %r / %r' % (
             #     taglist[-1] - 8, taglist[-1] + 8, indata, indata))
             raise RefParseError(
                 "parsed %s chars of %s (...%s...)" % (taglist[-1], len(indata),
@@ -395,6 +396,7 @@ class LegalRef:
     def reset(self):
         """Reset any context related to discovered/remembered data about
         things found in previous calls to parse() (last named law etc)"""
+        self.currentbasefile = None
         # SFS-specifik kod
         self.currentlaw = None
         self.currentchapter = None
@@ -731,9 +733,8 @@ class LegalRef:
             return sfsid
         else:
             if self.verbose:
-                # print "(unknown): I don't know the ID of named law [%s]" % text
-                log.warning(
-                    "(unknown): I don't know the ID of named law [%s]" % text)
+                self.log.warning("%s: Don't know the ID of named law [%s]" %
+                                 (self.currentbasefile, text))
             return None
 
     attributemap = {"year": RPUBL.arsutgava,
@@ -818,7 +819,7 @@ class LegalRef:
                 # to RDF predicates (as equivalent information must
                 # exist elsewhere)
                 if k not in ("shortsection", "shortchapter"):
-                    log.error("Can't map attribute %s to RDF predicate" % k)
+                    self.log.error("%s: Can't map attribute %s to RDF predicate" % (self.currentbasefile, k))
 
         # add any extra stuff
         for (p, o) in rest:
@@ -1019,8 +1020,9 @@ class LegalRef:
                 samelaw_node = self.find_node(root, 'SameLaw')
                 assert(samelaw_node is not None)
                 if self.lastlaw is None:
-                    log.warning(
-                        "(unknown): found reference to \"{samma,nämnda} {lag,förordning}\", but self.lastlaw is not set")
+                    self.log.warning("%s: found reference to \"{samma,nämnda} "
+                                     "{lag,förordning}\", but self.lastlaw is "
+                                     "not set" % self.currentbasefile)
                 self.currentlaw = self.lastlaw
             else:
                 # the NamedLaw case
@@ -1228,7 +1230,7 @@ class LegalRef:
     
     def format_AnonPropRefs(self, root):
         if not self.last_forarbete_attributes:
-            log.warning("(unknown): found reference to \"a. prop.\" but self.last_forarbete_attributes is not set")
+            self.log.warning("%s: found reference to \"a. prop.\" but self.last_forarbete_attributes is not set" % self.currentbasefile)
         self.current_forarbete_attributes = self.last_forarbete_attributes
         # do the thing
         return [self.format_generic_link(root, uriformatter=self.forarbete_format_uri)]
@@ -1252,7 +1254,7 @@ class LegalRef:
                 # We don't know which SOU document this refers to! We
                 # cannot construct an URI, and this reference must
                 # remain unlinked.
-                log.warning("Don't know the ID of 'kommitténs betänkande', leaving reference %s unlinked" %  a)
+                self.log.warning("%s: Don't know the ID of 'kommitténs betänkande', leaving reference %s unlinked" % (self.currentbasefile, a))
                 return None
         else:
             if not('prop' in a or 'bet' in a or 'skrivelse' in a or 'sou' in a or 'ds' in a or 'dir' in a or 'celex' in a):

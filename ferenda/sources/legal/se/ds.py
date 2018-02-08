@@ -16,6 +16,8 @@ from ferenda.errors import ParseError
 from . import Regeringen, Offtryck, RPUBL 
 
 def ds_sanitize_identifier(identifier):
+    if not identifier:
+        return identifier # allow infer_identifier to do it's magic later
     if identifier.startswith("DS "):
         identifier = identifier.replace("DS ", "Ds ")
     if not re.match("Ds (19|20)\d{2}:[1-9]\d*", identifier):

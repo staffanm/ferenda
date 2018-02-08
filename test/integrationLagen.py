@@ -17,6 +17,7 @@ import unittest
 import codecs
 import re
 from urllib.parse import urljoin
+from datetime import datetime
 
 # 3rdparty
 import requests
@@ -1018,21 +1019,58 @@ class Regressions(TestLagen):
     def test_toc(self):
         # issue 8
         errors = []
-        for doctype, startyear, regex in (("dir", 1987, "^Dir\. (19|20)\d{2}:[1-9]\d*$"),
-                                          ("ds", 1995, "^Ds (19|20)\d{2}:[1-9]\d*$"),
-                                          ("sou", 1922, "^SOU (19|20)\d{2}:[1-9]\d*$"),
-                                          ("prop", 1971, "^Prop\. (19|20)\d{2}(|/\d{2}|/2000):[1-9]\d*$")):
+        for doctype, startyear, regex in (("dir", 1987, "^Dir\. (19|20)\d{2}:[1-9]\d{,2}$"),
+                                          ("ds", 1995, "^Ds (19|20)\d{2}:[1-9]\d{,2}$"),
+                                          ("sou", 1922, "^SOU (19|20)\d{2}:[1-9]\d{,2}$"),
+                                          ("prop", 1971, "^Prop\. (19|20)\d{2}(|/\d{2}|/2000):[1-9]\d{,2}$")):
             for year in range(startyear, 2018):
                 if doctype == "prop" and year > 1975:
                     nextyear = "2000" if year == 2000 else str(year)[2:]
                     year = "%s/%s" % (year - 1, nextyear)
-                res = self.get(self.baseurl + "dataset/forarbeten?%s=%s" % (doctype, year))
+                url = "dataset/forarbeten?%s=%s" % (doctype, year)
+                res = self.get(self.baseurl + url)
                 res.raise_for_status()
                 soup = BeautifulSoup(res.text, "lxml")
-                for link in soup.find("article").find_all("a"):
+                links = 0
+                for idx, link in enumerate(soup.find("article").find_all("a")):
                     # self.assertRegexpMatches(link.text, regex)
                     if not re.match(regex, link.text):
                         errors.append("%s/%s: %s (%s)" % (doctype, year, link.text, link.get("href")))
+                maxidx = int(re.search("\:(\d+)$", link.text).group(1))
+                # no more than 10 % of indexes may be missing
+                coverage = (idx+1)/maxidx
+                if coverage <= 0.9:
+                    errors.append("%s/%s: coverage %s" % (doctype, year, coverage))
+                    # self.assertGreaterEqual(coverage, 0.9, url)
         self.maxDiff = None
         self.assertEqual([], errors)
 
+class AcceptableStatus(TestLagen):
+
+    def test_status(self):
+        def assert_stats(line, maxfail, maxwarn, repo="toplevel"):
+            m = re.match(r"(\d+) % failed,\s*(\d+) % warnings", line)
+            fail, warn = m.groups()
+            self.assertLessEqual(int(fail), maxfail, "%s has more than %s %% fails" % (repo, maxfail))
+            self.assertLessEqual(int(warn), maxwarn, "%s has more than %s %% warns" % (repo, maxwarn))
+            
+        res = self.get(self.baseurl + "status/status.html")
+        soup = BeautifulSoup(res.text, "lxml")
+
+        # 1 make sure h1.small is at most a day old
+        gentime = datetime.strptime(soup.find("h1").small.text.strip()[:19],
+                                    "%Y-%m-%dT%H:%M:%S")
+        days = (datetime.now() - gentime).days
+        self.assertLessEqual(days, 76)
+
+        # 2 make sure total fail < 3 %, warnings < 20 %
+        stats = soup.select("p > small")
+        assert_stats(stats.pop(0).text, 3, 20)
+
+        # 3 make sure that for each repo, fail < 6 %, warnings < 40 %
+        for s in stats:
+            repo = s.parent.find_previous_sibling("h2").text
+            assert_stats(s.text, 6, 40, repo)
+        
+    
+    
