@@ -1190,6 +1190,7 @@ all text in a Textbox has the same font and size.
         self.right = self.left + self.width
         self.bottom = self.top + self.height
         self.lines = int(kwargs.get("lines", 0))
+        self.lineheight = int(kwargs.get("lineheight", 0)) # a running average
         
         # self._fontspecid = kwargs['fontid']
         self.fontid = kwargs['fontid'] or 0
@@ -1254,8 +1255,12 @@ all text in a Textbox has the same font and size.
                     other.left + other.width) - left
         height = max(self.top + self.height,
                      other.top + other.height) - top
+        if self.lines + other.lines and other.lineheight:
+            lineheight = (self.lineheight * self.lines + other.lineheight * other.lines) / self.lines + other.lines
+        else:
+            lineheight = self.lineheight
         lines = self.lines + other.lines
-        if self.bottom > other.top + (other.height / 2):
+        if self.bottom > other.top + (other.height / 2) and self.lines:
             # self and other is really on the same line
             lines -= 1
             
@@ -1263,7 +1268,8 @@ all text in a Textbox has the same font and size.
                       fontid=self.fontid,
                       fontspec=self._fontspec,
                       pdf=self._pdf,
-                      lines=lines)
+                      lines=lines,
+                      lineheight=lineheight)
 
         # add all Textelement objects, concatenating adjacent TE:s if
         # their tags match.
@@ -1300,8 +1306,9 @@ all text in a Textbox has the same font and size.
                           other.top + other.height) - self.top
         self.right = self.left + self.width
         self.bottom = self.top + self.height
+        self.lineheight = (self.lineheight * self.lines + other.lineheight * other.lines) / self.lines + other.lines
         self.lines += other.lines
-        if self.bottom > other.top + (other.height / 2):
+        if self.bottom > other.top + (other.height / 2) and self.lines:
             # self and other is really on the same line
             self.lines -= 1
         if len(self):
@@ -1320,6 +1327,13 @@ all text in a Textbox has the same font and size.
         if c:
             self.append(c)
         return self
+
+    @property
+    def linespacing(self):
+        if self.lines > 1:
+            return ((self.height - self.lineheight) /
+                    (self.lines - 1)) / self.font.size
+        # else return None (linespacing is undefined for single-line textboxes)
 #
 #    def append(self, thing):
 #        if len(self) == 0 or self[-1].tag != thing.tag:

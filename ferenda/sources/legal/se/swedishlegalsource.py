@@ -276,7 +276,8 @@ class SwedishLegalSource(DocumentRepository):
             with self.resourceloader.open("extra/sfs.ttl") as fp:
                 cd.parse(data=fp.read(), format="turtle")
         filter = SwedishCitationParser.FILTER_LAW if self.alias == "sfs" else SwedishCitationParser.FILTER_ALL
-        return SwedishCitationParser(LegalRef(*self.parse_types),
+        return SwedishCitationParser(LegalRef(*self.parse_types,
+                                              logger=self.log),
                                      self.minter,
                                      cd,
                                      allow_relative=self.parse_allow_relative,
@@ -569,6 +570,7 @@ class SwedishLegalSource(DocumentRepository):
         PreambleSection.counter = 0
         Protokollsutdrag.counter = 0
         self.refparser._legalrefparser.namedlaws = {}
+        self.refparser._legalrefparser.currentbasefile = doc.basefile
         fp = self.parse_open(doc.basefile)
         # maybe the fp now contains a .patchdescription?
         resource = self.parse_metadata(fp, doc.basefile)
@@ -582,7 +584,7 @@ class SwedishLegalSource(DocumentRepository):
             # status code 404, not 200, since the actual document is
             # in fact not found.
             doc.body = Body([PreambleSection([
-                P(["Detta dokument har begränsad juridisk betydelse, så dess innehåll har inte tagits med här. Du kan hitta originaldokumentet från dess källa genom länken till höger."]),
+                P(["Detta dokument har bedömts ha begränsad juridisk betydelse, så dess innehåll har inte tagits med här. Du kan hitta originaldokumentet från dess källa genom länken till höger."]),
                 P(["Om du tycker att dokumentet bör tas med, ", A("hör gärna av dig!", href="/om/kontakt")])
             ], title='Dokumenttext saknas')])
         else:
