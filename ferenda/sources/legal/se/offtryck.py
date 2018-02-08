@@ -215,10 +215,16 @@ class Offtryck(SwedishLegalSource):
                 # out such empty elements, but tells us that we did
                 # through the skippedempty attribute
                 return True
-            elif len(prevbox) > 1 and prevbox[0].tag == "b" and re.match("\d+(| \w) §", prevbox[0]) and nextbox[0][0].islower():
+            elif (len(prevbox) > 1 and prevbox[0].tag == "b" and
+                  re.match("\d+(| \w) §", prevbox[0]) and
+                  not nextbox[0][0].isupper()):
                 # looks like the start of a paragraph? See if nextbox
                 # looks like the continuation of a sentence (ie not
                 # starting with a capital letter)
+                return True
+            elif (prevbox.font.family.replace("-Italic", "") ==
+                  nextbox.font.family.replace("-Italic", "") and
+                  not nextbox[0][0].isupper()):
                 return True
             else:
                 return prevbox.font.family in ("Symbol", nextbox.font.family)
@@ -238,6 +244,8 @@ class Offtryck(SwedishLegalSource):
             strtextbox = str(textbox).strip()
             strprevbox = str(prevbox).strip()
             strnextbox = str(nextbox).strip()
+            #if "lämna yttranden" in strprevbox:
+            #    from pudb import set_trace; set_trace()
             if scanned_source:
                 # allow for slight change in fontsize and vert
                 # align. Allow for more change if nextbox is a single
@@ -312,12 +320,12 @@ class Offtryck(SwedishLegalSource):
                 return False
             if (re.match("\d+ §", strnextbox) and
                  (strprevbox[-1] not in ("–", "-") and # make sure this isn't really a continuation
-                  not strprevbox.endswith("och") and
-                  not strprevbox.endswith("enligt") and
-                  not strprevbox.endswith("kap.") and
-                  not strprevbox.endswith("lagens")   # OK this is getting ridiculous
-                 )and
+                  not strprevbox.endswith(("och", "enligt", "kap.", "lagens", "före"))) and
                 (nextbox.top - prevbox.bottom >= (prevbox.font.size * 0.3))):  # new section (with a suitable linespacing (30% of a line))
+                return False
+            if nextbox[0].tag == "i" and nextbox[0].startswith("dels"):
+                # A common form of itemized list (without bullet or
+                # dash indicators) in act preambles
                 return False
             # These final conditions glue primarily *horizontally*
             if (sizematch(textbox, nextbox) and
@@ -485,6 +493,8 @@ class Offtryck(SwedishLegalSource):
                 self.validate_body(allbody, basefile)  # Throws exception if invalid
                 return allbody
             except Exception as e:
+                if type(e).__name__ in ("BdbQuit",):
+                    raise
                 errmsg = str(e)
                 loc = util.location_exception(e)
                 self.log.warning("%s: Parsing with config '%s' failed: %s (%s)" %
