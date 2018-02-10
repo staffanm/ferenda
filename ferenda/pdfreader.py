@@ -640,12 +640,25 @@ class PDFReader(CompoundElement):
         attribs = dict(element.attrib)
         thisfont = self.fontspec[int(element.get('font'))]
         lastfont = lastbox.font if lastbox else None
+        nextfont = self.fontspec[int(nextelement.get('font'))] if nextelement is not None and nextelement.get('font') else None
         if self.detect_footnotes:
             if (len(textelements) and
-                textelements[0].isdigit() and
-                lastfont and
-                lastfont.family == thisfont['family'] and
-                lastfont.size > thisfont['size']):
+                textelements[0].strip().isdigit() and
+                # check both previous box and next (for catching footnote markers in the foooter)
+                (lastfont and
+                 lastfont.family == thisfont['family'] and
+                 lastfont.size > thisfont['size'] and
+                 # final test that footnote marker is in the vincinity
+                 # of the text it's a footnote for (ie not a random
+                 # pagenumber):
+                 -5 < int(element.get("left")) - lastbox.right < 10 and # is really close to
+                 0 < lastbox.bottom - (int(element.get("top")) + int(element.get("height"))) < 20) # is slightly lower than
+                or (nextfont and
+                    thisfont['family'] == nextfont['family'] and
+                    thisfont['size'] < nextfont['size'] and
+                    -5 < int(nextelement.get("left")) - (int(element.get("left")) + int(element.get("width"))) < 10 and # is really close to
+                    0 < (int(nextelement.get("top")) + int(nextelement.get("height"))) - (int(element.get("top")) + int(element.get("height"))) < 20) # is slightly lower than
+            ):
                 # this must be a footnote -- alter tag to show that it
                 # should be rendered with superscript
                 if textelements[0].tag is None:
@@ -694,19 +707,33 @@ class PDFReader(CompoundElement):
             lastbox.append(self._parse_xml_make_textelement(element))
             after_footnote = False
         after_footnote = False
+
         # all textboxes share the same fontspec dict
         attribs['fontspec'] = self.fontspec
         attribs['fontid'] = int(attribs['font'])
         attribs['pdf'] = self
         del attribs['font']
-        return self._textdecoder(Textbox(textelements, **attribs), self.fontspec)
+
+        # merge whitespace-only-boxes, even if that changes the tag of the whitespace, eg
+        # <textelement tag="b">something</textelement>
+        # <textelement tag="bi"> </textelement>
+        #
+        # <textelement tag="b">something </textelement>
+        merged = []
+        for x in textelements:
+            # if only whitespace, merge with previous
+            if merged and x and not x.strip():
+                merged[-1] = merged[-1] + x
+            else:
+                merged.append(x)
+        return self._textdecoder(Textbox(merged, **attribs), self.fontspec)
 
     import string
     ws_trans = {ord("\n"): " ",
                 ord("\t"): " ",
                 ord("\xa0"): " "}
 
-    def _parse_xml_make_textelement(self, element, **origkwargs):
+    def _parse_xml_make_textelement(self, element, keep_ws_only=False, **origkwargs):
         # the complication is that a hierarchical sequence of tags
         # should be converted to a list of 
         # 
@@ -747,8 +774,10 @@ class PDFReader(CompoundElement):
                                          # sometimes be a bytestring?
                 txt = txt.decode()
             txt = txt.translate(self.ws_trans)
-            startspace = " " if txt.startswith(" ") else ""
+            if re.match(r"  +$", txt):
+                return " "
             endspace = " " if txt.endswith(" ") and len(txt) > 1 else ""
+            startspace = " " if txt.startswith(" ") else ""
             return startspace + util.normalize_space(txt) + endspace
         
         res = []
@@ -767,18 +796,33 @@ class PDFReader(CompoundElement):
             kwargs['tag'] += element.tag
         else:
             assert element.tag == "text", "Got <%s>, expected <{text,b,i,a}> " % element.tag
-        if element.text and (element.text.strip() or element.tag == "a"):
+        if element.text and (element.text.strip() or element.tag == "a" or keep_ws_only):
             res.append(cls(normspace(element.text), **cleantag(kwargs)))
-        for child in element:
-            res.extend(self._parse_xml_make_textelement(child, **kwargs))
-        if element.tail and element.tail.strip():
-            if element.text and element.text.strip() == "":
-                # even though we've skipped an empty tag like "<i>
-                # </i>", we record the fact that we've done so, since
-                # it is useful for some unreliable font family
-                # heuristics
-                origkwargs['skippedempty'] = element.tag
-            res.append(origcls(normspace(element.tail), **cleantag(origkwargs)))
+        for idx, child in enumerate(element):
+            # special rule: if next-to-last element didn't end with
+            # whitespace, allow for the last element to be counted
+            # even if only whitespace (To handle the case
+            # "<text>blahonga<i> </i></text><text>other</text>")
+            kwso = False
+            if idx + 1 == len(element) and res and not res[-1][-1].isspace():
+                kwso = True
+            res.extend(self._parse_xml_make_textelement(child, keep_ws_only=kwso, **kwargs))
+        if element.tag != "text" and element.tail:
+            if element.tail.strip():
+                if element.text and element.text.strip() == "":
+                    # even though we've skipped an empty tag like "<i>
+                    # </i>", we record the fact that we've done so, since
+                    # it is useful for some unreliable font family
+                    # heuristics
+                    origkwargs['skippedempty'] = element.tag
+                res.append(origcls(normspace(element.tail), **cleantag(origkwargs)))
+            elif (res and
+                  not isinstance(res[-1], LinkedTextelement) and
+                  not res[-1][-1] in (" ", "–", "-")):
+                # ie the tail consists only of whitespace -- move that
+                # ws inside of the element instead (unless we have
+                # indications that it's not needed)
+                res[-1] = res[-1] + " "
         return res
     
 
@@ -1239,15 +1283,6 @@ all text in a Textbox has the same font and size.
                                             s)
     def __add__(self, other):
 
-        def different_tags(self, other):
-            # None, {b, i} => True
-            # None, s => False
-            # {b, i}, {bs, is} => False
-            # b, bi => True
-            selftag = getattr(self, 'tag', '').replace("s", "")
-            othertag = getattr(other, 'tag', '').replace("s", "")
-            return selftag != othertag
-        
         # expand dimensions
         top = min(self.top, other.top)
         left = min(self.left, other.left)
@@ -1278,8 +1313,9 @@ all text in a Textbox has the same font and size.
         # possibly add a space instead of a missing newline -- but
         # not before superscript elements
         if (self and other and
-            different_tags(self, other) and 
-            not self[-1].endswith(" ")):
+            not (self[-1].tag and "s" in self[-1].tag or
+                 other[0].tag and "s" in other[0].tag) and 
+            not self[-1].endswith((" ", "-", "–"))):
             self.append(Textelement(" ", tag=self[-1].tag))
         for e in itertools.chain(self, other):
             if e.tag != c.tag:
@@ -1306,7 +1342,11 @@ all text in a Textbox has the same font and size.
                           other.top + other.height) - self.top
         self.right = self.left + self.width
         self.bottom = self.top + self.height
-        self.lineheight = (self.lineheight * self.lines + other.lineheight * other.lines) / self.lines + other.lines
+        if self.lines + other.lines and other.lineheight:
+            lineheight = (self.lineheight * self.lines + other.lineheight * other.lines) / self.lines + other.lines
+        else:
+            lineheight = self.lineheight
+        self.lineheight = lineheight
         self.lines += other.lines
         if self.bottom > other.top + (other.height / 2) and self.lines:
             # self and other is really on the same line
@@ -1461,7 +1501,7 @@ class Textelement(UnicodeElement):
         # space at the end of lines to that they can be concatenated,
         # but some (later) versions omit this, requiring us to add a
         # extra space to avoid mashing words together.
-        if len(self) and not (self.endswith(" ") or self.endswith("-") or other == " "):
+        if len(self) and not (self.endswith(" ") or self.endswith("-") or other.startswith(" ")):
             extraspace = " "
         else:
             extraspace = ""

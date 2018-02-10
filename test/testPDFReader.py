@@ -8,6 +8,7 @@ from builtins import *
 # are not, the tests fall back to using canned result files.
 
 from bz2 import BZ2File
+import re
 import os
 import shutil
 import tempfile
@@ -350,7 +351,6 @@ class ParseXML(unittest.TestCase):
 </pdf2xml>""" % xmlfrag
         xmlfp = BytesIO(xml.encode("utf-8"))
         xmlfp.name = "dummy.xml"
-                                                     
         pdf._parse_xml(xmlfp)
         return pdf
 
@@ -382,13 +382,13 @@ class ParseXML(unittest.TestCase):
 <fontspec id="1" size="5" family="X" color="#00000"/>
 <text top="0" left="0" width="23" height="13" font="1"><b>foo</b> <b>bar</b></text>
 """)
-        self.assertEqual("foobar", str(pdf[0][0]))
-        # test that Textelement.__add__ inserts a space correctly
+        # test that the space between the two <b> tags doesn't get lost
+        self.assertEqual("foo bar", str(pdf[0][0]))
         self.assertEqual('<Textelement tag="b">foo bar</Textelement>',
                          serialize(pdf[0][0][0] + pdf[0][0][1]).strip())
         want = """
-<Textbox bottom="13" fontid="1" height="13" left="0" lines="0" right="23" top="0" width="23">
-  <Textelement tag="b">foo</Textelement>
+<Textbox bottom="13" fontid="1" height="13" left="0" lineheight="0" lines="0" right="23" top="0" width="23">
+  <Textelement tag="b">foo </Textelement>
   <Textelement tag="b">bar</Textelement>
 </Textbox>
 """
@@ -400,9 +400,9 @@ class ParseXML(unittest.TestCase):
 <text top="374" left="508" width="211" height="14" font="0">näringsidkaren <i>en</i> <i>varning. En var-</i></text>
 """)
         want = """
-<Textbox bottom="388" fontid="0" height="14" left="508" lines="0" right="719" top="374" width="211">
+<Textbox bottom="388" fontid="0" height="14" left="508" lineheight="0" lines="0" right="719" top="374" width="211">
   <Textelement>näringsidkaren </Textelement>
-  <Textelement tag="i">en</Textelement>
+  <Textelement tag="i">en </Textelement>
   <Textelement tag="i">varning. En var-</Textelement>
 </Textbox>
 """
@@ -418,7 +418,7 @@ class ParseXML(unittest.TestCase):
 <text top="830" left="332" width="227" height="20" font="7">Bestämmelsen kan således inte </text>""")
         want = """
 <Page height="750" number="1" width="500">
-  <Textbox bottom="850" fontid="7" height="21" left="85" lines="-2" right="559" top="829" width="474">
+  <Textbox bottom="850" fontid="7" height="21" left="85" lineheight="0" lines="0" right="559" top="829" width="474">
     <Textelement>bindande verkan för det allmänna.</Textelement>
     <Textelement tag="sup">7</Textelement>
     <Textelement>Bestämmelsen kan således inte </Textelement>
@@ -441,11 +441,11 @@ class ParseXML(unittest.TestCase):
 """)
         want = """
 <Page height="750" number="1" width="500">
-  <Textbox bottom="178" fontid="0" height="19" left="291" lines="-1" right="697" top="159" width="406">
+  <Textbox bottom="178" fontid="0" height="19" left="291" lineheight="0" lines="0" right="697" top="159" width="406">
     <Textelement>Härigenom föreskrivs i fråga om mervärdesskattelagen (1994:200)</Textelement>
     <Textelement tag="sup">7</Textelement>
   </Textbox>
-  <Textbox bottom="195" fontid="4" height="17" left="291" lines="0" right="540" top="178" width="249">
+  <Textbox bottom="195" fontid="4" height="17" left="291" lineheight="0" lines="0" right="540" top="178" width="249">
     <Textelement tag="i">dels</Textelement>
     <Textelement> att 1 kap. 12 § ska upphöra att gälla, </Textelement>
   </Textbox>
@@ -465,7 +465,7 @@ class ParseXML(unittest.TestCase):
 """)
         want = """
 <Page height="750" number="1" width="500">
-  <Textbox bottom="850" fontid="7" height="21" left="85" lines="-2" right="559" top="829" width="474">
+  <Textbox bottom="850" fontid="7" height="21" left="85" lineheight="0" lines="0" right="559" top="829" width="474">
     <Textelement>bindande verkan för det allmänna.</Textelement>
     <LinkedTextelement tag="s" uri="unik-kunskap-genom-registerforskning-sou-201445.html#120">7</LinkedTextelement>
     <LinkedTextelement uri="unik-kunskap-genom-registerforskning-sou-201445.html#120"> </LinkedTextelement>
@@ -489,10 +489,10 @@ class ParseXML(unittest.TestCase):
 """)
         want = """
 <Page height="750" number="1" width="500">
-  <Textbox bottom="869" fontid="7" height="20" left="85" lines="0" right="557" top="849" width="472">
+  <Textbox bottom="869" fontid="7" height="20" left="85" lineheight="0" lines="0" right="557" top="849" width="472">
     <Textelement>ligga till grund för några individuella rättigheter. I 2 kap. 4 och 5 §§ </Textelement>
   </Textbox>
-  <Textbox bottom="906" fontid="16" height="15" left="85" lines="-1" right="347" top="891" width="262">
+  <Textbox bottom="906" fontid="16" height="15" left="85" lineheight="0" lines="0" right="347" top="891" width="262">
     <Textelement tag="sup">7</Textelement>
     <Textelement> Prop. 1975/76:209 s. 128, prop. 2009/10:80 s. 173. </Textelement>
   </Textbox>
@@ -521,7 +521,7 @@ class ParseXML(unittest.TestCase):
         """, OffsetDecoder1d)
         want = """
 <Page height="750" number="1" width="500">
-  <Textbox bottom="569" fontid="2" height="20" left="340" lines="-2" right="815" top="549" width="475">
+  <Textbox bottom="569" fontid="2" height="20" left="340" lineheight="0" lines="0" right="815" top="549" width="475">
     <Textelement>intressant om 50 år föreslås att projektet Kulturarw</Textelement>
     <Textelement tag="is">3</Textelement>
     <Textelement> får fortsätta </Textelement>
@@ -561,10 +561,10 @@ class ParseXML(unittest.TestCase):
 """)
         want = """
 <Page height="750" number="1" width="500">
-  <Textbox bottom="282" fontid="1" height="12" left="278" lines="0" right="728" top="270" width="450">
+  <Textbox bottom="282" fontid="1" height="12" left="278" lineheight="0" lines="0" right="728" top="270" width="450">
     <Textelement>First line</Textelement>
   </Textbox>
-  <Textbox bottom="302" fontid="1" height="12" left="278" lines="0" right="728" top="290" width="450">
+  <Textbox bottom="302" fontid="1" height="12" left="278" lineheight="0" lines="0" right="728" top="290" width="450">
     <Textelement>Second line</Textelement>
   </Textbox>
 </Page>
@@ -582,12 +582,70 @@ class ParseXML(unittest.TestCase):
 """)
         want = """
 <Page height="750" number="1" width="500">
-  <Textbox bottom="704" fontid="3" height="18" left="148" lines="0" right="152" top="686" width="4" />
+  <Textbox bottom="704" fontid="3" height="18" left="148" lineheight="0" lines="0" right="152" top="686" width="4" />
 </Page>
 """
         self.assertEqual(want[1:],
                          serialize(pdf[0]))
-        
+
+
+    def test_ending_whitespace_tag(self):
+        pdf = self._parse_xml("""
+<fontspec id="3" size="11" family="TimesNewRomanPS" color="#000000"/>
+<text top="686" left="148" width="4" height="18" font="3">Something<i> </i></text>
+""")
+        want = """
+<Page height="750" number="1" width="500">
+  <Textbox bottom="704" fontid="3" height="18" left="148" lineheight="0" lines="0" right="152" top="686" width="4">
+    <Textelement>Something </Textelement>
+  </Textbox>
+</Page>
+"""
+        self.assertEqual(want[1:],
+                         serialize(pdf[0]))
+
+        pdf = self._parse_xml("""
+<fontspec id="3" size="11" family="TimesNewRomanPS" color="#000000"/>
+<text top="686" left="148" width="4" height="18" font="3">Something<i> </i></text>
+<text top="706" left="148" width="4" height="18" font="3">Else</text>
+""")
+        want = """
+<Page height="750" number="1" width="500">
+  <Textbox bottom="704" fontid="3" height="18" left="148" lineheight="0" lines="0" right="152" top="686" width="4">
+    <Textelement>Something </Textelement>
+  </Textbox>
+  <Textbox bottom="724" fontid="3" height="18" left="148" lineheight="0" lines="0" right="152" top="706" width="4">
+    <Textelement>Else</Textelement>
+  </Textbox>
+</Page>
+"""
+        self.assertEqual(want[1:],
+                         serialize(pdf[0]))
+        # concatenate the two boxes and make sure that an additional
+        # space is produced
+        glued = pdf[0][0] + pdf[0][1]
+        res = etree.tostring(glued.as_xhtml(None)).decode()
+        res = re.sub("p xmlns[^>]*", "p", res)
+        want = "<p>Something Else</p>"
+        self.assertEqual(want,res)
+
+    def test_middle_whitespace_tag(self):
+        pdf = self._parse_xml("""
+<fontspec id="3" size="11" family="TimesNewRomanPS" color="#000000"/>
+<text top="686" left="148" width="4" height="18" font="3"><b>Verksamhetsregion<i> </i></b><b>Lund </b></text>
+""")
+        want = """
+<Page height="750" number="1" width="500">
+  <Textbox bottom="704" fontid="3" height="18" left="148" lineheight="0" lines="0" right="152" top="686" width="4">
+    <Textelement tag="b">Verksamhetsregion </Textelement>
+    <Textelement tag="b">Lund </Textelement>
+  </Textbox>
+</Page>
+"""
+        # res = etree.tostring(pdf.as_xhtml(None)).decode()
+        # from pudb import set_trace; set_trace()
+        self.assertEqual(want[1:],
+                         serialize(pdf[0]))
 
     def test_after_footnote_tag(self):
         # minimized version of Prop 2011/12:60 p 147. It seems to be
@@ -605,16 +663,76 @@ class ParseXML(unittest.TestCase):
         # make sure that empty element is removed completely
         want = """
 <Page height="750" number="1" width="500">
-  <Textbox bottom="76" fontid="0" height="16" left="283" lines="-1" right="325" top="60" width="42">
+  <Textbox bottom="76" fontid="0" height="16" left="283" lineheight="0" lines="0" right="325" top="60" width="42">
     <Textelement>20 a §</Textelement>
     <Textelement tag="sup">4</Textelement>
   </Textbox>
-  <Textbox bottom="473" fontid="4" height="31" left="304" lines="0" right="347" top="442" width="43">
+  <Textbox bottom="473" fontid="4" height="31" left="304" lineheight="0" lines="0" right="347" top="442" width="43">
     <Textelement tag="i">20 b § </Textelement>
   </Textbox>
 </Page>
 """
         self.assertEqual(want[1:], serialize(pdf[0]))
+
+    def test_space_insertion(self):
+        # this is really more of a test of as_xhtml, but the starting point is the XML parse. The goal is to recreate the trailing, italicized, space in the second <text> element
+        
+        pdf = self._parse_xml("""
+	<fontspec id="10" size="7" family="Times New Roman" color="#000000"/>
+<text top="699" left="327" width="226" height="20" font="10"><i>Myndig-</i></text>
+<text top="720" left="327" width="230" height="20" font="10"><i>heten ska </i>lämna<i> </i></text>
+<text top="740" left="327" width="230" height="20" font="10"><i>enligt</i>  23 a §.</text>
+""")
+        combined_tb = pdf[0][0] + pdf[0][1] + pdf[0][2]
+        # make sure that empty element is removed completely
+        want = """
+<Textbox bottom="760" fontid="10" height="61" left="327" lineheight="0" lines="0" right="557" top="699" width="230">
+  <Textelement tag="i">Myndigheten ska </Textelement>
+  <Textelement>lämna </Textelement>
+  <Textelement tag="i">enligt</Textelement>
+  <Textelement> 23 a §.</Textelement>
+</Textbox>
+"""
+        self.assertEqual(want[1:], serialize(combined_tb))
+        res = etree.tostring(combined_tb.as_xhtml(None), encoding="utf-8", pretty_print=True).decode()
+        res = re.sub("p xmlns[^>]*", "p", res)
+        want = """<p><i>Myndigheten ska </i>lämna <i>enligt</i> 23 a §.</p>"""
+        self.assertEqual(want, res.strip())
+
+    def test_space_insertion_2(self):
+        pdf = self._parse_xml("""
+<fontspec id="4" size="7" family="Times New Roman" color="#000000"/>
+<text top="828" left="86" width="552" height="17" font="4"><i>balansräkning</i> samt</text>
+<text top="851" left="86" width="552" height="17" font="4"><i>specifikationer.  </i>Vidare</i></text>
+""")
+        combined_tb = pdf[0][0] + pdf[0][1]
+        res = etree.tostring(combined_tb.as_xhtml(None), encoding="utf-8", pretty_print=True).decode()
+        res = re.sub("p xmlns[^>]*", "p", res)
+        want = "<p><i>balansräkning</i> samt <i>specifikationer. </i>Vidare</p>"
+        self.assertEqual(want, res.strip())
+
+    def test_space_insertion_3(self):
+        pdf = self._parse_xml("""
+<fontspec id="0" size="7" family="Times New Roman" color="#000000"/>
+<text top="1134" left="86" width="552" height="17" font="0">begreppet  <i>närings</i>verksamhet i</text>
+<text top="1157" left="86" width="78" height="17" font="0">2 kap. 6 §.</text>
+""")
+        combined_tb = pdf[0][0] + pdf[0][1]
+        res = etree.tostring(combined_tb.as_xhtml(None), encoding="utf-8", pretty_print=True).decode()
+        res = re.sub("p xmlns[^>]*", "p", res)
+        want = "<p>begreppet <i>närings</i>verksamhet i 2 kap. 6 §.</p>"
+        self.assertEqual(want, res.strip())
+
+    def test_space_insertion_4(self):
+        pdf = self._parse_xml("""
+<fontspec id="0" size="7" family="Times New Roman" color="#000000"/>
+<text top="896" left="86" width="552" height="17" font="0"><i>sidoordnad bokföring</i>,<i>  </i>samt</text>
+""")
+        res = etree.tostring(pdf[0][0].as_xhtml(None), encoding="utf-8", pretty_print=True).decode()
+        res = re.sub("p xmlns[^>]*", "p", res)
+        want = "<p><i>sidoordnad bokföring</i>, samt</p>"
+        self.assertEqual(want, res.strip())
+
         
 
 class AsXHTML(unittest.TestCase, FerendaTestCase):
@@ -622,7 +740,7 @@ class AsXHTML(unittest.TestCase, FerendaTestCase):
     def _test_asxhtml(self, want, body):
         body._fontspec = {0: {'family': 'Times', 'size': '12'},
                           1: {'family': 'Comic sans', 'encoding': 'Custom'}}
-        got = etree.tostring(body.as_xhtml(None), pretty_print=True)
+        got = etree.tostring(body.as_xhtml(None))
         self.assertEqualXML(want, got)
 
     def test_basic(self):
@@ -716,7 +834,7 @@ class AsXHTML(unittest.TestCase, FerendaTestCase):
 <p xmlns="http://www.w3.org/1999/xhtml" class="textbox fontspec0" style="top: 0px; left: 0px; height: 100px; width: 100px">23</p>
 """
         self._test_asxhtml(want, body)
-                        
+
 
 class Elements(unittest.TestCase):
     maxDiff = None
@@ -726,7 +844,7 @@ class Elements(unittest.TestCase):
         
         combinedbox = box1 + box2
         want = """
-<Textbox bottom="10" fontid="0" height="10" left="0" lines="1" right="90" top="0" width="90">
+<Textbox bottom="10" fontid="0" height="10" left="0" lineheight="0" lines="1" right="90" top="0" width="90">
   <Textelement>hey ho</Textelement>
 </Textbox>
 """
@@ -743,7 +861,7 @@ class Elements(unittest.TestCase):
         box2 = Textbox([LinkedTextelement("1", tag="s", uri="foo.html")], fontid=None, top=0, left=50, width=5, height=10, lines=1)
         combinedbox = box1 + box2
         want = """
-<Textbox bottom="10" fontid="0" height="10" left="0" lines="1" right="55" top="0" width="55">
+<Textbox bottom="10" fontid="0" height="10" left="0" lineheight="0" lines="1" right="55" top="0" width="55">
   <Textelement>hey</Textelement>
   <LinkedTextelement tag="s" uri="foo.html">1</LinkedTextelement>
 </Textbox>
@@ -754,3 +872,4 @@ class Elements(unittest.TestCase):
         box1 += box2
         self.assertEqual(want[1:],
                          serialize(box1))
+

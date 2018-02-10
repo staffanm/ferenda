@@ -244,8 +244,6 @@ class Offtryck(SwedishLegalSource):
             strtextbox = str(textbox).strip()
             strprevbox = str(prevbox).strip()
             strnextbox = str(nextbox).strip()
-            #if "lämna yttranden" in strprevbox:
-            #    from pudb import set_trace; set_trace()
             if scanned_source:
                 # allow for slight change in fontsize and vert
                 # align. Allow for more change if nextbox is a single
