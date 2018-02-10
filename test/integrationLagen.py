@@ -950,7 +950,14 @@ class Regressions(TestLagen):
                               ("prop/2007/08:95", [56, 295, 296]),
                               ("prop/1998/99:90", [18, 23]),
                               ("prop/1996/97:141", [19]),
-                              ("prop/1996/97:106", [22]) # based in index.wpd, not a PDF
+                              ("prop/1996/97:106", [22]), # based on index.wpd, not a PDF
+                              ("sou/1944:59", [15]),
+                              ("sou/1944:49", [15]),
+                              ("prop/1978/79:11", [15]), 
+                              ("prop/2008/09:14", [15]),
+                              ("prop/2011/12:115", [15]),
+                              ("prop/1980/81:44", [15]),
+                              ("prop/1996/97:9", [1])
         ):
             for page in pages:
                 url = self.baseurl + urlseg + "/sid%s.png" % page
@@ -972,9 +979,21 @@ class Regressions(TestLagen):
 
     def test_missing_pages(self):
         # issue 5: "I prop. 1992/93:30 saknas s. 18–30. Prop. 1996/97:106 är ofullständig (har bara två sidor)"
+        #
+        # added: I SOU 2002:18 saknas s. 6–15. I SOU 1997:58 saknas s. 6 och 7.
         for urlseg, expected_missing in (
                 ("prop/1992/93:30", []),
-                ("prop/1996/97:106", [3,])):
+                ("prop/1996/97:106", [3,]),
+                ("sou/2002:18", [2,3,4,5,6,7,8,9,10,11,12,13,14]),
+                ("sou/1997:58", [1,2,5,6])
+                # more to do:
+                # Prop. 1995/96:115 är ofullständig.
+                # I prop. 1983/84:78 är sidnumreringen fel fr.o.m. s. 12 (som har fått sidnummer 21).
+                # I prop. 2008/09:67 är sidnumreringen fel och saknas s. 4–7.
+                # I Ds 2002:56 är sidnumreringen fel.
+                # I prop. 1996/97:9 saknas bildfiler och verkar det vara något konstigt med sidnumreringen.
+                # I SOU 1997:44 är det fel på s. 5 (den skannade texten är annan än den på bilden) och s. 6–9 saknas.
+                ):
             res = self.get(self.baseurl + urlseg)
             res.raise_for_status()
             soup = BeautifulSoup(res.text, "lxml")
@@ -1000,8 +1019,29 @@ class Regressions(TestLagen):
                        "prop/1996/97:72",
                        "prop/1995/96:79",  # left out by design since noone refers to it
                        # "prop/2007/08:85",  # does this one even exist?
+                       "dir/1989:50",     # requested, but had parsing errors
+                       "prop/2004/05:17", # requested, but had parsing errors
+                       
         ):
             self.assert200(self.baseurl + urlseg)
+
+    def test_doc_version(self):
+        # Av SOU 2009:44 finns bara den engelska sammanfattningen med.
+        for urlseg, expected_title in (
+                ("sou/2009:44", "Integritetsskydd i arbetslivet"),
+                ):
+            res = self.get(self.baseurl + urlseg + ".rdf")
+            res.raise_for_status()
+            # once that gets working:
+            # 1 load into a rdflib graph,
+            # 2 find root,
+            # 3 get dcterms:title,
+            # 4 compare to expected_title
+            
+
+            
+
+        
 
     def test_identifier_formats(self):
         # issue 7
@@ -1044,6 +1084,29 @@ class Regressions(TestLagen):
                     # self.assertGreaterEqual(coverage, 0.9, url)
         self.maxDiff = None
         self.assertEqual([], errors)
+
+    # and some other bugs described in a second mail.
+
+    # 1. SOU 1995:149, SOU 2004:23, SOU 2006:22, SOU 2014:49,
+    # prop. 2009/10:165, prop. 2013/14:198 och prop. 2009/10:160
+    # saknar bildfiler, t.ex. s. 15.
+    # 
+    # the issue is that links to facsimile pages are
+    # incorrectly-relative ("2014:49/sid3.png" instead of
+    # "/sou/2014:49/sid3.png")
+    def test_facsimile_links(self):
+        for urlseg in ("sou/1995:149", "sou/2004:23", "sou/2006:22",
+                       "sou/2014:49", "prop/2009/10:165", "prop/2013/14:198",
+                       "prop/2009/10:160"):
+            res = self.get(self.baseurl + urlseg)
+            res.raise_for_status()
+            soup = BeautifulSoup(res.text, "lxml")
+            found = False
+            for a in soup.find_all("a", "facsimile"):
+                found = True
+                self.assertIn(urlseg, a.get("href"))
+                self.assertIn(urlseg, a.img.get("data-src"))
+            self.assertTrue(found, urlseg)
 
 class AcceptableStatus(TestLagen):
 

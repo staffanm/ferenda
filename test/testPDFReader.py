@@ -643,7 +643,6 @@ class ParseXML(unittest.TestCase):
 </Page>
 """
         # res = etree.tostring(pdf.as_xhtml(None)).decode()
-        # from pudb import set_trace; set_trace()
         self.assertEqual(want[1:],
                          serialize(pdf[0]))
 

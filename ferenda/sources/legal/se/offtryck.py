@@ -236,10 +236,15 @@ class Offtryck(SwedishLegalSource):
                                                   # so that lines appear to
                                                   # have greater linespacing
             parindent = nextbox.font.size
+            if textbox.lines < 1:
+                textbox.lines = 1
+                textbox.lineheight = textbox.height
             # if we're using hOCR data, take advantage of the paragraph
             # segmentation that tesseract does through the p.ocr_par mechanism
             if (hasattr(prevbox, 'parid') and hasattr(nextbox, 'parid') and
                 prevbox.parid == nextbox.parid):
+                textbox.lines += 1
+                textbox.lineheight = ((textbox.lines - 1 * textbox.lineheight) + nextbox.height) / textbox.lines
                 return True
             strtextbox = str(textbox).strip()
             strprevbox = str(prevbox).strip()
@@ -302,6 +307,8 @@ class Offtryck(SwedishLegalSource):
                     familymatch(textbox, nextbox) and 
                     nextbox.top < prevbox.top + (prevbox.height / 2) < nextbox.bottom and
                     textbox.left - (prevbox.right) < (prevbox.width * 3)):
+                    # don't add to textbox.lines as we haven't
+                    # switched lines
                     return True
 
             # Any line that ONLY contains a section reference should probably
@@ -345,6 +352,9 @@ class Offtryck(SwedishLegalSource):
                     (nextbox.left - textbox.right) > 50 and
                     len(strnextbox) < 10):
                     return False
+                textbox.lines += 1
+                # update the running average lineheight
+                textbox.lineheight = (((textbox.lines - 1) * textbox.lineheight) + nextbox.height) / textbox.lines
                 return True
 
         return offtryck_gluefunc
@@ -560,9 +570,10 @@ class Offtryck(SwedishLegalSource):
             # 2. then assign the analyzed pagenumbers
             for k, v in pagemapping.items():
                 pdffile, pp = k.split("#page=")
-                idx = filemapping[(pdffile, pp)]
-                sanitized[idx].number = v
-                sanitized[idx].src = "%s/sid%s.png" % (baseuri, v)
+                idx = filemapping.get((pdffile, pp))
+                if idx:
+                    sanitized[idx].number = v
+                    sanitized[idx].src = "%s/sid%s.png" % (baseuri, v)
         
 
     def postprocess_doc(self, doc):
@@ -570,7 +581,6 @@ class Offtryck(SwedishLegalSource):
         # dcterms:identifier, dcterms:title and dcterms:issued (then
         # compare them to what's present in doc.meta, ie data that has
         # been picked up from index.html or some other non-PDF source.
-
         def _check_differing(describer, predicate, newval):
             try:
                 describer.getvalue(predicate)
@@ -809,8 +819,6 @@ class Offtryck(SwedishLegalSource):
         m = re.search("(SOU|Ds) (\d+:\d+)", sectiontext)
         if m:
             state['kommittensbetankande'] = m.group(2)
-        else:
-            self.log.warning("Could not find reference to kommmittens betankande")
         return None
 
     def find_commentary(self, node, state):
@@ -858,10 +866,40 @@ class Offtryck(SwedishLegalSource):
 
 
     def _find_commentary_for_law(self, law, section, state, lawname):
-        # FIXME: this is basically a ad-hoc statemachine, with a lot
-        # of ill-understood conditionals and flag settings. Luckily
-        # there's a decent test harness in the
-        # functionalSources.TestPropRegeringen suite
+        # start by analyzing all nodes (segmented paragraphs) for
+        # typical linespacing, gaps between sections
+        linespacings = []
+        gaps = []
+        for idx, subnode in enumerate(section):
+            if isinstance(subnode, Sidbrytning):
+                continue
+             # a single line paragraph has no easily discernable line height
+            if subnode.linespacing:
+                linespacings.append(subnode.linespacing)
+            if idx and subnode.top > prevnode.bottom:
+                gaps.append(subnode.top - prevnode.bottom)
+            prevnode = subnode
+
+        ls_clusters = util.cluster(linespacings)
+        if len(ls_clusters) == 2: # ok, hopefully a clear gap between
+                                  # condensed and regular linespacing.
+            linespacing_threshold = ((ls_clusters[1][0] - ls_clusters[0][-1]) / 2) + ls_clusters[0][-1]
+        else:
+            # we can't reliably distinguish between condensed and
+            # regular linespacing
+            linespacing_threshold = None
+
+        gap_clusters = util.cluster(gaps)
+        if len(gap_clusters) == 2:
+            gap_threshold = ((gap_clusters[1][0] - gap_clusters[0][-1]) / 2) + gap_clusters[0][-1]
+        else:
+            gap_threshold = 20 # a sensible default?
+
+        # Then try to find what is what. FIXME: this is basically a
+        # ad-hoc statemachine, with a lot of ill-understood
+        # conditionals and flag settings. Luckily there's a decent
+        # test harness in the functionalSources.TestPropRegeringen
+        # suite
         textnodes = []
         reexamine_state = False
         comment_on = None
@@ -872,7 +910,6 @@ class Offtryck(SwedishLegalSource):
         comment_start = False
         parsestate = "commenttext"
         prevnode = None
-        # self.log.debug("Finding commentary for %s" % law)
         for idx, subnode in enumerate(section):
             if not isinstance(subnode, (Textbox, Sidbrytning, UnorderedList)):
                 raise ValueError("_find_commentary_for_law: Got a %s instead of a Textbox/Sidbrytning/UnorderedList, this indicates broken parsing" % type(subnode))
@@ -901,22 +938,6 @@ class Offtryck(SwedishLegalSource):
                     pass  # keep parsestate as-is
                 if prev_state == "acttext" and parsestate == "commenttext":
                     comment_start = True
-
-                # Calculating linespacing easily gives false positives
-                # (eg first para of prop 1997/98:44 p 116, which
-                # misidentifies as acttext due to strangely low
-                # linespacing.
-#                 if subnode.lines > 1:
-#                     horizontal_scale = 2 / 3
-#                     linespacing = ((subnode.height - (subnode.font.size/horizontal_scale)) /
-#                                    (subnode.lines - 1)) / subnode.font.size
-#                     if linespacing > 1.0:
-#                         parsestate = "commenttext"
-#                     else:
-#                         parsestate = "acttext"
-#                 else:  # probably a header, which is part of the acttext
-#                     parsestate = "acttext"
-                # self.log.debug("...Reexamination gives parsestate %s" % parsestate)
                 reexamine_state = False
 
             if isinstance(subnode, (Page, Sidbrytning)):
@@ -972,11 +993,9 @@ class Offtryck(SwedishLegalSource):
 
             # any big space signals a switch from acttext ->
             # commenttext or vice versa (if some other obscure
-            # conditions are met). The height of the gap should really
-            # be dynamically calculated, but how?
+            # conditions are met). 
             elif (prevnode and
-                  # hasattr(subnode, 'top'
-                  subnode.top - prevnode.bottom >= 20):
+                  subnode.top - prevnode.bottom >= gap_threshold):
                 # self.log.debug("...node spacing is %s, switching from parsestate %s" % (subnode.top - prevnode.bottom, parsestate))
                 if (re.match("\d+(| \w) §$", str(prevnode).strip())):
                     comment_start = True
@@ -1016,6 +1035,9 @@ class Offtryck(SwedishLegalSource):
             elif state['defaultsize'] >= subnode.font.size + 2:
                 # self.log.debug("... set in smallfont, probably acttext, maybe following an sectionheader w/o actttext")  # see prop 2005/06:180 p 62
                 parsestate = "acttext"
+#            elif (linespacing_threshold and subnode.linespacing and
+#                  subnode.linespacing < linespacing_threshold):
+#                parsestate = "acttext"
             else:
                 # self.log.debug("...will just keep on (parsestate %s)" % parsestate)
                 pass
