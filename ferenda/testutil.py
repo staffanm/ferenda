@@ -892,20 +892,22 @@ def parametrize_repotester(cls, include_failures=True):
         # transliterate basetest (ie å -> a)
         basetest = "".join((c for c in unicodedata.normalize('NFKD', basetest)
                             if not unicodedata.combining(c)))
-        # Test 1: is rdf distilled correctly?
-        rdf_file = "%s/distilled/%s.ttl" % (docroot, pathfrag)
-        testname = ("test_distill_" + basetest)
-        # wrapper = None
-        wrapper = unittest.expectedFailure if not os.path.exists(rdf_file) else None
-        if wrapper is None or include_failures:
-            parametrize(
-                cls,
-                cls.distill_test,
-                testname,
-                (downloaded_file,
-                 rdf_file,
-                 docroot),
-                wrapper)
+
+        if "FERENDA_SKIP_DISTILL_TEST" not in os.environ:
+            # Test 1: is rdf distilled correctly?
+            rdf_file = "%s/distilled/%s.ttl" % (docroot, pathfrag)
+            testname = ("test_distill_" + basetest)
+            # wrapper = None
+            wrapper = unittest.expectedFailure if not os.path.exists(rdf_file) else None
+            if wrapper is None or include_failures:
+                parametrize(
+                    cls,
+                    cls.distill_test,
+                    testname,
+                    (downloaded_file,
+                     rdf_file,
+                     docroot),
+                    wrapper)
 
         # Test 2: is xhtml parsed correctly?
         xhtml_file = "%s/parsed/%s.xhtml" % (docroot, pathfrag)

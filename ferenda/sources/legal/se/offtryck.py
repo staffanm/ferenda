@@ -571,7 +571,7 @@ class Offtryck(SwedishLegalSource):
             for k, v in pagemapping.items():
                 pdffile, pp = k.split("#page=")
                 idx = filemapping.get((pdffile, pp))
-                if idx:
+                if idx is not None:
                     sanitized[idx].number = v
                     sanitized[idx].src = "%s/sid%s.png" % (baseuri, v)
         
