@@ -1295,7 +1295,7 @@ all text in a Textbox has the same font and size.
         else:
             lineheight = self.lineheight
         lines = self.lines + other.lines
-        if self.bottom > other.top + (other.height / 2) and self.lines:
+        if self.bottom > other.top + (other.height / 2) and self.lines and other.lines:
             # self and other is really on the same line
             lines -= 1
             
@@ -1348,7 +1348,7 @@ all text in a Textbox has the same font and size.
             lineheight = self.lineheight
         self.lineheight = lineheight
         self.lines += other.lines
-        if self.bottom > other.top + (other.height / 2) and self.lines:
+        if self.bottom > other.top + (other.height / 2) and self.lines and other.lines:
             # self and other is really on the same line
             self.lines -= 1
         if len(self):

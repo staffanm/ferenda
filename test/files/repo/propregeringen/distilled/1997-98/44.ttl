@@ -23,317 +23,23 @@
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
     dcterms:references <https://lagen.nu/prop/1997/98:44#S7> .
 
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P1> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 1 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P1> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P10> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 10 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P10> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P11> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 11 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P11> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/1942:740#K33P3>,
-        <https://lagen.nu/1971:291#P44>,
-        <https://lagen.nu/1986:228#P10> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P12> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 12 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P12> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> .
-
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P13> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 13 § personuppgiftslag"@sv ;
     rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P13> ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
     dcterms:references <https://lagen.nu/prop/1997/98:44#S11-4-1> .
 
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P14> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 14 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P14> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#S11-4> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P15> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 15 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P15> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#S11-4> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P16> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 16 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P16> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#S11-4> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P17> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 17 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P17> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#S11-4> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P18> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 18 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P18> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/1980:100>,
-        <https://lagen.nu/1994:953>,
-        <https://lagen.nu/1996:786>,
-        <https://lagen.nu/prop/1997/98:44#S11-4> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P19> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 19 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P19> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#S11-4-2> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P2> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 2 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P2> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/0000:000>,
-        <https://lagen.nu/1949:105>,
-        <https://lagen.nu/1949:105#K2>,
-        <https://lagen.nu/1991:1469>,
-        <https://lagen.nu/prop/1997/98:44#S6-2> .
-
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P20> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 20 § personuppgiftslag"@sv ;
     rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P20> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/0000:000>,
-        <https://lagen.nu/prop/1997/98:44#S10>,
-        <https://lagen.nu/prop/1997/98:44#S15> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P21> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 21 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P21> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/0000:000>,
-        <https://lagen.nu/prop/1997/98:44#S10>,
-        <https://lagen.nu/prop/1997/98:44#S11-4-3>,
-        <https://lagen.nu/prop/1997/98:44#S15> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P22> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 22 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P22> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#S11-4-4> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P23> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 23 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P23> ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P24> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 24 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P24> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P25> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 25 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P25> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P26> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 26 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P26> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/1942:740#K33P3>,
-        <https://lagen.nu/1971:291#P44>,
-        <https://lagen.nu/1986:223#P10> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P27> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 27 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P27> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/1980:100>,
-        <https://lagen.nu/prop/1997/98:44#S11-5-2>,
-        <https://lagen.nu/prop/1997/98:44#S12-7-4> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P28> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 28 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P28> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#S11-6>,
-        <https://lagen.nu/prop/1997/98:44#S8-1> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P29> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 29 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P29> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/0000:000>,
-        <https://lagen.nu/1986:223#P27>,
-        <https://lagen.nu/prop/1997/98:44#S11-7> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P3> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 3 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P3> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/1949:105#K2>,
-        <https://lagen.nu/prop/1997/98:44#S7>,
-        <https://lagen.nu/prop/1997/98:44#S8-1> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P30> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 30 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P30> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P31> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 31 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P31> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#S12-10-2> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P32> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 32 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P32> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P33> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 33 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P33> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P34> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 34 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P34> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P35> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 35 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P35> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/0000:000>,
-        <https://lagen.nu/prop/1997/98:44#S10>,
-        <https://lagen.nu/prop/1997/98:44#S15> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P36> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 36 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P36> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#S10> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P37> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 37 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P37> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#S12>,
-        <https://lagen.nu/prop/1997/98:44#S12-12> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P38> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 38 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P38> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/0000:000>,
-        <https://lagen.nu/1982:80>,
-        <https://lagen.nu/1982:80#P7>,
-        <https://lagen.nu/dom/ad/1986:95>,
-        <https://lagen.nu/prop/1982/83:124#sid5> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P39> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 39 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P39> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P4> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 4 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P4> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#S9> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P40> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 40 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P40> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P42> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 42 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P42> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#S11-5-2>,
-        <https://lagen.nu/prop/1997/98:44#S12> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P47> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 47 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P47> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#S13> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P48> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 48 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P48> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/1972:207>,
-        <https://lagen.nu/1972:207#K1P3>,
-        <https://lagen.nu/1972:207#K4P1>,
-        <https://lagen.nu/1972:207#K5>,
-        <https://lagen.nu/1972:207#K6P1>,
-        <https://lagen.nu/1972:207#K6P3>,
-        <https://lagen.nu/prop/1997/98:44#S12-13-2-1>,
-        <https://lagen.nu/prop/1997/98:44#S14> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P49> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 49 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P49> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#S14> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P5> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 5 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P5> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#S6-1> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P50> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 50 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P50> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/0000:000>,
-        <https://lagen.nu/1974:152#K8P13>,
-        <https://lagen.nu/prop/1997/98:44#S10>,
-        <https://lagen.nu/prop/1997/98:44#S15> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P51> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 51 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P51> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#S12-15>,
-        <https://lagen.nu/prop/1997/98:44#S13>,
-        <https://lagen.nu/prop/1997/98:44#S15> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P6> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 6 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P6> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#S8-3> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P7> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 7 § personuppgiftslag"@sv ;
     rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P7> ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
     dcterms:references <https://lagen.nu/1949:105>,
-        <https://lagen.nu/1991:1469>,
-        <https://lagen.nu/prop/1997/98:44#S8-2> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P8> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 8 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P8> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/1949:105#K2>,
-        <https://lagen.nu/1949:105#K2P9>,
-        <https://lagen.nu/1990:782>,
-        <https://lagen.nu/prop/1997/98:44#S8-1> .
-
-<https://lagen.nu/prop/1997/98:44#kommentar-0000:1293083526811685308778923/P9> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till 9 § personuppgiftslag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:1293083526811685308778923#P9> ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-1> ;
-    dcterms:references <https://lagen.nu/prop/1997/98:44#S11-2> .
+        <https://lagen.nu/1991:1469> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-1962:700> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till brottsbalken"@sv ;
@@ -371,8 +77,7 @@
     rdfs:label "Författningskommentar till 15 kap. 14 § sekretesslagen (1980:100)"@sv ;
     rinfoex:kommentarTill <https://lagen.nu/1980:100#K15P14> ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-2> ;
-    dcterms:references <https://lagen.nu/0000:000>,
-        <https://lagen.nu/1973:289> .
+    dcterms:references <https://lagen.nu/1973:289> .
 
 <https://lagen.nu/prop/1997/98:44#kommentar-1980:100/K7P16> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till 7 kap. 16 § sekretesslagen (1980:100)"@sv ;
@@ -394,6 +99,11 @@
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-2> ;
     dcterms:references <https://lagen.nu/0000:000>,
         <https://lagen.nu/1973:289> .
+
+<https://lagen.nu/prop/1997/98:44#kommentar-1980:100/L> a rinfoex:Forfattningskommentar ;
+    rdfs:label "Författningskommentar till 15 kap. 14 § sekretesslagen (1980:100)"@sv ;
+    rinfoex:kommentarTill <https://lagen.nu/1980:100#L> ;
+    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18-2> .
 
 <https://lagen.nu/prop/1997/98:44> a rpubl:Proposition ;
     dcterms:abstract ""@sv ;
@@ -424,6 +134,67 @@
 
 <https://lagen.nu/prop/1997/98:44?attachment=personuppgiftslag&repo=propregeringen&dir=downloaded> rdfs:label "Personuppgiftslag (pdf 663 kB)"@sv .
 
+<https://lagen.nu/prop/1997/98:44#S18-1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18> ;
+    dcterms:references <https://lagen.nu/0000:000>,
+        <https://lagen.nu/1942:740#K33P3>,
+        <https://lagen.nu/1949:105>,
+        <https://lagen.nu/1949:105#K2>,
+        <https://lagen.nu/1949:105#K2P9>,
+        <https://lagen.nu/1970:428#P12>,
+        <https://lagen.nu/1971:291#P44>,
+        <https://lagen.nu/1972:207>,
+        <https://lagen.nu/1972:207#K1P3>,
+        <https://lagen.nu/1972:207#K4P1>,
+        <https://lagen.nu/1972:207#K5>,
+        <https://lagen.nu/1972:207#K6P1>,
+        <https://lagen.nu/1972:207#K6P3>,
+        <https://lagen.nu/1973:289>,
+        <https://lagen.nu/1974:152#K8P13>,
+        <https://lagen.nu/1980:100>,
+        <https://lagen.nu/1982:80>,
+        <https://lagen.nu/1982:80#P7>,
+        <https://lagen.nu/1986:223#P10>,
+        <https://lagen.nu/1986:223#P27>,
+        <https://lagen.nu/1986:228#P10>,
+        <https://lagen.nu/1990:782>,
+        <https://lagen.nu/1991:1469>,
+        <https://lagen.nu/1994:953>,
+        <https://lagen.nu/1996:786>,
+        <https://lagen.nu/dom/ad/1986:95>,
+        <https://lagen.nu/prop/1982/83:124#sid5>,
+        <https://lagen.nu/prop/1997/98:44#S10>,
+        <https://lagen.nu/prop/1997/98:44#S11-2>,
+        <https://lagen.nu/prop/1997/98:44#S11-3>,
+        <https://lagen.nu/prop/1997/98:44#S11-4>,
+        <https://lagen.nu/prop/1997/98:44#S11-4-2>,
+        <https://lagen.nu/prop/1997/98:44#S11-4-3>,
+        <https://lagen.nu/prop/1997/98:44#S11-4-4>,
+        <https://lagen.nu/prop/1997/98:44#S11-5>,
+        <https://lagen.nu/prop/1997/98:44#S11-5-2>,
+        <https://lagen.nu/prop/1997/98:44#S11-6>,
+        <https://lagen.nu/prop/1997/98:44#S11-7>,
+        <https://lagen.nu/prop/1997/98:44#S11-8>,
+        <https://lagen.nu/prop/1997/98:44#S11-9>,
+        <https://lagen.nu/prop/1997/98:44#S12>,
+        <https://lagen.nu/prop/1997/98:44#S12-10-2>,
+        <https://lagen.nu/prop/1997/98:44#S12-12>,
+        <https://lagen.nu/prop/1997/98:44#S12-13-2-1>,
+        <https://lagen.nu/prop/1997/98:44#S12-15>,
+        <https://lagen.nu/prop/1997/98:44#S12-7-4>,
+        <https://lagen.nu/prop/1997/98:44#S13>,
+        <https://lagen.nu/prop/1997/98:44#S14>,
+        <https://lagen.nu/prop/1997/98:44#S15>,
+        <https://lagen.nu/prop/1997/98:44#S6-1>,
+        <https://lagen.nu/prop/1997/98:44#S6-2>,
+        <https://lagen.nu/prop/1997/98:44#S7>,
+        <https://lagen.nu/prop/1997/98:44#S8-1>,
+        <https://lagen.nu/prop/1997/98:44#S8-2>,
+        <https://lagen.nu/prop/1997/98:44#S8-3>,
+        <https://lagen.nu/prop/1997/98:44#S9> ;
+    dcterms:title "Förslaget till personuppgiftslag"@sv ;
+    bibo:chapter "18.1"@sv .
+
 <https://lagen.nu/prop/1997/98:44#S18> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44> ;
     dcterms:title "Författningskommentar"@sv ;
@@ -431,27 +202,8 @@
 
 <https://lagen.nu/prop/1997/98:44#S18-2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18> ;
+    dcterms:references <https://lagen.nu/0000:000>,
+        <https://lagen.nu/1973:289> ;
     dcterms:title "Förslaget till lag om ändring i sekretesslagen (1980:100)"@sv ;
     bibo:chapter "18.2"@sv .
-
-<https://lagen.nu/prop/1997/98:44#S18-1> a bibo:DocumentPart ;
-    dcterms:isPartOf <https://lagen.nu/prop/1997/98:44#S18> ;
-    dcterms:references <https://lagen.nu/0000:000>,
-        <https://lagen.nu/1949:105>,
-        <https://lagen.nu/1949:105#K2>,
-        <https://lagen.nu/1970:428#P12>,
-        <https://lagen.nu/1973:289>,
-        <https://lagen.nu/1980:100>,
-        <https://lagen.nu/1991:1469>,
-        <https://lagen.nu/1994:953>,
-        <https://lagen.nu/1996:786>,
-        <https://lagen.nu/prop/1997/98:44#S10>,
-        <https://lagen.nu/prop/1997/98:44#S11-3>,
-        <https://lagen.nu/prop/1997/98:44#S11-5>,
-        <https://lagen.nu/prop/1997/98:44#S11-8>,
-        <https://lagen.nu/prop/1997/98:44#S11-9>,
-        <https://lagen.nu/prop/1997/98:44#S12>,
-        <https://lagen.nu/prop/1997/98:44#S15> ;
-    dcterms:title "Förslaget till personuppgiftslag"@sv ;
-    bibo:chapter "18.1"@sv .
 

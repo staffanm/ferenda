@@ -853,15 +853,21 @@ def robust_fetch(method, url, logger, attempts=5, sleep=1, raise_for_status=True
     else:
         return response
 
-def cluster(iterable, maxgap_ratio = 4):
+def cluster(iterable, maxgap=None, maxgap_ratio=10, remove_outliers=True):
     data = sorted(iterable)
     if len(data) == 0:
         return data  # 0 groups is probably better than 1 group with 0 elements?
-    maxgap = (data[-1] - data[0]) / maxgap_ratio
+    if maxgap is None:
+        maxgap = (data[-1] - data[0]) / maxgap_ratio
     groups = [[data[0]]]
     for x in data[1:]:
         if abs(x - groups[-1][-1]) <= maxgap:
             groups[-1].append(x)
         else:
             groups.append([x])
+    if remove_outliers:
+        # remove clear outliers
+        for group in list(groups):
+            if len(group) < 4 and len(groups) < len(data) / 10:
+                groups.remove(group)
     return groups

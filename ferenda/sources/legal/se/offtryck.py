@@ -9,6 +9,7 @@ import re
 import json
 import difflib
 import collections
+from math import sqrt, pi, e, floor
 # 3rd party
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
@@ -123,7 +124,8 @@ class Offtryck(SwedishLegalSource):
     
 
     def parse_body_parseconfigs(self):
-        return ("default", "noappendix", "simple")
+        # return ("default", "noappendix", "simple")
+        return ("default",)
 
     def get_parser(self, basefile, sanitized, initialstate=None,
                    startpage=None, pagecount=None, parseconfig="default"):
@@ -207,6 +209,9 @@ class Offtryck(SwedishLegalSource):
         scanned_source = analyzer.scanned_source
 
         def unreliable_familymatch(prevbox, nextbox):
+            def normalize_family(fontfamily):
+                return re.sub("[\-,](Italic|Bold|BoldItalic)", "", fontfamily)
+            
             # older native (non-scanned) pdfs from regeringen.se
             # contains very unreliable font information sometimes
             if getattr(nextbox[0], 'skippedempty', None):
@@ -222,8 +227,8 @@ class Offtryck(SwedishLegalSource):
                 # looks like the continuation of a sentence (ie not
                 # starting with a capital letter)
                 return True
-            elif (prevbox.font.family.replace("-Italic", "") ==
-                  nextbox.font.family.replace("-Italic", "") and
+            elif (normalize_family(prevbox.font.family) ==
+                  normalize_family(nextbox.font.family) and
                   not nextbox[0][0].isupper()):
                 return True
             else:
@@ -311,9 +316,10 @@ class Offtryck(SwedishLegalSource):
                     # switched lines
                     return True
 
-            # Any line that ONLY contains a section reference should probably
-            # be interpreted as a header
-            if re.match("(\d+ kap. |)\d+( \w|) §$", strprevbox) and prevbox.bottom <= nextbox.top:
+            # Any line that ONLY contains a section reference should
+            # probably be interpreted as a header. (also handle dual
+            # refs "4 kap. 9 c och 10 §§", prop 1997/98:44 s 148)
+            if re.match("(\d+ kap. |)\d+( \w och \d+| \w| och \d+|) §§?$", strprevbox) and prevbox.bottom <= nextbox.top:
                 return False
 
             # these text locutions indicate a new paragraph (normally, this is
@@ -323,9 +329,11 @@ class Offtryck(SwedishLegalSource):
                 return False
             if re.match("\d\. +", strnextbox):  # item in ordered list
                 return False
+            if re.match("[a-z]\) +", strnextbox):  # item in alphabetized ordered list
+                return False
             if (re.match("\d+ §", strnextbox) and
                  (strprevbox[-1] not in ("–", "-") and # make sure this isn't really a continuation
-                  not strprevbox.endswith(("och", "enligt", "kap.", "lagens", "före"))) and
+                  not strprevbox.endswith(("och", "enligt", "kap.", "lagens", "före", "i"))) and
                 (nextbox.top - prevbox.bottom >= (prevbox.font.size * 0.3))):  # new section (with a suitable linespacing (30% of a line))
                 return False
             if nextbox[0].tag == "i" and nextbox[0].startswith("dels"):
@@ -340,7 +348,7 @@ class Offtryck(SwedishLegalSource):
                  textbox.left < parindent * 2 + nextbox.left) and
                 (valignmatch(prevbox, nextbox) or  # compare baseline, not topline
                  alignmatch(prevbox, nextbox) or # compare previous line to next
-                 alignmatch(textbox, nextbox) or # compare entire glued box so far to next
+                 alignmatch(textbox, nextbox) or # compare entire glued box so far to next FIXME -- is this a good idea? Tends to glue rows in tables...
                  (parindent * 2 >= (prevbox.left - nextbox.left) >= parindent) or
                  (parindent * 2 >= (textbox.left - nextbox.left) >= parindent) or
                  (re.match(r"[\d\.]+\s+[A-ZÅÄÖ]", strtextbox) and nextbox.left - textbox.left < parindent * 5) # hanging indent (numbered) heading -- FIXME: we'd like to increase the parindent multiplier depending on the len of the initial number
@@ -822,6 +830,72 @@ class Offtryck(SwedishLegalSource):
         return None
 
     def find_commentary(self, node, state):
+
+        def plot(filename, linespacings, linespacing_threshold, gaps, gap_threshold):
+            try:
+                import matplotlib
+                matplotlib.use('Agg')
+                import matplotlib.pyplot as plt
+            except ImportError:
+                raise ImportError("You need matplotlib installed")
+            plot = plt.subplot2grid((2,1), (0, 0))
+            plot.set_title("linespacings")
+            y, x, _ = plot.hist(linespacings, bins=50)
+            plot.plot([linespacing_threshold, linespacing_threshold], [0, y.max()])
+            if gaps:
+                plot = plt.subplot2grid((2,1), (1, 0))
+                plot.set_title("gaps")
+                y, x, _ = plot.hist(gaps, bins=max(gaps))
+                plot.plot([gap_threshold, gap_threshold], [0, y.max()]) 
+            util.ensure_dir(filename)
+            plt.savefig(filename, dpi=150)
+            self.log.debug("wrote %s" % filename)
+
+        def threshold(series, resolution=1000, bandwidth=200):
+            # do a pseudo-KDE (but using discrete, high-resolution
+            # bins instead of a continous curve because math
+            start = min(series)
+            stop = max(series)
+            width = stop - start
+            binsize = width / resolution
+            bins = [0] * (resolution + bandwidth)
+            scale = [0] * (resolution + bandwidth)
+
+            # a bandwidth wide array with values forming a normal
+            # (gaussian) distribution
+            kernel = [0] * bandwidth
+            s = bandwidth / 10   
+            m = 0
+            kernelrange = list(range(int(-bandwidth/2)+1, int(bandwidth/2+1)))
+            kernel = [1/(sqrt(2*pi)*s)*e**(-0.5*(float(x-m)/s)**2) for x in kernelrange]
+            for val in series:
+                normval = val - start
+                fraction = normval / width
+                binidx = floor(fraction * resolution) + int(bandwidth/2)
+                for kernidx, offset in enumerate(kernelrange):
+                    bins[binidx+offset-1] += kernel[kernidx]
+            for idx, bin in enumerate(bins):
+                scale[idx] = ((idx - int(bandwidth/2))/resolution * width) + start
+
+            # find the valley after the first peak
+            peak = False
+            best = 0
+            for idx, val in enumerate(bins):
+                if not peak:
+                    # walk til we find the peak
+                    if val >= best:
+                        best = val
+                    else:
+                        peak = True
+                else:
+                    # walk til we find the valley
+                    if val <= best:
+                        best = val
+                    else:
+                        break
+            # now the valley is at idx - 1
+            return scale[idx-1]
+            
         if not isinstance(node, Avsnitt) or (node.title not in ("Författningskommentar",
                                                                 "Författningskommentarer",
                                                                 "Specialmotivering")):
@@ -859,41 +933,101 @@ class Offtryck(SwedishLegalSource):
                 commentary.append((state['primarylaw'], state['primarylawname'], node))
             else:
                 self.log.warning("%s: Författningskommentar does not specify name of law and find_primary_law didn't find it either" % state['basefile'])
+
+        # first, analyze gaps and linespacing constants using all sections
+        linespacings = []
+        gaps = []
+        detect_singleline_spacing = False
         for law, lawname, section in commentary:
-            textnodes = self._find_commentary_for_law(law, section, state, lawname)
-            # this is kinda risky but wth...
+            for idx, subnode in enumerate(section):
+                if isinstance(subnode, Sidbrytning):
+                    continue
+                if subnode.linespacing:
+                    linespacings.append(subnode.linespacing)
+                elif detect_singleline_spacing:
+                    # a single line paragraph has no easily discernable
+                    # line height, but we can approximate by checking the
+                    # nearest paragraph above and below
+                    candidates = []
+                    if (idx > 0 and
+                        not isinstance(section[idx-1], Sidbrytning) and
+                        subnode.bottom > section[idx-1].bottom):
+                        candidates.append(subnode.bottom - section[idx-1].bottom)
+                    if (idx +1 < len(section) and
+                        not isinstance(section[idx+1], Sidbrytning) and
+                        section[idx+1].bottom > subnode.bottom):
+                        candidates.append(section[idx+1].bottom - subnode.bottom)
+                    if candidates:
+                        linespacings.append(min(candidates) / subnode.font.size)
+                if idx and subnode.top > prevnode.bottom:
+                    gaps.append(subnode.top - prevnode.bottom)
+                prevnode = subnode
+
+        gap_threshold = threshold(gaps, resolution=1000, bandwidth=400)
+        linespacing_threshold = threshold(linespacings, resolution=1000, bandwidth=500)
+
+        if os.environ.get("FERENDA_PLOTANALYSIS"):
+            #datadir = self.store.datadir
+            #self.store.datadir = "plots/%s" % self.alias
+            plot_path = self.store.path(state['basefile'], 'intermediate',
+                                        '.commentary.plot.png')
+            plot(plot_path, linespacings, linespacing_threshold, gaps, gap_threshold)
+            #self.store.datadir = datadir
+        
+        for law, lawname, section in commentary:
+            textnodes = self._find_commentary_for_law(law, section, state, lawname, linespacing_threshold, gap_threshold)
             section[:] = textnodes[:]
 
 
-    def _find_commentary_for_law(self, law, section, state, lawname):
-        # start by analyzing all nodes (segmented paragraphs) for
-        # typical linespacing, gaps between sections
-        linespacings = []
-        gaps = []
-        for idx, subnode in enumerate(section):
-            if isinstance(subnode, Sidbrytning):
-                continue
-             # a single line paragraph has no easily discernable line height
-            if subnode.linespacing:
-                linespacings.append(subnode.linespacing)
-            if idx and subnode.top > prevnode.bottom:
-                gaps.append(subnode.top - prevnode.bottom)
-            prevnode = subnode
+    def _find_commentary_for_law(self, law, section, state, lawname, linespacing_threshold, gap_threshold):
 
-        ls_clusters = util.cluster(linespacings)
-        if len(ls_clusters) == 2: # ok, hopefully a clear gap between
-                                  # condensed and regular linespacing.
-            linespacing_threshold = ((ls_clusters[1][0] - ls_clusters[0][-1]) / 2) + ls_clusters[0][-1]
-        else:
-            # we can't reliably distinguish between condensed and
-            # regular linespacing
-            linespacing_threshold = None
+        def probable_header(para):
+            # headers are less than 100 chars and do not end with a period
+            # or other non-hederish thing
+            text = str(para).strip()
+            if text == 'Bestämmelse Kommentarerna finns i avsnitt':
+                # This is a table heading (not real header) type of thing
+                # occurring in SOU 2017:66, but similar constructs might
+                # appear elsewhere.
+                return False
+            return (len(text) < 100 and
+                    (len(text) < 2 or
+                     (text[-1] not in  (".", ")") and text[-2:] not in (" i", " §"))))
 
-        gap_clusters = util.cluster(gaps)
-        if len(gap_clusters) == 2:
-            gap_threshold = ((gap_clusters[1][0] - gap_clusters[0][-1]) / 2) + gap_clusters[0][-1]
-        else:
-            gap_threshold = 20 # a sensible default?
+        def probable_comment(para):
+            text = str(para).strip()
+            if re.match("(Av p|P)aragrafen (framgår|innehåller|har behandlats|är ny|, som är ny|avgränsar|innebär)", text):
+                return True
+            # elif re.match("(I f|F)örsta stycket", text):  # this overmatches, eg ÅRL 7:31 2 st
+            elif re.match("I första stycket", text): 
+                return True
+            elif re.match("\((Jfr|Paragrafen)", text):
+                return True
+            elif (subnode.linespacing or 0) > linespacing_threshold and text[0].isupper():
+                return True
+            return False
+
+
+        def probable_acttext(para):
+            # returns True iff this text is probably acttext
+            # returns False iff it's probably not acctext
+            # returns None if we don't have enough data
+            # (maybe because it's a single line or a Sidbrytning)
+
+            if isinstance(para, Sidbrytning):
+                return None
+
+            # 2 clear indicators of acttext: font size is smaller
+            if state['defaultsize'] >= para.font.size + 2:
+                return True
+            elif para.lines > 1:
+                # or linespacing is tighter than average
+                return bool(linespacing_threshold and
+                            para.linespacing and 
+                            para.linespacing < linespacing_threshold)
+            else:
+                return None
+
 
         # Then try to find what is what. FIXME: this is basically a
         # ad-hoc statemachine, with a lot of ill-understood
@@ -902,17 +1036,26 @@ class Offtryck(SwedishLegalSource):
         # suite
         textnodes = []
         reexamine_state = False
-        comment_on = None
         skipheader = False  # whether we should skip adding a subnode
                             # to current_comment since it's only a
-                            # header (eg "53 §")
+                            # header (eg "53 §" on a line by itself)
+        comment_on = None
         current_comment = None
         comment_start = False
         parsestate = "commenttext"
         prevnode = None
+
         for idx, subnode in enumerate(section):
             if not isinstance(subnode, (Textbox, Sidbrytning, UnorderedList)):
                 raise ValueError("_find_commentary_for_law: Got a %s instead of a Textbox/Sidbrytning/UnorderedList, this indicates broken parsing" % type(subnode))
+            if isinstance(subnode, (Page, Sidbrytning)):
+                # self.log.debug("...Setting reexamine_state flag")
+                reexamine_state = True
+                if parsestate == "commenttext":
+                    current_comment.append(subnode)
+                else:
+                    textnodes.append(subnode)
+                continue
             text = str(subnode).strip()
             # self.log.debug("Examining %s..." % text[:60])
             if reexamine_state:  # meaning the previous node was
@@ -923,28 +1066,30 @@ class Offtryck(SwedishLegalSource):
                 prev_state = parsestate
                 # indicates section starting with eg "<i>Första
                 # stycket</i> innehåller..." FIXME: this should be
-                # detected by self._is_commentstart now.
-                if isinstance(subnode, Textbox) and hasattr(subnode, '__getitem__') and (subnode[0].tag == "i"):
-                    parsestate = "commenttext"
-                elif self._is_headerlike(text):
+                # detected by probable_comment now.
+                # if isinstance(subnode, Textbox) and hasattr(subnode, '__getitem__') and (subnode[0].tag == "i"):
+                #     parsestate = "commenttext"
+                if (probable_header(subnode) and
+                    idx < len(section) - 2 and
+                    not str(section[idx+1]).strip()[0].islower()):
+                    # FIXME: the above check that a header is followed
+                    # by something that looks like a start of a
+                    # sentence should be rolled into probable_header
                     parsestate = "acttext"
                 elif (re.match("\d+(| \w) §", text) and
                       len(section) > idx+1 and
-                      not self._is_commentstart(str(section[idx+1]))):
+                      not probable_comment(section[idx+1])):
                     parsestate = "acttext"
-                elif self._is_commentstart(text):
+                elif probable_comment(text):
                     parsestate = "commenttext"
                 else:
                     pass  # keep parsestate as-is
                 if prev_state == "acttext" and parsestate == "commenttext":
                     comment_start = True
                 reexamine_state = False
-
-            if isinstance(subnode, (Page, Sidbrytning)):
-                # self.log.debug("...Setting reexamine_state flag")
-                reexamine_state = True
-
-            elif len(text) < 20 and (text.endswith(" kap.") or text.endswith(" kap")):
+                    
+            # elif len(text) < 20 and (text.endswith(" kap.") or text.endswith(" kap")):
+            if len(text) < 20 and (text.endswith(" kap.") or text.endswith(" kap")):
                 # subsection heading indicating the start of a new
                 # chapter. alter the parsing context from law to
                 # chapter in law
@@ -956,7 +1101,7 @@ class Offtryck(SwedishLegalSource):
                 textnodes.append(subnode)
                 subnode = None
                 reftext = text
-                
+                    
             elif len(text) < 20 and text.endswith("§"):
                 # self.log.debug("...detecting section header w/o acttext")
                 comment_on = self._parse_uri_from_text(text, state['basefile'], law)
@@ -964,9 +1109,14 @@ class Offtryck(SwedishLegalSource):
                 offset = 1
                 reftext = text
                 if len(section) > idx+offset:
-                    while isinstance(section[idx+offset], Sidbrytning):
+                    acttext = None
+                    # now look at following paras until we know
+                    # whether or not this is acctext or commenttext
+                    while acttext is None or idx+offset-1 >= len(section):
+
+                        acttext = probable_acttext(section[idx+offset])
                         offset += 1
-                    if state['defaultsize'] >= section[idx+offset].font.size + 2:
+                    if acttext is True:
                         parsestate = "acttext"
                         comment_start = False
                         skipheader = False
@@ -982,7 +1132,7 @@ class Offtryck(SwedishLegalSource):
                 textnodes.append(subnode)
                 parsestate = "acttext"
                 subnode = None
-                
+
             elif re.match("\d+(| \w) §", text):
                 # self.log.debug("...detecting section header with acttext")
                 reftext = text[:text.index("§")+ 1]
@@ -991,16 +1141,43 @@ class Offtryck(SwedishLegalSource):
                 parsestate = "acttext"
                 skipheader = False
 
-            # any big space signals a switch from acttext ->
+            elif text in ('Ikraftträdande- och övergångsbestämmelser',
+                          'Ikraftträdandebestämmelser'
+                          'Övergångsbestämmelser'):
+                # ideally, we'd like URIs of the form
+                # https://lagen.nu/1942:740#L2018:324, but at this
+                # stage we don't have the change SFS URI. Create a
+                # fake URI instead with just a #L fragment.
+                comment_on = law.split("#")[0] + "#L"
+                # this whole crap just tries to find out whether the
+                # following subnode is part of accttext or
+                # commenttext. We have the exact same test above --
+                # this needs refactoring.
+                offset = 1
+                if len(section) > idx+offset:
+                    acttext = None
+                    # now look at following paras until we know
+                    # whether or not this is acctext or commenttext
+                    while acttext is None or idx+offset-1 >= len(section):
+                        acttext = probable_acttext(section[idx+offset])
+                        offset += 1
+                    if acttext is True:
+                        parsestate = "acttext"
+                        comment_start = False
+                        skipheader = False
+                    else:
+                        comment_start = True
+
+            # any big space might signal a switch from acttext ->
             # commenttext or vice versa (if some other obscure
-            # conditions are met). 
+            # conditions are met).
             elif (prevnode and
                   subnode.top - prevnode.bottom >= gap_threshold):
                 # self.log.debug("...node spacing is %s, switching from parsestate %s" % (subnode.top - prevnode.bottom, parsestate))
                 if (re.match("\d+(| \w) §$", str(prevnode).strip())):
                     comment_start = True
                     parsestate == "commenttext"
-                elif self._is_headerlike(text) or parsestate == "commenttext":
+                elif probable_header(subnode) or parsestate == "commenttext":
                     if current_comment is not None and len(current_comment) == 0:
                         # this means we created a
                         # Forfattningskommentar and then never added
@@ -1016,32 +1193,42 @@ class Offtryck(SwedishLegalSource):
                         else:
                             self.log.warning("Failed to replace Forfattningskommentar for %s failed" %
                                              (current_comment.comment_on))
+                    # at this point, the current_comment is not valid
+                    # anymore. Any new comment subnodes should go into
+                    # a new (possibly unnamed) Forfattningskommentar
                     parsestate = "acttext"
-                elif parsestate == "acttext":
+                    current_comment = None
+                elif parsestate == "acttext" and not probable_acttext(subnode):
                     parsestate = "commenttext"
                     skipheader = False
                     comment_start = True
-                # self.log.debug("...new parsestate is %s" % parsestate)
-
-            # FIXME: This gives too many false positives right now --
-            # need to check distance to prevbox and/or nextbox. Once
-            # header detection works better we can enable it
-            # everywhere, not just at the start of the commentary for
-            # this act.
-            elif current_comment is None and self._is_headerlike(text):  
+                    # self.log.debug("...new parsestate is %s" % parsestate)
+                    
+                # FIXME: This gives too many false positives right now --
+                # need to check distance to prevbox and/or nextbox. Once
+                # header detection works better we can enable it
+                # everywhere, not just at the start of the commentary for
+                # this act.
+            elif current_comment is None and probable_header(subnode):
                 # self.log.debug("...seems like a header part of acttext")
                 parsestate = "acttext"
-
-            elif state['defaultsize'] >= subnode.font.size + 2:
-                # self.log.debug("... set in smallfont, probably acttext, maybe following an sectionheader w/o actttext")  # see prop 2005/06:180 p 62
+            elif probable_acttext(subnode):
                 parsestate = "acttext"
-#            elif (linespacing_threshold and subnode.linespacing and
-#                  subnode.linespacing < linespacing_threshold):
-#                parsestate = "acttext"
+            elif probable_comment(subnode):
+                parsestate = "commenttext"
+            elif (subnode.lines <= 1 and
+                  len(section) > idx+1 and 
+                  hasattr(section[idx+1], 'top') and 
+                  section[idx+1].top - subnode.bottom < gap_threshold and 
+                  probable_acttext(section[idx+1])):
+                # the current subnode is not acttext, but it's not a
+                # multiline section so it might be hard to tell. Take
+                # a guess by checking the following section, unless
+                # the distance to next is too big.
+                parsestate = "acttext"
             else:
                 # self.log.debug("...will just keep on (parsestate %s)" % parsestate)
                 pass
-
             # if comment_on and parsestate == "commenttext":
             if comment_start:
                 # self.log.debug("Starting new Forfattningskommentar for %s" % comment_on)
@@ -1051,7 +1238,7 @@ class Offtryck(SwedishLegalSource):
                     pageno = page.ordinal - 1 
                 else:
                     pageno = None
-                if comment_on not in state['commented_paras']:
+                if comment_on not in state['commented_paras'] or comment_on is None:
                     if not skipheader:  # means we have a section header
                                         # with acttext. that acttext
                                         # should already have been added
@@ -1066,6 +1253,17 @@ class Offtryck(SwedishLegalSource):
                                                                 comment_on=comment_on,
                                                                 uri=None,
                                                                 label="Författningskommentar till %s %s" % (reftext, lawname))
+                    else:
+                        # this is clearly a comment, but we cannot
+                        # pinpoint what it comments. Maybe it's a
+                        # comment following a inline heading (which
+                        # doesn't have URIs)
+                        self.log.warning("%s: Creating un-anchored comment '%s...'" % (state['basefile'], text[:40]))
+                        current_comment = Forfattningskommentar(title=title,
+                                                                comment_on=None,
+                                                                uri=None,
+                                                                label="Författningskommentar i %s" % lawname)
+                        
                         if parsestate != "commenttext":
                             #self.log.debug("%s, comment on %s, parsestate was '%s', "
                             #               "setting to 'commenttext'" %
@@ -1074,60 +1272,42 @@ class Offtryck(SwedishLegalSource):
                         # the URI to the above Forfattningskommentar is
                         # dynamically constructed in
                         # Forfattningskommentar.as_xhtml
-                        textnodes.append(current_comment)
+                    textnodes.append(current_comment)
+                    if comment_on:
                         state['commented_paras'][comment_on] = pageno
-                else:
+                elif comment_on:
                     self.log.warning("Dupe comment on %s at p %s (previous at %s), ignoring" % (comment_on, pageno, state['commented_paras'][comment_on]))
                 comment_on = None
                 comment_start = False
 
             if parsestate == "commenttext":
-                if subnode:
-                    if current_comment is None:
-                        # self.log.debug("...creating
-                        # Forfattningskommentar for law itself")
+                assert subnode
+                if current_comment is None:
+                    if "#" not in law:
+                        # if the law URI is really a chapter URI, this is
+                        # hardly the first comment in this section
                         current_comment = Forfattningskommentar(title="",
                                                                 comment_on=law,
                                                                 uri=None,
                                                                 label="Författningskommentar till %s" % lawname)
                         textnodes.append(current_comment)
-                    if not skipheader:
-                        current_comment.append(subnode)
                     else:
-                        skipheader = False
-
+                        from pudb import set_trace; set_trace()
+                        print("This should never happen")
+                if not skipheader:
+                    current_comment.append(subnode)
+                else:
+                    skipheader = False
             else:
                 if subnode:
                     textnodes.append(subnode)
-                    
+
             if isinstance(subnode, (Page, Sidbrytning)):
                 prevnode = None
             else:
                 prevnode = subnode
         return textnodes
-
-
-    def _is_headerlike(self, text):
-        # headers are less than 100 chars and do not end with a period
-        # or other non-hederish thing
-        if text == 'Bestämmelse Kommentarerna finns i avsnitt':
-            # This is a table heading (not real header) type of thing
-            # occurring in SOU 2017:66, but similar constructs might
-            # appear elsewhere.
-            return False
-        return (len(text) < 100 and
-                (len(text) < 2 or
-                 (text[-1] not in  (".", ")") and text[-2:] not in (" i", " §"))))
-
-
-    def _is_commentstart(self, text):
-        if re.match("(Av p|P)aragrafen (framgår|innehåller|har behandlats|är ny|, som är ny|avgränsar|innebär)", text):
-            return True
-        elif re.match("(I f|F)örsta stycket", text):
-            return True
-        elif re.match("\((Jfr|Paragrafen)", text):
-            return True
-        return False
+                    
     
     re_urisegments = re.compile(r'([\w]+://[^/]+/[^\d]*)(\d+:(bih\.[_ ]|N|)?\d+([_ ]s\.\d+|))#?(K([a-z0-9]+)|)(P([a-z0-9]+)|)(S(\d+)|)(N(\d+)|)')
     def _parse_uri_from_text(self, text, basefile, baseuri=""):

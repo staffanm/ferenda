@@ -557,10 +557,6 @@ class Forfattningskommentar(CompoundElement):
     
     def as_xhtml(self, uri, parent_uri=None):
         if not self.uri and self.comment_on:
-            # FIXME: this will normally create fragments with
-            # extra fragments, ie
-            # 'https://lagen.nu/prop/2013/14:34#kommentar-2010:1846#P52' --
-            # is that even legal?
             self.uri = self.compute_uri(uri)
         element = super(Forfattningskommentar, self).as_xhtml(uri, parent_uri)
         element.set("typeof", "rinfoex:Forfattningskommentar")
@@ -588,8 +584,8 @@ class Forfattningskommentar(CompoundElement):
             # element.append(E("div", div, {'property': 'dcterms:description',
             #                               'datatype':'rdf:XMLLiteral'}))
             element.append(div)
-        else:
-            print("comment_on not set")
+        # else:
+        #     print("comment_on not set")
         if hasattr(self, "title"):
             element.set("content", self.title)
         
