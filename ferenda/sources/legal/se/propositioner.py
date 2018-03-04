@@ -16,17 +16,18 @@ import tempfile
 
 from bs4 import BeautifulSoup
 from lxml import etree
+import lxml.html
 import requests
 from layeredconfig import LayeredConfig
 from cached_property import cached_property
 from rdflib import Literal
 from rdflib.namespace import DCTERMS
 
-from ferenda import util
+from ferenda import util, decorators
 from ferenda.elements import Preformatted, Body
 from ferenda import CompositeRepository, CompositeStore
 from ferenda import TextReader, PDFAnalyzer
-from ferenda import DocumentEntry, Facet
+from ferenda import DocumentEntry, Facet, PDFDocumentRepository
 from . import (Trips, NoMoreLinks, Regeringen, Riksdagen,
                SwedishLegalSource, SwedishLegalStore, RPUBL, Offtryck)
 from .fixedlayoutsource import FixedLayoutStore, FixedLayoutSource
@@ -626,6 +627,57 @@ class PropRiksdagen(Riksdagen):
 
     def sanitize_identifier(self, identifier):
         return prop_sanitize_identifier(identifier)
+
+
+class PropKB(Offtryck, PDFDocumentRepository):
+    alias = "propkb"
+    storage_policy = "dir"
+    start_url = "https://riksdagstryck.kb.se/tvakammarriksdagen.html"
+    rdf_type = RPUBL.Proposition
+    basefile_regex = "prop_(?P<year>\d{4})__+(?P<no>\d+)(?:_(?P<part>\d+)|)"
+
+    @classmethod
+    def get_default_options(cls):
+        opts = super(PropKB, cls).get_default_options()
+        opts['ocr'] = True
+        return opts
+
+    @decorators.downloadmax
+    def download_get_basefiles(self, source):
+        # source will be an iterator of links to individual collections of things
+        from pudb import set_trace; set_trace()
+        yielded = set()
+        if self.download_reverseorder:
+            source = reversed(list(source))
+        for (element, attribute, link, pos) in source:
+            if not element.text_content():
+                continue
+            if "proposition" in element.text_content():
+                resp = self.session.get(link)
+                resp.raise_for_status()
+                tree = lxml.html.document_fromstring(resp.text)
+                tree.make_links_absolute(link, resolve_base_href=True)
+                for (subelement, subattribute, sublink, subpos) in tree.iterlinks():
+                    if not subelement.text:
+                        continue
+                    m = re.match(self.basefile_regex, subelement.text)
+                    if m:
+                        basefile = "%s:%s" % (m.group("year"), m.group("no"))
+                        part = m.group("part")
+                        if (basefile,part) in yielded:
+                            continue
+                        if part and int(part) > 1:
+                            # do something smart here so that
+                            # download() will treat the yielded value
+                            # as an attachment to existing
+                            # basefile. Or maybe we could download it
+                            # ourselves at this point? Let's try that.
+                            filename = self.store.downloaded_path(basefile, attachment=part+".pdf")
+                            self.download_if_needed(sublink, basefile, archive=self.download_archive, filename=filename)
+                        else:
+                            yield basefile, sublink
+                            yielded.add((basefile,part))
+
 
 # inherit list_basefiles_for from CompositeStore, basefile_to_pathfrag
 # from SwedishLegalStore)
