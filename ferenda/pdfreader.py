@@ -643,7 +643,7 @@ class PDFReader(CompoundElement):
         nextfont = self.fontspec[int(nextelement.get('font'))] if nextelement is not None and nextelement.get('font') else None
         if self.detect_footnotes:
             if (len(textelements) and
-                textelements[0].strip().isdigit() and
+                (textelements[0].strip().isdigit() and
                 # check both previous box and next (for catching footnote markers in the foooter)
                 (lastfont and
                  lastfont.family == thisfont['family'] and
@@ -658,7 +658,7 @@ class PDFReader(CompoundElement):
                     thisfont['size'] < nextfont['size'] and
                     -5 < int(nextelement.get("left")) - (int(element.get("left")) + int(element.get("width"))) < 10 and # is really close to
                     0 < (int(nextelement.get("top")) + int(nextelement.get("height"))) - (int(element.get("top")) + int(element.get("height"))) < 20) # is slightly lower than
-            ):
+            )):
                 # this must be a footnote -- alter tag to show that it
                 # should be rendered with superscript
                 if textelements[0].tag is None:
@@ -670,12 +670,12 @@ class PDFReader(CompoundElement):
             
                 # is it in the main text, ie immediately
                 # following the last textbox? Then append it to that textbox 
-                if abs(lastbox.right - int(attribs['left'])) < 3:
+                if lastbox and abs(lastbox.right - int(attribs['left'])) < 3:
                     # return a Box that the caller will merge with current
                     attribs['fontid'] = attribs.pop('font')
                     attribs['merge-with-current'] = True
                     return Textbox(textelements, **attribs)
-                elif min([x.left for x in page]) - int(attribs['left']) < 3:
+                elif min([x.left for x in page] + [0]) - int(attribs['left']) < 3:
                     # then create a new textbox and let
                     # the after_footnote magic append more
                     # textboxes to it. Note: we don't use

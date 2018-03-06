@@ -127,3 +127,11 @@ class TestDecodeAndGlue(unittest.TestCase, Utils):
         nextbox = self._p('<text top="525" left="85" width="553" height="17" font="0">åstadkomma ett fritt flöde av personuppgifter mellan medlemsstaterna i</text>')
         self.assertTrue(self.gluefunc(prevbox, nextbox, prevbox))
 
+
+class TestIdentifyLaw(unittest.TestCase):
+
+    def test_basic(self):
+        cf = CommentaryFinder("2017/18:42")
+        self.assertTrue(cf.identify_law("Förslag till personuppgiftslag"))
+
+

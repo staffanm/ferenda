@@ -688,6 +688,18 @@ def is_roman(s):
     return roman.romanNumeralPattern.match(s.upper()) is not None
 
 
+def increment(s, amount=1):
+    """increment a number, regardless if it's a arabic number (int) or a roman number (str)."""
+    if is_roman(s):
+        lower = s.islower()
+        s = to_roman(from_roman(s) + amount, lower=lower)
+        if lower:
+            s = s.lower()
+        return s
+    else:
+        assert isinstance(s, int), "%s is neither a roman numeral nor an int" % s
+        return s + amount
+
 def title_sortkey(s):
     """Transform a document title into a key useful for sorting and partitioning documents.
 

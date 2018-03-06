@@ -129,13 +129,7 @@ class PDFAnalyzer(object):
             physical = "%s#page=%s" % (page.src.split(os.sep)[-1], page.number)
             pageskip = page.number - lastpagenumber
             lastpagenumber = page.number
-            if isinstance(currentpage, int):
-                currentpage += pageskip
-            elif util.is_roman(currentpage):
-                lower = currentpage.islower()
-                currentpage = util.to_roman(util.from_roman(currentpage)+pageskip, lower=lower)
-                if lower:
-                    currentpage = currentpage.lower()
+            currentpage = util.increment(currentpage, pageskip)
             pageguess = self.guess_pagenumber(page, currentpage)
             if pageguess is None:
                 if len(page) > 0:

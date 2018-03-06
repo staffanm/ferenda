@@ -28,9 +28,11 @@ from ferenda.elements import Preformatted, Body
 from ferenda import CompositeRepository, CompositeStore
 from ferenda import TextReader, PDFAnalyzer
 from ferenda import DocumentEntry, Facet, PDFDocumentRepository
+from ferenda.pdfreader import StreamingPDFReader
 from . import (Trips, NoMoreLinks, Regeringen, Riksdagen,
                SwedishLegalSource, SwedishLegalStore, RPUBL, Offtryck)
 from .fixedlayoutsource import FixedLayoutStore, FixedLayoutSource
+from .swedishlegalsource import lazyread
 
 def prop_sanitize_identifier(identifier):
     if not identifier:
@@ -635,17 +637,17 @@ class PropKB(Offtryck, PDFDocumentRepository):
     start_url = "https://riksdagstryck.kb.se/tvakammarriksdagen.html"
     rdf_type = RPUBL.Proposition
     basefile_regex = "prop_(?P<year>\d{4})__+(?P<no>\d+)(?:_(?P<part>\d+)|)"
+    document_type = PROPOSITION = True
+    SOU = DS = KOMMITTEDIREKTIV = False
 
     @classmethod
     def get_default_options(cls):
         opts = super(PropKB, cls).get_default_options()
-        opts['ocr'] = True
+        opts['ocr'] = False
         return opts
 
     @decorators.downloadmax
     def download_get_basefiles(self, source):
-        # source will be an iterator of links to individual collections of things
-        from pudb import set_trace; set_trace()
         yielded = set()
         if self.download_reverseorder:
             source = reversed(list(source))
@@ -678,6 +680,60 @@ class PropKB(Offtryck, PDFDocumentRepository):
                             yield basefile, sublink
                             yielded.add((basefile,part))
 
+    def metadata_from_basefile(self, basefile):
+        attrib = super(PropKB, self).metadata_from_basefile(basefile) 
+        year, ordinal = basefile.split(":")
+        attrib["rpubl:arsutgava"] = year
+        attrib["rpubl:lopnummer"] = ordinal
+        return attrib
+
+    @lazyread
+    def downloaded_to_intermediate(self, basefile):
+        downloaded_path = self.store.downloaded_path(basefile)
+        intermediate_path = self.store.intermediate_path(basefile)
+        return self.convert_pdf(downloaded_path, intermediate_path)
+
+    def convert_pdf(self, downloaded_path, intermediate_path):
+        intermediate_dir = os.path.dirname(intermediate_path)
+        keep_xml = "bz2" if self.config.compress == "bz2" else True
+        reader = StreamingPDFReader()
+        kwargs = {'filename': downloaded_path,
+                  'workdir': intermediate_dir,
+                  'images': self.config.pdfimages,
+                  'keep_xml': keep_xml}
+        if self.config.ocr:
+            kwargs['ocr_lang'] = 'swe'
+        return reader.convert(**kwargs)
+
+    def extract_head(self, fp, basefile):
+        return None  # "rawhead" is never used
+
+    def extract_metadata(self, rawhead, basefile):
+        # extracting title and other metadata (dep, publication date
+        # etc) requires parsing of the body)
+        return self.metadata_from_basefile(basefile)
+
+    def extract_body(self, fp, basefile):
+        reader = StreamingPDFReader()
+        parser = "ocr" if self.config.ocr else "xml"
+        intermediate_suffix = ".hocr" if self.config.ocr else ".xml"
+        if self.config.compress:
+            intermediate_suffix += "." + self.config.compress
+        reader.read(fp, parser=parser)
+        for attachment in [x for x in sorted(self.store.list_attachments(basefile, "downloaded")) if x.endswith(".pdf")]:
+            downloaded_path = self.store.downloaded_path(basefile, attachment=attachment)
+            iattachment = attachment.replace(".pdf", intermediate_suffix)
+            intermediate_path = self.store.intermediate_path(basefile, attachment=iattachment)
+            if not os.path.exists(intermediate_path):
+                fp = self.convert_pdf(downloaded_path, intermediate_path)
+            else:
+                fp = self.store.open_intermediate(basefile, attachment=iattachment)
+            reader += StreamingPDFReader().read(fp)
+
+        for page in reader:
+            page.src = "index.pdf"  # FIXME: don't hardcode the filename
+        return reader
+
 
 # inherit list_basefiles_for from CompositeStore, basefile_to_pathfrag
 # from SwedishLegalStore)
@@ -686,7 +742,7 @@ class PropositionerStore(CompositeStore, SwedishLegalStore):
 
 
 class Propositioner(CompositeRepository, FixedLayoutSource):
-    subrepos = PropRegeringen, PropTrips, PropRiksdagen
+    subrepos = PropRegeringen, PropTrips, PropRiksdagen, PropKB
     alias = "prop"
     xslt_template = "xsl/forarbete.xsl"
     storage_policy = "dir"
