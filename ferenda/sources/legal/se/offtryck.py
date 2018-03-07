@@ -1160,7 +1160,12 @@ class CommentaryFinder(object):
         def is_section_start(parser):
             text = str(parser.reader.peek())
             return bool(re.match("\d+(| \w) §", text))
-                
+
+        def is_transition_regs(parser):
+            return str(parser.reader.peek()).strip() in  (
+                'Ikraftträdande- och övergångsbestämmelser',
+                'Ikraftträdandebestämmelser'
+                'Övergångsbestämmelser')
 
         def is_header(parser):
             return probable_header(parser.reader.peek())
@@ -1224,7 +1229,7 @@ class CommentaryFinder(object):
             if not state["skipheader"]:
                 title = ""
             else:
-                title = text
+                title = state["reftext"]
             
             f = Forfattningskommentar(title=title,
                                       comment_on=state["comment_on"],
@@ -1233,6 +1238,7 @@ class CommentaryFinder(object):
             comment = parser.make_children(f)
             state["comment_on"] = None
             state["reftext"] = None
+            state["skipheader"] = False
             return comment
         
         def make_acttext(parser):
@@ -1265,12 +1271,23 @@ class CommentaryFinder(object):
             state["assume"] = None
             return parser.reader.next()
 
+        def setup_transition_header(parser):
+            # ideally, we'd like URIs of the form
+            # https://lagen.nu/1942:740#L2018:324, but at this
+            # stage we don't have the change SFS URI. Create a
+            # fake URI instead with just a #L fragment.
+            state["comment_on"] = state["law"].split("#")[0] + "#L"
+            state["reftext"] = str(parser.reader.next()).strip()
+            state["skipheader"] = True
+
         def setup_section_header(parser):
             state["assume"] = "comment"
-            return make_section(parser)
+            state["skipheader"] = True
+            make_section(parser) # throw away the result, which will be exactly the header we want to skip
 
         def setup_section_start(parser):
             state["assume"] = "acttext"
+            state["skipheader"] = False 
             return make_section(parser)
 
         def make_section(parser):
@@ -1278,7 +1295,6 @@ class CommentaryFinder(object):
             state["reftext"] = text[:text.index("§")+ 1]
             state["comment_on"] = self._parse_uri_from_text(state["reftext"], self.basefile, state["law"])
             state["comment_start"] = False
-            state["skipheader"] = False # maybe should be true if ?
             return make_paragraph(parser)
             
             
@@ -1298,17 +1314,19 @@ class CommentaryFinder(object):
         # False: This is most likely not <thing>
         # None: I have no idea whether this is <thing> or not
         def probable_header(para):
-            # headers are less than 100 chars and do not end with a period
-            # or other non-hederish thing
             text = str(para).strip()
             if text == 'Bestämmelse Kommentarerna finns i avsnitt':
                 # This is a table heading (not real header) type of thing
                 # occurring in SOU 2017:66, but similar constructs might
                 # appear elsewhere.
                 return False
+            # headers are less than 100 chars and do not end with a period
+            # or other non-hederish thing
             return (len(text) < 100 and
-                    (len(text) < 2 or
-                     (text[-1] not in  (".", ")") and text[-2:] not in (" i", " §"))))
+                    not text.endswith((")", " i", " §")) and
+                    not text.endswith(".") or text.endswith((" m.m.",
+                                                             " m.fl.")))
+                                      
 
         def probable_comment(para):
             text = str(para).strip()
@@ -1355,6 +1373,7 @@ class CommentaryFinder(object):
                           is_chapter_header,
                           is_section_header,
                           is_section_start,
+                          is_transition_regs,
                           is_header,
                           is_comment,
                           is_acttext,
@@ -1367,6 +1386,7 @@ class CommentaryFinder(object):
                            ("body", is_section_start): (setup_section_start, None),
                            ("body", is_comment): (make_comment, "comment"),
                            ("body", is_acttext): (make_acttext, None),
+                           ("body", is_transition_regs): (setup_transition_header, None),
                            ("comment", is_section_start): (False, None),
                            ("comment", is_header): (False, None),
                            ("comment", is_chapter_header): (False, None),
