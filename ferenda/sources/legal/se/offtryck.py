@@ -288,8 +288,11 @@ class Offtryck(SwedishLegalSource):
             # allow for more if prevbox starts with a bullet and
             # nextbox startswith lowercase, allow for a large indent
             # (but not hanging indent)
-            if strtextbox.startswith(("\u2022", "\uf0b7", "−")) and strnextbox[0].islower():
-                alignmatch = lambda p, n: n.left - p.left < 30
+            ul = False
+            if strtextbox.startswith(("\u2022", "\uf0b7", "−")):
+                ul = True
+                if strnextbox[0].islower():
+                    alignmatch = lambda p, n: n.left - p.left < 30
             if strtextbox.startswith("\uf0b7"):
                 # U+F0B7 is Private use -- probably using symbol font
                 # for bullet. Just accept any font family or size change
@@ -319,7 +322,9 @@ class Offtryck(SwedishLegalSource):
             # Any line that ONLY contains a section reference should
             # probably be interpreted as a header. (also handle dual
             # refs "4 kap. 9 c och 10 §§", prop 1997/98:44 s 148)
-            if re.match("(\d+ kap. |)\d+( \w och \d+| \w| och \d+|) §§?$", strprevbox) and prevbox.bottom <= nextbox.top:
+            sectionref = re.compile("(\d+ kap. |)\d+( \w och \d+| \w| och \d+|) §§?$")
+            if ((sectionref.match(strprevbox) or sectionref.match(strnextbox))
+                and prevbox.bottom <= nextbox.top):
                 return False
 
             # these text locutions indicate a new paragraph (normally, this is
@@ -350,7 +355,7 @@ class Offtryck(SwedishLegalSource):
                  alignmatch(prevbox, nextbox) or # compare previous line to next
                  alignmatch(textbox, nextbox) or # compare entire glued box so far to next FIXME -- is this a good idea? Tends to glue rows in tables...
                  (parindent * 2 >= (prevbox.left - nextbox.left) >= parindent / 2) or
-                 (parindent * 2 >= (textbox.left - nextbox.left) >= parindent / 2) or
+                 (not ul and (parindent * 2 >= (textbox.left - nextbox.left) >= parindent / 2)) or  # Too permitting when processing unordered lists
                  (re.match(r"[\d\.]+\s+[A-ZÅÄÖ]", strtextbox) and nextbox.left - textbox.left < parindent * 5) # hanging indent (numbered) heading -- FIXME: we'd like to increase the parindent multiplier depending on the len of the initial number
                  )):
                 # if the two boxes are on the same line, but have a
@@ -842,13 +847,14 @@ class Offtryck(SwedishLegalSource):
                 return None  # visit_node won't call any subnode
         cf = CommentaryFinder(state['basefile'], self._parse_uri_from_text, self.temp_sfs_uri)
         commentaries = []
+        found = False
         for subsection in node: # nb: Node is the "Författningskommentar" chapter
             if cf.is_commentary_section(subsection):
                 found = True
                 commentaries.append((subsection, *cf.identify_law(subsection.title)))
         if not found: #  # no subsecs, ie the prop changes a single law
             if 'primarylaw' in state:
-                commentaries.append((subsection, state['primarylaw'], state['primarylawname']))
+                commentaries.append((node, state['primarylaw'], state['primarylawname']))
             else:
                 self.log.warning("%s: Författningskommentar does not specify name of law and find_primary_law didn't find it either" % state['basefile'])
 
@@ -1072,7 +1078,9 @@ class CommentaryFinder(object):
     def threshold(self, series, resolution=1000, bandwidth=200):
         bins, scale = self.estimate_density(series, resolution, bandwidth)      
 
-        # find the valley after the first peak
+        # find the valley after the first (significant, not less than
+        # 25% of the highest) peak
+        minpeak = max(bins) * 0.25
         peak = False
         best = 0
         for idx, val in enumerate(bins):
@@ -1080,7 +1088,7 @@ class CommentaryFinder(object):
                 # walk til we find the peak
                 if val >= best:
                     best = val
-                else:
+                elif val >= minpeak:
                     peak = True
             else:
                 # walk til we find the valley
@@ -1125,7 +1133,17 @@ class CommentaryFinder(object):
         # first, analyze gaps and linespacing constants using all sections
         features = self.collect_features(commentaries)
         gap_threshold = self.threshold(features['gaps'], resolution=1000, bandwidth=400)
-        linespacing_threshold = self.threshold(features['linespacings'], resolution=1000, bandwidth=500)
+
+        # if all we have are paragraphs with equal-ish linespacing
+        # (say, because there is only comments, no acttext), minor
+        # accidentally differences between paragraphs might fall on
+        # different sides of this threshold. require that the spread is at least 20% (ie max ls must be at least 20% larger than min ls)
+        max_ls = max(features['linespacings'])
+        min_ls = min(features['linespacings'])
+        if (max_ls - min_ls) / min_ls < 0.20:
+            linespacing_threshold = min_ls # ie interpret everything as comment linespacing
+        else:
+            linespacing_threshold = self.threshold(features['linespacings'], resolution=1000, bandwidth=500)
 
         if os.environ.get("FERENDA_PLOTANALYSIS"):
             #datadir = self.store.datadir
@@ -1147,22 +1165,23 @@ class CommentaryFinder(object):
         # recognizers
         # "3 kap." or "3 kap. Om domare"
         def is_chapter_header(parser):
-            text = str(parser.reader.peek())
+            text = str(parser.reader.peek()).strip()
             return bool(len(text) < 20 and text.endswith((" kap.", " kap")) or
                         re.match("\d+ kap. +[^\d]", text))
 
         # "4 §" or "4 kap. 4 §"
         def is_section_header(parser):
-            text = str(parser.reader.peek())
+            text = str(parser.reader.peek()).strip()
             return len(text) < 20 and text.endswith("§")
 
         # "4 § Lagtext lagtext och mera lagtext"
         def is_section_start(parser):
-            text = str(parser.reader.peek())
-            return bool(re.match("\d+(| \w) §", text))
+            text = str(parser.reader.peek()).strip()
+            return bool(re.match("\d+(| \w) § +[A-ZÅÄÖ]", text))
 
         def is_transition_regs(parser):
             return str(parser.reader.peek()).strip() in  (
+                'Ikraftträdande- och övergångsbestämmelse',
                 'Ikraftträdande- och övergångsbestämmelser',
                 'Ikraftträdandebestämmelser'
                 'Övergångsbestämmelser')
@@ -1230,11 +1249,11 @@ class CommentaryFinder(object):
                 title = ""
             else:
                 title = state["reftext"]
-            
             f = Forfattningskommentar(title=title,
                                       comment_on=state["comment_on"],
                                       uri=None,
                                       label=label)
+            f.append(make_paragraph(parser))
             comment = parser.make_children(f)
             state["comment_on"] = None
             state["reftext"] = None
@@ -1268,8 +1287,19 @@ class CommentaryFinder(object):
             return ret
 
         def handle_pagebreak(parser):
-            state["assume"] = None
-            return parser.reader.next()
+            pagebreak = parser.reader.next()
+            try:
+                nextbox = parser.reader.peek()
+                nextbox.font  # trigger an AttributeError if nextbox is also a Sidbrytning
+                if probable_acttext(nextbox):
+                    state["assume"] = "acttext"
+                elif probable_comment(nextbox):
+                    state["assume"] = "comment"
+                else:
+                    state["assume"] = None
+            except (StopIteration, AttributeError):
+                state["assume"] = None
+            return pagebreak
 
         def setup_transition_header(parser):
             # ideally, we'd like URIs of the form
@@ -1281,9 +1311,31 @@ class CommentaryFinder(object):
             state["skipheader"] = True
 
         def setup_section_header(parser):
-            state["assume"] = "comment"
-            state["skipheader"] = True
-            make_section(parser) # throw away the result, which will be exactly the header we want to skip
+            # a header might be followed by acttext or commmenttext --
+            # it's not easy to tell. examine each box until we get a
+            # definite answer (or run out of adjacent boxes)
+            idx = 2
+            prevbox = None
+            acttext = False
+            while True:
+                box = parser.reader.peek(idx)
+                if isinstance(box, Sidbrytning) or (prevbox and box.top - prevbox.bottom > metrics['gap_threshold']):
+                    break
+                acttext = probable_acttext(box)
+                if acttext in (True, False):
+                    break
+                prevbox = box
+                idx += 1
+
+            if acttext:
+                ret = make_section(parser)
+                state["assume"] = "acttext"
+                state["skipheader"] = False
+                return ret
+            else:
+                make_section(parser) # throw away the result, which will be exactly the header we want to skip
+                state["assume"] = "comment"
+                state["skipheader"] = True
 
         def setup_section_start(parser):
             state["assume"] = "acttext"
@@ -1303,8 +1355,10 @@ class CommentaryFinder(object):
             newlaw = self._parse_uri_from_text(text, self.basefile, state["law"])
             if newlaw:
                 state["law"] = newlaw
+                state["comment_on"] = state["law"]
             state["skipheader"] = True
-            reftext = text
+            state["reftext"] = text
+            return parser.reader.next()
             
         
         # helpers
@@ -1337,9 +1391,14 @@ class CommentaryFinder(object):
                 return True
             elif re.match("\((Jfr|Paragrafen)", text):
                 return True
-            elif (para.linespacing or 0) > metrics['linespacing_threshold'] and text[0].isupper():
-                return True
-            return None 
+            elif metrics['defaultsize'] >= para.font.size + 2:
+                return False
+            elif para.lines > 1:
+                return bool(metrics['linespacing_threshold'] and
+                            para.linespacing and 
+                            para.linespacing >= metrics['linespacing_threshold'])
+            else:
+                return None 
 
 
         def probable_acttext(para):
@@ -1347,7 +1406,6 @@ class CommentaryFinder(object):
             # returns False iff it's probably not acctext
             # returns None if we don't have enough data
             # (maybe because it's a single line or a Sidbrytning)
-
             if isinstance(para, Sidbrytning):
                 return None
 
