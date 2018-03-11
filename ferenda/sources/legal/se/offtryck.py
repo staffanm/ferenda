@@ -27,7 +27,7 @@ from ferenda.elements import (Link, Body, CompoundElement,
 from ferenda.elements.html import P
 from ferenda.pdfreader import BaseTextDecoder, Page, Textbox
 from ferenda.decorators import newstate
-from ferenda.errors import ParseError, DocumentSkippedError
+from ferenda.errors import ParseError, DocumentSkippedError, FSMStateError
 
 from . import SwedishLegalSource, RPUBL
 from .legalref import Link, LegalRef, RefParseError
@@ -125,8 +125,8 @@ class Offtryck(SwedishLegalSource):
     
 
     def parse_body_parseconfigs(self):
-        # return ("default", "noappendix", "simple")
-        return ("default",)
+        return ("default", "noappendix", "simple")
+        
 
     def get_parser(self, basefile, sanitized, initialstate=None,
                    startpage=None, pagecount=None, parseconfig="default"):
@@ -857,11 +857,15 @@ class Offtryck(SwedishLegalSource):
                 commentaries.append((node, state['primarylaw'], state['primarylawname']))
             else:
                 self.log.warning("%s: Författningskommentar does not specify name of law and find_primary_law didn't find it either" % state['basefile'])
+                return  # there is absolutely nothing to analyze
 
         metrics = cf.analyze(commentaries)
         metrics["defaultsize"] = state["defaultsize"]
         for section, uri, name in commentaries:
-            cf.markup_commentary(section, uri, name, metrics)
+            try:
+                cf.markup_commentary(section, uri, name, metrics)
+            except FSMStateError as e:
+                self.log.warning("%s: %s" % (state['basefile'], e))
     
     re_urisegments = re.compile(r'([\w]+://[^/]+/[^\d]*)(\d+:(bih\.[_ ]|N|)?\d+([_ ]s\.\d+|))#?(K([a-z0-9]+)|)(P([a-z0-9]+)|)(S(\d+)|)(N(\d+)|)')
     def _parse_uri_from_text(self, text, basefile, baseuri=""):
@@ -1107,7 +1111,7 @@ class CommentaryFinder(object):
             for idx, subnode in enumerate(section):
                 if isinstance(subnode, Sidbrytning):
                     continue
-                if subnode.linespacing:
+                if hasattr(subnode, 'linespacing') and subnode.linespacing:
                     features['linespacings'].append(subnode.linespacing)
                 elif detect_singleline_spacing:
                     # a single line paragraph has no easily discernable
@@ -1393,7 +1397,7 @@ class CommentaryFinder(object):
                 return True
             elif metrics['defaultsize'] >= para.font.size + 2:
                 return False
-            elif para.lines > 1:
+            elif hasattr(para, 'lines') and para.lines > 1:
                 return bool(metrics['linespacing_threshold'] and
                             para.linespacing and 
                             para.linespacing >= metrics['linespacing_threshold'])
@@ -1412,7 +1416,7 @@ class CommentaryFinder(object):
             # 2 clear indicators of acttext: font size is smaller
             if metrics['defaultsize'] >= para.font.size + 2:
                 return True
-            elif para.lines > 1:
+            elif hasattr(para, 'lines') and para.lines > 1:
                 # or linespacing is tighter than average
                 return bool(metrics['linespacing_threshold'] and
                             para.linespacing and 

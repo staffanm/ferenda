@@ -7,6 +7,7 @@ from ferenda.sources.legal.se import Propositioner as OrigPropositioner
 from ferenda.sources.legal.se.propositioner import PropRegeringen as OrigPropRegeringen
 from ferenda.sources.legal.se.propositioner import PropTrips as OrigPropTrips
 from ferenda.sources.legal.se.propositioner import PropRiksdagen as OrigPropRiksdagen
+from ferenda.sources.legal.se.propositioner import PropKB as OrigPropKB
 from .regeringenlegacy import PropRegeringenLegacy
 from . import SameAs
 
@@ -18,7 +19,9 @@ class PropTrips(OrigPropTrips, SameAs): pass
 
 class PropRiksdagen(OrigPropRiksdagen, SameAs): pass
 
+class PropKB(OrigPropKB, SameAs): pass
+
 
 class Propositioner(OrigPropositioner):
-    subrepos = (PropRegeringen, PropRegeringenLegacy, PropTrips, PropRiksdagen)
+    subrepos = (PropRegeringen, PropRegeringenLegacy, PropTrips, PropRiksdagen, PropKB)
 

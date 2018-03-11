@@ -20,7 +20,7 @@ import lxml.html
 import requests
 from layeredconfig import LayeredConfig
 from cached_property import cached_property
-from rdflib import Literal
+from rdflib import Literal, URIRef
 from rdflib.namespace import DCTERMS
 
 from ferenda import util, decorators
@@ -28,11 +28,12 @@ from ferenda.elements import Preformatted, Body
 from ferenda import CompositeRepository, CompositeStore
 from ferenda import TextReader, PDFAnalyzer
 from ferenda import DocumentEntry, Facet, PDFDocumentRepository
-from ferenda.pdfreader import StreamingPDFReader
+from ferenda.pdfreader import StreamingPDFReader, Textbox
 from . import (Trips, NoMoreLinks, Regeringen, Riksdagen,
                SwedishLegalSource, SwedishLegalStore, RPUBL, Offtryck)
 from .fixedlayoutsource import FixedLayoutStore, FixedLayoutSource
 from .swedishlegalsource import lazyread
+from .elements import Sidbrytning
 
 def prop_sanitize_identifier(identifier):
     if not identifier:
@@ -733,6 +734,29 @@ class PropKB(Offtryck, PDFDocumentRepository):
         for page in reader:
             page.src = "index.pdf"  # FIXME: don't hardcode the filename
         return reader
+
+    def postprocess_doc(self, doc):
+        # the first thing will be a Sidbrytning; continue scanning text until next sidbrytning
+        firstpage = ""
+        for thing in doc.body[1:]:
+            if isinstance(thing, Sidbrytning):
+                break
+            elif isinstance(thing, Textbox):
+                firstpage += str(thing) + "\n\n"
+        m = re.search("proposition till riksdagen *,? *(.*?); gif?ven",
+                      util.normalize_space(firstpage), flags=re.I)
+        if not m:
+            self.log.warning("%s: Couldn't find title in first %s characters (first page)" %
+                             (doc.basefile, len(firstpage)))
+        else:
+            doc.meta.add((URIRef(doc.uri), DCTERMS.title, Literal(m.group(1), lang=self.lang)))
+        m = re.search("gif?ven stockholms slott den (\d+ \w+ \d{4})", util.normalize_space(firstpage), flags=re.I)
+        if not m:
+            self.log.warning("%s: Couldn't find date in first %s characters (first page)" %
+                             (doc.basefile, len(firstpage)))
+        else:
+            d = self.parse_swedish_date(m.group(1).lower())
+            doc.meta.add((URIRef(doc.uri), DCTERMS.issued, Literal(d)))
 
 
 # inherit list_basefiles_for from CompositeStore, basefile_to_pathfrag
