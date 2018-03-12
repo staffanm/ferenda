@@ -693,7 +693,7 @@ class ParseXML(unittest.TestCase):
 </Textbox>
 """
         self.assertEqual(want[1:], serialize(combined_tb))
-        res = etree.tostring(combined_tb.as_xhtml(None), encoding="utf-8", pretty_print=True).decode()
+        res = etree.tostring(combined_tb.as_xhtml(None), encoding="utf-8", pretty_print=True).decode("utf-8")
         res = re.sub("p xmlns[^>]*", "p", res)
         want = """<p><i>Myndigheten ska </i>lämna <i>enligt</i> 23 a §.</p>"""
         self.assertEqual(want, res.strip())
@@ -705,7 +705,7 @@ class ParseXML(unittest.TestCase):
 <text top="851" left="86" width="552" height="17" font="4"><i>specifikationer.  </i>Vidare</i></text>
 """)
         combined_tb = pdf[0][0] + pdf[0][1]
-        res = etree.tostring(combined_tb.as_xhtml(None), encoding="utf-8", pretty_print=True).decode()
+        res = etree.tostring(combined_tb.as_xhtml(None), encoding="utf-8", pretty_print=True).decode("utf-8")
         res = re.sub("p xmlns[^>]*", "p", res)
         want = "<p><i>balansräkning</i> samt <i>specifikationer. </i>Vidare</p>"
         self.assertEqual(want, res.strip())
@@ -717,7 +717,7 @@ class ParseXML(unittest.TestCase):
 <text top="1157" left="86" width="78" height="17" font="0">2 kap. 6 §.</text>
 """)
         combined_tb = pdf[0][0] + pdf[0][1]
-        res = etree.tostring(combined_tb.as_xhtml(None), encoding="utf-8", pretty_print=True).decode()
+        res = etree.tostring(combined_tb.as_xhtml(None), encoding="utf-8", pretty_print=True).decode("utf-8")
         res = re.sub("p xmlns[^>]*", "p", res)
         want = "<p>begreppet <i>närings</i>verksamhet i 2 kap. 6 §.</p>"
         self.assertEqual(want, res.strip())
@@ -727,7 +727,7 @@ class ParseXML(unittest.TestCase):
 <fontspec id="0" size="7" family="Times New Roman" color="#000000"/>
 <text top="896" left="86" width="552" height="17" font="0"><i>sidoordnad bokföring</i>,<i>  </i>samt</text>
 """)
-        res = etree.tostring(pdf[0][0].as_xhtml(None), encoding="utf-8", pretty_print=True).decode()
+        res = etree.tostring(pdf[0][0].as_xhtml(None), encoding="utf-8", pretty_print=True).decode("utf-8")
         res = re.sub("p xmlns[^>]*", "p", res)
         want = "<p><i>sidoordnad bokföring</i>, samt</p>"
         self.assertEqual(want, res.strip())

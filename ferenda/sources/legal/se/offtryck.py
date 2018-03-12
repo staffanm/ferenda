@@ -464,7 +464,7 @@ class Offtryck(SwedishLegalSource):
                                 # IDs for some named laws. Reuse these when
                                 # parsing the bulk of the text.
                                 self.refparser._legalrefparser.currentlynamedlaws.update(self.sfsparser.currentlynamedlaws)
-
+                            # FIXME: This fails on py2
                             hits_before = self.refparser._legalrefparser.tuple_to_uri.cache_info().hits
                             body = self.refparser.parse_recursive(body)
                             seen = self.refparser.seen_strings
@@ -851,7 +851,8 @@ class Offtryck(SwedishLegalSource):
         for subsection in node: # nb: Node is the "Författningskommentar" chapter
             if cf.is_commentary_section(subsection):
                 found = True
-                commentaries.append((subsection, *cf.identify_law(subsection.title)))
+                uri, lawname = cf.identify_law(subsection.title)
+                commentaries.append((subsection, uri, lawname))
         if not found: #  # no subsecs, ie the prop changes a single law
             if 'primarylaw' in state:
                 commentaries.append((node, state['primarylaw'], state['primarylawname']))
