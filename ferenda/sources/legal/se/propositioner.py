@@ -647,6 +647,24 @@ class PropKB(Offtryck, PDFDocumentRepository):
         opts['ocr'] = False
         return opts
 
+    def download_get_first_page(self):
+        # if we have already successfully downloaded everything, there
+        # is no need to even make a single network request (and we'd
+        # have to do at least 100 otherwise) since no new docs will
+        # ever be published (normally -- and if they are, just set
+        # config.refresh)
+        if (not self.config.refresh and
+            'lastdownload' in self.config and
+            self.config.lastdownload):
+            class DummyResp(object):
+                def raise_for_status(self):
+                    pass
+                text = "<h1>no data</h1>"
+            return DummyResp()
+        else:
+            return super(PropKB, self).download_get_first_page()
+
+
     @decorators.downloadmax
     def download_get_basefiles(self, source):
         yielded = set()
@@ -668,6 +686,8 @@ class PropKB(Offtryck, PDFDocumentRepository):
                         basefile = "%s:%s" % (m.group("year"), m.group("no"))
                         part = m.group("part")
                         if (basefile,part) in yielded:
+                            continue
+                        if self.get_parse_options(basefile) == "skip":
                             continue
                         if part and int(part) > 1:
                             # do something smart here so that
