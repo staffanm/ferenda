@@ -513,7 +513,13 @@ class PDFReader(CompoundElement):
             #
             newfp = BytesIO()
             buffer = xmlfp.read()
-
+            if not isinstance(buffer, bytes):
+                self.log.warning("File %s was opened in text, not binary mode" % util.name_from_fp(xmlfp))
+                buffer = bytes(buffer.encode("utf-8"))
+            else:
+                # convert to a py3 style bytes() object (one that
+                # returns ints, not strs, when iterating over it)
+                buffer = bytes(buffer)
             # NOTE: That bug in pdftohtml has now been fixed
             # (https://bugs.freedesktop.org/show_bug.cgi?id=101770) in
             # poppler 0.57. If our poppler is that version or newer,
@@ -522,15 +528,9 @@ class PDFReader(CompoundElement):
             version = re.search('version="([^"]*)"', buffer[40:150].decode()).group(1)
             version = [int(x) for x in version.split(".")]
             if version >= [0, 57]:
-                raise errors.ExternalCommandError("Your version of pdftohtml (poppler-utils) is too new and lacks a bug that is required to access text using custom encodings. We are so very sorry.")
-            
-            if not isinstance(buffer, bytes):
-                self.log.warning("File %s was opened in text, not binary mode" % util.name_from_fp(xmlfp))
-                buffer = bytes(buffer.encode("utf-8"))
-            else:
-                # convert to a py3 style bytes() object (one that
-                # returns ints, not strs, when iterating over it)
-                buffer = bytes(buffer)
+                raise errors.ExternalCommandError("Your version of pdftohtml (poppler-utils) is too new "
+                                                  "and lacks a bug that is required to access text using "
+                                                  "custom encodings. We are so very sorry.")
             for idx, b in enumerate(buffer):
                 # leave some control chars as-is (CR/LF but not TAB)
                 if b < 0x20 and b not in (0xa, 0xd):
