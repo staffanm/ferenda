@@ -23,7 +23,8 @@ echo "creating statusreport"
 ./ferenda-build.py devel statusreport
 cd ..
 echo "running smoketests"
-FERENDA_TESTURL=http://eliot/ tools/test.sh integrationLagen
+FERENDA_TESTURL=http://nate/ tools/test.sh integrationLagen
 echo "deploying to remote"
 # This MUST be run on the ES host (nate).
-ssh nate "cd wds/ferenda && fab -H colo.tomtebo.org -f tools/fabfile.py deploy"
+# ssh nate "cd wds/ferenda && fab -H colo.tomtebo.org -f tools/fabfile.py deploy"
+fab -H colo.tomtebo.org -f tools/fabfile.py deploy
