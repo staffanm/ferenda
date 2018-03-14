@@ -733,8 +733,12 @@ class PDFReader(CompoundElement):
         # <textelement tag="b">something </textelement>
         merged = []
         for x in textelements:
-            # if only whitespace, merge with previous
-            if merged and x and not x.strip():
+            # if only whitespace, merge with previous (if compatible)
+            if (merged and
+                x and
+                not x.strip() and
+                type(merged[-1]) == type(x) and
+                getattr(merged[-1], 'uri', None) == getattr(x, 'uri', None)):
                 merged[-1] = merged[-1] + x
             else:
                 merged.append(x)
