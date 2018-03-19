@@ -1667,7 +1667,7 @@ class SFS(Trips):
                 tree = etree.parse(descfile)
                 for desc in tree.findall(".//{http://www.w3.org/1999/xhtml}div[@class='forfattningskommentar']"):
                     about = desc.get("about")
-                    if basefile not in about and tempsfs not in about:
+                    if about is None or (basefile not in about and tempsfs not in about):
                         continue
                     descriptions[descfile][about] = desc.find("{http://www.w3.org/1999/xhtml}div")
 
