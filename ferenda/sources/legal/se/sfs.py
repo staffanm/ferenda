@@ -302,7 +302,7 @@ class SFS(Trips):
         # should parse it to find the correct URL (will have a post_id
         # parameter)
         if ("<div>Inga tr\xe4ffar</div>" not in text and
-            not re.search("Totalt <strong>\d+</strong> tr\xe4ffar", text)):
+            not re.search(r"Totalt <strong>\d+</strong> tr\xe4ffar", text)):
             grundforf.append("%s:%s" % (year, nr))
             return grundforf
 
@@ -315,11 +315,11 @@ class SFS(Trips):
         # this search will never work right with one-or two digit
         # ordinals. Bug filed with RK.
         if ("<div>Inga tr\xe4ffar</div>" in text or
-            re.search("Totalt <strong>\d+</strong> tr\xe4ffar", text)):
+            re.search(r"Totalt <strong>\d+</strong> tr\xe4ffar", text)):
             self.log.debug('    Found no change act')
             return grundforf
 
-        m = re.search('<a href="/sfst\?bet=([^"]+)"', text)
+        m = re.search(r'<a href="/sfst\?bet=([^"]+)"', text)
         if m:
             grundforf.append(m.group(1))
             self.log.debug('    Found change act (to %s)' %
@@ -450,7 +450,7 @@ class SFS(Trips):
         try:
             reader.cue("\xc4ndring inf\xf6rd:</span> t.o.m. SFS")
             l = reader.readline()
-            m = re.search('(\d+:\s?\d+)', l)
+            m = re.search(r'(\d+:\s?\d+)', l)
             if m:
                 return m.group(1)
             else:
@@ -572,7 +572,7 @@ class SFS(Trips):
                 idx = rawtext.find(needle, 0, 10000)
                 if idx != -1:
                     datestr = rawtext[idx+len(needle):idx+len(needle)+10]
-                    if (not re.match("\d+-\d+-\d+$", datestr) or
+                    if (not re.match(r"\d+-\d+-\d+$", datestr) or
                         (datetime.strptime(datestr, '%Y-%m-%d') < datetime.today())):
                         self.log.debug('%s: Expired' % basefile)
                         raise UpphavdForfattning("%s is an expired SFS" % basefile,
@@ -762,7 +762,7 @@ class SFS(Trips):
                             if identifier:
                                 d[node.uri] = {"dcterms:identifier": identifier}
                 elif key == 'CELEX-nr':
-                    for celex in re.findall('3\d{2,4}[LR]\d{4}', val):
+                    for celex in re.findall(r'3\d{2,4}[LR]\d{4}', val):
                         b = BNode()
                         cg = Graph()
                         cg.add((b, RPUBL.celexNummer, Literal(celex)))
@@ -880,7 +880,7 @@ class SFS(Trips):
         # loop until done to handle "Justitiedepartementet DOM, L5 och \xc5"
         cleaned = None
         while True:
-            cleaned = re.sub(",? (och|[A-Z\xc5\xc4\xd6\d]{1,5})$", "", val)
+            cleaned = re.sub(r",? (och|[A-Z\xc5\xc4\xd6\d]{1,5})$", "", val)
             if val == cleaned:
                 break
             val = cleaned
@@ -964,7 +964,7 @@ class SFS(Trips):
         return resource
 
 
-    re_missing_newline = re.compile("(\.)\n([IV]+  )", flags=re.MULTILINE)
+    re_missing_newline = re.compile(r"(\.)\n([IV]+  )", flags=re.MULTILINE)
     def sanitize_body(self, textreader):
         # add missing newlines where we can detect them missing. We
         # could do this with patchfiles, but some errors seem
@@ -1678,7 +1678,7 @@ class SFS(Trips):
             shortdesclen = self.config.shortdesclen
             if len(shortdesc) > shortdesclen:
                 # first split the (markup) string at the best word boundary
-                m = re.match('(.{%d,}?\S)\s'%shortdesclen, shortdesc, re.DOTALL)
+                m = re.match(r'(.{%d,}?\S)\s'%shortdesclen, shortdesc, re.DOTALL)
                 if m:
                     shortdesc = m.group()
                     # then, make sure all tags are ended properly
@@ -1942,13 +1942,13 @@ class SFS(Trips):
                     title = oldtitle
 
         # these are for better sorting/selecting
-        title = re.sub('Kungl\. Maj:ts ', '', title)
+        title = re.sub(r'Kungl\. Maj:ts ', '', title)
         # if newtitle was selected above, it might not contain the SFSid eg "(2016:123)"
         title = re.sub(
-            '^(Lag|F\xf6rordning|Tillk\xe4nnagivande|[kK]ung\xf6relse) ?(\([^\)]+\)|) ?(av|om|med|ang\xe5ende) ',
+            r'^(Lag|F\xf6rordning|Tillk\xe4nnagivande|[kK]ung\xf6relse) ?(\([^\)]+\)|) ?(av|om|med|ang\xe5ende) ',
             '',
             title)
-        title = re.sub("^\d{4} \xe5rs ", "", title)
+        title = re.sub(r"^\d{4} \xe5rs ", "", title)
 
         return title
 
@@ -2025,7 +2025,7 @@ WHERE {
     def _relate_fulltext_resources(self, body):
         # only return K1, K1P1 or B1, not more fine-grained resources
         # like K1P1S1N1
-        return [body] + [r for r in body.findall(".//*[@about]") if re.search("#[KPBS]\d+\w?(P\d+\w?|)$", r.get("about"))]
+        return [body] + [r for r in body.findall(".//*[@about]") if re.search(r"#[KPBS]\d+\w?(P\d+\w?|)$", r.get("about"))]
     
     _relate_fulltext_value_cache = {}
     def _relate_fulltext_value(self, facet, resource, desc):
