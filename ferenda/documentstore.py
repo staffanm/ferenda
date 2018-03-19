@@ -142,6 +142,13 @@ class _open(object):
                 os.unlink(tempname)
             return ret
         else:
+            # This is needed sometimes since
+            # Bzip2File/LZMAFile/GzipFile doesn't close the open file
+            # objects that they wrap
+            if hasattr(self.fp, '_fp'):  # for Bzip2File/LZMAFile with IOBufferedReader
+                self.fp._fp.close()
+            if hasattr(self.fp, 'fileobj'):  # for GzipFile in the same situation
+                self.fp.fileobj.close()
             return self.fp.close()
 
     def read(self, *args, **kwargs):

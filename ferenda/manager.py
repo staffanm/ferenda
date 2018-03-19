@@ -257,6 +257,7 @@ def frontpage(repos,
 
 
 def runserver(repos,
+              config=None,
               port=8000,  # now that we require url, we don't need this
               documentroot="data",  # relative to cwd
               apiendpoint="/api/",
@@ -300,7 +301,7 @@ def runserver(repos,
         inifile = _find_config_file()
     except errors.ConfigurationError:
         inifile = None
-    httpd = make_server('', port, make_wsgi_app(inifile, **kwargs))
+    httpd = make_server('', port, make_wsgi_app(inifile, config, **kwargs))
     httpd.serve_forever()
 
 def status(repo, samplesize=3):
@@ -348,7 +349,7 @@ def status(repo, samplesize=3):
     
 
 
-def make_wsgi_app(inifile=None, **kwargs):
+def make_wsgi_app(inifile=None, config=None, **kwargs):
     """Creates a callable object that can act as a WSGI application by
     mod_wsgi, gunicorn, the built-in webserver, or any other
     WSGI-compliant webserver.
@@ -363,7 +364,8 @@ def make_wsgi_app(inifile=None, **kwargs):
     if inifile:
         assert os.path.exists(
             inifile), "INI file %s doesn't exist (relative to %s)" % (inifile, os.getcwd())
-        config = _load_config(inifile)
+        if config is None:
+            config = _load_config(inifile)
         if not kwargs:
             kwargs = _setup_runserver_args(config, inifile)
         kwargs['inifile'] = inifile
@@ -401,7 +403,7 @@ def setup_logger(level='INFO', filename=None,
     :type filename: str
 
     """
-    l = logging.getLogger()  # get the root logger
+    l = getlog()  # get the root logger
     if not isinstance(level, int):
         loglevel = loglevels[level]
 
@@ -428,7 +430,7 @@ def setup_logger(level='INFO', filename=None,
                     'rdflib.plugins.sleepycat',
                     'rdflib.plugins.parsers.pyRdfa',
                     'ferenda.thirdparty.patch']:
-        log = logging.getLogger(logname)
+        log = getlog(logname)
         log.propagate = False
         if log.handlers == []:
             if hasattr(logging, 'NullHandler'):
@@ -446,19 +448,20 @@ def setup_logger(level='INFO', filename=None,
 
 def shutdown_logger():
     """Shuts down the configured logger. In particular, closes any
-    FileHandlers, which is needed on win32."""
+    FileHandlers, which is needed on win32 (and is a good idea on all
+    platforms).
 
-    # we only close handles on win32. This is because this works badly
-    # in conjunction with the quiet decorator, which sets up a
-    # /dev/null-like FileHandler, which shouldn't be removed,
-    # particularly not for tests that call run() twice or more. So we
-    # only close handles if we need it.
-    if sys.platform == "win32":
-        l = logging.getLogger()  # get the root logger
-        for existing_handler in list(l.handlers):
-            if isinstance(existing_handler, logging.FileHandler):
-                existing_handler.close()
-            l.removeHandler(existing_handler)
+    """
+    l = logging.getLogger()  # get the root logger
+    for existing_handler in list(l.handlers):
+        # a TempFileHandler means that the quiet() decorator or
+        # silence() context manager is in use. Don't remove these, the
+        # decorator/ctxmgr will do so when it's time.
+        if type(existing_handler).__name__ == "TempFileHandler":
+            continue
+        if isinstance(existing_handler, logging.FileHandler):
+            existing_handler.close()
+        l.removeHandler(existing_handler)
 
 
 def run(argv, config=None, subcall=False):
@@ -500,8 +503,11 @@ def run(argv, config=None, subcall=False):
     log = setup_logger(level=config.loglevel, filename=None)
     # if logfile is set to True (the default), autogenerate logfile
     # name from current datetime. Otherwise assume logfile is set to
-    # the desired file name of the log
-    if config.logfile and subcall is False and action != "buildclient":
+    # the desired file name of the log. However, if there already
+    # exists a logfile handler, don't create another one (the existing
+    # handler might have been set up by the @quiet decorator).
+    if (config.logfile and subcall is False and action != "buildclient" and
+        not any((isinstance(x, logging.FileHandler) for x in log.handlers))):
         # when running as buildclient, we don't want to each client to
         # create a logfile of their own. Instead, client nodes collect
         # log entries during each run and pass them as part of the
@@ -1089,11 +1095,10 @@ def runbuildclient(clientname,
                    serverport,
                    authkey,
                    processes):
-
     done = False
     # _run_jobqueue_multiprocessing > _build_worker might throw an exception,
     # which is how we exit
-    print("%s starting up buildclient with %s processes" % (clientname, processes))
+    getlog().info("%s starting up buildclient with %s processes" % (clientname, processes))
     while not done:
         manager = _make_client_manager(serverhost,
                                        serverport,
@@ -1135,7 +1140,6 @@ def _make_client_manager(ip, port, authkey):
             getlog().debug('Client: [pid %s] connected to %s:%s' % (os.getpid(), ip, port))
             return manager
         except Exception as e:
-            # print("Client: %s: sleeping and retrying..." % e)
             sleep(2)
 
 
@@ -1196,10 +1200,9 @@ def _build_worker(jobqueue, resultqueue, clientname):
             job = jobqueue.get()  # get() blocks -- wait until a job or the
                                   # DONE/SHUTDOWN signal comes
         except (EOFError, BrokenPipeError) as e:
-            print("%s: Couldn't get a new job from the queue, buildserver probably done?" % 
-                os.getpid())
+            getlog().error("%s: Couldn't get a new job from the queue, buildserver "
+                           "probably done?" % os.getpid())
             return
-                                  
         if job == "DONE":  # or a more sensible value
             # getlog().debug("Client: [pid %s] Got DONE signal" % os.getpid())
             return  # back to runbuildclient
@@ -1235,7 +1238,7 @@ def _build_worker(jobqueue, resultqueue, clientname):
         logrecords[:] = []
         try:
             resultqueue.put(outdict)
-            if clientname:
+            if clientname and log.level < logging.CRITICAL:
                 sys.stdout.write(".")
                 sys.stdout.flush()
 
@@ -1276,19 +1279,22 @@ def _instantiate_and_configure(classname, config, logrecords, clientname):
     inst = _instantiate_class(_load_class(classname))
     inst.config.clientname = clientname
     for k, v in config.items():
-        # log.debug("Client: [pid %s] setting config value %s to %r" % (os.getpid(), k, v))
         LayeredConfig.set(inst.config, k, v)
+        # if getattr(inst.config, k) != v:
+        #    print("pid %s: config %s is %s, should be %s" %
+        #          (os.getpid(), k, getattr(inst.config, k), v))
 
     # When running in distributed mode (but not in multiprocessing
     # mode), setup the root logger to log to a StringIO buffer.
     if clientname:
         # log.debug("Client: [pid %s] Setting up log" % os.getpid())
-        log = setup_logger(inst.config.loglevel)
+        # log = setup_logger(inst.config.loglevel)
+        log = setup_logger(config.get('loglevel', 'WARNING'))
         for handler in list(log.handlers):
             log.removeHandler(handler)
         handler = MarshallingHandler(logrecords)
         log.addHandler(handler)
-        log.setLevel(loglevels[inst.config.loglevel])
+        log.setLevel(config.get('loglevel', 'WARNING'))
     # log.debug("Client: [pid %s] Log is configured" % os.getpid())
     else:
         pass
@@ -1874,7 +1880,8 @@ def _setup_runserver_args(config, inifilename):
 
     # for repo in repos:
     #    print("Repo %r %s: config.datadir is %s" % (repo, id(repo), repo.config.datadir))
-    return {'port':           port,
+    return {'config':         config,
+            'port':           port,
             'documentroot':   relativeroot,
             'apiendpoint':    config.apiendpoint,
             'searchendpoint': config.searchendpoint,

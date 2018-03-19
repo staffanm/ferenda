@@ -298,8 +298,10 @@ class BaseAPI(RepoTester):
             want = json.load(fp)
         self.assertEqual(want, got)
 
-        got  = json.load(open(self.datadir + "/data/rsrc/api/common.json"))
-        want = json.load(open("test/files/api/var-common.json"))
+        with open(self.datadir + "/data/rsrc/api/common.json") as fp:
+            got  = json.load(fp)
+        with open("test/files/api/var-common.json") as fp:
+            want = json.load(fp)
         self.assertEqual(want,got)
 
 class ComplexAPI(RepoTester):

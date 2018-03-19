@@ -26,7 +26,7 @@ shift $((OPTIND-1))
 # Control how warnings are processed. Some examples:
 # -We::UserWarning to make exceptions out of warnings
 # -Wi::DeprecationWarning:bs4 to ignore warnings in the bs4 module
-PYTHONWARNINGS=-Wi::DeprecationWarning:bs4
+PYTHONWARNINGS=
 
 if [ -n "$@" ]
 then

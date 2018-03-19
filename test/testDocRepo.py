@@ -38,6 +38,9 @@ from examplerepos import DocRepo1, DocRepo2, DocRepo3
 from ferenda import util
 from ferenda.elements import serialize, Link
 
+from ferenda.compat import unittest
+
+
 class Repo(RepoTester):
     # TODO: Many parts of this class could be divided into subclasses
     # (like Generate, Toc, News, Storage and Archive already has)
@@ -48,6 +51,7 @@ class Repo(RepoTester):
         if hasattr(Repo, 'repo'):
             delattr(Repo, 'repo')
 
+    
     def test_init(self):
         # make sure self.ns is properly initialized
         class StandardNS(DocumentRepository):
@@ -68,6 +72,7 @@ class Repo(RepoTester):
                 rdflib.Namespace('http://example.org/vocab')}
         self.assertEqual(want, d.ns)
 
+    
     def test_setup_teardown(self):
         defaults = {'example':'config',
                     'setup': None,
@@ -97,11 +102,13 @@ class Repo(RepoTester):
         self.assertEqual(config.setup, None)
         self.assertEqual(config.teardown, "relate")
 
+    
     def test_dataset_uri(self):
         repo = DocumentRepository()
         self.assertEqual(repo.dataset_uri(), "http://localhost:8000/dataset/base")
         self.assertEqual(repo.dataset_uri('key','value'), "http://localhost:8000/dataset/base?key=value")
 
+    
     def test_qualified_class_name(self):
         repo = DocumentRepository()
         self.assertEqual(repo.qualified_class_name(),
@@ -205,7 +212,6 @@ class Repo(RepoTester):
             d.download("123/a")
         
         
-
     def test_download_single(self):
         url_location = None # The local location of the URL. 
         def my_get(url,**kwargs):
@@ -286,7 +292,6 @@ class Repo(RepoTester):
 
     # @patch('requests.get')
     def test_download_if_needed(self):
-
         def my_get(url,headers, timeout=None):
             # observes the scoped variables "last_modified" (should
             # contain a formatted date string according to HTTP rules)
@@ -342,7 +347,6 @@ class Repo(RepoTester):
             expect_if_modified_since = False
             expect_if_none_match     = False
             mock_get.side_effect = my_get
-
             # test1: file does not exist, we should not send a
             # if-modified-since, recieve a last-modified header and verify
             # file mtime
@@ -476,8 +480,9 @@ class Repo(RepoTester):
             # test10: RequestException
             mock_get.side_effect = requests.exceptions.RequestException
             with self.assertRaises(requests.exceptions.RequestException):
-                d.download_if_needed("http://example.org/document",
-                                     "example")
+                with silence():
+                    d.download_if_needed("http://example.org/document",
+                                         "example")
             mock_get.reset_mock()
 
 
@@ -491,6 +496,7 @@ class Repo(RepoTester):
 
 
     # class Parse(RepoTester)
+
 
     def test_parse(self):
         xhtmlns = "{http://www.w3.org/1999/xhtml}"
@@ -1528,9 +1534,8 @@ WHERE {
         with self.assertRaises(Exception):
             Facet.year({'dcterms_issued': '2014-14-99'})
         
+
 class Storage(RepoTester):
-
-
     def test_list_basefiles_file(self):
         files = ["base/downloaded/123/a.html",
                  "base/downloaded/123/b.html",
@@ -1693,6 +1698,7 @@ class Archive(RepoTester):
                          ['1'])
         self.assertEqual(list(self.repo.store.list_versions("123/a")),
                          ['1','2','3', '4'])
+
 
 class Patch(RepoTester):
     sourcedoc = """<body>
@@ -1958,9 +1964,9 @@ It can span several lines."""
         self.assertEqual(self.targetdoc3, result)
         
 
-# Add doctests in the module
-from ferenda import documentrepository
-from ferenda.testutil import Py23DocChecker
-def load_tests(loader,tests,ignore):
-    tests.addTests(doctest.DocTestSuite(documentrepository, checker=Py23DocChecker()))
-    return tests
+# # Add doctests in the module
+# from ferenda import documentrepository
+# from ferenda.testutil import Py23DocChecker
+# def load_tests(loader,tests,ignore):
+#     tests.addTests(doctest.DocTestSuite(documentrepository, checker=Py23DocChecker()))
+#     return tests

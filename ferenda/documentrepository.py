@@ -2183,7 +2183,8 @@ parsed document path to that documents dependency file."""
                 util.outfile_is_newer([dumppath], cachepath)):
             self.log.debug("Loading faceted_data from %s" % cachepath)
             hook = util.make_json_date_object_hook('dcterms_issued')
-            data = json.load(open(cachepath), object_hook=hook)
+            with open(cachepath) as fp:
+                data = json.load(fp, object_hook=hook)
         else:
             data = self.facet_select(self.facet_query(self.dataset_uri()))
             # make sure the dataset contains no duplicate entries --

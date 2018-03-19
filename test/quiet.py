@@ -7,6 +7,8 @@ from contextlib import contextmanager
 
 from ferenda.compat import patch
 
+class TempFileHandler(logging.FileHandler): pass
+
 def quiet():
     """A decorator that ensures that anything called by the decorated
     method won't output anything to the console, either by logging
@@ -30,9 +32,11 @@ def silence():
     """The same functionality as quiet(), but as a context manager so that
     one can use "with silence:" constructs."""
     state = _setup()
-    with patch('builtins.print') as printmock:
-        yield
-    _restore(state)
+    try:
+        with patch('builtins.print') as printmock:
+            yield
+    finally:
+        _restore(state)
 
 def _setup():
     l = logging.getLogger()
@@ -42,7 +46,7 @@ def _setup():
             break
     else:
         fileno, tmp = tempfile.mkstemp()
-        l.addHandler(logging.FileHandler(tmp))
+        l.addHandler(TempFileHandler(tmp))
         h = logging.StreamHandler()
         h.setLevel(logging.CRITICAL)
         h.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s",
@@ -58,6 +62,10 @@ def _restore(state):
     # assert l.level == logging.CRITICAL, "Someone messed with the root logger level"
     l.setLevel(prevlevel)
     h.setLevel(prevlevel) # otherwise it'll be the default logging.WARNING i think
+    for handler in list(l.handlers):
+        if isinstance(handler, TempFileHandler):
+            handler.close()
+            l.handlers.remove(handler)
     if tmp:
         os.unlink(tmp)
     

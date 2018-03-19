@@ -1037,7 +1037,7 @@ if __name__ == '__main__':
                     stderr=PIPE)
         try:
             # run an in-process server
-            argv = ["test", "pid", "--all", "--buildserver"]
+            argv = ["test", "pid", "--all", "--buildserver", "--loglevel=CRITICAL"]
             res = manager.run(argv)
             # same tests as for RunMultiproc.test_run_single_all
             args = [x[0] for x in res]
@@ -1047,8 +1047,10 @@ if __name__ == '__main__':
             self.assertEqual(set(args), set(["arg1", "myarg", "arg2"]))
             self.assertEqual(3, len(set(pids)))
         finally:
-            foo.terminate()
-            bar.terminate()
+            for p in foo, bar:
+                p.terminate()
+                p.wait()
+                p.stderr.close()
 
     @unittest.skipIf(sys.platform == "win32", "Queueless server mode not supported on Windows")
     def test_server_all(self):
@@ -1064,7 +1066,7 @@ if __name__ == '__main__':
                     stderr=PIPE)
         try:
             # run an in-process server
-            argv = ["all", "pid", "--all", "--buildserver"]
+            argv = ["all", "pid", "--all", "--buildserver", "--loglevel=CRITICAL"]
             res = manager.run(argv)
             # we should have two main sets of results, the first from
             # Testrepo, the second from Testrepo2
@@ -1082,8 +1084,10 @@ if __name__ == '__main__':
             self.assertEqual(3, len(set(pids2)))
             
         finally:
-            foo.terminate()
-            bar.terminate()
+            for p in foo, bar:
+                p.terminate()
+                p.wait()
+                p.stderr.close()
         
 
     def test_queue(self):
@@ -1094,7 +1098,6 @@ if __name__ == '__main__':
         # create a out-of-process buildqueue server
         queue = Popen(['python', 'ferenda-build.py', 'all',
                        'buildqueue', '--serverport=3456'])
-
         # create two out-of-process clients
         foo = Popen(['python', 'ferenda-build.py', 'all',
                      'buildclient', '--clientname=foo', '--serverport=3456',
@@ -1111,7 +1114,7 @@ if __name__ == '__main__':
         try:
             # then, in-process, push jobs to that queue and watch them
             # return results
-            argv = ["test", "pid", "--all", "--buildqueue", "--serverport=3456"]
+            argv = ["test", "pid", "--all", "--buildqueue", "--serverport=3456", "--loglevel=CRITICAL"]
             res = manager.run(argv)
             # same tests as for RunMultiproc.test_run_single_all
             args = [x[0] for x in res]
@@ -1131,10 +1134,13 @@ if __name__ == '__main__':
                     child.kill()
                 for child in psutil.Process(bar.pid).children(recursive=True):
                     child.kill()
-            
-            foo.terminate()
-            bar.terminate()
-            queue.terminate()
+
+            for p in foo, bar, queue:
+                p.terminate()
+                p.wait() # to clear up the process table (otherwise p lives on as zombie)
+                if p.stderr:
+                    p.stderr.close()
+                
 
 import doctest
 from ferenda import manager
