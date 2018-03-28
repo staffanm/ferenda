@@ -599,7 +599,7 @@ Disallow: /-/
                 results = OrderedDict()
                 for action in ("download",
                                "parse", "relate", "makeresources",
-                               "toc", "generate", "news", "frontpage"):
+                               "toc", "generate", "transformlinks", "news", "frontpage"):
                     if action in ("makeresources", "frontpage"):
                         argscopy = argv[2:]  # skip alias and action
                         argscopy.insert(0, action)
@@ -610,10 +610,14 @@ Disallow: /-/
                         for classname in classnames:
                             alias = enabled_aliases[classname]
                             argscopy = argv[2:]
-                            if action in ("parse", "relate", "generate"):
+                            if action in ("parse", "relate", "generate", "transformlinks"):
                                 config.all = True
                             else:
                                 config.all = False
+                            # FIXME: if action is transformlinks and
+                            # neither config.{develurl,staticsite} is
+                            # set, we should not call run at all
+                            # (there's no reason to transform links)
                             argscopy.insert(0, action)
                             argscopy.insert(0, classname)
                             try:
@@ -1765,7 +1769,8 @@ def _list_class_usage(cls):
     ...     'download':'Downloads all documents from a remote web service.',
     ...     'parse':'Parse downloaded documents into structured XML and RDF.',
     ...     'relate':'Runs various indexing operations for the document.',
-    ...     'generate':'Generate a browser-ready HTML file from structured XML and RDF.'}
+    ...     'generate':'Generate a browser-ready HTML file from structured XML and RDF.',
+    ...     'transformlinks':'Transform links in generated HTML files.'}
     True
 
     Note: Descriptions are taken from the first line of the action

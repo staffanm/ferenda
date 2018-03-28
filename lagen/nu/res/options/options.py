@@ -549,7 +549,7 @@
     ("sou", "2009:18"): "metadataonly",
     ("sou", "2009:12"): "metadataonly",
     ("sou", "2008:103"): "metadataonly",
-    ("sou", "2008:88"): "metadataonly",
+    # ("sou", "2008:88"): "metadataonly", Elektroniskt kungörande av författningar - refrerred from at least prop 2015/16:157
     ("sou", "2008:75"): "metadataonly",
     ("sou", "2008:56"): "metadataonly",
     ("sou", "2008:5"): "metadataonly",

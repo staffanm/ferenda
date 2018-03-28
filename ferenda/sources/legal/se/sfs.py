@@ -114,7 +114,7 @@ class SFS(Trips):
     app = "sfst"  # dir, prop, sfst
     base = "SFSR"  # DIR, THWALLPROP, SFSR
     # This must be pretty lax, basefile is sanitized later
-    basefile_regex = "(?P<basefile>\d{4}:(bih. ?|)\d+( ?s\. ?\d+| \d|))$"
+    basefile_regex = r"(?P<basefile>\d{4}:(bih. ?|)\d+( ?s\. ?\d+| \d|))$"
     # start_url = "http://rkrattsbaser.gov.se/sfsr/adv?sort=asc"
     start_url = "http://rkrattsbaser.gov.se/sfsr/adv?upph=false&sort=asc"
     document_url_template = "http://rkrattsbaser.gov.se/sfst?bet=%(basefile)s"

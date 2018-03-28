@@ -558,9 +558,7 @@ class DocumentRepository(object):
             'bulktripleload': False,
             'class': cls.__module__ + "." + cls.__name__,
             # FIXME: These only make sense at a global level, and
-            # furthermore are duplicated in manager._load_config. We
-            # now hardcode CDN paths to bootstrap and jquery into
-            # base.xsl
+            # furthermore are duplicated in manager._load_config.
             'cssfiles': ['css/ferenda.css'],
             'jsfiles': ['js/ferenda.js'],
             'imgfiles': ['img/atom.png'],
@@ -657,7 +655,7 @@ with the *config* object as single parameter.
         >>> d = DocumentRepository()
         >>> d.alias
         'base'
-        >>> d.config.url = "http://example.org/"
+        >>> d.config.url = "http://exampole.org/"
         >>> d.dataset_uri()
         'http://example.org/dataset/base'
         >>> d.dataset_uri("title","a")
@@ -2437,13 +2435,6 @@ WHERE {
                 repos = list(otherrepos)
                 if self not in repos:
                     repos.append(self)
-                transformargs = {'repos': repos,
-                                 'remove_missing': self.config.removeinvalidlinks}
-                if self.config.staticsite:
-                    transformargs['basedir'] = os.path.dirname(outfile)
-                elif 'develurl' in self.config:
-                    transformargs['develurl'] = self.config.develurl
-                urltransform = self.get_url_transform_func(**transformargs)
                 if self.config.staticsite:
                     depth = None
                 else:
@@ -2455,9 +2446,7 @@ WHERE {
                     # transform_file
                     urlparse(self.canonical_uri(basefile)).path[1:-1].count("/") 
                     depth = urlparse(self.canonical_uri(basefile)).path[1:-1].count("/")
-
-                transformer.transform_file(infile, outfile,
-                                           params, urltransform, depth)
+                transformer.transform_file(infile, outfile, params, depth=depth)
 
             # At this point, outfile may appear untouched if it already
             # existed and wasn't actually changed. But this will cause the
@@ -2483,7 +2472,9 @@ WHERE {
         only run if ``config.staticsite``is ``True``.
 
         """
-        def getpath(url, repos, methodname="documententry_path"):
+        def getpath(url, repos, methodname="generated_path"):
+            if methodname == "generated_path" and url == self.config.url:
+                return self.config.datadir + os.sep + "index.html"
             for (repoidx, repo) in enumerate(repos):
                 # FIXME: This works less than optimal when using
                 # CompositeRepository -- the problem is that a subrepo
@@ -2515,7 +2506,7 @@ WHERE {
         
         def simple_transform(url):
             if url.startswith(self.config.url):
-                if base_transform(url, "generated_path") is False:
+                if base_transform(url) is False:
                     return False
                 # convert eg.
                 # "https://lagen.nu/dom/md/2014:2?repo=dv&attachment=1.pdf"
@@ -2540,11 +2531,12 @@ WHERE {
                         relpath = relpath.replace(os.sep, "/")
                     return relpath
                 else:
+                    # this is an implicit self.config.removemissing
                     return False
             else:
                 return url
 
-        def base_transform(url, method="documententry_path"):
+        def base_transform(url, method="generated_path"):
             if remove_missing:
                 path = getpath(url, repos, method)
                 # If the file being transformed contains references to
@@ -2681,6 +2673,48 @@ WHERE {
         """
         return self.generic_url(basefile, 'generated', '.html')
 
+    #
+    #
+    # STEP 4.5: After generating HTML, go through all links and
+    # rewrite/transform them (we cannot do that as part of generate(),
+    # since the transform may depend on whether generated files exist
+    # on disk)
+    @decorators.action
+    def transformlinks(self, basefile, otherrepos=[]):
+        """Transform links in generated HTML files.
+
+        If the ``develurl`` or ``staticsite`` settings are used, this
+        function makes sure links are transformed to appropriate local
+        links.
+
+        """
+        # FIXME: Do we need any way of preventing double-transforming?
+        # How should we detect that a file already has been
+        # transformed?
+        repos = list(otherrepos)
+        generatedfile = self.store.generated_path(basefile)
+        if self not in repos:
+            repos.append(self)
+        transformargs = {'repos': repos,
+                         'remove_missing': self.config.removeinvalidlinks}
+        if self.config.staticsite:
+            transformargs['basedir'] = os.path.dirname(generatedfile)
+        elif getattr(self.config, 'develurl', None):
+            transformargs['develurl'] = self.config.develurl
+        elif self.config.removeinvalidlinks is False:
+            return None
+        
+        with util.logtime(self.log.info, "%(basefile)s: transformlinks OK (%(elapsed).3f sec)",
+                          {'basefile': basefile}):
+            urltransform = self.get_url_transform_func(**transformargs)
+            tree = etree.parse(generatedfile).getroot()
+            conffile = os.path.abspath(
+                os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
+            # NOTE: most arguments to the constructor might never be needed
+            transformer = Transformer('XSLT', None, None)
+            transformer.transform_links(tree, urltransform)
+            transformer.t.native_to_file(tree, generatedfile)
+        return True
     #
     #
     # STEP 5: Generate HTML pages for a TOC of a all documents, news

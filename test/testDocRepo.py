@@ -21,7 +21,7 @@ import rdflib
 import requests.exceptions
 
 from ferenda.compat import Mock, patch, call, unittest
-from ferenda import DocumentEntry, Describer, Facet
+from ferenda import DocumentEntry, Describer, Facet, Transformer
 from ferenda.fulltextindex import WhooshIndex
 from ferenda.errors import *
 
@@ -1201,7 +1201,6 @@ class Generate(RepoTester):
         config = {'connect.return_value': Mock(**{'construct.return_value': g})}
         with patch('ferenda.documentrepository.TripleStore', **config):
             self.repo.generate("1")
-        
         t = etree.parse(self.repo.store.generated_path("1"))
         # find top node annotations,
         anode = t.find(".//aside")
@@ -1461,8 +1460,15 @@ class Generate(RepoTester):
         self.assertEqual(4,len(divs))
         
     def test_staticsite_url(self):
-        self.repo.config.removeinvalidlinks = False
         tree = self._generate_complex(staticsite=True)
+        # now that generate() no longer transforms links
+        # automatically, we need to call those methods explicitly
+        transformer = Transformer('XSLT', None, None)
+        basedir = os.path.dirname(self.repo.store.generated_path("a"))
+        transformer.transform_links(tree.getroot(),
+                                    self.repo.get_url_transform_func(repos=[self.repo],
+                                                                     basedir=basedir))
+
         link = tree.xpath(".//a[text()='external']")[0]
         self.assertEqual("something-else.html", link.get("href"))
 
@@ -1491,6 +1497,150 @@ data/base/parsed/foo.xhtml
 
         # FIXME: we don't actually verify the that dependencies are
         # read or skipping is performed.
+
+class OtherRepo(DocumentRepository):
+    alias = "other"
+
+class Transformlinks(RepoTester):
+    def setUp(self):
+        with self.repo.store.open_generated("1", "w") as fp:
+            # this exact code might vary depending on how base.xsl
+            # evolves, but we're really only interested in link
+            # transformation
+            fp.write("""<!DOCTYPE html SYSTEM "about:legacy-compat">
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Document title | testsite</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"/>
+    <link href="../../rsrc/css/ferenda.css" rel="stylesheet"/>
+    <link href="../../rsrc/css/sfs.css" rel="stylesheet"/>
+  </head>
+  <body class="generic" data-spy="scroll" data-target="#toc">
+    <nav class="navbar navbar-default">
+      <div class="container-fluid">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1" aria-expanded="false">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar">‌</span>
+            <span class="icon-bar">‌</span>
+            <span class="icon-bar">‌</span>
+          </button>
+          <a class="navbar-brand" href="http://example.org/">testsite</a>
+        </div>
+        <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+          <ul class="nav navbar-nav">
+            <li>
+              <a href="http://example.org/dataset/base">Foo</a>
+            </li>
+            <li>
+              <a href="http://example.org/dataset/other">Bar</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+    <div class="row row-offcanvas row-offcanvas-left">
+      <article class="col-sm-9">
+        <h1>Document title</h1>
+        <div class="section-wrapper toplevel">
+          <section id="" class="col-sm-8">
+            <p>Main document text</p>
+            <ul>
+               <li><a href="http://example.org/res/base/2">A2 (does not exist)</a></li>
+               <li><a href="http://example.org/res/base/2#part1">part of A2</a></li>
+               <li><a href="http://example.org/res/other/1">B1 (exists)</a></li>
+               <li><a href="http://example.org/res/other/1#part">part of B1</a></li>
+               <li><a href="http://example.org/res/other/2">B2 (does not exist)</a></li>
+            </ul>
+          </section>
+        </div>
+      </article>
+      <footer>
+        <nav/>
+      </footer>
+    </div>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"> </script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"> </script>
+    <script src="https://hammerjs.github.io/dist/hammer.min.js"> </script>
+    <script src="https://cdn.rawgit.com/twitter/typeahead.js/v0.11.1/dist/typeahead.bundle.min.js"> </script>
+    <script src="../../rsrc/js/ferenda.js"/>
+  </body>
+</html>""")
+        self.otherrepo = OtherRepo(datadir=self.datadir)
+        for r in self.repo, self.otherrepo:
+            r.config.url = "http://example.org/"
+        util.writefile(self.otherrepo.store.generated_path("1"), "exists")
+        util.writefile(self.repo.store.path("index", "toc", ".html"), "exists")
+        # (re)set some configs that individual tests may change
+        self.repo.config.removeinvalidlinks = True
+        self.repo.config.develurl = None
+        self.repo.config.staticsite = False
+        
+
+    def _assert_invalid_links(self, links):
+        # NOTE: update this list if the above document changes w.r.t. links
+        expected = [True, False, True, True, True, False, False, True]
+        for idx, link in enumerate(links):
+            check = self.assertTrue if expected[idx] else self.assertFalse
+            check("invalid-link" in link.get("class", ""))
+                              
+    def test_default(self):
+        # by default, neither config.staticsite nor config.develurl
+        # should be set, but config.removeinvalidlinks is set and so
+        # transform should take place, and some links should be marked
+        # as invalid.
+        self.assertTrue(self.repo.transformlinks("1", otherrepos=[self.otherrepo]))
+        links = BeautifulSoup(util.readfile(self.repo.store.generated_path("1")),
+                              "lxml").find_all("a")
+        self._assert_invalid_links(links)
+        for link in links:
+            assert link.get("href").startswith("http://example.org/")
+
+    def test_not_removeinvalid(self):
+        self.repo.config.removeinvalidlinks = False
+        ret = self.repo.transformlinks("1")
+        self.assertEqual(None, ret)
+
+    def test_develurl(self):
+        develurl = "http://localhost:1234/subdir/"
+        self.repo.config.develurl = develurl
+        self.assertTrue(self.repo.transformlinks("1", otherrepos=[self.otherrepo]))
+        links = BeautifulSoup(util.readfile(self.repo.store.generated_path("1")),
+                              "lxml").find_all("a")
+        self._assert_invalid_links(links)
+        invalids = False
+        valids = False
+        for link in links:
+            if "invalid-link" in link.get("class", ""):
+                self.assertTrue(link.get("href").startswith("http"))
+                invalids = True
+            else:
+                self.assertTrue(link.get("href").startswith("/"))
+                valids = True
+        self.assertTrue(valids)
+        self.assertTrue(invalids)
+
+    def test_staticsite(self):
+        self.repo.config.staticsite = True
+        self.assertTrue(self.repo.transformlinks("1", otherrepos=[self.otherrepo]))
+        links = BeautifulSoup(util.readfile(self.repo.store.generated_path("1")),
+                              "lxml").find_all("a")
+        self._assert_invalid_links(links)
+        invalids = False
+        valids = False
+        for link in links:
+            if "invalid-link" in link.get("class", ""):
+                self.assertTrue(link.get("href").startswith("http"))
+                invalids = True
+            else:
+                self.assertTrue(link.get("href").startswith("../"))
+                valids = True
+        self.assertTrue(valids)
+        self.assertTrue(invalids)
+        
 
 class Faceting(RepoTester):
 

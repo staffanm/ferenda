@@ -112,13 +112,13 @@ class Transformer(object):
         if self.t.reparse:
             outdata = etree.parse(BytesIO(etree.tostring(outdata)))
         if uritransform:
-            self._transform_links(outdata.getroot(), uritransform)
+            self.transform_links(outdata.getroot(), uritransform)
         return outdata
 
-    def _transform_links(self, tree, uritransform):
+    def transform_links(self, tree, uritransform):
         for part in tree:
             # depth-first transformation seems the easiest
-            self._transform_links(part, uritransform)
+            self.transform_links(part, uritransform)
             if part.tag not in ("a", "{http://www.w3.org/1999/xhtml}a",
                                 "link", "{http://www.w3.org/1999/xhtml}link",
                                 "img", "{http://www.w3.org/1999/xhtml}img"):
@@ -135,7 +135,6 @@ class Transformer(object):
                     part.set("class", " ".join(existingclasses + ["invalid-link"]))
                 else:
                     part.set(attr, newuri)
-                
                 break
 
     def transform_stream(self, instream, depth,
@@ -176,24 +175,11 @@ class Transformer(object):
                 log.warning(
                     "self.config not set, cannot construct equivalent xsltproc command line")
 
-        placeholder = False
-        if not os.path.exists(outfile):
-            # create a placeholder so that the code to mark
-            # non-existing files as invalid doesn't get tripped up by
-            # self-references
-            util.ensure_dir(outfile)
-            util.writefile(outfile, "placeholder")
-            placeholder = True
-        try:
-            self.t.native_to_file(self.transform(self.t.file_to_native(infile),
-                                                 depth,
-                                                 parameters,
-                                                 uritransform),
-                                  outfile)
-        except Exception as e:
-            if placeholder and util.readfile(outfile) == "placeholder":
-                util.robust_remove(outfile)
-            raise
+        self.t.native_to_file(self.transform(self.t.file_to_native(infile),
+                                             depth,
+                                             parameters,
+                                             uritransform),
+                              outfile)
 
     def _depth(self, outfiledir, root):
         # NB: root must be a file in the root dir
@@ -209,9 +195,11 @@ class TransformerEngine(object):
 class XSLTTransform(TransformerEngine):
 
     def __init__(self, template, templatedir, resourceloader, **kwargs):
+        self.format = True  # FIXME: make configurable
+        if template is None:  # if we only want to use the transform_links function
+            return
         self.orig_template = template
         self.orig_templatedir = templatedir  # ?
-        self.format = True  # FIXME: make configurable
         self.resourceloader = resourceloader
         self.templdir = self._setup_templates(template, templatedir)
         # worktemplate = self.templdir + os.sep + template
@@ -233,7 +221,7 @@ class XSLTTransform(TransformerEngine):
             raise errors.TransformError(str(e.error_log))
 
     def __del__(self):
-        if os.path.exists(self.templdir):
+        if hasattr(self, 'templdir') and os.path.exists(self.templdir):
             # this had better be a tempdir!
             shutil.rmtree(self.templdir)
 

@@ -364,6 +364,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         cls.repo = cls.repoclass(datadir=cls.datadir,
                                  storelocation=cls.datadir + "/ferenda.sqlite",
                                  indexlocation=cls.datadir + "/whoosh",
+                                 develurl=None,
                                  **repoconfig)
         cls.setupclass = True
     

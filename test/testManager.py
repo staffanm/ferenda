@@ -60,6 +60,9 @@ class staticmockclass(DocumentRepository):
     def generate(self, basefile):
         return "%s generate %s" % (self.alias, basefile)
 
+    def transformlinks(self, basefile):
+        return "%s transformlinks %s" % (self.alias, basefile)
+
     def toc(self):
         return "%s toc ok" % (self.alias)
 
@@ -599,6 +602,9 @@ class Testrepo(DocumentRepository):
     def generate(self, basefile, otherrepos=[]): 
         return "%s generate %s" % (self.alias, basefile)
 
+    def transformlinks(self, basefile, otherrepos=[]): 
+        return "%s transformlinks %s" % (self.alias, basefile)
+
     def toc(self, otherrepos=[]): 
         return "%s toc ok" % (self.alias)
 
@@ -763,6 +769,12 @@ class Run(RunBase, unittest.TestCase):
                                     ('test2', ['test2 generate arg1',
                                                'test2 generate myarg',
                                                'test2 generate arg2'])])),
+             ('transformlinks', OrderedDict([('test', ['test transformlinks arg1',
+                                                 'test transformlinks myarg',
+                                                 'test transformlinks arg2']),
+                                    ('test2', ['test2 transformlinks arg1',
+                                               'test2 transformlinks myarg',
+                                               'test2 transformlinks arg2'])])),
              ('news', OrderedDict([('test','test news ok'),
                                    ('test2', 'test2 news ok')])),
              ('frontpage', True)])
@@ -808,6 +820,10 @@ class Run(RunBase, unittest.TestCase):
              ('generate', OrderedDict([('test', ['test generate arg1',
                                                  'test generate myarg',
                                                  'test generate arg2']),
+                                   ])),
+             ('transformlinks', OrderedDict([('test', ['test transformlinks arg1',
+                                                 'test transformlinks myarg',
+                                                 'test transformlinks arg2']),
                                    ])),
              ('news', OrderedDict([('test', 'test news ok'),
                                ])),

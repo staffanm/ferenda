@@ -443,11 +443,11 @@ class DocumentStore(object):
         elif action == "news":
             directory = os.path.sep.join((basedir, "entries"))
             suffixes = [".json"]
-        # FIXME: fake action, needed for get_status. replace with
-        # something more elegant
-        elif action in ("_postgenerate"):
+        # FIXME: _postgenerate is a fake action, needed for
+        # get_status. Maybe we can replace it with transformlinks now?
+        elif action in ("_postgenerate", "transformlinks"):
             directory = os.path.sep.join((basedir, "generated"))
-            suffixes = [".html"]
+            suffixes = prepend_index([".html"])
 
         if not directory:
             raise ValueError("No directory calculated for action %s" % action)
@@ -864,6 +864,17 @@ class DocumentStore(object):
         """
         return self.path(basefile, 'generated', '.html',
                          version, attachment)
+
+    def open_generated(self, basefile, mode="r", version=None, attachment=None):
+        """Opens files for reading and writing,
+        c.f. :meth:`~ferenda.DocumentStore.open`. The parameters are
+        the same as for
+        :meth:`~ferenda.DocumentStore.generated_path`.
+
+        """
+        filename = self.generated_path(basefile, version, attachment)
+        return _open(filename, mode)
+
 
 # Removed this method until I find a reason to use it
 #
