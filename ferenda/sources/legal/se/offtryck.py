@@ -561,7 +561,7 @@ class Offtryck(SwedishLegalSource):
             # fix the json file at pagemapping_path as well?
             for idx, page in enumerate(sanitized):
                 sanitized[idx].number = idx + 1
-                sanitized[idx].src = "%s/sid%s.png" % (basefile, idx+1)
+                sanitized[idx].src = "%s/sid%s.png" % (baseuri, idx+1)
         else:
             analyzer = sanitized.analyzer
             if not os.path.exists(pagemapping_path) or self.config.force:

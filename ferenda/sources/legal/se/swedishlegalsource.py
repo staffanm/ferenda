@@ -486,6 +486,7 @@ class SwedishLegalSource(DocumentRepository):
         # "https://lagen.nu/sfs/1736:0123_1" => "1736:0123 1"
         # "https://lagen.nu/utr/sou/2009:91?attachment=fingeravtryck-i-uppehallstillstand-sou-200991&repo=souregeringen&dir=downloaded" => "2009:91"
         # "https://lagen.nu/utr/sou/2009:91/sid42.png" => "2009:91"
+        # "https://lagen.nu/sou/2009:91.rdf" => "2009:91"
         # Subclasses with more specific rules should override, call
         # this through super(), and then sanitize basefile afterwards.
         base = self.urispace_base
@@ -506,6 +507,8 @@ class SwedishLegalSource(DocumentRepository):
                 basefile = basefile.replace(spacereplacement, " ")
             if "#" in basefile:
                 basefile = basefile.split("#", 1)[0]
+            elif basefile.endswith((".rdf", ".xhtml", ".json", ".nt", ".ttl")):
+                basefile = basefile.rsplit(".", 1)[0]
             return basefile
 
     @cached_property
@@ -867,7 +870,11 @@ class SwedishLegalSource(DocumentRepository):
                 self.log.warning("%s: Parsing with config '%s' failed: %s (%s)" %
                                  (basefile, parseconfig, errmsg, loc))
                 lastexception = e
-                pass # 
+                # This is kinda special-case (used to reset a
+                # TextReader), but should maybe work for all file-like
+                # objects?
+                if hasattr(sanitized, 'seek') and callable(sanitized.seek):
+                    sanitized.seek(0)
         else:
             raise lastexception
 

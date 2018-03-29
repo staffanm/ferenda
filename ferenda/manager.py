@@ -1277,6 +1277,7 @@ def _build_worker(jobqueue, resultqueue, clientname):
 
 def _instantiate_and_configure(classname, config, logrecords, clientname):
     log = getlog()
+    # print("Client [pid %s]: supplied config is %s" % (os.getpid(), config))
     log.debug(
         "Client: [pid %s] instantiating and configuring %s" %
         (os.getpid(), classname))
@@ -1293,12 +1294,13 @@ def _instantiate_and_configure(classname, config, logrecords, clientname):
     if clientname:
         # log.debug("Client: [pid %s] Setting up log" % os.getpid())
         # log = setup_logger(inst.config.loglevel)
-        log = setup_logger(config.get('loglevel', 'WARNING'))
+        log = setup_logger(config.get('loglevel', 'INFO'))
         for handler in list(log.handlers):
             log.removeHandler(handler)
         handler = MarshallingHandler(logrecords)
         log.addHandler(handler)
-        log.setLevel(config.get('loglevel', 'WARNING'))
+        # print("Client: [pid %s] Settings log to %s" % (os.getpid(), config.get('loglevel', None)))
+        log.setLevel(config.get('loglevel', 'INFO'))
     # log.debug("Client: [pid %s] Log is configured" % os.getpid())
     else:
         pass

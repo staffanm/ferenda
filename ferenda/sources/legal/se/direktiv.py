@@ -109,7 +109,8 @@ class DirTrips(Trips):
     document_url_template = "http://rkrattsbaser.gov.se/dir?bet=%(basefile)s"
     rdf_type = RPUBL.Kommittedirektiv
     urispace_segment = "dir"
-
+    storage_policy = "file"
+    
     @recordlastdownload
     def download(self, basefile=None):
         if basefile:
@@ -180,6 +181,8 @@ class DirTrips(Trips):
                             linesep=TextReader.UNIX)
         return reader
     
+    def parse_body_parseconfigs(self):
+        return ("default", "simple")
 
     def get_parser(self, basefile, sanitized, parseconfig="default"):
 
@@ -274,11 +277,14 @@ class DirTrips(Trips):
                 return None, None, chunk
 
         p = FSMParser()
-        recognizers = [is_section,
-                       is_subsection,
-                       is_header,
-                       is_strecksats,
-                       is_paragraph]
+        if parseconfig == "simple":
+            recognizers = [is_header, is_strecksats, is_paragraph]
+        else:
+            recognizers = [is_section,
+                           is_subsection,
+                           is_header,
+                           is_strecksats,
+                           is_paragraph]
         p.set_recognizers(*recognizers)
         commonstates = ("body", "section", "subsection", "unorderedsection")
         p.set_transitions({(commonstates, is_paragraph): (make_paragraph, None),

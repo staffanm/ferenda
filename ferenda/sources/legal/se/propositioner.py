@@ -44,6 +44,8 @@ def prop_sanitize_identifier(identifier):
         identifier = identifier.replace("PROP", "Prop")
     if identifier.startswith("Prop "):
         identifier = identifier.replace("Prop ", "Prop. ")
+    if re.match("Prop\.\d{4}", identifier): # missing space
+        identifier = identifier.replace("Prop.", "Prop. ")
     if "\xa0" in identifier: # Non-breakable space
         identifier = identifier.replace("\xa0", " ")
     if not identifier.startswith("Prop. "):
