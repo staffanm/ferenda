@@ -1246,32 +1246,26 @@ def _build_worker(jobqueue, resultqueue, clientname):
                 sys.stdout.write(".")
                 sys.stdout.flush()
 
-#        except RemoteError as e:
-#            # This happened when the result was an lxml.etree.ParseError
-#            # exception, as that one couldn't be pickled and unpickled without
-#            # problems. So we wrapped it in a ParseErrorWrapper at one end and
-#            # unwrapped it on the other end, so now there's no need for this hack.
-#            print("%s: Catastrophic failure (RemoteError)" % job['basefile'])
-#            resultqueue.put({'basefile': job['basefile'],
-#                             'result': None,
-#                             'log': list(logrecords),
-#                             'client': clientname})
-#            print("%s: Put a fake entry instead, and carrying on" % job['basefile'])
-
-#        except AttributeError as e:
-#            print("%s: Catastrophic error (AttributeError)" % job['basefile'])
-#            # this is probably a "Can't pickle local object
-#            # 'RDFXMLHandler.reset.<locals>.<lambda>'" error --
-#            # similar to the difficulties of pickling ParseErrors
-#            # above
-#            resultqueue.put({'basefile': job['basefile'],
-#                             'result': None,
-#                             'log': list(logrecords),
-#                             'client': clientname})
-#            print("%s: Put a fake entry instead, and carrying on" % job['basefile'])
         except EOFError as e:
             print("%s: Result of %s %s %s couldn't be put on resultqueue" % (
                 os.getpid(), job['classname'], job['command'], job['basefile']))
+        except TypeError, AttributeError, RemoteError as e:
+            # * TypeError: Has happened with a "can't pickle
+            #   pyexpat.xmlparser objects". Still not sure what was
+            #   the cause of that.
+            # * AttributeError is probably a "Can't pickle local object
+            #   'RDFXMLHandler.reset.<locals>.<lambda>'" error --
+            #   similar to the difficulties of pickling ParseErrors
+            #   above
+            # * RemoteError has happened when the result was an lxml.etree.ParseError
+            #   exception, as that one couldn't be pickled and unpickled without
+            #   problems. So we wrapped it in a ParseErrorWrapper at one end and
+            #   unwrapped it on the other end, so now there's no need for this hack.
+            print("%s: Catastrophic error %s" % (job['basefile'], e))
+            resultqueue.put({'basefile': job['basefile'],
+                             'result': None,
+                             'log': list(logrecords),
+                             'client': clientname})
         # log.debug("Client: [pid %s] Put '%s' on the queue" % (os.getpid(), outdict['result']))
 
 
