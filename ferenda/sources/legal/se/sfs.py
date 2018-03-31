@@ -2025,7 +2025,7 @@ WHERE {
     def _relate_fulltext_resources(self, body):
         # only return K1, K1P1 or B1, not more fine-grained resources
         # like K1P1S1N1
-        return [body] + [r for r in body.findall(".//*[@about]") if re.search(r"#[KPBS]\d+\w?(P\d+\w?|)$", r.get("about"))]
+        return [(r, {'order': idx}) for idx, r in enumerate([body] + [r for r in body.findall(".//*[@about]") if re.search(r"#[KPBS]\d+\w?(P\d+\w?|)$", r.get("about"))])]
     
     _relate_fulltext_value_cache = {}
     def _relate_fulltext_value(self, facet, resource, desc):

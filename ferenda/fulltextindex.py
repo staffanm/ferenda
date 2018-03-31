@@ -281,6 +281,9 @@ class Boolean(IndexedType):
     pass
 
 
+class Integer(IndexedType):
+    pass
+
 class URI(IndexedType):
 
     """Any URI (except the URI that identifies a indexed document -- use Identifier for that)."""
@@ -700,6 +703,8 @@ class ElasticSearchIndex(RemoteIndex):
                      {"type": "keyword", "copy_to": ["keyword"]}),
                     (URI(),
                      {"type": "keyword", "boost": 1.1, "norms": True}),
+                    (Integer(),
+                     {"type": "long"}),
                     )
 
     term_excludes = "excludes"  # this key changed name 
@@ -769,7 +774,6 @@ class ElasticSearchIndex(RemoteIndex):
         return relurl, json.dumps(payload, default=util.json_default_date)
 
     def update(self, uri, repo, basefile, text, **kwargs):
-        
         if not self._writer:
             self._writer = tempfile.TemporaryFile()
         relurl, payload = self._update_payload(
@@ -889,6 +893,7 @@ class ElasticSearchIndex(RemoteIndex):
                 match = {"bool": {"should": submatches}}
             else:
                 # ac_query -- need to work in inner_hits somehow
+                # also: sort by order if present
                 pass
         else:
             match = {"bool": {}}
@@ -942,6 +947,15 @@ class ElasticSearchIndex(RemoteIndex):
             payload['highlight'] = deepcopy(highlight)
         # if q:
         #    payload['highlight']['highlight_query'] = {'match': {'_all': q}}
+
+        # for autocomplete queries when not using any "natural
+        # language" queries (ie. only query based on a identifer like
+        # "TF 2:" -- in these cases we'd like to use natural order of
+        # the results if available
+        if ac_query and q is None:
+            payload['sort'] = [{"order": "asc"},
+                               "_score"]
+        
         return relurl, json.dumps(payload, indent=4, default=util.json_default_date)
 
     def _aggregation_payload(self):
