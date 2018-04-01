@@ -9,6 +9,7 @@ from xml.sax.saxutils import escape as xml_escape
 from io import BytesIO
 import os
 import re
+from collections import OrderedDict
 
 from rdflib import URIRef, Literal, Namespace
 from bs4 import BeautifulSoup
@@ -18,6 +19,7 @@ from rdflib import RDF, Graph
 from rdflib.namespace import DCTERMS, SKOS
 
 from . import RPUBL, RINFOEX, SwedishLegalSource, FixedLayoutSource
+from .fixedlayoutsource import FixedLayoutStore
 from .swedishlegalsource import SwedishCitationParser, SwedishLegalStore
 from ferenda import TextReader, Describer, Facet, PDFReader, DocumentEntry
 from ferenda import util, decorators, errors, fulltextindex
@@ -35,6 +37,10 @@ PROV = Namespace(util.ns['prov'])
 
 class RequiredTextMissing(errors.ParseError): pass
 
+class MyndFskrStore(FixedLayoutStore):
+    doctypes = OrderedDict([(".pdf", b'%PDF'),
+                            (".html", b'<!DO'),  # HTML can start basically in any way. This is the HTML5 way, which might be common for our targets])
+                            ])
 class MyndFskrBase(FixedLayoutSource):
     """A abstract base class for fetching and parsing regulations from
     various swedish government agencies. These documents often have a
@@ -65,14 +71,12 @@ class MyndFskrBase(FixedLayoutSource):
 
     nextpage_regex = None
     nextpage_url_regex = None
-    download_rewrite_url = False
-    # iff True, use remote_url to rewrite download links instead of
+    download_rewrite_url = False # iff True, use remote_url to rewrite download links instead of
     # accepting found links as-is. If it's a callable, call that with
     # basefile, URL and expect a rewritten URL.
 
-    
-    download_formid = None  # if the paging uses forms, POSTs and other
-    # forms of insanity
+    download_formid = None  # if the paging uses forms, POSTs and other forms of insanity
+    documentstore_class = MyndFskrStore
 
     @classmethod
     def get_default_options(cls):
@@ -1443,7 +1447,7 @@ class SKVFS(MyndFskrBase):
         # this also updates the docentry
         html_downloaded = super(SKVFS, self).download_single(basefile, url)
         # try to find link to a PDF in what was just downloaded
-        soup = BeautifulSoup(util.readfile(self.store.downloaded_path(basefile, suffix=".html")), "lxml")
+        soup = BeautifulSoup(util.readfile(self.store.downloaded_path(basefile)), "lxml")
         pdffilename = self.store.downloaded_path(basefile,
                                                  attachment="index.pdf")
         if (self.config.refresh or not(os.path.exists(pdffilename))):

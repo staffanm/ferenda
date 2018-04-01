@@ -1249,7 +1249,7 @@ def _build_worker(jobqueue, resultqueue, clientname):
         except EOFError as e:
             print("%s: Result of %s %s %s couldn't be put on resultqueue" % (
                 os.getpid(), job['classname'], job['command'], job['basefile']))
-        except TypeError, AttributeError, RemoteError as e:
+        except (TypeError, AttributeError, RemoteError) as e:
             # * TypeError: Has happened with a "can't pickle
             #   pyexpat.xmlparser objects". Still not sure what was
             #   the cause of that.

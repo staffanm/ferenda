@@ -139,7 +139,8 @@ class Regeringen(Offtryck):
         "http://www.regeringen.se/rattsdokument/departementsserien-och-promemorior/2015/12/"
         "andringar-i-rennaringsforordningen-1993384/",  # mistaken for a DS when it's really a unpublished PM
         "http://www.regeringen.se/rattsdokument/departementsserien-och-promemorior/2015/12/"
-        "andring-av-bestammelserna-om-ratt-till-bistand-i-lagen-1994137-om-mottagande-av-asylsokande-m.fl/" # same
+        "andring-av-bestammelserna-om-ratt-till-bistand-i-lagen-1994137-om-mottagande-av-asylsokande-m.fl/", # same
+        "http://www.regeringen.se/rattsdokument/proposition/2018/01/sou-2071883/" # looks like 2071/88:3, but should be 2017/18:83 (and also not SOU!)
     ])
                     
     def attribs_from_url(self, url):

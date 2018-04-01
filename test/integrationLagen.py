@@ -944,7 +944,8 @@ class Regressions(TestLagen):
 
     def test_facsimiles(self):
         # issue 3 
-        for urlseg, pages in (("prop/2004/05:147", [36, 48]),
+        for urlseg, pages in (("prop/1915:83", [29]), # new kind of repo
+                              ("prop/2004/05:147", [36, 48]),
                               ("prop/1997/98:177", [18, 30, 32]),
                               ("prop/1997/98:179", [57, 58, 43]),
                               ("prop/2007/08:95", [56, 295, 296]),
@@ -957,7 +958,7 @@ class Regressions(TestLagen):
                               ("prop/2008/09:14", [15]),
                               ("prop/2011/12:115", [15]),
                               ("prop/1980/81:44", [15]),
-                              ("prop/1996/97:9", [1])
+                              ("prop/1996/97:9", [1]),
         ):
             for page in pages:
                 url = self.baseurl + urlseg + "/sid%s.png" % page

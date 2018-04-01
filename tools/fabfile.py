@@ -74,7 +74,7 @@ def copy_elastic():
 @hosts('colo.tomtebo.org')
 def copy_files():
     # NOTE: This includes themes etc in data/rsrc
-    rsync_project(local_dir="/mnt/ferenda/tng.lagen.nu/data/",
+    rsync_project(local_dir="/home/staffan/wds/ferenda/tng.lagen.nu/data/",
                   remote_dir="/home/staffan/www/ferenda.lagen.nu/data",
                   exclude=["*downloaded*", "*archive*"],
                   delete=True,
