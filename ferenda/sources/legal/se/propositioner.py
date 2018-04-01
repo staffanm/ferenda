@@ -710,6 +710,13 @@ class PropKB(Offtryck, PDFDocumentRepository):
         attrib["rpubl:lopnummer"] = ordinal
         return attrib
 
+    def download_single(self, basefile, url=None):
+        if not url:
+            entry = DocumentEntry(self.store.documententry_path(basefile))
+            url = entry.orig_url
+        return super(PropKB, self).download_single(basefile, url)
+        
+
     @lazyread
     def downloaded_to_intermediate(self, basefile):
         downloaded_path = self.store.downloaded_path(basefile)
