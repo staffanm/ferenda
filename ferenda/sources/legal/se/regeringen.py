@@ -14,6 +14,7 @@ from datetime import datetime
 from urllib.parse import urljoin, urlencode
 
 import requests
+import requests.exceptions
 import lxml.html
 from bs4 import BeautifulSoup
 from rdflib import URIRef
@@ -104,6 +105,10 @@ class Regeringen(Offtryck):
                   }
         if 'lastdownload' in self.config and not self.config.refresh:
             params['fromDate'] = self.config.lastdownload.strftime("%Y-%m-%d")
+        # temporary test -- useful when troubleshooting behaviour related to malformed entries in the search result list
+        # params['fromDate'] = "2009-05-13"
+        # params['toDate']   = "2009-05-20"
+        
         self.log.debug("Loading documents starting from %s" %
                        params.get('fromDate', "the beginning"))
         try: 
@@ -140,7 +145,19 @@ class Regeringen(Offtryck):
         "andringar-i-rennaringsforordningen-1993384/",  # mistaken for a DS when it's really a unpublished PM
         "http://www.regeringen.se/rattsdokument/departementsserien-och-promemorior/2015/12/"
         "andring-av-bestammelserna-om-ratt-till-bistand-i-lagen-1994137-om-mottagande-av-asylsokande-m.fl/", # same
-        "http://www.regeringen.se/rattsdokument/proposition/2018/01/sou-2071883/" # looks like 2071/88:3, but should be 2017/18:83 (and also not SOU!)
+        "http://www.regeringen.se/rattsdokument/proposition/2018/01/sou-2071883/", # looks like 2071/88:3, but should be 2017/18:83 (and also not SOU!)
+        "http://www.regeringen.se/rattsdokument/statens-offentliga-utredningar/1921/04/overenskommelse-med-danmark-angaende-ordnandet-av-post--befordringen-mellan-malmo-och-kopenhamn4/", # SÖ, not SOU
+        "http://www.regeringen.se/rattsdokument/statens-offentliga-utredningar/1921/04/overenskommelse-med-danmark-angaende-ordnandet-av-post--befordringen-mellan-malmo-och-kopenhamn3/", # SÖ, not SOU
+        "http://www.regeringen.se/rattsdokument/statens-offentliga-utredningar/1921/04/overenskommelse-med-danmark-angaende-ordnandet-av-post--befordringen-mellan-malmo-och-kopenhamn2/", # SÖ, not SOU
+        "http://www.regeringen.se/rattsdokument/statens-offentliga-utredningar/1921/04/overenskommelse-med-danmark-angaende-ordnandet-av-post--befordringen-mellan-malmo-och-kopenhamn1/", # SÖ, not SOU
+        "http://www.regeringen.se/rattsdokument/statens-offentliga-utredningar/1921/04/overenskommelse-med-danmark-angaende-ordnandet-av-post--befordringen-mellan-malmo-och-kopenhamn/", # SÖ, not SOU
+        "http://www.regeringen.se/rattsdokument/statens-offentliga-utredningar/1921/05/skiljedomskonvention-med-brasiliens-forenta-stater/", # SÖ, not SOU
+        "http://www.regeringen.se/rattsdokument/statens-offentliga-utredningar/1921/07/internationell-konvention-rorande-upprattandet-i-paris-av-ett-internationellt-frysinstitut/", # SÖ, not SOU
+        "http://www.regeringen.se/rattsdokument/statens-offentliga-utredningar/1921/10/noter-med-egypten-angaende-forlangning-av-de-blandade-domstolarnas-verksamhet-m.-m/", # SÖ, not SOU
+        "http://www.regeringen.se/rattsdokument/statens-offentliga-utredningar/1921/07/ministeriella-noter-vaxlade-med-italien-angaende-omsesidighet-rorande-ersattning-for-olycksfall-i-arbete/", # SÖ, not SOU
+        "http://www.regeringen.se/rattsdokument/statens-offentliga-utredningar/1921/10/konvention-angaende-faststallande-av-minimialder-for-barns-anvandande-i-arbete-till-sjoss/", # SÖ, not SOU
+        
+        
     ])
                     
     def attribs_from_url(self, url):
@@ -193,6 +210,7 @@ class Regeringen(Offtryck):
     @downloadmax
     def download_get_basefiles(self, params):
         done = False
+        yielded = set()
         while not done:
             qsparams = urlencode(params)
             searchurl = self.start_url + "?" + qsparams
@@ -203,18 +221,32 @@ class Regeringen(Offtryck):
                 sleep(0.5)
                 # avoid using the established session, maybe it'll help?
                 resp = requests.get(searchurl)
-
+            
             tree = lxml.etree.fromstring(resp.text)
             done = True
             for item in tree.findall(".//item"):
                 done = False
                 url = item.find("link").text
+                if item.find("title") is not None and item.find("title").text.endswith(("(lättläst)",
+                                                                            "(engelsk sammanfattning)")):
+                    self.log.debug("%s ('%s') is probably not the real doc" % (url, item.find("title").text))
                 try:
                     attribs = self.attribs_from_url(url)
                     basefile = "%s:%s" % (attribs['rpubl:arsutgava'], attribs['rpubl:lopnummer'])
-                    basefile = self.sanitize_basefile(basefile)
+                    try:
+                        basefile = self.sanitize_basefile(basefile)
+                    except AssertionError: # if the basefile is just plain wrong
+                        continue
                     self.log.debug("%s: <- %s" % (basefile, url))
-                    yield basefile, url
+                    if basefile not in yielded: # just in case two or
+                                                # more URLs resolve to
+                                                # the same basefile
+                                                # (like the original
+                                                # and an english
+                                                # translation), go
+                                                # with the first one.
+                        yield basefile, url
+                        yielded.add(basefile)
                 except ValueError as e:
                     self.log.error(e)
             params['page'] = params.get('page', 1) + 1
@@ -230,7 +262,17 @@ class Regeringen(Offtryck):
         created = not os.path.exists(filename)
         if (not os.path.exists(filename) or self.config.refresh):
             existed = os.path.exists(filename)
-            updated = self.download_if_needed(url, basefile, filename=filename)
+            try:
+                updated = self.download_if_needed(url, basefile, filename=filename)
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 400:
+                    # regeringen.se seems to have a problem with the
+                    # first req after a search -- unless slowed down,
+                    # raises a 400 error. Sleep on it, and try once more
+                    sleep(5)
+                    updated = self.download_if_needed(url, basefile, filename=filename)
+                else:
+                    raise
             docid = url.split("/")[-1]
             if existed:
                 if updated:
