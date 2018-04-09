@@ -67,12 +67,9 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
         myndfskr.DIFS,
         myndfskr.DVFS,
         myndfskr.EIFS,
-        # myndfskr.ELSAKFS,  # disabled for the time being
-        # myndfskr.Ehalso,   #            -""-
+        myndfskr.ELSAKFS,
         myndfskr.FFFS,
         myndfskr.FFS,
-        # myndfskr.FMI,      #            -""-
-        myndfskr.FoHMFS,
         myndfskr.KFMFS,
         myndfskr.KOVFS,
         myndfskr.KVFS,
@@ -103,6 +100,13 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
     documentstore_class = MyndFskrStore
     requesthandler_class = MyndFskrHandler
     urispace_segment = ""
+    supress_subrepo_logging = False
+
+    # mapping to get basefile_from_uri to work. This is a ugly hack,
+    # the proper way would be to call the bsefile_from_uri method in
+    # the appropriate subrepo, but that turned out to be hard.
+    basefile_fs = {"elsaekfs": "elsakfs",
+                   "saeifs": "säifs"}
 
     @classmethod
     def get_default_options(cls):
@@ -133,12 +137,17 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
         # ferenda.sources.legal.MyndFskrBase.metadata_from_basefile
         if '/sid' in uri and uri.endswith(".png"):
             uri = uri.split("/sid")[0]
+        # FIXME: We should call the appropriate subrepos
+        # basefile_from_uri, not the superclass
         basefile = super(MyndFskr, self).basefile_from_uri(uri)
         if basefile and basefile.count("/") == 1:
             basefile = basefile.replace("-", "")
             fs, realbasefile = basefile.split("/")
             if fs != "sfs" and fs.endswith("fs"):
-                return basefile
+                # adjust some tricky URIs to get the basefile fs from
+                # them
+                fs = self.basefile_fs.get(fs, fs)
+                return fs + "/" + realbasefile
 
     # This custom implementation of download is able to select a
     # particular subrepo and call its download method. That way we

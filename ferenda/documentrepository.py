@@ -854,7 +854,7 @@ with the *config* object as single parameter.
                 yielded.add((basefile, link))
                 yield (basefile, link)
 
-    def download_single(self, basefile, url=None):
+    def download_single(self, basefile, url=None, orig_url=None):
         """Downloads the document from the web (unless explicitly
         specified, the URL to download is determined by
         :py:data:`~ferenda.DocumentRepository.document_url_template` combined
@@ -869,6 +869,8 @@ with the *config* object as single parameter.
         :param basefile: The basefile of the document to download
         :type basefile: string
         :param url: The URL to download (optional)
+        :type url: str
+        :param url: The URL to store in the documententry file (might be a landing page containing the actual document URL)
         :type url: str
         :returns: ``True`` if the document was downloaded and stored on
                   disk, ``False`` if the file on disk was not updated.
@@ -895,7 +897,9 @@ with the *config* object as single parameter.
 
         entry = DocumentEntry(self.store.documententry_path(basefile))
         now = datetime.now()
-        entry.orig_url = url
+        if orig_url is None:
+            orig_url = url
+        entry.orig_url = orig_url
         if created:
             entry.orig_created = now
         if updated:

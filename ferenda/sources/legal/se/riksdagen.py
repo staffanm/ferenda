@@ -29,9 +29,11 @@ from .swedishlegalsource import Lazyfile
 
 
 class RiksdagenStore(FixedLayoutStore):
-    doctypes = OrderedDict([(".pdf", b''),
-                            (".html", b''),
-                            (".xml", b'')])
+    doctypes = OrderedDict([
+        (".xml", b''),
+        (".html", b''),
+        (".pdf", b''),
+    ])
     intermediate_suffixes = [".xml", ".hocr.html"]
 
 class Riksdagen(Offtryck, FixedLayoutSource):

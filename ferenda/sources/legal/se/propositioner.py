@@ -254,11 +254,13 @@ class PropTripsStore(FixedLayoutStore):
     # 1993/94 and 1994/95 has only plaintext (wrapped in .html)
     # 1995/96 to 2006/07 has plaintext + doc
     # 2007/08 onwards has plaintext, doc and pdf
-    doctypes = OrderedDict([(".html", b'<!DO'),
-                            (".wpd", b'\xffWPC'),
-                            (".docx", b'PK\x03\x04'),
-                            (".doc", b'\xd0\xcf\x11\xe0'),
-                            (".pdf", b'%PDF')])
+    doctypes = OrderedDict([
+        (".pdf", b'%PDF'),
+        (".doc", b'\xd0\xcf\x11\xe0'),
+        (".docx", b'PK\x03\x04'),
+        (".wpd", b'\xffWPC'),
+        (".html", b'<!DO'),
+    ])
 
     def intermediate_path(self, basefile, version=None, attachment=None, suffix=None):
         # we need to select a suitable intermediate suffix based upon

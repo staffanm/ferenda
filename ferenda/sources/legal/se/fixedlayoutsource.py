@@ -80,14 +80,17 @@ class FixedLayoutStore(SwedishLegalStore):
 
     """
 
-    doctypes = OrderedDict([(".wpd", b'\xffWPC'),
-                            (".doc", b'\xd0\xcf\x11\xe0'),
-                            (".docx", b'PK\x03\x04'),
-                            (".rtf", b'{\\rt'),
-                            (".pdf", b'%PDF')])
+    doctypes = OrderedDict([
+        (".pdf", b'%PDF'),
+        (".rtf", b'{\\rt'),
+        (".docx", b'PK\x03\x04'),
+        (".doc", b'\xd0\xcf\x11\xe0'),
+        (".wpd", b'\xffWPC')
+    ])
+
     @property
     def downloaded_suffixes(self):
-        return list(reversed(self.doctypes.keys()))
+        return list(self.doctypes.keys())
 
     def guess_type(self, fp, basefile):
         start = fp.tell()

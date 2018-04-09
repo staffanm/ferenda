@@ -421,7 +421,7 @@ class SwedishLegalSource(DocumentRepository):
         attrib = self.metadata_from_basefile(basefile)
         resource = self.attributes_to_resource(attrib)
         uri = self.minter.space.coin_uri(resource)
-        # FIXME: temporary code we use while we get basefile_from_uri to work
+        # make sure basefiles are roundtrippable
         computed_basefile = self.basefile_from_uri(uri)
         if basefile != computed_basefile:
             computed_basefile = self.basefile_from_uri(uri)

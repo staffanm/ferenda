@@ -65,6 +65,8 @@ class CompositeRepository(DocumentRepository):
     extrabases = ()
     """List of mixin classes to add to each subrepo class."""
 
+    supress_subrepo_logging = True
+
     def get_instance(self, instanceclass):
         if instanceclass not in self._instances:
             if hasattr(self, '_config'):
@@ -81,7 +83,7 @@ class CompositeRepository(DocumentRepository):
             inst = instanceclass(config)
             # if we don't have a config object yet, the created
             # instance is just temporary -- don't save it
-            if hasattr(self, '_config'):
+            if hasattr(self, '_config') and self.supress_subrepo_logging:
                 # if the composite object has loglevel INFO, make the
                 # subrepo have a slightly higher loglevel to avoid
                 # creating almost-duplicate logging entries like:

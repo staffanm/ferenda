@@ -38,9 +38,9 @@ PROV = Namespace(util.ns['prov'])
 class RequiredTextMissing(errors.ParseError): pass
 
 class MyndFskrStore(FixedLayoutStore):
-    doctypes = OrderedDict([(".pdf", b'%PDF'),
-                            (".html", b'<!DO'),  # HTML can start basically in any way. This is the HTML5 way, which might be common for our targets])
-                            ])
+    downloaded_suffixes = [".pdf", ".html"]
+
+    
 class MyndFskrBase(FixedLayoutSource):
     """A abstract base class for fetching and parsing regulations from
     various swedish government agencies. These documents often have a
@@ -74,10 +74,24 @@ class MyndFskrBase(FixedLayoutSource):
     download_rewrite_url = False # iff True, use remote_url to rewrite download links instead of
     # accepting found links as-is. If it's a callable, call that with
     # basefile, URL and expect a rewritten URL.
-
+    landingpage = False # if true, any basefile/url pair discovered by
+                        # download_get_basefiles returns a HTML page,
+                        # on which the link to the real PDF file
+                        # exists.
+    landingpage_url_regex = None
     download_formid = None  # if the paging uses forms, POSTs and other forms of insanity
     documentstore_class = MyndFskrStore
 
+    def __init__(self, config=None, **kwargs):
+        super(MyndFskrBase, self).__init__(config, **kwargs)
+        # unconditionally set downloaded_suffixes, since the
+        # conditions for this re-set in DocumentRepository.__init__ is
+        # too rigid
+        if hasattr(self, 'downloaded_suffixes'):
+            self.store.downloaded_suffixes = self.downloaded_suffixes
+        else:
+            self.store.downloaded_suffixes = [self.downloaded_suffix]
+        
     @classmethod
     def get_default_options(cls):
         opts = super(MyndFskrBase, cls).get_default_options()
@@ -94,7 +108,7 @@ class MyndFskrBase(FixedLayoutSource):
         return [self.alias]
 
     def sanitize_basefile(self, basefile):
-        segments = re.split('[ /:_-]', basefile.lower())
+        segments = re.split('[ \./:_-]', basefile.lower())
         # force "01" to "1" (and check integerity (not integrity))
         segments[-1] = str(int(segments[-1]))
         if len(segments) == 2:
@@ -120,24 +134,27 @@ class MyndFskrBase(FixedLayoutSource):
         while source:
             nextform = nexturl = None
             for (element, attribute, link, pos) in source:
-                basefile = None
-
-                # Two step process: First examine link text to see if
-                # basefile_regex match. If not, examine link url to see
-                # if document_url_regex
+                if element.tag != "a":
+                    continue
+                # Three step process to find basefiles depending on
+                # attributes that subclasses can customize
+                # basefile_regex match. If not, examine link url to
+                # see if document_url_regex
+                # print("examining %s (%s)" % (link, bool(re.match(self.document_url_regex, link))))
+                # continue
                 elementtext = " ".join(element.itertext())
-                if (self.basefile_regex and
+                m = None
+                if (self.landingpage and self.landingpage_url_regex and
+                    re.match(self.landingpage_url_regex, link)):
+                    m = re.match(self.landingpage_url_regex, link)
+                elif (self.basefile_regex and
                         elementtext and
                         re.search(self.basefile_regex, elementtext)):
                     m = re.search(self.basefile_regex, elementtext)
-                    basefile = m.group("basefile")
                 elif self.document_url_regex and re.match(self.document_url_regex, link):
                     m = re.match(self.document_url_regex, link)
-                    if m:
-                        basefile = m.group("basefile")
-
-                if basefile:
-                    basefile = self.sanitize_basefile(basefile)
+                if m:
+                    basefile = self.sanitize_basefile(m.group("basefile"))
                     # since download_rewrite_url is potentially
                     # expensive (might do a HTTP request), we should
                     # perhaps check if we really need to download
@@ -179,16 +196,35 @@ class MyndFskrBase(FixedLayoutSource):
                 url = self.download_rewrite_url(basefile, url)
             else:
                 url = self.remote_url(basefile)
-        ret = super(MyndFskrBase, self).download_single(basefile, url)
+        orig_url = None
+        if self.landingpage:
+            # get landingpage, find real url on it (as determined by
+            # .document_url_regex or .basefile_regex)
+            resp = self.session.get(url)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "lxml")
+            if self.document_url_regex:
+                # FIXME: Maybe sanity check that the basefile matched
+                # is the same basefile as provided to this function?
+                link = soup.find("a", href=self.document_url_regex)
+            if link is None and self.basefile_regex:
+                link = soup.find("a", text=self.basefile_regex)
+            if link:
+                orig_url = url
+                url = urljoin(orig_url, link.get("href"))
+            else:
+                self.log.warning("%s: Couldn't find document from landing page %s" % (basefile, url))
+        ret = super(MyndFskrBase, self).download_single(basefile, url, orig_url)
         if self.downloaded_suffix == ".pdf":
             # assure that the downloaded resource really is a PDF
             downloaded_file = self.store.downloaded_path(basefile)
             with open(downloaded_file, "rb") as fp:
                 sig = fp.read(4)
-                if sig != b'%PDF':
-                    other_file = downloaded_file.replace(".pdf", ".bak")
-                    util.robust_rename(downloaded_file, other_file)
-                    raise errors.DownloadError("%s: Assumed PDF, but downloaded file has sig %r (saved at %s)" % (basefile, sig, other_file))
+            if sig != b'%PDF':
+                other_file = downloaded_file.replace(".pdf", ".bak")
+                util.robust_rename(downloaded_file, other_file)
+                raise errors.DownloadFileNotFoundError("%s: Assumed PDF, but downloaded file has sig %r"
+                                                       " (saved at %s)" % (basefile, sig, other_file))
         return ret
 
     def download_post_form(self, form, url):
@@ -263,6 +299,7 @@ class MyndFskrBase(FixedLayoutSource):
     #    _serialize_unparsed 
     #    refparser.parse_recursive 
     #    parse_entry_update
+
     @decorators.action
     @decorators.managedparsing
     def parse(self, doc):
@@ -802,25 +839,19 @@ class MyndFskrBase(FixedLayoutSource):
 class AFS(MyndFskrBase):
     alias = "afs"
     start_url = "https://www.av.se/arbetsmiljoarbete-och-inspektioner/publikationer/foreskrifter/foreskrifter-listade-i-nummerordning/"
+    landingpage = True
 
-    basefile_regex = "^(?P<basefile>AFS \d+:\d+)"
+    basefile_regex = re.compile("^(?P<basefile>AFS \d+:\d+)")
+    # we need a slighly more forgiving regex beause of AFS 2017:1,
+    # which has the url "...afs-1-2017.pdf" ...
+    document_url_regex = re.compile('.*(?P<basefile>\d+[:/_-]\d+).pdf$')
 
-    # document_url_regex = ".*(afs|AFS)(?P<basefile>\d+_\d+)\.pdf$"
-
-    # This handles the case when pdftotext confuses the metadata in
-    # the right margin on the frontpage, eg:
-    #    Arbetsmiljöverkets föreskrifter om upphävande AFS 2014:44
-    #    Utkom från trycket
-    #    av föreskrifterna (AFS 2005:19) om förebyggande den 20 januari 2014
-    #    av allvarliga kemikalieolyckor;
-    # and converts it to
-    #    Arbetsmiljöverkets föreskrifter om upphävande
-    #    av föreskrifterna (AFS 2005:19) om förebyggande
-    #    av allvarliga kemikalieolyckor;
-    #
-    #    AFS 2014:44
-    #    Utkom från trycket
-    #    den 20 januari 2014
+    # Note that the url for AFS 2015:6 doesn't include the basefile at
+    # all. There seems to be no way of constructing a
+    # document_url_regex that matches that, but not invalid PDFs (such
+    # as consolidated versions). The following is too greedy.
+    # document_url_regex =
+    # re.compile(".*/publikationer/foreskrifter/.*\.pdf$")
 
     def sanitize_text(self, text, basefile):
         # 'afs/2014:39' -> 'AFS 2014:39'
@@ -854,50 +885,33 @@ class AFS(MyndFskrBase):
             newtext += newline + "\n"
         return newtext
 
-    def sanitize_basefile(self, basefile):
-        return super(AFS, self).sanitize_basefile(basefile.replace("_", ":"))
-
-    def download_rewrite_url(self, basefile, url):
-        # download the landing page and find the appropriate URL
-        self.log.debug("%s: Loading %s to find PDF link" % (basefile, url))
-        resp = self.session.get(url)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "lxml")
-        identifier = basefile.upper().replace("/", " ")
-        regex = re.compile("^%s" % identifier)
-        link = soup.find("a", text=regex, href=re.compile("\.pdf$"))
-        if not link:
-            # this means that this FS has not had any changes and so
-            # no base FS is linked using it's identifier. Instead it's
-            # linked at the "Ladda ner pdf" link
-            link = soup.find("a", text="Ladda ner pdf")
-        assert link, "Couldn't find PDF link for %s at %s" % (basefile, url)
-        return urljoin(url, link["href"])
-
-#    def fwdtests(self):
-#        t = super(AFS, self).fwdtests()
-#        t["dcterms:title"].append('([\w ]+s (?:föreskrifter|allmänna råd)).*?)\nBeslutade'],
-#        return t
-
 class BOLFS(MyndFskrBase):
-    # FIXME: The id is not linked, and the link does not *reliably*
-    # contain the id: given link, one should get
-    # link.parent.parent.parent.div.h3.text for the basefile. Most of
-    # the time, the ID is deductible from the link though.
     alias = "bolfs"
     start_url = "http://www.bolagsverket.se/om/oss/verksamhet/styr/forfattningssamling"
+    download_iterlinks = False
+
+    @decorators.downloadmax
+    def download_get_basefiles(self, source):
+        # FIXME: The id (given in a h3) is not linked, and the link
+        # does not *reliably* contain the id: given link. Therefore,
+        # we get all basefiles from the h3:s and find corresponding
+        # links
+        soup = BeautifulSoup(source, "lxml") # source is HTML text,
+                                             # since
+                                             # download_iterlinks is
+                                             # False
+        for h in soup.find("div", id="block-container").find_all("h3"):
+            linklist = h.parent.find_next_sibling("ul")
+            if linklist:
+                el = linklist.find("a")
+                yield h.text, urljoin(self.start_url, el.get("href"))
 
 
 class DIFS(MyndFskrBase):
     alias = "difs"
     start_url = "http://www.datainspektionen.se/lagar-och-regler/datainspektionens-foreskrifter/"
 
-    # def sanitize_text(self, text, basefile):
 
-
-class DVFSStore(SwedishLegalStore):
-    # DVFS are available as HTML, not PDF (which FixedLayoutSource assumes)
-    pass
     
 class DVFS(MyndFskrBase):
     alias = "dvfs"
@@ -909,11 +923,14 @@ class DVFS(MyndFskrBase):
     basefile_regex = "^\s*(?P<basefile>\d{4}:\d+)"
     download_rewrite_url = True
     download_formid = "aspnetForm"
-    documentstore_class = DVFSStore
 
     def remote_url(self, basefile):
         if "/" in basefile:
             basefile = basefile.split("/")[1]
+        if basefile in ("2017:12", "2014:15"):  # single exception to the URL pattern
+            basefile = basefile.replace(":", "-")
+        elif basefile == "2017:11": # ok, so not single exception, but...
+            basefile = "Domstolsverkets-forfattningssamling-DVFS-" + basefile
         return "http://www.domstol.se/Ladda-ner--bestall/Verksamhetsstyrning/DVFS/DVFS2/%s/" % basefile.replace(
             ":", "")
 
@@ -988,18 +1005,10 @@ class EIFS(MyndFskrBase):
         basefile = basefile.replace("_", ":", 1)
         return super(EIFS, self).sanitize_basefile(basefile)
 
-
 class ELSAKFS(MyndFskrBase):
     alias = "elsakfs"  # real name is ELSÄK-FS, but avoid swedchars, uppercase and dashes
-    start_url = "http://www.elsakerhetsverket.se/om-oss/lag-och-ratt/gallande-regler/Elsakerhetsverkets-foreskrifter-listade-i-nummerordning/"
-    download_rewrite_url = True
-
-    def download(self, basefile=None, reporter=None):
-        # This repo source does not have a simple publishing strategy
-        # where a frontpage holds predictable links to all base and
-        # change acts. We disable downloading until we can devote
-        # resources to download it properly.
-        pass
+    start_url = "https://www.elsakerhetsverket.se/om-oss/lag-och-ratt/foreskrifter/"
+    landingpage = True
 
     # this repo has a mismatch between basefile prefix and the URI
     # space slug. This is easily fixed.
@@ -1011,104 +1020,28 @@ class ELSAKFS(MyndFskrBase):
     def remote_url(self, basefile):
         if "/" in basefile:
             basefile = basefile.split("/")[1]
-        return ("http://www.elsakerhetsverket.se/globalassets/foreskrifter/elsak-fs-%s.pdf" %
-                basefile.replace(":", "-"))
- 
-
-# This repo source has as of now a single act, which is published in a
-# different författningssamling (TLVFS). The generic downloader
-# misclassifies this. Skip for now.
-# 
-# class Ehalso(MyndFskrBase):
-#     alias = "ehalso"
-#     # Ehälsomyndigheten publicerar i TLVFS
-#     start_url = "http://www.ehalsomyndigheten.se/Om-oss-/Foreskrifter/"
-
+        landingpage = "https://www.elsakerhetsverket.se/om-oss/lag-och-ratt/foreskrifter/elsak-fs-%s/" % basefile.replace(":", "")
+        resp = self.session.get(landingpage)
+        resp.raise_for_status()
+        link = BeautifulSoup(resp.text, "lxml").find("a", text=self.basefile_regex)
+        if link:
+            return urljoin(landingpage, link.get("href"))
 
 class FFFS(MyndFskrBase):
     alias = "fffs"
-    start_url = "http://www.fi.se/Regler/FIs-forfattningar/Forteckning-FFFS/"
-    document_url = "http://www.fi.se/Regler/FIs-forfattningar/Samtliga-forfattningar/%s/"
-    storage_policy = "dir"  # must be able to handle attachments
-
+    start_url = "https://www.fi.se/sv/vara-register/forteckning-fffs/"
+    landingpage = True
+    landingpage_url_regex = re.compile(".*/sok-fffs/\d{4}/((?P<baseact>\d{5,}/)|)(?P<basefile>\d{5,})/$")
+    document_url_regex = re.compile(".*/contentassets/.*\.pdf$")
     def forfattningssamlingar(self):
         return ["fffs", "bffs"]
 
-    def download(self, basefile=None, reporter=None):
-        self.session = requests.session()
-        soup = BeautifulSoup(self.session.get(self.start_url).text, "lxml")
-        main = soup.find(id="fffs-searchresults")
-        docs = []
-        for numberlabel in main.find_all(text=re.compile('\s*Nummer\s*')):
-            ndiv = numberlabel.find_parent('div').parent
-            typediv = ndiv.findNextSibling()
-            if typediv.find('div', 'FFFSListAreaLeft').get_text(strip=True) != "Typ":
-                self.log.error("Expected 'Typ' in div, found %s" %
-                               typediv.get_text(strip=True))
-                continue
-
-            titlediv = typediv.findNextSibling()
-            if titlediv.find('div', 'FFFSListAreaLeft').get_text(strip=True) != "Rubrik":
-                self.log.error("Expected 'Rubrik' in div, found %s" %
-                               titlediv.get_text(strip=True))
-                continue
-
-            number = ndiv.find('div', 'FFFSListAreaRight').get_text(strip=True)
-            basefile = "fffs/" + number
-            reporter(basefile)
-            tmpfile = mktemp()
-            with self.store.open_downloaded(basefile, mode="w", attachment="snippet.html") as fp:
-                fp.write(str(ndiv))
-                fp.write(str(typediv))
-                fp.write(str(titlediv))
-            if (self.config.refresh or
-                    (not os.path.exists(self.store.downloaded_path(basefile)))):
-                entrypath = self.store.documententry_path(basefile)
-                DocumentEntry.updateentry(self.download_single, "download", entrypath, basefile)
-
-    # FIXME: This should create/update the documententry!!
-    def download_single(self, basefile):
-        pdffile = self.store.downloaded_path(basefile)
-        self.log.debug("%s: download_single..." % basefile)
-        snippetfile = self.store.downloaded_path(basefile, attachment="snippet.html")
-        soup = BeautifulSoup(open(snippetfile), "lxml")
-        href = soup.find(
-            text=re.compile("\s*Rubrik\s*")).find_parent("div", "FFFSListArea").a.get("href")
-        url = urljoin("http://www.fi.se/Regler/FIs-forfattningar/Forteckning-FFFS/", href)
-        if href.endswith(".pdf"):
-            self.download_if_needed(url, basefile)
-
-        elif "/Samtliga-forfattningar/" in href:
-            self.log.debug("%s: Separate page" % basefile)
-            self.download_if_needed(url, basefile,
-                                    filename=self.store.downloaded_path(basefile, attachment="description.html"))
-            descriptionfile = self.store.downloaded_path(
-                basefile,
-                attachment="description.html")
-            soup = BeautifulSoup(open(descriptionfile), "lxml")
-            for link in soup.find("div", "maincontent").find_all("a"):
-                suburl = urljoin(url, link['href']).replace(" ", "%20")
-                if link.text.strip().startswith('Grundförfattning'):
-                    if self.download_if_needed(suburl, basefile):
-                        self.log.info("%s: downloaded main PDF" % basefile)
-
-                elif link.text.strip().startswith('Konsoliderad version'):
-                    if self.download_if_needed(suburl, basefile,
-                                               filename=self.store.downloaded_path(basefile, attachment="konsoliderad.pdf")):
-                        self.log.info(
-                            "%s: downloaded consolidated PDF" % basefile)
-
-                elif link.text.strip().startswith('Ändringsförfattning'):
-                    self.log.info("Skipping change regulation")
-                elif link['href'].endswith(".pdf"):
-                    filename = link['href'].split("/")[-1]
-                    if self.download_if_needed(
-                            suburl, basefile, filename=self.store.downloaded_path(basefile, attachment=filename)):
-                        self.log.info("%s: downloaded '%s' to %s" %
-                                      (basefile, link.text, filename))
-
-        else:
-            self.log.warning("%s: No idea!" % basefile)
+    def sanitize_basefile(self, basefile):
+        # basefiles as captured by the document_url_regex is missing
+        # the colon separator. Re-introduce that.
+        if basefile.isdigit and len(basefile) > 4:
+            basefile = "%s:%s" % (basefile[:4], basefile[4:])
+        return super(FFFS, self).sanitize_basefile(basefile)
 
     def fwdtests(self):
         t = super(FFFS, self).fwdtests()
@@ -1120,51 +1053,27 @@ class FFFS(MyndFskrBase):
 class FFS(MyndFskrBase):
     alias = "ffs"
     start_url = "http://www.forsvarsmakten.se/sv/om-myndigheten/dokument/lagrum"
-    # FIXME: document_url_regex should match
-    #   http://www.forsvarsmakten.se/siteassets/4-om-myndigheten/dokumentfiler/lagrum/gallande-ffs-1995-2011/ffs-2010-8.pdf
-    #   http://www.forsvarsmakten.se/siteassets/4-om-myndigheten/dokumentfiler/lagrum/gallande-ffs-1995-2011/ffs2010-10.pdf
-    # but not
-    #   http://www.forsvarsmakten.se/siteassets/4-om-myndigheten/dokumentfiler/lagrum/gallande-fib/fib2001-4.pdf
-
-
-# This is similar to EHalso -- ie a separate agency publishing
-# ordinances in another agencys collection. We need better handling of
-# this.
-# 
-#class FMI(MyndFskrBase):
-#    alias = "fmi"
-#    # Fastighetsmäklarinspektionen publicerar i KAMFS
-#    start_url = "http://www.fmi.se/gallande-foreskrifter"
-
-
-class FoHMFS(MyndFskrBase):
-    alias = "fohmfs"
-    start_url = ("http://www.folkhalsomyndigheten.se/publicerat-material/"
-                 "foreskrifter-och-allmanna-rad/")
-    basefile_regex = "^(?P<basefile>(FoHMFS|HSLF-FS) \d+:\d+)$"
-
-    def forfattningssamlingar(self):
-        return ["fohmfs", "hslffs"]
-
-    def sanitize_basefile(self, basefile):
-        basefile = basefile.replace("-", "")
-        return super(FoHMFS, self).sanitize_basefile(basefile)
-
-    def download_rewrite_url(self, basefile, url):
-        self.log.debug("%s: Loading %s to find PDF link" % (basefile, url))
-        soup = BeautifulSoup(self.session.get(url).text, "lxml")
-        linkel = soup.find("a", href=re.compile(".pdf"))
-        if linkel:
-            link = urljoin(url, linkel.get("href"))
-        else:
-            raise errors.DownloadFileNotFoundError("No suitable PDF link found")
-        return link
+    document_url_regex = re.compile(".*/lagrum/gallande-ffs.*/ffs.*(?P<basefile>\d{4}[\.:/_-]\d{1,3})[^/]*.pdf$")
 
 
 class KFMFS(MyndFskrBase):
     alias = "kfmfs"
     start_url = "http://www.kronofogden.se/Foreskrifter.html"
+    download_iterlinks = False
+    # note that the above URL contains one (1) link to an old RSFS,
+    # which has been subsequently expired by SKVFS 2017:12. Don't know
+    # why they're still publishing it...
 
+    @decorators.downloadmax
+    def download_get_basefiles(self, source):
+        soup = BeautifulSoup(source, "lxml")
+        for ns in soup.find("h2", text="Föreskrifter").parent.find_all(
+                text=re.compile("KFMF?S")):
+            m = self.basefile_regex.search(ns.strip())
+            basefile = m.group("basefile")
+            link = ns.parent.find("a", href=re.compile(".*\.pdf"))
+            yield basefile, urljoin(self.start_url, link["href"])
+    
 
 class KOVFS(MyndFskrBase):
     alias = "kovfs"
