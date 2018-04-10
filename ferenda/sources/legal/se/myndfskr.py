@@ -9,6 +9,7 @@ from xml.sax.saxutils import escape as xml_escape
 from io import BytesIO
 import os
 import re
+import json
 from collections import OrderedDict
 
 from rdflib import URIRef, Literal, Namespace
@@ -108,13 +109,15 @@ class MyndFskrBase(FixedLayoutSource):
         return [self.alias]
 
     def sanitize_basefile(self, basefile):
-        segments = re.split('[ \./:_-]', basefile.lower())
+        segments = re.split('[ \./:_-]+', basefile.lower())
         # force "01" to "1" (and check integerity (not integrity))
         segments[-1] = str(int(segments[-1]))
         if len(segments) == 2:
             basefile = "%s:%s" % tuple(segments)
         elif len(segments) == 3:
             basefile = "%s/%s:%s" % tuple(segments)
+        elif len(segments) == 4 and segments[1] == "fs":  # eg for HSLF-FS and others
+            basefile = "%s-%s/%s:%s" % tuple(segments)
         else:
             raise ValueError("Can't sanitize %s" % basefile)
         if not any((basefile.startswith(fs + "/") for fs
@@ -134,7 +137,10 @@ class MyndFskrBase(FixedLayoutSource):
         while source:
             nextform = nexturl = None
             for (element, attribute, link, pos) in source:
-                if element.tag != "a":
+                # FIXME: Maybe do a full HTTP decoding later, but this
+                # should not cause any regressons, maybe
+                link = link.replace("%20", " ")
+                if element.tag not in ("a", "form"):
                     continue
                 # Three step process to find basefiles depending on
                 # attributes that subclasses can customize
@@ -904,7 +910,7 @@ class BOLFS(MyndFskrBase):
             linklist = h.parent.find_next_sibling("ul")
             if linklist:
                 el = linklist.find("a")
-                yield h.text, urljoin(self.start_url, el.get("href"))
+                yield self.sanitize_basefile(h.text), urljoin(self.start_url, el.get("href"))
 
 
 class DIFS(MyndFskrBase):
@@ -1068,17 +1074,47 @@ class KFMFS(MyndFskrBase):
     def download_get_basefiles(self, source):
         soup = BeautifulSoup(source, "lxml")
         for ns in soup.find("h2", text="Föreskrifter").parent.find_all(
-                text=re.compile("KFMF?S")):
+                text=re.compile("KFMFS")):
             m = self.basefile_regex.search(ns.strip())
             basefile = m.group("basefile")
             link = ns.parent.find("a", href=re.compile(".*\.pdf"))
-            yield basefile, urljoin(self.start_url, link["href"])
+            yield self.sanitize_basefile(basefile), urljoin(self.start_url, link["href"])
     
 
 class KOVFS(MyndFskrBase):
     alias = "kovfs"
-    start_url = ("http://publikationer.konsumentverket.se/sv/publikationer/"
-                 "lagarregler/forfattningssamling-kovfs/")
+    download_iterlinks = False
+    # start_url = "http://publikationer.konsumentverket.se/sv/sok/kovfs"
+
+    # since Konsumentverket uses a inaccessible Angular webshop from
+    # hell for publishing KOVFS, it seems that the simplest way of
+    # getting a list of basefile/pdf-link pairs is to craft a special
+    # JSON-RPC call to the backend endpoint of the company hosting the
+    # webshop, and then call another endpoint with a list of internal
+    # document ids. Seriously, fuck this. Don't break the web.
+    start_url = "https://shop.textalk.se/backend/jsonrpc/v1/?language=sv&webshop=55743"
+
+    def download_get_first_page(self):
+        payload = '{"id":10,"jsonrpc":"2.0","method":"Article.list","params":[{"uid":true,"name":"sv","articleNumber":true,"introductionText":true,"price":true,"url":"sv","images":true,"unit":true,"articlegroup":true,"news":true,"choices":true,"isBuyable":true,"presentationOnly":true,"choiceSchema":true},{"filters":{"search":{"term":"kovfs*"}},"offset":0,"limit":48,"sort":"name","descending":false}]}'
+        return self.session.post(self.start_url, data=payload)
+
+    @decorators.downloadmax
+    def download_get_basefiles(self, source):
+        # source is resp.text but we'd rather have resp.json(). But
+        # we'll parse it ourselves
+        resp = json.loads(source)
+        docs = {}
+        for result in resp['result']:
+            # KOVFS YYYY:NN = 13 chars
+            basefile = result['name']['sv'][:13].strip()
+            if self.basefile_regex.search(basefile):
+                uid = str(result['uid'])
+                docs[uid] = basefile
+        articleurl = "http://konsumentverket.shoptools.textalk.se/ro-api/55743/editions/preselected_for_articles.json?article_ids=[%s]" % ",".join(docs.keys())
+        resp = self.session.get(articleurl)
+        res = resp.json()
+        for uid in res.keys():
+            yield(self.sanitize_basefile(docs[uid]), res[uid]['preselected']['url'])
 
 
 class KVFS(MyndFskrBase):
@@ -1088,21 +1124,67 @@ class KVFS(MyndFskrBase):
     # (finns även konsoliderade på http://www.kriminalvarden.se/
     #  om-kriminalvarden/styrning-och-regelverk/lagar-forordningar-och-
     #  foreskrifter)
+    download_iterlinks = False
+    basefile_regex = re.compile("(?P<basefile>KVV?FS \d{4}:\d+)")
 
+    def forfattningssamlingar(self):
+        return ["kvfs", "kvvfs"]
+    
+    @decorators.downloadmax
+    def download_get_basefiles(self, source):
+        lasthref = None
+        done = False
+        while not done:
+            soup = BeautifulSoup(source, "lxml") # source is HTML text,
+                                                 # since
+                                                 # download_iterlinks is
+                                                 # False
+            for h in soup.find("section", "publications-list").find_all("h3"):
+                m = self.basefile_regex.match(h.text)
+                if not m:
+                    continue
+                el = h.parent.parent.find("a")
+                if el:
+                    yield self.sanitize_basefile(m.group("basefile")), urljoin(self.start_url, el.get("href"))
+            nextlink = soup.find("ul", "pagination").find_all("a")[-1] # last link is Next
+            if nextlink and nextlink["href"] != lasthref:
+                source = self.session.get(urljoin(self.start_url, nextlink["href"])).text
+                lasthref = nextlink["href"]
+            else:
+                done = True
+
+    def forfattningssamlingar(self):
+        return ["kvfs", "kvvfs"]
 
 class LMFS(MyndFskrBase):
     alias = "lmfs"
     start_url = "http://www.lantmateriet.se/Om-Lantmateriet/Rattsinformation/Foreskrifter/"
+    basefile_regex = re.compile('(?P<basefile>LMV?FS \d{4}:\d{1,3})')
+
+    def forfattningssamlingar(self):
+        return ["lmfs", "lmvfs"]
 
 
 class LIFS(MyndFskrBase):
     alias = "lifs"
     start_url = "http://www.lotteriinspektionen.se/sv/Lagar-och-villkor/Foreskrifter/"
+    basefile_regex = re.compile('(?P<basefile>LIFS \d{4}:\d{1,3})')
 
 
 class LVFS(MyndFskrBase):
     alias = "lvfs"
     start_url = "http://www.lakemedelsverket.se/overgripande/Lagar--regler/Lakemedelsverkets-foreskrifter---LVFS/"
+    basefile_regex = None # urls are consistent enough and contain FS
+                          # information, which link text lacks
+    document_url_regex = re.compile(".*/(?P<basefile>[LVHSF\-]+FS_ ?\d{4}[_\-]\d+)\.pdf$")
+
+    def sanitize_basefile(self, basefile):
+        # fix accidental misspellings found in 2015:35 and 2017:31
+        basefile = basefile.replace("HSLFS", "HSLF").replace("HLFS", "HSLF")
+        return super(LVFS, self).sanitize_basefile(basefile)
+    
+    def forfattningssamlingar(self):
+        return ["hslf-fs", "lvfs"]
 
     def fwdtests(self):
         t = super(LVFS, self).fwdtests()
