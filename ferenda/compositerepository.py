@@ -96,11 +96,8 @@ class CompositeRepository(DocumentRepository):
                     inst.log.getEffectiveLevel() == logging.INFO and
                     not isinstance(inst, CompositeRepository)):
                     inst.log.setLevel(inst.log.getEffectiveLevel() + 1)
-                self._instances[instanceclass] = inst
-                
-            return inst
-        else:
-            return self._instances[instanceclass]
+            self._instances[instanceclass] = inst
+        return self._instances[instanceclass]
 
     def __init__(self, config=None, **kwargs):
         self._instances = OrderedDict()

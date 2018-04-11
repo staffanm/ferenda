@@ -263,17 +263,22 @@ class PDFReader(CompoundElement):
         self.log.debug("running " + cmd)
         (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
 
-        # Step 4: Later versions of tesseract adds a automatic .hocr
-        # suffix, while earlier versions add a automatic .html. Other
-        # parts of the code expects the .html suffix, so we check to
-        # see if we have new-tesseract behaviour and compensate.
-        if os.path.exists("%(tmpdir)s/%(root)s%(suffix)s.hocr" % locals()):
-            util.robust_rename("%(tmpdir)s/%(root)s%(suffix)s.hocr" % locals(),
-                               "%(tmpdir)s/%(root)s%(suffix)s.html" % locals())
-        
-        # Step 5: Move our hOCR file to the workdir, then cleanup
-        util.robust_rename("%(tmpdir)s/%(root)s%(suffix)s.html" % locals(),
-                           "%(workdir)s/%(root)s%(suffix)s.html" % locals())
+        if hocr:
+            # Step 4: Later versions of tesseract adds a automatic .hocr
+            # suffix, while earlier versions add a automatic .html. Other
+            # parts of the code expects the .html suffix, so we check to
+            # see if we have new-tesseract behaviour and compensate.
+            if os.path.exists("%(tmpdir)s/%(root)s%(suffix)s.hocr" % locals()):
+                util.robust_rename("%(tmpdir)s/%(root)s%(suffix)s.hocr" % locals(),
+                                   "%(tmpdir)s/%(root)s%(suffix)s.html" % locals())
+
+            # Step 5: Move our hOCR file to the workdir, then cleanup
+            util.robust_rename("%(tmpdir)s/%(root)s%(suffix)s.html" % locals(),
+                               "%(workdir)s/%(root)s%(suffix)s.html" % locals())
+        else:
+            util.robust_rename("%(tmpdir)s/%(root)s.txt" % locals(),
+                               "%(workdir)s/%(root)s.txt" % locals())
+            
         shutil.rmtree(tmpdir)        
 
     def _pdftohtml(self, tmppdffile, workdir, images, keeppdffile):
