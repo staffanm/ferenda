@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2017-10-24T10:34:27.220987
+# Automatically transformed from sources at 2018-04-12T22:50:44.511399
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -157,6 +157,8 @@ rpubl:Skrivelse space:abbrSlug "skr" .
 
 <https://lagen.nu/dataset/kvfs> space:abbrSlug "kvfs" .
 
+<https://lagen.nu/dataset/kvvfs> space:abbrSlug "kvvfs" .
+
 <https://lagen.nu/dataset/lfnfs> space:abbrSlug "lfnfs" .
 
 <https://lagen.nu/dataset/lfs> space:abbrSlug "lfs" .
@@ -231,6 +233,8 @@ rpubl:Skrivelse space:abbrSlug "skr" .
 
 <https://lagen.nu/dataset/sgu-fs> space:abbrSlug "sgu-fs" .
 
+<https://lagen.nu/dataset/sivfs> space:abbrSlug "sivfs" .
+
 <https://lagen.nu/dataset/sjofs> space:abbrSlug "sjoefs" .
 
 <https://lagen.nu/dataset/sjvfs> space:abbrSlug "sjvfs" .
@@ -256,6 +260,8 @@ rpubl:Skrivelse space:abbrSlug "skr" .
 <https://lagen.nu/dataset/stafs> space:abbrSlug "stafs" .
 
 <https://lagen.nu/dataset/stemfs> space:abbrSlug "stemfs" .
+
+<https://lagen.nu/dataset/stfs> space:abbrSlug "stfs" .
 
 <https://lagen.nu/dataset/svkfs> space:abbrSlug "svkfs" .
 

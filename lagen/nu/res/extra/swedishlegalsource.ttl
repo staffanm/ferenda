@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2017-10-24T10:23:18.803363
+# Automatically transformed from sources at 2018-04-12T22:50:44.138197
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -479,6 +479,13 @@
     skos:altLabel "KVFS"@sv ;
     skos:prefLabel "Kriminalvårdens författningssamling"@sv .
 
+<https://lagen.nu/dataset/kvvfs> a rpubl:Forfattningssamling ;
+    dcterms:publisher <https://lagen.nu/org/2018/kriminalvardsverket> ;
+    rdfs:seeAlso <http://www.kvv.se/templates/KVV_InfoMaterialListing____3464.aspx> ;
+    owl:sameAs <http://rinfo.lagrummet.se/serie/fs/kvvfs> ;
+    skos:altLabel "KVVFS"@sv ;
+    skos:prefLabel "Kriminalvårdsverkets författningssamling"@sv .
+
 <https://lagen.nu/dataset/lbs> a rpubl:Forfattningssamling ;
     dcterms:publisher <https://lagen.nu/org/2014/statens_jordbruksverk> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/lbs> ;
@@ -523,6 +530,8 @@
     skos:prefLabel "Lantmäteriets författningssamling"@sv .
 
 <https://lagen.nu/dataset/lmvfs> a rpubl:Forfattningssamling ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/lmfs> ;
+    dcterms:publisher <https://lagen.nu/org/2014/lantmateriet> ;
     rdfs:comment "Numera benämnd Lantmäteriet författningssamling (LMFS)"@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/lmfs>,
         <http://rinfo.lagrummet.se/serie/fs/lmvfs> ;
@@ -751,6 +760,14 @@
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/sgu-fs> ;
     skos:altLabel "SGU-FS"@sv ;
     skos:prefLabel "Sveriges geologiska undersöknings författningssamling"@sv .
+
+<https://lagen.nu/dataset/sivfs> a rpubl:Forfattningssamling ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/migrfs> ;
+    dcterms:publisher <https://lagen.nu/org/2018/statens-invandrarverk> ;
+    rdfs:comment "Har tagits över av Arbetsförmedlingens författningssamling (AFFS)"@sv ;
+    owl:sameAs <http://rinfo.lagrummet.se/serie/fs/sivfs> ;
+    skos:altLabel "SIVFS"@sv ;
+    skos:prefLabel "Statens invandrarverks författningssamling"@sv .
 
 <https://lagen.nu/dataset/sjofs> a rpubl:Forfattningssamling ;
     dcterms:publisher <https://lagen.nu/org/2014/sjofartsverket> ;
@@ -1385,6 +1402,14 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/patent-_och_marknadsoeverdomstolen> ;
     foaf:name "Patent- och marknadsöverdomstolen"@sv .
 
+<https://lagen.nu/org/2018/kriminalvardsstyrelsen> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/kriminalvaardsstyrelsen> ;
+    foaf:name "Kriminalvårdsstyrelsen"@sv .
+
+<https://lagen.nu/org/2018/lantmateriverket> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/lantmaeteriverket> ;
+    foaf:name "Lantmäteriverket"@sv .
+
 <https://lagen.nu/org/2008/domstolsverket> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/domstolsverket> ;
     foaf:homepage <http://www.domstol.se/> ;
@@ -1606,10 +1631,6 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/lansstyrelsen_vaestra_goetalands_laen> ;
     foaf:name "Länsstyrelsen Västra Götalands län"@sv .
 
-<https://lagen.nu/org/2014/lantmateriet> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/lantmaeteriet> ;
-    foaf:name "Lantmäteriet"@sv .
-
 <https://lagen.nu/org/2014/livsmedelsverket> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/livsmedelsverket> ;
     foaf:name "Livsmedelsverket"@sv .
@@ -1781,6 +1802,15 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/statens_raeddningsverk> ;
     foaf:name "Statens räddningsverk"@sv .
 
+<https://lagen.nu/org/2018/kriminalvardsverket> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/kriminalvaardsverket> ;
+    foaf:name "Kriminalvårdsverket"@sv .
+
+<https://lagen.nu/org/2018/statens-invandrarverk> a foaf:Organization ;
+    rdfs:comment "Ersatt av Migrationsverket"@sv ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/statens_invandrarverk> ;
+    foaf:name "Statens invandrarverk"@sv .
+
 <https://lagen.nu/org/2008/forsakringskassan> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/foersaekringskassan> ;
     foaf:name "Försäkringskassan"@sv .
@@ -1788,6 +1818,10 @@
 <https://lagen.nu/org/2014/forsvarsmakten> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/foersvarsmakten> ;
     foaf:name "Försvarsmakten"@sv .
+
+<https://lagen.nu/org/2014/lantmateriet> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/lantmaeteriet> ;
+    foaf:name "Lantmäteriet"@sv .
 
 <https://lagen.nu/org/2014/riksarkivet> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/riksarkivet> ;

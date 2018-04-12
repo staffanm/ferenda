@@ -1,4 +1,4 @@
-# Automatically concatenated from sources at 2017-10-24T10:20:44.664571
+# Automatically concatenated from sources at 2018-04-12T22:50:43.375531
 
 @prefix : <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
 @prefix bibo: <http://purl.org/ontology/bibo/> .
@@ -140,6 +140,9 @@
 
 <http://rinfo.lagrummet.se/org/konstnaersnaemnden> a foaf:Organization ;
     foaf:name "Konstnärsnämnden"@sv .
+
+<http://rinfo.lagrummet.se/org/kriminalvaardsstyrelsen> a foaf:Organization ;
+    foaf:name "Kriminalvårdsstyrelsen"@sv .
 
 <http://rinfo.lagrummet.se/org/kulturdepartementet> a foaf:Organization ;
     foaf:name "Kulturdepartementet"@sv .
@@ -713,6 +716,12 @@
     skos:altLabel "KVFS"@sv ;
     skos:prefLabel "Kriminalvårdens författningssamling"@sv .
 
+<http://rinfo.lagrummet.se/serie/fs/kvvfs> a :Forfattningssamling ;
+    dct:publisher <http://rinfo.lagrummet.se/org/kriminalvaardsverket> ;
+    rdfs:seeAlso <http://www.kvv.se/templates/KVV_InfoMaterialListing____3464.aspx> ;
+    skos:altLabel "KVVFS"@sv ;
+    skos:prefLabel "Kriminalvårdsverkets författningssamling"@sv .
+
 <http://rinfo.lagrummet.se/serie/fs/lbs> a :Forfattningssamling ;
     dct:publisher <http://rinfo.lagrummet.se/org/statens_jordbruksverk> ;
     skos:altLabel "LBS"@sv ;
@@ -745,8 +754,9 @@
     skos:prefLabel "Livsmedelsverkets författningssamling"@sv .
 
 <http://rinfo.lagrummet.se/serie/fs/lmvfs> a :Forfattningssamling ;
+    dct:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/lmfs> ;
+    dct:publisher <http://rinfo.lagrummet.se/org/lantmaeteriverket> ;
     rdfs:comment "Numera benämnd Lantmäteriet författningssamling (LMFS)"@sv ;
-    owl:sameAs <http://rinfo.lagrummet.se/serie/fs/lmfs> ;
     skos:altLabel "LMVFS"@sv ;
     skos:prefLabel "Lantmäteriverkets författningssamling"@sv .
 
@@ -760,12 +770,6 @@
     rdfs:seeAlso <http://www.lakemedelsverket.se/Tpl/NormalPage____996.aspx> ;
     skos:altLabel "LVFS"@sv ;
     skos:prefLabel "Läkemedelsverkets författningssamling"@sv .
-
-<http://rinfo.lagrummet.se/serie/fs/migrfs> a :Forfattningssamling ;
-    dct:publisher <http://rinfo.lagrummet.se/org/migrationsverket> ;
-    rdfs:seeAlso <http://www.migrationsverket.se/index.jsp?swedish/verket/migrfs.jsp> ;
-    skos:altLabel "MIGRFS"@sv ;
-    skos:prefLabel "Migrationsverkets författningssamling"@sv .
 
 <http://rinfo.lagrummet.se/serie/fs/mprtfs> a :Forfattningssamling ;
     dct:publisher <http://rinfo.lagrummet.se/org/myndigheten_foer_press_radio_och_tv> ;
@@ -875,6 +879,13 @@
     rdfs:seeAlso <http://www.sgu.se/sgu/sv/om_sgu/foreskr_s.htm> ;
     skos:altLabel "SGU-FS"@sv ;
     skos:prefLabel "Sveriges geologiska undersöknings författningssamling"@sv .
+
+<http://rinfo.lagrummet.se/serie/fs/sivfs> a :Forfattningssamling ;
+    dct:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/migrfs> ;
+    dct:publisher <http://rinfo.lagrummet.se/org/statens_invandrarverk> ;
+    rdfs:comment "Har tagits över av Arbetsförmedlingens författningssamling (AFFS)"@sv ;
+    skos:altLabel "SIVFS"@sv ;
+    skos:prefLabel "Statens invandrarverks författningssamling"@sv .
 
 <http://rinfo.lagrummet.se/serie/fs/sjoefs> a :Forfattningssamling ;
     dct:publisher <http://rinfo.lagrummet.se/org/sjoefartsverket> ;
@@ -1157,6 +1168,9 @@
 <http://rinfo.lagrummet.se/org/kriminalvaarden> a foaf:Organization ;
     foaf:name "Kriminalvården"@sv .
 
+<http://rinfo.lagrummet.se/org/kriminalvaardsverket> a foaf:Organization ;
+    foaf:name "Kriminalvårdsverket"@sv .
+
 <http://rinfo.lagrummet.se/org/kronofogdemyndigheten> a foaf:Organization ;
     foaf:name "Kronofogdemyndigheten"@sv .
 
@@ -1228,6 +1242,9 @@
 
 <http://rinfo.lagrummet.se/org/lantmaeteriet> a foaf:Organization ;
     foaf:name "Lantmäteriet"@sv .
+
+<http://rinfo.lagrummet.se/org/lantmaeteriverket> a foaf:Organization ;
+    foaf:name "Lantmäteriverket"@sv .
 
 <http://rinfo.lagrummet.se/org/livsmedelsverket> a foaf:Organization ;
     foaf:name "Livsmedelsverket"@sv .
@@ -1305,6 +1322,10 @@
 <http://rinfo.lagrummet.se/org/statens_folkhaelsoinstitut> a foaf:Organization ;
     foaf:name "Statens folkhälsoinstitut"@sv .
 
+<http://rinfo.lagrummet.se/org/statens_invandrarverk> a foaf:Organization ;
+    rdfs:comment "Ersatt av Migrationsverket"@sv ;
+    foaf:name "Statens invandrarverk"@sv .
+
 <http://rinfo.lagrummet.se/org/statens_kulturraad> a foaf:Organization ;
     foaf:name "Statens kulturråd"@sv .
 
@@ -1380,6 +1401,12 @@
     rdfs:seeAlso <http://www.lantmateriet.se/templates/LMV_Page.aspx?id=2123> ;
     skos:altLabel "LMFS"@sv ;
     skos:prefLabel "Lantmäteriets författningssamling"@sv .
+
+<http://rinfo.lagrummet.se/serie/fs/migrfs> a :Forfattningssamling ;
+    dct:publisher <http://rinfo.lagrummet.se/org/migrationsverket> ;
+    rdfs:seeAlso <http://www.migrationsverket.se/index.jsp?swedish/verket/migrfs.jsp> ;
+    skos:altLabel "MIGRFS"@sv ;
+    skos:prefLabel "Migrationsverkets författningssamling"@sv .
 
 <http://rinfo.lagrummet.se/serie/fs/mtfs> a :Forfattningssamling ;
     dct:publisher <http://rinfo.lagrummet.se/org/myndigheten_foer_tillvaextpolitiska_utvaerderingar_och_analyser> ;

@@ -105,6 +105,14 @@ class MyndFskrBase(FixedLayoutSource):
         opts['jsfiles'].append('js/pdfviewer.js')
         return opts
 
+    def remote_url(self, basefile):
+        # if we already know the remote url, don't go to the landing page
+        if os.path.exists(self.store.documententry_path(basefile)):
+            entry = DocumentEntry(self.store.documententry_path(basefile))
+            return entry.orig_url
+        else:
+            return super(MyndFskrBase, self).remote_url(basefile)
+
     def forfattningssamlingar(self):
         return [self.alias]
 
@@ -117,7 +125,7 @@ class MyndFskrBase(FixedLayoutSource):
         elif len(segments) == 3:
             basefile = "%s/%s:%s" % tuple(segments)
         elif len(segments) == 4 and segments[1] == "fs":  # eg for HSLF-FS and others
-            basefile = "%s-%s/%s:%s" % tuple(segments)
+            basefile = "%s%s/%s:%s" % tuple(segments) # eliminate the hyphen in the fs name
         else:
             raise ValueError("Can't sanitize %s" % basefile)
         if not any((basefile.startswith(fs + "/") for fs
@@ -1022,16 +1030,6 @@ class ELSAKFS(MyndFskrBase):
         basefile = super(MyndFskrBase, self).basefile_from_uri(uri)
         if basefile.startswith("elsaek-fs"):
                 return basefile.replace("elsaek-fs", "elsakfs")
- 
-    def remote_url(self, basefile):
-        if "/" in basefile:
-            basefile = basefile.split("/")[1]
-        landingpage = "https://www.elsakerhetsverket.se/om-oss/lag-och-ratt/foreskrifter/elsak-fs-%s/" % basefile.replace(":", "")
-        resp = self.session.get(landingpage)
-        resp.raise_for_status()
-        link = BeautifulSoup(resp.text, "lxml").find("a", text=self.basefile_regex)
-        if link:
-            return urljoin(landingpage, link.get("href"))
 
 class FFFS(MyndFskrBase):
     alias = "fffs"
@@ -1184,7 +1182,7 @@ class LVFS(MyndFskrBase):
         return super(LVFS, self).sanitize_basefile(basefile)
     
     def forfattningssamlingar(self):
-        return ["hslf-fs", "lvfs"]
+        return ["hslffs", "lvfs"]
 
     def fwdtests(self):
         t = super(LVFS, self).fwdtests()
@@ -1194,7 +1192,20 @@ class LVFS(MyndFskrBase):
 
 class MIGRFS(MyndFskrBase):
     alias = "migrfs"
-    start_url = "http://www.migrationsverket.se/info/1082.html"
+    start_url = "https://www.migrationsverket.se/Om-Migrationsverket/Styrning-och-uppfoljning/Lagar-och-regler/Foreskrifter.html"
+    basefile_regex = re.compile("(?P<basefile>(MIGR|SIV)FS \d+[:/]\d+)$")
+
+    def sanitize_basefile(self, basefile):
+        # older MIGRFS uses non-standard identifiers like MIGRFS
+        # 04/2017. We normalize this to migrfs/2017-4 because who do
+        # they think they are?
+        if re.search("\d{1,2}/\d{4}$", basefile):
+            fs, ordinal, year = re.split("[ /]", basefile)
+            basefile = "%s %s:%s" % (fs, year, int(ordinal))
+        return super(MIGRFS, self).sanitize_basefile(basefile)
+    
+    def forfattningssamlingar(self):
+        return ["migrfs", "sivfs"]
 
 
 class MPRTFS(MyndFskrBase):
@@ -1225,7 +1236,6 @@ class MSBFS(MyndFskrBase):
     def basefile_from_uri(self, uri):
         uri = uri.replace("/saeifs/", "/säifs/")
         return super(MyndFskrBase, self).basefile_from_uri(uri)
-    
 
     def download_get_basefiles(self, source):
         doc = lxml.html.fromstring(source)
@@ -1245,7 +1255,6 @@ class MSBFS(MyndFskrBase):
             basefile = re.match(self.basefile_regex, link.get_text()).group("basefile")
             yield self.sanitize_basefile(basefile), urljoin(self.start_url, link["href"])
 
-
     def fwdtests(self):
         t = super(MSBFS, self).fwdtests()
         # cf. NFS.fwdtests()
@@ -1257,7 +1266,15 @@ class MYHFS(MyndFskrBase):
     #  (id vs länk)
     alias = "myhfs"
     start_url = "https://www.myh.se/Lagar-regler-och-tillsyn/Foreskrifter/"
+    download_iterlinks = False
 
+    @decorators.downloadmax
+    def download_get_basefiles(self, source):
+        soup = BeautifulSoup(source, "lxml")
+        for basefile in soup.find("div", "article-text").find_all("strong", text=re.compile("\d+:\d+")):
+            link = basefile.find_parent("td").find_next_sibling("td").a
+            yield self.sanitize_basefile(basefile.text.strip()), urljoin(self.start_url, link["href"])
+        
 
 class NFS(MyndFskrBase):
     alias = "nfs"
@@ -1329,24 +1346,66 @@ class NFS(MyndFskrBase):
     def sanitize_text(self, text, basefile):
         # rudimentary dehyphenation for a special case (snfs/1994:2)
         return text.replace("Statens na—\n\nturvårdsverk", "Statens naturvårdsverk")
-        
 
-
-class RNFS(MyndFskrBase):
-    alias = "rnfs"
-    start_url = "http://www.revisorsnamnden.se/rn/om_rn/regler/kronologi.html"
-    basefile_regex = re.compile('RNFS (?P<basefile>\d{4}[:/_-]\d{1,3})$')
-    document_url_regex = None
 
 class RAFS(MyndFskrBase):
     #  (efter POST)
     alias = "rafs"
-    start_url = "http://riksarkivet.se/rafs"
+    start_url = "https://riksarkivet.se/rafs"
+    download_iterlinks = False
+    landingpage = True
 
+    def download_get_first_page(self):
+        resp = self.session.get(self.start_url)
+        tree = lxml.html.document_fromstring(resp.text)
+        tree.make_links_absolute(self.start_url, resolve_base_href=True)
+        form = tree.forms[1]
+        assert form.action == self.start_url
+        fields = dict(form.fields)
 
+        formid = 'ctl00$cphMasterFirstRow$ctl02$InsertFieldWithControlsOnInit1$SearchRafsForm_ascx1$'
+        fields['__EVENTTARGET'] = formid + 'lnkVisaAllaGiltiga'
+        fields['__EVENTARGUMENT'] = ''
+        for f in ('btAdvancedSearch', 'btSimpleSearch', 'chkSokUpphavda'):
+            del fields[formid + f]
+        for f in ('tbSearch', 'tbRafsnr', 'tbRubrik', 'tbBemyndigande', 'tbGrundforfattning', 'tbFulltext'):
+            fields[formid + f] = ''
+        resp = self.session.post(self.start_url, data=fields)
+        assert 'Antal träffar:' in resp.text, "ASP.net event lnkVisaAllaGiltiga was not properly called"
+        return resp
+
+    @decorators.downloadmax
+    def download_get_basefiles(self, source):
+        soup = BeautifulSoup(source, "lxml")
+        for item in soup.find_all("div", "dataitem"):
+            link = urljoin(self.start_url, item.a["href"])
+            basefile = item.find("dt", text="Nummer:").find_next_sibling("dd").text
+            yield self.sanitize_basefile(basefile), link
+            
+    
 class RGKFS(MyndFskrBase):
     alias = "rgkfs"
     start_url = "https://www.riksgalden.se/sv/omriksgalden/Pressrum/publicerat/Foreskrifter/"
+    download_iterlinks = False
+
+    @decorators.downloadmax
+    def download_get_basefiles(self, source):
+        soup = BeautifulSoup(source, "lxml")
+        for item in soup.find_all("td", text=re.compile("^\d{4}:\d+$")):
+            link = item.find_next_sibling("td").a
+            if link and link["href"].endswith(".pdf"):
+                yield self.sanitize_basefile(item.text.strip()), urljoin(self.start_url, link["href"])
+
+
+# This is newly renamed from RNFS
+class RIFS(MyndFskrBase):
+    alias = "rifs"
+    start_url = "https://www.revisorsinspektionen.se/regelverk/samtliga-foreskrifter/"
+    basefile_regex = re.compile('(?P<basefile>(RIFS|RNFS) \d{4}[:/_-]\d{1,3})$')
+    document_url_regex = None
+
+    def forfattningssamlingar(self):
+        return ["rifs", "rnfs"]
 
 
 class SJVFS(MyndFskrBase):
@@ -1397,7 +1456,7 @@ class SKVFS(MyndFskrBase):
     storage_policy = "dir"
     downloaded_suffix = ".html"
 
-    start_url = "http://www4.skatteverket.se/rattsligvagledning/115.html"
+    start_url = "https://www4.skatteverket.se/rattsligvagledning/115.html"
     # also consolidated versions
     # http://www.skatteverket.se/rattsinformation/lagrummet/foreskrifterkonsoliderade/aldrear.4.19b9f599116a9e8ef3680004242.html
     def forfattningssamlingar(self):
@@ -1485,9 +1544,13 @@ class SOSFS(MyndFskrBase):
     storage_policy = "dir"  # must be able to handle attachments
     download_iterlinks = False
 
+    def forfattningssamlingar(self):
+        return ["hslffs", "sosfs"]
+    
+
     def _basefile_from_text(self, linktext):
         if linktext:
-            m = re.search("SOSFS\s+(\d+:\d+)", linktext)
+            m = re.search("((SOSFS|HSLF-FS)\s+\d+:\d+)", linktext)
             if m:
                 return self.sanitize_basefile(m.group(1))
 
@@ -1595,7 +1658,8 @@ class SOSFS(MyndFskrBase):
         # cue past the first cover pages until we find the first real page
         page = 1
         try:
-            while "Ansvarig utgivare" not in reader.peekchunk('\f'):
+            while ("Ansvarig utgivare" not in reader.peekchunk('\f') and
+                   "Utgivare" not in reader.peekchunk('\f')):
                 self.log.debug("%s: Skipping cover page %s" %
                                (doc.basefile, page))
                 reader.readpage()
@@ -1626,8 +1690,28 @@ class SOSFS(MyndFskrBase):
 class STFS(MyndFskrBase):
     # (id vs länk)
     alias = "stfs"
-    start_url = "http://www.sametinget.se/1014?cat_id=52"
-
+    start_url = "https://www.sametinget.se/dokument?cat_id=52"
+    download_iterlinks = False
+    
+    @decorators.downloadmax
+    def download_get_basefiles(self, source):
+        done = False
+        soup = BeautifulSoup(source, "lxml")
+        from pudb import set_trace; set_trace()
+        while not done:
+            for item in soup.find_all("div", "item"):
+                basefile = item.h3.text.strip()
+                link = item.find("a", href=re.compile("file_id=\d+$"))
+                yield self.sanitize_basefile(basefile), urljoin(self.start_url, link["href"])
+            nextpage = soup.find("a", text="»")
+            if nextpage:
+                nexturl = urljoin(self.start_url, nextpage["href"])
+                self.log.debug("getting page %s" % nexturl)
+                resp = self.session.get(nexturl)
+                resp.raise_for_status()
+                soup = BeautifulSoup(resp.text, "lxml")
+            else:
+                done = True
 
 class SvKFS(MyndFskrBase):
     alias = "svkfs"

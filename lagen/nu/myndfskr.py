@@ -83,7 +83,7 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
         myndfskr.NFS,
         myndfskr.RAFS,
         myndfskr.RGKFS,
-        myndfskr.RNFS,
+        myndfskr.RIFS,
         myndfskr.SJVFS,
         myndfskr.SKVFS,
         myndfskr.SOSFS,

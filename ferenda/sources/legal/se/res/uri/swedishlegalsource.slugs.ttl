@@ -1,4 +1,4 @@
-# Automatically concatenated from sources at 2017-10-24T10:34:26.155557
+# Automatically concatenated from sources at 2018-04-12T22:49:49.156713
 
 @prefix : <http://rinfo.lagrummet.se/sys/uri/space#> .
 @prefix coin: <http://purl.org/court/def/2009/coin#> .
@@ -196,6 +196,8 @@ rpubl:Skrivelse :abbrSlug "skr" .
 
 <http://rinfo.lagrummet.se/serie/fs/kvfs> :abbrSlug "kvfs" .
 
+<http://rinfo.lagrummet.se/serie/fs/kvvfs> :abbrSlug "kvvfs" .
+
 <http://rinfo.lagrummet.se/serie/fs/lfnfs> :abbrSlug "lfnfs" .
 
 <http://rinfo.lagrummet.se/serie/fs/lfs> :abbrSlug "lfs" .
@@ -250,6 +252,8 @@ rpubl:Skrivelse :abbrSlug "skr" .
 
 <http://rinfo.lagrummet.se/serie/fs/sgu-fs> :abbrSlug "sgu-fs" .
 
+<http://rinfo.lagrummet.se/serie/fs/sivfs> :abbrSlug "sivfs" .
+
 <http://rinfo.lagrummet.se/serie/fs/sjoefs> :abbrSlug "sjoefs" .
 
 <http://rinfo.lagrummet.se/serie/fs/sjvfs> :abbrSlug "sjvfs" .
@@ -273,6 +277,8 @@ rpubl:Skrivelse :abbrSlug "skr" .
 <http://rinfo.lagrummet.se/serie/fs/stafs> :abbrSlug "stafs" .
 
 <http://rinfo.lagrummet.se/serie/fs/stemfs> :abbrSlug "stemfs" .
+
+<http://rinfo.lagrummet.se/serie/fs/stfs> :abbrSlug "stfs" .
 
 <http://rinfo.lagrummet.se/serie/fs/svkfs> :abbrSlug "svkfs" .
 
