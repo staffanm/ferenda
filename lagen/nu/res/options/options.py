@@ -18246,7 +18246,7 @@
     ("prop", "1957:148"): "skip",
     ("prop", "1957:149"): "skip",
     ("prop", "1957:15"): "skip",
-    ("prop", "1957:152"): "skip",
+    # ("prop", "1957:152"): "skip",
     ("prop", "1957:154"): "skip",
     ("prop", "1957:155"): "skip",
     ("prop", "1957:158"): "skip",
@@ -19301,6 +19301,6 @@
     ("prop", "1966:1"): "metadataonly",
     ("prop", "1967:1"): "metadataonly",
     ("prop", "1968:1"): "metadataonly",
-    ("prop", "1969:1"): "metadataonly",
+    # ("prop", "1969:1"): "metadataonly",
     ("prop", "1970:1"): "metadataonly",
 }
