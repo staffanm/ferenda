@@ -1,3 +1,24 @@
+2018-04-03 08:00:00 Äldre propositioner nu tillgängliga
+
+<p>Kungliga biblioteket och Riksdagsförvaltningen har nyligen gjort <a
+href="https://www.kb.se/om-oss/nyheter/nyhetsarkiv/2018-03-02-450-ar-av-riksdagens-historia-pa-natet.html">450
+års riksdagstryck tillgängligt</a>, bland detta även äldre
+propositioner. Ett urval av propositioner från tvåkammarriksdagen
+(1867-1970) finns nu tillgängligt i tjänsten.</p>
+
+<p>Urvalet har gjorts efter vilka äldre propositioner som har
+refererats i nyare material, och omfattar drygt 2000 dokument (av
+sammanlagt ca 17 500 tillgängliga). Det kan tänkas att vissa
+intressanta äldre propositioner därmed har missats -- <a
+href="mailto:staffan.malmgren@gmail.com">hör gärna av dig</a> om du
+saknar någon äldre prop!</p>
+
+<p>Bland viktigare propositioner som nu blir tillgängliga kan
+bl.a. nämnas <a href="/prop/1915:83">Prop. 1915:83 (avtalslagen)</a>,
+<a href="/prop/1942:5">1942:5 (rättegångsbalken)</a>, <a
+href="/prop/1960:17">1960:17 (upphovsrättslagen)</a> och <a
+href="/prop/1962:5">1962:5 (brottsbalken)</a>.
+
 2017-12-23 17:01:00 Ny version tillgänglig för testning
 
 <p>Efter många års tystnad finns nu nästa version av lagen.nu

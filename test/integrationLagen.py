@@ -1083,7 +1083,7 @@ class Regressions(TestLagen):
         self.maxDiff = None
         self.assertEqual([], errors)
 
-    @unittest.expectedFailure
+    # @unittest.expectedFailure
     def test_toc_coverage(self):
         errors = []
         for doctype, startyear, regex in self.tocs:
