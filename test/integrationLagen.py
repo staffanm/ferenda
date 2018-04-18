@@ -115,6 +115,14 @@ class TestPaths(TestLagen):
         self.assertEqual("text/css", res.headers["Content-Type"])
 
 class TestPages(TestLagen):
+    def test_doctype(self):
+        for doc in ("", "1998:204", "dom/nja/2015s180", "sou/1997:39", "prop/1997/98:44",
+                    "begrepp/Personuppgift", "begrepp/Sekundär_sekretessbestämmelse"):
+            resp = self.get(self.baseurl + doc)
+            self.assertEqual('<!DOCTYPE html SYSTEM "about:legacy-compat">',
+                             resp.text[:44], "Wrong doctype for %s" % doc)
+
+
     def test_frontpage_links(self):
         # <a> elements should have a href attribute (you'd think that
         # was obvious, but it's not)

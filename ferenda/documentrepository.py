@@ -763,7 +763,6 @@ with the *config* object as single parameter.
         # use for lastdownload, as all the documents it can find are
         # the one linked from the start page. Therefore it's not used
         # for anything else than a diagnostic tool.
-
         refresh = self.config.refresh
         if refresh:
             self.log.debug("download: Refreshing all downloaded files")
@@ -2711,13 +2710,15 @@ WHERE {
         with util.logtime(self.log.info, "%(basefile)s: transformlinks OK (%(elapsed).3f sec)",
                           {'basefile': basefile}):
             urltransform = self.get_url_transform_func(**transformargs)
-            tree = etree.parse(generatedfile).getroot()
+            doc = etree.parse(generatedfile)
+            doctype = doc.docinfo.doctype
+            tree = doc.getroot()
             conffile = os.path.abspath(
                 os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
             # NOTE: most arguments to the constructor might never be needed
             transformer = Transformer('XSLT', None, None)
             transformer.transform_links(tree, urltransform)
-            transformer.t.native_to_file(tree, generatedfile)
+            transformer.t.native_to_file(tree, generatedfile, doctype=doctype)
         return True
     #
     #
@@ -3711,19 +3712,3 @@ WHERE {
         """
         return []
 
-
-#    @staticmethod
-#    def _setup_logger(logname):
-#        log = logging.getLogger(logname)
-#        if log.handlers == []:
-#            if hasattr(logging, 'NullHandler'):
-#                log.addHandler(logging.NullHandler())
-#            else:  # pragma: no cover
-#                # py26 compatibility
-#                class NullHandler(logging.Handler):
-#
-#                    def emit(self, record):
-#                        pass
-#                log.addHandler(NullHandler())
-#        return log
-#
