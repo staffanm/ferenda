@@ -641,7 +641,7 @@ class PropKB(Offtryck, PDFDocumentRepository):
     storage_policy = "dir"
     start_url = "https://riksdagstryck.kb.se/tvakammarriksdagen.html"
     rdf_type = RPUBL.Proposition
-    basefile_regex = "prop_(?P<year>\d{4})__+(?P<no>\d+)(?:_(?P<part>\d+)|)"
+    basefile_regex = "prop_(?P<year>\d{4})(?P<type>_urtima|_höst|_a|_b|)__+(?P<no>\d+)(?:_(?P<part>\d+)|)"
     document_type = PROPOSITION = True
     SOU = DS = KOMMITTEDIREKTIV = False
 
@@ -668,7 +668,12 @@ class PropKB(Offtryck, PDFDocumentRepository):
         else:
             return super(PropKB, self).download_get_first_page()
 
-
+    proptype = {"": "",
+                "_a": "", # 1914, 1958
+                "_höst": "",
+                "_b": "b", # also 1914, 1958
+                "_urtima": "u"}
+    
     @decorators.downloadmax
     def download_get_basefiles(self, source):
         yielded = set()
@@ -687,18 +692,19 @@ class PropKB(Offtryck, PDFDocumentRepository):
                         continue
                     m = re.match(self.basefile_regex, subelement.text)
                     if m:
-                        basefile = "%s:%s" % (m.group("year"), m.group("no"))
+                        basefile = "%s:%s%s" % (m.group("year"), self.proptype[m.group("type")], m.group("no"))
+                        exists = os.path.exists(self.store.downloaded_path(basefile))
+                        if exists and not self.config.refresh:
+                            continue
                         part = m.group("part")
                         if (basefile,part) in yielded:
                             continue
                         if self.get_parse_options(basefile) == "skip":
                             continue
                         if part and int(part) > 1:
-                            # do something smart here so that
-                            # download() will treat the yielded value
-                            # as an attachment to existing
-                            # basefile. Or maybe we could download it
-                            # ourselves at this point? Let's try that.
+                            # Download attachments ourselves -- not
+                            # really what download_get_basefile should
+                            # do, but hey....
                             filename = self.store.downloaded_path(basefile, attachment=part+".pdf")
                             self.download_if_needed(sublink, basefile, archive=self.download_archive, filename=filename)
                         else:
