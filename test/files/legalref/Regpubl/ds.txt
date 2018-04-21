@@ -1,13 +1,13 @@
 Ds 1997:29, s. 112-121, 141-142
 
 <list>
-  <Link uri="https://lagen.nu/utr/ds/1997:29#sid112">Ds 1997:29, s. 112</Link>
+  <Link uri="https://lagen.nu/ds/1997:29#sid112">Ds 1997:29, s. 112</Link>
   <str>-</str>
-  <Link uri="https://lagen.nu/utr/ds/1997:29#sid121">121</Link>
+  <Link uri="https://lagen.nu/ds/1997:29#sid121">121</Link>
   <str>, </str>
-  <Link uri="https://lagen.nu/utr/ds/1997:29#sid141">141</Link>
+  <Link uri="https://lagen.nu/ds/1997:29#sid141">141</Link>
   <str>-</str>
-  <Link uri="https://lagen.nu/utr/ds/1997:29#sid142">142</Link>
+  <Link uri="https://lagen.nu/ds/1997:29#sid142">142</Link>
 </list>
 
 

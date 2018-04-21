@@ -1269,7 +1269,14 @@ class LegalRef:
         for key, val in list(a.items()):
             if key == 'prop':
                 a['type'] = RPUBL.Proposition
-                a['year'], a['no'] = val.split(":")
+                if val.startswith("nr "): # old-style ref, 'prop. nr 212/1949'
+                    a['no'], a['year'] = val.split(" ")[1].split("/")
+                elif " nr " in val: # old-style ref 2 , 'Prop. 1952 nr 187'
+                    a['year'], a['no'] = val.split(" nr ")
+                else:
+                    a['year'], a['no'] = val.split(":")
+                if a['no'].startswith('A '):  # Prop 1958:A 30 is more commonly known as Prop. 1958:30
+                    a['no'] = a['no'].replace("A ", "")
                 del a[key]
             elif key == 'bet':
                 a['type'] = RINFOEX.Utskottsbetankande

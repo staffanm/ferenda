@@ -1,0 +1,22 @@
+prop. 1958:B 6
+prop. 1958:A 30 s. 5
+Kungl. Maj:ts prop. nr 212/1949, s. 164 ff.
+Prop. 1952 nr 187 s. 103
+Prop. 1968 nr 91, Bihang A s. 215.
+
+<list>
+  <Link uri="https://lagen.nu/prop/1958:B6">prop. 1958:B 6</Link>
+  <str>
+</str>
+  <Link uri="https://lagen.nu/prop/1958:30#sid5">prop. 1958:A 30 s. 5</Link>
+  <str>
+Kungl. Maj:ts </str>
+  <Link uri="https://lagen.nu/prop/1949:212#sid164">prop. nr 212/1949, s. 164</Link>
+  <str> ff.
+</str>
+  <Link uri="https://lagen.nu/prop/1952:187#sid103">Prop. 1952 nr 187 s. 103</Link>
+  <str>
+</str>
+  <Link uri="https://lagen.nu/prop/1968:91">Prop. 1968 nr 91</Link>
+  <str>, Bihang A s. 215.</str>
+</list>

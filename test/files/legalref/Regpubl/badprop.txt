@@ -1,0 +1,15 @@
+Prop.1971:30 s. 370
+prop. 2009/10: 165 sid 1 och sid 207
+Prop.1938: 267 och 1952:15
+
+
+<list>
+  <Link uri="https://lagen.nu/prop/1971:30#sid370">Prop.1971:30 s. 370</Link>
+  <str>
+</str>
+  <Link uri="https://lagen.nu/prop/2009/10:165">prop. 2009/10: 165</Link>
+  <str> sid 1 och sid 207
+</str>
+  <Link uri="https://lagen.nu/prop/1938:267">Prop.1938: 267</Link>
+  <str> och 1952:15</str>
+</list>

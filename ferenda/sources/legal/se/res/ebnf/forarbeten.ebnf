@@ -14,9 +14,14 @@ ForarbRef ::= (PropRef/BetRef/SkrivelseRef/CelexRef/SouRef/DsRef)
 ForarbRefs ::= ForarbRef, Sidor
 
 # Propositioner exv "Prop. 1999/2000:100"
-PropRef	       ::= PropPrefix, Whitespace, PropRefID
+PropRef	       ::= PropPrefix, Whitespace?, PropRefID
 PropPrefix     ::= ('prop.'/'Prop.')
-PropRefID      ::= RiksmoteID, Colon, LopnrID
+PropRefID      ::= StandardPropRef/XPropRef/YPropRef/ZPropRef
+StandardPropRef ::= RiksmoteID, Colon, Whitespace?, LopnrID
+XPropRef ::= RiksmoteID, Colon, SubRiksmoteID, Whitespace?, LopnrID  # prop. 1958:B 6
+YPropRef ::= 'nr', Whitespace, LopnrID, '/', RiksmoteID  # prop. nr 212/1949
+ZPropRef ::= RiksmoteID, Whitespace, 'nr', Whitespace, LopnrID
+SubRiksmoteID ::= 'A'/'B'/'U' 
 
 # exv "a. prop. s. 42"
 AnonPropRefs ::= "a. prop.", Sidor

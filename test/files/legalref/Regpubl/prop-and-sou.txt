@@ -4,6 +4,6 @@
   <str>(se </str>
   <Link uri="https://lagen.nu/prop/2002/03:12#sid51">prop. 2002/03:12, s. 51</Link>
   <str> och </str>
-  <Link uri="https://lagen.nu/utr/sou/2000:2#sid183">SOU 2000:2, s. 183</Link>
+  <Link uri="https://lagen.nu/sou/2000:2#sid183">SOU 2000:2, s. 183</Link>
   <str>)</str>
 </list>
