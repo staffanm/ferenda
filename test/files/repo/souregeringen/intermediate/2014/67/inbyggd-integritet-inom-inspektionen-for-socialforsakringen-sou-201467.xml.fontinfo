@@ -1,0 +1,172 @@
+name                                 type              encoding         emb sub uni object ID
+------------------------------------ ----------------- ---------------- --- --- --- ---------
+PAAXZU+TradeGothicPro-Light          Type 1C           WinAnsi          yes yes yes   4730  0
+PAAXZU+TradeGothicPro-Bd2            Type 1C           WinAnsi          yes yes yes   4732  0
+PAAXZU+OriginalGaramondBT-Italic     TrueType          WinAnsi          yes yes yes   4734  0
+FGAPPO+OriginalGaramondBT-Roman      TrueType          WinAnsi          yes yes yes   1161  0
+ABCDEE+TradeGothic Light             TrueType          WinAnsi          yes yes no    1167  0
+ABCDEE+OrigGarmnd BT                 TrueType          WinAnsi          yes yes no    1164  0
+ABCDEE+OrigGarmnd BT,Italic          TrueType          WinAnsi          yes yes no    1163  0
+ABCDEE+TradeGothic,Bold              TrueType          WinAnsi          yes yes no    1168  0
+ABCDEE+TradeGothic,Bold              TrueType          WinAnsi          yes yes no    1178  0
+ABCDEE+OrigGarmnd BT                 TrueType          WinAnsi          yes yes no    1175  0
+ABCDEE+TradeGothic Light             TrueType          WinAnsi          yes yes no    1174  0
+ABCDEE+Calibri                       TrueType          WinAnsi          yes yes no    1171  0
+Times New Roman                      TrueType          WinAnsi          no  no  no    1181  0
+ABCDEE+TradeGothic,Bold              TrueType          WinAnsi          yes yes no    1184  0
+ABCDEE+OrigGarmnd BT                 TrueType          WinAnsi          yes yes no    1191  0
+ABCDEE+TradeGothic Light             TrueType          WinAnsi          yes yes no    1190  0
+ABCDEE+OrigGarmnd BT,Italic          TrueType          WinAnsi          yes yes no    1187  0
+ABCDEE+OrigGarmnd BT                 CID TrueType      Identity-H       yes yes yes   1192  0
+ABCDEE+TradeGothic,Bold              TrueType          WinAnsi          yes yes no    1211  0
+ABCDEE+OrigGarmnd BT                 TrueType          WinAnsi          yes yes no    1208  0
+ABCDEE+TradeGothic Light             TrueType          WinAnsi          yes yes no    1207  0
+Arial                                TrueType          WinAnsi          no  no  no    1205  0
+Arial,Bold                           TrueType          WinAnsi          no  no  no    1202  0
+ABCDEE+OrigGarmnd BT,Bold            TrueType          WinAnsi          yes yes no    1199  0
+ABCDEE+OrigGarmnd BT                 CID TrueType      Identity-H       yes yes yes   1198  0
+ABCDEE+OrigGarmnd BT,Italic          TrueType          WinAnsi          yes yes no    1214  0
+ABCDEE+TradeGothic,Bold              TrueType          WinAnsi          yes yes no    1224  0
+ABCDEE+OrigGarmnd BT                 TrueType          WinAnsi          yes yes no    1221  0
+ABCDEE+TradeGothic Light             TrueType          WinAnsi          yes yes no    1220  0
+Arial                                TrueType          WinAnsi          no  no  no    1219  0
+Arial,Bold                           TrueType          WinAnsi          no  no  no    1217  0
+ABCDEE+OrigGarmnd BT                 CID TrueType      Identity-H       yes yes yes   1227  0
+ABCDEE+TradeGothic,Bold              TrueType          WinAnsi          yes yes no    1246  0
+ABCDEE+OrigGarmnd BT                 TrueType          WinAnsi          yes yes no    1243  0
+ABCDEE+TradeGothic Light             TrueType          WinAnsi          yes yes no    1242  0
+Arial                                TrueType          WinAnsi          no  no  no    1240  0
+Arial,Bold                           TrueType          WinAnsi          no  no  no    1238  0
+Symbol                               CID TrueType      Identity-H       yes no  yes   1233  0
+ABCDEE+TradeGothic,Bold              TrueType          WinAnsi          yes yes no    1257  0
+ABCDEE+OrigGarmnd BT                 TrueType          WinAnsi          yes yes no    1254  0
+ABCDEE+TradeGothic Light             TrueType          WinAnsi          yes yes no    1253  0
+Arial                                TrueType          WinAnsi          no  no  no    1251  0
+Arial,Bold                           TrueType          WinAnsi          no  no  no    1249  0
+ABCDEE+OrigGarmnd BT,Italic          TrueType          WinAnsi          yes yes no    1260  0
+ABCDEE+OrigGarmnd BT                 CID TrueType      Identity-H       yes yes yes   1263  0
+ABCDEE+TradeGothic,Bold              TrueType          WinAnsi          yes yes no    1276  0
+ABCDEE+OrigGarmnd BT                 TrueType          WinAnsi          yes yes no    1273  0
+ABCDEE+TradeGothic Light             TrueType          WinAnsi          yes yes no    1272  0
+Arial                                TrueType          WinAnsi          no  no  no    1271  0
+Arial,Bold                           TrueType          WinAnsi          no  no  no    1269  0
+ABCDEE+OrigGarmnd BT                 CID TrueType      Identity-H       yes yes yes   1279  0
+ABCDEE+TradeGothic,Bold              TrueType          WinAnsi          yes yes no    1290  0
+ABCDEE+OrigGarmnd BT                 TrueType          WinAnsi          yes yes no    1287  0
+Arial                                TrueType          WinAnsi          no  no  no    1285  0
+ABCDEE+TradeGothic Light             TrueType          WinAnsi          yes yes no    1295  0
+Arial,Bold                           TrueType          WinAnsi          no  no  no    1293  0
+ABCDEE+OrigGarmnd BT                 CID TrueType      Identity-H       yes yes yes   1299  0
+ABCDEE+Courier New                   TrueType          WinAnsi          yes yes no    1296  0
+ABCDEE+OrigGarmnd BT,Italic          TrueType          WinAnsi          yes yes no    1305  0
+ABCDEE+OrigGarmnd BT,Bold            TrueType          WinAnsi          yes yes no    1308  0
+ABCDEE+TradeGothic,Bold              TrueType          WinAnsi          yes yes no    1321  0
+ABCDEE+OrigGarmnd BT                 TrueType          WinAnsi          yes yes no    1318  0
+ABCDEE+TradeGothic Light             TrueType          WinAnsi          yes yes no    1317  0
+Arial                                TrueType          WinAnsi          no  no  no    1315  0
+Arial,Bold                           TrueType          WinAnsi          no  no  no    1313  0
+ABCDEE+OrigGarmnd BT,Bold            TrueType          WinAnsi          yes yes no    1311  0
+ABCDEE+OrigGarmnd BT                 CID TrueType      Identity-H       yes yes yes   1324  0
+Times New Roman,Bold                 TrueType          WinAnsi          no  no  no    1330  0
+ABCDEE+OrigGarmnd BT,Italic          TrueType          WinAnsi          yes yes no    1331  0
+ABCDEE+TradeGothic,Bold              TrueType          WinAnsi          yes yes no    1332  0
+ABCDEE+OrigGarmnd BT                 TrueType          WinAnsi          yes yes no    1339  0
+ABCDEE+TradeGothic Light             TrueType          WinAnsi          yes yes no    1338  0
+Arial                                TrueType          WinAnsi          no  no  no    1337  0
+Arial,Bold                           TrueType          WinAnsi          no  no  no    1335  0
+Symbol                               CID TrueType      Identity-H       yes no  yes   1348  0
+ABCDEE+OrigGarmnd BT                 CID TrueType      Identity-H       yes yes yes   1342  0
+ABCDEE+OrigGarmnd BT,Bold            TrueType          WinAnsi          yes yes no    1349  0
+ABCDEE+OrigGarmnd BT,Italic          TrueType          WinAnsi          yes yes no    1351  0
+ABCDEE+OrigGarmnd BT,Italic          CID TrueType      Identity-H       yes yes yes   1354  0
+ABCDEE+TradeGothic,Bold              TrueType          WinAnsi          yes yes no    1369  0
+ABCDEE+OrigGarmnd BT                 TrueType          WinAnsi          yes yes no    1366  0
+ABCDEE+TradeGothic Light             TrueType          WinAnsi          yes yes no    1365  0
+Arial                                TrueType          WinAnsi          no  no  no    1363  0
+Arial,Bold                           TrueType          WinAnsi          no  no  no    1361  0
+ABCDEE+OrigGarmnd BT                 CID TrueType      Identity-H       yes yes yes   1355  0
+ABCDEE+OrigGarmnd BT,Bold            TrueType          WinAnsi          yes yes no    1375  0
+ABCDEE+OrigGarmnd BT,Italic          TrueType          WinAnsi          yes yes no    1372  0
+ABCDEE+Courier New                   TrueType          WinAnsi          yes yes no    1379  0
+Symbol                               CID TrueType      Identity-H       yes no  yes   1378  0
+ABCDEE+TradeGothic,Bold              TrueType          WinAnsi          yes yes no    1388  0
+ABCDEE+OrigGarmnd BT                 TrueType          WinAnsi          yes yes no    1385  0
+ABCDEE+TradeGothic Light             TrueType          WinAnsi          yes yes no    1384  0
+Arial                                TrueType          WinAnsi          no  no  no    1382  0
+Arial,Bold                           TrueType          WinAnsi          no  no  no    1380  0
+ABCDEE+OrigGarmnd BT                 CID TrueType      Identity-H       yes yes yes   1391  0
+ABCDEE+OrigGarmnd BT,Italic          TrueType          WinAnsi          yes yes no    1397  0
+ABCDEE+OrigGarmnd BT,Bold            TrueType          WinAnsi          yes yes no    1400  0
+ABCDEE+OrigGarmnd BT,Italic          CID TrueType      Identity-H       yes yes yes   1403  0
+Symbol                               CID TrueType      Identity-H       yes no  yes   1404  0
+ABCDEE+TradeGothic,Bold              TrueType          WinAnsi          yes yes no    1415  0
+ABCDEE+OrigGarmnd BT                 TrueType          WinAnsi          yes yes no    1412  0
+ABCDEE+TradeGothic Light             TrueType          WinAnsi          yes yes no    1411  0
+Arial                                TrueType          WinAnsi          no  no  no    1410  0
+Arial,Bold                           TrueType          WinAnsi          no  no  no    1409  0
+ABCDEE+OrigGarmnd BT,Bold            TrueType          WinAnsi          yes yes no    1406  0
+ABCDEE+OrigGarmnd BT                 CID TrueType      Identity-H       yes yes yes   1418  0
+ABCDEE+TradeGothic,Bold              TrueType          WinAnsi          yes yes no    1431  0
+ABCDEE+OrigGarmnd BT                 TrueType          WinAnsi          yes yes no    1428  0
+ABCDEE+TradeGothic Light             TrueType          WinAnsi          yes yes no    1427  0
+Arial                                TrueType          WinAnsi          no  no  no    1426  0
+Arial,Bold                           TrueType          WinAnsi          no  no  no    1424  0
+ABCDEE+OrigGarmnd BT,Bold            TrueType          WinAnsi          yes yes no    1434  0
+ABCDEE+OrigGarmnd BT                 CID TrueType      Identity-H       yes yes yes   1436  0
+ABCDEE+TradeGothic,Bold              TrueType          WinAnsi          yes yes no    1451  0
+ABCDEE+OrigGarmnd BT                 TrueType          WinAnsi          yes yes no    1448  0
+ABCDEE+TradeGothic Light             TrueType          WinAnsi          yes yes no    1447  0
+Arial                                TrueType          WinAnsi          no  no  no    1445  0
+Arial,Bold                           TrueType          WinAnsi          no  no  no    1443  0
+ABCDEE+OrigGarmnd BT                 CID TrueType      Identity-H       yes yes yes   1437  0
+ABCDEE+OrigGarmnd BT,Italic          TrueType          WinAnsi          yes yes no    1457  0
+ABCDEE+OrigGarmnd BT,Italic          CID TrueType      Identity-H       yes yes yes   1460  0
+Symbol                               CID TrueType      Identity-H       yes no  yes   1463  0
+ABCDEE+OrigGarmnd BT,Bold            TrueType          WinAnsi          yes yes no    1465  0
+ABCDEE+Calibri                       TrueType          WinAnsi          yes yes no    1464  0
+ABCDEE+Times                         TrueType          WinAnsi          yes yes no    1466  0
+ABCDEE+TradeGothic,Bold              TrueType          WinAnsi          yes yes no    1475  0
+ABCDEE+OrigGarmnd BT                 TrueType          WinAnsi          yes yes no    1472  0
+ABCDEE+TradeGothic Light             TrueType          WinAnsi          yes yes no    1471  0
+Arial                                TrueType          WinAnsi          no  no  no    1470  0
+ABCDEE+OrigGarmnd BT,Bold            TrueType          WinAnsi          yes yes no    1469  0
+ABCDEE+OrigGarmnd BT                 CID TrueType      Identity-H       yes yes yes   1468  0
+ABCDEE+TradeGothic,Bold              TrueType          WinAnsi          yes yes no    1485  0
+ABCDEE+OrigGarmnd BT                 TrueType          WinAnsi          yes yes no    1482  0
+ABCDEE+TradeGothic Light             TrueType          WinAnsi          yes yes no    1481  0
+Arial                                TrueType          WinAnsi          no  no  no    1480  0
+Arial,Bold                           TrueType          WinAnsi          no  no  no    1478  0
+ABCDEE+OrigGarmnd BT                 CID TrueType      Identity-H       yes yes yes   1488  0
+ABCDEE+TradeGothic,Bold              TrueType          WinAnsi          yes yes no    1492  0
+ABCDEE+OrigGarmnd BT                 TrueType          WinAnsi          yes yes no    1489  0
+ABCDEE+TradeGothic Light             TrueType          WinAnsi          yes yes no    1510  0
+Arial                                TrueType          WinAnsi          no  no  no    1509  0
+Arial,Bold                           TrueType          WinAnsi          no  no  no    1507  0
+ABCDEE+OrigGarmnd BT,Bold            TrueType          WinAnsi          yes yes no    1505  0
+ABCDEE+OrigGarmnd BT,Italic          TrueType          WinAnsi          yes yes no    1502  0
+ABCDEE+OrigGarmnd BT,Italic          CID TrueType      Identity-H       yes yes yes   1501  0
+ABCDEE+OrigGarmnd BT                 CID TrueType      Identity-H       yes yes yes   1495  0
+ABCDEE+OrigGarmnd BT,BoldItalic      TrueType          WinAnsi          yes yes no    1511  0
+ABCDEE+TradeGothic,Bold              TrueType          WinAnsi          yes yes no    1522  0
+ABCDEE+OrigGarmnd BT                 TrueType          WinAnsi          yes yes no    1519  0
+ABCDEE+TradeGothic Light             TrueType          WinAnsi          yes yes no    1518  0
+ABCDEE+Courier New                   TrueType          WinAnsi          yes yes no    1516  0
+Arial                                TrueType          WinAnsi          no  no  no    1514  0
+ABCDEE+OrigGarmnd BT,Italic          TrueType          WinAnsi          yes yes no    1525  0
+ABCDEE+OrigGarmnd BT                 CID TrueType      Identity-H       yes yes yes   1528  0
+ABCDEE+TradeGothic,Bold              TrueType          WinAnsi          yes yes no    1531  0
+ABCDEE+OrigGarmnd BT                 TrueType          WinAnsi          yes yes no    1530  0
+ABCDEE+TradeGothic Light             TrueType          WinAnsi          yes yes no    1529  0
+ABCDEE+TradeGothic,Bold              TrueType          WinAnsi          yes yes no    1543  0
+ABCDEE+OrigGarmnd BT                 TrueType          WinAnsi          yes yes no    1540  0
+ABCDEE+TradeGothic Light             TrueType          WinAnsi          yes yes no    1539  0
+ABCDEE+OrigGarmnd BT,Italic          TrueType          WinAnsi          yes yes no    1536  0
+Symbol                               CID TrueType      Identity-H       yes no  yes   1534  0
+Arial                                TrueType          WinAnsi          no  no  no    1532  0
+ABCDEE+OrigGarmnd BT                 CID TrueType      Identity-H       yes yes yes   1546  0
+ABCDEE+OrigGarmnd BT,Italic          CID TrueType      Identity-H       yes yes yes   1552  0
+ABCDEE+Courier New                   TrueType          WinAnsi          yes yes no    1558  0
+PAAXZU+TradeGothicPro-Light          Type 1C           WinAnsi          yes yes yes   1563  0
+MJBTXQ+TradeGothicPro                Type 1C           WinAnsi          yes yes yes   1561  0
+FGAPPO+OriginalGaramondBT-Roman      TrueType          WinAnsi          yes yes yes   1560  0
+PAAXZU+TradeGothicPro-Bd2            Type 1C           WinAnsi          yes yes yes   1564  0

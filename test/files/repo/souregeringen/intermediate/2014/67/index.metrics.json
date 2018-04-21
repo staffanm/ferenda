@@ -1,0 +1,27 @@
+{
+    "bottommargin": 896, 
+    "default": {
+        "family": "OrigGarmnd BT", 
+        "size": 14
+    }, 
+    "h1": {
+        "family": "TradeGothic Light", 
+        "size": 26
+    }, 
+    "h2": {
+        "family": "TradeGothic,Bold", 
+        "size": 16
+    }, 
+    "h3": {
+        "family": "TradeGothic,Bold", 
+        "size": 14
+    }, 
+    "leftmargin": 85, 
+    "leftmargin_even": 340, 
+    "pageheight": 1262, 
+    "pagewidth": 893, 
+    "rightmargin": 560, 
+    "rightmargin_even": 820, 
+    "scanned_source": false, 
+    "topmargin": 100
+}
