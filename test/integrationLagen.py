@@ -168,6 +168,14 @@ class TestPages(TestLagen):
         subheadings = firstoutline.find_all("li")
         self.assertEqual(3, len(subheadings))
         self.assertIn('Definitioner', subheadings[-1].a.text)
+
+    def test_paragrafbeteckning(self):
+        for doc in ("1949:105", "1998:204"):
+            res = self.get(self.baseurl + doc)
+            soup = BeautifulSoup(res.text, "lxml")
+            self.assertTrue(soup.find("a", "paragrafbeteckning"),
+                            "%s lacks marked-up paragrafbeteckning" % doc)
+
             
 class TestPatching(TestLagen):
 

@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2018-04-12T22:50:44.138197
+# Automatically transformed from sources at 2018-04-13T23:25:42.696237
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -761,6 +761,14 @@
     skos:altLabel "SGU-FS"@sv ;
     skos:prefLabel "Sveriges geologiska undersöknings författningssamling"@sv .
 
+<https://lagen.nu/dataset/sind-fs> a rpubl:Forfattningssamling ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/elsaek-fs> ;
+    dcterms:publisher <https://lagen.nu/org/2018/statens-industriverk> ;
+    rdfs:comment "Numera Elsäkerhetsverkets författningssamling (?)"@sv ;
+    owl:sameAs <http://rinfo.lagrummet.se/serie/fs/sind-fs> ;
+    skos:altLabel "SIND-FS"@sv ;
+    skos:prefLabel "Statens industriverks författningssamling"@sv .
+
 <https://lagen.nu/dataset/sivfs> a rpubl:Forfattningssamling ;
     dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/migrfs> ;
     dcterms:publisher <https://lagen.nu/org/2018/statens-invandrarverk> ;
@@ -1410,6 +1418,10 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/lantmaeteriverket> ;
     foaf:name "Lantmäteriverket"@sv .
 
+<https://lagen.nu/org/2018/statens-lantmateriverk> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/statens_lantmaeteriverk> ;
+    foaf:name "Statens lantmäteriverk"@sv .
+
 <https://lagen.nu/org/2008/domstolsverket> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/domstolsverket> ;
     foaf:homepage <http://www.domstol.se/> ;
@@ -1805,6 +1817,10 @@
 <https://lagen.nu/org/2018/kriminalvardsverket> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/kriminalvaardsverket> ;
     foaf:name "Kriminalvårdsverket"@sv .
+
+<https://lagen.nu/org/2018/statens-industriverk> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/statens_industriverk> ;
+    foaf:name "Statens industriverk"@sv .
 
 <https://lagen.nu/org/2018/statens-invandrarverk> a foaf:Organization ;
     rdfs:comment "Ersatt av Migrationsverket"@sv ;

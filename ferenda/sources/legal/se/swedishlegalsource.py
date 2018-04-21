@@ -383,9 +383,10 @@ class SwedishLegalSource(DocumentRepository):
 
         # specifically for rpubl:KonsolideradGrundforfattning, create
         # relToBase things
+        rdf_type = attributes["rdf:type"] if "rdf:type" in attributes else self.rdf_type
         if (infer_nodes and
-            not isinstance(self.rdf_type, (tuple, list)) and
-            self.rdf_type.endswith("KonsolideradGrundforfattning") and
+            not isinstance(rdf_type, (tuple, list)) and
+            rdf_type.endswith("KonsolideradGrundforfattning") and
             "dcterms:issued" in attributes):
             rel = RPUBL.konsoliderar
             new = BNode()  # the document
@@ -1354,6 +1355,8 @@ class SwedishLegalSource(DocumentRepository):
         datetime.date(2010, 2, 3)
         >>> parse_swedish_date("vid utgången av december 1999")
         datetime.date(1999, 12, 31)
+        >>> parse_swedish_date("2013-11-08")
+        datetime.date(2013, 11, 8)
         >>> parse_swedish_date("november 1999")
         ferenda.util.gYearMonth(1999, 11)
         >>> parse_swedish_date("1998")
@@ -1369,6 +1372,8 @@ class SwedishLegalSource(DocumentRepository):
             month = self.swedish_months[month]
             year = int(year)
             day = calendar.monthrange(year, month)[1]
+        elif re.match('\d{4}-\d{2}-\d{2}', datestr):
+            year, month, day = [int(x) for x in datestr.split("-")]
         else:
             # assume strings on the form "3 februari 2010", "8 dec. 1997"
             # first normalize misformtting like "7juni 2007"

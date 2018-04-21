@@ -188,7 +188,7 @@ def render(f):
 
         # Validate that all required triples are present (we check
         # distilled_graph, but we could just as well check doc.meta)
-        for p in self.required_predicates:
+        for p in self.get_required_predicates(doc):
             x = distilled_graph.value(URIRef(doc.uri), p)
             if not x:
                 self.log.warning("%s: Metadata is missing a %s triple" %

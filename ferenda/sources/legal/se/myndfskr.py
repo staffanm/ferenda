@@ -16,13 +16,15 @@ from rdflib import URIRef, Literal, Namespace
 from bs4 import BeautifulSoup
 import requests
 import lxml.html
+import datetime
 from rdflib import RDF, Graph
+from rdflib.resource import Resource
 from rdflib.namespace import DCTERMS, SKOS
 
 from . import RPUBL, RINFOEX, SwedishLegalSource, FixedLayoutSource
 from .fixedlayoutsource import FixedLayoutStore
 from .swedishlegalsource import SwedishCitationParser, SwedishLegalStore
-from ferenda import TextReader, Describer, Facet, PDFReader, DocumentEntry
+from ferenda import TextReader, Describer, Facet, PDFReader, DocumentEntry, DocumentRepository
 from ferenda import util, decorators, errors, fulltextindex
 from ferenda.elements import Body, Page, Preformatted, Link
 from ferenda.elements.html import elements_from_soup
@@ -58,14 +60,12 @@ class MyndFskrBase(FixedLayoutSource):
     xslt_template = "xsl/paged.xsl"
 
     rdf_type = (RPUBL.Myndighetsforeskrift, RPUBL.AllmannaRad)
-    required_predicates = [RDF.type, DCTERMS.title,
-                           DCTERMS.identifier, RPUBL.arsutgava,
-                           DCTERMS.publisher, RPUBL.beslutadAv,
-                           RPUBL.beslutsdatum,
-                           RPUBL.forfattningssamling,
-                           RPUBL.ikrafttradandedatum, RPUBL.lopnummer,
-                           RPUBL.utkomFranTryck, PROV.wasGeneratedBy]
-
+    # FIXME: For docs of rdf:type rpubl:KonsolideradGrundforfattning,
+    # not all of the above should be required (rpubl:beslutadAv,
+    # rpubl:beslutsdatum, rpubl:forfattningssamling (in fact, that one
+    # shoud not be present), rpubl:ikrafttradandedatum,
+    # rpubl:utkomFranTryck
+    
     basefile_regex = re.compile('(?P<basefile>\d{4}[:/_-]\d{1,3})(?:|\.\w+)$')
     document_url_regex = re.compile('.*(?P<basefile>\d{4}[:/_-]\d{1,3}).pdf$')
     download_accept_404 = True  # because the occasional 404 is to be expected
@@ -82,6 +82,22 @@ class MyndFskrBase(FixedLayoutSource):
     landingpage_url_regex = None
     download_formid = None  # if the paging uses forms, POSTs and other forms of insanity
     documentstore_class = MyndFskrStore
+
+    # FIXME: Should use self.get_parse_options
+    blacklist = set(["fohmfs/2014:1",  # Föreskriftsförteckning, inte föreskrift
+                     "myhfs/2013:2",   # Annan förteckning "FK" utan beslut
+                     "myhfs/2013:5",   #   -""-
+                     "myhfs/2014:4",   #   -""-
+                     "myhfs/2012:1",   # Saknar bara beslutsdatum, förbiseende? Borde kunna fixas med baseprops
+                    ])
+
+    # for some badly written docs, certain metadata properties cannot
+    # be found. We list missing properties here, as a last resort.
+    # FIXME: This should use the options get_parse_options systems
+    # instead (howeever, that needs to be made more flexible with
+    # subkeys/multiple options
+    baseprops = {'nfs/2004:5': {"rpubl:beslutadAv": "Naturvårdsverket"}}
+
 
     def __init__(self, config=None, **kwargs):
         super(MyndFskrBase, self).__init__(config, **kwargs)
@@ -112,6 +128,15 @@ class MyndFskrBase(FixedLayoutSource):
             return entry.orig_url
         else:
             return super(MyndFskrBase, self).remote_url(basefile)
+
+    def required_predicates(self, doc):
+        return [RDF.type, DCTERMS.title,
+                DCTERMS.identifier, RPUBL.arsutgava,
+                DCTERMS.publisher, RPUBL.beslutadAv,
+                RPUBL.beslutsdatum,
+                RPUBL.forfattningssamling,
+                RPUBL.ikrafttradandedatum, RPUBL.lopnummer,
+                RPUBL.utkomFranTryck, PROV.wasGeneratedBy]
 
     def forfattningssamlingar(self):
         return [self.alias]
@@ -252,16 +277,22 @@ class MyndFskrBase(FixedLayoutSource):
                 'SVKFS': 'SvKFS'}.get(basefilefrag, basefilefrag)
     
     def metadata_from_basefile(self, basefile):
+        a = super(MyndFskrBase, self).metadata_from_basefile(basefile)
         # munge basefile or classname to find the skos:altLabel of the
         # forfattningssamling we're dealing with
         if "/" in basefile:
-            fs, realbasefile = basefile.split("/")
+            segments = basefile.split("/")
+            if len(segments) > 2 and segments[0] == "konsolidering":
+                a["rdf:type"] = RPUBL.KonsolideradGrundforfattning
+                a["rpubl:konsoliderar"] = self.canonical_uri(basefile.split("/",1)[1])
+                a["dcterms:issued"] = datetime.date.today()
+                segments.pop(0)
+            fs, realbasefile = segments
             fs = fs.upper()
         else:
             fs = self.__class__.__name__
             realbasefile = basefile
         fs = self._basefile_frag_to_altlabel(fs)
-        a = super(MyndFskrBase, self).metadata_from_basefile(basefile)
         a["rpubl:arsutgava"], a["rpubl:lopnummer"] = realbasefile.split(":", 1)
         a["rpubl:forfattningssamling"] = self.lookup_resource(fs, SKOS.altLabel)
         return a
@@ -269,28 +300,26 @@ class MyndFskrBase(FixedLayoutSource):
     urispace_segment = ""
     
     def basefile_from_uri(self, uri):
-        # this should map https://lagen.nu/sjvfs/2014:9 to basefile sjvfs/2014:9
-        # but also https://lagen.nu/dfs/2007:8 -> dfs/2007:8
+        # this should map
+        # https://lagen.nu/sjvfs/2014:9 to basefile sjvfs/2014:9
+        # https://lagen.nu/dfs/2007:8 -> dfs/2007:8
+        # https://lagen.nu/afs/2011:19/konsolidering/2018-04-17 -> konsolidering/afs/2011:19
         basefile = super(MyndFskrBase, self).basefile_from_uri(uri)
         if basefile is None:
             return basefile
+        # re-arrange konsolideringsinformation
+        prefix = ""
+        if "/konsolidering/" in basefile:
+            prefix = "konsolidering/"
+            basefile = prefix + basefile.split("/konsolidering/")[0]
         # since basefiles are always wihout hyphens, but URIs for
         # författningssamlingar like HSLF-FS will contain a hyphen, we
         # remove it here.
         basefile = basefile.replace("-", "")
         for fs in self.forfattningssamlingar():
             # FIXME: use self.coin_base (self.urispace_base) instead.
-            if basefile.startswith(fs):
+            if basefile.startswith(prefix + fs):
                 return basefile
-
-
-    blacklist = set(["fohmfs/2014:1",  # Föreskriftsförteckning, inte föreskrift
-                     "myhfs/2013:2",   # Annan förteckning "FK" utan beslut
-                     "myhfs/2013:5",   #   -""-
-                     "myhfs/2014:4",   #   -""-
-                     "myhfs/2012:1",   # Saknar bara beslutsdatum, förbiseende? Borde kunna fixas med baseprops
-                    ])
-
 
     # principial call chain
     # parse
@@ -307,12 +336,10 @@ class MyndFskrBase(FixedLayoutSource):
     #          makeurl
     #             attributes_to_resource
     #       infer_metadata
-    #    [possibly set returned basefile (instead of True)]
-    #    open_-> PDFReader
-    #    parse_document_from_textreader # sets doc.body
-    #    _serialize_unparsed 
-    #    refparser.parse_recursive 
-    #    parse_entry_update
+    #    parse_open
+    #    parse_body
+    #    postprocess_doc(doc)
+    #    parse_entry_update(doc)
 
     @decorators.action
     @decorators.managedparsing
@@ -328,27 +355,32 @@ class MyndFskrBase(FixedLayoutSource):
         if doc.basefile in self.blacklist:
             raise errors.DocumentRemovedError("%s is blacklisted" % doc.basefile,
                                        dummyfile=self.store.parsed_path(doc.basefile))
-        reader = self.textreader_from_basefile(doc.basefile)
         orig_basefile = doc.basefile
-        try:
-            self.parse_metadata_from_textreader(reader, doc)
-        except RequiredTextMissing:
-            if self.might_need_ocr:
-                self.log.warning("%s: reprocessing using OCR" % doc.basefile)
-                reader = self.textreader_from_basefile(doc.basefile, force_ocr=True)
-                self.parse_metadata_from_textreader(reader, doc)
-            else:
-                raise
-        # the parse_metadata_from_textreader step might determine that
-        # the assumed basefile was wrong (ie during download we
-        # thought it would be fffs/1991:15, but upon parsing, we
-        # discovered it should be bffs/1991:15
-        if doc.basefile != orig_basefile:
-            assert doc.basefile # it must be truthy, if it's False or None we have a problem 
-            ret = doc.basefile
+        ret = True
+        if doc.basefile.startswith("konsolidering/"):
+            self.parse_metadata_from_consolidated(doc)
         else:
-            ret = True # Signals that everything is OK
+            reader = self.textreader_from_basefile(doc.basefile)
+            try:
+                self.parse_metadata_from_textreader(reader, doc)
+            except RequiredTextMissing:
+                if self.might_need_ocr:
+                    self.log.warning("%s: reprocessing using OCR" % doc.basefile)
+                    reader = self.textreader_from_basefile(doc.basefile, force_ocr=True)
+                    self.parse_metadata_from_textreader(reader, doc)
+                else:
+                    raise
 
+            # the parse_metadata_from_textreader step might determine
+            # that the assumed basefile was wrong (ie during download
+            # we thought it would be fffs/1991:15, but upon parsing,
+            # we discovered it should be bffs/1991:15. This is
+            # communicated by returning the truthy value of the new
+            # basefile.
+            if doc.basefile != orig_basefile:
+                assert doc.basefile # it must be truthy, if it's False or None we have a problem 
+                ret = doc.basefile
+        
         # now treat the body like PDFReader does
         fp = self.parse_open(orig_basefile)
         if orig_basefile != doc.basefile:
@@ -371,14 +403,23 @@ class MyndFskrBase(FixedLayoutSource):
         doc.body.uri = doc.uri
         self.postprocess_doc(doc)
         self.parse_entry_update(doc)
-        
-#        self.parse_document_from_textreader(reader, doc)
-#        self._serialize_unparsed(doc.body, doc.basefile)
-#        if self.config.parserefs and self.parse_types:
-#            doc.body = self.refparser.parse_recursive(doc.body)
-#        self.parse_entry_update(doc)
         return ret 
 
+    # subclasses should override this and make to add a suitable set
+    # of triples (particularly rpubl:konsolideringsunderlag) to
+    # doc.meta. Also maybe correct dcterms:issued?
+    def parse_metadata_from_consolidated(self,doc):
+        # the resource is a BNode, but we already know the URI (it's doc.uri)
+        resource = self.attributes_to_resource(
+            self.metadata_from_basefile(doc.basefile), infer_nodes=False)
+        for p, o in resource.predicate_objects():
+            if isinstance(p, Resource):
+                p = p.identifier
+            if isinstance(o, Resource):
+                o = o.identifier
+            doc.meta.add((URIRef(doc.uri), p, o))
+        
+    
     def textreader_from_basefile(self, basefile, force_ocr=False):
         infile = self.store.downloaded_path(basefile)
         tmpfile = self.store.path(basefile, 'intermediate', '.pdf')
@@ -414,8 +455,8 @@ class MyndFskrBase(FixedLayoutSource):
         newbuffer = BytesIO()
         warnings = []
         for idx, b in enumerate(bytebuffer):
-            # allow CR, LF, FF
-            if b < 0x20 and b not in (0xa, 0xd, 0xc):
+            # allow CR, LF, FF, TAB
+            if b < 0x20 and b not in (0xa, 0xd, 0xc, 0x9):
                 warnings.append(idx)
             else:
                 newbuffer.write(bytes((b,)))
@@ -454,7 +495,8 @@ class MyndFskrBase(FixedLayoutSource):
                 ['((?:Föreskrifter|[\w ]+s (?:föreskrifter|allmänna råd)).*?)[;\n]\n'],
                 'dcterms:identifier': ['^([A-ZÅÄÖ-]+FS\s\s?\d{4}:\d+)$'],
                 'rpubl:utkomFranTryck':
-                ['Utkom från\strycket\s+den\s(\d+ \w+ \d{4})'],
+                ['Utkom från\strycket\s+den\s(\d+ \w+ \d{4})',
+                 'Utkom från\strycket\s+(\d{4}-\d{2}-\d{2})'],
                 'rpubl:omtryckAv': ['^(Omtryck)$'],
                 'rpubl:genomforDirektiv': ['Celex (3\d{2,4}\w\d{4})'],
                 'rpubl:beslutsdatum':
@@ -483,9 +525,6 @@ class MyndFskrBase(FixedLayoutSource):
                  'att (.*) skall upphöra att gälla (denna dag|vid utgången av \w+ \d{4})']
                 }
 
-    # for some badly written docs, certain metadata properties cannot
-    # be found. We list missing properties here, as a last resort.
-    baseprops = {'nfs/2004:5': {"rpubl:beslutadAv": "Naturvårdsverket"}}
                  
 
     def parse_metadata_from_textreader(self, reader, doc):
@@ -855,7 +894,7 @@ class AFS(MyndFskrBase):
     start_url = "https://www.av.se/arbetsmiljoarbete-och-inspektioner/publikationer/foreskrifter/foreskrifter-listade-i-nummerordning/"
     landingpage = True
 
-    basefile_regex = re.compile("^(?P<basefile>AFS \d+:\d+)")
+    basefile_regex = re.compile("^(?P<basefile>AFS \d+: ?\d+)")
     # we need a slighly more forgiving regex beause of AFS 2017:1,
     # which has the url "...afs-1-2017.pdf" ...
     document_url_regex = re.compile('.*(?P<basefile>\d+[:/_-]\d+).pdf$')
@@ -866,6 +905,89 @@ class AFS(MyndFskrBase):
     # as consolidated versions). The following is too greedy.
     # document_url_regex =
     # re.compile(".*/publikationer/foreskrifter/.*\.pdf$")
+
+    def download_single(self, basefile, url=None):
+        # the basefile might be the lastest change act, while the url
+        # could be a landing page for the base act. The most prominent
+        # link ("Ladda ner pdf") could be to an official base act, or
+        # to an unofficial consolidated version up to and including
+        # the latest change act. So, yeah.
+        assert not url.endswith(".pdf"), ("expected landing page for %s, got direct pdf"
+                                          " link %s" % (basefile, url))
+        resp = self.session.get(url)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "lxml")
+        title = soup.find("h1").text
+        # afs/2017:4 -> "AFS 2017:4"
+        identifier = basefile.upper().replace("/", " ")
+        # AFS 2017:4 -> 2017:4
+        short_identifier = identifier.split(" ")[1] 
+        # the test of wheter base act: the basefile matches the
+        # identifier in the title. If not, this is a change act.
+        is_baseact = identifier in title
+        if is_baseact:
+            link = soup.find("a", text="Ladda ner pdf")
+            pdfurl = urljoin(url, link["href"])
+            # do something smart to actually download the basefile
+            # from the pdfurl (saving url as orig_url). We'd like to
+            # call DocumentRepository.download_single, since
+            # super(...).download_single will call
+            # MyndFskrBase.download_single, which does too much. This
+            # is a clear sign that I don't understand OOP
+            # design. Anyway, this might work.
+            DocumentRepository.download_single(self, basefile, pdfurl, url)
+        else:
+            changeheader = soup.find(["h2", "h3"], text="Ursprungs- och ändringsföreskrifter")
+            if not changeheader:
+                self.log.error("%s: Can't find a list of change acts at %s" % (basefile, url))
+                return False
+            pdfs = changeheader.parent.find_all("a", href=re.compile("\.pdf$"))
+            # first, get the actual basefile we're looking for (assume
+            # there really is one)
+            norm = util.normalize_space
+            match = lambda x: identifier in norm(x.text) or short_identifier in norm(x.text)
+            links = [x for x in pdfs if match(x)]
+            if not links:
+                self.log.error("Can't find PDF link to %s amongst %s" % (identifier, [x.text for x in pdfs]))
+                return False
+            link = [x for x in pdfs if match(x)][0]
+            pdfurl = urljoin(url, link["href"])
+            # note: the actual downloading (call to
+            # DocumentRepository.download_single) happens at the very
+            # end
+            
+            # then, 1) find out what change act the consolidated
+            # version might be updated to
+            ids = [norm(x.text).split(" ")[1] for x in pdfs if re.match("AFS \d+:\d+", norm(x.text))]
+            updated_to = sorted(ids, key=util.split_numalpha)[-1]
+
+            # 2) find the url to the consolidated pdf and store that
+            # as a separate basefile, using the html page as an
+            # attachment
+            base_basefile = re.search("AFS \d+:\d+", title).group(0).lower().replace(" ", "/")
+            link = soup.find("a", text="Ladda ner pdf")
+            consolidated_pdfurl = urljoin(url, link["href"])
+            consolidated_basefile = "konsolidering/%s" % base_basefile
+            DocumentRepository.download_single(self, consolidated_basefile, consolidated_pdfurl)
+            with self.store.open_downloaded(consolidated_basefile, "w", attachment="landingpage.html") as fp:
+                fp.write(resp.text)
+            
+            # 4) Actually download the main basefile
+            return DocumentRepository.download_single(self, basefile, pdfurl, url)
+
+    def parse_metadata_from_consolidated(self,doc):
+        super(AFS, self).parse_metadata_from_consolidated(doc)
+        with self.store.open_downloaded(doc.basefile, attachment="landingpage.html") as fp:
+            soup = BeautifulSoup(fp.read(), "lxml")
+        changeheader = soup.find(["h2", "h3"], text="Ursprungs- och ändringsföreskrifter")
+        pdfs = changeheader.parent.find_all("a", href=re.compile("\.pdf$"))
+        norm = util.normalize_space
+        # FIXME: in some cases the leading AFS is missing
+        matcher = re.compile("(?:|AFS )(\d+:\d+)").match
+        fsnummer = [matcher(norm(x.text)).group(1) for x in pdfs if matcher(norm(x.text))]
+        for f in fsnummer:
+            konsolideringsunderlag = self.canonical_uri(self.sanitize_basefile(f))
+            doc.meta.add((URIRef(doc.uri), RPUBL.konsolideringsunderlag, URIRef(konsolideringsunderlag)))
 
     def sanitize_text(self, text, basefile):
         # 'afs/2014:39' -> 'AFS 2014:39'
@@ -898,6 +1020,8 @@ class AFS(MyndFskrBase):
                     newline = ""
             newtext += newline + "\n"
         return newtext
+
+
 
 class BOLFS(MyndFskrBase):
     alias = "bolfs"
@@ -1031,6 +1155,14 @@ class ELSAKFS(MyndFskrBase):
         if basefile.startswith("elsaek-fs"):
                 return basefile.replace("elsaek-fs", "elsakfs")
 
+    def fwdtests(self):
+        t = super(ELSAKFS, self).fwdtests()
+        # it's hard to match "...föreskriver X följande" if X contains
+        # spaces ("följande" can be pretty much anything else)
+        t["rpubl:beslutadAv"].insert(0, '(?:meddelar|föreskriver)\s(Sveriges geologiska undersökning)')
+        return t
+
+
 class FFFS(MyndFskrBase):
     alias = "fffs"
     start_url = "https://www.fi.se/sv/vara-register/forteckning-fffs/"
@@ -1162,6 +1294,12 @@ class LMFS(MyndFskrBase):
     def forfattningssamlingar(self):
         return ["lmfs", "lmvfs"]
 
+    def fwdtests(self):
+        t = super(LMFS, self).fwdtests()
+        # it's hard to match "...föreskriver X följande" if X contains
+        # spaces ("följande" can be pretty much anything else)
+        t["rpubl:beslutadAv"].insert(0, '(?:meddelar|föreskriver)\s(Statens\s+lantmäteriverk)')
+        return t
 
 class LIFS(MyndFskrBase):
     alias = "lifs"
@@ -1207,6 +1345,12 @@ class MIGRFS(MyndFskrBase):
     def forfattningssamlingar(self):
         return ["migrfs", "sivfs"]
 
+    def fwdtests(self):
+        t = super(MIGRFS, self).fwdtests()
+        # it's hard to match "...föreskriver X följande" if X contains
+        # spaces ("följande" can be pretty much anything else)
+        t["rpubl:beslutadAv"].insert(0, '(?:meddelar|föreskriver)\s(Statens\s+invandrarverk)')
+        return t
 
 class MPRTFS(MyndFskrBase):
     alias = "mprtfs"
@@ -1697,7 +1841,6 @@ class STFS(MyndFskrBase):
     def download_get_basefiles(self, source):
         done = False
         soup = BeautifulSoup(source, "lxml")
-        from pudb import set_trace; set_trace()
         while not done:
             for item in soup.find_all("div", "item"):
                 basefile = item.h3.text.strip()

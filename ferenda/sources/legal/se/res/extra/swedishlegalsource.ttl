@@ -1,4 +1,4 @@
-# Automatically concatenated from sources at 2018-04-12T22:50:43.375531
+# Automatically concatenated from sources at 2018-04-13T23:25:41.915537
 
 @prefix : <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
 @prefix bibo: <http://purl.org/ontology/bibo/> .
@@ -285,6 +285,9 @@
 <http://rinfo.lagrummet.se/org/statens_geotekniska_institut> a foaf:Organization ;
     foaf:name "Statens geotekniska institut"@sv .
 
+<http://rinfo.lagrummet.se/org/statens_lantmaeteriverk> a foaf:Organization ;
+    foaf:name "Statens lantmäteriverk"@sv .
+
 <http://rinfo.lagrummet.se/org/statens_naturvaardsverk> a foaf:Organization ;
     rdfs:comment "Numera Naturvårdsverket" ;
     foaf:name "Statens naturvårdsverk"@sv .
@@ -570,12 +573,6 @@
     dct:publisher <http://rinfo.lagrummet.se/org/energimarknadsinspektionen> ;
     skos:altLabel "EIFS"@sv ;
     skos:prefLabel "Energimarknadsinspektionens författningssamling"@sv .
-
-<http://rinfo.lagrummet.se/serie/fs/elsaek-fs> a :Forfattningssamling ;
-    dct:publisher <http://rinfo.lagrummet.se/org/elsaekerhetsverket> ;
-    rdfs:seeAlso <http://www.elsakerhetsverket.se/vanstermeny/foreskrifter.4.964130fe7b18648b80001451.html> ;
-    skos:altLabel "ELSÄK-FS"@sv ;
-    skos:prefLabel "Elsäkerhetsverkets författningssamling"@sv .
 
 <http://rinfo.lagrummet.se/serie/fs/emfs> a :Forfattningssamling ;
     dct:publisher <http://rinfo.lagrummet.se/org/exempelmyndigheten> ;
@@ -879,6 +876,13 @@
     rdfs:seeAlso <http://www.sgu.se/sgu/sv/om_sgu/foreskr_s.htm> ;
     skos:altLabel "SGU-FS"@sv ;
     skos:prefLabel "Sveriges geologiska undersöknings författningssamling"@sv .
+
+<http://rinfo.lagrummet.se/serie/fs/sind-fs> a :Forfattningssamling ;
+    dct:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/elsaek-fs> ;
+    dct:publisher <http://rinfo.lagrummet.se/org/statens_industriverk> ;
+    rdfs:comment "Numera Elsäkerhetsverkets författningssamling (?)"@sv ;
+    skos:altLabel "SIND-FS"@sv ;
+    skos:prefLabel "Statens industriverks författningssamling"@sv .
 
 <http://rinfo.lagrummet.se/serie/fs/sivfs> a :Forfattningssamling ;
     dct:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/migrfs> ;
@@ -1322,6 +1326,9 @@
 <http://rinfo.lagrummet.se/org/statens_folkhaelsoinstitut> a foaf:Organization ;
     foaf:name "Statens folkhälsoinstitut"@sv .
 
+<http://rinfo.lagrummet.se/org/statens_industriverk> a foaf:Organization ;
+    foaf:name "Statens industriverk"@sv .
+
 <http://rinfo.lagrummet.se/org/statens_invandrarverk> a foaf:Organization ;
     rdfs:comment "Ersatt av Migrationsverket"@sv ;
     foaf:name "Statens invandrarverk"@sv .
@@ -1389,6 +1396,12 @@
     dct:publisher <http://rinfo.lagrummet.se/org/arbetsfoermedlingen> ;
     skos:altLabel "AFFS"@sv ;
     skos:prefLabel "Arbetsförmedlingens författningssamling"@sv .
+
+<http://rinfo.lagrummet.se/serie/fs/elsaek-fs> a :Forfattningssamling ;
+    dct:publisher <http://rinfo.lagrummet.se/org/elsaekerhetsverket> ;
+    rdfs:seeAlso <http://www.elsakerhetsverket.se/vanstermeny/foreskrifter.4.964130fe7b18648b80001451.html> ;
+    skos:altLabel "ELSÄK-FS"@sv ;
+    skos:prefLabel "Elsäkerhetsverkets författningssamling"@sv .
 
 <http://rinfo.lagrummet.se/serie/fs/fffs> a :Forfattningssamling ;
     dct:publisher <http://rinfo.lagrummet.se/org/finansinspektionen> ;

@@ -308,8 +308,11 @@ class XSLTTransform(TransformerEngine):
             raise errors.TransformError(str(_transformer.error_log))
 
     # nativedata = lxml.etree
-    def native_to_file(self, nativedata, outfile):
-        res = etree.tostring(nativedata, pretty_print=self.format, encoding="utf-8")
+    def native_to_file(self, nativedata, outfile, doctype=None):
+        extra = {}
+        if doctype:
+            extra['doctype'] = doctype
+        res = etree.tostring(nativedata, pretty_print=self.format, encoding="utf-8", **extra)
         util.ensure_dir(outfile)
         with open(outfile, "wb") as fp:
             fp.write(res)

@@ -100,7 +100,6 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
     documentstore_class = MyndFskrStore
     requesthandler_class = MyndFskrHandler
     urispace_segment = ""
-    supress_subrepo_logging = False
 
     # mapping to get basefile_from_uri to work. This is a ugly hack,
     # the proper way would be to call the bsefile_from_uri method in
@@ -169,6 +168,13 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
                 cls.alias == subrepoalias):
                 found = True
                 inst = self.get_instance(cls)
+                # the feature where subrepos has a slighly higher
+                # loglevel to avoid creating almost-duplicate "OK" log
+                # messages is not useful for downloading. So we work
+                # around it here.
+                subrepo_loglevel = inst.log.getEffectiveLevel()
+                if subrepo_loglevel == self.log.getEffectiveLevel() + 1:
+                    inst.log.setLevel(self.log.getEffectiveLevel())
                 basefiles = []
                 try:
                     ret = inst.download(basefile, reporter=basefiles.append)
@@ -177,6 +183,7 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
                     self.log.error("download for %s failed: %s (%s)" % (cls.alias, e, loc))
                     ret = False
                 finally:
+                    inst.log.setLevel(subrepo_loglevel)
                     for b in basefiles:
                         util.link_or_copy(inst.store.documententry_path(b),
                                           self.store.documententry_path(b))

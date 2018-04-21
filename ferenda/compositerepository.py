@@ -92,6 +92,9 @@ class CompositeRepository(DocumentRepository):
                 # <time> comprepo INFO basefile: parse OK (2.52 sec)
                 #
                 # Although not if the subrepo itself has subrepos
+                #
+                # FIXME: This is not good when using a compositerepo
+                # for downloading
                 if (self.log.getEffectiveLevel() == logging.INFO and
                     inst.log.getEffectiveLevel() == logging.INFO and
                     not isinstance(inst, CompositeRepository)):
