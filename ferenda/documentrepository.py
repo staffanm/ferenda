@@ -705,9 +705,9 @@ with the *config* object as single parameter.
                 if alias == self.alias:
                     return basefile
 
+    def get_required_predicates(self, doc):
+        return self.required_predicates
 
-
-    #
     #
     # STEP 1: Download documents from the web
     #

@@ -15,6 +15,12 @@ mediawiki Sekundär_sekretessbestämmelse
 mediawiki SFS/1949:105
 myndfs difs/2010:1
 myndfs difs/2013:1
+myndfs afs/konsolidering/2011:19
+myndfs afs/2011:19
+myndfs afs/2014:5
+myndfs afs/2014:43
+myndfs afs/2017:4
+prop 1962:10
 prop 1997/98:44
 prop 1997/98:160
 prop 2000/01:105
