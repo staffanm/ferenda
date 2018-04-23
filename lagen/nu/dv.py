@@ -5,7 +5,7 @@ from builtins import *
 
 from collections import Counter
 from operator import attrgetter, index
-from datetime import datetime, time
+from datetime import date, datetime, time
 
 from rdflib import RDF, URIRef, BNode, Graph, Literal
 from rdflib.namespace import DCTERMS, OWL, RDFS
@@ -228,8 +228,13 @@ class DV(OrigDV, SameAs):
         entry['title'] = entry['dcterms_identifier']
         if entry.get("rpubl_avgorandedatum"):
             if isinstance(entry["rpubl_avgorandedatum"], str):
-                self.log.error("rpubl_avgorandedatum is str, note datetime: %r" % entry)
-            entry['published'] = datetime.combine(entry["rpubl_avgorandedatum"], time())
+                try:
+                    avg_dat = datetime.strptime(entry["rpubl_avgorandedatum"], "%Y-%m-%d")
+                except ValueError as e:
+                    return entry 
+            else:
+                avg_dat = entry["rpubl_avgorandedatum"]
+            entry['published'] = datetime.combine(avg_dat, time())
         return entry
 
     def tabs(self):
