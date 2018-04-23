@@ -477,41 +477,50 @@ class DocumentStore(object):
             else:
                 # make sure the underlying file really still exists
                 path = None
+                intermediate_path = False
                 if action == "parse":
                     path = self.downloaded_path(basefile)
+                    intermediate_path = os.path.exists(self.intermediate_path(basefile))
                 elif action == "relate":
                     path = self.distilled_path(basefile)
                 elif action == "generate":
                     path = self.parsed_path(basefile)
                 if os.path.exists(path):
                     yielded_paths.add(path)
-                    if os.path.getsize(path) > 0:
+                    if os.path.getsize(path) > 0 or intermediate_path:
                         yield basefile
                     else:
                         trim_documententry(basefile)
         
         for x in util.list_dirs(directory, suffixes, reverse=True):
-            # ignore empty files placed by download (which may
-            # have done that in order to avoid trying to
-            # re-download nonexistent resources)
             if x in yielded_paths:
                 continue
-            if os.path.exists(x) and not x.endswith((".root.json", ".durations.json")):
-                # get a pathfrag from full path
-                # suffixlen = len(suffix) if self.storage_policy == "file" else len(suffix) + 1
-                suffixlen = 0
-                for s in suffixes:
-                    if x.endswith(s):
-                        suffixlen = len(s)
-                        break
-                else:
-                    raise ValueError("%s doesn't end with a valid suffix (%s)" % x, ", ".join(suffixes))
-                pathfrag = x[len(directory) + 1:-suffixlen]
-                basefile = self.pathfrag_to_basefile(pathfrag)
-                if os.path.getsize(x) > 0:
-                    yield basefile
-                else:
-                    trim_documententry(basefile)
+            if not os.path.exists(x) or x.endswith((".root.json", ".durations.json")):
+                continue
+            # get a pathfrag from full path
+            # suffixlen = len(suffix) if self.storage_policy == "file" else len(suffix) + 1
+            suffixlen = 0
+            for s in suffixes:
+                if x.endswith(s):
+                    suffixlen = len(s)
+                    break
+            else:
+                raise ValueError("%s doesn't end with a valid suffix (%s)" % x, ", ".join(suffixes))
+            pathfrag = x[len(directory) + 1:-suffixlen]
+            basefile = self.pathfrag_to_basefile(pathfrag)
+            # ignore empty files placed by download (which may have
+            # done that in order to avoid trying to re-download
+            # nonexistent resources) -- but not if there is a viable
+            # intermediate file (dv.py creates empty files in download
+            # but contentful files in intermediate, when splitting a
+            # large doc over multiple basefiles).
+            intermediate_path = False
+            if action == "parse":
+                intermediate_path = os.path.exists(self.intermediate_path(basefile))
+            if os.path.getsize(x) > 0 or intermediate_path:
+                yield basefile
+            elif action in ("relate", "generate"):
+                trim_documententry(basefile)
 
     def list_versions(self, basefile, action=None):
         """Get all archived versions of a given basefile.
