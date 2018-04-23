@@ -129,7 +129,7 @@ class MyndFskrBase(FixedLayoutSource):
         else:
             return super(MyndFskrBase, self).remote_url(basefile)
 
-    def required_predicates(self, doc):
+    def get_required_predicates(self, doc):
         return [RDF.type, DCTERMS.title,
                 DCTERMS.identifier, RPUBL.arsutgava,
                 DCTERMS.publisher, RPUBL.beslutadAv,
@@ -818,8 +818,8 @@ class MyndFskrBase(FixedLayoutSource):
             rdftype = RPUBL.Myndighetsforeskrift
         desc.rdftype(rdftype)
         desc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
-        if RPUBL.bemyndigande in self.required_predicates:
-            self.required_predicates.pop(self.required_predicates.index(RPUBL.bemyndigande))
+        # if RPUBL.bemyndigande in self.get_required_predicates(doc):
+        #     self.required_predicates.pop(self.required_predicates.index(RPUBL.bemyndigande))
         if rdftype == RPUBL.Myndighetsforeskrift:
             self.required_predicates.append(RPUBL.bemyndigande)
 

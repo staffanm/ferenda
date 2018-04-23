@@ -461,9 +461,18 @@ class DocumentRepository(object):
     def config(self, config):
         """TBD"""
         self._config = config
+        downloaded_suffixes = None
+        if self.store:
+            # DocumentRepository.__init__ may set this attribute on
+            # it's store after initialization. We need to save it
+            # prior to creating a new store, so that we can re-set it
+            # on the new store.
+            downloaded_suffixes = self.store.downloaded_suffixes
         self.store = self.documentstore_class(
             config.datadir + os.sep + self.alias,
             storage_policy=self.storage_policy)
+        if downloaded_suffixes:
+            self.store.downloaded_suffixes = downloaded_suffixes
 
     def lookup_resource(self, label, predicate=FOAF.name, cutoff=0.8, warn=True):
         """Given a textual identifier (ie. the name for something), lookup the
