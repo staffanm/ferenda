@@ -651,6 +651,16 @@ class SFS(Trips):
                 "rpubl:forfattningssamling": "SFS",
                 "rpubl:lopnummer": lopnummer
             }
+            if 'Rubrik' not in rowdict:
+                # We normally use Rubrik to deduce a rdf:type based on
+                # it, but if we have none, we'll have to find out the
+                # rdf:type some other way. Let's just assume that it's
+                # the same type as the first change
+                firstchange = next((d[change] for change in d if isinstance(d[change], dict))) 
+                rdftype = firstchange.get('rdf:type', None)
+                if rdftype:
+                    d[docuri]["rdf:type"] = rdftype
+                d[docuri]["dcterms:title"] = "(Rubrik saknas)"
             for key, val in list(rowdict.items()):
                 if key == 'SFS-nummer':
                     (arsutgava, lopnummer) = val.split(":")

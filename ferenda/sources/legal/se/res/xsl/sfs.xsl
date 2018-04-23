@@ -367,7 +367,7 @@
       </xsl:if>
       <xsl:if test="xhtml:span[@class='paragrafbeteckning']">
 	<xsl:choose>
-	  <xsl:when test="$marker != ''">
+	  <xsl:when test="@id">
 	    <a href="#{@id}" class="paragrafbeteckning" title="Permalänk till detta stycke"><xsl:value-of select="xhtml:span[@class='paragrafbeteckning']"/></a>&#160;
 	  </xsl:when>
 	  <xsl:otherwise>

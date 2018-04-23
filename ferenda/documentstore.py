@@ -458,7 +458,8 @@ class DocumentStore(object):
         # if we have information about how long each basefile took the
         # last time, use that to yield the most demanding basefiles
         # first. This improves throughput when processing files in
-        # paralel
+        # paralell. Note: .durations.json is only created by
+        # devel.statusreport
         durations_path = self.path(".durations", "entries", ".json", storage_policy="file")
         durations = {}
         if os.path.exists(durations_path):

@@ -1,0 +1,109 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rinfoex: <http://lagen.nu/terms#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://lagen.nu/1958:638#L1970:842S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1958:638#L1970:842> ;
+    dcterms:references <https://lagen.nu/1958:637>,
+        <https://lagen.nu/1958:638>,
+        <https://lagen.nu/1958:638#P4> .
+
+<https://lagen.nu/1958:638#P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1958:638#P1> ;
+    dcterms:references <https://lagen.nu/1958:637> .
+
+<https://lagen.nu/1958:638#P1S2> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1958:638#P1> ;
+    dcterms:references <https://lagen.nu/1958:637> .
+
+<https://lagen.nu/1958:638#P2S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1958:638#P2> ;
+    dcterms:references <https://lagen.nu/1958:637> .
+
+<https://lagen.nu/1958:638#P2S2> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1958:638#P2> ;
+    dcterms:references <https://lagen.nu/1949:381>,
+        <https://lagen.nu/1958:638#P8> .
+
+<https://lagen.nu/1958:638#P3S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1958:638#P3> .
+
+<https://lagen.nu/1958:638#P5S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/1958:638#P5> ;
+    dcterms:references <https://lagen.nu/1958:637>,
+        <https://lagen.nu/1958:638#K16P5> .
+
+<https://lagen.nu/1958:638/konsolidering> owl:sameAs <https://lagen.nu/1958:638/konsolidering/1970:842> .
+
+<https://lagen.nu/1958:638#L1970:842> dcterms:isPartOf <https://lagen.nu/1970:842> .
+
+<https://lagen.nu/1958:638#P3> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/1958:638> ;
+    rpubl:paragrafnummer "3"@sv .
+
+<https://lagen.nu/1958:638#P5> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/1958:638> ;
+    rpubl:paragrafnummer "5"@sv .
+
+<https://lagen.nu/1958:638/konsolidering/1970:842> a rpubl:KonsolideradGrundforfattning ;
+    dcterms:creator <https://lagen.nu/org/2008/justitiedepartementet> ;
+    dcterms:identifier "SFS 1958:638 i lydelse enligt SFS 1970:842" ;
+    dcterms:issued "2018-04-23T14:09:13.107112"^^xsd:dateTime ;
+    dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:title "Lag (1958:638) om införande av nya ärvdabalken"@sv ;
+    rpubl:konsoliderar <https://lagen.nu/1958:638> ;
+    rpubl:konsolideringsunderlag <https://lagen.nu/1958:638>,
+        <https://lagen.nu/1970:842> ;
+    rpubl:utfardandedatum "1958-12-12"^^xsd:date ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1958:638/konsolidering/2018-04-23t14:09:13.107112> ;
+    prov:wasGeneratedBy "lagen.nu.sfs.SFS" .
+
+<https://lagen.nu/prop/1958:B23> a rpubl:Proposition ;
+    dcterms:identifier "Prop. 1958:B 23" .
+
+<https://lagen.nu/prop/1970:186> a rpubl:Proposition ;
+    dcterms:identifier "Prop. 1970:186" .
+
+<https://lagen.nu/1958:638#P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/1958:638> ;
+    rpubl:paragrafnummer "1"@sv .
+
+<https://lagen.nu/1958:638#P2> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/1958:638> ;
+    rpubl:paragrafnummer "2"@sv .
+
+<https://lagen.nu/1970:842> a rpubl:Lag ;
+    dcterms:identifier "SFS 1970:842" ;
+    dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:title "(Rubrik saknas)"@sv ;
+    rpubl:andrar "upph. 4 §" ;
+    rpubl:arsutgava "1970" ;
+    rpubl:beslutadAv <https://lagen.nu/org/2008/regeringskansliet> ;
+    rpubl:forarbete <https://lagen.nu/prop/1970:186> ;
+    rpubl:forfattningssamling <https://lagen.nu/dataset/sfs> ;
+    rpubl:lopnummer "842" ;
+    rpubl:upphaver <https://lagen.nu/1958:638#P4> ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1970:842> .
+
+<https://lagen.nu/org/2008/justitiedepartementet> rdfs:label "Justitiedepartementet L2"@sv .
+
+<https://lagen.nu/org/2008/regeringskansliet> rdfs:label "Regeringskansliet"@sv .
+
+<https://lagen.nu/1958:638> a rpubl:Lag ;
+    dcterms:identifier "SFS 1958:638" ;
+    dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:title "Lag (1958:638) om införande av nya ärvdabalken"@sv ;
+    rpubl:arsutgava "1958" ;
+    rpubl:beslutadAv <https://lagen.nu/org/2008/regeringskansliet> ;
+    rpubl:departement <https://lagen.nu/org/2008/justitiedepartementet> ;
+    rpubl:forarbete <https://lagen.nu/prop/1958:B23> ;
+    rpubl:forfattningssamling <https://lagen.nu/dataset/sfs> ;
+    rpubl:lopnummer "638" ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1958:638> .
+

@@ -227,6 +227,8 @@ class DV(OrigDV, SameAs):
             self.log.warning("%s: No rpubl_referatrubrik found" % entry['basefile'])
         entry['title'] = entry['dcterms_identifier']
         if entry.get("rpubl_avgorandedatum"):
+            if isinstance(entry["rpubl_avgorandedatum"], str):
+                self.log.error("rpubl_avgorandedatum is str, note datetime: %r" % entry)
             entry['published'] = datetime.combine(entry["rpubl_avgorandedatum"], time())
         return entry
 
