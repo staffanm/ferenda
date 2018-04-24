@@ -424,9 +424,6 @@ class SwedishLegalSource(DocumentRepository):
         uri = self.minter.space.coin_uri(resource)
         # make sure basefiles are roundtrippable
         computed_basefile = self.basefile_from_uri(uri)
-        if basefile != computed_basefile:
-            computed_basefile = self.basefile_from_uri(uri)
-            
         assert basefile == computed_basefile, "%s -> %s -> %s" % (basefile, uri, computed_basefile)
         # end temporary code
         return uri

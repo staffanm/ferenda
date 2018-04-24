@@ -141,7 +141,6 @@ def render(f):
                  self.store.serialized_path(
                      doc.basefile)))
         # css file + background images + png renderings of text
-                                
         resources = self.create_external_resources(doc)
         if resources:
             cssuris = [cssuri(doc.uri, x) for x in resources if x.endswith(".css")]
@@ -194,7 +193,6 @@ def render(f):
             if not x:
                 self.log.warning("%s: Metadata is missing a %s triple" %
                                  (doc.basefile, distilled_graph.qname(p)))
-                self.log.info("%s: self is %s, get_required_predicates() is %s" % (doc.basefile, type(self), ", ".join([distilled_graph.qname(p) for p in required]), len(set(self.get_required_predicates(doc)))))
         if 'validaterdfa' in self.config and self.config.validaterdfa:
             # Validate that all triples specified in doc.meta and any
             # .meta property on any body object is present in the

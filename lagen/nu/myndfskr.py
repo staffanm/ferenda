@@ -7,6 +7,7 @@ from operator import attrgetter
 from collections import Counter
 import re
 import os
+import datetime
 from urllib.parse import unquote
 from wsgiref.util import request_uri
 from itertools import chain
@@ -122,11 +123,22 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
     def metadata_from_basefile(self, basefile):
         # FIXME: Copied from
         # ferenda.sources.legal.MyndFskrBase.metadata_from_basefile
-        fs, realbasefile = basefile.split("/")
-        fs = fs.upper()
-        # fs = self._basefile_frag_to_altlabel(fs)
-        fs = myndfskr.MyndFskrBase._basefile_frag_to_altlabel(self, fs)
         a = super(MyndFskr, self).metadata_from_basefile(basefile)
+        # munge basefile or classname to find the skos:altLabel of the
+        # forfattningssamling we're dealing with
+        if "/" in basefile:
+            segments = basefile.split("/")
+            if len(segments) > 2 and segments[0] == "konsolidering":
+                a["rdf:type"] = RPUBL.KonsolideradGrundforfattning
+                a["rpubl:konsoliderar"] = self.canonical_uri(basefile.split("/",1)[1])
+                a["dcterms:issued"] = datetime.date.today()
+                segments.pop(0)
+            fs, realbasefile = segments
+            fs = fs.upper()
+        else:
+            fs = self.__class__.__name__
+            realbasefile = basefile
+        fs = myndfskr.MyndFskrBase._basefile_frag_to_altlabel(None, fs)
         a["rpubl:arsutgava"], a["rpubl:lopnummer"] = realbasefile.split(":", 1)
         a["rpubl:forfattningssamling"] = self.lookup_resource(fs, SKOS.altLabel)
         return a
@@ -139,14 +151,19 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
         # FIXME: We should call the appropriate subrepos
         # basefile_from_uri, not the superclass
         basefile = super(MyndFskr, self).basefile_from_uri(uri)
-        if basefile and basefile.count("/") == 1:
-            basefile = basefile.replace("-", "")
-            fs, realbasefile = basefile.split("/")
-            if fs != "sfs" and fs.endswith("fs"):
-                # adjust some tricky URIs to get the basefile fs from
-                # them
-                fs = self.basefile_fs.get(fs, fs)
-                return fs + "/" + realbasefile
+        if basefile:
+            if basefile.count("/") == 1:
+                basefile = basefile.replace("-", "")
+                fs, realbasefile = basefile.split("/")
+                if fs != "sfs" and fs.endswith("fs"):
+                    # adjust some tricky URIs to get the basefile fs from
+                    # them
+                    fs = self.basefile_fs.get(fs, fs)
+                    return fs + "/" + realbasefile
+            elif "/konsolidering/" in basefile: # chop off trailing dcterms:issued segment
+                prefix = "konsolidering/"
+                basefile = prefix + basefile.split("/konsolidering/")[0]
+                return basefile
 
     # This custom implementation of download is able to select a
     # particular subrepo and call its download method. That way we

@@ -850,7 +850,7 @@ class MyndFskrBase(FixedLayoutSource):
         if isinstance(doc.body, Body):
             # document wasn't derived from a PDF file, probably from HTML instead
             return resources
-        
+        from pudb import set_trace; set_trace()
         cssfile = self.store.parsed_path(doc.basefile, attachment="index.css")
         urltransform = self.get_url_transform_func([self], os.path.dirname(cssfile),
                                                    develurl=self.config.develurl)
