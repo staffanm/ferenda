@@ -1,6 +1,14 @@
 --- data/sfs/intermediate/1999/1229.txt.bz2
 +++ 
-@@ -15176,6 +15176,7 @@ Korrigerad formattering av strecksatslistor i 44:12-13, styckeindelning i 44:21 samt tabell i 63:3
+@@ -9883,6 +9883,7 @@ Korrigerad formattering av strecksatslistor i 44:12-13, styckeindelning i 44:21, paragrafindelning i 48:26 samt tabell i 63:3
+ uppfyllda för samtliga fonder, ska senare gjord avsättning till
+ periodiseringsfond anses överförd före tidigare gjord
+ avsättning.
++
+ I 48 kap. 12 § finns bestämmelser om beräkningen av
+ omkostnadsbeloppet för aktierna. Lag (2007:1419).
+ 
+@@ -15176,6 +15177,7 @@
  underliggande tillgångar eller av kursindex eller liknande.
  
  12 § Med option avses en rätt för innehavaren att
@@ -8,7 +16,7 @@
  - förvärva eller avyttra aktier, obligationer eller andra
  tillgångar till ett bestämt pris, eller
  
-@@ -15187,6 +15188,7 @@
+@@ -15187,6 +15189,7 @@
  Huvudregel
  
  13 § Kapitalvinsten ska beräknas som skillnaden mellan
@@ -16,7 +24,7 @@
  - ersättningen för den avyttrade tillgången eller för den
  utfärdade förpliktelsen minskad med utgifterna för avyttringen
  eller utfärdandet, och
-@@ -15255,6 +15257,7 @@
+@@ -15255,6 +15258,7 @@
  avyttrats vid tidpunkten för utnyttjandet. Lag (2007:1419).
  
  Tillgångar som förvärvas genom arv, gåva m.m.
@@ -24,7 +32,29 @@
  21 § Om en tillgång förvärvas genom arv, testamente, gåva,
  bodelning eller på liknande sätt, inträder förvärvaren i den
  tidigare ägarens skattemässiga situation.
-@@ -20610,15 +20613,19 @@
+@@ -16400,6 +16404,7 @@
+ ersättningsbostaden inte utgör sådan bostad, ska ett återfört
+ uppskovsbelopp tas upp till beskattning enligt bestämmelserna i
+ 48 kap.
++
+ Om en begränsat skattskyldig avyttrar en utomlands belägen
+ ersättningsbostad med en kapitalförlust och ska återföra ett
+ uppskovsbelopp, ska uppskovsbeloppet reduceras med
+@@ -16901,11 +16906,13 @@
+ som sägs om en tillgång i 26 och 27 §§ ska tillämpas också på
+ en förpliktelse med sådan underliggande tillgång. Lag
+ (2007:1419).
++
+ 26 § Juridiska personers kapitalförluster på delägarrätter för
+ vilka avdrag ska göras får dras av bara mot kapitalvinster på
+ delägarrätter. Om en del av en sådan förlust inte kan dras av,
+ får den dras av mot en annan juridisk persons kapitalvinster
+ på delägarrätter om var och en av de juridiska personerna
++
+ 1. begär det för ett beskattningsår som har samma
+ deklarationstidpunkt enligt skatteförfarandelagen (2011:1244)
+ eller som skulle ha haft det om inte någon av de juridiska
+@@ -20613,15 +20620,19 @@
                                  procent av det belopp med vilket
                                  den fastställda förvärvsinkomsten
                                  överstiger 0,99 prisbasbelopp
@@ -44,7 +74,7 @@
  Lag (2011:1256).
  
  3 a § För dem som vid beskattningsårets ingång har fyllt 65 
-@@ -20672,6 +20679,7 @@
+@@ -20675,6 +20686,7 @@
  
  överstiger 12,43 
  prisbasbelopp			0,422 prisbasbelopp	

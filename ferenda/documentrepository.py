@@ -471,8 +471,9 @@ class DocumentRepository(object):
         self.store = self.documentstore_class(
             config.datadir + os.sep + self.alias,
             storage_policy=self.storage_policy)
-        if downloaded_suffixes:
-            self.store.downloaded_suffixes = downloaded_suffixes
+        if downloaded_suffixes and downloaded_suffixes != self.store.downloaded_suffixes:
+            self.store.downloaded_suffixes.clear()
+            self.store.downloaded_suffixes.extend(downloaded_suffixes)
 
     def lookup_resource(self, label, predicate=FOAF.name, cutoff=0.8, warn=True):
         """Given a textual identifier (ie. the name for something), lookup the
