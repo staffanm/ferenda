@@ -188,12 +188,13 @@ def render(f):
 
         # Validate that all required triples are present (we check
         # distilled_graph, but we could just as well check doc.meta)
-        for p in self.get_required_predicates(doc):
+        required = sorted(set(self.get_required_predicates(doc))) 
+        for p in required:
             x = distilled_graph.value(URIRef(doc.uri), p)
             if not x:
                 self.log.warning("%s: Metadata is missing a %s triple" %
                                  (doc.basefile, distilled_graph.qname(p)))
-
+                self.log.info("%s: self is %s, get_required_predicates() is %s" % (doc.basefile, type(self), ", ".join([distilled_graph.qname(p) for p in required]), len(set(self.get_required_predicates(doc)))))
         if 'validaterdfa' in self.config and self.config.validaterdfa:
             # Validate that all triples specified in doc.meta and any
             # .meta property on any body object is present in the

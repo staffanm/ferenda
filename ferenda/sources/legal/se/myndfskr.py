@@ -130,13 +130,25 @@ class MyndFskrBase(FixedLayoutSource):
             return super(MyndFskrBase, self).remote_url(basefile)
 
     def get_required_predicates(self, doc):
-        return [RDF.type, DCTERMS.title,
-                DCTERMS.identifier, RPUBL.arsutgava,
-                DCTERMS.publisher, RPUBL.beslutadAv,
-                RPUBL.beslutsdatum,
-                RPUBL.forfattningssamling,
-                RPUBL.ikrafttradandedatum, RPUBL.lopnummer,
-                RPUBL.utkomFranTryck, PROV.wasGeneratedBy]
+        rdftype = doc.meta.value(URIRef(doc.uri), RDF.type)
+        req = [RDF.type, DCTERMS.title,
+               DCTERMS.identifier, RPUBL.arsutgava,
+               DCTERMS.publisher, RPUBL.beslutadAv,
+               RPUBL.beslutsdatum,
+               RPUBL.forfattningssamling,
+               RPUBL.ikrafttradandedatum, RPUBL.lopnummer,
+               RPUBL.utkomFranTryck, PROV.wasGeneratedBy]
+        if rdftype == RPUBL.Myndighetsforeskrift:
+            return req
+        elif rdftype == RPUBL.Myndighetsforeskrift:
+            return req + [RPUBL.bemyndigande]
+        elif rdftype == RPUBL.KonsolideradGrundforfattning:
+            return [RDF.type, DCTERMS.title,
+                    DCTERMS.identifier, RPUBL.arsutgava,
+                    DCTERMS.publisher, RPUBL.lopnummer,
+                    PROV.wasGeneratedBy]
+        else:
+            return super(MyndFskrBase, self).get_required_predicates(doc)
 
     def forfattningssamlingar(self):
         return [self.alias]
@@ -818,10 +830,6 @@ class MyndFskrBase(FixedLayoutSource):
             rdftype = RPUBL.Myndighetsforeskrift
         desc.rdftype(rdftype)
         desc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
-        # if RPUBL.bemyndigande in self.get_required_predicates(doc):
-        #     self.required_predicates.pop(self.required_predicates.index(RPUBL.bemyndigande))
-        if rdftype == RPUBL.Myndighetsforeskrift:
-            self.required_predicates.append(RPUBL.bemyndigande)
 
 
     def infer_identifier(self, basefile):
