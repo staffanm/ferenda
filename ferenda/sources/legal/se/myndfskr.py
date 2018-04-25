@@ -11,6 +11,7 @@ import os
 import re
 import json
 from collections import OrderedDict
+from functools import lru_cache
 
 from rdflib import URIRef, Literal, Namespace
 from bs4 import BeautifulSoup
@@ -297,7 +298,16 @@ class MyndFskrBase(FixedLayoutSource):
             if len(segments) > 2 and segments[0] == "konsolidering":
                 a["rdf:type"] = RPUBL.KonsolideradGrundforfattning
                 a["rpubl:konsoliderar"] = self.canonical_uri(basefile.split("/",1)[1])
-                a["dcterms:issued"] = datetime.date.today()
+                # FIXME: Technically, we're not deriving
+                # dcterms:issued from the basefile alone
+                # (consolidation_date might read PDF and/or HTML files
+                # to get this data). However, due to the order of
+                # calls in SwedishLegalSource.canonical_uri, this
+                # method is required to return all metadata needed to
+                # construct the URI, which means we need to come up
+                # with a date (or really any identifying string, like
+                # a fsnummer) at this point.
+                a["dcterms:issued"] = self.consolidation_date(basefile)
                 segments.pop(0)
             fs, realbasefile = segments
             fs = fs.upper()
@@ -308,6 +318,10 @@ class MyndFskrBase(FixedLayoutSource):
         a["rpubl:arsutgava"], a["rpubl:lopnummer"] = realbasefile.split(":", 1)
         a["rpubl:forfattningssamling"] = self.lookup_resource(fs, SKOS.altLabel)
         return a
+
+    def consolidation_date(self, basefile):
+        # subclasses should override this and dig out real data somewhere
+        return datetime.date.today() 
 
     urispace_segment = ""
     
@@ -421,16 +435,18 @@ class MyndFskrBase(FixedLayoutSource):
     # of triples (particularly rpubl:konsolideringsunderlag) to
     # doc.meta. Also maybe correct dcterms:issued?
     def parse_metadata_from_consolidated(self,doc):
-        # the resource is a BNode, but we already know the URI (it's doc.uri)
         resource = self.attributes_to_resource(
             self.metadata_from_basefile(doc.basefile), infer_nodes=False)
+        # attributes_to_resource() returns a BNode-rooted resource,
+        # but we already know the correct URI (it's doc.uri), so we
+        # modify each triple as we move them onto the doc.meta graph
         for p, o in resource.predicate_objects():
             if isinstance(p, Resource):
                 p = p.identifier
             if isinstance(o, Resource):
                 o = o.identifier
             doc.meta.add((URIRef(doc.uri), p, o))
-        
+
     
     def textreader_from_basefile(self, basefile, force_ocr=False):
         infile = self.store.downloaded_path(basefile)
@@ -850,7 +866,6 @@ class MyndFskrBase(FixedLayoutSource):
         if isinstance(doc.body, Body):
             # document wasn't derived from a PDF file, probably from HTML instead
             return resources
-        from pudb import set_trace; set_trace()
         cssfile = self.store.parsed_path(doc.basefile, attachment="index.css")
         urltransform = self.get_url_transform_func([self], os.path.dirname(cssfile),
                                                    develurl=self.config.develurl)
@@ -996,6 +1011,28 @@ class AFS(MyndFskrBase):
         for f in fsnummer:
             konsolideringsunderlag = self.canonical_uri(self.sanitize_basefile(f))
             doc.meta.add((URIRef(doc.uri), RPUBL.konsolideringsunderlag, URIRef(konsolideringsunderlag)))
+        title = soup.title.text
+        if ", föreskrifter" in title:
+            title = title.split(", föreskrifter")[0].strip()
+        identifier = "%s (konsoliderad tom. %s)" % (
+            re.search("AFS \d+:\d+", title).group(0),
+            self.consolidation_date(doc.basefile))
+        doc.meta.add((URIRef(doc.uri), DCTERMS.identifier, Literal(identifier)))
+        doc.meta.add((URIRef(doc.uri), DCTERMS.title, Literal(title, lang="sv")))
+        doc.meta.add((URIRef(doc.uri), DCTERMS.publisher, self.lookup_resource("Arbetsmiljöverket")))
+
+    @lru_cache(maxsize=None)
+    def consolidation_date(self, basefile):
+        reader = self.textreader_from_basefile(basefile)
+        # look at the first TWO pages for consolidation info
+        for page in reader.readpage(), reader.readpage():
+            # All these variants exists:
+            m = re.search(r"Ändringar (?:införda|gjorda|är gjorda) (?:t\.o\.m\.?|till och med) ?(?:|den )(\d+ \w+ \d+|\d+-\d+-\d+)", page)
+            if m:
+                return self.parse_swedish_date(m.group(1))
+        else:
+            self.log.warning("%s: Cannot find consolidation date" % basefile)
+            return ""
 
     def sanitize_text(self, text, basefile):
         # 'afs/2014:39' -> 'AFS 2014:39'

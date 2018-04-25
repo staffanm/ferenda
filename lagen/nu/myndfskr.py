@@ -120,28 +120,16 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
         opts['jsfiles'].append('js/pdfviewer.js')
         return opts
 
-    def metadata_from_basefile(self, basefile):
-        # FIXME: Copied from
-        # ferenda.sources.legal.MyndFskrBase.metadata_from_basefile
-        a = super(MyndFskr, self).metadata_from_basefile(basefile)
-        # munge basefile or classname to find the skos:altLabel of the
-        # forfattningssamling we're dealing with
-        if "/" in basefile:
-            segments = basefile.split("/")
-            if len(segments) > 2 and segments[0] == "konsolidering":
-                a["rdf:type"] = RPUBL.KonsolideradGrundforfattning
-                a["rpubl:konsoliderar"] = self.canonical_uri(basefile.split("/",1)[1])
-                a["dcterms:issued"] = datetime.date.today()
-                segments.pop(0)
-            fs, realbasefile = segments
-            fs = fs.upper()
-        else:
-            fs = self.__class__.__name__
-            realbasefile = basefile
-        fs = myndfskr.MyndFskrBase._basefile_frag_to_altlabel(None, fs)
-        a["rpubl:arsutgava"], a["rpubl:lopnummer"] = realbasefile.split(":", 1)
-        a["rpubl:forfattningssamling"] = self.lookup_resource(fs, SKOS.altLabel)
-        return a
+    def canonical_uri(self, basefile):
+        # this is maybe only used by DocumentRepository.generate, and
+        # only to calculate the url pathinfo segment depth. At that
+        # stage, we have a parsed file containing this information, so
+        # we don't need to reconstruct it, just read the first kb of
+        # the parsed file and find the head@about data
+        with self.store.open_parsed(basefile) as fp:
+            head = fp.read(1024)
+        uri = re.search('<head about="([^"]+)"', head).group(1)
+        return uri
 
     def basefile_from_uri(self, uri):
         # FIXME: Adapted from
@@ -251,7 +239,6 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
             if mainuri:
                 uri = mainuri
             return util.uri_leaf(uri)
-            
         return [Facet(RPUBL.forfattningssamling,
                       selector=altlabel,
                       identificator=mainfs,
@@ -260,6 +247,10 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
                       indexingtype=fulltextindex.Label(),
                       selector_descending=True,
                       use_for_toc=True),
+                Facet(RPUBL.konsolideringsunderlag,
+                      indexingtype=fulltextindex.Identifier(),
+                      use_for_toc=False, use_for_feed=False,
+                      multiple_values=True),
                 Facet(RDF.type, use_for_toc=False, use_for_feed=False),
                 Facet(DCTERMS.title, use_for_toc=False),
                 Facet(DCTERMS.publisher, use_for_toc=False,
