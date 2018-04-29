@@ -2096,7 +2096,6 @@ parsed document path to that documents dependency file."""
     def _relate_fulltext_value(self, facet, resource, desc):
         if facet.toplevel_only and resource.tag != '{http://www.w3.org/1999/xhtml}body':
             return None, None
-
         # facets don't tell whether their sought subjects
         # are URIRefs or Literals. Look for both.
         v = desc.getrels(facet.rdftype)
@@ -2785,8 +2784,8 @@ WHERE {
             facets = self.facets()
             pagesets = self.toc_pagesets(data, facets)
             pagecontent = self.toc_select_for_pages(data, pagesets, facets)
-            self.toc_generate_pages(pagecontent, pagesets, otherrepos)
-            self.toc_generate_first_page(pagecontent, pagesets, otherrepos)
+            self.toc_generate_pages(pagecontent, pagesets, otherrepos=otherrepos)
+            self.toc_generate_first_page(pagecontent, pagesets, otherrepos=otherrepos)
         else:
             self.log.error("faceted_data found 0 results for query, can't generate TOC")
             self.log.info("(query PROBABLY was '%s')" %
@@ -2955,7 +2954,7 @@ WHERE {
         paths = []
         for (binding, value), documents in sorted(pagecontent.items()):
             paths.append(self.toc_generate_page(
-                binding, value, documents, pagesets, None, otherrepos))
+                binding, value, documents, pagesets, effective_basefile=None, otherrepos=otherrepos))
         return paths
 
     def toc_generate_first_page(self, pagecontent, pagesets, otherrepos=[]):
@@ -2963,7 +2962,7 @@ WHERE {
         firstpage = pagesets[0].pages[0]  # has .binding and .value
         documents = pagecontent[(firstpage.binding, firstpage.value)]
         return self.toc_generate_page(firstpage.binding, firstpage.value,
-                                      documents, pagesets, "index", otherrepos)
+                                      documents, pagesets, effective_basefile="index", otherrepos=otherrepos)
 
     def toc_generate_page(self, binding, value, documentlist, pagesets,
                           effective_basefile=None, title=None, otherrepos=[]):

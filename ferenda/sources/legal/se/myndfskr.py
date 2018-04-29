@@ -746,8 +746,7 @@ class MyndFskrBase(FixedLayoutSource):
             desc.value(DCTERMS.title,
                        Literal(util.normalize_space(
                            props['dcterms:title']), lang="sv"))
-
-            if re.search('^(Föreskrifter|[\w ]+s föreskrifter) om ändring i ',
+            if re.search('^(Föreskrifter|[\w ]+s föreskrifter) om ändring (i|av) ',
                          props['dcterms:title'], re.UNICODE):
                 # There should be something like FOOFS 2013:42 (or
                 # possibly just 2013:42) in the title. The regex is forgiving about spurious spaces, seee LVFS 1998:5
@@ -945,9 +944,10 @@ class AFS(MyndFskrBase):
         identifier = basefile.upper().replace("/", " ")
         # AFS 2017:4 -> 2017:4
         short_identifier = identifier.split(" ")[1] 
-        # the test of wheter base act: the basefile matches the
-        # identifier in the title. If not, this is a change act.
-        is_baseact = identifier in title
+        # the test of wheter base act: It doesn't contain any change
+        # acts.
+        changeheader = soup.find(["h2", "h3"], text="Ursprungs- och ändringsföreskrifter")
+        is_baseact = not(changeheader)
         if is_baseact:
             link = soup.find("a", text="Ladda ner pdf")
             pdfurl = urljoin(url, link["href"])
@@ -960,7 +960,6 @@ class AFS(MyndFskrBase):
             # design. Anyway, this might work.
             DocumentRepository.download_single(self, basefile, pdfurl, url)
         else:
-            changeheader = soup.find(["h2", "h3"], text="Ursprungs- och ändringsföreskrifter")
             if not changeheader:
                 self.log.error("%s: Can't find a list of change acts at %s" % (basefile, url))
                 return False
@@ -980,7 +979,8 @@ class AFS(MyndFskrBase):
             # end
             
             # then, 1) find out what change act the consolidated
-            # version might be updated to
+            # version might be updated to. FIXME: we don't DO anything
+            # with this information!
             ids = [norm(x.text).split(" ")[1] for x in pdfs if re.match("AFS \d+:\d+", norm(x.text))]
             updated_to = sorted(ids, key=util.split_numalpha)[-1]
 
@@ -1067,7 +1067,6 @@ class AFS(MyndFskrBase):
         return newtext
 
 
-
 class BOLFS(MyndFskrBase):
     alias = "bolfs"
     start_url = "http://www.bolagsverket.se/om/oss/verksamhet/styr/forfattningssamling"
@@ -1095,7 +1094,6 @@ class DIFS(MyndFskrBase):
     start_url = "http://www.datainspektionen.se/lagar-och-regler/datainspektionens-foreskrifter/"
 
 
-    
 class DVFS(MyndFskrBase):
     alias = "dvfs"
     start_url = "http://www.domstol.se/Ladda-ner--bestall/Verksamhetsstyrning/DVFS/DVFS1/"
@@ -1469,6 +1467,7 @@ class NFS(MyndFskrBase):
     alias = "nfs"
     start_url = "http://www.naturvardsverket.se/nfs"
     basefile_regex = "^(?P<basefile>S?NFS \d+:\d+)$"
+    document_url_regex = None
     nextpage_regex = "Nästa"
     storage_policy = "dir"
 
@@ -1485,46 +1484,58 @@ class NFS(MyndFskrBase):
 
         # NB: the basefile we got might be a later change act. first
         # order of business is to identify the base act basefile
-        soup = BeautifulSoup(self.session.get(url).text, "lxml")
+        resp = self.session.get(url)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "lxml")
+
+        # nfs/2017:4 -> "NFS 2017:4"
+        identifier = basefile.upper().replace("/", " ")
+        # SNFS 1987:4 -> 1987:4
+        short_identifier = identifier.split(" ")[1] 
+
+        base_basefile = None
         basehead = soup.find("h3", text=re.compile("Grundföreskrift$"))
-        if not basehead:
-            realbasefile = basefile
-        else:
-            m = re.match("(S?NFS)\s+(\d+:\d+)", basehead.get_text())
-            realbasefile = m.group(1).lower() + "/" + m.group(2)
-        self.log.info(
-            "%s: Downloaded index %s, real basefile was %s" %
-            (basefile, url, realbasefile))
-        basefile = realbasefile
-        descpath = self.store.downloaded_path(basefile,
-                                              attachment="description.html")
-        self.download_if_needed(url, basefile, filename=descpath)
-        soup = BeautifulSoup(util.readfile(descpath), "lxml")
-        seen_consolidated = False
+        if basehead:
+            m = re.match("(S?NFS)\s+(\d+:\d+)", util.normalize_space(basehead.text))
+            base_basefile = m.group(1).lower() + "/" + m.group(2)
         # find all pdf links, identify consolidated version if present
         # [1:] in order to skip header
-        for tr in soup.find("table", "regulations-table").find_all("tr")[1:]:
-            head = tr.find("h3")
-            link = tr.find("a", href=re.compile("\.pdf$", re.I))
+        rows = soup.find("table", "regulations-table").find_all("tr")[1:]
+        links = []
+        for row in rows:
+            title = util.normalize_space(row.find("h3").text)
+            link = row.find("a", href=re.compile("\.pdf$", re.I))
             if not link:
                 continue
-            if "Konsoliderad" in head.get_text() or "-k" in link.get("href"):
-                assert not seen_consolidated
-                conspath = self.store.downloaded_path(basefile,
-                                                      attachment="consolidated.pdf")
-                consurl = urljoin(url, link.get("href"))
-                self.log.info(
-                    "%s: Downloading consolidated version from %s" %
-                    (basefile, consurl))
-                self.download_if_needed(consurl, basefile, filename=conspath)
-                seen_consolidated = True
-            else:
-                m = re.match("(S?NFS)\s+(\d+:\d+)", head.get_text())
-                subbasefile = m.group(1).lower() + "/" + m.group(2)
-                suburl = urljoin(url, link.get("href"))
-                entrypath = self.store.documententry_path(subbasefile)
-                DocumentEntry.updateentry(self.download_single, "download", entrypath, subbasefile, suburl)
-                # self.download_single(subbasefile, suburl)
+            if "Konsoliderad" in title or "-k" in link.get("href"):
+                # in order to download this, we need to know the
+                # base_basefile. Normally, that row will have
+                # "Grundförfattning" somewhere in the title, but not
+                # always...
+                if not base_basefile:
+                    # we could wither get the row with the lowest
+                    # fsnummer, or the last row. Lets try with the
+                    # last one
+                    m = re.match("(S?NFS)\s+(\d+:\d+)", util.normalize_space(rows[-1].h3.text))
+                    if m:
+                        base_basefile = m.group(1).lower() + "/" + m.group(2)
+                    else:
+                        assert base_basefile, "%s: Found consolidated version, but no base act" % (basefile)
+                consolidated_pdfurl = urljoin(url, link["href"])
+                consolidated_basefile = "konsolidering/%s" % base_basefile
+                DocumentRepository.download_single(self, consolidated_basefile, consolidated_pdfurl)
+                # save the landing page as it contains information
+                # about the consolidation date
+                with self.store.open_downloaded(consolidated_basefile, "w", attachment="landingpage.html") as fp:
+                    fp.write(resp.text)
+            elif identifier in title:
+                pdfurl = urljoin(url, link["href"])
+                # we assume that we encounter any consolidated
+                # versions before this one, so once we download it
+                # we're done!
+                return DocumentRepository.download_single(self, basefile, pdfurl, url)
+        else:
+            self.log.error("%s: Couldn't find appropriate PDF version at %s" % (basefile, url))
 
     def fwdtests(self):
         t = super(NFS, self).fwdtests()

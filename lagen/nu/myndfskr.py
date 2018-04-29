@@ -4,13 +4,14 @@ from __future__ import (absolute_import, division,
 from builtins import *
 
 from operator import attrgetter
-from collections import Counter
+from collections import Counter, OrderedDict
 import re
 import os
 import datetime
 from urllib.parse import unquote
 from wsgiref.util import request_uri
 from itertools import chain
+
 
 from rdflib import RDF, URIRef
 from rdflib.namespace import DCTERMS, SKOS
@@ -20,7 +21,7 @@ from ferenda.sources.legal.se import myndfskr
 from ferenda import (CompositeRepository, CompositeStore, Facet, TocPageset,
                      TocPage, RequestHandler)
 from ferenda import util, fulltextindex
-from ferenda.elements import Link
+from ferenda.elements import Body, Link, html
 from ferenda.sources.legal.se import (SwedishLegalSource, SwedishLegalStore)
 from . import SameAs
 
@@ -92,7 +93,7 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
         myndfskr.STFS,
         myndfskr.SvKFS,
     ]
-    rdf_type = (RPUBL.Myndighetsforeskrift, RPUBL.AllmannaRad)
+    rdf_type = (RPUBL.Myndighetsforeskrift, RPUBL.AllmannaRad, RPUBL.KonsolideradGrundforfattning)
     namespaces = ['rdf', 'rdfs', 'xsd', 'dcterms', 'skos', 'foaf',
                   'xhv', 'xsi', 'owl', 'prov', 'bibo',
                   ('rpubl', 'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#'),
@@ -242,12 +243,18 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
         return [Facet(RPUBL.forfattningssamling,
                       selector=altlabel,
                       identificator=mainfs,
-                      use_for_toc=True),
+                      use_for_toc=True,
+                      label="Ordnade efter författningssamling",
+                      pagetitle="Föreskrifter i %(selected)s"),
                 Facet(RPUBL.arsutgava,
                       indexingtype=fulltextindex.Label(),
                       selector_descending=True,
-                      use_for_toc=True),
+                      use_for_toc=False),
                 Facet(RPUBL.konsolideringsunderlag,
+                      indexingtype=fulltextindex.Identifier(),
+                      use_for_toc=False, use_for_feed=False,
+                      multiple_values=True),
+                Facet(RPUBL.andrar,
                       indexingtype=fulltextindex.Identifier(),
                       use_for_toc=False, use_for_feed=False,
                       multiple_values=True),
@@ -257,74 +264,149 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
                       pagetitle="Författningar utgivna av %(selected)s"),
                 Facet(DCTERMS.identifier)] + self.standardfacets
 
-    def toc_pagesets(self, data, facets):
-        # FIXME: Main structure of this (create a two-level hierarchy
-        # based on two different facets) mirrors the dv.py
-        # toc_pagesets and could possibly be abstracted.
-        pagesetdict = {}
-        labelsets = {} 
-        selector_values = {}
-        for row in data:
-            pagesetid = facets[0].identificator(row,
-                                                'rpubl_forfattningssamling',
-                                                self.commondata)
-            altlabel = facets[0].selector(row, 'rpubl_forfattningssamling', self.commondata)
-            if "|" in altlabel:
-                mainaltlabel, altaltlabel = altlabel.split
-            else:
-                mainaltlabel = altaltlabel = altlabel
+    def toc_item(self, binding, row):
+        """Returns a formatted version of row, using Element objects"""
+        # let toc_generate_page_body do something useful with these
+        return row
+    
+    def toc_generate_page_body(self, documentlist, nav):
+        # move documentlist into a ordereddict keyed on url,
+        # concatenating rpubl_konsolideringsunderlag as we go
+        documents = OrderedDict()
+        # make sure all rpubl:KonsolideradGrundforfattning comes first in the list
+        for row in documentlist:
+            row = dict(row)
+            if row['rdf_type'] == str(RPUBL.KonsolideradGrundforfattning):
+                if row['uri'] not in documents:
+                    documents[row['uri']] = row
+                    # transform single value to a list, so we can
+                    # append more if other rows are about the same
+                    # rpubl:KonsolideradGrundforfattning
+                    row['rpubl_konsolideringsunderlag'] = [row['rpubl_konsolideringsunderlag']]
+                else:
+                    documents[row['uri']]['rpubl_konsolideringsunderlag'].append(row['rpubl_konsolideringsunderlag'])
+        # then the rest
+        for row in documentlist:
+            if row['rdf_type'] != str(RPUBL.KonsolideradGrundforfattning):
+                documents[row['uri']] = row
 
-            # this makes sure that each value in labelsets is a array
-            # with the main preflabel and altlabel first (eg ["Statens
-            # Jordbruksverks författningssamling, "SJVFS"]), and
-            # alternate altlabels (eg DFS) later (in an arbitrary
-            # order).
-            if pagesetid not in labelsets:
-                preflabel = self.commondata.value(URIRef(row['rpubl_forfattningssamling']),
-                                                  SKOS.prefLabel)
-                labelsets[pagesetid] = [preflabel, mainaltlabel]
-            if altaltlabel not in labelsets[pagesetid]:
-                labelsets[pagesetid].append(altaltlabel)
+        # now that we have all documents, check if some of them change
+        # some other of them
+        for uri in list(documents):
+            row = documents[uri]
+            if 'rpubl_andrar' in row:
+                if row['rpubl_andrar'] not in documents:
+                    self.log.warning("%(uri)s: changes %(rpubl_andrar)s, but that doc doesn't exist" % row)
+                    continue
+                if 'andras_av' not in documents[row['rpubl_andrar']]:
+                    documents[row['rpubl_andrar']]['andras_av'] = []
+                documents[row['rpubl_andrar']]['andras_av'].insert(0, uri)
+                documents.move_to_end(uri)
                 
-            selected = facets[1].selector(row, 'rpubl_arsutgava', self.commondata)
-            selector_values[(pagesetid, selected)] = True
-        for (pagesetid, value) in sorted(list(selector_values.keys()), reverse=True):
-            if pagesetid not in pagesetdict:
-                # generate eg "Skatteverkets författningssamling (SKVFS, RSFS)
-                labels = labelsets[pagesetid]
-                preflabel = labels.pop(0)
-                pslabel = "%s (%s)" % (preflabel, ", ".join(labels))
-                pagesetdict[pagesetid] = TocPageset(label=pslabel,
-                                                    predicate=pagesetid,  # ??
-                                                    pages=[])
-            pageset = pagesetdict[pagesetid]
-            pageset.pages.append(TocPage(linktext=value,
-                                         title="%s från %s" % (pageset.label, value),
-                                         binding=pagesetid,
-                                         value=value))
-        return sorted(pagesetdict.values(), key=attrgetter('label'))
+        dl = html.DL(role='main')
+        for uri in list(documents):
+            if uri not in documents: 
+                continue  # we must have removed it earlier in the loop
+            row = documents[uri]
+            label = row.get('dcterms_title', row.get('dcterms_identifier', '(Titel saknas)'))
+            if row['dcterms_identifier'] not in label:
+                label = "%s: %s" % (row['dcterms_identifier'], label)
+            # in most cases we want to link this thing, but not if
+            # this is the base act of a non-consolidated act (we link
+            # to it in the DD element below instead)
+            if (row['rdf_type'] == str(RPUBL.KonsolideradGrundforfattning) or
+                'andras_av' not in row):
+                label = Link(label, uri=uri)
+            dl.append(html.DT([label]))
+            # groups of base+change acts may be present wether we have
+            # consolidated acts or not, and they might be grouped a
+            # little differently, but we need to do the same things
+            # with them.
+            relevant_docs = []
+            if row['rdf_type'] == str(RPUBL.KonsolideradGrundforfattning):
+                relevant_docs = row['rpubl_konsolideringsunderlag']
+            elif 'andras_av' in row:
+                relevant_docs = [uri] + row['andras_av']
+            if relevant_docs:
+                fs = []
+                for f in relevant_docs:
+                    if f in documents:
+                        fs.append(Link(documents[f]['dcterms_identifier'], uri=documents[f]['uri']))
+                        fs.append(", ")
+                        del documents[f]
+                if fs:
+                    dl.append(html.DD(["Grund- och ändringsförfattningar: ", *fs[:-1]]))
+        return Body([nav,
+                     dl])
 
-    def toc_select_for_pages(self, data, pagesets, facets):
-        def sortkey(doc):
-            return util.split_numalpha(doc['dcterms_identifier'])
-        # FIXME: Again, this mirrors the dv.py structure
-        res = {}
-        documents = {}
-        for row in data:
-            key = (facets[0].identificator(row, 'rpubl_forfattningssamling', self.commondata),
-                   facets[1].selector(row, 'rpubl_arsutgava', self.commondata))
-            if key not in documents:
-                documents[key] = []
-            documents[key].append(row)
-        pagesetdict = {}
-        for pageset in pagesets:
-            pagesetdict[pageset.predicate] = pageset
-        for (binding, value) in sorted(documents.keys()):
-            pageset = pagesetdict[binding]
-            s = sorted(documents[(binding, value)], key=sortkey)
-            res[(binding, value)] = [self.toc_item(binding, row)
-                                     for row in s]
-        return res
+#    def toc_pagesets(self, data, facets):
+#        # FIXME: Main structure of this (create a two-level hierarchy
+#        # based on two different facets) mirrors the dv.py
+#        # toc_pagesets and could possibly be abstracted.
+#        pagesetdict = {}
+#        labelsets = {} 
+#        selector_values = {}
+#        for row in data:
+#            pagesetid = facets[0].identificator(row,
+#                                                'rpubl_forfattningssamling',
+#                                                self.commondata)
+#            altlabel = facets[0].selector(row, 'rpubl_forfattningssamling', self.commondata)
+#            if "|" in altlabel:
+#                mainaltlabel, altaltlabel = altlabel.split
+#            else:
+#                mainaltlabel = altaltlabel = altlabel
+#
+#            # this makes sure that each value in labelsets is a array
+#            # with the main preflabel and altlabel first (eg ["Statens
+#            # Jordbruksverks författningssamling, "SJVFS"]), and
+#            # alternate altlabels (eg DFS) later (in an arbitrary
+#            # order).
+#            if pagesetid not in labelsets:
+#                preflabel = self.commondata.value(URIRef(row['rpubl_forfattningssamling']),
+#                                                  SKOS.prefLabel)
+#                labelsets[pagesetid] = [preflabel, mainaltlabel]
+#            if altaltlabel not in labelsets[pagesetid]:
+#                labelsets[pagesetid].append(altaltlabel)
+#                
+#            selected = facets[1].selector(row, 'rpubl_arsutgava', self.commondata)
+#            selector_values[(pagesetid, selected)] = True
+#        for (pagesetid, value) in sorted(list(selector_values.keys()), reverse=True):
+#            if pagesetid not in pagesetdict:
+#                # generate eg "Skatteverkets författningssamling (SKVFS, RSFS)
+#                labels = labelsets[pagesetid]
+#                preflabel = labels.pop(0)
+#                pslabel = "%s (%s)" % (preflabel, ", ".join(labels))
+#                pagesetdict[pagesetid] = TocPageset(label=pslabel,
+#                                                    predicate=pagesetid,  # ??
+#                                                    pages=[])
+#            pageset = pagesetdict[pagesetid]
+#            pageset.pages.append(TocPage(linktext=value,
+#                                         title="%s från %s" % (pageset.label, value),
+#                                         binding=pagesetid,
+#                                         value=value))
+#        return sorted(pagesetdict.values(), key=attrgetter('label'))
+#
+#    def toc_select_for_pages(self, data, pagesets, facets):
+#        def sortkey(doc):
+#            return util.split_numalpha(doc['dcterms_identifier'])
+#        # FIXME: Again, this mirrors the dv.py structure
+#        res = {}
+#        documents = {}
+#        for row in data:
+#            key = (facets[0].identificator(row, 'rpubl_forfattningssamling', self.commondata),
+#                   facets[1].selector(row, 'rpubl_arsutgava', self.commondata))
+#            if key not in documents:
+#                documents[key] = []
+#            documents[key].append(row)
+#        pagesetdict = {}
+#        for pageset in pagesets:
+#            pagesetdict[pageset.predicate] = pageset
+#        for (binding, value) in sorted(documents.keys()):
+#            pageset = pagesetdict[binding]
+#            s = sorted(documents[(binding, value)], key=sortkey)
+#            res[(binding, value)] = [self.toc_item(binding, row)
+#                                     for row in s]
+#        return res
 
     news_feedsets_main_label = "Samtliga föreskrifter"
     news_sortkey = "orig_created"
