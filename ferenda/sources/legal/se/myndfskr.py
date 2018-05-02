@@ -58,7 +58,7 @@ class MyndFskrBase(FixedLayoutSource):
     downloaded_suffix = ".pdf"
     alias = 'myndfskr'
     storage_policy = 'dir'
-    xslt_template = "xsl/paged.xsl"
+    xslt_template = "xsl/myndfskr.xsl"
 
     rdf_type = (RPUBL.Myndighetsforeskrift, RPUBL.AllmannaRad)
     # FIXME: For docs of rdf:type rpubl:KonsolideradGrundforfattning,
@@ -242,7 +242,7 @@ class MyndFskrBase(FixedLayoutSource):
                                          resolve_base_href=True)
                 source = tree.iterlinks()
 
-    def download_single(self, basefile, url=None):
+    def download_single(self, basefile, url=None, orig_url=None):
         if self.download_rewrite_url:
             if callable(self.download_rewrite_url):
                 url = self.download_rewrite_url(basefile, url)
@@ -634,7 +634,6 @@ class MyndFskrBase(FixedLayoutSource):
            find
 
         """
-
         # common false positive
         if 'dcterms:title' in props:
             if 'denna f\xf6rfattning har beslutats den' in props['dcterms:title']:
@@ -648,6 +647,10 @@ class MyndFskrBase(FixedLayoutSource):
         if 'rpubl:bemyndigande' in props:
             props['rpubl:bemyndigande'] = props[
                 'rpubl:bemyndigande'].replace('\u2013', '-')
+        if 'dcterms:identifier' in props:
+            # "DVFS 2012-4" -> "DVFS 2012:4"
+            if re.search("\d{4}-\d+", props['dcterms:identifier']):
+                props['dcterms:identifier'] = re.sub(r"(\d{4})-(\d+)", r"\1:\2", props['dcterms:identifier'])
 
     def polish_metadata(self, props, doc):
         """Clean up data, including converting a string->string dict to a
@@ -757,6 +760,9 @@ class MyndFskrBase(FixedLayoutSource):
                     self.log.warning(
                         "%s: Couldn't find reference to change act in title %r" %
                         (doc.basefile, props['dcterms:title']))
+                    # in some cases (eg dvfs/2001:2) the fs number is
+                    # omitted in the title, but is part of the main
+                    # body text (though not in a standardized form)
                 else:
                     parts = m.groupdict()
                     if not parts['pub']:
@@ -1005,7 +1011,7 @@ class AFS(MyndFskrBase):
         changeheader = soup.find(["h2", "h3"], text="Ursprungs- och ändringsföreskrifter")
         pdfs = changeheader.parent.find_all("a", href=re.compile("\.pdf$"))
         norm = util.normalize_space
-        # FIXME: in some cases the leading AFS is missing
+        # in some cases the leading AFS is missing
         matcher = re.compile("(?:|AFS )(\d+:\d+)").match
         fsnummer = [matcher(norm(x.text)).group(1) for x in pdfs if matcher(norm(x.text))]
         for f in fsnummer:
@@ -1102,18 +1108,57 @@ class DVFS(MyndFskrBase):
     nextpage_regex = ">"
     nextpage_url_regex = None
     basefile_regex = "^\s*(?P<basefile>\d{4}:\d+)"
-    download_rewrite_url = True
     download_formid = "aspnetForm"
 
-    def remote_url(self, basefile):
-        if "/" in basefile:
-            basefile = basefile.split("/")[1]
-        if basefile in ("2017:12", "2014:15"):  # single exception to the URL pattern
-            basefile = basefile.replace(":", "-")
-        elif basefile == "2017:11": # ok, so not single exception, but...
-            basefile = "Domstolsverkets-forfattningssamling-DVFS-" + basefile
-        return "http://www.domstol.se/Ladda-ner--bestall/Verksamhetsstyrning/DVFS/DVFS2/%s/" % basefile.replace(
-            ":", "")
+    @decorators.downloadmax
+    def download_get_basefiles(self, source):
+        # Adapted version of MyndFskrBase.download_get_basefile that
+        # downloads each landing page found in the regular list to
+        # find the URLs for base and change acts (the regular list
+        # only lists base acts)
+        re_bf = re.compile("^\d{4}:\d+")
+        while source:
+            nextform = nexturl = None
+            for (element, attribute, link, pos) in source:
+                elementtext = " ".join(element.itertext())
+                m = re.search(self.basefile_regex, elementtext)
+                if m:
+                    self.log.debug("%s: Looking at %s for additional basefiles" %
+                                   (m.group("basefile"), link))
+                    resp = self.session.get(link)
+                    resp.raise_for_status()
+                    soup = BeautifulSoup(resp.text, "lxml")
+                    found = False
+                    for sublink in soup.find("div", id="readme").find_all("a", text=re_bf):
+                        basefile = re_bf.match(sublink.text).group(0)
+                        yield self.sanitize_basefile(basefile), urljoin(link, sublink["href"])
+                if (self.nextpage_regex and elementtext and
+                        re.search(self.nextpage_regex, elementtext)):
+                    nexturl = link
+                if (self.download_formid and
+                        element.tag == "form" and
+                        element.get("id") == self.download_formid):
+                    nextform = element
+            if nextform is not None and nexturl is not None:
+                resp = self.download_post_form(nextform, nexturl)
+            else:
+                resp = None
+                source = None
+            if resp:
+                tree = lxml.html.document_fromstring(resp.text)
+                tree.make_links_absolute(resp.url,
+                                         resolve_base_href=True)
+                source = tree.iterlinks()
+
+#     def remote_url(self, basefile):
+#         if "/" in basefile:
+#             basefile = basefile.split("/")[1]
+#         if basefile in ("2017:12", "2014:15"):  # single exception to the URL pattern
+#             basefile = basefile.replace(":", "-")
+#         elif basefile == "2017:11": # ok, so not single exception, but...
+#             basefile = "Domstolsverkets-forfattningssamling-DVFS-" + basefile
+#         return "http://www.domstol.se/Ladda-ner--bestall/Verksamhetsstyrning/DVFS/DVFS2/%s/" % basefile.replace(
+#             ":", "")
 
     def download_post_form(self, form, url):
         # nexturl == "javascript:__doPostBack('ctl00$MainRegion$"
@@ -1148,6 +1193,18 @@ class DVFS(MyndFskrBase):
         main = soup.find("div", id="readme")
         if main:
             main.find("div", "rs_skip").decompose()
+            # find title of this fs and remove unneeded markup (messes
+            # up the get_text call in textreader_from_basefile)
+            oldtitle = main.h2
+            if oldtitle is None:
+                for t in main.find_all("h1"):
+                    if re.match("(Domstolsverkets föreskrifter|Föreskrifter)", t.text):
+                        oldtitle = t
+                        break
+            if oldtitle:
+                newtitle = soup.new_tag(oldtitle.name)
+                newtitle.string = oldtitle.get_text(" ")
+                oldtitle.replace_with(newtitle)
             return main
         elif soup.find("title").text == "Sveriges Domstolar - 404":
             e = errors.DocumentRemovedError()
@@ -1158,8 +1215,10 @@ class DVFS(MyndFskrBase):
         infile = self.store.downloaded_path(basefile)
         soup = BeautifulSoup(util.readfile(infile), "lxml")
         main = self.maintext_from_soup(soup)
-        maintext = main.get_text("\n\n", strip=True)
-        return TextReader(string=maintext)
+        text = main.get_text("\n\n", strip=True)
+        text = self.sanitize_text(text, basefile)
+        return TextReader(string=text)
+
 
     def parse_open(self, basefile):
         return self.store.open_downloaded(basefile)
@@ -1171,7 +1230,7 @@ class DVFS(MyndFskrBase):
 
     def fwdtests(self):
         t = super(DVFS, self).fwdtests()
-        t["dcterms:identifier"] = ['(DVFS\s\s?\d{4}:\d+)']
+        t["dcterms:identifier"] = ['(DVFS\s\s?\d{4}[:\-]\d+)']
         return t
 
 
@@ -1536,6 +1595,49 @@ class NFS(MyndFskrBase):
                 return DocumentRepository.download_single(self, basefile, pdfurl, url)
         else:
             self.log.error("%s: Couldn't find appropriate PDF version at %s" % (basefile, url))
+    def parse_metadata_from_consolidated(self, doc):
+        # we need identifier, title and publisher (which may be
+        # Naturvårdsverket (NFS) or Statens naturvårdsverk (SNFS). And
+        # also all konsolideringsunderlag
+
+
+        super(NFS, self).parse_metadata_from_consolidated(doc)
+        with self.store.open_downloaded(doc.basefile, attachment="landingpage.html") as fp:
+            soup = BeautifulSoup(fp.read(), "lxml")
+
+        # [2:] == skip header and first real row (that only contains
+        # the consolidated version
+        matcher = re.compile("(S?NFS \d+:\d+)").match
+        norm = util.normalize_space
+
+        for row in soup.find("table", "regulations-table").find_all("tr")[2:]:
+            fsnummer = matcher(norm(row.h3.text)).group(1)
+            konsolideringsunderlag = self.canonical_uri(self.sanitize_basefile(fsnummer))
+            doc.meta.add((URIRef(doc.uri), RPUBL.konsolideringsunderlag, URIRef(konsolideringsunderlag)))
+            
+        title = soup.h1.text
+        segments = doc.basefile.split("/")
+        identifier = "%s %s (konsoliderad tom. %s)" % (segments[1].upper(), segments[2], self.consolidation_date(doc.basefile))
+        publisher = "Statens naturvårdsverk" if segments[1] == "snfs" else "Naturvårdsverket"
+
+        doc.meta.add((URIRef(doc.uri), DCTERMS.identifier, Literal(identifier)))
+        doc.meta.add((URIRef(doc.uri), DCTERMS.title, Literal(title, lang="sv")))
+        doc.meta.add((URIRef(doc.uri), DCTERMS.publisher, self.lookup_resource(publisher)))
+        
+
+    @lru_cache(maxsize=None)
+    def consolidation_date(self, basefile):
+        # try to find consolidation date on stored landingpage
+        with self.store.open_downloaded(basefile, attachment="landingpage.html") as fp:
+            soup = BeautifulSoup(fp.read(), "lxml")
+        # the first row will probably contain the consolidation date
+        tr_text = soup.find("table", "regulations-table").find_all("tr")[1].text
+        if "Konsoliderad" in tr_text:
+            m = re.search('\d{4}-\d{2}-\d{2}', tr_text)
+            if m:
+                return datetime.datetime.strptime(m.group(0), '%Y-%m-%d').date()
+        self.log.warning("%s: Could not find consolidation date" % basefile)
+        return super(NFS, self).consolidation_date(basefile)
 
     def fwdtests(self):
         t = super(NFS, self).fwdtests()
@@ -1739,20 +1841,34 @@ class SKVFS(MyndFskrBase):
 
 
 class SOSFS(MyndFskrBase):
+    # NOTE: Now that Socialstyrelsen publishes in HSLF-FS this is
+    # kinda misnamed, but other docrepos handle other agencies parts
+    # of HSLF-FS, so we'll keep it
     alias = "sosfs"
     start_url = "http://www.socialstyrelsen.se/sosfs"
     storage_policy = "dir"  # must be able to handle attachments
     download_iterlinks = False
+    downloaded_suffixes = [".pdf", ".html"]
 
     def forfattningssamlingar(self):
         return ["hslffs", "sosfs"]
-    
 
     def _basefile_from_text(self, linktext):
         if linktext:
-            m = re.search("((SOSFS|HSLF-FS)\s+\d+:\d+)", linktext)
+            # if fs is missing, we should prepend either SOSFS or
+            # HSLF-FS to it, depending on year (< 2015 -> SOSFS, >
+            # 2015 -> HSLFS, if == 2015, raise hands and scream)
+            m = re.search("(SOSFS\s+|HSLF-FS\s+|)(\d+):(\d+)", linktext)
             if m:
-                return self.sanitize_basefile(m.group(1))
+                fs, year, no = m.groups()
+                if not fs:
+                    if int(year) < 2015:
+                        fs = "SOSFS "
+                    elif int(year) > 2015:
+                        fs = "HSLF-FS "
+                    else:
+                        raise ValueError("Can't guess fs from %s" % m.group(0))
+                return self.sanitize_basefile("%s%s:%s" % (fs, year, no))
 
     @decorators.downloadmax
     def download_get_basefiles(self, source):
@@ -1766,88 +1882,120 @@ class SOSFS(MyndFskrBase):
             link = urljoin(self.start_url, link_el.get("href"))
             if link.startswith("javascript:"):
                 continue
-            # If a base act has no changes, only type 1 links will be
-            # on the front page. If it has any changes, only a type 2
-            # link will be on the front page, but type 1 links will be
-            # on that subsequent page.
-            if txt.startswith("Grundförfattning"):
-                # 1) links to HTML pages describing (and linking to) a
-                # base act, eg for SOSFS 2014:10
-                # http://www.socialstyrelsen.se/publikationer2014/2014-10-12
-                yield(basefile, link)
-            elif txt.startswith("Konsoliderad"):
-                # 2) links to HTML pages containing a consolidated act
-                # (with links to type 1 base and change acts), eg for
-                # SOSFS 2011:13
-                # http://www.socialstyrelsen.se/sosfs/2011-13 - fetch
-                # page, yield all type 1 links, also find basefile form
-                # element.text
-                konsfile = self.store.downloaded_path(
-                    basefile, attachment="konsolidering.html")
-                if (self.config.refresh or (not os.path.exists(konsfile))):
-                    soup = BeautifulSoup(self.session.get(link).text, "lxml")
-                    self.log.debug("%s: Has had changes -- downloading base act and all changes" %
-                                   basefile)
+            if txt.startswith("Konsoliderad"):
+                basefile = "konsolidering/%s" % basefile
+            yield basefile, link
 
-                    linkhead = soup.find(text=re.compile(
-                        "(Ladda ner eller beställ|Beställ eller ladda ner)"))
-                    if linkhead:
-                        for link_el in linkhead.find_parent("div").find_all("a"):
-                            if '/publikationer' in link_el.get("href"):
-                                subbasefile = self._basefile_from_text(link_el.get_text())
-                                if subbasefile:
-                                    yield(subbasefile,
-                                          urljoin(link, link_el.get("href")))
-                    else:
-                        self.log.warning("%s: Can't find links to base/change"
-                                         " acts" % basefile)
-                    # then save page itself as grundforf/konsoldering.html
-                    self.log.debug("%s: Downloading consolidated version" %
-                                   basefile)
-                    self.download_if_needed(link, basefile, filename=konsfile)
-            elif txt.startswith("Ändringsförfattning"):
-                if (self.config.refresh or (
-                        not os.path.exists(self.store.downloaded_path(basefile)))):
-                    self.log.debug(
-                        "%s: Downloading updated consolidated version of base" %
-                        basefile)
-                    self.log.debug("%s:    first getting %s" % (basefile, link))
-                    soup = BeautifulSoup(self.session.get(link).text, "lxml")
-                    konsbasefileregex = re.compile(
-                        "Senaste version av SOSFS (?P<basefile>\d+:\d+)")
-                    konslinkel = soup.find("a", text=konsbasefileregex)
-                    if konslinkel:
-                        konsbasefile = self.sanitize_basefile(
-                            konsbasefileregex.search(
-                                konslinkel.text).group("basefile"))
-                        konsfile = self.store.downloaded_path(
-                            konsbasefile,
-                            attachment="konsolidering.html")
-                        konslink = urljoin(link, konslinkel.get("href"))
-                        self.log.debug(
-                            "%s:    now downloading consolidated %s" %
-                            (konsbasefile, konslink))
-                        self.download_if_needed(konslink, basefile, filename=konsfile)
-                    else:
-                        self.log.warning(
-                            "%s:    Couldn't find link to consolidated version" %
-                            basefile)
-                yield(basefile, link)
-
-    def download_single(self, basefile, url):
-        # the url will be to a HTML landing page. We extract the link
-        # to the actual PDF file and then call default impl of
-        # download_single in order to update documententry. This'll
-        # mean that the orig_url is set to the PDF link, not this HTML
-        # landing page.
-        soup = BeautifulSoup(self.session.get(url).text, "lxml")
-        link_el = soup.find("a", text=re.compile("^\s*Ladda ner\s*$"))
-        if link_el:
-            link = urljoin(url, link_el.get("href"))
-            return super(SOSFS, self).download_single(basefile, link)
+    def download_single(self, basefile, url, orig_url=None):
+        resp = self.session.get(url)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "lxml")
+        if basefile.startswith("konsolidering"):
+            # that HTML page is the best available representation of
+            # the consolidated version, and we already have it, so
+            # let's save it. FIXME: but we should really make use of
+            # everything we have in the base
+            # download_single/download_if_needed implementations...
+            with self.store.open_downloaded(basefile, "wb", attachment="index.html") as fp:
+                fp.write(resp.content)
+            self.log.info("%s: downloaded from %s" % (basefile, url))
+            # and since we're here already, download all PDF
+            # base/change acts we can find (some might not be linked
+            # from the front page)
+            linkhead = soup.find(text=re.compile(
+                "(Ladda ner eller beställ|Beställ eller ladda ner)"))
+            if linkhead:
+                for link_el in linkhead.find_parent("div").find_all("a"):
+                    if '/publikationer' in link_el.get("href"):
+                        link = urljoin(url, link_el["href"])
+                        subbasefile = self._basefile_from_text(link_el.text)
+                        if (subbasefile and
+                            (self.config.refresh or
+                             not os.path.exists(self.store.downloaded_path(subbasefile)))):
+                            self.download_single(subbasefile, link)
+            else:
+                self.log.warning("%s: Can't find links to base/change"
+                                 " acts" % basefile)
         else:
-            self.log.warning("%s: No link to PDF file found at %s" % (basefile, url))
-            return False
+            # the url will be to a HTML landing page. We extract the link
+            # to the actual PDF file and then call default impl of
+            # download_single in order to update documententry.
+            link_el = soup.find("a", text=re.compile("^\s*Ladda ner\s*$"))
+            if link_el:
+                link = urljoin(url, link_el.get("href"))
+                return DocumentRepository.download_single(self, basefile, link, url)
+            else:
+                self.log.warning("%s: No link to PDF file found at %s" % (basefile, url))
+                return False
+
+    def parse_metadata_from_consolidated(self,doc):
+        super(SOSFS, self).parse_metadata_from_consolidated(doc)
+        with self.store.open_downloaded(doc.basefile, attachment="index.html") as fp:
+            soup = BeautifulSoup(fp.read(), "lxml")
+            for fsnummer in self.consolidation_basis(soup):
+                konsolideringsunderlag = self.canonical_uri(self.sanitize_basefile(fsnummer))
+                doc.meta.add((URIRef(doc.uri), RPUBL.konsolideringsunderlag,
+                              URIRef(konsolideringsunderlag)))
+        title = util.normalize_space(soup.title.text)
+        if title.startswith("Senaste version av "):
+            title = title.replace("Senaste version av ", "")
+        identifier = "%s (konsoliderad tom. %s)" % (
+            re.search("(SOSFS|HSLF-FS) \d+:\d+", title).group(0),
+            self.consolidation_date(doc.basefile))
+        doc.meta.add((URIRef(doc.uri), DCTERMS.identifier, Literal(identifier)))
+        doc.meta.add((URIRef(doc.uri), DCTERMS.title, Literal(title, lang="sv")))
+        doc.meta.add((URIRef(doc.uri), DCTERMS.publisher, self.lookup_resource("Arbetsmiljöverket")))
+
+    @lru_cache(maxsize=None)
+    def consolidation_date(self, basefile):
+        with self.store.open_downloaded(basefile, attachment="index.html") as fp:
+            soup = BeautifulSoup(fp.read(), "lxml")
+        changeleader = soup.find("strong", text=re.compile("^Ändrad"))
+        if changeleader:
+            change = util.normalize_space(changeleader.next_sibling)
+        else:
+            changeleader = soup.find("p", text=re.compile("^Ändrad: t.o.m."))
+            if changeleader:
+                change = util.normalize_space(changeleader).text
+            else:
+                # at this point we'll need to locate the "Ladda ner
+                # eller beställ" box and find the most recent change
+                # act, and assume that the consolidated version is
+                # consolidated up to and including that
+                change = sorted(self.consolidation_basis(soup), key=util.split_numalpha)[-1]
+        assert len(re.findall('(\d+:\d+)', change)) == 1
+        return re.search("(SOSFS |HSLF-FS |)(\d+:\d+)", change).group(2)
+
+    def consolidation_basis(self, soup):
+        res = []
+        linkhead = soup.find(text=re.compile(
+            "(Ladda ne[rd] (och|eller) beställ|Beställ eller ladda ner)"))
+        for link_el in linkhead.find_parent("div").find_all("a"):
+            if '/publikationer' not in link_el.get("href"):
+                continue
+            fsnummer = self._basefile_from_text(link_el.text)
+            if fsnummer:
+                res.append(fsnummer)
+        return res
+
+    def maintext_from_soup(self, soup):
+        main = soup.find("div", id="socextPageBody").find("div", "ms-rtestate-field")
+        assert main
+        return main
+
+    def parse_open(self, basefile):
+        if basefile.startswith("konsolidering"):
+            return self.store.open_downloaded(basefile, attachment="index.html")
+        else:
+            return super(SOSFS,self).parse_open(basefile)
+
+    def parse_body(self, fp, basefile):
+        if basefile.startswith("konsolidering"):
+            main = self.maintext_from_soup(BeautifulSoup(fp, "lxml"))
+            return Body([elements_from_soup(main)],
+                        uri=None)
+        else:
+            return super(SOSFS,self).parse_body(fp, basefile)
 
     def fwdtests(self):
         t = super(SOSFS, self).fwdtests()

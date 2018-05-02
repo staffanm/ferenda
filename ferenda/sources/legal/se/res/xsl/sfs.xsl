@@ -465,10 +465,17 @@
     <xsl:variable name="nr" select="xhtml:span[@property='rpubl:lopnummer']/@content"/>
     <div class="andring" id="{@id}" about="{@about}">
       <h2><xsl:value-of select="@content"/></h2>
-      <xsl:if test="(number($year) > 1998) or (number($year) = 1998 and number($nr) >= 306)">
-	<p><a href="http://rkrattsdb.gov.se/SFSdoc/{substring($year,3,2)}/{substring($year,3,2)}{format-number($nr,'0000')}.PDF">Officiell version (PDF)</a></p>
+      <!-- SFS older than 1998:306 does not exist in PDF anywhere. SFS
+           1998:306 to 2018:159 exists in unofficial form at
+           rkrattsdb.gov.se. SFS equal to or newer than 2018:160
+           exists in official form at svenskforfattningssamling.se -->
+      <xsl:if test="((number($year) > 1998) or (number($year) = 1998 and number($nr) >= 306)) and (2018 > number($year)) or (number($year) = 2018 and 160 > number($nr))">
+	<p><a href="http://rkrattsdb.gov.se/SFSdoc/{substring($year,3,2)}/{substring($year,3,2)}{format-number($nr,'0000')}.PDF">Tryckt format (PDF)</a></p>
       </xsl:if>
-      <xsl:if test="xhtml:div[@class='overgangsbestammelse']">
+      <xsl:if test="(number($year) > 2018) or (number($year) = 2018 and number($nr) >= 160)">
+	<p><a href="https://svenskforfattningssamling.se/doc/{$year}{$nr}.html">Officiell autentisk version</a></p>
+      </xsl:if>
+       <xsl:if test="xhtml:div[@class='overgangsbestammelse']">
 	<div class="overgangsbestammelse">
 	  <h3>Övergångsbestämmelse</h3> <!-- FIXME: sometimes better labeled as Ikraftträdandebestämmelse -->
 	  <xsl:apply-templates select="xhtml:div[@class='overgangsbestammelse']"/>

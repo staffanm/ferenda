@@ -54,13 +54,14 @@ class MyndFskrHandler(RequestHandler):
                 # ".../sid4.png" => "3" (because 0-based) 
                 params["page"] = str(int(environ["PATH_INFO"].split("/sid")[1][:-4])-1)
             params["format"] = suffix
-        return super(MyndFskrHandler, self).get_pathfunc(environ, basefile, params, contenttype, suffix)
+        return super(MyndFskrHandler, self).get_pathfunc(environ, basefile, params,
+                                                         contenttype, suffix)
 
 
 class MyndFskr(CompositeRepository, SwedishLegalSource):
     alias = "myndfs"
     storage_policy = 'dir'
-    xslt_template = "xsl/paged.xsl"
+    xslt_template = "xsl/myndfskr.xsl"
     extrabases = SameAs,
     loadpath = [os.path.dirname(__file__) + os.sep + "res"]
     subrepos = [
@@ -93,12 +94,13 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
         myndfskr.STFS,
         myndfskr.SvKFS,
     ]
-    rdf_type = (RPUBL.Myndighetsforeskrift, RPUBL.AllmannaRad, RPUBL.KonsolideradGrundforfattning)
+    rdf_type = (RPUBL.Myndighetsforeskrift, RPUBL.AllmannaRad,
+                RPUBL.KonsolideradGrundforfattning)
     namespaces = ['rdf', 'rdfs', 'xsd', 'dcterms', 'skos', 'foaf',
                   'xhv', 'xsi', 'owl', 'prov', 'bibo',
                   ('rpubl', 'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#'),
                   ('rinfoex', 'http://lagen.nu/terms#')]
-    sparql_annotations = None  # until we can speed things up
+    # sparql_annotations = None  # until we can speed things up
     documentstore_class = MyndFskrStore
     requesthandler_class = MyndFskrHandler
     urispace_segment = ""
