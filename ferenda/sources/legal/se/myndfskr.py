@@ -288,35 +288,41 @@ class MyndFskrBase(FixedLayoutSource):
                 'HSLFFS': 'HSLF-FS',
                 'FOHMFS': 'FoHMFS',
                 'SVKFS': 'SvKFS'}.get(basefilefrag, basefilefrag)
-    
+
+    @lru_cache(maxsize=None)
     def metadata_from_basefile(self, basefile):
         a = super(MyndFskrBase, self).metadata_from_basefile(basefile)
         # munge basefile or classname to find the skos:altLabel of the
         # forfattningssamling we're dealing with
-        if "/" in basefile:
-            segments = basefile.split("/")
-            if len(segments) > 2 and segments[0] == "konsolidering":
-                a["rdf:type"] = RPUBL.KonsolideradGrundforfattning
-                a["rpubl:konsoliderar"] = self.canonical_uri(basefile.split("/",1)[1])
-                # FIXME: Technically, we're not deriving
-                # dcterms:issued from the basefile alone
-                # (consolidation_date might read PDF and/or HTML files
-                # to get this data). However, due to the order of
-                # calls in SwedishLegalSource.canonical_uri, this
-                # method is required to return all metadata needed to
-                # construct the URI, which means we need to come up
-                # with a date (or really any identifying string, like
-                # a fsnummer) at this point.
-                a["dcterms:issued"] = self.consolidation_date(basefile)
-                segments.pop(0)
-            fs, realbasefile = segments
-            fs = fs.upper()
+        assert "/" in basefile, "%s is not a valid basefile (should be something like %s/%s)" % (self.__class__.__name__.lower(), basefile)
+        segments = basefile.split("/")
+        if len(segments) > 2 and segments[0] == "konsolidering":
+            a["rdf:type"] = RPUBL.KonsolideradGrundforfattning
+            a["rpubl:konsoliderar"] = URIRef(self.canonical_uri(basefile.split("/",1)[1]))
+            # FIXME: Technically, we're not deriving
+            # dcterms:issued from the basefile alone
+            # (consolidation_date might read PDF and/or HTML files
+            # to get this data). However, due to the order of
+            # calls in SwedishLegalSource.canonical_uri, this
+            # method is required to return all metadata needed to
+            # construct the URI, which means we need to come up
+            # with a date (or really any identifying string, like
+            # a fsnummer) at this point.
+            a["dcterms:issued"] = self.consolidation_date(basefile)
+            segments.pop(0)
         else:
-            fs = self.__class__.__name__
-            realbasefile = basefile
-        fs = self._basefile_frag_to_altlabel(fs)
+            # only set rpubl:forfattningssamling on real acts
+            # (actually published in a författningssamling). Partly
+            # because this is correct (an KonsolideradGrundforfattning
+            # is not published in a författningssamling), partly
+            # because this avoids matching the wrong coin:template
+            # when minting URIs for them.
+            a["rpubl:forfattningssamling"] = self.lookup_resource(segments[0].upper(),
+                                                                  SKOS.altLabel)
+        fs, realbasefile = segments
+        # fs = fs.upper()
+        # fs = self._basefile_frag_to_altlabel(fs)
         a["rpubl:arsutgava"], a["rpubl:lopnummer"] = realbasefile.split(":", 1)
-        a["rpubl:forfattningssamling"] = self.lookup_resource(fs, SKOS.altLabel)
         return a
 
     def consolidation_date(self, basefile):
@@ -347,106 +353,88 @@ class MyndFskrBase(FixedLayoutSource):
             if basefile.startswith(prefix + fs):
                 return basefile
 
-    # principial call chain
-    # parse
-    #    blacklist
-    #    textreader_from_basefile  -- parse_open
-    #       textreader_from_basefile_pdftotext
-    #          sanitize_text
-    #    parse_metadata_from_textreader
-    #       fwdtests
-    #       revtests
-    #       sanitize_metadata
-    #       polish_metadata
-    #          _basefile_frag_to_altlabel
-    #          makeurl
-    #             attributes_to_resource
-    #       infer_metadata
-    #    parse_open
-    #    parse_body
-    #    postprocess_doc(doc)
-    #    parse_entry_update(doc)
-
-    @decorators.action
-    @decorators.managedparsing
-    def parse(self, doc):
-        # This has a similar structure to DocumentRepository.parse but
-        # works on PDF docs converted to plaintext, instead of HTML
-        # trees. FIXME: We should convert the general structure to
-        # what SwedishLegalSource uses.
-        
-        # Some documents are just beyond usable and/or completely
-        # uninteresting from a legal information point of view. We
-        # keep a hardcoded black list to skip these.
-        if doc.basefile in self.blacklist:
-            raise errors.DocumentRemovedError("%s is blacklisted" % doc.basefile,
-                                       dummyfile=self.store.parsed_path(doc.basefile))
-        orig_basefile = doc.basefile
-        ret = True
-        if doc.basefile.startswith("konsolidering/"):
-            self.parse_metadata_from_consolidated(doc)
+    def extract_head(self, fp, basefile, force_ocr=False):
+        infile = self.store.downloaded_path(basefile)
+        tmpfile = self.store.path(basefile, 'intermediate', '.pdf')
+        outfile = self.store.path(basefile, 'intermediate', '.txt')
+        if not util.outfile_is_newer([infile], outfile):
+            util.copy_if_different(infile, tmpfile)
+            with open(tmpfile, "rb") as fp:
+                if fp.read(4) != b'%PDF':
+                    raise errors.ParseError("%s is not a PDF file" % tmpfile)
+            # this command will create a file named as the val of outfile
+            util.runcmd("pdftotext %s" % tmpfile, require_success=True)
+            # check to see if the outfile actually contains any text. It
+            # might just be a series of scanned images.
+            text = util.readfile(outfile)
+            if not text.strip() or force_ocr:
+                os.unlink(outfile)
+                # OK, it's scanned images. We extract these, put them in a
+                # tif file, and OCR them with tesseract.
+                self.log.debug("%s: No text in PDF, trying OCR" % basefile)
+                p = PDFReader()
+                p._tesseract(tmpfile, os.path.dirname(outfile), "swe", False)
+                tmptif = self.store.path(basefile, 'intermediate', '.tif')
+                util.robust_remove(tmptif)
+        # remove control chars so that they don't end up in the XML
+        # (control chars might stem from text segments with weird
+        # character encoding, see pdfreader.BaseTextDecoder)
+        bytebuffer = util.readfile(outfile, "rb")
+        newbuffer = BytesIO()
+        warnings = []
+        for idx, b in enumerate(bytebuffer):
+            # allow CR, LF, FF, TAB
+            if b < 0x20 and b not in (0xa, 0xd, 0xc, 0x9):
+                warnings.append(idx)
+            else:
+                newbuffer.write(bytes((b,)))
+        if warnings:
+            self.log.warning("%s: Invalid character(s) at byte pos %s" %
+                             (basefile, ", ".join([str(x) for x in warnings])))
+        newbuffer.seek(0)
+        text = newbuffer.getvalue().decode("utf-8")
+        # if there's less than 100 chars on each page, chances are it's
+        # just watermarks or leftovers from the scanning toolchain,
+        # and that the real text is in non-OCR:ed images.
+        if len(text) / (text.count("\x0c") + 1) < 100:
+            self.log.warning("%s: Extracted text from PDF suspiciously short "
+                             "(%s bytes per page, %s total)" %
+                             (basefile,
+                              len(text) / text.count("\x0c") + 1,
+                              len(text)))
+            # parse_metadata_from_textreader will raise an error if it
+            # can't find what it needs, at which time we might
+            # consider OCR:ing. FIXME: Do something with this
+            # parameter!
+            self.might_need_ocr = True 
         else:
-            reader = self.textreader_from_basefile(doc.basefile)
+            self.might_need_ocr = False
+        util.robust_remove(tmpfile)
+        text = self.sanitize_text(text, basefile)
+        return TextReader(string=text, encoding=self.source_encoding,
+                          linesep=TextReader.UNIX)
+
+    def extract_metadata(self, reader, basefile):
+        props = self.metadata_from_basefile(basefile)
+        if props.get("rdf:type", "").endswith("#KonsolideradGrundforfattning"):
+            props = self.parse_metadata_from_consolidated(reader, props, basefile)
+        else:
             try:
-                self.parse_metadata_from_textreader(reader, doc)
+                props = self.parse_metadata_from_textreader(reader, props, basefile)
             except RequiredTextMissing:
                 if self.might_need_ocr:
                     self.log.warning("%s: reprocessing using OCR" % doc.basefile)
                     reader = self.textreader_from_basefile(doc.basefile, force_ocr=True)
-                    self.parse_metadata_from_textreader(reader, doc)
+                    props = self.parse_metadata_from_textreader(reader, props, basefile)
                 else:
                     raise
-
-            # the parse_metadata_from_textreader step might determine
-            # that the assumed basefile was wrong (ie during download
-            # we thought it would be fffs/1991:15, but upon parsing,
-            # we discovered it should be bffs/1991:15. This is
-            # communicated by returning the truthy value of the new
-            # basefile.
-            if doc.basefile != orig_basefile:
-                assert doc.basefile # it must be truthy, if it's False or None we have a problem 
-                ret = doc.basefile
-        
-        # now treat the body like PDFReader does
-        fp = self.parse_open(orig_basefile)
-        if orig_basefile != doc.basefile:
-            # if basefile has changed, parse_open still needed the
-            # original basefile. But afterwards, move any created
-            # intermediate files to their correct place.
-            old_dir = os.path.dirname(self.store.intermediate_path(orig_basefile))
-            new_dir = os.path.dirname(self.store.intermediate_path(doc.basefile))
-            util.ensure_dir(new_dir)
-            if os.path.exists(new_dir):
-                util.robust_remove(new_dir)
-            # I'm not sure it's wise to remove the entire olddir, as
-            # this will cause self.parse_open to run pdftohtml again
-            # and again when using --force. But at least it will work.
-            os.rename(old_dir, new_dir)
-        
-        doc.body = self.parse_body(fp, doc.basefile)
-        if getattr(doc.body, 'tagname', None) != "body":
-            doc.body.tagname = "body"
-        doc.body.uri = doc.uri
-        self.postprocess_doc(doc)
-        self.parse_entry_update(doc)
-        return ret 
+        return props
 
     # subclasses should override this and make to add a suitable set
     # of triples (particularly rpubl:konsolideringsunderlag) to
-    # doc.meta. Also maybe correct dcterms:issued?
-    def parse_metadata_from_consolidated(self,doc):
-        resource = self.attributes_to_resource(
-            self.metadata_from_basefile(doc.basefile), infer_nodes=False)
-        # attributes_to_resource() returns a BNode-rooted resource,
-        # but we already know the correct URI (it's doc.uri), so we
-        # modify each triple as we move them onto the doc.meta graph
-        for p, o in resource.predicate_objects():
-            if isinstance(p, Resource):
-                p = p.identifier
-            if isinstance(o, Resource):
-                o = o.identifier
-            doc.meta.add((URIRef(doc.uri), p, o))
-
+    # doc.meta.
+    def parse_metadata_from_consolidated(self, reader, props, basefile):
+        return props
     
     def textreader_from_basefile(self, basefile, force_ocr=False):
         infile = self.store.downloaded_path(basefile)
@@ -555,9 +543,7 @@ class MyndFskrBase(FixedLayoutSource):
 
                  
 
-    def parse_metadata_from_textreader(self, reader, doc):
-        g = doc.meta
-
+    def parse_metadata_from_textreader(self, reader, props, basefile):
         # 1. Find some of the properties on the first page (or the
         #    2nd, or 3rd... continue past TOC pages, cover pages etc
         #    until the "real" first page is found) NB: FFFS 2007:1
@@ -568,7 +554,7 @@ class MyndFskrBase(FixedLayoutSource):
         # from page 2 and so on. AFS 2014:44 requires that we glean
         # dcterms:title from page 1 and rpubl:beslutsdatum from page
         # 2.
-        props = self.baseprops.get(doc.basefile, {})
+        props.update(self.baseprops.get(basefile, {}))
         for page in reader.getiterator(reader.readpage):
             pagecount += 1
             for (prop, tests) in list(self.fwdtests().items()):
@@ -585,7 +571,7 @@ class MyndFskrBase(FixedLayoutSource):
             if 'rpubl:beslutsdatum' in props:
                 break
             self.log.debug("%s: Couldn't find required props on page %s" %
-                           (doc.basefile, pagecount))
+                           (basefile, pagecount))
         if 'rpubl:beslutsdatum' not in props:
             # raise errors.ParseError(
             self.log.warning(
@@ -623,17 +609,14 @@ class MyndFskrBase(FixedLayoutSource):
             # Single required propery. If we find this, we're done
             if 'rpubl:ikrafttradandedatum' in props:
                 break
+        return props
 
-        self.sanitize_metadata(props, doc)
-        self.polish_metadata(props, doc)
-        self.infer_metadata(doc.meta.resource(doc.uri), doc.basefile)
-        return doc
-
-    def sanitize_metadata(self, props, doc):
+    def sanitize_metadata(self, props, basefile):
         """Correct those irregularities in the extracted metadata that we can
            find
 
         """
+        konsolidering = props.get("rdf:type", "").endswith("#KonsolideradGrundforfattning")
         # common false positive
         if 'dcterms:title' in props:
             if 'denna f\xf6rfattning har beslutats den' in props['dcterms:title']:
@@ -651,8 +634,31 @@ class MyndFskrBase(FixedLayoutSource):
             # "DVFS 2012-4" -> "DVFS 2012:4"
             if re.search("\d{4}-\d+", props['dcterms:identifier']):
                 props['dcterms:identifier'] = re.sub(r"(\d{4})-(\d+)", r"\1:\2", props['dcterms:identifier'])
+            # if the found dcterms:identifier differs from what has
+            # been inferred by metadata_from_basefile, the keys
+            # rpubl:arsutgava, rpubl:lopnummer and possibly
+            # rpubl:forfattningssamling might be wrong. Re-set these
+            # now that we have the correct identifier
+            if not konsolidering:
+                fs, year, no = re.split("[ :]", props['dcterms:identifier'])
+                if year != props['rpubl:arsutgava'] or no != props['rpubl:lopnummer']:
+                    realbasefile = self.sanitize_basefile(props['dcterms:identifier'])
+                    self.log.warning("Assumed basefile was %s but turned out to be %s" % (basefile, realbasefile))
+                    props.update(self.metadata_from_basefile(realbasefile))
+        else:
+            # do a a simple inference from basefile and populate props
+            parts = re.split('[/:_]', basefile.upper())
+            if konsolidering:
+                parts.pop(0)
+            (pub, year, ordinal) = parts
+            pub = self._basefile_frag_to_altlabel(pub)
+            props['dcterms:identifier'] = "%s %s:%s" % (pub, year, ordinal)
+            if konsolidering:
+                props['dcterms:identifier'] += " (konsoliderad)"
+        return props
 
-    def polish_metadata(self, props, doc):
+    def polish_metadata(self, props):
+        
         """Clean up data, including converting a string->string dict to a
         proper RDF graph.
 
@@ -664,96 +670,59 @@ class MyndFskrBase(FixedLayoutSource):
         parser = SwedishCitationParser(LegalRef(LegalRef.LAGRUM),
                                        self.minter,
                                        self.commondata)
-
         # FIXME: this code should go into canonical_uri, if we can
         # find a way to give it access to props['dcterms:identifier']
-        if 'dcterms:identifier' in props:
-            (pub, year, ordinal) = re.split('[ :]',
-                                            props['dcterms:identifier'])
-        else:
-            # do a a simple inference from basefile and populate props
-            (pub, year, ordinal) = re.split('[/:_]', doc.basefile.upper())
-            pub = self._basefile_frag_to_altlabel(pub)
-            props['dcterms:identifier'] = "%s %s:%s" % (pub, year, ordinal)
-            self.log.warning("%s: Couldn't find dcterms:identifier, inferred %s from basefile" %
-                             (doc.basefile, props['dcterms:identifier']))
-        attrs = {'rdf:type': RPUBL.Myndighetsforeskrift,
-                 'rpubl:forfattningssamling':
-                 self.lookup_resource(pub, SKOS.altLabel),
-                 'rpubl:arsutgava': year,
-                 'rpubl:lopnummer': ordinal}
-        uri = makeurl(attrs)
+        konsolidering = props.get("rdf:type", "").endswith("#KonsolideradGrundforfattning")
 
-        if doc.uri is not None and uri != doc.uri:
-            self.log.warning(
-                "Assumed URI would be %s but it turns out to be %s" %
-                (doc.uri, uri))
-            newbasefile = self.basefile_from_uri(uri)
-            if newbasefile:
-                # change the basefile we're dealing with. Touch
-                # self.store.parsed_path(basefile) first so we don't
-                # regenerate. 
-                with self.store.open_parsed(doc.basefile, "w"):
-                    pass
-                doc.basefile = newbasefile
-        doc.uri = uri
-        desc = Describer(doc.meta, doc.uri)
-
-        fs = self.lookup_resource(pub, SKOS.altLabel)
-        desc.rel(RPUBL.forfattningssamling, fs)
         # publisher for the series == publisher for the document
-        publisher = self.commondata.value(fs, DCTERMS.publisher)
-        assert publisher, "Found no publisher for fs %s" % fs
-        desc.rel(DCTERMS.publisher, publisher)
+        if "dcterms:publisher" not in props:
+            publisher = self.commondata.value(props['rpubl:forfattningssamling'],
+                                              DCTERMS.publisher)
+            assert publisher, "Found no publisher for fs %s" % fs
+            props["dcterms:publisher"] = publisher
 
-        desc.value(RPUBL.arsutgava, year)
-        desc.value(RPUBL.lopnummer, ordinal)
-        desc.value(DCTERMS.identifier, props['dcterms:identifier'])
-        if 'rpubl:beslutadAv' in props:
-            try:
-                beslutad_av = props['rpubl:beslutadAv']
-                if beslutad_av == "Räddningsverket":  # The agency sometimes doesn't use it's official name!
+        if not konsolidering:
+            if 'rpubl:beslutadAv' in props:
+                # The agency sometimes doesn't use it's official name!
+                if props['rpubl:beslutadAv'] == "Räddningsverket":  
                     self.log.warning("%s: rpubl:beslutadAv was '%s', "
                                      "correcting to 'Statens räddningsverk'" %
                                      (doc.basefile, beslutad_av))
-                    beslutad_av = "Statens räddningsverk" 
-                desc.rel(RPUBL.beslutadAv,
-                         self.lookup_resource(beslutad_av))
-            except KeyError as e:
-                if self.alias == "ffs":
-                    # These documents are often enacted by entities
-                    # like Chefen för Flygvapnet, Försvarets
-                    # sjukvårdsstyrelse, Generalläkaren, Krigsarkivet,
-                    # Överbefälhavaren. We have no resources for those
-                    # and probably won't have (are they even
-                    # enumerable?)
-                    self.log.warning("%s: Couldn't look up entity '%s'" %
-                                     (doc.basefile, props['rpubl:beslutadAv']))
-                else:
-                    # there are other examples of where a entity might
-                    # not be resolved, like lvfs/1999:25, where a bad
-                    # OCR has resulted in "Läkea\nmedelsverket"
-                    # (instead of the proper Läkemedelsverket). Keep a
-                    # blacklist for now, until we can determine the
-                    # size of this problem.
-                    if doc.basefile in ("lvfs/1995:25"):
-                        self.log.warning("%s: Unknown entity '%s'" %
-                                         (doc.basefile, props['rpubl:beslutadAv']))
+                    props['rpubl:beslutadAv'] = "Statens räddningsverk"
+                try:
+                    props['rpubl:beslutadAv'] = self.lookup_resource(props['rpubl:beslutadAv'])
+                except KeyError as e:
+                    beslutad_av = props['rpubl:beslutadAv']
+                    del props['rpubl:beslutadAv']
+                    if self.alias == "ffs":
+                        # These documents are often enacted by entities
+                        # like Chefen för Flygvapnet, Försvarets
+                        # sjukvårdsstyrelse, Generalläkaren, Krigsarkivet,
+                        # Överbefälhavaren. We have no resources for those
+                        # and probably won't have (are they even
+                        # enumerable?)
+                        self.log.warning("%s: Couldn't look up entity '%s'" %
+                                         (doc.basefile, beslutad_av))
                     else:
-                        raise e
-
-        if 'dcterms:issn' in props:
-            desc.value(DCTERMS.issn, props['dcterms:issn'])
+                        # there are other examples of where a entity might
+                        # not be resolved, like lvfs/1999:25, where a bad
+                        # OCR has resulted in "Läkea\nmedelsverket"
+                        # (instead of the proper Läkemedelsverket). Keep a
+                        # blacklist for now, until we can determine the
+                        # size of this problem.
+                        if doc.basefile in ("lvfs/1995:25"):
+                            self.log.warning("%s: Unknown entity '%s'" %
+                                             (doc.basefile, beslutad_av))
+                        else:
+                            raise e
 
         if 'dcterms:title' in props:
-            desc.value(DCTERMS.title,
-                       Literal(util.normalize_space(
-                           props['dcterms:title']), lang="sv"))
             if re.search('^(Föreskrifter|[\w ]+s föreskrifter) om ändring (i|av) ',
                          props['dcterms:title'], re.UNICODE):
                 # There should be something like FOOFS 2013:42 (or
-                # possibly just 2013:42) in the title. The regex is forgiving about spurious spaces, seee LVFS 1998:5
-                m = re.search('(?P<pub>[A-ZÅÄÖ-]+FS|) ?(?P<year>\d{4}) ?:(?P<ordinal>\d+)',
+                # possibly just 2013:42) in the title. The regex is
+                # forgiving about spurious spaces, seee LVFS 1998:5
+                m = re.search('(?P<fs>[A-ZÅÄÖ-]+FS|) ?(?P<year>\d{4}) ?:(?P<ordinal>\d+)',
                               props['dcterms:title'])
                 if not m:
                     # raise errors.ParseError(
@@ -765,50 +734,41 @@ class MyndFskrBase(FixedLayoutSource):
                     # body text (though not in a standardized form)
                 else:
                     parts = m.groupdict()
-                    if not parts['pub']:
-                        parts["pub"] = props['dcterms:identifier'].split(" ")[0]
+                    if not parts['fs']:
+                        parts["fs"] = props['dcterms:identifier'].split(" ")[0]
 
                     origuri = makeurl({'rdf:type': RPUBL.Myndighetsforeskrift,
                                        'rpubl:forfattningssamling':
-                                       self.lookup_resource(parts["pub"], SKOS.altLabel),
+                                       self.lookup_resource(parts["fs"], SKOS.altLabel),
                                        'rpubl:arsutgava': parts["year"],
                                        'rpubl:lopnummer': parts["ordinal"]})
-                    desc.rel(RPUBL.andrar,
-                             URIRef(origuri))
+                    props["rpubl:andrar"] =  URIRef(origuri)
 
-            # FIXME: is this a sensible value for rpubl:upphaver
+            # FIXME: is this a sensible value for rpubl:upphaver?
             if (re.search('^(Föreskrifter|[\w ]+s föreskrifter) om upphävande '
                           'av', props['dcterms:title'], re.UNICODE)
                     and not 'rpubl:upphaver' in props):
                 props['rpubl:upphaver'] = props['dcterms:title']
+            # finally type the title as a swedish-language literal
+            props['dcterms:title'] = Literal(props['dcterms:title'], lang="sv")
 
         for key, pred in (('rpubl:utkomFranTryck', RPUBL.utkomFranTryck),
                           ('rpubl:beslutsdatum', RPUBL.beslutsdatum),
                           ('rpubl:ikrafttradandedatum', RPUBL.ikrafttradandedatum)):
             if key in props:
-                # FIXME: how does this even work
-                if (props[key] == 'denna dag' and
-                        key == 'rpubl:ikrafttradandedatum'):
-                    desc.value(RPUBL.ikrafttradandedatum,
-                               self.parse_swedish_date(props['rpubl:beslutsdatum']))
-                elif (props[key] == 'utkom från trycket' and
-                      key == 'rpubl:ikrafttradandedatum'):
-                    desc.value(RPUBL.ikrafttradandedatum,
-                               self.parse_swedish_date(props['rpubl:utkomFranTryck']))
-                else:
-                    try:
-                        date = self.parse_swedish_date(props[key].lower())
-                        desc.value(pred,
-                                   self.parse_swedish_date(props[key].lower()))
-                    except ValueError as e:
-                        self.log.error("%s: Couldn't parse %s as a date" % (doc.basefile, props[key].lower()))
-                        
+                if (key == 'rpubl:ikrafttradandedatum' and 
+                    props[key] in ('denna dag', 'utkom från trycket')):
+                    if props[key] == 'denna dag':
+                        props[key] = props['rpubl:beslutsdatum']
+                    elif props[key] == 'utkom från trycket':
+                        props[key] = props['rpubl:utkomFranTryck']
+                props[key] = Literal(self.parse_swedish_date(props[key]))
 
         if 'rpubl:genomforDirektiv' in props:
-            diruri = makeurl({'rdf:type': RINFOEX.EUDirektiv, # FIXME: standardize this type
-                              'rpubl:celexNummer':
-                              props['rpubl:genomforDirektiv']})
-            desc.rel(RPUBL.genomforDirektiv, diruri)
+            props['rpubl:genomforDirektiv'] = URIRef(makeurl(
+                {'rdf:type': RINFOEX.EUDirektiv, # FIXME: standardize this type
+                 'rpubl:celexNummer':
+                 props['rpubl:genomforDirektiv']}))
 
         has_bemyndiganden = False
         if 'rpubl:bemyndigande' in props:
@@ -828,30 +788,37 @@ class MyndFskrBase(FixedLayoutSource):
                         keep = False
                 if keep:
                     filtered_bemyndiganden.append(bem_uri)
-
-            for bem_uri in filtered_bemyndiganden:
-                desc.rel(RPUBL.bemyndigande, bem_uri)
+            props['rpubl:bemyndigande'] = [URIRef(x) for x in filtered_bemyndiganden]
 
         if 'rpubl:upphaver' in props:
+            upphaver = []
             for upph in re.findall('([A-ZÅÄÖ-]+FS \d{4}:\d+)',
                                    util.normalize_space(props['rpubl:upphaver'])):
-                (pub, year, ordinal) = re.split('[ :]', upph)
-                upphuri = makeurl({'rdf:type': RPUBL.Myndighetsforeskrift,
-                                   'rpubl:forfattningssamling':
-                                   self.lookup_resource(pub, SKOS.altLabel),
-                                   'rpubl:arsutgava': year,
-                                   'rpubl:lopnummer': ordinal})
-                desc.rel(RPUBL.upphaver, upphuri)
+                (fs, year, ordinal) = re.split('[ :]', upph)
+                upphaver.append(makeurl(
+                    {'rdf:type': RPUBL.Myndighetsforeskrift,
+                     'rpubl:forfattningssamling': self.lookup_resource(fs, SKOS.altLabel),
+                     'rpubl:arsutgava': year,
+                     'rpubl:lopnummer': ordinal}))
+            props['rpubl:upphaver'] = [URIRef(x) for x in upphaver]
 
-        if ('dcterms:title' in props and
-            "allmänna råd" in props['dcterms:title'] and
-                "föreskrifter" not in props['dcterms:title']):
-            rdftype = RPUBL.AllmannaRad
-        else:
-            rdftype = RPUBL.Myndighetsforeskrift
-        desc.rdftype(rdftype)
-        desc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
-
+        if 'rdf:type' not in props:
+            if ('dcterms:title' in props and
+                "allmänna råd" in props['dcterms:title'] and
+                    "föreskrifter" not in props['dcterms:title']):
+                props['rdf:type'] = RPUBL.AllmannaRad
+            else:
+                props['rdf:type'] = RPUBL.Myndighetsforeskrift
+        resource = self.attributes_to_resource(props)
+        uri = URIRef(self.minter.space.coin_uri(resource))
+        for (p, o) in list(resource.graph.predicate_objects(
+                resource.identifier)):
+            resource.graph.remove((resource.identifier, p, o))
+            # remove those dcterms:issued triples we only used to be
+            # able to mint a URI
+            if p != DCTERMS.issued or o.datatype is not None:
+                resource.graph.add((uri, p, o))
+        return resource.graph.resource(uri)
 
     def infer_identifier(self, basefile):
         p = self.store.distilled_path(basefile)
@@ -1004,9 +971,9 @@ class AFS(MyndFskrBase):
             # 4) Actually download the main basefile
             return DocumentRepository.download_single(self, basefile, pdfurl, url)
 
-    def parse_metadata_from_consolidated(self,doc):
-        super(AFS, self).parse_metadata_from_consolidated(doc)
-        with self.store.open_downloaded(doc.basefile, attachment="landingpage.html") as fp:
+    def parse_metadata_from_consolidated(self, reader, props, basefile):
+        super(AFS, self).parse_metadata_from_consolidated(reader, props, basefile)
+        with self.store.open_downloaded(basefile, attachment="landingpage.html") as fp:
             soup = BeautifulSoup(fp.read(), "lxml")
         changeheader = soup.find(["h2", "h3"], text="Ursprungs- och ändringsföreskrifter")
         pdfs = changeheader.parent.find_all("a", href=re.compile("\.pdf$"))
@@ -1014,18 +981,21 @@ class AFS(MyndFskrBase):
         # in some cases the leading AFS is missing
         matcher = re.compile("(?:|AFS )(\d+:\d+)").match
         fsnummer = [matcher(norm(x.text)).group(1) for x in pdfs if matcher(norm(x.text))]
+        props['rpubl:konsolideringsunderlag'] = []
         for f in fsnummer:
-            konsolideringsunderlag = self.canonical_uri(self.sanitize_basefile(f))
-            doc.meta.add((URIRef(doc.uri), RPUBL.konsolideringsunderlag, URIRef(konsolideringsunderlag)))
+            kons_uri = self.canonical_uri(self.sanitize_basefile(f))
+            props['rpubl:konsolideringsunderlag'].append(URIRef(kons_uri))
+
         title = soup.title.text
         if ", föreskrifter" in title:
             title = title.split(", föreskrifter")[0].strip()
         identifier = "%s (konsoliderad tom. %s)" % (
             re.search("AFS \d+:\d+", title).group(0),
-            self.consolidation_date(doc.basefile))
-        doc.meta.add((URIRef(doc.uri), DCTERMS.identifier, Literal(identifier)))
-        doc.meta.add((URIRef(doc.uri), DCTERMS.title, Literal(title, lang="sv")))
-        doc.meta.add((URIRef(doc.uri), DCTERMS.publisher, self.lookup_resource("Arbetsmiljöverket")))
+            self.consolidation_date(basefile))
+        props['dcterms:identifier'] = identifier
+        props['dcterms:title'] = Literal(title, lang="sv")
+        props['dcterms:publisher'] = self.lookup_resource("Arbetsmiljöverket")
+        return props
 
     @lru_cache(maxsize=None)
     def consolidation_date(self, basefile):
@@ -1595,14 +1565,13 @@ class NFS(MyndFskrBase):
                 return DocumentRepository.download_single(self, basefile, pdfurl, url)
         else:
             self.log.error("%s: Couldn't find appropriate PDF version at %s" % (basefile, url))
-    def parse_metadata_from_consolidated(self, doc):
+    def parse_metadata_from_consolidated(self, reader, props, basefile):
         # we need identifier, title and publisher (which may be
         # Naturvårdsverket (NFS) or Statens naturvårdsverk (SNFS). And
         # also all konsolideringsunderlag
 
-
-        super(NFS, self).parse_metadata_from_consolidated(doc)
-        with self.store.open_downloaded(doc.basefile, attachment="landingpage.html") as fp:
+        super(NFS, self).parse_metadata_from_consolidated(reader, props, basefile)
+        with self.store.open_downloaded(basefile, attachment="landingpage.html") as fp:
             soup = BeautifulSoup(fp.read(), "lxml")
 
         # [2:] == skip header and first real row (that only contains
@@ -1610,21 +1579,20 @@ class NFS(MyndFskrBase):
         matcher = re.compile("(S?NFS \d+:\d+)").match
         norm = util.normalize_space
 
+        props['rpubl:konsolideringsunderlag'] = []
         for row in soup.find("table", "regulations-table").find_all("tr")[2:]:
             fsnummer = matcher(norm(row.h3.text)).group(1)
             konsolideringsunderlag = self.canonical_uri(self.sanitize_basefile(fsnummer))
-            doc.meta.add((URIRef(doc.uri), RPUBL.konsolideringsunderlag, URIRef(konsolideringsunderlag)))
-            
+            props['rpubl:konsolideringsunderlag'].append(URIRef(konsolideringsunderlag))
         title = soup.h1.text
-        segments = doc.basefile.split("/")
-        identifier = "%s %s (konsoliderad tom. %s)" % (segments[1].upper(), segments[2], self.consolidation_date(doc.basefile))
+        segments = basefile.split("/")
+        identifier = "%s %s (konsoliderad tom. %s)" % (segments[1].upper(), segments[2], self.consolidation_date(basefile))
         publisher = "Statens naturvårdsverk" if segments[1] == "snfs" else "Naturvårdsverket"
-
-        doc.meta.add((URIRef(doc.uri), DCTERMS.identifier, Literal(identifier)))
-        doc.meta.add((URIRef(doc.uri), DCTERMS.title, Literal(title, lang="sv")))
-        doc.meta.add((URIRef(doc.uri), DCTERMS.publisher, self.lookup_resource(publisher)))
+        props["dcterms:identifier"] = identifier
+        props["dcterms:title"] = Literal(title, lang="sv")
+        props["dcterms:publisher"] = self.lookup_resource(publisher)
+        return props
         
-
     @lru_cache(maxsize=None)
     def consolidation_date(self, basefile):
         # try to find consolidation date on stored landingpage
@@ -1892,16 +1860,16 @@ class SOSFS(MyndFskrBase):
         soup = BeautifulSoup(resp.text, "lxml")
         if basefile.startswith("konsolidering"):
             # that HTML page is the best available representation of
-            # the consolidated version, and we already have it, so
-            # let's save it. FIXME: but we should really make use of
-            # everything we have in the base
-            # download_single/download_if_needed implementations...
-            with self.store.open_downloaded(basefile, "wb", attachment="index.html") as fp:
-                fp.write(resp.content)
-            self.log.info("%s: downloaded from %s" % (basefile, url))
+            # the consolidated version, and we already have it, so we
+            # could save it, but if we call
+            # DocumentRepository.download_single(self, basefile, link,
+            # url), our documententry JSON file will be updated.
             # and since we're here already, download all PDF
             # base/change acts we can find (some might not be linked
             # from the front page)
+            with self.store.open_downloaded(basefile, "wb", attachment="index.html") as fp:
+                fp.write(resp.content)            
+            DocumentRepository.download_single(self, basefile, url, orig_url)
             linkhead = soup.find(text=re.compile(
                 "(Ladda ner eller beställ|Beställ eller ladda ner)"))
             if linkhead:
@@ -1928,23 +1896,25 @@ class SOSFS(MyndFskrBase):
                 self.log.warning("%s: No link to PDF file found at %s" % (basefile, url))
                 return False
 
-    def parse_metadata_from_consolidated(self,doc):
-        super(SOSFS, self).parse_metadata_from_consolidated(doc)
-        with self.store.open_downloaded(doc.basefile, attachment="index.html") as fp:
+    def parse_metadata_from_consolidated(self, reader, props, basefile):
+        super(SOSFS, self).parse_metadata_from_consolidated(reader, props, basefile)
+        with self.store.open_downloaded(basefile, attachment="index.html") as fp:
             soup = BeautifulSoup(fp.read(), "lxml")
-            for fsnummer in self.consolidation_basis(soup):
-                konsolideringsunderlag = self.canonical_uri(self.sanitize_basefile(fsnummer))
-                doc.meta.add((URIRef(doc.uri), RPUBL.konsolideringsunderlag,
-                              URIRef(konsolideringsunderlag)))
+        props['rpubl:konsolideringsunderlag'] = []
+        for fsnummer in self.consolidation_basis(soup):
+            konsolideringsunderlag = self.canonical_uri(self.sanitize_basefile(fsnummer))
+            props['rpubl:konsolideringsunderlag'].append(URIRef(konsolideringsunderlag))
+
         title = util.normalize_space(soup.title.text)
         if title.startswith("Senaste version av "):
             title = title.replace("Senaste version av ", "")
         identifier = "%s (konsoliderad tom. %s)" % (
             re.search("(SOSFS|HSLF-FS) \d+:\d+", title).group(0),
-            self.consolidation_date(doc.basefile))
-        doc.meta.add((URIRef(doc.uri), DCTERMS.identifier, Literal(identifier)))
-        doc.meta.add((URIRef(doc.uri), DCTERMS.title, Literal(title, lang="sv")))
-        doc.meta.add((URIRef(doc.uri), DCTERMS.publisher, self.lookup_resource("Arbetsmiljöverket")))
+            self.consolidation_date(basefile))
+        props['dcterms:identifier'] = identifier
+        props['dcterms:identifier'] = Literal(title, lang="sv")
+        props['dcterms:publisher'] = self.lookup_resource("Socialstyrelsen")
+        return props
 
     @lru_cache(maxsize=None)
     def consolidation_date(self, basefile):
@@ -1989,6 +1959,15 @@ class SOSFS(MyndFskrBase):
         else:
             return super(SOSFS,self).parse_open(basefile)
 
+    def extract_head(self, fp, basefile, force_ocr=False):
+        if basefile.startswith("konsolidering/"):
+            # konsoliderade files are only available as HTML, not PDF,
+            # and the base extract_head expects to run pdftotext on a
+            # real PDF file
+            return None
+        else:
+            return super(SOSFS, self).extract_head(fp, basefile, force_ocr)
+
     def parse_body(self, fp, basefile):
         if basefile.startswith("konsolidering"):
             main = self.maintext_from_soup(BeautifulSoup(fp, "lxml"))
@@ -2002,22 +1981,22 @@ class SOSFS(MyndFskrBase):
         t["dcterms:identifier"] = ['^([A-ZÅÄÖ-]+FS\s\s?\d{4}:\d+)']
         return t
 
-    def parse_metadata_from_textreader(self, reader, doc):
+    def parse_metadata_from_textreader(self, reader, props, basefile):
         # cue past the first cover pages until we find the first real page
         page = 1
         try:
             while ("Ansvarig utgivare" not in reader.peekchunk('\f') and
                    "Utgivare" not in reader.peekchunk('\f')):
                 self.log.debug("%s: Skipping cover page %s" %
-                               (doc.basefile, page))
+                               (basefile, page))
                 reader.readpage()
                 page += 1
         except IOError:   # read past end of file
-            util.robust_remove(self.store.path(doc.basefile,
+            util.robust_remove(self.store.path(basefile,
                                                'intermediate', '.txt'))
             raise RequiredTextMissing("%s: Could not find proper first page" %
-                                      doc.basefile)
-        return super(SOSFS, self).parse_metadata_from_textreader(reader, doc)
+                                      basefile)
+        return super(SOSFS, self).parse_metadata_from_textreader(reader, props, basefile)
 
 
 # The previous implementation of STAFS.download_single was just too

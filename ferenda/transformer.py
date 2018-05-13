@@ -8,12 +8,15 @@ import os
 import shutil
 import re
 from io import BytesIO
+import logging
 
 from lxml import etree
 from lxml.etree import XSLT
 
 from ferenda import errors, util
 from ferenda import ResourceLoader
+
+log = logging.getLogger("ferenda.transformer")
 
 # assumption: A transformer is initialized with a single template. If
 # you want to use a different template, create a different
@@ -154,8 +157,6 @@ class Transformer(object):
                             self.documentroot + os.sep + "index.html")
         helpful = os.environ.get('FERENDA_TRANSFORMDEBUG', False)
         if helpful:
-            import logging
-            log = logging.getLogger("ferenda.transformer")
             if self.config:
                 xslfile = self.resourceloader.filename(self.t.orig_template)
                 p = {}
@@ -258,7 +259,6 @@ class XSLTTransform(TransformerEngine):
         return filename
 
     def transform(self, indata, config=None, parameters={}):
-        
         strparams = {}
         if config:
             # paths to be used with the document() function
@@ -298,6 +298,14 @@ class XSLTTransform(TransformerEngine):
         try:
             return self._transformer(indata, **strparams)
         except etree.XSLTApplyError as e:
+            # the exception will only contain the last error. Errors
+            # emanting from the xhtml file will not have file/line
+            # number information. Errors emanting from the xslt file
+            # do have file/line number info, and is probably more
+            # useful to deal with.
+            for error in self._transformer.error_log:
+                if error.line:
+                    log.error("%s: %s (line %s)" % (error.filename, error.message, error.line))
             raise errors.TransformError(str(e))
         finally:
             for f in removefiles:
@@ -319,7 +327,6 @@ class XSLTTransform(TransformerEngine):
 
     def file_to_native(self, infile):
         return etree.parse(infile)
-        # FIXME: hook in the transform_links step somehow?
 
 
 class JinjaTransform(TransformerEngine):

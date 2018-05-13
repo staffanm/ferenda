@@ -1,0 +1,43 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://rinfo.lagrummet.se/publ/nfs/2007:10/konsolidering/2017-05-12> a rpubl:KonsolideradGrundforfattning ;
+    dcterms:identifier "NFS 2007:10 (konsoliderad tom. 2017:05-12)" ;
+    dcterms:issued "2017-05-12"^^xsd:date ;
+    dcterms:publisher <http://rinfo.lagrummet.se/org/naturvaardsverket> ;
+    dcterms:title "Naturvårdsverkets föreskrifter och allmänna råd om inventering av björn, varg, järv, lodjur och kungsörn"@sv ;
+    rpubl:arsutgava "2007" ;
+    rpubl:konsoliderar <http://rinfo.lagrummet.se/publ/nfs/2007:10> ;
+    rpubl:konsolideringsunderlag <http://rinfo.lagrummet.se/publ/nfs/2007:10>,
+        <http://rinfo.lagrummet.se/publ/nfs/2012:1>,
+        <http://rinfo.lagrummet.se/publ/nfs/2012:12>,
+        <http://rinfo.lagrummet.se/publ/nfs/2014:23> ;
+    rpubl:lopnummer "10" ;
+    prov:alternateOf <http://example.org/docs/konsolidering/nfs/2007%3A10.html> ;
+    prov:wasDerivedFrom <http://rinfo.lagrummet.se/publ/nfs/2007:10/konsolidering/2017-05-12?attachment=index.pdf&repo=nfs&dir=downloaded> ;
+    prov:wasGeneratedBy "ferenda.sources.legal.se.myndfskr.NFS" .
+
+<http://rinfo.lagrummet.se/publ/nfs/2007:10/konsolidering/2017-05-12/sid1.png> dcterms:references <http://rinfo.lagrummet.se/publ/sfs/2001:724#p_13>,
+        <http://rinfo.lagrummet.se/publ/sfs/2009:1263>,
+        <http://rinfo.lagrummet.se/publ/sfs/2009:1263#p_10>,
+        <http://rinfo.lagrummet.se/publ/sfs/2009:1263#p_8> .
+
+<http://rinfo.lagrummet.se/publ/nfs/2007:10/konsolidering/2017-05-12/sid2.png> dcterms:references <http://rinfo.lagrummet.se/publ/sfs/1971:437> .
+
+<http://rinfo.lagrummet.se/publ/nfs/2007:10/konsolidering/2017-05-12/sid3.png> dcterms:references <http://rinfo.lagrummet.se/publ/sfs/2009:1263>,
+        <http://rinfo.lagrummet.se/publ/sfs/2009:1263#p_8> .
+
+<http://rinfo.lagrummet.se/publ/nfs/2007:10/konsolidering/2017-05-12/sid4.png> dcterms:references <http://rinfo.lagrummet.se/publ/sfs/2009:1263>,
+        <http://rinfo.lagrummet.se/publ/sfs/2009:1263#p_9> .
+
+<http://rinfo.lagrummet.se/publ/nfs/2007:10/konsolidering/2017-05-12/sid5.png> dcterms:references <http://rinfo.lagrummet.se/publ/sfs/2009:400#k_20-p_1> .
+
+<http://example.org/docs/konsolidering/nfs/2007%3A10.html> rdfs:label "Källa"@sv .
+
+<http://rinfo.lagrummet.se/publ/nfs/2007:10/konsolidering/2017-05-12?attachment=index.pdf&repo=nfs&dir=downloaded> rdfs:label "NFS 2007:10 (konsoliderad tom. 2017:05-12)"@sv .
+

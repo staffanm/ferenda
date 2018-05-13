@@ -5,9 +5,7 @@
 		xmlns:dcterms="http://purl.org/dc/terms/"
 		xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 		xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
-		xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
-		xmlns:rinfoex="http://lagen.nu/terms#"
-		exclude-result-prefixes="xhtml rdf dcterms xsd rinfo rinfoex"
+		exclude-result-prefixes="xhtml rdf dcterms xsd"
 		>
   <!-- I removed xml:space="preserve" from the above attributes, as it
        caused toc.xsl to not properly pretty-print the navbar

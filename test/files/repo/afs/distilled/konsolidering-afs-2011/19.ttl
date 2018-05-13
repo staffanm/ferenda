@@ -1,0 +1,61 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://rinfo.lagrummet.se/publ/afs/2011:19/konsolidering/2017-06-13> a rpubl:KonsolideradGrundforfattning ;
+    dcterms:identifier "AFS 2011:19 (konsoliderad tom. 2017:06-13)" ;
+    dcterms:issued "2017-06-13"^^xsd:date ;
+    dcterms:publisher <http://rinfo.lagrummet.se/org/arbetsmiljoeverket> ;
+    dcterms:title "Kemiska arbetsmiljörisker (AFS 2011:19)"@sv ;
+    rpubl:arsutgava "2011" ;
+    rpubl:konsoliderar <http://rinfo.lagrummet.se/publ/afs/2011:19> ;
+    rpubl:konsolideringsunderlag <http://rinfo.lagrummet.se/publ/afs/2011:19>,
+        <http://rinfo.lagrummet.se/publ/afs/2014:43>,
+        <http://rinfo.lagrummet.se/publ/afs/2014:5>,
+        <http://rinfo.lagrummet.se/publ/afs/2017:4> ;
+    rpubl:lopnummer "19" ;
+    prov:alternateOf <https://www.av.se/globalassets/filer/publikationer/foreskrifter/kemiska-arbetsmiljorisker-foreskrifter-afs2014-43.pdf> ;
+    prov:wasDerivedFrom <http://rinfo.lagrummet.se/publ/afs/2011:19/konsolidering/2017-06-13?attachment=index.pdf&repo=afs&dir=downloaded> ;
+    prov:wasGeneratedBy "ferenda.sources.legal.se.myndfskr.AFS" .
+
+<http://rinfo.lagrummet.se/publ/afs/2011:19/konsolidering/2017-06-13/sid14.png> dcterms:references <http://rinfo.lagrummet.se/publ/sfs/1977:1160> .
+
+<http://rinfo.lagrummet.se/publ/afs/2011:19/konsolidering/2017-06-13/sid15.png> dcterms:references <http://rinfo.lagrummet.se/publ/sfs/1977:1160> .
+
+<http://rinfo.lagrummet.se/publ/afs/2011:19/konsolidering/2017-06-13/sid16.png> dcterms:references <http://rinfo.lagrummet.se/publ/sfs/1977:1160>,
+        <http://rinfo.lagrummet.se/publ/sfs/1977:1160#k_4>,
+        <http://rinfo.lagrummet.se/publ/sfs/1977:1160#k_4-p_1>,
+        <http://rinfo.lagrummet.se/publ/sfs/1977:1160#k_4-p_2>,
+        <http://rinfo.lagrummet.se/publ/sfs/1977:1160#k_4-p_4>,
+        <http://rinfo.lagrummet.se/publ/sfs/1977:1160#k_8>,
+        <http://rinfo.lagrummet.se/publ/sfs/1977:1160#k_8-p_10>,
+        <http://rinfo.lagrummet.se/publ/sfs/1977:1160#k_8-p_5> .
+
+<http://rinfo.lagrummet.se/publ/afs/2011:19/konsolidering/2017-06-13/sid19.png> dcterms:references <http://rinfo.lagrummet.se/publ/sfs/1977:1160>,
+        <http://rinfo.lagrummet.se/publ/sfs/1977:1160#k_1-p_3> .
+
+<http://rinfo.lagrummet.se/publ/afs/2011:19/konsolidering/2017-06-13/sid20.png> dcterms:references <http://rinfo.lagrummet.se/publ/sfs/1998:808> .
+
+<http://rinfo.lagrummet.se/publ/afs/2011:19/konsolidering/2017-06-13/sid25.png> dcterms:references <http://rinfo.lagrummet.se/publ/sfs/2011:927> .
+
+<http://rinfo.lagrummet.se/publ/afs/2011:19/konsolidering/2017-06-13/sid28.png> dcterms:references <http://rinfo.lagrummet.se/publ/sfs/1977:1160#k_3-p_12>,
+        <http://rinfo.lagrummet.se/publ/sfs/1977:1160#k_3-p_5> .
+
+<http://rinfo.lagrummet.se/publ/afs/2011:19/konsolidering/2017-06-13/sid31.png> dcterms:references <http://rinfo.lagrummet.se/publ/sfs/2010:1011>,
+        <http://rinfo.lagrummet.se/publ/sfs/2010:1075> .
+
+<http://rinfo.lagrummet.se/publ/afs/2011:19/konsolidering/2017-06-13/sid33.png> dcterms:references <http://rinfo.lagrummet.se/publ/sfs/1977:1166#p_3> .
+
+<http://rinfo.lagrummet.se/publ/afs/2011:19/konsolidering/2017-06-13/sid4.png> dcterms:references <http://rinfo.lagrummet.se/publ/sfs/1977:1160>,
+        <http://rinfo.lagrummet.se/publ/sfs/1977:1160#k_3>,
+        <http://rinfo.lagrummet.se/publ/sfs/1977:1160#k_3-p_5>,
+        <http://rinfo.lagrummet.se/publ/sfs/1977:1166> .
+
+<http://rinfo.lagrummet.se/publ/afs/2011:19/konsolidering/2017-06-13?attachment=index.pdf&repo=afs&dir=downloaded> rdfs:label "AFS 2011:19 (konsoliderad tom. 2017:06-13)"@sv .
+
+<https://www.av.se/globalassets/filer/publikationer/foreskrifter/kemiska-arbetsmiljorisker-foreskrifter-afs2014-43.pdf> rdfs:label "Källa"@sv .
+

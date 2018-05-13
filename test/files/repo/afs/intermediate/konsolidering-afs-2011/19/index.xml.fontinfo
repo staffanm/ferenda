@@ -1,0 +1,22 @@
+name                                 type              encoding         emb sub uni object ID
+------------------------------------ ----------------- ---------------- --- --- --- ---------
+ABCDEE+Calibri                       TrueType          WinAnsi          yes yes no       5  0
+TimesNewRomanPSMT                    TrueType          WinAnsi          no  no  no       9  0
+Arial-BoldMT                         TrueType          WinAnsi          no  no  no      11  0
+ABCDEE+Cambria-Bold                  TrueType          WinAnsi          yes yes no      13  0
+ABCDEE+Cambria-Italic                TrueType          WinAnsi          yes yes no      15  0
+ABCDEE+BookAntiqua                   TrueType          WinAnsi          yes yes no      20  0
+ABCDEE+BookAntiqua-Bold              TrueType          WinAnsi          yes yes no      24  0
+ABCDEE+BookAntiqua-Italic            TrueType          WinAnsi          yes yes no      28  0
+TimesNewRomanPS-BoldMT               CID TrueType      Identity-H       yes no  yes     30  0
+TimesNewRomanPSMT                    CID TrueType      Identity-H       yes no  yes     35  0
+ABCDEE+BookAntiqua                   CID TrueType      Identity-H       yes yes yes     40  0
+TimesNewRomanPSMT                    CID TrueType      Identity-H       yes no  yes     75  0
+ABCDEE+Cambria                       TrueType          WinAnsi          yes yes no      82  0
+ABCDEE+Cambria-Bold                  CID TrueType      Identity-H       yes yes yes     94  0
+Arial-BoldMT                         CID TrueType      Identity-H       yes no  yes     99  0
+SymbolMT                             CID TrueType      Identity-H       yes no  yes    104  0
+ABCDEE+Times                         TrueType          WinAnsi          yes yes no     111  0
+ABCDEE+BookAntiqua-Italic            CID TrueType      Identity-H       yes yes yes    133  0
+ABCDEE+BookAntiqua-BoldItalic        TrueType          WinAnsi          yes yes no     140  0
+ABCEEE+BookAntiqua-Bold              CID TrueType      Identity-H       yes yes yes    152  0

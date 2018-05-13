@@ -5,8 +5,6 @@
 		xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 		xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
 		xmlns:dcterms="http://purl.org/dc/terms/"
-		xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
-		xmlns:rinfoex="http://lagen.nu/terms#"
 		xml:space="preserve"
 		exclude-result-prefixes="xhtml rdf">
 
@@ -41,8 +39,6 @@
     <xsl:param name="uri"/>
     <xsl:variable name="legaldefs" select="$myannotations/rdf:Description/rinfoex:isDefinedBy/*"/>
     <xsl:variable name="rattsfall" select="$myannotations/rdf:Description/dcterms:subject/rdf:Description"/>
-    <xsl:message>aside: <xsl:value-of select="count($legaldefs)"/> legaldefs, <xsl:value-of select="count($rattsfall)"/> legalcases</xsl:message>
-
     <aside class="panel-group col-sm-5" role="tablist" id="panel-top"
 	   aria-multiselectable="true">
       <xsl:if test="$rattsfall">

@@ -18,8 +18,9 @@ from ferenda.sources.legal.eu import EURLexCaselaw, EURLexTreaties, EURLexActs
 from ferenda.sources.legal.se import (Direktiv, JK, Kommitte, MyndFskrBase,
                                       Propositioner, Regeringen, Riksdagen,
                                       SwedishLegalSource)
+from ferenda.sources.legal.se.myndfskr import AFS, NFS, SOSFS
 
-from lagen.nu import ARN, DV, SFS, SOU, Ds, JO
+from lagen.nu import ARN, DV, SFS, SOU, Ds, JO, MyndFskr
 
 # subrepos, normally used through a container CompositeRepository
 from lagen.nu.direktiv import DirRegeringen, DirTrips
@@ -32,7 +33,7 @@ for cls in (Keyword, Skeleton, MediaWiki, RFC, W3Standards, PEP,
             JO, Kommitte, MyndFskrBase, Propositioner, Regeringen,
             Riksdagen, SwedishLegalSource, PropRegeringen,
             PropRiksdagen, PropTrips, DirTrips, DirRegeringen,
-            DsRegeringen, SOURegeringen, SOUKB, SFS):
+            DsRegeringen, SOURegeringen, SOUKB, SFS, AFS, NFS, SOSFS):
     # Create a new class, based on RepoTester, on the fly.
     d = {'repoclass': cls,
          'docroot': os.path.dirname(__file__)+"/files/repo/" + cls.alias,

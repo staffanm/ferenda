@@ -382,12 +382,14 @@ class SwedishLegalSource(DocumentRepository):
                     current = new
 
         # specifically for rpubl:KonsolideradGrundforfattning, create
-        # relToBase things
+        # relToBase things if we need them (ie if we're missing a
+        # rpubl:konsoliderar attribute)
         rdf_type = attributes["rdf:type"] if "rdf:type" in attributes else self.rdf_type
         if (infer_nodes and
             not isinstance(rdf_type, (tuple, list)) and
             rdf_type.endswith("KonsolideradGrundforfattning") and
-            "dcterms:issued" in attributes):
+            "dcterms:issued" in attributes and
+            "rpubl:konsoliderar" not in attributes):
             rel = RPUBL.konsoliderar
             new = BNode()  # the document
             g.add((current, DCTERMS.issued,
@@ -492,7 +494,7 @@ class SwedishLegalSource(DocumentRepository):
         # FIXME: This is super hacky.
         if base == "http://rinfo.lagrummet.se":
             base += "/publ"
-        if 'develurl' in self.config:
+        if 'develurl' in self.config and self.config.develurl:
             uri = uri.replace(self.config.develurl, self.config.url)
         if '?' in uri:
             uri = uri.split("?")[0]
@@ -574,9 +576,19 @@ class SwedishLegalSource(DocumentRepository):
         self.refparser._legalrefparser.currentbasefile = doc.basefile
         fp = self.parse_open(doc.basefile)
         # maybe the fp now contains a .patchdescription?
+        orig_uri = doc.uri
         resource = self.parse_metadata(fp, doc.basefile)
         doc.meta = resource.graph
         doc.uri = str(resource.identifier)
+        if orig_uri != doc.uri:
+            newbasefile = self.basefile_from_uri(uri)
+            if newbasefile:
+                # change the basefile we're dealing with. Touch
+                # self.store.parsed_path(basefile) first so we don't
+                # regenerate. 
+                with self.store.open_parsed(doc.basefile, "w"):
+                    pass
+                doc.basefile = newbasefile
         if resource.value(DCTERMS.title):
             doc.lang = resource.value(DCTERMS.title).language
         if options == "metadataonly":
@@ -1350,6 +1362,8 @@ class SwedishLegalSource(DocumentRepository):
 
         >>> parse_swedish_date("3 februari 2010")
         datetime.date(2010, 2, 3)
+        >>> parse_swedish_date("9 Juli 2010")
+        datetime.date(2010, 7, 9)
         >>> parse_swedish_date("vid utgången av december 1999")
         datetime.date(1999, 12, 31)
         >>> parse_swedish_date("2013-11-08")
@@ -1369,13 +1383,14 @@ class SwedishLegalSource(DocumentRepository):
             month = self.swedish_months[month]
             year = int(year)
             day = calendar.monthrange(year, month)[1]
-        elif re.match('\d{4}-\d{2}-\d{2}', datestr):
+        elif re.match(r'\d{4}-\d{2}-\d{2}', datestr):
             year, month, day = [int(x) for x in datestr.split("-")]
         else:
             # assume strings on the form "3 februari 2010", "8 dec. 1997"
             # first normalize misformtting like "7juni 2007"
-            datestr = re.sub("([a-z])(\d)", "\\1 \\2", datestr)
-            datestr = re.sub("(\d)([a-z])", "\\1 \\2", datestr)
+            datestr = datestr.lower()
+            datestr = re.sub(r"([a-z])(\d)", "\\1 \\2", datestr)
+            datestr = re.sub(r"(\d)([a-z])", "\\1 \\2", datestr)
             components = datestr.split()
             try:
                 year = int(components[-1])
@@ -1418,8 +1433,8 @@ class SwedishLegalSource(DocumentRepository):
         # 
         # This function creates a unique URI, based on a SFS number
         # derived from the name of the law
-        slug = re.sub('\W+', '', lawname).lower()
-        slug = re.sub('\d+', '', slug)
+        slug = re.sub(r'\W+', '', lawname).lower()
+        slug = re.sub(r'\d+', '', slug)
         slug = slug.replace("å", "aa").replace("ä", "ae").replace("ö", "oe").replace("é", "e").replace("æ", "a")
         numslug = util.base27encode(slug)
         assert util.base27decode(numslug) == slug, "%s roundtripped as %s" % (slug, util.base26decode(numslug))

@@ -11,29 +11,46 @@ sidebar + non-paged (ie. structural) XHTML
 		xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
 		xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 		xmlns:dcterms="http://purl.org/dc/terms/"
-		xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
+		xmlns:rpubl="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
 		xmlns:ext="http://exslt.org/common"
-		exclude-result-prefixes="xhtml rdf dcterms rinfo rinfoex">
+		exclude-result-prefixes="xhtml rdf dcterms rpubl rinfoex">
   <xsl:import href="annotations-panel.xsl"/>
   <xsl:include href="base.xsl"/>
 
-  <xsl:template name="headtitle"><xsl:value-of select="xhtml:title"/></xsl:template>
+  <xsl:template name="headtitle"><xsl:value-of select="xhtml:title"/> | <xsl:value-of select="$configuration/sitename"/></xsl:template>
   <xsl:template name="metarobots"><xsl:comment>Robot metatag goes here</xsl:comment></xsl:template>
   <xsl:template name="linkalternate"><xsl:comment>Alternate link(s)</xsl:comment></xsl:template>
   <xsl:template name="headmetadata"><xsl:comment>headmetadata?</xsl:comment></xsl:template>
   <xsl:template name="bodyclass">myndfskr</xsl:template>
   <xsl:template name="pagetitle">
+    <xsl:variable name="about" select="//xhtml:body/@about"/>
+    <xsl:variable name="rdftype"><xsl:value-of select="//xhtml:link[@rel='rdf:type']/@href"/></xsl:variable>
+    <xsl:variable name="consolidated" select="boolean($rdftype = 'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#KonsolideradGrundforfattning')"/>
     <xsl:variable name="metadata">
+      <!--
+      <p>data abt <xsl:value-of select="$about"/> [<small><xsl:value-of select="$rdftype"/></small>] (<xsl:value-of select="$consolidated"/>)</p>
+      <p><small><xsl:value-of select="//xhtml:link[@rel='rdf:type']/@href"/></small></p>
+      -->
       <ul>
-	<li><a href="{//xhtml:head/xhtml:link[@rel='prov:alternateOf']/@href}">Källa</a></li>
-	<li>Senast hämtad (entry:orig_updated)</li>
-	<li>(Om konsoliderad: konsolideringsdatum</li>
-	<li>(Om konsoliderad: konsolideringsunderlag m länkar)</li>
-	<li>Om grundförfattning: OBS efterförljande ändringsförfattning</li>
-	<li>Om inte senaste ändringsförfattning: OBS efterförljande ändringsförfattning</li>
-	<li>Om ändringsförfattning: länk t grundförfattning</li>
-	<li>Om grund- eller ändringsförfattning: Länk t konsoliderad version, om det finns</li>
+	<li><a href="{//xhtml:link[@rel='prov:alternateOf']/@href}">Källa</a></li>
+	<li>Senast hämtad: <xsl:value-of select="substring(//xhtml:meta[@property='rinfoex:senastHamtad']/@content, 1, 10)"/></li>
+	<xsl:if test="$consolidated">
+	  <li>Konsoliderar: <xsl:for-each select="$annotations//resource[@uri=$about]/rpubl:konsolideringsunderlag">
+	    <xsl:sort select="@ref"/>
+	    <xsl:variable name="ku-uri" select="@ref"/>
+	    <a href="{$ku-uri}">
+	      <xsl:value-of select="$annotations//resource[@uri=$ku-uri]/dcterms:identifier"/>
+	    </a>
+	    </xsl:for-each>
+	  </li>
+	</xsl:if>
+	<xsl:if test="not($consolidated)">
+	  <li>Om grundförfattning: OBS efterförljande ändringsförfattning</li>
+	  <li>Om inte senaste ändringsförfattning: OBS efterförljande ändringsförfattning</li>
+	  <li>Om ändringsförfattning: länk t grundförfattning</li>
+	  <li>Om grund- eller ändringsförfattning: Länk t konsoliderad version, om det finns</li>
+	</xsl:if>
       </ul>
     </xsl:variable>
     <div class="row">

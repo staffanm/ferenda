@@ -1,0 +1,1969 @@
+AFS 2011:19
+
+Kemiska arbetsmiljörisker
+Arbetsmiljöverkets föreskrifter och allmänna råd om kemiska arbetsmiljörisker
+(Ändringar införda t.o.m 13 juni 2017.)
+
+AFS 2011:19
+
+Kemiska arbetsmiljörisker
+Arbetsmiljöverkets föreskrifter och allmänna råd om kemiska arbetsmiljörisker
+Innehållsförteckning
+Arbetsmiljöverkets föreskrifter om kemiska arbetsmiljörisker
+Syfte och tillämpningsområde
+Vilka föreskrifterna riktar sig till
+Reach-förordningen
+Definitioner
+Undersökning och riskbedömning
+När en undersökning och riskbedömning ska göras
+Kemiska riskkällor som ska identifieras och förtecknas
+Dokument som är viktiga för riskbedömningen
+Faktorer som ska bedömas för att avgöra om åtgärder krävs
+Dokumentation och information
+Dokumentation av riskbedömningens resultat
+Hanterings- och skyddsinstruktioner samt andra rutiner
+Beredskapsplan för olyckor och nödsituationer
+Skyldighet att informera om risker och hålla dokumentation
+tillgänglig
+Skyldigheter att vidta vissa särskilda åtgärder och följa förbud
+Primära skyldigheter i verksamheter där kemiska riskkällor
+förekommer
+Prioritetsordning vid val av åtgärder för att ytterligare begränsa
+riskerna (åtgärdstrappa)
+Uppgifter om avfall
+Allmänna krav på märkning
+Särskilt om märkning av farliga kemiska produkter i arbetet
+Skyltning, förvaring och behållare
+Åtgärder mot risker vid inandning
+Organiska lösningsmedel
+Andningsskydd
+Åtgärder mot risker vid hudkontakt, ögonstänk och förtäring
+Arbete i cistern, brunn, silo, lastutrymme eller liknande
+Åtgärder för att förebygga brand-, explosions- och reaktionsrisker
+Arbetstillstånd
+Åtgärder vid hantering av radioaktiva kemiska riskkällor
+Särskilda krav för allergiframkallande kemiska produkter och vissa
+processer
+Dokumentation av riskbedömning
+Skyltning
+Information
+Utbildning
+Läkarundersökningar
+Särskilda krav för cancerframkallande, mutagena och reproduktionsstörande kemiska produkter och viss verksamhet
+Utredning om möjlighet att ersätta produkt
+Dokumentation av riskbedömningen
+Register
+Minskning av exponeringen
+Förbud och tillstånd
+Periodiska mätningar av vissa kemiska ämnen
+Bestämmelser om sanktionsavgifter
+
+2
+
+4
+4
+4
+4
+5
+5
+5
+6
+6
+6
+6
+7
+7
+7
+8
+8
+8
+8
+8
+8
+9
+10
+10
+10
+10
+11
+11
+11
+11
+11
+12
+12
+12
+12
+13
+13
+13
+13
+14
+14
+14
+15
+16
+
+AFS 2011:19
+
+Bilaga 1: Ämnen med förbud eller tillståndskrav
+Arbetsmiljöverkets allmänna råd om tillämpningen av föreskrifterna
+om kemiska arbetsmiljörisker
+Syfte och tillämpningsområde
+Vilka föreskrifterna riktar sig till
+Reach-förordningen
+Definitioner
+Undersökning och riskbedömning
+När en undersökning och riskbedömning ska göras
+Kemiska riskkällor som ska identifieras och förtecknas
+Dokument som är viktiga för riskbedömningen
+Faktorer som ska bedömas för att avgöra om åtgärder krävs
+Dokumentation och information
+Hanterings- och skyddsinstruktioner samt andra rutiner
+Beredskapsplan för olyckor och nödsituationer
+Skyldighet att informera om risker och hålla dokumentation
+tillgänglig
+Skyldigheter att vidta vissa särskilda åtgärder och följa förbud
+Primära skyldigheter i verksamheter där kemiska riskkällor förekommer
+Prioritetsordning vid val av åtgärder för att ytterligare begränsa
+riskerna (åtgärdstrappa)
+Uppgifter om avfall
+Allmänna krav på märkning
+Särskilt om märkning av farliga kemiska produkter i arbetet
+Skyltning, förvaring och behållare
+Åtgärder mot risker vid inandning
+Organiska lösningsmedel
+Andningsskydd
+Åtgärder mot risker vid hudkontakt, ögonstänk och förtäring
+Arbete i cistern, brunn, silo, lastutrymme eller liknande
+Åtgärder för att förebygga brand-, explosions- och reaktionsrisker
+Arbetstillstånd
+Åtgärder vid hantering av radioaktiva kemiska riskkällor
+Särskilda krav för allergiframkallande kemiska produkter och vissa
+processer
+Dokumentation av riskbedömning
+Skyltning
+Utbildning
+Läkarundersökningar
+Särskilda krav för cancerframkallande, mutagena och reproduktionsstörande kemiska produkter och viss verksamhet
+Dokumentation av riskbedömningen
+Register
+Förbud och tillstånd
+Periodiska mätningar av vissa kemiska ämnen
+
+17
+
+19
+19
+19
+20
+20
+20
+20
+20
+21
+21
+22
+22
+23
+24
+24
+24
+25
+25
+25
+26
+28
+30
+30
+30
+30
+30
+31
+31
+32
+32
+32
+32
+33
+33
+33
+33
+33
+34
+34
+
+3
+
+AFS 2011:19
+
+Kemiska arbetsmiljörisker
+Arbetsmiljöverkets föreskrifter och allmänna råd om kemiska arbetsmiljörisker
+
+beslutade den 29 november 2011.
+(Ändringar införda t.o.m 13 juni 2017.)
+
+Utkom från trycket
+den 28 december 2011
+
+Syfte och tillämpningsområde
+1 § Syftet med dessa föreskrifter är att fastställa hur ohälsa och olycksfall orsakade av kemiska riskkällor i
+arbetet ska förebyggas.
+Föreskrifterna gäller alla verksamheter där kemiska riskkällor kan förekomma. Men i arbetsgivares
+hushåll får man göra undersökning och riskbedömning enligt 5 § första stycket utan att tillämpa 6–10 §§.
+Detsamma gäller för allmänt tillgängliga kemiska produkter för disk och städning i samband med
+arbetstagarnas utnyttjande av pentryn, lunchrum eller liknande för eget bruk.
+
+Vilka föreskrifterna riktar sig till
+2 § Arbetsgivaren har ansvaret för att föreskrifterna följs. Andra än arbetsgivare är också skyldiga att följa
+arbetsmiljölagen (1977:1160) om ämne som kan föranleda ohälsa enligt 1 och 3 kap. arbetsmiljölagen. Dessa
+personer omfattas av föreskriften med de begränsningar som framgår av tredje och fjärde styckena nedan.
+Arbetstagare är i dessa föreskrifter även den som likställs med arbetstagare enligt 1 kap. 3 §
+arbetsmiljölagen.
+Den som driver verksamhet utan anställd enligt 3 kap. 5 § andra stycket arbetsmiljölagen är inte skyldig
+att följa dessa föreskrifter i de avsnitt som gäller skyldigheter att ge arbetstagare information.
+Den som bara är arbetsgivare i egenskap av uthyrare av personal är bara skyldig att följa följande
+bestämmelser.
+– 5 § sista stycket om att se till att de uthyrda arbetstagarna inte påbörjar arbete innan uthyraren, genom
+kontroll av inhyrarens dokumentation enligt 13 §, kunnat förvissa sig om att undersökning och
+riskbedömning genomförts och nödvändiga riskbegränsande åtgärder vidtagits och
+– 41 § om registreringsskyldighet.
+
+Reach-förordningen
+3 § Verksamheter som tillverkar, importerar eller använder kemiska ämnen eller beredningar omfattas
+även av bestämmelserna i Europaparlamentets och rådets förordning (EG) nr 1907/2006 av den 18
+december 2006 om registrering, utvärdering, godkännande och begränsning av kemikalier (Reach),
+inrättande av en europeisk kemikaliemyndighet, ändring av direktiv 1999/45/EG och upphävande av
+rådets förordning (EEG) nr 793/93 och kommissionens förordning (EG) nr 1488/94 samt rådets direktiv
+76/769/EEG och kommissionens direktiv 91/155/EEG, 93/67/EEG, 93/105/EG och 2000/21/EG (Reachförordningen).
+Enligt förordningen är tillverkare, importörer och nedströmsanvändare skyldiga att spara all information
+som behövs för tillämpningen av förordningen i 10 år och i vissa fall även utarbeta en
+kemikaliesäkerhetsrapport.
+
+Definitioner
+4 § De beteckningar som används i dessa föreskrifter har samma betydelse som i arbetsmiljölagen
+(1977:1160), arbetsmiljöförordningen (1977:1166) och Arbetsmiljöverkets föreskrifter om hygieniska
+gränsvärden. Dessutom använder föreskrifterna följande beteckningar.
+Exponering
+
+4
+
+Att utsättas för en kemisk riskkälla genom inandning, förtäring, eller kontakt med
+hud, slemhinnor eller ögon.
+
+AFS 2011:19
+Farlig kemisk produkt
+
+Kemisk produkt eller explosivt föremål som medför en fysikalisk fara eller
+hälsofara, inklusive de som inte släpps ut på marknaden, enligt kriterierna i
+– Europaparlamentets och rådets förordning (EG) nr 1272/2008 av den 16
+december 2008 om klassificering, märkning och förpackning av ämnen och
+blandningar, ändring och upphävande av direktiven 67/548/EEG och
+1999/45/EG samt ändring av förordning (EG) nr 1907/2006 (CLPförordningen).
+
+Hantering
+
+Tillverkning,
+användning,
+förfaranden.
+
+Kemisk produkt
+
+Kemiskt ämne eller blandning av kemiska ämnen som tillverkats eller utvunnits
+och vars funktion främst bestäms av dess kemiska sammansättning eller utgör
+avfall.
+
+Kemisk riskkälla
+
+Ett kemiskt ämne eller flera kemiska ämnen tillsammans som, kan medföra ohälsa
+eller olycksfall genom
+– sina hälsofarliga egenskaper,
+– sina egenskaper när det beror på det sätt på vilket ämnena används eller
+förekommer,
+– sin temperatur,
+– att minska halten syrgas i luften eller
+– att öka risken för brand, explosion eller annan farlig kemisk reaktion.
+
+Kemiskt ämne
+
+Ett kemiskt grundämne eller en kemisk förening.
+(AFS 2014:43)
+
+bearbetning, behandling, förpackning, förvaring, transport,
+omhänder-tagande, destruktion, konvertering och liknande
+
+Undersökning och riskbedömning
+När en undersökning och riskbedömning ska göras
+5 § Risken för att kemiska riskkällor kan orsaka ohälsa eller olycksfall i verksamheten ska undersökas och
+bedömas enligt 6-9 §§ så ofta som förhållandena i verksamheten kräver.
+Dessutom ska sådan undersökning och riskbedömning alltid genomföras när verksamheten förändras
+tillfälligt eller permanent eller om det kan antas att resultatet av riskbedömningen kommer att påverkas
+med anledning av ny information.
+Luften ska undersökas och bedömas varje gång arbete ska påbörjas i en cistern, brunn, silo, ett
+lastutrymme eller liknande. Om det inte är uppenbart att luften är säker ska luftens innehåll av syrgas och
+hälsofarliga ämnen mätas och explosionsrisken bedömas genom att mäta halten brännbara gaser och ångor.
+Arbete får inte påbörjas innan en undersökning och riskbedömning har genomförts och nödvändiga
+åtgärder vidtagits för att förebygga ohälsa och olycksfall i arbetet.
+
+Kemiska riskkällor som ska identifieras och förtecknas
+6 § De kemiska riskkällor som kan förväntas förekomma i verksamheten ska identifieras och förtecknas.
+Riskkällorna ska ges ett namn som, för farliga kemiska produkter, inte får skilja sig från det namn som
+används vid märkning enligt 19 §. Datum när uppgifterna förtecknades ska anges och för respektive
+riskkälla ska framgå
+1. typ av farlighet,
+2. på vilken plats den förvaras och annars förekommer,
+3. om hygieniskt gränsvärde finns och
+4. vilka andra särskilda regler som kan gälla för riskkällan.
+Sådana riskkällor som är kemiska produkter och som hanteras eller saluförs i slutna förpackningar får
+sammanföras och förtecknas under ett gemensamt namn om bedömningen av riskerna i hanteringen enligt
+8 § kan göras för dessa produkter gemensamt.
+
+5
+
+AFS 2011:19
+Dokument som är viktiga för riskbedömningen
+7 § Den ytterligare information om de förtecknade riskkällorna som behövs för att göra bedömningen
+enligt 8 § ska tas fram. Följande dokument ska alltid finnas.
+1. Säkerhetsdatablad för kemiska produkter samt annan information om risker och skyddsåtgärder som
+leverantören är skyldig att lämna. Om den mängd som hanteras är så liten att ohälsa eller olycksfall inte
+rimligen kan uppkomma räcker det emellertid med informationen i leverantörsmärkningen.
+2. Ett dokument med de uppgifter som behövs om hälsa och säkerhet för de farliga kemiska produkter
+som tillverkas på arbetsstället eller förs in i landet av verksamheten. Dokumentation behöver inte tas fram
+om den kemiska produkten tillverkas eller används för eget bruk i liten skala på laboratorium.
+
+Faktorer som ska bedömas för att avgöra om åtgärder krävs
+8 § En bedömning ska göras om och när åtgärder behövs för att begränsa risken för att en kemisk riskkälla
+orsakar ohälsa eller olycksfall i den egna verksamheten genom
+1. skadlig exponering via inandning,
+2. skadlig exponering via hudkontakt, stänk i ögonen eller intag via munnen,
+3. bildning av antändbar luftblandning eller brandrisk av annan orsak, samt
+4. personskador på grund av reaktiva, explosiva eller materialförstörande egenskaper.
+Vid bedömningen ska bland annat följande faktorer beaktas.
+1. Hur riskkällans farliga egenskaper kan komma till uttryck vid det sätt som den förekommer i
+verksamheten.
+2. Hur arten, nivån och varaktigheten av exponeringen för riskkällan är där den förekommer.
+3. Eventuella samverkande effekter med andra kemiska riskkällor eller med andra arbetsmiljöfaktorer på
+arbetsplatsen.
+4. Möjliga reaktioner tillsammans med andra kemiska riskkällor eller material som förekommer på
+arbetsplatsen.
+5. Förhållanden vid arbetet som kan påverka risken, inklusive effekten av vidtagna och planerade
+skyddsåtgärder.
+6. Erfarenheter från ohälsa, olycksfall eller tillbud i verksamheten, vid beredskapsövningar enligt 12 §
+sista stycket samt erfarenheter från medicinska kontroller.
+Bedömningen ska leda till beslut om vilka åtgärder som ska vidtas för att begränsa riskerna.
+9 § För kemiska riskkällor som är upptagna i bilaga 1, Arbetsmiljöverkets föreskrifter (AFS 2011:18) om
+hygieniska gränsvärden ska man vid bedömningen enligt 8 § avgöra om halten av respektive ämne är
+godtagbar med hänsyn till gränsvärdet. Bedömningen och skälen för denna ska dokumenteras.
+Vid bedömningen ska hänsyn tas till halten av alla kemiska ämnen i inandningsluften som kan medföra
+ohälsa eller olycksfall, till hur fysiskt påfrestande arbetet är och till att vissa ämnen kan tas upp genom
+huden.
+Mätning av luftföroreningar i andningszonen ska utföras om det inte på annat sätt kan klargöras vilka
+åtgärder som krävs för att exponeringen ska vara godtagbar med hänsyn till gränsvärdet.
+Om mätning inte behöver utföras enligt undantagen i tredje stycket eller 50 § andra stycket ska skälen för
+detta dokumenteras.
+
+Dokumentation och information
+Dokumentation av riskbedömningens resultat
+10 § Resultatet av en riskbedömning och besluten om åtgärder enligt 8 § sista stycket ska dokumenteras.
+Av dokumentationen ska framgå
+1. vilka delar av verksamheten som ingått i undersökningen och riskbedömningen,
+2. i vilka situationer eller utrymmen en kemisk risk behöver undanröjas eller begränsas,
+3. vilka skyddsåtgärder som ska vidtas när man utför olika typer av arbetsuppgifter och vilka
+skadebegränsande och avhjälpande åtgärder som ska vara förberedda,
+4. vilka övriga åtgärder eller mer detaljerade undersökningar som är beslutade, vem som har ansvaret
+och när de ska vara klara,
+5. vilka personer som deltagit i bedömningen,
+
+6
+
+AFS 2011:19
+6. tidpunkten för nästa planerade undersökning och riskbedömning, så-vida det inte är en bedömning av
+ett tillfälligt arbete,
+7. vilket datum dokumentet upprättats och
+8. vem den fysiska person är som i egenskap av ansvarig godkänt undersökningen och riskbedömningen.
+Om bedömningen enligt 8 § sista stycket är att det inte finns några situa-tioner eller utrymmen där någon
+kemisk risk behöver undanröjas eller begränsas får dokumentationen enligt punkterna 2, 3 och 4 ersättas
+med en uppgift om detta.
+
+Hanterings- och skyddsinstruktioner samt andra rutiner
+11 § De hanterings- och skyddsinstruktioner samt andra rutiner som behövs för den verksamhet som
+bedrivs på arbetsplatsen ska fastställas. De ska vara skriftliga när det inte rör sig om en enkel hantering där
+riskerna lätt kan överblickas.
+
+Beredskapsplan för olyckor och nödsituationer
+12 § En beredskapsplan med rutiner och instruktioner enligt 11 § ska upprättas om det av undersökningen
+och riskbedömningen följer att olyckor och nödsituationer kan uppkomma som kräver omedelbara
+åtgärder för att skydda arbetstagare.
+Beredskapsplanen ska innehålla uppgifter om:
+1. Vid vilka händelser omedelbara åtgärder krävs.
+2. Vilka uppgifter särskilt utsedda personer har vid sådana händelser.
+3. Vilka skadebegränsande åtgärder som omedelbart ska genomföras, vilken skyddsutrustning som då
+behövs och var den finns.
+4. Hur berörda arbetstagare ska informeras om händelsen.
+5. Vilka varningssystem som finns och hur de fungerar.
+6. När utrymning ska ske.
+7. Var utrustning för första hjälpen finns.
+Övningar ska genomföras i den omfattning som behövs för att beredskapsplanen ska följas då en olycka
+eller en nödsituation uppstår.
+
+Skyldighet att informera om risker och hålla dokumentation tillgänglig
+13 § Berörda arbetstagare ska informeras om vilka hälso- och olycksfallsrisker som är förbundna med de
+kemiska riskkällor som hanteras eller på annat sätt förekommer i verksamheten och om hur dessa risker
+ska förebyggas. Av informationen ska framgå vilka skyldigheter detta innebär för arbetstagarna, särskilt
+skyldigheten att underrätta arbetsgivaren vid misstanke om att en kemisk riskkälla orsakat ohälsa,
+olycksfall eller tillbud. Det ska säkerställas att arbetstagarna har förstått informationen.
+Information enligt första stycket avser huvudsakligen uppgifter ur följande dokument.
+1. De förtecknade kemiska riskkällorna enligt 6 §.
+2. Säkerhetsdatablad, risk- och skyddsinformation om farliga kemiska produkter och andra dokument
+som kan krävas enligt 7 §.
+3. Bedömningen av exponeringen vid inandning och mätrapporter som upprättats enligt 9 och 50 §§.
+4. Dokumentationen av undersökningens och riskbedömningens resultat samt beslutade åtgärder enligt
+10 och 40 §§.
+5. Hanterings- och skyddsinstruktioner samt andra rutiner när de ska vara skriftliga enligt 11, 36 eller
+44 §§.
+6. Beredskapsplan för olyckor och nödsituationer enligt 12 §.
+7. Föreskrifter om hygieniska gränsvärden samt andra föreskrifter som gäller för arbetet.
+8. Villkorsdelen i tillstånd från Arbetsmiljöverket enligt 46 och 47 §§.
+Dokumentationen ska vara tillgänglig för berörda arbetstagare och skriven på svenska eller på ett annat
+språk som hela personalen använder. Den dokumentation som upprättats i verksamheten ska vara
+överskådlig, lättläst och tydlig.
+
+Skyldigheter att vidta vissa särskilda åtgärder och följa förbud
+14 §
+
+Bestämmelserna i 15-49 §§ ska beaktas vid tillämpningen av 8 § sista stycket.
+
+7
+
+AFS 2011:19
+Primära skyldigheter i verksamheter där kemiska riskkällor förekommer
+15 § Oavsett resultatet av bedömningen enligt 8 § gäller följande skyldigheter vid arbete där kemiska
+riskkällor förekommer om kostnaden för åtgärden står i rimlig proportion till minskningen av risken.
+1. Kemiska produkter och material ska väljas så att kemiska risker tillsammans med andra risker
+förbundna med arbetet sammantaget blir så små som möjligt vid hanteringen.
+2. Exponeringen och antalet exponerade personer samt olycksrisken ska begränsas genom val av
+lämpliga arbetsmetoder, anpassning av lokaler, arbetsutrustning, plats och tidpunkt.
+3. Mängden av varje kemisk riskkälla på arbetsplatsen ska begränsas till den mängd som behövs för
+arbetet om detta kan minska risken.
+
+Prioritetsordning vid val av åtgärder för att ytterligare begränsa riskerna (åtgärdstrappa)
+16 § Om bedömningen enligt 8 § visar att det trots valen av kemisk produkt, arbetsmetod och
+arbetsutrustning enligt 15 § fortfarande finns risker ska ytterligare åtgärder vidtas. Riskerna ska minskas till
+godtagbar nivå genom att man genomför en eller flera av följande typer av åtgärder i följande
+prioritetsordning.
+1. Utföra arbetet eller processen i ett slutet system, använda fjärrstyrning eller andra tekniska åtgärder
+som medför att arbetstagarna inte utsätts för risken.
+2. Använda processventilation eller andra tekniska skyddsåtgärder i anslutning till den kemiska
+riskkällan för att minska risken för arbetstagarna.
+3. Förlägga arbetet till en särskild tid eller plats där endast personal som behövs för detta arbete är
+närvarande.
+4. Använda personlig skyddsutrustning när åtgärder enligt ovan inte är tillräckliga eller går att använda.
+
+Uppgifter om avfall
+17 § Den som överlämnar avfall som utgör en kemisk riskkälla för omhändertagande ska ge mottagaren
+den produktinformation som behövs för en säker hantering.
+
+Allmänna krav på märkning
+18 § Behållare och rörledningar som innehåller kemiska riskkällor ska vara märkta med de uppgifter som
+behövs för att man klart ska kunna identifiera innehållet och de risker som är förknippade med detta.
+Rörledningar som innehåller en brandfarlig vätska med en flampunkt 100 °C eller lägre, vilken inte är en
+farlig kemisk produkt enligt 4 §, ska vara märkta med produktens namn samt en pil för
+strömningsriktningen. Om rörledningen används för flera sådana vätskor får produktnamnen anges med
+en samlingsbeteckning. (AFS 2014:43)
+
+Särskilt om märkning av farliga kemiska produkter i arbetet
+19 § Behållare som innehåller farliga kemiska produkter ska, när de används eller lagerhålls i anslutning
+till användning, vara märkta enligt alternativ 1 eller 2 nedan.
+1. Enligt förordning (EG) nr 1272/2008 (CLP-förordningen).
+2. Med följande:
+a) produktens namn,
+b) de faropiktogram som ska finnas i märkningen när produkten släpps ut på marknaden enligt CLPförordningen samt text enligt nedanstående tabell och
+c) text med information därom när produkten kan
+– ge cancer,
+– ge allergi,
+– skada arvsmassan eller
+– störa reproduktionen.
+
+8
+
+AFS 2011:19
+Fysikaliska faror
+Faropiktogram
+enligt CLPförordningen
+Text till
+faropiktogrammet
+
+Explosiv
+
+Brandfarlig
+
+Oxiderande
+
+Gas under
+tryck
+
+Hälsofarlig
+
+Skadlig
+
+Hälsofaror
+Faropiktogram
+enligt CLPförordningen
+Text till
+faropiktogrammet
+
+Giftig
+
+Frätande
+
+Behållare i en teknisk anordning, där den farliga kemiska produkten behövs för anordningens funktion,
+behöver enbart uppfylla kravet i 18 §.
+Märkningen får begränsas till enbart produktens namn eller helt utelämnas om andra åtgärder vidtas
+som säkerställer att detta inte innebär ökad risk för ohälsa eller olycksfall och om kravet i 18 § uppfylls.
+(AFS 2014:43)
+20 § Synliga rörledningar som innehåller en farlig kemisk produkt ska vara märkta med produktens namn
+och faropiktogram samt med en pil för strömningsriktningen. På en rörledning som används för olika
+produkter med samma farliga egenskaper får produktnamnen anges med en samlingsbeteckning.
+Märkning ska placeras väl synlig i närheten av farliga ställen såsom ventiler och kopplingar samt med
+sådana mellanrum att en märkning alltid kan ses när man befinner sig längs ledningen.
+Den arbetsgivare som inte har märkt en eller flera rörledningar med farliga kemiska produkter enligt
+kravet i första stycket ska betala en sanktionsavgift, se 52 §.
+Lägsta avgiften är 15 000 kronor och högsta avgiften är 150 000 kronor. För den som har 500 eller fler
+sysselsatta är avgiften 150 000 kronor. För den som har färre än 500 sysselsatta ska sanktionsavgiften
+beräknas enligt följande:
+Avgift = 15 000 kronor + (antal sysselsatta –1) x 271 kronor.
+Summan ska avrundas nedåt till närmaste hela hundratal. (AFS 2014:43)
+
+Skyltning, förvaring och behållare
+20 a § Områden, lokaler och inhägnader där så stora mängder farliga kemiska produkter lagras att det har
+betydelse för säkerheten ska skyltas med tillämpliga faropiktogram om inte märkningen av de individuella
+behållarna kan ses och läsas utifrån.
+Utöver skyltning enligt första stycket ska skyltar med förbud, påbud och varningar som rör kemiska
+risker sättas upp när riskbedömningen enligt 8 § i dessa föreskrifter visar att det behövs. (AFS 2017:4)
+21 § Vid förvaring av kemiska riskkällor ska hälso- och olycksfallsrisker förebyggas. Bland annat ska
+följande iakttas.
+1. Förvaringsskåp och förråd inomhus ska ha fläktstyrd ventilation när hälsofarliga gaser eller ångor kan
+avges från behållarna.
+2. Behållare ska förvaras åtskilda om de tillsammans kan ge upphov till ökade risker.
+3. Risk för läckage av kemiska riskkällor ska kontrolleras och åtgärdas. (AFS 2014:43)
+22 § Behållare som innehåller kemiska riskkällor ska vara anpassade till riskkällans egenskaper och till
+hanteringen genom material, form och hållfasthet så att ohälsa och olycksfall förebyggs. Behållare ska om
+möjligt vara förslutna när riskkällan kan avge luftföroreningar. Behållare ska ha säkerhetsutrustning när
+det behövs.
+Kemiska riskkällor får inte förvaras i sådana behållare som kan medföra att riskkällorna orsakar ohälsa
+eller olycksfall genom förväxling. (AFS 2014:43)
+
+9
+
+AFS 2011:19
+Åtgärder mot risker vid inandning
+23 § Arbetet ska ordnas, utföras, följas upp och åtgärdas så att inandningsluften blir så fri från
+luftföroreningar som är praktiskt möjligt med hänsyn till de resurser som krävs för att begränsa
+luftföroreningarna.
+Åtgärder ska omedelbart vidtas om inandningsluften inte bedöms vara godtagbar med hänsyn till
+gränsvärdena i bilaga 1, Arbetsmiljöverkets föreskrifter (AFS 2011:18) om hygieniska gränsvärden.
+Sedan åtgärder vidtagits för att minska halten luftföroreningar i andningszonen ska en mätning av halten
+göras senast tre månader efter det att åtgärder enligt andra stycket vidtagits, om det inte är uppenbart
+onödigt. (AFS 2014:5)
+
+Organiska lösningsmedel
+24 § Färg eller lack som används på tillfälliga arbetsplatser som är belägna inomhus eller i ett helt eller
+delvis slutet utrymme, ska vara fri från organiska lösningsmedel eller vara vattenburen om inte organiska
+lösningsmedel krävs av tekniska eller kulturhistoriska skäl.
+
+Andningsskydd
+25 § Andningsskydd ska vara individuellt utprovat och ge fullgott skydd med hänsyn till luftens
+syrgashalt, förekomsten av hälsofarliga fasta partiklar eller vätskepartiklar, samt hälsofarliga gaser eller
+ångor.
+
+Åtgärder mot risker vid hudkontakt, ögonstänk och förtäring
+26 § För att ingen ska skadas genom hudkontakt eller förtäring ska
+1. behållare och utrustning hållas rena utvändigt,
+2. arbetskläder och skyddskläder som kan orsaka ohälsa eller olycksfall därför att de förorenats med en
+kemisk riskkälla snarast bytas,
+3. munpipettering eller andra metoder där kemiska riskkällor kan komma in i munnen inte användas,
+4. skyddskläder tas av och händer tvättas när toalett, personalmatsal eller annat utrymme där riskkällan
+som skyddskläderna används mot inte förekommer ska besökas,
+5. personliga tillhörigheter inte medföras vid arbete där kemiska riskkällor hanteras om detta skulle
+kunna medföra risk för ohälsa samt
+6. mat eller dryck inte tillredas, förtäras eller förvaras, tobaksvaror inte används och kosmetika inte
+appliceras där en kemisk riskkälla förekommer, om det skulle kunna medföra risk för ohälsa. (AFS 2014:43)
+27 § Vid val av skyddshandskar och skyddskläder ska följande faktorer beaktas.
+1. På vilket sätt ämnet är farligt vid hudkontakt.
+2. Hur ofta och länge hudkontakt beräknas förekomma.
+3. Vilka material som skyddar mot ämnet och hur länge materialet skyddar från hudkontakt med ämnet,
+så kallad genombrottstid.
+4. Arbetets krav på funktion och hållfasthet.
+5. Leverantörsinformation om lämpliga skyddshandskar och skyddskläder.
+28 § Om riskerna för stänk eller översköljning inte helt kunnat undanröjas genom andra åtgärder ska
+ögonskydd med god funktion och passform användas vid hantering där en kemisk riskkälla kan skada
+ögonen.
+29 § Regler om tvättmöjlighet, nöddusch och ögonspolningsanordning finns i 36 och 73 §§
+Arbetsmiljöverkets föreskrifter (AFS 2009:2) om arbetsplatsens utformning och 9 och 10 §§
+Arbetarskyddsstyrelsens föreskrifter (AFS 1999:7) om första hjälpen och krisstöd.
+30 § Innan en trycksatt anordning som innehåller en kemisk riskkälla tas isär ska den göras trycklös och
+dräneras om det är tekniskt möjligt.
+
+10
+
+AFS 2011:19
+Arbete i cistern, brunn, silo, lastutrymme eller liknande
+31 § Innan man påbörjar arbete i en cistern, brunn, silo, ett lastutrymme eller liknade ska en särskild
+riskbedömning göras enligt 5 § tredje stycket. Vid tillämpning av 8 och 9 §§ ska man bedöma om luften
+behöver kontrolleras fortlöpande under arbetet.
+Om utrymmet inte kan ventileras så att luftens sammansättning blir säker ska lämpligt andningsskydd
+användas.
+32 § Arbete som avses i 31 § ska övervakas så att snabb hjälp kan erhållas. Lyft av person ur utrymmet ska
+vara förberett om det inte är uppenbart onödigt.
+
+Åtgärder för att förebygga brand-, explosions- och reaktionsrisker
+33 § Vid beslut om åtgärder enligt 8 § sista stycket för att förebygga risk för brand och explosion ska typ
+av åtgärder övervägas i följande ordning.
+1. Begränsning av hantering av kemiska riskkällor som kan medföra att antändbara halter i luften bildas.
+2. Begränsning av antändningskällor som kan ge upphov till brand eller explosion.
+3. Utformning av arbetslokaler och tekniska anordningar så att en brand eller explosion medför minsta
+möjliga risk för personskador.
+34 § Lämplig utrustning för brandsläckning och livräddning ska finnas tillgänglig vid verksamheter där
+en kemisk riskkälla kan orsaka brand eller explosion. Detsamma gäller vid verksamhet där det förekommer
+en kemisk riskkälla som vid brand kan utveckla farlig mängd gas eller aerosol.
+35 § Situationer som kan ge upphov till farliga kemiska reaktioner eller bildande av oönskade kemiska
+riskkällor ska undvikas.
+Kemiska riskkällor som utgörs av kemiskt instabila ämnen ska hanteras så att situationer som ökar risken
+för okontrollerad sönderdelning eller polymerisation undviks.
+
+Arbetstillstånd
+36 § Innan ett arbete enligt punkt 1–3 nedan påbörjas ska arbetsgivaren, eller annan som har motsvarande
+skyldigheter enligt 2 §, ha lämnat sitt skriftliga godkännande på ett dokument som innehåller hanteringsoch skyddsinstruktioner för arbetsuppgiften enligt 11 § och ett intygande av den som ska utföra arbetet att
+denne tagit del av och kommer att följa instruktionerna. Dokumentet ska benämnas arbetstillstånd och
+bevaras i minst tre månader efter det att arbetet avslutats.
+1. Arbete i en cistern, brunn, silo, lastutrymme eller liknade där en brandfarlig vätska, gas eller aerosol
+enligt förordning (EG) nr 1272/2008 (CLP-förordningen) hanteras eller förekommer på annat sätt.
+2. Svetsa, skära, löda, slipa, borra eller utföra annat arbete som medför hög temperatur i eller på
+rörledning, cistern, fat eller liknande behållare som innehåller eller har innehållit brandfarlig vara eller
+brännbar vätska.
+3. Utföra arbete som kan orsaka brand eller explosion inom ett område där explosionsfarlig atmosfär kan
+förekomma.
+På ett gemensamt arbetsställe ska de villkor och instruktioner som gäller för ett arbete enligt första
+stycket samt uppgift om de risker som kan uppstå för dem som arbetar för andra företag eller motsvarande
+lämnas till den som är ansvarig för samordningen av arbetsmiljöfrågorna. Arbetet får inte påbörjas förrän
+den ansvarige godkänt detta. (AFS 2014:43)
+
+Åtgärder vid hantering av radioaktiva kemiska riskkällor
+37 § Radioaktiva kemiska riskkällor ska hanteras så att skydd erhålls mot såväl intag och upptag av
+riskkällan som mot yttre bestrålning.
+
+Särskilda krav för allergiframkallande kemiska produkter och vissa processer
+37 a §
+
+Då riskbedömningen, enligt 5 ,§§ 9–har visat att det kan förekomma exponering för
+allergiframkallande kemiska produkter ska bestämmelserna i 37 b–g §§ tillämpas för de som sysselsätts:
+
+11
+
+AFS 2011:19
+1. med farliga kemiska produkter som, enligt förordning (EG) nr 1272/2008 (CLP-förordningen), ska vara
+märkta med någon av följande faroangivelser,
+– H317 Kan orsaka allergisk hudreaktion,
+–H334 Kan orsaka allergi- eller astmasymtom eller andningssvårigheter vid inandning,
+2. med lim eller andra kemiska produkter som innehåller etyl-2-cyano-akrylat eller metyl-2-cyanoakrylat
+eller
+3. med arbete som innebär termisk nedbrytning av material som frisätter isocyanater eller processer som
+frisätter formaldehyd. (AFS 2014:43)
+
+Dokumentation av riskbedömning
+37 b § När resultatet av undersökningen och riskbedömningen dokumenteras enligt 10 §, för arbeten som
+avses i 37 a §, ska följande uppgifter anges med särskild tydlighet.
+1. Inom vilka platser och utrymmen som de farliga kemiska produkterna hanteras och var isocyanater
+eller formaldehyd kan frisättas.
+2. Vilka skyddsåtgärder som är nödvändiga för att säkerställa att exponeringen är så låg som är praktiskt
+möjligt.
+3. I vilka situationer personlig skyddsutrustning krävs och vilken skyddsutrustning som ska användas.
+4. Hur funktionen hos arbetsutrustning och ventilation ska kontrolleras och underhållas för att förebygga
+att allergiframkallande ämnen orsakar ohälsa. (AFS 2014:43)
+
+Skyltning
+37 c §
+
+Skyltar som anger att öppen hantering av sådana farliga kemiska produkter som avses i 37 a §
+pågår ,ska sättas upp i anslutning till arbetsplatsen. De ska anslås på dörrar till lokalen eller utrymmet för
+att upplysa andra arbetstagare än de som hanterar de kemiska produkterna. Om riskbedömningen visat att
+arbetet inte innebär någon risk för exponering av andra arbetstagare kan skylten utelämnas .(AFS 2014:43)
+
+Information
+37 d §
+
+Arbetsgivaren ska se till att de som leder eller sysselsätts med arbete som avses i 37 a § har kunskap
+om hur arbetet ska ske på ett säkert sätt. Arbetsledare och arbetstagare ska åtminstone ha fått information
+om riskerna vid hanteringen och de åtgärder som ska vidtas enligt riskbedömningen i 37b .§ (AFS 2014:43)
+
+Utbildning
+37 e §
+
+Utbildning krävs för att leda eller aktivt sysselsättas i ett arbete som kan innebära exponering för
+farliga kemiska produkter som innehåller:
+1. diisocyanater,
+2. epoxiplastkomponenter,
+3. organiska syraanhydrider,
+4. formaldehydhartser,
+5. metakrylater som ska vara märkta med H317 eller H334 eller
+6. akrylater som ska vara märkta med H317 eller H334
+samt vid arbete som innebär termisk nedbrytning som frisätter isocyanater eller processer som frisätter
+formaldehyd.
+Utbildning krävs även för arbete med kemiska produkter som innehåller etyl-2-cyanoakrylat eller metyl2-cyanoakrylat om arbetet sammanlagt pågår mer än 30 minuter per vecka.
+Utbildningen ska minst innehålla information om de risker som arbetet innebär och vilka skyddsåtgärder
+som kan behöva vidtas för att arbetet ska kunna utföras på ett säkert sätt.
+Utbildningen för de som leder eller aktivt sysselsätts i arbete enligt första och andra stycket ska kunna
+styrkas genom ett högst fem år gammalt utbildningsintyg. Utbildningsintyget ska beskriva de moment som
+ingått i utbildningen.
+Den arbetsgivare som låter någon utan utbildningsintyg leda eller utföra arbete i strid med fjärde stycket
+ska betala sanktionsavgift om 10 000 kr för varje sådan person, se 52 §. (AFS 2014:43)
+
+12
+
+AFS 2011:19
+Läkarundersökningar
+37 f §
+
+Arbetsgivaren ska erbjuda läkarundersökning, enligt Arbetsmiljöverkets föreskrifter om medicinska
+kontroller i arbetslivet, för arbetstagare som sysselsätts eller kommer att sysselsättas i arbete med farliga
+kemiska produkter som innehåller:
+1. epoxiplastkomponenter,
+2. formaldehydhartser,
+3. metakrylater som ska vara märkta med H317 eller H334 eller
+4. akrylater som ska vara märkta med H317 eller H334. (AFS 2014:43)
+37 g § Arbetsgivare ska se till att periodisk läkarundersökning med tjänstbarhetsbedömning, enligt
+Arbetsmiljöverkets föreskrifter om medicinska kontroller i arbetslivet, genomförs av de arbetstagare som
+sysselsätts eller kommer att sysselsättas i något av följande arbeten:
+1. Arbete med kemiska produkter som innehåller diisocyanater eller organiska syraanhydrider som ska
+vara märkta med H334.
+2. Arbete med kemiska produkter som innehåller etyl-2-cyanoakrylat eller metyl-2-cyanoakrylat om
+arbetet sammanlagt pågår mer än 30 minuter per vecka.
+3. Arbete som kan medföra exponering för isocyanater som bildas vid termisk nedbrytning.
+Bestämmelser om sanktionsavgifter för den som sysselsätter arbetstagare som inte bedömts som
+tjänstbara finns i 6 § Arbetsmiljöverkets föreskrifter om medicinska kontroller i arbetslivet. (AFS 2014:43)
+
+Särskilda krav för cancerframkallande, mutagena och reproduktionsstörande
+kemiska produkter och viss verksamhet
+38 § Bestämmelserna i 39-44 §§ ska tillämpas vid hantering av kemiska produkter som uppfyller
+kriterierna i förordning (EG) nr 1272/2008 (CLP-förordningen) för att märkas med följande faroangivelser.
+– H350: Kan orsaka cancer.
+– H340: Kan orsaka genetiska defekter.
+– H360: Kan skada fertiliteten eller det ofödda barnet.
+Oavsett om kriterierna i första stycket är uppfyllda ska bestämmelserna i 40, 41 och 44 §§ tillämpas för
+verksamheter som innebär
+1. framställning av auramin,
+2. arbete som innebär exponering för polycykliska aromatiska kolväten som finns i sot, tjära eller beck av
+stenkol,
+3. arbete som innebär exponering för damm, rökgaser eller stänk som uppstått vid avbränning och
+elektroraffinering av kopparnickelskärsten,
+4. processer där stark syra ingår vid framställningen av isopropylalkohol samt
+5. arbete som innebär exponering för trädamm från lövträd. (AFS 2014:43)
+
+Utredning om möjlighet att ersätta produkt
+39 § En kemisk produkt enligt 38 § första stycket får endast hanteras om det finns en dokumenterad
+utredning som visar att det inte är tekniskt möjligt att ersätta produkten genom att använda andra kemiska
+produkter som utgör en mindre risk för ohälsa och olycksfall.
+Kravet gäller inte kemiska produkter som används för motordrift eller uppvärmning eller förvaras för
+sådan användning.
+
+Dokumentation av riskbedömningen
+40 § När resultatet av undersökningen och riskbedömningen för hanteringen av sådana kemiska
+produkter och för sådan verksamhet som avses i 38 § dokumenteras enligt 10 § ska följande uppgifter anges
+med särskild tydlighet.
+1. Inom vilka platser och utrymmen de cancerframkallande, mutagena eller reproduktionsstörande
+ämnena kan förekomma och vilka åtgärder som ska vidtas så att endast personer som behövs för arbetet
+vistas där.
+2. Vilka skyddsåtgärder som är nödvändiga för att säkerställa att exponeringen är minimal.
+3. I vilka situationer personlig skyddsutrustning krävs.
+
+13
+
+AFS 2011:19
+4. Hur hantering av och funktionen hos utrustning, processer eller ventilation ska övervakas så att man
+tidigt kan upptäcka avvikelser som kan innebära ökad risk.
+
+Register
+41 § Arbetsgivaren ska föra ett register över arbetstagare som utsatts för exponering som kan innebära
+risk för ohälsa i arbete med kemiska produkter som ska vara märkta med faroangivelse H350 eller H340
+eller vid verksamheter enligt 38 § andra stycket. Registret ska innehålla uppgifter om
+1. arbetstagarens namn,
+2. arbetsuppgifter,
+3. vilken kemisk riskkälla som arbetstagaren utsatts för samt
+4. uppmätt eller uppskattad grad av exponering. (AFS 2014:43)
+
+Minskning av exponeringen
+42 § Kemiska produkter enligt 38 § första stycket ska hanteras i ett slutet system om det är tekniskt
+möjligt.
+43 § Där kemiska produkter enligt 38 § första stycket hanteras utan att systemet är helt slutet ska följande
+åtgärder alltid vidtas vid sidan av de andra åtgärder som väljs som en del av bedömningen enligt 8 §.
+1. Utrustning och metoder ska väljas och utformas så att minsta möjliga mängd luftföroreningar bildas,
+och så att sprut eller stänk undviks.
+2. Förorenad luft ska omhändertas genom processventilation vid den plats där luftföroreningen
+uppkommer.
+3. Skyddskläder och skyddshandskar ska användas om det finns risk för kontakt med den kemiska
+produkten. De ska bytas vid övergång till annat arbete.
+4. Spill ska samlas upp så snabbt och säkert som möjligt.
+5. Ytor som kan ha förorenats ska rengöras dagligen och när en arbetsuppgift slutförts.
+6. Den kemiska produkten och avfallet från hanteringen ska förvaras och transporteras i stötsäkra,
+förslutna och tydligt märkta behållare.
+44 § För den hantering och verksamhet som regleras i 38 § ska de hanterings- och skyddsinstruktioner
+som avses i 11 § vara skriftliga.
+
+Förbud och tillstånd
+45 § Ett kemiskt ämne som tillhör grupp A i bilaga 1 eller en kemisk produkt som innehåller en tillsats av
+ett sådant ämne får inte hanteras, med undantag för de situationer som anges i 46 och 48 §§ i dessa
+föreskrifter. Detsamma gäller kemiska produkter som innehåller ett sådant ämne som förorening i en halt
+av 0,1 viktprocent eller mer. För erionit gäller dock -halten 1 viktprocent eller mer.
+Den arbetsgivare som hanterar ett eller flera kemiska ämnen eller produkter i strid med kraven i första
+stycket ska betala en sanktionsavgift, se 52 §. Detsamma gäller den som driver verksamhet enligt 3 kap. 5 §
+arbetsmiljölagen.
+Lägsta avgiften är 40 000 kronor och högsta avgiften är 400 000 kronor. För den som har 500 eller fler
+sysselsatta är avgiften 400 000 kronor. För den som har färre än 500 sysselsatta ska sanktionsavgiften
+beräknas enligt följande:
+Avgift 40 000 kronor + (antal sysselsatta –1) x 721 kronor.
+Summan ska avrundas nedåt till närmaste hela hundratal. (AFS 2014:5)
+46 § Ett kemiskt ämne eller produkt som avses i 45 § får hanteras efter tillstånd av Arbetsmiljöverket
+1. vid forskning om ett cancerframkallande ämnes effekter,
+2. vid utveckling av analysmetoder för ett ämne som tillhör grupp A samt
+3. i annan verksamhet där det finns särskilda skäl att hantera ett sådant ämne.
+47 § Ett kemiskt ämne som tillhör grupp B i bilaga 1 eller en kemisk produkt som innehåller ett sådant
+ämne i en halt av 1 viktprocent eller mer får inte hanteras utan tillstånd av Arbetsmiljöverket, med
+undantag för de situationer som anges i 48 § i dessa föreskrifter.
+
+14
+
+AFS 2011:19
+Den arbetsgivare som hanterar ett eller flera kemiska ämnen eller produkter i strid med kraven i första
+stycket ska betala en sanktionsavgift, se 52 §. Detsamma gäller den som driver verksamhet enligt 3 kap. 5 §
+arbetsmiljölagen.
+Lägsta avgiften är 15 000 kronor och högsta avgiften är 150 000 kronor. För den som har 500 eller fler
+sysselsatta är avgiften 150 000 kronor. För den som har färre än 500 sysselsatta ska sanktionsavgiften
+beräknas enligt följande:
+Avgift = 15 000 kronor + (antal sysselsatta –1) x 271 kronor.
+Summan ska avrundas nedåt till närmaste hela hundratal.
+Överträdelse av både 45 och 47 §§ medför sanktionsavgift endast enligt 45 §. (AFS 2014:5)
+48 § Tillstånd enligt 46 och 47 §§ behövs inte vid lagerhållning för försäljning eller transport av obrutna
+originalförpackningar.
+49 § I ansökan om tillstånd enligt 46 och 47 §§ ska följande anges.
+1. Vilket kemiskt ämne eller produkt som ska hanteras.
+2. Beskrivning av arbetsmetoden som används.
+3. Syftet med hanteringen.
+4. Tidsperioden för vilken tillstånd söks.
+5. Den största mängd som ska förvaras respektive användas under en och samma dag.
+6. Årsförbrukning.
+7. Det antal personer som berörs.
+8. Skälen till att ämnet eller produkten inte kan ersättas av en mindre farlig riskkälla.
+Till ansökan ska bifogas dokumentation av riskbedömningens resultat och beslut om åtgärder enligt 10,
+37 b och 40 §§ samt hanterings- och skyddsinstruktioner som upprättats för arbetet enligt 44 §. Finns ett
+skyddsombud ska ett yttrande från denne bifogas ansökan. (AFS 2014:43)
+
+Periodiska mätningar av vissa kemiska ämnen
+50 § När nedan uppräknade ämnen, eller material som innehåller ämnena, hanteras så att exponering via
+inandning kan förekomma ska riskbedömningen alltid innefatta mätningar av ämnena i andningszonen.
+1. Bly och oorganiska blyföreningar.
+2. Etylenoxid.
+3. Kadmium och oorganiska kadmiumföreningar.
+4. Styren, vinyltoluen eller andra reaktiva monomerer vid esterplastframställning.
+Mätning enligt första stycket behöver inte utföras om det är ett arbete som utförs kortare tid än två
+månader per år. Mätning behöver heller inte göras om man kan visa att det är uppenbart onödigt på grund
+av att mängden är försumbar, exponeringstiden kort eller hanteringen är ordnad så att halten i luften är
+försumbar.
+Mätning ska utföras
+– inom tre månader efter det att hanteringen påbörjats,
+– om hanteringen ändrats så att tidigare mätning inte är rättvisande samt
+– efter ett år.
+Därefter ska mätning göras med nedanstående tidsintervall. Tidsintervallen får överskridas med högst
+två månader.
+Mätresultatet jämfört med nivågränsvärdet från två på
+varandra följande mätningar
+
+Tid till nästa
+mätning
+
+Minst ett av mätresultaten är över 1/2 gränsvärdet
+
+1 år
+
+Båda mätresultaten är mellan 1/5 och 1/2 gränsvärdet
+
+3 år
+
+Det ena mätresultatet är mellan 1/5 och 1/2 gränsvärdet 3 år
+och det andra under 1/5 av gränsvärdet
+Båda mätresultaten är under 1/5 av gränsvärdet
+
+5 år
+
+15
+
+AFS 2011:19
+Mätningen ska dokumenteras i en mätrapport enligt Arbetsmiljöverkets föreskrifter om hygieniska
+gränsvärden. (AFS 2014:43)
+51 § Senast tre månader efter det att en mätning enligt 50 § har utförts ska en kopia av mätrapporten
+skickas till Arbetsmiljöverket. (AFS 2014:5)
+
+Bestämmelser om sanktionsavgifter
+52 § Bestämmelserna i 20 § utgör föreskrifter enligt 4 kap. 1 § arbetsmiljölagen (1977:1160).
+Bestämmelserna i 37 e § utgör föreskrifter enligt 4 kap. 1 § arbetsmiljölagen (1977:1160). Bestämmelserna i
+45 § utgör föreskrifter enligt 4 kap. 2 och 4 §§ samma lag. Bestämmelserna i 47 § utgör föreskrifter enligt
+4 kap. 2 § samma lag.
+Den som överträder dessa bestämmelser ska betala sanktionsavgift enligt 8 kap. 5–10 §§ arbetsmiljölagen.
+Sanktionsavgiftens storlek beräknas enligt de grunder som anges i 20, 37 e, 45 och 47 §§. (AFS 2014:43)
+
+AFS 2011:19
+Denna författning träder i kraft den 1 juli 2012 då följande av Arbetsmiljöverkets och
+Arbetarskyddsstyrelsens föreskrifter ska upphöra att gälla.
+1. Arbetarskyddsstyrelsens kungörelse med föreskrifter (AFS 1986:13) om oljor.
+2. Arbetarskyddsstyrelsens kungörelse med föreskrifter (AFS 1992:18) om motorbränslen.
+3. Arbetarskyddsstyrelsens föreskrifter (AFS 1997:10) om laboratoriearbete med kemikalier.
+4. Arbetarskyddsstyrelsens föreskrifter (AFS 2000:4) om kemiska arbetsmiljörisker.
+Tillstånd som meddelats enligt de upphävda föreskrifterna ska gälla som tillstånd enligt de nya
+föreskrifterna.
+
+AFS 2014:5
+Denna författning träder i kraft den 1 juli 2014.
+
+AFS 2014:43
+Denna författning träder i kraft den 1 juli 2014.
+1. Denna författning träder i kraft den 1 juni 2017 ifråga om 20 § tredje stycket och 37 § femte stycket samt
+i övrigt den 1 juni 2015. Genom författningen upphävs Arbetsmiljöverkets föreskrifter (AFS 2005:18) om
+härdplaster.
+2. För behållare med kemiska produkter som lagligen satts på marknaden med märkning enligt
+Kemikalieinspektionens föreskrifter (KIFS 2005:7) om klassificering och märkning av kemiska produkter får
+19 § tillämpas enligt sin senaste lydelse (AFS 2014:5) till den 1 juni 2019.
+3. Tillstånd som meddelats enligt de upphävda föreskrifterna gäller fortfarande som tillstånd enligt de
+nya föreskrifterna.
+
+AFS 2017:4
+Denna författning träder i kraft den 1 december 2017.
+
+16
+
+AFS 2011:19
+
+Bilaga 1: Ämnen med förbud eller tillståndskrav
+
+Bilaga 1
+
+Grupp A – Ämnen som enligt 45 § inte får hanteras
+Bestämmelserna i 45 § gäller även ämnets salter och när ämnet innehåller kristallvatten.
+Cancerframkallande ämnen
+CAS-nr17
+2-Acetamidofluoren .................................................................................... 53-96-3
+4-Aminodifenyl ........................................................................................... 92-67-1
+Benzidin ....................................................................................................... 92-87-5
+1,1’-Diklordimetyleter .............................................................................. 542-88-1
+1,2-Dibrom-3-klorpropan ........................................................................... 96-12-8
+N,N-Dimetyl-4-aminoazobensen .............................................................. 60-11-7
+Erionit ..................................................................................................... 66733-21-9
+12510-42-8
+Hexametylfosfortriamid (HMPA) .......................................................... 680-31-9
+Metylklormetyleter ................................................................................... 107-30-2
+20-Metylkolantren (3-metylkolantren) ..................................................... 56-49-5
+N-Metyl-N-nitrosourea ............................................................................ 684-93-5
+-Naftylamin ............................................................................................... 91-59-8
+4-Nitrodifenyl .............................................................................................. 92-93-3
+
+Grupp B – Ämnen som enligt 47 § får hanteras endast efter tillstånd av Arbetsmiljöverket
+Bestämmelserna i 47 § gäller även ämnets salter och när ämnet innehåller kristallvatten.
+Cancerframkallande ämnen
+CAS-nr
+p-Aminoazobensen ..................................................................................... 60-09-3
+Auramin ..................................................................................................... 492-80-8
+(4,4’-imidokarbonyl-bis(N,N-dimetylanilin))
+Bensalklorid ................................................................................................. 98-87-3
+Bensotriklorid .............................................................................................. 98-07-7
+-Butyrolakton ........................................................................................ 3068-88-0
+4,4’-Diamino-3,3’-diklor-difenylmetan .................................................. 101-14-4
+(metylenbis(o-kloranilin))
+2,4-Diamino-1-metoxibensen (2,4-diaminoanisol)................................ 615-05-4
+2,4-Diaminotoluen ..................................................................................... 95-80-7
+Dianisidin (3,3’-dimetoxibenzidin) ......................................................... 119-90-4
+Diazometan ................................................................................................ 334-88-3
+1,2-Dibrometan (etyldibromid) ............................................................... 106-93-4
+1,2:3,4-Diepoxibutan ............................................................................... 1464-53-5
+Dietylsulfat .................................................................................................. 64-67-5
+3,3’-Diklorbenzidin ..................................................................................... 91-94-1
+2,2’-Diklordietyleter.................................................................................. 111-44-4
+2,2’-Diklorodietylsulfid (senapsgas) ....................................................... 505-60-2
+3,3’-Dimetylbenzidin (o-Tolidin) ............................................................ 119-93-7
+1,1-Dimetylhydrazin................................................................................... 57-14-7
+1,2-Dimetylhydrazin................................................................................. 540-73-8
+Dimetylsulfat ............................................................................................... 77-78-1
+Etylenimin .................................................................................................. 151-56-4
+Etylmetansulfonat ....................................................................................... 62-50-0
+Fenyl--naftylamin ................................................................................... 135-88-6
+Hydrazin .................................................................................................... 302-01-2
+4,4’-Metylendianilin.................................................................................. 101-77-9
+(4,4’-diaminodifenylmetan)
+Metylmetansulfonat ................................................................................... 66-27-3
+Monometylhydrazin ................................................................................... 60-34-4
+______________________________
+17 CAS-nr
+
+är ämnets identifikationsnummer enligt Chemical Abstract Service.
+
+17
+
+AFS 2011:19
+-Naftylamin ............................................................................................. 134-32-7
+N-Nitrosodimetylamin .............................................................................. 62-75-9
+1,3-Propansulton ..................................................................................... 1120-71-4
+-Propiolakton............................................................................................. 57-57-8
+1,2-Propylenimin......................................................................................... 75-55-8
+Tioacetamid ................................................................................................. 62-55-5
+Tris(2,3-dibrompropyl)fosfat ................................................................... 126-72-7
+Uretan (etylkarbamat) ................................................................................ 51-79-6
+Sensibiliserande ämnen
+CAS-nr
+2,4-Diaminotoluen ...................................................................................... 95-80-7
+3,3’-diklorbenzidin ..................................................................................... 91-94-1
+S-[2-(Dimetylamino)etyl]-pseudotioureadihydroklorid (PBA 1) ........................................................................................ 16111-27-6
+Hexahydroftalsyraanhydrid18 ................................................................... 85-42-7
+13149-00-3
+14166-21-3
+Metylhexahydroftalsyraanhydrid19 .................................................... 25550-51-0
+19438-60-9
+48122-14-1
+57110-29-9
+Metyltetrahydroftalsyraanhydrid19 .................................................... 26590-20-5
+11070-44-3
+34090-76-1
+1694-82-2
+3425-89-6
+5333-84-6
+42498-58-8
+Tetrahydroftalsyraanhydrid19 ................................................................... 85-43-8
+935-79-5
+Tetraklorftalsyraanhydrid19 ..................................................................... 117-08-8
+Reproduktionsstörande ämnen
+CAS-nr
+Etylenglykolmonometyleter20 ................................................................. 109-86-4
+(2-Metoxietanol)
+Etylenglykolmonometyleteracetat20 ....................................................... 110-49-6
+(2-Metoxietylacetat)
+Etylentiourea ............................................................................................... 96-45-7
+
+Allmänna råd till bilagan
+Se fotnot 18, 19 och 20. I den tryckta versionen anges fel fotnoter på detta ställe och till ämnen på denna
+sida. Arbetsmiljöverket arbetar med ett rättelseblad som kommer så snart som möjligt.
+
+18
+
+Som riktvärde gäller att värdet 0,005 mg/m3 för den sammanlagda exponeringen för syraanhydrider under 15 minuter via
+inandning inte bör överskridas.
+19 Som riktvärde gäller att värdet 0,005 mg/m3 för den sammanlagda exponeringen för syraanhydrider under 15 minuter via
+inandning inte bör överskridas.
+20 Som riktvärde gäller att värdet 0,1 ppm för exponeringen via inandning som tidsvägt dagsmedelvärde inte bör överskridas.
+
+18
+
+AFS 2011:19
+
+Arbetsmiljöverkets allmänna råd om tillämpningen av föreskrifterna om kemiska
+arbetsmiljörisker
+Syfte och tillämpningsområde
+Till 1 § Med arbete i arbetsgivarens hushåll avses arbete med matlagning, disk och städning, hjälp med
+personlig hygien och liknande. Hantverksarbete, arbete i djurstallar och reparationer ingår normalt inte.
+När en undersökning och riskbedömning görs i en arbetsgivares hushåll bör det alltid ingå att beakta
+märkningen på alla kemiska produkter som de som arbetar i hushållet kan komma i kontakt med. För
+hushållskemikalier bör man utifrån informationen i märkningen, om på vilket sätt produkten är farlig,
+kunna avgöra om några farliga situationer kan uppstå och vilka skyddsåtgärder som därför behövs.
+Exempel på skyddsåtgärder som kan behövas är skyddshandskar, skyddsglasögon, ventilerad arbetsplats,
+åtgärder mot antändning av brandfarlig vara och säkra förpackningar.
+När undantag får göras från 6–10 §§ i dessa föreskrifter gäller ändå kraven på dokumentation av
+riskbedömningen enligt Arbetsmiljöverkets föreskrifter om systematiskt arbetsmiljöarbete.
+När det på en arbetsplats finns särskilda arbetstagare som under stor del av sin arbetstid sköter städning
+och diskning m.m. torde det aldrig vara fråga om dessa arbetstagares egna bruk varför 6–10 §§ ska
+tillämpas.
+
+Vilka föreskrifterna riktar sig till
+Till 2 § Arbetsmiljölagen gäller allt arbete som en arbetstagare utför för en arbetsgivares räkning.
+Arbetsmiljölagen gäller delvis även utanför yrkes-livet. Elever, vårdtagare i anstalt och den som tjänstgör
+inom totalförsvaret jämställs i vissa avseenden med arbetstagare, bl.a. när det gäller arbetsmiljöns
+beskaffenhet (1 kap. 3 § arbetsmiljölagen). Dessa föreskrifter gäller därför även i skolan om där förekommer
+ämnen som kan föranleda ohälsa.
+Arbetsmiljölagen och dessa föreskrifter gäller i vissa delar även för
+• den som ensam eller gemensamt med familjemedlem driver yrkesmässig verksamhet utan anställd,
+• byggherren eller byggherrens uppdragstagare,
+• arkitekter, projektörer och andra som medverkar vid planeringen och projekteringen inom ramen för
+sina uppdrag,
+• byggarbetsmiljösamordnaren,
+• den som tillverkar monteringsfärdiga byggnader och anläggningar,
+• samordningsansvarig,
+• den som tillverkar, importerar, överlåter eller upplåter maskin, redskap, skyddsutrustning eller annan
+teknisk anordning,
+• den som tillverkar, importerar eller överlåter ett farligt ämne,
+• den som överlåter eller upplåter en förpackad produkt,
+• den som installerar en teknisk anordning,
+• den som hyr in arbetskraft,
+• den som råder över ett arbetsställe och
+• den som upplåter lokal, markområde m.m.
+Arbetsmiljölagen gäller bara delvis för den som ensam eller gemensamt med familjemedlem driver
+yrkesmässig verksamhet utan anställd. En ensam- eller familjeföretagare är skyldig att följa vad som i
+arbetsmiljölagen och med stöd av den föreskrivits om tekniska anordningar eller farliga ämnen, som kan
+föranleda ohälsa eller olycksfall, samt beträffande gemensamt arbetsställe.
+För en entreprenör på ett gemensamt arbetsställe som någon annan råder över och samordnar är det i
+regel tillräckligt att entreprenören utför sin undersökning och riskbedömning genom att tillgodogöra sig de
+dokument som redan tagits fram för det gemensamma arbetsstället. För riskkällor som entreprenören själv
+tillför till arbetsplatsen måste entreprenören dock göra en egen undersökning och riskbedömning och ta
+fram dokumentation enligt föreskrifterna. Resultatet av en sådan riskbedömning och övrig dokumentation
+måste förankras med samordnaren för arbetsstället.
+Eftersom en inhyrare disponerar över arbetskraften och utövar den direkta arbetsledningen, har
+inhyraren ett ansvar som i princip motsvarar en arbetsgivares arbetsmiljöansvar. Det innebär bland annat
+att inhyraren ska bedöma riskerna i de arbetsuppgifter som en inhyrd arbetstagare utför.
+
+19
+
+AFS 2011:19
+Reach-förordningen
+Till 3 § En arbetsgivare som är tillverkare, importör eller nedströmsanvändare kan vara skyldig att
+utarbeta en kemikaliesäkerhetsrapport, utöver att uppfylla de riskbedömnings- och dokumentationskrav
+som följer av Arbetsmiljöverkets föreskrifter. Detta enligt bestämmelserna i Reach-förordningen.
+
+Definitioner
+Till 4 § Definitionen av farlig kemisk produkt omfattar inte kemiska produkter som kosmetiska och
+hygieniska produkter, läkemedel, livsmedel, foder och avfall eftersom dessa undantas från de regler om
+klassificering och märkning som definitionen hänvisar till. Sådana kemiska produkter definieras därför inte
+som farliga kemiska produkter även om de utgör kemiska riskkällor.
+Kemisk produkt har som det definieras här samma innebörd som i miljöbalken (1998:808). Definitionen här
+är annorlunda formulerad för att förtydliga skillnaden mot kemiska ämnen och blandningar som
+förekommer naturligt eller oavsiktligt.
+Begreppet kemisk riskkälla innefattar både när kemiska ämnen eller blandningar som kan medföra ohälsa
+eller olycksfall förekommer som en kemisk produkt och på andra sätt. Andra sätt kan vara som avgaser
+eller andra luftföroreningar, i eller på ett material, växt eller teknisk anordning. Att medföra ohälsa genom sina
+egenskaper när det beror på det sätt på vilket ämnena förekommer kan bland annat innebära att ett ämne är farligt
+på grund av att det förekommer som damm. Höga halter av damm som har en skadlig effekt på
+luftvägarna kan alltså vara en kemisk riskkälla även om dammets sammansättning inte är hälsofarlig.
+
+Undersökning och riskbedömning
+När en undersökning och riskbedömning ska göras
+Till 5 § För att säkerställa att utrustning, kompetens och information finns på plats när den behövs i en
+verksamhet som bedrivs på platser som man inte i förväg känner till, som vid räddningsarbete eller
+inspektion, där okända kemiska riskkällor kan finnas, görs riskbedömningen utifrån de riskkällor och
+situationer som man kan tänka sig uppstår. Man får t.ex. ta med skydd som klarar de flesta ämnen och lära
+sig om skyddens begränsningar.
+Vissa gropar och rörgravar är så djupa och trånga att kravet på undersökning av luften före arbetet
+gäller. Det som avgör är om luften inte naturligt blandas med omgivande luft.
+
+Kemiska riskkällor som ska identifieras och förtecknas
+Till 6 § När man gör en planerad undersökning och riskbedömning är det lämpligt att göra en samlad
+förteckning över det område som undersökningen och riskbedömningen avser. För ett nytt eller tillfälligt
+arbete räcker det att förteckna riskkällorna separat och sedan föra in dem som fortfarande är aktuella i den
+samlade förteckningen vid nästa planerade undersökning och riskbedömning.
+Exempel på ett sådant namn som avses i första stycket är ”svetsrök från rostfritt” för en riskkälla som
+utgörs av rök från svetsarbeten med rostfri metall.
+Man kan använda uppgifter ur märkningen som faroan-givelser eller faroklass och farokategori för att
+ange typen av farlighet hos farliga kemiska produkter. För andra kemiska riskkällor anger man typen av
+farlighet med egna ord. Det är oftast tillräckligt att beskriva en kemisk riskkällas typ av farlighet med ett
+eller ett fåtal ord som brandfarlig eller kan ge allergi. Mer ingående information om riskkällans farliga
+egenskaper som graden av farlighet och farligheten i olika sammanhang, som ska framgå av informationen
+enligt 7 §, behöver inte anges när riskkällorna förtecknas.
+Ibland kan det underlätta att identifiera riskkällorna systematiskt genom att dela in dem i följande
+kategorier.
+1. Farliga kemiska produkter enligt förordning (EG) nr 1272/2008 (CLP-förordningen).
+2. Andra kemiska produkter eller varor med inneboende egenskaper som kan medföra kemiska risker.
+3. Kemiska produkter vars hantering medför att de blir farliga.
+4. Farliga kemiska ämnen eller luftföroreningar som bildas i hanteringen.
+5. Luft med för låg eller hög syrgashalt.
+
+20
+
+AFS 2011:19
+Dokument som är viktiga för riskbedömningen
+Till 7 § Papperslim som används för att limma vid enstaka tillfällen är ett exempel på en farlig kemisk
+produkt där informationen i leverantörsmärkningen är tillräcklig. Anledningen är att ohälsa eller olycksfall
+inte rimligen kan uppkomma vid den lilla mängd som då hanteras.
+Bedömningen av riskerna vid hanteringen en kemisk riskkälla för vilken det inte går att skaffa
+fullständig information bör utgå från att den har de misstänkta farliga egenskaperna och att åtgärder
+behövs mot de risker som kan uppkomma.
+
+Faktorer som ska bedömas för att avgöra om åtgärder krävs
+Till 8 § För att kunna avgöra när en kemisk riskkälla medför en risk behöver man till exempel beakta hur
+personer kan exponeras för den i de sammanhang där man har identifierat risken. I detta ingår att förutse
+oavsiktliga fel som kan resultera i olyckor i olika arbetssituationer.
+Ämnets egenskaper tillsammans med faktorer som t.ex. hanterad mängd, temperatur, om hanteringen
+sker öppet, ventilation, avdunstningsyta och aerosolbildning, bestämmer hur hög halten av ämnet blir i
+andningszonen. Internetbaserade verktyg där sådana faktorer matas in kan användas vid
+exponeringsbedömningen. Exempel på allmänt tillgängliga verktyg finns på följande Internetadresser:
+www.hse.gov.uk/coshh/essentials www.stoffenmanager.nl och www.advancedreachtool.com
+Samverkande effekter kan vara både additiva och synergistiska. Om flera riskkällor med likartad
+påverkan förekommer samtidigt bör man ofta lägga samman deras respektive påverkan (additiv effekt). Ett
+exempel på en synergistiskt samverkande effekt är den nervskadande effekten av lösningsmedlen n-hexan
+och metyletylketon (MEK) som i kombination är betydligt starkare än summan av effekten av ämnena var
+för sig.
+Till 9 § När en arbetstagare samtidigt utsätts för flera luftföroreningar som verkar på likartat sätt, t.ex.
+organiska lösningsmedel som påverkar det centrala nervsystemet, beräknar man deras sammantagna
+påverkan genom att lägga samman deras andelar av respektive gränsvärde, så att man får den så kallade
+hygieniska effekten. Om båda halterna av två ämnen som ska adderas uppgår till halva gränsvärdet så
+motsvarar alltså kombinationen gränsvärdet.
+Det är inte acceptabelt att en halvtidsanställd ska kunna exponeras för högre halter av en luftförorening
+på grund av kortare exponeringstid. Vid längre arbetspass och för beräkning av hygienisk effekt, se
+Arbetsmiljöverkets föreskrifter om hygieniska gränsvärden.
+Fysisk påfrestning
+Upptaget av luftföroreningar i kroppen genom inandning blir större vid fysiskt påfrestande arbete bl.a.
+eftersom sådant arbete ökar lungventila-tionen.
+Gränsvärdena avser exponeringsnivån vid medeltungt arbete. Vid tyngre arbete med ökad
+lungventilation är det viktigt att ytterligare begränsa halten luftföroreningar. Här anges lungventilationen
+vid olika typer av fysisk påfrestning.
+Arbete
+Sittande arbete
+(läs- och skrivarbete, kontorsarbete,
+bilkörning, avsyningsarbete)
+
+Lungventilation
+<15 l/min
+
+Lätt arbete
+(lätt verkstadsarbete, truckkörning, promenad)
+
+15–25 l/min
+
+Medeltungt arbete
+(tungt verkstadsarbete, tungt sjukvårdsarbete,
+byggnadsarbete, snabb promenad)
+
+25–40 l/min
+
+Tungt arbete
+(tungt byggnadsarbete, manuellt anläggningsarbete,
+tungt lantbruksarbete, långsam löpning)
+
+40–50 l/min
+
+Mycket tungt arbete
+
+>50 l/min
+
+21
+
+AFS 2011:19
+(tungt stuveriarbete, rökdykning, manuellt
+skogsarbete, klättring i mast, löpning)
+
+Dokumentation och information
+Hanterings- och skyddsinstruktioner samt andra rutiner
+Till 11 § Hanterings- och skyddsinstruktioner är instruktioner om hur ett visst arbete eller arbetsmoment
+ska utföras och om vilka skyddsåtgärder, inklusive användning av personlig skyddsutrustning, som
+behövs i de olika arbetsmomenten.
+Innehållet och detaljeringsgraden i hanterings- och skyddsinstruktionerna behöver anpassas till
+arbetsuppgiftens svårighetsgrad och till individens behov och förutsättningar.
+Som underlag för arbetsgivarens instruktioner kan man använda bruksanvisningar eller förslag till
+hanterings- och skyddsinstruktioner som är framtagna av någon annan än arbetsgivaren, t.ex. en leverantör
+av utrustning, ett branschorgan eller ett annat företag.
+Utöver paragrafens krav ska skriftliga instruktioner också finnas när riskerna är allvarliga eftersom det
+då krävs för att följa Arbetsmiljöverkets föreskrifter om systematiskt arbetsmiljöarbete.
+Följande kan behöva ingå i instruktionerna:
+1. Vilket arbete instruktionerna är avsedda för, utfärdare samt datum för utfärdandet.
+2. Hur man förbereder arbetet:
+– Var arbetet ska utföras.
+– Kontroll av utrustning och apparatur.
+– Framtagning av skyddsutrustning och saneringsmedel för spill.
+– Utplacering av varningsskyltning och avspärrningar.
+3. Arbetsbeskrivning moment för moment med uppgift om:
+– Vilka mängder av olika kemikalier som ska tillsättas, i vilken ordning samt vilken doseringsutrustning
+som man ska använda.
+– Vilka åtgärder som ska vidtas för att minska riskerna, t.ex. använda punktutsug, dragskåp.
+– Vilken personlig skyddsutrustning som ska användas under de olika
+momenten.
+4. Hur man gör efter avslutat arbete:
+– Hur avfall ska tas om hand.
+– Sanering och städning.
+– Rengöring av huden och den personliga skyddsutrustning som man använt.
+5. Hur man ska göra om en olycka eller ett tillbud inträffar (som häftig reaktion, brand, spill eller utsläpp
+till luften):
+– Vilka åtgärder man själv bör göra.
+– Om skyddsutrustning behöver användas.
+– Hur man kallar på hjälp.
+– Vilken första hjälp som kan behöva ges.
+– Vilka som ska underrättas om händelsen.
+Arbete i cistern, brunn, silo, lastutrymme eller liknande
+Hanteringsinstruktionerna för sådana arbeten som avses i 36 § bör innehålla uppgifter om vilka kontroller
+som ska göras, vilka verktyg och vilken utrustning som ska användas, vem som får utföra arbetet och när
+detta ska utföras. I hanteringsinstruktionerna bör det ingå hur mätning, övervakning och förberedelse för
+lyft enligt 32 § ska göras.
+Nedan anges exempel på faktorer som är viktiga att beakta när man utfärdar hanteringsinstruktioner för
+arbeten med en brandfarlig vätska i utrymmet.
+1. Att arbetsmetoden minimerar den yta som vätskan kan dunsta från och risken att vätska spills ut.
+2. Att atmosfären i utrymmet kan behöva fyllas med inert gas (t.ex. kvävgas eller argon) eller att man kan
+behöva se till att temperaturen i utrymmet är minst 5 C lägre änflampunkten på förekommande ämnen.
+3. Vakt med lämplig handbrandsläckare med beredskap att snabbt ingripa behöver normalt finnas i
+närheten av utrymmets ingång.
+4. Kontroll av att utrustningen har explosionsskyddat utförande.
+5. Behov av andningsapparat med säkerhetstryck och lyftsele med lina.
+
+22
+
+AFS 2011:19
+6. Behov av skyddskläder för de risker som kan uppstå.
+7. Behov av avspärrning av platsen och varningsskyltar.
+8. Att behållaren är säkrad mot inströmmande ämnen och mot att t.ex. omrörare sätts igång.
+Arbete med cancerframkallande, mutagena eller reproduktionsstörande riskkällor
+Instruktionerna som avses i 44 § bör gälla alla moment i hanteringen, inklusive underhåll, rengöring och
+bortforslande av avfall samt tillvägagångssättet vid spill eller liknande.
+Rutiner
+Rutiner är i förväg bestämda tillvägagångssätt, t.ex. vem som ansvarar för en arbetsuppgift, vad
+arbetsuppgiften innefattar och när olika moment ska göras.
+Bestämmelsen preciserar vilka rutiner för arbetsmiljöarbetet som krävs enligt 5 § i Arbetsmiljöverkets
+föreskrifter om systematiskt arbetsmiljöarbete. I det kemiska arbetsmiljöarbetet kan det, förutom rutiner för
+undersökning, riskbedömning och uppföljning, behövas rutiner för bland annat
+– Produktval och inköp.
+– Utfärdande av hanterings- och skyddsinstruktioner samt för instruktion av arbetstagare.
+– Mottagning av farliga kemiska produkter, förvaring och omförpackning.
+– Introduktion i nya arbetsuppgifter.
+– Rapportering, utredning och uppföljning av ohälsa, tillbud och olycksfall.
+– Kontroll och underhåll av utrustning och ventilation.
+– Avfallshantering.
+– Städning och uppsamling av utspillda kemikalier.
+Rutiner för kontroll och underhåll
+Rutiner bör exempelvis tas fram för att säkerställa att utrustning i allmänhet och skyddsanordningar i
+synnerhet fungerar som avsett. Av dessa rutiner kan t.ex. framgå när och av vem utrustningen ska
+kontrolleras. För processutrustning kan rutiner om kontroll och underhåll bland annat gälla kontroll av
+packningar, reglerdon, säkerhetsutrustning, byte eller justering.
+Det är viktigt att utforma rutinerna så att arbetsplatsen följer regler om skydd mot kemiska risker även ur
+andra föreskrifter. Exempel på sådana regler är
+– reglerna om underhåll av arbetsutrustning i Arbetsmiljöverkets föreskrifter om användning av
+arbetsutrustning,
+– reglerna om funktionskontroll och underhåll av ventilationen i Arbetsmiljöverkets föreskrifter om
+arbetsplatsens utformning samt
+– de krav på underhåll av personlig skyddsutrustning som finns i Arbetsmiljöverkets föreskrifter om
+användning av personlig skyddsutrustning.
+Underrätta arbetsgivaren om ohälsa eller olycksfall
+Det är ofta lämpligt att ha en rutin för arbetstagarnas skyldighet att underrätta arbetsgivaren om misstänkt
+exponering. Av en sådan rutin bör framgå att även ohälsa i form av övergående besvär, som huvudvärk, i
+vissa fall kan ge arbetstagaren anledning att misstänka sådan exponering som gör det nödvändigt att
+underrätta arbetsgivaren.
+
+Beredskapsplan för olyckor och nödsituationer
+Till 12 § Av beredskapsplanen bör framgå hur arbetstagarna ska agera vid brandtillbud eller brand. Det
+gäller t.ex. vilket släckmedel som man ska välja i olika situationer, hur man använder släckningsutrustning,
+när man kan behöva brandvakt samt hur larm fungerar och utrymning går till. Det är lämpligt att i
+beredskapsplanen informera om de åtgärder som vidtagits om larm och utrymning enligt
+Arbetsmiljöverkets föreskrifter om arbetsplatsens utformning.
+Det bör alltid framgå av beredskapsplanen hur man ska agera när det läcker ut sådana kemiska riskkällor
+som kan bilda farliga blandningar med luft och orsaka explosionsartad brand eller explosion.
+
+23
+
+AFS 2011:19
+Exempel på omedelbara åtgärder som kan behövas är t.ex. att stänga gaskranar.
+Vid risk för exponering för kemiska riskkällor med hög akutgiftighet bör det finnas särskilda
+instruktioner för första hjälpen. Om det finns mot-medel (antidoter) tillgängliga för en riskkälla eller syrgas
+mot syrebrist bör information om detta ingå i beredskapsplanen. Även i övrigt kan det vara lämpligt att
+rutinerna för första hjälpen som krävs enligt Arbetarskyddsstyrelsens föreskrifter om första hjälpen och
+krisstöd ingår i beredskapsplanen.
+
+Skyldighet att informera om risker och hålla dokumentation tillgänglig
+Till 13 § Hur omfattande informationen behöver vara beror bland annat på riskerna vid hanteringen och på
+tidigare erfarenhet och utbildning hos arbetstagarna.
+Observera att särskilda informationsinsatser kan behövas för vissa arbetstagargrupper, t.ex. minderåriga,
+personer med funktionsnedsättning eller personer med annan språklig bakgrund, för att förvissa sig om att
+de förstått innebörden.
+I de fall instruktionerna är skriftliga bör man gå igenom dem muntligt när de lämnas till arbetstagarna.
+CHECKLISTA FÖR INFORMATIONEN – Ett exempel på vad en lista kan innehålla:
+1. Information om risker och skydd i den egna arbetsuppgiften och om vilka särskilda moment som kan
+innebära risker.
+2. Vilka övriga risker som finns på arbetsstället och hur dessa risker undviks.
+3. Rutinerna för kemikaliesäkerhetsarbetet, t.ex. för ordning, sanering och instruktion.
+4. Saker som arbetstagaren ska tänka på innan hon eller han påbörjar en ny arbetsuppgift.
+5. Upplysningar om personlig skyddsutrustning, var utrustningen finns, hur den sköts och vilka
+begränsningar utrustningen har.
+6. Innebörden av de olika märkningssymbolerna.
+7. Förekomst och förvaring av dokumentationen enligt 13 §.
+8. Vilken lagstiftning som gäller för hanteringen av de förekommande kemiska riskkällorna, t.ex.
+hygieniska gränsvärden.
+9. Utrymningsplan enligt Arbetsmiljöverkets föreskrifter om arbetsplatsens utformning och hur man ska
+göra om larmsignal ljuder.
+10. Beredskapsplan enligt 12 §.
+11. Användning av utrustning för brandsläckning och första hjälpen samt övriga åtgärder för första
+hjälpen.
+Kravet att dokumentationen ska vara överskådlig och lättläst innebär att man behöver ordna den
+systematiskt, så att det går att hitta de uppgifter man behöver. För att dokumentationen ska vara begriplig
+kan man behöva förklara svårförståeliga ord och förkortningar. För att berörd personal som inte förstår
+svenska ska förstå informationen kan det räcka att översätta innehållet i dokument muntligt.
+Dokumentationen kan föras in i ett datorbaserat system. Det krävs normalt att samtliga arbetstagare som
+berörs av information i dokumenten har möjlighet att få information ur dessa när som helst under
+arbetstiden för att dokumentationen ska anses tillgänglig.
+
+Skyldigheter att vidta vissa särskilda åtgärder och följa förbud
+Primära skyldigheter i verksamheter där kemiska riskkällor förekommer
+Till 15 § Vid bedömning av om kostnaden för en åtgärd står i rimlig proportion till den minskning av
+risken som åtgärden skulle medföra ska hänsyn inte tas till verksamhetens möjlighet att bekosta åtgärden.
+Att man ska välja den produkt och det material som medför de sammantaget minsta riskerna kan
+innebära att man måste bedöma riskerna hos kombinationen av en arbetsmetod och en produkt, t.ex.
+genom att väga in risker från belastningssynpunkt och för olycksfall vid den arbetsmetod som den kemiska
+produkten kombineras med. En belastningsskada som uppstår på grund av olämpligt manuellt arbete som
+rengöring kan exempelvis vara svårare att skydda sig mot än mot en kemisk skada.
+Olycksfallsriskerna kan vara större om man väljer att maskinellt slipa en yta i stället för att använda ett
+kemiskt medel. Risken att halka kan också variera mellan olika ämnen och metoder.
+Risk för hörselskador är en annan viktig faktor som man bör väga in om valet står mellan metoder där
+bullernivån är olika.
+
+24
+
+AFS 2011:19
+Ytterligare ett exempel på tillämpningen av bestämmelsen är att man normalt bör välja
+gummiringsfogning i stället för limning med hälsofarliga produkter när man sammanfogar plaströrssystem
+vid installation av t.ex. avlopp.
+Ett annat sätt att minska risken är att välja sådana material som inte påverkas av de ämnen och den miljö
+de utsätts för.
+Fast installerade rörledningar är ofta att föredra framför slangar.
+Att de krav på arbetsutrustning som finns i Arbetsmiljöverkets föreskrifter om användning av
+arbetsutrustning följs är en förutsättning för att 15 § punkt 2 ska anses uppfylld.
+Att välja plats för att motverka olika risker kan innebära att man tidigt i planeringen överväger behovet
+av t.ex. avskilda rum och förråd för viss hantering, processventilation, särskilda avfalls- och städrum,
+tvättmöjlighet, anordning för ögonspolning samt nöddusch. Regler om processventilation finns i
+föreskrifterna om arbetsplatsens utformning.
+När man sprutar färg och spackel blir exponeringen för sprutdimma lätt så hög att gränsvärdet för
+organiskt damm överskrids vilket innebär att arbetsmetoden inte bör användas om inte ventilationen
+ordnats för detta. Man bör även undvika att spruta produkter som innehåller lösningsmedel, t.ex. vid
+klotterborttagning, om inte ventilationen är tillräcklig. Likaså bör man undvika att tvätta bort
+lösningsmedelsrester med varmvatten eftersom ångor av lösningsmedel då bildas i stora mängder.
+Man kan motverka den dammspridning som användning av pulverformiga kemiska produkter medför
+genom att man i stället väljer en produkt i form av pasta, pellets, granulat, uppslamning eller lösning. Man
+kan även hindra spridning av luftföroreningar genom vattenbegjutning.
+
+Prioritetsordning vid val av åtgärder för att ytterligare begränsa riskerna (åtgärdstrappa)
+Till 16 § För att avskilja arbetet eller processen från mindre förorenande verksamhet är det lämpligt att
+förlägga arbetsmetoder eller processer till en särskild lokal eller utrymme, t.ex. blästerskåp eller sprutbox. I
+en sådan lokal bör det vara undertryck i förhållande till de omgivande lokalerna. I avskärmade utrymmen
+bör frånluftsflödet vara större än tilluftsflödet, så att spridningen av luftföroreningen minskas.
+
+Uppgifter om avfall
+Till 17 § Exempel på produktinformation om avfall som kan behövas är dess innehåll av kemiska ämnen,
+dess farlighet och att det är nödvändigt att sanera emballage som innehåller rester av farliga kemiska
+produkter innan det skickas till destruktion, återvinning eller annat slutligt omhändertagande. Det är
+viktigt att förvara avfallet på ett säkert sätt i avvaktan på slutligt omhändertagande. Särskilda
+förvaringsutrymmen under tak eller annat skydd kan behövas under mellanförvaringen.
+
+Allmänna krav på märkning
+Till 18 § Med behållare avses alla typer av behållare, till exempel inköpta förpackningar, flaskor, säckar,
+lösa kärl, fasta behållare och cisterner. Även behållare som är en del av en teknisk anordning avses.
+Observera att man även kan behöva märka annat än behållare, t.ex. ventilationskanaler och filter till
+sådana, om de har förorenats med ämnen som medför att särskilda åtgärder behövs vid arbete med dessa.
+Märk lämpligen avfallsbehållare som innehåller en kemisk riskkälla med uppgift om risken i klartext,
+faropiktogram om sådana ska användas för de kemiska produkter som bildat avfallet, och med avfallsslag
+enligt avfallsförordningen, (2011:927). Det är viktigt att beakta behovet av märkning med information enligt
+17 § av behållare som innehåller avfall.
+Radioaktiva ämnen märks lämpligen med varselsymbol för joniserande strålning, texten radioaktivt och
+namnen på ingående radioaktiva nuklider samt uppgifter om dessas aktiviteter. Som regel bör också
+tidpunkten för aktivitetsangivelsen framgå av märkningen. I vissa fall har Strålsäkerhetsmyndigheten
+meddelat särskilda föreskrifter som då normalt är tillräckliga för att uppfylla detta krav.
+Man kan behöva märka behållare som innehåller material och varor, om de har ett ytskikt som är en
+kemisk riskkälla eller om de kan avge en kemisk riskkälla vid hanteringen, t.ex. behållare med
+bekämpningsmedelsbehandlade plantor. Lämplig märkning är den använda produktens namn, risken i
+klartext och faropiktogram om sådant är tillämplig.
+
+25
+
+AFS 2011:19
+Rörledningar
+Vätskor betraktas som brandfarliga om flampunkten är 100 °C eller lägre. Det är dock bara de med
+flampunkt 60 °C eller lägre som klassificeras som brandfarliga enligt CLP-förordningen.
+Det är lämpligt att rörledningar har färgmärkning enligt svensk standard SS 741.
+
+Särskilt om märkning av farliga kemiska produkter i arbetet
+Till 19 § I rådet till 18 § anges vad som ingår i begreppet behållare.
+Förvaring av farliga kemiska produkter som inte är i anslutning till användning omfattas inte av
+märkningskraven i 19 §. Exempel på sådan förvaring är när behållarna inte öppnas utan bara förvaras för
+att transporteras vidare eller för att överlåtas. I lagstiftningen om transport av farligt gods finns krav om
+märkning vid transporter och därtill anslutande hantering. Begreppet användning omfattar även farliga
+kemiska produkter som fylls över i andra behållare och transporteras vidare.
+Kravet i 19 § avser de behållare som de farliga kemiska produkterna förvaras i och inte eventuella
+ytterförpackningar som dessa i sin tur förvaras i. Ytterförpackningar kan behöva märkas enligt 18 §.
+Den som framställt kemiska produkter för eget bruk i liten skala på laboratorium och inte kunnat skaffa
+fullständig information om farligheten bör utöver känd farlighet märka produkterna med information om
+att egenskaperna är ofullständigt kända.
+Information om klassificering enligt CLP-förordningen av kemiska produkter som vid inköpet var
+märkta enligt tidigare gällande lagstiftning finns på säkerhetsdatabladet. När en kemisk produkt ska
+märkas både enligt CLP-förordningen och bestämmelserna för transport av farligt gods behöver
+faropiktogram enligt CLP-förordningen inte användas om det gäller samma fara som i
+transportbestämmelserna.
+En kemisk produkt som har en funktion i en teknisk anordning omfattar till exempel drivmedel och
+kylvätskor i fordon samt vätskor och gaser i analysutrustning. För tekniska anordningar som ska uppfylla
+Arbetsmiljöverkets föreskrifter om maskiner finns krav om åtgärder mot risker på grund av kemiska
+produkter som används i maskinen och varningar i form av symboler eller piktogram. Om detta följs
+uppfylls kravet i 18 §.
+
+26
+
+AFS 2011:19
+Nedan visas exempel på märkning enligt alternativ 1 respektive 2 i paragrafen.
+Märkning enligt alternativ 1
+
+Faropiktogram
+
+PRODUKT
+
+Fara
+
+Handelsnamn
+Signalord
+
+Mycket brandfarlig vätska och ånga. Orsakar allvarlig
+ögonirritation. Kan göra att man blir dåsig eller
+omtöcknad.
+
+Faroangivelser
+
+Förvaras oåtkomligt för barn. Får inte utsättas för
+gnistor/öppen låga - Rökning förbjuden.
+Förvaras på väl ventilerad plats. Förpackningen ska
+förvaras väl tillsluten. Använd ögonskydd.
+VID KONTAKT MED ÖGONEN: skölj försiktigt med
+vatten i flera minuter. Ta ur eventuella kontaktlinser
+om det går lätt. Fortsätt att skölja.
+
+Skyddsangivelser
+
+Innehåller: ämne x, ämne y
+
+Ämnen som bidrar till
+produktens klassificering
+
+Leverantör, namn, adress och telefonnummer
+500 ml
+
+Nominell mängd
+
+Märkning enligt alternativ 2
+
+Faropiktogram
+
+Skadlig
+
+Brandfarlig
+PRODUKT
+
+Text enligt tabell i 19 §
+Produktens namn
+
+Utelämnande av märkning
+Att enbart märka med produktens namn eller helt utelämna märkning för-utsätter normalt att man har
+arbetsrutiner som är väl utarbetade samt en i övrigt god risk- och skyddsinformation. Om man skyltar
+området där en farlig kemisk produkt förekommer, t.ex. dragskåp eller uppställningsplats, kan man i vissa
+fall utelämna märkning eller enbart märka med produktens namn.
+Att inte märka är acceptabelt främst vid kortvarig hantering, där det är uppenbart för alla berörda vad
+kärlen innehåller. Observera att det ska vara uppenbart inte bara för arbetstagare som är direkt berörda av
+arbetet med produkten utan även för sådana som normalt inte hanterar den, t.ex. städ- och servicepersonal
+samt väktare.
+Man kan normalt aldrig utelämna märkning när samma behållare vid olika tillfällen används till
+produkter med olika risker, eftersom risken då är stor att man förväxlar dem. Men på en behållare, där
+olika ämnen blandas och nya tillverkas, behöver man inte ändra märkningen allteftersom sammansättningen ändras. Däremot behöver det alltid finnas information om den process som pågår för att
+man ska kunna veta vilka riskerna är.
+Till 20 § En inbyggd rörledning behöver märkas i de öppningar där den är åtkomlig. Vid riskbedömningen
+avgör man hur inbyggnaden behöver vara märkt enligt 18 §.
+
+27
+
+AFS 2011:19
+Exempel på rörledningar är fast installerade trycksatta ledningar som används för transport av gas,
+vätska eller fasta ämnen med hjälp av gas eller vätska. Rökgaskanaler, ventilationskanaler och liknande är
+inte rörledningar. Rörledningar som främst används som en del i en process anses som processkärl och ska
+märkas enligt 19 .§
+En rörledning som tillfälligt innehåller ett farligt kemiskt ämne kan ofta märkas med upphängda skyltar .
+Till 20, 45 och 47 §§ De aktuella bestämmelserna är tillämpliga för de som föreskrifterna riktar sig till, se
+föreskrifternas 2 § med tillhörande allmänt råd. Sanktionsavgift kan dock påföras endast arbetsgivare och
+den som driver verksamhet enligt 3 kap. 5 § arbetsmiljölagen.
+Med antal sysselsatta avses, oavsett om de arbetar heltid eller deltid:
+• Anställda arbetstagare.
+• Inhyrd arbetskraft (jämför 3 kap. 12 § andra stycket arbetsmiljölagen). (AFS 2014:5)
+I fråga om verksamhet utan anställda arbetstagare (jämför 3 kap. 5 § arbetsmiljölagen) avses med antal
+sysselsatta, oavsett om de arbetar heltid eller deltid:
+• De personer som driver verksamheten.
+• Inhyrd arbetskraft.
+Den aktuella fysiska eller juridiska personens organisationsnummer avgör vilka personer som ska anses
+ingå i verksamheten. I antalet sysselsatta inräknas personer på verksamhetens samtliga arbetsställen.
+Antalet sysselsatta ska beräknas utifrån information avseende den dag som överträdelsen av
+sanktionsbestämmelsen konstaterades.
+
+Skyltning, förvaring och behållare
+Till 20 a § Mängder som har betydelse för säkerheten vid lagring är till exempel att en brand förvärras eller
+att ett läckage kan medföra hälsorisker.
+Vid skyltning som avser flera olika kemiska produkter får faropiktogram som varnar för lägre grad av
+farlighet uteslutas. Företrädesprinciperna i artikel 26 i CLP-förordningen kan användas som vägledning.
+Fram till 1 juni 2019 får varningsskyltar enligt Arbetsmiljöverkets föreskrifter om skyltar och signaler,
+bilaga 2, avsnitt 3.2, användas istället för det tillämpliga faropiktogrammet om de har samma symbol. Detta
+enligt en övergångsbestämmelse i Arbetsmiljöverkets föreskrifter om skyltar och signaler.
+Vid tillämpning av tredje stycket: Tänk på att skyltar i första hand sätts upp för andra än de som arbetar i
+en lokal och på vad som är viktigt att dessa iakttar. Det kan behövas skyltar med förbud mot öppen eld,
+skyltar med tillträdesförbud eller påbud att bära skyddsglasögon. Utformning av andra skyltar än
+faropiktogrammen enligt 19 § framgår av Arbetsmiljöverkets föreskrifter om skyltar och signaler.
+(AFS 2017:4)
+Till 21 § Man behöver anpassa förvaringen till riskkällans egenskaper för att undvika hälso- och
+olycksfallsrisker. Det kan innebära att man förvarar produkter i förråd som är avsedda för detta och
+ordnade så att inte spill sprids på ett farligt sätt. Invallning kan behövas för t.ex. brandfarliga, reaktiva och
+frätande kemiska produkter. För att förebygga olycksfallsrisker kan cisterner och andra behållare som
+innehåller farliga kemiska produkter eller andra kemiska riskkällor behöva skyddas mot påkörning av t.ex.
+truck.
+Man kan uppfylla kravet på åtskild förvaring på olika sätt beroende på vilka mängder som ska förvaras,
+vilka reaktioner som kan inträffa och vilka riskerna är. Ibland räcker det att hålla tillräckligt stort avstånd
+mellan behållarna. I andra fall kan man behöva förvara produkterna i separata skåp eller placera dem i
+separata rum som vid behov är invallade. En säkerhetsanordning som ett larm anslutet till en givare i
+invallningens botten som varnar vid läckage kan ibland vara lämpligt för att förebygga risker för ohälsa
+eller olycksfall.
+En förutsättning för att förvaringen ska uppfylla kraven i denna bestämmelse är att följande regler följs.
+– Reglerna om förpackningar och förvaring av hälso- eller miljöfarliga kemiska produkter i
+Kemikalieinspektionens föreskrifter (KIFS 2008:2) om kemiska produkter och biotekniska organismer.
+
+– Sprängämnesinspektionens föreskrifter (SÄIFS 2000:2) om hantering av brandfarliga vätskor.
+– Myndigheten för samhällsskydd och beredskaps föreskrifter (MSBFS 2010:5) om förvaring av
+explosiva varor.
+– Sprängämnesinspektionens föreskrifter (SÄIFS 1996:4) om hantering av organiska peroxider.
+
+28
+
+AFS 2011:19
+– Sprängämnesinspektionens föreskrifter (SÄIFS 1999:2) om hantering av väteperoxid.
+Det kan medföra ökad risk att förvara ett mycket giftigt ämne i närheten av ett ämne som kan
+föranleda brand eller explosion. Vid en explosion kan större skador orsakas genom att det giftiga
+ämnet sprids än av själva explosionen. Det är viktigt att beakta information i leverantörens
+säkerhetsdatablad om ämnen som tillsammans med produkten kan orsaka farliga reaktioner.
+På nästa sida finns riktlinjer för förvaring i skåp av kemiska produkter i förslutna burkar och flaskor
+när den egna riskbedömningen inte föranleder någon annan förvaring.
+Är den kemiska produkten brandfarlig, oxiderande, explosiv eller kan avge brandfarlig gas gäller
+dessutom reglerna om brandfarliga och explosiva varor som finns inom Myndigheten för
+samhällsskydd och beredskaps ansvarsområde, se www.msb.se
+Riktlinjer för förvaring i skåp av kemiska produkter
+Farlighet
+
+Frätande
+
+Dödliga och
+CMR*
+
+Giftiga
+
+Skadliga
+
+Reaktionsrisker
+
+Flyktig eller
+illaluktande
+vätska eller fast
+ämne
+
+Ventilerat
+Spillbehållare
+Säker placering
+
+Ventilerat
+Yttre skydd
+Oåtkomligt
+
+Ventilerat
+Säker placering
+Oåtkomligt
+
+Ventilerat
+
+Ventilerat
+Separerat
+
+Övriga
+vätskor
+
+Spillbehållare
+Säker placering
+
+Yttre skydd
+Oåtkomligt
+
+Oåtkomligt
+
+Separerat
+
+Dammande
+pulver
+
+Yttre skydd
+Oåtkomligt
+
+Oåtkomligt
+
+Separerat
+
+Fast ämne, ej
+dammande
+
+Yttre skydd
+Oåtkomligt
+
+Oåtkomligt
+
+Separerat
+
+Produkt
+
+Ventilerat: Ett skåp som är anslutet till frånluft och där fläkten går dygnet runt. Det finns skåp som är
+genomventilerade och skåp som är avsedda för undertryck. Dimensionerande luftflöden för skåpen är
+vanligen cirka 10–20 l/s. För skåp som är avsedda för undertryck, gäller värdet när skåpet är öppet.
+Spillbehållare: Behållaren placeras i en anordning som samlar upp eventuellt spill om den skulle spricka.
+Säker placering: Behållaren placeras lågt så att man inte kan få kemikalien i ansiktet om man tappar den då
+den tas fram.
+Yttre skydd: Behållaren med den farliga kemikalien placeras i en lämplig -ytterförpackning eller annat som
+även skyddar när behållaren flyttas till den plats där den öppnas.
+Oåtkomligt: Kemikalierna förvaras så att obehöriga inte kan komma åt dem. Detta uppnår man normalt
+genom att låsa skåpen, rummet eller området.
+Separerat: Behållaren placeras så att en utspilld kemikalie inte kan komma i kontakt med ämnen som
+medför en reaktionsrisk. Förvaring i olika skåp behövs om reaktionen kan orsaka en allvarlig skada.
+Till 22 § Förpackningar som uppfyller de krav som gäller vid transport av farligt gods kan normalt
+användas vid förvaring av de ämnen de är godkända för. När man överför ett ämne till ett annat kärl än
+ursprungsförpackningen är det viktigt att bedöma hur lämpligt kärlet är.
+Kärl, dunkar och säckar som innehåller kemiska riskkällor bör vara utformade så att minsta möjliga
+skvalp, stänk eller dammbildning uppstår vid hanteringen. Det är också viktigt att behållare är
+lätthanterliga och utformade så att man får bra grepp vid all hantering.
+* Cancerframkallande, mutagena eller reproduktionsstörande kemiska produkter.
+
+29
+
+AFS 2011:19
+Säkerhetsutrustningar på behållare kan vara överfyllnadsskydd, nivå-mätare, säkerhetsventil,
+kylanordning och liknande.
+
+Åtgärder mot risker vid inandning
+Till 23 § Vid bedömning av om en åtgärd för att begränsa luftföroreningarna är praktiskt möjlig med
+hänsyn till de resurser som krävs ska hänsyn inte tas till verksamhetens möjlighet att bekosta åtgärden utan
+endast om den är rimlig i jämförelse med den riskminskning den åstadkommer.
+Tillämpning av åtgärdstrappan i 16 § innebär att andningsskydd endast är en åtgärd som ska användas
+när andra möjligheter inte finns, t.ex. under en övergångsperiod innan ventilationen förbättras.
+Med andningszon avses området runt den arbetandes näsa och mun utanför eventuellt andningsskydd.
+Ett exempel på när mätning är uppenbart onödigt är när ämnet är helt inneslutet och arbetstagarna
+därför inte kan exponeras.
+
+Organiska lösningsmedel
+Till 24 § När organiska lösningsmedel måste användas och det inte är möjligt att vidta åtgärder enligt 16 §
+punkten 1 eller 2 bör i regel användningen förläggas utanför ordinarie arbetstid enligt tillämpning av 15 §
+punkten 2 och 16 § punkten 3.
+
+Andningsskydd
+Till 25 § I en lokal där gas hanteras krävs enligt Arbetarskyddsstyrelsens föreskrifter om gaser att
+andningsapparat ska användas där syrgashalten är under 18 procent. Denna regel kan användas som
+vägledning även vid annan hantering.
+I ett utrymme där syrgasen i luften förbrukas i olika processer, t.ex. vid svetsning eller lagring av träflis
+och pellets, kan luften i oventilerade delar bli livsfarlig på grund av låg syrgashalt eller förekomst av
+hälsofarlig gas som kolmonoxid. I ett sådant utrymme krävs i regel andningsapparat för ett fullgott skydd.
+Fullgott andningsskydd mot blyhaltigt damm kan vara en halvmask med utbytbart filter av klass P 3.
+Vid fristråleblästring av material målat med blyhaltig färg krävs som regel en andningsapparat för att
+skyddet ska vara fullgott.
+Man bör prova tillpassningen varje gång ett filterskydd ska användas så att skyddet sluter tätt mot
+ansiktet.
+
+Åtgärder mot risker vid hudkontakt, ögonstänk och förtäring
+Till 27 § För att avgöra vilket skydd för huden som behövs är det ibland nödvändigt att väga risken mot
+nackdelarna i form av hudproblem som användning av skyddet kan medföra. Om skador inte uppkommer
+vid kortvarig kontakt med produkten kan man ibland låta bli att använda handskar om det finns möjlighet
+att genast tvätta av eventuella stänk. Kontaktallergi kan uppkomma efter upprepad kortvarig kontakt.
+Därför bör handskar användas om man hanterar allergiframkallande ämnen.
+Till 28 § Exempel på lämpliga skydd mot stänk av kemiska ämnen är korgglasögon med täckta
+ventilationshål, ansiktsskärm (visir), huva eller helhjälm. I vissa arbeten är det viktigt att välja ett
+ögonskydd som inte ökar olycksrisken genom att begränsa synfältet.
+
+Arbete i cistern, brunn, silo, lastutrymme eller liknande
+Till 31 § För exempel på när luftens sammansättning inte är säker se även kommentaren till 25 §. Om
+kontroll av halten brännbara ångor se kommentaren till 36 §.
+Exempel på när luften behöver kontrolleras fortlöpande under arbetet är vid arbete i utrymmen där det
+finns avloppsvatten, latrin och gödsel eftersom det då kan avges metangas som medför explosionsrisk och
+hälsofarliga gaser som svavelväte och kolmonoxid. Dessutom kan halten syrgas i utrymmet minska. Om
+inte tillräcklig ventilation kan ordnas behöver andningsskydd användas som skyddar mot ämnena.
+Till 32 § För att kunna lyfta en person ur utrymmet är det viktigt att se till att cisternen eller motsvarande,
+redan då den konstrueras, får så stor manhålsöppning att en person tillsammans med den utrustning som
+
+30
+
+AFS 2011:19
+behövs, kan lyftas ut. Svensk standard SS 1797, Inspektionsöppningar och manhål – mått, kan användas
+som vägledning.
+
+Åtgärder för att förebygga brand-, explosions- och reaktionsrisker
+Till 33 § När man hanterar brandfarliga varor måste åtgärderna också vara förenliga med reglerna om
+hantering av brandfarliga och explosiva varor i lagen (2010:1011) och förordningen (2010:1075) om
+brandfarliga och explosiva varor samt i tillämpningsföreskrifter till dessa.
+Att följande regler följs beträffande begränsning av antändningskällor, utformning av arbetslokaler och
+tekniska anordningar är en förutsättning för att kraven i denna bestämmelse ska anses uppfyllda.
+– Arbetarskyddsstyrelsens föreskrifter om utrustningar för explosionsfarlig miljö.
+– Reglerna om elektrisk utrustning i Elsäkerhetsverkets föreskrifter (ELSÄK-FS 1995:6).
+– Reglerna om vilken elektrisk utrustning som ska väljas vid hantering av brandfarliga varor i
+Elsäkerhetsverkets föreskrifter om hur elektriska starkströmsanläggningar ska vara utförda (ELSÄK-FS 2008:1).
+– Reglerna för när lokal, utrymme, del av utrymme e.d. ska klassas som explosionsfarligt område inom
+Myndigheten för samhällsskydd och beredskaps ansvarsområde om explosionsfarlig miljö vid hantering av
+brandfarliga gaser och vätskor (SRVFS 2004:7) och om klassning vid hantering av explosiva varor (SÄIFS 1988:2).
+– Reglerna i Arbetarskyddsstyrelsens föreskrifter om arbete i explosionsfarlig miljö.
+Till 34 § Lämplig utrustning enligt bestämmelsen bör främst vara utrustning som behövs för att minska
+riskerna för personskador på grund av brandtillbud och mindre bränder såsom brandfilt,
+handbrandsläckare eller framdragen vattenslang.
+Räddningstjänstens råd i frågor om lämplig släckningsutrustning och släckmedel samt om hur
+utrustningen används kan användas vid tillämpningen av denna bestämmelse.
+Lämplig utrustning i lokaler med särskilda risker vid brand innebär också att man tillgodoser kravet i
+Arbetsmiljöverkets föreskrifter om arbetsplatsens utformning om automatisk brandsläckningsutrustning.
+Till 35 § första stycket Leverantörens säkerhetsdatablad är ett underlag för att avgöra vilka farliga
+kemiska reaktioner som kan ske. I bladet ska den kemiska produktens reaktivitet och kemiska stabilitet
+anges enligt Reachförordningen. Där ska också beskrivas vilka förhållanden som bör undvikas, med vilka
+ämnen eller material som en farlig situation kan uppstå och vilka farliga sönderdelningsprodukter som kan
+bildas vid användning, lagring, spill och upphettning.
+Bestämmelsens tillämpning kan kräva värmeavledning vid uppskalning av en kemisk process.
+Till 35 § andra stycket Vid tillämpningen av bestämmelsen bör man vara observant på allt som kan sätta
+igång en okontrollerad reaktion. Det kan vara föroreningar, rost eller andra beläggningar såväl som ljus och
+värme. Man bör använda stabiliseringsmedel där det är möjligt med hänsyn till hanteringen av ämnet.
+Halten stabiliseringsmedel kan behöva kontrolleras regelbundet. Planera användningen av
+stabiliseringsmedel utifrån aktuell hantering och leverantörens rekommendationer om lämplig
+analysmetod, provtagning och tillsättning av stabiliseringsmedel. Det är lämpligt att föra journal över
+datum för kontroll, kontrollresultat och de eventuella åtgärder som vidtagits.
+Organiska peroxider, väteperoxid, trikloretylen, perkloretylen, 1,1,1-trikloretan och metylenklorid är
+exempel på ämnen som kan sönderdelas okontrollerat. Kondenserad etylenoxid är ett exempel på en
+kemisk produkt som kan polymerisera under stark värmeutveckling.
+
+Arbetstillstånd
+Till 36 §
+Punkt 1
+Vid arbete i tank, cistern eller liknande utrymme med en brandfarlig vätska eller aerosol behöver halten
+brännbara ångor kontrolleras under hela arbetet genom mätning med explosimeter. Det är viktigt att
+kontrollera att explosimetern är tillverkad för att användas i den aktuella atmosfären. Ex-klassade
+explosimetrar finns för olika gaser, ångor och zontyper. Det är vidare viktigt att mätningarna utförs så att
+de blir representativa för hela utrymmet där arbetet ska ske. Syrgashalten behöver mätas samtidigt
+eftersom man underskattar explosionsrisken om syrgashalten är lägre än normalt.
+Halten ångor bör högst vara enligt följande:
+
+31
+
+AFS 2011:19
+– När hett arbete ska utföras i utrymmet: Högst 5 procent av den undre explosionsgränsen (vid 21
+procent syrgashalt i utrymmet). Det är därefter viktigt att explosionsrisken kontrolleras ända tills ytorna
+kallnat.
+– När övrigt arbete ska utföras: Högst 25 procent av den undre explosionsgränsen (vid 21 procent
+syrgashalt i utrymmet), förutsatt att inga tändkällor finns i närheten.
+Punkt 2
+Innan medgivande ges att påbörja svetsning, skärning eller annat arbete som medför hög temperatur på en
+behållare, som innehållit en brandfarlig eller brännbar vätska, behöver risken för brand och explosion vara
+förebyggd. Detta kan göras genom att man kontrollerar att den är tömd och rengjord samt ventilerar den så
+att den inte innehåller explosiv atmosfär eller fyller den med vatten.
+För att få utföra arbetet på en rörledning, cistern, fat eller liknande behållare för brandfarlig vara eller
+brännbar vätska, som inte är tom finns krav på certifiering i Arbetsmiljöverkets föreskrifter AFS 2005:2 om
+tillverkning av vissa behållare, rörledningar och anläggningar. Tills certifieringsorgan är utsett gäller krav på att
+anslutning av avstickare till ledning under drift endast får utföras efter anvisningar från Arbetsmiljöverket.
+Sista stycket
+Innan den som är ansvarig för samordningen av arbetsmiljöfrågor godkänner att ett arbete startar behöver
+hon eller han veta att anläggningen ställts av på ett säkert sätt så att inte den som ska utföra arbetet utsätts
+för risker från anläggningen.
+
+Åtgärder vid hantering av radioaktiva kemiska riskkällor
+Till 37 § En förutsättning för att kraven på hantering i denna bestämmelse ska kunna anses uppfyllda är att
+man följer reglerna om hantering av radioaktiva ämnen i Strålsäkerhetsmyndighetens föreskrifter.
+
+Särskilda krav för allergiframkallande kemiska produkter och vissa processer
+Till 37 a § Snabblim som innehåller cyanoakrylater har gett upphov till allergi och omfattas därför trots att
+de inte är klassificerade som allergiframkallande.
+Vissa kemiska produkter är märkta med att de innehåller ett ämne som är allergiframkallande men i så
+låg halt att produkten inte klassificeras som allergiframkallande. Vid riskbedömningen är det viktigt att
+uppmärksamma att dessa kan ge allergisymtom hos de som är känsliga.
+Exempel på en process som kan frisätta formaldehyd är härdning av syrahärdande lack och färg.
+
+Dokumentation av riskbedömning
+Till 37 b § En sådan situation som punkten 3 avser är exempelvis då skyddshandskar som skyddar mot ett
+hudallergent ämne används på grund av att tekniska eller andra åtgärder inte är tillräckliga för att
+hudkontakt med ämnet ska kunna undvikas. Punkten 3 avser även situationen då andningsskydd används
+för att det inte går att vidta tekniska åtgärder för att helt förhindra inandning av luftvägsallergena ämnen.
+Vid dokumentation av riskbedömningen är det även viktigt att identifiera de situationer där
+allergiframkallande ämnen bildas under processen och vilka åtgärder som ska vidtas.
+
+Skyltning
+Till 37 c § Utformning av skyltar avseende färg, form och symbol framgår av föreskrifterna om skyltar och
+signaler. Varningsskylten för ”Fara” i bilaga 2 med tilläggsskylt om farans art kan vara lämplig.
+Vid öppen hantering finns det risk för exponering av hud och andningsvägar. I princip innebär öppen
+hantering att man fysiskt ska kunna röra den farliga kemiska produkten eller att ångor kan avges till
+omgivningen.
+När en produkt finns i en applikator eller när kemikalierna blandas inne i applikatorn innan de används
+så är det inte öppen hantering.
+
+32
+
+AFS 2011:19
+Utbildning
+Till 37 e § Utbildningen behöver omfatta de moment som är relevanta för arbetet som ska utföras:
+– Grundläggande kunskaper om kemiska risker.
+– Kunskaper om de kemiska produkter som hanteras.
+– Genomgång av de moment i hanteringen som kan vara riskfyllda.
+– Vad som händer vid bearbetning och termisk nedbrytning.
+– Vilka skyddsåtgärder som är nödvändiga för ett säkert arbete.
+– Vilken typ av ventilation som behövs.
+– I vilka situationer som personlig skyddsutrustning behövs och vilken typ av skyddsutrustning som är
+lämplig.
+– Teknik för rengöring och sanering.
+För att kunna ge de kunskaper som bestämmelsen kräver behöver utbildaren ha goda kunskaper om
+föreskrifterna om kemiska arbetsmiljörisker och om allergiframkallande ämnen. Utbildaren bör även kunna
+arbetsmiljölagstiftningen och övriga lagar och föreskrifter som berör det kemiska området.
+
+Läkarundersökningar
+Till 37 f § Exempel på formaldehydhartser är fenol-formaldehydharts, urea-formaldehydharts och
+melamin-formaldehydharts.
+
+Särskilda krav för cancerframkallande, mutagena och reproduktionsstörande
+kemiska produkter och viss verksamhet
+Till 38 § Vid den riskbedömning som ska göras enligt Arbetsmiljöverkets föreskrifter om gravida och
+ammande arbetstagare behöver de kemiska produkter och verksamheter som omfattas av bestämmelserna
+ägnas särskild uppmärksamhet.
+Kemiska produkter som är märkta enligt Kemikalieinspektionens föreskrifter (KIFS 2005:7) om
+klassificering och märkning av kemiska produkter får finnas på marknaden fram till 1 juni 2017. Om en kemisk
+produkt är märkt enligt KIFS 2005:7 så gäller kraven produkter med följande riskfraser.
+R45: Kan ge cancer.
+R46: Kan ge ärftliga genetiska skador.
+R49: Kan ge cancer vid inandning.
+R60: Kan ge nedsatt fortplantningsförmåga.
+R61: Kan ge fosterskador.
+
+Dokumentation av riskbedömningen
+Till 40 § För att ta ställning till hur man ska övervaka hanteringen och funktionen hos utrustningen bör
+man utreda vilka faktorer som kan påverka exponeringen. Möjlighet att kontinuerligt mäta halten av
+riskkällan i luften finns för ett fåtal ämnen. I övriga fall kan man till exempel kontrollera att ventilationen
+inte försämrats jämfört med vad hanteringen planerats för. Ett annat sätt kan vara att regelbundet
+kontrollera om ytor i omgivningen har kontaminerats.
+Regler om ventilationskontroll finns i Arbetsmiljöverkets föreskrifter om arbetsplatsens utformning.
+Register
+Till 41 § Syftet med registret är att bevara uppgifter om exponering för cancerframkallande och mutagena
+ämnen för att underlätta utredningar om sjukdomssamband.
+Sådana exponeringar kan exempelvis finnas när arbetet innehåller moment där tekniska åtgärder inte är
+tillräckliga för att undvika skadlig exponering. Registreringsskyldigheten gäller också när man har
+upptäckt förhöjd exponering genom övervakningen eller på annat sätt, t.ex. att ventilationen inte är
+tillfredsställande eller att arbetet inte bedrivs som planerat.
+För att avgöra vilken grad av exponering en arbetstagare utsatts för behövs uppgifter om på vilket sätt
+arbetstagaren exponerats, hur hög exponeringen varit och hur länge och ofta den skett.
+Enligt 3 § arbetsmiljöförordningen ska arbetsgivaren förvara register under minst 40 år räknat från den
+dag då exponeringen upphörde.
+
+33
+
+AFS 2011:19
+
+Förbud och tillstånd
+Till 45–49 §§ Tillstånd beviljas i allmänhet för 1–3 år.
+Se även rådet till 20, 45 och 47 §§.
+
+Periodiska mätningar av vissa kemiska ämnen
+Till 50 § andra stycket Avsikten med mätningarna är att avgöra vilka åtgärder som behövs och att följa
+upp tidigare resultat. De ska därför avse luften utanför eventuellt andningsskydd.
+En fackkunnig person, t.ex. en arbetsmiljöingenjör, kan bedöma om mätning är uppenbart onödig utifrån
+uppgifter om i vilken form ämnet förekommer, hanterade mängder, hanteringssätt, ventilation, ämnenas
+flyktighet, kännedom om resultat av mätningar i liknande verksamhet osv. Avseende bly kan följande
+exempel nämnas:
+– Hantering utan bearbetning av föremål med bly inneslutet i glas eller plast när blyexponering rimligen
+inte sker.
+– Manuellt mjuklödningsarbete med lödtenn och elektrisk lödkolv medför oftast ingen skadlig
+exponering om det finns effektiv ventilation som suger ut röken.
+– Arbete i gruvor där bly föreligger som blysulfid medför normalt liten risk för blyupptag på grund av att
+sulfiden har låg löslighet.
+– Där kontroll av blodblyhalten visat att ingen exponering sker.
+– Om arbetet endast utförs vid enstaka tillfällen eller några timmar per vecka.
+Med ett arbete som utförs kortare tid än två månader avses här det sammanlagda arbete som utförs på
+ett arbetsställe. Om arbetet utförs periodvis ska perioderna räknas samman. När man beräknar hur länge
+arbetet pågår tar man inte hänsyn till hur många som deltar eller om det utförs av samma personer.
+En verksamhet som gör arbeten på entreprenad vid andra arbetsställen under mindre än två månader på
+varje arbetsställe behöver inte utföra periodiska mätningar.
+För arbete med bly och kadmium gäller Arbetsmiljöverkets föreskrifter om medicinska kontroller i
+arbetslivet.
+Till 51 § Blanketter att använda finns på Arbetsmiljöverkets webbplats www.av.se under rubriken
+Blanketter. Skicka gärna mätrapporten elektroniskt till Arbetsmiljöverket. Om mätrapporten är en
+papperskopia bör den skickas in i två exemplar.
+
+34
+
+

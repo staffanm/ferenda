@@ -1,4 +1,5 @@
 from .sameas import SameAs
+from .infertimes import InferTimes
 from .sfs import SFS
 from .keyword import LNKeyword
 from .mediawiki import LNMediaWiki

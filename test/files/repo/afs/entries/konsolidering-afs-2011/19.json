@@ -1,0 +1,35 @@
+{
+  "basefile": "konsolidering/afs/2011:19", 
+  "content": {}, 
+  "id": "https://lagen.nu/afs/2011:19/konsolidering/2017-06-13", 
+  "indexed_dep": "2018-05-03T09:24:44.343735", 
+  "indexed_ft": "2018-05-03T09:24:44.314082", 
+  "indexed_ts": "2018-05-03T09:24:44.397143", 
+  "link": {}, 
+  "orig_checked": "2018-04-28T23:09:35.390316", 
+  "orig_created": "2018-04-28T23:06:58.373152", 
+  "orig_updated": "2018-04-28T23:06:58.373152", 
+  "orig_url": "https://www.av.se/globalassets/filer/publikationer/foreskrifter/kemiska-arbetsmiljorisker-foreskrifter-afs2014-43.pdf", 
+  "published": "2018-05-03T09:30:58.109337", 
+  "status": {
+    "generate": {
+      "date": "2018-05-03T09:30:58.025562", 
+      "duration": 0.089239, 
+      "success": true
+    }, 
+    "parse": {
+      "date": "2018-04-29T07:56:33.608644", 
+      "duration": 18.358872, 
+      "success": true
+    }, 
+    "relate": {
+      "date": "2018-05-03T09:24:44.196048", 
+      "duration": 0.202485, 
+      "success": true
+    }
+  }, 
+  "summary": null, 
+  "title": "Kemiska arbetsmilj\u00f6risker (AFS 2011:19)", 
+  "updated": "2018-05-03T09:30:58.109337", 
+  "url": null
+}

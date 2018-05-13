@@ -23,7 +23,7 @@ from ferenda import (CompositeRepository, CompositeStore, Facet, TocPageset,
 from ferenda import util, fulltextindex
 from ferenda.elements import Body, Link, html
 from ferenda.sources.legal.se import (SwedishLegalSource, SwedishLegalStore)
-from . import SameAs
+from . import SameAs, InferTimes
 
 
 # inherit list_basefiles_for from CompositeStore, basefile_to_pathfrag
@@ -62,7 +62,7 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
     alias = "myndfs"
     storage_policy = 'dir'
     xslt_template = "xsl/myndfskr.xsl"
-    extrabases = SameAs,
+    extrabases = SameAs, InferTimes
     loadpath = [os.path.dirname(__file__) + os.sep + "res"]
     subrepos = [
         myndfskr.AFS,

@@ -1,0 +1,24 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://rinfo.lagrummet.se/publ/sosfs/2005:27/konsolidering/2017:23> a rpubl:KonsolideradGrundforfattning ;
+    dcterms:identifier "Socialstyrelsens föreskrifter (SOSFS 2005:27) om samverkan vid in- och utskrivning av patienter i sluten vård"@sv ;
+    dcterms:publisher <http://rinfo.lagrummet.se/org/socialstyrelsen> ;
+    rpubl:arsutgava "2005" ;
+    rpubl:konsoliderar <http://rinfo.lagrummet.se/publ/sosfs/2005:27> ;
+    rpubl:konsolideringsunderlag <http://rinfo.lagrummet.se/publ/hslf-fs/2017:23>,
+        <http://rinfo.lagrummet.se/publ/sosfs/2005:27> ;
+    rpubl:lopnummer "27" ;
+    prov:alternateOf <http://example.org/docs/konsolidering/sosfs/2005%3A27.html> ;
+    prov:wasDerivedFrom <http://rinfo.lagrummet.se/publ/sosfs/2005:27/konsolidering/2017:23?attachment=index.html&repo=sosfs&dir=downloaded> ;
+    prov:wasGeneratedBy "ferenda.sources.legal.se.myndfskr.SOSFS" .
+
+<http://example.org/docs/konsolidering/sosfs/2005%3A27.html> rdfs:label "Källa"@sv .
+
+<http://rinfo.lagrummet.se/publ/sosfs/2005:27/konsolidering/2017:23?attachment=index.html&repo=sosfs&dir=downloaded> rdfs:label "Socialstyrelsens föreskrifter (SOSFS 2005:27) om samverkan vid in- och utskrivning av patienter i sluten vård"@sv .
+
