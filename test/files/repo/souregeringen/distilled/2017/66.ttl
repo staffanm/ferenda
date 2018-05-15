@@ -13,36 +13,6 @@
     dcterms:isPartOf <https://lagen.nu/sou/2017:66> ;
     dcterms:title "Till statsrådet och chefen för Socialdepartementet"@sv .
 
-<https://lagen.nu/sou/2017:66#kommentar-0000:128787383237853175001972779908982667918520224355346651637499791384501221920595137223148124475568179717423815227444300509628072830619790362259558289833501013244987327861821225084624410068490848559101770196660846014296083728036> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till förordning om ändring i förordningen (2009:1422) om behandling av personuppgifter i Statistiska centralbyråns verksamhet med framställning av statistik över kommunalt vårdnadsbidrag"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:128787383237853175001972779908982667918520224355346651637499791384501221920595137223148124475568179717423815227444300509628072830619790362259558289833501013244987327861821225084624410068490848559101770196660846014296083728036> ;
-    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-29> .
-
-<https://lagen.nu/sou/2017:66#kommentar-0000:141208901027851630679679046447193329164014817866012234627624658029603401758176398336887263437440881> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till förordning om ändring i förordningen (2001:709) om cancerregister hos Socialstyrelsen"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:141208901027851630679679046447193329164014817866012234627624658029603401758176398336887263437440881> ;
-    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-23> .
-
-<https://lagen.nu/sou/2017:66#kommentar-0000:15450935206839301986454817074238291537864600906804688556199647280576622620333665905065632082095748033228867188737084206> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till förordning om ändring i förordningen (2001:637) om behandling av personuppgifter inom socialtjänsten"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:15450935206839301986454817074238291537864600906804688556199647280576622620333665905065632082095748033228867188737084206> ;
-    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-20> .
-
-<https://lagen.nu/sou/2017:66#kommentar-0000:169237069865820686849167508571891757587615791719709257495959872084> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till förordning om ändring i läkemedelsförordningen (2015:458)"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:169237069865820686849167508571891757587615791719709257495959872084> ;
-    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-33> .
-
-<https://lagen.nu/sou/2017:66#kommentar-0000:2026193388420847458421061427319457491194836368181348045926120539469630027331861317303295979127387413017615> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till förordning om ändring i förordningen (2005:363) om läkemedelsregister hos Socialstyrelsen"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:2026193388420847458421061427319457491194836368181348045926120539469630027331861317303295979127387413017615> ;
-    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-25> .
-
-<https://lagen.nu/sou/2017:66#kommentar-0000:21194698500465434823669159223920838872242250900966651357619466456646446106112088288385738310191981214323825117731123> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till förordning om ändring i förordningen (2001:708) om medicinskt födelseregister hos Socialstyrelsen"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:21194698500465434823669159223920838872242250900966651357619466456646446106112088288385738310191981214323825117731123> ;
-    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-22> .
-
 <https://lagen.nu/sou/2017:66#kommentar-0000:24751088203164763027191828255264868594562212942383132099640883409564935031941559807120085473120669163197170813215016897175616996824855918699199766490023471329328> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till ändringar i förslaget till lag om behandling av personuppgifter inom verksamheten för Inspektionen för socialförsäkringen"@sv ;
     rinfoex:kommentarTill <https://lagen.nu/0000:24751088203164763027191828255264868594562212942383132099640883409564935031941559807120085473120669163197170813215016897175616996824855918699199766490023471329328> ;
@@ -53,55 +23,15 @@
     rinfoex:kommentarTill <https://lagen.nu/0000:265709459804289903842639209083138196878880436460729567156926648131136687613494834823737663586> ;
     dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-34> .
 
-<https://lagen.nu/sou/2017:66#kommentar-0000:34844411907055028750122673787072411256947409308131036555643130876119617560873911> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till förordning om ändring i förordningen (2013:413) om kosmetiska produkter"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:34844411907055028750122673787072411256947409308131036555643130876119617560873911> ;
-    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-32> .
-
-<https://lagen.nu/sou/2017:66#kommentar-0000:3812640327751994028351334254074219887428400082382330417715082097435530504539804520166817053289869758> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till förordning om ändring i förordningen (2001:707) om patientregister hos Socialstyrelsen"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:3812640327751994028351334254074219887428400082382330417715082097435530504539804520166817053289869758> ;
-    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-21> .
-
-<https://lagen.nu/sou/2017:66#kommentar-0000:39881564464287540524101752073928881799187964234913473997337209855406322181547708965741293301735017260710243886> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till förordning om ändring i förordningen (2006:196) om register över hälso- och sjukvårdspersonal"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:39881564464287540524101752073928881799187964234913473997337209855406322181547708965741293301735017260710243886> ;
-    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-27> .
-
-<https://lagen.nu/sou/2017:66#kommentar-0000:4994637021413970784355938865315933690470835813123109044520252816683062197561964050541031860685836862165728206722547301508349917605531582406829724996535116716782> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till förordning om ändring i förordningen (2006:94) om register hos Socialstyrelsen över insatser inom den kommunala hälso- och sjukvården"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:4994637021413970784355938865315933690470835813123109044520252816683062197561964050541031860685836862165728206722547301508349917605531582406829724996535116716782> ;
-    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-26> .
-
-<https://lagen.nu/sou/2017:66#kommentar-0000:62615767091438935180015287956465368913926387663006174451784003668570430846219451008226094348748986097864599040921811632239319746412542505> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till förordning om ändring i förordningen (1981:1370) om skyldighet för socialnämnderna att lämna statistiska uppgifter"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:62615767091438935180015287956465368913926387663006174451784003668570430846219451008226094348748986097864599040921811632239319746412542505> ;
-    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-19> .
-
-<https://lagen.nu/sou/2017:66#kommentar-0000:654983039853235259489182298964379846277366520496946302684463927697200900124540804993267480400089677578397976350587782902405356478764092595353901598> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till förordning om ändring i förordningen (2003:766) om behandling av personuppgifter inom socialförsäkringens administration"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:654983039853235259489182298964379846277366520496946302684463927697200900124540804993267480400089677578397976350587782902405356478764092595353901598> ;
-    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-24> .
-
-<https://lagen.nu/sou/2017:66#kommentar-0000:71667582119026075285440421676103858142732809294772871230679967283073307948032248898556565853018030621105031814561983714337349558810650033490222663359137310564628858048> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till förordning om ändring i förordningen (2011:116) om register hos Socialstyrelsen över läkemedel som lämnats ut från apotek i Jämtlands län"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:71667582119026075285440421676103858142732809294772871230679967283073307948032248898556565853018030621105031814561983714337349558810650033490222663359137310564628858048> ;
-    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-30> .
-
-<https://lagen.nu/sou/2017:66#kommentar-0000:75044199571142498460039312122942870044253198821531410111770931193832252989174028892245556490094931196568> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till förordning om ändring i förordningen (2008:194) om tandhälsoregister hos Socialstyrelsen"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:75044199571142498460039312122942870044253198821531410111770931193832252989174028892245556490094931196568> ;
-    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-28> .
-
 <https://lagen.nu/sou/2017:66#kommentar-0000:82027939053861603856536133157490026167370514408237801251148419677441901447875260541368726723726517981090417514103752898989770868962571937956843979152978900439370907925687498314852735677215438226029> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till förordning om upphävande av förordningen (1998:156) med bemyndigande för Datainspektionen att meddela säkerhetsföreskrifter för socialförsäkringsregister"@sv ;
     rinfoex:kommentarTill <https://lagen.nu/0000:82027939053861603856536133157490026167370514408237801251148419677441901447875260541368726723726517981090417514103752898989770868962571937956843979152978900439370907925687498314852735677215438226029> ;
     dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-35> .
 
-<https://lagen.nu/sou/2017:66#kommentar-0000:8975414171814841019038786711000542962507194753952106013196670058876346604002321377032280192182847421734401832254125580616951688141464823238714846932000281215352067346383352617148428711596117812794461402899034482892940> a rinfoex:Forfattningskommentar ;
-    rdfs:label "Författningskommentar till förordning om ändring i förordningen (2011:306) om behandling av personuppgifter i Tandvårds- och läkemedelsförmånsverkets verksamhet i fråga om det statliga tandvårdsstödet"@sv ;
-    rinfoex:kommentarTill <https://lagen.nu/0000:8975414171814841019038786711000542962507194753952106013196670058876346604002321377032280192182847421734401832254125580616951688141464823238714846932000281215352067346383352617148428711596117812794461402899034482892940> ;
-    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-31> .
+<https://lagen.nu/sou/2017:66#kommentar-1981:1370> a rinfoex:Forfattningskommentar ;
+    rdfs:label "Författningskommentar till förordningen (1981:1370) om skyldighet för socialnämnderna att lämna statistiska uppgifter"@sv ;
+    rinfoex:kommentarTill <https://lagen.nu/1981:1370> ;
+    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-19> .
 
 <https://lagen.nu/sou/2017:66#kommentar-1996:1156> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till lagen (1996:1156) om receptregister"@sv ;
@@ -118,20 +48,55 @@
     rinfoex:kommentarTill <https://lagen.nu/2001:454> ;
     dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-5> .
 
+<https://lagen.nu/sou/2017:66#kommentar-2001:637> a rinfoex:Forfattningskommentar ;
+    rdfs:label "Författningskommentar till förordningen (2001:637) om behandling av personuppgifter inom socialtjänsten"@sv ;
+    rinfoex:kommentarTill <https://lagen.nu/2001:637> ;
+    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-20> .
+
+<https://lagen.nu/sou/2017:66#kommentar-2001:707> a rinfoex:Forfattningskommentar ;
+    rdfs:label "Författningskommentar till förordningen (2001:707) om patientregister hos Socialstyrelsen"@sv ;
+    rinfoex:kommentarTill <https://lagen.nu/2001:707> ;
+    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-21> .
+
+<https://lagen.nu/sou/2017:66#kommentar-2001:708> a rinfoex:Forfattningskommentar ;
+    rdfs:label "Författningskommentar till förordningen (2001:708) om medicinskt födelseregister hos Socialstyrelsen"@sv ;
+    rinfoex:kommentarTill <https://lagen.nu/2001:708> ;
+    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-22> .
+
+<https://lagen.nu/sou/2017:66#kommentar-2001:709> a rinfoex:Forfattningskommentar ;
+    rdfs:label "Författningskommentar till förordningen (2001:709) om cancerregister hos Socialstyrelsen"@sv ;
+    rinfoex:kommentarTill <https://lagen.nu/2001:709> ;
+    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-23> .
+
 <https://lagen.nu/sou/2017:66#kommentar-2002:297> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till lagen (2002:297) om biobanker i hälso- och sjukvården m.m."@sv ;
     rinfoex:kommentarTill <https://lagen.nu/2002:297> ;
     dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-6> .
+
+<https://lagen.nu/sou/2017:66#kommentar-2003:766> a rinfoex:Forfattningskommentar ;
+    rdfs:label "Författningskommentar till förordningen (2003:766) om behandling av personuppgifter inom socialförsäkringens administration"@sv ;
+    rinfoex:kommentarTill <https://lagen.nu/2003:766> ;
+    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-24> .
 
 <https://lagen.nu/sou/2017:66#kommentar-2005:258> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till lagen (2005:258) om läkemedelsförteckning"@sv ;
     rinfoex:kommentarTill <https://lagen.nu/2005:258> ;
     dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-7> .
 
+<https://lagen.nu/sou/2017:66#kommentar-2005:363> a rinfoex:Forfattningskommentar ;
+    rdfs:label "Författningskommentar till förordningen (2005:363) om läkemedelsregister hos Socialstyrelsen"@sv ;
+    rinfoex:kommentarTill <https://lagen.nu/2005:363> ;
+    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-25> .
+
 <https://lagen.nu/sou/2017:66#kommentar-2006:1570> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till lagen (2006:1570) om skydd mot internationella hot mot människors hälsa"@sv ;
     rinfoex:kommentarTill <https://lagen.nu/2006:1570> ;
     dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-10> .
+
+<https://lagen.nu/sou/2017:66#kommentar-2006:196> a rinfoex:Forfattningskommentar ;
+    rdfs:label "Författningskommentar till förordningen (2006:196) om register över hälso- och sjukvårdspersonal"@sv ;
+    rinfoex:kommentarTill <https://lagen.nu/2006:196> ;
+    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-27> .
 
 <https://lagen.nu/sou/2017:66#kommentar-2006:351> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till lagen (2006:351) om genetisk integritet m.m."@sv ;
@@ -143,6 +108,16 @@
     rinfoex:kommentarTill <https://lagen.nu/2006:496> ;
     dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-9> .
 
+<https://lagen.nu/sou/2017:66#kommentar-2006:94> a rinfoex:Forfattningskommentar ;
+    rdfs:label "Författningskommentar till förordningen (2006:94) om register hos Socialstyrelsen över insatser inom den kommunala hälso- och sjukvården"@sv ;
+    rinfoex:kommentarTill <https://lagen.nu/2006:94> ;
+    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-26> .
+
+<https://lagen.nu/sou/2017:66#kommentar-2008:194> a rinfoex:Forfattningskommentar ;
+    rdfs:label "Författningskommentar till förordningen (2008:194) om tandhälsoregister hos Socialstyrelsen"@sv ;
+    rinfoex:kommentarTill <https://lagen.nu/2008:194> ;
+    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-28> .
+
 <https://lagen.nu/sou/2017:66#kommentar-2008:286> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till lagen (2008:286) om kvalitets- och säkerhetsnormer vid hantering av mänskliga vävnader och celler"@sv ;
     rinfoex:kommentarTill <https://lagen.nu/2008:286> ;
@@ -152,6 +127,11 @@
     rdfs:label "Författningskommentar till patientdatalagen (2008:355)"@sv ;
     rinfoex:kommentarTill <https://lagen.nu/2008:355> ;
     dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-12> .
+
+<https://lagen.nu/sou/2017:66#kommentar-2009:1422> a rinfoex:Forfattningskommentar ;
+    rdfs:label "Författningskommentar till förordningen (2009:1422) om behandling av personuppgifter i Statistiska centralbyråns verksamhet med framställning av statistik över kommunalt vårdnadsbidrag"@sv ;
+    rinfoex:kommentarTill <https://lagen.nu/2009:1422> ;
+    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-29> .
 
 <https://lagen.nu/sou/2017:66#kommentar-2009:367> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till apoteksdatalagen (2009:367)"@sv ;
@@ -173,6 +153,16 @@
     rinfoex:kommentarTill <https://lagen.nu/2010:1622> ;
     dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-15> .
 
+<https://lagen.nu/sou/2017:66#kommentar-2011:116> a rinfoex:Forfattningskommentar ;
+    rdfs:label "Författningskommentar till förordningen (2011:116) om register hos Socialstyrelsen över läkemedel som lämnats ut från apotek i Jämtlands län"@sv ;
+    rinfoex:kommentarTill <https://lagen.nu/2011:116> ;
+    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-30> .
+
+<https://lagen.nu/sou/2017:66#kommentar-2011:306> a rinfoex:Forfattningskommentar ;
+    rdfs:label "Författningskommentar till förordningen (2011:306) om behandling av personuppgifter i Tandvårds- och läkemedelsförmånsverkets verksamhet i fråga om det statliga tandvårdsstödet"@sv ;
+    rinfoex:kommentarTill <https://lagen.nu/2011:306> ;
+    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-31> .
+
 <https://lagen.nu/sou/2017:66#kommentar-2012:263> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till lagen (2012:263) om kvalitets- och säkerhetsnormer vid hantering av mänskliga organ"@sv ;
     rinfoex:kommentarTill <https://lagen.nu/2012:263> ;
@@ -182,6 +172,16 @@
     rdfs:label "Författningskommentar till lagen (2012:453) om register över nationella vaccinationsprogram"@sv ;
     rinfoex:kommentarTill <https://lagen.nu/2012:453> ;
     dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-17> .
+
+<https://lagen.nu/sou/2017:66#kommentar-2013:413> a rinfoex:Forfattningskommentar ;
+    rdfs:label "Författningskommentar till förordningen (2013:413) om kosmetiska produkter"@sv ;
+    rinfoex:kommentarTill <https://lagen.nu/2013:413> ;
+    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-32> .
+
+<https://lagen.nu/sou/2017:66#kommentar-2015:458> a rinfoex:Forfattningskommentar ;
+    rdfs:label "Författningskommentar till läkemedelsförordningen (2015:458)"@sv ;
+    rinfoex:kommentarTill <https://lagen.nu/2015:458> ;
+    dcterms:isPartOf <https://lagen.nu/sou/2017:66#S17-33> .
 
 <https://lagen.nu/sou/2017:66#kommentar-2016:526> a rinfoex:Forfattningskommentar ;
     rdfs:label "Författningskommentar till lagen (2016:526) om behandling av personuppgifter i ärenden om licens för läkemedel"@sv ;

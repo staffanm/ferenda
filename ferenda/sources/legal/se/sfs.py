@@ -595,11 +595,12 @@ class SFS(Trips):
         if notfound:
             raise InteExisterandeSFS(str(notfound))
         textheader = fp.read(2048)
-        idx = textheader.index("-"*64)
+        assert(isinstance(textheader, bytes))
+        idx = textheader.index(b"-"*64)
         header = textheader[:idx]
         offset = len(header)
         fp.seek(offset + 66) # the extra 66 for the dividing ruler made of hyphens + newlines
-        return soup, header
+        return soup, header.decode(self.source_encoding)
 
     def extract_metadata(self, datatuple, basefile):
         soup, reader = datatuple
@@ -967,10 +968,11 @@ class SFS(Trips):
         if issued:
             resource.graph.add((resource.identifier, DCTERMS.issued, issued))
         else:
-            # create a totally incorrect value, otherwise
-            # lagen.nu.SFS.infer_triples wont be able to generate a
-            # owl:sameAs uri
-            resource.graph.add((resource.identifier, DCTERMS.issued, Literal(datetime.today())))
+            # create a non-date value so that
+            # lagen.nu.SFS.infer_triples will at least be able to
+            # generate a stable owl:sameAs uri
+            issued = str(r.value(DCTERMS.identifier)).split(" ", 1)[1]
+            resource.graph.add((resource.identifier, DCTERMS.issued, Literal(issued)))
         return resource
 
 

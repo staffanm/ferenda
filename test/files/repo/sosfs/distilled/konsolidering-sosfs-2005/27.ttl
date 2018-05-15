@@ -6,9 +6,13 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
+<http://example.org/docs/konsolidering/sosfs/2005%3A27.html> rdfs:label "Källa"@sv .
+
 <http://rinfo.lagrummet.se/publ/sosfs/2005:27/konsolidering/2017:23> a rpubl:KonsolideradGrundforfattning ;
-    dcterms:identifier "Socialstyrelsens föreskrifter (SOSFS 2005:27) om samverkan vid in- och utskrivning av patienter i sluten vård"@sv ;
+    dcterms:identifier "SOSFS 2005:27 (konsoliderad tom. 2017:23)" ;
+    dcterms:isPartOf <http://rinfo.lagrummet.se/publ/sosfs/2005:27/konsolidering/2017:23> ;
     dcterms:publisher <http://rinfo.lagrummet.se/org/socialstyrelsen> ;
+    dcterms:title "Socialstyrelsens föreskrifter (SOSFS 2005:27) om samverkan vid in- och utskrivning av patienter i sluten vård"@sv ;
     rpubl:arsutgava "2005" ;
     rpubl:konsoliderar <http://rinfo.lagrummet.se/publ/sosfs/2005:27> ;
     rpubl:konsolideringsunderlag <http://rinfo.lagrummet.se/publ/hslf-fs/2017:23>,
@@ -18,7 +22,5 @@
     prov:wasDerivedFrom <http://rinfo.lagrummet.se/publ/sosfs/2005:27/konsolidering/2017:23?attachment=index.html&repo=sosfs&dir=downloaded> ;
     prov:wasGeneratedBy "ferenda.sources.legal.se.myndfskr.SOSFS" .
 
-<http://example.org/docs/konsolidering/sosfs/2005%3A27.html> rdfs:label "Källa"@sv .
-
-<http://rinfo.lagrummet.se/publ/sosfs/2005:27/konsolidering/2017:23?attachment=index.html&repo=sosfs&dir=downloaded> rdfs:label "Socialstyrelsens föreskrifter (SOSFS 2005:27) om samverkan vid in- och utskrivning av patienter i sluten vård"@sv .
+<http://rinfo.lagrummet.se/publ/sosfs/2005:27/konsolidering/2017:23?attachment=index.html&repo=sosfs&dir=downloaded> rdfs:label "SOSFS 2005:27 (konsoliderad tom. 2017:23)"@sv .
 

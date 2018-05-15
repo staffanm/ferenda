@@ -581,7 +581,7 @@ class SwedishLegalSource(DocumentRepository):
         doc.meta = resource.graph
         doc.uri = str(resource.identifier)
         if orig_uri != doc.uri:
-            newbasefile = self.basefile_from_uri(uri)
+            newbasefile = self.basefile_from_uri(doc.uri)
             if newbasefile:
                 # change the basefile we're dealing with. Touch
                 # self.store.parsed_path(basefile) first so we don't
@@ -626,10 +626,10 @@ class SwedishLegalSource(DocumentRepository):
             #    parse_convert_to_intermediate(basefile) to convert
             #    downloaded_path -> intermediate_path (eg.
             #    WordReader.read, SFS.extract_sfst)
-            fp = self.downloaded_to_intermediate(basefile)
+            fp = self.downloaded_to_intermediate(basefile, attachment)
         else:
             # 3. recieve intermediate_path as open file (binary?)
-            fp = self.store.open_intermediate(basefile)
+            fp = self.store.open_intermediate(basefile, mode="rb")
         # 4. call patch_if_needed, recieve as open file (binary?)
         return self.patch_if_needed(fp, basefile)
 
@@ -690,7 +690,7 @@ class SwedishLegalSource(DocumentRepository):
     
 
 
-    def downloaded_to_intermediate(self, basefile):
+    def downloaded_to_intermediate(self, basefile, attachment=None):
         """Given a basefile, convert the corresponding downloaded file 
         into some suitable intermediate format and returns an open file
         to that intermediate format (if any).
@@ -704,7 +704,7 @@ class SwedishLegalSource(DocumentRepository):
         redone.
 
         """
-        return open(self.store.downloaded_path(basefile))
+        return open(self.store.downloaded_path(basefile, attachment=attachment))
 
     def parse_metadata(self, fp, basefile):
         """Given a open file containing raw document content (or intermediate

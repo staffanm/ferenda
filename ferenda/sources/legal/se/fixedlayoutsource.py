@@ -120,9 +120,9 @@ class FixedLayoutSource(SwedishLegalSource):
         opts['imgfiles'] = ['img/spinner.gif']
         return opts
 
-    def downloaded_to_intermediate(self, basefile):
+    def downloaded_to_intermediate(self, basefile, attachment=None):
         # force just the conversion part of the PDF handling
-        downloaded_path = self.store.downloaded_path(basefile)
+        downloaded_path = self.store.downloaded_path(basefile, attachment=attachment)
         intermediate_path = self.store.intermediate_path(basefile)
         intermediate_dir = os.path.dirname(intermediate_path)
         ocr_lang = None

@@ -558,12 +558,12 @@ class PropTrips(Trips, Offtryck, FixedLayoutSource):
     # FixedLayoutSource.downloaded_to_intermediate will always convert
     # things to pdf, even html files. But if we only have html
     # (eg. plaintext, we should work with that)
-    def downloaded_to_intermediate(self, basefile):
-        downloaded_path = self.store.downloaded_path(basefile)
+    def downloaded_to_intermediate(self, basefile, attachment=None):
+        downloaded_path = self.store.downloaded_path(basefile, attachment=attachment)
         if downloaded_path.endswith(".html"):
             return self._extract_text(basefile)
         else:
-            return super(PropTrips, self).downloaded_to_intermediate(basefile)
+            return super(PropTrips, self).downloaded_to_intermediate(basefile, attachment)
 
     def extract_head(self, fp, basefile):
         # get metadata from plaintext html even if we have doc/pdf,

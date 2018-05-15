@@ -124,7 +124,7 @@ class DirTrips(Trips):
             super(DirTrips, self).download()
 
 
-    def downloaded_to_intermediate(self, basefile):
+    def downloaded_to_intermediate(self, basefile, attachment=None):
         return self._extract_text(basefile)
 
     def extract_head(self, fp, basefile):

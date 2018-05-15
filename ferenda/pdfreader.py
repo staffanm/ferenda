@@ -1121,7 +1121,7 @@ class StreamingPDFReader(PDFReader):
         # it's important that we open the file as a bytestream since
         # we might do byte-level manipulation in _parse_xml.
         if keep_xml == "bz2":
-            fp = BZ2File(convertedfile)
+            fp = BZ2File(convertedfile, mode="rb")
         else:
             fp = open(convertedfile, "rb")
         return fp
