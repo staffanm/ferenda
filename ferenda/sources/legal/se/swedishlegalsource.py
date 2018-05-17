@@ -1439,7 +1439,7 @@ class SwedishLegalSource(DocumentRepository):
         numslug = util.base27encode(slug)
         assert util.base27decode(numslug) == slug, "%s roundtripped as %s" % (slug, util.base26decode(numslug))
         resource = self.polish_metadata(
-            {"rdf:type": RPUBL.KonsolideradGrundforfattning,
+            {"rdf:type": RPUBL.Lag,
              "rpubl:arsutgava": "0000",
              "rpubl:lopnummer": str(numslug),
              "rpubl:forfattningssamling": URIRef(self.lookup_resource("SFS", SKOS.altLabel))})

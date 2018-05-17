@@ -1577,6 +1577,7 @@ class NFS(MyndFskrBase):
                 return DocumentRepository.download_single(self, basefile, pdfurl, url)
         else:
             self.log.error("%s: Couldn't find appropriate PDF version at %s" % (basefile, url))
+
     def parse_metadata_from_consolidated(self, reader, props, basefile):
         # we need identifier, title and publisher (which may be
         # Naturvårdsverket (NFS) or Statens naturvårdsverk (SNFS). And
@@ -1592,8 +1593,11 @@ class NFS(MyndFskrBase):
         norm = util.normalize_space
 
         props['rpubl:konsolideringsunderlag'] = []
-        for row in soup.find("table", "regulations-table").find_all("tr")[2:]:
-            fsnummer = matcher(norm(row.h3.text)).group(1)
+        start = False
+        rows = soup.find("table", "regulations-table").find_all("tr")
+        for row in rows[self._consolidation_row_index(rows)+1:]:
+            title = norm(row.h3.text)
+            fsnummer = matcher(title).group(1)
             konsolideringsunderlag = self.canonical_uri(self.sanitize_basefile(fsnummer))
             props['rpubl:konsolideringsunderlag'].append(URIRef(konsolideringsunderlag))
         title = soup.h1.text
@@ -1604,15 +1608,26 @@ class NFS(MyndFskrBase):
         props["dcterms:title"] = Literal(title, lang="sv")
         props["dcterms:publisher"] = self.lookup_resource(publisher)
         return props
+
+    def _consolidation_row_index(self, rows):
+        for idx, row in enumerate(rows):
+            title = row.h3
+            if not title:
+                continue
+            title = util.normalize_space(row.h3.text)
+            if "Konsoliderad" in title:
+                return idx
+        return None
         
     @lru_cache(maxsize=None)
     def consolidation_date(self, basefile):
         # try to find consolidation date on stored landingpage
         with self.store.open_downloaded(basefile, attachment="landingpage.html") as fp:
             soup = BeautifulSoup(fp.read(), "lxml")
-        # the first row will probably contain the consolidation date
-        tr_text = soup.find("table", "regulations-table").find_all("tr")[1].text
-        if "Konsoliderad" in tr_text:
+        rows = soup.find("table", "regulations-table").find_all("tr")
+        rowidx = self._consolidation_row_index(rows)
+        if rowidx:
+            tr_text = rows[rowidx].text
             m = re.search('\d{4}-\d{2}-\d{2}', tr_text)
             if m:
                 return datetime.datetime.strptime(m.group(0), '%Y-%m-%d').date()
@@ -1622,7 +1637,7 @@ class NFS(MyndFskrBase):
     def fwdtests(self):
         t = super(NFS, self).fwdtests()
         # it's hard to match "...föreskriver X följande" if X contains spaces ("följande" can be pretty much anything else)
-        t["rpubl:beslutadAv"].insert(0, '(?:meddelar|föreskriver)\s(Statens\s*naturvårdsverk)')
+        t["rpubl:beslutadAv"].insert(0, '(?:meddelar|föreskriver)\s([Ss]tatens\s*naturvårdsverk)')
         return t
 
     def sanitize_text(self, text, basefile):

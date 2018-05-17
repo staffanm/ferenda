@@ -945,34 +945,35 @@ class SFS(Trips):
                     attributes[URIRef(k)] = ar
         resource = super(SFS, self).polish_metadata(attributes,
                                                     infer_nodes=False)
-        # Finally: the dcterms:issued property for this
-        # rpubl:KonsolideradGrundforfattning isn't readily
-        # available. The true value is only found by parsing PDF files
-        # in another docrepo. There are two ways of finding
-        # it out.
-        issued = None
-        # 1. if registry contains a single value (ie a
-        # Grundforfattning that hasn't been amended yet), we can
-        # assume that dcterms:issued == rpubl:utfardandedatum
-        if post_count == 1 and resource.value(RPUBL.utfardandedatum):
-            issued = resource.value(RPUBL.utfardandedatum)
-        elif r:
-            # 2. if the last post in registry contains a
-            # rpubl:utfardandedatum, assume that this version of the
-            # rpubl:KonsolideradGrundforfattning has the same
-            # dcterms:issued date (Note that r is automatically set to
-            # the last post due to the above loop)
-            utfardad = r.value(RPUBL.utfardandedatum)
-            if utfardad:
-                issued = utfardad
-        if issued:
-            resource.graph.add((resource.identifier, DCTERMS.issued, issued))
-        else:
-            # create a non-date value so that
-            # lagen.nu.SFS.infer_triples will at least be able to
-            # generate a stable owl:sameAs uri
-            issued = str(r.value(DCTERMS.identifier)).split(" ", 1)[1]
-            resource.graph.add((resource.identifier, DCTERMS.issued, Literal(issued)))
+        if attributes['rdf:type'] == RPUBL.KonsolideradGrundforfattning:
+            # Finally: the dcterms:issued property for this
+            # rpubl:KonsolideradGrundforfattning isn't readily
+            # available. The true value is only found by parsing PDF files
+            # in another docrepo. There are two ways of finding
+            # it out.
+            issued = None
+            # 1. if registry contains a single value (ie a
+            # Grundforfattning that hasn't been amended yet), we can
+            # assume that dcterms:issued == rpubl:utfardandedatum
+            if post_count == 1 and resource.value(RPUBL.utfardandedatum):
+                issued = resource.value(RPUBL.utfardandedatum)
+            elif r:
+                # 2. if the last post in registry contains a
+                # rpubl:utfardandedatum, assume that this version of the
+                # rpubl:KonsolideradGrundforfattning has the same
+                # dcterms:issued date (Note that r is automatically set to
+                # the last post due to the above loop)
+                utfardad = r.value(RPUBL.utfardandedatum)
+                if utfardad:
+                    issued = utfardad
+            if issued:
+                resource.graph.add((resource.identifier, DCTERMS.issued, issued))
+            else:
+                # create a non-date value so that
+                # lagen.nu.SFS.infer_triples will at least be able to
+                # generate a stable owl:sameAs uri
+                issued = str(r.value(DCTERMS.identifier)).split(" ", 1)[1]
+                resource.graph.add((resource.identifier, DCTERMS.issued, Literal(issued)))
         return resource
 
 
