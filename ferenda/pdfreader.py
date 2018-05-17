@@ -241,12 +241,21 @@ class PDFReader(CompoundElement):
             # as imagemagick can create a number of pretty large files
             # for each page, so converting 200 images will fill 10 G
             # of your temp space -- which we'd like to avoid)
-            cmd = "convert %(tmpdir)s/%(root)s-* -compress Zip %(tmpdir)s/%(root)s_tmp%(idx)04d.tif" % locals()
-            self.log.debug("- running " + cmd)
-            (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
-            # step 2.2: Remove extracted image files now that they're in the .tif
-            for f in glob("%(tmpdir)s/%(root)s-*" % locals()):
-                os.unlink(f)
+            imagefiles = glob("%(tmpdir)s/%(root)s-*" % locals())
+            if len(imagefiles) < topage - (frompage - 1):
+                self.log.warning("Expected to find %s images from running '%s', found %s" % (
+                    topage - (frompage - 1), cmd, len(imagefiles)))
+                    # it's entirely possible (for pdf containing real
+                    # blank pages, ie w/o scanned data, that we can
+                    # end up with zero pages. We'll just have to go
+                    # on.
+            if imagefiles:
+                cmd = "convert %(tmpdir)s/%(root)s-* -compress Zip %(tmpdir)s/%(root)s_tmp%(idx)04d.tif" % locals()
+                self.log.debug("- running " + cmd)
+                (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
+                # step 2.2: Remove extracted image files now that they're in the .tif
+                for f in imagefiles:
+                    os.unlink(f)
 
         # Step 3: Combine all the 10-page tifs into a giant tif using tiffcp
         cmd = "tiffcp -c zip %(tmpdir)s/%(root)s_tmp*.tif %(tmpdir)s/%(root)s.tif" % locals()
@@ -258,7 +267,8 @@ class PDFReader(CompoundElement):
         # of tesseract-ocr-3.01.osd.tar.gz
         usehocr = "hocr" if hocr else ""
         suffix = ".hocr" if hocr else ""
-        cmd = "tesseract %(tmpdir)s/%(root)s.tif %(tmpdir)s/%(root)s%(suffix)s -l %(lang)s -psm 1 %(usehocr)s" % locals(
+        pagebreaks = "-c include_page_breaks=1" if not hocr else "" # Tesseract 4.0 removes this option
+        cmd = "tesseract %(tmpdir)s/%(root)s.tif %(tmpdir)s/%(root)s%(suffix)s -l %(lang)s -psm 1 %(usehocr)s %(pagebreaks)s" % locals(
         )
         self.log.debug("running " + cmd)
         (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)

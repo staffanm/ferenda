@@ -1,4 +1,4 @@
-# Automatically concatenated from sources at 2018-04-13T23:25:41.915537
+# Automatically concatenated from sources at 2018-05-17T12:08:34.347796
 
 @prefix : <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
 @prefix bibo: <http://purl.org/ontology/bibo/> .
@@ -284,6 +284,9 @@
 
 <http://rinfo.lagrummet.se/org/statens_geotekniska_institut> a foaf:Organization ;
     foaf:name "Statens geotekniska institut"@sv .
+
+<http://rinfo.lagrummet.se/org/statens_institut_foer_saerskilt_utbildningsstoed> a foaf:Organization ;
+    foaf:name "Statens institut för särskilt utbildningsstöd"@sv .
 
 <http://rinfo.lagrummet.se/org/statens_lantmaeteriverk> a foaf:Organization ;
     foaf:name "Statens lantmäteriverk"@sv .

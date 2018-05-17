@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2018-04-13T23:25:42.696237
+# Automatically transformed from sources at 2018-05-17T12:08:35.119027
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -1417,6 +1417,10 @@
 <https://lagen.nu/org/2018/lantmateriverket> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/lantmaeteriverket> ;
     foaf:name "Lantmäteriverket"@sv .
+
+<https://lagen.nu/org/2018/statens-institut-for-sarskilt-utbildningsstod> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/statens_institut_foer_saerskilt_utbildningsstoed> ;
+    foaf:name "Statens institut för särskilt utbildningsstöd"@sv .
 
 <https://lagen.nu/org/2018/statens-lantmateriverk> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/statens_lantmaeteriverk> ;

@@ -99,7 +99,8 @@ class MyndFskrBase(FixedLayoutSource):
     # instead (howeever, that needs to be made more flexible with
     # subkeys/multiple options
     baseprops = {'nfs/2004:5': {"rpubl:beslutadAv": "Naturvårdsverket"},
-                 'sosfs/1982:13': {"rpubl:beslutadAv": "Socialstyrelsen"}
+                 'sosfs/1982:13': {"rpubl:beslutadAv": "Socialstyrelsen"},
+                 'sjvfs/1991:2': {"dcterms:identifier": "SJVFS 1991:2"}
                  }
 
 
@@ -1711,7 +1712,7 @@ class SJVFS(MyndFskrBase):
     download_iterlinks = False
 
     def forfattningssamlingar(self):
-        return ["sjvfs", "dfs"]
+        return ["sjvfs", "dfs", "lvfs"]
 
     @decorators.downloadmax
     def download_get_basefiles(self, source):
@@ -1942,6 +1943,14 @@ class SOSFS(MyndFskrBase):
                 self.log.warning("%s: No link to PDF file found at %s" % (basefile, url))
                 return False
 
+    def sanitize_text(self, text, basefile):
+        # sosfs 1996:21 is so badly scanned that tesseract fails to
+        # find the only needed property (the text "Ansvarig utgivare")
+        # on the proper first page
+        if basefile == "sosfs/1996:21":
+            text = text.replace("Ansvarigutgiyare", "Ansvarig utgivare")
+        return text
+
     def parse_metadata_from_consolidated(self, reader, props, basefile):
         super(SOSFS, self).parse_metadata_from_consolidated(reader, props, basefile)
         with self.store.open_downloaded(basefile, attachment="index.html") as fp:
@@ -1968,7 +1977,15 @@ class SOSFS(MyndFskrBase):
             soup = BeautifulSoup(fp.read(), "lxml")
         changeleader = soup.find("strong", text=re.compile("^Ändrad"))
         if changeleader:
-            # change = util.normalize_space(changeleader.next_sibling)
+            # because of incosistent HTML, we'll have to include the
+            # entire paragraph this <strong> tag occurs in, but not
+            # anything after the first <br>, if present
+            afterbr = False
+            for n in list(changeleader.parent.children):
+                if getattr(n, 'name', None) == "br":
+                    afterbr = True
+                if afterbr:
+                    n.extract()
             change = util.normalize_space(changeleader.parent.text)
         else:
             changeleader = soup.find("p", text=re.compile("^Ändrad: t.o.m."))
@@ -1980,7 +1997,7 @@ class SOSFS(MyndFskrBase):
                 # act, and assume that the consolidated version is
                 # consolidated up to and including that
                 change = sorted(self.consolidation_basis(soup), key=util.split_numalpha)[-1]
-        assert len(re.findall('(\d+:\d+)', change)) == 1
+        assert len(re.findall('(\d+:\d+)', change)) == 1, "Didn't find exactly one change (fsnummer) in '%s'" % change
         return re.search("(SOSFS |HSLF-FS |)(\d+:\d+)", change).group(2)
 
     def consolidation_basis(self, soup):
