@@ -548,7 +548,7 @@ class SFS(Trips):
         attribs["dcterms:publisher"] = "Regeringskansliet"
         return attribs
     
-    def downloaded_to_intermediate(self, basefile):
+    def downloaded_to_intermediate(self, basefile, attachment=None):
         filename = self.store.downloaded_path(basefile)
         if not os.path.exists(filename):
             self.log.warning("%s: Fulltext is missing" % basefile)

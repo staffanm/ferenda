@@ -191,7 +191,7 @@ class SFS(DocumentRepository, SameAs):
         attribs["dcterms:publisher"] = "Regeringskansliet"
         return attribs
     
-    def downloaded_to_intermediate(self, basefile):
+    def downloaded_to_intermediate(self, basefile, attachment=None):
         # Check to see if this might not be a proper SFS at all
         # (from time to time, other agencies publish their stuff
         # in SFS - this seems to be handled by giving those

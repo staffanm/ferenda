@@ -233,7 +233,7 @@ class Riksdagen(Offtryck, FixedLayoutSource):
             self.log.debug(
                 "  %s: %s and all associated files unchanged" % (basefile, xmlfile))
 
-    def downloaded_to_intermediate(self, basefile):
+    def downloaded_to_intermediate(self, basefile, attachment=None):
 
         def lazy_downloaded_to_intermediate(basefile):
             downloaded_path = self.store.downloaded_path(basefile,

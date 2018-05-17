@@ -726,8 +726,8 @@ class PropKB(Offtryck, PDFDocumentRepository):
         
 
     @lazyread
-    def downloaded_to_intermediate(self, basefile):
-        downloaded_path = self.store.downloaded_path(basefile)
+    def downloaded_to_intermediate(self, basefile, attachment=None):
+        downloaded_path = self.store.downloaded_path(basefile, attachment=attachment)
         intermediate_path = self.store.intermediate_path(basefile)
         return self.convert_pdf(downloaded_path, intermediate_path)
 

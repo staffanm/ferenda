@@ -285,12 +285,12 @@ class SOUKB(Offtryck, PDFDocumentRepository):
         return attrib
 
     @lazyread
-    def downloaded_to_intermediate(self, basefile):
+    def downloaded_to_intermediate(self, basefile, attachment=None):
         intermediate_path = self.store.intermediate_path(basefile)
         intermediate_dir = os.path.dirname(intermediate_path)
         keep_xml = "bz2" if self.config.compress == "bz2" else True
         reader = StreamingPDFReader()
-        kwargs = {'filename': self.store.downloaded_path(basefile),
+        kwargs = {'filename': self.store.downloaded_path(basefile, attachment=attachment),
                   'workdir': intermediate_dir,
                   'images': self.config.pdfimages,
                   'keep_xml': keep_xml}

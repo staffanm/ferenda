@@ -29,7 +29,7 @@ class RegeringenLegacy(Regeringen):
     def download(self, basefile=None):
         return False
 
-    def downloaded_to_intermediate(self, basefile):
+    def downloaded_to_intermediate(self, basefile, attachment=None):
         return codecs.open(self.store.downloaded_path(basefile), encoding=self.source_encoding)
     
     # override just some of the methods to parse the HTML index page

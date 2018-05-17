@@ -647,7 +647,7 @@ class DV(SwedishLegalSource):
             self.filetype = filetype
         return self.patch_if_needed(fp, basefile)
 
-    def downloaded_to_intermediate(self, basefile):
+    def downloaded_to_intermediate(self, basefile, attachment=None):
         assert "_not_" not in basefile, "downloaded_to_intermediate can't handle Notisfall %s" % basefile
         docfile = self.store.downloaded_path(basefile)
         intermediatefile = self.store.intermediate_path(basefile)
