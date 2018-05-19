@@ -1335,7 +1335,21 @@ class LegalRef:
             sektor = '3'
             rattslig_form = {'direktiv': 'L',
                              'förordning': 'R'}
-
+            # Löpnumret och året bytte plats 2015 -- det som tidigare
+            # uttrycktes som 42/2014, uttrycks nu 2018/42. Vår EBNF är
+            # än så länge skriven efter gamla systemet, så försök
+            # detektera och vända om. Eftersom äldre löpnummer kan
+            # vara större än 2015 (exv rådets förordning (EEG) nr
+            # 2092/91 av den 24 juni 1991 om ...) så måste vi stämma
+            # av mot det angivna datumet.
+            m = re.search("\d{4}", attributes.get("datum", ""))
+            if m:
+                realyear = int(m.group(0))
+            
+            if int(attributes['lopnummer']) > 2014 and realyear > 2014:
+                a = attributes
+                a['lopnummer'], a['ar'] = a['ar'], a['lopnummer']
+            
             if len(attributes['ar']) == 2:
                 attributes['ar'] = '19' + attributes['ar']
             fixed['celex'] = "%s%s%s%04d" % (sektor, attributes['ar'],

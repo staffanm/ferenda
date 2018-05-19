@@ -1,0 +1,19 @@
+Denna lag kompletterar Europaparlamentets och rådets
+förordning (EU) 2016/679 av den 27 april 2016 om skydd för
+fysiska personer med avseende på behandling av
+personuppgifter och om det fria flödet av sådana uppgifter
+och om upphävande av direktiv 95/46/EG (allmän
+dataskyddsförordning), här benämnd EU:s dataskyddsförordning.
+
+<list>
+  <str>Denna lag kompletterar </str>
+  <Link uri="https://lagen.nu/ext/celex/32016R0679">Europaparlamentets och rådets
+förordning (EU) 2016/679 av den 27 april 2016</Link>
+  <str> om skydd för
+fysiska personer med avseende på behandling av
+personuppgifter och om det fria flödet av sådana uppgifter
+och om upphävande av direktiv </str>
+  <Link uri="https://lagen.nu/ext/celex/31995L0046">95/46/EG</Link>
+  <str> (allmän
+dataskyddsförordning), här benämnd EU:s dataskyddsförordning.</str>
+</list>

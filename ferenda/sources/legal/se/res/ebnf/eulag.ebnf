@@ -27,12 +27,13 @@ AkttypRefId     ::= ('direktiv'/'förordning')
 DirektivRefID   ::= DirektivRef
 DirektivRef     ::= ArRefID, Slash, LopnummerRefID, Slash, SamarbeteRefID
 ForordningRefID ::= ForordningRef
-ForordningRef   ::= LeftParen, SamarbeteRefID, RightParen, Whitespace,'nr', Whitespace, LopnummerRefID, Slash, ArRefID
-ArRefID         ::= Ar
+ForordningRef   ::= LeftParen, SamarbeteRefID, RightParen, (Whitespace,'nr')?, Whitespace, LopnummerRefID, Slash, ArRefID
+ArRefID         ::= digit+  # not Ar, which expects 2 or 4 digit years -- in some cases this might be a lopnummer in the "wrong" place, so anything from 1 to 4 is ok
 LopnummerRefID  ::= Lopnummer
 Lopnummer       ::= number
 SamarbeteRefID  ::= Samarbete
 Samarbete       ::= 'EU'/'EG'/'EEG'
-AvDatum		::= 'av', Whitespace, 'den', Whitespace, Datum
+AvDatum		::= 'av', Whitespace, 'den', Whitespace, DatumRefID
+DatumRefID      ::= Datum
 # ------------ end of eglag.ebnf ----------------
 

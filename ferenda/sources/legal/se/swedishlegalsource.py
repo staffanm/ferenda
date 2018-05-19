@@ -1144,19 +1144,26 @@ class SwedishLegalSource(DocumentRepository):
 
     def get_url_transform_func(self, repos=None, basedir=None, develurl=None, remove_missing=False):
         f = super(SwedishLegalSource, self).get_url_transform_func(repos, basedir, develurl, remove_missing)
-        if develurl:
-            return f
-        # since all Swedish legal source repos share the method of
-        # generating URIs (through the self.minter property), we can
-        # just share the initialized minter object.
-        minter = self.minter
-        for repo in repos:
-            # NB: this doesn't check for the existance of a previous
-            # minter object, since I can't find a way to do that with
-            # a property using the @cached_property
-            # decorator. Hopefully not an issue.
-            repo.minter = minter
-        return f
+        urlbase = repos[0].minter.space.base
+        if not develurl:
+            # since all Swedish legal source repos share the method of
+            # generating URIs (through the self.minter property), we can
+            # just share the initialized minter object.
+            minter = self.minter
+            for repo in repos:
+                # NB: this doesn't check for the existance of a previous
+                # minter object, since I can't find a way to do that with
+                # a property using the @cached_property
+                # decorator. Hopefully not an issue.
+                repo.minter = minter
+        # special hack to make sure eurlex URIs are transformed to a
+        # proper Eurlex URI
+        def wrap_transform(url):
+            if url.startswith(urlbase + "/ext/celex/"):
+                return url.replace(urlbase + "/ext/celex/", "http://eur-lex.europa.eu/legal-content/SV/TXT/?uri=CELEX:")
+            else:
+                return f(url)
+        return wrap_transform
 
     def sourcefiles(self, basefile, resource=None):
         if resource.value(DCTERMS.identifier):

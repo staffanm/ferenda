@@ -1,0 +1,45 @@
+{
+  "basefile": "1958:638", 
+  "content": {
+    "hash": "md5:c77b3d27130bc8cc364fb9e297e5f864", 
+    "markup": null, 
+    "src": "https://lagen.nu/sfs/parsed/1958:638.xhtml", 
+    "type": "application/html+xml"
+  }, 
+  "id": "https://lagen.nu/1958:638", 
+  "indexed_dep": "2018-04-23T23:18:59.814558", 
+  "indexed_ft": "2018-04-23T23:18:59.775014", 
+  "indexed_ts": "2018-04-23T23:18:59.849994", 
+  "link": {
+    "hash": "md5:d6ffb47ed803a48b8b0411208b156aeb", 
+    "href": "https://lagen.nu/sfs/distilled/1958:638.rdf", 
+    "length": 6911, 
+    "type": "application/rdf+xml"
+  }, 
+  "orig_checked": "2017-09-23T10:49:42.643356", 
+  "orig_created": "2017-09-23T10:49:42.643356", 
+  "orig_updated": "2017-09-23T10:49:42.643356", 
+  "orig_url": "http://rkrattsbaser.gov.se/sfst?bet=1958%3A638", 
+  "published": "2018-04-23T11:56:35.406654", 
+  "status": {
+    "generate": {
+      "date": "2018-04-23T23:20:16.107697", 
+      "duration": 0.138481, 
+      "success": true
+    }, 
+    "parse": {
+      "date": "2018-05-18T23:10:39.380071", 
+      "duration": 0.261391, 
+      "success": true
+    }, 
+    "relate": {
+      "date": "2018-04-23T23:18:59.676780", 
+      "duration": 0.174492, 
+      "success": true
+    }
+  }, 
+  "summary": "Omfattning: upph. 4 \u00a7\nF\u00f6rarbeten: Prop. 1970:186\n", 
+  "title": "\u00c4ndring (1970:842) (Rubrik saknas)", 
+  "updated": "2018-04-23T23:20:16.240502", 
+  "url": "https://lagen.nu/sfs/generated/1958:638.html"
+}
