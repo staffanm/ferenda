@@ -99,8 +99,8 @@ class Lazyfile(object):
 def lazyread(f):
     """Don't call the wrapped function until someone actually tries to read from the fp that it should return."""
     @wraps(f)
-    def wrapper(self, basefile):
-        p = partial(f, self, basefile)
+    def wrapper(self, basefile, attachment=None):
+        p = partial(f, self, basefile, attachment)
         fp = Lazyfile(p)
         return fp
     return wrapper
