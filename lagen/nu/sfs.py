@@ -96,10 +96,10 @@ class SFS(OrigSFS, SameAs):
         # postprocess_doc as well, because for this lagen.nu-derived
         # class it needs to be done at this point, but for use of the
         # superclass directly, it needs to be done at some point.
-        sameas_uri = self.sameas_minter.space.coin_uri(resource)
         for o in resource.objects(DCTERMS.issued):
             if not o.datatype:
                 resource.remove(DCTERMS.issued, o)
+        sameas_uri = self.sameas_minter.space.coin_uri(resource)
         resource.add(OWL.sameAs, URIRef(sameas_uri))
         resource.graph.add((URIRef(self.canonical_uri(basefile, True)),
                             OWL.sameAs, resource.identifier))

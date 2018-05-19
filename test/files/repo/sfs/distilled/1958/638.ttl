@@ -52,15 +52,18 @@
     rpubl:paragrafnummer "5"@sv .
 
 <https://lagen.nu/1958:638/konsolidering/1970:842> a rpubl:KonsolideradGrundforfattning ;
+    rinfoex:senastHamtad "2017-09-23T10:49:42.643356"^^xsd:dateTime ;
+    rinfoex:senastKontrollerad "2017-09-23T10:49:42.643356"^^xsd:dateTime ;
     dcterms:creator <https://lagen.nu/org/2008/justitiedepartementet> ;
     dcterms:identifier "SFS 1958:638 i lydelse enligt SFS 1970:842" ;
+    dcterms:issued "2017-09-23"^^xsd:date ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
     dcterms:title "Lag (1958:638) om införande av nya ärvdabalken"@sv ;
     rpubl:konsoliderar <https://lagen.nu/1958:638> ;
     rpubl:konsolideringsunderlag <https://lagen.nu/1958:638>,
         <https://lagen.nu/1970:842> ;
     rpubl:utfardandedatum "1958-12-12"^^xsd:date ;
-    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1958:638/konsolidering/1970:842> ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1958:638/konsolidering/2017-09-23> ;
     prov:wasGeneratedBy "lagen.nu.sfs.SFS" .
 
 <https://lagen.nu/prop/1958:B23> a rpubl:Proposition ;

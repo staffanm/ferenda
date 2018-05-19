@@ -626,7 +626,7 @@ class SFS(Trips):
             d[key.strip()] = val.strip()
         changes = [d]
         for c in content.findAll('div', 'result-inner-sub-box-container'):
-            d = OrderedDict()
+            sub_d = OrderedDict()
             sfsnr = c.find('div',
                            'result-inner-sub-box-header').text.split("SFS ")[1].strip()
             # Since we can't patch errors in register pages yet, we
@@ -634,11 +634,11 @@ class SFS(Trips):
             if basefile == "1993:1637" and sfsnr == "1993:1446":
                 sfsnr = "1993:1646"
             assert util.numcmp(sfsnr, basefile) >= 0, "change SFS %s is smaller than basefile SFS %s, that can't be right" % (sfsnr, basefile)
-            d[u'SFS-nummer'] = sfsnr
+            sub_d[u'SFS-nummer'] = sfsnr
             for row in c.findAll('div', 'result-inner-sub-box'):
                 key, val = row.text.split(":", 1)
-                d[key.strip()] = util.normalize_space(val)
-            changes.append(d)
+                sub_d[key.strip()] = util.normalize_space(val)
+            changes.append(sub_d)
         g = self.make_graph()  # used for qname lookup only
         for rowdict in changes:
             docuri = self.canonical_uri(rowdict['SFS-nummer'])
@@ -945,6 +945,7 @@ class SFS(Trips):
                     attributes[URIRef(k)] = ar
         resource = super(SFS, self).polish_metadata(attributes,
                                                     infer_nodes=False)
+
         if attributes['rdf:type'] == RPUBL.KonsolideradGrundforfattning:
             # Finally: the dcterms:issued property for this
             # rpubl:KonsolideradGrundforfattning isn't readily
@@ -959,21 +960,31 @@ class SFS(Trips):
                 issued = resource.value(RPUBL.utfardandedatum)
             elif r:
                 # 2. if the last post in registry contains a
-                # rpubl:utfardandedatum, assume that this version of the
-                # rpubl:KonsolideradGrundforfattning has the same
-                # dcterms:issued date (Note that r is automatically set to
-                # the last post due to the above loop)
+                # rpubl:utfardandedatum, assume that this version of
+                # the rpubl:KonsolideradGrundforfattning has the same
+                # dcterms:issued date (Note that r is automatically
+                # set to the last post due to the above loop. Also
+                # note that due to the very incomplete nature of
+                # _find_utfardandedatum(), very few registry posts
+                # contain this information)
                 utfardad = r.value(RPUBL.utfardandedatum)
                 if utfardad:
                     issued = utfardad
-            if issued:
-                resource.graph.add((resource.identifier, DCTERMS.issued, issued))
-            else:
-                # create a non-date value so that
-                # lagen.nu.SFS.infer_triples will at least be able to
-                # generate a stable owl:sameAs uri
-                issued = str(r.value(DCTERMS.identifier)).split(" ", 1)[1]
-                resource.graph.add((resource.identifier, DCTERMS.issued, Literal(issued)))
+            if not issued:
+                # A good approximation of an actual dcterms:issued
+                # statement would be the timestamp when we last
+                # updated this document (since we do it all the time)
+                basefile = str(attributes['SFS-nummer'])
+                entrypath = self.store.documententry_path(basefile)
+                if os.path.exists(entrypath):
+                    entry = DocumentEntry(self.store.documententry_path(basefile))
+                    if entry.orig_updated:
+                        issued = entry.orig_updated.date()
+            if not issued:
+                # ok, we don't know but we really must know. Fake it
+                # with todays date.
+                issued = datetime.today().date()
+            resource.graph.add((resource.identifier, DCTERMS.issued, Literal(issued)))
         return resource
 
 
