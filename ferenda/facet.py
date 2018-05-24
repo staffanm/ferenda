@@ -189,8 +189,8 @@ class Facet(object):
         >>> Facet.booleanvalue(row, "schema_free")
         True
         """
-        # only 'true' is True, everything else is False
-        return row[binding] == 'true'
+        # only 'true' is True, everything else is False (unless boolean)
+        return row[binding] if isinstance(row[binding], bool) else row[binding] == 'true'
 
     @classmethod
     def titlesortkey(cls, row, binding='dcterms_title', resource_graph=None):

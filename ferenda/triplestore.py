@@ -520,6 +520,13 @@ class RemoteStore(TripleStore):
                         value = util.gYearMonth(value[:7])
                     elif datatype == "http://www.w3.org/2001/XMLSchema#integer":
                         value = int(value)
+                    elif datatype == "http://www.w3.org/2001/XMLSchema#boolean":
+                        if value == "true":
+                            value = True
+                        elif value == "false":
+                            value = False
+                        else:
+                            raise ValueError("Can't convert %s to boolean: Neither 'true' nor 'false'" % value)
                     elif datatype == "http://www.w3.org/1999/02/22-rdf-syntax-ns#XMLLiteral":
                         value = Literal(value, datatype=RDF.XMLLiteral)
                     else:

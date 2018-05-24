@@ -1144,7 +1144,10 @@ class SwedishLegalSource(DocumentRepository):
 
     def get_url_transform_func(self, repos=None, basedir=None, develurl=None, remove_missing=False):
         f = super(SwedishLegalSource, self).get_url_transform_func(repos, basedir, develurl, remove_missing)
-        urlbase = repos[0].minter.space.base
+        if repos:
+            urlbase = repos[0].minter.space.base
+        else:
+            urlbase = ""
         if not develurl:
             # since all Swedish legal source repos share the method of
             # generating URIs (through the self.minter property), we can

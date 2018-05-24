@@ -9,27 +9,58 @@ $(document).ready(function () {
       slidebutton doesn't recieve the click)
    2. as a keypress handler, press 'f' to toggle the menu
    3. as a swipeleft handler (doesn't work, at least not on Chrome devtools)
- */
+  */
   $('.slidebutton').click(toggleOffcanvas);
+  /* 
   $('body').keydown(function(e) {
     if (e.key == 'f') { toggleOffcanvas() }
   });
-
-  /* this is said to work in situations where doc.body doesn't... */
-  body = document.getElementsByTagName('body')[0];
-  /* for some bizarre reason, hammmer.js disables text selection by
-   * default...  That's strike two against this lib (first being
-   * indecipherable API), see
-   * https://github.com/hammerjs/hammer.js/issues/81 */
+  */
+  /* clicking the search button (only visible on mobile) should show
+   * the search field (and not submit the search yet) if not already
+   * shown. */
+  $('form#search button').click(function() {
+    form = $(this).closest("form");
+    if (!form.hasClass("active")) {
+      $('a.navbar-brand').addClass("hidden-xs");
+      $('button.navbar-toggle').addClass("hidden-xs");
+      form.addClass("active");
+      $('input').focus();
+      return false; /* don't submit the form yet */
+    }
+  });
   
+
+  $('form#search button').mousedown(function() {
+    if (form.hasClass("active")) {
+      form.submit();
+    }
+  });
+				    
+  /* search field should auto-hide when it looses focus (again, on
+   * mobile). One problem though: Clicking the button makes it lose
+   * focus. We therefore also register a mousedown handler (which
+   * fires before blur) above */
+  $('form#search input').blur(function(e) {
+    $(this).closest("form").removeClass("active");
+    $('a.navbar-brand').removeClass("hidden-xs");
+    $('button.navbar-toggle').removeClass("hidden-xs");
+    return true;
+  });
+  /* pressing enter in search field should submit the form. Maybe it
+   * always does this? */
   /*
-  hammer = new Hammer(body, {cssProps: {userSelect: false}});
-  hammer.on("swipe", function(e) {
-    $('.row-offcanvas').toggleClass('active');
+  $('form#search input').keypress(function(e) {
+    if(e.which == 13){
+      $(this).closest("form").submit();
+    }
   });
   */
+  /* this is said to work in situations where doc.body doesn't... */
+  body = document.getElementsByTagName('body')[0];
   
-  /* functions for replacing the text rendering of a pdf page with an image rendering of same */
+  /* functions for replacing the text rendering of a pdf page with an
+   * image rendering of same */
     $('div.sida a.view-img').click(function () {
 	/* hide everything else from here to next page */
 	$(this).parents("div.sida").nextUntil("div.sida").hide()
@@ -65,6 +96,7 @@ $(document).ready(function () {
 	}
     });
 
+  /* hook up the autocomplete function of the search field */				
   var suggestions = new Bloodhound({
     datumTokenizer: Bloodhound.tokenizers.obj.whitespace('label'),
     queryTokenizer: Bloodhound.tokenizers.whitespace,

@@ -83,15 +83,15 @@
               <span class="icon-bar">&#8204;</span>
               <span class="icon-bar">&#8204;</span>
 	    </button>
+	    <xsl:if test="$configuration/search">
+	      <xsl:call-template name="nav-search-form"/>
+	    </xsl:if>
 	    <a class="navbar-brand" href="{$configuration/url}"><xsl:value-of select="$configuration/sitename"/></a>
 	  </div>
 	  <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
 	    <ul class="nav navbar-nav">
 	      <xsl:call-template name="decorate-nav"/>
 	    </ul>
-	    <xsl:if test="$configuration/search">
-	      <xsl:call-template name="nav-search-form"/>
-	    </xsl:if>
 	  </div><!-- /.navbar-collapse -->
 	</div><!-- /.container-fluid -->
       </nav>
@@ -100,8 +100,7 @@
 	<div class="col-sm-3 sidebar-offcanvas" id="sidebar">
 	  <div class="slidebutton" data-toggle="offcanvas">
 	    <div class="inner-slidebutton">
-	      <span class="glyphicon glyphicon-menu-right">&#8288;</span>
-	      <span class="glyphicon glyphicon-menu-left">&#8288;</span>
+	      <span class="glyphicon glyphicon-option-vertical">&#8288;</span>
 	    </div>
 	  </div>
 	  <!-- note: importing stylesheet MUST define
@@ -142,7 +141,6 @@
       </div>
       <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js">&#160;</script>
       <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous">&#160;</script>
-      <script src="https://hammerjs.github.io/dist/hammer.min.js">&#160;</script>
       <script src="https://cdn.rawgit.com/twitter/typeahead.js/v0.11.1/dist/typeahead.bundle.min.js">&#160;</script>
       <xsl:if test="$dyntoc">
 	<script src="https://cdn.rawgit.com/afeld/bootstrap-toc/v0.3.0/dist/bootstrap-toc.min.js">&#160;</script> 

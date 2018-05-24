@@ -34,7 +34,7 @@
 
 body {
     /* extra space so that .slidebutton doesn't obscure the text */
-    margin-left: 10px;
+    /* margin-left: 10px; */ /* maybe not now with the new slidebutton */
 }
 @media (min-width: 960px) {
     body {
@@ -174,12 +174,12 @@ nav[data-toggle='toc'].affix {
   position: fixed; 
   top: 0;
   width: 200px;
-  left: -195px; /* leave just a few pixels of the border so that the user notices it */
+  left: -200px;
   height: 100vh;
   padding: 3px; 
-  border-width: 0 5px 0 0;
+  border-width: 0 1px 0 0;
   border-style: solid;
-  border-image: linear-gradient(to left, black, rgba(0, 0, 0, 0)) 1 100%;
+  border-color: black;
   background-color: #fff;
   transition: all .15s ease-out;
   z-index: 10; /* since it occupies the same space as article.col-sm-9, and comes before it in the HTML, it seems to be obscured? Try to raise it. */
@@ -201,21 +201,19 @@ nav[data-toggle='toc'].affix {
 .slidebutton {
   position: fixed;
   width: 40px;
-  left: -24px;
-  top: 50vh;
+  left: 0;
+  top: 92vh;
   height: 40px;
   border-radius: 20px;
   padding: 2px;
-  background: #000;
-}
-.active .slidebutton {
-    left: 178px;
+  background: #5e5e5e;
+  z-index: 20;
 }
 .inner-slidebutton {
   width:36px;
   height:36px;
   border-radius:18px;
-  color:#000;
+  color:#5e5e5e;
   line-height:20px;
   background:#fff;
   text-decoration: none;
@@ -224,12 +222,6 @@ nav[data-toggle='toc'].affix {
   font-size: 26px;
   text-align: right;
 }
-
-/* by default: don't show the left-pointing icon on the button */
-.inner-slidebutton .glyphicon-menu-left { display: none }
-/* but when active, show it and hide the other */
-.active .inner-slidebutton .glyphicon-menu-right { display: none }
-.active .inner-slidebutton .glyphicon-menu-left { display: inline }
 
 @media only screen and (min-width: 960px) {
     .row-offcanvas-left .sidebar-offcanvas {
@@ -362,7 +354,70 @@ div.panel-body ul {
 	width: 75%
     }
 }
-/* PART 2.3: Search results styling */
+/* PART 2.3: Search form + results styling */
+
+.twitter-typeahead {
+    display: none !important;
+}
+
+
+form#search {
+    float: right;
+    width: inherit;
+    border: none;
+    padding: 0;
+    margin-right: 8px;
+}
+
+form#search .input-group-btn {
+    width: auto;
+    display: inline-block;
+}
+
+form#search input {
+    height: 34px;
+    padding: 0;
+    display: none;
+}
+form#search button {
+    border-radius: 4px;
+    background-color: transparent;
+}
+form#search.active {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+form#search.active .twitter-typeahead {
+    display: inline-block !important;
+    float: left;
+    width: 85%;
+    margin-left: 12px;
+}
+
+form#search.active input {
+    display: inline-block;
+    float: left;
+}
+
+@media(min-width: 768px) {
+    form#search {
+	position: absolute;
+	right: 0;
+    }
+    form#search input.form-control {
+	display: block;
+	margin-top: 1px;
+	width: 20em;
+    }
+    form#search .twitter-typeahead {
+	display: inline-block !important;
+    }
+    form#search button {
+	display: none;
+    }
+}
 
 /* FIXME: what was the purpose of this, again? */
 body.search nav#toc > ul > li > ul > li {
@@ -430,7 +485,7 @@ body.toc article ul li ul li {
 }
 
 .tt-menu {
-  width: 200%;
+  width: 100%;
   background-color: #fff;
   border: 1px solid #ccc;
   border: 1px solid rgba(0, 0, 0, 0.2);
