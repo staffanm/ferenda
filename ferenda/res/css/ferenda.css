@@ -202,7 +202,7 @@ nav[data-toggle='toc'].affix {
   position: fixed;
   width: 40px;
   left: 0;
-  top: 92vh;
+  top: 80vh;
   height: 40px;
   border-radius: 20px;
   padding: 2px;
@@ -378,6 +378,7 @@ form#search input {
     height: 34px;
     padding: 0;
     display: none;
+    font-size: 16px; /* any less and mobile safari auto-zooms when input gets focus */
 }
 form#search button {
     border-radius: 4px;

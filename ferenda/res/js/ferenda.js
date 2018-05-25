@@ -1,35 +1,24 @@
-function toggleOffcanvas() {
-  $('.row-offcanvas').toggleClass('active');
-}
-
 $(document).ready(function () {
-  /* hook up the offcanvas classes to make a sliding left menu
-   * possible on small screens -- in three different ways
-   1. as a onclickhandler on the slide button (doesn't work, the
-      slidebutton doesn't recieve the click)
-   2. as a keypress handler, press 'f' to toggle the menu
-   3. as a swipeleft handler (doesn't work, at least not on Chrome devtools)
-  */
-  $('.slidebutton').click(toggleOffcanvas);
-  /* 
-  $('body').keydown(function(e) {
-    if (e.key == 'f') { toggleOffcanvas() }
-  });
-  */
-  /* clicking the search button (only visible on mobile) should show
-   * the search field (and not submit the search yet) if not already
-   * shown. */
-  $('form#search button').click(function() {
-    form = $(this).closest("form");
-    if (!form.hasClass("active")) {
-      $('a.navbar-brand').addClass("hidden-xs");
-      $('button.navbar-toggle').addClass("hidden-xs");
-      form.addClass("active");
-      $('input').focus();
-      return false; /* don't submit the form yet */
-    }
-  });
-  
+    /* hook up the offcanvas classes to make a sliding left menu
+     * possible on small screens  */
+    $('.slidebutton').on("click touchstart", function(e) {
+	$('.row-offcanvas').toggleClass('active');
+	e.preventDefault();
+    });
+    /* clicking the search button (only visible on mobile) should show
+     * the search field (and not submit the search yet) if not already
+     * shown. */
+    $('form#search button').on("click touchstart", function(e) {
+	form = $(this).closest("form");
+	if (!form.hasClass("active")) {
+	    $('a.navbar-brand').addClass("hidden-xs");
+	    $('button.navbar-toggle').addClass("hidden-xs");
+	    form.addClass("active");
+	    $('input').focus();
+	    e.preventDefault(); /* if it's a touchstart event, cancel the following click event */
+	    return false; /* don't submit the form yet */
+	}
+    });
 
   $('form#search button').mousedown(function() {
     if (form.hasClass("active")) {
@@ -61,7 +50,7 @@ $(document).ready(function () {
   
   /* functions for replacing the text rendering of a pdf page with an
    * image rendering of same */
-    $('div.sida a.view-img').click(function () {
+    $('div.sida a.view-img').on("click touchstart", function () {
 	/* hide everything else from here to next page */
 	$(this).parents("div.sida").nextUntil("div.sida").hide()
 
@@ -83,7 +72,7 @@ $(document).ready(function () {
            $(this).show();
 	})
     });
-  $('div.sida a.view-text').click(function() {
+    $('div.sida a.view-text').on("click touchstart", function() {
 	navtabs = $(this).parents("ul")
 	navtabs.find("li:nth-child(1)").addClass("active");
 	navtabs.find("li:nth-child(2)").removeClass("active");
