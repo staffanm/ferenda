@@ -236,18 +236,18 @@ class DV(SwedishLegalSource):
                 return self._basefilemap[basefile]
             else:
                 # this will happen for older cases for which we don't
-                # have any files. We could invent URI-derived
-                # basefiles for these, and gain a sort of skeleton
-                # entry for those, which we could use to track
-                # eg. frequently referenced older cases.
+                # have any files. We invent URI-derived basefiles for
+                # these to gain a sort of skeleton entry for those,
+                # which we can use to track eg. frequently referenced
+                # older cases.
 
-                # right now, we only check if we ought to have a
-                # basefile (because it's recent enough) and warn then.
+                # however, we check if we OUGHT to have a basefile
+                # (because it's recent enough) and warn.
                 court, year = basefile.split("/", 1)
                 year=int(year[:4])
                 if court not in self.expected_cases or self.expected_cases[court] <= year:
                     self.log.warning("%s: Could not find corresponding basefile" % uri)
-                return None
+                return basefile.replace(":", "/")
 
     def readmapfile(self, callback):
         mapfile = self.store.path("uri", "generated", ".map")
