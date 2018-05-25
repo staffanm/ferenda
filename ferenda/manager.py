@@ -1006,7 +1006,7 @@ def _run_class(enabled, argv, config):
             return
 
         kwargs = {}
-        if action in ('relate', 'generate', 'toc', 'news'):
+        if action in ('relate', 'generate', 'transformlinks', 'toc', 'news'):
             # we need to provide the otherrepos parameter to get
             # things like URI transformation to work. However we might
             # not need all repos (ie. not repos where relate or even
