@@ -1,6 +1,6 @@
 import re
 
-from . import EURLex
+from . import EURLex, CDM
 
 class EURLexActs(EURLex):
     alias = "eurlexacts"
@@ -15,4 +15,6 @@ class EURLexActs(EURLex):
     expertquery_template = "DTS_SUBDOM = EU_LAW_ALL AND (DTT = R OR DTT = L)"
     # Match 31960R0009 and 31960R0009(01)
     celexfilter = re.compile("(3\d{4}[RL]\d{4}(|\(\d+\)))$").match
+
+    rdf_type = (CDM.directive, CDM.regulation)
     

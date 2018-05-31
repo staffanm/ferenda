@@ -13,12 +13,14 @@ import tempfile
 
 import requests
 from bs4 import BeautifulSoup
-from rdflib import Graph, Namespace, URIRef
+from rdflib import Graph, Namespace, URIRef, Literal, RDF
 from rdflib.resource import Resource
 from rdflib.namespace import OWL
+from lxml.etree import XSLT
 
 from ferenda import util, decorators, errors
-from ferenda import DocumentRepository, DocumentStore
+from ferenda import DocumentRepository, DocumentStore, Describer
+from . import FormexParser, CDM
 
 class EURLexStore(DocumentStore):
     downloaded_suffixes = [".fmx4", ".xhtml", ".html", ".pdf"]
@@ -72,6 +74,8 @@ class EURLex(DocumentRepository):
     contenttype = "application/xhtml+xml" 
     namespace = "{http://eur-lex.europa.eu/search}"
     download_archive = False
+    namespaces = ['rdf', 'rdfs', 'xsd', 'dcterms', 'prov',
+                  ('cdm', str(CDM))]
     
     @classmethod
     def get_default_options(cls):
@@ -209,7 +213,7 @@ class EURLex(DocumentRepository):
             if lang in candidateexpressions:
                 expression = candidateexpressions[lang]
                 candidateitem = {}
-                # we'd like to order the manifestations in some preference order -- xhtml > html > pdf
+                # we'd like to order the manifestations in some preference order -- fmx4 > xhtml > html > pdf
                 for manifestation in expression.objects(CDM.expression_manifested_by_manifestation):
                     manifestationtype = str(manifestation.value(CDM.type))
                     # there might be multiple equivalent
@@ -222,8 +226,26 @@ class EURLex(DocumentRepository):
                     if rootmanifestations:
                         manifestation = rootmanifestations[0]
                     items = list(manifestation.subjects(CDM.item_belongs_to_manifestation))
-                    if len(items) == 1:
+                    if len(items) == 1: 
                         candidateitem[manifestationtype] = items[0]
+                    elif len(items) == 2:
+                        # NOTE: for at least 32016L0680, there can be
+                        # two items of the fmx4 manifestation, where
+                        # one (DOC_1) is bad (eg only a reference to
+                        # the pdf file) and the other (DOC_2) is
+                        # good. The heuristic for choosing the good
+                        # one: if the owl:sameAs property ends in .xml
+                        # but not .doc.xml...
+                        for item in items:
+                            # this picks a random object if there are
+                            # two or more owl:sameAs triples, but the
+                            # heuristic seems to work with all
+                            # owl:sameAs objects
+                            sameas = str(item.value(OWL.sameAs).identifier)
+                            if sameas.endswith(".xml") and not sameas.endswith(".doc.xml"):
+                                candidateitem[manifestationtype] = item
+                                break
+
                 if candidateitem:
                     for t in ("fmx4", "xhtml", "html", "pdf", "pdfa1a"):
                         if t in candidateitem:
@@ -318,6 +340,57 @@ class EURLex(DocumentRepository):
                 result.raise_for_status()
                 source = result.text
 
+    # since doc.body is a etree object, not a tree of CompoundElement
+    # objects, the job for render_xhtml_doc is already done
+    def render_xhtml_tree(self, doc):
+        return doc.body
+
+    def metadata_from_basefile(self, doc):
+        from pudb import set_trace; set_trace()
+        desc = Describer(doc.meta, doc.uri)
+        desc.rel(CDM.resource_legal_id_celex, Literal(doc.basefile))
+        # the sixth letter in 
+        rdftype = {"R": CDM.regulation,
+                   "L": CDM.directive,
+                   "C": CDM.decision_cjeu}[doc.basefile[5]]
+        desc.rel(RDF.type, rdftype)
+        return doc.meta
+        
+    
+    @decorators.managedparsing
+    def parse(self, doc):
+        doc.meta = self.metadata_from_basefile(doc)
+        source = self.store.downloaded_path(doc.basefile)
+        # maybe derive some metadata (type, year, number) from
+        # basefile? It's probably not warranted to have a special
+        # parse_metadata stage for these documents, we can extract
+        # title, dates and other essential metadata from the body.
+        if source.endswith(".fmx4"):
+            doc.body = self.parse_formex(doc, source)
+        elif source.endswith(".html"):
+            doc.body = self.parse_html(doc, source)
+        else:
+            raise errors.ParseError("Can't yet parse %s" % source)
+        self.parse_entry_update(doc)
+        return True  # Signals that everything is OK
+
+    def parse_formex(self, doc, source):
+        parser = etree.XMLParser(remove_blank_text=True)
+        sourcetree = etree.parse(source, parser).getroot()
+        from pudb import set_trace; set_trace()
+        fp = self.resourceloader.openfp("xsl/formex.xsl")
+        xslttree = etree.parse(fp, parser)
+        transformer = etree.XSLT(xslttree)
+        params = etree.XSLT
+        from pudb import set_trace; set_trace()
+        resulttree = transformer(sourcetree,
+                                 about=XSLT.strparam(doc.uri),
+                                 rdftype=XSLT.strparam(str(doc.meta.value(URIRef(doc.uri), RDF.type))))
+        return resulttree
+        # re-parse to fix whitespace
+        buffer = BytesIO(etree.tostring(resulttree, encoding="utf-8"))
+        return etree.parse(buffer, parser)
+        
     def tabs(self):
         return []
 
