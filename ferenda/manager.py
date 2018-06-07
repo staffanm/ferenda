@@ -1015,7 +1015,8 @@ def _run_class(enabled, argv, config):
             for othercls in _classes_from_classname(enabled, 'all'):
                 if othercls != inst.__class__:
                     obj = _instantiate_class(othercls, config, argv=argv)
-                    otherrepos.append(obj)
+                    if getattr(obj.config, action, True):
+                        otherrepos.append(obj)
             kwargs['otherrepos'] = otherrepos
 
         if 'all' in inst.config and inst.config.all is True:
@@ -1239,7 +1240,8 @@ def _build_worker(jobqueue, resultqueue, clientname):
                 for alias, classname in _enabled_classes().items():
                     if alias != inst.alias:
                         obj = _instantiate_and_configure(classname, job['config'], logrecords, clientname)
-                        otherrepos.append(obj)
+                        if getattr(obj.config, job['command'], True):
+                            otherrepos.append(obj)
                 repos[job['classname']] = otherrepos
             kwargs['otherrepos'] = repos[job['classname']]
                         
