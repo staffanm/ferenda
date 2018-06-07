@@ -7,6 +7,7 @@ if [ "$1" = "-f" ]; then
    rm -r data/*/generated
    rm -r data/*/toc
    rm -r data/*/feed
+   rm -r data/*/deps
    set -e  # fail immediately on error
    echo "resetting fulltextindex"
    ./ferenda-build.py devel destroyindex

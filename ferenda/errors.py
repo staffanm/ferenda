@@ -24,6 +24,9 @@ class DownloadFileNotFoundError(DownloadError):
     reason."""
     pass
 
+class DownloadSkippedError(DownloadError):
+    """Raised when asked to download a document that the options file indicates should be skipped."""
+    pass
 class ParseError(FerendaException):
 
     """Raised when :py:meth:`~ferenda.DocumentRepository.parse` fails in

@@ -1008,7 +1008,7 @@ def _run_class(enabled, argv, config):
         kwargs = {}
         if action in ('relate', 'generate', 'transformlinks', 'toc', 'news'):
             # we need to provide the otherrepos parameter to get
-            # things like URI transformation to work. However we might
+            # things like URI transformation to work. FIXME: However we might
             # not need all repos (ie. not repos where relate or even
             # tabs is set to false)
             otherrepos = []
@@ -1196,6 +1196,7 @@ def _build_worker(jobqueue, resultqueue, clientname):
     # create the inst with a default config
     # (_instantiate_class will try to read ferenda.ini)
     insts = {}
+    repos = {}
     log = getlog()
     log.debug("Client: [pid %s] _build_worker ready to process job queue" % os.getpid())
     logrecords = []
@@ -1225,6 +1226,23 @@ def _build_worker(jobqueue, resultqueue, clientname):
         clbl = getattr(insts[job['classname']], job['command'])
         # kwargs = job['kwargs']   # if we ever support that
         kwargs = {}
+
+        # For some commands (relate, generate, transformlinks) this
+        # child process need to instantiate the correct set of
+        # otherrepos and add it to kwargs. Note that the child
+        # processes should instantiate these themselves, not get them
+        # from the parent process (would that even work?)
+        if job['command'] in ('relate', 'generate', 'transformlinks'):
+            if job['classname'] not in repos:
+                otherrepos = []
+                inst = insts[job['classname']]
+                for alias, classname in _enabled_classes().items():
+                    if alias != inst.alias:
+                        obj = _instantiate_and_configure(classname, job['config'], logrecords, clientname)
+                        otherrepos.append(obj)
+                repos[job['classname']] = otherrepos
+            kwargs['otherrepos'] = repos[job['classname']]
+                        
         # proctitle = re.sub(" [now: .*]$", "", getproctitle())
         proctitle = getproctitle()
         setproctitle(proctitle + " [%(alias)s %(command)s %(basefile)s]" % job)

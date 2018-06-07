@@ -20,7 +20,7 @@ from cached_property import cached_property
 
 from ferenda import (PDFAnalyzer, CompositeRepository, DocumentEntry,
                      PDFDocumentRepository, CompositeStore, Facet)
-from ferenda import util, decorators
+from ferenda import util, decorators, errors
 from ferenda.pdfreader import StreamingPDFReader
 from . import Regeringen, SwedishLegalSource, FixedLayoutSource, SwedishLegalStore, Offtryck, RPUBL
 from .swedishlegalsource import lazyread
@@ -163,7 +163,6 @@ class SOUKB(Offtryck, PDFDocumentRepository):
         opts = super(SOUKB, cls).get_default_options()
         opts['ocr'] = True
         return opts
-
     
     def download(self, basefile=None):
         if basefile:
@@ -208,6 +207,8 @@ class SOUKB(Offtryck, PDFDocumentRepository):
                 yield (basefile, (link, element.tail.strip()))
 
     def download_single(self, basefile, url):
+        if self.get_parse_options(basefile) == "skip":
+            raise errors.DownloadSkippedError("%s should not be downloaded according to options.py" % basefile)
         # url is really a 2-tuple
         url, title = url
         resp = self.session.get(url)
@@ -219,43 +220,56 @@ class SOUKB(Offtryck, PDFDocumentRepository):
         rdfurl = "http://data.libris.kb.se/open/bib/%s.rdf" % librisid
         filename = self.store.downloaded_path(basefile)
         created = not os.path.exists(filename)
-        if self.download_if_needed(pdfurl, basefile) or self.config.refresh:
-            if created:
-                self.log.info("%s: downloaded from %s" % (basefile, pdfurl))
-            else:
-                self.log.info(
-                    "%s: downloaded new version from %s" % (basefile, pdfurl))
-            updated = True
-            try:
-                # it appears that certain URLs (like curl
-                # http://data.libris.kb.se/open/bib/8351225.rdf)
-                # sometimes return an empty response. We should check
-                # and warn for this (and infer a minimal RDF by
-                # hand from what we can, eg dc:title from the link
-                # text)
-                rdffilename = self.store.downloaded_path(basefile, attachment="metadata.rdf")
-                self.download_if_needed(rdfurl, basefile,
-                                        filename=rdffilename)
-                if os.path.getsize(rdffilename) == 0:
-                    self.log.warning("%s: %s returned 0 response, infer RDF" %
-                                     (basefile, rdfurl))
-                    base = URIRef("http://libris.kb.se/resource/bib/%s" %
-                                  librisid)
-                    fakegraph = Graph()
-                    fakegraph.bind("dc", str(DC))
-                    fakegraph.add((base, DC.title, Literal(title, lang="sv")))
-                    year = basefile.split(":")[0] # Libris uses str type
-                    fakegraph.add((base, DC.date, Literal(year)))
-                    with open(rdffilename, "wb") as fp:
-                        fakegraph.serialize(fp, format="pretty-xml")
-                self.download_if_needed(thumburl, basefile,
-                                        filename=self.store.downloaded_path(
-                        basefile, attachment="thumb.jpg"))
-            except requests.exceptions.HTTPError as e:
-                self.log.error("Failed to load attachment: %s" % e)
-                raise
+        updated = False
+        
+        # download rdf metadata before actual content
+        try:
+            # it appears that certain URLs (like curl
+            # http://data.libris.kb.se/open/bib/8351225.rdf)
+            # sometimes return an empty response. We should check
+            # and warn for this (and infer a minimal RDF by
+            # hand from what we can, eg dc:title from the link
+            # text)
+            rdffilename = self.store.downloaded_path(basefile, attachment="metadata.rdf")
+            self.download_if_needed(rdfurl, basefile,
+                                    filename=rdffilename)
+            if os.path.getsize(rdffilename) == 0:
+                self.log.warning("%s: %s returned 0 response, infer RDF" %
+                                 (basefile, rdfurl))
+                base = URIRef("http://libris.kb.se/resource/bib/%s" %
+                              librisid)
+                fakegraph = Graph()
+                fakegraph.bind("dc", str(DC))
+                fakegraph.add((base, DC.title, Literal(title, lang="sv")))
+                year = basefile.split(":")[0] # Libris uses str type
+                fakegraph.add((base, DC.date, Literal(year)))
+                with open(rdffilename, "wb") as fp:
+                    fakegraph.serialize(fp, format="pretty-xml")
+        except requests.exceptions.HTTPError as e:
+            self.log.error("Failed to load attachment: %s" % e)
+            raise
+
+        if self.get_parse_options(basefile) == "metadataonly":
+            self.log.debug("%s: Marked as 'metadataonly', not downloading actual PDF file" % basefile)
+            with self.store.open_downloaded(basefile, "w") as fp:
+                pass
         else:
-            self.log.debug("%s: exists and is unchanged" % basefile)
+            if self.download_if_needed(pdfurl, basefile) or self.config.refresh:
+                if created:
+                    self.log.info("%s: downloaded from %s" % (basefile, pdfurl))
+                else:
+                    self.log.info(
+                        "%s: downloaded new version from %s" % (basefile, pdfurl))
+                updated = True
+                try:
+                    self.download_if_needed(thumburl, basefile,
+                                            filename=self.store.downloaded_path(
+                            basefile, attachment="thumb.jpg"))
+                except requests.exceptions.HTTPError as e:
+                    self.log.error("Failed to load attachment: %s" % e)
+                    raise
+            else:
+                self.log.debug("%s: exists and is unchanged" % basefile)
         entry = DocumentEntry(self.store.documententry_path(basefile))
         now = datetime.now()
         entry.orig_url = url  # or pdfurl?

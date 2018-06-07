@@ -1842,9 +1842,12 @@ with the *config* object as single parameter.
         timings = {'basefile': basefile,
                    'e_triples': 0,
                    'e_deps': 0,
-                   'e_fulltext': 0}
+                   'e_fulltext': 0,
+                   'v_triples': -1,
+                   'v_deps': -1,
+                   'v_fulltext': -1}
         with util.logtime(self.log.info,
-                          "%(basefile)s: relate OK (%(elapsed).3f sec) [%(e_triples).3f/%(e_deps).3f/%(e_fulltext).3f]",
+                          "%(basefile)s: relate OK (%(elapsed).3f sec) [%(e_triples).3f:%(v_triples)s/%(e_deps).3f:%(v_deps)s/%(e_fulltext).3f:%(v_fulltext)s]",
                           timings):
             # first, load fulltextindex, then add dependencies, lastly
             # load triplestore. fulltextindex is slightly more picky
@@ -1858,13 +1861,13 @@ with the *config* object as single parameter.
 
             if self.config.fulltextindex and relate.fulltext:
                 start = time.time()
-                self.relate_fulltext(basefile, otherrepos)
+                timings['v_fulltext'] = self.relate_fulltext(basefile, otherrepos)
                 timings['e_fulltext'] = time.time() - start
                 entry.indexed_ft = datetime.now()
 
             if relate.dependencies:
                 start = time.time()
-                self.relate_dependencies(basefile, otherrepos)
+                timings['v_deps'] = self.relate_dependencies(basefile, otherrepos)
                 timings['e_deps'] = time.time() - start
                 entry.indexed_dep = datetime.now()
             if relate.triples:
@@ -1893,7 +1896,7 @@ with the *config* object as single parameter.
                         self.relate_triples(basefile)
                         entry.indexed_ts = datetime.now()
                     else:
-                        self.relate_triples(basefile, removesubjects=True)
+                        timings['v_triples'] = self.relate_triples(basefile, removesubjects=True)
                         entry.indexed_ts = datetime.now()
                     timings['e_triples'] = time.time() - start
         entry.save()
@@ -1933,6 +1936,7 @@ with the *config* object as single parameter.
             ts.add_serialized(data, format="xml", context=self.dataset_uri())
             #ts.add_serialized_file(self.store.distilled_path(basefile), format="xml",
             #                       context=self.dataset_uri())
+            return len(data)
 
     def _get_fulltext_indexer(self, repos, batchoptimize=False):
         if not hasattr(self, '_fulltextindexer'):
@@ -1961,8 +1965,7 @@ parsed document path to that documents dependency file."""
         with util.logtime(self.log.debug,
                           "%(basefile)s: Registered %(deps)s dependencies (%(elapsed).3f sec)",
                           values):
-            distilled = util.readfile(self.store.distilled_path(basefile), encoding="utf-8")
-            g = Graph().parse(data=distilled, format="xml")
+            g = Graph().parse(data=util.readfile(self.store.distilled_path(basefile), encoding="utf-8"), format="xml")
             subjects = set([s for s, p, o in g])
             for (s, p, o) in g:
                 # the graph for a single doc can describe
@@ -1975,6 +1978,7 @@ parsed document path to that documents dependency file."""
                     continue
                 # for each URIRef in graph
                 if isinstance(o, URIRef):
+                    handled = False
                     # find out if any docrepo can handle it
                     for repoidx, repo in enumerate(repos):
                         dep_basefile = repo.basefile_from_uri(str(o))
@@ -1984,12 +1988,13 @@ parsed document path to that documents dependency file."""
                             # if so, add to that repo's dependencyfile
                             pp = self.store.parsed_path(basefile)
                             res = repo.add_dependency(dep_basefile, pp)
+                            handled = True
                             values['deps'] += 1
                             break
-                    # reorder repos in MRU order
-                    repos.insert(0, repos.pop(repoidx))
-
-        return values['deps']
+                    if handled:
+                        # reorder repos in MRU order
+                        repos.insert(0, repos.pop(repoidx))
+        return "%s[%s]" % (values['deps'], len(repos))
 
     def add_dependency(self, basefile, dependencyfile):
         """Add the *dependencyfile* to *basefile* s dependency file. Returns
@@ -2081,8 +2086,8 @@ parsed document path to that documents dependency file."""
                                **kwargs)
                 values['resources'] += 1
                 values['words'] += len(plaintext.split())
-
             indexer.commit()  # NB: Destroys indexer._writer
+            return values['resources']
 
     def _relate_fulltext_resources(self, body):
         res = []
