@@ -253,6 +253,8 @@ class Regeringen(Offtryck):
 
 
     def download_single(self, basefile, url=None):
+        if self.get_parse_options(basefile) == "skip":
+            raise DownloadSkippedError("%s should not be downloaded according to options.py" % basefile)
         if not url:
             url = self.remote_url(basefile)
             if not url:  # remote_url failed
@@ -283,25 +285,28 @@ class Regeringen(Offtryck):
             else:
                 self.log.info("%s: downloaded from %s" % (basefile, url))
 
-            soup = BeautifulSoup(codecs.open(filename, encoding=self.source_encoding), "lxml")
-            cnt = 0
-            selected_files = self.find_doc_links(soup, basefile)
-            if selected_files:
-                for (filename, filetype,label) in selected_files:
-                    fileurl = urljoin(url, filename)
-                    basepath = filename.split("/")[-1]
-                    filename = self.store.downloaded_path(basefile, attachment=basepath)
-                    if not filename.lower().endswith(".pdf"):
-                        filename += ".%s" % filetype
-                    if self.download_if_needed(fileurl, basefile, filename=filename):
-                        filesupdated = True
-                        self.log.debug(
-                            "    %s is new or updated" % filename)
-                    else:
-                        self.log.debug("    %s is unchanged" % filename)
+            if self.get_parse_options(basefile) == "metadataonly":
+                self.log.debug("%s: Marked as 'metadataonly', not downloading actual PDF file" % basefile)
             else:
-                self.log.warning(
-                    "%s (%s) has no downloadable files" % (basefile, url))
+                soup = BeautifulSoup(codecs.open(filename, encoding=self.source_encoding), "lxml")
+                cnt = 0
+                selected_files = self.find_doc_links(soup, basefile)
+                if selected_files:
+                    for (filename, filetype,label) in selected_files:
+                        fileurl = urljoin(url, filename)
+                        basepath = filename.split("/")[-1]
+                        filename = self.store.downloaded_path(basefile, attachment=basepath)
+                        if not filename.lower().endswith(".pdf"):
+                            filename += ".%s" % filetype
+                        if self.download_if_needed(fileurl, basefile, filename=filename):
+                            filesupdated = True
+                            self.log.debug(
+                                "    %s is new or updated" % filename)
+                        else:
+                            self.log.debug("    %s is unchanged" % filename)
+                else:
+                    self.log.warning(
+                        "%s (%s) has no downloadable files" % (basefile, url))
             if updated or filesupdated:
                 pass
             else:

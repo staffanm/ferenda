@@ -32,7 +32,7 @@ from ferenda.pdfreader import StreamingPDFReader, Textbox
 from . import (Trips, NoMoreLinks, Regeringen, Riksdagen,
                SwedishLegalSource, SwedishLegalStore, RPUBL, Offtryck)
 from .fixedlayoutsource import FixedLayoutStore, FixedLayoutSource
-from .swedishlegalsource import lazyread
+from .swedishlegalsource import lazyread, SwedishLegalStore
 from .elements import Sidbrytning
 
 def prop_sanitize_identifier(identifier):
@@ -635,6 +635,8 @@ class PropRiksdagen(Riksdagen):
     def sanitize_identifier(self, identifier):
         return prop_sanitize_identifier(identifier)
 
+class PropKBStore(SwedishLegalStore):
+    downloaded_suffixes = [".pdf", ".xml"]
 
 class PropKB(Offtryck, PDFDocumentRepository):
     alias = "propkb"
@@ -644,7 +646,8 @@ class PropKB(Offtryck, PDFDocumentRepository):
     basefile_regex = "prop_(?P<year>\d{4})(?P<type>_urtima|_höst|_a|_b|)__+(?P<no>\d+)(?:_(?P<part>\d+)|)"
     document_type = PROPOSITION = True
     SOU = DS = KOMMITTEDIREKTIV = False
-
+    documentstore_class = PropKBStore
+    
     @classmethod
     def get_default_options(cls):
         opts = super(PropKB, cls).get_default_options()
@@ -701,7 +704,7 @@ class PropKB(Offtryck, PDFDocumentRepository):
                             continue
                         if self.get_parse_options(basefile) == "skip":
                             continue
-                        if part and int(part) > 1:
+                        if part and int(part) > 1 and self.get_parse_options(basefile) != "metadataonly":
                             # Download attachments ourselves -- not
                             # really what download_get_basefile should
                             # do, but hey....
@@ -722,14 +725,30 @@ class PropKB(Offtryck, PDFDocumentRepository):
         if not url:
             entry = DocumentEntry(self.store.documententry_path(basefile))
             url = entry.orig_url
+        if self.get_parse_options(basefile) == "metadataonly":
+            # in these cases, to save space, get
+            # the smaller XML OCR data, not the
+            # actual scanned images-in-PDF
+            url = url.replace(".pdf", ".xml").replace("pdf/web", "xml")
+            # make store.downloaded_path return .xml suffixes (and set
+            # the timestamp to the beginning of epoch so that the
+            # resulting if-modified-since header doesn't contain the
+            # current date/time
+            downloaded_path = self.store.downloaded_path(basefile).replace(".pdf", ".xml")
+            if not os.path.exists(downloaded_path):
+                util.writefile(downloaded_path, "")
+                os.utime(downloaded_path, (0,0))
         return super(PropKB, self).download_single(basefile, url)
         
 
-    @lazyread
+    # @lazyread
     def downloaded_to_intermediate(self, basefile, attachment=None):
         downloaded_path = self.store.downloaded_path(basefile, attachment=attachment)
-        intermediate_path = self.store.intermediate_path(basefile)
-        return self.convert_pdf(downloaded_path, intermediate_path)
+        if downloaded_path.endswith(".xml"):
+            return open(downloaded_path)
+        else:
+            intermediate_path = self.store.intermediate_path(basefile)
+            return self.convert_pdf(downloaded_path, intermediate_path)
 
     def convert_pdf(self, downloaded_path, intermediate_path):
         intermediate_dir = os.path.dirname(intermediate_path)
@@ -744,12 +763,41 @@ class PropKB(Offtryck, PDFDocumentRepository):
         return reader.convert(**kwargs)
 
     def extract_head(self, fp, basefile):
-        return None  # "rawhead" is never used
+        if self.get_parse_options(basefile) == "metadataonly":
+            tree = etree.parse(fp)
+            firstpage = tree.find("//{http://www.abbyy.com/FineReader_xml/FineReader10-schema-v1.xml}page")
+            return firstpage
+        else:
+            return None  # "rawhead" is never used
 
     def extract_metadata(self, rawhead, basefile):
+        res = self.metadata_from_basefile(basefile)
         # extracting title and other metadata (dep, publication date
-        # etc) requires parsing of the body)
-        return self.metadata_from_basefile(basefile)
+        # etc) requires parsing of the body (and subsequent processing
+        # in postprocess_doc). For documents marked as metadataonly in
+        # options.py, the body is never parsed. Therefore, we do a
+        # very limited parsing of the first page here.
+        if self.get_parse_options(basefile) == "metadataonly":
+            text = util.normalize_space(etree.tostring(rawhead, method="text", encoding="utf-8").decode("utf-8"))
+            res.update(self.find_firstpage_metadata(text, basefile))
+        return res
+
+    def find_firstpage_metadata(self, firstpage, basefile):
+        res = {}
+        m = re.search("proposition till riksdagen *,? *(.*?); gif?ven",
+                      util.normalize_space(firstpage), flags=re.I)
+        if not m:
+            self.log.warning("%s: Couldn't find title in first %s characters (first page)" %
+                             (basefile, len(firstpage)))
+        else:
+            res["dcterms:title"] = m.groups(1)
+        m = re.search("gif?ven stockholms slott den (\d+ \w+ \d{4})", util.normalize_space(firstpage), flags=re.I)
+        if not m:
+            self.log.warning("%s: Couldn't find date in first %s characters (first page)" %
+                             (basefile, len(firstpage)))
+        else:
+            res["dcterms:issued"] = self.parse_swedish_date(m.group(1).lower())
+        return res
 
     def extract_body(self, fp, basefile):
         reader = StreamingPDFReader()
@@ -773,27 +821,20 @@ class PropKB(Offtryck, PDFDocumentRepository):
         return reader
 
     def postprocess_doc(self, doc):
+        if self.get_parse_options(doc.basefile) == "metadataonly":
+            return
         # the first thing will be a Sidbrytning; continue scanning text until next sidbrytning
         firstpage = ""
         for thing in doc.body[1:]:
             if isinstance(thing, Sidbrytning):
                 break
             elif isinstance(thing, Textbox):
-                firstpage += str(thing) + "\n\n"
-        m = re.search("proposition till riksdagen *,? *(.*?); gif?ven",
-                      util.normalize_space(firstpage), flags=re.I)
-        if not m:
-            self.log.warning("%s: Couldn't find title in first %s characters (first page)" %
-                             (doc.basefile, len(firstpage)))
-        else:
-            doc.meta.add((URIRef(doc.uri), DCTERMS.title, Literal(m.group(1), lang=self.lang)))
-        m = re.search("gif?ven stockholms slott den (\d+ \w+ \d{4})", util.normalize_space(firstpage), flags=re.I)
-        if not m:
-            self.log.warning("%s: Couldn't find date in first %s characters (first page)" %
-                             (doc.basefile, len(firstpage)))
-        else:
-            d = self.parse_swedish_date(m.group(1).lower())
-            doc.meta.add((URIRef(doc.uri), DCTERMS.issued, Literal(d)))
+                firstpage += util.normalize_space(str(thing)) + "\n\n"
+        metadata = self.find_firstpage_metadata(firstpage, doc.basefile)
+        if "dcterms:title" in metadata:
+            doc.meta.add((URIRef(doc.uri), DCTERMS.title, Literal(metadata["dcterms:title"], lang=self.lang)))
+        if "dcterms:issued" in metadata:
+            doc.meta.add((URIRef(doc.uri), DCTERMS.issued, Literal(metadata["dcterms:issued"])))
 
 
 # inherit list_basefiles_for from CompositeStore, basefile_to_pathfrag

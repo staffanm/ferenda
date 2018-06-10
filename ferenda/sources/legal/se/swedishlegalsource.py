@@ -598,7 +598,7 @@ class SwedishLegalSource(DocumentRepository):
             # in fact not found.
             doc.body = Body([PreambleSection([
                 P(["Detta dokument har bedömts ha begränsad juridisk betydelse, så dess innehåll har inte tagits med här. Du kan hitta originaldokumentet från dess källa genom länken till höger."]),
-                P(["Om du tycker att dokumentet bör tas med, ", A("hör gärna av dig!", href="/om/kontakt")])
+                P(["Om du tycker att dokumentet bör tas med, ", A(["hör gärna av dig!"], href="/om/kontakt")])
             ], title='Dokumenttext saknas')])
         else:
             doc.body = self.parse_body(fp, doc.basefile)
