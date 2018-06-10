@@ -11,7 +11,10 @@ import os
 import re
 import json
 from collections import OrderedDict
-from functools import lru_cache
+try:
+    from functools import lru_cache
+except ImportError:
+    from backports.functools_lru_cache import lru_cache
 
 from rdflib import URIRef, Literal, Namespace
 from bs4 import BeautifulSoup

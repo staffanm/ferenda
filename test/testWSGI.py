@@ -799,8 +799,7 @@ class Search(WSGI):
         self.assertEqual('https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css',
                          css[0].get('href'))
         js = t.findall("body/script")
-        self.assertEqual(len(js), 5) # jquery, bootstrap, hammer, ferenda, typeahead
-        
+        self.assertEqual(len(js), 4) # jquery, bootstrap, ferenda, typeahead
         resulthead = t.find(".//article/h1").text
         self.assertEqual(resulthead, "3 matches for 'part'")
         docs = t.findall(".//section[@class='hit']")

@@ -32,3 +32,4 @@ responses<0.6.0 # newer versions don't support 2.6
 importlib
 langdetect
 bz2file   # backport
+backports.functools_lru_cache # another backport
