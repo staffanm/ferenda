@@ -156,7 +156,7 @@ class Regeringen(Offtryck):
         "http://www.regeringen.se/rattsdokument/statens-offentliga-utredningar/1921/10/noter-med-egypten-angaende-forlangning-av-de-blandade-domstolarnas-verksamhet-m.-m/", # SÖ, not SOU
         "http://www.regeringen.se/rattsdokument/statens-offentliga-utredningar/1921/07/ministeriella-noter-vaxlade-med-italien-angaende-omsesidighet-rorande-ersattning-for-olycksfall-i-arbete/", # SÖ, not SOU
         "http://www.regeringen.se/rattsdokument/statens-offentliga-utredningar/1921/10/konvention-angaende-faststallande-av-minimialder-for-barns-anvandande-i-arbete-till-sjoss/", # SÖ, not SOU
-        
+        "https://www.regeringen.se/rattsliga-dokument/proposition/2018/01/sou-2071883" # missing a 1, leading to the interpretation prop. 2071/88:3 instead of 2017/18:83
         
     ])
                     
@@ -254,7 +254,7 @@ class Regeringen(Offtryck):
 
     def download_single(self, basefile, url=None):
         if self.get_parse_options(basefile) == "skip":
-            raise DownloadSkippedError("%s should not be downloaded according to options.py" % basefile)
+            raise DocumentSkippedError("%s should not be downloaded according to options.py" % basefile)
         if not url:
             url = self.remote_url(basefile)
             if not url:  # remote_url failed

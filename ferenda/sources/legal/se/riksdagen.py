@@ -70,7 +70,7 @@ class Riksdagen(Offtryck, FixedLayoutSource):
     documentstore_class = RiksdagenStore
     document_type = None
     start_url = None
-    start_url_template = "http://data.riksdagen.se/dokumentlista/?sort=datum&sortorder=asc&utformat=xml&doktyp=%(doctype)s"
+    start_url_template = "http://data.riksdagen.se/dokumentlista/?sort=datum&sortorder=desc&utformat=xml&doktyp=%(doctype)s"
 
 
     @property
@@ -97,7 +97,9 @@ class Riksdagen(Offtryck, FixedLayoutSource):
         url = start_url
         done = False
         pagecount = 1
+        seenurls = set()
         while not done:
+            seenurls.add(url)
             resp = requests.get(url)
             soup = BeautifulSoup(resp.text, features="xml")
 
@@ -119,9 +121,14 @@ class Riksdagen(Offtryck, FixedLayoutSource):
                     attachment = doc.tempbeteckning.text
                 yield (basefile, attachment), doc.dokumentstatus_url_xml.text
             try:
-                url = soup.dokumentlista['nasta_sida']
-                pagecount += 1
-                self.log.debug("Getting page #%d" % pagecount)
+                nexturl = soup.dokumentlista['nasta_sida']
+                if nexturl in seenurls:
+                    self.log.warning("Saw %s for the second time, probably means that we've got what we can" % nexturl)
+                    done = True
+                else:
+                    url = nexturl
+                    pagecount += 1
+                    self.log.debug("Getting page #%d" % pagecount)
             except KeyError:
                 self.log.debug("That was the last page")
                 done = True
@@ -150,7 +157,7 @@ class Riksdagen(Offtryck, FixedLayoutSource):
 
     def download_single(self, basefile, url=None):
         if self.get_parse_options(basefile) == "skip":
-            raise errors.DownloadSkippedError("%s should not be downloaded according to options.py" % basefile)
+            raise errors.DocumentSkippedError("%s should not be downloaded according to options.py" % basefile)
         attachment = None
         if isinstance(basefile, tuple):
             basefile, attachment = basefile
@@ -169,7 +176,7 @@ class Riksdagen(Offtryck, FixedLayoutSource):
         existed = os.path.exists(xmlfile)
         self.log.debug("  %s: Downloading to %s" % (basefile, xmlfile))
         try:
-            updated = self.download_if_needed(url, basefile)
+            updated = self.download_if_needed(url, basefile, archive=self.download_archive)
             if existed:
                 if updated:
                     self.log.info("  %s: updated from %s" % (basefile, url))
@@ -207,14 +214,14 @@ class Riksdagen(Offtryck, FixedLayoutSource):
                     htmlurl = docsoup.find('dokument_url_html').text
                     htmlfile = self.store.downloaded_path(basefile, attachment=docname + ".html")
                     #self.log.debug("   Downloading to %s" % htmlfile)
-                    r = self.download_if_needed(htmlurl, basefile, filename=htmlfile)
+                    r = self.download_if_needed(htmlurl, basefile, filename=htmlfile, archive=self.download_archive)
                     if r:
                         self.log.debug("    Downloaded html ver to %s" % htmlfile)
                 elif docsoup.find('dokument_url_text'):
                     texturl = docsoup.find('dokument_url_text').text
                     textfile = self.store.downloaded_path(basefile, attachment=docname + ".txt")
                     #self.log.debug("   Downloading to %s" % htmlfile)
-                    r = self.download_if_needed(texturl, basefile, filename=textfile)
+                    r = self.download_if_needed(texturl, basefile, filename=textfile, archive=self.download_archive)
                     if r:
                         self.log.debug("    Downloaded text ver to %s" % textfile)
                 fileupdated = fileupdated or r
@@ -232,7 +239,7 @@ class Riksdagen(Offtryck, FixedLayoutSource):
                     filename = self.store.downloaded_path(basefile, attachment=docname + filetype)
                     # self.log.debug("   Downloading to %s" % filename)
                     try:
-                        r = self.download_if_needed(b.fil_url.text, basefile, filename=filename)
+                        r = self.download_if_needed(b.fil_url.text, basefile, filename=filename, archive=self.download_archive)
                         if r:
                             self.log.debug("    Downloaded attachment as %s" % filename)
                     except requests.exceptions.HTTPError as e:

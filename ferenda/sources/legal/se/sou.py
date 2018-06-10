@@ -208,7 +208,7 @@ class SOUKB(Offtryck, PDFDocumentRepository):
 
     def download_single(self, basefile, url):
         if self.get_parse_options(basefile) == "skip":
-            raise errors.DownloadSkippedError("%s should not be downloaded according to options.py" % basefile)
+            raise errors.DocumentSkippedError("%s should not be downloaded according to options.py" % basefile)
         # url is really a 2-tuple
         url, title = url
         resp = self.session.get(url)
