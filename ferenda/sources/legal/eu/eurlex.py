@@ -346,7 +346,6 @@ class EURLex(DocumentRepository):
         return doc.body
 
     def metadata_from_basefile(self, doc):
-        from pudb import set_trace; set_trace()
         desc = Describer(doc.meta, doc.uri)
         desc.rel(CDM.resource_legal_id_celex, Literal(doc.basefile))
         # the sixth letter in 
@@ -377,12 +376,10 @@ class EURLex(DocumentRepository):
     def parse_formex(self, doc, source):
         parser = etree.XMLParser(remove_blank_text=True)
         sourcetree = etree.parse(source, parser).getroot()
-        from pudb import set_trace; set_trace()
         fp = self.resourceloader.openfp("xsl/formex.xsl")
         xslttree = etree.parse(fp, parser)
         transformer = etree.XSLT(xslttree)
         params = etree.XSLT
-        from pudb import set_trace; set_trace()
         resulttree = transformer(sourcetree,
                                  about=XSLT.strparam(doc.uri),
                                  rdftype=XSLT.strparam(str(doc.meta.value(URIRef(doc.uri), RDF.type))))
@@ -390,6 +387,20 @@ class EURLex(DocumentRepository):
         # re-parse to fix whitespace
         buffer = BytesIO(etree.tostring(resulttree, encoding="utf-8"))
         return etree.parse(buffer, parser)
+
+    def render_xhtml_validate(self, xhtmldoc):
+        def checknode(node):
+            if node.tag.split("}")[-1].isupper():
+                raise errors.InvalidTree("Node %s has not been properly transformed from Formex to XHTML" % node.tag)
+            for child in node:
+                if type(child).__name__ == "_Element":
+                    checknode(child)
+        try:
+            checknode(xhtmldoc.getroot())
+        except errors.InvalidTree as e:
+            return str(e)
+        return super(EURLex, self).render_xhtml_validate(xhtmldoc)
+
         
     def tabs(self):
         return []

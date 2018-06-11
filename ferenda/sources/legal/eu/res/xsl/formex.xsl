@@ -17,6 +17,7 @@ Note: this template expects Formex version 4 (http://formex.publications.europa.
   <xsl:param name="about"/>
   <xsl:param name="rdftype"/>
   <xsl:output indent="yes"/>
+
   <xsl:template match="/">
     <html xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	  xsi:schemaLocation="http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd"
@@ -94,6 +95,8 @@ Note: this template expects Formex version 4 (http://formex.publications.europa.
     <span class="oj-ref"><xsl:apply-templates/></span>
   </xsl:template>
 
+  <xsl:template match="QUOT.START|QUOT.END"><xsl:value-of disable-output-escaping="yes" select="concat('&amp;#x',@CODE,';')"/></xsl:template>
+
   
   <xsl:template match="CONSID">
     <!-- eg: sv: "skäl" -->
@@ -111,7 +114,13 @@ Note: this template expects Formex version 4 (http://formex.publications.europa.
   </xsl:template>
 
   <xsl:template match="DIVISION">
-    <div typeof="bibo:DocumentPart" about="$about#..." property="dcterms:title" content="{TITLE/TI/P/HT} // {TITLE/STI/P/HT}">
+    <div typeof="bibo:DocumentPart" about="{$about}#D{count(preceding-sibling::DIVISION)+1}" property="dcterms:title" content="{TITLE/TI/P/HT} // {TITLE/STI/P/HT}">
+      <xsl:apply-templates/>
+    </div>
+  </xsl:template>
+
+  <xsl:template match="DIVISION/DIVISION">
+    <div typeof="bibo:DocumentPart" about="{$about}#D{count(../preceding-sibling::DIVISION)+1}-{count(preceding-sibling::DIVISION)+1}" property="dcterms:title" content="{TITLE/TI/P/HT} // {TITLE/STI/P/HT}">
       <xsl:apply-templates/>
     </div>
   </xsl:template>
@@ -154,11 +163,25 @@ Note: this template expects Formex version 4 (http://formex.publications.europa.
     </ol>
   </xsl:template>
 
+  <xsl:template match="LIST[@TYPE='ARAB']">
+    <ol type='1'>
+      <xsl:apply-templates/>
+    </ol>
+  </xsl:template>
+
+  <xsl:template match="LIST[@TYPE='DASH']">
+    <ul class="dash">
+      <xsl:apply-templates/>
+    </ul>
+  </xsl:template>
+
   <xsl:template match="ITEM">
     <!-- fixme: find better rdf predicate -->
     <li property="rinfoex:punkt" content="{NP/NO.P}"><xsl:apply-templates select="NP/TXT"/></li>
   </xsl:template>
-  
+
+  <xsl:template match="FT"><span class="ft"><xsl:apply-templates/></span></xsl:template>
+
   <xsl:template match="FINAL">
     <div class="final">
       <xsl:apply-templates/>
