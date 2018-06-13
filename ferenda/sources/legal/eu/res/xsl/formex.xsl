@@ -17,6 +17,7 @@ Note: this template expects Formex version 4 (http://formex.publications.europa.
   <xsl:param name="about"/>
   <xsl:param name="rdftype"/>
   <xsl:output indent="yes"/>
+  <xsl:strip-space elements="*"/>
 
   <xsl:template match="/">
     <html xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -100,7 +101,7 @@ Note: this template expects Formex version 4 (http://formex.publications.europa.
   
   <xsl:template match="CONSID">
     <!-- eg: sv: "skäl" -->
-    <p class="consid" property="cdm:consid-no" content="{NP/NO.P}"><xsl:apply-templates select="NP/TXT"/></p>
+    <p class="consid" about="{$about}#{substring-before(substring-after(NP/NO.P, '('), ')')}" property="cdm:consid-no" content="{NP/NO.P}"><xsl:apply-templates select="NP/TXT"/></p>
   </xsl:template>
 
   <xsl:template match="TXT">

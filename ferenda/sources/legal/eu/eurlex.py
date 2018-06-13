@@ -20,7 +20,7 @@ from lxml.etree import XSLT
 
 from ferenda import util, decorators, errors
 from ferenda import DocumentRepository, DocumentStore, Describer
-from . import FormexParser, CDM
+from . import CDM
 
 class EURLexStore(DocumentStore):
     downloaded_suffixes = [".fmx4", ".xhtml", ".html", ".pdf"]
@@ -76,6 +76,7 @@ class EURLex(DocumentRepository):
     download_archive = False
     namespaces = ['rdf', 'rdfs', 'xsd', 'dcterms', 'prov',
                   ('cdm', str(CDM))]
+    sparql_annotations = None
     
     @classmethod
     def get_default_options(cls):

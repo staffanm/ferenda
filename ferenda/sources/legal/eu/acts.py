@@ -17,4 +17,4 @@ class EURLexActs(EURLex):
     celexfilter = re.compile("(3\d{4}[RL]\d{4}(|\(\d+\)))$").match
 
     rdf_type = (CDM.directive, CDM.regulation)
-    
+    xslt_template = "xsl/eurlexacts.xsl"
