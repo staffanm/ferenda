@@ -1,16 +1,16 @@
---- data/sfs/intermediate/1988/609.txt
-+++ /tmp/tmpk07w4k8c
-@@ -65,7 +65,7 @@ Korrigerat SFS-nummer i hänvisningarna till rättshjälpslagen
- 
- 4 § Målsägandebiträde förordnas på begäran av målsäganden eller när
+--- data/sfs/intermediate/1988/609.txt.bz2
++++ 
+@@ -121,7 +121,7 @@ Korrigerat SFS-nummer i hänvisningarna till rättshjälpslagen
+ 4 § /Upphör att gälla U:2018-07-01/
+ Målsägandebiträde förordnas på begäran av målsäganden eller när
  det annars finns anledning till det. Vid förordnandet tillämpas 26 §
 -första stycket rättshjälpslagen (1996:000).
 +första stycket rättshjälpslagen (1996:1619).
  
  I fråga om byte av målsägandebiträde och rätt för sådant biträde att
  sätta någon annan i sitt ställe tillämpas 26 § andra och tredje
-@@ -78,7 +78,7 @@
- regler om rättegångsbiträde. Lag (1996:1644).
+@@ -160,7 +160,7 @@
+ Lag (2018:535).
  
  5 § Målsägandebiträdet har rätt till ersättning i enlighet med vad
 -som enligt 27 § rättshjälpslagen (1996:000) gäller för biträde vid
@@ -18,7 +18,7 @@
  rättshjälp. I fråga om ersättningen tillämpas även 29, 43, och 47 §§
  rättshjälpslagen. Lag (1996:1644).
  
-@@ -96,7 +96,7 @@
+@@ -178,7 +178,7 @@
  7 § Beslut i frågor som avses i denna lag fattas av rätten. I de
  fall som avses i 6 § får dock målsägandebiträdet själv besluta om
  utredning i samma utsträckning som enligt 17 § rättshjälpslagen

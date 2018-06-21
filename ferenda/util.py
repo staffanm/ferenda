@@ -850,8 +850,8 @@ def robust_fetch(method, url, logger, attempts=5, sleep=1, raise_for_status=True
                     lastexception = e
         if not fetched:
             logger.error("Failed to fetch %s, giving up" % url)
-            # if lastexception:
-            #     raise lastexception
+            if lastexception and raise_for_status:
+                raise lastexception
             return False
     except requests.exceptions.RequestException as e:
             logger.error("Failed to fetch %s: error %s" % (url, e))

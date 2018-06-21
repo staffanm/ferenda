@@ -1014,6 +1014,10 @@ with the *config* object as single parameter.
                     if isinstance(etag, bytes):
                         etag = etag.decode()
                     fp.write(etag)
+            # FIXME: temporary workaround of the issue that opening a
+            # tempfile creates files readably only by the creating
+            # user
+            os.chmod(filename, stat.S_IRUSR|stat.S_IWUSR|stat.S_IRGRP|stat.S_IWGRP|stat.S_IROTH)
         return updated
 
     def download_name_file(self, tmpfile, basefile, assumedfile):

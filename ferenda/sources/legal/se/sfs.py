@@ -1930,9 +1930,11 @@ class SFS(Trips):
                 else:
                     basefile = self.basefile_from_uri(uri)
                     # the metadata hasn't been placed in the triple store yet. but maybe it exists on disk in a RDF file?
-                    with self.store.open_distilled(basefile, "rb") as fp:
-                        g = Graph().parse(fp)
-                    title = g.value(URIRef(self.canonical_uri(basefile)), DCTERMS.title)
+                    title = None
+                    if os.path.exists(self.store.distilled_path(basefile)):
+                        with self.store.open_distilled(basefile, "rb") as fp:
+                            g = Graph().parse(fp)
+                        title = g.value(URIRef(self.canonical_uri(basefile)), DCTERMS.title)
                     if not title:
                         title = "SFS %s" % parts['law']
                         # print("Cache miss for %s (%s)" % (parts['law'],

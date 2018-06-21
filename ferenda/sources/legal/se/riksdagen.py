@@ -70,7 +70,7 @@ class Riksdagen(Offtryck, FixedLayoutSource):
     documentstore_class = RiksdagenStore
     document_type = None
     start_url = None
-    start_url_template = "http://data.riksdagen.se/dokumentlista/?sort=datum&sortorder=desc&utformat=xml&doktyp=%(doctype)s"
+    start_url_template = "http://data.riksdagen.se/dokumentlista/?sort=datum&sortorder=desc&utformat=xml&doktyp=%(doctype)s&tom=1988-01-01"
 
 
     @property
@@ -200,7 +200,8 @@ class Riksdagen(Offtryck, FixedLayoutSource):
             # just zap the html element? NOTE: This means that the
             # content on disk is no longer a true copy of the remote
             # resource, but we'll just accept that in this case.
-            docsoup.html.decompose()
+            if docsoup.html: 
+                docsoup.html.decompose()
             with open(xmlfile, "w") as fp:
                 fp.write(str(docsoup))
 
@@ -249,7 +250,7 @@ class Riksdagen(Offtryck, FixedLayoutSource):
                         continue
                     fileupdated = fileupdated or r
                     break
-        except requests.exceptions.HTTPError as e:
+        except (requests.exceptions.HTTPError, requests.exceptions.ConnectionError) as e:
             self.log.error("%s: Failed: %s" % (basefile, e))
             return False
         if updated or fileupdated:

@@ -13,6 +13,7 @@ import codecs
 from urllib.parse import urljoin
 import json
 import tempfile
+import filecmp
 
 from bs4 import BeautifulSoup
 from lxml import etree
@@ -725,6 +726,7 @@ class PropKB(Offtryck, PDFDocumentRepository):
         if not url:
             entry = DocumentEntry(self.store.documententry_path(basefile))
             url = entry.orig_url
+        xml_downloaded_path = self.store.downloaded_path(basefile).replace(".pdf", ".xml")
         if self.get_parse_options(basefile) == "metadataonly":
             # in these cases, to save space, get
             # the smaller XML OCR data, not the
@@ -734,12 +736,21 @@ class PropKB(Offtryck, PDFDocumentRepository):
             # the timestamp to the beginning of epoch so that the
             # resulting if-modified-since header doesn't contain the
             # current date/time
-            downloaded_path = self.store.downloaded_path(basefile).replace(".pdf", ".xml")
-            if not os.path.exists(downloaded_path):
-                util.writefile(downloaded_path, "")
-                os.utime(downloaded_path, (0,0))
+            if not os.path.exists(xml_downloaded_path):
+                util.writefile(xml_downloaded_path, "")
+                os.utime(xml_downloaded_path, (0,0))
+        else:
+            # if parse options have changed from metadataonly to
+            # default, there will be a xml file lying about which will
+            # make downloaded_path return its name. Remove it so that
+            # we don't end up with pdf files that have a .xml
+            # extension.
+            if os.path.exists(xml_downloaded_path):
+                os.unlink(xml_downloaded_path)
         return super(PropKB, self).download_single(basefile, url)
         
+    def download_is_different(self, existing, new):
+        return not filecmp.cmp(new, existing, shallow=False)
 
     # @lazyread
     def downloaded_to_intermediate(self, basefile, attachment=None):
@@ -800,6 +811,7 @@ class PropKB(Offtryck, PDFDocumentRepository):
         return res
 
     def extract_body(self, fp, basefile):
+        import pudb; pu.db
         reader = StreamingPDFReader()
         parser = "ocr" if self.config.ocr else "xml"
         intermediate_suffix = ".hocr" if self.config.ocr else ".xml"

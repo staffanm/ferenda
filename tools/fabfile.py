@@ -12,17 +12,19 @@ macaddress = {
     "eliot": "10:C3:7B:6D:D9:50"
 }
 
-env.hosts = ["nate", "sophie", "alec", "parker", "eliot"]
 env.skip_bad_hosts = True
 
+@hosts("nate", "sophie", "alec", "parker", "eliot")
 def shutdown():
     with settings(warn_only=True):
         result = run('sudo shutdown -h now')
 
+@hosts("nate", "sophie", "alec", "parker", "eliot")
 def wakeup():
     local("echo Waking %s" % env.host)
     local("wakeonlan %s" % macaddress[env.host])
 
+@hosts("nate", "sophie", "alec", "parker", "eliot")
 def ping():
     with settings(warn_only=True):
         local("ping -c 1 %s|head -2" % env.host)
@@ -30,7 +32,6 @@ def ping():
 def doccount():
     run("curl -s http://localhost:9200/lagen/_count?pretty=true|grep count")
 
-# run from i7 with fab -H colo.tomtebo.org -f tools/fabfile.py copy_elastic
 def copy_elastic():
     # remove all old snapshots
     snapshotids = local("curl -s http://localhost:9200/_snapshot/lagen_backup/_all?pretty=true|jq -r '.snapshots[]|.snapshot'", capture=True)
@@ -49,6 +50,8 @@ def copy_elastic():
     # create a new snapshot with the computed id
     local('curl -f -XPUT \'%s\' -d \'{ "indices": "lagen"}\'' % snapshot_url)
 
+#    snapshot_id = "180619-230802"
+#    local_doccount = '  "count" : 3607700,'
     # rsync /tmp/elasticsearch/snapshots from local to target (must be
     # same locally and on target)
     snapshotdir = "/tmp/elasticsearch/snapshot/lagen/"
@@ -69,9 +72,7 @@ def copy_elastic():
     remote_doccount = run("curl -s http://localhost:9200/lagen/_count?pretty=true|grep count")
     assert local_doccount == remote_doccount
 
-
-# run from i7 with fab -H colo.tomtebo.org -f tools/fabfile.py copy_elastic
-@hosts('colo.tomtebo.org')
+# run from nate with fab -H colo.tomtebo.org -f tools/fabfile.py copy_elastic
 def copy_files():
     # NOTE: This includes themes etc in data/rsrc
     rsync_project(local_dir="/home/staffan/wds/ferenda/tng.lagen.nu/data/",
@@ -92,7 +93,7 @@ def git_pull():
 
 def upload_rdf():
     with cd("~/www/ferenda.lagen.nu"):
-        run("~/.virtualenvs/lagen.nu/bin/python ./ferenda-build.py all relate --all --upload")
+        run("~/.virtualenvs/frnd35/bin/python ./ferenda-build.py all relate --all --upload")
 
 @hosts('colo.tomtebo.org')
 def deploy():

@@ -21307,7 +21307,7 @@
     ("prop", "1917:88"): "metadataonly",
     ("prop", "1916:207"): "metadataonly",
     ("prop", "1915:173"): "metadataonly",
-    ("prop", "1915:83"): "metadataonly",
+    # ("prop", "1915:83"): "metadataonly",  # AvtL prop
     ("prop", "1914:b285"): "metadataonly",
     ("prop", "1914:b284"): "metadataonly",
     ("prop", "1914:b283"): "metadataonly",
