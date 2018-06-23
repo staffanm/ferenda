@@ -323,6 +323,11 @@ class SOUKB(Offtryck, PDFDocumentRepository):
         metadata = unicodedata.normalize("NFC", metadata)
         sourcegraph = Graph().parse(data=metadata)
         rooturi = sourcegraph.value(predicate=RDF.type, object=BIBO.Book)
+        if rooturi is None:
+            # then just try to identify the main uri and use that 
+            subjects = set(sourcegraph.subjects())
+            if len(subjects) == 1:
+                rooturi = next(iter(subjects))
         title = sourcegraph.value(subject=rooturi, predicate=DC.title)
         issued = sourcegraph.value(subject=rooturi, predicate=DC.date)
         if isinstance(issued, str):

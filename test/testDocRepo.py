@@ -468,16 +468,17 @@ class Repo(RepoTester):
                                          "example")
             mock_get.reset_mock()
 
-            # test9: ConnectionError
+            # test9: ConnectionError -- this should raise an exception to the caller
             mock_get.side_effect = requests.exceptions.ConnectionError
-            with silence():
-                self.assertFalse(d.download_if_needed("http://example.org/document",
-                                                      "example",
-                                                      sleep=0))
+            with self.assertRaises(requests.exceptions.ConnectionError):
+                with silence():
+                    self.assertFalse(d.download_if_needed("http://example.org/document",
+                                                          "example",
+                                                          sleep=0))
             self.assertEqual(mock_get.call_count, 5)
             mock_get.reset_mock()
 
-            # test10: RequestException
+            # test10: RequestException -- this should also raise an exception to the caller
             mock_get.side_effect = requests.exceptions.RequestException
             with self.assertRaises(requests.exceptions.RequestException):
                 with silence():

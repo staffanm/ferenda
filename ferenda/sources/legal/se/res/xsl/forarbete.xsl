@@ -14,8 +14,11 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
 		xmlns:rpubl="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
 		xmlns:ext="http://exslt.org/common"
+		xmlns:str="http://exslt.org/strings"
+		extension-element-prefixes="str"
 		exclude-result-prefixes="xhtml rdf rdfs prov bibo rpubl ext">
   <xsl:include href="base.xsl"/>
+  <xsl:include href="metadata-only.xsl"/>
 
   <!-- Implementations of templates called by base.xsl -->
   <xsl:template name="headtitle"><xsl:value-of select="//xhtml:title"/> | <xsl:value-of select="$configuration/sitename"/></xsl:template>
@@ -271,7 +274,32 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
     </xsl:call-template>
   </xsl:template>
 
-
+  <xsl:template match="xhtml:div[@class='metadata-only']">
+    <xsl:variable name="about" select="//xhtml:body/@about"/>
+    <xsl:variable name="generator" select="//xhtml:meta[@property='prov:wasGeneratedBy']/@content"/>
+    <xsl:variable name="repo" select="str:tokenize($about, '/')[3]"/>
+    <xsl:variable name="subrepo" select="translate(str:tokenize($generator, '.')[last()], 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')"/>
+    <!-- FIXME: this gives incorrect results for uris like http://lagen.nu/prop/2017/18:42 -->
+    <xsl:variable name="basefile" select="str:tokenize($about, '/')[last()]"/>
+    <!--
+    <p>
+      about: <xsl:value-of select="$about"/><br/>
+      repo: <xsl:value-of select="$repo"/><br/>
+      subrepo: <xsl:value-of select="$subrepo"/><br/>
+      basefile: <xsl:value-of select="$basefile"/><br/>
+    </p>
+    -->
+    <div class="row">
+      <section class="col-sm-8">
+	<xsl:call-template name="metadata-only">
+	  <xsl:with-param name="repo" select="'sou'"/>
+	  <xsl:with-param name="subrepo" select="'soukb'"/>
+	  <xsl:with-param name="basefile" select="'1922:9'"/>
+	</xsl:call-template>
+      </section>
+    </div>
+  </xsl:template>
+  
   <!-- remove these empty elements (often <i/> or <span/> tags) -->
   <xsl:template match="xhtml:span|xhtml:i[not(string())]">
   </xsl:template>

@@ -213,7 +213,8 @@ class RequestHandler(object):
             # asks for that. Yep, that's a big FIXME.
             available = ("text/html")  # add to this?
             preferred = httpheader.acceptable_content_type(accept,
-                                                           available)
+                                                           available,
+                                                           ignore_wildcard=False)
         contenttype = None
         if accept != "text/html" and accept in self._mimemap:
             contenttype = accept
@@ -396,9 +397,12 @@ class RequestHandler(object):
     def prep_request(self, environ, path, data, contenttype):
         if path and os.path.exists(path):
             status = 200
-            # FIXME: This is a horrible hack
+            # FIXME: These are not terribly well designed flow control
+            # mechanisms
             if path.endswith("page_error.png"):
                 status = 500
+            elif path.endswith(".404"):
+                status = 404
             fp = open(path, 'rb')
             return (fp,
                     os.path.getsize(path),

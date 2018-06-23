@@ -132,7 +132,14 @@ class SwedishLegalHandler(RequestHandler):
             basefile = self.repo.basefile_from_uri(request_uri)
             assert basefile, "Cannot derive basefile from %s" % request_uri
             entrypath = self.repo.store.documententry_path(basefile)
-            if os.path.exists(entrypath):
+            if os.path.exists(path+".404"):
+                # we have the document, but it contains no actual data
+                # (it might contain links to source data on the
+                # remote/upstream server though) -- serve the page,
+                # but make sure that status is 404
+                return super(SwedishLegalHandler, self).prep_request(environ, path+".404", data, contenttype)
+                
+            elif os.path.exists(entrypath):
                 # We have the resource but cannot for some reason
                 # serve it -- return 500
                 entry = DocumentEntry(entrypath)
@@ -592,14 +599,10 @@ class SwedishLegalSource(DocumentRepository):
         if resource.value(DCTERMS.title):
             doc.lang = resource.value(DCTERMS.title).language
         if options == "metadataonly":
-            # FIXME: It'd be nice (and probably not incorrect) if
-            # these special placeholder documents could be sent with
-            # status code 404, not 200, since the actual document is
-            # in fact not found.
-            doc.body = Body([PreambleSection([
-                P(["Detta dokument har bedömts ha begränsad juridisk betydelse, så dess innehåll har inte tagits med här. Du kan hitta originaldokumentet från dess källa genom länken till höger."]),
-                P(["Om du tycker att dokumentet bör tas med, ", A(["hör gärna av dig!"], href="/om/kontakt")])
-            ], title='Dokumenttext saknas')])
+            # any div with a metadata-only class should be transformed
+            # (through metdata-only.xsl) to a page explaining why the
+            # document content is missing.
+            doc.body = Body([Div(**{'class': 'metadata-only'})])
         else:
             doc.body = self.parse_body(fp, doc.basefile)
         if not fp.closed:
@@ -1309,6 +1312,15 @@ class SwedishLegalSource(DocumentRepository):
         #     v = "%s, %s" % (v, resourceuri.split("#", 1)[1])
         return v
 
+    def generate(self, basefile, otherrepos=[]):
+        ret = super(SwedishLegalSource, self).generate(basefile, otherrepos)
+        if self.get_parse_options(basefile) == "metadataonly":
+            # Do a little magic to ensure wsgiapp.py serves this file
+            # with status code 404 instead of 200
+            os.rename(self.store.generated_path(basefile),
+                      self.store.generated_path(basefile) + ".404")
+        return ret
+    
     def facets(self):
         return super(SwedishLegalSource, self).facets() + self.standardfacets
 

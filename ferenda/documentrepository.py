@@ -986,7 +986,6 @@ with the *config* object as single parameter.
             filename = self.download_name_file(tmpfile,
                                                basefile,
                                                assumedfilename)
-
         if not os.path.exists(filename):
             util.robust_rename(tmpfile, filename)
             updated = True
