@@ -98,6 +98,8 @@ class WSGIApp(object):
             elif (path.startswith(self.config.apiendpoint) or
                   (self.config.legacyapi and path.startswith("/-/publ"))):
                 return self.api(environ, start_response)
+            elif ('stream' in qs):
+                return self.stream(environ, start_response)
             else:
                 return self.static(environ, start_response)
         except Exception:
@@ -248,6 +250,46 @@ class WSGIApp(object):
                 iterdata = self._transform("404 Not found", msgbody, environ)
                 status = "404 Not Found"
                 length = None
+        return self._return_response(iterdata, start_response, status, mimetype, length)
+
+    def stream(self, environ, start_response):
+        """WSGI method, called by the wsgi app for requests that indicate the
+        need for a streaming response."""
+
+        path = environ['PATH_INFO']
+        if not isinstance(path, str):
+            path = path.decode("utf-8")
+        fullpath = self.config.documentroot + path
+        # we start by asking all repos "do you handle this path"?
+        # default impl is to say yes if 1st seg == self.alias and the
+        # rest can be treated as basefile yielding a existing
+        # generated file.  a yes answer contains a FileWrapper around
+        # the repo-selected file and optionally length (but not
+        # status, always 200, or mimetype, always text/html). None
+        # means no.
+        fp = None
+        reasons = OrderedDict()
+        if not((path.startswith("/rsrc") or
+                path == "/robots.txt")
+               and os.path.exists(fullpath)):
+            for repo in self.repos:
+                supports = repo.requesthandler.supports(environ)
+                if supports:
+                    return repo.requesthandler.stream(environ, start_response)
+                elif hasattr(supports, 'reason'):
+                    reasons[repo.alias] = supports.reason
+                else:
+                    reasons[repo.alias] = '(unknown reason)'
+        # if we reach this, no repo handled the path
+        mimetype = "text/html"
+        reasonmsg = "\n".join(["%s: %s" % (k, reasons[k]) for k in reasons])
+        msgbody = html.Body([html.H1("Document not found"),
+                             html.P(["The path %s was not found at %s" % (path, fullpath)]),
+                             html.P(["Examined %s repos" % (len(self.repos))]),
+                             html.Pre([reasonmsg])])
+        iterdata = self._transform("404 Not found", msgbody, environ)
+        status = "404 Not Found"
+        length = None
         return self._return_response(iterdata, start_response, status, mimetype, length)
 
 

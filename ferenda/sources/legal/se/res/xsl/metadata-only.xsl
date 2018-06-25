@@ -9,12 +9,12 @@
       <p>Detta dokument har bedömts ha begränsad juridisk betydelse, så dess innehåll har inte tagits med här. Du kan hitta originaldokumentet från dess källa genom länken till höger.</p>
       <p>Om du tycker att dokumentet är relevant kan ange varför, och klicka på nedanstående knapp för att importera det till tjänsten (OBS: Detta kan ta flera minuter för stora dokument).</p>
       <form action="/devel/change-parse-options" method="POST">
-	<input type="hidden" id="repo" value="{$repo}"/> 
-	<input type="hidden" id="subrepo" value="{$subrepo}"/> 
-	<input type="hidden" id="basefile" value="{$basefile}"/>
-	<input type="hidden" id="value" value="default"/>
+	<input type="hidden" name="repo" value="{$repo}"/> 
+	<input type="hidden" name="subrepo" value="{$subrepo}"/> 
+	<input type="hidden" name="basefile" value="{$basefile}"/>
+	<input type="hidden" name="newvalue" value="default"/>
 	<div class="form-group">
-	  <input type="text" id="reason" class="form-control" placeholder="Beskriv varför dokumentet bör tas med..."/>
+	  <input type="text" name="reason" class="form-control" placeholder="Beskriv varför dokumentet bör tas med..."/>
 	</div>
 	<input type="submit" class="btn btn-default" value="Importera dokument"/>
       </form>

@@ -8,16 +8,20 @@ from ast import literal_eval
 from bz2 import BZ2File
 from collections import OrderedDict, defaultdict
 from difflib import unified_diff
+from datetime import datetime
 from itertools import islice
 from io import BytesIO, StringIO
 from tempfile import mkstemp
+from time import sleep
 from operator import attrgetter
 import codecs
+import fileinput
 import inspect
 import json
 import logging
 import os
 import random
+import re
 import shutil
 import sys
 import traceback
@@ -36,7 +40,7 @@ from ferenda import (TextReader, TripleStore, FulltextIndex, WSGIApp,
                      CompositeRepository, DocumentEntry, Transformer,
                      RequestHandler, ResourceLoader)
 from ferenda.elements import serialize
-from ferenda.elements.html import Body, P, H1, H2, Form, Textarea, Input, Label, Button, Textarea, Br, Div, A, Pre
+from ferenda.elements.html import Body, P, H1, H2, Form, Textarea, Input, Label, Button, Textarea, Br, Div, A, Pre, Code
 from ferenda import decorators, util
 
 class DummyStore(object):
@@ -66,6 +70,19 @@ class DevelHandler(RequestHandler):
             length = len(res)
             fp = BytesIO(res)
             return fp, length, 200, "text/html"
+        elif segments[1] == "change-parse-options":
+            # FIXME: Change code duplication (once we get our third
+            # thing for devel to handle)
+            if environ['REQUEST_METHOD'] == 'POST':
+                reqbody = environ['wsgi.input'].read(int(environ.get('CONTENT_LENGTH', 0)))
+                params = dict(parse_qsl(reqbody.decode("utf-8")))
+            else:
+                params = dict(parse_qsl(environ['QUERY_STRING']))
+            body = self.handle_change_parse_options(environ, params)
+            res = self._render("change-parse-options", body, request_uri(environ), self.repo.config)
+            length = len(res)
+            fp = BytesIO(res)
+            return fp, length, 200, "text/html"
         else:
             raise ValueError("DevelHandler can't handle path %s" % environ['PATH_INFO'])
 
@@ -91,6 +108,64 @@ class DevelHandler(RequestHandler):
         tree = transformer.transform(xhtml, depth,
                                      uritransform=urltransform)
         return etree.tostring(tree, encoding="utf-8")
+
+    def stream(self, environ, start_response):
+        # right now we have only a single method that requires
+        # streaming, so we don't try to differentiate
+        return self.handle_change_parse_options_stream(environ, start_response)
+
+    def handle_change_parse_options(self, environ, params):
+        assert params
+        assert environ['REQUEST_METHOD'] == 'POST'
+        repo = params['repo']
+        basefile = params['basefile']
+        newvalue = params['newvalue']
+        reason = params['reason']
+        inst = self.repo._repo_from_alias(repo)
+        optionsfile = inst.resourceloader.filename("options/options.py")
+        want = '("%s", "%s"):' % (repo, basefile)
+        lineidx = None
+        out = ""
+        with open(optionsfile) as f:
+            for idx, line in enumerate(f):
+                if want in line:
+                    lineidx = idx
+                    currentvalue = re.search(': "([^"]+)",', line).group(1)
+                    line = line.replace(currentvalue, newvalue)
+                    line = line.rstrip() + " # " + reason + "\n"
+                out += line
+        util.writefile(optionsfile, out)
+        if lineidx:
+            res = [H2(["Changing options for %s in repo %s" % (basefile, repo)]),
+                   P(["Changed option at line %s from " % lineidx,
+                      Code([currentvalue]),
+                      " to ",
+                      Code([newvalue])]),
+                   P(["Now downloading and processing (please be patient...)"]),
+                   Pre(**{'class': 'pre-scrollable',
+                          'id': 'output'})]
+        else:
+            res = [H2(["Couldn't change options for %s in repo %s" % (basefile, repo)]),
+                   P(["Didn't manage to find a line matching ",
+                      Code([want]),
+                      " in ",
+                      Code([optionsfile])])]
+        return Body([
+            Div(res)
+            ])
+        
+    def handle_change_parse_options_stream(self, environ, start_response):
+        # this should output a streaming plaintext log from calling
+        # subrepo.download(), repo.parse(), repo.relate() and
+        # repo.generate() in turn
+        start_response('200 OK', [('Content-Type', 'text/plain')])
+        def stream():
+            for i in range(10):
+                line = '%s: %s\n' % (i, datetime.now().isoformat())
+                yield(line.encode("utf-8"))
+                sleep(1)
+        return stream()
+        
 
     def handle_patch(self, environ, params):
         def open_intermed_text(repo, basefile, mode="rb"):
