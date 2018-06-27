@@ -7,7 +7,7 @@
     <div class="metadata-only">
       <h2>Dokumenttext saknas</h2>
       <p>Detta dokument har bedömts ha begränsad juridisk betydelse, så dess innehåll har inte tagits med här. Du kan hitta originaldokumentet från dess källa genom länken till höger.</p>
-      <p>Om du tycker att dokumentet är relevant kan ange varför, och klicka på nedanstående knapp för att importera det till tjänsten (OBS: Detta kan ta flera minuter för stora dokument).</p>
+      <p>Om du tycker att dokumentet är relevant kan du ange varför, och klicka på nedanstående knapp för att importera det till tjänsten (OBS: Detta kan ta flera minuter för stora dokument).</p>
       <form action="/devel/change-parse-options" method="POST">
 	<input type="hidden" name="repo" value="{$repo}"/> 
 	<input type="hidden" name="subrepo" value="{$subrepo}"/> 

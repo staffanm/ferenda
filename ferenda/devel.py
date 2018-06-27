@@ -135,6 +135,9 @@ class DevelHandler(RequestHandler):
                     line = line.rstrip() + " # " + reason + "\n"
                 out += line
         util.writefile(optionsfile, out)
+        # now we must invalidate the cached property
+        if 'parse_options' in inst.__dict__:
+            del inst.__dict__['parse_options']
         if lineidx:
             res = [H2(["Changing options for %s in repo %s" % (basefile, repo)]),
                    P(["Changed option at line %s from " % lineidx,
@@ -153,19 +156,55 @@ class DevelHandler(RequestHandler):
         return Body([
             Div(res)
             ])
-        
+
     def handle_change_parse_options_stream(self, environ, start_response):
-        # this should output a streaming plaintext log from calling
-        # subrepo.download(), repo.parse(), repo.relate() and
-        # repo.generate() in turn
-        start_response('200 OK', [('Content-Type', 'text/plain')])
-        def stream():
-            for i in range(10):
-                line = '%s: %s\n' % (i, datetime.now().isoformat())
-                yield(line.encode("utf-8"))
-                sleep(1)
-        return stream()
-        
+        class WSGIOutputHandler(logging.Handler):
+            def __init__(self, writer):
+                self.writer = writer
+                super(WSGIOutputHandler, self).__init__()
+
+            def emit(self, record):
+                entry = self.format(record) + "\n"
+                self.writer(entry.encode("utf-8"))
+
+        writer = start_response('200 OK', [('Content-Type', 'text/plain')])
+        wsgihandler = WSGIOutputHandler(writer)
+        wsgihandler.setFormatter(
+            logging.Formatter("%(asctime)s %(levelname)s %(message)s",
+                 datefmt="%H:%M:%S"))
+        rootlogger = logging.getLogger()
+        rootlogger.setLevel(logging.DEBUG)
+        for handler in rootlogger.handlers:
+            rootlogger.removeHandler(handler)
+            
+        logging.getLogger().addHandler(wsgihandler)
+        # now do the work
+        params = dict(parse_qsl(environ['QUERY_STRING']))
+        repoconfig = getattr(self.repo.config._parent, params['repo'])
+        repoconfig.loglevel = "DEBUG"
+        repo = self.repo._repo_from_alias(params['repo'], repoconfig=repoconfig)
+        if 'subrepo' in params:
+            subrepoconfig = getattr(self.repo.config._parent, params['subrepo'])
+            subrepoconfig.loglevel = "DEBUG"
+            subrepo = self.repo._repo_from_alias(params['subrepo'], repoconfig=subrepoconfig)
+        else:
+            subrepo = repo
+        basefile = params['basefile']
+        try:
+            rootlogger.info("Downloading %s" % basefile)
+            subrepo.download(basefile)
+            rootlogger.info("Parsing %s" % basefile)
+            repo.parse(basefile)
+            rootlogger.info("Relating %s" % basefile)
+            repo.relate(basefile)
+            rootlogger.info("Generating %s" % basefile)
+            repo.generate(basefile)
+        except Exception as e:
+            msg = str(e) + "\n"
+            writer(msg.encode("utf-8"))
+        # ok we're done
+        wsgihandler.close()  
+        return []
 
     def handle_patch(self, environ, params):
         def open_intermed_text(repo, basefile, mode="rb"):
@@ -481,9 +520,9 @@ class Devel(object):
 
     def _repo_from_alias(self, alias, datadir=None, repoconfig=None):
         #  (FIXME: This uses several undocumented APIs)
+        mainconfig = self.config._parent
+        assert mainconfig is not None, "Devel must be initialized with a full set of configuration"
         if repoconfig is None:
-            mainconfig = self.config._parent
-            assert mainconfig is not None, "Devel must be initialized with a full set of configuration"
             repoconfig = getattr(mainconfig, alias)
         from ferenda import manager
         repocls = manager._load_class(getattr(repoconfig, 'class'))
