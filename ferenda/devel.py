@@ -110,14 +110,19 @@ class DevelHandler(RequestHandler):
         return etree.tostring(tree, encoding="utf-8")
 
     def stream(self, environ, start_response):
-        # right now we have only a single method that requires
-        # streaming, so we don't try to differentiate
+        # right now we have only a single method that
+        # requires/supports streaming response, so we don't examine
+        # the request to find out which method to call. 
         return self.handle_change_parse_options_stream(environ, start_response)
 
     def handle_change_parse_options(self, environ, params):
+        # this method changes the options and creates a response page
+        # that, in turn, does an ajax request that ends up calling
+        # handle_change_parse_options_stream
         assert params
         assert environ['REQUEST_METHOD'] == 'POST'
         repo = params['repo']
+        subrepo = params['repo']
         basefile = params['basefile']
         newvalue = params['newvalue']
         reason = params['reason']
@@ -139,6 +144,11 @@ class DevelHandler(RequestHandler):
         if 'parse_options' in inst.__dict__:
             del inst.__dict__['parse_options']
         if lineidx:
+            datasrc = "%s?repo=%s&subrepo=%s&basefile=%s&stream=true" % (
+                request_uri(environ),
+                repo,
+                subrepo,
+                basefile)
             res = [H2(["Changing options for %s in repo %s" % (basefile, repo)]),
                    P(["Changed option at line %s from " % lineidx,
                       Code([currentvalue]),
@@ -146,7 +156,8 @@ class DevelHandler(RequestHandler):
                       Code([newvalue])]),
                    P(["Now downloading and processing (please be patient...)"]),
                    Pre(**{'class': 'pre-scrollable',
-                          'id': 'output'})]
+                          'id': 'streaming-log-output',
+                          'src': datasrc})]
         else:
             res = [H2(["Couldn't change options for %s in repo %s" % (basefile, repo)]),
                    P(["Didn't manage to find a line matching ",
@@ -176,7 +187,6 @@ class DevelHandler(RequestHandler):
         rootlogger.setLevel(logging.DEBUG)
         for handler in rootlogger.handlers:
             rootlogger.removeHandler(handler)
-            
         logging.getLogger().addHandler(wsgihandler)
         # now do the work
         params = dict(parse_qsl(environ['QUERY_STRING']))
@@ -192,18 +202,24 @@ class DevelHandler(RequestHandler):
         basefile = params['basefile']
         try:
             rootlogger.info("Downloading %s" % basefile)
-            subrepo.download(basefile)
+            # subrepo.download(basefile)
+            sleep(1)
             rootlogger.info("Parsing %s" % basefile)
-            repo.parse(basefile)
+            # repo.parse(basefile)
+            sleep(1)
             rootlogger.info("Relating %s" % basefile)
-            repo.relate(basefile)
+            # repo.relate(basefile)
+            sleep(1)
             rootlogger.info("Generating %s" % basefile)
-            repo.generate(basefile)
+            # repo.generate(basefile)
+            sleep(1)
         except Exception as e:
             msg = str(e) + "\n"
             writer(msg.encode("utf-8"))
-        # ok we're done
-        wsgihandler.close()  
+        finally:
+            # ok we're done
+            wsgihandler.close()
+            rootlogger.removeHandler(wsgihandler)
         return []
 
     def handle_patch(self, environ, params):

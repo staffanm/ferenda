@@ -156,7 +156,7 @@ class RequestHandler(object):
         
     def handle(self, environ):
         """provides a response to a particular request by returning a a tuple
-        *(fp, length, memtype)*, where *fp* is an open file of the
+        *(fp, length, status, mimetype)*, where *fp* is an open file of the
         document to be returned.
 
         """

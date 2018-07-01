@@ -122,6 +122,34 @@ $(document).ready(function () {
   $('.navbar-form .typeahead').bind('typeahead:select', function(ev, suggestion) {
      window.location.href=suggestion.url
   });
+
+  /* Functionality to show streaming logs for long-running commands */
+  /* old vanilla-JS implementation
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'http://localhost:8000/devel/change-parse-options?basefile=1922:9&repo=sou&subrepo=soukb&stream=true');
+    xhr.send();
+    setInterval(function() {
+        output.textContent = xhr.responseText;
+    }, 500);
+    */
+
+  output = $('#streaming-log-output');
+  if (output) {
+    console.log("Setting up ajax call to stream log output")
+    connection = $.ajax({
+      cache: false,
+      dataType: 'text',
+      url: output.attr('src')
+    });
+    connection.done(function(data) {
+        console.log('Complete response = ' + data);
+    });
+    /* it seems we have to poll, setting a event handler on the onprogress event only fires when everything has been recieved */
+    setInterval(function() {
+        output.textContent = connection.responseText;
+    }, 500);
+
+  }
 })
 
 
