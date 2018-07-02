@@ -52,6 +52,16 @@ class DummyStore(object):
         return []  # pragma: no cover
 
 
+class WSGIOutputHandler(logging.Handler):
+    def __init__(self, writer):
+        self.writer = writer
+        super(WSGIOutputHandler, self).__init__()
+
+    def emit(self, record):
+        entry = self.format(record) + "\n"
+        self.writer(entry.encode("utf-8"))
+
+
 class DevelHandler(RequestHandler):
 
     def supports(self, environ):
@@ -66,10 +76,6 @@ class DevelHandler(RequestHandler):
             else:
                 params = dict(parse_qsl(environ['QUERY_STRING']))
             body = self.handle_patch(environ, params)
-            res = self._render("mkpatch", body, request_uri(environ), self.repo.config)
-            length = len(res)
-            fp = BytesIO(res)
-            return fp, length, 200, "text/html"
         elif segments[1] == "change-parse-options":
             # FIXME: Change code duplication (once we get our third
             # thing for devel to handle)
@@ -79,12 +85,16 @@ class DevelHandler(RequestHandler):
             else:
                 params = dict(parse_qsl(environ['QUERY_STRING']))
             body = self.handle_change_parse_options(environ, params)
-            res = self._render("change-parse-options", body, request_uri(environ), self.repo.config)
-            length = len(res)
-            fp = BytesIO(res)
-            return fp, length, 200, "text/html"
+        elif segments[1] == 'streaming-test':
+            body = self.handle_streaming_test(environ)
         else:
             raise ValueError("DevelHandler can't handle path %s" % environ['PATH_INFO'])
+        
+        res = self._render(segments[1], body, request_uri(environ), self.repo.config)
+        length = len(res)
+        fp = BytesIO(res)
+        return fp, length, 200, "text/html"
+
 
     def _render(self, title, body, uri, config, template="xsl/generic.xsl"):
         repo = DocumentRepository(config=config)
@@ -110,10 +120,51 @@ class DevelHandler(RequestHandler):
         return etree.tostring(tree, encoding="utf-8")
 
     def stream(self, environ, start_response):
-        # right now we have only a single method that
-        # requires/supports streaming response, so we don't examine
-        # the request to find out which method to call. 
-        return self.handle_change_parse_options_stream(environ, start_response)
+        if environ['PATH_INFO'].endswith('change-parse-options'):
+            return self.handle_change_parse_options_stream(environ, start_response)
+        elif environ['PATH_INFO'].endswith('streaming-test'):
+            return self.handle_streaming_test_stream(environ, start_response)
+        else:
+            start_response('500 Server error', [('Content-Type', 'text/plain')])
+            return ['No streaming handler registered for PATH_INFO %s' % environ['PATH_INFO']]
+
+
+    def _setup_streaming_logger(self, writer):
+        wsgihandler = WSGIOutputHandler(writer)
+        wsgihandler.setFormatter(
+            logging.Formatter("%(asctime)s %(levelname)s %(message)s",
+                 datefmt="%H:%M:%S"))
+        rootlogger = logging.getLogger()
+        rootlogger.setLevel(logging.DEBUG)
+        for handler in rootlogger.handlers:
+            rootlogger.removeHandler(handler)
+        logging.getLogger().addHandler(wsgihandler)
+        return rootlogger
+        
+    def _shutdown_streaming_logger(self, rootlogger):
+        for h in list(rootlogger.handlers):
+            if isinstance(h, WSGIOutputHandler):
+                h.close()
+                rootlogger.removeHandler(h)
+
+    def handle_streaming_test(self, environ):
+        return Body([
+            Div([H2(["Streaming test"]),
+                 Pre(**{'class': 'pre-scrollable',
+                        'id': 'streaming-log-output',
+                        'src': request_uri(environ) + "?stream=true"})])])
+
+    def handle_streaming_test_stream(self, environ, start_response):
+        writer = start_response('200 OK', [('Content-Type', 'text/plain')])
+        rootlogger = self._setup_streaming_logger(writer)
+        log = logging.getLogger(__name__)
+        log.debug("Debug messages should work")
+        sleep(1)
+        log.info("Info messages should work")
+        sleep(1)
+        log.warning("Warnings should, unsurprisingly, work")
+        self._shutdown_streaming_logger(rootlogger)
+        return []
 
     def handle_change_parse_options(self, environ, params):
         # this method changes the options and creates a response page
@@ -169,25 +220,8 @@ class DevelHandler(RequestHandler):
             ])
 
     def handle_change_parse_options_stream(self, environ, start_response):
-        class WSGIOutputHandler(logging.Handler):
-            def __init__(self, writer):
-                self.writer = writer
-                super(WSGIOutputHandler, self).__init__()
-
-            def emit(self, record):
-                entry = self.format(record) + "\n"
-                self.writer(entry.encode("utf-8"))
-
         writer = start_response('200 OK', [('Content-Type', 'text/plain')])
-        wsgihandler = WSGIOutputHandler(writer)
-        wsgihandler.setFormatter(
-            logging.Formatter("%(asctime)s %(levelname)s %(message)s",
-                 datefmt="%H:%M:%S"))
-        rootlogger = logging.getLogger()
-        rootlogger.setLevel(logging.DEBUG)
-        for handler in rootlogger.handlers:
-            rootlogger.removeHandler(handler)
-        logging.getLogger().addHandler(wsgihandler)
+        rootlogger = self._setup_streaming_logger(writer)
         # now do the work
         params = dict(parse_qsl(environ['QUERY_STRING']))
         repoconfig = getattr(self.repo.config._parent, params['repo'])
@@ -217,9 +251,8 @@ class DevelHandler(RequestHandler):
             msg = str(e) + "\n"
             writer(msg.encode("utf-8"))
         finally:
+            self._shutdown_streaming_logger(rootlogger)
             # ok we're done
-            wsgihandler.close()
-            rootlogger.removeHandler(wsgihandler)
         return []
 
     def handle_patch(self, environ, params):
