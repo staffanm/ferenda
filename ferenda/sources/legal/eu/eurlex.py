@@ -95,7 +95,7 @@ class EURLex(DocumentRepository):
         # this is the only soap template we'll need, so we include it
         # verbatim to avoid having a dependency on a soap module like
         # zeep.
-        endpoint = 'http://eur-lex.europa.eu/EURLexWebService'
+        endpoint = 'https://eur-lex.europa.eu/EURLexWebService'
         envelope = """<soap-env:Envelope xmlns:soap-env="http://www.w3.org/2003/05/soap-envelope">
   <soap-env:Header>
     <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
