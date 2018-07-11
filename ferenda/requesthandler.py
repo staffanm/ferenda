@@ -151,6 +151,15 @@ class RequestHandler(object):
         rawuri = request_uri(environ)
         uri = unquote(rawuri.encode("latin-1").decode("utf-8"))
         if getattr(self.repo.config, 'develurl', None):
+            # in some circumstances, we might want to set develurl to
+            # https://... while the actual uri provided will be
+            # http://... (eg. due to TLS-terminating proxies and other
+            # things), so we change the protocol of the request to
+            # match the protocol as specified by config.develuri
+            uriproto = uri.split("://")[0]
+            develproto = self.repo.config.develurl.split("://")[0]
+            if uriproto != develproto:
+                uri = re.sub("^"+uriproto, develproto, uri)
             uri = uri.replace(self.repo.config.develurl, self.repo.config.url)
         return uri
         
