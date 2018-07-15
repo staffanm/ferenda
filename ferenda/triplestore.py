@@ -332,7 +332,7 @@ class RemoteStore(TripleStore):
 
     _contenttype = {"xml": "application/rdf+xml",
                     "sparql": "application/sparql-results+xml",
-                    "nt": "text/plain",
+                    "nt": "application/n-triples",
                     "ttl": "application/x-turtle",
                     "turtle": "application/x-turtle",
                     "n3": "text/rdf+n3",

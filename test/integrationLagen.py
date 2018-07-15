@@ -216,21 +216,21 @@ class TestConNeg(TestLagen):
         self.assertEqual("application/rdf+xml", res.headers['Content-Type'])
 
     def test_ntriples(self):
-        # transform test 4: accept: text/plain -> RDF statements (in NTriples)
+        # transform test 4: accept: application/n-triples -> RDF statements (in NTriples)
 
         # get the untransformed data to compare with
         g = Graph().parse(data=self.get(self.baseurl + "1998:204.rdf").text)
         res = self.get(self.baseurl + "1998:204",
-                       headers={'Accept': 'text/plain'})
+                       headers={'Accept': 'application/n-triples'})
         self.assertEqual(200, res.status_code)
-        self.assertEqual("text/plain", res.headers['Content-Type'])
+        self.assertEqual("application/n-triples", res.headers['Content-Type'])
         got = Graph().parse(data=res.content, format="nt")
         self.assertEqualGraphs(g, got)
 
         # variation: use file extension
         res = self.get(self.baseurl + "1998:204.nt")
         self.assertEqual(200, res.status_code)
-        self.assertEqual("text/plain", res.headers['Content-Type'])
+        self.assertEqual("application/n-triples", res.headers['Content-Type'])
         got = Graph()
         got.parse(data=res.content, format="nt")
         self.assertEqualGraphs(g, got)
@@ -294,19 +294,19 @@ class TestConNeg(TestLagen):
         self.assertEqualGraphs(g, got)
 
     def test_extended_ntriples(self):
-        # extended test 7: accept: "/data" + "text/plain" -> extended
+        # extended test 7: accept: "/data" + "application/n-triples" -> extended
         # RDF statements in NTriples
         g = Graph().parse(data=self.get(self.baseurl + "1998:204/data.rdf").text)
         res = self.get(self.baseurl + "1998:204/data",
-                     headers={'Accept': 'text/plain'})
+                     headers={'Accept': 'application/n-triples'})
         self.assertEqual(200, res.status_code)
-        self.assertEqual("text/plain", res.headers['Content-Type'])
+        self.assertEqual("application/n-triples", res.headers['Content-Type'])
         got = Graph().parse(data=res.text, format="nt")
         self.assertEqualGraphs(g, got)
         # variation: use file extension
         res = self.get(self.baseurl + "1998:204/data.nt")
         self.assertEqual(200, res.status_code)
-        self.assertEqual("text/plain", res.headers['Content-Type'])
+        self.assertEqual("application/n-triples", res.headers['Content-Type'])
         got = Graph().parse(data=res.text, format="nt")
         self.assertEqualGraphs(g, got)
 
@@ -340,13 +340,13 @@ class TestConNeg(TestLagen):
 
     def test_dataset_ntriples(self):
         res = self.get(self.baseurl  + "dataset/sitenews",
-                       headers={'Accept': 'text/plain'})
+                       headers={'Accept': 'application/n-triples'})
         self.assertTrue(res.status_code, 200)
-        self.assertEqual("text/plain", res.headers['Content-Type'])
+        self.assertEqual("application/n-triples", res.headers['Content-Type'])
         Graph().parse(data=res.text, format="nt")
         res = self.get(self.baseurl  + "dataset/sitenews.nt")
         self.assertTrue(res.status_code, 200)
-        self.assertEqual("text/plain", res.headers['Content-Type'])
+        self.assertEqual("application/n-triples", res.headers['Content-Type'])
         Graph().parse(data=res.text, format="nt")
 
     def test_dataset_turtle(self):
@@ -424,7 +424,7 @@ class TestSearch(TestLagen):
         
     def test_basic_search(self):
         # assert that left nav contains a number of results with at least x hits
-        res = self.get(self.baseurl + "search/?q=personuppgift")
+        res = self.get(self.baseurl + "search/?q=personuppgift", raise_for_status=True)
         soup = BeautifulSoup(res.text, "lxml")
         self.assertGreaterEqual(self.totalhits(soup), 14)
         nav = soup.find("nav", id="toc")
@@ -442,8 +442,8 @@ class TestSearch(TestLagen):
             self.assertGreaterEqual(hits, minhits, "Expected more hits for %s" % repo)
 
     def test_faceted_search(self):
-        totalhits = self.totalhits(BeautifulSoup(self.get(
-            self.baseurl + "search/?q=personuppgift").text, "lxml"))
+        res = self.get(self.baseurl + "search/?q=personuppgift", raise_for_status=True)
+        totalhits = self.totalhits(BeautifulSoup(res.text, "lxml"))
         soup = BeautifulSoup(self.get(self.baseurl + "search/?q=personuppgift&type=dv").text,
                              "lxml")
         self.assertLess(self.totalhits(soup), totalhits)

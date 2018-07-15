@@ -26,7 +26,7 @@ class RequestHandler(object):
                      'atom': 'application/atom+xml'}
     _rdfformats = {'application/rdf+xml': 'pretty-xml',
                    'text/turtle': 'turtle',
-                   'text/plain': 'nt',
+                   'application/n-triples': 'nt',
                    'application/json': 'json-ld'}
     _revformats = dict([(v, k) for k, v in _rdfformats.items()])
     _rdfsuffixes = {'rdf': 'pretty-xml',
@@ -339,7 +339,7 @@ class RequestHandler(object):
             else:
                 pseudobasefile = "toc/index.html"
             return partial(self.repo.store.resourcepath, pseudobasefile)
-        elif contenttype == "text/plain" or suffix == "nt":
+        elif contenttype == "application/n-triples" or suffix == "nt":
             return partial(self.repo.store.resourcepath, "distilled/dump.nt")
         
 
@@ -389,7 +389,7 @@ class RequestHandler(object):
             else:
                 pseudobasefile = "toc/index.html"
             path = self.repo.store.resourcepath(pseudobasefile)
-        elif contenttype == "text/plain" or suffix == "nt":
+        elif contenttype == "application/n-triples" or suffix == "nt":
             path = self.repo.store.resourcepath("distilled/dump.nt")
         elif contenttype in self._rdfformats or suffix in self._rdfsuffixes:
             g = Graph()

@@ -69,14 +69,14 @@ class Main(unittest.TestCase, FerendaTestCase):
         cmdline = runcmd_mock.call_args[0][0] # first ordered argument
         # replace the temporary file name
         cmdline = re.sub('"@[^"]+"', '"@tempfile.nt"', cmdline)
-        self.assertEqual('curl -X POST --data-binary "@tempfile.nt" --header "Content-Type:text/plain;charset=UTF-8" "//data?default"', cmdline)
+        self.assertEqual('curl -X POST --data-binary "@tempfile.nt" --header "Content-Type:application/n-triples;charset=UTF-8" "//data?default"', cmdline)
         runcmd_mock.mock_reset()
 
         # 2. add_serialized_file
         runcmd_mock.return_value = (0, "", "")
         store.add_serialized_file("tempfile.nt", "nt")
         cmdline = runcmd_mock.call_args[0][0] # first ordered argument
-        self.assertEqual('curl -X POST --data-binary "@tempfile.nt" --header "Content-Type:text/plain;charset=UTF-8" "//data?default"', cmdline)
+        self.assertEqual('curl -X POST --data-binary "@tempfile.nt" --header "Content-Type:application/n-triples;charset=UTF-8" "//data?default"', cmdline)
         runcmd_mock.mock_reset()
 
         # 3. get_serialized
@@ -92,7 +92,7 @@ class Main(unittest.TestCase, FerendaTestCase):
         # replace the temporary file name
         cmdline = re.sub('-o "[^"]+"', '-o "tempfile.nt"', cmdline)
         # FIXME is this really right?
-        self.assertEqual('curl -o "tempfile.nt" --header "Accept:text/plain" "//data?graph=urn:x-arq:UnionGraph"', cmdline)
+        self.assertEqual('curl -o "tempfile.nt" --header "Accept:application/n-triples" "//data?graph=urn:x-arq:UnionGraph"', cmdline)
         runcmd_mock.side_effect = None
         runcmd_mock.mock_reset()
 

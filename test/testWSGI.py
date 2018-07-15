@@ -474,13 +474,13 @@ class ConNeg(WSGI):
         # same byte stream. Therefore, we only compare headers, not
         # content, and follow up with a proper graph comparison
         
-        # transform test 4: accept: text/plain -> RDF statements (in NTriples)
+        # transform test 4: accept: application/n-triples -> RDF statements (in NTriples)
         g = Graph()
         g.parse(source=self.repo.store.distilled_path("123/a"))
-        self.env['HTTP_ACCEPT'] = 'text/plain'
+        self.env['HTTP_ACCEPT'] = 'application/n-triples'
         status, headers, content = self.call_wsgi(self.env)
         want = ["200 OK",
-                {'Content-Type': 'text/plain'},
+                {'Content-Type': 'application/n-triples'},
                 None]
         self.assertResponse(want[0], want[1], want[2],
                             status, headers, None)
@@ -588,16 +588,16 @@ class ConNeg(WSGI):
         self.assertEqualGraphs(g, got)
 
     def test_extended_ntriples(self):
-        # extended test 7: accept: "/data" + "text/plain" -> extended
+        # extended test 7: accept: "/data" + "application/n-triples" -> extended
         # RDF statements in NTriples
         self.env['PATH_INFO'] = self.env['PATH_INFO'] + "/data"       
-        self.env['HTTP_ACCEPT'] = 'text/plain'
+        self.env['HTTP_ACCEPT'] = 'application/n-triples'
         g = Graph()
         g.parse(source=self.repo.store.distilled_path("123/a"))
         g += self.repo.annotation_file_to_graph(self.repo.store.annotation_path("123/a"))
         status, headers, content = self.call_wsgi(self.env)
         want = ["200 OK",
-                 {'Content-Type': 'text/plain'},
+                 {'Content-Type': 'application/n-triples'},
                  None]
         self.assertResponse(want[0], want[1], want[2],
                             status, headers, None)
@@ -660,10 +660,10 @@ class ConNeg(WSGI):
 
     def test_dataset_ntriples(self):
         self.env['PATH_INFO'] = "/dataset/base"
-        self.env['HTTP_ACCEPT'] = 'text/plain'
+        self.env['HTTP_ACCEPT'] = 'application/n-triples'
         status, headers, content = self.call_wsgi(self.env)
         want = ("200 OK",
-                {'Content-Type': 'text/plain'},
+                {'Content-Type': 'application/n-triples'},
                 None)
         self.assertResponse(want[0], want[1], want[2],
                             status, headers, None)

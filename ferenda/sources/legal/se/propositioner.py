@@ -811,7 +811,6 @@ class PropKB(Offtryck, PDFDocumentRepository):
         return res
 
     def extract_body(self, fp, basefile):
-        import pudb; pu.db
         reader = StreamingPDFReader()
         parser = "ocr" if self.config.ocr else "xml"
         intermediate_suffix = ".hocr" if self.config.ocr else ".xml"

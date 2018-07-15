@@ -33,6 +33,7 @@ sfs 1909:53_s.7 # atypical basefile
 sfs 1958:638 # ÄktBP, slightly atypical
 sou 1997:39 # regeringen, multipart
 sou 2004:6
+sou 2016:41
 sou 2017:66
 jo 4171-2011
 jk 2081-03-42
