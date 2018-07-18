@@ -587,15 +587,7 @@ class SwedishLegalSource(DocumentRepository):
         resource = self.parse_metadata(fp, doc.basefile)
         doc.meta = resource.graph
         doc.uri = str(resource.identifier)
-        if orig_uri != doc.uri:
-            newbasefile = self.basefile_from_uri(doc.uri)
-            if newbasefile:
-                # change the basefile we're dealing with. Touch
-                # self.store.parsed_path(basefile) first so we don't
-                # regenerate. 
-                with self.store.open_parsed(doc.basefile, "w"):
-                    pass
-                doc.basefile = newbasefile
+        self._adjust_basefile(doc, orig_uri)
         if resource.value(DCTERMS.title):
             doc.lang = resource.value(DCTERMS.title).language
         if options == "metadataonly":
@@ -612,6 +604,24 @@ class SwedishLegalSource(DocumentRepository):
         # print(doc.meta.serialize(format="turtle").decode("utf-8"))
         return True
 
+    def _adjust_basefile(self, doc, orig_uri):
+        # In some cases, we might discover during parse that we've
+        # gotten the basefile wrong in the download step. If doc.uri
+        # has changed, this is a clear sign of that. Adjust so that we
+        # use the correct basefile going forward (NOTE: This doesn't
+        # work for DV.py, which doesn't set orig_uri to start with,
+        # and for which basefile_from_uri might return wrong results
+        # if generate() hasn't run yet.
+        if orig_uri != doc.uri:
+            newbasefile = self.basefile_from_uri(doc.uri)
+            if newbasefile:
+                # change the basefile we're dealing with. Touch
+                # self.store.parsed_path(basefile) first so we don't
+                # regenerate. 
+                with self.store.open_parsed(doc.basefile, "w"):
+                    pass
+                doc.basefile = newbasefile
+    
     def parse_open(self, basefile, attachment=None):
         """Open the main downloaded file for the given basefile, caching the
         contents to an intermediate representation if applicable (or

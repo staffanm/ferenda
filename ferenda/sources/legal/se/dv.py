@@ -278,7 +278,7 @@ class DV(SwedishLegalSource):
 
     def download(self, basefile=None):
         if basefile is not None:
-            raise ValueException("DV.download cannot process a basefile parameter")
+            raise ValueError("DV.download cannot process a basefile parameter")
         # recurse =~ download everything, which we do if refresh is
         # specified OR if we've never downloaded before
         recurse = False
@@ -374,10 +374,15 @@ class DV(SwedishLegalSource):
         r'([^_]*)_([^_\.]*)_?(\d*)_TABORT_\d+-\d+-\d+_?(\d*)(\.docx?)')
 
     # temporary helper
+    @action
     def process_all_zipfiles(self):
         self.downloadcount = 0
         zippath = self.store.path('', 'downloaded/zips', '')
-        for zipfilename in util.list_dirs(zippath, suffix=".zip"):
+        # Peocess zips in subdirs first (HDO, ADO
+        # etc), then in numerics-only order.
+        mykey = lambda v: (-len(v.split(os.sep)), "".join(c for c in v if c.isnumeric()))
+        zipfiles = sorted(util.list_dirs(zippath, suffix=".zip"), key=mykey)
+        for zipfilename in zipfiles:
             self.log.info("%s: Processing..." % zipfilename)
             self.process_zipfile(zipfilename)
 
@@ -534,6 +539,7 @@ class DV(SwedishLegalSource):
             filetype = WordReader().read(docfile, fp)
         
         soup = BeautifulSoup(util.readfile(intermediatefile), "lxml")
+        os.unlink(intermediatefile) # won't be needed past this point
         if filetype == "docx":
             p_tag = "w:p"
             xmlns = ' xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
@@ -625,6 +631,9 @@ class DV(SwedishLegalSource):
         # There is no publicly available URL where the source document
         # could be fetched.
         return None
+
+    def _adjust_basefile(self, doc, orig_uri):
+        pass # See comments in swedishlegalsource.py 
 
     def parse_open(self, basefile, attachment=None):
         intermediate_path = self.store.intermediate_path(basefile)

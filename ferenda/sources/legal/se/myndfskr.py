@@ -1204,7 +1204,7 @@ class DVFS(MyndFskrBase):
         return self.store.open_downloaded(basefile)
 
     def parse_body(self, fp, basefile):
-        main = self.maintext_from_soup(BeautifulSoup(fp, "lxml"))
+        main = BeautifulSoup(self.maintext_from_soup(BeautifulSoup(fp, "lxml")), "lxml")
         return Body([elements_from_soup(main)],
                     uri=None)
 
@@ -1827,16 +1827,39 @@ class SKVFS(MyndFskrBase):
         else:
             infile = self.store.downloaded_path(basefile)
             soup = BeautifulSoup(util.readfile(infile), "lxml")
+            return TextReader(string=self.maintext_from_soup(soup))
+
+    def main_from_soup(self, soup):
         h = soup.find("h1", id="pageheader")
         body = soup.find("div", "body")
         if body:
-            maintext = body.get_text("\n\n", strip=True)
-            maintext = h.get_text().strip() + "\n\n" + maintext
-            outfile = self.store.path(basefile, 'intermediate', '.txt')
-            util.writefile(outfile, maintext)
-            return TextReader(string=maintext)
+            update = body.find("div", "update")
+            if update:
+                # collapse this div into a single plaintext string
+                # (removing links etc) so that SKVFS identifiers
+                # refered to doesn't get misidentified as the main
+                # identifier for the document
+                new_tag = soup.new_tag("div", **{'class': 'update'})
+                new_tag.string = update.get_text()
+                update.replace_with(new_tag)
+            main = soup.new_tag("div", role="main")
+            main.append(h)
+            main.append(body)
+            return main
         else:
-            raise ParseError("%s: Didn't find a text body element" % basefile)
+            raise errors.ParseError("Didn't find a text body element")
+
+    def maintext_from_soup(self, soup):
+        main = self.main_from_soup(soup)
+        return main.get_text("\n\n", strip=True)
+
+    def parse_body(self, fp, basefile):
+        if os.path.exists(self.store.downloaded_path(basefile, attachment="index.pdf")):
+            return super(SKVFS, self).parse_body(fp, basefile)
+        else:
+            main = self.main_from_soup(BeautifulSoup(fp, "lxml"))
+            return Body([elements_from_soup(main)],
+                        uri=None)
 
     def parse_open(self, basefile):
         if os.path.exists(self.store.downloaded_path(basefile, attachment="index.pdf")):
