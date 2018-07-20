@@ -55,7 +55,7 @@ def prop_sanitize_identifier(identifier):
     m = re.search(r"(\d{4})/(\d{4}):(\d+)$", identifier)
     if m and m.group(2) != "2000" and int(m.group(1)) == int(m.group(2)) - 1:
         identifier = identifier.replace(m.group(2), m.group(2)[-2:])
-    if not re.match(r"^Prop\. (19|20)\d{2}(|/\d{2}|/2000):(|B ?|U ?)[1-9]\d*$", identifier):
+    if not re.match(r"^Prop\. (19|20)\d{2}(|/\d{2}|/2000):(|B ?|U ?)[1-9]\d{0,2}$", identifier):
         raise ValueError("Irregular identifier %s" % identifier)
     return Literal(identifier)
 

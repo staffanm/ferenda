@@ -20,7 +20,7 @@ def ds_sanitize_identifier(identifier):
         return identifier # allow infer_identifier to do it's magic later
     if identifier.startswith("DS "):
         identifier = identifier.replace("DS ", "Ds ")
-    if not re.match("Ds (19|20)\d{2}:[1-9]\d*", identifier):
+    if not re.match("Ds (19|20)\d{2}:[1-9]\d{0,2}$", identifier):
         raise ValueError("Irregular identifier %s (after mangling)" %  identifier)
     return Literal(identifier)
     

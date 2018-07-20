@@ -2618,7 +2618,6 @@
     ("prop", "1976/77:156"): "metadataonly",
     ("prop", "1976/77:103"): "metadataonly",
     ("prop", "1976/77:157"): "metadataonly",
-    ("prop", "1976/77:77115"): "metadataonly",
     ("prop", "1977/78:2"): "metadataonly",
     ("prop", "1977/78:4"): "metadataonly",
     ("prop", "1977/78:7"): "metadataonly",

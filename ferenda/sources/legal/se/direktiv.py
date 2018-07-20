@@ -52,11 +52,9 @@ def dir_sanitize_identifier(identifier):
         identifier = identifier[::-1].replace(".", ":", 1)[::-1]
     if not identifier.startswith("Dir. "):
         identifier = "Dir. " + identifier
-    if not re.match("Dir\. (19|20)\d{2}:[1-9]\d*", identifier):
+    if not re.match("Dir\. (19|20)\d{2}:[1-9]\d{0,2}$", identifier):
         raise ValueError("Irregular identifier %s (after mangling)" %  identifier)
     return Literal(identifier)
-
-
 
 # custom style analyzer
 class DirAnalyzer(PDFAnalyzer):

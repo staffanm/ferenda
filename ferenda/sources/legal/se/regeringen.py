@@ -335,7 +335,6 @@ class Regeringen(Offtryck):
         # trim identifier
         a["dcterms:identifier"] = self.sanitize_identifier(
             a["dcterms:identifier"].replace("ID-nummer: ", ""))
-        # FIXME call sanitize_identifier
         # save for later
         self._identifier = a["dcterms:identifier"]
         # it's rare, but in some cases a document can be published by
