@@ -1,4 +1,4 @@
-from fabric.api import env, run, local, cd, sudo, settings, hosts
+<from fabric.api import env, run, local, cd, sudo, settings, hosts
 from fabric.contrib.project import rsync_project
 from datetime import datetime
 
@@ -33,7 +33,7 @@ def doccount():
     run("curl -s http://localhost:9200/lagen/_count?pretty=true|grep count")
 
 def copy_elastic():
-    # remove all old snapshots
+   # remove all old snapshots
     snapshotids = local("curl -s http://localhost:9200/_snapshot/lagen_backup/_all?pretty=true|jq -r '.snapshots[]|.snapshot'", capture=True)
     if snapshotids.strip():
         for snapshot_id in snapshotids.split("\n"):
@@ -50,7 +50,7 @@ def copy_elastic():
     # create a new snapshot with the computed id
     local('curl -f -XPUT \'%s\' -d \'{ "indices": "lagen"}\'' % snapshot_url)
 
-#    snapshot_id = "180619-230802"
+#    snapshot_id = "180706-232553"
 #    local_doccount = '  "count" : 3607700,'
     # rsync /tmp/elasticsearch/snapshots from local to target (must be
     # same locally and on target)
@@ -76,14 +76,17 @@ def copy_elastic():
 def copy_files():
     # NOTE: This includes themes etc in data/rsrc
     rsync_project(local_dir="/home/staffan/wds/ferenda/tng.lagen.nu/data/",
-                  remote_dir="/home/staffan/www/ferenda.lagen.nu/data",
-                  exclude=["*downloaded*", "*archive*"],
+                  # remote_dir="/home/staffan/www/ferenda.lagen.nu/data", # the directory name on colo1
+                  remote_dir="/home/staffan/wds/ferenda/tng.lagen.nu/data/", # the dir name on banan.kodapan.se
+                  # exclude=["*downloaded*", "*archive*"],
+                  exclude=["*archive*"],
                   delete=True,
                   default_opts="-aziO --no-perms")
     # we use quiet=True since this may fail on webserver-owned
     # directories (if the webserver owns the directory, we don't
     # need to chmod it).
-    run("chmod -R go+w /home/staffan/www/ferenda.lagen.nu/data", quiet=True)
+    # run("chmod -R go+w /home/staffan/www/ferenda.lagen.nu/data", quiet=True)
+    run("chmod -R go+w /home/staffan/wds/ferenda/tng.lagen.nu/data", quiet=True)
 
     
 def git_pull():
@@ -92,12 +95,12 @@ def git_pull():
 
 
 def upload_rdf():
-    with cd("~/www/ferenda.lagen.nu"):
+    # with cd("~/www/ferenda.lagen.nu"):
+    with cd("~/wds/ferenda/tng.lagen.nu"):
         run("~/.virtualenvs/frnd35/bin/python ./ferenda-build.py all relate --all --upload")
 
-@hosts('colo.tomtebo.org')
 def deploy():
     copy_elastic()  # requires password b/c of sudo() so we do it first
     git_pull()
     copy_files()
-    # upload_rdf()
+    upload_rdf()

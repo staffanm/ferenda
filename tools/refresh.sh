@@ -28,4 +28,5 @@ FERENDA_TESTURL=http://nate/ tools/test.sh integrationLagen
 echo "deploying to remote"
 # This MUST be run on the ES host (nate).
 # ssh nate "cd wds/ferenda && fab -H colo.tomtebo.org -f tools/fabfile.py deploy"
-fab -H colo.tomtebo.org -f tools/fabfile.py deploy
+# fab -H colo.tomtebo.org -f tools/fabfile.py deploy
+fab -H staffan@banan.kodapan.se:20722 -f tools/fabfile.py deploy
