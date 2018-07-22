@@ -156,8 +156,9 @@ class Regeringen(Offtryck):
         "http://www.regeringen.se/rattsdokument/statens-offentliga-utredningar/1921/10/noter-med-egypten-angaende-forlangning-av-de-blandade-domstolarnas-verksamhet-m.-m/", # SÖ, not SOU
         "http://www.regeringen.se/rattsdokument/statens-offentliga-utredningar/1921/07/ministeriella-noter-vaxlade-med-italien-angaende-omsesidighet-rorande-ersattning-for-olycksfall-i-arbete/", # SÖ, not SOU
         "http://www.regeringen.se/rattsdokument/statens-offentliga-utredningar/1921/10/konvention-angaende-faststallande-av-minimialder-for-barns-anvandande-i-arbete-till-sjoss/", # SÖ, not SOU
-        "https://www.regeringen.se/rattsliga-dokument/proposition/2018/01/sou-2071883" # missing a 1, leading to the interpretation prop. 2071/88:3 instead of 2017/18:83
-        
+        "https://www.regeringen.se/rattsliga-dokument/proposition/2018/01/sou-2071883", # missing a 1, leading to the interpretation prop. 2071/88:3 instead of 2017/18:83
+        "https://www.regeringen.se/rattsliga-dokument/kommittedirektiv/2017/04/dir.-201645/", # is Dir. 2017:45, not 2016:45
+        "https://www.regeringen.se/rattsliga-dokument/departementsserien-och-promemorior/2015/11/andring-av-en-avvisningsbestammelse-i-utlanningslagen-2005716/", # no ds, gets incorrect id from a SFS quoted in the title
     ])
                     
     def attribs_from_url(self, url):

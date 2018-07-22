@@ -219,7 +219,7 @@ class TestConNeg(TestLagen):
         # transform test 4: accept: application/n-triples -> RDF statements (in NTriples)
 
         # get the untransformed data to compare with
-        g = Graph().parse(data=self.get(self.baseurl + "1998:204.rdf").text)
+        g = Graph().parse(data=self.get(self.baseurl + "1998:204.rdf", raise_for_status=True).text)
         res = self.get(self.baseurl + "1998:204",
                        headers={'Accept': 'application/n-triples'})
         self.assertEqual(200, res.status_code)
@@ -228,7 +228,7 @@ class TestConNeg(TestLagen):
         self.assertEqualGraphs(g, got)
 
         # variation: use file extension
-        res = self.get(self.baseurl + "1998:204.nt")
+        res = self.get(self.baseurl + "1998:204.nt", raise_for_status=True)
         self.assertEqual(200, res.status_code)
         self.assertEqual("application/n-triples", res.headers['Content-Type'])
         got = Graph()
@@ -237,7 +237,7 @@ class TestConNeg(TestLagen):
 
     def test_turtle(self):
         # transform test 5: accept: text/turtle -> RDF statements (in Turtle)
-        g = Graph().parse(data=self.get(self.baseurl + "1998:204.rdf").text)
+        g = Graph().parse(data=self.get(self.baseurl + "1998:204.rdf", raise_for_status=True).text)
         res = self.get(self.baseurl + "1998:204",
                        headers={'Accept': 'text/turtle'})
         self.assertEqual(200, res.status_code)
@@ -1068,9 +1068,10 @@ class Regressions(TestLagen):
                 self.assertIn("row", node.get("class", []))
 
     tocs = (("dir", 1987, "^Dir\. (19|20)\d{2}:[1-9]\d{,2}$"),
-            ("ds", 1995, "^Ds (19|20)\d{2}:[1-9]\d{,2}$"),
+            ("ds", 2001, "^Ds (19|20)\d{2}:[1-9]\d{,2}$"), # first published is from 1995 but published coverage the first few years is spotty 
             ("sou", 1922, "^SOU (19|20)\d{2}:[1-9]\d{,2}$"),
             ("prop", 1971, "^Prop\. (19|20)\d{2}(|/\d{2}|/2000):[1-9]\d{,2}$"))
+
     def test_toc(self):
         # issue 8
         errors = []
@@ -1108,7 +1109,12 @@ class Regressions(TestLagen):
                 maxidx = int(re.search("\:(\d+)$", link.text).group(1))
                 # no more than 10 % of indexes may be missing
                 coverage = (len(links)+1)/maxidx
-                if coverage <= 0.9:
+                # propositioner shares a ordinal series with
+                # skrivelser (which we don't include, and which can be
+                # up to a third of total output per year), so we need to
+                # lower our coverage expectations
+                expected_coverage = 0.65 if doctype == "prop" else 0.9
+                if coverage < expected_coverage:
                     errors.append("%s/%s: coverage %s" % (doctype, year, coverage))
                     # self.assertGreaterEqual(coverage, 0.9, url)
         self.maxDiff = None
