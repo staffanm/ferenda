@@ -35,6 +35,7 @@ sou 1997:39 # regeringen, multipart
 sou 2004:6
 sou 2016:41
 sou 2017:66
+sou 2008:5 # marked as "metadataonly"
 jo 4171-2011
 jk 2081-03-42
 dir 2016:15

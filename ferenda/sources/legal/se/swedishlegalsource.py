@@ -138,13 +138,12 @@ class SwedishLegalHandler(RequestHandler):
                 # remote/upstream server though) -- serve the page,
                 # but make sure that status is 404
                 return super(SwedishLegalHandler, self).prep_request(environ, path+".404", data, contenttype)
-                
             elif os.path.exists(entrypath):
                 # We have the resource but cannot for some reason
                 # serve it -- return 500
                 entry = DocumentEntry(entrypath)
                 data = Div([H1(["Något fel är trasigt"]),
-                            P(["Vi har dokumentet %s, men kan inte visa det." % basefile])])
+                            P(["Vi har dokumentet %s (%s), men kan inte visa det." % (basefile, path) ])])
                 for stage in ("parse", "relate", "generate"):
                     if stage in entry.status and entry.status[stage]["success"] is False:
                         data.extend([H2(["Fel i %s" % stage]),
