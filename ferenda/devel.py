@@ -155,7 +155,11 @@ class DevelHandler(RequestHandler):
                         'src': request_uri(environ) + "?stream=true"})])])
 
     def handle_streaming_test_stream(self, environ, start_response):
-        writer = start_response('200 OK', [('Content-Type', 'text/plain')])
+        # the second header disables nginx/uwsgi buffering so that
+        # results are actually streamed to the client, see
+        # http://nginx.org/en/docs/http/ngx_http_uwsgi_module.html#uwsgi_buffering
+        writer = start_response('200 OK', [('Content-Type', 'text/plain'),
+                                           ('X-Accel-Buffering', 'no')]) 
         rootlogger = self._setup_streaming_logger(writer)
         log = logging.getLogger(__name__)
         log.debug("Debug messages should work")
@@ -220,7 +224,8 @@ class DevelHandler(RequestHandler):
             ])
 
     def handle_change_parse_options_stream(self, environ, start_response):
-        writer = start_response('200 OK', [('Content-Type', 'text/plain')])
+        writer = start_response('200 OK', [('Content-Type', 'text/plain'),
+                                           ('X-Accel-Buffering', 'no')]) 
         rootlogger = self._setup_streaming_logger(writer)
         # now do the work
         params = dict(parse_qsl(environ['QUERY_STRING']))
