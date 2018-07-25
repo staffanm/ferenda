@@ -216,13 +216,12 @@ class Regeringen(Offtryck):
             qsparams = urlencode(params)
             searchurl = self.start_url + "?" + qsparams
             self.log.debug("Loading page #%s" % params.get('page', 1))
-            resp = self.session.get(searchurl)
-            if resp.status_code >= 400:
-                self.log.warning("GET %s returned 400, pausing and retrying..." % searchurl)
-                sleep(0.5)
-                # avoid using the established session, maybe it'll help?
-                resp = requests.get(searchurl)
-            
+            try:
+                resp = util.robust_fetch(self.session.get, searchurl, self.log)
+            except requests.exceptions.HTTPError as e:
+                assert e.response.status_code == 404
+                done = True
+                continue
             tree = lxml.etree.fromstring(resp.text)
             done = True
             for item in tree.findall(".//item"):
@@ -246,7 +245,11 @@ class Regeringen(Offtryck):
                                                 # and an english
                                                 # translation), go
                                                 # with the first one.
-                        yield basefile, url
+                        if self.get_parse_options(basefile) != "skip":
+                            yield basefile, url
+                        else:
+                            self.log.debug("%s: Marked as 'skip' in options.py" % basefile)
+                            
                         yielded.add(basefile)
                 except ValueError as e:
                     self.log.error(e)

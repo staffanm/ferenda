@@ -440,6 +440,8 @@ class DV(SwedishLegalSource):
                     else:
                         basefile = "%s/%s" % (court, malnr)
 
+                    basefile = basefile.strip()  # to avoid spurious trailing spaces in the filename before the file suffix
+
                     outfile = self.store.path(basefile, 'downloaded', suffix)
 
                     if "TABORT" in name:

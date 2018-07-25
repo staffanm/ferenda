@@ -845,14 +845,16 @@ def robust_fetch(method, url, logger, attempts=5, sleep=1, raise_for_status=True
                     logger.warning(
                         "Failed to fetch %s: err %s (%s remaining attempts)" %
                         (url, e, attempts))
-                    attempts -= 1
-                    time.sleep(sleep)
                     lastexception = e
+            if response.status_code >= 400 and response.status_code != 404:
+                fetched = False  # let's retry even for 400 or 500 class errors, maybe it'll go better in a second
+                logger.warning("Failed to fetch %s: status %s (%s remaining attempts)" % (url, response.status_code, attempts))
+            attempts -= 1
+            time.sleep(sleep)
         if not fetched:
             logger.error("Failed to fetch %s, giving up" % url)
             if lastexception and raise_for_status:
                 raise lastexception
-            return False
     except requests.exceptions.RequestException as e:
             logger.error("Failed to fetch %s: error %s" % (url, e))
             raise e
