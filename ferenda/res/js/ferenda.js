@@ -123,7 +123,7 @@ $(document).ready(function () {
      window.location.href=suggestion.url
   });
 
-  /* Functionality to show streaming logs for long-running commands (currently not working in Chrome) */
+  /* Functionality to show streaming logs for long-running commands */
   output = $('#streaming-log-output');
   if (output) {
       // console.log("Setting up ajax call to stream log output")
@@ -132,26 +132,15 @@ $(document).ready(function () {
 	  dataType: 'text',
 	  url: output.attr('src'),
 	  xhrFields: {
-	      // Chrome refuses to call this during the actual response time, it's only called when response is finished (works as expected in Safari/Firefox) 
 	      onprogress: function(e) {
 		  // console.log('onprogress: response len is ' + e.currentTarget.response.length);
 		  output.text(e.currentTarget.response);
 	      }
 	  }
       });
-      /* 
-      i = setInterval(function() {
-	  if (connection.readyState > 2) {
-	      console.log('poll: response len is ' + connection.responseText.length);
-	  } else {
-	      console.log('poll: readystate still in ' + connection.readyState);
-	  }
-      }, 200);
-      */
       connection.done(function(data) {
           // console.log('Complete response = ' + data);
 	  output.text(data);
-	  // clearInterval(i);
       });
 
   }

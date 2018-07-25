@@ -155,13 +155,23 @@ class DevelHandler(RequestHandler):
                         'src': request_uri(environ) + "?stream=true"})])])
 
     def handle_streaming_test_stream(self, environ, start_response):
+        # using this instead of text/plain prevent chrome from
+        # buffering at the beginning (according to
+        # https://stackoverflow.com/q/20508788, there are three ways
+        # of overcoming this: The "X-Content-Type-Options: nosniff"
+        # header, sending at least 1024 bytes of data right away, or
+        # using a non text/plain content-type. The latter seems the
+        # easiest.
+        content_type = 'application/octet-stream'
         # the second header disables nginx/uwsgi buffering so that
         # results are actually streamed to the client, see
         # http://nginx.org/en/docs/http/ngx_http_uwsgi_module.html#uwsgi_buffering
-        writer = start_response('200 OK', [('Content-Type', 'text/plain'),
+        writer = start_response('200 OK', [('Content-Type', content_type),
                                            ('X-Accel-Buffering', 'no')]) 
         rootlogger = self._setup_streaming_logger(writer)
         log = logging.getLogger(__name__)
+        # log.info("1024 bytes of start data: " + "x" * 1024)
+        # sleep(1)
         log.debug("Debug messages should work")
         sleep(1)
         log.info("Info messages should work")
@@ -224,7 +234,7 @@ class DevelHandler(RequestHandler):
             ])
 
     def handle_change_parse_options_stream(self, environ, start_response):
-        writer = start_response('200 OK', [('Content-Type', 'text/plain'),
+        writer = start_response('200 OK', [('Content-Type', 'application/octet-stream'),
                                            ('X-Accel-Buffering', 'no')]) 
         rootlogger = self._setup_streaming_logger(writer)
         # now do the work
