@@ -125,12 +125,12 @@ $(document).ready(function () {
 
   /* Functionality to show streaming logs for long-running commands */
   output = $('#streaming-log-output');
-  if (output) {
+  if (output.length > 0) {
       // console.log("Setting up ajax call to stream log output")
       connection = $.ajax({
 	  cache: false,
 	  dataType: 'text',
-	  url: output.attr('src'),
+	  url: output.first().attr('src'),
 	  xhrFields: {
 	      onprogress: function(e) {
 		  // console.log('onprogress: response len is ' + e.currentTarget.response.length);

@@ -280,21 +280,22 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
     <xsl:variable name="repo" select="str:tokenize($about, '/')[3]"/>
     <xsl:variable name="subrepo" select="translate(str:tokenize($generator, '.')[last()], 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')"/>
     <!-- FIXME: this gives incorrect results for uris like http://lagen.nu/prop/2017/18:42 -->
-    <xsl:variable name="basefile" select="str:tokenize($about, '/')[last()]"/>
+    <!-- <xsl:variable name="basefile" select="str:tokenize($about, '/')[last()]"/> -->
+    <xsl:variable name="basefile" select="substring-after($about, concat('/', $repo, '/'))"/>
     <!--
     <p>
       about: <xsl:value-of select="$about"/><br/>
       repo: <xsl:value-of select="$repo"/><br/>
       subrepo: <xsl:value-of select="$subrepo"/><br/>
       basefile: <xsl:value-of select="$basefile"/><br/>
-    </p>
+      </p>
     -->
     <div class="row">
       <section class="col-sm-8">
 	<xsl:call-template name="metadata-only">
-	  <xsl:with-param name="repo" select="'sou'"/>
-	  <xsl:with-param name="subrepo" select="'soukb'"/>
-	  <xsl:with-param name="basefile" select="'1922:9'"/>
+	  <xsl:with-param name="repo" select="$repo"/>
+	  <xsl:with-param name="subrepo" select="$subrepo"/>
+	  <xsl:with-param name="basefile" select="$basefile"/>
 	</xsl:call-template>
       </section>
     </div>

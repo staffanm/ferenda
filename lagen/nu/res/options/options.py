@@ -19838,7 +19838,7 @@
     ("sou", "1922:27"): "metadataonly",
     ("sou", "1922:26"): "metadataonly",
     ("sou", "1922:13"): "metadataonly",
-    ("sou", "1922:9"): "default", # lolwat # lolwat # lolwat # lolwat # lolwat # lolwat # lolwat # lolwat # lolwat # lolwat # lolwat # lolwat # lolwat # lolwat # lolwat
+    ("sou", "1922:9"): "metadataonly",
     ("prop", "2002/03:58"): "metadataonly",
     ("prop", "2002/03:14"): "metadataonly",
     ("prop", "2001/02:116"): "metadataonly",

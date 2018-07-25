@@ -14,6 +14,7 @@ from io import BytesIO, StringIO
 from tempfile import mkstemp
 from time import sleep
 from operator import attrgetter
+from pprint import pformat
 import codecs
 import fileinput
 import inspect
@@ -152,7 +153,7 @@ class DevelHandler(RequestHandler):
             Div([H2(["Streaming test"]),
                  Pre(**{'class': 'pre-scrollable',
                         'id': 'streaming-log-output',
-                        'src': request_uri(environ) + "?stream=true"})])])
+                        'src': environ['PATH_INFO'] + "?stream=true"})])])
 
     def handle_streaming_test_stream(self, environ, start_response):
         # using this instead of text/plain prevent chrome from
@@ -167,11 +168,12 @@ class DevelHandler(RequestHandler):
         # results are actually streamed to the client, see
         # http://nginx.org/en/docs/http/ngx_http_uwsgi_module.html#uwsgi_buffering
         writer = start_response('200 OK', [('Content-Type', content_type),
-                                           ('X-Accel-Buffering', 'no')]) 
+                                           ('X-Accel-Buffering', 'no'),
+                                           ('X-Content-Type-Options', 'nosniff')]) 
         rootlogger = self._setup_streaming_logger(writer)
         log = logging.getLogger(__name__)
-        # log.info("1024 bytes of start data: " + "x" * 1024)
-        # sleep(1)
+        #log.info("1024 bytes of start data: " + "x" * 1024)
+        #sleep(1)
         log.debug("Debug messages should work")
         sleep(1)
         log.info("Info messages should work")
@@ -210,11 +212,12 @@ class DevelHandler(RequestHandler):
             del inst.__dict__['parse_options']
         if lineidx:
             datasrc = "%s?repo=%s&subrepo=%s&basefile=%s&stream=true" % (
-                request_uri(environ),
+                environ['PATH_INFO'],
                 repo,
                 subrepo,
                 basefile)
             res = [H2(["Changing options for %s in repo %s" % (basefile, repo)]),
+                   # Pre([pformat(environ)]),
                    P(["Changed option at line %s from " % lineidx,
                       Code([currentvalue]),
                       " to ",
@@ -251,17 +254,17 @@ class DevelHandler(RequestHandler):
         basefile = params['basefile']
         try:
             rootlogger.info("Downloading %s" % basefile)
-            # subrepo.download(basefile)
-            sleep(1)
+            subrepo.download(basefile)
+            # sleep(1)
             rootlogger.info("Parsing %s" % basefile)
-            # repo.parse(basefile)
-            sleep(1)
+            repo.parse(basefile)
+            # sleep(1)
             rootlogger.info("Relating %s" % basefile)
-            # repo.relate(basefile)
-            sleep(1)
+            repo.relate(basefile)
+            # sleep(1)
             rootlogger.info("Generating %s" % basefile)
-            # repo.generate(basefile)
-            sleep(1)
+            repo.generate(basefile)
+            # sleep(1)
         except Exception as e:
             msg = str(e) + "\n"
             writer(msg.encode("utf-8"))
