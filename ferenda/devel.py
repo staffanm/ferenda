@@ -131,9 +131,16 @@ class DevelHandler(RequestHandler):
 
 
     def _setup_streaming_logger(self, writer):
+        # these internal libs use logging to log things we rather not disturb the user with
+        for logname in ['urllib3.connectionpool',
+                        'chardet.charsetprober',
+                        'rdflib.plugins.parsers.pyRdfa']:
+            log = logging.getLogger(logname)
+            log.propagate = False
+
         wsgihandler = WSGIOutputHandler(writer)
         wsgihandler.setFormatter(
-            logging.Formatter("%(asctime)s %(levelname)s %(message)s",
+            logging.Formatter("%(asctime)s [%(name)s] %(levelname)s %(message)s",
                  datefmt="%H:%M:%S"))
         rootlogger = logging.getLogger()
         rootlogger.setLevel(logging.DEBUG)
@@ -189,7 +196,7 @@ class DevelHandler(RequestHandler):
         assert params
         assert environ['REQUEST_METHOD'] == 'POST'
         repo = params['repo']
-        subrepo = params['repo']
+        subrepo = params['subrepo']
         basefile = params['basefile']
         newvalue = params['newvalue']
         reason = params['reason']
@@ -254,6 +261,7 @@ class DevelHandler(RequestHandler):
         basefile = params['basefile']
         try:
             rootlogger.info("Downloading %s" % basefile)
+            subrepo.config.refresh = True  # the repo might have a partial download, eg of index HTML page but without PDF document
             subrepo.download(basefile)
             # sleep(1)
             rootlogger.info("Parsing %s" % basefile)
@@ -266,7 +274,9 @@ class DevelHandler(RequestHandler):
             repo.generate(basefile)
             # sleep(1)
         except Exception as e:
-            msg = str(e) + "\n"
+            exc_type, exc_value, tb = sys.exc_info()
+            tblines = traceback.format_exception(exc_type, exc_value, tb)
+            msg = "\n".join(tblines)
             writer(msg.encode("utf-8"))
         finally:
             self._shutdown_streaming_logger(rootlogger)

@@ -11,6 +11,7 @@ import logging
 import os
 import re
 import shutil
+import subprocess
 import tempfile
 import warnings
 import unicodedata
@@ -258,6 +259,14 @@ class PDFReader(CompoundElement):
                     os.unlink(f)
 
         # Step 3: Combine all the 10-page tifs into a giant tif using tiffcp
+
+        # FIXME: This can take more than 60 seconds, in which case
+        # nginx (when running this code via change-parse-options)
+        # might time out. One way would be to use raw subprocess.Popen
+        # and occasionally write status updates to the log (like with
+        # tesseract below). tiffcp itself doesn't seem to be very
+        # verbose though.
+        
         cmd = "tiffcp -c zip %(tmpdir)s/%(root)s_tmp*.tif %(tmpdir)s/%(root)s.tif" % locals()
         self.log.debug("- running " + cmd)
         (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
@@ -271,7 +280,17 @@ class PDFReader(CompoundElement):
         cmd = "tesseract %(tmpdir)s/%(root)s.tif %(tmpdir)s/%(root)s%(suffix)s -l %(lang)s -psm 1 %(usehocr)s %(pagebreaks)s" % locals(
         )
         self.log.debug("running " + cmd)
-        (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
+        # run the command in a more involved way so that we can log its' progress
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+        outputs = []
+        for line in iter(process.stdout.readline, b''):
+            output = line.decode("utf-8", errors="ignore").strip()
+            outputs.append(output)
+            if output.startswith("Page "):
+                self.log.debug("OCR processed: %s" % output)
+        returncode = process.poll()
+        if returncode != 0:
+            raise errors.ExternalCommandError(outputs[-1])
 
         if hocr:
             # Step 4: Later versions of tesseract adds a automatic .hocr
