@@ -19745,7 +19745,7 @@
     ("sou", "1922:27"): "metadataonly",
     ("sou", "1922:26"): "metadataonly",
     ("sou", "1922:13"): "metadataonly",
-    ("sou", "1922:9"): "default", # Viktigt även för dagens PL? # Viktigt även för dagens PL? # Viktigt för PL
+    ("sou", "1922:9"): "default", # Viktigt även för dagens PL? 
     ("prop", "2002/03:58"): "metadataonly",
     ("prop", "2002/03:14"): "metadataonly",
     ("prop", "2001/02:116"): "metadataonly",

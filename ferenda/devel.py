@@ -54,13 +54,20 @@ class DummyStore(object):
 
 
 class WSGIOutputHandler(logging.Handler):
+    
     def __init__(self, writer):
         self.writer = writer
         super(WSGIOutputHandler, self).__init__()
 
     def emit(self, record):
         entry = self.format(record) + "\n"
-        self.writer(entry.encode("utf-8"))
+        try:
+            self.writer(entry.encode("utf-8"))
+        except OSError as e:
+            # if self.writer has closed, it probably means that the
+            # HTTP client has closed the connection. But we don't stop
+            # for that.
+            pass
 
 
 class DevelHandler(RequestHandler):

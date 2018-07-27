@@ -6,6 +6,7 @@ from builtins import *
 from bz2 import BZ2File
 from glob import glob
 from io import BytesIO
+from time import sleep
 import itertools
 import logging
 import os
@@ -15,7 +16,6 @@ import subprocess
 import tempfile
 import warnings
 import unicodedata
-
 from lxml import etree
 from lxml.builder import ElementMaker
 from layeredconfig import LayeredConfig, Defaults
@@ -269,7 +269,18 @@ class PDFReader(CompoundElement):
         
         cmd = "tiffcp -c zip %(tmpdir)s/%(root)s_tmp*.tif %(tmpdir)s/%(root)s.tif" % locals()
         self.log.debug("- running " + cmd)
-        (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
+        # (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
+        process = subprocess.Popen(cmd, shell=True)
+        timer = 0
+        while process.poll() == None:
+            timer += 1
+            if not (timer % 100):
+                self.log.debug("tiffcp processing: %s s elapsed..." % str(timer/10))
+            sleep(0.1)
+        returncode = process.poll()
+        if returncode != 0:
+            stdout, stderr = process.communicate()
+            raise errors.ExternalCommandError(stderr)
         # Step 3: OCR the giant tif file to create a .hocr.html file
         # Note that -psm 1 (automatic page segmentation with
         # orientation and script detection) requires the installation
