@@ -27,7 +27,7 @@ import shutil
 import sys
 import traceback
 from wsgiref.util import request_uri
-from urllib.parse import parse_qsl
+from urllib.parse import parse_qsl, urlencode
 
 from rdflib import Graph, URIRef, RDF, Literal
 from rdflib.namespace import DCTERMS
@@ -42,7 +42,7 @@ from ferenda import (TextReader, TripleStore, FulltextIndex, WSGIApp,
                      RequestHandler, ResourceLoader)
 from ferenda.elements import serialize
 from ferenda.elements.html import Body, P, H1, H2, Form, Textarea, Input, Label, Button, Textarea, Br, Div, A, Pre, Code
-from ferenda import decorators, util
+from ferenda import decorators, util, manager
 
 class DummyStore(object):
 
@@ -77,27 +77,17 @@ class DevelHandler(RequestHandler):
 
     def handle(self, environ):
         segments = [x for x in environ['PATH_INFO'].split("/") if x]
-        if segments[1] == "patch":
-            if environ['REQUEST_METHOD'] == 'POST':
-                reqbody = environ['wsgi.input'].read(int(environ.get('CONTENT_LENGTH', 0)))
-                params = dict(parse_qsl(reqbody.decode("utf-8")))
-            else:
-                params = dict(parse_qsl(environ['QUERY_STRING']))
-            body = self.handle_patch(environ, params)
-        elif segments[1] == "change-parse-options":
-            # FIXME: Change code duplication (once we get our third
-            # thing for devel to handle)
-            if environ['REQUEST_METHOD'] == 'POST':
-                reqbody = environ['wsgi.input'].read(int(environ.get('CONTENT_LENGTH', 0)))
-                params = dict(parse_qsl(reqbody.decode("utf-8")))
-            else:
-                params = dict(parse_qsl(environ['QUERY_STRING']))
-            body = self.handle_change_parse_options(environ, params)
-        elif segments[1] == 'streaming-test':
-            body = self.handle_streaming_test(environ)
+        if environ['REQUEST_METHOD'] == 'POST':
+            reqbody = environ['wsgi.input'].read(int(environ.get('CONTENT_LENGTH', 0)))
+            params = dict(parse_qsl(reqbody.decode("utf-8")))
         else:
-            raise ValueError("DevelHandler can't handle path %s" % environ['PATH_INFO'])
-        
+            params = dict(parse_qsl(environ['QUERY_STRING']))
+
+        handler = {'patch': self.handle_patch,
+                   'change-parse-options': self.handle_change_parse_options,
+                   'build': self.handle_build,
+                   'streaming-test': self.handle_streaming_test}[segments[1]]
+        body = handler(environ, params)
         res = self._render(segments[1], body, request_uri(environ), self.repo.config)
         length = len(res)
         fp = BytesIO(res)
@@ -132,6 +122,8 @@ class DevelHandler(RequestHandler):
             return self.handle_change_parse_options_stream(environ, start_response)
         elif environ['PATH_INFO'].endswith('streaming-test'):
             return self.handle_streaming_test_stream(environ, start_response)
+        elif environ['PATH_INFO'].endswith('build'):
+            return self.handle_build_stream(environ, start_response)
         else:
             start_response('500 Server error', [('Content-Type', 'text/plain')])
             return ['No streaming handler registered for PATH_INFO %s' % environ['PATH_INFO']]
@@ -162,7 +154,63 @@ class DevelHandler(RequestHandler):
                 h.close()
                 rootlogger.removeHandler(h)
 
-    def handle_streaming_test(self, environ):
+    def handle_build(self, environ, params):
+        if params:
+            params = defaultdict(str, params)
+            label = "Running %(repo)s %(action)s %(basefile)s %(all)s %(force)s %(sefresh)s" % params
+            params["stream"] = "true"
+            streamurl = environ['PATH_INFO'] + "?" + urlencode(params)
+            return Body([H2(["ferenda-build"]),
+                         Pre(**{'class': 'pre-scrollable',
+                                'id': 'streaming-log-output',
+                                'src': streamurl})
+                         ])
+        else:
+            return Body([
+                Div([H2(["ferenda-build.py"]),
+                     Form([
+                          Div([Label(["repo"], **{'for': "repo", 'class': "sr-only"}),
+                               Input(**{'type': "text", 'id': "repo", 'name': "repo", 'placeholder': "repo", 'class': "form-control"}),
+                               Label(["action"], **{'for': "action", 'class': "sr-only"}),
+                               Input(**{'type': "text", 'id': "action", 'name': "action", 'placeholder': "action", 'class': "form-control"}),
+                               Label(["basefile"], **{'for': "basefile", 'class': "sr-only"}),
+                               Input(**{'type': "text", 'id': "basefile", 'name': "basefile", 'placeholder': "basefile", 'class': "form-control"})
+                          ], **{'class': 'form-group'}),
+                         Div([Input(**{'type': "checkbox", 'id': "all", 'name': "all", 'value': "--all"}),
+                              Label(["--all"], **{'for': "all"}),
+                              Input(**{'type': "checkbox", 'id': "force", 'name': "force", 'value': "--force"}),
+                              Label(["--force"], **{'for': "force"}),
+                              Input(**{'type': "checkbox", 'id': "refresh", 'name': "refresh", 'value': "--refresh"}),
+                              Label(["--refresh"], **{'for': "refresh"}),
+                              Button(["Build"], **{'type': "submit", 'class': "btn btn-default"})
+                         ], **{'class': 'form-group'})
+                         
+                      ], **{'class': 'form-inline'})])])
+
+    def handle_build_stream(self, environ, start_response):
+        content_type = 'application/octet-stream'
+        writer = start_response('200 OK', [('Content-Type', content_type),
+                                           ('X-Accel-Buffering', 'no')]) 
+        rootlogger = self._setup_streaming_logger(writer)
+        log = logging.getLogger(__name__)
+        log.info("Running ...")
+        params = dict(parse_qsl(environ['QUERY_STRING']))
+        argv = [params[x] for x in ('repo', 'action', 'basefile', 'all', 'force', 'refresh') if params.get(x)]
+        argv.append('--loglevel=DEBUG')
+        try:
+            manager.run(argv)
+        except Exception as e:
+            exc_type, exc_value, tb = sys.exc_info()
+            tblines = traceback.format_exception(exc_type, exc_value, tb)
+            msg = "\n".join(tblines)
+            writer(msg.encode("utf-8"))
+        finally:
+            self._shutdown_streaming_logger(rootlogger)
+            # ok we're done
+        return []
+
+
+    def handle_streaming_test(self, environ, params):
         return Body([
             Div([H2(["Streaming test"]),
                  Pre(**{'class': 'pre-scrollable',

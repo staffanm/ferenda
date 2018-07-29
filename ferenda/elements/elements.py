@@ -308,10 +308,10 @@ class CompoundElement(AbstractElement, list):
         # RDFa ones). FIXME: There should be an overridable class
         # variable with this list. action and method is really only
         # applicable to html.Form, for is only for html.Label, and
-        # type+name for html.Input, and rows+cols for html.Textarea
+        # type+name+placeholder for html.Input, and rows+cols for html.Textarea
         for stdattr in ('class', 'id', 'dir', 'lang', 'src',
                         'href', 'name', 'alt', 'role', 'typeof',
-                        'datatype', 'property', 'rel', 'about', 'action', 'method', 'for', 'type', 'name', 'value', 'rows', 'cols', 'checked'):
+                        'datatype', 'property', 'rel', 'about', 'action', 'method', 'for', 'type', 'name', 'value', 'rows', 'cols', 'checked', 'placeholder'):
             if hasattr(self, stdattr) and getattr(self, stdattr):
                 attrs[stdattr] = getattr(self, stdattr)
 
