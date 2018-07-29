@@ -580,6 +580,11 @@ textarea {
     overflow: auto;
 }
 
+/* only used in devel/change-parse-options web UI */
+#streaming-log-output {
+    font-size: x-small;
+}
+
 /* in bootstrap, all headers by default have font-weight 500, which renders as bold on Chrome/FF, but as normal on (at least some versions of) IE. Specify that we really want a bold heading. */
 h1, h2, h3, h4, h5, h6 {
     font-weight: bold;
