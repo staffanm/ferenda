@@ -821,6 +821,34 @@ class Repo(RepoTester):
         self.assertFalse(self.repoclass.relate_all_setup(config))
 
     @patch('ferenda.documentrepository.TripleStore')
+    def test_relate_all_setup_storage_policy(self, mock_store):
+        try:
+            self.repoclass.storage_policy = "dir"
+            util.writefile(self.datadir+"/base/distilled/1/index.rdf", "example")
+            util.writefile(self.datadir+"/base/parsed/1/index.xhtml", "")
+            util.writefile(self.datadir+"/base/distilled/dump.nt", "example")
+            # make sure that relate_all_setup doesn't instantiate a
+            # documentstore that uses the wrong storage policy
+            # (interpreting the above rdf file as belonging to
+            # basefile "1/index" instead of the intended "1") by
+            # creating a write-protected file in the "wrong" place.
+            util.writefile(self.datadir+"/base/entries/1/index.json", "")
+            os.chmod(self.datadir+"/base/entries/1/index.json", 0)
+            config = LayeredConfig(Defaults({'datadir': self.datadir,
+                                             'url': 'http://localhost:8000/',
+                                             'force': False,
+                                             'fulltextindex': False,
+                                             'storetype': 'a',
+                                             'storelocation': 'b',
+                                             'storerepository': 'c'}))
+            # there is nothing to do, so relate_all_setup returns
+            # false. The important thing is that it doesn't raise
+            # errors due to the write-protected file
+            self.assertFalse(self.repoclass.relate_all_setup(config))
+        finally:
+            self.repoclass.storage_policy = "file"
+
+    @patch('ferenda.documentrepository.TripleStore')
     def test_relate_all_teardown(self, mock_store):
         util.writefile(self.datadir+"/base/distilled/dump.nt", "example")
         config = LayeredConfig(Defaults({'datadir': self.datadir,
