@@ -520,8 +520,12 @@ class DevelHandler(RequestHandler):
         logdir = self.repo.config.datadir + os.sep + "logs"
         def firstline(f):
             with open(logdir+os.sep+f) as fp:
-                # trim uninteresting things from start and end 
-                return fp.readline().split(" ", 3)[-1].rsplit(" (", 1)[0]
+                # trim uninteresting things from start and end
+                l = fp.readline().split(" ", 3)[-1].rsplit(" (", 1)[0]
+                if l.strip():
+                    return l
+                else:
+                    return "[log is empty?]"
             
         def linkelement(f):
             href = environ['PATH_INFO'] + "?file=" + f

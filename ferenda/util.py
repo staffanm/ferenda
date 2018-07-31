@@ -834,6 +834,7 @@ def robust_fetch(method, url, logger, attempts=5, sleep=1, raise_for_status=True
                  *args, **kwargs):
     fetched = False
     lastexception = None
+    response = None
     try:
         while (not fetched) and (attempts > 0):
             try:
@@ -846,7 +847,7 @@ def robust_fetch(method, url, logger, attempts=5, sleep=1, raise_for_status=True
                         "Failed to fetch %s: err %s (%s remaining attempts)" %
                         (url, e, attempts))
                     lastexception = e
-            if response.status_code >= 400 and response.status_code != 404:
+            if response and response.status_code >= 400 and response.status_code != 404:
                 fetched = False  # let's retry even for 400 or 500 class errors, maybe it'll go better in a second
                 logger.warning("Failed to fetch %s: status %s (%s remaining attempts)" % (url, response.status_code, attempts))
             attempts -= 1
