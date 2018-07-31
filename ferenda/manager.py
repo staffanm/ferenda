@@ -521,6 +521,8 @@ def run(argv, config=None, subcall=False):
         util.ensure_dir(logfile)
         setup_logger(level=config.loglevel, filename=logfile)
 
+    if not subcall:
+        log.info("run: %s" % " ".join(argv))
     try:
         # reads only ferenda.ini using configparser rather than layeredconfig
         enabled = _enabled_classes()

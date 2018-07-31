@@ -41,7 +41,7 @@ from ferenda import (TextReader, TripleStore, FulltextIndex, WSGIApp,
                      CompositeRepository, DocumentEntry, Transformer,
                      RequestHandler, ResourceLoader)
 from ferenda.elements import serialize
-from ferenda.elements.html import Body, P, H1, H2, Form, Textarea, Input, Label, Button, Textarea, Br, Div, A, Pre, Code
+from ferenda.elements.html import Body, P, H1, H2, Form, Textarea, Input, Label, Button, Textarea, Br, Div, A, Pre, Code, UL, LI
 from ferenda import decorators, util, manager
 
 class DummyStore(object):
@@ -84,6 +84,7 @@ class DevelHandler(RequestHandler):
             params = dict(parse_qsl(environ['QUERY_STRING']))
 
         handler = {'patch': self.handle_patch,
+                   'logs': self.handle_logs,
                    'change-parse-options': self.handle_change_parse_options,
                    'build': self.handle_build,
                    'streaming-test': self.handle_streaming_test}[segments[1]]
@@ -514,6 +515,29 @@ class DevelHandler(RequestHandler):
                              
                 return res
         # return fp, length, status, mimetype
+
+    def handle_logs(self, environ, params):
+        logdir = self.repo.config.datadir + os.sep + "logs"
+        def firstline(f):
+            with open(logdir+os.sep+f) as fp:
+                # trim uninteresting things from start and end 
+                return fp.readline().split(" ", 3)[-1].rsplit(" (", 1)[0]
+            
+        def linkelement(f):
+            href = environ['PATH_INFO'] + "?file=" + f
+            return LI([A(f, href=href), " ", Code([firstline(f)]), " (%.2f kb)" % (os.path.getsize(logdir+os.sep+f) / 1024)])
+
+        if not params:
+            logfiles = sorted([f for f in os.listdir(logdir) if f.endswith(".log")], reverse=True)
+            return Body([
+                Div([UL([linkelement(f) for f in logfiles])])])
+        elif 'file' in params:
+            assert re.match("\d{8}-\d{6}.log$", params['file']), "invalid log file name"
+            return Body([
+                Div([H2([params['file']]),
+                     Pre([util.readfile(logdir+os.sep+params['file'])])])])
+
+
 class Devel(object):
 
     """Collection of utility commands for developing docrepos.
