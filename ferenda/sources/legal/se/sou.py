@@ -11,6 +11,7 @@ import unicodedata
 from datetime import datetime
 from urllib.parse import urljoin
 
+import requests.exceptions
 from rdflib import URIRef, Literal, Graph, Namespace
 from rdflib.namespace import SKOS, DC, RDF, XSD, DCTERMS
 BIBO = Namespace("http://purl.org/ontology/bibo/")
@@ -177,7 +178,7 @@ class SOUKB(Offtryck, PDFDocumentRepository):
             else:
                 self.log.error("%s: Couldn't find requested basefile" % basefile)
         else:
-             return super(SOUKB, self).download()
+            return super(SOUKB, self).download()
          
 
     @decorators.downloadmax
@@ -209,6 +210,15 @@ class SOUKB(Offtryck, PDFDocumentRepository):
     def download_single(self, basefile, url):
         if self.get_parse_options(basefile) == "skip":
             raise errors.DocumentSkippedError("%s should not be downloaded according to options.py" % basefile)
+        rdffilename = self.store.downloaded_path(basefile, attachment="metadata.rdf")
+        if self.get_parse_options(basefile) == "metadataonly" and os.path.exists(rdffilename) and (not self.config.refresh):
+            # it is kind of bad that we can even get here in these
+            # cases (if a rdffile exists, and a empty index.pdf
+            # exists, shouldn't download() skip that file? Right now
+            # it ignores empty files and passes them to
+            # download_single.
+            return False
+        
         # url is really a 2-tuple
         url, title = url
         resp = self.session.get(url)
@@ -230,7 +240,6 @@ class SOUKB(Offtryck, PDFDocumentRepository):
             # and warn for this (and infer a minimal RDF by
             # hand from what we can, eg dc:title from the link
             # text)
-            rdffilename = self.store.downloaded_path(basefile, attachment="metadata.rdf")
             self.download_if_needed(rdfurl, basefile,
                                     filename=rdffilename)
             if os.path.getsize(rdffilename) == 0:
