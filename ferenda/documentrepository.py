@@ -1682,8 +1682,8 @@ with the *config* object as single parameter.
         """
         # FIXME: should use dataset_uri(), but that's a instancemethod
         context = "%sdataset/%s" % (config.url, cls.alias)
-
-        docstore = DocumentStore(config.datadir + os.sep + cls.alias, storage_policy=cls.storage_policy)
+        
+        docstore = cls.documentstore_class(config.datadir + os.sep + cls.alias, storage_policy=cls.storage_policy)
         dumppath = docstore.resourcepath("distilled/dump.nt")
 
         # log = cls._setup_logger(cls.alias)
