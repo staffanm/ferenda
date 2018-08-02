@@ -516,6 +516,51 @@ class DevelHandler(RequestHandler):
                 return res
         # return fp, length, status, mimetype
 
+    def analyze_log(self, filename, listerrors=False):
+        modules = defaultdict(int)
+        locations = defaultdict(int)
+        locationmsg = {}
+        errors = []
+        output = StringIO()
+        with open(filename) as fp:
+            for line in fp:
+                try:
+                    timestamp, module, level, message = line.split(" ", 3)
+                except ValueError:
+                    continue
+                if level == "ERROR":
+                    if module == "root":
+                        module = message.split(" ", 1)[0]
+                    modules[module] += 1
+                    m = re.search("\([\w/]+.py:\d+\)", message)
+                    if m:
+                        location = m.group(0)
+                        locations[location] += 1
+                        if location not in locationmsg:
+                            locationmsg[location] = message.strip()
+                    if listerrors:
+                        m = re.match("([\w\.]+) (\w+) ([^ ]*) failed", message)
+                        if m:
+                            errors.append((m.group(1), m.group(3)))
+        if listerrors:
+            for repo, basefile in errors:
+                print(repo,basefile, file=output)
+        else:
+            print("Top error modules:", file=output)
+            self.printdict(modules, file=output)
+            print("Top error messages:", file=output)
+            self.printdict(locations, locationmsg, file=output)
+        return output.getvalue()
+
+    def printdict(self, d, labels=None, file=sys.stdout):
+        # prints out a dict with int values, sorted by these
+        for k in sorted(d, key=d.get, reverse=True):
+            if labels:
+                lbl = labels[k]
+            else:
+                lbl = k
+            print("%4d %s" % (d[k], lbl), file=file)
+
     def handle_logs(self, environ, params):
         logdir = self.repo.config.datadir + os.sep + "logs"
         def firstline(f):
@@ -537,9 +582,15 @@ class DevelHandler(RequestHandler):
                 Div([UL([linkelement(f) for f in logfiles])])])
         elif 'file' in params:
             assert re.match("\d{8}-\d{6}.log$", params['file']), "invalid log file name"
+            logfilename = logdir+os.sep+params['file']
+            errorstats = self.analyze_log(logfilename)
+            if not errorstats:
+                errorstats = "[analyze_log didn't return any output?]"
             return Body([
                 Div([H2([params['file']]),
-                     Pre([util.readfile(logdir+os.sep+params['file'])])])])
+                     Pre([errorstats]),
+                     Pre([util.readfile(logfilename)], **{'class': 'logviewer'})])])
+
 
 
 class Devel(object):
