@@ -336,8 +336,17 @@ class Regeringen(Offtryck):
             if k in a:
                 a[k] = util.normalize_space(a[k])
         # trim identifier
-        a["dcterms:identifier"] = self.sanitize_identifier(
-            a["dcterms:identifier"].replace("ID-nummer: ", ""))
+        try:
+            # The identifier displayed on the HTML page is not always
+            # correct -- it might be missing digits (eg "SOU 207:111"
+            # instead of "SOU 2017:111"). Try to sanitize it, but if
+            # we fail, infer it from our basefile instead.
+            a["dcterms:identifier"] = self.sanitize_identifier(
+                a["dcterms:identifier"].replace("ID-nummer: ", ""))
+        except ValueError as e:
+            inferred_identifier = str(self.infer_identifier(basefile))
+            self.log.error("%s: Irregular identifier %s, using inferred identifier %s instead" % (basefile, a["dcterms:identifier"], inferred_identifier))
+            a["dcterms:identifier"] = inferred_identifier
         # save for later
         self._identifier = a["dcterms:identifier"]
         # it's rare, but in some cases a document can be published by
