@@ -807,7 +807,10 @@ class PropKB(Offtryck, PDFDocumentRepository):
             self.log.warning("%s: Couldn't find date in first %s characters (first page)" %
                              (basefile, len(firstpage)))
         else:
-            res["dcterms:issued"] = self.parse_swedish_date(m.group(1).lower())
+            try:
+                res["dcterms:issued"] = self.parse_swedish_date(m.group(1).lower())
+            except ValueError as e:
+                self.log.warning("%s: Couldn't parse date %s" % (basefile, m.group(1)))
         return res
 
     def extract_body(self, fp, basefile):

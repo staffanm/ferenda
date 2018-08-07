@@ -810,7 +810,7 @@ class DV(SwedishLegalSource):
         if coll == "HDO":
             # keep this in sync w extract_notis
             re_notisstart = re.compile(
-                "(?:Den (?P<avgdatum>\d+):[ae].\s+|)(?P<ordinal>\d+)\.[ \xa0]*\((?P<malnr>\w[ \xa0]\d+-\d+)\)",
+                "(?:Den (?P<avgdatum>\d+):[ae].\s+|)(?P<ordinal>\d+)\s*\.\s*\((?P<malnr>\w[ \xa0]\d+-\d+)\)",
                 flags=re.UNICODE)
             re_avgdatum = re_malnr = re_notisstart
             re_lagrum = re_sokord = None
@@ -966,7 +966,7 @@ class DV(SwedishLegalSource):
         # domstolen") följt av referatnumret ("NJA 1987
         # s. 113").
         firstfield = soup.find("w:t")
-        # Ibland ärdomstolsnamnet uppsplittat på två
+        # Ibland är domstolsnamnet uppsplittat på två
         # w:r-element. Bäst att gå på all text i
         # föräldra-w:tc-cellen
         firstfield = firstfield.find_parent("w:tc")
@@ -1091,7 +1091,7 @@ class DV(SwedishLegalSource):
     def sanitize_metadata(self, head, basefile):
         basefile_regex = re.compile('(?P<type>\w+)/(?P<year>\d+)-(?P<ordinal>\d+)')
         nja_regex = re.compile(
-            "NJA ?(\d+) ?s\.? ?(\d+) ?\( ?(?:NJA|) ?[ :]?(\d+) ?: ?(\d+)")
+            "NJA ?(\d+) ?s\.? ?(\d+) *\( ?(?:NJA|) ?[ :]?(\d+) ?: ?(\d+)")
         date_regex = re.compile("(\d+)[^\d]+(\d+)[^\d]+(\d+)")
         referat_regex = re.compile(
             "(?P<type>[A-ZÅÄÖ]+)[^\d]*(?P<year>\d+)[^\d]+(?P<ordinal>\d+)")
