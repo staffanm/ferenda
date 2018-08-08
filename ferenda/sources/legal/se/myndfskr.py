@@ -1337,13 +1337,23 @@ class KOVFS(MyndFskrBase):
 
 class KVFS(MyndFskrBase):
     alias = "kvfs"
-    start_url = ("http://www.kriminalvarden.se/om-kriminalvarden/"
-                 "publikationer/regelverk")
+    start_url = ("https://www.kriminalvarden.se/om-kriminalvarden/"
+                 "publikationer/regelverk/search")
     # (finns även konsoliderade på http://www.kriminalvarden.se/
     #  om-kriminalvarden/styrning-och-regelverk/lagar-forordningar-och-
     #  foreskrifter)
     download_iterlinks = False
     basefile_regex = re.compile("(?P<basefile>KVV?FS \d{4}:\d+)")
+
+    def download_get_first_page(self, paging=1):
+        self.log.info("POSTing to search, paging=%s" % paging)
+        params = {'publicationKeyword':'',
+                  'sortOrder': 'publish_desc',
+                  'paging': str(paging)}
+        headers = {'accept': 'application/json, text/javascript, */*; q=0.01'}
+        resp = self.session.post(self.start_url, data=params, headers=headers)
+        return resp
+    
 
     def forfattningssamlingar(self):
         return ["kvfs", "kvvfs"]
@@ -1352,13 +1362,15 @@ class KVFS(MyndFskrBase):
     def download_get_basefiles(self, source):
         lasthref = None
         done = False
+        paging = 1
         while not done:
-            soup = BeautifulSoup(source, "lxml") # source is HTML text,
+            partial = json.loads(source)['PartialViewHtml']
+            soup = BeautifulSoup(partial, "lxml") # source is HTML text,
                                                  # since
                                                  # download_iterlinks is
                                                  # False
-            for h in soup.find("section", "publications-list").find_all("h3"):
-                m = self.basefile_regex.match(h.text)
+            for h in soup.find_all("h3"):
+                m = self.basefile_regex.match(h.text.strip())
                 if not m:
                     continue
                 el = h.parent.parent.find("a")
@@ -1366,7 +1378,10 @@ class KVFS(MyndFskrBase):
                     yield self.sanitize_basefile(m.group("basefile")), urljoin(self.start_url, el.get("href"))
             nextlink = soup.find("ul", "pagination").find_all("a")[-1] # last link is Next
             if nextlink and nextlink["href"] != lasthref:
-                source = self.session.get(urljoin(self.start_url, nextlink["href"])).text
+                paging += 1
+                resp = self.download_get_first_page(paging)
+                resp.raise_for_status()
+                source = resp.text
                 lasthref = nextlink["href"]
             else:
                 done = True
