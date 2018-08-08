@@ -581,17 +581,25 @@ class DevelHandler(RequestHandler):
                 if m:
                     action = m.group(1)
                     counters[action][module] += 1
-        actions = counters.keys()  # maybe sort in a reasonable order?
-        alength = max([len(a) for a in actions])
-        formatstring = "%-" + str(alength) + "s: %d (%s)\n"
-        for action in actions:
-            actionsum = sum(counters[action].values())
-            modcounts = ", ".join(["%s: %s" % (k, v) for k, v in sorted(counters[action].items())])
-            output.write(formatstring % (action, actionsum, modcounts))
-        # download: 666 (sfs 421, prop 42, soukb 12)
-        # parse:    555 (sfs 400, prop 0,  sou 12)
-        # relate:   500 (sfs 140, prop 0,  sou 12)
-        # generate: 450 (sfs 130, prop 0,  sou 12)
+        sortkeys = defaultdict(int,
+                               {"download": -4,
+                                "parse": -3,
+                                "relate": -2,
+                                "generate": -1})
+        actions = sorted(counters.keys(), key=sortkeys.get)  # maybe sort in a reasonable order?
+        if actions:
+            alength = max([len(a) for a in actions])
+            formatstring = "%-" + str(alength) + "s: %d (%s)\n"
+            for action in actions:
+                actionsum = sum(counters[action].values())
+                modcounts = ", ".join(["%s: %s" % (k, v) for k, v in sorted(counters[action].items())])
+                output.write(formatstring % (action, actionsum, modcounts))
+            # download: 666 (sfs 421, prop 42, soukb 12)
+            # parse:    555 (sfs 400, prop 0,  sou 12)
+            # relate:   500 (sfs 140, prop 0,  sou 12)
+            # generate: 450 (sfs 130, prop 0,  sou 12)
+        else:
+            output.write("[no successful processing actions found]\n")
         return output.getvalue()
         
 
