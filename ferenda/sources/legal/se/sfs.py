@@ -353,10 +353,10 @@ class SFS(Trips):
                     self.log.warning("%s: Is not really an base SFS, search results must have contained an invalid entry" % basefile)
                     util.robust_remove(downloaded_path)
                     return False
-                self.log.info("%s: downloaded from %s" % (basefile, url))
+                self.log.info("%s: download OK from %s" % (basefile, url))
             else:
                 self.log.info(
-                    "%s: downloaded new version from %s" % (basefile, url))
+                    "%s: download OK (new version) from %s" % (basefile, url))
             updated = True
         # using the attachment functionality makes some sense, but
         # requires that self.store.storage_policy = "dir"

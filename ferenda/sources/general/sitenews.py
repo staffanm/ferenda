@@ -1,6 +1,8 @@
 from datetime import datetime
-import re
 import codecs
+import os
+import re
+import tempfile
 
 import bs4
 from rdflib import URIRef, Literal, Namespace
@@ -54,7 +56,7 @@ class Sitenews(DocumentRepository):
     def download(self):
         # do something with static/sitenews.txt --> split into
         # <datadir>/sitenews/<timestamp>.txt
-        ofp = None
+        ofp = temppath = path = basefile = None
         with codecs.open(self.resourceloader.filename(self.config.newsfile),
                          encoding="utf-8") as fp:
             for line in fp:
@@ -62,14 +64,20 @@ class Sitenews(DocumentRepository):
                 if m:
                     if ofp:
                         ofp.close()
+                        if util.replace_if_different(temppath, path):
+                            self.log.info("%s: creating news item" % basefile)
                     d = datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S")
                     basefile = str(int(d.timestamp()))
                     path = self.store.downloaded_path(basefile)
-                    self.log.info("%s: creating news item" % basefile)
+                    fileno, temppath = tempfile.mkstemp(text=True)
                     util.ensure_dir(path)
-                    ofp = codecs.open(path, "w", encoding="utf-8")
+                    # ofp = codecs.open(path, "w", encoding="utf-8")
+                    ofp = os.fdopen(fileno, "w")
                 ofp.write(line)
             ofp.close()
+            if util.replace_if_different(temppath, path):
+                self.log.info("%s: download OK (creating news item)" % basefile)
+                
 
     @managedparsing
     def parse(self, doc):

@@ -287,7 +287,7 @@ class Regeringen(Offtryck):
                     self.log.debug("%s: %s is unchanged, checking PDF files" %
                                    (basefile, filename))
             else:
-                self.log.info("%s: downloaded from %s" % (basefile, url))
+                self.log.info("%s: download OK from %s" % (basefile, url))
 
             if self.get_parse_options(basefile) == "metadataonly":
                 self.log.debug("%s: Marked as 'metadataonly', not downloading actual PDF file" % basefile)

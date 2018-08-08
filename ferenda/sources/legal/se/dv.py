@@ -453,13 +453,13 @@ class DV(SwedishLegalSource):
                             os.unlink(outfile)
                         removed += 1
                     elif "BYTUT" in name:
-                        self.log.info("%s: Replacing with new" % basefile)
+                        self.log.info("%s: download OK (replacing with new)" % basefile)
                         if not os.path.exists(outfile):
                             self.log.warning("%s: %s doesn't exist" %
                                              (basefile, outfile))
                         replaced += 1
                     else:
-                        self.log.info("%s: Unpacking" % basefile)
+                        self.log.info("%s: download OK (unpacking)" % basefile)
                         if os.path.exists(outfile):
                             untouched += 1
                             continue

@@ -265,10 +265,10 @@ class SOUKB(Offtryck, PDFDocumentRepository):
         else:
             if self.download_if_needed(pdfurl, basefile) or self.config.refresh:
                 if created:
-                    self.log.info("%s: downloaded from %s" % (basefile, pdfurl))
+                    self.log.info("%s: download OK from %s" % (basefile, pdfurl))
                 else:
                     self.log.info(
-                        "%s: downloaded new version from %s" % (basefile, pdfurl))
+                        "%s: download OK (new version) from %s" % (basefile, pdfurl))
                 updated = True
                 try:
                     self.download_if_needed(thumburl, basefile,

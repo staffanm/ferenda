@@ -184,7 +184,7 @@ class Riksdagen(Offtryck, FixedLayoutSource):
                     self.log.debug("  %s: %s is unchanged, checking files" %
                                    (basefile, xmlfile))
             else:
-                self.log.info("%s: downloaded from %s" % (basefile, url))
+                self.log.info("%s: download OK from %s" % (basefile, url))
 
             # for some reason, using a XML parser ("xml" or
             # "lxml-xml") causes only the first ~70 kb of the file
