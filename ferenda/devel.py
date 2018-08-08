@@ -6,7 +6,7 @@ import builtins
 
 from ast import literal_eval
 from bz2 import BZ2File
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict, defaultdict, Counter
 from difflib import unified_diff
 from datetime import datetime
 from itertools import islice
@@ -25,6 +25,7 @@ import random
 import re
 import shutil
 import sys
+import time
 import traceback
 from wsgiref.util import request_uri
 from urllib.parse import parse_qsl, urlencode
@@ -561,6 +562,39 @@ class DevelHandler(RequestHandler):
                 lbl = k
             print("%4d %s" % (d[k], lbl), file=file)
 
+    re_message_loc = re.compile
+    def analyze_buildstats(self, logfilename):
+        output = StringIO()
+        counters = defaultdict(Counter)
+        msgloc = re.compile(" \([\w/]+.py:\d+\)").search
+        eventok = re.compile("[^ ]+: (download|parse|relate|generate) OK").match
+        with open(logfilename) as fp:
+            for line in fp:
+                try:
+                    timestamp, module, level, message = line.split(" ", 3)
+                except ValueError:
+                    continue
+                m = msgloc(message)
+                if m:
+                    message = message[:m.start()]
+                m = eventok(message)
+                if m:
+                    action = m.group(1)
+                    counters[action][module] += 1
+        actions = counters.keys()  # maybe sort in a reasonable order?
+        alength = max([len(a) for a in actions])
+        formatstring = "%-" + str(alength) + "s: %d (%s)\n"
+        for action in actions:
+            actionsum = sum(counters[action].values())
+            modcounts = ", ".join(["%s: %s" % (k, v) for k, v in sorted(counters[action].items())])
+            output.write(formatstring % (action, actionsum, modcounts))
+        # download: 666 (sfs 421, prop 42, soukb 12)
+        # parse:    555 (sfs 400, prop 0,  sou 12)
+        # relate:   500 (sfs 140, prop 0,  sou 12)
+        # generate: 450 (sfs 130, prop 0,  sou 12)
+        return output.getvalue()
+        
+
     def handle_logs(self, environ, params):
         logdir = self.repo.config.datadir + os.sep + "logs"
         def firstline(f):
@@ -581,15 +615,21 @@ class DevelHandler(RequestHandler):
             return Body([
                 Div([UL([linkelement(f) for f in logfiles])])])
         elif 'file' in params:
+            start = time.time()
             assert re.match("\d{8}-\d{6}.log$", params['file']), "invalid log file name"
             logfilename = logdir+os.sep+params['file']
+            buildstats = self.analyze_buildstats(logfilename)
             errorstats = self.analyze_log(logfilename)
             if not errorstats:
                 errorstats = "[analyze_log didn't return any output?]"
+            logcontents = util.readfile(logfilename)
+            
             return Body([
                 Div([H2([params['file']]),
+                     P(["Log processed in %.3f s" % (time.time() - start)]),
+                     Pre([buildstats]),
                      Pre([errorstats]),
-                     Pre([util.readfile(logfilename)], **{'class': 'logviewer'})])])
+                     Pre([logcontents], **{'class': 'logviewer'})])])
 
 
 
