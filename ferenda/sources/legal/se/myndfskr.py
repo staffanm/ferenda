@@ -1346,7 +1346,7 @@ class KVFS(MyndFskrBase):
     basefile_regex = re.compile("(?P<basefile>KVV?FS \d{4}:\d+)")
 
     def download_get_first_page(self, paging=1):
-        self.log.info("POSTing to search, paging=%s" % paging)
+        self.log.debug("POSTing to search, paging=%s" % paging)
         params = {'publicationKeyword':'',
                   'sortOrder': 'publish_desc',
                   'paging': str(paging)}
@@ -1391,7 +1391,7 @@ class KVFS(MyndFskrBase):
 
 class LMFS(MyndFskrBase):
     alias = "lmfs"
-    start_url = "http://www.lantmateriet.se/Om-Lantmateriet/Rattsinformation/Foreskrifter/"
+    start_url = "http://www.lantmateriet.se/sv/Om-Lantmateriet/Rattsinformation/Foreskrifter/"
     basefile_regex = re.compile('(?P<basefile>LMV?FS \d{4}:\d{1,3})')
 
     def forfattningssamlingar(self):
@@ -1433,7 +1433,7 @@ class LVFS(MyndFskrBase):
 
 class MIGRFS(MyndFskrBase):
     alias = "migrfs"
-    start_url = "https://www.migrationsverket.se/Om-Migrationsverket/Styrning-och-uppfoljning/Lagar-och-regler/Foreskrifter.html"
+    start_url = "https://www.migrationsverket.se/Om-Migrationsverket/Vart-uppdrag/Styrning-och-uppfoljning/Foreskrifter.html"
     basefile_regex = re.compile("(?P<basefile>(MIGR|SIV)FS \d+[:/]\d+)$")
 
     def sanitize_basefile(self, basefile):
@@ -2147,7 +2147,8 @@ class STFS(MyndFskrBase):
         soup = BeautifulSoup(source, "lxml")
         while not done:
             for item in soup.find_all("div", "item"):
-                basefile = item.h3.text.strip()
+                title = item.h3.text.strip() # eg. 'STFS 2018:1 Föreskrifter om partistöd'
+                basefile = " ".join(title.split(" ")[:2])
                 link = item.find("a", href=re.compile("file_id=\d+$"))
                 yield self.sanitize_basefile(basefile), urljoin(self.start_url, link["href"])
             nextpage = soup.find("a", text="»")
