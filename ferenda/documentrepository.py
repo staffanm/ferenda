@@ -1880,11 +1880,10 @@ with the *config* object as single parameter.
                     start = time.time()
                     if self.config.force:
                         self.relate_triples(basefile)
-                        entry.indexed_ts = datetime.now()
                     else:
                         timings['v_triples'] = self.relate_triples(basefile, removesubjects=True)
-                        entry.indexed_ts = datetime.now()
                     timings['e_triples'] = time.time() - start
+                entry.indexed_ts = datetime.now()
         entry.save()
 
     def _get_triplestore(self, **kwargs):
