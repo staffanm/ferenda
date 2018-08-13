@@ -56,6 +56,8 @@ class ScannedPatents(DocumentRepository):
     # actually work
     def ocr_and_structure(self, doc):
         return True # A-OK!
+    # FIXME: noone calls repo.parseneeded anymore, they should call
+    # repo.store.needed(basefile, "parse")
     def parseneeded(self, basefile):
         return True
     required_predicates = []

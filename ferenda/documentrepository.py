@@ -59,7 +59,7 @@ from ferenda import (Describer, TripleStore, FulltextIndex, Document,
 from ferenda.elements import (Body, Link,
                               UnorderedList, ListItem, Paragraph)
 from ferenda.elements.html import elements_from_soup
-from ferenda.documentstore import Relate
+from ferenda.documentstore import RelateNeeded
 # establish two central RDF Namespaces at the top level
 DCTERMS = Namespace(util.ns['dcterms'])
 PROV = Namespace(util.ns['prov'])
@@ -1118,20 +1118,9 @@ with the *config* object as single parameter.
            this might change to a instance method.
         """
 
-    def parseneeded(self, basefile):
-        """Returns True iff there is a need to parse the given basefile. If
-        the resulting parsed file exists and is newer than the
-        downloaded file, there is typically no reason to parse the
-        file.
-
-        """
-        infile = self.store.downloaded_path(basefile)
-        outfile = self.store.parsed_path(basefile)
-        return not util.outfile_is_newer([infile], outfile)
-
     @decorators.action
     @decorators.managedparsing
-    def parse(self, doc):
+    def parse(self, doc, needed=True):
         """Parse downloaded documents into structured XML and RDF.
 
         It will also save the same RDF statements in a separate
@@ -1820,8 +1809,9 @@ with the *config* object as single parameter.
         return True
 
     @decorators.action
+    @decorators.ifneeded('relate')
     @decorators.updateentry('relate')
-    def relate(self, basefile, otherrepos=[]):
+    def relate(self, basefile, otherrepos=[], needed=RelateNeeded(True,True,True)):
         """Runs various indexing operations for the document.
 
            This includes inserting RDF statements into a triple store,
@@ -1835,13 +1825,6 @@ with the *config* object as single parameter.
                              (basefile, self.alias))
             return False
         entry = DocumentEntry(self.store.documententry_path(basefile))
-        if self.config.force:
-            relate = Relate(True, True, True)
-        else:
-            relate = self.store.needed(basefile, "relate")
-        if not(relate.triples or relate.dependencies or relate.fulltext):
-            self.log.debug("%s: skipped relate" % basefile)
-            return
         timings = {'basefile': basefile,
                    'e_triples': 0,
                    'e_deps': 0,
@@ -1862,18 +1845,18 @@ with the *config* object as single parameter.
             if self not in otherrepos:
                 otherrepos.append(self)
 
-            if self.config.fulltextindex and relate.fulltext:
+            if self.config.fulltextindex and needed.fulltext:
                 start = time.time()
                 timings['v_fulltext'] = self.relate_fulltext(basefile, otherrepos)
                 timings['e_fulltext'] = time.time() - start
                 entry.indexed_ft = datetime.now()
 
-            if relate.dependencies:
+            if needed.dependencies:
                 start = time.time()
                 timings['v_deps'] = self.relate_dependencies(basefile, otherrepos)
                 timings['e_deps'] = time.time() - start
                 entry.indexed_dep = datetime.now()
-            if relate.triples:
+            if needed.triples:
                 # If using the Bulk upload feature, append to the
                 # temporary file that is to be bulk uploaded (see
                 # relate_all_setup).
@@ -2372,8 +2355,9 @@ WHERE {
         """
 
     @decorators.action
+    @decorators.ifneeded('generate')
     @decorators.updateentry('generate')
-    def generate(self, basefile, otherrepos=[]):
+    def generate(self, basefile, otherrepos=[], needed=True):
         """Generate a browser-ready HTML file from structured XML and RDF.
 
         Uses the XML and RDF files constructed by
@@ -2392,27 +2376,6 @@ WHERE {
         :type  basefile: str
         :returns: None
         """
-        # This dependency management could be abstracted away like
-        # the parseifneeded decorator does for parse(). But unlike
-        # parse(), noone is expected to override generate(), so
-        # the proper place to handle this complexity is probably
-        # here.
-        infile = self.store.parsed_path(basefile)
-        
-        annotations = self.store.annotation_path(basefile)
-        if os.path.exists(self.store.dependencies_path(basefile)):
-            deptxt = util.readfile(self.store.dependencies_path(basefile))
-            dependencies = deptxt.strip().split("\n")
-        else:
-            dependencies = []
-        dependencies.extend((infile, annotations))
-
-        outfile = self.store.generated_path(basefile)
-        if ((not self.config.force) and
-                util.outfile_is_newer(dependencies, outfile)):
-            self.log.debug("%s: Skipped", basefile)
-            return
-
         with util.logtime(self.log.info, "%(basefile)s: generate OK (%(elapsed).3f sec)",
                           {'basefile': basefile}):
 
@@ -2420,9 +2383,16 @@ WHERE {
 
             # All bookkeping done, now lets prepare and transform!
 
+            infile = self.store.parsed_path(basefile)
+            outfile = self.store.generated_path(basefile)
             # The annotationfile might be newer than all dependencies
             # (and thus not need regenerateion) even though the
             # outfile is older.
+            if os.path.exists(self.store.dependencies_path(basefile)):
+                deptxt = util.readfile(self.store.dependencies_path(basefile))
+                dependencies = deptxt.strip().split("\n")
+            else:
+                dependencies = []
             if (self.config.force or (not
                                       util.outfile_is_newer(dependencies, self.store.annotation_path(basefile)))):
                 with util.logtime(self.log.debug,

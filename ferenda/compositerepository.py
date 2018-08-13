@@ -184,17 +184,18 @@ class CompositeRepository(DocumentRepository):
     @updateentry("parse")
     def parse(self, basefile):
         # first, check if we really need to parse. If any subrepo
-        # returns that parseneeded is false and we have parsed file in
-        # the mainrepo, then we're done. This is mainly to avoid the
-        # log message below (to be in line with expected repo
-        # behaviour of not logging anything at severity INFO if no real
-        # work was done), it does not noticably affect performance
+        # returns that .store.needed(...., "parse") is false and we
+        # have parsed file in the mainrepo, then we're done. This is
+        # mainly to avoid the log message below (to be in line with
+        # expected repo behaviour of not logging anything at severity
+        # INFO if no real work was done), it does not noticably affect
+        # performance
         force = (self.config.force is True or
                  self.config.parseforce is True)
         if not force:
             for c in self.subrepos:
                 inst = self.get_instance(c)
-                needed = inst.parseneeded(basefile)
+                needed = inst.store.needed(basefile, "parse")
                 if not needed and os.path.exists(self.store.parsed_path(basefile)):
                     self.log.debug("%s: Skipped" % basefile)
                     return True  # signals everything OK

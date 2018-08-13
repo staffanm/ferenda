@@ -387,18 +387,39 @@ doesn't require that the directory of *dst* exists beforehand.
 
 # util.File
 
+class OutfileIsNotNewer(int):
+    def __new__(cls, *args, **kwargs):
+        obj = int.__new__(cls, *args)
+        object.__setattr__(obj, 'reason', kwargs['reason'])
+        return obj
+
+    def __bool__(self):
+        return False
+    
 
 def outfile_is_newer(infiles, outfile):
-    """Check if a given *outfile* is newer (has a more recent modification time) than a list of *infiles*. Returns True if so, False otherwise (including if outfile doesn't exist)."""
+    """Check if a given *outfile* is newer than all of the given files in the *infiles* list.
+
+    Newer is defined as having more recent modification time. Returns
+    True if so, a falsey value otherwise (including if outfile doesn't
+    exist).
+
+    If the outfile isn't never, the value returned will evaluate to
+    False in a bool context, but also contain a *reason* attribute
+    containing a text description of which infiles file was never than
+    outfile.
+
+    """
 
     if not os.path.exists(outfile):
-        return False
+        return OutfileIsNotNewer(reason="outfile doesn't exist: %s" % outfile)
     outfile_mtime = os.stat(outfile).st_mtime
     for f in infiles:
         # print "Testing whether %s is newer than %s" % (f, outfile)
         if os.path.exists(f) and os.stat(f).st_mtime > outfile_mtime:
             # print "%s was newer than %s" % (f, outfile)
-            return False
+            # return False
+            return OutfileIsNotNewer(reason="%s is newer than outfile %s" % (f, outfile))
     # print "%s is newer than %r" % (outfile, infiles)
     return True
 

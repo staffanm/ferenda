@@ -186,11 +186,25 @@ class _open(object):
     def name(self):
         return self.fp.name
 
-Relate = namedtuple('Relate', ['fulltext', 'dependencies', 'triples'])
+class Needed(int):
+    def __new__(cls, *args, **kwargs):
+        obj = int.__new__(cls, *args)
+        object.__setattr__(obj, 'reason', kwargs['reason'])
+        return obj
+
+    def __bool__(self):
+        return True
+
+RelateNeeded = namedtuple('RelateNeeded', ['fulltext', 'dependencies', 'triples'])
 # make this namedtuple class work in a bool context: False iff all
-# elements are falsy
-Relate.__bool__ = lambda self: any(self)
-                   
+# elements are falsy. Elements should be plain bools or Needed objects
+RelateNeeded.__bool__ = lambda self: any(self)
+
+# for reason, return the first True-ish elements reason (FIXME: what
+# happens if no element is True?)
+RelateNeeded.reason = property(lambda self: next(x.reason for x in self if x))
+
+
 
 class DocumentStore(object):
     """Unifies handling of reading and writing of various data files
@@ -351,25 +365,42 @@ class DocumentStore(object):
 
 
     def needed(self, basefile, action):
+        """Determine if we really need to perform *action* for the given
+*basefile*, or if the result of the action (in the form of the file
+that the action creates, or similar) is newer than all of the actions
+dependencies (in the form of source files for the action).
+
+        """
+        
         # if this function is even called, it means that force is not
         # true (or ferenda-build.py has not been called with a single
         # basefile, which is an implied force)
         if action == "parse":
             infile = self.downloaded_path(basefile)
             outfile = self.parsed_path(basefile)
-            return not util.outfile_is_newer([infile], outfile)
+            newer = util.outfile_is_newer([infile], outfile)
+            if not newer:
+                return Needed(reason=getattr(newer, 'reason', None))
+            else:
+                return False
         elif action == "relate":
             entry = DocumentEntry(self.documententry_path(basefile))
-            def newer(filename, dt):
+            def newer(filename, dt, field):
                 if not os.path.exists(filename):
                     return False
                 elif not dt:  # has never been indexed
-                    return True
+                    return Needed(reason="%s has not been processed" % filename)
                 else:
-                    return datetime.fromtimestamp(os.stat(filename).st_mtime) > dt
-            return Relate(fulltext=newer(self.parsed_path(basefile), entry.indexed_ft),
-                          triples=newer(self.distilled_path(basefile), entry.indexed_ts),
-                          dependencies=newer(self.distilled_path(basefile), entry.indexed_dep))
+                    if datetime.fromtimestamp(os.stat(filename).st_mtime) > dt:
+                        return Needed(reason="%s is newer than %s in documententry %s" % (filename, field, entry._path))
+                    else:
+                        return False
+                                    
+            return RelateNeeded(
+                fulltext=newer(self.parsed_path(basefile), entry.indexed_ft, 'indexed_ft'),
+                triples=newer(self.distilled_path(basefile), entry.indexed_ts, 'indexed_ts'),
+                dependencies=newer(self.dependencies_path(basefile), entry.indexed_dep,
+                                   'indexed_dep'))
         elif action == "generate":
             infile = self.parsed_path(basefile)
             annotations = self.annotation_path(basefile)
@@ -380,7 +411,16 @@ class DocumentStore(object):
                 dependencies = []
             dependencies.extend((infile, annotations))
             outfile = self.generated_path(basefile)
-            return not util.outfile_is_newer(dependencies, outfile)
+            # support generated 404 files (when served through HTTP,
+            # served with HTTP status 404, but otherwise works just as
+            # regular generated files)
+            if not os.path.exists(outfile) and os.path.exists(outfile + ".404"):
+                outfile += ".404"
+            newer = util.outfile_is_newer(dependencies, outfile)
+            if not newer:
+                return Needed(reason = getattr(newer, 'reason', None))
+            else:
+                return False
         else:
             # custom actions will need to override needed and provide logic there
             return True  

@@ -8,11 +8,12 @@ import sys
 import shutil
 import tempfile
 import time
+from datetime import datetime, timedelta
 
 from ferenda.compat import unittest
 
 #SUT
-from ferenda import DocumentStore
+from ferenda import DocumentStore, DocumentEntry
 from ferenda import util
 from ferenda.errors import *
 
@@ -377,6 +378,120 @@ class XzCompression(Compression):
     expected_mimetype = ("application/x-xz",)
     
 
+
+class Needed(unittest.TestCase):
+    def setUp(self):
+        self.datadir = tempfile.mkdtemp()
+        self.store = DocumentStore(self.datadir)
+
+    def tearDown(self):
+        shutil.rmtree(self.datadir)
+
+    def create_file(self, path, timestampoffset=0, content="dummy"):
+        util.ensure_dir(path)
+        with open(path, "w") as fp:
+            fp.write(content)
+        if timestampoffset:
+            os.utime(path, (time.time(), time.time() + timestampoffset))
+        
+    def test_parse_not_needed(self):
+        self.create_file(self.store.downloaded_path("a"))
+        self.create_file(self.store.parsed_path("a"), 3600)
+        self.assertFalse(self.store.needed("a", "parse"))
+
+    def test_parse_needed(self):
+        self.create_file(self.store.downloaded_path("a"))
+        res = self.store.needed("a", "parse")
+        self.assertTrue(res)
+        self.assertIn("outfile doesn't exist", res.reason)
+
+    def test_parse_needed_outdated(self):
+        self.create_file(self.store.downloaded_path("a"))
+        self.create_file(self.store.parsed_path("a"), -3600)
+        res = self.store.needed("a", "parse")
+        self.assertTrue(res)
+        self.assertIn("is newer than outfile", res.reason)
+
+
+    def create_entry(self, basefile, timestampoffset=0):
+        # create a entry file with indexed_{ft,ts,dep} set to the
+        # current time with optional offset
+        de = DocumentEntry(self.store.documententry_path(basefile))
+        delta = timedelta(seconds=timestampoffset)
+        ts = datetime.now() + delta
+        de.indexed_ts = ts
+        de.indexed_ft = ts
+        de.indexed_dep = ts
+        de.save()
+
+    def test_relate_not_needed(self):
+        self.create_entry("a")
+        self.create_file(self.store.distilled_path("a"), -3600)
+        self.create_file(self.store.parsed_path("a"), -3600)
+        self.create_file(self.store.dependencies_path("a"), -3600)
+        self.assertFalse(self.store.needed("a", "relate"))
+
+    def test_relate_needed_ts(self):
+        self.create_entry("a", -3600)
+        self.create_file(self.store.distilled_path("a"))
+        self.create_file(self.store.parsed_path("a"), -7200)
+        self.create_file(self.store.dependencies_path("a"), -7200)
+        res = self.store.needed("a", "relate")
+        self.assertTrue(res)
+        self.assertIn("is newer than indexed_ts in documententry", res.reason)
+
+    def test_relate_needed_ft(self):
+        self.create_entry("a", -3600)
+        self.create_file(self.store.distilled_path("a"), -7200)
+        self.create_file(self.store.parsed_path("a"))
+        self.create_file(self.store.dependencies_path("a"), -7200)
+        res = self.store.needed("a", "relate")
+        self.assertTrue(res)
+        self.assertIn("is newer than indexed_ft in documententry", res.reason)
+
+    def test_relate_needed_dep(self):
+        self.create_entry("a", -3600)
+        self.create_file(self.store.distilled_path("a"), -7200)
+        self.create_file(self.store.parsed_path("a"), -7200)
+        self.create_file(self.store.dependencies_path("a"))
+        res = self.store.needed("a", "relate")
+        self.assertTrue(res)
+        self.assertIn("is newer than indexed_dep in documententry", res.reason)
+        
+    def test_generate_not_needed(self):
+        self.create_file(self.store.parsed_path("a"))
+        self.create_file(self.store.generated_path("a"), 3600)
+        self.assertFalse(self.store.needed("a", "generate"))
+
+    def test_generate_not_needed_404(self):
+        self.create_file(self.store.parsed_path("a"))
+        self.create_file(self.store.generated_path("a") + ".404", 3600)
+        self.assertFalse(self.store.needed("a", "generate"))
+
+    def test_generate_needed(self):
+        self.create_file(self.store.parsed_path("a"))
+        res = self.store.needed("a", "generate")
+        self.assertTrue(res)
+        self.assertIn("outfile doesn't exist", res.reason)
+
+    def test_generate_needed_outdated(self):
+        self.create_file(self.store.parsed_path("a"))
+        self.create_file(self.store.generated_path("a"), -3600)
+        res = self.store.needed("a", "generate")
+        self.assertTrue(res)
+        self.assertIn("is newer than outfile", res.reason)
+
+    def test_generate_needed_outdated_dep(self):
+        self.create_file(self.store.parsed_path("a"), -3600)
+        self.create_file(self.store.generated_path("a"), -1800)
+        dependency_path = self.store.datadir + os.sep + "blahonga.txt"
+        self.create_file(self.store.dependencies_path("a"), -3600, dependency_path)
+        # create a arbitrary dependency file which is newer than outfile
+        self.create_file(dependency_path)
+        res = self.store.needed("a", "generate")
+        self.assertTrue(res)
+        self.assertIn("is newer than outfile", res.reason)
+        
 import doctest
 from ferenda import documentstore
 def load_tests(loader,tests,ignore):

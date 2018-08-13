@@ -22,6 +22,10 @@ import os
 import sys
 import time
 import logging
+try:
+    from inspect import getfullargspec
+except ImportError: # py 2 doesn't have getfullargspec, use getargspec instead
+    from inspect import getargspec
 
 from rdflib import Graph, URIRef
 from rdflib.compare import graph_diff
@@ -29,6 +33,7 @@ from layeredconfig import LayeredConfig
 
 from ferenda import util
 from ferenda import DocumentEntry
+from ferenda.documentstore import Needed
 from ferenda.errors import DocumentRemovedError, ParseError
 from ferenda.elements import serialize
 
@@ -82,7 +87,7 @@ def parseifneeded(f):
     it should be re-generated."""
     @functools.wraps(f)
     def wrapper(self, basefile):
-        # note: We hardcode the use of .parseneeded() and the
+        # note: We hardcode the use of .store.needed(..., "parse") and the
         # 'parseforce' config option, which means that this decorator
         # can only be used sensibly with the .parse() function.
         force = (self.config.force is True or
@@ -95,6 +100,33 @@ def parseifneeded(f):
             return f(self, basefile)
     return wrapper
 
+def ifneeded(action):
+    def outer_wrapper(f, *args):
+        @functools.wraps(f)
+        def inner_wrapper(self, basefile, *args, **kwargs):
+            if self.config.force:
+                needed = Needed(reason="force is True")
+            else:
+                needed = self.store.needed(basefile, action)
+            if not needed:
+                self.log.debug("%s: %s skipped" % (basefile, action))
+                return True  # signals that everything is OK
+            else:
+                reason = ""
+                if hasattr(needed, 'reason'):
+                    reason = " (%s)" % needed.reason
+                # we should log this msg at DEBUG level, except now
+                # we're troubleshooting why certain files are
+                # re-processed and so we log at a slightly higher
+                # level (INFO + 1, to get around compositerepo's
+                # supress_subrepo_logging feature)
+                # self.log.debug("%s: %s starting%s" % (basefile, action, reason))
+                self.log.log(logging.INFO+1, "%s: %s starting%s" % (basefile, action, reason))
+                if 'needed' in getfullargspec(f).args and 'needed' not in kwargs:
+                    kwargs['needed'] = needed
+                return f(self, basefile, *args, **kwargs)
+        return inner_wrapper
+    return outer_wrapper
 
 def render(f):
     """Handles the serialization of the :py:class:`~ferenda.Document`
@@ -277,11 +309,11 @@ def makedocument(f):
 
 def managedparsing(f):
     """Use all standard decorators for parse() in the correct order
-    (:py:func:`~ferenda.decorators.parseifneeded`, 
+    (:py:func:`~ferenda.decorators.ifneeded`, :py:func:`~ferenda.decorators.updateentry`, 
     :py:func:`~ferenda.decorators.makedocument`, 
     :py:func:`~ferenda.decorators.timed`, 
     :py:func:`~ferenda.decorators.render`)"""
-    return parseifneeded(
+    return ifneeded('parse')(
         updateentry('parse')(
             makedocument(
                 # handleerror( # is this really a good idea?

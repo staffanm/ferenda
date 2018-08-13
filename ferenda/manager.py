@@ -1027,7 +1027,7 @@ def _run_class(enabled, argv, config):
                 # if we don't need to parse all basefiles, let's not
                 # even send jobs out to buildclients if we can avoid
                 # it
-                iterable = (x for x in iterable if inst.parseneeded(x))
+                iterable = (x for x in iterable if inst.store.needed(x, "parse"))
             res = []
             # semi-magic handling
             kwargs['currentrepo'] = inst

@@ -6,12 +6,15 @@ from builtins import *
 import sys
 import os
 import datetime
+import shutil
+import tempfile
 from ferenda.compat import unittest, Mock, MagicMock, patch
 
-from ferenda import DocumentRepository, DocumentStore, Document
+from ferenda import util
+from ferenda import DocumentRepository, DocumentStore, Document, DocumentEntry
 from ferenda.errors import DocumentRemovedError, ParseError
 # SUT
-from ferenda.decorators import (timed, parseifneeded, render, handleerror,
+from ferenda.decorators import (timed, parseifneeded, ifneeded, render, handleerror,
                                 makedocument, recordlastdownload, downloadmax)
 
 
@@ -77,6 +80,137 @@ class Decorators(unittest.TestCase):
             testfunc(mockrepo, mockbasefile)
         self.assertTrue(mockrepo.called)
         mockrepo.called = False
+
+    def test_ifneeded_parse(self):
+        @ifneeded("parse")
+        def testfunc(repo, basefile):
+            repo.called = True
+
+        # mockdoc = Mock()
+        # mockdoc.basefile="1234"
+        mockbasefile = "1234"
+        mockrepo = Mock()
+        mockrepo.store.needed = DocumentStore(datadir='fake').needed
+        mockrepo.called = False
+        mockrepo.config.force = False
+
+        # test 1: Outfile is newer - the ifneeded decorator should
+        # make sure the actual testfunc code is never reached
+        with patch('ferenda.util.outfile_is_newer', return_value=True):
+            testfunc(mockrepo, mockbasefile)
+
+        self.assertFalse(mockrepo.called)
+        mockrepo.called = False
+
+        # test 2: Outfile is older
+        with patch('ferenda.util.outfile_is_newer', return_value=False):
+            testfunc(mockrepo, mockbasefile)
+        self.assertTrue(mockrepo.called)
+        mockrepo.called = False
+
+        # test 3: Outfile is newer, but the global force option was set
+        mockrepo.config.force = True
+        with patch('ferenda.util.outfile_is_newer', return_value=True):
+            testfunc(mockrepo, mockbasefile)
+        self.assertTrue(mockrepo.called)
+        mockrepo.config.force = None
+        mockrepo.called = False
+
+    def test_ifneeded_relate(self):
+        @ifneeded("relate")
+        def testfunc(repo, basefile, needed):
+            repo.called = True
+            repo.needed = needed
+
+        try:
+            datadir = tempfile.mkdtemp()
+            mockbasefile = "1234"
+            mockrepo = Mock()
+            mockrepo.store = DocumentStore(datadir=datadir)
+            mockrepo.called = False
+            mockrepo.config.force = False
+
+            # create some docentry file in a good place
+            de = DocumentEntry(mockrepo.store.documententry_path("1234"))
+            now = datetime.datetime.now()
+            de.indexed_ts = now + datetime.timedelta(seconds=3600)
+            de.indexed_ft = now + datetime.timedelta(seconds=-3600)
+            de.indexed_dep = now + datetime.timedelta(seconds=-3600)
+            de.save()
+
+            # test 1: Outfile is newer - the ifneeded decorator should
+            # make sure the actual testfunc code is never reached
+
+            # NOTE: the "relate" branch of DocumentStore.needed
+            # doesn't use outfile_is_newer, so we can't patch that, we
+            # have to create actual files
+            parsedpath = mockrepo.store.parsed_path("1234")
+            util.writefile(parsedpath,  "dummy")
+            os.utime(parsedpath, (now.timestamp(), now.timestamp() - 7200))
+            testfunc(mockrepo, mockbasefile)
+            self.assertFalse(mockrepo.called)
+            mockrepo.called = False
+
+            # test 2: Outfile is older than the information in the documententry file
+            os.utime(parsedpath, (now.timestamp(), now.timestamp()))
+            testfunc(mockrepo, mockbasefile)
+            self.assertTrue(mockrepo.called)
+            self.assertTrue(mockrepo.needed)
+            self.assertFalse(mockrepo.needed.triples)
+            self.assertFalse(mockrepo.needed.dependencies)
+            self.assertTrue(mockrepo.needed.fulltext)
+            
+            mockrepo.called = False
+            # test 3: Outfile is newer, but the global force option was set
+            os.utime(parsedpath, (now.timestamp(), now.timestamp() - 7200))
+            mockrepo.config.force = True
+            testfunc(mockrepo, mockbasefile)
+            self.assertTrue(mockrepo.called)
+            mockrepo.config.force = None
+            mockrepo.called = False
+        finally:
+            if os.path.exists(datadir):
+                shutil.rmtree(datadir)
+            
+
+    def test_ifneeded_generate(self):
+        @ifneeded("generate")
+        def testfunc(repo, basefile):
+            repo.called = True
+
+        mockbasefile = "1234"
+        mockrepo = Mock()
+        mockrepo.store.needed = DocumentStore(datadir='fake').needed
+        mockrepo.called = False
+        mockrepo.config.force = False
+
+        # test 1: Outfile is newer - the ifneeded decorator should
+        # make sure the actual testfunc code is never reached
+        with patch('ferenda.util.outfile_is_newer', return_value=True):
+            testfunc(mockrepo, mockbasefile)
+
+        self.assertFalse(mockrepo.called)
+        mockrepo.called = False
+
+        # test 2: Outfile is older than source file
+        with patch('ferenda.util.outfile_is_newer', return_value=False):
+            testfunc(mockrepo, mockbasefile)
+        self.assertTrue(mockrepo.called)
+        mockrepo.called = False
+
+        # FIXME: we could add more tests, eg create a dependency file
+        # and make sure an arbitrary file named in that depfile is
+        # newer then outfile. but the tests in testDocStore.Needed
+        # should cover that pretty well.
+
+        # test 3: Outfile is newer, but the global force option was set
+        mockrepo.config.force = True
+        with patch('ferenda.util.outfile_is_newer', return_value=True):
+            testfunc(mockrepo, mockbasefile)
+        self.assertTrue(mockrepo.called)
+        mockrepo.config.force = None
+        mockrepo.called = False
+
 
     @patch('ferenda.documentrepository.Graph')
     def test_render(self,mock_graph):

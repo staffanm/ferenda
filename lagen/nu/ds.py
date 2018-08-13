@@ -22,8 +22,8 @@ class DsRegeringen(OrigDs, SameAs):
 class DsStore(CompositeStore, SwedishLegalStore):
     pass
 
-# We inherit from SwedishLegalSource to get at the custom tabs()
-# implementation (that respects config.tabs)
+# We inherit from SwedishLegalSource (via FixedLayoutSource) to get at
+# the custom tabs() implementation (that respects config.tabs)
 class Ds(CompositeRepository, FixedLayoutSource):
     rdf_type = RPUBL.Utredningsbetankande
     alias = "ds"
