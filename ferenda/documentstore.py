@@ -372,6 +372,17 @@ dependencies (in the form of source files for the action).
 
         """
         
+        def newer(filename, dt, field):
+            if not os.path.exists(filename):
+                return False
+            elif not dt:  # has never been indexed
+                return Needed(reason="%s has not been processed" % filename)
+            else:
+                if datetime.fromtimestamp(os.stat(filename).st_mtime) > dt:
+                    return Needed(reason="%s is newer than %s in documententry %s" % (filename, field, entry._path))
+                else:
+                    return False
+
         # if this function is even called, it means that force is not
         # true (or ferenda-build.py has not been called with a single
         # basefile, which is an implied force)
@@ -385,16 +396,6 @@ dependencies (in the form of source files for the action).
                 return False
         elif action == "relate":
             entry = DocumentEntry(self.documententry_path(basefile))
-            def newer(filename, dt, field):
-                if not os.path.exists(filename):
-                    return False
-                elif not dt:  # has never been indexed
-                    return Needed(reason="%s has not been processed" % filename)
-                else:
-                    if datetime.fromtimestamp(os.stat(filename).st_mtime) > dt:
-                        return Needed(reason="%s is newer than %s in documententry %s" % (filename, field, entry._path))
-                    else:
-                        return False
                                     
             return RelateNeeded(
                 fulltext=newer(self.parsed_path(basefile), entry.indexed_ft, 'indexed_ft'),
@@ -418,7 +419,17 @@ dependencies (in the form of source files for the action).
                 outfile += ".404"
             newer = util.outfile_is_newer(dependencies, outfile)
             if not newer:
-                return Needed(reason = getattr(newer, 'reason', None))
+                return Needed(reason=getattr(newer, 'reason', None))
+            else:
+                return False
+        elif action == "transformlinks":
+            entry = DocumentEntry(self.documententry_path(basefile))
+            infile = self.generated_path(basefile)
+            # if entry.status['generate']['date'] is older than the
+            # file modification date, something has modified the file
+            # after generate -- most likely a call to transformlinks()
+            if not newer(infile, entry.updated, 'updated'):
+                return Needed(reason="%s has not been modified after generate at %s" % (infile, entry.status['generate']['date']))
             else:
                 return False
         else:

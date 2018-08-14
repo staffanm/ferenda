@@ -2666,9 +2666,10 @@ WHERE {
     #
     # STEP 4.5: After generating HTML, go through all links and
     # rewrite/transform them (we cannot do that as part of generate(),
-    # since the transform may depend on whether generated files exist
-    # on disk)
+    # since the transform may depend on whether other generated files
+    # exist on disk, to know whether keep links to them or not)
     @decorators.action
+    @decorators.ifneeded('transformlinks')
     def transformlinks(self, basefile, otherrepos=[]):
         """Transform links in generated HTML files.
 
@@ -3617,6 +3618,16 @@ WHERE {
         :rtype: dict
 
         """
+        # FIXME:
+        # * This needs to output data about whether relate or
+        #   transformlinks needs to run (even though these actions don'
+        #   result in new files).
+        # * It should use the logic provided by DocumentStore.needed,
+        #   not calling outfile_is_newer et al on its own
+        # * Should be able to run with a single basefile, and explain
+        #   the status of the different actions (ie generate needed
+        #   because a dependency is newer than existing generated
+        #   file)
         status = OrderedDict()
         exists = []
         todo = []

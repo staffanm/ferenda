@@ -42,7 +42,7 @@ from ferenda import (TextReader, TripleStore, FulltextIndex, WSGIApp,
                      CompositeRepository, DocumentEntry, Transformer,
                      RequestHandler, ResourceLoader)
 from ferenda.elements import serialize
-from ferenda.elements.html import Body, P, H1, H2, Form, Textarea, Input, Label, Button, Textarea, Br, Div, A, Pre, Code, UL, LI
+from ferenda.elements.html import Body, P, H1, H2, H3, Form, Textarea, Input, Label, Button, Textarea, Br, Div, A, Pre, Code, UL, LI
 from ferenda import decorators, util, manager
 
 class DummyStore(object):
@@ -567,7 +567,7 @@ class DevelHandler(RequestHandler):
         output = StringIO()
         counters = defaultdict(Counter)
         msgloc = re.compile(" \([\w/]+.py:\d+\)").search
-        eventok = re.compile("[^ ]+: (download|parse|relate|generate) OK").match
+        eventok = re.compile("[^ ]+: (download|parse|relate|generate|transformlinks) OK").match
         with open(logfilename) as fp:
             for line in fp:
                 try:
@@ -582,10 +582,11 @@ class DevelHandler(RequestHandler):
                     action = m.group(1)
                     counters[action][module] += 1
         sortkeys = defaultdict(int,
-                               {"download": -4,
-                                "parse": -3,
-                                "relate": -2,
-                                "generate": -1})
+                               {"download": -5,
+                                "parse": -4,
+                                "relate": -3,
+                                "generate": -2,
+                                "transformlinks": -1})
         actions = sorted(counters.keys(), key=sortkeys.get)  # maybe sort in a reasonable order?
         if actions:
             alength = max([len(a) for a in actions])
@@ -605,6 +606,15 @@ class DevelHandler(RequestHandler):
 
     def handle_logs(self, environ, params):
         logdir = self.repo.config.datadir + os.sep + "logs"
+        def elapsedtime(f):
+            with open(f) as fp:
+                first = fp.readline()
+                fp.seek(os.path.getsize(f) - 500)
+                last = fp.read().split("\n")[-2]
+            start = datetime.strptime(first.split(" ")[0], "%H:%M:%S")
+            end = datetime.strptime(last.split(" ")[0], "%H:%M:%S")
+            return end - start  # FIXME: Handle wraparound
+
         def firstline(f):
             with open(logdir+os.sep+f) as fp:
                 # trim uninteresting things from start and end
@@ -631,12 +641,15 @@ class DevelHandler(RequestHandler):
             if not errorstats:
                 errorstats = "[analyze_log didn't return any output?]"
             logcontents = util.readfile(logfilename)
-            
+            elapsed = elapsedtime(logfilename)
             return Body([
                 Div([H2([params['file']]),
-                     P(["Log processed in %.3f s" % (time.time() - start)]),
+                     P(["Log processed in %.3f s. The logged action took %.0f s." % (time.time() - start, elapsed.total_seconds())]),
+                     H3(["Buildstats"]),
                      Pre([buildstats]),
+                     H3(["Errors"]),
                      Pre([errorstats]),
+                     H3(["Logs"]),
                      Pre([logcontents], **{'class': 'logviewer'})])])
 
 

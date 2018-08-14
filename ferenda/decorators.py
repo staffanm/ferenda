@@ -25,7 +25,7 @@ import logging
 try:
     from inspect import getfullargspec
 except ImportError: # py 2 doesn't have getfullargspec, use getargspec instead
-    from inspect import getargspec
+    from inspect import getargspec as getfullargspec
 
 from rdflib import Graph, URIRef
 from rdflib.compare import graph_diff

@@ -1532,6 +1532,9 @@ class OtherRepo(DocumentRepository):
 
 class Transformlinks(RepoTester):
     def setUp(self):
+        self.repo.config.force = True  # needed now that we use the
+                                       # @ifneeded decorator on
+                                       # transformlinks()
         with self.repo.store.open_generated("1", "w") as fp:
             # this exact code might vary depending on how base.xsl
             # evolves, but we're really only interested in link

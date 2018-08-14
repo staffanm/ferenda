@@ -412,16 +412,19 @@ class Needed(unittest.TestCase):
         self.assertTrue(res)
         self.assertIn("is newer than outfile", res.reason)
 
-
     def create_entry(self, basefile, timestampoffset=0):
         # create a entry file with indexed_{ft,ts,dep} set to the
-        # current time with optional offset
+        # current time with optional offset. Also
+        # .status['generated']['date'], to test needed(...,
+        # 'transformlinks')
         de = DocumentEntry(self.store.documententry_path(basefile))
         delta = timedelta(seconds=timestampoffset)
         ts = datetime.now() + delta
         de.indexed_ts = ts
         de.indexed_ft = ts
         de.indexed_dep = ts
+        de.updated = ts
+        de.status['generate'] = {'date': ts}
         de.save()
 
     def test_relate_not_needed(self):
@@ -491,6 +494,19 @@ class Needed(unittest.TestCase):
         res = self.store.needed("a", "generate")
         self.assertTrue(res)
         self.assertIn("is newer than outfile", res.reason)
+
+    def test_transformlinks_needed(self):
+        self.create_file(self.store.generated_path("a"))
+        self.create_entry("a")
+        res = self.store.needed("a", "transformlinks")
+        self.assertTrue(res)
+        self.assertIn("has not been modified after generate", res.reason)
+
+    def test_transformlinks_not_needed(self):
+        self.create_entry("a", -3600)
+        self.create_file(self.store.generated_path("a"))
+        self.assertFalse(self.store.needed("a", "transformlinks"))
+
         
 import doctest
 from ferenda import documentstore

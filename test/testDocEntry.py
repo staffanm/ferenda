@@ -67,6 +67,24 @@ class DocEntry(unittest.TestCase):
   "url": null
 }"""
 
+    status_json = """{
+  "status": {
+    "download": {
+      "date": "2018-08-14T18:15:00"
+    },
+    "parse": {
+      "date": "2018-08-14T18:16:00"
+    },
+    "relate": {
+      "date": "2018-08-14T18:17:00"
+    },
+    "generate": {
+      "date": "2018-08-14T18:18:00", 
+      "not_a_date": "2018-08-14T18:18:00"
+    }
+  }
+}"""
+
     def setUp(self):
         self.maxDiff = None
         self.datadir = tempfile.mkdtemp()
@@ -199,3 +217,16 @@ class DocEntry(unittest.TestCase):
         self.assertEqual(d.guess_type("test.xhtml"),"application/html+xml")
         self.assertEqual(d.guess_type("test.bin"),  "application/octet-stream")
 
+    def test_load_status(self):
+        path = self.repo.store.documententry_path("123/a")
+        util.ensure_dir(path)
+        with open(path, "w") as fp:
+            fp.write(self.status_json)
+        d = DocumentEntry(path=path)
+        self.assertEqual(datetime(2018,8,14,18,15,00), d.status['download']['date'])
+        self.assertEqual(datetime(2018,8,14,18,16,00), d.status['parse']['date'])
+        self.assertEqual(datetime(2018,8,14,18,17,00), d.status['relate']['date'])
+        self.assertEqual(datetime(2018,8,14,18,18,00), d.status['generate']['date'])
+        self.assertEqual("2018-08-14T18:18:00", d.status['generate']['not_a_date'])
+
+        

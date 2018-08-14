@@ -114,10 +114,7 @@ class DocumentEntry(object):
                                                        'indexed_ts',
                                                        'indexed_dep',
                                                        'indexed_ft',
-                                                       'status.download.date',
-                                                       'status.parse.date',
-                                                       'status.relate.date',
-                                                       'status.generate.date')
+                                                       'date')
                 try:
                     d = json.load(fp, object_hook=hook)
                 except JSONDecodeError as e:
@@ -274,7 +271,6 @@ class DocumentEntry(object):
         is assumed to be the first element in args.
 
         """
-
         def clear(key, d):
             if key in d:
                 del d[key]
