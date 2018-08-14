@@ -47,7 +47,7 @@ from ferenda.elements import serialize, Section, Body, CompoundElement, UnicodeE
 from ferenda.pdfreader import Page, BaseTextDecoder, Textelement
 from ferenda.pdfreader import PDFReader
 from ferenda.pdfanalyze import PDFAnalyzer
-from ferenda.decorators import action, managedparsing, newstate
+from ferenda.decorators import action, managedparsing, newstate, ifneeded, updateentry
 from ferenda.thirdparty.coin import URIMinter
 from . import RPUBL
 from .elements import *
@@ -1321,6 +1321,8 @@ class SwedishLegalSource(DocumentRepository):
         #     v = "%s, %s" % (v, resourceuri.split("#", 1)[1])
         return v
 
+    @ifneeded('generate')
+    @updateentry('generate')
     def generate(self, basefile, otherrepos=[]):
         ret = super(SwedishLegalSource, self).generate(basefile, otherrepos)
         if self.get_parse_options(basefile) == "metadataonly":
