@@ -3,9 +3,15 @@ from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 from builtins import *
 
+import os
+
+import rdflib
+from rdflib.namespace import DCTERMS
+
 from ferenda import DocumentRepository, util, errors
 from ferenda.testutil import RepoTester
-from ferenda.decorators import updateentry
+from ferenda.decorators import updateentry, managedparsing
+from ferenda.elements.html import Body, H1
 # SUT
 from ferenda import CompositeRepository
 
@@ -173,3 +179,56 @@ class TestExtrabase(RepoTester):
     def test_super(self):
         got = self.repo.qualified_class_name()
         self.assertEqual("Q:testCompositeRepo.SubrepoBSubclass", got)
+
+
+class RenamingRepo(DocumentRepository):
+    alias = "renaming"
+    
+    @managedparsing
+    def parse(self, doc):
+        # create an intermediate file before we know the correct
+        # path for it. Later steps should move this file to the
+        # correct place.
+        util.writefile(self.store.intermediate_path(doc.basefile), "dummy")
+        doc.meta.add((rdflib.URIRef(doc.uri), DCTERMS.title,
+                      rdflib.Literal("Hello World", lang="en")))
+        doc.body = Body([H1(["Hello world"])])
+        doc.basefile = doc.basefile.replace("a/", "b/")
+        return True
+
+class BasefileRename(RepoTester):
+
+    class RenamingCompositeRepo(CompositeRepository):
+        alias = "composite"
+        subrepos = RenamingRepo,
+    
+    repoclass = RenamingCompositeRepo
+    
+    def test_rename(self):
+        self.repo.store.basefiles[RenamingRepo].add("a/1")
+        ret = self.repo.parse("a/1")
+        exists = os.path.exists
+        store = self.repo.get_instance(RenamingRepo).store
+        compositestore = self.repo.store
+        self.assertTrue(exists(store.parsed_path("b/1")))
+        self.assertTrue(exists(store.distilled_path("b/1")))
+        self.assertTrue(exists(store.documententry_path("b/1")))
+        self.assertTrue(exists(store.intermediate_path("b/1")))
+        # to make @ifneeded report that a re-parse is not needed
+        self.assertTrue(exists(store.parsed_path("a/1")))
+        self.assertEqual(0, os.path.getsize(store.parsed_path("a/1")))
+        # make sure only b/1 files exists at distilled/intermediate/docentry
+        self.assertFalse(exists(store.distilled_path("a/1")))
+        self.assertFalse(exists(store.documententry_path("a/1")))
+        self.assertFalse(exists(store.intermediate_path("a/1")))
+        # make sure the composite docentry is correctly placed and pointing
+        self.assertFalse(exists(compositestore.documententry_path("a/1")))
+        self.assertTrue(exists(compositestore.documententry_path("b/1")))
+        self.assertTrue(os.path.islink(compositestore.documententry_path("b/1")))
+        link = os.path.normpath(os.path.join(
+            os.path.dirname(compositestore.documententry_path("b/1")),
+            os.readlink(compositestore.documententry_path("b/1"))))
+        self.assertEqual(store.documententry_path("b/1"), link)
+        
+        # make sure a reparse works
+        self.assertTrue(self.repo.parse("a/1"))

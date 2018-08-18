@@ -665,7 +665,7 @@ with the *config* object as single parameter.
         >>> d = DocumentRepository()
         >>> d.alias
         'base'
-        >>> d.config.url = "http://exampole.org/"
+        >>> d.config.url = "http://example.org/"
         >>> d.dataset_uri()
         'http://example.org/dataset/base'
         >>> d.dataset_uri("title","a")
@@ -798,7 +798,8 @@ with the *config* object as single parameter.
                 try:
                     ret = DocumentEntry.updateentry(self.download_single,
                                                     'download',
-                                                    self.store.documententry_path(basefile),
+                                                    self.store.documententry_path,
+                                                    basefile,
                                                     basefile,
                                                     link)
                 except requests.exceptions.HTTPError as e:

@@ -221,7 +221,7 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
                         self.copy_parsed(subbasefile, inst)
                     break
         else:
-             return super(MyndFskr, self).parse(basefile)   
+            return super(MyndFskr, self).parse(basefile)   
     
     def facets(self):
         # maybe if each entry in the list could be a tuple or a single

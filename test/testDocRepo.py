@@ -18,18 +18,21 @@ from bs4 import BeautifulSoup
 from layeredconfig import LayeredConfig, Defaults, INIFile
 import lxml.etree as etree
 import rdflib
+from rdflib.namespace import DCTERMS
 import requests.exceptions
 
 from ferenda.compat import Mock, patch, call, unittest
 from ferenda import DocumentEntry, Describer, Facet, Transformer
 from ferenda.fulltextindex import WhooshIndex
+from ferenda.elements.html import Body, H1
+from ferenda.decorators import managedparsing
 from ferenda.errors import *
 
 
 # The main system under test (SUT)
 from test.quiet import silence
 from ferenda import DocumentRepository
-from ferenda.testutil import RepoTester
+from ferenda.testutil import RepoTester, parametrize
 
 # helper classes
 from examplerepos import DocRepo1, DocRepo2, DocRepo3
@@ -2145,13 +2148,52 @@ It can span several lines."""
         result, desc = self.repo.patch_if_needed("123/a", self.sourcedoc2)
         self.assertEqual(self.targetdoc3, result)
         
+class BasefileRename(RepoTester):
+    # If parse() changes doc.basefile during parse (in case the parse
+    # process discovers that download() got the basefile wrong) the
+    # various decorators in @managedparsing should respect this new basefile (creating parsed/distilled/documententry files under that new 
+    class RenamingRepo(DocumentRepository):
+        @managedparsing
+        def parse(self, doc):
+            # create an intermediate file before we know the correct
+            # path for it. Later steps should move this file to the
+            # correct place.
+            util.writefile(self.store.intermediate_path(doc.basefile), "dummy")
+            doc.meta.add((rdflib.URIRef(doc.uri), DCTERMS.title,
+                          rdflib.Literal("Hello World", lang="en")))
+            doc.body = Body([H1(["Hello world"])])
+            doc.basefile = doc.basefile.replace("a/", "b/")
+            return True
+    
+    repoclass = RenamingRepo
+    
+    def test_rename(self):
+        ret = self.repo.parse("a/1")
+        exists = os.path.exists
+        store = self.repo.store
+        self.assertTrue(ret)
+        self.assertTrue(exists(store.parsed_path("b/1")))
+        self.assertTrue(exists(store.distilled_path("b/1")))
+        self.assertTrue(exists(store.documententry_path("b/1")))
+        self.assertTrue(exists(store.intermediate_path("b/1")))
+        # to make @ifneeded report that a re-parse is not needed
+        self.assertTrue(exists(store.parsed_path("a/1")))
+        self.assertEqual(0, os.path.getsize(store.parsed_path("a/1")))
+        # make sure only b/1 files exists at distilled/intermediate/docentry
+        self.assertFalse(exists(store.distilled_path("a/1")))
+        self.assertFalse(exists(store.documententry_path("a/1")))
+        self.assertFalse(exists(store.intermediate_path("a/1")))
+
+        # make sure a reparse works
+        self.assertTrue(self.repo.parse("a/1"))
+        
 
 # # Add doctests in the module
-# from ferenda import documentrepository
-# from ferenda.testutil import Py23DocChecker
-# def load_tests(loader,tests,ignore):
-#     tests.addTests(doctest.DocTestSuite(documentrepository, checker=Py23DocChecker()))
-#     return tests
+from ferenda import documentrepository
+from ferenda.testutil import Py23DocChecker
+def load_tests(loader,tests,ignore):
+    tests.addTests(doctest.DocTestSuite(documentrepository, checker=Py23DocChecker()))
+    return tests
 
 
 

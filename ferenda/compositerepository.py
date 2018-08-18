@@ -221,15 +221,28 @@ class CompositeRepository(DocumentRepository):
                 break
             
         if ret:
+            oldbasefile = basefile
             if ret is not True and ret != basefile:
-                # this is a signal that parse discovered
-                # that the basefile was wrong
+                # this is a signal that parse discovered that the
+                # basefile was adjusted. We should raise
+                # DocumentRenamedError at the very end to get
+                # updateentry do the right thing.
                 basefile = ret
+                # Also, touch the old parsed path so we don't
+                # regenerate.
+                with self.store.open_parsed(oldbasefile, "w"):
+                    pass
+                
 
             self.copy_parsed(basefile, inst)
             self.log.info("%(basefile)s parse OK (%(elapsed).3f sec)",
                           {'basefile': basefile,
                            'elapsed': time.time() - start})
+
+            if basefile != oldbasefile:
+                msg = "%s: In subrepo %s basefile turned out to really be %s" % (
+                    oldbasefile, inst.qualified_class_name(), basefile)
+                raise errors.DocumentRenamedError(True, msg, oldbasefile, basefile)
             return ret
         else:
             # subrepos should only contain those repos that actually

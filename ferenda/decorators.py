@@ -34,7 +34,7 @@ from layeredconfig import LayeredConfig
 from ferenda import util
 from ferenda import DocumentEntry
 from ferenda.documentstore import Needed
-from ferenda.errors import DocumentRemovedError, ParseError
+from ferenda.errors import DocumentRemovedError, ParseError, DocumentRenamedError
 from ferenda.elements import serialize
 
 
@@ -161,7 +161,24 @@ def render(f):
     @functools.wraps(f)
     def wrapper(self, doc):
         # call the actual function that creates the doc data
+        oldbasefile = doc.basefile
         ret = f(self, doc)
+        if doc.basefile != oldbasefile:
+            # means that basefile was adjusted.  Touch the old parsed
+            # path first so we don't regenerate.
+            with self.store.open_parsed(oldbasefile, "w"):
+                pass
+            # move any intermediate files (in particular extracted
+            # image backgrounds from PDF files) that might be
+            # needed later. 
+            old_intermediate = self.store.intermediate_path(oldbasefile)
+            new_intermediate = self.store.intermediate_path(doc.basefile)
+            if self.store.storage_policy == "dir":
+                old_intermediate = os.path.dirname(old_intermediate)
+                new_intermediate = os.path.dirname(new_intermediate)
+            if os.path.exists(old_intermediate) and not os.path.exists(new_intermediate):
+                util.ensure_dir(new_intermediate)
+                os.rename(old_intermediate, new_intermediate)
         # now render thath doc data as files (JSON, XHTML, RDF/XML)
         if self.config.serializejson == True:
             with self.store.open_serialized(doc.basefile, "wb") as fp:
@@ -303,7 +320,12 @@ def makedocument(f):
     @functools.wraps(f)
     def wrapper(self, basefile):
         doc = self.make_document(basefile)
-        return f(self, doc)
+        ret = f(self, doc)
+        if doc.basefile != basefile:
+            raise DocumentRenamedError(
+                "%s: Basefile turned out to really be %s" % (basefile, doc.basefile),
+                returnvalue=doc.basefile, oldbasefile=basefile, newbasefile=doc.basefile)
+        return ret
     return wrapper
 
 
@@ -360,14 +382,14 @@ def updateentry(section):
     def outer_wrapper(f, *args):
         @functools.wraps(f)
         def inner_wrapper(self, *args, **kwargs):
+            # try to find out if we have a basefile
             if args and args[0]:
-                # try to find out if we have a basefile
-                basefile = args[0]
+                entrypath_arg = args[0]
             else:
-                basefile = ".root"
                 args = ()
-            entrypath = self.store.documententry_path(basefile)
+                entrypath_arg = ".root"
+            entrypath = self.store.documententry_path
             args = [self] + list(args)
-            return DocumentEntry.updateentry(f, section, entrypath, *args, **kwargs)
+            return DocumentEntry.updateentry(f, section, entrypath, entrypath_arg, *args, **kwargs)
         return inner_wrapper
     return outer_wrapper

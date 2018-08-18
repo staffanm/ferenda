@@ -376,7 +376,7 @@ dependencies (in the form of source files for the action).
             if not os.path.exists(filename):
                 return False
             elif not dt:  # has never been indexed
-                return Needed(reason="%s has not been processed" % filename)
+                return Needed(reason="%s has not been processed according to %s in documententry %s" % (filename, field, entry._path))
             else:
                 if datetime.fromtimestamp(os.stat(filename).st_mtime) > dt:
                     return Needed(reason="%s is newer than %s in documententry %s" % (filename, field, entry._path))

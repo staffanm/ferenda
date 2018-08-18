@@ -335,7 +335,6 @@ class Decorators(unittest.TestCase):
         @makedocument
         def testfunc(repo, doc):
             return doc
-
         doc = testfunc(DocumentRepository(), "base/file")
         self.assertIsInstance(doc, Document)
         self.assertEqual(doc.basefile, "base/file")

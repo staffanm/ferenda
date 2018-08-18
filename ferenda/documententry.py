@@ -22,7 +22,7 @@ from rdflib import Literal
 from rdflib.namespace import RDF
 
 from ferenda import util
-from ferenda.errors import DocumentRemovedError
+from ferenda.errors import DocumentRemovedError, DocumentRenamedError
 
 class DocumentEntry(object):
 
@@ -264,11 +264,12 @@ class DocumentEntry(object):
         return "application/octet-stream"
 
     @staticmethod
-    def updateentry(f, section, entrypath, *args, **kwargs):
+    def updateentry(f, section, entrypath, entrypath_arg, *args, **kwargs):
         """runs the provided function with the provided arguments, captures
         any logged events emitted, catches any errors, and records the
-        result in the entry file under the provided section. The basefile
-        is assumed to be the first element in args.
+        result in the entry file under the provided section. Entrypath
+        should be a function that takes a basefile string and returns
+        the full path to the entry file for that basefile.
 
         """
         def clear(key, d):
@@ -292,6 +293,10 @@ class DocumentEntry(object):
         except DocumentRemovedError as e:
             success = "removed"
             raise
+        except DocumentRenamedError as e:
+            entrypath_arg = e.newbasefile
+            success = True
+            return e.returnvalue
         except Exception as e:
             success = False
             errortype, errorval, errortb = sys.exc_info()
@@ -305,7 +310,7 @@ class DocumentEntry(object):
             rootlog.removeHandler(handler)
             if success is not None:
                 warnings = logstream.getvalue()
-                entry = DocumentEntry(entrypath)
+                entry = DocumentEntry(entrypath(entrypath_arg))
                 if section not in entry.status:
                     entry.status[section] = {}
                 entry.status[section]['success'] = success

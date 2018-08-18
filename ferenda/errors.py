@@ -65,6 +65,14 @@ class DocumentSkippedError(DocumentRemovedError):
     exist) since it's not interesting."""
 
 
+class DocumentRenamedError(FerendaException):
+    def __init__(self, value, returnvalue, oldbasefile, newbasefile):
+        super(DocumentRenamedError, self).__init__(value)
+        self.returnvalue = returnvalue
+        self.oldbasefile = oldbasefile
+        self.newbasefile = newbasefile
+
+
 class PatchError(ParseError):
     """Raised if a patch cannot be applied by
 :py:meth:`~ferenda.DocumentRepository.patch_if_needed`."""

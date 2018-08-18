@@ -1397,7 +1397,7 @@ class Devel(object):
                                                  {"id": action,
                                                   "success": str(status["success"]),
                                                   "duration": str(status["duration"]),
-                                                  "date": status["date"]})
+                                                  "date": str(status["date"])})
                     if status["success"]:
                         successcnt += 1
                     else:

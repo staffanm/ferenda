@@ -19,6 +19,7 @@ import logging
 import operator
 import os
 import re
+import shutil
 import sys
 import unicodedata
 
@@ -586,7 +587,12 @@ class SwedishLegalSource(DocumentRepository):
         resource = self.parse_metadata(fp, doc.basefile)
         doc.meta = resource.graph
         doc.uri = str(resource.identifier)
-        self._adjust_basefile(doc, orig_uri)
+        # _adjust_basefile returns true iff basefile was adjusted. We
+        # return the new adjusted basefile to the caller
+        if self._adjust_basefile(doc, orig_uri):
+            ret = doc.basefile
+        else:
+            ret = True
         if resource.value(DCTERMS.title):
             doc.lang = resource.value(DCTERMS.title).language
         if options == "metadataonly":
@@ -601,7 +607,7 @@ class SwedishLegalSource(DocumentRepository):
         self.postprocess_doc(doc)
         self.parse_entry_update(doc)
         # print(doc.meta.serialize(format="turtle").decode("utf-8"))
-        return True
+        return ret
 
     def _adjust_basefile(self, doc, orig_uri):
         # In some cases, we might discover during parse that we've
@@ -613,13 +619,15 @@ class SwedishLegalSource(DocumentRepository):
         # if generate() hasn't run yet.
         if orig_uri != doc.uri:
             newbasefile = self.basefile_from_uri(doc.uri)
+            oldbasefile = doc.basefile
             if newbasefile:
-                # change the basefile we're dealing with. Touch
-                # self.store.parsed_path(basefile) first so we don't
-                # regenerate. 
-                with self.store.open_parsed(doc.basefile, "w"):
-                    pass
+                # Decorators.render should deal with writing results
+                # to the correct locations, moving intermediate files
+                # etc, as long as doc.basefile is changed
                 doc.basefile = newbasefile
+            return True  # basefile was adjusted
+        else:
+            return False # basefile was not adjusted
     
     def parse_open(self, basefile, attachment=None):
         """Open the main downloaded file for the given basefile, caching the
