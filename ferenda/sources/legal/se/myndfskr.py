@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
@@ -1167,7 +1168,7 @@ class DVFS(MyndFskrBase):
         resp = self.session.send(req, allow_redirects=True)
         return resp
 
-    def maintext_from_soup(self, soup):
+    def main_from_soup(self, soup):
         main = soup.find("div", id="readme")
         if main:
             main.find("div", "rs_skip").decompose()
@@ -1189,11 +1190,14 @@ class DVFS(MyndFskrBase):
             e.dummyfile = self.store.parsed_path(basefile)
             raise e
 
+    def maintext_from_soup(self, soup):
+        main = self.main_from_soup(soup)
+        return main.get_text("\n\n", strip=True)
+        
     def textreader_from_basefile(self, basefile, force_ocr=False, attachment=None):
         infile = self.store.downloaded_path(basefile)
         soup = BeautifulSoup(util.readfile(infile), "lxml")
-        main = self.maintext_from_soup(soup)
-        text = main.get_text("\n\n", strip=True)
+        text = self.maintext_from_soup(soup)
         text = self.sanitize_text(text, basefile)
         return TextReader(string=text)
 
@@ -1204,7 +1208,7 @@ class DVFS(MyndFskrBase):
         return self.store.open_downloaded(basefile)
 
     def parse_body(self, fp, basefile):
-        main = BeautifulSoup(self.maintext_from_soup(BeautifulSoup(fp, "lxml")), "lxml")
+        main = self.main_from_soup(BeautifulSoup(fp, "lxml"))
         return Body([elements_from_soup(main)],
                     uri=None)
 
@@ -2056,7 +2060,7 @@ class SOSFS(MyndFskrBase):
     def maintext_from_soup(self, soup):
         main = soup.find("div", id="socextPageBody").find("div", "ms-rtestate-field")
         assert main
-        return main
+        return str(main)
 
     def parse_open(self, basefile):
         if basefile.startswith("konsolidering"):

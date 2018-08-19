@@ -20,7 +20,7 @@ import lxml.html
 from cached_property import cached_property
 
 from ferenda import (PDFAnalyzer, CompositeRepository, DocumentEntry,
-                     PDFDocumentRepository, CompositeStore, Facet)
+                     PDFDocumentRepository, CompositeStore, Facet, DocumentStore)
 from ferenda import util, decorators, errors
 from ferenda.pdfreader import StreamingPDFReader
 from . import Regeringen, SwedishLegalSource, FixedLayoutSource, SwedishLegalStore, Offtryck, RPUBL
@@ -145,6 +145,8 @@ class SOURegeringen(Regeringen):
     def sanitize_identifier(self, identifier):
         return sou_sanitize_identifier(identifier)
 
+class SOUKBStore(SwedishLegalStore):
+    downloaded_suffixes = [".pdf", ".rdf"]
 
 class SOUKB(Offtryck, PDFDocumentRepository):
     alias = "soukb"
@@ -158,7 +160,8 @@ class SOUKB(Offtryck, PDFDocumentRepository):
     # A bit nonsensical, but required for SwedishLegalSource.get_parser
     document_type = SOU = True
     PROPOSITION = DS = KOMMITTEDIREKTIV = False
-
+    documentstore_class = SOUKBStore
+    
     @classmethod
     def get_default_options(cls):
         opts = super(SOUKB, cls).get_default_options()
@@ -210,7 +213,7 @@ class SOUKB(Offtryck, PDFDocumentRepository):
     def download_single(self, basefile, url):
         if self.get_parse_options(basefile) == "skip":
             raise errors.DocumentSkippedError("%s should not be downloaded according to options.py" % basefile)
-        rdffilename = self.store.downloaded_path(basefile, attachment="metadata.rdf")
+        rdffilename = self.store.downloaded_path(basefile, attachment="index.rdf")
         if self.get_parse_options(basefile) == "metadataonly" and os.path.exists(rdffilename) and (not self.config.refresh):
             # it is kind of bad that we can even get here in these
             # cases (if a rdffile exists, and a empty index.pdf
@@ -234,14 +237,15 @@ class SOUKB(Offtryck, PDFDocumentRepository):
         
         # download rdf metadata before actual content
         try:
-            # it appears that certain URLs (like curl
-            # http://data.libris.kb.se/open/bib/8351225.rdf)
-            # sometimes return an empty response. We should check
-            # and warn for this (and infer a minimal RDF by
-            # hand from what we can, eg dc:title from the link
-            # text)
+            # it appears that URLs like
+            # http://data.libris.kb.se/open/bib/8351225.rdf now
+            # returns empty responses. Until we find out the proper
+            # RDF endpoint URLs, we should check and warn for this
+            # (and infer a minimal RDF by hand from what we can, eg
+            # dc:title from the link text)
             self.download_if_needed(rdfurl, basefile,
-                                    filename=rdffilename)
+                                    filename=rdffilename,
+                                    archive=False)
             if os.path.getsize(rdffilename) == 0:
                 self.log.warning("%s: %s returned 0 response, infer RDF" %
                                  (basefile, rdfurl))
@@ -326,7 +330,7 @@ class SOUKB(Offtryck, PDFDocumentRepository):
         
     def extract_metadata(self, rawhead, basefile):
         metadata = util.readfile(self.store.downloaded_path(
-            basefile, attachment="metadata.rdf"))
+            basefile, attachment="index.rdf"))
         # For some reason these RDF files might use canonical
         # decomposition form (NFD) which is less optimal. Fix this.
         metadata = unicodedata.normalize("NFC", metadata)
