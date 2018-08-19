@@ -587,9 +587,9 @@ class SwedishLegalSource(DocumentRepository):
         resource = self.parse_metadata(fp, doc.basefile)
         doc.meta = resource.graph
         doc.uri = str(resource.identifier)
-        # _adjust_basefile returns true iff basefile was adjusted. We
+        # adjust_basefile returns true iff basefile was adjusted. We
         # return the new adjusted basefile to the caller
-        if self._adjust_basefile(doc, orig_uri):
+        if self.adjust_basefile(doc, orig_uri):
             ret = doc.basefile
         else:
             ret = True
@@ -609,14 +609,17 @@ class SwedishLegalSource(DocumentRepository):
         # print(doc.meta.serialize(format="turtle").decode("utf-8"))
         return ret
 
-    def _adjust_basefile(self, doc, orig_uri):
+    def adjust_basefile(self, doc, orig_uri):
         # In some cases, we might discover during parse that we've
         # gotten the basefile wrong in the download step. If doc.uri
         # has changed, this is a clear sign of that. Adjust so that we
         # use the correct basefile going forward (NOTE: This doesn't
         # work for DV.py, which doesn't set orig_uri to start with,
         # and for which basefile_from_uri might return wrong results
-        # if generate() hasn't run yet.
+        # if generate() hasn't run yet. It's also not optimal for
+        # JK.se, which sometimes use diarienummer like 2015-17-4.3
+        # instead of the expected 2015-17-43, which is used for
+        # basefile.)
         if orig_uri != doc.uri:
             newbasefile = self.basefile_from_uri(doc.uri)
             oldbasefile = doc.basefile

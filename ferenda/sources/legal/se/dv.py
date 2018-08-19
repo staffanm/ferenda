@@ -634,7 +634,7 @@ class DV(SwedishLegalSource):
         # could be fetched.
         return None
 
-    def _adjust_basefile(self, doc, orig_uri):
+    def adjust_basefile(self, doc, orig_uri):
         pass # See comments in swedishlegalsource.py 
 
     def parse_open(self, basefile, attachment=None):

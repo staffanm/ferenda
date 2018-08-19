@@ -88,6 +88,9 @@ class JK(SwedishLegalSource):
             basefile = document_url_regex.search(link["href"]).group("basefile")
             yield basefile, urljoin(self.start_url, link["href"])
 
+    def adjust_basefile(self, doc, orig_uri):
+        pass # See comments in swedishlegalsource.py 
+
     def source_url(self, basefile):
         # this source does not have any predictable URLs, so we try to
         # find if we made a note on the URL when we ran download()
