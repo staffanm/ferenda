@@ -2069,7 +2069,9 @@ WHERE {
                 else:
                     utfardandedatum = date(int(desc.getvalue(RPUBL.arsutgava)), 12, 31)
                 self._relate_fulltext_value_cache[rooturi] = {
-                    "creator": desc.getrel(RPUBL.departement),
+                    # "creator": desc.getrel(RPUBL.departement),
+                    # in rare cases (SFS 2018:1392) we might be missing rpubl:departement for this URI, so we'll accept None in these cases.
+                    "creator": desc.graph.value(desc._current(), RPUBL.departement),
                     "issued": utfardandedatum
                 }
             if facet.dimension_label == "label":
