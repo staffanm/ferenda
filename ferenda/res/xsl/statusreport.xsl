@@ -61,7 +61,7 @@
       </small>
     </p>
     <div class="control-panel">
-      <button onclick="$('div.alert-success').toggle()">show/hide successes</button>
+      <!-- <button onclick="$('div.alert-success').toggle()">show/hide successes</button> -->
       <button onclick="$('div.alert-warning').toggle()">show/hide warnings</button>
       <button onclick="$('div.alert-danger').toggle()">show/hide errors</button>
     </div>
@@ -128,18 +128,22 @@
   </xsl:template>
 
   <xsl:template match="basefile">
-    <xsl:variable name="alerttype">
-      <xsl:choose>
-	<xsl:when test="action[@success='False']">alert-danger</xsl:when>
-	<xsl:when test="action[@success='True'] and action/warnings">alert-warning</xsl:when>
-	<xsl:when test="action[@success='True']">alert-success</xsl:when>
-      </xsl:choose>
-    </xsl:variable> 
-    <div class="basefile alert {$alerttype}">
-      <xsl:if test="$alerttype = 'alert-success'"><xsl:attribute name="style">display: none;</xsl:attribute></xsl:if>
-      <b><xsl:value-of select="@id"/></b><br/>
-      <xsl:apply-templates/>
-    </div>
+    <xsl:if test="action[@success='False'] or action/warnings">
+      <xsl:variable name="alerttype">
+	<xsl:choose>
+	  <xsl:when test="action[@success='False']">alert-danger</xsl:when>
+	  <xsl:when test="action[@success='True'] and action/warnings">alert-warning</xsl:when>
+	  <xsl:when test="action[@success='True']">alert-success</xsl:when>
+	</xsl:choose>
+      </xsl:variable> 
+      <div class="basefile alert {$alerttype}">
+	<!-- can't happen now that we don't render any alert-success divs
+	    <xsl:if test="$alerttype = 'alert-success'"><xsl:attribute name="style">display: none;</xsl:attribute></xsl:if>
+	-->
+	<b><xsl:value-of select="@id"/></b><br/>
+	<xsl:apply-templates/>
+      </div>
+    </xsl:if>
   </xsl:template>
 
   <xsl:template match="repo" mode="toc"/>

@@ -84,10 +84,11 @@ class Offtryck(SwedishLegalSource):
                 sanitized = basefile
         else:  # KOMMITTEDIREKTIV, SOU, DS
             y, idx = basefile.split(":")
+            idx = int(idx)
             assert len(y) == 4, "Basefile %s is invalid beyond sanitization" % basefile
-            assert len(idx) < 4, "Basefile %s is invalid beyond sanitization" % basefile
+            assert len(str(idx)) < 4, "Basefile %s is invalid beyond sanitization" % basefile
             assert 1900 < int(y) < 2100, "Basefile %s has improbable year %s" % (basefile, y)
-            sanitized = basefile
+            sanitized = "%s:%s" % (y, idx)
         return sanitized
 
     @property

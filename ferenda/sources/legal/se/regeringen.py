@@ -345,7 +345,7 @@ class Regeringen(Offtryck):
                 a["dcterms:identifier"].replace("ID-nummer: ", ""))
         except ValueError as e:
             inferred_identifier = str(self.infer_identifier(basefile))
-            self.log.error("%s: Irregular identifier %s, using inferred identifier %s instead" % (basefile, a["dcterms:identifier"], inferred_identifier))
+            self.log.warning("%s: Irregular identifier %s, using inferred identifier %s instead" % (basefile, a["dcterms:identifier"], inferred_identifier))
             a["dcterms:identifier"] = inferred_identifier
         # save for later
         self._identifier = a["dcterms:identifier"]
