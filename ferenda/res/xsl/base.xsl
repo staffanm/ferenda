@@ -19,6 +19,7 @@
   <xsl:param name="configurationfile"/>
   <xsl:variable name="configuration" select="document($configurationfile)/configuration"/>
   <xsl:include href="nav-search-form.xsl"/>
+  <xsl:include href="analytics-tracker.xsl"/>
   <xsl:output method="html"
 	      doctype-system="about:legacy-compat"
 	      omit-xml-declaration="yes"
@@ -61,6 +62,7 @@
       <link rel="apple-touch-icon-precomposed" href="../assets/ico/apple-touch-icon-57-precomposed.png"/>
       <link rel="shortcut icon" href="../assets/ico/favicon.png"/>
       -->
+      <xsl:call-template name="analytics-tracker"/>
     </head>
   </xsl:template>
 
