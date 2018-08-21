@@ -92,7 +92,7 @@ class SFSDocumentStore(SwedishLegalStore):
 class SFS(Trips):
 
     """Handles consolidated (codified) versions of statutes from SFS
-    (Svensk f\xf6rfattningssamling).
+    (Svensk författningssamling).
     """
 
     # A note about logging:
@@ -267,8 +267,8 @@ class SFS(Trips):
                 uppdaterad_tom = self._find_uppdaterad_tom(base_sfsnr,
                                                            filename)
                 if base_sfsnr_list[0] == wanted_sfs_nr:
-                    # initial grundf\xf6rfattning - varken
-                    # "Uppdaterad T.O.M. eller "Upph\xe4vd av" ska
+                    # initial grundförfattning - varken
+                    # "Uppdaterad T.O.M. eller "Upphävd av" ska
                     # vara satt
                     pass
                 elif util.numcmp(uppdaterad_tom, wanted_sfs_nr) < 0:
@@ -288,34 +288,34 @@ class SFS(Trips):
 
     def _check_for_sfs(self, year, nr):
         """Givet ett SFS-nummer, returnera en lista med alla
-        SFS-numret f\xf6r dess grundf\xf6rfattningar. Normalt sett har en
-        \xe4ndringsf\xf6rfattning bara en grundf\xf6rfattning, men f\xf6r vissa
+        SFS-numret för dess grundförfattningar. Normalt sett har en
+        ändringsförfattning bara en grundförfattning, men för vissa
         (exv 2008:605) finns flera. Om SFS-numret inte finns alls,
         returnera en tom lista."""
-        # Titta f\xf6rst efter grundf\xf6rfattning
+        # Titta först efter grundförfattning
         self.log.debug('    Looking for base act')
         grundforf = []
         basefile = "%s:%s" % (year, nr)
         url = self.document_sfsr_url_template % {'basefile': basefile}
         text = requests.get(url).text
-        # FIXME: If the result page contains "Totalt \d tr\xe4ffar", we
+        # FIXME: If the result page contains "Totalt \d träffar", we
         # should parse it to find the correct URL (will have a post_id
         # parameter)
-        if ("<div>Inga tr\xe4ffar</div>" not in text and
-            not re.search(r"Totalt <strong>\d+</strong> tr\xe4ffar", text)):
+        if ("<div>Inga träffar</div>" not in text and
+            not re.search(r"Totalt <strong>\d+</strong> träffar", text)):
             grundforf.append("%s:%s" % (year, nr))
             return grundforf
 
-        # Sen efter \xe4ndringsf\xf6rfattning
+        # Sen efter ändringsförfattning
         self.log.debug('    Looking for change act')
         url = self.document_sfsr_change_url_template % {'basefile': basefile}
         text = requests.get(url).text
-        # NB: Right now a search for \xe4bet=2016:1 will return all base
+        # NB: Right now a search for äbet=2016:1 will return all base
         # acts changed by any act *starting* with 2016:1. This means
         # this search will never work right with one-or two digit
         # ordinals. Bug filed with RK.
-        if ("<div>Inga tr\xe4ffar</div>" in text or
-            re.search(r"Totalt <strong>\d+</strong> tr\xe4ffar", text)):
+        if ("<div>Inga träffar</div>" in text or
+            re.search(r"Totalt <strong>\d+</strong> träffar", text)):
             self.log.debug('    Found no change act')
             return grundforf
 
@@ -333,9 +333,9 @@ class SFS(Trips):
 
     def download_single(self, basefile, url=None):
         """Laddar ner senaste konsoliderade versionen av
-        grundf\xf6rfattningen med angivet SFS-nr. Om en tidigare version
-        finns p\xe5 disk, arkiveras den. Returnerar det SFS-nummer till
-        vilket f\xf6rfattningen uppdaterats."""
+        grundförfattningen med angivet SFS-nr. Om en tidigare version
+        finns på disk, arkiveras den. Returnerar det SFS-nummer till
+        vilket författningen uppdaterats."""
         if not url:
             url = self.remote_url(basefile)
         sfsr_url = url.replace("sfst?", "sfsr?")
@@ -349,7 +349,7 @@ class SFS(Trips):
         if self.download_if_needed(url, basefile):
             if created:
                 text = util.readfile(downloaded_path, encoding=self.source_encoding)
-                if "<div>Inga tr\xe4ffar</div>" in text:
+                if "<div>Inga träffar</div>" in text:
                     self.log.warning("%s: Is not really an base SFS, search results must have contained an invalid entry" % basefile)
                     util.robust_remove(downloaded_path)
                     return False
@@ -398,11 +398,11 @@ class SFS(Trips):
                 uppdaterad_tom = self._find_uppdaterad_tom(
                     basefile, sfst_tempfile)
                 if uppdaterad_tom != old_uppdaterad_tom:
-                    self.log.info('        %s har \xe4ndrats (%s -> %s)' % (
+                    self.log.info('        %s har ändrats (%s -> %s)' % (
                         basefile, old_uppdaterad_tom, uppdaterad_tom))
                     self._archive(sfst_file, basefile, old_uppdaterad_tom)
                 else:
-                    self.log.info('        %s har \xe4ndrats (gammal '
+                    self.log.info('        %s har ändrats (gammal '
                                   'checksum %s)' % (basefile, old_checksum))
                     self._archive(sfst_file,
                                   basefile, old_uppdaterad_tom, old_checksum)
@@ -411,10 +411,10 @@ class SFS(Trips):
                 # we've updated it or not
                 util.robust_rename(sfst_tempfile, sfst_file)
             elif upphavd_genom:
-                self.log.info('        %s har upph\xe4vts' % (basefile))
+                self.log.info('        %s har upphävts' % (basefile))
 
             else:
-                self.log.debug('        %s har inte \xe4ndrats (gammal '
+                self.log.debug('        %s har inte ändrats (gammal '
                                'checksum %s)' % (basefile, old_checksum))
         else:
             util.robust_rename(sfst_tempfile, sfst_file)
@@ -433,22 +433,22 @@ class SFS(Trips):
 
         if upphavd_genom:
             self.log.info(
-                '        %s \xe4r upph\xe4vd genom %s' % (basefile, upphavd_genom))
+                '        %s är upphävd genom %s' % (basefile, upphavd_genom))
             return upphavd_genom
         elif uppdaterad_tom:
             self.log.info(
-                '        %s \xe4r uppdaterad tom %s' % (basefile, uppdaterad_tom))
+                '        %s är uppdaterad tom %s' % (basefile, uppdaterad_tom))
             return uppdaterad_tom
         else:
             self.log.info(
-                '        %s \xe4r varken uppdaterad eller upph\xe4vd' % (basefile))
+                '        %s är varken uppdaterad eller upphävd' % (basefile))
             return None
 
     def _find_uppdaterad_tom(self, sfsnr, filename=None, reader=None):
         if not reader:
             reader = TextReader(filename, encoding=self.source_encoding)
         try:
-            reader.cue("\xc4ndring inf\xf6rd:</span> t.o.m. SFS")
+            reader.cue("Ändring införd:</span> t.o.m. SFS")
             l = reader.readline()
             m = re.search(r'(\d+:\s?\d+)', l)
             if m:
@@ -467,7 +467,7 @@ class SFS(Trips):
                     # although date seems to be missing).
 
     def _checksum(self, filename):
-        """MD5-checksumman f\xf6r den angivna filen"""
+        """MD5-checksumman för den angivna filen"""
         import hashlib
         c = hashlib.md5()
         try:
@@ -566,7 +566,7 @@ class SFS(Trips):
                                            id='S1')])
         rawtext = util.readfile(filename, encoding=self.source_encoding)
         if not self.config.keepexpired:
-            needles = ('<span class="bold">Upph\xe4vd:</span> ',
+            needles = ('<span class="bold">Upphävd:</span> ',
                        '<span class="bold">Övrigt:</span> Utgår genom SFS')
             for needle in needles:
                 idx = rawtext.find(needle, 0, 10000)
@@ -580,8 +580,8 @@ class SFS(Trips):
         return self._extract_text(basefile)
 
     def extract_head(self, fp, basefile):
-        """Parsear ut det SFSR-registret som inneh\xe5ller alla \xe4ndringar
-        i lagtexten fr\xe5n HTML-filer"""
+        """Parsear ut det SFSR-registret som innehåller alla ändringar
+        i lagtexten från HTML-filer"""
 
         # NB: We should really call self.store.register_path, but that
         # custom func isn't mocked by ferenda.testutil.RepoTester,
@@ -591,7 +591,7 @@ class SFS(Trips):
         with codecs.open(filename, encoding=self.source_encoding) as rfp:
             soup = BeautifulSoup(rfp.read(), "lxml")
         # do we really have a registry?
-        notfound = soup.find(text="S\xf6kningen gav ingen tr\xe4ff!")
+        notfound = soup.find(text="Sökningen gav ingen träff!")
         if notfound:
             raise InteExisterandeSFS(str(notfound))
         textheader = fp.read(2048)
@@ -705,23 +705,23 @@ class SFS(Trips):
                     # First, create rdf statements for every
                     # single modified section we can find
                     for changecat in val.split('; '):
-                        if (changecat.startswith('\xe4ndr.') or
-                            changecat.startswith('\xe4ndr ') or
-                                changecat.startswith('\xe4ndring ')):
+                        if (changecat.startswith('ändr.') or
+                            changecat.startswith('ändr ') or
+                                changecat.startswith('ändring ')):
                             pred = self.ns['rpubl'].ersatter
                         elif (changecat.startswith('upph.') or
                               changecat.startswith('upp.') or
-                              changecat.startswith('utg\xe5r')):
+                              changecat.startswith('utgår')):
                             pred = self.ns['rpubl'].upphaver
                         elif (changecat.startswith('ny') or
                               changecat.startswith('ikrafttr.') or
                               changecat.startswith('ikrafftr.') or
                               changecat.startswith('ikraftr.') or
-                              changecat.startswith('ikrafttr\xe4d.') or
-                              changecat.startswith('till\xe4gg')):
+                              changecat.startswith('ikraftträd.') or
+                              changecat.startswith('tillägg')):
                             pred = self.ns['rpubl'].inforsI
                         elif (changecat.startswith('nuvarande') or
-                              changecat.startswith('rubr. n\xe4rmast') or
+                              changecat.startswith('rubr. närmast') or
                               changecat in ('begr. giltighet', 'Omtryck',
                                             'omtryck', 'forts.giltighet',
                                             'forts. giltighet',
@@ -729,12 +729,12 @@ class SFS(Trips):
                             # some of these changecats are renames, eg
                             # "nuvarande 2, 3, 4, 5 \xa7\xa7 betecknas 10,
                             # 11, 12, 13, 14, 15 \xa7\xa7;" or
-                            # "rubr. n\xe4rmast efter 1 \xa7 s\xe4tts n\xe4rmast
-                            # f\xf6re 10 \xa7"
+                            # "rubr. närmast efter 1 \xa7 sätts närmast
+                            # före 10 \xa7"
                             pred = None
                         else:
                             self.log.warning(
-                                "%s: Ok\xe4nd omfattningstyp %r" %
+                                "%s: Okänd omfattningstyp %r" %
                                 (basefile, changecat))
                             pred = None
                         for node in self.lagrum_parser.parse_string(changecat,
@@ -746,7 +746,7 @@ class SFS(Trips):
                                 d[docuri][qname].append(node.uri)
                     # Secondly, preserve the entire text
                     d[docuri]["rpubl:andrar"] = val
-                elif key == 'F\xf6rarbeten':
+                elif key == 'Förarbeten':
                     for node in self.forarbete_parser.parse_string(val,
                                                                    "rpubl:forarbete"):
                         if hasattr(node, 'uri'):
@@ -782,7 +782,7 @@ class SFS(Trips):
                             d[docuri]["rpubl:genomforDirektiv"] = []
                         d[docuri]["rpubl:genomforDirektiv"].append(celexuri)
                         d[celexuri] = {"rpubl:celexNummer": celex}
-                elif key == 'Tidsbegr\xe4nsad':
+                elif key == 'Tidsbegränsad':
                     d["rinfoex:tidsbegransad"] = val[:10]
                     expdate = datetime.strptime(val[:10], '%Y-%m-%d')
                     if expdate < datetime.today():
@@ -814,15 +814,18 @@ class SFS(Trips):
             key, val = [x.strip() for x in line.split(":", 1)]
             
             # Simple string literals
-            if key == '\xd6vrigt':
+            if key == 'Övrigt':
+                if val.startswith("Utgår genom"): # occurs only for SFS 2014:1329, 2013:984, 2006:909
+                    raise UpphavdForfattning("%s is a revoked SFS" % basefile,
+                                             dummyfile=self.store.parsed_path(basefile))
                 d["rdfs:comment"] = val
             # date literals
-            elif key == 'Utf\xe4rdad':
+            elif key == 'Utfärdad':
                 d["rpubl:utfardandedatum"] = val[:10]
-            elif key == 'Tidsbegr\xe4nsad':
+            elif key == 'Tidsbegränsad':
                 # FIXME: Should be done by lagen.nu.SFS
                 d["rinfoex:tidsbegransad"] = val[:10]
-            elif key == 'Upph\xe4vd':
+            elif key == 'Upphävd':
                 dat = datetime.strptime(val[:10], '%Y-%m-%d')
                 d["rpubl:upphavandedatum"] = val[:10]
                 if not self.config.keepexpired and dat < datetime.today():
@@ -831,12 +834,12 @@ class SFS(Trips):
 
             elif key == 'Departement':
                 # the split is only needed because of SFS 1942:724,
-                # which has "F\xf6rsvarsdepartementet,
+                # which has "Försvarsdepartementet,
                 # Socialdepartementet"...
                 if "departementet, " in val:
                     val = val.split(", ")[0]
                 d["dcterms:creator"] = val
-            elif (key == '\xc4ndring inf\xf6rd' and re_sfs(val)):
+            elif (key == 'Ändring införd' and re_sfs(val)):
                 uppdaterad = re_sfs(val).group(1)
                 # not sure we need to add this, since parse_metadata
                 # catches the same
@@ -847,7 +850,7 @@ class SFS(Trips):
 
             elif (key == 'Omtryck' and re_sfs(val)):
                 d["rinfoex:omtryck"] = self.canonical_uri(re_sfs(val).group(1))
-            elif (key == 'F\xf6rfattningen har upph\xe4vts genom' and
+            elif (key == 'Författningen har upphävts genom' and
                   re_sfs(val)):
                 s = re_sfs(val).group(1)
                 d["rinfoex:upphavdAv"] = self.canonical_uri(s)
@@ -888,10 +891,10 @@ class SFS(Trips):
     def sanitize_departement(self, val):
         # to avoid "Assuming that" warnings, autoremove sub-org ids,
         # ie "Finansdepartementet S3" -> "Finansdepartementet"
-        # loop until done to handle "Justitiedepartementet DOM, L5 och \xc5"
+        # loop until done to handle "Justitiedepartementet DOM, L5 och Å"
         cleaned = None
         while True:
-            cleaned = re.sub(r",? (och|[A-Z\xc5\xc4\xd6\d]{1,5})$", "", val)
+            cleaned = re.sub(r",? (och|[A-ZÅÄÖ\d]{1,5})$", "", val)
             if val == cleaned:
                 break
             val = cleaned
@@ -1018,9 +1021,9 @@ class SFS(Trips):
                 break
         if obs:
             del doc.body[obsidx]
-            reg = Register(rubrik='\xc4ndringar och \xf6verg\xe5ngsbest\xe4mmelser')
+            reg = Register(rubrik='Ändringar och övergångsbestämmelser')
         else:
-            reg = Register(rubrik='\xc4ndringar')
+            reg = Register(rubrik='Ändringar')
 
         # remove the bogus dcterms:issued thing that we only added to
         # aid URI generation
@@ -1078,8 +1081,8 @@ class SFS(Trips):
             re.sub(self.basefile_regex[:-1], "", forfattningsrubrik).replace("()", ""))
         if (forfattningsrubrik.startswith('Lag ') or
             (forfattningsrubrik.endswith('lag') and
-             not forfattningsrubrik.startswith('F\xf6rordning')) or
-            forfattningsrubrik.endswith(('balk', 'Tryckfrihetsf\xf6rordning'))):
+             not forfattningsrubrik.startswith('Förordning')) or
+            forfattningsrubrik.endswith(('balk', 'Tryckfrihetsförordning'))):
             return RPUBL.Lag
         else:
             return RPUBL.Forordning
@@ -1202,14 +1205,14 @@ class SFS(Trips):
     re_ChangeNote = re.compile(r'(Lag|Förordning) \(\d{4}:\d+\)\.?$')
     re_Bokstavslista = re.compile(r'^(\w)\) ')
     re_definitions = re.compile(
-        r'^I (lagen|f\xf6rordningen|balken|denna lag|denna f\xf6rordning|denna balk|denna paragraf|detta kapitel) (avses med|betyder|anv\xe4nds f\xf6ljande)').match
+        r'^I (lagen|förordningen|balken|denna lag|denna förordning|denna balk|denna paragraf|detta kapitel) (avses med|betyder|används följande)').match
     re_brottsdef = re.compile(
-        r'\b(d\xf6ms|d\xf6mes)(?: han)?(?:,[\w\xa7 ]+,)? f\xf6r ([\w ]{3,50}) till (b\xf6ter|f\xe4ngelse)', re.UNICODE).search
+        r'\b(döms|dömes)(?: han)?(?:,[\w\xa7 ]+,)? för ([\w ]{3,50}) till (böter|fängelse)', re.UNICODE).search
     re_brottsdef_alt = re.compile(
-        r'[Ff]\xf6r ([\w ]{3,50}) (d\xf6ms|d\xf6mas) till (b\xf6ter|f\xe4ngelse)', re.UNICODE).search
+        r'[Ff]ör ([\w ]{3,50}) (döms|dömas) till (böter|fängelse)', re.UNICODE).search
     re_parantesdef = re.compile(r'\(([\w ]{3,50})\)\.', re.UNICODE).search
     re_loptextdef = re.compile(
-        r'^Med ([\w ]{3,50}) (?:avses|f\xf6rst\xe5s) i denna (f\xf6rordning|lag|balk)', re.UNICODE).search
+        r'^Med ([\w ]{3,50}) (?:avses|förstås) i denna (förordning|lag|balk)', re.UNICODE).search
 
     def find_definitions(self, element, find_definitions):
         if not isinstance(element, CompoundElement):
@@ -1217,8 +1220,8 @@ class SFS(Trips):
         find_definitions_recursive = find_definitions
         # Hitta begreppsdefinitioner
         if isinstance(element, Paragraf):
-            # kolla om f\xf6rsta stycket inneh\xe5ller en text som
-            # antyder att definitioner f\xf6ljer
+            # kolla om första stycket innehåller en text som
+            # antyder att definitioner följer
             # self.log.debug("Testing %r against some regexes" % element[0][0])
             if self.re_definitions(element[0][0]):
                 find_definitions = "normal"
@@ -1239,7 +1242,7 @@ class SFS(Trips):
                         find_definitions = "normal"
             find_definitions_recursive = find_definitions
 
-        # Hitta lagrumsh\xe4nvisningar + definitioner
+        # Hitta lagrumshänvisningar + definitioner
         if isinstance(element, (Stycke, Listelement, Tabellrad)):
             nodes = []
             term = None
@@ -1263,10 +1266,10 @@ class SFS(Trips):
                         not self.re_ChangeNote.match(elementtext)):
                         term = elementtext
                         self.log.debug(
-                            '"%s" \xe4r nog en definition (1)' % term)
+                            '"%s" är nog en definition (1)' % term)
                 elif isinstance(element, Stycke):
 
-                    # Case 1: "antisladdsystem: ett tekniskt st\xf6dsystem"
+                    # Case 1: "antisladdsystem: ett tekniskt stödsystem"
                     # Sometimes, : is not the delimiter between
                     # the term and the definition, but even in
                     # those cases, : might figure in the
@@ -1289,39 +1292,39 @@ class SFS(Trips):
 
                             if termdelimiter in elementtext:
                                 term = elementtext.split(termdelimiter)[0]
-                                self.log.debug('"%s" \xe4r nog en definition (2.1)' % term)
+                                self.log.debug('"%s" är nog en definition (2.1)' % term)
 
-                    # case 2: "Den som ber\xf6var annan livet, d\xf6ms
-                    # f\xf6r mord till f\xe4ngelse"
+                    # case 2: "Den som berövar annan livet, döms
+                    # för mord till fängelse"
                     m = self.re_brottsdef(elementtext)
                     if m:
                         term = m.group(2)
                         self.log.debug(
-                            '"%s" \xe4r nog en definition (2.2)' % term)
+                            '"%s" är nog en definition (2.2)' % term)
 
-                    # case 3: "F\xf6r milj\xf6brott d\xf6ms till b\xf6ter"
+                    # case 3: "För miljöbrott döms till böter"
                     m = self.re_brottsdef_alt(elementtext)
                     if m:
                         term = m.group(1)
                         self.log.debug(
-                            '"%s" \xe4r nog en definition (2.3)' % term)
+                            '"%s" är nog en definition (2.3)' % term)
 
-                    # case 4: "Inteckning f\xe5r p\xe5 ans\xf6kan av
-                    # fastighets\xe4garen d\xf6das (d\xf6dning)."
+                    # case 4: "Inteckning får på ansökan av
+                    # fastighetsägaren dödas (dödning)."
                     m = self.re_parantesdef(elementtext)
                     if m:
                         term = m.group(1)
                         # print("%s: %s" %  (basefile, elementtext))
                         self.log.debug(
-                            '"%s" \xe4r nog en definition (2.4)' % term)
+                            '"%s" är nog en definition (2.4)' % term)
 
                     # case 5: "Med detaljhandel avses i denna lag
-                    # f\xf6rs\xe4ljning av l\xe4kemedel"
+                    # försäljning av läkemedel"
                     m = self.re_loptextdef(elementtext)
                     if m:
                         term = m.group(1)
                         self.log.debug(
-                            '"%s" \xe4r nog en definition (2.5)' % term)
+                            '"%s" är nog en definition (2.5)' % term)
 
                 elif isinstance(element, Listelement):
                     for rx in (self.re_Bullet,
@@ -1329,10 +1332,10 @@ class SFS(Trips):
                                self.re_Bokstavslista):
                         elementtext = rx.sub('', elementtext)
                     term = elementtext.split(termdelimiter)[0]
-                    self.log.debug('"%s" \xe4r nog en definition (3)' % term)
+                    self.log.debug('"%s" är nog en definition (3)' % term)
 
-                # Longest legitimate term found "Valutav\xe4xling,
-                # betalnings\xf6verf\xf6ring och annan finansiell
+                # Longest legitimate term found "Valutaväxling,
+                # betalningsöverföring och annan finansiell
                 # verksamhet"
                 if term and len(term) < 68:
                     term = util.normalize_space(term)
@@ -1554,7 +1557,7 @@ class SFS(Trips):
         stuff[baseuri]['inboundlinks'] = []
 
         # mapping <http://rinfo.lagrummet.se/publ/sfs/1999:175> =>
-        # "R\xe4ttsinformationsf\xf6rordning (1999:175)"
+        # "Rättsinformationsförordning (1999:175)"
         specifics = {}
         for row in inboundlinks:
             if not (row['uri'].startswith(("http://", "https://"))):
@@ -1952,7 +1955,7 @@ class SFS(Trips):
         title = re.sub("^/r1/ ", "", util.normalize_space(title))
         if title.startswith("/Rubriken"):
             m = re.match(
-                "/Rubriken upph\xf6r att g\xe4lla U:([^/]+)/ *([^/]+)/Rubriken tr\xe4der i kraft I:([^/]+)/ *([^/]+)",
+                "/Rubriken upphör att gälla U:([^/]+)/ *([^/]+)/Rubriken träder i kraft I:([^/]+)/ *([^/]+)",
                 title)
             if m:
                 expdate = m.group(1)
@@ -1971,10 +1974,10 @@ class SFS(Trips):
         title = re.sub(r'Kungl\. Maj:ts ', '', title)
         # if newtitle was selected above, it might not contain the SFSid eg "(2016:123)"
         title = re.sub(
-            r'^(Lag|F\xf6rordning|Tillk\xe4nnagivande|[kK]ung\xf6relse) ?(\([^\)]+\)|) ?(av|om|med|ang\xe5ende) ',
+            r'^(Lag|Förordning|Tillkännagivande|[kK]ungörelse) ?(\([^\)]+\)|) ?(av|om|med|angående) ',
             '',
             title)
-        title = re.sub(r"^\d{4} \xe5rs ", "", title)
+        title = re.sub(r"^\d{4} års ", "", title)
 
         return title
 
@@ -2005,12 +2008,12 @@ WHERE {
 
     def facets(self):
         def forfattningskey(row, binding, resource_graph):
-            # "Lag (1994:1920) om allm\xe4n l\xf6neavgift" => "allm\xe4n l\xf6neavgift"
-            # "Lag (2012:318) om 1996 \xe5rs Haagkonvention" => "Haagkonvention" (avoid leading year)
+            # "Lag (1994:1920) om allmän löneavgift" => "allmän löneavgift"
+            # "Lag (2012:318) om 1996 års Haagkonvention" => "Haagkonvention" (avoid leading year)
             return self._forfattningskey(row[binding]).lower()
 
         def forfattningsselector(row, binding, resource_graph):
-            # "Lag (1994:1920) om allm\xe4n l\xf6neavgift" => "A"
+            # "Lag (1994:1920) om allmän löneavgift" => "A"
             return forfattningskey(row, binding, resource_graph)[0].upper()
 
         def typelabel(row, binding, resource_graph):
@@ -2035,13 +2038,13 @@ WHERE {
                       key_descending=True),
                 Facet(RPUBL.arsutgava,
                       use_for_toc=True,
-                      label="Ordnade efter utgivnings\xe5r",
-                      pagetitle='F\xf6rfattningar utgivna %(selected)s',
+                      label="Ordnade efter utgivningsår",
+                      pagetitle='Författningar utgivna %(selected)s',
                       dimension_label="utgiven",
                       selector_descending=True),
                 Facet(DCTERMS.title,
                       label="Ordnade efter titel",
-                      pagetitle='F\xf6rfattningar som b\xf6rjar p\xe5 "%(selected)s"',
+                      pagetitle='Författningar som börjar på "%(selected)s"',
                       selector=forfattningsselector,
                       identificator=forfattningsselector,
                       key=forfattningskey,
