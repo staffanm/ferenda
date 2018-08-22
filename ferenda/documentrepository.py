@@ -584,6 +584,7 @@ class DocumentRepository(object):
             'sitedescription': 'Just another Ferenda site',
             'apiendpoint': "/api/",
             'searchendpoint': "/search/",
+            'acceptalldomains': False,
         }
 
     @classmethod

@@ -161,6 +161,12 @@ class RequestHandler(object):
             if uriproto != develproto:
                 uri = re.sub("^"+uriproto, develproto, uri)
             uri = uri.replace(self.repo.config.develurl, self.repo.config.url)
+        if getattr(self.repo.config, 'acceptalldomains', False):
+            # eg if the request_uri is http://localhost:8080/docs/1
+            # (and config.develurl is not set or doesn't match this),
+            # and config.url is https://example.org/, chnage
+            # request_uri to https://example.org/docs/1
+            uri = self.repo.config.url + uri.split("/", 3)[-1]
         return uri
         
     def handle(self, environ):
