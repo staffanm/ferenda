@@ -1345,7 +1345,9 @@ class LegalRef:
             m = re.search("\d{4}", attributes.get("datum", ""))
             if m:
                 realyear = int(m.group(0))
-            
+            else:
+                realyear = 0
+                
             if int(attributes['lopnummer']) > 2014 and realyear > 2014:
                 a = attributes
                 a['lopnummer'], a['ar'] = a['ar'], a['lopnummer']

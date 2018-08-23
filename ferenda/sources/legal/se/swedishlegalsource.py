@@ -1158,7 +1158,7 @@ class SwedishLegalSource(DocumentRepository):
         else:
             
             raise ValueError("Cannot create dcterms:identifier for rdf_type %s" % repr(self.rdf_type))
-        return self.sanitize_identifier("%s%s" % (prefix, basefile))
+        return str(self.sanitize_identifier("%s%s" % (prefix, basefile)))
 
     def postprocess_doc(self, doc):
         """Do any last-minute postprocessing (mainly used to add extra
