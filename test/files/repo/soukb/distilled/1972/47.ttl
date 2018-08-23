@@ -8,14 +8,8 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/sou/1972:47#B1> a bibo:DocumentPart ;
-    dcterms:isPartOf <https://lagen.nu/sou/1972:47> ;
-    dcterms:title "Bilagor"@sv ;
-    bibo:chapter "1"@sv .
-
 <https://lagen.nu/sou/1972:47#PS1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/sou/1972:47> ;
-    dcterms:references <https://lagen.nu/1949:105> ;
     dcterms:title "Till Statsrådet och chefen för justitiedepartementet"@sv .
 
 <https://lagen.nu/sou/1972:47#PS2> a bibo:DocumentPart ;
@@ -25,30 +19,44 @@
 
 <https://lagen.nu/sou/1972:47#PS3> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/sou/1972:47> ;
-    dcterms:references <https://lagen.nu/1937:249>,
-        <https://lagen.nu/1942:740>,
-        <https://lagen.nu/1949:105>,
-        <https://lagen.nu/1949:105#K2>,
-        <https://lagen.nu/1962:700>,
-        <https://lagen.nu/1962:700#K4> ;
     dcterms:title "Sammanfattning"@sv .
 
-<https://lagen.nu/sou/1972:47#S1> a bibo:DocumentPart ;
+<https://lagen.nu/sou/1972:47#PS4> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/sou/1972:47> ;
-    dcterms:references <https://lagen.nu/1937:249>,
-        <https://lagen.nu/1949:105>,
-        <https://lagen.nu/1949:105#K2P1> ;
-    dcterms:title "Direktiv"@sv ;
-    bibo:chapter "1"@sv .
+    dcterms:references <https://lagen.nu/1942:740>,
+        <https://lagen.nu/1949:105#K2>,
+        <https://lagen.nu/1962:700#K4> ;
+    dcterms:title "Sammanfattningsvis medför alltså ADB—       tekniken enligt OSK följande sätt för utläm-"@sv .
+
+<https://lagen.nu/sou/1972:47#S1-2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/sou/1972:47#S1> ;
+    dcterms:title "Kreditupplysningsu tredningen (KUU)"@sv ;
+    bibo:chapter "1.2"@sv .
+
+<https://lagen.nu/sou/1972:47#S1-4> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/sou/1972:47#S1> ;
+    dcterms:title "Datasamordningskammittén (DA SK)"@sv ;
+    bibo:chapter "1.4"@sv .
+
+<https://lagen.nu/sou/1972:47#S2-1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/sou/1972:47#S2> ;
+    dcterms:title "Avgivna remissyttranden"@sv ;
+    bibo:chapter "2.1"@sv .
+
+<http://urn.kb.se/resolve?urn=urn:nbn:se:kb:sou-8350729> rdfs:label "Källa"@sv .
 
 <https://lagen.nu/sou/1972:47#S2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/sou/1972:47> ;
     dcterms:title "Redovisning av OSK:s arbete hittills"@sv ;
     bibo:chapter "2"@sv .
 
-<http://urn.kb.se/resolve?urn=urn:nbn:se:kb:sou-8350729> rdfs:label "Källa"@sv .
-
 <https://lagen.nu/sou/1972:47?attachment=index.pdf&repo=soukb&dir=downloaded> rdfs:label "SOU 1972:47"@sv .
+
+<https://lagen.nu/sou/1972:47#S1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/sou/1972:47> ;
+    dcterms:references <https://lagen.nu/1949:105> ;
+    dcterms:title "Direktiv"@sv ;
+    bibo:chapter "1"@sv .
 
 <https://lagen.nu/sou/1972:47> a rpubl:Utredningsbetankande ;
     dcterms:identifier "SOU 1972:47" ;
