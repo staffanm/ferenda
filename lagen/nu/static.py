@@ -33,3 +33,8 @@ class Static(BaseStatic, SwedishLegalSource):
         
     def _relate_fulltext_value_rootlabel(self, desc):
         return "Lagen.nu: %s" % desc.getvalue(DCTERMS.title)
+
+    def footer(self):
+        res = super(Static, self).footer()
+        res.append(("Hostas hos kodapan", "http://kodapan.se/"))
+        return res
