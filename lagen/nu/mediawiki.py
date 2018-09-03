@@ -19,6 +19,7 @@ from cached_property import cached_property
 # mine
 from ferenda import util
 from ferenda import DocumentStore
+from ferenda.decorators import action
 from ferenda.sources.legal.se import SwedishLegalSource, SwedishCitationParser
 from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda.sources.general import wiki
@@ -197,6 +198,18 @@ class LNMediaWiki(wiki.MediaWiki):
         xhtmltree.remove(body)
         xhtmltree.append(newbody)
 
+    @action
+    def update(self, article):
+        """Update all generated pages that are dependent on/include the given wiki article."""
+        # self.config.force = True
+        # self.parse(article)
+        # self.relate(article)
+        # if article.startswith("SFS/"):
+        #     sfsrepo = instantiate_sfs(...)  # sets config.force = True?
+        #     sfsrepo.generate(article.split("/"))
+        # else:
+        #     kwrepo = instantiate_kw(...)
+        #     kwrepo.generate(article)
 
     def frontpage_content(self, primary=False):
         if primary:

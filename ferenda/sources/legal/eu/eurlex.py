@@ -115,8 +115,8 @@ class EURLex(DocumentRepository):
   </soap-env:Body>
 </soap-env:Envelope>
 """ % (self.config.username, self.config.password, escape(query, quote=False), page, self.pagesize, self.lang)
-        headers = {'Content-Type': 'application/soap+xml; charset=utf-8; action="http://eur-lex.europa.eu/EURLexWebService/doQuery"',
-                   'SOAPAction': 'http://eur-lex.europa.eu/EURLexWebService/doQuery'}
+        headers = {'Content-Type': 'application/soap+xml; charset=utf-8; action="https://eur-lex.europa.eu/EURLexWebService/doQuery"',
+                   'SOAPAction': 'https://eur-lex.europa.eu/EURLexWebService/doQuery'}
         if self.config.curl:
             # dump the envelope to a tempfile
             headerstr = ""
@@ -128,7 +128,7 @@ class EURLex(DocumentRepository):
                 fp.flush()
                 envelopename = fp.name
                 headerfiledesc, headerfilename = tempfile.mkstemp()
-                cmd = 'curl -X POST -D %(headerfilename)s --data-binary "@%(envelopename)s" %(headerstr)s %(endpoint)s' % locals()
+                cmd = 'curl -L -X POST -D %(headerfilename)s --data-binary "@%(envelopename)s" %(headerstr)s %(endpoint)s' % locals()
                 (ret, stdout, stderr) = util.runcmd(cmd)
             headerfp = os.fdopen(headerfiledesc)
             header = headerfp.read()
@@ -139,11 +139,9 @@ class EURLex(DocumentRepository):
             headers = dict(email.message_from_string(headers).items())
             res = FakeResponse(int(code), stdout, headers)
         else:
-            res = util.robust_fetch(self.session.post, url
-                                    , self.log,
+            res = util.robust_fetch(self.session.post, endpoint, self.log,
                                     raise_for_status=False,
-                                    data=envelope,
-                                    headers=headers,
+                                    data=envelope, headers=headers,
                                     timeout=10)
             
         if res.status_code == 500:
@@ -151,6 +149,11 @@ class EURLex(DocumentRepository):
             statuscode = tree.find(".//{http://www.w3.org/2003/05/soap-envelope}Subcode")[0].text
             statusmsg = tree.find(".//{http://www.w3.org/2003/05/soap-envelope}Text").text
             raise errors.DownloadError("%s: %s" % (statuscode, statusmsg))
+        elif res.status_code == 301:
+            # the call to robust_fetch or curl should have followed
+            # the redirect, but at this point we'll just have to
+            # report the error
+            raise errors.DownloadError("%s: was redirected to %s" % (endpoint, res.headers['Location']))
         return res
         
     def construct_expertquery(self, query_template):
