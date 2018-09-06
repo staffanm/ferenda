@@ -201,15 +201,18 @@ class LNMediaWiki(wiki.MediaWiki):
     @action
     def update(self, article):
         """Update all generated pages that are dependent on/include the given wiki article."""
-        # self.config.force = True
-        # self.parse(article)
-        # self.relate(article)
-        # if article.startswith("SFS/"):
-        #     sfsrepo = instantiate_sfs(...)  # sets config.force = True?
-        #     sfsrepo.generate(article.split("/"))
-        # else:
-        #     kwrepo = instantiate_kw(...)
-        #     kwrepo.generate(article)
+        from pudb import set_trace; set_trace()
+        self.config.force = True
+        self.config.refresh = True
+        self.download(article)
+        self.parse(article)
+        self.relate(article)
+        if article.startswith("SFS/"):
+            self.sfsrepo.config.force = True
+            self.sfsrepo.generate(article.split("/", 1)[1])
+        else:
+            self.keywordrepo.config.force = True
+            self.keywordrepo.generate(article)
 
     def frontpage_content(self, primary=False):
         if primary:
