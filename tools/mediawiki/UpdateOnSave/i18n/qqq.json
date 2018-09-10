@@ -1,0 +1,9 @@
+{
+    "@metadata": {
+        "authors": [
+            "Staffan Malmgren"
+        ]
+    },
+    "updateOnSave": "The name of the extension",
+    "updateOnSave-desc": "{{desc|name=UpdateOnSave|url=https://github.com/staffanm/ferenda/}}"
+}

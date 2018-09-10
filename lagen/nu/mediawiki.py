@@ -201,7 +201,6 @@ class LNMediaWiki(wiki.MediaWiki):
     @action
     def update(self, article):
         """Update all generated pages that are dependent on/include the given wiki article."""
-        from pudb import set_trace; set_trace()
         self.config.force = True
         self.config.refresh = True
         self.download(article)
@@ -210,6 +209,10 @@ class LNMediaWiki(wiki.MediaWiki):
         if article.startswith("SFS/"):
             self.sfsrepo.config.force = True
             self.sfsrepo.generate(article.split("/", 1)[1])
+        elif article == "Lagen.nu:Huvudsida":
+            # FIXME: This re-downloads and re-parses the wiki page
+            from ferenda import manager
+            manager.run(["all", "frontpage"], self.config._parent)
         else:
             self.keywordrepo.config.force = True
             self.keywordrepo.generate(article)

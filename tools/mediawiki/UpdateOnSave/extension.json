@@ -1,0 +1,29 @@
+{
+    "name": "UpdateOnSave",
+    "version": "0.0.1",
+    "author": [
+        "Staffan Malmgren"
+    ],
+    "url": "https://github.com/staffanm/ferenda/",
+    "namemsg": "updateOnSave",
+    "descriptionmsg": "updateOnSave-desc",
+    "license-name": "BSD-2-Clause",
+    "type": "other",
+    "manifest_version": 1,
+    "MessagesDirs": {
+        "UpdateOnSave": [
+            "i18n"
+        ]
+    },
+    "config": {
+	"UpdateOnSaveEndpoint": "http://lagen.nu/devel/build?repo=mediawiki&action=update&stream=true&basefile="
+    },
+    "AutoloadClasses": {
+        "UpdateOnSaveHooks": "Hooks.php"
+    },
+    "Hooks": {
+        "PageContentSaveComplete": [
+            "UpdateOnSaveHooks::onPageContentSaveComplete"
+        ]
+    }
+}

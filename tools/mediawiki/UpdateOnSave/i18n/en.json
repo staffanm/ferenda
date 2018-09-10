@@ -1,0 +1,9 @@
+{
+    "@metadata": {
+        "authors": [
+            "Staffan Malmgren"
+        ]
+    },
+    "updateOnSave": "UpdateOnSave",
+    "updateOnSave-desc": "Calls a configurable REST endpoint whenever a page is saved, with the wikiPage name as a parameter"
+}
