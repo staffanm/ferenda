@@ -7,7 +7,7 @@
 		xmlns:rpubl="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
 		xmlns:ext="http://exslt.org/common"
-		exclude-result-prefixes="xhtml rdf rpubl ext">
+		exclude-result-prefixes="xhtml rdf rpubl ext rinfoex">
 
   <xsl:import href="tune-width.xsl"/>
   <xsl:import href="annotations-panel.xsl"/>
@@ -363,7 +363,7 @@
       <!-- marker can be empty if the Stycke has no @id (which is the
            case for Stycke in a Paragraf which is not in force -->
       <xsl:if test="$marker != ''">
-	<a href="#{@id}" title="Permalänk till detta stycke"><img class="platsmarkor" src="../../../rsrc/img/{$marker}.png"/></a>
+	<a href="#{@id}" title="Permalänk till detta stycke"><img class="platsmarkor" src="../../../rsrc/img/{$marker}.png" alt="[{$marker}]"/></a>
       </xsl:if>
       <xsl:if test="xhtml:span[@class='paragrafbeteckning']">
 	<xsl:choose>
@@ -599,7 +599,7 @@
   
   <xsl:template match="xhtml:h2" mode="toc">
     <xsl:variable name="this" select="."/>
-    <xsl:variable name="subheadings" select="following-sibling::xhtml:h3[preceding-sibling::xhtml:h2[1] = $this]"/>
+    <xsl:variable name="subheadings" select="following-sibling::xhtml:h3[preceding-sibling::xhtml:h2[1] = $this][@id]"/>
     <xsl:variable name="subparas" select="following-sibling::xhtml:div[preceding-sibling::xhtml:h2[1] = $this]"/>
     <xsl:variable name="firstpara" select="$subparas[1]/@content"/><!-- select="$subparas[first()]/@content"/> -->
     <xsl:variable name="lastpara" select="$subparas[last()]/@content"/><!-- select="$subparas[last()]/@content"/> -->
