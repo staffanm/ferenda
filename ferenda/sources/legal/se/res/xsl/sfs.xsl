@@ -394,19 +394,17 @@
     </xsl:variable>
 
     <xsl:if test="@id">
-      <div class="row" about="{//html/@about}#{@id}">
-	<section id="{@id}" class="col-sm-7 bilaga">
-	  <xsl:copy-of select="$andringsmarkering"/>
-	  <xsl:apply-templates/>
-	</section>
+      <div class="row bilaga" about="{//html/@about}#{@id}" id="{@id}">
+ 	<xsl:apply-templates select="xhtml:h1[1]"/>
+	<xsl:copy-of select="$andringsmarkering"/>
+	<xsl:apply-templates select="*[not(self::xhtml:h1[1])]"/>
       </div>
     </xsl:if>
     <xsl:if test="not(@id)">
-      <div class="row">
-	<section class="col-sm-7 bilaga ej-ikraft">
-	  <xsl:copy-of select="$andringsmarkering"/>
-	  <xsl:apply-templates/>
-	</section>
+      <div class="row bilaga ej-ikraft">
+	<xsl:apply-templates select="xhtml:h1[1]"/>
+	<xsl:copy-of select="$andringsmarkering"/>
+	<xsl:apply-templates select="*[not(self::xhtml:h1[1])]"/>
       </div>
     </xsl:if>
   </xsl:template>
