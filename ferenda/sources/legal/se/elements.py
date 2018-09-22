@@ -298,7 +298,7 @@ class Overgangsbestammelse(CompoundElement, OrdinalElement):
         return res
         
 
-class Bilaga(CompoundElement):
+class Bilaga(CompoundElement, Tidsbestamd):
     fragment_label = "B"
     tagname = "div"
     typeof = "rinfoex:Bilaga"
@@ -309,6 +309,8 @@ class Bilaga(CompoundElement):
 
     def as_xhtml(self, uri=None, parent_uri=None):
         res = super(Bilaga, self).as_xhtml(uri, parent_uri)
+        # see comment in Paragraf.as_xhtml -- we use the same ugly workaround here:
+        Tidsbestamd.as_xhtml(self, uri, parent_uri, res)
         res.insert(0, E('h1', self.rubrik))
         return res
 

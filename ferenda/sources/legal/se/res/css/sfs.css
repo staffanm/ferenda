@@ -36,6 +36,11 @@
                          ferenda.css overrides */
 }
 
+.bilaga {
+    border: solid 1px #ddd;
+    margin-bottom: 6pt;
+}
+
 ol.numreradlista, ol.bokstavslista, ul.strecksatslista { list-style: none; }
 
 ol.numreradlista > li:before, ol.bokstavslista > li:before, ul.strecksatslista > li:before {

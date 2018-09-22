@@ -383,6 +383,34 @@
     <li id="{@id}" about="{@about}" data-ordinal="{@content}"><xsl:apply-templates/></li>
   </xsl:template>
   
+  <xsl:template match="xhtml:div[@typeof='rinfoex:Bilaga']">
+    <xsl:variable name="andringsmarkering">
+      <xsl:if test="xhtml:span[@rel='rinfoex:upphor']">
+	<p class="andringsdatum">/Upphör att gälla U: <xsl:value-of select="xhtml:span[@rel='rinfoex:upphor']/@content"/>/</p>
+      </xsl:if>
+      <xsl:if test="xhtml:span[@rel='rinfoex:ikrafttrader']">
+	<p class="andringsdatum">/Träder i kraft I: <xsl:value-of select="xhtml:span[@rel='rinfoex:ikrafttrader']/@content"/>/</p>
+      </xsl:if>
+    </xsl:variable>
+
+    <xsl:if test="@id">
+      <div class="row" about="{//html/@about}#{@id}">
+	<section id="{@id}" class="col-sm-7 bilaga">
+	  <xsl:copy-of select="$andringsmarkering"/>
+	  <xsl:apply-templates/>
+	</section>
+      </div>
+    </xsl:if>
+    <xsl:if test="not(@id)">
+      <div class="row">
+	<section class="col-sm-7 bilaga ej-ikraft">
+	  <xsl:copy-of select="$andringsmarkering"/>
+	  <xsl:apply-templates/>
+	</section>
+      </div>
+    </xsl:if>
+  </xsl:template>
+
   <xsl:template name="andringsnoteringar">
     <xsl:param name="typ"/>
     <xsl:param name="andringar"/>
@@ -620,7 +648,7 @@
     </xsl:if>
   </xsl:template>
 
-  <xsl:template match="xhtml:div[@typeof='rinfoex:Bilaga']" mode="toc">
+  <xsl:template match="xhtml:div[@typeof='rinfoex:Bilaga'][@id]" mode="toc">
     <li><a href="#{@id}"><xsl:value-of select="xhtml:h1"/></a></li>
   </xsl:template>
 

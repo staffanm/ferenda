@@ -261,6 +261,14 @@ def make_parser(reader, basefile, log, trace):
         if upphor:
             kwargs['upphor'] = upphor
         if ikrafttrader:
+            # special handling of the case where 1 kap 1 §, containing
+            # a TOC that shouldn't be mistaken for real chapter
+            # headings, occurs twice (one in the expired version, one
+            # in the newly enacted version) -- in these cases,
+            # state['fake_chapter'] will have been set to a value that
+            # keeps isKapitel from detecting this special case
+            if paragrafnummer == '1' and state['current_chapter'] == '1':
+                state['fake_chapter'] = '0'
             kwargs['ikrafttrader'] = ikrafttrader
 
         if momentnummer:
@@ -728,6 +736,7 @@ def make_parser(reader, basefile, log, trace):
             indirect = False
         else:
             indirect = True
+
         trace['rubrik'].debug("isRubrik (%s): indirect=%s" % (
             p[:50], indirect))
 
@@ -774,6 +783,14 @@ def make_parser(reader, basefile, log, trace):
                 p.endswith("eller")):
             trace['rubrik'].debug(
                 "isRubrik (%s): ends with comma/colon etc" % (p[:50]))
+            return False
+
+        # The TOC in 2016:1145 has specific lines that are easily
+        # mistaken for headlines, but a proper headline shouldn't
+        # start with eg "Bilaga 2 a - Blahonga foo" (right?)
+        if (re.match("Bilaga \d(| \w) – ", p)):
+            trace['rubrik'].debug(
+                "isRubrik (%s): looks like a TOC line for an appendix" % (p[:50]))
             return False
 
         if re_ChangeNote.search(p):  # eg 1994:1512 8 \xa7
@@ -1251,8 +1268,10 @@ def make_parser(reader, basefile, log, trace):
     def isBilaga():
         (line, upphor, ikrafttrader) = andringsDatum(
             reader.peekline())
+        if line.endswith(" /Bilagan är inte med här/"):
+            line = line.replace(" /Bilagan är inte med här/", "")
         return (line in ("Bilaga", "Bilaga*", "Bilaga *",
-                         "Bilaga 1", "Bilaga 2", "Bilaga 3",
+                         "Bilaga 1", "Bilaga 2", "Bilaga 2 a", "Bilaga 3",
                          "Bilaga 4", "Bilaga 5", "Bilaga 6"))
 
     return parse

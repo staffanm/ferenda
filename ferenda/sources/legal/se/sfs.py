@@ -383,66 +383,14 @@ class SFS(Trips):
 
         return updated
 
-    # FIXME: This doesn't work at all
-    def get_archive_version_nonworking(self, basefile, sfst_tempfile):
+    # FIXME: rename once we are sure it is in fact working
+    def get_archive_version_nonworking(self, basefile):
         sfst_file = self.store.downloaded_path(basefile)
-        # FIXME: Implement get_archive_version
-        if os.path.exists(sfst_file):
-            old_checksum = self._checksum(sfst_file)
-            new_checksum = self._checksum(sfst_tempfile)
-            upphavd_genom = self._find_upphavts_genom(sfst_tempfile)
-            uppdaterad_tom = self._find_uppdaterad_tom(basefile, sfst_tempfile)
-            if (old_checksum != new_checksum):
-                old_uppdaterad_tom = self._find_uppdaterad_tom(
-                    basefile, sfst_file)
-                uppdaterad_tom = self._find_uppdaterad_tom(
-                    basefile, sfst_tempfile)
-                if uppdaterad_tom != old_uppdaterad_tom:
-                    self.log.info('        %s har ändrats (%s -> %s)' % (
-                        basefile, old_uppdaterad_tom, uppdaterad_tom))
-                    self._archive(sfst_file, basefile, old_uppdaterad_tom)
-                else:
-                    self.log.info('        %s har ändrats (gammal '
-                                  'checksum %s)' % (basefile, old_checksum))
-                    self._archive(sfst_file,
-                                  basefile, old_uppdaterad_tom, old_checksum)
-
-                # replace the current file, regardless of wheter
-                # we've updated it or not
-                util.robust_rename(sfst_tempfile, sfst_file)
-            elif upphavd_genom:
-                self.log.info('        %s har upphävts' % (basefile))
-
-            else:
-                self.log.debug('        %s har inte ändrats (gammal '
-                               'checksum %s)' % (basefile, old_checksum))
-        else:
-            util.robust_rename(sfst_tempfile, sfst_file)
-
-        # FIXME: since basefile might be slightly modified from the
-        # actual URL to be used ("bet=1878:bih. 56 s. 1" vs
-        # "1878:bih.56_s.1") it's not really safe to use this template
-        sfsr_url = self.document_sfsr_url_template % {'basefile':
-                                                      basefile.replace(" ", "%20")}
-        sfsr_file = self.store.register_path(basefile)
-        if (old_uppdaterad_tom and
-                old_uppdaterad_tom != uppdaterad_tom):
-            self._archive(sfsr_file, basefile, old_uppdaterad_tom)
-
-        self.download_if_needed(sfsr_url, basefile, filename=sfsr_file)
-
-        if upphavd_genom:
-            self.log.info(
-                '        %s är upphävd genom %s' % (basefile, upphavd_genom))
-            return upphavd_genom
-        elif uppdaterad_tom:
-            self.log.info(
-                '        %s är uppdaterad tom %s' % (basefile, uppdaterad_tom))
-            return uppdaterad_tom
-        else:
-            self.log.info(
-                '        %s är varken uppdaterad eller upphävd' % (basefile))
-            return None
+        old_checksum = self._checksum(sfst_file)
+        # new_checksum = self._checksum(sfst_tempfile)
+        # upphavd_genom = self._find_upphavts_genom(sfst_tempfile)
+        # uppdaterad_tom = self._find_uppdaterad_tom(basefile, sfst_tempfile)
+        return self._find_uppdaterad_tom(basefile, sfst_file)
 
     def _find_uppdaterad_tom(self, sfsnr, filename=None, reader=None):
         if not reader:
