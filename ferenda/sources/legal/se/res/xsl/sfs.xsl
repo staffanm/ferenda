@@ -147,8 +147,17 @@
 
  
   <xsl:template match="xhtml:div[@typeof='rpubl:Kapitel']">
+    <xsl:variable name="andringsmarkering">
+      <xsl:if test="xhtml:span[@rel='rinfoex:upphor']">
+	<p class="andringsdatum">/Upphör att gälla U: <xsl:value-of select="xhtml:span[@rel='rinfoex:upphor']/@content"/>/</p>
+      </xsl:if>
+      <xsl:if test="xhtml:span[@rel='rinfoex:ikrafttrader']">
+	<p class="andringsdatum">/Träder i kraft I: <xsl:value-of select="xhtml:span[@rel='rinfoex:ikrafttrader']/@content"/>/</p>
+      </xsl:if>
+    </xsl:variable>
     <div class="row" about="{//html/@about}#{@id}">
       <section id="{@id}" class="col-sm-7 kapitelrubrik">
+	<xsl:copy-of select="$andringsmarkering"/>
 	<xsl:apply-templates select="*[1]"/>
       </section>
       <xsl:call-template name="aside-annotations">

@@ -202,6 +202,7 @@ class Kapitel(CompoundElement, OrdinalElement, Tidsbestamd):
         res = super(Kapitel, self).as_xhtml(uri, uri)
         res.attrib.update({"property": "rpubl:kapitelnummer",
                            "content": self.ordinal})
+        Tidsbestamd.as_xhtml(self, uri, parent_uri, res)
         res.insert(0, E('h1', self.rubrik))
         return res
 

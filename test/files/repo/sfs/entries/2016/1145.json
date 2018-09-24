@@ -1,0 +1,45 @@
+{
+  "basefile": "2016:1145", 
+  "content": {
+    "hash": "md5:fe8e5007573358ad8f3dbb0e55daa8bd", 
+    "markup": null, 
+    "src": "https://lagen.nu/sfs/parsed/2016:1145.xhtml", 
+    "type": "application/html+xml"
+  }, 
+  "id": "https://lagen.nu/2016:1145", 
+  "indexed_dep": "2018-08-21T20:56:07.041118", 
+  "indexed_ft": "2018-08-21T20:56:06.005060", 
+  "indexed_ts": "2018-08-21T20:56:08.013533", 
+  "link": {
+    "hash": "md5:443722ef80b0783993da872c75c82c86", 
+    "href": "https://lagen.nu/sfs/distilled/2016:1145.rdf", 
+    "length": 191280, 
+    "type": "application/rdf+xml"
+  }, 
+  "orig_checked": "2018-09-21T12:44:27.935849", 
+  "orig_created": "2018-08-19T13:12:05.826711", 
+  "orig_updated": "2018-09-22T13:12:05.826711", 
+  "orig_url": "http://rkrattsbaser.gov.se/sfst?bet=2016%3A1145", 
+  "published": "2018-08-19T15:19:52.019013", 
+  "status": {
+    "generate": {
+      "date": "2018-09-22T21:06:59.893704", 
+      "duration": 1.888843, 
+      "success": true
+    }, 
+    "parse": {
+      "date": "2018-09-22T13:45:21.374747", 
+      "duration": 16.366772, 
+      "success": true
+    }, 
+    "relate": {
+      "date": "2018-08-21T20:56:03.555630", 
+      "duration": 4.460059, 
+      "success": true
+    }
+  }, 
+  "summary": "Omfattning: \u00e4ndr. 13 kap. 1 \u00a7\nIkrafttr\u00e4der: 2018-09-01\nF\u00f6rarbeten: Bet. 2017/18:JuU35, Rskr. 2017/18:390, Prop. 2017/18:174\n", 
+  "title": "Lag (2018:1317) om \u00e4ndring i lagen (2016:1145) om offentlig upphandling", 
+  "updated": "2018-09-22T21:07:01.394555", 
+  "url": "https://lagen.nu/sfs/generated/2016:1145.html"
+}

@@ -35,13 +35,13 @@ re_ChapterRevoked = re.compile(
 re_SectionRevoked = re.compile(
     r'^(\d+ ?\w?) \xa7[ \.]([Hh]ar upphävts|[Nn]y beteckning (\d+ ?\w?) \xa7) genom ([Ff]örordning|[Ll]ag) \([\d\:\. s]+\)\.$').match
 re_RevokeDate = re.compile(
-    r'/(?:Rubriken u|U)pphör att gälla U:(\d+)-(\d+)-(\d+)/')
+    r'/(?:Rubriken u|Kapitlet u|U)pphör att gälla U:(\d+)-(\d+)-(\d+)(?: genom lag \(\d{4}:\d+\).|)/')
 re_RevokeAuthorization = re.compile(
-    r'/Upphör att gälla U:(den dag regeringen bestämmer)/')
+    r'/(?:Kapitlet u|U)pphör att gälla U:(den dag (?:som |)regeringen bestämmer)(?: genom lag \(\d{4}:\d+\).|)/')
 re_EntryIntoForceDate = re.compile(
-    r'/(?:Rubriken t|T)räder i kraft I:(\d+)-(\d+)-(\d+)/')
+    r'/(?:Rubriken t||Kapitlet t|T)räder i kraft I:(\d+)-(\d+)-(\d+)(?: genom lag \(\d{4}:\d+\).|)/')
 re_EntryIntoForceAuthorization = re.compile(
-    r'/Träder i kraft I:(den dag regeringen bestämmer)/')
+    r'/(?:Kapitlet t|T)räder i kraft I:(den dag (?:som |)regeringen bestämmer)(?: genom lag \(\d{4}:\d+\).|)/')
 re_dehyphenate = re.compile(r'\b- (?!(och|eller))', re.UNICODE).sub
 
 # use this custom matcher to ensure any strings you intend to convert
@@ -675,7 +675,7 @@ def make_parser(reader, basefile, log, trace):
     def idOfKapitel(p=None):
         if not p:
             p = reader.peekparagraph().replace("\n", " ")
-
+        p, upphor, ikrafttrader = andringsDatum(p)
         # '1 a kap.' -- almost always a headline, regardless if it
         # streches several lines but there are always special cases
         # (1982:713 1 a kap. 7 \xa7)
