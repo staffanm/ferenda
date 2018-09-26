@@ -91,40 +91,8 @@ class MediaWiki(DocumentRepository):
         return opts
 
     def download(self, basefile=None):
-        if basefile:
-            return self.download_single(basefile)
-        if self.config.mediawikidump:
-            xmldumppath = self.store.path('dump', 'downloaded', '.xml')
-            try:
-                resp = requests.get(self.config.mediawikidump)
-                self.log.info("Loaded XML dump from %s" % self.config.mediawikidump)
-                with self.store._open(xmldumppath, mode="wb") as fp:
-                    fp.write(resp.content)
-            except Exception:
-                # try to loa
-                pass
-            # xml = etree.parse(resp.content)
-            xml = etree.parse(xmldumppath)
-        else:
-            raise ConfigurationError("config.mediawikidump not set")
 
-        MW_NS = "{%s}" % xml.getroot().nsmap[None]
-        wikinamespaces = []
-        for ns_el in xml.findall("//" + MW_NS + "namespace"):
-            wikinamespaces.append(ns_el.text)
-
-        # Get list of existing basefiles - if any of those
-        # does not appear in the XML dump, remove them afterwards
-        basefiles = list(self.store.list_basefiles_for("parse"))
-        total = written = 0
-        for page_el in xml.findall(MW_NS + "page"):
-            basefile = page_el.find(MW_NS + "title").text
-            if basefile == "Huvudsida":
-                continue
-            if ":" in basefile and basefile.split(":")[0] in wikinamespaces:
-                (namespace, localtitle) = basefile.split(":", 1)
-                if namespace not in self.config.mediawikinamespaces:
-                    continue
+        def write_doc(basefile, page_el):
             writefile = False
             p = self.store.downloaded_path(basefile)
             newcontent = etree.tostring(page_el, encoding="utf-8")
@@ -139,22 +107,63 @@ class MediaWiki(DocumentRepository):
                 with open(p, "wb") as fp:
                     fp.write(newcontent)
                     self.log.info("%s: extracting from XML dump" % basefile)
-                written += 1
-
             if basefile in basefiles:
                 del basefiles[basefiles.index(basefile)]
-            total += 1
+
+        if basefile:
+            return self.download_single(basefile)
+        if self.config.mediawikidump:
+            from pudb import set_trace; set_trace()
+            xmldumppath = self.store.path('dump', 'downloaded', '.xml')
+            resp = requests.get(self.config.mediawikidump)
+            self.log.info("Loaded XML dump from %s" % self.config.mediawikidump)
+            from ferenda.documentstore import _open
+            with _open(xmldumppath, mode="wb") as fp:
+                fp.write(resp.content)
+            xml = etree.parse(xmldumppath)
+        else:
+            raise ConfigurationError("config.mediawikidump not set")
+
+        MW_NS = "{%s}" % xml.getroot().nsmap[None]
+        wikinamespaces = []
+        for ns_el in xml.findall("//" + MW_NS + "namespace"):
+            wikinamespaces.append(ns_el.text)
+
+        # Get list of existing basefiles - if any of those
+        # does not appear in the XML dump, remove them afterwards
+        basefiles = list(self.store.list_basefiles_for("parse"))
+        total = written = 0
+        deferred = {}
+        for page_el in xml.findall(MW_NS + "page"):
+            basefile = page_el.find(MW_NS + "title").text
+            if basefile == "Huvudsida":  # FIXME: generalize/make configurable
+                continue
+            if ":" in basefile and basefile.split(":")[0] in wikinamespaces:
+                (namespace, localtitle) = basefile.split(":", 1)
+                if namespace not in self.config.mediawikinamespaces:
+                    continue
+                # defer writing of this one, so that it overwrites any
+                # similarly named pages from teh main namespace. This
+                # is so that Category pages about $TOPIC take
+                # precedence over ordinary pages about $TOPIC
+                deferred[localtitle] = page_el
+            else:
+                write_doc(basefile, page_el)
+        for basefile, page_el in deferred.items():
+            write_doc(basefile, page_el)
 
         if 'dump' in basefiles:  # never remove
             del basefiles[basefiles.index('dump')]
         for b in basefiles:
             self.log.info("%s: removing stale document" % b)
             util.robust_remove(self.store.downloaded_path(b))
-        self.log.info("Examined %s documents, wrote %s of them" % (total, written))
+        # self.log.info("Examined %s documents, wrote %s of them" % (total, written))
 
     def download_single(self, basefile):
         # download a single term, for speed
         url = self.config.mediawikiexport % {'basefile': basefile}
+        if ":" in basefile and basefile.split(":")[0] in self.config.mediawikinamespaces:
+            basefile = basefile.split(":",1 )[1]
         self.download_if_needed(url, basefile, archive=self.download_archive)
 
     re_anchors = re.compile('(<a.*?</a>)', re.DOTALL)
@@ -174,7 +183,6 @@ class MediaWiki(DocumentRepository):
 
     def get_wikitext(self, soup, doc):
         return soup.find("text").text
-
 
     def parse_document_from_soup(self, soup, doc):
         parser = self.get_wikiparser()
