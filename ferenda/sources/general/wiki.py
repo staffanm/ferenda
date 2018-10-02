@@ -113,7 +113,6 @@ class MediaWiki(DocumentRepository):
         if basefile:
             return self.download_single(basefile)
         if self.config.mediawikidump:
-            from pudb import set_trace; set_trace()
             xmldumppath = self.store.path('dump', 'downloaded', '.xml')
             resp = requests.get(self.config.mediawikidump)
             self.log.info("Loaded XML dump from %s" % self.config.mediawikidump)

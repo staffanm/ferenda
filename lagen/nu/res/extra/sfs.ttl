@@ -29,7 +29,7 @@
 <https://lagen.nu/1964:19> rdfs:label "krigshandelslagen" .
 <https://lagen.nu/1966:209> rdfs:label "virkesmätningslagen" .
 <https://lagen.nu/1967:837> rdfs:label "patentlagen" .
-<https://lagen.nu/1967:868> rdfs:label "förköpslagen" ; dcterms:alternate "FL" .
+# <https://lagen.nu/1967:868> rdfs:label "förköpslagen" ; dcterms:alternate "FL" .
 <https://lagen.nu/1968:45> rdfs:label "atomansvarighetslagen" .
 <https://lagen.nu/1968:64> dcterms:alternate "NSL" .
 <https://lagen.nu/1968:64> rdfs:label "narkotikastrafflagen" .
@@ -109,7 +109,6 @@
 <https://lagen.nu/1985:192> rdfs:label "järnvägstrafiklagen" .
 <https://lagen.nu/1985:206> dcterms:alternate "VitesL" .
 <https://lagen.nu/1985:716> rdfs:label "konsumenttjänstlagen" ; dcterms:alternate "KTjL" .
-<https://lagen.nu/1986:223> rdfs:label "förvaltningslagen" ; dcterms:alternate "FL" .
 <https://lagen.nu/1987:10> dcterms:alternate "PBL" .
 <https://lagen.nu/1987:11> dcterms:alternate "ESL" .
 <https://lagen.nu/1987:230> rdfs:label "äktenskapsbalken"; dcterms:alternate "ÄktB" .
@@ -234,3 +233,4 @@
 <https://lagen.nu/2010:1622> rdfs:label "alkohollagen" .
 <https://lagen.nu/2010:1846> rdfs:label "konsumentkreditlagen" ; dcterms:alternate "KKrL" .
 <https://lagen.nu/2015:315> rdfs:label "läkemedelslagen" .
+<https://lagen.nu/2017:900> rdfs:label "förvaltningslagen" ; dcterms:alternate "FL" .

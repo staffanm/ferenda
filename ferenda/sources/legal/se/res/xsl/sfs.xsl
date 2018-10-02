@@ -550,7 +550,8 @@
 	</xsl:if>
 	<xsl:if test="xhtml:span[@rel='rpubl:genomforDirektiv']">
 	  <dt>CELEX-nr</dt>
-	  <dd><a href="xhtml:span[@rel='rpubl:genomforDirektiv']/@href"><xsl:value-of select="xhtml:span[@rel='rpubl:genomforDirektiv']/xhtml:span/@content"/></a></dd>
+	  <!-- we'd like to use {xhtml:span[@rel='rpubl:genomforDirektiv']/@href} here, but that points to an internal URL that doesn't redirect -->
+	  <dd><a href="https://eur-lex.europa.eu/legal-content/SV/TXT/?uri=CELEX:{xhtml:span[@rel='rpubl:genomforDirektiv']/xhtml:span/@content}"><xsl:value-of select="xhtml:span[@rel='rpubl:genomforDirektiv']/xhtml:span/@content"/></a></dd>
 	</xsl:if>
 	<xsl:if test="xhtml:span[@property='rpubl:ikrafttradandedatum']">
 	  <dt>Ikraftträder</dt>

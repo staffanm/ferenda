@@ -1,7 +1,7 @@
 Vad är nytt?
 ============
 
-Hösten 2017 lanseras en ny version av lagen.nu, den fjärde sedan starten 2004. 
+Hösten 2018 lanseras en ny version av lagen.nu, den fjärde sedan starten 2004. 
 
 Den stora nyheten är att det nu finns mycket mer information, då både förarbeten,
 myndighetspraxis och myndigheters författningssamlingar tillkommit. Även vägledande 

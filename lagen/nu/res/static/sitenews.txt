@@ -1,3 +1,15 @@
+2018-09-11 10:39:00 Ny version lanserad
+
+<p>Efter en lång testperiod finns nu den nya versionen av lagen.nu
+tillgänglig. I den nya versionen finns förarbeten, myndighetspraxis
+och många myndigheters författningssamlingar med. Det finns även en
+inbyggd sökfunktion med mer precisa sökningar. Se mer under <a
+href="http://ferenda.lagen.nu/om/nytt">Vad är nytt?</a></p>
+
+<p>Den gamla versionen av tjänsten kommer tills vidare finnas
+tillgänglig på <a
+href="http://retro.lagen.nu/">retro.lagen.nu</a>.</p>
+
 2018-04-03 08:00:00 Äldre propositioner nu tillgängliga
 
 <p>Kungliga biblioteket och Riksdagsförvaltningen har nyligen gjort <a

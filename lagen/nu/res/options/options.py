@@ -3497,7 +3497,7 @@
     ("prop", "1867:17"): "metadataonly",
     ("prop", "1867:18"): "metadataonly",
     ("prop", "1867:19"): "metadataonly",
-    ("prop", "1867:2"): "metadataonly",
+    ("prop", "1867:2"): "default", # Relevant för upphovsrättsfrågor
     ("prop", "1867:20"): "metadataonly",
     ("prop", "1867:21"): "metadataonly",
     ("prop", "1867:22"): "metadataonly",
