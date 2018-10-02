@@ -1332,8 +1332,6 @@ class SwedishLegalSource(DocumentRepository):
         #     v = "%s, %s" % (v, resourceuri.split("#", 1)[1])
         return v
 
-    @ifneeded('generate')
-    @updateentry('generate')
     def generate(self, basefile, otherrepos=[]):
         ret = super(SwedishLegalSource, self).generate(basefile, otherrepos)
         if self.get_parse_options(basefile) == "metadataonly":

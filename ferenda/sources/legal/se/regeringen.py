@@ -159,12 +159,13 @@ class Regeringen(Offtryck):
         "https://www.regeringen.se/rattsliga-dokument/proposition/2018/01/sou-2071883", # missing a 1, leading to the interpretation prop. 2071/88:3 instead of 2017/18:83
         "https://www.regeringen.se/rattsliga-dokument/kommittedirektiv/2017/04/dir.-201645/", # is Dir. 2017:45, not 2016:45
         "https://www.regeringen.se/rattsliga-dokument/departementsserien-och-promemorior/2015/11/andring-av-en-avvisningsbestammelse-i-utlanningslagen-2005716/", # no ds, gets incorrect id from a SFS quoted in the title
-    ])
+        "http://www.regeringen.se/rattsliga-dokument/proposition/2018/01/sou-2071883/" # is 2017/18, not 2017/72
+     ])
                     
     def attribs_from_url(self, url):
-        # Neither search results nor RSS feeds from regeringen.se
-        # contain textual information about the identifier
-        # (eg. "Prop. 2015/16:64") of each document. However, the URL
+        # The RSS feeds from regeringen.se does not contain textual
+        # information about the identifier (eg. "Prop. 2015/16:64") of
+        # each document. However, the URL
         # (eg. http://www.regeringen.se/rattsdokument/proposition/2015/12/prop.-20151664/
         # often contains the same information. But not always...
         year = ordinal = None
@@ -176,7 +177,7 @@ class Regeringen(Offtryck):
             if m: 
                 (year, ordinal) = m.groups()
                 year = year.replace("_", "")
-        if year and ordinal and url not in self.misleading_urls:
+        if year and ordinal and url not in self.misleading_urls and int(year[:4]) <= datetime.now().year:  # make sure a misleading url doesn't result in eg year 2071
             return {'rdf:type': self.urispace_segment.split("/")[-1],
                     'rpubl:arsutgava': year,
                     'rpubl:lopnummer': ordinal}

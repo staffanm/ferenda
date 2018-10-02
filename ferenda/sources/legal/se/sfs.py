@@ -523,8 +523,9 @@ class SFS(Trips):
                     if (not re.match(r"\d+-\d+-\d+$", datestr) or
                         (datetime.strptime(datestr, '%Y-%m-%d') < datetime.today())):
                         self.log.debug('%s: Expired' % basefile)
-                        raise UpphavdForfattning("%s is an expired SFS" % basefile,
-                                                 dummyfile=self.store.parsed_path(basefile))
+                        if not self.config.keepexpired:
+                            raise UpphavdForfattning("%s is an expired SFS" % basefile,
+                                                     dummyfile=self.store.parsed_path(basefile))
         return self._extract_text(basefile)
 
     def extract_head(self, fp, basefile):
@@ -609,7 +610,7 @@ class SFS(Trips):
                 rdftype = firstchange.get('rdf:type', None)
                 if rdftype:
                     d[docuri]["rdf:type"] = rdftype
-                d[docuri]["dcterms:title"] = "(Rubrik saknas)"
+                # d[docuri]["dcterms:title"] = "(Rubrik saknas)"
             for key, val in list(rowdict.items()):
                 if key == 'SFS-nummer':
                     (arsutgava, lopnummer) = val.split(":")
@@ -642,7 +643,7 @@ class SFS(Trips):
                 elif key == 'Upphävd':
                     # val is normally "YYYY-MM-DD" but may contain trailing info (1973:638)
                     dateval = datetime.strptime(val[:10], '%Y-%m-%d')
-                    if dateval < datetime.today():
+                    if dateval < datetime.today() and not self.config.keepexpired:
                         raise UpphavdForfattning("%s is an expired SFS"
                                                  % basefile,
                                                  dummyfile=self.store.parsed_path(basefile))
@@ -1940,18 +1941,18 @@ PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
 
 SELECT DISTINCT ?uri ?rdf_type ?titel ?utgiven ?label ?creator ?issued
-FROM <https://lagen.nu/dataset/sfs>
+FROM <%s>
 WHERE {
     ?childuri rdf:type rpubl:KonsolideradGrundforfattning .
     ?childuri rpubl:konsoliderar ?uri .
+    ?childuri dcterms:issued ?issued .
+    ?uri dcterms:title ?titel .
     OPTIONAL { ?uri rdf:type ?rdf_type . }
-    OPTIONAL { ?uri dcterms:title ?titel . }
     OPTIONAL { ?uri rpubl:arsutgava ?utgiven . }
     OPTIONAL { ?childuri rdfs:label ?label . }
     OPTIONAL { ?childuri dcterms:creator ?creator . }
-    OPTIONAL { ?childuri dcterms:issued ?issued . }
 
-}"""
+}""" % context
 
 
     def facets(self):
@@ -1960,6 +1961,9 @@ WHERE {
             # "Lag (2012:318) om 1996 års Haagkonvention" => "Haagkonvention" (avoid leading year)
             return self._forfattningskey(row[binding]).lower()
 
+        def sfsnrkey(row, binding, resource_graph):
+            return util.split_numalpha(row['uri'].rsplit("/")[-1])
+        
         def forfattningsselector(row, binding, resource_graph):
             # "Lag (1994:1920) om allmän löneavgift" => "A"
             return forfattningskey(row, binding, resource_graph)[0].upper()
@@ -1988,6 +1992,7 @@ WHERE {
                       use_for_toc=True,
                       label="Ordnade efter utgivningsår",
                       pagetitle='Författningar utgivna %(selected)s',
+                      key=sfsnrkey,
                       dimension_label="utgiven",
                       selector_descending=True),
                 Facet(DCTERMS.title,

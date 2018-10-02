@@ -115,9 +115,20 @@
       <dd><xsl:value-of select="//xhtml:meta[@property='rpubl:utfardandedatum']/@content"/></dd>
       <dt>Ändring införd</dt>
       <dd><xsl:value-of select="//xhtml:meta[@property='dcterms:identifier']/@content"/></dd>
+      <xsl:if test="//xhtml:meta[@property='rpubl:ikrafttradandedatum']/@content">
+	<dt>Ikraft</dt>
+	<dd><xsl:value-of select="//xhtml:meta[@property='rpubl:ikrafttradandedatum']/@content"/></dd>
+      </xsl:if>
       <xsl:if test="//xhtml:meta[@property='rinfoex:tidsbegransad']/@content">
 	<dt>Tidsbegränsad</dt>
 	<dd><xsl:value-of select="//xhtml:meta[@property='rinfoex:tidsbegransad']/@content"/></dd>
+      </xsl:if>
+      <xsl:if test="//xhtml:meta[@property='rinfoex:upphavdAv']"> <!-- FIXME: This property should be encoded as link rel="..." ? -->
+	<xsl:variable name="upphavdAv" select="//xhtml:meta[@property='rinfoex:upphavdAv']/@content"/>
+	<dt>Upphävd</dt>
+	<dd><xsl:value-of select="//xhtml:meta[@property='rpubl:upphavandedatum']/@content"/></dd>
+	<dt>Upphävd genom</dt>
+	<dd><a href="{$upphavdAv}"><xsl:value-of select="//xhtml:div[@about=$upphavdAv]/xhtml:span[@property='dcterms:identifier']/@content"/></a></dd>
       </xsl:if>
       <dt>Källa</dt>
       <dd rel="dcterms:publisher" resource="http://lagen.nu/org/2008/regeringskansliet"><a href="http://rkrattsbaser.gov.se/sfst?bet={$regpost/xhtml:span[@property='rpubl:arsutgava']/@content}:{$regpost/xhtml:span[@property='rpubl:lopnummer']/@content}">Regeringskansliets rättsdatabaser</a></dd>
@@ -499,7 +510,7 @@
     <xsl:variable name="year" select="xhtml:span[@property='rpubl:arsutgava']/@content"/>
     <xsl:variable name="nr" select="xhtml:span[@property='rpubl:lopnummer']/@content"/>
     <div class="andring" id="{@id}" about="{@about}">
-      <h2><xsl:value-of select="@content"/></h2>
+      <h2><xsl:choose><xsl:when test="@content"><xsl:value-of select="@content"/></xsl:when><xsl:otherwise>Ändring, <xsl:value-of select="xhtml:span[@property='dcterms:identifier']/@content"/></xsl:otherwise></xsl:choose></h2>
       <!-- SFS older than 1998:306 does not exist in PDF anywhere. SFS
            1998:306 to 2018:159 exists in unofficial form at
            rkrattsdb.gov.se. SFS equal to or newer than 2018:160
@@ -524,7 +535,12 @@
 	  <dt>Förarbeten</dt>
 	  <dd>
 	    <xsl:for-each select="xhtml:span[@rel='rpubl:forarbete']">
-	      <a href="{@href}"><xsl:value-of select="xhtml:span/@content"/></a><xsl:if test="position()!= last()">, </xsl:if>
+	      <!-- only link propositioner, not utskottsbetänkanden nor riksdagsskrivelser -->
+	      <xsl:choose>
+		<xsl:when test="xhtml:span[@rel='rdf:type']/@href = 'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Proposition'">
+		  <a href="{@href}"><xsl:value-of select="xhtml:span/@content"/></a>
+		</xsl:when>
+		<xsl:otherwise><xsl:value-of select="xhtml:span/@content"/></xsl:otherwise></xsl:choose><xsl:if test="position()!= last()">, </xsl:if>
 	    </xsl:for-each>
 	  </dd>
 	</xsl:if>
