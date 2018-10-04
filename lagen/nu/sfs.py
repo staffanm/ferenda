@@ -11,7 +11,7 @@ from urllib.parse import quote, unquote
 from wsgiref.util import request_uri
 
 from rdflib import URIRef
-from rdflib.namespace import DCTERMS, OWL, RDF
+from rdflib.namespace import DCTERMS, OWL, RDF, RDFS
 from ferenda.sources.legal.se import RPUBL, RINFOEX
 from ferenda.sources.legal.se.swedishlegalsource import SwedishLegalHandler
 
@@ -121,10 +121,20 @@ class SFS(OrigSFS, SameAs):
             desc.value(RINFOEX.senastHamtad, de.orig_updated)
         if de.orig_checked:
             desc.value(RINFOEX.senastKontrollerad, de.orig_checked)
-        v = self.commondata.value(resource.identifier,
-                                  DCTERMS.alternate, any=True)
+        rooturi = URIRef(desc.getrel(RPUBL.konsoliderar))
+
+        v = self.commondata.value(rooturi, DCTERMS.alternate, any=True)
         if v:
             desc.value(DCTERMS.alternate, v)
+        v = self.commondata.value(rooturi, RDFS.label, any=True)
+        if v:
+            # don't include labels if they're essentially the same as
+            # dcterms:title (legalref needs it to be able to parse
+            # refs to laws that typically don't include SFS numbers,
+            # so that's why they're in sfs.ttl
+            basetitle = str(resource.value(DCTERMS.title)).rsplit(" (")[0]
+            if not v.startswith(basetitle.lower()):
+                desc.value(RDFS.label, util.ucfirst(v))
 
     def tabs(self):
         if self.config.tabs:

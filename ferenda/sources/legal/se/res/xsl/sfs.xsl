@@ -40,9 +40,14 @@
     <xsl:variable name="kommentar" select="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/dcterms:description/xhtml:div/*"/>
     <xsl:variable name="myndfs" select="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/rpubl:isBemyndigandeFor/rdf:Description"/>
     <xsl:variable name="forfattningskommentar" select="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/rinfoex:forfattningskommentar/xhtml:div/*"/>
+    <xsl:variable name="label" select="//xhtml:meta[@property='rdfs:label' and not(@about)]/@content"/>
+    <xsl:variable name="alternate" select="//xhtml:meta[@property='dcterms:alternate']/@content"/>
     <div class="row">
       <section id="top" class="col-sm-7">
 	<h1><xsl:value-of select="../xhtml:head/xhtml:title"/></h1>
+	<xsl:if test="$label or $alternate">
+	  <p class="lead">(<xsl:value-of select="$label"/><xsl:if test="$label and $alternate">, </xsl:if><xsl:value-of select="$alternate"/>)</p>
+	</xsl:if>
 	<xsl:call-template name="docmetadata"/>
 	<xsl:if test="../../xhtml:head/xhtml:meta[@rel='rinfoex:upphavdAv']">
 	  <div class="ui-state-error">

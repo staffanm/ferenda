@@ -2032,6 +2032,16 @@ WHERE {
                 }
             if facet.dimension_label == "label":
                 v = self.display_title(resourceuri)
+                root = desc.graph.value(predicate=RPUBL.konsoliderar, object=desc._current())
+                if root:
+                    # optionally add rdfs:label and dcterms:alternate
+                    alts = []
+                    for pred in RDFS.label, DCTERMS.alternate:
+                        val = desc.graph.value(root, pred)
+                        if val:
+                            alts.append(val)
+                    if alts:
+                        v += " (%s)" % ", ".join(alts)
             else:
                 v = self._relate_fulltext_value_cache[rooturi][facet.dimension_label]
             return facet.dimension_label, v
