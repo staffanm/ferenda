@@ -392,11 +392,16 @@ class SFS(Trips):
         # uppdaterad_tom = self._find_uppdaterad_tom(basefile, sfst_tempfile)
         return self._find_uppdaterad_tom(basefile, sfst_file)
 
-    def _find_uppdaterad_tom(self, sfsnr, filename=None, reader=None):
+    def _find_uppdaterad_tom(self, sfsnr, filename=None, reader=None, fail_silently=True):
         if not reader:
             reader = TextReader(filename, encoding=self.source_encoding)
         try:
-            reader.cue("Ändring införd:</span> t.o.m. SFS")
+            # FIXME: older files use <b> around the metadata value
+            # instead of <span> around the metadata key
+            try:
+                reader.cue("Ändring införd:</span> t.o.m. SFS")
+            except IOError:
+                reader.cue("Ändring införd:<b> t.o.m. SFS")
             l = reader.readline()
             m = re.search(r'(\d+:\s?\d+)', l)
             if m:
@@ -406,8 +411,11 @@ class SFS(Trips):
                 # formatting (eg 1996/613-first-version) -- interpret
                 # it as if it didn't exist
                 return sfsnr
-        except IOError:
-            return sfsnr  # the base SFS nr
+        except IOError as e:
+            if fail_silently:
+                return sfsnr  # the base SFS nr
+            else:
+                raise e
 
     def _find_upphavts_genom(self, filename):
         return None # this info is not available in the SFST document

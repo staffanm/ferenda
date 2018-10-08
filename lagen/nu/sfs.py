@@ -9,7 +9,7 @@ import shutil
 from datetime import datetime
 from urllib.parse import quote, unquote
 from wsgiref.util import request_uri
-
+from html import unescape # on py2, use from HTMLParser import HTMLParser; unescape = HTMLParser().unescape
 from rdflib import URIRef
 from rdflib.namespace import DCTERMS, OWL, RDF, RDFS
 from ferenda.sources.legal.se import RPUBL, RINFOEX
@@ -150,6 +150,9 @@ class SFS(OrigSFS, SameAs):
         return "%s författningar" % len(set([row['uri'] for row in self.faceted_data()]))
 
 
+    templ = ['(?P<type>sfs[tr])/(?P<byear>\d+)/(?P<bnum>[^\-]+).html',
+             '(?P<type>sfs[tr])/(?P<byear>\d+)/(?P<bnum>[^\-]+)-(?P<vyear>[^\-]+)-(?P<vnum>[^\-]+).html',
+             '(?P<type>sfs[tr])/(?P<byear>\d+)/(?P<bnum>[^\-]+)-(?P<vyear>[^\-]+)-(?P<vnum>[^\-]+)-(?P<vcheck>checksum-[a-f0-9]+).html']
     @decorators.action
     def importarchive(self, archivedir):
         """Imports downloaded data from an archive from legacy lagen.nu data.
@@ -162,17 +165,26 @@ class SFS(OrigSFS, SameAs):
         for f in util.list_dirs(archivedir, ".html"):
             if "downloaded/sfst" not in f:
                 continue
+            if os.path.getsize(f) == 0:
+                continue
             for regex in self.templ:
-                m = re.match(regex, f)
+                m = re.search(regex, f)
                 if not m:
                     continue
-                if "vcheck" in m.groupdict():  # silently ignore
+                
+                if "vcheck" in m.groupdict():  # silently ignore these
+                                             # (they should be older
+                                             # versions of a version
+                                             # we already have -- but
+                                             # we ought to test this!)
                     break
                 basefile = "%s:%s" % (m.group("byear"), m.group("bnum"))
 
                 # need to look at the file to find out its version
-                # text = t.extractfile(f).read(4000).decode("latin-1")
-                text = open(f).read(4000).decode("latin-1")
+                raw = open(f, 'rb').read(8000)
+                # if it uses html5 doctype, assume utf-8, otherwise assume latin-1
+                encoding = "utf-8" if b'<!DOCTYPE html>' in raw else "latin-1" 
+                text = unescape(raw.decode(encoding, errors="replace"))
                 reader = TextReader(string=text)
                 updated_to = self._find_uppdaterad_tom(basefile,
                                                        reader=reader)
@@ -190,30 +202,31 @@ class SFS(OrigSFS, SameAs):
                             self.log.warning("%s: Expected %s, found %s" %
                                              (f, exp, version))
                 else:
-                    version = None
-                    current += 1
-                    de = DocumentEntry()
-                    de.basefile = basefile
-                    de.id = self.canonical_uri(basefile, updated_to)
-                    # fudge timestamps best as we can
-                    de.orig_created = datetime.fromtimestamp(os.path.getctime(f))
-                    de.orig_updated = datetime.fromtimestamp(os.path.getmtime(f))
-                    de.orig_updated = datetime.now()
-                    de.orig_url = self.document_url_template % locals()
-                    de.published = datetime.now()
-                    de.url = self.generated_url(basefile)
-                    de.title = "SFS %s" % basefile
-                    # de.set_content()
-                    # de.set_link()
-                    de.save(self.store.documententry_path(basefile))
-                # this yields more reasonable basefiles, but they are not
-                # backwards compatible -- skip them for now
-                # basefile = basefile.replace("_", "").replace(".", "")
-                if "type" in m.groupdict() and m.group("type") == "sfsr":
-                    dest = self.store.register_path(basefile)
-                    current -= 1  # to offset the previous increment
+                    break
+                    # what was the actual POINT of this? SFS.download
+                    # will have downloaded a copy of this exact
+                    # version (the most recent version), regardless of
+                    # whether it's expired or not.
+                    
+                    # version = None
+                    # current += 1
+                    # de = DocumentEntry()
+                    # de.basefile = basefile
+                    # de.id = self.canonical_uri(basefile, updated_to)
+                    # # fudge timestamps best as we can
+                    # de.orig_created = datetime.fromtimestamp(os.path.getctime(f))
+                    # de.orig_updated = datetime.fromtimestamp(os.path.getmtime(f))
+                    # de.orig_updated = datetime.now()
+                    # de.orig_url = self.document_url_template % locals()
+                    # de.published = datetime.now()
+                    # de.url = self.generated_url(basefile)
+                    # de.title = "SFS %s" % basefile
+                    # de.save(self.store.documententry_path(basefile))
+
+                if m.group("type") == "sfsr":
+                    dest = self.store.register_path(basefile, version=version)
                 else:
-                    dest = self.store.downloaded_path(basefile, version)
+                    dest = self.store.downloaded_path(basefile, version=version)
                 self.log.debug("%s: extracting %s to %s" % (basefile, f, dest))
                 util.ensure_dir(dest)
                 shutil.copy2(f, dest)
