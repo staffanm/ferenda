@@ -315,6 +315,8 @@ class RequestHandler(object):
                 method = partial(repo.store.intermediate_path, attachment=baseattach)
                 return method  # we really don't want to partial()
                                # this method again below
+        elif "version" in params:
+            method = partial(repo.store.generated_path, version=params["version"])
         elif contenttype in self._mimemap and not basefile.endswith("/data"):
             method = getattr(repo.store, self._mimemap[contenttype])
         elif suffix in self._suffixmap and not basefile.endswith("/data"):

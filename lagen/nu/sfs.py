@@ -180,10 +180,10 @@ class SFS(OrigSFS, SameAs):
                     break
                 basefile = "%s:%s" % (m.group("byear"), m.group("bnum"))
 
+                
                 # need to look at the file to find out its version
+                encoding = self._sniff_encoding(f)
                 raw = open(f, 'rb').read(8000)
-                # if it uses html5 doctype, assume utf-8, otherwise assume latin-1
-                encoding = "utf-8" if b'<!DOCTYPE html>' in raw else "latin-1" 
                 text = unescape(raw.decode(encoding, errors="replace"))
                 reader = TextReader(string=text)
                 updated_to = self._find_uppdaterad_tom(basefile,

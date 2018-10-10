@@ -28,6 +28,7 @@ from queue import Queue
 from time import sleep
 from urllib.parse import urlsplit
 from wsgiref.simple_server import make_server
+from contextlib import contextmanager
 import argparse
 import builtins
 import cProfile
@@ -124,6 +125,12 @@ class MarshallingHandler(logging.Handler):
 
 class ParseErrorWrapper(errors.FerendaException): pass
 
+class BasefileLoggerAdapter(logging.LoggerAdapter):
+    def process(self, msg, kwargs):
+        e = self.extra
+        label = e['basefile'] + "@" + e['version'] if e['version'] else e['basefile']
+        return '[{%s}] %s' % (label, msg), kwargs
+    
 
 def makeresources(repos,
                   resourcedir="data/rsrc",
@@ -463,8 +470,25 @@ def shutdown_logger():
             existing_handler.close()
         l.removeHandler(existing_handler)
 
+@contextmanager
+def adaptlogger(instance, basefile, version):
+    """A context manager that temporarily switches out the logger on the
+provided docrepo instance for a wrapping LoggerAdapter. The wrapper
+automatically prepends basefile and optional version to all log messages.
+
+Note that this doesn't change any other loggers that submodules might
+use.
+
+    """
+    oldlog = instance.log
+    instance.log = BasefileLoggerAdapter(instance.log, {'basefile': basefile, 'version': version})
+    try:
+        yield
+    finally:
+        instance.log = oldlog
 
 def run(argv, config=None, subcall=False):
+
     """Runs a particular action for either a particular class or all
     enabled classes.
 
@@ -1023,6 +1047,19 @@ def _run_class(enabled, argv, config):
 
         if 'all' in inst.config and inst.config.all is True:
             iterable = inst.store.list_basefiles_for(action, force=inst.config.force)
+
+            # FIXME: This part creates a list of tuples (basefile,
+            # version) from a simple iterable of basefile values. It
+            # would be better to create a true lazy-eval generator.
+            combined_iterable = []
+            if 'allversions' in inst.config and inst.config.allversions is True:
+                for basefile in iterable:
+                    for version in inst.store.list_versions(basefile, action):
+                        new_iterable.append((basefile, version))
+            else:
+                for basefile in iterable:
+                    new_iterable.append((basefile, None))
+                    
             if action == "parse" and not inst.config.force:
                 # if we don't need to parse all basefiles, let's not
                 # even send jobs out to buildclients if we can avoid
@@ -1063,32 +1100,46 @@ def _run_class(enabled, argv, config):
                         argv)
                 else:
                     # - run the jobs, one by one, in the current process
-                    for basefile in iterable:
-                        r = _run_class_with_basefile(
-                            clbl,
-                            basefile,
-                            kwargs,
-                            action,
-                            alias)
+                    for (basefile, version) in iterable:
+                        with adaptlogger(inst, basefile, version):
+                            r = _run_class_with_basefile(
+                                clbl,
+                                basefile,
+                                version,
+                                kwargs,
+                                action,
+                                alias)
                         res.append(r)
                 cls.teardown(action, inst.config)
         else:
-            # The only thing that kwargs may contain is a
-            # 'otherrepos' parameter.
-            # NOTE: This is a shorter version of the error handling
-            # that _run_class_with_basefile does. All errors except
-            # DocumentRemoved we want to propagate.
-            try:
-                res = clbl(*config.arguments, **kwargs)
-            except errors.DocumentRemovedError as e:
-                if e.dummyfile:
-                    util.writefile(e.dummyfile, "")
-                raise e
-            except Exception as e:
-                loc = util.location_exception(e)
-                log.error("%s %s failed: %s (%s)" %
-                          (action, alias, e, loc))
-                raise e
+            # The only thing that kwargs may contain is a 'otherrepos'
+            # parameter.
+            if len(config.arguments) == 1 and action in ('parse', 'generate'):
+                basefile = config.arguments[0]
+                with adaptlogger(inst, basefile, None):
+                    res = _run_class_with_basefile(clbl, basefile, None, kwargs, action, alias)
+                adjective = {'parse': 'downloaded',
+                             'generate': 'parsed'}
+                if 'allversions' in config and config.allversions:
+                    res = [res] 
+                    for version in inst.store.list_versions(basefile, adjective.get(action, action)):
+                        with adaptlogger(inst, basefile, version):
+                            res = _run_class_with_basefile(clbl, basefile, version, kwargs, action, alias)
+            else:
+                # NOTE: This is a shorter version of the error
+                # handling that _run_class_with_basefile does. We want
+                # to propagate all errors except DocumentRemoved.
+                try:
+                    res = clbl(*config.arguments, **kwargs)
+                except errors.DocumentRemovedError as e:
+                    if e.dummyfile:
+                        util.writefile(e.dummyfile, "")
+                    raise e
+                except Exception as e:
+                    loc = util.location_exception(e)
+                    log.error("%s %s failed: %s (%s)" %
+                              (action, alias, e, loc))
+                    raise e
     return res
 
 # The functions runbuildclient, _queuejobs, _make_client_manager,
@@ -1250,10 +1301,12 @@ def _build_worker(jobqueue, resultqueue, clientname):
         # proctitle = re.sub(" [now: .*]$", "", getproctitle())
         proctitle = getproctitle()
         setproctitle(proctitle + " [%(alias)s %(command)s %(basefile)s]" % job)
-        res = _run_class_with_basefile(clbl, job['basefile'],
-                                       kwargs, job['command'],
-                                       job['alias'],
-                                       wrapctrlc=True)
+        with adaptlogger(inst, job['basefile'], job['version']):
+            res = _run_class_with_basefile(clbl, job['basefile'],
+                                           job['version'],
+                                           kwargs, job['command'],
+                                           job['alias'],
+                                           wrapctrlc=True)
         setproctitle(proctitle)
         log.debug("Client: [pid %s] %s finished: %s" % (os.getpid(), job['basefile'], res))
         outdict = {'basefile': job['basefile'],
@@ -1602,10 +1655,10 @@ def _siginfo_handler(signum, frame):
         print("Queued %s jobs, recieved %s results" % (frame.f_locals['number_of_jobs'], len(frame.f_locals['res'])))
     
     
-def _run_class_with_basefile(clbl, basefile, kwargs, command,
+def _run_class_with_basefile(clbl, basefile, version, kwargs, command,
                              alias="(unknown)", wrapctrlc=False):
     try:
-        return clbl(basefile, **kwargs)
+        return clbl(basefile, version, **kwargs)
     except errors.DocumentRemovedError as e:
         errmsg = str(e)
         getlog().error("%s %s %s failed! %s" %

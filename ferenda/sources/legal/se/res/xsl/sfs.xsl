@@ -48,6 +48,7 @@
 	<xsl:if test="$label or $alternate">
 	  <p class="lead">(<xsl:value-of select="$label"/><xsl:if test="$label and $alternate">, </xsl:if><xsl:value-of select="$alternate"/>)</p>
 	</xsl:if>
+	<xsl:call-template name="docversions"/>
 	<xsl:call-template name="docmetadata"/>
 	<xsl:if test="../../xhtml:head/xhtml:meta[@rel='rinfoex:upphavdAv']">
 	  <div class="ui-state-error">
@@ -111,6 +112,18 @@
   <xsl:param name="fixedtoc" select="true()"/>
   <xsl:param name="content-under-pagetitle" select="false()"/>
 
+  <xsl:template name="docversions">
+    <xsl:variable name="versions" select="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/dcterms:hasVersion/rdf:Description"/>
+    <div class="docversions">
+      <xsl:if test="$versions">
+	<h1>Andra versioner</h1>
+	<xsl:for-each select="$versions">
+	  <p><xsl:value-of select="@rdf:about"/></p>
+	</xsl:for-each>
+      </xsl:if>
+    </div>
+  </xsl:template>
+  
   <xsl:template name="docmetadata">
     <xsl:variable name="regpost" select="//xhtml:div[@class='registerpost'][1]"/>
     <dl id="refs-dokument" class="dl-horizontal">

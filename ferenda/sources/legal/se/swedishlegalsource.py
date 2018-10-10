@@ -581,7 +581,7 @@ class SwedishLegalSource(DocumentRepository):
         Protokollsutdrag.counter = 0
         self.refparser._legalrefparser.namedlaws = {}
         self.refparser._legalrefparser.currentbasefile = doc.basefile
-        fp = self.parse_open(doc.basefile)
+        fp = self.parse_open(doc.basefile, version=doc.version)
         # maybe the fp now contains a .patchdescription?
         orig_uri = doc.uri
         resource = self.parse_metadata(fp, doc.basefile)
@@ -632,7 +632,7 @@ class SwedishLegalSource(DocumentRepository):
         else:
             return False # basefile was not adjusted
     
-    def parse_open(self, basefile, attachment=None):
+    def parse_open(self, basefile, attachment=None, version=None):
         """Open the main downloaded file for the given basefile, caching the
         contents to an intermediate representation if applicable (or
         reading from that cache if that's ok), and patching the file
@@ -643,25 +643,28 @@ class SwedishLegalSource(DocumentRepository):
 
         """
         # 1. check if intermediate_path exists
-        intermediate_path = self.store.intermediate_path(basefile)
+        intermediate_path = self.store.intermediate_path(basefile, version=version)
         if not os.path.exists(intermediate_path):
             # 2. if not, call code
             #    parse_convert_to_intermediate(basefile) to convert
             #    downloaded_path -> intermediate_path (eg.
             #    WordReader.read, SFS.extract_sfst)
-            fp = self.downloaded_to_intermediate(basefile, attachment)
+            fp = self.downloaded_to_intermediate(basefile, attachment, version)
         else:
             # 3. recieve intermediate_path as open file (binary?)
-            fp = self.store.open_intermediate(basefile, mode="rb")
+            fp = self.store.open_intermediate(basefile, mode="rb", version=version)
         # 4. call patch_if_needed, recieve as open file (binary?)
-        return self.patch_if_needed(fp, basefile)
+        return self.patch_if_needed(fp, basefile, version=version)
 
-    def patch_if_needed(self, fp, basefile):
+    def patch_if_needed(self, fp, basefile, version=None):
         """Override of DocumentRepository.patch_if_needed with different,
         streamier API."""
         if self.config.ignorepatch is True:
             return fp
-        # 1. do we have a patch?
+        # 1. do we have a patch? FIXME: respect the version specifier
+        # (preferably in a smart way, so that we can say that a
+        # specific patch applies to all versions from A to B (possibly
+        # open-ended)
         patchstore = self.documentstore_class(self.config.patchdir +
                                               os.sep + self.alias)
         patchpath = patchstore.path(basefile, "patches", ".patch")
@@ -1332,8 +1335,8 @@ class SwedishLegalSource(DocumentRepository):
         #     v = "%s, %s" % (v, resourceuri.split("#", 1)[1])
         return v
 
-    def generate(self, basefile, otherrepos=[]):
-        ret = super(SwedishLegalSource, self).generate(basefile, otherrepos)
+    def generate(self, basefile, version, otherrepos=[]):
+        ret = super(SwedishLegalSource, self).generate(basefile, version, otherrepos)
         if self.get_parse_options(basefile) == "metadataonly":
             # Do a little magic to ensure wsgiapp.py serves this file
             # with status code 404 instead of 200

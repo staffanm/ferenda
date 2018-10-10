@@ -55,12 +55,11 @@ def timed(f):
         # suited for this usecase?
         if isinstance(self.config.processes, int) and self.config.processes > 1:
             self.log.info(
-                '%s: parse OK (%.3f sec) [pid %s]',
-                doc.basefile,
+                'parse OK (%.3f sec) [pid %s]',
                 time.time() - start,
                 os.getpid())
         else:
-            self.log.info('%s: parse OK (%.3f sec)', doc.basefile, time.time() - start)
+            self.log.info('parse OK (%.3f sec)', time.time() - start)
         return ret
     return wrapper
 
@@ -93,23 +92,23 @@ def parseifneeded(f):
         force = (self.config.force is True or
                  self.config.parseforce is True)
         if not force and not self.store.needed(basefile, "parse"):
-            self.log.debug("%s: Skipped", basefile)
+            self.log.debug("Skipped")
             return True  # Signals that everything is OK
         else:
-            self.log.debug("%s: Starting", basefile)
+            self.log.debug("Starting")
             return f(self, basefile)
     return wrapper
 
 def ifneeded(action):
     def outer_wrapper(f, *args):
         @functools.wraps(f)
-        def inner_wrapper(self, basefile, *args, **kwargs):
+        def inner_wrapper(self, basefile, version, *args, **kwargs):
             if self.config.force:
                 needed = Needed(reason="force is True")
             else:
-                needed = self.store.needed(basefile, action)
+                needed = self.store.needed(basefile, action, version)
             if not needed:
-                self.log.debug("%s: %s skipped" % (basefile, action))
+                self.log.debug("%s skipped" % (action))
                 return True  # signals that everything is OK
             else:
                 reason = ""
@@ -121,10 +120,10 @@ def ifneeded(action):
                 # level (INFO + 1, to get around compositerepo's
                 # supress_subrepo_logging feature)
                 # self.log.debug("%s: %s starting%s" % (basefile, action, reason))
-                self.log.log(logging.INFO+1, "%s: %s starting%s" % (basefile, action, reason))
+                self.log.log(logging.INFO+1, "%s starting%s" % (action, reason))
                 if 'needed' in getfullargspec(f).args and 'needed' not in kwargs:
                     kwargs['needed'] = needed
-                return f(self, basefile, *args, **kwargs)
+                return f(self, basefile, version, *args, **kwargs)
         return inner_wrapper
     return outer_wrapper
 
@@ -185,10 +184,9 @@ def render(f):
                 r = serialize(doc, format="json")  # should be a (unicode) str
                 fp.write(r.encode('utf-8'))
             self.log.debug(
-                "%s: Created %s" %
-                (doc.basefile,
-                 self.store.serialized_path(
-                     doc.basefile)))
+                "Created %s" %
+                (self.store.serialized_path(
+                    doc.basefile)))
         # css file + background images + png renderings of text
         resources = self.create_external_resources(doc)
         if resources:
@@ -197,19 +195,18 @@ def render(f):
             cssuris = []
         if cssuris:
             doc.cssuris = cssuris
-        updated = self.render_xhtml(doc, self.store.parsed_path(doc.basefile))
+        updated = self.render_xhtml(doc, self.store.parsed_path(doc.basefile, version=doc.version))
         if updated:
             self.log.debug(
-                "%s: Created %s" %
-                (doc.basefile,
-                 self.store.parsed_path(
-                     doc.basefile)))
+                "Created %s" %
+                (self.store.parsed_path(
+                    doc.basefile)))
 
 
         # Extract all triples on the XHTML/RDFa data to a separate
         # RDF/XML file
         distilled_graph = Graph()
-        with codecs.open(self.store.parsed_path(doc.basefile),
+        with codecs.open(self.store.parsed_path(doc.basefile, version=doc.version),
                          encoding="utf-8") as fp:  # unicode
             distilled_graph.parse(data=fp.read(), format="rdfa",
                                   publicID=doc.uri)
@@ -224,15 +221,15 @@ def render(f):
             "dcterms",
             URIRef("http://example.org/this-prefix-should-not-be-used"))
 
-        util.ensure_dir(self.store.distilled_path(doc.basefile))
-        with open(self.store.distilled_path(doc.basefile),
+        util.ensure_dir(self.store.distilled_path(doc.basefile, version=doc.version))
+        with open(self.store.distilled_path(doc.basefile, version=doc.version),
                   "wb") as distilled_file:
             # print("============distilled===============")
             # print(distilled_graph.serialize(format="turtle").decode('utf-8'))
             distilled_graph.serialize(distilled_file, format="pretty-xml")
         self.log.debug(
-            '%s: %s triples extracted to %s', doc.basefile,
-            len(distilled_graph), self.store.distilled_path(doc.basefile))
+            '%s triples extracted to %s',
+            len(distilled_graph), self.store.distilled_path(doc.basefile, version=doc.version))
 
         # Validate that all required triples are present (we check
         # distilled_graph, but we could just as well check doc.meta)
@@ -240,8 +237,8 @@ def render(f):
         for p in required:
             x = distilled_graph.value(URIRef(doc.uri), p)
             if not x:
-                self.log.warning("%s: Metadata is missing a %s triple" %
-                                 (doc.basefile, distilled_graph.qname(p)))
+                self.log.warning("Metadata is missing a %s triple" %
+                                 (distilled_graph.qname(p)))
         if 'validaterdfa' in self.config and self.config.validaterdfa:
             # Validate that all triples specified in doc.meta and any
             # .meta property on any body object is present in the
@@ -255,24 +252,24 @@ def render(f):
                     huge_graph = True
                     break
             if huge_graph:
-                self.log.warning("%s: Graph seems huge, skipping validation" % doc.basefile)
+                self.log.warning("Graph seems huge, skipping validation")
             else:
-                # self.log.debug("%s: diffing graphs" % doc.basefile)
+                # self.log.debug("diffing graphs")
                 (in_both, in_first, in_second) = graph_diff(doc.meta, distilled_graph)
-                self.log.debug("%s: graphs diffed (-%s, +%s)" % (doc.basefile, len(in_first), len(in_second)))
+                self.log.debug("graphs diffed (-%s, +%s)" % (len(in_first), len(in_second)))
 
                 if in_first:  # original metadata not present in the XHTML filee
-                    self.log.warning("%s: %d triple(s) from the original metadata was "
+                    self.log.warning("%d triple(s) from the original metadata was "
                                      "not found in the serialized XHTML file:\n%s",
-                                     doc.basefile, len(in_first), in_first.serialize(format="n3").decode("utf-8"))
+                                     len(in_first), in_first.serialize(format="n3").decode("utf-8"))
 
         # Validate that entry.title and entry.id has been filled
         # (might be from doc.meta and doc.uri, might be other things
-        entry = DocumentEntry(self.store.documententry_path(doc.basefile))
+        entry = DocumentEntry(self.store.documententry_path(doc.basefile, version=doc.version))
         if not entry.id:
-            self.log.warning("%s: entry.id missing" % doc.basefile)
+            self.log.warning("entry.id missing")
         if not entry.title:
-            self.log.warning("%s: entry.title missing" % doc.basefile)
+            self.log.warning("entry.title missing")
         return ret
     return wrapper
 
@@ -287,11 +284,11 @@ def handleerror(f):
             return f(self, doc)
         except DocumentRemovedError as e:
             self.log.info(
-                "%s: Document has been removed (%s)", doc.basefile, e)
+                "Document has been removed (%s)", e)
             util.robust_remove(self.parsed_path(doc.basefile))
             return False
         except ParseError as e:
-            self.log.error("%s: ParseError %s", doc.basefile, e)
+            self.log.error("ParseError %s", e)
             # FIXME: we'd like to use the shorter "if
             # ('fatalexceptions' in self.config" but a Mock we're
             # using in testDecorators.Decorators.test_handleerror does
@@ -304,7 +301,7 @@ def handleerror(f):
             else:
                 return False
         except Exception:
-            self.log.exception("parse of %s failed", doc.basefile)
+            self.log.exception("parse failed")
             # FIXME: see above
             if (hasattr(self.config, 'fatalexceptions') and
                     self.config.fatalexceptions):
@@ -318,10 +315,16 @@ def makedocument(f):
     """Changes the signature of the parse method to expect a Document
     object instead of a basefile string, and creates the object."""
     @functools.wraps(f)
-    def wrapper(self, basefile):
-        doc = self.make_document(basefile)
+    def wrapper(self, basefile, version=None):
+        if version is None:  # support calling with
+                             # --version=<versionid> as well as
+                             # --allversions (which provides version
+                             # as second agument to clbl)
+            version = getattr(self.config, 'version', None)
+        doc = self.make_document(basefile, version)
         ret = f(self, doc)
         if doc.basefile != basefile:
+            # FIXME: Need special handling if a non-None version was specified
             raise DocumentRenamedError(
                 "%s: Basefile turned out to really be %s" % (basefile, doc.basefile),
                 returnvalue=doc.basefile, oldbasefile=basefile, newbasefile=doc.basefile)

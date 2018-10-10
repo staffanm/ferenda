@@ -1271,8 +1271,8 @@ with the *config* object as single parameter.
             raise errors.ParseError("%s: parse_content_selector %r matches nothing" %
                                     (doc.basefile, self.parse_content_selector))
         if len(soups) > 1:
-            self.log.warning("%s: parse_content_selector %r matches more than one tag" %
-                             (doc.basefile, self.parse_content_selector))
+            self.log.warning("parse_content_selector %r matches more than one tag" %
+                             (self.parse_content_selector))
         soup = soups[0]
         for filter_selector in self.parse_filter_selectors:
             for tag in soup.select(native_str(filter_selector)):
@@ -1332,7 +1332,7 @@ with the *config* object as single parameter.
         except PatchConflictError as e:
             raise errors.PatchError(e)
 
-    def make_document(self, basefile=None):
+    def make_document(self, basefile=None, version=None):
         """
         Create a :py:class:`~ferenda.Document` objects with basic
         initialized fields.
@@ -1355,6 +1355,7 @@ with the *config* object as single parameter.
             basefile = unicodedata.normalize("NFC", basefile)
             doc.uri = self.canonical_uri(basefile)
         doc.basefile = basefile
+        doc.version = version
         doc.meta = self.make_graph()
         doc.lang = self.lang
         doc.body = Body()
@@ -1413,7 +1414,7 @@ with the *config* object as single parameter.
                 fp.write(res)
             raise errors.InvalidTree("%s. Invalid tree saved as %s.invalid" % (err, outfile))
 
-        with self.store.open_parsed(doc.basefile, mode="wb") as fp:
+        with self.store.open_parsed(doc.basefile, mode="wb", version=doc.version) as fp:
             fp.write(res)
         # it's a bit nonsensical to first use _open (which leaves the
         # target file untouched if the contents don't change) and then
@@ -1835,7 +1836,7 @@ with the *config* object as single parameter.
                    'v_deps': -1,
                    'v_fulltext': -1}
         with util.logtime(self.log.info,
-                          "%(basefile)s: relate OK (%(elapsed).3f sec) [%(e_triples).3f:%(v_triples)s/%(e_deps).3f:%(v_deps)s/%(e_fulltext).3f:%(v_fulltext)s]",
+                          "relate OK (%(elapsed).3f sec) [%(e_triples).3f:%(v_triples)s/%(e_deps).3f:%(v_deps)s/%(e_fulltext).3f:%(v_fulltext)s]",
                           timings):
             # first, load fulltextindex, then add dependencies, lastly
             # load triplestore. fulltextindex is slightly more picky
@@ -1871,7 +1872,7 @@ with the *config* object as single parameter.
                     values = {'basefile': basefile,
                               'nttemp': nttemp}
                     with util.logtime(self.log.debug,
-                                      "%(basefile)s: Added %(triplecount)s triples to %(nttemp)s (%(elapsed).3f sec)",
+                                      "Added %(triplecount)s triples to %(nttemp)s (%(elapsed).3f sec)",
                                       values):
                         data = open(self.store.distilled_path(basefile), "rb").read()
                         g = Graph().parse(data=data)
@@ -1912,7 +1913,7 @@ with the *config* object as single parameter.
         """
         ts = self._get_triplestore()  # init self._triplestore
         with util.logtime(self.log.debug,
-                          "%(basefile)s: Added %(rdffile)s to context %(context)s (%(elapsed).3f sec)",
+                          "Added %(rdffile)s to context %(context)s (%(elapsed).3f sec)",
                           {'basefile': basefile,
                            'context': self.dataset_uri(),
                            'dataset': self.dataset_uri(),
@@ -1950,7 +1951,7 @@ parsed document path to that documents dependency file."""
         values = {'basefile': basefile,
                   'deps': 0}
         with util.logtime(self.log.debug,
-                          "%(basefile)s: Registered %(deps)s dependencies (%(elapsed).3f sec)",
+                          "Registered %(deps)s dependencies (%(elapsed).3f sec)",
                           values):
             g = Graph().parse(data=util.readfile(self.store.distilled_path(basefile), encoding="utf-8"), format="xml")
             subjects = set([s for s, p, o in g])
@@ -2020,7 +2021,7 @@ parsed document path to that documents dependency file."""
                   'resources': 0,
                   'words': 0}
         with util.logtime(self.log.debug,
-                          "%(basefile)s: Added %(resources)s resources (%(words)s words) to fulltext index  (%(elapsed).3f sec)", values):
+                          "Added %(resources)s resources (%(words)s words) to fulltext index  (%(elapsed).3f sec)", values):
             if repos is None:
                 repos = []
             indexer = self._get_fulltext_indexer(repos)
@@ -2358,7 +2359,7 @@ WHERE {
     @decorators.action
     @decorators.ifneeded('generate')
     @decorators.updateentry('generate')
-    def generate(self, basefile, otherrepos=[], needed=True):
+    def generate(self, basefile, version=None, otherrepos=[], needed=True):
         """Generate a browser-ready HTML file from structured XML and RDF.
 
         Uses the XML and RDF files constructed by
@@ -2377,15 +2378,15 @@ WHERE {
         :type  basefile: str
         :returns: None
         """
-        with util.logtime(self.log.info, "%(basefile)s: generate OK (%(elapsed).3f sec)",
+        with util.logtime(self.log.info, "generate OK (%(elapsed).3f sec)",
                           {'basefile': basefile}):
 
-            self.log.debug("%s: Starting", basefile)
+            self.log.debug("Starting")
 
             # All bookkeping done, now lets prepare and transform!
 
-            infile = self.store.parsed_path(basefile)
-            outfile = self.store.generated_path(basefile)
+            infile = self.store.parsed_path(basefile, version)
+            outfile = self.store.generated_path(basefile, version)
             # The annotationfile might be newer than all dependencies
             # (and thus not need regenerateion) even though the
             # outfile is older.
@@ -2395,20 +2396,20 @@ WHERE {
             else:
                 dependencies = []
             if (self.config.force or (not
-                                      util.outfile_is_newer(dependencies, self.store.annotation_path(basefile)))):
+                                      util.outfile_is_newer(dependencies, self.store.annotation_path(basefile, version)))):
                 with util.logtime(self.log.debug,
-                                  "%(basefile)s: prep_annotation_file (%(elapsed).3f sec)",
+                                  "prep_annotation_file (%(elapsed).3f sec)",
                                   {'basefile': basefile}):
                     # annotation_file should be the same as annotations above?
-                    annotation_file = self.prep_annotation_file(basefile)
+                    annotation_file = self.prep_annotation_file(basefile, version)
             else:
-                annotation_file = self.store.annotation_path(basefile)
+                annotation_file = self.store.annotation_path(basefile, version)
             params = {}
             if annotation_file:
                 params['annotationfile'] = annotation_file
 
             with util.logtime(self.log.debug,
-                              "%(basefile)s: transform (%(elapsed).3f sec)",
+                              "transform (%(elapsed).3f sec)",
                               {'basefile': basefile}):
                 conffile = os.path.abspath(
                     os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
@@ -2554,7 +2555,7 @@ WHERE {
         
         
 
-    def prep_annotation_file(self, basefile):
+    def prep_annotation_file(self, basefile, version):
         """Helper function used by
         :py:meth:`~ferenda.DocumentRepository.generate` -- prepares a
         RDF/XML file containing statements that in some way annotates
@@ -2573,12 +2574,12 @@ WHERE {
             return
         graph = self.construct_annotations(self.canonical_uri(basefile))
         if graph and len(graph) > 0:
-            with self.store.open_annotation(basefile, "w") as fp:
+            with self.store.open_annotation(basefile, "w", version) as fp:
                 fp.write(self.graph_to_annotation_file(graph))
-            return self.store.annotation_path(basefile)
+            return self.store.annotation_path(basefile, version)
         elif self.sparql_expect_results:
             self.log.warning(
-                "%s: No annotation data fetched, something might be wrong with the SPARQL query" % basefile)
+                "No annotation data fetched, something might be wrong with the SPARQL query")
 
     def construct_annotations(self, uri):
         """Construct a RDF graph containing metadata by running the query
@@ -2696,8 +2697,7 @@ WHERE {
         elif self.config.removeinvalidlinks is False:
             return None
         
-        with util.logtime(self.log.info, "%(basefile)s: transformlinks OK (%(elapsed).3f sec)",
-                          {'basefile': basefile}):
+        with util.logtime(self.log.info, "transformlinks OK (%(elapsed).3f sec)"):
             urltransform = self.get_url_transform_func(**transformargs)
             doc = etree.parse(generatedfile)
             doctype = doc.docinfo.doctype
