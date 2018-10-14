@@ -1808,11 +1808,33 @@ class SFS(Trips):
             desc_node = root_node[0]
             assert desc_node.get(ns("rdf:about")) == canonical_uri
             hasVersion_node = etree.SubElement(desc_node, ns("dcterms:hasVersion"))
-            for version in self.store.list_versions(basefile, "parsed"):
+            versions = {}
+            for change in changes:
+                if change['id'] not in versions:
+                    versions[change['id']] = {'ikraft': change.get('ikraft', None),
+                                              'prop': change.get('prop', None),
+                                              'propid': change.get('propid', None),
+                                              'proptitle': change.get('proptitle', None)}
+
+            for version_id in self.store.list_versions(basefile, "parsed"):
                 version_node = etree.SubElement(hasVersion_node, ns("rdf:Description"))
-                version_node.set(ns("rdf:about"), canonical_uri + "?version=" + version)
-                # add labels and metadata so that the XSL transformation can
-                # generate nicer things
+                version_node.set(ns("rdf:about"), canonical_uri + "?version=" + version_id)
+                label_node = etree.SubElement(version_node, ns("dcterms:identifier"))
+                label_node.text = "SFS %s" % version_id
+                if label_node.text in versions:
+                    v = versions[label_node.text]
+                    if 'ikraft' in v:
+                        ikraft_node = etree.SubElement(version_node, ns("rpubl:ikrafttradandedatum"))
+                        ikraft_node.text = str(v['ikraft'])
+                    if 'propid' in v:
+                        proplink_node = etree.SubElement(version_node, ns("rpubl:forarbete"))
+                        prop_node = etree.SubElement(proplink_node, ns("rdf:Description"))
+                        prop_node.set(ns("rdf:about"), v['prop'])
+                        propid_node = etree.SubElement(prop_node, ns("dcterms:identifier"))
+                        propid_node.text = v['propid']
+                        if 'proptitle' in v:
+                            proptitle_node = etree.SubElement(prop_node, ns("dcterms:title"))
+                            proptitle_node.text = v['proptitle']
                 
         treestring = etree.tostring(root_node, encoding="utf-8", pretty_print=True)
         with self.store.open_annotation(basefile, mode="wb", version=version) as fp:

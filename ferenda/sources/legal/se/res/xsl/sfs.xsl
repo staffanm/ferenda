@@ -117,9 +117,11 @@
     <div class="docversions">
       <xsl:if test="$versions">
 	<h1>Andra versioner</h1>
+	<ul>
 	<xsl:for-each select="$versions">
-	  <p><xsl:value-of select="@rdf:about"/></p>
+	  <li><a href="{@rdf:about}"><xsl:value-of select="dcterms:identifier"/> (Ikraft <xsl:value-of select="rpubl:ikrafttradandedatum"/>, <xsl:value-of select="rpubl:forarbete/rdf:Description/dcterms:identifier"/> <xsl:value-of select="rpubl:forarbete/rdf:Description/dcterms:title"/>)</a></li>
 	</xsl:for-each>
+	</ul>
       </xsl:if>
     </div>
   </xsl:template>

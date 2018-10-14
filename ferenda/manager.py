@@ -1658,7 +1658,11 @@ def _siginfo_handler(signum, frame):
 def _run_class_with_basefile(clbl, basefile, version, kwargs, command,
                              alias="(unknown)", wrapctrlc=False):
     try:
-        return clbl(basefile, version, **kwargs)
+        if version and 'version' not in inspect.signature(clbl).parameters:
+            getlog().warning("%s %s: Called with basefile %s and version %s, but %s doesn't support version parameter" % (alias, command, basefile, version, command))
+        elif version:
+            kwargs['version'] = version
+        return clbl(basefile, **kwargs)
     except errors.DocumentRemovedError as e:
         errmsg = str(e)
         getlog().error("%s %s %s failed! %s" %

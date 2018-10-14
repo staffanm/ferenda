@@ -2,15 +2,14 @@ PREFIX rdf:<http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX dcterms:<http://purl.org/dc/terms/>
 PREFIX rpubl:<http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
 
-SELECT DISTINCT ?change ?changetype ?id ?lagrum ?prop ?propid ?proptitle
+SELECT DISTINCT ?change ?changetype ?id ?lagrum ?ikraft ?prop ?propid ?proptitle
 WHERE {
     ?change ?changetype ?lagrum;
             dcterms:identifier ?id;
             rpubl:forarbete ?prop .
     ?prop rdf:type rpubl:Proposition . 
-    OPTIONAL {
-      ?prop dcterms:identifier ?propid;
-            dcterms:title ?proptitle .
-    }
+    OPTIONAL { ?change rpubl:ikrafttradandedatum ?ikraft } .
+    OPTIONAL { ?prop dcterms:identifier ?propid } .
+    OPTIONAL { ?prop dcterms:title ?proptitle } .
     FILTER(STRSTARTS(STR(?lagrum), "%(uri)s") && ?changetype IN (rpubl:ersatter, rpubl:upphaver, rpubl:inforsI))
 }

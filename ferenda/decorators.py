@@ -102,11 +102,11 @@ def parseifneeded(f):
 def ifneeded(action):
     def outer_wrapper(f, *args):
         @functools.wraps(f)
-        def inner_wrapper(self, basefile, version, *args, **kwargs):
+        def inner_wrapper(self, basefile, *args, **kwargs):
             if self.config.force:
                 needed = Needed(reason="force is True")
             else:
-                needed = self.store.needed(basefile, action, version)
+                needed = self.store.needed(basefile, action, kwargs.get('version', None))
             if not needed:
                 self.log.debug("%s skipped" % (action))
                 return True  # signals that everything is OK
@@ -123,7 +123,7 @@ def ifneeded(action):
                 self.log.log(logging.INFO+1, "%s starting%s" % (action, reason))
                 if 'needed' in getfullargspec(f).args and 'needed' not in kwargs:
                     kwargs['needed'] = needed
-                return f(self, basefile, version, *args, **kwargs)
+                return f(self, basefile, *args, **kwargs)
         return inner_wrapper
     return outer_wrapper
 

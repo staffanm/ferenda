@@ -649,7 +649,10 @@ class SwedishLegalSource(DocumentRepository):
             #    parse_convert_to_intermediate(basefile) to convert
             #    downloaded_path -> intermediate_path (eg.
             #    WordReader.read, SFS.extract_sfst)
-            fp = self.downloaded_to_intermediate(basefile, attachment, version)
+            kwargs = {}
+            if version and 'version' in inspect.signature(self.downloaded_to_intermediate):
+                kwargs['version'] = version
+            fp = self.downloaded_to_intermediate(basefile, attachment, **kwargs)
         else:
             # 3. recieve intermediate_path as open file (binary?)
             fp = self.store.open_intermediate(basefile, mode="rb", version=version)
@@ -1335,7 +1338,7 @@ class SwedishLegalSource(DocumentRepository):
         #     v = "%s, %s" % (v, resourceuri.split("#", 1)[1])
         return v
 
-    def generate(self, basefile, version, otherrepos=[]):
+    def generate(self, basefile, version=None, otherrepos=[]):
         ret = super(SwedishLegalSource, self).generate(basefile, version, otherrepos)
         if self.get_parse_options(basefile) == "metadataonly":
             # Do a little magic to ensure wsgiapp.py serves this file

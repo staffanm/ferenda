@@ -13,6 +13,8 @@ from urllib.parse import urlparse, unquote, parse_qsl
 import mimetypes
 import traceback
 
+from lxml import etree
+from lxml.html.diff import htmldiff
 from rdflib import Graph
 from ferenda.thirdparty import httpheader
 
@@ -317,6 +319,8 @@ class RequestHandler(object):
                                # this method again below
         elif "version" in params:
             method = partial(repo.store.generated_path, version=params["version"])
+        elif "diff" in params:
+            return None
         elif contenttype in self._mimemap and not basefile.endswith("/data"):
             method = getattr(repo.store, self._mimemap[contenttype])
         elif suffix in self._suffixmap and not basefile.endswith("/data"):
@@ -371,6 +375,8 @@ class RequestHandler(object):
                 data = g.serialize(format=self._rdfformats[contenttype])
             elif suffix in self._rdfsuffixes:
                 data = g.serialize(format=rdfsuffixes[suffix])
+            elif 'diff' in params:
+                data = self.diff_versions(basefile, params.get('from'), params.get('to'))
             else:
                 data = None
         path = None
@@ -378,6 +384,27 @@ class RequestHandler(object):
             path = pathfunc(basefile)
             data = None
         return path, data
+
+    def diff_versions(self, basefile, from_version, to_version):
+        # 1 load basefile, current version
+        current = etree.parse(self.repo.store.generated_path(basefile))
+        # 2 load from_version
+        from_tree = etree.parse(self.repo.store.generated_path(basefile, version=from_version))
+        # 3 load to_version (if not current version)
+        to_tree = etree.parse(self.repo.store.generated_path(basefile, version=to_version))
+        docversions = to_tree.find("//div[@class='docversions']")
+        if docversions is not None:
+            docversions.getparent().remove(docversions)
+        # 4 extract doc area from 2 and 3
+        from_area = from_tree.find("//article")
+        to_area = to_tree.find("//article")
+        # 5 call htmldiff(area(2), area(3))
+        diff = etree.HTML(htmldiff(etree.tostring(from_area).decode(),
+                                   etree.tostring(to_area).decode()))[0][0]
+        # 6 insert resunt into doc area for 1
+        area = current.find("//article")
+        area.getparent().replace(area, diff)
+        return etree.tostring(current)
 
     def lookup_dataset(self, environ, params, contenttype, suffix):
         # FIXME: This should also make use of pathfunc
