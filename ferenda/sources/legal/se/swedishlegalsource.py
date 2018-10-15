@@ -1334,7 +1334,7 @@ class SwedishLegalSource(DocumentRepository):
 
     def generate(self, basefile, otherrepos=[]):
         ret = super(SwedishLegalSource, self).generate(basefile, otherrepos)
-        if self.get_parse_options(basefile) == "metadataonly":
+        if self.get_parse_options(basefile) == "metadataonly" and os.path.exists(self.store.generated_path(basefile)):
             # Do a little magic to ensure wsgiapp.py serves this file
             # with status code 404 instead of 200
             os.rename(self.store.generated_path(basefile),
@@ -1416,6 +1416,8 @@ class SwedishLegalSource(DocumentRepository):
         ferenda.util.gYear(1999)
 
         """
+        if not datestr:
+            raise ValueError("empty date string")
         day = month = year = None
         # assume strings on the form "3 februari 2010"
         # strings on the form "vid utg\xe5ngen av december 1999"
