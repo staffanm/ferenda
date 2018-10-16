@@ -12,14 +12,15 @@ from functools import partial
 from urllib.parse import urlparse, unquote, parse_qsl
 import mimetypes
 import traceback
+from copy import deepcopy
 
 from lxml import etree
-from lxml.html.diff import htmldiff
 from rdflib import Graph
 from ferenda.thirdparty import httpheader
 
 from ferenda import util
 from ferenda.errors import RequestHandlerError
+from ferenda.thirdparty.htmldiff import htmldiff
 
 class RequestHandler(object):
     
@@ -386,25 +387,46 @@ class RequestHandler(object):
         return path, data
 
     def diff_versions(self, basefile, from_version, to_version):
-        # 1 load basefile, current version
-        current = etree.parse(self.repo.store.generated_path(basefile))
-        # 2 load from_version
-        from_tree = etree.parse(self.repo.store.generated_path(basefile, version=from_version))
-        # 3 load to_version (if not current version)
-        to_tree = etree.parse(self.repo.store.generated_path(basefile, version=to_version))
-        docversions = to_tree.find("//div[@class='docversions']")
-        if docversions is not None:
-            docversions.getparent().remove(docversions)
-        # 4 extract doc area from 2 and 3
+        def cleantree(tree, savednodes=None):
+            for xpath, save in (("//div[@class='docversions']", False),
+                                ("//div[@role='tablist']", True)):
+                for node in tree.xpath(xpath):
+                    parent = node.getparent()
+                    if save and savednodes is not None:
+                        savednodes[parent.get("about")] = node
+                    parent.remove(node)
+            return tree
+        # 1 load the from_version, cleaning away some parts that we won't diff
+        from_tree = cleantree(etree.parse(
+            self.repo.store.generated_path(basefile, version=from_version)))
+
+        # 2 load the to_version, making a deep copy to be used for the
+        # final template, then cleaning awy the same parts as for the
+        # from_version, but storing these parts for later use.
+        to_tree = etree.parse(
+            self.repo.store.generated_path(basefile, version=to_version))
+        template_tree = deepcopy(to_tree)
+        savednodes = {}
+        to_tree = cleantree(to_tree, savednodes=savednodes)
+
+        # 3 extract doc areas to be diffed (maybe cleantree should do this?)
         from_area = from_tree.find("//article")
         to_area = to_tree.find("//article")
-        # 5 call htmldiff(area(2), area(3))
-        diff = etree.HTML(htmldiff(etree.tostring(from_area).decode(),
-                                   etree.tostring(to_area).decode()))[0][0]
+
+        # 4 diff the content areas
+        diffstr = '<article class="col-sm-9">' + htmldiff(from_area, to_area, include_hrefs=False) + '</article>'
+        diff_tree = etree.HTML(diffstr)[0][0]
+        # 5 re-insert the stored-away parts
+        for parent in to_area.xpath("//div[@class='row']"):
+            if parent.get("about") in savednodes:
+                # the saved nodes always appear last amongst its
+                # siblings, so we can always just append to the parent
+                parent.append(savednodes[parent.get("about")])
+        
         # 6 insert resunt into doc area for 1
-        area = current.find("//article")
-        area.getparent().replace(area, diff)
-        return etree.tostring(current)
+        area = template_tree.find("//article")
+        area.getparent().replace(area, diff_tree)
+        return etree.tostring(template_tree)
 
     def lookup_dataset(self, environ, params, contenttype, suffix):
         # FIXME: This should also make use of pathfunc
