@@ -1046,25 +1046,20 @@ def _run_class(enabled, argv, config):
             kwargs['otherrepos'] = otherrepos
 
         if 'all' in inst.config and inst.config.all is True:
+            # create an iterable that yields (basefile, version)
+            # pairs. If config.allversions is not set to True, the
+            # version element will always be None (meaning we'll only
+            # parse the current version, not any archived versions)
             iterable = inst.store.list_basefiles_for(action, force=inst.config.force)
-
-            # FIXME: This part creates a list of tuples (basefile,
-            # version) from a simple iterable of basefile values. It
-            # would be better to create a true lazy-eval generator.
-            combined_iterable = []
-            if 'allversions' in inst.config and inst.config.allversions is True:
-                for basefile in iterable:
-                    for version in inst.store.list_versions(basefile, action):
-                        new_iterable.append((basefile, version))
+            if 'allversions' in inst.config and inst.config.allversions:
+                iterable = inst.store.list_versions_for_basefiles(iterable, action)
             else:
-                for basefile in iterable:
-                    new_iterable.append((basefile, None))
-                    
+                iterable = ((x, None) for x in iterable)
             if action == "parse" and not inst.config.force:
                 # if we don't need to parse all basefiles, let's not
                 # even send jobs out to buildclients if we can avoid
                 # it
-                iterable = (x for x in iterable if inst.store.needed(x, "parse"))
+                iterable = ((b,v) for b,v in iterable if inst.store.needed(b, "parse", v))
             res = []
             # semi-magic handling
             kwargs['currentrepo'] = inst
@@ -1116,7 +1111,8 @@ def _run_class(enabled, argv, config):
             # parameter.
             if len(config.arguments) == 1 and action in ('parse', 'generate'):
                 basefile = config.arguments[0]
-                with adaptlogger(inst, basefile, None):
+                version = getattr(config, 'version', None)
+                with adaptlogger(inst, basefile, version):
                     res = _run_class_with_basefile(clbl, basefile, None, kwargs, action, alias)
                 adjective = {'parse': 'downloaded',
                              'generate': 'parsed'}
@@ -1658,9 +1654,12 @@ def _siginfo_handler(signum, frame):
 def _run_class_with_basefile(clbl, basefile, version, kwargs, command,
                              alias="(unknown)", wrapctrlc=False):
     try:
-        if version and 'version' not in inspect.signature(clbl).parameters:
-            getlog().warning("%s %s: Called with basefile %s and version %s, but %s doesn't support version parameter" % (alias, command, basefile, version, command))
-        elif version:
+        # This doesn't work great with @managedparsing (particularly
+        # the @makedocument decorator changes the method signature
+        # from (self, baseefile, version) to (self, doc)
+        # if version and 'version' not in inspect.signature(clbl).parameters:
+        #     getlog().warning("%s %s: Called with basefile %s and version %s, but %s doesn't support version parameter" % (alias, command, basefile, version, command))
+        if version:
             kwargs['version'] = version
         return clbl(basefile, **kwargs)
     except errors.DocumentRemovedError as e:

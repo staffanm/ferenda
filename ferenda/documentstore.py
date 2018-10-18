@@ -634,6 +634,14 @@ dependencies (in the form of source files for the action).
                         yielded_basefiles.append(basefile)
                         yield basefile
 
+    def list_versions_for_basefiles(self, basefiles, action):
+        adjective = {'parse': 'downloaded',
+                     'generate': 'parsed'}
+        for basefile in basefiles:
+            yield (basefile, None)
+            for version in self.list_versions(basefile, adjective[action]):
+                yield (basefile, version)
+
     def list_attachments(self, basefile, action, version=None):
         """Get all attachments for a basefile in a specified state
 
