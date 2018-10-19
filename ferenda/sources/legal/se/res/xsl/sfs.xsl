@@ -644,7 +644,7 @@
     </li>
   </xsl:template>
 
-  <xsl:template match="xhtml:div[@typeof='rpubl:Kapitel']" mode="toc">
+  <xsl:template match="xhtml:div[@typeof='rpubl:Kapitel' and @id]" mode="toc">
     <li><a href="#{@id}"><xsl:value-of select="xhtml:h1"/></a>
     <xsl:if test="xhtml:h2|xhtml:h3">
       <ul class="nav">
