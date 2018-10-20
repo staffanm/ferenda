@@ -1297,7 +1297,7 @@ def _build_worker(jobqueue, resultqueue, clientname):
         # proctitle = re.sub(" [now: .*]$", "", getproctitle())
         proctitle = getproctitle()
         setproctitle(proctitle + " [%(alias)s %(command)s %(basefile)s]" % job)
-        with adaptlogger(inst, job['basefile'], job['version']):
+        with adaptlogger(insts[job['classname']], job['basefile'], job['version']):
             res = _run_class_with_basefile(clbl, job['basefile'],
                                            job['version'],
                                            kwargs, job['command'],
@@ -1400,7 +1400,8 @@ def __queue_jobs_nomanager(jobqueue, iterable, inst, classname, command):
     # print("Server: Extra config for clients is %r" % client_config)
     basefiles = []
     for idx, basefile in enumerate(iterable):
-        job = {'basefile': basefile,
+        job = {'basefile': basefile[0],
+               'version': basefile[1],
                'classname': classname,
                'command': command,
                'alias': inst.alias,

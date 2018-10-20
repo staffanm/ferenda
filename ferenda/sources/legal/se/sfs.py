@@ -1818,7 +1818,7 @@ class SFS(Trips):
 
             for version_id in self.store.list_versions(basefile, "parsed"):
                 version_node = etree.SubElement(hasVersion_node, ns("rdf:Description"))
-                version_node.set(ns("rdf:about"), canonical_uri + "?version=" + version_id)
+                version_node.set(ns("rdf:about"), canonical_uri + "/konsolidering/" + version_id)
                 label_node = etree.SubElement(version_node, ns("dcterms:identifier"))
                 label_node.text = "SFS %s" % version_id
                 if label_node.text in versions:

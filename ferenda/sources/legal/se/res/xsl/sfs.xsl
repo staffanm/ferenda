@@ -116,12 +116,23 @@
     <xsl:variable name="versions" select="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/dcterms:hasVersion/rdf:Description"/>
     <div class="docversions">
       <xsl:if test="$versions">
-	<h1>Andra versioner</h1>
+	<h2>Jämför med tidigare versioner</h2>
+	<!--
 	<ul>
 	<xsl:for-each select="$versions">
 	  <li><a href="{@rdf:about}"><xsl:value-of select="dcterms:identifier"/> (Ikraft <xsl:value-of select="rpubl:ikrafttradandedatum"/>, <xsl:value-of select="rpubl:forarbete/rdf:Description/dcterms:identifier"/> <xsl:value-of select="rpubl:forarbete/rdf:Description/dcterms:title"/>)</a></li>
 	</xsl:for-each>
 	</ul>
+	-->
+	<form action="" method="GET">
+	  <input type="hidden" name="diff" value="true"/>
+	  <select name="from">
+	    <xsl:for-each select="$versions">
+	      <option value="{substring(dcterms:identifier, 5)}"><xsl:value-of select="dcterms:identifier"/></option>
+	    </xsl:for-each>
+	  </select>
+	  <input type="submit" value="Jämför"/>
+	</form>
       </xsl:if>
     </div>
   </xsl:template>
