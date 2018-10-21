@@ -1306,6 +1306,7 @@ def _build_worker(jobqueue, resultqueue, clientname):
         setproctitle(proctitle)
         log.debug("Client: [pid %s] %s finished: %s" % (os.getpid(), job['basefile'], res))
         outdict = {'basefile': job['basefile'],
+                   'version': job['version'],
                    'alias': job['alias'],
                    'result':  res,
                    'log': list(logrecords),
@@ -1334,6 +1335,7 @@ def _build_worker(jobqueue, resultqueue, clientname):
             #   unwrapped it on the other end, so now there's no need for this hack.
             print("%s: Catastrophic error %s" % (job['basefile'], e))
             resultqueue.put({'basefile': job['basefile'],
+                             'version': job['version'],
                              'result': None,
                              'log': list(logrecords),
                              'client': clientname})
@@ -1433,7 +1435,8 @@ def _queue_jobs(manager, iterable, inst, classname, command):
     log.debug("Server: Extra config for clients is %r" % client_config)
     idx = -1
     for idx, basefile in enumerate(iterable):
-        job = {'basefile': basefile,
+        job = {'basefile': basefile[0],
+               'version': basefile[1],
                'classname': classname,
                'command': command,
                'alias': inst.alias,
@@ -1463,12 +1466,12 @@ def _queue_jobs(manager, iterable, inst, classname, command):
             processing.clear()
             continue
         signal.alarm(timeout_length)
-        if (r['alias'], r['basefile']) not in processing:
+        if (r['alias'], (r['basefile'], r['version'])) not in processing:
             if r['alias'] == inst.alias:
                 log.warning("%s not found in processing (%s)" % (r['basefile'], format_tupleset(processing)))
             else:
                 log.warning("%s from repo %s was straggling, better late than never" % (r['basefile'], r['alias']))
-        processing.discard((r['alias'], r['basefile']))
+        processing.discard((r['alias'], (r['basefile'], r['version'])))
         if isinstance(r['result'], tuple) and r['result'][0] == _WrappedKeyboardInterrupt:
             raise KeyboardInterrupt()
         elif isinstance(r['result'], tuple) and isinstance(r['result'][0], Exception):
@@ -1624,8 +1627,13 @@ def _process_resultqueue(resultqueue, basefiles, procs, jobqueue, clientname):
             log.error("result could not be decoded: %s" % e)
             # now we'll have a basefile without a result -- maybe we should indicate somehow
     signal.alarm(0)
-    # return the results in the same order as they were queued. If we miss a result for a particular 
-    return [res.get(x, {'basefile': x, 'result': False, 'log': 'CATASTROPHIC ERROR (couldnt decode result from client)', 'client': 'unknown'}) for x in basefiles]
+    # return the results in the same order as they were queued. If we
+    # miss a result for a particular basefile, return a catastropic
+    # error saying we couldn't get the result
+    return [res.get(b, {'basefile': b,
+                        'result': False,
+                        'log': 'CATASTROPHIC ERROR (couldnt decode result from client)',
+                        'client': 'unknown'}) for b, v in basefiles]
 
 def _resultqueue_get_timeout(signum, frame):
     # get a list of sent jobs and recieved results. determine which

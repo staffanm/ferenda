@@ -36,9 +36,9 @@ class Decorators(unittest.TestCase):
         call_args = mockrepo.log.info.call_args
 
         # ...with the correct method and arguments
-        self.assertEqual(len(call_args[0]), 3)
-        self.assertEqual(call_args[0][0], '%s: parse OK (%.3f sec)')
-        self.assertEqual(call_args[0][1], "1234")
+        self.assertEqual(len(call_args[0]), 2)
+        self.assertEqual(call_args[0][0], 'parse OK (%.3f sec)')
+
 
     def test_parseifneeded(self):
         @parseifneeded
@@ -133,6 +133,14 @@ class Decorators(unittest.TestCase):
             # create some docentry file in a good place
             de = DocumentEntry(mockrepo.store.documententry_path("1234"))
             now = datetime.datetime.now()
+            if hasattr(now, 'timestamp'): # py3
+                timestamp = now.timestamp()
+            else:
+                import time
+                # this isn't as good as the python3 timestamp() method
+                # because this loses fractions of a second, but it'll
+                # do.
+                timestamp = time.mktime(now.timetuple()) 
             de.indexed_ts = now + datetime.timedelta(seconds=3600)
             de.indexed_ft = now + datetime.timedelta(seconds=-3600)
             de.indexed_dep = now + datetime.timedelta(seconds=-3600)
@@ -146,13 +154,13 @@ class Decorators(unittest.TestCase):
             # have to create actual files
             parsedpath = mockrepo.store.parsed_path("1234")
             util.writefile(parsedpath,  "dummy")
-            os.utime(parsedpath, (now.timestamp(), now.timestamp() - 7200))
+            os.utime(parsedpath, (timestamp, timestamp - 7200))
             testfunc(mockrepo, mockbasefile)
             self.assertFalse(mockrepo.called)
             mockrepo.called = False
 
             # test 2: Outfile is older than the information in the documententry file
-            os.utime(parsedpath, (now.timestamp(), now.timestamp()))
+            os.utime(parsedpath, (timestamp, timestamp))
             testfunc(mockrepo, mockbasefile)
             self.assertTrue(mockrepo.called)
             self.assertTrue(mockrepo.needed)
@@ -162,7 +170,7 @@ class Decorators(unittest.TestCase):
             
             mockrepo.called = False
             # test 3: Outfile is newer, but the global force option was set
-            os.utime(parsedpath, (now.timestamp(), now.timestamp() - 7200))
+            os.utime(parsedpath, (timestamp, timestamp - 7200))
             mockrepo.config.force = True
             testfunc(mockrepo, mockbasefile)
             self.assertTrue(mockrepo.called)

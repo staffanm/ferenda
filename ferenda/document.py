@@ -21,7 +21,7 @@ class Document(object):
     :param basefile: The basefile of the document
     """
 
-    def __init__(self, meta=None, body=None, uri=None, lang=None, basefile=None):
+    def __init__(self, meta=None, body=None, uri=None, lang=None, basefile=None, version=None):
         if meta is None:
             self.meta = Graph()
         else:
@@ -33,6 +33,7 @@ class Document(object):
         self.uri = uri
         self.lang = lang
         self.basefile = basefile
+        self.version = version
 
     def __eq__(self, other):
         return self.__dict__ == other.__dict__

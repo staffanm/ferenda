@@ -195,10 +195,14 @@ class Needed(int):
     def __bool__(self):
         return True
 
+    __nonzero__ = __bool__  # py2 compat, py2 doesn't use the __bool__ magic method
+
 RelateNeeded = namedtuple('RelateNeeded', ['fulltext', 'dependencies', 'triples'])
 # make this namedtuple class work in a bool context: False iff all
 # elements are falsy. Elements should be plain bools or Needed objects
 RelateNeeded.__bool__ = lambda self: any(self)
+RelateNeeded.__nonzero__ = RelateNeeded.__bool__
+
 
 # for reason, return the first True-ish elements reason (FIXME: what
 # happens if no element is True?)
@@ -292,7 +296,7 @@ class DocumentStore(object):
         >>> d.storage_policy = "dir"
         >>> d.path('123/a', 'parsed', '.xhtml') == '/tmp/base/parsed/123/a/index.xhtml'
         True
-        >>> d.path('123/a', 'downloaded', None, 'r4711', 'appendix.txt') == '/tmp/base/archive/downloaded/123/a/r4711/appendix.txt'
+        >>> d.path('123/a', 'downloaded', None, 'r4711', 'appendix.txt') == '/tmp/base/archive/downloaded/123/a/.versions/r4711/appendix.txt'
         True
         >>> os.sep = realsep
 

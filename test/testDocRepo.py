@@ -262,7 +262,7 @@ class Repo(RepoTester):
         self.assertTrue(os.path.exists(self.datadir+"/base/downloaded/123/a.html"))  
 
         # make sure download_single tucked away the previous version
-        self.assertTrue(os.path.exists(self.datadir+"/base/archive/downloaded/123/a/1.html"))
+        self.assertTrue(os.path.exists(self.datadir+"/base/archive/downloaded/123/a/.versions/1.html"))
         self.assertTrue(os.path.exists(self.datadir+"/base/entries/123/a.json"))
         p = DocumentEntry(self.datadir+"/base/entries/123/a.json")
         self.assertAlmostEqualDatetime(p.orig_updated, datetime.now())
@@ -271,7 +271,7 @@ class Repo(RepoTester):
         self.assertEqual(p.orig_url, "http://example.org/very/specific/url") # orig_url has been modified from test1
         self.assertEqual(util.readfile(self.datadir+"/base/downloaded/123/a.html"),
                          util.readfile("test/files/base/downloaded/123/a-version2.htm"))
-        self.assertEqual(util.readfile(self.datadir+"/base/archive/downloaded/123/a/1.html"),
+        self.assertEqual(util.readfile(self.datadir+"/base/archive/downloaded/123/a/.versions/1.html"),
                          util.readfile("test/files/base/downloaded/123/a-version1.htm"))
 
         # test3: unchanged file
@@ -1832,7 +1832,7 @@ class Archive(RepoTester):
         eq = self.assertEqual
         eq(util.readfile(self.p("base/downloaded/123/a.html")),
            util.readfile("test/files/base/downloaded/123/a-version2.htm"))
-        eq(util.readfile(self.p("base/archive/downloaded/123/a/1.html")),
+        eq(util.readfile(self.p("base/archive/downloaded/123/a/.versions/1.html")),
            util.readfile("test/files/base/downloaded/123/a-version1.htm"))
 
 
@@ -1863,11 +1863,11 @@ class Archive(RepoTester):
         version = self.repo.get_archive_version("123/a")
         self.repo.store.archive("123/a",version)
         self.assertEqual(version, "4")
-        self.assertEqual(sorted(os.listdir(self.p("base/archive/downloaded/123/a/"))),
+        self.assertEqual(sorted(os.listdir(self.p("base/archive/downloaded/123/a/.versions"))),
                          ['1.html', '2.html', '3.html'])
-        self.assertEqual(sorted(os.listdir(self.p("base/archive/parsed/123/a/"))),
+        self.assertEqual(sorted(os.listdir(self.p("base/archive/parsed/123/a/.versions"))),
                          ['1.xhtml', '2.xhtml'])
-        self.assertEqual(sorted(os.listdir(self.p("/base/archive/generated/123/a/"))),
+        self.assertEqual(sorted(os.listdir(self.p("/base/archive/generated/123/a/.versions"))),
                          ['1.html', '4.html'])
         self.assertEqual(list(self.repo.store.list_versions("123/a")),
                          ['1','2','3', '4'])
