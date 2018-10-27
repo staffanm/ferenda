@@ -117,7 +117,7 @@
 	  </xsl:if>
 	</div>
       </xsl:if>
-    </div>
+    </div>p
   </xsl:template>
   <xsl:param name="dyntoc" select="false()"/>
   <xsl:param name="fixedtoc" select="true()"/>
@@ -551,6 +551,7 @@
   <xsl:template match="xhtml:div[@class='registerpost']">
     <xsl:variable name="year" select="xhtml:span[@property='rpubl:arsutgava']/@content"/>
     <xsl:variable name="nr" select="xhtml:span[@property='rpubl:lopnummer']/@content"/>
+    <xsl:variable name="konsurl" select="concat($documenturi, '/konsolidering/', $year, ':', $nr)"/>
     <div class="andring" id="{@id}" about="{@about}">
       <h2><xsl:choose><xsl:when test="@content"><xsl:value-of select="@content"/></xsl:when><xsl:otherwise>Ändring, <xsl:value-of select="xhtml:span[@property='dcterms:identifier']/@content"/></xsl:otherwise></xsl:choose></h2>
       <ul>
@@ -564,7 +565,7 @@
       <xsl:if test="(number($year) > 2018) or (number($year) = 2018 and number($nr) >= 160)">
 	<li><a href="https://svenskforfattningssamling.se/doc/{$year}{$nr}.html">Officiell autentisk version</a></li>
       </xsl:if>
-      <xsl:if test="(number($year) > 2004)"> <!-- we should have an earlier consolidated version of this available. If we don't, maybe transformlinks will unlink this? -->
+      <xsl:if test="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/dcterms:hasVersion/rdf:Description[@rdf:about=$konsurl]">
 	<li><a href="{$documenturi}/konsolidering/{$year}:{$nr}">Konsoliderad version med ändringar införda till och med SFS <xsl:value-of select="$year"/>:<xsl:value-of select="$nr"/></a></li>
       </xsl:if>
       </ul>
