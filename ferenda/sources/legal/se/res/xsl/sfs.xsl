@@ -11,8 +11,10 @@
 
   <xsl:import href="tune-width.xsl"/>
   <xsl:import href="annotations-panel.xsl"/>
-  <xsl:include href="base.xsl"/>
-  
+  <xsl:include href="base.xsl"/> 
+  <xsl:param name="version"/> <!-- set by generate() if asked to generate a specific version -->
+  <xsl:param name="expired"/> <!-- set by generate() if asked to generate a expired SFS -->
+ 
   <!-- Implementationer av templates som anropas från base.xsl -->
   <xsl:template name="headtitle">
     <xsl:value-of select="//xhtml:title"/>
@@ -23,9 +25,9 @@
 
   <xsl:template name="metarobots"/>
 
-  <xsl:template name="linkalternate">
+  <xsl:template name="linkalternate"><!--
     <link rel="alternate" type="text/plain" href="{$documenturi}.txt" title="Plain text"/>
-  </xsl:template>
+  --></xsl:template>
 
   <xsl:template name="headmetadata"/>
 
@@ -43,8 +45,17 @@
     <xsl:variable name="label" select="//xhtml:meta[@property='rdfs:label' and not(@about)]/@content"/>
     <xsl:variable name="alternate" select="//xhtml:meta[@property='dcterms:alternate']/@content"/>
     <div class="row">
+      <xsl:choose>
+	<xsl:when test="$expired">
+	  <div class="watermark"><p>Upphävd författning</p></div>
+	</xsl:when>
+	<xsl:when test="$version">
+	  <div class="watermark"><p>Inaktuell version</p></div>
+	</xsl:when>
+      </xsl:choose>
       <section id="top" class="col-sm-7">
 	<h1><xsl:value-of select="../xhtml:head/xhtml:title"/></h1>
+	<h2>Version: <xsl:value-of select="$version"/></h2>
 	<xsl:if test="$label or $alternate">
 	  <p class="lead">(<xsl:value-of select="$label"/><xsl:if test="$label and $alternate">, </xsl:if><xsl:value-of select="$alternate"/>)</p>
 	</xsl:if>
@@ -230,7 +241,7 @@
 	</xsl:call-template>
       </div>
     </xsl:if>
-    <xsl:if test="not(@id)">
+    <xsl:if test="not(@id) and not($version)">
       <div class="row">
 	<section class="col-sm-7 ej-ikraft">
 	  <xsl:copy-of select="$andringsmarkering"/>
@@ -259,7 +270,7 @@
 	  <xsl:element name="{local-name(.)}"><xsl:apply-templates/></xsl:element>
 	</section>
       </xsl:if>
-      <xsl:if test="not(@id)">
+      <xsl:if test="not(@id) and not($version)">
 	<section class="col-sm-7 ej-ikraft">
 	  <xsl:copy-of select="$andringsmarkering"/>
 	  <xsl:element name="{local-name(.)}"><xsl:apply-templates/></xsl:element>
@@ -451,7 +462,7 @@
 	<xsl:apply-templates select="*[not(self::xhtml:h1[1])]"/>
       </div>
     </xsl:if>
-    <xsl:if test="not(@id)">
+    <xsl:if test="not(@id) and not($version)">
       <div class="row bilaga ej-ikraft">
 	<xsl:apply-templates select="xhtml:h1[1]"/>
 	<xsl:copy-of select="$andringsmarkering"/>
@@ -542,16 +553,21 @@
     <xsl:variable name="nr" select="xhtml:span[@property='rpubl:lopnummer']/@content"/>
     <div class="andring" id="{@id}" about="{@about}">
       <h2><xsl:choose><xsl:when test="@content"><xsl:value-of select="@content"/></xsl:when><xsl:otherwise>Ändring, <xsl:value-of select="xhtml:span[@property='dcterms:identifier']/@content"/></xsl:otherwise></xsl:choose></h2>
+      <ul>
       <!-- SFS older than 1998:306 does not exist in PDF anywhere. SFS
            1998:306 to 2018:159 exists in unofficial form at
            rkrattsdb.gov.se. SFS equal to or newer than 2018:160
            exists in official form at svenskforfattningssamling.se -->
       <xsl:if test="((number($year) > 1998) or (number($year) = 1998 and number($nr) >= 306)) and (2018 > number($year)) or (number($year) = 2018 and 160 > number($nr))">
-	<p><a href="http://rkrattsdb.gov.se/SFSdoc/{substring($year,3,2)}/{substring($year,3,2)}{format-number($nr,'0000')}.PDF">Tryckt format (PDF)</a></p>
+	<li><a href="http://rkrattsdb.gov.se/SFSdoc/{substring($year,3,2)}/{substring($year,3,2)}{format-number($nr,'0000')}.PDF">Tryckt format (PDF)</a></li>
       </xsl:if>
       <xsl:if test="(number($year) > 2018) or (number($year) = 2018 and number($nr) >= 160)">
-	<p><a href="https://svenskforfattningssamling.se/doc/{$year}{$nr}.html">Officiell autentisk version</a></p>
+	<li><a href="https://svenskforfattningssamling.se/doc/{$year}{$nr}.html">Officiell autentisk version</a></li>
       </xsl:if>
+      <xsl:if test="(number($year) > 2004)"> <!-- we should have an earlier consolidated version of this available. If we don't, maybe transformlinks will unlink this? -->
+	<li><a href="{$documenturi}/konsolidering/{$year}:{$nr}">Konsoliderad version med ändringar införda till och med SFS <xsl:value-of select="$year"/>:<xsl:value-of select="$nr"/></a></li>
+      </xsl:if>
+      </ul>
        <xsl:if test="xhtml:div[@class='overgangsbestammelse']">
 	<div class="overgangsbestammelse">
 	  <h3>Övergångsbestämmelse</h3> <!-- FIXME: sometimes better labeled as Ikraftträdandebestämmelse -->

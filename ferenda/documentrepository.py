@@ -2407,6 +2407,9 @@ WHERE {
             params = {}
             if annotation_file:
                 params['annotationfile'] = annotation_file
+            if version:
+                params['version'] = version
+            params = self.generate_set_params(basefile, version, params)
 
             with util.logtime(self.log.debug,
                               "transform (%(elapsed).3f sec)",
@@ -2453,6 +2456,10 @@ WHERE {
             docentry.updated = now
             docentry.save()
 
+    def generate_set_params(self, basefile, version, params):
+        return params
+
+
     def get_url_transform_func(self, repos=None, basedir=None,
                                develurl=None, remove_missing=False):
         """Returns a function that, when called with a URI, transforms that
@@ -2480,21 +2487,7 @@ WHERE {
                 # CompositeRepository repos come before subrepos in
                 # the list.
                 if repo.requesthandler.supports_uri(url):
-                    basefile = repo.basefile_from_uri(url)
-                    if basefile:  # if not, might be a dataset uri
-                        # What is the proper path if we want to test
-                        # if a resource exists? sometimes entries/,
-                        # sometimes parsed/, sometimes generated/
-                        method = getattr(repo.store, methodname)
-                        return method(basefile)
-                    else:
-                        # even dataset uris must be mapped to a
-                        # path... this is complicated, but
-                        # requesthandler.path solves most of it
-                        # (except that it doesn't handle selecting a
-                        # path to the parsed or docentry file, only
-                        # generated files)
-                        return repo.requesthandler.path(url)
+                    return repo.requesthandler.path(url)
         
         def simple_transform(url):
             if url.startswith(self.config.url):
@@ -2673,7 +2666,7 @@ WHERE {
     # exist on disk, to know whether keep links to them or not)
     @decorators.action
     @decorators.ifneeded('transformlinks')
-    def transformlinks(self, basefile, otherrepos=[]):
+    def transformlinks(self, basefile, version=None, otherrepos=[]):
         """Transform links in generated HTML files.
 
         If the ``develurl`` or ``staticsite`` settings are used, this
@@ -2683,9 +2676,11 @@ WHERE {
         """
         # FIXME: Do we need any way of preventing double-transforming?
         # How should we detect that a file already has been
-        # transformed?
+        # transformed? Right now documentstore.needed() detects that
+        # by comparing the generated file timestamp with info from the
+        # documententry file
         repos = list(otherrepos)
-        generatedfile = self.store.generated_path(basefile)
+        generatedfile = self.store.generated_path(basefile, version=version)
         if self not in repos:
             repos.append(self)
         transformargs = {'repos': repos,

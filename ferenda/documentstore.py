@@ -640,7 +640,8 @@ dependencies (in the form of source files for the action).
 
     def list_versions_for_basefiles(self, basefiles, action):
         adjective = {'parse': 'downloaded',
-                     'generate': 'parsed'}
+                     'generate': 'parsed',
+                     'transformlinks': 'generated'}
         for basefile in basefiles:
             yield (basefile, None)
             for version in self.list_versions(basefile, adjective[action]):

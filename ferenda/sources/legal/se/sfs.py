@@ -115,8 +115,6 @@ class SFS(Trips):
     base = "SFSR"  # DIR, THWALLPROP, SFSR
     # This must be pretty lax, basefile is sanitized later
     basefile_regex = r"(?P<basefile>\d{4}:(bih. ?|)\d+( ?s\. ?\d+| \d|))$"
-    # start_url = "http://rkrattsbaser.gov.se/sfsr/adv?sort=asc"
-    start_url = "http://rkrattsbaser.gov.se/sfsr/adv?upph=false&sort=asc"
     document_url_template = "http://rkrattsbaser.gov.se/sfst?bet=%(basefile)s"
     document_sfsr_url_template = "http://rkrattsbaser.gov.se/sfsr?bet=%(basefile)s"
     document_sfsr_change_url_template = "http://rkrattsbaser.gov.se/sfsr?%%C3%%A4bet=%(basefile)s"
@@ -145,6 +143,16 @@ class SFS(Trips):
             else:
                 # shut up logger
                 self.trace[logname].propagate = False
+
+    _start_url = "http://rkrattsbaser.gov.se/sfsr/adv?sort=asc"
+    @property
+    def start_url(self):
+        return self._start_url + ("&upph=false" if not self.config.keepexpired and "&upph=false" not in self._start_url else "")
+
+    @start_url.setter
+    def start_url(self, newval):
+        self._start_url = newval
+    
 
     @cached_property
     def lagrum_parser(self):
@@ -773,7 +781,7 @@ class SFS(Trips):
         for line in lines[startline:]:
             if ":" not in line:
                 continue
-            key, val = [x.strip() for x in line.split(":", 1)]
+            key, val = [util.normalize_space(x) for x in line.split(":", 1)]
             
             # Simple string literals
             if key == 'Rubrik':
@@ -796,7 +804,7 @@ class SFS(Trips):
                     raise UpphavdForfattning("%s is an expired SFS" % basefile,
                                              dummyfile=self.store.parsed_path(basefile))
 
-            elif key == 'Departement':
+            elif key in ('Departement', 'Departement/ myndighet'):
                 # the split is only needed because of SFS 1942:724,
                 # which has "Försvarsdepartementet,
                 # Socialdepartementet"...
@@ -822,7 +830,7 @@ class SFS(Trips):
                 d["rpubl:ikrafttradandedatum"] = val[:10]
             else:
                 self.log.warning(
-                    "Obekant nyckel '%s']" % (key))
+                    "Obekant nyckel '%s'" % (key))
         # FIXME: This is a misuse of the dcterms:issued prop in order
         # to mint the correct URI. We need to remove this somehow afterwards.
         if "dcterms:issued" not in d:
@@ -1362,6 +1370,14 @@ class SFS(Trips):
                                      'uris': set()}),
                 (self.find_definitions, False))
 
+    def generate_set_params(self, basefile, version, params):
+        resource = Graph().parse(self.store.distilled_path(basefile, version)).resource(self.canonical_uri(basefile))
+        upph = resource.value(RPUBL.upphavandedatum)
+        if upph and upph.value < date.today():
+            params['expired'] = 'true'
+        return params
+
+    
     def parse_entry_id(self, doc):
         # For SFS, the doc.uri can be temporal, ie
         # https://lagen.nu/2015:220/konsolidering/2015:667, but we'd

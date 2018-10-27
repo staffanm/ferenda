@@ -1109,15 +1109,16 @@ def _run_class(enabled, argv, config):
         else:
             # The only thing that kwargs may contain is a 'otherrepos'
             # parameter.
-            if len(config.arguments) == 1 and action in ('parse', 'generate'):
+            if len(config.arguments) == 1 and action in ('parse', 'generate', 'transformlinks'):
                 basefile = config.arguments[0]
                 version = getattr(config, 'version', None)
                 with adaptlogger(inst, basefile, version):
                     res = _run_class_with_basefile(clbl, basefile, None, kwargs, action, alias)
                 adjective = {'parse': 'downloaded',
-                             'generate': 'parsed'}
+                             'generate': 'parsed',
+                             'transformlinks': 'generated'}
                 if 'allversions' in config and config.allversions:
-                    res = [res] 
+                    res = [res]
                     for version in inst.store.list_versions(basefile, adjective.get(action, action)):
                         with adaptlogger(inst, basefile, version):
                             res = _run_class_with_basefile(clbl, basefile, version, kwargs, action, alias)

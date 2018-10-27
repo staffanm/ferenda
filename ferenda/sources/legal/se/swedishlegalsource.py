@@ -679,12 +679,7 @@ class SwedishLegalSource(DocumentRepository):
                 descpath = unicodedata.normalize("NFD", descpath)
             else:
                 return fp
-        self.log.warning("%s: Applying patch %s" % (basefile, patchpath))
         from ferenda.thirdparty.patchit import PatchSet, PatchSyntaxError, PatchConflictError
-        binarystream = False
-        if "b" in fp.mode: # binary stream, won't play nice with patchit
-            fp = codecs.getreader(self.source_encoding)(fp)
-            binarystream = True
         with codecs.open(patchpath, 'r', encoding=self.source_encoding) as pfp:
             if self.config.patchformat == "rot13":
                 # replace the rot13 obfuscated stream with a plaintext stream
@@ -701,6 +696,29 @@ class SwedishLegalSource(DocumentRepository):
         else:
             desc = "(No patch description available)"
 
+        if desc.startswith("[version:"):
+            # if the desc starts with a string like [version:
+            # 2017:1279-] it means that the patch is only working for
+            # versions equal to or above version 2017:1279.
+            m = re.match("\[version: ([^-]*)-([^\]]*)]", desc)
+            assert m, "version specifier malformed"
+            minver, maxver = m.groups()
+            if not minver:
+                minver = "0000:0000"
+            if not maxver:
+                maxver = "9999:9999"
+            # make the version numbers comparable for numsort
+            (minver_s, maxver_s, version_s) = [util.split_numalpha(x) for x in (minver, maxver, version)]
+            if not (minver_s <= version_s <= maxver_s):
+                self.log.debug("version %s is not within compatible versions for patch %s: %s" % (version, patchpath, m.group(0)))
+                return fp
+            desc = desc.replace(m.group(0), "")
+            
+        binarystream = False
+        if "b" in fp.mode: # binary stream, won't play nice with patchit
+            fp = codecs.getreader(self.source_encoding)(fp)
+            binarystream = True
+        self.log.warning("Applying patch %s" % (patchpath))
         # perform the patching, return the result as a stream, and add
         # an attribute with the description
         # lines = [l.decode().rstrip() for l in fp.readlines()]
@@ -810,7 +828,8 @@ class SwedishLegalSource(DocumentRepository):
                 elif k in ("dcterms:issued", "rpubl:avgorandedatum",
                            "rpubl:utfardandedatum",
                            "rpubl:ikrafttradandedatum",
-                           "rpubl:beslutsdatum"):
+                           "rpubl:beslutsdatum",
+                           "rpubl:upphavandedatum"):
                     if re.match("\d{4}-\d{2}-\d{2}", value):
                         # iso8859-1 date (no time portion)
                         dt = datetime.strptime(value, "%Y-%m-%d")
@@ -1339,7 +1358,7 @@ class SwedishLegalSource(DocumentRepository):
         return v
 
     def generate(self, basefile, version=None, otherrepos=[]):
-        ret = super(SwedishLegalSource, self).generate(basefile, version, otherrepos)
+        ret = super(SwedishLegalSource, self).generate(basefile, version=version, otherrepos=otherrepos)
         if self.get_parse_options(basefile) == "metadataonly":
             # Do a little magic to ensure wsgiapp.py serves this file
             # with status code 404 instead of 200
