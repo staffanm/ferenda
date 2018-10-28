@@ -123,7 +123,7 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
         opts['jsfiles'].append('js/pdfviewer.js')
         return opts
 
-    def canonical_uri(self, basefile):
+    def canonical_uri(self, basefile, version=None):
         # this is maybe only used by DocumentRepository.generate, and
         # only to calculate the url pathinfo segment depth. At that
         # stage, we have a parsed file containing this information, so

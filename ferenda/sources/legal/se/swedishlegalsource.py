@@ -427,7 +427,7 @@ class SwedishLegalSource(DocumentRepository):
                     g.add((current, uri(k), v))
         return g.resource(b)
 
-    def canonical_uri(self, basefile):
+    def canonical_uri(self, basefile, version=None):
         attrib = self.metadata_from_basefile(basefile)
         resource = self.attributes_to_resource(attrib)
         uri = self.minter.space.coin_uri(resource)

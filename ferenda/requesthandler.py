@@ -80,11 +80,11 @@ class RequestHandler(object):
             return params
         # else return None (which is different from {})
 
-    def basefile_params_from_basefile(self, basefile):
-        if "?" not in basefile:
+    def params_from_uri(self, uri):
+        if "?" not in uri:
             return {}
         else:
-            return dict(parse_qsl(basefile.split("?", 1)[1]))
+            return dict(parse_qsl(uri.split("?", 1)[1]))
 
     def supports(self, environ):
         """Returns True iff this particular handler supports this particular request."""
@@ -125,7 +125,7 @@ class RequestHandler(object):
             else:
                 return None
         else:
-            params = self.basefile_params_from_basefile(uri)
+            params = self.params_from_uri(uri)
             if params:
                 uri = uri.split("?")[0]
             basefile = self.repo.basefile_from_uri(uri)
@@ -197,10 +197,7 @@ class RequestHandler(object):
             basefile = self.repo.basefile_from_uri(uri)
             if not basefile:
                 raise RequestHandlerError("%s couldn't resolve %s to a basefile" % (self.repo.alias, uri))
-            if querystring:
-                params = dict(parse_qsl(querystring))
-            else:
-                params = self.basefile_params_from_basefile(basefile)
+            params = self.params_from_uri(uri)
         if 'format' in params:
             suffix = params['format']
         else:

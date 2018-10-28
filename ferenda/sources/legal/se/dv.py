@@ -169,7 +169,7 @@ class DV(SwedishLegalSource):
         opts['mapfiletype'] = 'apache' # or nginx
         return opts
 
-    def canonical_uri(self, basefile):
+    def canonical_uri(self, basefile, version=None):
         # The canonical URI for HDO/B3811-03 should be
         # https://lagen.nu/dom/nja/2004s510. We can't know
         # this URI before we parse the document. Once we have, we can

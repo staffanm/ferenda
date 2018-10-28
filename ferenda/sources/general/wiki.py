@@ -200,11 +200,11 @@ class MediaWiki(DocumentRepository):
         doc.body = self.postprocess(doc, xhtml)
         return None
 
-    def canonical_uri(self, basefile):
+    def canonical_uri(self, basefile, version=None):
         # by default, a wiki page is expected to describe a
         # concept/keyword -- so we use our associated Keyword repo to
         # find its uri.
-        return self.keywordrepo.canonical_uri(basefile)
+        return self.keywordrepo.canonical_uri(basefile, version)
 
     def get_wikiparser(self):
         return Parser(parseinfo=False, whitespace='', nameguard=False)

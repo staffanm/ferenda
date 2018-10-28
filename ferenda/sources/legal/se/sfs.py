@@ -456,7 +456,7 @@ class SFS(Trips):
             doc.uri = self.canonical_uri(basefile, uppdaterad_tom)
         return doc
 
-    def canonical_uri(self, basefile, konsolidering=False):
+    def canonical_uri(self, basefile, version=None):
         basefile = self.sanitize_basefile(basefile)
         attributes = self.metadata_from_basefile(basefile)
 
@@ -469,17 +469,17 @@ class SFS(Trips):
                            "rpubl:forfattningssamling":
                            URIRef(self.lookup_resource("SFS",
                                                        SKOS.altLabel))})
-        if konsolidering:
-            if konsolidering is not True:
+        if version:
+            if version is not True:
                 # eg konsolidering = "2013-05-30" or "2013:460"
-                konsolidering = konsolidering.replace(" ", "_")
-            attributes["dcterms:issued"] = konsolidering
+                version = version.replace(" ", "_")
+            attributes["dcterms:issued"] = version
         resource = self.attributes_to_resource(attributes)
         uri = self.minter.space.coin_uri(resource)
         # create eg "https://lagen.nu/sfs/2013:460/konsolidering" if
         # konsolidering = True instead of a issued date.
         # FIXME: This should be done in CoIN entirely
-        if konsolidering is True:
+        if version is True:
             uri = uri.rsplit("/", 1)[0]
         computed_basefile = self.basefile_from_uri(uri)
         assert basefile == computed_basefile, "%s -> %s -> %s" % (basefile, uri, computed_basefile)
@@ -821,11 +821,11 @@ class SFS(Trips):
                 d["dcterms:issued"] = uppdaterad
 
             elif (key == 'Omtryck' and re_sfs(val)):
-                d["rinfoex:omtryck"] = self.canonical_uri(re_sfs(val).group(1))
+                d["rinfoex:omtryck"] = URIRef(self.canonical_uri(re_sfs(val).group(1)))
             elif (key == 'Författningen har upphävts genom' and
                   re_sfs(val)):
                 s = re_sfs(val).group(1)
-                d["rinfoex:upphavdAv"] = self.canonical_uri(s)
+                d["rinfoex:upphavdAv"] = URIRef(self.canonical_uri(s))
             elif key == 'Ikraft':
                 d["rpubl:ikrafttradandedatum"] = val[:10]
             else:
@@ -1704,6 +1704,16 @@ class SFS(Trips):
                 stuff[lagrum]['kommentar'] = ""
             stuff[lagrum]['kommentar'] += shortdesc.replace("p>", "p>"+link, 1)
 
+        # 8. Any possible inbound rinfoex:upphavdAv statements from an
+        # earlier statute that was expired by this statue
+        upphaver = self.time_store_select(store,
+                                             "sparql/sfs_upphaver.rq",
+                                             basefile,
+                                             sfsdataset,
+                                             "upphaver")
+        if upphaver:
+            stuff[baseuri]['upphaver'] = upphaver
+
         # then, construct a single de-normalized rdf/xml dump, sorted
         # by root/chapter/section/paragraph URI:s. We do this using
         # raw XML, not RDFlib, to avoid normalizing the graph -- we
@@ -1816,6 +1826,15 @@ class SFS(Trips):
                     myndfsid_node.text = myndfs['identifier']
                     lagrum_node.append(bf_node)
 
+            if 'upphaver' in stuff[l]:
+                for upphaver in stuff[l]['upphaver']:
+                    uh_node = etree.Element(ns("rinfoex:upphaver"))
+                    uhf_node = etree.SubElement(uh_node, ns("rdf:Description"))
+                    uhf_node.set(ns("rdf:about"), upphaver['uri'])
+                    uhf_title_node = etree.SubElement(uhf_node, ns("dcterms:title"))
+                    uhf_title_node.text = upphaver['title']
+                    lagrum_node.append(uh_node)
+ 
         if version is None:
             # FIXME: This is supposed to grab the rdf:Description node
             # that describes the statute itself (not any single chapter or
@@ -1834,7 +1853,8 @@ class SFS(Trips):
 
             for version_id in self.store.list_versions(basefile, "parsed"):
                 version_node = etree.SubElement(hasVersion_node, ns("rdf:Description"))
-                version_node.set(ns("rdf:about"), canonical_uri + "/konsolidering/" + version_id)
+                
+                version_node.set(ns("rdf:about"), self.canonical_uri(basefile, version_id))
                 label_node = etree.SubElement(version_node, ns("dcterms:identifier"))
                 label_node.text = "SFS %s" % version_id
                 if label_node.text in versions:

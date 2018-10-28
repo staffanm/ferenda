@@ -32,14 +32,28 @@ class SFSHandler(SwedishLegalHandler):
             return super(SFSHandler, self).supports(environ)
         return re.match("/\d{4}\:", environ['PATH_INFO'])
 
-    def path(self, uri):
+    def _params(self, uri):
         m = re.search("(?P<basefile>\d{4}:(bih._?|)\d+(_?s\._?\d+|_\d|)+)/konsolidering/(?P<version>\d{4}:\d+)$", uri)
         if m:
             basefile = m.group('basefile').replace("_", " ")
             version = m.group('version')
+            return basefile, version
+        else:
+            return None, None
+
+    def path(self, uri):
+        basefile, version = self._params(uri)
+        if basefile and version:
             return self.repo.store.generated_path(basefile, version)
         else:
             return super(SFSHandler, self).path(uri)
+
+    def params_from_uri(self, uri):
+        basefile, version = self._params(uri)
+        if version:
+            return {'version': version}
+        else:
+            return super(SFSHandler, self).params_from_uri(uri)
     
 class SFS(OrigSFS, SameAs):
     requesthandler_class = SFSHandler

@@ -117,7 +117,7 @@
 	  </xsl:if>
 	</div>
       </xsl:if>
-    </div>p
+    </div>
   </xsl:template>
   <xsl:param name="dyntoc" select="false()"/>
   <xsl:param name="fixedtoc" select="true()"/>
@@ -171,6 +171,12 @@
 	<dd><xsl:value-of select="//xhtml:meta[@property='rpubl:upphavandedatum']/@content"/></dd>
 	<dt>Upphävd genom</dt>
 	<dd><a href="{$upphavdAv}"><xsl:value-of select="//xhtml:div[@about=$upphavdAv]/xhtml:span[@property='dcterms:identifier']/@content"/></a></dd>
+      </xsl:if>
+      <xsl:if test="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/rinfoex:upphaver/rdf:Description"> 
+	<dt>Upphäver</dt>
+	<xsl:for-each select="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/rinfoex:upphaver/rdf:Description">
+	  <dd><a href="{@rdf:about}"><xsl:value-of select="dcterms:title"/></a></dd>
+	</xsl:for-each>
       </xsl:if>
       <dt>Källa</dt>
       <dd rel="dcterms:publisher" resource="http://lagen.nu/org/2008/regeringskansliet"><a href="http://rkrattsbaser.gov.se/sfst?bet={$regpost/xhtml:span[@property='rpubl:arsutgava']/@content}:{$regpost/xhtml:span[@property='rpubl:lopnummer']/@content}">Regeringskansliets rättsdatabaser</a></dd>

@@ -55,7 +55,7 @@ class LNKeyword(keyword.Keyword, SameAs):
             return sanitized
         # else return None
             
-    def canonical_uri(self, basefile):
+    def canonical_uri(self, basefile, version=None):
         return self.keyword_uri(basefile)
 
     def basefile_from_uri(self, uri):

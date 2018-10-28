@@ -1157,7 +1157,7 @@ class Generate(RepoTester):
     class TestRepo(DocumentRepository):
         alias = "test"
         
-        def canonical_uri(self,basefile):
+        def canonical_uri(self,basefile, version=None):
             return "http://example.org/repo/a/%s" % basefile
 
     repoclass = TestRepo

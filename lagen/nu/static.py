@@ -13,7 +13,7 @@ class Static(BaseStatic, SwedishLegalSource):
     required_predicates = [RDF.type, DCTERMS.title, PROV.wasGeneratedBy]
     urispace_segment = "om"
     
-    def canonical_uri(self, basefile):
+    def canonical_uri(self, basefile, version=None):
         return "https://lagen.nu/om/%s" % basefile
     
     def facets(self):

@@ -639,7 +639,7 @@ with the *config* object as single parameter.
         """
         return self.__class__.__module__ + "." + self.__class__.__name__
 
-    def canonical_uri(self, basefile):
+    def canonical_uri(self, basefile, version=None):
         """The canonical URI for the document identified by ``basefile``.
 
         :returns: The canonical URI
@@ -652,7 +652,10 @@ with the *config* object as single parameter.
         # It might also be impossible to provide the canonical_uri
         # without actually parse()ing the document
 
-        return "%sres/%s/%s" % (self.config.url, self.alias, basefile)
+        uri = "%sres/%s/%s" % (self.config.url, self.alias, basefile)
+        if version:
+            uri += "?version=" % urlencode(version)
+        return uri
 
     def dataset_uri(self, param=None, value=None, feed=False):
         """Returns the URI that identifies the dataset that this docrepository
@@ -2439,8 +2442,7 @@ WHERE {
                     # the URI into account when relative paths are
                     # constructed with the depth argument to
                     # transform_file
-                    urlparse(self.canonical_uri(basefile)).path[1:-1].count("/") 
-                    depth = urlparse(self.canonical_uri(basefile)).path[1:-1].count("/")
+                    depth = urlparse(self.canonical_uri(basefile, version)).path[1:-1].count("/")
                 transformer.transform_file(infile, outfile, params, depth=depth)
 
             # At this point, outfile may appear untouched if it already
