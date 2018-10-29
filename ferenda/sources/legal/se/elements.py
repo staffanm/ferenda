@@ -38,7 +38,7 @@ class Tidsbestamd(TemporalElement):
             p = getattr(self, property, None)
             if p:
                 if isinstance(p, datetime):
-                    attrs = {'content': p.strftime("%Y-%m-%m"),
+                    attrs = {'content': p.strftime("%Y-%m-%d"),
                              'datatype': 'xsd:date'}
                 else:
                     # träder i kraft: den dag regeringen bestämmer
