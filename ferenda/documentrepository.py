@@ -2063,13 +2063,14 @@ parsed document path to that documents dependency file."""
                     repo = repo.decode()     # pragma: no cover
                 plaintext = util.normalize_space(self._extract_plaintext(resource, resources))
                 # print("%s -> %s" % (resource.get("about"), plaintext))
+                import pudb; pu.db
                 for facet in self.facets():
                     k, v = self._relate_fulltext_value(facet, resource, desc)
                     if v is not None:
                         if k is None:
                             k = qname_graph.qname(facet.rdftype).replace(":", "_")
                         kwargs[k] = v
-                # print("%s -> %s" % (about, kwargs))
+                print("%s -> %s" % (about, kwargs))
                 indexer.update(uri=about,
                                repo=repo,
                                basefile=basefile,

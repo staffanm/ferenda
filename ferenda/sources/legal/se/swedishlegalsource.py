@@ -649,6 +649,7 @@ class SwedishLegalSource(DocumentRepository):
             #    parse_convert_to_intermediate(basefile) to convert
             #    downloaded_path -> intermediate_path (eg.
             #    WordReader.read, SFS.extract_sfst)
+
             kwargs = {}
             if version and 'version' in inspect.signature(self.downloaded_to_intermediate):
                 kwargs['version'] = version
@@ -713,12 +714,13 @@ class SwedishLegalSource(DocumentRepository):
                 self.log.debug("version %s is not within compatible versions for patch %s: %s" % (version, patchpath, m.group(0)))
                 return fp
             desc = desc.replace(m.group(0), "")
-            
+
         binarystream = False
         if "b" in fp.mode: # binary stream, won't play nice with patchit
             fp = codecs.getreader(self.source_encoding)(fp)
             binarystream = True
         self.log.warning("Applying patch %s" % (patchpath))
+
         # perform the patching, return the result as a stream, and add
         # an attribute with the description
         # lines = [l.decode().rstrip() for l in fp.readlines()]
@@ -1246,6 +1248,15 @@ class SwedishLegalSource(DocumentRepository):
                             multiple_values=False,
                             indexingtype=fulltextindex.Label(boost=16),
                             pagetitle='Alla %(selected)s:ar'),
+                      Facet(RDFS.comment,
+                            use_for_toc=False,
+                            use_for_feed=False,
+                            toplevel_only=False,
+                            dimension_label="comment",
+                            dimension_type="value",
+                            multiple_value=Fale,
+                            indexingtype=fulltextindex.Label(boost=16),
+                            pagetitle='Alla %s(selected)s:ar'),
                       Facet(DCTERMS.creator,
                             use_for_toc=False,
                             use_for_feed=False,
@@ -1314,16 +1325,28 @@ class SwedishLegalSource(DocumentRepository):
                 self._relate_fulltext_value_cache[rooturi] = {
                     "creator": c,
                     "issued": i,
-                    "label": l
+                    "label": l,
+                    "comment": l
                 }
             v = self._relate_fulltext_value_cache[rooturi][facet.dimension_label]
             if facet.dimension_label == "label" and "#" in resourceuri:
                 v = self._relate_fulltext_value_label(resourceuri, rooturi, desc)
+            elif facet.dimension_label == "comment" and "#" in resourceuri:
+                v = self._relate_fulltext_value_comment(resourceuri, rooturi, desc)
             return facet.dimension_label, v
         else:
             return super(SwedishLegalSource, self)._relate_fulltext_value(facet, resource, desc)
 
+        
     def _relate_fulltext_value_label(self, resourceuri, rooturi, desc):
+        # Label is used for a shorter, context-dependent description
+        # of a resource, primarily intended for display in nested /
+        # inner hits. In that context (of the parent document, shown
+        # just above), it's preferable to use "15.2 Konsekvenser"
+        # rather than "SOU 1997:39: Integritet ´ Offentlighet ´
+        # Informationsteknik, avsnitt 15.2 'Konsekvenser'". Comment
+        # (see below) is used for context-less situations such as the
+        # autocomplete search form.
         if desc.getvalues(DCTERMS.title):
             if desc.getvalues(BIBO.chapter):
                 v = "%s %s" % (desc.getvalue(BIBO.chapter),
@@ -1336,26 +1359,23 @@ class SwedishLegalSource(DocumentRepository):
             # we don't have any title/label for whatever
             # reason. Uniquify this by using the URI fragment
             v = "%s, %s" % (v, resourceuri.split("#", 1)[1])
-        # the below logic is useful for when labels must be
-        # "standalone". with nested / inner hits, labels are
-        # presented within the context of the parent document,
-        # ie. it's preferable to use "15.2 Konsekvenser"
-        # rather than "SOU 1997:39: Integritet ´ Offentlighet
-        # ´ Informationsteknik, avsnitt 15.2 'Konsekvenser'"
-        #
-        # if desc.getvalues(DCTERMS.title):
-        #     if desc.getvalues(BIBO.chapter):
-        #         v = "%s, avsnitt %s '%s'" % (v,
-        #                                      desc.getvalue(BIBO.chapter),
-        #                                      desc.getvalue(DCTERMS.title))
-        #     else:
-        #         v = "%s, '%s'" % (v, desc.getvalue(DCTERMS.title))
-        # else:
-        #     # we don't have any title for whatever
-        #     # reason. Uniquify this rdfs:label by using the
-        #     # URI fragment
-        #     v = "%s, %s" % (v, resourceuri.split("#", 1)[1])
+
+    def _relate_fulltext_value_comment(self, resourceuri, rooturi, desc):
+        v = desc.graph.value(URIRef(rooturi), DCTERMS.identifier)
+        if desc.getvalues(DCTERMS.title):
+            if desc.getvalues(BIBO.chapter):
+                v = "%s, avsnitt %s '%s'" % (v,
+                                             desc.getvalue(BIBO.chapter),
+                                             desc.getvalue(DCTERMS.title))
+            else:
+                 v = "%s, avsnitt '%s'" % (v, desc.getvalue(DCTERMS.title))
+        else:
+            # we don't have any title for whatever
+            # reason. Uniquify this rdfs:label by using the
+            # URI fragment
+             v = "%s, %s" % (v, resourceuri.split("#", 1)[1])
         return v
+        
 
     def generate(self, basefile, version=None, otherrepos=[]):
         ret = super(SwedishLegalSource, self).generate(basefile, version=version, otherrepos=otherrepos)
@@ -1441,6 +1461,8 @@ class SwedishLegalSource(DocumentRepository):
         ferenda.util.gYear(1999)
 
         """
+        if not datestr:
+            raise ValueError("empty date string")
         day = month = year = None
         # assume strings on the form "3 februari 2010"
         # strings on the form "vid utg\xe5ngen av december 1999"

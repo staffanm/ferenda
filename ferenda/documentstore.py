@@ -592,6 +592,8 @@ dependencies (in the form of source files for the action).
         """
 
         if action:
+            if action == "relate":
+                return None
             assert action in (
                 'downloaded', 'parsed', 'generated'), "Action %s invalid" % action
             actions = (action,)
@@ -644,8 +646,9 @@ dependencies (in the form of source files for the action).
                      'transformlinks': 'generated'}
         for basefile in basefiles:
             yield (basefile, None)
-            for version in self.list_versions(basefile, adjective[action]):
-                yield (basefile, version)
+            if action in adjective:
+                for version in self.list_versions(basefile, adjective[action]):
+                    yield (basefile, version)
 
     def list_attachments(self, basefile, action, version=None):
         """Get all attachments for a basefile in a specified state

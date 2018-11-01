@@ -1297,7 +1297,10 @@ def _build_worker(jobqueue, resultqueue, clientname):
                         
         # proctitle = re.sub(" [now: .*]$", "", getproctitle())
         proctitle = getproctitle()
-        setproctitle(proctitle + " [%(alias)s %(command)s %(basefile)s]" % job)
+        newproctitle = proctitle + " [%(alias)s %(command)s %(basefile)s]" % job
+        if job['version']:
+            newproctitle = newproctitle[:-1] + "@" + job['version'] + newproctitle[-1]
+        setproctitle(newproctitle)
         with adaptlogger(insts[job['classname']], job['basefile'], job['version']):
             res = _run_class_with_basefile(clbl, job['basefile'],
                                            job['version'],
@@ -1458,7 +1461,7 @@ def _queue_jobs(manager, iterable, inst, classname, command):
     clients = Counter()
     signal.signal(signal.SIGALRM, _resultqueue_get_timeout)
     # FIXME: be smart about how long we wait before timing out the resultqueue.get() call
-    timeout_length = 300 
+    timeout_length = 900 
     while len(processing) > 0:
         try:
             r = resultqueue.get()
@@ -1615,7 +1618,7 @@ def _process_resultqueue(resultqueue, basefiles, procs, jobqueue, clientname):
             # some client have failed sending us a result on the
             # queue
             # FIXME: be smart about selecting a suitable timeout
-            signal.alarm(180)
+            signal.alarm(900)
             if isinstance(r['result'], tuple) and r['result'][0] == _WrappedKeyboardInterrupt:
                 raise KeyboardInterrupt()
             res[r['basefile']] = r['result']
@@ -1707,8 +1710,9 @@ def _run_class_with_basefile(clbl, basefile, version, kwargs, command,
             raise
         errmsg = str(e)
         loc = util.location_exception(e)
+        label = basefile + ("@%s" % version if version else "")
         getlog().error("%s %s %s failed: %s (%s)" %
-                       (alias, command, basefile, errmsg, loc))
+                       (alias, command, label, errmsg, loc))
         exc_type, exc_value, tb = sys.exc_info()
         return exc_type, exc_value, traceback.extract_tb(tb)
     except KeyboardInterrupt as e:   # KeyboardInterrupt is not an Exception
