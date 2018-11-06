@@ -131,6 +131,13 @@ div.orderedparagraph p {
 div.orderedparagraph {
     clear: both;
 }
+
+div.betankande, div.skiljaktig, div.tillagg {
+  font-size: smaller;
+  font-color: #333;
+  margin-left: 10pt;
+}
+
 @media only screen and (min-width: 768px) {
     body.frontpage td {
         display:table-cell;

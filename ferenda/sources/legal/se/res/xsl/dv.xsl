@@ -190,22 +190,22 @@
   </xsl:template>
 
   <xsl:template match="xhtml:div[@class='skiljaktig']">
-    <div>
-      <h3>Skiljaktig</h3>
+    <h3>Skiljaktig</h3>
+    <div class="skiljaktig">
       <xsl:apply-templates/>
     </div>
   </xsl:template>
 
   <xsl:template match="xhtml:div[@class='betankande']">
-    <div>
-      <h3>Betänkande</h3>
+    <h3>Betänkande</h3>
+    <div class="betankande">
       <xsl:apply-templates/>
     </div>
   </xsl:template>
 
   <xsl:template match="xhtml:div[@class='tillagg']">
-    <div>
-      <h3>Tillägg</h3>
+    <h3>Tillägg</h3>
+    <div class="tillagg">
       <xsl:apply-templates/>
     </div>
   </xsl:template>
