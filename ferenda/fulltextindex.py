@@ -948,13 +948,27 @@ class ElasticSearchIndex(RemoteIndex):
         # if q:
         #    payload['highlight']['highlight_query'] = {'match': {'_all': q}}
 
+        # FIXME: This below adjustments should not be done in a
+        # general-purpose implementation!
+        #
         # for autocomplete queries when not using any "natural
         # language" queries (ie. only query based on a identifer like
         # "TF 2:" -- in these cases we'd like to use natural order of
         # the results if available
-        if ac_query and q is None:
+        #
+        # maybe do that for all searches (so that full documents
+        # appear before fragments of documents)?
+        if ac_query and q is None and 'uri' in kwargs:
             payload['sort'] = [{"order": "asc"},
                                "_score"]
+        elif q is None:
+            # if we don't have an autocomplete query of this kind,
+            # exclude fragments (here identified by having a non-zero
+            # order)
+            match['bool']['must_not'].append({"range": {"order": {"gt": 0}}})
+            # match['bool']['must_not'].append({"term": {"role": "expired"}})
+            pass
+            
         
         return relurl, json.dumps(payload, indent=4, default=util.json_default_date)
 

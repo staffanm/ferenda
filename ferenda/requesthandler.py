@@ -141,7 +141,7 @@ class RequestHandler(object):
                     leaf = uri.split("/")[-1]
                 if "." in leaf:
                     suffix = leaf.rsplit(".", 1)[1]
-        environ = {}
+        environ = {'PATH_INFO': urlparse(uri).path}
         if not suffix:
             environ['HTTP_ACCEPT'] = "text/html"
         contenttype = self.contenttype(environ, uri, basefile, params, suffix)

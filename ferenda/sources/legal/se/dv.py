@@ -194,7 +194,7 @@ class DV(SwedishLegalSource):
 
     # we override make_document to avoid having it calling
     # canonical_uri prematurely
-    def make_document(self, basefile=None):
+    def make_document(self, basefile=None, version=None):
         doc = Document()
         doc.basefile = basefile
         doc.meta = self.make_graph()
@@ -287,7 +287,6 @@ class DV(SwedishLegalSource):
         # AttributeError. Should it return None instead?
         if self.config.refresh or 'lastdownload' not in self.config:
             recurse = True
-
         self.downloadcount = 0  # number of files extracted from zip files
         # (not number of zip files)
         try:
@@ -637,7 +636,7 @@ class DV(SwedishLegalSource):
     def adjust_basefile(self, doc, orig_uri):
         pass # See comments in swedishlegalsource.py 
 
-    def parse_open(self, basefile, attachment=None):
+    def parse_open(self, basefile, attachment=None, version=None):
         intermediate_path = self.store.intermediate_path(basefile)
         if not os.path.exists(intermediate_path):
             fp = self.downloaded_to_intermediate(basefile)
@@ -2759,10 +2758,17 @@ class DV(SwedishLegalSource):
     _relate_fulltext_value_cache = {}
     def _relate_fulltext_value(self, facet, resource, desc):
         def rootlabel(desc):
-            return desc.getvalue(DCTERMS.identifier)
-        if facet.dimension_label in ("label", "creator", "issued"):
+            about = desc._subjects[-1]
+            try:
+                if "#" in about:
+                    desc.about(URIRef(str(about).split("#", 1)[0]))
+                return desc.getvalue(DCTERMS.identifier)
+            finally:
+                desc.about(about)
+
+        if facet.dimension_label in ("label", "comment", "creator", "issued"):
             # "creator" and "issued" should be identical for the root
-            # resource and all contained subresources. "label" can
+            # resource and all contained subresources. "label" and "comment" can
             # change slighly.
             resourceuri = resource.get("about")
             rooturi = resourceuri.split("#")[0]
@@ -2772,18 +2778,26 @@ class DV(SwedishLegalSource):
                 self._relate_fulltext_value_cache[rooturi] = {
                     "creator": desc.getrel(DCTERMS.publisher),
                     "issued": desc.getvalue(RPUBL.avgorandedatum),
-                    "label": l
+                    "label": l,
+                    "comment": l,
                 }
                 desc.about(resourceuri)
             v = self._relate_fulltext_value_cache[rooturi][facet.dimension_label]
             
-            if facet.dimension_label == "label" and "#" in resourceuri:
-                if desc.getvalues(DCTERMS.creator):
-                    court = desc.getvalue(DCTERMS.creator)
+            if "#" in resourceuri and facet.dimension_label in ("label", "comment"):
+                if "/P" not in resourceuri.split("#",1)[1]:
+                    if desc.getvalues(DCTERMS.creator):
+                        court = desc.getvalue(DCTERMS.creator)
+                    else:
+                        court = resource.get("about").split("#")[1]
+                    self._relate_fulltext_value_cache[resourceuri] = {
+                        "label": court,
+                        "comment": "%s: %s" % (v, court)
+                        }
+                    v = self._relate_fulltext_value_cache[resourceuri].get(facet.dimension_label, None)
                 else:
-                    court = resource.get("about").split("#")[1]
-                # v = "%s (%s)" % (v, court)
-                v = court
+                    decisionuri, part = resourceuri.split("/P", 1)
+                    v = "%s, punkt %s" % (self._relate_fulltext_value_cache[decisionuri][facet.dimension_label], part)
             return facet.dimension_label, v
         else:
             return super(DV, self)._relate_fulltext_value(facet, resource, desc)

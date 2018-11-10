@@ -187,18 +187,26 @@ class FixedLayoutSource(SwedishLegalSource):
     def _relate_fulltext_resources(self, body):
         res = super(FixedLayoutSource, self)._relate_fulltext_resources(body)
         # also: add every page (the pagebreak element)
-        for r in body.findall(".//*[@class='sidbrytning']"):
+#        for r in body.findall(".//*[@class='sidbrytning']"):
             # each entry in the resource list may be a (resource,
             # extrametadata) tuple. The extrametadata is assumed to be
             # appended to by the caller as dictated by facets, then
             # passed as kwargs to FulltextIndex.update.
-            res.append((r, {"role": "autocomplete"}))
+#            res.append((r, {"role": "autocomplete"}))
         return res
+
+    def _relate_fulltext_value_comment(self, resourceuri, rooturi, desc):
+        if "#sid" not in resourceuri:
+            return super(FixedLayoutSource, self)._relate_fulltext_value_comment(resourceuri, rooturi, desc)
+        else:
+            pageno = resourceuri.split("#sid")[1]
+            return "%s s. %s" % (desc.graph.value(URIRef(rooturi), DCTERMS.identifier),
+                                 pageno)
+
 
     def _relate_fulltext_value_label(self, resourceuri, rooturi, desc):
         if "#sid" not in resourceuri:
             return super(FixedLayoutSource, self)._relate_fulltext_value_label(resourceuri, rooturi, desc)
         else:
             pageno = resourceuri.split("#sid")[1]
-            return "%s s. %s" % (desc.graph.value(URIRef(rooturi), DCTERMS.identifier),
-                                 pageno)
+            return "s. %s" % pageno

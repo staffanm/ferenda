@@ -2092,22 +2092,30 @@ WHERE {
     def _relate_fulltext_resources(self, body):
         # only return K1, K1P1 or B1, not more fine-grained resources
         # like K1P1S1N1
-        
-        # FIXME: we should return the body (toplevel) resource with an
-        # extra default metadata dict {"role": "expired"} if the statute is expired.
-        return [(r, {'order': idx}) for idx, r in enumerate([body] + [r for r in body.findall(".//*[@about]") if re.search(r"#[KPBS]\d+\w?(P\d+\w?|)$", r.get("about"))])]
+
+        # But return only the body (toplevel) resource with an extra
+        # default metadata dict {"role": "expired"} if the statute is
+        # expired.
+        meta = body.getparent().xpath(".//xhtml:meta[@property='rpubl:upphavandedatum']", namespaces={'xhtml': "http://www.w3.org/1999/xhtml"})
+        if meta and meta[0].get("content") <= str(date.today()):
+            return [(body, {"role": "expired"}),]
+        else:
+            return [(r, {'order': idx}) for idx, r in enumerate([body] + [r for r in body.findall(".//*[@about]") if re.search(r"#[KPBS]\d+\w?(P\d+\w?|)$", r.get("about"))])]
     
     
     _relate_fulltext_value_cache = {}
     def _relate_fulltext_value(self, facet, resource, desc):
         def rootlabel(desc):
             return desc.getvalue(DCTERMS.identifier)
-        if facet.dimension_label in ("label", "creator", "issued"):
+        if facet.dimension_label in ("label", "comment", "creator", "issued"):
             # "creator" and "issued" should be identical for the root
             # resource and all contained subresources. "label" can
             # change slighly.
             resourceuri = resource.get("about")
             rooturi = resourceuri.split("#")[0]
+            #upphavandedatum = desc.graph.value(URIRef(rooturi), RPUBL.upphavandedatum)
+            #upphavd = bool(upphavandedatum and upphavandedatum.value < date.today())
+            
             if "#" not in resourceuri:
                 if desc.getvalues(RPUBL.utfardandedatum):
                     utfardandedatum = desc.getvalue(RPUBL.utfardandedatum)
@@ -2119,20 +2127,23 @@ WHERE {
                     "creator": desc.graph.value(desc._current(), RPUBL.departement),
                     "issued": utfardandedatum
                 }
-            if facet.dimension_label == "label":
+            if facet.dimension_label == "comment":
                 v = self.display_title(resourceuri)
-                root = desc.graph.value(predicate=RPUBL.konsoliderar, object=desc._current())
-                if root:
-                    # optionally add rdfs:label and dcterms:alternate
-                    alts = []
-                    for pred in RDFS.label, DCTERMS.alternate:
-                        val = desc.graph.value(root, pred)
-                        if val:
-                            alts.append(val)
-                    if alts:
-                        v += " (%s)" % ", ".join(alts)
+                # optionally add rdfs:label and dcterms:alternate
+                alts = []
+                for pred in RDFS.label, DCTERMS.alternate:
+                    val = desc.graph.value(URIRef(rooturi), pred)
+                    if val:
+                        alts.append(val)
+                if alts:
+                    v += " (%s)" % ", ".join(alts)
+            elif facet.dimension_label == "label":
+                form = "relative" if "#" in resourceuri else "absolute"
+                v = self.display_title(resourceuri, form=form)
             else:
                 v = self._relate_fulltext_value_cache[rooturi][facet.dimension_label]
+            #if facet.dimension_label in ("comment", "label") and upphavd:
+            #    v = "[Upphävd] " + v
             return facet.dimension_label, v
         else:
             return super(SFS, self)._relate_fulltext_value(facet, resource, desc)

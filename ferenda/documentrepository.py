@@ -2063,7 +2063,6 @@ parsed document path to that documents dependency file."""
                     repo = repo.decode()     # pragma: no cover
                 plaintext = util.normalize_space(self._extract_plaintext(resource, resources))
                 # print("%s -> %s" % (resource.get("about"), plaintext))
-                import pudb; pu.db
                 for facet in self.facets():
                     k, v = self._relate_fulltext_value(facet, resource, desc)
                     if v is not None:
@@ -2474,8 +2473,8 @@ WHERE {
         only run if ``config.staticsite``is ``True``.
 
         """
-        def getpath(url, repos, methodname="generated_path"):
-            if methodname == "generated_path" and url == self.config.url:
+        def getpath(url, repos):
+            if url == self.config.url:
                 return self.config.datadir + os.sep + "index.html"
             for (repoidx, repo) in enumerate(repos):
                 # FIXME: This works less than optimal when using
@@ -2490,7 +2489,19 @@ WHERE {
                 # CompositeRepository repos come before subrepos in
                 # the list.
                 if repo.requesthandler.supports_uri(url):
-                    return repo.requesthandler.path(url)
+                    if url.endswith(".png"):
+                        # FIXME: This is slightly hacky as it returns
+                        # the path to the generated HTML file, not the
+                        # image, but calling path() will either
+                        # return a filepath that doesn't exist yet
+                        # (the facsimile image won't have been
+                        # created) leading to a invalid-link class, or
+                        # it will create the facsimile image before
+                        # returning the path to it (which would be
+                        # very bad).
+                        return self.store.generated_path(self.basefile_from_uri(url))
+                    else:
+                        return repo.requesthandler.path(url)
         
         def simple_transform(url):
             if url.startswith(self.config.url):
@@ -2524,9 +2535,9 @@ WHERE {
             else:
                 return url
 
-        def base_transform(url, method="generated_path"):
+        def base_transform(url):
             if remove_missing:
-                path = getpath(url, repos, method)
+                path = getpath(url, repos)
                 # If the file being transformed contains references to
                 # itself, this will return False even when it
                 # shouldn't. As a workaround,

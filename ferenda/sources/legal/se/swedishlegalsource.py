@@ -1254,7 +1254,7 @@ class SwedishLegalSource(DocumentRepository):
                             toplevel_only=False,
                             dimension_label="comment",
                             dimension_type="value",
-                            multiple_value=Fale,
+                            multiple_values=False,
                             indexingtype=fulltextindex.Label(boost=16),
                             pagetitle='Alla %s(selected)s:ar'),
                       Facet(DCTERMS.creator,
@@ -1297,7 +1297,7 @@ class SwedishLegalSource(DocumentRepository):
                            title)
     
     def _relate_fulltext_value(self, facet, resource, desc):
-        if facet.dimension_label in ("label", "creator", "issued"):
+        if facet.dimension_label in ("label", "comment", "creator", "issued"):
             # "creator" and "issued" should be identical for the root
             # resource and all contained subresources. "label" can
             # change slighly.
@@ -1359,16 +1359,17 @@ class SwedishLegalSource(DocumentRepository):
             # we don't have any title/label for whatever
             # reason. Uniquify this by using the URI fragment
             v = "%s, %s" % (v, resourceuri.split("#", 1)[1])
+        return v
 
     def _relate_fulltext_value_comment(self, resourceuri, rooturi, desc):
         v = desc.graph.value(URIRef(rooturi), DCTERMS.identifier)
         if desc.getvalues(DCTERMS.title):
             if desc.getvalues(BIBO.chapter):
-                v = "%s, avsnitt %s '%s'" % (v,
+                v = "%s, avsnitt %s: %s" % (v,
                                              desc.getvalue(BIBO.chapter),
                                              desc.getvalue(DCTERMS.title))
             else:
-                 v = "%s, avsnitt '%s'" % (v, desc.getvalue(DCTERMS.title))
+                 v = "%s, avsnitt %s" % (v, desc.getvalue(DCTERMS.title))
         else:
             # we don't have any title for whatever
             # reason. Uniquify this rdfs:label by using the
