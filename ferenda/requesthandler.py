@@ -197,7 +197,7 @@ class RequestHandler(object):
             basefile = self.repo.basefile_from_uri(uri)
             if not basefile:
                 raise RequestHandlerError("%s couldn't resolve %s to a basefile" % (self.repo.alias, uri))
-            params = self.params_from_uri(uri)
+            params = self.params_from_uri(uri + ("?" + querystring if querystring else ""))
         if 'format' in params:
             suffix = params['format']
         else:
