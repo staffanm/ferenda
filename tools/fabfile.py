@@ -1,4 +1,4 @@
-<from fabric.api import env, run, local, cd, sudo, settings, hosts
+from fabric.api import env, run, local, cd, sudo, settings, hosts
 from fabric.contrib.project import rsync_project
 from datetime import datetime
 

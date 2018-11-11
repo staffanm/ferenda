@@ -273,9 +273,6 @@ class DV(SwedishLegalSource):
                         if ret is not None:
                             return ret
                         
-
-                    
-
     def download(self, basefile=None):
         if basefile is not None:
             raise ValueError("DV.download cannot process a basefile parameter")
