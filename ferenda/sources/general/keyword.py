@@ -273,7 +273,7 @@ class Keyword(DocumentRepository):
     # (e.g. return a RDF graph through one or a few SPARQL queries),
     # not a XML monstrosity
 
-    def prep_annotation_file(self, basefile):
+    def prep_annotation_file(self, basefile, version):
         uri = self.canonical_uri(basefile)
         keyword = basefile
         store = TripleStore.connect(self.config.storetype,

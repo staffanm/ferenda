@@ -1380,7 +1380,7 @@ class SwedishLegalSource(DocumentRepository):
 
     def generate(self, basefile, version=None, otherrepos=[]):
         ret = super(SwedishLegalSource, self).generate(basefile, version=version, otherrepos=otherrepos)
-        if self.get_parse_options(basefile) == "metadataonly":
+        if self.get_parse_options(basefile) == "metadataonly" and os.path.exists(self.store.generated_path(basefile)):
             # Do a little magic to ensure wsgiapp.py serves this file
             # with status code 404 instead of 200
             os.rename(self.store.generated_path(basefile),

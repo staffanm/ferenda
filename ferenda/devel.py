@@ -53,6 +53,8 @@ class DummyStore(object):
     def list_basefiles_for(self, action, basedir=None, force=True):
         return []  # pragma: no cover
 
+    def list_versions_for_basefiles(self, basefiles, action):
+        return [] # pragma: no cover
 
 class WSGIOutputHandler(logging.Handler):
     
@@ -1457,6 +1459,9 @@ class Devel(object):
         pass  # pragma: no cover
 
     def generate(self, basefile):
+        pass  # pragma: no cover
+
+    def transformlinks(self, basefile):
         pass  # pragma: no cover
 
     def toc(self, otherrepos):
