@@ -539,7 +539,7 @@ class TestAutocomplete(TestLagen):
         # the same order that they were indexed in, which might not
         # always be guaranteed.
         self.assertEqual(hits[0]['url'], self.baseurl + "1949:105#K2P1")
-        self.assertEqual(hits[0]['label'], "2 kap. 1 § Tryckfrihetsförordning (1949:105)")
+        self.assertEqual(hits[0]['comment'], "2 kap. 1 § Tryckfrihetsförordning (1949:105)")
         self.assertTrue(hits[0]['desc'].startswith("Till främjande av ett fritt meningsutbyte"))
 
     def test_incomplete_lawname(self):
