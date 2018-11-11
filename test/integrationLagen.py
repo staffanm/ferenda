@@ -511,25 +511,21 @@ class TestSearch(TestLagen):
 
 class TestAutocomplete(TestLagen):
     def test_basic_sfs(self):
-        res = self.get(self.baseurl + "api/?q=3+§+personuppgiftslag&_ac=true",
+        res = self.get(self.baseurl + "api/?q=3+§+förvaltningslag&_ac=true",
                        headers={'Accept': 'application/json'})
-        # returns eg [{'url': 'http://localhost:8000/1998:204#P3',
-        #              'label': '3 § personuppgiftslagen',
-        #              'desc': 'I denna lag används följande '
-        #                      'beteckningar med nedan angiven...'},
-        #             {'url': 'http://localhost:8000/dom/nja/2015s180',
-        #              'desc': 'NJA 2015 s. 180', # NB! Is :identifier not :title
-        #              'label': 'Lagring av personuppgifter '
-        #                       '(domstols dagboksblad) i dator har'
-        #                       ' ansetts inte omfattad av ...'}]
+        # returns eg [{'url': 'http://localhost:8000/2017:900#P3',
+        #              'label': '3 §',
+        #              'comment': '3 § förvaltningslagen',
+        #              'desc': 'U brottsbekämpande verksamhet hos...'}]
         self.assertEqual('application/json', res.headers['Content-Type'])
         hits = res.json()
-        self.assertEqual(hits[0]['url'], self.baseurl + "1998:204#P3")
+        self.assertEqual(hits[0]['url'], self.baseurl + "2017:900#P3")
         self.assertTrue(hits[0]['desc'].startswith("I denna lag"))
         self.assertGreaterEqual(len(hits), 1) # "3 §
-                                              # Personuppgiftslagen"
-                                              # only matches one thing
-                                              # ("personuppgiftslagen
+                                              # förvaltningslagen"
+                                              # should only match one
+                                              # thing
+                                              # ("förvaltningslagen
                                               # 3" matches several)
 
     def test_shortform_sfs(self):
