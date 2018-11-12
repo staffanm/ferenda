@@ -530,7 +530,10 @@ div.watermark p {
     font: bold 50pt arial, sans-serif;
     transform: rotate(-45deg);
 }
-
+div.watermark p del,
+div.watermark p ins {
+    display: none;
+}
 a.facsimile img { 
     display: none;
     border-left: 1px solid #ddd;
