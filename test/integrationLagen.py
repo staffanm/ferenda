@@ -1183,3 +1183,55 @@ class AcceptableStatus(TestLagen):
         
     
     
+class SFSHistory(TestLagen):
+
+    def test_expired(self):
+        # the resource should exist and be watermarked
+        res = self.get(self.baseurl + "1986:223")
+        res.raise_for_status()
+        soup = BeautifulSoup(res.text, "lxml")
+        watermark = soup.find("div", "watermark")
+        self.assertEqual("Upphävd författning", watermark.text.strip())
+
+    def test_available_versions(self):
+        # verify that we have 8 other versions of this to compare to
+        res = self.get(self.baseurl + "1986:223")
+        soup = BeautifulSoup(res.text, "lxml")
+        versions = soup.find("select").find_all("option")
+        self.assertGreaterEqual(len(versions), 8)
+
+    def test_specific_version(self):
+        res = self.get(self.baseurl + "1999:175/konsolidering/2003:610")
+        res.raise_for_status()
+        soup = BeautifulSoup(res.text, "lxml")
+        dl = soup.find("dl", id="refs-dokument")
+        self.assertIn("i lydelse enligt SFS 2003:610", dl.text)
+        watermark = soup.find("div", "watermark")
+        self.assertEqual("Inaktuell version", watermark.text.strip())
+
+    def test_expires(self):
+        res = self.get(self.baseurl + "2017:900")
+        res.raise_for_status()
+        soup = BeautifulSoup(res.text, "lxml")
+        dl = soup.find("dl", id="refs-dokument")
+        dd = dl.find("dt", text="Upphäver").find_next_sibling("dd")
+        self.assertEqual("Förvaltningslag (1986:223)", dd.text.strip())
+        self.assertTrue(dd.a.get("href").endswith("/1986:223"))
+        
+    def test_diff(self):
+        res = self.get(self.baseurl + "1999:175?diff=true&from=2003:610")
+        res.raise_for_status()
+        self.assertTrue(res.headers.get("X-WSGI-app"))
+        soup = BeautifulSoup(res.text, "lxml")
+        self.assertGreaterEqual(len(soup.find_all("ins")), 10)
+        self.assertGreaterEqual(len(soup.find_all("del")), 10)
+
+    def test_autocomplete_expired(self):
+        res = self.get(self.baseurl + "api/?q=personuppgiftslag&_ac=true",
+                       headers={'Accept': 'application/json'})
+        hits = res.json()
+        self.assertEqual(hits[0]['url'], self.baseurl + "1998:204")
+        self.assertEqual(hits[0]['role'], "expired")
+        
+        
+    
