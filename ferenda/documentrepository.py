@@ -2069,7 +2069,7 @@ parsed document path to that documents dependency file."""
                         if k is None:
                             k = qname_graph.qname(facet.rdftype).replace(":", "_")
                         kwargs[k] = v
-                print("%s -> %s" % (about, kwargs))
+                # print("%s -> %s" % (about, kwargs))
                 indexer.update(uri=about,
                                repo=repo,
                                basefile=basefile,
@@ -2522,7 +2522,7 @@ WHERE {
             elif url.startswith("#"):
                 return url
             else:
-                path = getpath(url, repos, "generated_path")
+                path = getpath(url, repos)
             if path:
                 if os.path.exists(path) or not remove_missing:
                     relpath = os.path.relpath(path, basedir)

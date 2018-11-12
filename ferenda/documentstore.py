@@ -593,7 +593,7 @@ dependencies (in the form of source files for the action).
 
         if action:
             if action == "relate":
-                return None
+                raise StopIteration()
             assert action in (
                 'downloaded', 'parsed', 'generated'), "Action %s invalid" % action
             actions = (action,)
