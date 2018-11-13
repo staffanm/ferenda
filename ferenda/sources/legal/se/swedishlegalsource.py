@@ -1176,12 +1176,13 @@ class SwedishLegalSource(DocumentRepository):
             # generating URIs (through the self.minter property), we can
             # just share the initialized minter object.
             minter = self.minter
-            for repo in repos:
-                # NB: this doesn't check for the existance of a previous
-                # minter object, since I can't find a way to do that with
-                # a property using the @cached_property
-                # decorator. Hopefully not an issue.
-                repo.minter = minter
+            if repos:
+                for repo in repos:
+                    # NB: this doesn't check for the existance of a previous
+                    # minter object, since I can't find a way to do that with
+                    # a property using the @cached_property
+                    # decorator. Hopefully not an issue.
+                    repo.minter = minter
         # special hack to make sure eurlex URIs are transformed to a
         # proper Eurlex URI
         def wrap_transform(url):

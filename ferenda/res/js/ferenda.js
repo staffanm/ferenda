@@ -110,12 +110,12 @@ $(document).ready(function () {
     });
   $('.navbar-form .typeahead').typeahead(null, {
     name: 'suggestions',
-    display: 'label',
+    display: 'comment',
     source: suggestions,
     limit: 9,
     templates: {
       suggestion: function(ctx) {
-	return "<div class='tt-suggestion'><strong>" + ctx.label + "</strong><br/><small>" + ctx.desc + "</small></div>";
+	return "<div class='tt-suggestion'><strong>" + ctx.comment + "</strong><br/><small>" + ctx.desc + "</small></div>";
       }
     }
   });

@@ -955,6 +955,10 @@ class ElasticSearchIndex(RemoteIndex):
         if ac_query and q is None:
             payload['sort'] = [{"order": "asc"},
                                "_score"]
+            # temporary workaround -- the feature/sfs-history branch
+            # causes a lot of extra info in the index, inc expired
+            # versions, so we filter those
+            match['bool']['must_not'].append({"term": {"role": "expired"}})
         
         return relurl, json.dumps(payload, indent=4, default=util.json_default_date)
 
