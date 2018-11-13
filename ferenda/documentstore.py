@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from collections import namedtuple
 from tempfile import NamedTemporaryFile
 import json
+from json.decoder import JSONDecodeError
 import filecmp
 import operator
 import os
@@ -519,7 +520,12 @@ dependencies (in the form of source files for the action).
         durations = {}
         if os.path.exists(durations_path):
             with open(durations_path) as fp:
-                d = json.load(fp)
+                try:
+                    d = json.load(fp)
+                except JSONDecodeError as e:
+                    # just skip this, it's not essential (we should warn about the corrupt JSON file though)
+                    print("ERROR: %s is not a valid JSON file" % durations_path)
+                    d = {}
                 if action in d:
                     durations = d[action]
         yielded_paths = set()
