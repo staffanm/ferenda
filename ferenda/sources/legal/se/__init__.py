@@ -20,3 +20,4 @@ from .myndfskr import MyndFskrBase
 from .propositioner import Propositioner
 from .sfs import SFS
 from .sou import SOU
+from .kkv import KKV
