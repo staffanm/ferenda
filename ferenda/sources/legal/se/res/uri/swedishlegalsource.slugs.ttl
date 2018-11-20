@@ -326,3 +326,79 @@ rpubl:Skrivelse :abbrSlug "skr" .
 
 <http://rinfo.lagrummet.se/serie/utr/sou> :abbrSlug "sou" .
 
+<http://rinfo.lagrummet.se/org/laensraetten_i_blekinge_laen> :abbrSlug "lbl" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_dalarnas_laen> :abbrSlug "ldl" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_gotlands_laen> :abbrSlug "lgl" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_gaevleborgs_laen> :abbrSlug "lga" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_goeteborg> :abbrSlug "lgo" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_hallands_laen> :abbrSlug "lha" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_jaemtlands_laen> :abbrSlug "lja" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_joenköpings_laen> :abbrSlug "ljo" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_kalmars_laen> :abbrSlug "lka" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_kronobergs_laen> :abbrSlug "lkr" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_mariestad> :abbrSlug "lma" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_norrbottens_laen> :abbrSlug "lnl" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_skaane_laen> :abbrSlug "lsk" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_stockholms_laen> :abbrSlug "lsl" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_soedermanlands_laen> :abbrSlug "lsl" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_uppsala_laen> :abbrSlug "lul" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_vaenersborg> :abbrSlug "lva" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_vaermlands_laen> :abbrSlug "lvl" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_vaesterbottens_laen> :abbrSlug "lvb" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_vaesternorrlands_laen> :abbrSlug "lvn" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_vaestmanlands_laen> :abbrSlug "lvm" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_vaestra_goetaland> :abbrSlug "lvg" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_oerebro_laen> :abbrSlug "lor" .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_oestergoetlands_laen> :abbrSlug "los" .
+
+<http://rinfo.lagrummet.se/org/eu-domstolen> :abbrSlug "eud" .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_falun> :abbrSlug "ffa" .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_goeteborg> :abbrSlug "fgo" .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_haernoesand> :abbrSlug "fha" .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_joenkoeping> :abbrSlug "fjo" .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_karlstad> :abbrSlug "fka" .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_linkoeping> :abbrSlug "fli" .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_luleaa> :abbrSlug "flu" .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_malmoe> :abbrSlug "fma" .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_stockholm> :abbrSlug "fst" .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_umeå> :abbrSlug "fum" .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_uppsala> :abbrSlug "fup" .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_vaexjoe> :abbrSlug "fva" .
+
+<http://rinfo.lagrummet.se/org/stockholms_tingsraett> :abbrSlug "tst" .
+

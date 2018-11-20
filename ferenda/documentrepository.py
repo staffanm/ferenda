@@ -264,6 +264,7 @@ class DocumentRepository(object):
 
     download_accept_406 = False
     # same
+    download_accept_400 = False
     
     download_reverseorder = False
     """It ``True`` (default: ``False``), download_get_basefiles will
@@ -812,6 +813,10 @@ with the *config* object as single parameter.
                         # this (if a doc is not available in our
                         # wanted language, I think?) and we'd like to
                         # distinguish this from a 404 error
+                        self.log.error("%s: %s %s" % (basefile, link, e))
+                        ret = False
+                    elif self.download_accept_400 and e.response.status_code == 400:
+                        # KKV does this for some (malformed) URLs like http://www.konkurrensverket.se/beslut/1_20160922110607_Nordic%20Camping%20&%20Resort%20AB.pdf
                         self.log.error("%s: %s %s" % (basefile, link, e))
                         ret = False
                     else:

@@ -8,7 +8,7 @@ import re
 import lxml.html
 from bs4 import BeautifulSoup
 
-from ferenda import util
+from ferenda import util, errors
 from . import RPUBL
 from .fixedlayoutsource import FixedLayoutSource, FixedLayoutStore
 
@@ -25,8 +25,10 @@ som samlar, strukturerar och tillgängliggör dem."""
     document_url_regex = ".*/arende.asp\?id=(?P<basefile>\d+)"
     source_encoding = "iso-8859-1"
     download_iterlinks = False
-
-
+    download_accept_404 = True
+    download_accept_400 = True
+    rdf_type = RPUBL.VagledandeDomstolsavgorande  # FIXME: Not all are Vägledande...
+    identifiers = {}
     def canonical_uri(self, basefile):
         # FIXME: temporary stopgap measure
         return "http://example.org/docs/%s" % basefile
@@ -36,8 +38,8 @@ som samlar, strukturerar och tillgängliggör dem."""
         tree = lxml.html.document_fromstring(resp.text)
         tree.make_links_absolute(self.start_url, resolve_base_href=True)
         form = tree.forms[1]
-        #form.fields['beslutsdatumfrom'] = '2000-01-01'
-        form.fields['beslutsdatumfrom'] = '2018-09-01'
+        form.fields['beslutsdatumfrom'] = '2000-01-01'
+        # form.fields['beslutsdatumfrom'] = '2018-09-01'
         action = form.action
         parameters = form.form_values()
         # self.log.debug("First Params (%s): %s" % (action, dict(parameters)))
@@ -49,7 +51,10 @@ som samlar, strukturerar och tillgängliggör dem."""
         headnote = self.store.downloaded_path(basefile, attachment="headnote.html")
         self.download_if_needed(url, basefile, filename=headnote)
         soup = BeautifulSoup(util.readfile(headnote, encoding=self.source_encoding), "lxml")
-        url = soup.find("a", text=re.compile("\w*Beslut\w*")).get("href")
+        beslut = soup.find("a", text=re.compile("\w*Beslut\w*"))
+        if not beslut:
+            raise errors.DownloadFileNotFoundError("%s contains no PDF link" % url)
+        url = beslut.get("href")
         assert url
         return super(KKV, self).download_single(basefile, url)
 
@@ -83,3 +88,36 @@ som samlar, strukturerar och tillgängliggör dem."""
                     res = self.session.post(action, data=dict(parameters))
                     source = res.text
                     break
+
+    def extract_head(self, fp, basefile):
+        data = util.readfile(self.store.downloaded_path(basefile, attachment="headnote.html"), encoding=self.source_encoding)
+        return BeautifulSoup(data, "lxml")
+
+    def infer_identifier(self, basefile):
+        return self.identifiers[basefile]
+
+    lblmap = {"Domstol:": "dcterms:publisher", # really :creator (KKV is the :publisher) but swedishlegalsource.space.ttl isn't written like that...
+              "Målnummer:": "rpubl:malnummer",
+              "Ärendemening:": "dcterms:title",
+              "Beslutsdatum:": "rpubl:avgorandedatum",
+              "Leverantör/Sökande:": "rinfoex:leverantor",
+              "UM/UE:": "rinfoex:upphandlande",
+              "Ärendetyp:": "rinfoex:arendetyp",
+              "Avgörande:": "rinfoex:avgorande",
+              "Kortreferat:": "dcterms:abstract"}
+    def extract_metadata(self, rawhead, basefile):
+        d = self.metadata_from_basefile(basefile)
+        for row in rawhead.find("table", "tabellram").find_all("tr"):
+            cells = row.find_all("td")
+            if len(cells) < 2:
+                continue
+            lbl = cells[0].text.strip()
+            value = cells[1].text.strip()
+            if value and lbl and self.lblmap.get(lbl):
+                assert lbl.endswith(":"), "invalid label %s" % lbl
+                d[self.lblmap[lbl]] = value
+        d["dcterms:issued"] = d["rpubl:avgorandedatum"]
+        self.identifiers[basefile] = "%ss dom den %s i mål %s" % (d["dcterms:publisher"],
+                                                                  d["rpubl:avgorandedatum"],
+                                                                  d["rpubl:malnummer"])
+        return d
