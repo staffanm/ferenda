@@ -328,7 +328,7 @@ class SwedishLegalSource(DocumentRepository):
         else:
             return str(val)
 
-    def attributes_to_resource(self, attributes, infer_nodes=True):
+    def attributes_to_resource(self, attributes, infer_nodes=True, basefile=None):
         """Given a dict of metadata attributes for a document or
         fragment, create a RDF resource for that same thing. The RDF
         graph may contain multiple nodes if the thing is a document
@@ -429,13 +429,16 @@ class SwedishLegalSource(DocumentRepository):
 
     def canonical_uri(self, basefile):
         attrib = self.metadata_from_basefile(basefile)
-        resource = self.attributes_to_resource(attrib)
-        uri = self.minter.space.coin_uri(resource)
+        resource = self.attributes_to_resource(attrib, basefile)
+        uri = self.coin_uri(resource, basefile)
         # make sure basefiles are roundtrippable
         computed_basefile = self.basefile_from_uri(uri)
         assert basefile == computed_basefile, "%s -> %s -> %s" % (basefile, uri, computed_basefile)
         # end temporary code
         return uri
+
+    def coin_uri(self, resource, basefile):
+        return self.minter.space.coin_uri(resource)
 
     def metadata_from_basefile(self, basefile):
         """Create a metadata dict with whatever we can infer from a document
@@ -551,8 +554,8 @@ class SwedishLegalSource(DocumentRepository):
                 [metadata_from_basefile(basefile) -> dict]
             sanitize_metadata(dict, basefile) -> dict
                 sanitize_identifier(str) -> str
-            polish_metadata(dict) -> rdflib.Resource
-                attributes_to_resource(dict) -> rdflib.Resource
+            polish_metadata(dict, basefile) -> rdflib.Resource
+                attributes_to_resource(dict, basefile) -> rdflib.Resource
             infer_metadata(rdflib.Resource, basefile) -> rdflib.Resource
                 infer_identifier(basefile) -> str
         parse_body(file, basefile) -> elements.Body
@@ -742,7 +745,7 @@ class SwedishLegalSource(DocumentRepository):
             # used to signify description of a patch?
             attribs['rinfoex:patchdescription'] = fp.patchdescription
         sane_attribs = self.sanitize_metadata(attribs, basefile)
-        resource = self.polish_metadata(sane_attribs)
+        resource = self.polish_metadata(sane_attribs, basefile)
         self.infer_metadata(resource, basefile)
         return resource
 
@@ -781,7 +784,7 @@ class SwedishLegalSource(DocumentRepository):
         # docrepos with unclean data might override this
         return identifier
 
-    def polish_metadata(self, attribs, infer_nodes=True):
+    def polish_metadata(self, attribs, basefile, infer_nodes=True):
         """Given a sanitized flat dict of metadata for a document, return a
         rdflib.Resource version of the same. 
 
@@ -851,8 +854,8 @@ class SwedishLegalSource(DocumentRepository):
                 assert len(result) == 1, "attribs[%s] returned %s results" % (k, len(result))
                 attribs[k] = result[0]
 
-        resource = self.attributes_to_resource(attribs, infer_nodes=infer_nodes)
-        uri = URIRef(self.minter.space.coin_uri(resource))
+        resource = self.attributes_to_resource(attribs, infer_nodes=infer_nodes, basefile=basefile)
+        uri = URIRef(self.coin_uri(resource, basefile))
         # now that we know the document URI (didn't we already know it
         # from canonical_uri?), we should somehow replace
         # resource.identifier (a BNODE) with uri (a URIRef) in the

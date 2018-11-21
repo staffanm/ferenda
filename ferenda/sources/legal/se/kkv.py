@@ -4,11 +4,14 @@ from __future__ import (absolute_import, division,
 from builtins import *
 
 import re
+import os
 
 import lxml.html
 from bs4 import BeautifulSoup
 
 from ferenda import util, errors
+from ferenda import PDFReader
+from ferenda.elements import Body
 from . import RPUBL
 from .fixedlayoutsource import FixedLayoutSource, FixedLayoutStore
 
@@ -28,11 +31,20 @@ som samlar, strukturerar och tillgängliggör dem."""
     download_accept_404 = True
     download_accept_400 = True
     rdf_type = RPUBL.VagledandeDomstolsavgorande  # FIXME: Not all are Vägledande...
+    xslt_template = "xsl/myndfskr.xsl"
     identifiers = {}
+
+    # For now we use a simpler basefile-to-uri mapping through these
+    # implementations of canonical_uri and coin_uri
     def canonical_uri(self, basefile):
-        # FIXME: temporary stopgap measure
-        return "http://example.org/docs/%s" % basefile
+        return "%s%s/%s" % (self.config.url, self.alias, basefile)
+
+    def coin_uri(self, resource, basefile):
+        return self.canonical_uri(basefile)
     
+    def basefile_from_uri(self, uri):
+        return uri.split("/")[-1].split("?")[0]
+
     def download_get_first_page(self):
         resp = self.session.get(self.start_url)
         tree = lxml.html.document_fromstring(resp.text)
@@ -121,3 +133,7 @@ som samlar, strukturerar och tillgängliggör dem."""
                                                                   d["rpubl:avgorandedatum"],
                                                                   d["rpubl:malnummer"])
         return d
+
+    def postprocess_doc(self, doc):
+        if not isinstance(doc.body, Body):
+            doc.body = Body(doc.body)

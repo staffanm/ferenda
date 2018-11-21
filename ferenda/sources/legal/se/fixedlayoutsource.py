@@ -14,9 +14,10 @@ from lxml import etree
 
 from . import SwedishLegalStore, SwedishLegalSource, SwedishLegalHandler
 from ferenda import util
-from ferenda import CompositeRepository
+from ferenda import CompositeRepository, PDFReader
 from ferenda.errors import DocumentRemovedError, RequestHandlerError, PDFFileIsEmpty
 from ferenda.pdfreader import StreamingPDFReader
+from ferenda.elements import Body
 
 
 class FixedLayoutHandler(SwedishLegalHandler):
@@ -202,3 +203,43 @@ class FixedLayoutSource(SwedishLegalSource):
             pageno = resourceuri.split("#sid")[1]
             return "%s s. %s" % (desc.graph.value(URIRef(rooturi), DCTERMS.identifier),
                                  pageno)
+
+    # FIXME: THis is copied verbatim from PDFDocumentRepository --
+    def create_external_resources(self, doc):
+        resources = []
+
+        if isinstance(doc.body, Body):
+            # document wasn't derived from a PDF file, probably from HTML instead
+            return resources
+        cssfile = self.store.parsed_path(doc.basefile, attachment="index.css")
+        urltransform = self.get_url_transform_func([self], os.path.dirname(cssfile),
+                                                   develurl=self.config.develurl)
+        resources.append(cssfile)
+        util.ensure_dir(cssfile)
+        with open(cssfile, "w") as fp:
+            # Create CSS header with fontspecs
+            assert isinstance(doc.body, PDFReader), "doc.body is %s, not PDFReader -- still need to access fontspecs etc" % type(doc.body)
+            for spec in list(doc.body.fontspec.values()):
+                fp.write(".fontspec%s {font: %spx %s; color: %s;}\n" %
+                         (spec['id'], spec['size'], spec['family'],
+                          spec.get('color', 'black')))
+
+            # 2 Copy all created png files to their correct locations
+            for cnt, page in enumerate(doc.body):
+                if page.background:
+                    src = self.store.intermediate_path(
+                        doc.basefile, attachment=os.path.basename(page.background))
+                    dest = self.store.parsed_path(
+                        doc.basefile, attachment=os.path.basename(page.background))
+                    resources.append(dest)
+                    if util.copy_if_different(src, dest):
+                        self.log.debug("Copied %s to %s" % (src, dest))
+                    desturi = "%s?dir=parsed&attachment=%s" % (doc.uri, os.path.basename(dest))
+                    desturi = urltransform(desturi)
+                    background = " background: url('%s') no-repeat grey;" % desturi
+                else:
+                    background = ""
+                fp.write("#page%03d {width: %spx; height: %spx;%s}\n" %
+                         (cnt+1, page.width, page.height, background))
+        return resources
+
