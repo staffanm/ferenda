@@ -737,7 +737,7 @@ class Devel(object):
 #        sub.debug('Sublog message at DEBUG level')
 
     @decorators.action
-    def csvinventory(self, alias):
+    def csvinventory(self, alias, predicates=None):
         """Create an inventory of documents, as a CSV file. 
 
         Only documents that have been parsed and yielded some minimum
@@ -747,14 +747,18 @@ class Devel(object):
         :type  alias: str
 
         """
-        predicates = ['basefile',
-                      'subobjects',  # sections that have rdf:type
-                      'rdf:type',
-                      'dcterms:identifier',
-                      'dcterms:title',
-                      'dcterms:published',
-                      'prov:wasGeneratedBy',
-                      ]
+        if predicates is None:
+            predicates = ['basefile',
+                          'subobjects',  # sections that have rdf:type
+                          'rdf:type',
+                          'dcterms:identifier',
+                          'dcterms:title',
+                          'dcterms:published',
+                          'prov:wasGeneratedBy',
+            ]
+        else:
+            # predicates are given as a comma separated list, eg ./ferenda-build.py devel csvinventory kkv rpubl:malnummer,rpubl:avgorandedatum,rinfoex:instanstyp,rinfoex:domstol,rinfoex:upphandlande,rinfoex:leverantor,rinfoex:arendetyp,rinfoex:avgorande
+            predicates = predicates.split(",")
         import csv
         # if six.PY2:
         #     delimiter = b';'
@@ -771,7 +775,9 @@ class Devel(object):
         for basefile in repo.store.list_basefiles_for("relate"):
             baseuri = URIRef(repo.canonical_uri(basefile))
             with repo.store.open_distilled(basefile) as fp:
-                row = {'basefile': basefile}
+                row = {}
+                if 'basefile' in predicates:
+                    row['basefile'] = basefile
                 g = Graph().parse(fp, format="xml")
                 for (p, o) in g.predicate_objects(baseuri):
                     qname = g.qname(p)
@@ -787,7 +793,8 @@ class Devel(object):
                             # if six.PY2:
                             #     fld = fld.encode("latin-1", errors="replace")
                             row[qname] = fld
-                row['subobjects'] = len(list(g.subject_objects(RDF.type)))
+                if 'subobjects' in predicates:
+                    row['subobjects'] = len(list(g.subject_objects(RDF.type)))
                 writer.writerow(row)
 
     def _repo_from_alias(self, alias, datadir=None, repoconfig=None):

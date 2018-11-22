@@ -120,7 +120,14 @@ som samlar, strukturerar och tillgängliggör dem."""
     def infer_identifier(self, basefile):
         return self.identifiers[basefile]
 
-    lblmap = {"Domstol:": "dcterms:publisher", # really :creator (KKV is the :publisher) but swedishlegalsource.space.ttl isn't written like that...
+    lblmap = {"Domstol:": "rinfoex:domstol",  # this ad-hoc predicate
+                                              # keeps
+                                              # attributes_to_resource
+                                              # from converting the
+                                              # string into a URI,
+                                              # which we'd like to
+                                              # avoid for now
+              "Instans:": "rinfoex:instanstyp",
               "Målnummer:": "rpubl:malnummer",
               "Ärendemening:": "dcterms:title",
               "Beslutsdatum:": "rpubl:avgorandedatum",
@@ -141,7 +148,7 @@ som samlar, strukturerar och tillgängliggör dem."""
                 assert lbl.endswith(":"), "invalid label %s" % lbl
                 d[self.lblmap[lbl]] = value
         d["dcterms:issued"] = d["rpubl:avgorandedatum"]
-        self.identifiers[basefile] = "%ss dom den %s i mål %s" % (d["dcterms:publisher"],
+        self.identifiers[basefile] = "%ss dom den %s i mål %s" % (d["rinfoex:domstol"],
                                                                   d["rpubl:avgorandedatum"],
                                                                   d["rpubl:malnummer"])
         return d
