@@ -112,7 +112,7 @@ class DevelHandler(RequestHandler):
                                   resourceloader=repo.resourceloader,
                                   config=conffile)
         urltransform = None
-        if repo.config.develurl:
+        if 'develurl' in repo.config and repo.config.develurl:
             urltransform = repo.get_url_transform_func(develurl=repo.config.develurl)
         depth = len(doc.uri.split("/")) - 3
         tree = transformer.transform(xhtml, depth,

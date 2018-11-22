@@ -556,6 +556,7 @@ class DocumentRepository(object):
             'downloadmax': nativeint,
             'conditionalget': True,
             'url': 'http://localhost:8000/',
+            'develurl': None,
             'fulltextindex': True,
             'useragent': 'ferenda-bot',
             'relate': True,
@@ -2471,6 +2472,11 @@ WHERE {
         def getpath(url, repos, methodname="generated_path"):
             if methodname == "generated_path" and url == self.config.url:
                 return self.config.datadir + os.sep + "index.html"
+            if "/" not in url:
+                # this is definitly not a HTTP(S) url, might be a
+                # mailto:? Anyway, we won't get a usable path from it
+                # so don't bother.
+                return None
             for (repoidx, repo) in enumerate(repos):
                 # FIXME: This works less than optimal when using
                 # CompositeRepository -- the problem is that a subrepo
