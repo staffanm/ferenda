@@ -13,9 +13,18 @@ from ferenda import util, errors
 from ferenda import PDFReader
 from ferenda.elements import Body
 from . import RPUBL
-from .fixedlayoutsource import FixedLayoutSource, FixedLayoutStore
+from .fixedlayoutsource import FixedLayoutSource, FixedLayoutStore, FixedLayoutHandler
 
-
+class KKVHandler(FixedLayoutHandler):
+    # this is a simplified version of MyndFskrHandler.get_pathfunc
+    def get_pathfunc(self, environ, basefile, params, contenttype, suffix):
+        if basefile and suffix == "png":
+            params["dir"] = "downloaded"
+            params["page"] = str(int(environ["PATH_INFO"].split("/sid")[1][:-4])-1)
+            params["format"] = suffix
+        return super(FixedLayoutHandler, self).get_pathfunc(environ, basefile, params,
+                                                         contenttype, suffix)
+            
 
 class KKV(FixedLayoutSource):
     """Hanterar konkurrensverkets databas över upphandlingsmål. Dokumenten
@@ -31,7 +40,9 @@ som samlar, strukturerar och tillgängliggör dem."""
     download_accept_404 = True
     download_accept_400 = True
     rdf_type = RPUBL.VagledandeDomstolsavgorande  # FIXME: Not all are Vägledande...
-    xslt_template = "xsl/myndfskr.xsl"
+    xslt_template = "xsl/myndfskr.xsl" # FIXME: don't we have a better template?
+    requesthandler_class = KKVHandler
+
     identifiers = {}
 
     # For now we use a simpler basefile-to-uri mapping through these
@@ -43,7 +54,8 @@ som samlar, strukturerar och tillgängliggör dem."""
         return self.canonical_uri(basefile)
     
     def basefile_from_uri(self, uri):
-        return uri.split("/")[-1].split("?")[0]
+        basefile_segment = -2 if re.search('/sid\d+.png$',uri) else -1
+        return uri.split("/")[basefile_segment].split("?")[0]
 
     def download_get_first_page(self):
         resp = self.session.get(self.start_url)
@@ -135,5 +147,7 @@ som samlar, strukturerar och tillgängliggör dem."""
         return d
 
     def postprocess_doc(self, doc):
-        if not isinstance(doc.body, Body):
-            doc.body = Body(doc.body)
+        super(KKV, self).postprocess_doc(doc)
+        if getattr(doc.body, 'tagname', None) != "body":
+            doc.body.tagname = "body"
+        doc.body.uri = doc.uri

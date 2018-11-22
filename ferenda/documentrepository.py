@@ -2470,6 +2470,8 @@ WHERE {
 
         """
         def getpath(url, repos, methodname="generated_path"):
+            if url.endswith("png"):
+                from pudb import set_trace; set_trace()
             if methodname == "generated_path" and url == self.config.url:
                 return self.config.datadir + os.sep + "index.html"
             if "/" not in url:
