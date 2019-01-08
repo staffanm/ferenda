@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 from ferenda import util, errors
 from ferenda import PDFReader
 from ferenda.elements import Body
-from . import RPUBL
+from . import RPUBL, RINFOEX
 from .fixedlayoutsource import FixedLayoutSource, FixedLayoutStore, FixedLayoutHandler
 
 class KKVHandler(FixedLayoutHandler):
@@ -43,8 +43,10 @@ som samlar, strukturerar och tillgängliggör dem."""
     xslt_template = "xsl/myndfskr.xsl" # FIXME: don't we have a better template?
     requesthandler_class = KKVHandler
 
-    identifiers = {}
+    _default_creator_predicate = RINFOEX.domstol
 
+    identifiers = {}
+    
     # For now we use a simpler basefile-to-uri mapping through these
     # implementations of canonical_uri and coin_uri
     def canonical_uri(self, basefile):
@@ -152,6 +154,111 @@ som samlar, strukturerar och tillgängliggör dem."""
                                                                   d["rpubl:avgorandedatum"],
                                                                   d["rpubl:malnummer"])
         return d
+
+    def get_parser(self, basefile, sanitized, initialstate=None, parseconfig="default"):
+        def kkv_parser(pdfreader):
+            def is_overklagandehanvisning(page):
+                # only look at the top 1/4 of the page
+                for textbox in page.boundingbox(0, 0, page.height/4, page.width):
+                    if str(textbox).strip() in ("HUR MAN ÖVERKLAGAR - PRÖVNINGSTILLSTÅND",
+                                                "Hur man överklagar FR-05"):
+                        return True
+                return False
+
+            def detect_ombud(sokande):
+                ombud = False
+                for line in sokande:
+                    if line.startswith("Ombud:"):
+                        ombud = True
+                    if ombud and ("firman " in line or "byrå " in line or  "AB" in line or "KB" in line or "HB" in line):
+                        return line
+
+            def detect_domare(trailing):
+                domare = False
+                # first strategy: Whatever line is followed by a known title
+                for line in reversed(trailing):
+                    if line.lower() in ("förvaltningsrättsfiskal", "rådman", "chefsrådman"):
+                        domare = True # next line will contain what we want
+                    elif domare:
+                        return line
+                # second strategy: Whatever line is followed by the föredragande
+                for line in reversed(trailing):
+                    if line.endswith("har föredragit målet."):
+                        domare = True # next line will contain what we want
+                    elif domare:
+                        return line
+
+            def detect_klagande_type(contact):
+                # returns "myndighet", "leverantör", or None
+                for line in contact:
+                    if line.endswith("kommun"):
+                        return "myndighet"
+                    elif line.endswith(" AB"):
+                        return "leverantör"
+                return None
+            
+                
+            def find_headsection(page, heading, startswith=False, bbheight=0.75):
+                result = []
+                started = False
+                for textbox in page.boundingbox(0, 0, page.height*bbheight, page.width):
+                    strtextbox = str(textbox).strip()
+                    # What to do in the case of OCR errors, eg
+                    # "SOKANDE ." instead of "SÖKANDE"?
+                    if strtextbox == heading or (startswith and strtextbox.startswith(heading)):
+                        started = True
+                    elif strtextbox.isupper() and len(strtextbox) > 4:
+                        if started:
+                            return result
+                    elif started:
+                        result.append(strtextbox)
+                if result:
+                    self.log.debug("Possible non-finished headsection %s: %s...%s" % (heading, result[0], result[-1]))
+                    return result
+
+            assert isinstance(pdfreader, PDFReader), "Unexpected: %s is not PDFReader" % type(pdfreader)
+            # start by remove overklagandehanvisning and all subsequent pages
+            for idx, page in enumerate(pdfreader):
+                if is_overklagandehanvisning(page):
+                    # sanity check: should be max three pages left
+                    assert(len(pdfreader) - idx <= 3), "Överklagandehänvisning probably incorrectly detected"
+                    self.log.info("%s: Page %s is överklagandehänvisning, skipping this and all following pages" % (basefile, idx+1))
+                    pdfreader[:] = pdfreader[:idx]
+                    break
+
+            # find crap
+            from pudb import set_trace; set_trace()
+            sokande = find_headsection(pdfreader[0], "SÖKANDE")
+            if sokande:
+                # print(",".join(sokande))
+                sokandeombud = detect_ombud(sokande)
+                if sokandeombud:
+                    self.log.info("Sökandeombud: " + sokandeombud)
+            else:
+                klagande = find_headsection(pdfreader[0], "KLAGANDE")
+                if klagande:
+                    sokandeombud = detect_ombud(klagande)
+                    if sokandeombud:
+                        self.log.info("Klagandeombud: " + sokandeombud)
+                    klagandetyp = detect_klagande_type(klagande)
+                    self.log.info("Klagande: %s" % klagandetyp)
+            motpart = find_headsection(pdfreader[0], "MOTPART")
+            if motpart:
+                # print(",".join(motpart))
+                motpartsombud = detect_ombud(motpart)
+                if motpartsombud:
+                    self.log.info("Motpartsombud: " + motpartsombud)
+                    
+
+            trailing = find_headsection(pdfreader[-1], "HUR MAN ÖVERKLAGAR", startswith=True, bbheight=1)
+            if trailing:
+                domare = detect_domare(trailing)
+                if not domare:
+                    self.log.warning("Can't detect domare in %s" % ", ".join(trailing))
+                self.log.info("Domare: %s" % domare)
+            return pdfreader
+        return kkv_parser
+
 
     def postprocess_doc(self, doc):
         super(KKV, self).postprocess_doc(doc)
