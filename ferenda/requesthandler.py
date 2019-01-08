@@ -266,7 +266,7 @@ class RequestHandler(object):
                     break
             else:
                 raise ValueError("No '%s' repo is a subrepo of %s" %
-                                 (param['repo'], self.repo.alias))
+                                 (params['repo'], self.repo.alias))
         else:
             repo = self.repo
 
