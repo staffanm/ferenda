@@ -35,6 +35,7 @@ som samlar, strukturerar och tillgängliggör dem."""
     storage_policy = "dir"
     start_url = "http://www.konkurrensverket.se/domar/DomarKKV/domar.asp"
     document_url_regex = ".*/arende.asp\?id=(?P<basefile>\d+)"
+    document_url_template = "http://www.konkurrensverket.se/domar/DomarKKV/arende.asp?id=%(basefile)s"
     source_encoding = "iso-8859-1"
     download_iterlinks = False
     download_accept_404 = True
@@ -73,8 +74,10 @@ som samlar, strukturerar och tillgängliggör dem."""
         return res
 
 
-    def download_single(self, basefile, url):
+    def download_single(self, basefile, url=None):
         headnote = self.store.downloaded_path(basefile, attachment="headnote.html")
+        if url is None:
+            url = self.remote_url(basefile)
         self.download_if_needed(url, basefile, filename=headnote)
         soup = BeautifulSoup(util.readfile(headnote, encoding=self.source_encoding), "lxml")
         beslut = soup.find("a", text=re.compile("\w*Beslut\w*"))
@@ -155,15 +158,29 @@ som samlar, strukturerar och tillgängliggör dem."""
                                                                   d["rpubl:malnummer"])
         return d
 
+    def polish_metadata(self, attribs, basefile, infer_nodes=True):
+        # expand :malnummer, :upphandlande, :leverantor into lists
+        # since these can be of the form "7040-17, 7048--7050-17" or
+        # "1. Uppsala kommun 2. UK Skolfastigheter AB 3. Uppsala
+        # kommuns Fastighetsbolag m.fl."
+        if "," in attribs["rpubl:malnummer"]:
+            attribs["rpubl:malnummer"] = re.split(", *", attribs["rpubl:malnummer"])
+        for k in "rinfoex:upphandlande", "rinfoex:leverantor":
+            if attribs[k].startswith("1."):
+                attribs[k] = [x.strip() for x in re.split("\d\. *", attribs[k]) if x]
+        return super(KKV, self).polish_metadata(attribs, basefile, infer_nodes)
+    
     def get_parser(self, basefile, sanitized, initialstate=None, parseconfig="default"):
         def kkv_parser(pdfreader):
             def is_overklagandehanvisning(page):
                 # only look at the top 1/4 of the page
                 for textbox in page.boundingbox(0, 0, page.height/4, page.width):
                     if str(textbox).strip() in ("HUR MAN ÖVERKLAGAR - PRÖVNINGSTILLSTÅND",
-                                                "Hur man överklagar FR-05"):
+                                                "Hur man överklagar FR-05",
+                                                "HUR MAN ÖVERKLAGAR"): # KamR
                         return True
                 return False
+
 
             def detect_ombud(sokande):
                 ombud = False
@@ -227,7 +244,6 @@ som samlar, strukturerar och tillgängliggör dem."""
                     break
 
             # find crap
-            from pudb import set_trace; set_trace()
             sokande = find_headsection(pdfreader[0], "SÖKANDE")
             if sokande:
                 # print(",".join(sokande))

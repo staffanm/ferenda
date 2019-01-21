@@ -1467,6 +1467,7 @@ class SwedishLegalSource(DocumentRepository):
         else:
             return util.gYear(year)
 
+
     def temp_sfs_uri(self, lawname):
         # Propositions and other preparatory works may suggest new
         # laws. At that point in time, no SFS number for the proposed
