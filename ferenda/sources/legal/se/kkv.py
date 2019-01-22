@@ -5,6 +5,8 @@ from builtins import *
 
 import re
 import os
+from io import BytesIO
+
 
 import lxml.html
 from bs4 import BeautifulSoup
@@ -82,7 +84,9 @@ som samlar, strukturerar och tillgängliggör dem."""
         soup = BeautifulSoup(util.readfile(headnote, encoding=self.source_encoding), "lxml")
         beslut = soup.find("a", text=re.compile("\w*Beslut\w*"))
         if not beslut:
-            raise errors.DownloadFileNotFoundError("%s contains no PDF link" % url)
+            self.log.warning("%s: %s contains no PDF link" % (basefile, url))
+            util.writefile(self.store.downloaded_path(basefile), "")
+            return True
         url = beslut.get("href")
         assert url
         return super(KKV, self).download_single(basefile, url)
@@ -117,6 +121,20 @@ som samlar, strukturerar och tillgängliggör dem."""
                     res = self.session.post(action, data=dict(parameters))
                     source = res.text
                     break
+
+    def downloaded_to_intermediate(self, basefile, attachment=None):
+        # the PDF file wasn't available. Let's try to just parse the metadata for now
+        if os.path.getsize(self.store.downloaded_path(basefile)) == 0:
+            fp = BytesIO(b"""<pdf2xml>
+            <page number="1" position="absolute" top="0" left="0" height="1029" width="701">
+	    <fontspec id="0" size="12" family="TimesNewRomanPSMT" color="#000000"/>
+            <text top="67" left="77" width="287" height="26" font="0">[Avg&#246;randetext saknas]</text>
+            </page>
+            </pdf2xml>""")
+            fp.name = "dummy.xml"
+            return fp
+        else:
+            return super(KKV, self).downloaded_to_intermediate(basefile, attachment)
 
     def extract_head(self, fp, basefile):
         data = util.readfile(self.store.downloaded_path(basefile, attachment="headnote.html"), encoding=self.source_encoding)
