@@ -43,13 +43,20 @@ som samlar, strukturerar och tillgängliggör dem."""
     download_accept_404 = True
     download_accept_400 = True
     rdf_type = RPUBL.VagledandeDomstolsavgorande  # FIXME: Not all are Vägledande...
-    xslt_template = "xsl/myndfskr.xsl" # FIXME: don't we have a better template?
+    xslt_template = "xsl/dom.xsl" # FIXME: don't we have a better template?
     requesthandler_class = KKVHandler
 
     _default_creator_predicate = RINFOEX.domstol
 
     identifiers = {}
     
+    @classmethod
+    def get_default_options(cls):
+        opts = super(KKV, cls).get_default_options()
+        opts['cssfiles'].append('css/pdfview.css')
+        opts['jsfiles'].append('js/pdfviewer.js')
+        return opts
+        
     # For now we use a simpler basefile-to-uri mapping through these
     # implementations of canonical_uri and coin_uri
     def canonical_uri(self, basefile):
@@ -299,3 +306,10 @@ som samlar, strukturerar och tillgängliggör dem."""
         if getattr(doc.body, 'tagname', None) != "body":
             doc.body.tagname = "body"
         doc.body.uri = doc.uri
+
+    def create_external_resources(self, doc):
+        # avoid flyspeck size fonts from the tesseracted material
+        for spec in doc.body.fontspec.values():
+            if spec['size'] < 11:
+                spec['size'] = 11
+        return super(KKV, self).create_external_resources(doc)

@@ -1720,7 +1720,7 @@ with the *config* object as single parameter.
         if config.fulltextindex:
             repos = kwargs.get("otherrepos", [])
             if kwargs.get("currentrepo"):
-                repos.append(kwargs["currentrepo"])
+                repos.insert(0, kwargs["currentrepo"])
             FulltextIndex.connect(config.indextype,
                                   config.indexlocation,
                                   repos=repos)

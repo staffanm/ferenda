@@ -1111,11 +1111,14 @@ class ElasticSearchIndex(RemoteIndex):
         for repo in repos:
             if not repo.config.relate:
                 continue
+            facets = repo.facets()
+            if not facets:
+                continue
             g = repo.make_graph()  # for qname lookup
             es_fields = {}
             schema = self.get_default_schema()
             childschema = self.get_default_schema()
-            for facet in repo.facets():
+            for facet in facets:
                 if facet.dimension_label:
                     fld = facet.dimension_label
                 else:
