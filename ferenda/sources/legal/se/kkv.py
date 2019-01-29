@@ -5,6 +5,7 @@ from builtins import *
 
 import re
 import os
+import filecmp
 from io import BytesIO
 
 
@@ -42,6 +43,7 @@ som samlar, strukturerar och tillgängliggör dem."""
     download_iterlinks = False
     download_accept_404 = True
     download_accept_400 = True
+    download_archive = False
     rdf_type = RPUBL.VagledandeDomstolsavgorande  # FIXME: Not all are Vägledande...
     xslt_template = "xsl/dom.xsl" # FIXME: don't we have a better template?
     requesthandler_class = KKVHandler
@@ -82,17 +84,22 @@ som samlar, strukturerar och tillgängliggör dem."""
         res = self.session.post(action, data=dict(parameters))
         return res
 
+    def download_is_different(self, existing, new):
+        return not filecmp.cmp(new, existing, shallow=False)
+
 
     def download_single(self, basefile, url=None):
         headnote = self.store.downloaded_path(basefile, attachment="headnote.html")
         if url is None:
             url = self.remote_url(basefile)
-        new = self.download_if_needed(url, basefile, filename=headnote)
+        new = self.download_if_needed(url, basefile, filename=headnote, archive=self.download_archive)
         soup = BeautifulSoup(util.readfile(headnote, encoding=self.source_encoding), "lxml")
         beslut = soup.find("a", text=re.compile("\w*Beslut\w*"))
         if not beslut:
             self.log.warning("%s: %s contains no PDF link" % (basefile, url))
-            util.writefile(self.store.downloaded_path(basefile), "")
+            outfile = self.store.downloaded_path(basefile)
+            util.writefile(outfile, "")
+            os.utime(outfile, (0,0)) # set the atime,mtime to start of epoch so that subsequent attempts to download doesn't return an unwarranted 304
             return True
         url = beslut.get("href")
         assert url
@@ -129,19 +136,19 @@ som samlar, strukturerar och tillgängliggör dem."""
                     source = res.text
                     break
 
-    def downloaded_to_intermediate(self, basefile, attachment=None):
-        # the PDF file wasn't available. Let's try to just parse the metadata for now
-        if os.path.getsize(self.store.downloaded_path(basefile)) == 0:
-            fp = BytesIO(b"""<pdf2xml>
-            <page number="1" position="absolute" top="0" left="0" height="1029" width="701">
-	    <fontspec id="0" size="12" family="TimesNewRomanPSMT" color="#000000"/>
-            <text top="67" left="77" width="287" height="26" font="0">[Avg&#246;randetext saknas]</text>
-            </page>
-            </pdf2xml>""")
-            fp.name = "dummy.xml"
-            return fp
-        else:
-            return super(KKV, self).downloaded_to_intermediate(basefile, attachment)
+#    def downloaded_to_intermediate(self, basefile, attachment=None):
+#        # the PDF file wasn't available. Let's try to just parse the metadata for now
+#        if os.path.getsize(self.store.downloaded_path(basefile)) == 0:
+#            fp = BytesIO(b"""<pdf2xml>
+#            <page number="1" position="absolute" top="0" left="0" height="1029" width="701">
+#	    <fontspec id="0" size="12" family="TimesNewRomanPSMT" color="#000000"/>
+#            <text top="67" left="77" width="287" height="26" font="0">[Avg&#246;randetext saknas]</text>
+#            </page>
+#            </pdf2xml>""")
+#            fp.name = "dummy.xml"
+#            return fp
+#        else:
+#            return super(KKV, self).downloaded_to_intermediate(basefile, attachment)
 
     def extract_head(self, fp, basefile):
         data = util.readfile(self.store.downloaded_path(basefile, attachment="headnote.html"), encoding=self.source_encoding)

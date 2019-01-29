@@ -7,6 +7,7 @@ from collections import OrderedDict
 import os
 import re
 import json
+from io import BytesIO
 
 from rdflib import URIRef
 from rdflib.namespace import DCTERMS
@@ -119,6 +120,7 @@ class FixedLayoutSource(SwedishLegalSource):
     def get_default_options(cls):
         opts = super(FixedLayoutSource, cls).get_default_options()
         opts['imgfiles'] = ['img/spinner.gif']
+        opts['ocr'] = True
         return opts
 
     def downloaded_to_intermediate(self, basefile, attachment=None):
@@ -138,14 +140,25 @@ class FixedLayoutSource(SwedishLegalSource):
                                   keep_xml=keep_xml,
                                   ocr_lang=ocr_lang)
         except PDFFileIsEmpty as e:
-            self.log.warning("%s: %s was empty, attempting OCR" % (basefile, downloaded_path))
-            ocr_lang = "swe" # reasonable guess
-            return reader.convert(filename=downloaded_path,
-                                  workdir=intermediate_dir,
-                                  images=self.config.pdfimages,
-                                  convert_to_pdf=convert_to_pdf,
-                                  keep_xml=keep_xml,
-                                  ocr_lang=ocr_lang)
+            if self.config.ocr:
+                self.log.warning("%s: %s was empty, attempting OCR" % (basefile, downloaded_path))
+                ocr_lang = "swe" # reasonable guess
+                return reader.convert(filename=downloaded_path,
+                                      workdir=intermediate_dir,
+                                      images=self.config.pdfimages,
+                                      convert_to_pdf=convert_to_pdf,
+                                      keep_xml=keep_xml,
+                                      ocr_lang=ocr_lang)
+            else:
+                self.log.warning("%s: %s was empty, returning placeholder" % (basefile, downloaded_path))
+                fp = BytesIO(b"""<pdf2xml>
+                <page number="1" position="absolute" top="0" left="0" height="1029" width="701">
+	        <fontspec id="0" size="12" family="TimesNewRomanPSMT" color="#000000"/>
+                <text top="67" left="77" width="287" height="26" font="0">[Avg&#246;randetext saknas]</text>
+                </page>
+                </pdf2xml>""")
+                fp.name = "dummy.xml"
+                return fp
             
     def extract_head(self, fp, basefile):
         # at this point, fp points to the PDF file itself, which is
