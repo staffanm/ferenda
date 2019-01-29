@@ -87,7 +87,7 @@ som samlar, strukturerar och tillgängliggör dem."""
         headnote = self.store.downloaded_path(basefile, attachment="headnote.html")
         if url is None:
             url = self.remote_url(basefile)
-        self.download_if_needed(url, basefile, filename=headnote)
+        new = self.download_if_needed(url, basefile, filename=headnote)
         soup = BeautifulSoup(util.readfile(headnote, encoding=self.source_encoding), "lxml")
         beslut = soup.find("a", text=re.compile("\w*Beslut\w*"))
         if not beslut:
@@ -197,15 +197,26 @@ som samlar, strukturerar och tillgängliggör dem."""
     
     def get_parser(self, basefile, sanitized, initialstate=None, parseconfig="default"):
         def kkv_parser(pdfreader):
+
             def is_overklagandehanvisning(page):
                 # only look at the top 1/4 of the page
+                pgnum = False
+                malnum = False
+                hanvisning = False
                 for textbox in page.boundingbox(0, 0, page.height/4, page.width):
-                    if str(textbox).strip() in ("HUR MAN ÖVERKLAGAR - PRÖVNINGSTILLSTÅND",
-                                                "Hur man överklagar FR-05",
-                                                "HUR MAN ÖVERKLAGAR"): # KamR
-                        return True
-                return False
-
+                    textbox = str(textbox).strip()
+                    if textbox in ("HUR MAN ÖVERKLAGAR - PRÖVNINGSTILLSTÅND",
+                                   "Hur man överklagar FR-05",
+                                   "HUR MAN ÖVERKLAGAR"): # KamR
+                        hanvisning = True
+                    # avoid false positives for the last page of the
+                    # real verdict by checking for indicators that
+                    # we're still within the real verdict
+                    if re.match("Sida \d+$", textbox):
+                        pgnum = True
+                    if re.match("\d+\d{2}$", textbox):
+                        malnum = True
+                return hanvisning and not (pgnum or malnum)
 
             def detect_ombud(sokande):
                 ombud = False
@@ -263,9 +274,16 @@ som samlar, strukturerar och tillgängliggör dem."""
             for idx, page in enumerate(pdfreader):
                 if is_overklagandehanvisning(page):
                     # sanity check: should be max three pages left
-                    assert(len(pdfreader) - idx <= 3), "Överklagandehänvisning probably incorrectly detected"
-                    self.log.info("%s: Page %s is överklagandehänvisning, skipping this and all following pages" % (basefile, idx+1))
-                    pdfreader[:] = pdfreader[:idx]
+                    if len(pdfreader) - idx <= 3:
+                        self.log.info("%s: Page %s is överklagandehänvisning, skipping this and all following pages" % (basefile, idx+1))
+                        pdfreader[:] = pdfreader[:idx]
+                    else:
+                        # more than three pages left -- probably an
+                        # appendix (like the lower level court
+                        # verdict) comes after. Let's just eliminate
+                        # this specific page
+                        self.log.info("%s: Page %s out of %s is överklagandehänvisning, skipping this page only" % (basefile, idx+1, len(pdfreader)))
+                        pdfreader[:] = pdfreader[:idx] + pdfreader[idx+1:]
                     break
 
             # find crap
