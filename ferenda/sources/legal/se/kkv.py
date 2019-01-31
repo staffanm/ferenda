@@ -7,15 +7,17 @@ import re
 import os
 import filecmp
 from io import BytesIO
-
+from urllib.parse import urlencode
 
 import lxml.html
 from bs4 import BeautifulSoup
+from rdflib import URIRef, Literal
 
 from ferenda import util, errors
 from ferenda import PDFReader
 from ferenda.elements import Body
 from . import RPUBL, RINFOEX
+from .elements import Meta
 from .fixedlayoutsource import FixedLayoutSource, FixedLayoutStore, FixedLayoutHandler
 
 class KKVHandler(FixedLayoutHandler):
@@ -188,6 +190,11 @@ som samlar, strukturerar och tillgängliggör dem."""
         self.identifiers[basefile] = "%ss dom den %s i mål %s" % (d["rinfoex:domstol"],
                                                                   d["rpubl:avgorandedatum"],
                                                                   d["rpubl:malnummer"])
+        beslut = rawhead.find("a", text=re.compile("\w*Beslut\w*"))
+        if beslut:
+            # assume that the href is a valid url
+            d["prov:wasDerivedFrom"] = URIRef(beslut.get("href").replace(" ", "%20"))
+            assert str(d["prov:wasDerivedFrom"]).startswith("http")
         return d
 
     def polish_metadata(self, attribs, basefile, infer_nodes=True):
@@ -277,7 +284,10 @@ som samlar, strukturerar och tillgängliggör dem."""
                     return result
 
             assert isinstance(pdfreader, PDFReader), "Unexpected: %s is not PDFReader" % type(pdfreader)
-            # start by remove overklagandehanvisning and all subsequent pages
+            # start by remove overklagandehanvisning and all
+            # subsequent pages FIXME: reading the raw page objects
+            # avoids calling the gluefunc (see PDFReader.textboxes())
+            # which we'd really like to do...
             for idx, page in enumerate(pdfreader):
                 if is_overklagandehanvisning(page):
                     # sanity check: should be max three pages left
@@ -300,21 +310,25 @@ som samlar, strukturerar och tillgängliggör dem."""
                 sokandeombud = detect_ombud(sokande)
                 if sokandeombud:
                     self.log.info("Sökandeombud: " + sokandeombud)
+                    pdfreader[0].insert(0, Meta([sokandeombud], predicate=RINFOEX.sokandeombud))
             else:
                 klagande = find_headsection(pdfreader[0], "KLAGANDE")
                 if klagande:
-                    sokandeombud = detect_ombud(klagande)
-                    if sokandeombud:
-                        self.log.info("Klagandeombud: " + sokandeombud)
+                    klagandeombud = detect_ombud(klagande)
+                    if klagandeombud:
+                        self.log.info("Klagandeombud: " + klagandeombud)
+                    pdfreader[0].insert(0, Meta([klagandeombud], predicate=RINFOEX.klagandeombud))
                     klagandetyp = detect_klagande_type(klagande)
-                    self.log.info("Klagande: %s" % klagandetyp)
+                    self.log.info("Klagandetyp: %s" % klagandetyp)
+                    pdfreader[0].insert(0, Meta([klagandetyp], predicate=RINFOEX.klagandetyp))
+
             motpart = find_headsection(pdfreader[0], "MOTPART")
             if motpart:
                 # print(",".join(motpart))
                 motpartsombud = detect_ombud(motpart)
                 if motpartsombud:
                     self.log.info("Motpartsombud: " + motpartsombud)
-                    
+                    pdfreader[0].insert(0, Meta([motpartsombud], predicate=RINFOEX.motpartsombud))
 
             trailing = find_headsection(pdfreader[-1], "HUR MAN ÖVERKLAGAR", startswith=True, bbheight=1)
             if trailing:
@@ -322,6 +336,8 @@ som samlar, strukturerar och tillgängliggör dem."""
                 if not domare:
                     self.log.warning("Can't detect domare in %s" % ", ".join(trailing))
                 self.log.info("Domare: %s" % domare)
+                pdfreader[0].insert(0, Meta([domare], predicate=RINFOEX.domare))
+                
             return pdfreader
         return kkv_parser
 
@@ -331,6 +347,12 @@ som samlar, strukturerar och tillgängliggör dem."""
         if getattr(doc.body, 'tagname', None) != "body":
             doc.body.tagname = "body"
         doc.body.uri = doc.uri
+        page = doc.body[0]
+        for node in page:
+            if isinstance(node, Meta):
+                doc.meta.add((URIRef(doc.uri), node.predicate, Literal(node[0])))
+                page.remove(node)
+        d = doc.meta.value(URIRef(doc.uri), RPUBL.avgorandedatum)
 
     def create_external_resources(self, doc):
         # avoid flyspeck size fonts from the tesseracted material
