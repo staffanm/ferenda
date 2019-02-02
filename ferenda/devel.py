@@ -782,7 +782,7 @@ class Devel(object):
                 for (p, o) in g.predicate_objects(baseuri):
                     qname = g.qname(p)
                     if qname in predicates:
-                        if isinstance(o, URIRef):
+                        if isinstance(o, URIRef) and qname not in ("prov:wasDerivedFrom",):
                             row[qname] = g.qname(o)
                         else:
                             # it seems py2 CSV modue expects latin-1
