@@ -212,6 +212,20 @@ som samlar, strukturerar och tillgängliggör dem."""
     def get_parser(self, basefile, sanitized, initialstate=None, parseconfig="default"):
         def kkv_parser(pdfreader):
 
+            def clean_name(name):
+                if name is None:
+                    return None
+                if "DV 3109" in name:
+                    self.log.warning("Can't clean name %s, mis-identified name" % name)
+                    return None
+                # remove leading and trailing non-alpha
+                m = re.match(r"^\W*(.*?)\W*$", name)
+                if m:
+                    return m.group(1)
+                else:
+                    self.log.warning("Can't clean name %s, doesn't look remotely like a name" % name)
+                    return None
+            
             def is_overklagandehanvisning(page):
                 # only look at the top 1/4 of the page
                 pgnum = False
@@ -244,13 +258,15 @@ som samlar, strukturerar och tillgängliggör dem."""
                 domare = False
                 # first strategy: Whatever line is followed by a known title
                 for line in reversed(trailing):
-                    if line.lower() in ("förvaltningsrättsfiskal", "rådman", "chefsrådman"):
+                    if line.startswith(("tf. ", "fd. ", "t.f. ", "f.d. ")):
+                        line = line.split(" ", 1)[1]
+                    if line.lower() in ("förvaltningsrättsfiskal", "kammarrättsråd", "lagman","rådman", "chefsrådman"):
                         domare = True # next line will contain what we want
                     elif domare:
                         return line
                 # second strategy: Whatever line is followed by the föredragande
                 for line in reversed(trailing):
-                    if line.endswith("har föredragit målet."):
+                    if line.endswith("har föredragit målet.") or line.startswith("Föredragande har varit "):
                         domare = True # next line will contain what we want
                     elif domare:
                         return line
@@ -307,17 +323,17 @@ som samlar, strukturerar och tillgängliggör dem."""
             sokande = find_headsection(pdfreader[0], "SÖKANDE")
             if sokande:
                 # print(",".join(sokande))
-                sokandeombud = detect_ombud(sokande)
+                sokandeombud = clean_name(detect_ombud(sokande))
                 if sokandeombud:
                     self.log.info("Sökandeombud: " + sokandeombud)
                     pdfreader[0].insert(0, Meta([sokandeombud], predicate=RINFOEX.sokandeombud))
             else:
                 klagande = find_headsection(pdfreader[0], "KLAGANDE")
                 if klagande:
-                    klagandeombud = detect_ombud(klagande)
+                    klagandeombud = clean_name(detect_ombud(klagande))
                     if klagandeombud:
                         self.log.info("Klagandeombud: " + klagandeombud)
-                    pdfreader[0].insert(0, Meta([klagandeombud], predicate=RINFOEX.klagandeombud))
+                        pdfreader[0].insert(0, Meta([klagandeombud], predicate=RINFOEX.klagandeombud))
                     klagandetyp = detect_klagande_type(klagande)
                     self.log.info("Klagandetyp: %s" % klagandetyp)
                     pdfreader[0].insert(0, Meta([klagandetyp], predicate=RINFOEX.klagandetyp))
@@ -325,18 +341,19 @@ som samlar, strukturerar och tillgängliggör dem."""
             motpart = find_headsection(pdfreader[0], "MOTPART")
             if motpart:
                 # print(",".join(motpart))
-                motpartsombud = detect_ombud(motpart)
+                motpartsombud = clean_name(detect_ombud(motpart))
                 if motpartsombud:
                     self.log.info("Motpartsombud: " + motpartsombud)
                     pdfreader[0].insert(0, Meta([motpartsombud], predicate=RINFOEX.motpartsombud))
 
             trailing = find_headsection(pdfreader[-1], "HUR MAN ÖVERKLAGAR", startswith=True, bbheight=1)
             if trailing:
-                domare = detect_domare(trailing)
+                domare = clean_name(detect_domare(trailing))
                 if not domare:
                     self.log.warning("Can't detect domare in %s" % ", ".join(trailing))
-                self.log.info("Domare: %s" % domare)
-                pdfreader[0].insert(0, Meta([domare], predicate=RINFOEX.domare))
+                else:
+                    self.log.info("Domare: %s" % domare)
+                    pdfreader[0].insert(0, Meta([domare], predicate=RINFOEX.domare))
                 
             return pdfreader
         return kkv_parser
