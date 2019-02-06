@@ -16,6 +16,7 @@ from rdflib import URIRef, Literal
 from ferenda import util, errors
 from ferenda import PDFReader
 from ferenda.elements import Body
+from ferenda.decorators import action
 from . import RPUBL, RINFOEX
 from .elements import Meta
 from .fixedlayoutsource import FixedLayoutSource, FixedLayoutStore, FixedLayoutHandler
@@ -327,6 +328,7 @@ som samlar, strukturerar och tillgängliggör dem."""
             # find crap
             sokande = find_headsection(pdfreader[0], "SÖKANDE")
             if sokande:
+                klagande = None
                 # print(",".join(sokande))
                 sokandeombud = clean_name(detect_ombud(sokande))
                 if sokandeombud:
@@ -341,7 +343,8 @@ som samlar, strukturerar och tillgängliggör dem."""
                         pdfreader[0].insert(0, Meta([klagandeombud], predicate=RINFOEX.klagandeombud))
                     klagandetyp = detect_klagande_type(klagande)
                     self.log.info("Klagandetyp: %s" % klagandetyp)
-                    pdfreader[0].insert(0, Meta([klagandetyp], predicate=RINFOEX.klagandetyp))
+                    if klagandetyp:
+                        pdfreader[0].insert(0, Meta([klagandetyp], predicate=RINFOEX.klagandetyp))
 
             motpart = find_headsection(pdfreader[0], "MOTPART")
             if motpart:
@@ -359,10 +362,28 @@ som samlar, strukturerar och tillgängliggör dem."""
                 else:
                     self.log.info("Domare: %s" % domare)
                     pdfreader[0].insert(0, Meta([domare], predicate=RINFOEX.domare))
-                
+
+            import json
+            tmp = json.dumps({"basefile": basefile, "trailing": trailing, "klagande": klagande, "sokande": sokande, "motpart": motpart}) + "\n"
+            with open("tmp.txt", "a") as fp:
+                fp.write(tmp)
             return pdfreader
         return kkv_parser
 
+
+    @action
+    def parsetest(self, testfile, outfile):
+        """Run only the extraction parts on a specially prepared textfile"""
+        import json
+        with open(testfile) as fp:
+            for line in fp:
+                data = json.loads(line)
+                domare = self.detect_domare(data['trailing'])
+                klagandeombud = self.detect_ombud(data['klagande'])
+                klagandetyp = self.detect_klagandetyp(data['klagande'])
+                sokandeombud = self.detect_ombud(data['sokande'])
+                motpartsombud = self.detect_ombud(data['motpart'])
+                
 
     def postprocess_doc(self, doc):
         super(KKV, self).postprocess_doc(doc)
