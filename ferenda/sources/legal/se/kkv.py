@@ -218,8 +218,8 @@ som samlar, strukturerar och tillgängliggör dem."""
                 if "DV 3109" in name:
                     self.log.warning("Can't clean name %s, mis-identified name" % name)
                     return None
-                # remove leading and trailing non-alpha
-                m = re.match(r"^\W*(.*?)\W*$", name)
+                # remove leading and trailing non-alpha until the first uppercase letter
+                m = re.match(r"^[^A-ZÅÄÖ]*([A-ZÅÄÖ].*?)[^a-zåäöA-ZÅÄÖ]*$", name)
                 if m:
                     return m.group(1)
                 else:
@@ -227,6 +227,11 @@ som samlar, strukturerar och tillgängliggör dem."""
                     return None
             
             def is_overklagandehanvisning(page):
+                # FIXME: we should look at the entirety of the text
+                # and compare its distance (edit distance, some sort
+                # of vector distance?) to a standard
+                # överklagandehänvisning appendix
+                
                 # only look at the top 1/4 of the page
                 pgnum = False
                 malnum = False
