@@ -3,15 +3,20 @@ from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 from builtins import *
 
-import re
-import os
-import filecmp
+from collections import Counter, defaultdict
 from io import BytesIO
 from urllib.parse import urlencode
+import ast
+import difflib
+import filecmp
+import math
+import os
+import re
 
 import lxml.html
 from bs4 import BeautifulSoup
 from rdflib import URIRef, Literal
+from cached_property import cached_property
 
 from ferenda import util, errors
 from ferenda import PDFReader
@@ -62,6 +67,45 @@ som samlar, strukturerar och tillgängliggör dem."""
         opts['jsfiles'].append('js/pdfviewer.js')
         return opts
         
+    def __init__(self, config=None, **kwargs):
+        super(KKV, self).__init__(config, **kwargs)
+        self.vectors = self.load_vectors()
+
+    @cached_property
+    def parse_options(self):
+        # we use a file with python literals rather than json because
+        # comments
+        if self.resourceloader.exists("options/%s.py"  % self.urispace_segment):
+            with self.resourceloader.open("options/%s.py" % self.urispace_segment) as fp:
+                return ast.literal_eval(fp.read())
+        else:
+            return {}
+
+    def get_parse_options(self, basefile):
+        return defaultdict(lambda: None, self.parse_options.get(basefile, {}))
+
+    re_words = re.compile(r'\w+')
+    def load_vectors(self):
+        # for resourcename in self.resourceloader.listresources("extra/*txt"):
+        res = {}
+        for resourcename in ("examples/fr-05.txt", "examples/formular-9.txt", "examples/dv-3109-1-b-lou.txt", "examples/formular-1.txt"):
+            with self.resourceloader.openfp(resourcename) as fp:
+                pages = fp.read().split("\x08")
+                for idx, page in enumerate(pages):
+                    res[(resourcename, idx)] = Counter(self.re_words.findall(page.lower()))
+        return res
+
+    def cos_distance(self, vector1, vector2):
+     intersection = set(vector1.keys()) & set(vector2.keys())
+     numerator = sum([vector1[x] * vector2[x] for x in intersection])
+     sum1 = sum([vector1[x]**2 for x in vector1.keys()])
+     sum2 = sum([vector2[x]**2 for x in vector2.keys()])
+     denominator = math.sqrt(sum1) * math.sqrt(sum2)
+     if not denominator:
+         return 0.0
+     else:
+         return float(numerator) / denominator
+
     # For now we use a simpler basefile-to-uri mapping through these
     # implementations of canonical_uri and coin_uri
     def canonical_uri(self, basefile):
@@ -196,6 +240,8 @@ som samlar, strukturerar och tillgängliggör dem."""
             # assume that the href is a valid url
             d["prov:wasDerivedFrom"] = URIRef(beslut.get("href").replace(" ", "%20"))
             assert str(d["prov:wasDerivedFrom"]).startswith("http")
+
+        self._remove_overklagandehanvisning = d["rinfoex:domstol"] != "Högsta förvaltningsdomstolen"
         return d
 
     def polish_metadata(self, attribs, basefile, infer_nodes=True):
@@ -210,155 +256,261 @@ som samlar, strukturerar och tillgängliggör dem."""
                 attribs[k] = [x.strip() for x in re.split("\d\. *", attribs[k]) if x]
         return super(KKV, self).polish_metadata(attribs, basefile, infer_nodes)
     
+
+    def clean_name(self, name, count=1):
+        if name is None:
+            return None
+        if count > 1:
+            # eg 'Magnus Schultzberg Patricia Schömer' =>
+            parts = name.split()
+            res = []
+            if len(parts) % 2 != 0:
+                self.log.warning("Can't split %s into equal firstname,lastname tuples" % name)
+                return None,
+            for idx, part in enumerate(parts):
+                if idx % 2 == 0:
+                    first = part
+                else:
+                    res.append(self.clean_name("%s %s" % (first, part)))
+            return res
+            
+        if "DV 3109" in name:
+            self.log.warning("Can't clean name %s, mis-identified name" % name)
+            return None
+        if name.startswith("holmgrenhansson"): #specialcase to handle the following regex check
+            name = "H" + name[1:]
+        newname = self.clean_line(name, "full")
+        if newname is None:
+            self.log.warning("Can't clean name %s, doesn't look remotely like a name" % name)
+        return newname
+
+    def clean_line(self, line, mode="light"):
+        if mode == "light":
+            # just remove all leanding and trailing non-alpha
+            regex = r"^\W*(.*?)\W*$"
+        else:
+            # remove leading and trailing non-alpha until the first uppercase letter
+            regex = r"^[^A-ZÅÄÖ]*([A-ZÅÄÖ].*?)[^a-zåäöA-ZÅÄÖ]*$"
+        m = re.match(regex, line)
+        if m:
+            return m.group(1)
+        else:
+            return None
+
+    def is_overklagandehanvisning(self, page, pageidx):
+        pagevector = Counter(self.re_words.findall(page.as_plaintext().lower()))
+        for vectorid in self.vectors:
+            if vectorid[1] != 0:  # for now, only consider the 1st page of all example vectors
+                continue
+            cosdist = self.cos_distance(pagevector, self.vectors[vectorid])
+            self.log.debug("is_overklagandehanvisning: page %s has %s similarity with %r" % (pageidx+1, cosdist, vectorid))
+            if cosdist > 0.9:
+                return True
+        
+    def is_overklagandehanvisning_old(self, page):
+        # FIXME: we should look at the entirety of the text
+        # and compare its distance (edit distance, some sort
+        # of vector distance?) to a standard
+        # överklagandehänvisning appendix
+
+        # only look at the top 1/4 of the page
+        pgnum = False
+        malnum = False
+        hanvisning = False
+        for textbox in page.boundingbox(0, 0, page.height/4, page.width):
+            textbox = str(textbox).strip()
+            if textbox in ("HUR MAN ÖVERKLAGAR - PRÖVNINGSTILLSTÅND",
+                           "Hur man överklagar FR-05",
+                           "HUR MAN ÖVERKLAGAR"): # KamR
+                hanvisning = True
+            # avoid false positives for the last page of the
+            # real verdict by checking for indicators that
+            # we're still within the real verdict
+            if re.match("Sida \d+$", textbox):
+                pgnum = True
+            if re.match("\d+\d{2}$", textbox):
+                malnum = True
+        return hanvisning and not (pgnum or malnum)
+
+    def detect_ombud(self, sokande):
+        ombud = False
+        for line in sokande:
+            if line.startswith("Ombud:"):
+                ombud = True
+            if ombud and ("firman " in line or "byrå " in line or  "AB" in line or "KB" in line or "HB" in line):
+                return self.normalize_ombud(self.clean_name(line))
+
+    def detect_domare(self, trailing):
+        titles = ("förvaltningsrättsfiskal", "kammarrättsråd", "lagman","rådman", "chefsrådman")
+        modifiers = ("tf. ", "fd. ", "t.f. ", "f.d. ", "tf ", "fd ")
+        domare = False
+        # first strategy: Whatever line is followed by a known title
+        for line in reversed(trailing):
+            line = self.clean_line(line)
+            if not line:
+                continue
+            if line.lower().startswith(modifiers):
+                line = line.split(" ", 1)[1]
+            parts = line.lower().split(" ") 
+            if all(part in titles for part in parts):
+                domare = len(parts) # a true value
+            elif domare:
+                # clean_name might return a string or a list. If the
+                # latter, just keep the first one for now
+                ret = self.clean_name(line, domare)
+                if isinstance(ret, list):
+                    return ret[0]
+                else:
+                    return ret
+        # second strategy: Whatever line is followed by the föredragande
+        for line in reversed(trailing):
+            line = self.clean_line(line)
+            if not line:
+                continue
+            if line.endswith("har föredragit målet") or line.startswith("Föredragande har varit "):
+                domare = True # next line will contain what we want
+            elif domare:
+                return self.clean_name(line)
+
+        # third strategy: If only referent is given, try to detect the
+        # non-titled name and assume that one. c.f 29529, eg
+        #
+        # Mikael Ocklind      Sonja Huldén
+        #                     referent
+        #
+        # => Mikael Ocklind
+        domare = False
+        for line in reversed(trailing):
+            line = self.clean_line(line)
+            if line.lower() in ("referent"):
+                # next one will contain names
+                domare = True
+            elif domare:
+                # should be at least two names
+                if len(line.split()) < 4:
+                    self.log.warning("%s doesn't contain two+ names" % line)
+                    return None
+                else:
+                    return self.clean_name(line, 2)[0]
+        
+        # fourth strategy: "Rådmannen Magnus Isgren har fattat beslutet. Föredragande jurist har varit"
+        for line in trailing:
+            m = re.match(r"(Rådmannen|Förvaltningsrättsfiskalen) (.*?) har (fattat beslutet|avgjort målet)", line)
+            if m:
+                return self.clean_name(m.group(2))
+
+    def detect_klagandetyp(self, contact):
+        # returns "myndighet", "leverantör", or None
+        for line in contact:
+            if line.endswith("kommun"):
+                return "myndighet"
+            elif line.endswith(" AB"):
+                return "leverantör"
+        return None
+
+
+    def find_headsection(self, page, heading, startswith=False, bbheight=0.75):
+        result = []
+        started = False
+        textboxiter = page.boundingbox(0, 0, page.height*bbheight, page.width) if bbheight < 1 else page
+        for textbox in textboxiter:
+            strtextbox = str(textbox).strip()
+            if not started:
+                if startswith:
+                    strtextbox = strtextbox[:len(heading)]
+                # adjust fuzziness aspect depending on how confident the OCR process is
+                if hasattr(textbox, 'confidence'):
+                    # transform confidence into cutoff with
+                    # compression so that confidence 0 => cutoff .5,
+                    # confidence 50 => cutoff .75, confidence 100 =>
+                    # cutoff 1)
+                    cutoff = (textbox.confidence/2+50)/100
+                    f = difflib.get_close_matches(strtextbox, [heading], 1, cutoff)
+                    if f and f[0] == heading:
+                        started = True
+                        if strtextbox != heading:
+                            self.log.warning("Accepting %r instead of %r (confidence %.2f, cutoff %.3f)" % (strtextbox, heading, textbox.confidence, cutoff))
+                elif strtextbox == heading:
+                    started = True
+            else:
+                # when we find the next headsection, we're done
+                if strtextbox.isupper() and len(strtextbox) > 4:
+                    return result
+                else:
+                    result.append(strtextbox)
+        if result:
+            self.log.debug("Possible non-finished headsection %s: %s...%s" % (heading, result[0], result[-1]))
+            return result
+
     def get_parser(self, basefile, sanitized, initialstate=None, parseconfig="default"):
         def kkv_parser(pdfreader):
-
-            def clean_name(name):
-                if name is None:
-                    return None
-                if "DV 3109" in name:
-                    self.log.warning("Can't clean name %s, mis-identified name" % name)
-                    return None
-                # remove leading and trailing non-alpha until the first uppercase letter
-                m = re.match(r"^[^A-ZÅÄÖ]*([A-ZÅÄÖ].*?)[^a-zåäöA-ZÅÄÖ]*$", name)
-                if m:
-                    return m.group(1)
-                else:
-                    self.log.warning("Can't clean name %s, doesn't look remotely like a name" % name)
-                    return None
-            
-            def is_overklagandehanvisning(page):
-                # FIXME: we should look at the entirety of the text
-                # and compare its distance (edit distance, some sort
-                # of vector distance?) to a standard
-                # överklagandehänvisning appendix
-                
-                # only look at the top 1/4 of the page
-                pgnum = False
-                malnum = False
-                hanvisning = False
-                for textbox in page.boundingbox(0, 0, page.height/4, page.width):
-                    textbox = str(textbox).strip()
-                    if textbox in ("HUR MAN ÖVERKLAGAR - PRÖVNINGSTILLSTÅND",
-                                   "Hur man överklagar FR-05",
-                                   "HUR MAN ÖVERKLAGAR"): # KamR
-                        hanvisning = True
-                    # avoid false positives for the last page of the
-                    # real verdict by checking for indicators that
-                    # we're still within the real verdict
-                    if re.match("Sida \d+$", textbox):
-                        pgnum = True
-                    if re.match("\d+\d{2}$", textbox):
-                        malnum = True
-                return hanvisning and not (pgnum or malnum)
-
-            def detect_ombud(sokande):
-                ombud = False
-                for line in sokande:
-                    if line.startswith("Ombud:"):
-                        ombud = True
-                    if ombud and ("firman " in line or "byrå " in line or  "AB" in line or "KB" in line or "HB" in line):
-                        return line
-
-            def detect_domare(trailing):
-                domare = False
-                # first strategy: Whatever line is followed by a known title
-                for line in reversed(trailing):
-                    if line.startswith(("tf. ", "fd. ", "t.f. ", "f.d. ")):
-                        line = line.split(" ", 1)[1]
-                    if line.lower() in ("förvaltningsrättsfiskal", "kammarrättsråd", "lagman","rådman", "chefsrådman"):
-                        domare = True # next line will contain what we want
-                    elif domare:
-                        return line
-                # second strategy: Whatever line is followed by the föredragande
-                for line in reversed(trailing):
-                    if line.endswith("har föredragit målet.") or line.startswith("Föredragande har varit "):
-                        domare = True # next line will contain what we want
-                    elif domare:
-                        return line
-
-            def detect_klagande_type(contact):
-                # returns "myndighet", "leverantör", or None
-                for line in contact:
-                    if line.endswith("kommun"):
-                        return "myndighet"
-                    elif line.endswith(" AB"):
-                        return "leverantör"
-                return None
-            
-                
-            def find_headsection(page, heading, startswith=False, bbheight=0.75):
-                result = []
-                started = False
-                for textbox in page.boundingbox(0, 0, page.height*bbheight, page.width):
-                    strtextbox = str(textbox).strip()
-                    # What to do in the case of OCR errors, eg
-                    # "SOKANDE ." instead of "SÖKANDE"?
-                    if strtextbox == heading or (startswith and strtextbox.startswith(heading)):
-                        started = True
-                    elif strtextbox.isupper() and len(strtextbox) > 4:
-                        if started:
-                            return result
-                    elif started:
-                        result.append(strtextbox)
-                if result:
-                    self.log.debug("Possible non-finished headsection %s: %s...%s" % (heading, result[0], result[-1]))
-                    return result
-
             assert isinstance(pdfreader, PDFReader), "Unexpected: %s is not PDFReader" % type(pdfreader)
-            # start by remove overklagandehanvisning and all
-            # subsequent pages FIXME: reading the raw page objects
-            # avoids calling the gluefunc (see PDFReader.textboxes())
-            # which we'd really like to do...
-            for idx, page in enumerate(pdfreader):
-                if is_overklagandehanvisning(page):
+            if self._remove_overklagandehanvisning and len(pdfreader) > 1 : # eg not for HFD verdicts or one-pagers (eg avskrivningar)
+                # check if we have annotated the correct idx for this basefile
+                if self.get_parse_options(basefile)['overklagandeidx']:
+                    idx = self.get_parse_options(basefile)['overklagandeidx']
+                else:
+                    # start by remove overklagandehanvisning and all
+                    # subsequent pages
+                    for idx, page in enumerate(pdfreader):
+                        if self.is_overklagandehanvisning(page, idx):
+                            break
+                if idx:
                     # sanity check: should be max three pages left
-                    if len(pdfreader) - idx <= 3:
+                    if len(pdfreader) - idx <= 4:
                         self.log.info("%s: Page %s is överklagandehänvisning, skipping this and all following pages" % (basefile, idx+1))
                         pdfreader[:] = pdfreader[:idx]
                     else:
-                        # more than three pages left -- probably an
+                        # more than four pages left -- probably an
                         # appendix (like the lower level court
                         # verdict) comes after. Let's just eliminate
                         # this specific page
                         self.log.info("%s: Page %s out of %s is överklagandehänvisning, skipping this page only" % (basefile, idx+1, len(pdfreader)))
                         pdfreader[:] = pdfreader[:idx] + pdfreader[idx+1:]
-                    break
+                else:
+                    self.log.warning("%s: Couldn't find överklagandehänvisning" % basefile)
 
             # find crap
-            sokande = find_headsection(pdfreader[0], "SÖKANDE")
+            kwargs = {}
+            if self.get_parse_options(basefile)['bbheight']:
+                kwargs['bbheight'] = self.get_parse_options(basefile)['bbheight']
+            sokande = self.find_headsection(pdfreader[0], "SÖKANDE", **kwargs)
             if sokande:
                 klagande = None
                 # print(",".join(sokande))
-                sokandeombud = clean_name(detect_ombud(sokande))
+                sokandeombud = self.detect_ombud(sokande)
                 if sokandeombud:
                     self.log.info("Sökandeombud: " + sokandeombud)
                     pdfreader[0].insert(0, Meta([sokandeombud], predicate=RINFOEX.sokandeombud))
             else:
-                klagande = find_headsection(pdfreader[0], "KLAGANDE")
+                klagande = self.find_headsection(pdfreader[0], "KLAGANDE", **kwargs)
                 if klagande:
-                    klagandeombud = clean_name(detect_ombud(klagande))
+                    klagandeombud = self.detect_ombud(klagande)
                     if klagandeombud:
                         self.log.info("Klagandeombud: " + klagandeombud)
                         pdfreader[0].insert(0, Meta([klagandeombud], predicate=RINFOEX.klagandeombud))
-                    klagandetyp = detect_klagande_type(klagande)
+                    klagandetyp = self.detect_klagandetyp(klagande)
                     self.log.info("Klagandetyp: %s" % klagandetyp)
                     if klagandetyp:
                         pdfreader[0].insert(0, Meta([klagandetyp], predicate=RINFOEX.klagandetyp))
 
-            motpart = find_headsection(pdfreader[0], "MOTPART")
+            motpart = self.find_headsection(pdfreader[0], "MOTPART", **kwargs)
             if motpart:
                 # print(",".join(motpart))
-                motpartsombud = clean_name(detect_ombud(motpart))
+                motpartsombud = self.detect_ombud(motpart)
                 if motpartsombud:
                     self.log.info("Motpartsombud: " + motpartsombud)
                     pdfreader[0].insert(0, Meta([motpartsombud], predicate=RINFOEX.motpartsombud))
 
-            trailing = find_headsection(pdfreader[-1], "HUR MAN ÖVERKLAGAR", startswith=True, bbheight=1)
+            lastidx = -1
+            while not re.search("\w\w+", pdfreader[lastidx].as_plaintext()):
+                lastidx -= 1
+            # FIXME: Find better heuristic for HFD
+            trailing = self.find_headsection(pdfreader[lastidx], "HUR MAN ÖVERKLAGAR", startswith=True, bbheight=1)
             if trailing:
-                domare = clean_name(detect_domare(trailing))
+                domare = self.detect_domare(trailing)
                 if not domare:
-                    self.log.warning("Can't detect domare in %s" % ", ".join(trailing))
+                    self.log.warning("%s: Can't detect domare in '%s'" % (basefile, ", ".join(trailing)))
                 else:
                     self.log.info("Domare: %s" % domare)
                     pdfreader[0].insert(0, Meta([domare], predicate=RINFOEX.domare))
@@ -372,18 +524,63 @@ som samlar, strukturerar och tillgängliggör dem."""
 
 
     @action
-    def parsetest(self, testfile, outfile):
+    def parsetest(self, testfile, outfile, basefile=None):
         """Run only the extraction parts on a specially prepared textfile"""
         import json
+        d = Counter()
+        o = Counter()
+        totalcnt = 0
+        trailcnt = 0
+        domarecnt = 0
         with open(testfile) as fp:
-            for line in fp:
-                data = json.loads(line)
-                domare = self.detect_domare(data['trailing'])
-                klagandeombud = self.detect_ombud(data['klagande'])
-                klagandetyp = self.detect_klagandetyp(data['klagande'])
-                sokandeombud = self.detect_ombud(data['sokande'])
-                motpartsombud = self.detect_ombud(data['motpart'])
-                
+            with open(outfile, "w") as ofp:
+                for line in fp:
+                    totalcnt += 1
+                    data = json.loads(line)
+                    if basefile and basefile != data['basefile']:
+                        continue
+                    if data['trailing']:
+                        trailcnt += 1
+                    domare = self.detect_domare(data['trailing']) if data['trailing'] else None
+                    klagandeombud = self.detect_ombud(data['klagande']) if data['klagande'] else None
+                    klagandetyp = self.detect_klagandetyp(data['klagande']) if data['klagande'] else None
+                    sokandeombud = self.detect_ombud(data['sokande']) if data['sokande'] else None
+                    motpartsombud = self.detect_ombud(data['motpart']) if data['motpart'] else None
+                    outdata = json.dumps({'basefile': data['basefile'],
+                                          'domare': domare,
+                                          'klagandeombud': klagandeombud,
+                                          'klagandetyp': klagandetyp,
+                                          'sokandeombud': sokandeombud,
+                                          'motpartsombud': motpartsombud})
+                    ofp.write(outdata+"\n")
+                    if basefile:
+                        print(outdata)
+                    else:
+                        if domare:
+                            domarecnt += 1
+                            d[domare] += 1
+                        if klagandeombud:
+                            o[klagandeombud] += 1
+                        if sokandeombud:
+                            o[sokandeombud] += 1
+                        if motpartsombud:
+                            o[motpartsombud] += 1
+        if not basefile:
+            from pprint import pprint
+            pprint(d.most_common())
+            pprint(o.most_common())
+            print("Total: %s, trailing: %s, domare: %s" % (totalcnt, trailcnt, domarecnt))
+
+    def normalize_ombud(self, ombud):
+        # 'Ombud: Advokat Anders Nilsson, Advokatfirman Lindahl KB' -> 'Advokatfirman Lindahl KB'
+        if ombud.startswith("Ombud: ") and ", " in ombud:
+            ombud = ombud.split(", ", 1)[1]
+        # remove parts of a company name that often gets reported inconsistently
+        # Advokatfirman Glimstedt Jönköping AB -> Glimstedt
+        locations = ("Sverige", "Stockholm", "Göteborg", "Malmö", "Jönköping", "Helsingborg", "Växjö")
+        remove = ("Ombud:", "Advokatfirma", "Advokatfirman", "Advokatbyrå", "Advokatbyrån", "AB", "HB", "KB", "i", "KONKURRENSVERKET") + locations
+        parts = [part for part in ombud.split() if part not in remove]
+        return " ".join(parts)
 
     def postprocess_doc(self, doc):
         super(KKV, self).postprocess_doc(doc)

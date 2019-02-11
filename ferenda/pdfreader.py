@@ -392,16 +392,18 @@ class PDFReader(CompoundElement):
                 os.unlink(tmppdffile)
                 assert not os.path.exists(tmppdffile), "tmppdffile still there:" + tmppdffile
 
-    dims = r"bbox (?P<left>\d+) (?P<top>\d+) (?P<right>\d+) (?P<bottom>\d+)"
+    dims = r"bbox (?P<left>\d+) (?P<top>\d+) (?P<right>\d+) (?P<bottom>\d+)(; x_wconf (?P<confidence>\d+)|)"
     re_dimensions = re.compile(dims).search
-
     def _parse_hocr(self, fp, dummy=None):
         if dummy:
             warnings.warn("filenames passed to _parse_hocr are now ignored", DeprecationWarning)
         def dimensions(s):
             m = self.re_dimensions(s)
-            return dict([(k, round(int(v) / px_per_point)) for (k, v)
-                         in m.groupdict().items()])
+            res = dict([(k, round(int(v) / px_per_point)) for (k, v)
+                        in m.groupdict().items() if k != "confidence"])
+            if m.group("confidence"):
+                res["confidence"] = int(m.group("confidence"))
+            return res
         
         tree = etree.parse(fp)
         for pageelement in tree.findall(
@@ -433,6 +435,7 @@ class PDFReader(CompoundElement):
                     parid = par.get('id')
                 else:
                     parid = None
+                confidence = conflen = 0
                 for element in boxelement.findall(
                         ".//{http://www.w3.org/1999/xhtml}span[@class='ocrx_word']"):
                     dim = dimensions(element.get("title"))
@@ -440,7 +443,7 @@ class PDFReader(CompoundElement):
                     if not t.strip():
                         continue  # strip empty things
                     t = t.replace("\n", " ")
-
+                    
                     if element.getchildren():  # probably a <em> or <strong> element
                         tag = {'{http://www.w3.org/1999/xhtml}em': 'i',
                                '{http://www.w3.org/1999/xhtml}strong': 'b'}[element.getchildren()[0].tag]
@@ -453,7 +456,10 @@ class PDFReader(CompoundElement):
                                        width=dim['right'] - dim['left'],
                                        height=dim['bottom'] - dim['top'])
                     textelements.append(text)
-
+                    tlen = len(t.strip())
+                    confidence += dim['confidence'] * tlen
+                    conflen += tlen
+                    
                 # try to determine footnotes by checking if first
                 # element is numeric and way smaller than the
                 # others. in that case, set it's tag to "sup" (for
@@ -493,10 +499,13 @@ class PDFReader(CompoundElement):
                           'fontid': fontid}
                 if parid:
                     kwargs['parid'] = parid
+                kwargs['confidence'] = confidence / conflen
+                assert kwargs['confidence'] <= 100, "Confidence is impossibly high"
                 kwargs['pdf'] = self
                 box = Textbox(**kwargs)
                 for e in textelements:
                     box.append(e)
+                # print("%.2f: %s" % (kwargs['confidence'], str(box)))
                 page.append(box)
             self.append(page)
         self.log.debug("PDFReader initialized: %d pages" %
