@@ -88,8 +88,8 @@ som samlar, strukturerar och tillgängliggör dem."""
     def load_vectors(self):
         # for resourcename in self.resourceloader.listresources("extra/*txt"):
         res = {}
-        for resourcename in ("examples/fr-05.txt", "examples/formular-9.txt", "examples/dv-3109-1-b-lou.txt", "examples/formular-1.txt"):
-            with self.resourceloader.openfp(resourcename) as fp:
+        for resourcename in ("fr-05.txt", "formular-9.txt", "dv-3109-1-b-lou.txt", "formular-1.txt", "dv-3109-d.txt", "dv-3109-1-a-lou.txt", "dv-3109-1-a.txt"):
+            with self.resourceloader.openfp("examples/" + resourcename) as fp:
                 pages = fp.read().split("\x08")
                 for idx, page in enumerate(pages):
                     res[(resourcename, idx)] = Counter(self.re_words.findall(page.lower()))
