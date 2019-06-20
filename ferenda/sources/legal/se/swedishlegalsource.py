@@ -684,6 +684,10 @@ class SwedishLegalSource(DocumentRepository):
             else:
                 return fp
         from ferenda.thirdparty.patchit import PatchSet, PatchSyntaxError, PatchConflictError
+        binarystream = False
+        if not hasattr(fp, 'mode') or "b" in fp.mode: # binary stream, won't play nice with patchit
+            fp = codecs.getreader(self.source_encoding)(fp)
+            binarystream = True
         with codecs.open(patchpath, 'r', encoding=self.source_encoding) as pfp:
             if self.config.patchformat == "rot13":
                 # replace the rot13 obfuscated stream with a plaintext stream
@@ -1537,7 +1541,8 @@ class SwedishLegalSource(DocumentRepository):
             {"rdf:type": RPUBL.Lag,
              "rpubl:arsutgava": "0000",
              "rpubl:lopnummer": str(numslug),
-             "rpubl:forfattningssamling": URIRef(self.lookup_resource("SFS", SKOS.altLabel))})
+             "rpubl:forfattningssamling": URIRef(self.lookup_resource("SFS", SKOS.altLabel))},
+        basefile=None)
         return str(resource.identifier)
 
     # hook for RepoTester to call

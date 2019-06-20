@@ -471,8 +471,8 @@ class Regeringen(Offtryck):
         return a
 
 
-    def polish_metadata(self, sane_attribs):
-        resource = super(Regeringen, self).polish_metadata(sane_attribs)
+    def polish_metadata(self, sane_attribs, basefile, infer_nodes=True):
+        resource = super(Regeringen, self).polish_metadata(sane_attribs, basefile, infer_nodes)
         # FIXME: This is hackish -- need to rethink which parts of the
         # parse steps needs access to which data
         self._resource = resource

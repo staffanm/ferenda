@@ -187,6 +187,7 @@ class SFS(Trips):
         elif self.config.refresh or ('next_sfsnr' not in self.config):
             ret = super(SFS, self).download(basefile)
             self._set_last_sfsnr()
+            self.config.revisit = []
         else:
             # in this case, super().download is never called so we'll
             # have to make sure this runs anyway:
@@ -872,7 +873,7 @@ class SFS(Trips):
             val = cleaned
         return cleaned
 
-    def polish_metadata(self, attributes):
+    def polish_metadata(self, attributes, basefile, infer_nodes=True):
         # attributes will be a nested dict with some values being
         # dicts themselves. Convert the subdicts to rdflib.Resource
         # objects.
@@ -882,7 +883,7 @@ class SFS(Trips):
             if isinstance(attributes[k], dict):
                 if len(attributes[k]) > 1:
                     # get a rdflib.Resource with a coined URI
-                    r = super(SFS, self).polish_metadata(attributes[k])
+                    r = super(SFS, self).polish_metadata(attributes[k], basefile)
                     if k != str(r.identifier):
                         # This happens when lopnummer cointains spaces
                         # because the URISpace defintion removes
@@ -918,7 +919,7 @@ class SFS(Trips):
                         ar.add(RDF.type, RINFOEX.Riksdagsskrivelse)
                     del attributes[k]
                     attributes[URIRef(k)] = ar
-        resource = super(SFS, self).polish_metadata(attributes,
+        resource = super(SFS, self).polish_metadata(attributes, basefile,
                                                     infer_nodes=False)
 
         if attributes['rdf:type'] == RPUBL.KonsolideradGrundforfattning:

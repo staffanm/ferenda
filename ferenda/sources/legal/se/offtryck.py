@@ -1174,7 +1174,7 @@ class CommentaryFinder(object):
         def is_chapter_header(parser):
             text = str(parser.reader.peek()).strip()
             return bool(len(text) < 20 and text.endswith((" kap.", " kap")) or
-                        re.match("\d+ kap. +[^\d]", text))
+                        re.match("\d+( \w|)\s[Kk]ap. +[^\d]", text))
 
         # "4 §" or "4 kap. 4 §"
         def is_section_header(parser):

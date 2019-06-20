@@ -50,11 +50,11 @@ class DV(OrigDV, SameAs):
                 prevuri = uri
                     
     # override polish_metadata to add some extra owl:sameAs attributes
-    def polish_metadata(self, head):
+    def polish_metadata(self, head, basefile, infer_nodes=True):
 
         # where do we get refdesc, domdesc?
         coin_uri = self.sameas_minter.space.coin_uri
-        resource = super(DV, self).polish_metadata(head)
+        resource = super(DV, self).polish_metadata(head, basefile)
         refuri = resource.identifier
         if 'rinfoex:patchdescription' in head:
             resource.add(RINFOEX.patchdescription,

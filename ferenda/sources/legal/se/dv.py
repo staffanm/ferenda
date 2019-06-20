@@ -1289,7 +1289,7 @@ class DV(SwedishLegalSource):
                                        self.commondata)
 
     # create nice RDF from the sanitized metadata
-    def polish_metadata(self, head):
+    def polish_metadata(self, head, basefile, infer_nodes=True):
 
         def ref_to_uri(ref):
             nodes = self.rattsfall_parser.parse_string(ref)
