@@ -747,7 +747,7 @@ dependencies (in the form of source files for the action).
             pathfrag = pathfrag.replace("\\", "/")
         return unquote(pathfrag.replace('/%', '%'))
 
-    def archive(self, basefile, version):
+    def archive(self, basefile, version, overwrite=False):
         """Moves the current version of a document to an archive. All
         files related to the document are moved (downloaded, parsed,
         generated files and any existing attachment files).
@@ -774,8 +774,11 @@ dependencies (in the form of source files for the action).
             if not os.path.exists(src):
                 continue
             if os.path.exists(dest):
-                raise errors.ArchivingError(
-                    "Archive destination %s for basefile %s version %s already exists!" % (dest, basefile, version))
+                if overwrite:
+                    util.robust_remove(dest)
+                else:
+                    raise errors.ArchivingError(
+                        "Archive destination %s for basefile %s version %s already exists!" % (dest, basefile, version))
             # self.log.debug("Archiving %s to %s" % (src,dest))
             # print("Archiving %s to %s" % (src,dest))
             util.ensure_dir(dest)

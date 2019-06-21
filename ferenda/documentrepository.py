@@ -248,6 +248,15 @@ class DocumentRepository(object):
     to be archived. See :ref:`keyconcept-archiving`.
     """
 
+    download_archive_overwrite = False
+    """If ``False`` (the default), any attempt to overwrite an archived
+    version with a new archived version with the same version id will
+    fail (this will happen when
+    `~ferenda.DocumentRepository.downloaded_is_different()` signals
+    that document versions are different, yet
+    `~ferenda.DocumentRepository.get_archive_version()` returns the
+    same version id for both."""
+
     download_iterlinks = True
     """If ``True`` (the default),
     :py:meth:`~ferenda.DocumentRepository.download_get_basefiles`
@@ -997,7 +1006,7 @@ with the *config* object as single parameter.
         elif self.download_is_different(filename, tmpfile):
             if archive:
                 version = self.get_archive_version(basefile)
-                self.store.archive(basefile, version)
+                self.store.archive(basefile, version, overwrite=self.download_archive_overwrite)
             util.robust_rename(tmpfile, filename)
             updated = True
         else:

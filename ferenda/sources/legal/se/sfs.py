@@ -114,6 +114,7 @@ class SFS(Trips):
     app = "sfst"  # dir, prop, sfst
     base = "SFSR"  # DIR, THWALLPROP, SFSR
     # This must be pretty lax, basefile is sanitized later
+    download_archive_overwrite = True
     basefile_regex = r"(?P<basefile>\d{4}:(bih. ?|)\d+( ?s\. ?\d+| \d|))$"
     document_url_template = "http://rkrattsbaser.gov.se/sfst?bet=%(basefile)s"
     document_sfsr_url_template = "http://rkrattsbaser.gov.se/sfsr?bet=%(basefile)s"
@@ -392,7 +393,7 @@ class SFS(Trips):
         return updated
 
     # FIXME: rename once we are sure it is in fact working
-    def get_archive_version_nonworking(self, basefile):
+    def get_archive_version(self, basefile):
         sfst_file = self.store.downloaded_path(basefile)
         old_checksum = self._checksum(sfst_file)
         # new_checksum = self._checksum(sfst_tempfile)
@@ -435,7 +436,7 @@ class SFS(Trips):
         import hashlib
         c = hashlib.md5()
         try:
-            c.update(util.readfile(filename, encoding=self.source_encoding))
+            c.update(util.readfile(filename, encoding=self.source_encoding).encode("utf-8"))
         except:
             self.log.warning("Could not extract plaintext from %s" % filename)
         return c.hexdigest()
