@@ -520,6 +520,20 @@ body.toc article ul li ul li {
 
 
 /* PART 2.6: Misc styling */
+div.watermark {
+    position: fixed;
+    z-index: -1;
+}
+div.watermark p {
+    margin-top: 100pt;
+    color: lightgrey;
+    font: bold 50pt arial, sans-serif;
+    transform: rotate(-45deg);
+}
+div.watermark p del,
+div.watermark p ins {
+    display: none;
+}
 a.facsimile img { 
     display: none;
     border-left: 1px solid #ddd;
@@ -630,6 +644,15 @@ table {
     line-height: 1.42857143;
 }
 
+/* used for making prettier diffs (styles <ins> and <del> tags from lxml's htmldiff */
+ins {
+    color: #22863a;
+    background-color: #f0fff4;
+}
+del {
+    color: #b31d28;
+    background-color: #ffeef0;
+}
 /* PART 3: Footer */
 footer nav {
     text-align: center;

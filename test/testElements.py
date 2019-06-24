@@ -91,6 +91,7 @@ class Main(unittest.TestCase):
         d.parse_from_pdfreader(reader, doc)
         jsondoc = serialize(doc, format="json")
         newdoc = deserialize(jsondoc, format="json")
+        newdoc.version = None
         self.assertEqual(doc, newdoc)
 
     def test_serialize_pyparsing(self):

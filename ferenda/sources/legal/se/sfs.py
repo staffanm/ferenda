@@ -45,7 +45,7 @@ class UpphavdForfattning(DocumentRemovedError):
     """
     # FIXME: Those checks occur in several places:
     # extract_metadata_header, extract_metadata_register and
-    # download_to_intermediate, with varying amounts of completeness
+    # downloaded_to_intermediate, with varying amounts of completeness
     # and error handling
 
 
@@ -115,8 +115,6 @@ class SFS(Trips):
     base = "SFSR"  # DIR, THWALLPROP, SFSR
     # This must be pretty lax, basefile is sanitized later
     basefile_regex = r"(?P<basefile>\d{4}:(bih. ?|)\d+( ?s\. ?\d+| \d|))$"
-    # start_url = "http://rkrattsbaser.gov.se/sfsr/adv?sort=asc"
-    start_url = "http://rkrattsbaser.gov.se/sfsr/adv?upph=false&sort=asc"
     document_url_template = "http://rkrattsbaser.gov.se/sfst?bet=%(basefile)s"
     document_sfsr_url_template = "http://rkrattsbaser.gov.se/sfsr?bet=%(basefile)s"
     document_sfsr_change_url_template = "http://rkrattsbaser.gov.se/sfsr?%%C3%%A4bet=%(basefile)s"
@@ -145,6 +143,16 @@ class SFS(Trips):
             else:
                 # shut up logger
                 self.trace[logname].propagate = False
+
+    _start_url = "http://rkrattsbaser.gov.se/sfsr/adv?sort=asc"
+    @property
+    def start_url(self):
+        return self._start_url + ("&upph=false" if not self.config.keepexpired and "&upph=false" not in self._start_url else "")
+
+    @start_url.setter
+    def start_url(self, newval):
+        self._start_url = newval
+    
 
     @cached_property
     def lagrum_parser(self):
@@ -432,14 +440,15 @@ class SFS(Trips):
             self.log.warning("Could not extract plaintext from %s" % filename)
         return c.hexdigest()
 
-    def make_document(self, basefile=None):
-        doc = super(SFS, self).make_document(basefile)
+    def make_document(self, basefile=None, version=None):
+        doc = super(SFS, self).make_document(basefile, version)
         if basefile:   # toc_generate_page calls this w/o basefile
             # We need to get the uppdaterad_tom field to create a proper
             # URI.  First create a throwaway reader and make sure we have
             # the intermediate file at ready
-            # FIXME: this is broken
-            fp = self.downloaded_to_intermediate(basefile)
+            fp = self.downloaded_to_intermediate(basefile, version=version)
+            # FIXME: need to read moar bytes, handle latin-1 and utf-8
+            # encodings to be able to handle all archival material
             textheader = fp.read(2048)
             t = TextReader(string=textheader.decode(self.source_encoding, errors="ignore"))
             fp.close()
@@ -447,7 +456,7 @@ class SFS(Trips):
             doc.uri = self.canonical_uri(basefile, uppdaterad_tom)
         return doc
 
-    def canonical_uri(self, basefile, konsolidering=False):
+    def canonical_uri(self, basefile, version=None):
         basefile = self.sanitize_basefile(basefile)
         attributes = self.metadata_from_basefile(basefile)
 
@@ -460,17 +469,17 @@ class SFS(Trips):
                            "rpubl:forfattningssamling":
                            URIRef(self.lookup_resource("SFS",
                                                        SKOS.altLabel))})
-        if konsolidering:
-            if konsolidering is not True:
+        if version:
+            if version is not True:
                 # eg konsolidering = "2013-05-30" or "2013:460"
-                konsolidering = konsolidering.replace(" ", "_")
-            attributes["dcterms:issued"] = konsolidering
+                version = version.replace(" ", "_")
+            attributes["dcterms:issued"] = version
         resource = self.attributes_to_resource(attributes)
         uri = self.minter.space.coin_uri(resource)
         # create eg "https://lagen.nu/sfs/2013:460/konsolidering" if
         # konsolidering = True instead of a issued date.
         # FIXME: This should be done in CoIN entirely
-        if konsolidering is True:
+        if version is True:
             uri = uri.rsplit("/", 1)[0]
         computed_basefile = self.basefile_from_uri(uri)
         assert basefile == computed_basefile, "%s -> %s -> %s" % (basefile, uri, computed_basefile)
@@ -504,10 +513,10 @@ class SFS(Trips):
         attribs["dcterms:publisher"] = "Regeringskansliet"
         return attribs
     
-    def downloaded_to_intermediate(self, basefile, attachment=None):
-        filename = self.store.downloaded_path(basefile)
+    def downloaded_to_intermediate(self, basefile, attachment=None, version=None):
+        filename = self.store.downloaded_path(basefile, version)
         if not os.path.exists(filename):
-            self.log.warning("%s: Fulltext is missing" % basefile)
+            self.log.warning("Fulltext is missing")
             # FIXME: This code (which only runs when fulltext is
             # missong) needs to be rewritten
             baseuri = self.canonical_uri(basefile)
@@ -520,7 +529,8 @@ class SFS(Trips):
             desc.value(self.ns['dcterms'].identifier, "SFS " + basefile)
             doc.body = Forfattning([Stycke(['Lagtext saknas'],
                                            id='S1')])
-        rawtext = util.readfile(filename, encoding=self.source_encoding)
+        encoding = self._sniff_encoding(filename)
+        rawtext = util.readfile(filename, encoding=encoding)
         if not self.config.keepexpired:
             needles = ('<span class="bold">Upphävd:</span> ',
                        '<span class="bold">Övrigt:</span> Utgår genom SFS')
@@ -530,11 +540,11 @@ class SFS(Trips):
                     datestr = rawtext[idx+len(needle):idx+len(needle)+10]
                     if (not re.match(r"\d+-\d+-\d+$", datestr) or
                         (datetime.strptime(datestr, '%Y-%m-%d') < datetime.today())):
-                        self.log.debug('%s: Expired' % basefile)
+                        self.log.debug('Expired' % basefile)
                         if not self.config.keepexpired:
                             raise UpphavdForfattning("%s is an expired SFS" % basefile,
                                                      dummyfile=self.store.parsed_path(basefile))
-        return self._extract_text(basefile)
+        return self._extract_text(basefile, version=version)
 
     def extract_head(self, fp, basefile):
         """Parsear ut det SFSR-registret som innehåller alla ändringar
@@ -641,9 +651,7 @@ class SFS(Trips):
                                "2014:801", "1991:1469")
                     if basefile.replace("_", " ") not in val and not basefile in special:
                         self.log.warning(
-                            "%s: Base SFS %s not in title %r" % (basefile,
-                                                                 basefile,
-                                                                 val))
+                            "Base SFS %s not in title %r" % (basefile, val))
                     d[docuri]["dcterms:title"] = util.normalize_space(val)
                     d[docuri]["rdf:type"] = self._forfattningstyp(val)
                 elif key == 'Observera':
@@ -691,8 +699,8 @@ class SFS(Trips):
                             pred = None
                         else:
                             self.log.warning(
-                                "%s: Okänd omfattningstyp %r" %
-                                (basefile, changecat))
+                                "Okänd omfattningstyp %r" %
+                                (changecat))
                             pred = None
                         for node in self.lagrum_parser.parse_string(changecat,
                                                                     pred):
@@ -725,7 +733,7 @@ class SFS(Trips):
                                 try:
                                     identifier = prop_sanitize_identifier(identifier)
                                 except ValueError:
-                                    self.log.warning("%s: Could not sanitize irregular identifier %s" % (basefile, identifier))
+                                    self.log.warning("Could not sanitize irregular identifier %s" % (identifier))
                                     identifier = None
                             if identifier:
                                 d[node.uri] = {"dcterms:identifier": identifier}
@@ -749,8 +757,7 @@ class SFS(Trips):
                                 dummyfile=self.store.parsed_path(basefile))
                 else:
                     if not (key.startswith("http://") or key.startswith("https://")):
-                        self.log.warning(
-                            '%s: Obekant nyckel [\'%s\']' % (basefile, key))
+                        self.log.warning("Obekant nyckel '%s'" % (key))
             utfardandedatum = self._find_utfardandedatum(rowdict['SFS-nummer'])
             if utfardandedatum:
                 d[docuri]["rpubl:utfardandedatum"] = utfardandedatum
@@ -763,15 +770,23 @@ class SFS(Trips):
         # have that data from other sources, so just skip it
         skip = True
         d = {}
-        identifier = "SFS " + lines[0].split('\xb7')[1].strip()
-        d["dcterms:title"] = util.normalize_space(lines[1])
-        for line in lines[2:]:
+        if '\xb7' in lines[0]: # new-style formatting
+            identifier = "SFS " + lines[0].split('\xb7')[1].strip()
+            d["dcterms:title"] = util.normalize_space(lines[1])
+            startline = 2
+        else:
+            identifier = "SFS " + lines[0].split(':')[1].strip()
+            startline = 1
+
+        for line in lines[startline:]:
             if ":" not in line:
                 continue
-            key, val = [x.strip() for x in line.split(":", 1)]
+            key, val = [util.normalize_space(x) for x in line.split(":", 1)]
             
             # Simple string literals
-            if key == 'Övrigt':
+            if key == 'Rubrik':
+                d["dcterms:title"] = val
+            elif key == 'Övrigt':
                 if val.startswith("Utgår genom"): # occurs only for SFS 2014:1329, 2013:984, 2006:909
                     raise UpphavdForfattning("%s is a revoked SFS" % basefile,
                                              dummyfile=self.store.parsed_path(basefile))
@@ -789,7 +804,7 @@ class SFS(Trips):
                     raise UpphavdForfattning("%s is an expired SFS" % basefile,
                                              dummyfile=self.store.parsed_path(basefile))
 
-            elif key == 'Departement':
+            elif key in ('Departement', 'Departement/ myndighet'):
                 # the split is only needed because of SFS 1942:724,
                 # which has "Försvarsdepartementet,
                 # Socialdepartementet"...
@@ -806,16 +821,16 @@ class SFS(Trips):
                 d["dcterms:issued"] = uppdaterad
 
             elif (key == 'Omtryck' and re_sfs(val)):
-                d["rinfoex:omtryck"] = self.canonical_uri(re_sfs(val).group(1))
+                d["rinfoex:omtryck"] = URIRef(self.canonical_uri(re_sfs(val).group(1)))
             elif (key == 'Författningen har upphävts genom' and
                   re_sfs(val)):
                 s = re_sfs(val).group(1)
-                d["rinfoex:upphavdAv"] = self.canonical_uri(s)
+                d["rinfoex:upphavdAv"] = URIRef(self.canonical_uri(s))
             elif key == 'Ikraft':
                 d["rpubl:ikrafttradandedatum"] = val[:10]
             else:
                 self.log.warning(
-                    '%s: Obekant nyckel [\'%s\']' % (basefile, key))
+                    "Obekant nyckel '%s'" % (key))
         # FIXME: This is a misuse of the dcterms:issued prop in order
         # to mint the correct URI. We need to remove this somehow afterwards.
         if "dcterms:issued" not in d:
@@ -1355,6 +1370,14 @@ class SFS(Trips):
                                      'uris': set()}),
                 (self.find_definitions, False))
 
+    def generate_set_params(self, basefile, version, params):
+        resource = Graph().parse(self.store.distilled_path(basefile, version)).resource(self.canonical_uri(basefile))
+        upph = resource.value(RPUBL.upphavandedatum)
+        if upph and upph.value < date.today():
+            params['expired'] = 'true'
+        return params
+
+    
     def parse_entry_id(self, doc):
         # For SFS, the doc.uri can be temporal, ie
         # https://lagen.nu/2015:220/konsolidering/2015:667, but we'd
@@ -1422,7 +1445,7 @@ class SFS(Trips):
                   'label': label,
                   'count': None}
         uri = self.canonical_uri(basefile)
-        msg = ("%(basefile)s: selected %(count)s %(label)s "
+        msg = ("selected %(count)s %(label)s "
                "(%(elapsed).3f sec)")
         with util.logtime(self.log.debug,
                           msg,
@@ -1435,7 +1458,7 @@ class SFS(Trips):
             values['count'] = len(result)
         return result
 
-    def prep_annotation_file(self, basefile):
+    def prep_annotation_file(self, basefile, version):
         sfsdataset = self.dataset_uri()
         assert "sfs" in sfsdataset
         dvdataset = sfsdataset.replace("sfs", "dv")
@@ -1681,6 +1704,16 @@ class SFS(Trips):
                 stuff[lagrum]['kommentar'] = ""
             stuff[lagrum]['kommentar'] += shortdesc.replace("p>", "p>"+link, 1)
 
+        # 8. Any possible inbound rinfoex:upphavdAv statements from an
+        # earlier statute that was expired by this statue
+        upphaver = self.time_store_select(store,
+                                             "sparql/sfs_upphaver.rq",
+                                             basefile,
+                                             sfsdataset,
+                                             "upphaver")
+        if upphaver:
+            stuff[baseuri]['upphaver'] = upphaver
+
         # then, construct a single de-normalized rdf/xml dump, sorted
         # by root/chapter/section/paragraph URI:s. We do this using
         # raw XML, not RDFlib, to avoid normalizing the graph -- we
@@ -1699,7 +1732,6 @@ class SFS(Trips):
                        'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#upphaver': 'rpubl:isRemovedBy'}
 
         root_node = etree.Element(ns("rdf:RDF"), nsmap=self.ns)
-
         for l in sorted(list(stuff.keys()), key=util.split_numalpha):
             lagrum_node = etree.SubElement(root_node, ns("rdf:Description"))
             lagrum_node.set(ns("rdf:about"), l)
@@ -1794,11 +1826,56 @@ class SFS(Trips):
                     myndfsid_node.text = myndfs['identifier']
                     lagrum_node.append(bf_node)
 
-        # tree = etree.ElementTree(root_node)
+            if 'upphaver' in stuff[l]:
+                for upphaver in stuff[l]['upphaver']:
+                    uh_node = etree.Element(ns("rinfoex:upphaver"))
+                    uhf_node = etree.SubElement(uh_node, ns("rdf:Description"))
+                    uhf_node.set(ns("rdf:about"), upphaver['uri'])
+                    uhf_title_node = etree.SubElement(uhf_node, ns("dcterms:title"))
+                    uhf_title_node.text = upphaver['title']
+                    lagrum_node.append(uh_node)
+ 
+        if version is None:
+            # FIXME: This is supposed to grab the rdf:Description node
+            # that describes the statute itself (not any single chapter or
+            # section), but we're not guaranteed that this will be the
+            # first node or indeed exist at all
+            desc_node = root_node[0]
+            assert desc_node.get(ns("rdf:about")) == canonical_uri
+            hasVersion_node = etree.SubElement(desc_node, ns("dcterms:hasVersion"))
+            versions = {}
+            for change in changes:
+                if change['id'] not in versions:
+                    versions[change['id']] = {'ikraft': change.get('ikraft', None),
+                                              'prop': change.get('prop', None),
+                                              'propid': change.get('propid', None),
+                                              'proptitle': change.get('proptitle', None)}
+
+            for version_id in self.store.list_versions(basefile, "parsed"):
+                version_node = etree.SubElement(hasVersion_node, ns("rdf:Description"))
+                
+                version_node.set(ns("rdf:about"), self.canonical_uri(basefile, version_id))
+                label_node = etree.SubElement(version_node, ns("dcterms:identifier"))
+                label_node.text = "SFS %s" % version_id
+                if label_node.text in versions:
+                    v = versions[label_node.text]
+                    if 'ikraft' in v:
+                        ikraft_node = etree.SubElement(version_node, ns("rpubl:ikrafttradandedatum"))
+                        ikraft_node.text = str(v['ikraft'])
+                    if 'propid' in v:
+                        proplink_node = etree.SubElement(version_node, ns("rpubl:forarbete"))
+                        prop_node = etree.SubElement(proplink_node, ns("rdf:Description"))
+                        prop_node.set(ns("rdf:about"), v['prop'])
+                        propid_node = etree.SubElement(prop_node, ns("dcterms:identifier"))
+                        propid_node.text = v['propid']
+                        if 'proptitle' in v:
+                            proptitle_node = etree.SubElement(prop_node, ns("dcterms:title"))
+                            proptitle_node.text = v['proptitle']
+                
         treestring = etree.tostring(root_node, encoding="utf-8", pretty_print=True)
-        with self.store.open_annotation(basefile, mode="wb") as fp:
+        with self.store.open_annotation(basefile, mode="wb", version=version) as fp:
             fp.write(treestring)
-        return self.store.annotation_path(basefile)
+        return self.store.annotation_path(basefile, version)
 
     def annotation_file_to_graph(self, annotation_file):
         # since our custom built annotation files aren't really proper
@@ -2015,18 +2092,30 @@ WHERE {
     def _relate_fulltext_resources(self, body):
         # only return K1, K1P1 or B1, not more fine-grained resources
         # like K1P1S1N1
-        return [(r, {'order': idx}) for idx, r in enumerate([body] + [r for r in body.findall(".//*[@about]") if re.search(r"#[KPBS]\d+\w?(P\d+\w?|)$", r.get("about"))])]
+
+        # But return only the body (toplevel) resource with an extra
+        # default metadata dict {"role": "expired"} if the statute is
+        # expired.
+        meta = body.getparent().xpath(".//xhtml:meta[@property='rpubl:upphavandedatum']", namespaces={'xhtml': "http://www.w3.org/1999/xhtml"})
+        if meta and meta[0].get("content") <= str(date.today()):
+            return [(body, {"role": "expired"}),]
+        else:
+            return [(r, {'order': idx}) for idx, r in enumerate([body] + [r for r in body.findall(".//*[@about]") if re.search(r"#[KPBS]\d+\w?(P\d+\w?|)$", r.get("about"))])]
+    
     
     _relate_fulltext_value_cache = {}
     def _relate_fulltext_value(self, facet, resource, desc):
         def rootlabel(desc):
             return desc.getvalue(DCTERMS.identifier)
-        if facet.dimension_label in ("label", "creator", "issued"):
+        if facet.dimension_label in ("label", "comment", "creator", "issued"):
             # "creator" and "issued" should be identical for the root
             # resource and all contained subresources. "label" can
             # change slighly.
             resourceuri = resource.get("about")
             rooturi = resourceuri.split("#")[0]
+            #upphavandedatum = desc.graph.value(URIRef(rooturi), RPUBL.upphavandedatum)
+            #upphavd = bool(upphavandedatum and upphavandedatum.value < date.today())
+            
             if "#" not in resourceuri:
                 if desc.getvalues(RPUBL.utfardandedatum):
                     utfardandedatum = desc.getvalue(RPUBL.utfardandedatum)
@@ -2038,20 +2127,23 @@ WHERE {
                     "creator": desc.graph.value(desc._current(), RPUBL.departement),
                     "issued": utfardandedatum
                 }
-            if facet.dimension_label == "label":
+            if facet.dimension_label == "comment":
                 v = self.display_title(resourceuri)
-                root = desc.graph.value(predicate=RPUBL.konsoliderar, object=desc._current())
-                if root:
-                    # optionally add rdfs:label and dcterms:alternate
-                    alts = []
-                    for pred in RDFS.label, DCTERMS.alternate:
-                        val = desc.graph.value(root, pred)
-                        if val:
-                            alts.append(val)
-                    if alts:
-                        v += " (%s)" % ", ".join(alts)
+                # optionally add rdfs:label and dcterms:alternate
+                alts = []
+                for pred in RDFS.label, DCTERMS.alternate:
+                    val = desc.graph.value(URIRef(rooturi), pred)
+                    if val:
+                        alts.append(val)
+                if alts:
+                    v += " (%s)" % ", ".join(alts)
+            elif facet.dimension_label == "label":
+                form = "relative" if "#" in resourceuri else "absolute"
+                v = self.display_title(resourceuri, form=form)
             else:
                 v = self._relate_fulltext_value_cache[rooturi][facet.dimension_label]
+            #if facet.dimension_label in ("comment", "label") and upphavd:
+            #    v = "[Upphävd] " + v
             return facet.dimension_label, v
         else:
             return super(SFS, self)._relate_fulltext_value(facet, resource, desc)

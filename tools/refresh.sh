@@ -1,13 +1,13 @@
 #! /bin/bash
 if [ "$1" = "-f" ]; then
    echo "removing old generated files"
-   rm -r data/*/parsed
-   rm -r data/*/distilled
-   rm -r data/*/annotations
-   rm -r data/*/generated
-   rm -r data/*/toc
-   rm -r data/*/feed
-   rm -r data/*/deps
+   rm -rf data/*/parsed
+   rm -rf data/*/distilled
+   rm -rf data/*/annotations
+   rm -rf data/*/generated
+   rm -rf data/*/toc
+   rm -rf data/*/feed
+   rm -rf data/*/deps
    set -e  # fail immediately on error
    echo "resetting fulltextindex"
    ./ferenda-build.py devel destroyindex

@@ -110,14 +110,23 @@ $(document).ready(function () {
     });
   $('.navbar-form .typeahead').typeahead(null, {
     name: 'suggestions',
+    highlight: true,
     display: 'comment',
     source: suggestions,
-    limit: 9,
+    minLength: 1,
     templates: {
       suggestion: function(ctx) {
-	return "<div class='tt-suggestion'><strong>" + ctx.comment + "</strong><br/><small>" + ctx.desc + "</small></div>";
+	// typeahead.js should be able to highlight matches itself,
+	// but I can't get it to work, so we do it manually.
+        q_regex = new RegExp(ctx._query.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'ig');
+        ctx.comment = ctx.comment.replace(q_regex, "<strong>$&</strong>");
+        if (ctx.role == "expired") {
+          ctx.comment = "[upphävd] " + ctx.comment;
+        }
+        return "<div class='tt-suggestion'>" + ctx.comment + "<br/><small>" + ctx.desc + "</small></div>";
       }
-    }
+    },
+    limit: 9
   });
   $('.navbar-form .typeahead').bind('typeahead:select', function(ev, suggestion) {
      window.location.href=suggestion.url

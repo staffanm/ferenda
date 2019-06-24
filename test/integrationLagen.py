@@ -511,25 +511,21 @@ class TestSearch(TestLagen):
 
 class TestAutocomplete(TestLagen):
     def test_basic_sfs(self):
-        res = self.get(self.baseurl + "api/?q=3+§+personuppgiftslag&_ac=true",
+        res = self.get(self.baseurl + "api/?q=3+§+förvaltningslag&_ac=true",
                        headers={'Accept': 'application/json'})
-        # returns eg [{'url': 'http://localhost:8000/1998:204#P3',
-        #              'label': '3 § personuppgiftslagen',
-        #              'desc': 'I denna lag används följande '
-        #                      'beteckningar med nedan angiven...'},
-        #             {'url': 'http://localhost:8000/dom/nja/2015s180',
-        #              'desc': 'NJA 2015 s. 180', # NB! Is :identifier not :title
-        #              'label': 'Lagring av personuppgifter '
-        #                       '(domstols dagboksblad) i dator har'
-        #                       ' ansetts inte omfattad av ...'}]
+        # returns eg [{'url': 'http://localhost:8000/2017:900#P3',
+        #              'label': '3 §',
+        #              'comment': '3 § förvaltningslagen',
+        #              'desc': 'U brottsbekämpande verksamhet hos...'}]
         self.assertEqual('application/json', res.headers['Content-Type'])
         hits = res.json()
-        self.assertEqual(hits[0]['url'], self.baseurl + "1998:204#P3")
+        self.assertEqual(hits[0]['url'], self.baseurl + "2017:900#P3")
         self.assertTrue(hits[0]['desc'].startswith("I denna lag"))
         self.assertGreaterEqual(len(hits), 1) # "3 §
-                                              # Personuppgiftslagen"
-                                              # only matches one thing
-                                              # ("personuppgiftslagen
+                                              # förvaltningslagen"
+                                              # should only match one
+                                              # thing
+                                              # ("förvaltningslagen
                                               # 3" matches several)
 
     def test_shortform_sfs(self):
@@ -543,7 +539,7 @@ class TestAutocomplete(TestLagen):
         # the same order that they were indexed in, which might not
         # always be guaranteed.
         self.assertEqual(hits[0]['url'], self.baseurl + "1949:105#K2P1")
-        self.assertEqual(hits[0]['label'], "2 kap. 1 § Tryckfrihetsförordning (1949:105)")
+        self.assertEqual(hits[0]['comment'], "2 kap. 1 § Tryckfrihetsförordning (1949:105)")
         self.assertTrue(hits[0]['desc'].startswith("Till främjande av ett fritt meningsutbyte"))
 
     def test_incomplete_lawname(self):
@@ -1186,4 +1182,56 @@ class AcceptableStatus(TestLagen):
             assert_stats(s.text, 6, 65, repo)
         
     
+    
+class SFSHistory(TestLagen):
+
+    def test_expired(self):
+        # the resource should exist and be watermarked
+        res = self.get(self.baseurl + "1986:223")
+        res.raise_for_status()
+        soup = BeautifulSoup(res.text, "lxml")
+        watermark = soup.find("div", "watermark")
+        self.assertEqual("Upphävd författning", watermark.text.strip())
+
+    def test_available_versions(self):
+        # verify that we have 8 other versions of this to compare to
+        res = self.get(self.baseurl + "1986:223")
+        soup = BeautifulSoup(res.text, "lxml")
+        versions = soup.find("select").find_all("option")
+        self.assertGreaterEqual(len(versions), 8)
+
+    def test_specific_version(self):
+        res = self.get(self.baseurl + "1999:175/konsolidering/2003:610")
+        res.raise_for_status()
+        soup = BeautifulSoup(res.text, "lxml")
+        dl = soup.find("dl", id="refs-dokument")
+        self.assertIn("i lydelse enligt SFS 2003:610", dl.text)
+        watermark = soup.find("div", "watermark")
+        self.assertEqual("Inaktuell version", watermark.text.strip())
+
+    def test_expires(self):
+        res = self.get(self.baseurl + "2017:900")
+        res.raise_for_status()
+        soup = BeautifulSoup(res.text, "lxml")
+        dl = soup.find("dl", id="refs-dokument")
+        dd = dl.find("dt", text="Upphäver").find_next_sibling("dd")
+        self.assertEqual("Förvaltningslag (1986:223)", dd.text.strip())
+        self.assertTrue(dd.a.get("href").endswith("/1986:223"))
+        
+    def test_diff(self):
+        res = self.get(self.baseurl + "1999:175?diff=true&from=2003:610")
+        res.raise_for_status()
+        self.assertTrue(res.headers.get("X-WSGI-app"))
+        soup = BeautifulSoup(res.text, "lxml")
+        self.assertGreaterEqual(len(soup.find_all("ins")), 10)
+        self.assertGreaterEqual(len(soup.find_all("del")), 10)
+
+    def test_autocomplete_expired(self):
+        res = self.get(self.baseurl + "api/?q=personuppgiftslag&_ac=true",
+                       headers={'Accept': 'application/json'})
+        hits = res.json()
+        self.assertEqual(hits[0]['url'], self.baseurl + "1998:204")
+        self.assertEqual(hits[0]['role'], "expired")
+        
+        
     

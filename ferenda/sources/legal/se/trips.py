@@ -145,27 +145,44 @@ class Trips(SwedishLegalSource):
         a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":", 1)
         return a
 
-    def _extract_text(self, basefile, attachment=None):
-        txt = self._extract_text_inner(basefile, attachment)
-        with self.store.open_intermediate(basefile, mode="wb") as fp:
+    def _extract_text(self, basefile, attachment=None, version=None):
+        txt = self._extract_text_inner(basefile, attachment, version)
+        with self.store.open_intermediate(basefile, mode="wb", version=version) as fp:
             fp.write(txt.encode(self.source_encoding))
-        return self.store.open_intermediate(basefile, "rb")
+        return self.store.open_intermediate(basefile, "rb", version=version)
 
 
-    def _extract_text_inner(self, basefile, attachment=None):
+    def _extract_text_inner(self, basefile, attachment=None, version=None, encoding=None):
         if not attachment and self.store.storage_policy == "dir":
             attachment = "index.html"
-        soup = BeautifulSoup(util.readfile(self.store.downloaded_path(
-            basefile, attachment=attachment)), "lxml")
-        content = soup.find("div", "search-results-content")
-        body = content.find("div", "body-text")
-        if not body or not body.string:
-            raise DocumentRemovedError("%s has no body-text" % basefile,
-                                       dummyfile=self.store.parsed_path(basefile))
-        body.string = "----------------------------------------------------------------\n\n" + body.string
-        txt = content.text
+        path = self.store.downloaded_path(basefile, attachment=attachment, version=version)
+        if encoding is None:
+            encoding = self._sniff_encoding(path)
+        soup = BeautifulSoup(util.readfile(path, encoding=encoding), "lxml")
+        if encoding == "utf-8":
+            content = soup.find("div", "search-results-content")
+            body = content.find("div", "body-text")
+            if not body or not body.string:
+                raise DocumentRemovedError("%s has no body-text" % basefile,
+                                           dummyfile=self.store.parsed_path(basefile))
+            body.string = "----------------------------------------------------------------\n\n" + body.string
+            txt = content.text
+        else:
+            # some archival pages have a different tag structure
+            body = soup.find("pre")
+            body.hr.string = "----------------------------------------------------------------\n\n"
+            txt = body.text
         # the body of the text uses CRLF, but the header uses only
         # LF. Convert to only LF.
         txt = txt.replace("\r", "")
         return txt
+        
+    def _sniff_encoding(self, path):
+        # when handling archival material, encoding can be both utf-8
+        # and latin-1. We could use chardet, but it's probably better
+        # to sniff the start of the file since we know that only utf-8
+        # files use the html5 doctype
+        with open(path, 'rb') as fp:
+            rawhead = fp.read(256)
+        return "utf-8" if b'<!DOCTYPE html>' in rawhead else "latin-1" 
         

@@ -1,0 +1,12 @@
+PREFIX dcterms:<http://purl.org/dc/terms/>
+PREFIX rpubl:<http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
+PREFIX rinfoex:<http://lagen.nu/terms#>
+
+SELECT ?uri ?title
+WHERE {
+  GRAPH <%(context)s> {
+    ?konsuri rinfoex:upphavdAv <%(uri)s>;
+             rpubl:konsoliderar ?uri.
+    ?uri dcterms:title ?title.
+    }
+}

@@ -120,7 +120,7 @@ class LNMediaWiki(wiki.MediaWiki):
     def get_wikisemantics(self, parser, settings):
         return LNSemantics(parser, settings)
 
-    def canonical_uri(self, basefile):
+    def canonical_uri(self, basefile, version=None):
         if basefile.startswith("SFS/") or basefile.startswith("SFS:"):
             # "SFS/1998:204" -> "1998:204"
             basefile = basefile[4:].replace("/", ":")

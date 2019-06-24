@@ -88,6 +88,11 @@ class WSGIApp(object):
         path = environ['PATH_INFO']
         if not isinstance(path, str):
             path = path.decode("utf-8")
+
+        # due to nginx config issues we might have to add a bogus
+        # .diff suffix to our path. remove it as early as possible
+        if path.endswith(".diff"):
+            environ['PATH_INFO'] = environ['PATH_INFO'][:-5]
         url = request_uri(environ)
         qs = environ['QUERY_STRING']
         # self.log.info("Starting process for %s (path_info=%s, query_string=%s)" % (url, path, environ['QUERY_STRING']))

@@ -641,7 +641,7 @@ with the *config* object as single parameter.
         """
         return self.__class__.__module__ + "." + self.__class__.__name__
 
-    def canonical_uri(self, basefile):
+    def canonical_uri(self, basefile, version=None):
         """The canonical URI for the document identified by ``basefile``.
 
         :returns: The canonical URI
@@ -654,7 +654,10 @@ with the *config* object as single parameter.
         # It might also be impossible to provide the canonical_uri
         # without actually parse()ing the document
 
-        return "%sres/%s/%s" % (self.config.url, self.alias, basefile)
+        uri = "%sres/%s/%s" % (self.config.url, self.alias, basefile)
+        if version:
+            uri += "?version=" % urlencode(version)
+        return uri
 
     def dataset_uri(self, param=None, value=None, feed=False):
         """Returns the URI that identifies the dataset that this docrepository
@@ -1277,8 +1280,8 @@ with the *config* object as single parameter.
             raise errors.ParseError("%s: parse_content_selector %r matches nothing" %
                                     (doc.basefile, self.parse_content_selector))
         if len(soups) > 1:
-            self.log.warning("%s: parse_content_selector %r matches more than one tag" %
-                             (doc.basefile, self.parse_content_selector))
+            self.log.warning("parse_content_selector %r matches more than one tag" %
+                             (self.parse_content_selector))
         soup = soups[0]
         for filter_selector in self.parse_filter_selectors:
             for tag in soup.select(native_str(filter_selector)):
@@ -1338,7 +1341,7 @@ with the *config* object as single parameter.
         except PatchConflictError as e:
             raise errors.PatchError(e)
 
-    def make_document(self, basefile=None):
+    def make_document(self, basefile=None, version=None):
         """
         Create a :py:class:`~ferenda.Document` objects with basic
         initialized fields.
@@ -1361,6 +1364,7 @@ with the *config* object as single parameter.
             basefile = unicodedata.normalize("NFC", basefile)
             doc.uri = self.canonical_uri(basefile)
         doc.basefile = basefile
+        doc.version = version
         doc.meta = self.make_graph()
         doc.lang = self.lang
         doc.body = Body()
@@ -1419,7 +1423,7 @@ with the *config* object as single parameter.
                 fp.write(res)
             raise errors.InvalidTree("%s. Invalid tree saved as %s.invalid" % (err, outfile))
 
-        with self.store.open_parsed(doc.basefile, mode="wb") as fp:
+        with self.store.open_parsed(doc.basefile, mode="wb", version=doc.version) as fp:
             fp.write(res)
         # it's a bit nonsensical to first use _open (which leaves the
         # target file untouched if the contents don't change) and then
@@ -1841,7 +1845,7 @@ with the *config* object as single parameter.
                    'v_deps': -1,
                    'v_fulltext': -1}
         with util.logtime(self.log.info,
-                          "%(basefile)s: relate OK (%(elapsed).3f sec) [%(e_triples).3f:%(v_triples)s/%(e_deps).3f:%(v_deps)s/%(e_fulltext).3f:%(v_fulltext)s]",
+                          "relate OK (%(elapsed).3f sec) [%(e_triples).3f:%(v_triples)s/%(e_deps).3f:%(v_deps)s/%(e_fulltext).3f:%(v_fulltext)s]",
                           timings):
             # first, load fulltextindex, then add dependencies, lastly
             # load triplestore. fulltextindex is slightly more picky
@@ -1877,7 +1881,7 @@ with the *config* object as single parameter.
                     values = {'basefile': basefile,
                               'nttemp': nttemp}
                     with util.logtime(self.log.debug,
-                                      "%(basefile)s: Added %(triplecount)s triples to %(nttemp)s (%(elapsed).3f sec)",
+                                      "Added %(triplecount)s triples to %(nttemp)s (%(elapsed).3f sec)",
                                       values):
                         data = open(self.store.distilled_path(basefile), "rb").read()
                         g = Graph().parse(data=data)
@@ -1918,7 +1922,7 @@ with the *config* object as single parameter.
         """
         ts = self._get_triplestore()  # init self._triplestore
         with util.logtime(self.log.debug,
-                          "%(basefile)s: Added %(rdffile)s to context %(context)s (%(elapsed).3f sec)",
+                          "Added %(rdffile)s to context %(context)s (%(elapsed).3f sec)",
                           {'basefile': basefile,
                            'context': self.dataset_uri(),
                            'dataset': self.dataset_uri(),
@@ -1956,7 +1960,7 @@ parsed document path to that documents dependency file."""
         values = {'basefile': basefile,
                   'deps': 0}
         with util.logtime(self.log.debug,
-                          "%(basefile)s: Registered %(deps)s dependencies (%(elapsed).3f sec)",
+                          "Registered %(deps)s dependencies (%(elapsed).3f sec)",
                           values):
             g = Graph().parse(data=util.readfile(self.store.distilled_path(basefile), encoding="utf-8"), format="xml")
             subjects = set([s for s, p, o in g])
@@ -2026,7 +2030,7 @@ parsed document path to that documents dependency file."""
                   'resources': 0,
                   'words': 0}
         with util.logtime(self.log.debug,
-                          "%(basefile)s: Added %(resources)s resources (%(words)s words) to fulltext index  (%(elapsed).3f sec)", values):
+                          "Added %(resources)s resources (%(words)s words) to fulltext index  (%(elapsed).3f sec)", values):
             if repos is None:
                 repos = []
             indexer = self._get_fulltext_indexer(repos)
@@ -2364,7 +2368,7 @@ WHERE {
     @decorators.action
     @decorators.ifneeded('generate')
     @decorators.updateentry('generate')
-    def generate(self, basefile, otherrepos=[], needed=True):
+    def generate(self, basefile, version=None, otherrepos=[], needed=True):
         """Generate a browser-ready HTML file from structured XML and RDF.
 
         Uses the XML and RDF files constructed by
@@ -2383,15 +2387,15 @@ WHERE {
         :type  basefile: str
         :returns: None
         """
-        with util.logtime(self.log.info, "%(basefile)s: generate OK (%(elapsed).3f sec)",
+        with util.logtime(self.log.info, "generate OK (%(elapsed).3f sec)",
                           {'basefile': basefile}):
 
-            self.log.debug("%s: Starting", basefile)
+            self.log.debug("Starting")
 
             # All bookkeping done, now lets prepare and transform!
 
-            infile = self.store.parsed_path(basefile)
-            outfile = self.store.generated_path(basefile)
+            infile = self.store.parsed_path(basefile, version)
+            outfile = self.store.generated_path(basefile, version)
             # The annotationfile might be newer than all dependencies
             # (and thus not need regenerateion) even though the
             # outfile is older.
@@ -2401,20 +2405,23 @@ WHERE {
             else:
                 dependencies = []
             if (self.config.force or (not
-                                      util.outfile_is_newer(dependencies, self.store.annotation_path(basefile)))):
+                                      util.outfile_is_newer(dependencies, self.store.annotation_path(basefile, version)))):
                 with util.logtime(self.log.debug,
-                                  "%(basefile)s: prep_annotation_file (%(elapsed).3f sec)",
+                                  "prep_annotation_file (%(elapsed).3f sec)",
                                   {'basefile': basefile}):
                     # annotation_file should be the same as annotations above?
-                    annotation_file = self.prep_annotation_file(basefile)
+                    annotation_file = self.prep_annotation_file(basefile, version)
             else:
-                annotation_file = self.store.annotation_path(basefile)
+                annotation_file = self.store.annotation_path(basefile, version)
             params = {}
             if annotation_file:
                 params['annotationfile'] = annotation_file
+            if version:
+                params['version'] = version
+            params = self.generate_set_params(basefile, version, params)
 
             with util.logtime(self.log.debug,
-                              "%(basefile)s: transform (%(elapsed).3f sec)",
+                              "transform (%(elapsed).3f sec)",
                               {'basefile': basefile}):
                 conffile = os.path.abspath(
                     os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
@@ -2441,8 +2448,7 @@ WHERE {
                     # the URI into account when relative paths are
                     # constructed with the depth argument to
                     # transform_file
-                    urlparse(self.canonical_uri(basefile)).path[1:-1].count("/") 
-                    depth = urlparse(self.canonical_uri(basefile)).path[1:-1].count("/")
+                    depth = urlparse(self.canonical_uri(basefile, version)).path[1:-1].count("/")
                 transformer.transform_file(infile, outfile, params, depth=depth)
 
             # At this point, outfile may appear untouched if it already
@@ -2458,6 +2464,10 @@ WHERE {
             docentry.updated = now
             docentry.save()
 
+    def generate_set_params(self, basefile, version, params):
+        return params
+
+
     def get_url_transform_func(self, repos=None, basedir=None,
                                develurl=None, remove_missing=False):
         """Returns a function that, when called with a URI, transforms that
@@ -2469,8 +2479,8 @@ WHERE {
         only run if ``config.staticsite``is ``True``.
 
         """
-        def getpath(url, repos, methodname="generated_path"):
-            if methodname == "generated_path" and url == self.config.url:
+        def getpath(url, repos):
+            if url == self.config.url:
                 return self.config.datadir + os.sep + "index.html"
             if "/" not in url:
                 # this is definitly not a HTTP(S) url, might be a
@@ -2490,20 +2500,18 @@ WHERE {
                 # CompositeRepository repos come before subrepos in
                 # the list.
                 if repo.requesthandler.supports_uri(url):
-                    basefile = repo.basefile_from_uri(url)
-                    if basefile:  # if not, might be a dataset uri
-                        # What is the proper path if we want to test
-                        # if a resource exists? sometimes entries/,
-                        # sometimes parsed/, sometimes generated/
-                        method = getattr(repo.store, methodname)
-                        return method(basefile)
+                    if url.endswith(".png"):
+                        # FIXME: This is slightly hacky as it returns
+                        # the path to the generated HTML file, not the
+                        # image, but calling path() will either
+                        # return a filepath that doesn't exist yet
+                        # (the facsimile image won't have been
+                        # created) leading to a invalid-link class, or
+                        # it will create the facsimile image before
+                        # returning the path to it (which would be
+                        # very bad).
+                        return self.store.generated_path(self.basefile_from_uri(url))
                     else:
-                        # even dataset uris must be mapped to a
-                        # path... this is complicated, but
-                        # requesthandler.path solves most of it
-                        # (except that it doesn't handle selecting a
-                        # path to the parsed or docentry file, only
-                        # generated files)
                         return repo.requesthandler.path(url)
         
         def simple_transform(url):
@@ -2525,7 +2533,7 @@ WHERE {
             elif url.startswith("#"):
                 return url
             else:
-                path = getpath(url, repos, "generated_path")
+                path = getpath(url, repos)
             if path:
                 if os.path.exists(path) or not remove_missing:
                     relpath = os.path.relpath(path, basedir)
@@ -2538,9 +2546,9 @@ WHERE {
             else:
                 return url
 
-        def base_transform(url, method="generated_path"):
+        def base_transform(url):
             if remove_missing:
-                path = getpath(url, repos, method)
+                path = getpath(url, repos)
                 # If the file being transformed contains references to
                 # itself, this will return False even when it
                 # shouldn't. As a workaround,
@@ -2565,7 +2573,7 @@ WHERE {
         
         
 
-    def prep_annotation_file(self, basefile):
+    def prep_annotation_file(self, basefile, version):
         """Helper function used by
         :py:meth:`~ferenda.DocumentRepository.generate` -- prepares a
         RDF/XML file containing statements that in some way annotates
@@ -2584,12 +2592,12 @@ WHERE {
             return
         graph = self.construct_annotations(self.canonical_uri(basefile))
         if graph and len(graph) > 0:
-            with self.store.open_annotation(basefile, "w") as fp:
+            with self.store.open_annotation(basefile, "w", version) as fp:
                 fp.write(self.graph_to_annotation_file(graph))
-            return self.store.annotation_path(basefile)
+            return self.store.annotation_path(basefile, version)
         elif self.sparql_expect_results:
             self.log.warning(
-                "%s: No annotation data fetched, something might be wrong with the SPARQL query" % basefile)
+                "No annotation data fetched, something might be wrong with the SPARQL query")
 
     def construct_annotations(self, uri):
         """Construct a RDF graph containing metadata by running the query
@@ -2683,7 +2691,7 @@ WHERE {
     # exist on disk, to know whether keep links to them or not)
     @decorators.action
     @decorators.ifneeded('transformlinks')
-    def transformlinks(self, basefile, otherrepos=[]):
+    def transformlinks(self, basefile, version=None, otherrepos=[]):
         """Transform links in generated HTML files.
 
         If the ``develurl`` or ``staticsite`` settings are used, this
@@ -2693,9 +2701,11 @@ WHERE {
         """
         # FIXME: Do we need any way of preventing double-transforming?
         # How should we detect that a file already has been
-        # transformed?
+        # transformed? Right now documentstore.needed() detects that
+        # by comparing the generated file timestamp with info from the
+        # documententry file
         repos = list(otherrepos)
-        generatedfile = self.store.generated_path(basefile)
+        generatedfile = self.store.generated_path(basefile, version=version)
         if self not in repos:
             repos.append(self)
         transformargs = {'repos': repos,
@@ -2707,8 +2717,7 @@ WHERE {
         elif self.config.removeinvalidlinks is False:
             return None
         
-        with util.logtime(self.log.info, "%(basefile)s: transformlinks OK (%(elapsed).3f sec)",
-                          {'basefile': basefile}):
+        with util.logtime(self.log.info, "transformlinks OK (%(elapsed).3f sec)"):
             urltransform = self.get_url_transform_func(**transformargs)
             doc = etree.parse(generatedfile)
             doctype = doc.docinfo.doctype

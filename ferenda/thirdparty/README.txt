@@ -37,3 +37,7 @@ reason or another, couldn't be directly fetched by setup.py from pypi.
 * coin, part of court, by Niklas Lindström
   (https://code.google.com/p/court/source/checkout?repo=python). Included
   since the package isn't on pypi. BSD License.
+
+* lxml.html.diff, part of lxml (https://lxml.de/). Included with
+  modifications to allow better control over exactly how diffing is
+  performed. BSD License.

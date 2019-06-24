@@ -104,8 +104,8 @@ class Main(SubTestCase, DocumentEntry):
 
 class RepoResourceLoader(unittest.TestCase):
 
-    expected = set(["annotations-panel.xsl", "atom.xsl", "base.xsl", "error.xsl",
-                    "frontpage.xsl", "generic.xsl",
+    expected = set(["analytics-tracker.xsl", "annotations-panel.xsl", "atom.xsl",
+                    "base.xsl", "error.xsl", "frontpage.xsl", "generic.xsl",
                     "grit-grddl.xsl", "keyword.xsl", "nav-search-form.xsl", "paged.xsl",
                     "rdfxml-grit.xsl", "search.xsl", "simplify-ooxml.xsl",
                     "toc.xsl", "tune-width.xsl", "statusreport.xsl"])

@@ -427,7 +427,7 @@ class SwedishLegalSource(DocumentRepository):
                     g.add((current, uri(k), v))
         return g.resource(b)
 
-    def canonical_uri(self, basefile):
+    def canonical_uri(self, basefile, version=None):
         attrib = self.metadata_from_basefile(basefile)
         resource = self.attributes_to_resource(attrib, basefile)
         uri = self.coin_uri(resource, basefile)
@@ -584,7 +584,7 @@ class SwedishLegalSource(DocumentRepository):
         Protokollsutdrag.counter = 0
         self.refparser._legalrefparser.namedlaws = {}
         self.refparser._legalrefparser.currentbasefile = doc.basefile
-        fp = self.parse_open(doc.basefile)
+        fp = self.parse_open(doc.basefile, version=doc.version)
         # maybe the fp now contains a .patchdescription?
         orig_uri = doc.uri
         resource = self.parse_metadata(fp, doc.basefile)
@@ -635,7 +635,7 @@ class SwedishLegalSource(DocumentRepository):
         else:
             return False # basefile was not adjusted
     
-    def parse_open(self, basefile, attachment=None):
+    def parse_open(self, basefile, attachment=None, version=None):
         """Open the main downloaded file for the given basefile, caching the
         contents to an intermediate representation if applicable (or
         reading from that cache if that's ok), and patching the file
@@ -646,25 +646,32 @@ class SwedishLegalSource(DocumentRepository):
 
         """
         # 1. check if intermediate_path exists
-        intermediate_path = self.store.intermediate_path(basefile)
+        intermediate_path = self.store.intermediate_path(basefile, version=version)
         if not os.path.exists(intermediate_path):
             # 2. if not, call code
             #    parse_convert_to_intermediate(basefile) to convert
             #    downloaded_path -> intermediate_path (eg.
             #    WordReader.read, SFS.extract_sfst)
-            fp = self.downloaded_to_intermediate(basefile, attachment)
+
+            kwargs = {}
+            if version and 'version' in inspect.signature(self.downloaded_to_intermediate):
+                kwargs['version'] = version
+            fp = self.downloaded_to_intermediate(basefile, attachment, **kwargs)
         else:
             # 3. recieve intermediate_path as open file (binary?)
-            fp = self.store.open_intermediate(basefile, mode="rb")
+            fp = self.store.open_intermediate(basefile, mode="rb", version=version)
         # 4. call patch_if_needed, recieve as open file (binary?)
-        return self.patch_if_needed(fp, basefile)
+        return self.patch_if_needed(fp, basefile, version=version)
 
-    def patch_if_needed(self, fp, basefile):
+    def patch_if_needed(self, fp, basefile, version=None):
         """Override of DocumentRepository.patch_if_needed with different,
         streamier API."""
         if self.config.ignorepatch is True:
             return fp
-        # 1. do we have a patch?
+        # 1. do we have a patch? FIXME: respect the version specifier
+        # (preferably in a smart way, so that we can say that a
+        # specific patch applies to all versions from A to B (possibly
+        # open-ended)
         patchstore = self.documentstore_class(self.config.patchdir +
                                               os.sep + self.alias)
         patchpath = patchstore.path(basefile, "patches", ".patch")
@@ -676,12 +683,7 @@ class SwedishLegalSource(DocumentRepository):
                 descpath = unicodedata.normalize("NFD", descpath)
             else:
                 return fp
-        self.log.warning("%s: Applying patch %s" % (basefile, patchpath))
         from ferenda.thirdparty.patchit import PatchSet, PatchSyntaxError, PatchConflictError
-        binarystream = False
-        if "b" in fp.mode: # binary stream, won't play nice with patchit
-            fp = codecs.getreader(self.source_encoding)(fp)
-            binarystream = True
         with codecs.open(patchpath, 'r', encoding=self.source_encoding) as pfp:
             if self.config.patchformat == "rot13":
                 # replace the rot13 obfuscated stream with a plaintext stream
@@ -697,6 +699,30 @@ class SwedishLegalSource(DocumentRepository):
             desc = util.readfile(descpath).strip()
         else:
             desc = "(No patch description available)"
+
+        if desc.startswith("[version:"):
+            # if the desc starts with a string like [version:
+            # 2017:1279-] it means that the patch is only working for
+            # versions equal to or above version 2017:1279.
+            m = re.match("\[version: ([^-]*)-([^\]]*)]", desc)
+            assert m, "version specifier malformed"
+            minver, maxver = m.groups()
+            if not minver:
+                minver = "0000:0000"
+            if not maxver:
+                maxver = "9999:9999"
+            # make the version numbers comparable for numsort
+            (minver_s, maxver_s, version_s) = [util.split_numalpha(x) for x in (minver, maxver, version)]
+            if not (minver_s <= version_s <= maxver_s):
+                self.log.debug("version %s is not within compatible versions for patch %s: %s" % (version, patchpath, m.group(0)))
+                return fp
+            desc = desc.replace(m.group(0), "")
+
+        binarystream = False
+        if "b" in fp.mode: # binary stream, won't play nice with patchit
+            fp = codecs.getreader(self.source_encoding)(fp)
+            binarystream = True
+        self.log.warning("Applying patch %s" % (patchpath))
 
         # perform the patching, return the result as a stream, and add
         # an attribute with the description
@@ -807,7 +833,8 @@ class SwedishLegalSource(DocumentRepository):
                 elif k in ("dcterms:issued", "rpubl:avgorandedatum",
                            "rpubl:utfardandedatum",
                            "rpubl:ikrafttradandedatum",
-                           "rpubl:beslutsdatum"):
+                           "rpubl:beslutsdatum",
+                           "rpubl:upphavandedatum"):
                     if re.match("\d{4}-\d{2}-\d{2}", value):
                         # iso8859-1 date (no time portion)
                         dt = datetime.strptime(value, "%Y-%m-%d")
@@ -1225,6 +1252,15 @@ class SwedishLegalSource(DocumentRepository):
                             multiple_values=False,
                             indexingtype=fulltextindex.Label(boost=16),
                             pagetitle='Alla %(selected)s:ar'),
+                      Facet(RDFS.comment,
+                            use_for_toc=False,
+                            use_for_feed=False,
+                            toplevel_only=False,
+                            dimension_label="comment",
+                            dimension_type="value",
+                            multiple_values=False,
+                            indexingtype=fulltextindex.Label(boost=16),
+                            pagetitle='Alla %s(selected)s:ar'),
                       Facet(DCTERMS.creator,
                             use_for_toc=False,
                             use_for_feed=False,
@@ -1265,7 +1301,7 @@ class SwedishLegalSource(DocumentRepository):
                            title)
     
     def _relate_fulltext_value(self, facet, resource, desc):
-        if facet.dimension_label in ("label", "creator", "issued"):
+        if facet.dimension_label in ("label", "comment", "creator", "issued"):
             # "creator" and "issued" should be identical for the root
             # resource and all contained subresources. "label" can
             # change slighly.
@@ -1293,16 +1329,28 @@ class SwedishLegalSource(DocumentRepository):
                 self._relate_fulltext_value_cache[rooturi] = {
                     "creator": c,
                     "issued": i,
-                    "label": l
+                    "label": l,
+                    "comment": l
                 }
             v = self._relate_fulltext_value_cache[rooturi][facet.dimension_label]
             if facet.dimension_label == "label" and "#" in resourceuri:
                 v = self._relate_fulltext_value_label(resourceuri, rooturi, desc)
+            elif facet.dimension_label == "comment" and "#" in resourceuri:
+                v = self._relate_fulltext_value_comment(resourceuri, rooturi, desc)
             return facet.dimension_label, v
         else:
             return super(SwedishLegalSource, self)._relate_fulltext_value(facet, resource, desc)
 
+        
     def _relate_fulltext_value_label(self, resourceuri, rooturi, desc):
+        # Label is used for a shorter, context-dependent description
+        # of a resource, primarily intended for display in nested /
+        # inner hits. In that context (of the parent document, shown
+        # just above), it's preferable to use "15.2 Konsekvenser"
+        # rather than "SOU 1997:39: Integritet ´ Offentlighet ´
+        # Informationsteknik, avsnitt 15.2 'Konsekvenser'". Comment
+        # (see below) is used for context-less situations such as the
+        # autocomplete search form.
         if desc.getvalues(DCTERMS.title):
             if desc.getvalues(BIBO.chapter):
                 v = "%s %s" % (desc.getvalue(BIBO.chapter),
@@ -1315,29 +1363,27 @@ class SwedishLegalSource(DocumentRepository):
             # we don't have any title/label for whatever
             # reason. Uniquify this by using the URI fragment
             v = "%s, %s" % (v, resourceuri.split("#", 1)[1])
-        # the below logic is useful for when labels must be
-        # "standalone". with nested / inner hits, labels are
-        # presented within the context of the parent document,
-        # ie. it's preferable to use "15.2 Konsekvenser"
-        # rather than "SOU 1997:39: Integritet ´ Offentlighet
-        # ´ Informationsteknik, avsnitt 15.2 'Konsekvenser'"
-        #
-        # if desc.getvalues(DCTERMS.title):
-        #     if desc.getvalues(BIBO.chapter):
-        #         v = "%s, avsnitt %s '%s'" % (v,
-        #                                      desc.getvalue(BIBO.chapter),
-        #                                      desc.getvalue(DCTERMS.title))
-        #     else:
-        #         v = "%s, '%s'" % (v, desc.getvalue(DCTERMS.title))
-        # else:
-        #     # we don't have any title for whatever
-        #     # reason. Uniquify this rdfs:label by using the
-        #     # URI fragment
-        #     v = "%s, %s" % (v, resourceuri.split("#", 1)[1])
         return v
 
-    def generate(self, basefile, otherrepos=[]):
-        ret = super(SwedishLegalSource, self).generate(basefile, otherrepos)
+    def _relate_fulltext_value_comment(self, resourceuri, rooturi, desc):
+        v = desc.graph.value(URIRef(rooturi), DCTERMS.identifier)
+        if desc.getvalues(DCTERMS.title):
+            if desc.getvalues(BIBO.chapter):
+                v = "%s, avsnitt %s: %s" % (v,
+                                             desc.getvalue(BIBO.chapter),
+                                             desc.getvalue(DCTERMS.title))
+            else:
+                 v = "%s, avsnitt %s" % (v, desc.getvalue(DCTERMS.title))
+        else:
+            # we don't have any title for whatever
+            # reason. Uniquify this rdfs:label by using the
+            # URI fragment
+             v = "%s, %s" % (v, resourceuri.split("#", 1)[1])
+        return v
+        
+
+    def generate(self, basefile, version=None, otherrepos=[]):
+        ret = super(SwedishLegalSource, self).generate(basefile, version=version, otherrepos=otherrepos)
         if self.get_parse_options(basefile) == "metadataonly" and os.path.exists(self.store.generated_path(basefile)):
             # Do a little magic to ensure wsgiapp.py serves this file
             # with status code 404 instead of 200

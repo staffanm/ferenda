@@ -11,8 +11,10 @@
 
   <xsl:import href="tune-width.xsl"/>
   <xsl:import href="annotations-panel.xsl"/>
-  <xsl:include href="base.xsl"/>
-  
+  <xsl:include href="base.xsl"/> 
+  <xsl:param name="version"/> <!-- set by generate() if asked to generate a specific version -->
+  <xsl:param name="expired"/> <!-- set by generate() if asked to generate a expired SFS -->
+ 
   <!-- Implementationer av templates som anropas från base.xsl -->
   <xsl:template name="headtitle">
     <xsl:value-of select="//xhtml:title"/>
@@ -23,9 +25,9 @@
 
   <xsl:template name="metarobots"/>
 
-  <xsl:template name="linkalternate">
+  <xsl:template name="linkalternate"><!--
     <link rel="alternate" type="text/plain" href="{$documenturi}.txt" title="Plain text"/>
-  </xsl:template>
+  --></xsl:template>
 
   <xsl:template name="headmetadata"/>
 
@@ -43,11 +45,21 @@
     <xsl:variable name="label" select="//xhtml:meta[@property='rdfs:label' and not(@about)]/@content"/>
     <xsl:variable name="alternate" select="//xhtml:meta[@property='dcterms:alternate']/@content"/>
     <div class="row">
+      <xsl:choose>
+	<xsl:when test="$expired">
+	  <div class="watermark"><p>Upphävd författning</p></div>
+	</xsl:when>
+	<xsl:when test="$version">
+	  <div class="watermark"><p>Inaktuell version</p></div>
+	</xsl:when>
+      </xsl:choose>
       <section id="top" class="col-sm-7">
 	<h1><xsl:value-of select="../xhtml:head/xhtml:title"/></h1>
+	<h2>Version: <xsl:value-of select="$version"/></h2>
 	<xsl:if test="$label or $alternate">
 	  <p class="lead">(<xsl:value-of select="$label"/><xsl:if test="$label and $alternate">, </xsl:if><xsl:value-of select="$alternate"/>)</p>
 	</xsl:if>
+	<xsl:call-template name="docversions"/>
 	<xsl:call-template name="docmetadata"/>
 	<xsl:if test="../../xhtml:head/xhtml:meta[@rel='rinfoex:upphavdAv']">
 	  <div class="ui-state-error">
@@ -111,6 +123,31 @@
   <xsl:param name="fixedtoc" select="true()"/>
   <xsl:param name="content-under-pagetitle" select="false()"/>
 
+  <xsl:template name="docversions">
+    <xsl:variable name="versions" select="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/dcterms:hasVersion/rdf:Description"/>
+    <div class="docversions">
+      <xsl:if test="$versions">
+	<h2>Jämför med tidigare versioner</h2>
+	<!--
+	<ul>
+	<xsl:for-each select="$versions">
+	  <li><a href="{@rdf:about}"><xsl:value-of select="dcterms:identifier"/> (Ikraft <xsl:value-of select="rpubl:ikrafttradandedatum"/>, <xsl:value-of select="rpubl:forarbete/rdf:Description/dcterms:identifier"/> <xsl:value-of select="rpubl:forarbete/rdf:Description/dcterms:title"/>)</a></li>
+	</xsl:for-each>
+	</ul>
+	-->
+	<form action="" method="GET">
+	  <input type="hidden" name="diff" value="true"/>
+	  <select name="from">
+	    <xsl:for-each select="$versions">
+	      <option value="{substring(dcterms:identifier, 5)}"><xsl:value-of select="dcterms:identifier"/></option>
+	    </xsl:for-each>
+	  </select>
+	  <input type="submit" value="Jämför"/>
+	</form>
+      </xsl:if>
+    </div>
+  </xsl:template>
+  
   <xsl:template name="docmetadata">
     <xsl:variable name="regpost" select="//xhtml:div[@class='registerpost'][1]"/>
     <dl id="refs-dokument" class="dl-horizontal">
@@ -134,6 +171,12 @@
 	<dd><xsl:value-of select="//xhtml:meta[@property='rpubl:upphavandedatum']/@content"/></dd>
 	<dt>Upphävd genom</dt>
 	<dd><a href="{$upphavdAv}"><xsl:value-of select="//xhtml:div[@about=$upphavdAv]/xhtml:span[@property='dcterms:identifier']/@content"/></a></dd>
+      </xsl:if>
+      <xsl:if test="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/rinfoex:upphaver/rdf:Description"> 
+	<dt>Upphäver</dt>
+	<xsl:for-each select="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/rinfoex:upphaver/rdf:Description">
+	  <dd><a href="{@rdf:about}"><xsl:value-of select="dcterms:title"/></a></dd>
+	</xsl:for-each>
       </xsl:if>
       <dt>Källa</dt>
       <dd rel="dcterms:publisher" resource="http://lagen.nu/org/2008/regeringskansliet"><a href="http://rkrattsbaser.gov.se/sfst?bet={$regpost/xhtml:span[@property='rpubl:arsutgava']/@content}:{$regpost/xhtml:span[@property='rpubl:lopnummer']/@content}">Regeringskansliets rättsdatabaser</a></dd>
@@ -204,7 +247,7 @@
 	</xsl:call-template>
       </div>
     </xsl:if>
-    <xsl:if test="not(@id)">
+    <xsl:if test="not(@id) and not($version)">
       <div class="row">
 	<section class="col-sm-7 ej-ikraft">
 	  <xsl:copy-of select="$andringsmarkering"/>
@@ -233,7 +276,7 @@
 	  <xsl:element name="{local-name(.)}"><xsl:apply-templates/></xsl:element>
 	</section>
       </xsl:if>
-      <xsl:if test="not(@id)">
+      <xsl:if test="not(@id) and not($version)">
 	<section class="col-sm-7 ej-ikraft">
 	  <xsl:copy-of select="$andringsmarkering"/>
 	  <xsl:element name="{local-name(.)}"><xsl:apply-templates/></xsl:element>
@@ -425,7 +468,7 @@
 	<xsl:apply-templates select="*[not(self::xhtml:h1[1])]"/>
       </div>
     </xsl:if>
-    <xsl:if test="not(@id)">
+    <xsl:if test="not(@id) and not($version)">
       <div class="row bilaga ej-ikraft">
 	<xsl:apply-templates select="xhtml:h1[1]"/>
 	<xsl:copy-of select="$andringsmarkering"/>
@@ -514,18 +557,24 @@
   <xsl:template match="xhtml:div[@class='registerpost']">
     <xsl:variable name="year" select="xhtml:span[@property='rpubl:arsutgava']/@content"/>
     <xsl:variable name="nr" select="xhtml:span[@property='rpubl:lopnummer']/@content"/>
+    <xsl:variable name="konsurl" select="concat($documenturi, '/konsolidering/', $year, ':', $nr)"/>
     <div class="andring" id="{@id}" about="{@about}">
       <h2><xsl:choose><xsl:when test="@content"><xsl:value-of select="@content"/></xsl:when><xsl:otherwise>Ändring, <xsl:value-of select="xhtml:span[@property='dcterms:identifier']/@content"/></xsl:otherwise></xsl:choose></h2>
+      <ul>
       <!-- SFS older than 1998:306 does not exist in PDF anywhere. SFS
            1998:306 to 2018:159 exists in unofficial form at
            rkrattsdb.gov.se. SFS equal to or newer than 2018:160
            exists in official form at svenskforfattningssamling.se -->
       <xsl:if test="((number($year) > 1998) or (number($year) = 1998 and number($nr) >= 306)) and (2018 > number($year)) or (number($year) = 2018 and 160 > number($nr))">
-	<p><a href="http://rkrattsdb.gov.se/SFSdoc/{substring($year,3,2)}/{substring($year,3,2)}{format-number($nr,'0000')}.PDF">Tryckt format (PDF)</a></p>
+	<li><a href="http://rkrattsdb.gov.se/SFSdoc/{substring($year,3,2)}/{substring($year,3,2)}{format-number($nr,'0000')}.PDF">Tryckt format (PDF)</a></li>
       </xsl:if>
       <xsl:if test="(number($year) > 2018) or (number($year) = 2018 and number($nr) >= 160)">
-	<p><a href="https://svenskforfattningssamling.se/doc/{$year}{$nr}.html">Officiell autentisk version</a></p>
+	<li><a href="https://svenskforfattningssamling.se/doc/{$year}{$nr}.html">Officiell autentisk version</a></li>
       </xsl:if>
+      <xsl:if test="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/dcterms:hasVersion/rdf:Description[@rdf:about=$konsurl]">
+	<li><a href="{$documenturi}/konsolidering/{$year}:{$nr}">Konsoliderad version med ändringar införda till och med SFS <xsl:value-of select="$year"/>:<xsl:value-of select="$nr"/></a></li>
+      </xsl:if>
+      </ul>
        <xsl:if test="xhtml:div[@class='overgangsbestammelse']">
 	<div class="overgangsbestammelse">
 	  <h3>Övergångsbestämmelse</h3> <!-- FIXME: sometimes better labeled as Ikraftträdandebestämmelse -->

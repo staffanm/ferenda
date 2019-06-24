@@ -94,22 +94,22 @@ class Store(unittest.TestCase):
     def test_path_version(self):
         eq = self.assertEqual
         eq(self.store.path("123","foo", ".bar", version="42"),
-           self.p("archive/foo/123/42.bar"))
+           self.p("archive/foo/123/.versions/42.bar"))
         eq(self.store.path("123/a","foo", ".bar", version="42"),
-           self.p("archive/foo/123/a/42.bar"))
+           self.p("archive/foo/123/a/.versions/42.bar"))
         eq(self.store.path("123:a","foo", ".bar", version="42"),
-           self.p("archive/foo/123/%3Aa/42.bar"))
+           self.p("archive/foo/123/%3Aa/.versions/42.bar"))
         eq(self.store.path("123:a","foo", ".bar", version="42:1"),
-           self.p("archive/foo/123/%3Aa/42/%3A1.bar"))
+           self.p("archive/foo/123/%3Aa/.versions/42/%3A1.bar"))
         self.store.storage_policy = "dir"
         eq(self.store.path("123","foo", ".bar", version="42"),
-           self.p("archive/foo/123/42/index.bar"))
+           self.p("archive/foo/123/.versions/42/index.bar"))
         eq(self.store.path("123/a","foo", ".bar", version="42"),
-           self.p("archive/foo/123/a/42/index.bar"))
+           self.p("archive/foo/123/a/.versions/42/index.bar"))
         eq(self.store.path("123:a","foo", ".bar", version="42"),
-           self.p("archive/foo/123/%3Aa/42/index.bar"))
+           self.p("archive/foo/123/%3Aa/.versions/42/index.bar"))
         eq(self.store.path("123:a","foo", ".bar", version="42:1"),
-           self.p("archive/foo/123/%3Aa/42/%3A1/index.bar"))
+           self.p("archive/foo/123/%3Aa/.versions/42/%3A1/index.bar"))
             
 
     def test_path_attachment(self):
@@ -141,34 +141,34 @@ class Store(unittest.TestCase):
         self.store.storage_policy = "dir"
         eq(self.store.path("123","foo", None,
                                   version="42", attachment="external.foo"),
-           self.p("archive/foo/123/42/external.foo"))
+           self.p("archive/foo/123/.versions/42/external.foo"))
         eq(self.store.path("123/a","foo", None,
                                   version="42", attachment="external.foo"),
-           self.p("archive/foo/123/a/42/external.foo"))
+           self.p("archive/foo/123/a/.versions/42/external.foo"))
 
         eq(self.store.path("123:a","foo", None,
                                   version="42", attachment="external.foo"),
-           self.p("archive/foo/123/%3Aa/42/external.foo"))
+           self.p("archive/foo/123/%3Aa/.versions/42/external.foo"))
         
         
     def test_specific_path_methods(self):
         self.assertEqual(self.store.downloaded_path('123/a'),
                          self.p("downloaded/123/a.html"))
         self.assertEqual(self.store.downloaded_path('123/a', version="1"),
-                         self.p("archive/downloaded/123/a/1.html"))
+                         self.p("archive/downloaded/123/a/.versions/1.html"))
         self.assertEqual(self.store.parsed_path('123/a', version="1"),
-                         self.p("archive/parsed/123/a/1.xhtml"))
+                         self.p("archive/parsed/123/a/.versions/1.xhtml"))
         self.assertEqual(self.store.generated_path('123/a', version="1"),
-                         self.p("archive/generated/123/a/1.html"))
+                         self.p("archive/generated/123/a/.versions/1.html"))
         self.store.storage_policy = "dir"
         self.assertEqual(self.store.downloaded_path('123/a'),
                          self.p("downloaded/123/a/index.html"))
         self.assertEqual(self.store.downloaded_path('123/a', version="1"),
-                         self.p("archive/downloaded/123/a/1/index.html"))
+                         self.p("archive/downloaded/123/a/.versions/1/index.html"))
         self.assertEqual(self.store.parsed_path('123/a', version="1"),
-                         self.p("archive/parsed/123/a/1/index.xhtml"))
+                         self.p("archive/parsed/123/a/.versions/1/index.xhtml"))
         self.assertEqual(self.store.generated_path('123/a', version="1"),
-                         self.p("archive/generated/123/a/1/index.html"))
+                         self.p("archive/generated/123/a/.versions/1/index.html"))
 
            
     def test_basefile_to_pathfrag(self):
@@ -243,10 +243,10 @@ class Store(unittest.TestCase):
             list(self.store.list_basefiles_for("invalid_action"))
 
     def test_list_versions_file(self):
-        files = ["archive/downloaded/123/a/1.html",
-                 "archive/downloaded/123/a/2.html",
-                 "archive/downloaded/123/a/2bis.html",
-                 "archive/downloaded/123/a/10.html"]
+        files = ["archive/downloaded/123/a/.versions/1.html",
+                 "archive/downloaded/123/a/.versions/2.html",
+                 "archive/downloaded/123/a/.versions/2bis.html",
+                 "archive/downloaded/123/a/.versions/10.html"]
         versions = ["1","2", "2bis", "10"]
         for f in files:
             util.writefile(self.p(f),"nonempty")
@@ -255,10 +255,10 @@ class Store(unittest.TestCase):
                          versions)
 
     def test_list_versions_dir(self):
-        files = ["archive/downloaded/123/a/1/index.html",
-                 "archive/downloaded/123/a/2/index.html",
-                 "archive/downloaded/123/a/2bis/index.html",
-                 "archive/downloaded/123/a/10/index.html"]
+        files = ["archive/downloaded/123/a/.versions/1/index.html",
+                 "archive/downloaded/123/a/.versions/2/index.html",
+                 "archive/downloaded/123/a/.versions/2bis/index.html",
+                 "archive/downloaded/123/a/.versions/10/index.html"]
         basefiles = ['123/a']
         versions = ["1","2", "2bis", "10"]
         for f in files:
@@ -266,6 +266,24 @@ class Store(unittest.TestCase):
         self.store.storage_policy = "dir"
         self.assertEqual(list(self.store.list_versions("123/a", "downloaded")),
                          versions)
+
+    def test_list_complicated_versions(self):
+        # the test here is that basefile + version might be ambigious
+        # as to where to split unless we add the reserved .versions
+        # directory
+        a_files = ["archive/downloaded/123/.versions/a/27.html",
+                 "archive/downloaded/123/.versions/a/27/b"]
+        b_files = ["archive/downloaded/123/b/.versions/27.html",
+                 "archive/downloaded/123/b/.versions/27/b.html"]
+        a_versions = ["a/27", "a/27/b"]
+        b_versions = ["27", "27/b"]
+        for f in a_files + b_files:
+            util.writefile(self.p(f),"nonempty")
+        self.assertEqual(list(self.store.list_versions("123","downloaded")),
+                         a_versions)
+        self.assertEqual(list(self.store.list_versions("123/b","downloaded")),
+                         b_versions)
+        
 
     def test_list_attachments(self):
         self.store.storage_policy = "dir" # attachments require this
@@ -299,11 +317,11 @@ class Store(unittest.TestCase):
         
     def test_list_attachments_version(self):
         self.store.storage_policy = "dir" # attachments require this
-        files = ["archive/downloaded/123/a/1/index.html",
-                 "archive/downloaded/123/a/1/attachment.txt",
-                 "archive/downloaded/123/a/2/index.html",
-                 "archive/downloaded/123/a/2/attachment.txt",
-                 "archive/downloaded/123/a/2/other.txt"]
+        files = ["archive/downloaded/123/a/.versions/1/index.html",
+                 "archive/downloaded/123/a/.versions/1/attachment.txt",
+                 "archive/downloaded/123/a/.versions/2/index.html",
+                 "archive/downloaded/123/a/.versions/2/attachment.txt",
+                 "archive/downloaded/123/a/.versions/2/other.txt"]
         basefiles = ['123/a']
         versions = ['1','2']
         attachments_1 = ['attachment.txt']

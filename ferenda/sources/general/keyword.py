@@ -88,9 +88,9 @@ class Keyword(DocumentRepository):
             'wikipediatitles'] = 'http://download.wikimedia.org/svwiki/latest/svwiki-latest-all-titles-in-ns0.gz'
         return opts
 
-    def canonical_uri(self, basefile):
+    def canonical_uri(self, basefile, version=None):
         # keywords often contain spaces -- convert to underscore to get nicer URIs
-        return super(Keyword, self).canonical_uri(basefile.replace(" ",  "_"))
+        return super(Keyword, self).canonical_uri(basefile.replace(" ",  "_"), version)
 
     def basefile_from_uri(self, uri):
         # do the inverse conversion from canonical_uri. NOTE: if your
@@ -273,7 +273,7 @@ class Keyword(DocumentRepository):
     # (e.g. return a RDF graph through one or a few SPARQL queries),
     # not a XML monstrosity
 
-    def prep_annotation_file(self, basefile):
+    def prep_annotation_file(self, basefile, version):
         uri = self.canonical_uri(basefile)
         keyword = basefile
         store = TripleStore.connect(self.config.storetype,

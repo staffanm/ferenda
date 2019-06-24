@@ -12,12 +12,15 @@ from functools import partial
 from urllib.parse import urlparse, unquote, parse_qsl
 import mimetypes
 import traceback
+from copy import deepcopy
 
+from lxml import etree
 from rdflib import Graph
 from ferenda.thirdparty import httpheader
 
 from ferenda import util
 from ferenda.errors import RequestHandlerError
+from ferenda.thirdparty.htmldiff import htmldiff
 
 class RequestHandler(object):
     
@@ -77,11 +80,11 @@ class RequestHandler(object):
             return params
         # else return None (which is different from {})
 
-    def basefile_params_from_basefile(self, basefile):
-        if "?" not in basefile:
+    def params_from_uri(self, uri):
+        if "?" not in uri:
             return {}
         else:
-            return dict(parse_qsl(basefile.split("?", 1)[1]))
+            return dict(parse_qsl(uri.split("?", 1)[1]))
 
     def supports(self, environ):
         """Returns True iff this particular handler supports this particular request."""
@@ -122,7 +125,7 @@ class RequestHandler(object):
             else:
                 return None
         else:
-            params = self.basefile_params_from_basefile(uri)
+            params = self.params_from_uri(uri)
             if params:
                 uri = uri.split("?")[0]
             basefile = self.repo.basefile_from_uri(uri)
@@ -138,7 +141,7 @@ class RequestHandler(object):
                     leaf = uri.split("/")[-1]
                 if "." in leaf:
                     suffix = leaf.rsplit(".", 1)[1]
-        environ = {}
+        environ = {'PATH_INFO': urlparse(uri).path}
         if not suffix:
             environ['HTTP_ACCEPT'] = "text/html"
         contenttype = self.contenttype(environ, uri, basefile, params, suffix)
@@ -194,10 +197,7 @@ class RequestHandler(object):
             basefile = self.repo.basefile_from_uri(uri)
             if not basefile:
                 raise RequestHandlerError("%s couldn't resolve %s to a basefile" % (self.repo.alias, uri))
-            if querystring:
-                params = dict(parse_qsl(querystring))
-            else:
-                params = self.basefile_params_from_basefile(basefile)
+            params = self.params_from_uri(uri + ("?" + querystring if querystring else ""))
         if 'format' in params:
             suffix = params['format']
         else:
@@ -315,6 +315,10 @@ class RequestHandler(object):
                 method = partial(repo.store.intermediate_path, attachment=baseattach)
                 return method  # we really don't want to partial()
                                # this method again below
+        elif "version" in params:
+            method = partial(repo.store.generated_path, version=params["version"])
+        elif "diff" in params:
+            return None
         elif contenttype in self._mimemap and not basefile.endswith("/data"):
             method = getattr(repo.store, self._mimemap[contenttype])
         elif suffix in self._suffixmap and not basefile.endswith("/data"):
@@ -369,6 +373,8 @@ class RequestHandler(object):
                 data = g.serialize(format=self._rdfformats[contenttype])
             elif suffix in self._rdfsuffixes:
                 data = g.serialize(format=rdfsuffixes[suffix])
+            elif 'diff' in params:
+                data = self.diff_versions(basefile, params.get('from'), params.get('to'))
             else:
                 data = None
         path = None
@@ -376,6 +382,48 @@ class RequestHandler(object):
             path = pathfunc(basefile)
             data = None
         return path, data
+
+    def diff_versions(self, basefile, from_version, to_version):
+        def cleantree(tree, savednodes=None):
+            for xpath, save in (("//div[@class='docversions']", False),
+                                ("//div[@role='tablist']", True)):
+                for node in tree.xpath(xpath):
+                    parent = node.getparent()
+                    if save and savednodes is not None:
+                        savednodes[parent.get("about")] = node
+                    parent.remove(node)
+            return tree
+        # 1 load the from_version, cleaning away some parts that we won't diff
+        from_tree = cleantree(etree.parse(
+            self.repo.store.generated_path(basefile, version=from_version)))
+
+        # 2 load the to_version, making a deep copy to be used for the
+        # final template, then cleaning awy the same parts as for the
+        # from_version, but storing these parts for later use.
+        to_tree = etree.parse(
+            self.repo.store.generated_path(basefile, version=to_version))
+        template_tree = deepcopy(to_tree)
+        savednodes = {}
+        to_tree = cleantree(to_tree, savednodes=savednodes)
+
+        # 3 extract doc areas to be diffed (maybe cleantree should do this?)
+        from_area = from_tree.find("//article")
+        to_area = to_tree.find("//article")
+
+        # 4 diff the content areas
+        diffstr = '<article class="col-sm-9">' + htmldiff(from_area, to_area, include_hrefs=False) + '</article>'
+        diff_tree = etree.HTML(diffstr)[0][0]
+        # 5 re-insert the stored-away parts
+        for parent in to_area.xpath("//div[@class='row']"):
+            if parent.get("about") in savednodes:
+                # the saved nodes always appear last amongst its
+                # siblings, so we can always just append to the parent
+                parent.append(savednodes[parent.get("about")])
+        
+        # 6 insert resunt into doc area for 1
+        area = template_tree.find("//article")
+        area.getparent().replace(area, diff_tree)
+        return etree.tostring(template_tree)
 
     def lookup_dataset(self, environ, params, contenttype, suffix):
         # FIXME: This should also make use of pathfunc

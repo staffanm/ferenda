@@ -590,14 +590,14 @@ def make_parser(reader, basefile, log, trace):
         #   1998:674, 2000:192, 2005:104 and 2007:528 -- not always in all
         #   uppercase. However, the initial line "FÖRSTA AVDELNININGEN"
         #   (in any casing) is always followed by another line that
-        #   describes/labels the part.)
+        #   describes/labels the part.). FIXME: 2007:528 uses this pattern but isnt recognized
         #
         # 1979:1152: "Avd. 1. Bestämmelser om taxering av fastighet"
         #  (also in 1979:1193 (revoked))
         #
         # 1994:1009: "Avdelning I Fartyg"
         #
-        # 1999:1229: "AVD. I INNEH\XE5LL OCH DEFINITIONER"
+        # 1999:1229: "AVD. I INNEHÅLL OCH DEFINITIONER"
         #
         # 2009:400: "AVDELNING I. INLEDANDE BESTÄMMELSER"
         # 

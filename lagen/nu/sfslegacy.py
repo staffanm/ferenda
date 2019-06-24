@@ -141,7 +141,7 @@ class SFS(DocumentRepository, SameAs):
             doc.uri = self.canonical_uri(basefile, uppdaterad_tom)
         return doc
 
-    def canonical_uri(self, basefile, konsolidering=False):
+    def canonical_uri(self, basefile, version=None):
         attributes = self.metadata_from_basefile(basefile)
         parts = basefile.split(":", 1)
         # add some extra attributes that will enable
@@ -152,17 +152,17 @@ class SFS(DocumentRepository, SameAs):
                            "rpubl:forfattningssamling":
                            URIRef(self.lookup_resource("SFS",
                                                        SKOS.altLabel))})
-        if konsolidering:
-            if konsolidering is not True:
+        if version:
+            if version is not True:
                 # eg konsolidering = "2013-05-30" or "2013:460"
-                konsolidering = konsolidering.replace(" ", "_")
-            attributes["dcterms:issued"] = konsolidering
+                version = version.replace(" ", "_")
+            attributes["dcterms:issued"] = version
         resource = self.attributes_to_resource(attributes)
         uri = self.minter.space.coin_uri(resource)
         # create eg "https://lagen.nu/sfs/2013:460/konsolidering" if
         # konsolidering = True instead of a issued date.
         # FIXME: This should be done in CoIN entirely
-        if konsolidering is True:
+        if version is True:
             uri = uri.rsplit("/", 1)[0]
         # FIXME: temporary code we use while we get basefile_from_uri to work
         computed_basefile = self.basefile_from_uri(uri)

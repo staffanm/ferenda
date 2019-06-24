@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from collections import namedtuple
 from tempfile import NamedTemporaryFile
 import json
+from json.decoder import JSONDecodeError
 import filecmp
 import operator
 import os
@@ -195,10 +196,14 @@ class Needed(int):
     def __bool__(self):
         return True
 
+    __nonzero__ = __bool__  # py2 compat, py2 doesn't use the __bool__ magic method
+
 RelateNeeded = namedtuple('RelateNeeded', ['fulltext', 'dependencies', 'triples'])
 # make this namedtuple class work in a bool context: False iff all
 # elements are falsy. Elements should be plain bools or Needed objects
 RelateNeeded.__bool__ = lambda self: any(self)
+RelateNeeded.__nonzero__ = RelateNeeded.__bool__
+
 
 # for reason, return the first True-ish elements reason (FIXME: what
 # happens if no element is True?)
@@ -292,7 +297,7 @@ class DocumentStore(object):
         >>> d.storage_policy = "dir"
         >>> d.path('123/a', 'parsed', '.xhtml') == '/tmp/base/parsed/123/a/index.xhtml'
         True
-        >>> d.path('123/a', 'downloaded', None, 'r4711', 'appendix.txt') == '/tmp/base/archive/downloaded/123/a/r4711/appendix.txt'
+        >>> d.path('123/a', 'downloaded', None, 'r4711', 'appendix.txt') == '/tmp/base/archive/downloaded/123/a/.versions/r4711/appendix.txt'
         True
         >>> os.sep = realsep
 
@@ -318,7 +323,7 @@ class DocumentStore(object):
         if version:
             v_pathfrag = self.basefile_to_pathfrag(version)
             segments = [self.datadir,
-                        'archive', maindir, pathfrag, v_pathfrag]
+                        'archive', maindir, pathfrag, '.versions', v_pathfrag]
         else:
             segments = [self.datadir, maindir, pathfrag]
 
@@ -364,7 +369,7 @@ class DocumentStore(object):
         return _open(filename, mode, compression)
 
 
-    def needed(self, basefile, action):
+    def needed(self, basefile, action, version=None):
         """Determine if we really need to perform *action* for the given
 *basefile*, or if the result of the action (in the form of the file
 that the action creates, or similar) is newer than all of the actions
@@ -387,8 +392,8 @@ dependencies (in the form of source files for the action).
         # true (or ferenda-build.py has not been called with a single
         # basefile, which is an implied force)
         if action == "parse":
-            infile = self.downloaded_path(basefile)
-            outfile = self.parsed_path(basefile)
+            infile = self.downloaded_path(basefile, version)
+            outfile = self.parsed_path(basefile, version)
             newer = util.outfile_is_newer([infile], outfile)
             if not newer:
                 return Needed(reason=getattr(newer, 'reason', None))
@@ -403,15 +408,15 @@ dependencies (in the form of source files for the action).
                 dependencies=newer(self.dependencies_path(basefile), entry.indexed_dep,
                                    'indexed_dep'))
         elif action == "generate":
-            infile = self.parsed_path(basefile)
-            annotations = self.annotation_path(basefile)
+            infile = self.parsed_path(basefile, version)
+            annotations = self.annotation_path(basefile, version)
             if os.path.exists(self.dependencies_path(basefile)):
                 deptxt = util.readfile(self.dependencies_path(basefile))
                 dependencies = deptxt.strip().split("\n")
             else:
                 dependencies = []
             dependencies.extend((infile, annotations))
-            outfile = self.generated_path(basefile)
+            outfile = self.generated_path(basefile, version)
             # support generated 404 files (when served through HTTP,
             # served with HTTP status 404, but otherwise works just as
             # regular generated files)
@@ -515,7 +520,12 @@ dependencies (in the form of source files for the action).
         durations = {}
         if os.path.exists(durations_path):
             with open(durations_path) as fp:
-                d = json.load(fp)
+                try:
+                    d = json.load(fp)
+                except JSONDecodeError as e:
+                    # just skip this, it's not essential (we should warn about the corrupt JSON file though)
+                    print("ERROR: %s is not a valid JSON file" % durations_path)
+                    d = {}
                 if action in d:
                     durations = d[action]
         yielded_paths = set()
@@ -588,6 +598,8 @@ dependencies (in the form of source files for the action).
         """
 
         if action:
+            if action == "relate":
+                raise StopIteration()
             assert action in (
                 'downloaded', 'parsed', 'generated'), "Action %s invalid" % action
             actions = (action,)
@@ -599,7 +611,7 @@ dependencies (in the form of source files for the action).
         yielded_basefiles = []
         for action in actions:
             directory = os.sep.join((basedir, "archive",
-                                     action, pathfrag))
+                                     action, pathfrag, ".versions"))
             if not os.path.exists(directory):
                 continue
             for x in util.list_dirs(directory, reverse=False):
@@ -619,12 +631,30 @@ dependencies (in the form of source files for the action).
                         # for another basefile that startswith our
                         # basefile (eg '123' and '123/a', and we found
                         # '123/a/4.html')
-                        continue
+
+                        # FIXME: This doesn't work at all with version
+                        # identifiers that map to os.sep (eg SFS.py,
+                        # which might have a basefile 1980:100, which
+                        # then has version 2007:145, stored at
+                        # <datadir>/archive/downloaded/1980/100/2007/145.html. We
+                        # might need to rethink filenaming here...
+                        # continue
+                        pass
                     # print("Found file %r %r" % (x, self.pathfrag_to_basefile(x)))
                     basefile = self.pathfrag_to_basefile(x)
                     if basefile not in yielded_basefiles:
                         yielded_basefiles.append(basefile)
                         yield basefile
+
+    def list_versions_for_basefiles(self, basefiles, action):
+        adjective = {'parse': 'downloaded',
+                     'generate': 'parsed',
+                     'transformlinks': 'generated'}
+        for basefile in basefiles:
+            yield (basefile, None)
+            if action in adjective:
+                for version in self.list_versions(basefile, adjective[action]):
+                    yield (basefile, version)
 
     def list_attachments(self, basefile, action, version=None):
         """Get all attachments for a basefile in a specified state
@@ -649,7 +679,7 @@ dependencies (in the form of source files for the action).
         pathfrag = self.basefile_to_pathfrag(basefile)
         if version:
             v_pathfrag = self.basefile_to_pathfrag(version)
-            directory = os.sep.join((basedir, "archive", action, pathfrag, v_pathfrag))
+            directory = os.sep.join((basedir, "archive", action, pathfrag, ".versions", v_pathfrag))
         else:
             directory = os.sep.join((basedir, action, pathfrag))
         # FIXME: Similar map exists in list_basefiles_for and in other

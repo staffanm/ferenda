@@ -32,6 +32,29 @@ class SFSHandler(SwedishLegalHandler):
             return super(SFSHandler, self).supports(environ)
         return re.match("/\d{4}\:", environ['PATH_INFO'])
 
+    def _params(self, uri):
+        m = re.search("(?P<basefile>\d{4}:(bih._?|)\d+(_?s\._?\d+|_\d|)+)/konsolidering/(?P<version>\d{4}:\d+)$", uri)
+        if m:
+            basefile = m.group('basefile').replace("_", " ")
+            version = m.group('version')
+            return basefile, version
+        else:
+            return None, None
+
+    def path(self, uri):
+        basefile, version = self._params(uri)
+        if basefile and version:
+            return self.repo.store.generated_path(basefile, version)
+        else:
+            return super(SFSHandler, self).path(uri)
+
+    def params_from_uri(self, uri):
+        basefile, version = self._params(uri)
+        if version:
+            return {'version': version}
+        else:
+            return super(SFSHandler, self).params_from_uri(uri)
+    
 class SFS(OrigSFS, SameAs):
     requesthandler_class = SFSHandler
     
@@ -151,26 +174,57 @@ class SFS(OrigSFS, SameAs):
 
 
     templ = ['(?P<type>sfs[tr])/(?P<byear>\d+)/(?P<bnum>[^\-]+).html',
-             '(?P<type>sfs[tr])/(?P<byear>\d+)/(?P<bnum>[^\-]+)-(?P<vyear>[^\-]+)-(?P<vnum>[^\-]+).html',
-             '(?P<type>sfs[tr])/(?P<byear>\d+)/(?P<bnum>[^\-]+)-(?P<vyear>[^\-]+)-(?P<vnum>[^\-]+)-(?P<vcheck>checksum-[a-f0-9]+).html']
+             '(?P<type>sfs[tr])/(?P<byear>\d+)/(?P<bnum>[^\-]+)-(?P<vfirst>first-version).html',
+             '(?P<type>sfs[tr])/(?P<byear>\d+)/(?P<bnum>[^\-]+)-(?P<vyear>\d{4})-(?P<vnum>[^\-]+).html',
+             '(?P<type>sfs[tr])/(?P<byear>\d+)/(?P<bnum>[^\-]+)-(?P<vyear>\d{4})-(?P<vnum>[^\-]+)-(?P<vcheck>checksum-[a-f0-9]+).html']
     @decorators.action
-    def importarchive(self, archivedir):
+    def importarchive(self, archivedir, overwrite=False):
         """Imports downloaded data from an archive from legacy lagen.nu data.
 
         In particular, creates proper archive storage for older
         versions of each text.
 
         """
-        current = archived = 0
+
+        def valid(f):
+            size = os.path.getsize(f)
+            if size == 0:
+                return False
+            with open(f, mode="rb") as fp:
+                fp.seek(size-20)
+                end_bytes = fp.read()
+            end = end_bytes.decode(errors="ignore")
+            return '</html>' in end
+
+        def find_version(f):
+            # need to look at the file to find out its version
+            encoding = self._sniff_encoding(f)
+            raw = open(f, 'rb').read(8000)
+            text = unescape(raw.decode(encoding, errors="replace"))
+            reader = TextReader(string=text)
+            updated_to = self._find_uppdaterad_tom(basefile,
+                                                   reader=reader)
+            return updated_to
+            
+        current = archived = skipped = invalid = 0
+        spares = {}
+        recent_versions = {}  # records the current version of every
+                              # basefile for which we have any archive
+                              # file
         for f in util.list_dirs(archivedir, ".html"):
             if "downloaded/sfst" not in f:
                 continue
+<<<<<<< HEAD
             if os.path.getsize(f) == 0:
                 continue
+=======
+            self.log.debug("Examining %s" % f)
+>>>>>>> feature/sfs-history
             for regex in self.templ:
                 m = re.search(regex, f)
                 if not m:
                     continue
+<<<<<<< HEAD
                 
                 if "vcheck" in m.groupdict():  # silently ignore these
                                              # (they should be older
@@ -189,19 +243,73 @@ class SFS(OrigSFS, SameAs):
                 updated_to = self._find_uppdaterad_tom(basefile,
                                                        reader=reader)
 
+=======
+                basefile = self.sanitize_basefile("%s:%s" % (m.group("byear"), m.group("bnum")))
+                
+>>>>>>> feature/sfs-history
                 if "vyear" in m.groupdict():  # this file is marked as
                                               # an archival version
-                    archived += 1
-                    version = updated_to
-
-                    if m.group("vyear") == "first":
-                        pass
-                    else:
-                        exp = "%s:%s" % (m.group("vyear"), m.group("vnum"))
-                        if version != exp:
-                            self.log.warning("%s: Expected %s, found %s" %
-                                             (f, exp, version))
+                    expected_version = self.sanitize_basefile("%s:%s" % (m.group("vyear"), m.group("vnum")))
+                elif "vfirst" in m.groupdict(): 
+                    expected_version = basefile
                 else:
+                    # if neither vyear or vfirst is in the filename,
+                    # this is the very first version we have saved. It
+                    # might be the first version, or it could be the
+                    # first version that we were able to download. We
+                    # just go with something and don't worry if it
+                    # turns out to be wrong.
+                    expected_version = basefile
+
+                if os.path.getsize(f) == 0:
+                    # we can't get any useful info from this file, but
+                    # we can use it to trigger a selection of a spare,
+                    # if available
+                    this_version = expected_version
+                else:
+                    this_version = find_version(f)
+                    if this_version != expected_version:
+                        self.log.warning("%s@%s: Expected %s to be version %s" % (basefile, this_version, f, expected_version))
+                    try:
+                        sanitized_this_version = self.sanitize_basefile(this_version)
+                    except:
+                        self.log.error("%s@%s: Couldn't sanitize version found in %s" % (basefile, this_version, f))
+                        break 
+                    if this_version != sanitized_this_version:
+                        self.log.warning("%s@%s: Version in %s sanitizes to %s" % (basefile, this_version, f, sanitized_this_version))
+                        this_version = sanitized_this_version
+
+                if "vcheck" in m.groupdict():
+                    # these checksum variants should be older variants
+                    # of a version we already have -- but in case the
+                    # non-checksum version is empty or corrupted, we
+                    # ought to use the best available checksum version
+                    if valid(f):
+                        spare_version = find_version(f)
+                        spares[(basefile, spare_version)] = f
+                    break
+
+                if basefile not in recent_versions:
+                    mainline = self.store.downloaded_path(basefile)
+                    if os.path.exists(mainline):
+                        recent_versions[basefile] = find_version(mainline)
+                    else:
+                        self.log.warning("%s@%s: archive file %s has no corresponding file in mainline (expected %s)" % (basefile, this_version, f, mainline))
+                        current += 1
+                        # but we'll create an archived version anyway, not one in mainline
+                        recent_versions[basefile] = None
+                if this_version == recent_versions[basefile]:
+                    self.log.debug("%s@%s: file %s has same version as mainline" %
+                                   (basefile, this_version, f))
+                    break
+                if valid(f):
+                    source = f
+                elif (basefile, this_version) in spares:
+                    source = spares[(basefile, this_version)]
+                    self.log.warning("%s@%s: using spare %s instead of invalid file %s" %
+                                     (basefile, this_version, f, source))
+                else:
+<<<<<<< HEAD
                     break
                     # what was the actual POINT of this? SFS.download
                     # will have downloaded a copy of this exact
@@ -230,9 +338,37 @@ class SFS(OrigSFS, SameAs):
                 self.log.debug("%s: extracting %s to %s" % (basefile, f, dest))
                 util.ensure_dir(dest)
                 shutil.copy2(f, dest)
+=======
+                    self.log.error("%s@%s: file %s is invalid, and no spare is available" % 
+                        (basefile, this_version, f))
+                    invalid += 1
+                    break
+                dest = self.store.downloaded_path(basefile, version=this_version)
+                if os.path.exists(dest) and not overwrite:
+                    self.log.debug("%s@%s: Not extracting %s as %s already exists" %
+                                  (basefile, this_version, f, dest))
+                    skipped += 1
+                else:
+                    self.log.info("%s@%s: extracting %s to %s" %
+                                  (basefile, this_version, f, dest))
+                    util.ensure_dir(dest)
+                    shutil.copy2(f, dest)
+                    archived += 1
+>>>>>>> feature/sfs-history
                 break
             else:
                 self.log.warning("Couldn't process %s" % f)
-        self.log.info("Extracted %s current versions and %s archived versions"
-                      % (current, archived))
+        self.log.info("Extracted %s current versions and %s archived versions (skipped %s files that already existed, and couldn't handle %s invalid versions)"
+                      % (current, archived, skipped, invalid))
 
+    @decorators.action
+    def correct_archive_versions(self):
+        # enumerate all basefiles for action parse
+            # enumerate all basefile versions (maybe there's an iterator that does both?)
+                # (if version is single digit)
+                # check what version it probably is (_find_uppdaterad_tom)
+                # stash rename the downloaded version to its correct version
+                # for action in ('distill', 'entries', ...)
+                     # stash rename that as well
+        # execute all renames
+        pass

@@ -28,6 +28,7 @@ from queue import Queue
 from time import sleep
 from urllib.parse import urlsplit
 from wsgiref.simple_server import make_server
+from contextlib import contextmanager
 import argparse
 import builtins
 import cProfile
@@ -124,6 +125,12 @@ class MarshallingHandler(logging.Handler):
 
 class ParseErrorWrapper(errors.FerendaException): pass
 
+class BasefileLoggerAdapter(logging.LoggerAdapter):
+    def process(self, msg, kwargs):
+        e = self.extra
+        label = e['basefile'] + "@" + e['version'] if e['version'] else e['basefile']
+        return '[{%s}] %s' % (label, msg), kwargs
+    
 
 def makeresources(repos,
                   resourcedir="data/rsrc",
@@ -463,8 +470,25 @@ def shutdown_logger():
             existing_handler.close()
         l.removeHandler(existing_handler)
 
+@contextmanager
+def adaptlogger(instance, basefile, version):
+    """A context manager that temporarily switches out the logger on the
+provided docrepo instance for a wrapping LoggerAdapter. The wrapper
+automatically prepends basefile and optional version to all log messages.
+
+Note that this doesn't change any other loggers that submodules might
+use.
+
+    """
+    oldlog = instance.log
+    instance.log = BasefileLoggerAdapter(instance.log, {'basefile': basefile, 'version': version})
+    try:
+        yield
+    finally:
+        instance.log = oldlog
 
 def run(argv, config=None, subcall=False):
+
     """Runs a particular action for either a particular class or all
     enabled classes.
 
@@ -1022,12 +1046,20 @@ def _run_class(enabled, argv, config):
             kwargs['otherrepos'] = otherrepos
 
         if 'all' in inst.config and inst.config.all is True:
+            # create an iterable that yields (basefile, version)
+            # pairs. If config.allversions is not set to True, the
+            # version element will always be None (meaning we'll only
+            # parse the current version, not any archived versions)
             iterable = inst.store.list_basefiles_for(action, force=inst.config.force)
+            if 'allversions' in inst.config and inst.config.allversions:
+                iterable = inst.store.list_versions_for_basefiles(iterable, action)
+            else:
+                iterable = ((x, None) for x in iterable)
             if action == "parse" and not inst.config.force:
                 # if we don't need to parse all basefiles, let's not
                 # even send jobs out to buildclients if we can avoid
                 # it
-                iterable = (x for x in iterable if inst.store.needed(x, "parse"))
+                iterable = ((b,v) for b,v in iterable if inst.store.needed(b, "parse", v))
             res = []
             # semi-magic handling
             kwargs['currentrepo'] = inst
@@ -1063,32 +1095,48 @@ def _run_class(enabled, argv, config):
                         argv)
                 else:
                     # - run the jobs, one by one, in the current process
-                    for basefile in iterable:
-                        r = _run_class_with_basefile(
-                            clbl,
-                            basefile,
-                            kwargs,
-                            action,
-                            alias)
+                    for (basefile, version) in iterable:
+                        with adaptlogger(inst, basefile, version):
+                            r = _run_class_with_basefile(
+                                clbl,
+                                basefile,
+                                version,
+                                kwargs,
+                                action,
+                                alias)
                         res.append(r)
                 cls.teardown(action, inst.config)
         else:
-            # The only thing that kwargs may contain is a
-            # 'otherrepos' parameter.
-            # NOTE: This is a shorter version of the error handling
-            # that _run_class_with_basefile does. All errors except
-            # DocumentRemoved we want to propagate.
-            try:
-                res = clbl(*config.arguments, **kwargs)
-            except errors.DocumentRemovedError as e:
-                if e.dummyfile:
-                    util.writefile(e.dummyfile, "")
-                raise e
-            except Exception as e:
-                loc = util.location_exception(e)
-                log.error("%s %s failed: %s (%s)" %
-                          (action, alias, e, loc))
-                raise e
+            # The only thing that kwargs may contain is a 'otherrepos'
+            # parameter.
+            if len(config.arguments) == 1 and action in ('parse', 'generate', 'transformlinks'):
+                basefile = config.arguments[0]
+                version = getattr(config, 'version', None)
+                with adaptlogger(inst, basefile, version):
+                    res = _run_class_with_basefile(clbl, basefile, None, kwargs, action, alias)
+                adjective = {'parse': 'downloaded',
+                             'generate': 'parsed',
+                             'transformlinks': 'generated'}
+                if 'allversions' in config and config.allversions:
+                    res = [res]
+                    for version in inst.store.list_versions(basefile, adjective.get(action, action)):
+                        with adaptlogger(inst, basefile, version):
+                            res = _run_class_with_basefile(clbl, basefile, version, kwargs, action, alias)
+            else:
+                # NOTE: This is a shorter version of the error
+                # handling that _run_class_with_basefile does. We want
+                # to propagate all errors except DocumentRemoved.
+                try:
+                    res = clbl(*config.arguments, **kwargs)
+                except errors.DocumentRemovedError as e:
+                    if e.dummyfile:
+                        util.writefile(e.dummyfile, "")
+                    raise e
+                except Exception as e:
+                    loc = util.location_exception(e)
+                    log.error("%s %s failed: %s (%s)" %
+                              (action, alias, e, loc))
+                    raise e
     return res
 
 # The functions runbuildclient, _queuejobs, _make_client_manager,
@@ -1249,14 +1297,20 @@ def _build_worker(jobqueue, resultqueue, clientname):
                         
         # proctitle = re.sub(" [now: .*]$", "", getproctitle())
         proctitle = getproctitle()
-        setproctitle(proctitle + " [%(alias)s %(command)s %(basefile)s]" % job)
-        res = _run_class_with_basefile(clbl, job['basefile'],
-                                       kwargs, job['command'],
-                                       job['alias'],
-                                       wrapctrlc=True)
+        newproctitle = proctitle + " [%(alias)s %(command)s %(basefile)s]" % job
+        if job['version']:
+            newproctitle = newproctitle[:-1] + "@" + job['version'] + newproctitle[-1]
+        setproctitle(newproctitle)
+        with adaptlogger(insts[job['classname']], job['basefile'], job['version']):
+            res = _run_class_with_basefile(clbl, job['basefile'],
+                                           job['version'],
+                                           kwargs, job['command'],
+                                           job['alias'],
+                                           wrapctrlc=True)
         setproctitle(proctitle)
         log.debug("Client: [pid %s] %s finished: %s" % (os.getpid(), job['basefile'], res))
         outdict = {'basefile': job['basefile'],
+                   'version': job['version'],
                    'alias': job['alias'],
                    'result':  res,
                    'log': list(logrecords),
@@ -1285,6 +1339,7 @@ def _build_worker(jobqueue, resultqueue, clientname):
             #   unwrapped it on the other end, so now there's no need for this hack.
             print("%s: Catastrophic error %s" % (job['basefile'], e))
             resultqueue.put({'basefile': job['basefile'],
+                             'version': job['version'],
                              'result': None,
                              'log': list(logrecords),
                              'client': clientname})
@@ -1351,7 +1406,8 @@ def __queue_jobs_nomanager(jobqueue, iterable, inst, classname, command):
     # print("Server: Extra config for clients is %r" % client_config)
     basefiles = []
     for idx, basefile in enumerate(iterable):
-        job = {'basefile': basefile,
+        job = {'basefile': basefile[0],
+               'version': basefile[1],
                'classname': classname,
                'command': command,
                'alias': inst.alias,
@@ -1383,7 +1439,8 @@ def _queue_jobs(manager, iterable, inst, classname, command):
     log.debug("Server: Extra config for clients is %r" % client_config)
     idx = -1
     for idx, basefile in enumerate(iterable):
-        job = {'basefile': basefile,
+        job = {'basefile': basefile[0],
+               'version': basefile[1],
                'classname': classname,
                'command': command,
                'alias': inst.alias,
@@ -1404,7 +1461,7 @@ def _queue_jobs(manager, iterable, inst, classname, command):
     clients = Counter()
     signal.signal(signal.SIGALRM, _resultqueue_get_timeout)
     # FIXME: be smart about how long we wait before timing out the resultqueue.get() call
-    timeout_length = 300 
+    timeout_length = 900 
     while len(processing) > 0:
         try:
             r = resultqueue.get()
@@ -1413,12 +1470,12 @@ def _queue_jobs(manager, iterable, inst, classname, command):
             processing.clear()
             continue
         signal.alarm(timeout_length)
-        if (r['alias'], r['basefile']) not in processing:
+        if (r['alias'], (r['basefile'], r['version'])) not in processing:
             if r['alias'] == inst.alias:
                 log.warning("%s not found in processing (%s)" % (r['basefile'], format_tupleset(processing)))
             else:
                 log.warning("%s from repo %s was straggling, better late than never" % (r['basefile'], r['alias']))
-        processing.discard((r['alias'], r['basefile']))
+        processing.discard((r['alias'], (r['basefile'], r['version'])))
         if isinstance(r['result'], tuple) and r['result'][0] == _WrappedKeyboardInterrupt:
             raise KeyboardInterrupt()
         elif isinstance(r['result'], tuple) and isinstance(r['result'][0], Exception):
@@ -1561,7 +1618,7 @@ def _process_resultqueue(resultqueue, basefiles, procs, jobqueue, clientname):
             # some client have failed sending us a result on the
             # queue
             # FIXME: be smart about selecting a suitable timeout
-            signal.alarm(180)
+            signal.alarm(900)
             if isinstance(r['result'], tuple) and r['result'][0] == _WrappedKeyboardInterrupt:
                 raise KeyboardInterrupt()
             res[r['basefile']] = r['result']
@@ -1574,8 +1631,13 @@ def _process_resultqueue(resultqueue, basefiles, procs, jobqueue, clientname):
             log.error("result could not be decoded: %s" % e)
             # now we'll have a basefile without a result -- maybe we should indicate somehow
     signal.alarm(0)
-    # return the results in the same order as they were queued. If we miss a result for a particular 
-    return [res.get(x, {'basefile': x, 'result': False, 'log': 'CATASTROPHIC ERROR (couldnt decode result from client)', 'client': 'unknown'}) for x in basefiles]
+    # return the results in the same order as they were queued. If we
+    # miss a result for a particular basefile, return a catastropic
+    # error saying we couldn't get the result
+    return [res.get(b, {'basefile': b,
+                        'result': False,
+                        'log': 'CATASTROPHIC ERROR (couldnt decode result from client)',
+                        'client': 'unknown'}) for b, v in basefiles]
 
 def _resultqueue_get_timeout(signum, frame):
     # get a list of sent jobs and recieved results. determine which
@@ -1602,9 +1664,16 @@ def _siginfo_handler(signum, frame):
         print("Queued %s jobs, recieved %s results" % (frame.f_locals['number_of_jobs'], len(frame.f_locals['res'])))
     
     
-def _run_class_with_basefile(clbl, basefile, kwargs, command,
+def _run_class_with_basefile(clbl, basefile, version, kwargs, command,
                              alias="(unknown)", wrapctrlc=False):
     try:
+        # This doesn't work great with @managedparsing (particularly
+        # the @makedocument decorator changes the method signature
+        # from (self, baseefile, version) to (self, doc)
+        # if version and 'version' not in inspect.signature(clbl).parameters:
+        #     getlog().warning("%s %s: Called with basefile %s and version %s, but %s doesn't support version parameter" % (alias, command, basefile, version, command))
+        if version:
+            kwargs['version'] = version
         return clbl(basefile, **kwargs)
     except errors.DocumentRemovedError as e:
         errmsg = str(e)
@@ -1641,8 +1710,9 @@ def _run_class_with_basefile(clbl, basefile, kwargs, command,
             raise
         errmsg = str(e)
         loc = util.location_exception(e)
+        label = basefile + ("@%s" % version if version else "")
         getlog().error("%s %s %s failed: %s (%s)" %
-                       (alias, command, basefile, errmsg, loc))
+                       (alias, command, label, errmsg, loc))
         exc_type, exc_value, tb = sys.exc_info()
         return exc_type, exc_value, traceback.extract_tb(tb)
     except KeyboardInterrupt as e:   # KeyboardInterrupt is not an Exception
