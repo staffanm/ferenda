@@ -304,3 +304,14 @@ class SFS(OrigSFS, SameAs):
         self.log.info("Extracted %s current versions and %s archived versions (skipped %s files that already existed, and couldn't handle %s invalid versions)"
                       % (current, archived, skipped, invalid))
 
+    @decorators.action
+    def correct_archive_versions(self):
+        # enumerate all basefiles for action parse
+            # enumerate all basefile versions (maybe there's an iterator that does both?)
+                # (if version is single digit)
+                # check what version it probably is (_find_uppdaterad_tom)
+                # stash rename the downloaded version to its correct version
+                # for action in ('distill', 'entries', ...)
+                     # stash rename that as well
+        # execute all renames
+        pass
