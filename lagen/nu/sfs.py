@@ -214,39 +214,14 @@ class SFS(OrigSFS, SameAs):
         for f in util.list_dirs(archivedir, ".html"):
             if "downloaded/sfst" not in f:
                 continue
-<<<<<<< HEAD
             if os.path.getsize(f) == 0:
                 continue
-=======
-            self.log.debug("Examining %s" % f)
->>>>>>> feature/sfs-history
             for regex in self.templ:
                 m = re.search(regex, f)
                 if not m:
                     continue
-<<<<<<< HEAD
-                
-                if "vcheck" in m.groupdict():  # silently ignore these
-                                             # (they should be older
-                                             # versions of a version
-                                             # we already have -- but
-                                             # we ought to test this!)
-                    break
-                basefile = "%s:%s" % (m.group("byear"), m.group("bnum"))
-
-                # need to look at the file to find out its version
-                raw = open(f, 'rb').read(8000)
-                # if it uses html5 doctype, assume utf-8, otherwise assume latin-1
-                encoding = "utf-8" if b'<!DOCTYPE html>' in raw else "latin-1" 
-                text = unescape(raw.decode(encoding, errors="replace"))
-                reader = TextReader(string=text)
-                updated_to = self._find_uppdaterad_tom(basefile,
-                                                       reader=reader)
-
-=======
                 basefile = self.sanitize_basefile("%s:%s" % (m.group("byear"), m.group("bnum")))
                 
->>>>>>> feature/sfs-history
                 if "vyear" in m.groupdict():  # this file is marked as
                                               # an archival version
                     expected_version = self.sanitize_basefile("%s:%s" % (m.group("vyear"), m.group("vnum")))
@@ -309,36 +284,6 @@ class SFS(OrigSFS, SameAs):
                     self.log.warning("%s@%s: using spare %s instead of invalid file %s" %
                                      (basefile, this_version, f, source))
                 else:
-<<<<<<< HEAD
-                    break
-                    # what was the actual POINT of this? SFS.download
-                    # will have downloaded a copy of this exact
-                    # version (the most recent version), regardless of
-                    # whether it's expired or not.
-                    
-                    # version = None
-                    # current += 1
-                    # de = DocumentEntry()
-                    # de.basefile = basefile
-                    # de.id = self.canonical_uri(basefile, updated_to)
-                    # # fudge timestamps best as we can
-                    # de.orig_created = datetime.fromtimestamp(os.path.getctime(f))
-                    # de.orig_updated = datetime.fromtimestamp(os.path.getmtime(f))
-                    # de.orig_updated = datetime.now()
-                    # de.orig_url = self.document_url_template % locals()
-                    # de.published = datetime.now()
-                    # de.url = self.generated_url(basefile)
-                    # de.title = "SFS %s" % basefile
-                    # de.save(self.store.documententry_path(basefile))
-
-                if m.group("type") == "sfsr":
-                    dest = self.store.register_path(basefile, version=version)
-                else:
-                    dest = self.store.downloaded_path(basefile, version=version)
-                self.log.debug("%s: extracting %s to %s" % (basefile, f, dest))
-                util.ensure_dir(dest)
-                shutil.copy2(f, dest)
-=======
                     self.log.error("%s@%s: file %s is invalid, and no spare is available" % 
                         (basefile, this_version, f))
                     invalid += 1
@@ -354,7 +299,6 @@ class SFS(OrigSFS, SameAs):
                     util.ensure_dir(dest)
                     shutil.copy2(f, dest)
                     archived += 1
->>>>>>> feature/sfs-history
                 break
             else:
                 self.log.warning("Couldn't process %s" % f)
