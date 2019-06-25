@@ -3,10 +3,10 @@ version: 0.3.1.dev1.{build}
 environment:
   matrix:
     - PYTHON: "C:/Python27"
-      LXML_WHEEL: "lxml-4.3.4-cp27-cp27m-win32.whl"
+      LXML_WHEEL: "tools/win32/lxml-4.3.4-cp27-cp27m-win32.whl"
       REQUIREMENTS: "requirements.py2.txt"
     - PYTHON: "C:/Python37"
-      LXML_WHEEL: "lxml-4.3.4-cp37-cp37m-win32.whl"
+      LXML_WHEEL: "tools/win32/lxml-4.3.4-cp37-cp37m-win32.whl"
       REQUIREMENTS: "requirements.py3.txt"
       PYTHONPATH: "."      
 init:
