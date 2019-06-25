@@ -685,6 +685,7 @@ class SwedishLegalSource(DocumentRepository):
                 return fp
         from ferenda.thirdparty.patchit import PatchSet, PatchSyntaxError, PatchConflictError
         binarystream = False
+        orig_fp = fp
         if not hasattr(fp, 'mode') or "b" in fp.mode: # binary stream, won't play nice with patchit
             fp = codecs.getreader(self.source_encoding)(fp)
             binarystream = True
@@ -703,7 +704,6 @@ class SwedishLegalSource(DocumentRepository):
             desc = util.readfile(descpath).strip()
         else:
             desc = "(No patch description available)"
-
         if desc.startswith("[version:"):
             # if the desc starts with a string like [version:
             # 2017:1279-] it means that the patch is only working for
@@ -719,12 +719,12 @@ class SwedishLegalSource(DocumentRepository):
             (minver_s, maxver_s, version_s) = [util.split_numalpha(x) for x in (minver, maxver, version)]
             if not (minver_s <= version_s <= maxver_s):
                 self.log.debug("version %s is not within compatible versions for patch %s: %s" % (version, patchpath, m.group(0)))
-                return fp
+                return orig_fp
             desc = desc.replace(m.group(0), "")
 
         binarystream = False
         if "b" in fp.mode: # binary stream, won't play nice with patchit
-            fp = codecs.getreader(self.source_encoding)(fp)
+            # fp = codecs.getreader(self.source_encoding)(fp)
             binarystream = True
         self.log.warning("Applying patch %s" % (patchpath))
 

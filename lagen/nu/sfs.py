@@ -306,7 +306,10 @@ class SFS(OrigSFS, SameAs):
                       % (current, archived, skipped, invalid))
 
     @decorators.action
-    def correct_archive_versions(self):
+    def correct_archive_versions(self, archivedir=None):
+        if not archivedir:
+            archivedir = self.store.datadir
+        store = DocumentStore(archivedir)
         # enumerate all basefiles for action parse
             # enumerate all basefile versions (maybe there's an iterator that does both?)
                 # (if version is single digit)

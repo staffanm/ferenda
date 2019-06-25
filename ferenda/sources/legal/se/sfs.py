@@ -541,7 +541,7 @@ class SFS(Trips):
                     datestr = rawtext[idx+len(needle):idx+len(needle)+10]
                     if (not re.match(r"\d+-\d+-\d+$", datestr) or
                         (datetime.strptime(datestr, '%Y-%m-%d') < datetime.today())):
-                        self.log.debug('Expired' % basefile)
+                        self.log.debug('%s Expired' % basefile)
                         if not self.config.keepexpired:
                             raise UpphavdForfattning("%s is an expired SFS" % basefile,
                                                      dummyfile=self.store.parsed_path(basefile))
@@ -563,7 +563,7 @@ class SFS(Trips):
         if notfound:
             raise InteExisterandeSFS(str(notfound))
         textheader = fp.read(2048)
-        assert(isinstance(textheader, bytes))
+        assert isinstance(textheader, bytes), "textheader.read() returned a %s, not bytes" % type(textheader)
         idx = textheader.index(b"-"*64)
         header = textheader[:idx]
         offset = len(header)
@@ -664,7 +664,7 @@ class SFS(Trips):
                         raise UpphavdForfattning("%s is an expired SFS"
                                                  % basefile,
                                                  dummyfile=self.store.parsed_path(basefile))
-                    d[docuri]["rpubl:upphavandedatum"] = val
+                    d[docuri]["rpubl:upphavandedatum"] = val[:10]  # discard trailing info
                 elif key == 'Ikraft':
                     d[docuri]["rpubl:ikrafttradandedatum"] = val[:10]
                 elif key == 'Omfattning':
@@ -1083,7 +1083,11 @@ class SFS(Trips):
         # bytes- and str-files
         if not isinstance(bodystring, str):
             bodystring = bodystring.decode(self.source_encoding)
-        reader = TextReader(string=bodystring, linesep=TextReader.UNIX)
+        if bodystring.strip():
+            reader = TextReader(string=bodystring, linesep=TextReader.UNIX)
+        else:
+            self.log.warning("Missing actual statute text")
+            reader = TextReader(string="(Författningstext saknas)")
         reader.autostrip = True
         return reader
 

@@ -587,6 +587,7 @@ class DocumentRepository(object):
             'apiendpoint': "/api/",
             'searchendpoint': "/search/",
             'acceptalldomains': False,
+            'allversions': False
         }
 
     @classmethod

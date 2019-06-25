@@ -198,6 +198,7 @@ class FulltextIndex(object):
     fields.
 
     """
+    alternate_fieldmapping = ()
 
     def to_native_field(self, fieldobject):
         """Given a abstract field (an instance of a IndexedType-derived
@@ -222,7 +223,10 @@ class FulltextIndex(object):
             if (isinstance(fieldobject, type(nativefield)) and
                     fieldobject == nativefield):
                 return abstractfield
-        raise errors.SchemaMappingError("Native field %s cannot be mapped" % fieldobject)
+        for abstractfield, nativefield in self.alternate_fieldmapping:
+            if fieldobject == nativefield:
+                return abstractfield
+        raise errors.SchemaMappingError("Native field %s cannot be mapped, fieldmapping: %r " % (fieldobject, self.fieldmapping))
 
 
 class IndexedType(object):
@@ -707,6 +711,13 @@ class ElasticSearchIndex(RemoteIndex):
                      {"type": "long"}),
                     )
 
+    # used whenever ElasticSearch changes the mapping behind our backs...
+    alternate_fieldmapping = (
+        (Label(boost=16),
+         {'fields': {'keyword':
+                     {'ignore_above': 256, 'type': 'keyword'}},
+          'type': 'text'}),
+        )
     term_excludes = "excludes"  # this key changed name 
                                 # "exclude"->"excludes" from 2.* to
                                 # 5.*
