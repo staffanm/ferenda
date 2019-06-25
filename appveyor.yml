@@ -17,8 +17,7 @@ init:
 install:
   - "copy tools\\win32\\tidy.exe tidy.exe"
   - "%PYTHON%/python.exe c:/get-pip.py"
-  - "%PYTHON%/Scripts/pip.exe -q install wheel"
-  - "%PYTHON%/Scripts/wheel.exe install %LXML_WHEEL%"
+  - "%PYTHON%/Scripts/pip.exe install %LXML_WHEEL%"
   - "%PYTHON%/Scripts/pip.exe -q install -r %REQUIREMENTS%"
 test_script:
   - "%PYTHON%/python.exe -Wi tools/rununittest.py discover test"
