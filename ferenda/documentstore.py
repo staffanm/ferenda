@@ -7,7 +7,11 @@ from contextlib import contextmanager
 from collections import namedtuple
 from tempfile import NamedTemporaryFile
 import json
-from json.decoder import JSONDecodeError
+try:
+    from json.decoder import JSONDecodeError
+except ImportError: # probably on py2.7/py3.4
+    JSONDecodeError = ValueError
+    
 import filecmp
 import operator
 import os
