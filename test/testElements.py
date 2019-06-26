@@ -21,7 +21,7 @@ from ferenda.elements import (serialize, deserialize, AbstractElement,
                               PredicateElement, Body, Section, Paragraph,
                               Link, html)
 from ferenda import elements as el
-from test.quiet import quiet
+from quiet import quiet
 
 
 class Main(unittest.TestCase):

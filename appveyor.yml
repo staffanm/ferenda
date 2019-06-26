@@ -4,20 +4,21 @@ environment:
   matrix:
     - PYTHON: "C:/Python27"
       LXML_WHEEL: "tools/win32/lxml-4.3.4-cp27-cp27m-win32.whl"
+      SIMPLEPARSE_WHEEL: "tools/win32/SimpleParse-2.2.0-cp27-cp27m-win32.whl"
       REQUIREMENTS: "requirements.py2.txt"
     - PYTHON: "C:/Python37"
       LXML_WHEEL: "tools/win32/lxml-4.3.4-cp37-cp37m-win32.whl"
+      SIMPLEPARSE_WHEEL: "tools/win32/SimpleParse-2.2.0-cp37-cp37m-win32.whl"
       REQUIREMENTS: "requirements.py3.txt"
       PYTHONPATH: "."      
 init:
   - "ECHO %PYTHON%"
-  - "ECHO %LXML%"
   - ps: Invoke-WebRequest "https://bootstrap.pypa.io/get-pip.py" -OutFile "c:/get-pip.py"
   - ps: "git config --global core.autocrlf false" # always use unix lineendings
 install:
   - "copy tools\\win32\\tidy.exe tidy.exe"
   - "%PYTHON%/python.exe c:/get-pip.py"
-  - "%PYTHON%/Scripts/pip.exe install %LXML_WHEEL%"
+  - "%PYTHON%/Scripts/pip.exe install %LXML_WHEEL% %SIMPLEPARSE_WHEEL%"
   - "%PYTHON%/Scripts/pip.exe -q install -r %REQUIREMENTS%"
 test_script:
   - "%PYTHON%/python.exe -Wi tools/rununittest.py discover test"

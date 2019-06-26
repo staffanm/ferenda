@@ -18,7 +18,7 @@ from examplerepos import staticmockclass, staticmockclass2, staticmockclass3
 # SUT
 from ferenda import Resources
 
-from test.quiet import silence
+from quiet import silence
 
 class Make(unittest.TestCase, FerendaTestCase):
     def setUp(self):

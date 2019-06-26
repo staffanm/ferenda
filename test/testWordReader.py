@@ -15,7 +15,7 @@ from lxml import etree
 from ferenda.compat import unittest
 from ferenda.errors import ExternalCommandError
 
-from test.quiet import silence
+from quiet import silence
 
 # SUT
 from ferenda import WordReader

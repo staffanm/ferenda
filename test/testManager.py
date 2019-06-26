@@ -25,7 +25,7 @@ from ferenda.testutil import RepoTester, FerendaTestCase
 from ferenda import manager, decorators, util, errors
 from ferenda import (DocumentRepository, DocumentStore,
                      ResourceLoader, Resources)
-from test.quiet import quiet
+from quiet import quiet
 
 
 

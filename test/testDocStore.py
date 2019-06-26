@@ -338,6 +338,7 @@ class Store(unittest.TestCase):
 
 
 class Compression(unittest.TestCase):
+    maxDiff = 2048
     compression = None
     expected_suffix = ""
     expected_mimetype = "text/plain"
