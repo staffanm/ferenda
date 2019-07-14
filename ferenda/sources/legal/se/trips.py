@@ -162,11 +162,26 @@ class Trips(SwedishLegalSource):
         if encoding == "utf-8":
             content = soup.find("div", "search-results-content")
             body = content.find("div", "body-text")
-            if not body or not body.string:
-                raise DocumentRemovedError("%s has no body-text" % basefile,
+            if not body:
+                raise DocumentRemovedError("%s has no body-text div" % basefile,
                                            dummyfile=self.store.parsed_path(basefile))
-            body.string = "----------------------------------------------------------------\n\n" + body.string
-            txt = content.text
+            if body.string:
+                body.string = "----------------------------------------------------------------\n\n" + body.string
+                txt = content.text
+            else:
+                if body.text.strip():
+                    # meaning we have text, just not as a single
+                    # textnode within the <div>. This usually means
+                    # that some < > characters have not been escaped
+                    # in the source material, and are misinterpreted
+                    # by BS4. We warn and salvage what we can.
+                    self.log.warning("Plaintext probably contains unescaped angle brackets, causing an incorrect HTML interpretation")
+                    tmptext = body.text
+                    body.clear()
+                    body.string = "----------------------------------------------------------------\n\n" + tmptext
+                    txt = content.text
+                else:
+                    txt = content.text + "----------------------------------------------------------------\n\n"
         else:
             # some archival pages have a different tag structure
             body = soup.find("pre")

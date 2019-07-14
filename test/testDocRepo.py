@@ -30,7 +30,7 @@ from ferenda.errors import *
 
 
 # The main system under test (SUT)
-from test.quiet import silence
+from quiet import silence
 from ferenda import DocumentRepository
 from ferenda.testutil import RepoTester, parametrize
 

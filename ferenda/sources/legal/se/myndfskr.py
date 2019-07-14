@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
@@ -671,8 +670,7 @@ class MyndFskrBase(FixedLayoutSource):
                 props['dcterms:identifier'] += " (konsoliderad)"
         return props
 
-    def polish_metadata(self, props):
-        
+    def polish_metadata(self, attributes, basefile, infer_nodes=True):
         """Clean up data, including converting a string->string dict to a
         proper RDF graph.
 
@@ -685,33 +683,33 @@ class MyndFskrBase(FixedLayoutSource):
                                        self.minter,
                                        self.commondata)
         # FIXME: this code should go into canonical_uri, if we can
-        # find a way to give it access to props['dcterms:identifier']
-        konsolidering = props.get("rdf:type", "").endswith("#KonsolideradGrundforfattning")
+        # find a way to give it access to attributes['dcterms:identifier']
+        konsolidering = attributes.get("rdf:type", "").endswith("#KonsolideradGrundforfattning")
 
         # publisher for the series == publisher for the document
-        if "dcterms:publisher" not in props:
-            publisher = self.commondata.value(props['rpubl:forfattningssamling'],
+        if "dcterms:publisher" not in attributes:
+            publisher = self.commondata.value(attributes['rpubl:forfattningssamling'],
                                               DCTERMS.publisher)
             assert publisher, "Found no publisher for fs %s" % fs
-            props["dcterms:publisher"] = publisher
+            attributes["dcterms:publisher"] = publisher
 
-        if 'rpubl:beslutadAv' in props:
+        if 'rpubl:beslutadAv' in attributes:
             # The agencies sometimes doesn't use it's official name!
-            if props['rpubl:beslutadAv'] == "Räddningsverket":  
+            if attributes['rpubl:beslutadAv'] == "Räddningsverket":  
                 self.log.warning("rpubl:beslutadAv was '%s', "
                                  "correcting to 'Statens räddningsverk'" %
-                                 props['rpubl:beslutadAv'])
-                props['rpubl:beslutadAv'] = "Statens räddningsverk"
-            if props['rpubl:beslutadAv'] == "Jordbruksverket":
+                                 attributes['rpubl:beslutadAv'])
+                attributes['rpubl:beslutadAv'] = "Statens räddningsverk"
+            if attributes['rpubl:beslutadAv'] == "Jordbruksverket":
                 self.log.warning("rpubl:beslutadAv was '%s', "
                                  "correcting to 'Statens jordbruksverk'" %
-                                 props['rpubl:beslutadAv'])
-                props['rpubl:beslutadAv'] = "Statens jordbruksverk"
+                                 attributes['rpubl:beslutadAv'])
+                attributes['rpubl:beslutadAv'] = "Statens jordbruksverk"
             try:
-                props['rpubl:beslutadAv'] = self.lookup_resource(props['rpubl:beslutadAv'])
+                attributes['rpubl:beslutadAv'] = self.lookup_resource(attributes['rpubl:beslutadAv'])
             except KeyError as e:
-                beslutad_av = props['rpubl:beslutadAv']
-                del props['rpubl:beslutadAv']
+                beslutad_av = attributes['rpubl:beslutadAv']
+                del attributes['rpubl:beslutadAv']
                 if self.alias == "ffs":
                     # These documents are often enacted by entities
                     # like Chefen för Flygvapnet, Försvarets
@@ -724,69 +722,69 @@ class MyndFskrBase(FixedLayoutSource):
                 else:
                     raise e
                 
-        if 'dcterms:title' in props:
+        if 'dcterms:title' in attributes:
             if re.search('^(Föreskrifter|[\w ]+s föreskrifter) om ändring (i|av) ',
-                         props['dcterms:title'], re.UNICODE):
+                         attributes['dcterms:title'], re.UNICODE):
                 # There should be something like FOOFS 2013:42 (or
                 # possibly just 2013:42) in the title. The regex is
                 # forgiving about spurious spaces, seee LVFS 1998:5
                 m = re.search('(?P<fs>[A-ZÅÄÖ-]+FS|) ?(?P<year>\d{4}) ?:(?P<ordinal>\d+)',
-                              props['dcterms:title'])
+                              attributes['dcterms:title'])
                 if not m:
                     # raise errors.ParseError(
                     self.log.warning(
                         "Couldn't find reference to change act in title %r" %
-                        (props['dcterms:title']))
+                        (attributes['dcterms:title']))
                     # in some cases (eg dvfs/2001:2) the fs number is
                     # omitted in the title, but is part of the main
                     # body text (though not in a standardized form)
                 else:
                     parts = m.groupdict()
                     if not parts['fs']:
-                        parts["fs"] = props['dcterms:identifier'].split(" ")[0]
+                        parts["fs"] = attributes['dcterms:identifier'].split(" ")[0]
 
                     origuri = makeurl({'rdf:type': RPUBL.Myndighetsforeskrift,
                                        'rpubl:forfattningssamling':
                                        self.lookup_resource(parts["fs"], SKOS.altLabel),
                                        'rpubl:arsutgava': parts["year"],
                                        'rpubl:lopnummer': parts["ordinal"]})
-                    props["rpubl:andrar"] =  URIRef(origuri)
+                    attributes["rpubl:andrar"] =  URIRef(origuri)
 
             # FIXME: is this a sensible value for rpubl:upphaver?
             if (re.search('^(Föreskrifter|[\w ]+s föreskrifter) om upphävande '
-                          'av', props['dcterms:title'], re.UNICODE)
-                    and not 'rpubl:upphaver' in props):
-                props['rpubl:upphaver'] = props['dcterms:title']
+                          'av', attributes['dcterms:title'], re.UNICODE)
+                    and not 'rpubl:upphaver' in attributes):
+                attributes['rpubl:upphaver'] = attributes['dcterms:title']
             # finally type the title as a swedish-language literal
-            props['dcterms:title'] = Literal(props['dcterms:title'], lang="sv")
+            attributes['dcterms:title'] = Literal(attributes['dcterms:title'], lang="sv")
 
         for key, pred in (('rpubl:utkomFranTryck', RPUBL.utkomFranTryck),
                           ('rpubl:beslutsdatum', RPUBL.beslutsdatum),
                           ('rpubl:ikrafttradandedatum', RPUBL.ikrafttradandedatum)):
-            if key in props:
+            if key in attributes:
                 if (key == 'rpubl:ikrafttradandedatum' and 
-                    props[key] in ('denna dag', 'utkom från trycket')):
-                    if props[key] == 'denna dag':
-                        props[key] = props['rpubl:beslutsdatum']
-                    elif props[key] == 'utkom från trycket':
-                        props[key] = props['rpubl:utkomFranTryck']
+                    attributes[key] in ('denna dag', 'utkom från trycket')):
+                    if attributes[key] == 'denna dag':
+                        attributes[key] = attributes['rpubl:beslutsdatum']
+                    elif attributes[key] == 'utkom från trycket':
+                        attributes[key] = attributes['rpubl:utkomFranTryck']
                 try:
-                    props[key] = Literal(self.parse_swedish_date(props[key]))
+                    attributes[key] = Literal(self.parse_swedish_date(attributes[key]))
                 except ValueError as e:
-                    self.log.warning("Couldn't parse date '%s' for %s: %s" % (props[key], key, e))
+                    self.log.warning("Couldn't parse date '%s' for %s: %s" % (attributes[key], key, e))
                     # and then go on
 
-        if 'rpubl:genomforDirektiv' in props:
-            props['rpubl:genomforDirektiv'] = URIRef(makeurl(
+        if 'rpubl:genomforDirektiv' in attributes:
+            attributes['rpubl:genomforDirektiv'] = URIRef(makeurl(
                 {'rdf:type': RINFOEX.EUDirektiv, # FIXME: standardize this type
                  'rpubl:celexNummer':
-                 props['rpubl:genomforDirektiv']}))
+                 attributes['rpubl:genomforDirektiv']}))
 
         has_bemyndiganden = False
-        if 'rpubl:bemyndigande' in props:
+        if 'rpubl:bemyndigande' in attributes:
             # dehyphenate (note that normalize_space already has changed "\n" to " "...
-            props['rpubl:bemyndigande'] = props['rpubl:bemyndigande'].replace("\xad ", "")
-            result = parser.parse_string(props['rpubl:bemyndigande'])
+            attributes['rpubl:bemyndigande'] = attributes['rpubl:bemyndigande'].replace("\xad ", "")
+            result = parser.parse_string(attributes['rpubl:bemyndigande'])
             bemyndiganden = [x.uri for x in result if hasattr(x, 'uri')]
 
             # some of these uris need to be filtered away due to
@@ -800,28 +798,28 @@ class MyndFskrBase(FixedLayoutSource):
                         keep = False
                 if keep:
                     filtered_bemyndiganden.append(bem_uri)
-            props['rpubl:bemyndigande'] = [URIRef(x) for x in filtered_bemyndiganden]
+            attributes['rpubl:bemyndigande'] = [URIRef(x) for x in filtered_bemyndiganden]
 
-        if 'rpubl:upphaver' in props:
+        if 'rpubl:upphaver' in attributes:
             upphaver = []
             for upph in re.findall('([A-ZÅÄÖ-]+FS \d{4}:\d+)',
-                                   util.normalize_space(props['rpubl:upphaver'])):
+                                   util.normalize_space(attributes['rpubl:upphaver'])):
                 (fs, year, ordinal) = re.split('[ :]', upph)
                 upphaver.append(makeurl(
                     {'rdf:type': RPUBL.Myndighetsforeskrift,
                      'rpubl:forfattningssamling': self.lookup_resource(fs, SKOS.altLabel),
                      'rpubl:arsutgava': year,
                      'rpubl:lopnummer': ordinal}))
-            props['rpubl:upphaver'] = [URIRef(x) for x in upphaver]
+            attributes['rpubl:upphaver'] = [URIRef(x) for x in upphaver]
 
-        if 'rdf:type' not in props:
-            if ('dcterms:title' in props and
-                "allmänna råd" in props['dcterms:title'] and
-                    "föreskrifter" not in props['dcterms:title']):
-                props['rdf:type'] = RPUBL.AllmannaRad
+        if 'rdf:type' not in attributes:
+            if ('dcterms:title' in attributes and
+                "allmänna råd" in attributes['dcterms:title'] and
+                    "föreskrifter" not in attributes['dcterms:title']):
+                attributes['rdf:type'] = RPUBL.AllmannaRad
             else:
-                props['rdf:type'] = RPUBL.Myndighetsforeskrift
-        resource = self.attributes_to_resource(props)
+                attributes['rdf:type'] = RPUBL.Myndighetsforeskrift
+        resource = self.attributes_to_resource(attributes)
         uri = URIRef(self.minter.space.coin_uri(resource))
         for (p, o) in list(resource.graph.predicate_objects(
                 resource.identifier)):
@@ -847,48 +845,6 @@ class MyndFskrBase(FixedLayoutSource):
         if getattr(doc.body, 'tagname', None) != "body":
             doc.body.tagname = "body"
         doc.body.uri = doc.uri
-
-    # FIXME: THis is copied verbatim from PDFDocumentRepository --
-    # should we inherit from that as well? Or should FixedLayoutSource
-    # do that? SHould this function do things depending on config.pdfimages?
-    def create_external_resources(self, doc):
-        resources = []
-
-        if isinstance(doc.body, Body):
-            # document wasn't derived from a PDF file, probably from HTML instead
-            return resources
-        cssfile = self.store.parsed_path(doc.basefile, attachment="index.css")
-        urltransform = self.get_url_transform_func([self], os.path.dirname(cssfile),
-                                                   develurl=self.config.develurl)
-        resources.append(cssfile)
-        util.ensure_dir(cssfile)
-        with open(cssfile, "w") as fp:
-            # Create CSS header with fontspecs
-            assert isinstance(doc.body, PDFReader), "doc.body is %s, not PDFReader -- still need to access fontspecs etc" % type(doc.body)
-            for spec in list(doc.body.fontspec.values()):
-                fp.write(".fontspec%s {font: %spx %s; color: %s;}\n" %
-                         (spec['id'], spec['size'], spec['family'],
-                          spec.get('color', 'black')))
-
-            # 2 Copy all created png files to their correct locations
-            for cnt, page in enumerate(doc.body):
-                if page.background:
-                    src = self.store.intermediate_path(
-                        doc.basefile, attachment=os.path.basename(page.background))
-                    dest = self.store.parsed_path(
-                        doc.basefile, attachment=os.path.basename(page.background))
-                    resources.append(dest)
-                    if util.copy_if_different(src, dest):
-                        self.log.debug("Copied %s to %s" % (src, dest))
-                    desturi = "%s?dir=parsed&attachment=%s" % (doc.uri, os.path.basename(dest))
-                    desturi = urltransform(desturi)
-                    background = " background: url('%s') no-repeat grey;" % desturi
-                else:
-                    background = ""
-                fp.write("#page%03d {width: %spx; height: %spx;%s}\n" %
-                         (cnt+1, page.width, page.height, background))
-        return resources
-
 
     def facets(self):
         return [Facet(RDF.type),

@@ -17,7 +17,7 @@ from ferenda.compat import Mock, MagicMock
 from ferenda import util
 from ferenda.testutil import RepoTester
 
-from test.quiet import silence
+from quiet import silence
 
 # SUT
 from ferenda import Facet, Feedset, Feed, DocumentEntry, Describer

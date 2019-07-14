@@ -188,6 +188,7 @@ class SFS(Trips):
         elif self.config.refresh or ('next_sfsnr' not in self.config):
             ret = super(SFS, self).download(basefile)
             self._set_last_sfsnr()
+            self.config.revisit = []
         else:
             # in this case, super().download is never called so we'll
             # have to make sure this runs anyway:
@@ -225,6 +226,8 @@ class SFS(Trips):
         revisit = []
         if 'revisit' in self.config and self.config.revisit:
             last_revisit = self.config.revisit
+            if not isinstance(last_revisit, list):
+                last_revisit = [last_revisit]
             for wanted_sfs_nr in last_revisit:
                 self.log.info('Revisiting %s' % wanted_sfs_nr)
                 try:
@@ -541,7 +544,7 @@ class SFS(Trips):
                     datestr = rawtext[idx+len(needle):idx+len(needle)+10]
                     if (not re.match(r"\d+-\d+-\d+$", datestr) or
                         (datetime.strptime(datestr, '%Y-%m-%d') < datetime.today())):
-                        self.log.debug('Expired' % basefile)
+                        self.log.debug('%s Expired' % basefile)
                         if not self.config.keepexpired:
                             raise UpphavdForfattning("%s is an expired SFS" % basefile,
                                                      dummyfile=self.store.parsed_path(basefile))
@@ -563,7 +566,7 @@ class SFS(Trips):
         if notfound:
             raise InteExisterandeSFS(str(notfound))
         textheader = fp.read(2048)
-        assert(isinstance(textheader, bytes))
+        assert isinstance(textheader, bytes), "textheader.read() returned a %s, not bytes" % type(textheader)
         idx = textheader.index(b"-"*64)
         header = textheader[:idx]
         offset = len(header)
@@ -664,7 +667,7 @@ class SFS(Trips):
                         raise UpphavdForfattning("%s is an expired SFS"
                                                  % basefile,
                                                  dummyfile=self.store.parsed_path(basefile))
-                    d[docuri]["rpubl:upphavandedatum"] = val
+                    d[docuri]["rpubl:upphavandedatum"] = val[:10]  # discard trailing info
                 elif key == 'Ikraft':
                     d[docuri]["rpubl:ikrafttradandedatum"] = val[:10]
                 elif key == 'Omfattning':
@@ -806,11 +809,6 @@ class SFS(Trips):
                                              dummyfile=self.store.parsed_path(basefile))
 
             elif key in ('Departement', 'Departement/ myndighet'):
-                # the split is only needed because of SFS 1942:724,
-                # which has "Försvarsdepartementet,
-                # Socialdepartementet"...
-                if "departementet, " in val:
-                    val = val.split(", ")[0]
                 d["dcterms:creator"] = val
             elif (key == 'Ändring införd' and re_sfs(val)):
                 uppdaterad = re_sfs(val).group(1)
@@ -871,9 +869,14 @@ class SFS(Trips):
             if val == cleaned:
                 break
             val = cleaned
-        return cleaned
+        # SFS 1942:723: has "Försvarsdepartementet, Socialdepartementet",
+        # SFS 1941:846 has "Miljödepartementet Justitiedepartementet"...
+        # ... just grab the first in these rare cases
+        if re.search("departementet,? [A-Z]", val):
+            val = re.split(",? ", val)[0]
+        return val
 
-    def polish_metadata(self, attributes):
+    def polish_metadata(self, attributes, basefile, infer_nodes=True):
         # attributes will be a nested dict with some values being
         # dicts themselves. Convert the subdicts to rdflib.Resource
         # objects.
@@ -883,7 +886,7 @@ class SFS(Trips):
             if isinstance(attributes[k], dict):
                 if len(attributes[k]) > 1:
                     # get a rdflib.Resource with a coined URI
-                    r = super(SFS, self).polish_metadata(attributes[k])
+                    r = super(SFS, self).polish_metadata(attributes[k], basefile)
                     if k != str(r.identifier):
                         # This happens when lopnummer cointains spaces
                         # because the URISpace defintion removes
@@ -919,7 +922,7 @@ class SFS(Trips):
                         ar.add(RDF.type, RINFOEX.Riksdagsskrivelse)
                     del attributes[k]
                     attributes[URIRef(k)] = ar
-        resource = super(SFS, self).polish_metadata(attributes,
+        resource = super(SFS, self).polish_metadata(attributes, basefile,
                                                     infer_nodes=False)
 
         if attributes['rdf:type'] == RPUBL.KonsolideradGrundforfattning:
@@ -1083,7 +1086,11 @@ class SFS(Trips):
         # bytes- and str-files
         if not isinstance(bodystring, str):
             bodystring = bodystring.decode(self.source_encoding)
-        reader = TextReader(string=bodystring, linesep=TextReader.UNIX)
+        if bodystring.strip():
+            reader = TextReader(string=bodystring, linesep=TextReader.UNIX)
+        else:
+            self.log.warning("Missing actual statute text")
+            reader = TextReader(string="(Författningstext saknas)")
         reader.autostrip = True
         return reader
 
@@ -1412,7 +1419,7 @@ class SFS(Trips):
         if ikraft:
             summary += "Ikraftträder: %s\n" % ikraft
         if forarb:
-            display = ", ".join([regpost.meta.value(x, DCTERMS.identifier) for x in forarb])
+            display = ", ".join([regpost.meta.value(x, DCTERMS.identifier) for x in forarb if regpost.meta.value(x, DCTERMS.identifier)])
             summary += "Förarbeten: %s\n" % display
         return summary
 
@@ -2077,7 +2084,7 @@ WHERE {
                 Facet(RPUBL.arsutgava,
                       use_for_toc=True,
                       label="Ordnade efter utgivningsår",
-                      pagetitle='Författningar utgivna %(selected)s',
+                      pagetitle='Författninagr utgivna %(selected)s',
                       key=sfsnrkey,
                       dimension_label="utgiven",
                       selector_descending=True),

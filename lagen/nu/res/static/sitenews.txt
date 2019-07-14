@@ -1,4 +1,4 @@
-2018-11-13 00:18:00 Ny funktion: Tidsmaskin för lagtext
+2019-06-25 00:18:00 Ny funktion: Tidsmaskin för lagtext
 
 <p>Det är nu möjligt att få upp äldre lydelser av en viss lag eller
 förordning. Det går även att jämföra dagens version av en lag med hur
@@ -9,12 +9,9 @@ den lag som ersatt denna (<a href="https://lagen.nu/2017:900">nya
 förvaltningslagen</a>) och leta efter rubriken "Upphäver" högst upp i
 sidhuvudet. Det går även att söka på den upphävda lagens namn.</p>
 
-<p>Denna funktion kommer testas under en period på addressen <a
-href="https://ferenda.lagen.nu/">ferenda.lagen.nu</a> innan den införs
-på huvudversionen av tjänsten. Hör gärna av dig med synpunkter till <a
-href="mailto:staffan.malmgren@gmail.com">staffan.malmgren@gmail.com</a></p>
-</p>
-
+<p>Tyvärr finns inte en fullständig historik för alla författningar,
+men de allra flesta äldre versioner från de senaste ca 15 åren bör
+finnas i tjänsten.</p>
 
 2018-09-11 10:39:00 Ny version lanserad
 

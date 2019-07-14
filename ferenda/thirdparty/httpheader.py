@@ -1295,11 +1295,11 @@ class content_type(object):
         unless they appear in the given paramter_list.
 
         """
-        if hasattr(parameter_list_or_dict, 'has_key'):
+        if isinstance(parameter_list_or_dict, dict):
             # already a dictionary
             pl = parameter_list_or_dict
         else:
-            pl, k = parse_parameter_list(parameter_list)
+            pl, k = parse_parameter_list(parameter_list_or_dict)
             if k < len(parameter_list):
                 raise ParseError('Invalid parameter list',paramter_list,k)
         self.parmdict = dict(pl)

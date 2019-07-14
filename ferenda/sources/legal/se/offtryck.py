@@ -1083,6 +1083,12 @@ class CommentaryFinder(object):
         return bins, scale
         
     def threshold(self, series, resolution=1000, bandwidth=200):
+        # in the degenerate case that we have a single element series,
+        # there is no way to calculate a threshold between "low" and
+        # "high" values. Just return whatever that element is.
+        assert len(series), "Impossible to calculate a KDE threshold for an empty series"
+        if len(series) == 1:
+            return series[0]
         bins, scale = self.estimate_density(series, resolution, bandwidth)      
 
         # find the valley after the first (significant, not less than
@@ -1174,7 +1180,7 @@ class CommentaryFinder(object):
         def is_chapter_header(parser):
             text = str(parser.reader.peek()).strip()
             return bool(len(text) < 20 and text.endswith((" kap.", " kap")) or
-                        re.match("\d+ kap. +[^\d]", text))
+                        re.match("\d+( \w|)\s[Kk]ap. +[^\d]", text))
 
         # "4 §" or "4 kap. 4 §"
         def is_section_header(parser):

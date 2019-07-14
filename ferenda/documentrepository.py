@@ -273,6 +273,7 @@ class DocumentRepository(object):
 
     download_accept_406 = False
     # same
+    download_accept_400 = False
     
     download_reverseorder = False
     """It ``True`` (default: ``False``), download_get_basefiles will
@@ -564,6 +565,7 @@ class DocumentRepository(object):
             'downloadmax': nativeint,
             'conditionalget': True,
             'url': 'http://localhost:8000/',
+            'develurl': None,
             'fulltextindex': True,
             'useragent': 'ferenda-bot',
             'relate': True,
@@ -594,6 +596,7 @@ class DocumentRepository(object):
             'apiendpoint': "/api/",
             'searchendpoint': "/search/",
             'acceptalldomains': False,
+            'allversions': False
         }
 
     @classmethod
@@ -824,6 +827,10 @@ with the *config* object as single parameter.
                         # this (if a doc is not available in our
                         # wanted language, I think?) and we'd like to
                         # distinguish this from a 404 error
+                        self.log.error("%s: %s %s" % (basefile, link, e))
+                        ret = False
+                    elif self.download_accept_400 and e.response.status_code == 400:
+                        # KKV does this for some (malformed) URLs like http://www.konkurrensverket.se/beslut/1_20160922110607_Nordic%20Camping%20&%20Resort%20AB.pdf
                         self.log.error("%s: %s %s" % (basefile, link, e))
                         ret = False
                     else:
@@ -1727,7 +1734,7 @@ with the *config* object as single parameter.
         if config.fulltextindex:
             repos = kwargs.get("otherrepos", [])
             if kwargs.get("currentrepo"):
-                repos.append(kwargs["currentrepo"])
+                repos.insert(0, kwargs["currentrepo"])
             FulltextIndex.connect(config.indextype,
                                   config.indexlocation,
                                   repos=repos)
@@ -2485,6 +2492,11 @@ WHERE {
         def getpath(url, repos):
             if url == self.config.url:
                 return self.config.datadir + os.sep + "index.html"
+            if "/" not in url:
+                # this is definitly not a HTTP(S) url, might be a
+                # mailto:? Anyway, we won't get a usable path from it
+                # so don't bother.
+                return None
             for (repoidx, repo) in enumerate(repos):
                 # FIXME: This works less than optimal when using
                 # CompositeRepository -- the problem is that a subrepo

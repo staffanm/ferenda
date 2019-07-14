@@ -38,31 +38,3 @@
  1. begär det för ett beskattningsår som har samma
  deklarationstidpunkt enligt skatteförfarandelagen (2011:1244)
  eller som skulle ha haft det om inte någon av de juridiska
-@@ -20613,15 +20620,19 @@
-                                 procent av det belopp med vilket
-                                 den fastställda förvärvsinkomsten
-                                 överstiger 0,99 prisbasbelopp
-+
- överstiger 2,72 men inte
- 3,11 prisbasbelopp              0,77 prisbasbelopp
-+
- överstiger 3,11 men inte
- 7,88 prisbasbelopp              0,77 prisbasbelopp minskat med
-                                 10 procent av det belopp med
-                                 vilket den fastställda
-                                 förvärvsinkomsten överstiger
-                                 3,11 prisbasbelopp
-+
- överstiger 7,88 prisbasbelopp   0,293 prisbasbelopp
-+
- Lag (2011:1256).
- 
- 3 a § För dem som vid beskattningsårets ingång har fyllt 65 
-@@ -20675,6 +20686,7 @@
- 
- överstiger 12,43 
- prisbasbelopp			0,422 prisbasbelopp	
-+
- Lag (2017:1212).
- 
- 4 § För dem som är obegränsat skattskyldiga bara under en del

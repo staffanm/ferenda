@@ -38,6 +38,8 @@ class MyndFskrHandler(RequestHandler):
         segment = environ['PATH_INFO'].split("/")[1]
         if segment == "dataset":
             return super(MyndFskrHandler, self).supports(environ)
+        # handle RA-FS, ELSÄK-FS and HSLF-FS
+        segment = segment.replace("-", "")
         fs = chain.from_iterable([self.repo.get_instance(cls).forfattningssamlingar() for cls in self.repo.subrepos])
         return segment in fs
 
@@ -48,7 +50,7 @@ class MyndFskrHandler(RequestHandler):
             # 
             # FIXME: Maybe the first segment isn't always equal to the
             # correct repo name?
-            params["repo"] = environ["PATH_INFO"].split("/")[1]
+            params["repo"] = environ["PATH_INFO"].split("/")[1].replace("-", "")
             if "dir" not in params:
                 params["dir"] = "downloaded"
                 # ".../sid4.png" => "3" (because 0-based) 

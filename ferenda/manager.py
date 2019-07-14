@@ -1051,7 +1051,7 @@ def _run_class(enabled, argv, config):
             # version element will always be None (meaning we'll only
             # parse the current version, not any archived versions)
             iterable = inst.store.list_basefiles_for(action, force=inst.config.force)
-            if 'allversions' in inst.config and inst.config.allversions:
+            if inst.config.allversions:
                 iterable = inst.store.list_versions_for_basefiles(iterable, action)
             else:
                 iterable = ((x, None) for x in iterable)
@@ -1117,7 +1117,7 @@ def _run_class(enabled, argv, config):
                 adjective = {'parse': 'downloaded',
                              'generate': 'parsed',
                              'transformlinks': 'generated'}
-                if 'allversions' in config and config.allversions:
+                if config.allversions and not version:
                     res = [res]
                     for version in inst.store.list_versions(basefile, adjective.get(action, action)):
                         with adaptlogger(inst, basefile, version):

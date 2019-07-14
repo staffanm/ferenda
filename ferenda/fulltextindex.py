@@ -198,6 +198,7 @@ class FulltextIndex(object):
     fields.
 
     """
+    alternate_fieldmapping = ()
 
     def to_native_field(self, fieldobject):
         """Given a abstract field (an instance of a IndexedType-derived
@@ -222,7 +223,10 @@ class FulltextIndex(object):
             if (isinstance(fieldobject, type(nativefield)) and
                     fieldobject == nativefield):
                 return abstractfield
-        raise errors.SchemaMappingError("Native field %s cannot be mapped" % fieldobject)
+        for abstractfield, nativefield in self.alternate_fieldmapping:
+            if fieldobject == nativefield:
+                return abstractfield
+        raise errors.SchemaMappingError("Native field %s cannot be mapped, fieldmapping: %r " % (fieldobject, self.fieldmapping))
 
 
 class IndexedType(object):
@@ -707,6 +711,13 @@ class ElasticSearchIndex(RemoteIndex):
                      {"type": "long"}),
                     )
 
+    # used whenever ElasticSearch changes the mapping behind our backs...
+    alternate_fieldmapping = (
+        (Label(boost=16),
+         {'fields': {'keyword':
+                     {'ignore_above': 256, 'type': 'keyword'}},
+          'type': 'text'}),
+        )
     term_excludes = "excludes"  # this key changed name 
                                 # "exclude"->"excludes" from 2.* to
                                 # 5.*
@@ -968,8 +979,6 @@ class ElasticSearchIndex(RemoteIndex):
             match['bool']['must_not'].append({"range": {"order": {"gt": 0}}})
             # match['bool']['must_not'].append({"term": {"role": "expired"}})
             pass
-            
-        
         return relurl, json.dumps(payload, indent=4, default=util.json_default_date)
 
     def _aggregation_payload(self):
@@ -1121,11 +1130,14 @@ class ElasticSearchIndex(RemoteIndex):
         for repo in repos:
             if not repo.config.relate:
                 continue
+            facets = repo.facets()
+            if not facets:
+                continue
             g = repo.make_graph()  # for qname lookup
             es_fields = {}
             schema = self.get_default_schema()
             childschema = self.get_default_schema()
-            for facet in repo.facets():
+            for facet in facets:
                 if facet.dimension_label:
                     fld = facet.dimension_label
                 else:

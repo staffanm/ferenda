@@ -214,7 +214,8 @@ class SFS(OrigSFS, SameAs):
         for f in util.list_dirs(archivedir, ".html"):
             if "downloaded/sfst" not in f:
                 continue
-            self.log.debug("Examining %s" % f)
+            if os.path.getsize(f) == 0:
+                continue
             for regex in self.templ:
                 m = re.search(regex, f)
                 if not m:
@@ -304,3 +305,17 @@ class SFS(OrigSFS, SameAs):
         self.log.info("Extracted %s current versions and %s archived versions (skipped %s files that already existed, and couldn't handle %s invalid versions)"
                       % (current, archived, skipped, invalid))
 
+    @decorators.action
+    def correct_archive_versions(self, archivedir=None):
+        if not archivedir:
+            archivedir = self.store.datadir
+        store = DocumentStore(archivedir)
+        # enumerate all basefiles for action parse
+            # enumerate all basefile versions (maybe there's an iterator that does both?)
+                # (if version is single digit)
+                # check what version it probably is (_find_uppdaterad_tom)
+                # stash rename the downloaded version to its correct version
+                # for action in ('distill', 'entries', ...)
+                     # stash rename that as well
+        # execute all renames
+        pass

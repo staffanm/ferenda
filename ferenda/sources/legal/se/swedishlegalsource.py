@@ -328,7 +328,7 @@ class SwedishLegalSource(DocumentRepository):
         else:
             return str(val)
 
-    def attributes_to_resource(self, attributes, infer_nodes=True):
+    def attributes_to_resource(self, attributes, infer_nodes=True, basefile=None):
         """Given a dict of metadata attributes for a document or
         fragment, create a RDF resource for that same thing. The RDF
         graph may contain multiple nodes if the thing is a document
@@ -429,13 +429,16 @@ class SwedishLegalSource(DocumentRepository):
 
     def canonical_uri(self, basefile, version=None):
         attrib = self.metadata_from_basefile(basefile)
-        resource = self.attributes_to_resource(attrib)
-        uri = self.minter.space.coin_uri(resource)
+        resource = self.attributes_to_resource(attrib, basefile)
+        uri = self.coin_uri(resource, basefile)
         # make sure basefiles are roundtrippable
         computed_basefile = self.basefile_from_uri(uri)
         assert basefile == computed_basefile, "%s -> %s -> %s" % (basefile, uri, computed_basefile)
         # end temporary code
         return uri
+
+    def coin_uri(self, resource, basefile):
+        return self.minter.space.coin_uri(resource)
 
     def metadata_from_basefile(self, basefile):
         """Create a metadata dict with whatever we can infer from a document
@@ -551,8 +554,8 @@ class SwedishLegalSource(DocumentRepository):
                 [metadata_from_basefile(basefile) -> dict]
             sanitize_metadata(dict, basefile) -> dict
                 sanitize_identifier(str) -> str
-            polish_metadata(dict) -> rdflib.Resource
-                attributes_to_resource(dict) -> rdflib.Resource
+            polish_metadata(dict, basefile) -> rdflib.Resource
+                attributes_to_resource(dict, basefile) -> rdflib.Resource
             infer_metadata(rdflib.Resource, basefile) -> rdflib.Resource
                 infer_identifier(basefile) -> str
         parse_body(file, basefile) -> elements.Body
@@ -681,6 +684,11 @@ class SwedishLegalSource(DocumentRepository):
             else:
                 return fp
         from ferenda.thirdparty.patchit import PatchSet, PatchSyntaxError, PatchConflictError
+        binarystream = False
+        orig_fp = fp
+        if not hasattr(fp, 'mode') or "b" in fp.mode: # binary stream, won't play nice with patchit
+            fp = codecs.getreader(self.source_encoding)(fp)
+            binarystream = True
         with codecs.open(patchpath, 'r', encoding=self.source_encoding) as pfp:
             if self.config.patchformat == "rot13":
                 # replace the rot13 obfuscated stream with a plaintext stream
@@ -696,7 +704,6 @@ class SwedishLegalSource(DocumentRepository):
             desc = util.readfile(descpath).strip()
         else:
             desc = "(No patch description available)"
-
         if desc.startswith("[version:"):
             # if the desc starts with a string like [version:
             # 2017:1279-] it means that the patch is only working for
@@ -712,12 +719,12 @@ class SwedishLegalSource(DocumentRepository):
             (minver_s, maxver_s, version_s) = [util.split_numalpha(x) for x in (minver, maxver, version)]
             if not (minver_s <= version_s <= maxver_s):
                 self.log.debug("version %s is not within compatible versions for patch %s: %s" % (version, patchpath, m.group(0)))
-                return fp
+                return orig_fp
             desc = desc.replace(m.group(0), "")
 
         binarystream = False
         if "b" in fp.mode: # binary stream, won't play nice with patchit
-            fp = codecs.getreader(self.source_encoding)(fp)
+            # fp = codecs.getreader(self.source_encoding)(fp)
             binarystream = True
         self.log.warning("Applying patch %s" % (patchpath))
 
@@ -768,7 +775,7 @@ class SwedishLegalSource(DocumentRepository):
             # used to signify description of a patch?
             attribs['rinfoex:patchdescription'] = fp.patchdescription
         sane_attribs = self.sanitize_metadata(attribs, basefile)
-        resource = self.polish_metadata(sane_attribs)
+        resource = self.polish_metadata(sane_attribs, basefile)
         self.infer_metadata(resource, basefile)
         return resource
 
@@ -807,7 +814,7 @@ class SwedishLegalSource(DocumentRepository):
         # docrepos with unclean data might override this
         return identifier
 
-    def polish_metadata(self, attribs, infer_nodes=True):
+    def polish_metadata(self, attribs, basefile, infer_nodes=True):
         """Given a sanitized flat dict of metadata for a document, return a
         rdflib.Resource version of the same. 
 
@@ -878,8 +885,8 @@ class SwedishLegalSource(DocumentRepository):
                 assert len(result) == 1, "attribs[%s] returned %s results" % (k, len(result))
                 attribs[k] = result[0]
 
-        resource = self.attributes_to_resource(attribs, infer_nodes=infer_nodes)
-        uri = URIRef(self.minter.space.coin_uri(resource))
+        resource = self.attributes_to_resource(attribs, infer_nodes=infer_nodes, basefile=basefile)
+        uri = URIRef(self.coin_uri(resource, basefile))
         # now that we know the document URI (didn't we already know it
         # from canonical_uri?), we should somehow replace
         # resource.identifier (a BNODE) with uri (a URIRef) in the
@@ -1203,12 +1210,13 @@ class SwedishLegalSource(DocumentRepository):
             # generating URIs (through the self.minter property), we can
             # just share the initialized minter object.
             minter = self.minter
-            for repo in repos:
-                # NB: this doesn't check for the existance of a previous
-                # minter object, since I can't find a way to do that with
-                # a property using the @cached_property
-                # decorator. Hopefully not an issue.
-                repo.minter = minter
+            if repos:
+                for repo in repos:
+                    # NB: this doesn't check for the existance of a previous
+                    # minter object, since I can't find a way to do that with
+                    # a property using the @cached_property
+                    # decorator. Hopefully not an issue.
+                    repo.minter = minter
         # special hack to make sure eurlex URIs are transformed to a
         # proper Eurlex URI
         def wrap_transform(url):
@@ -1285,8 +1293,8 @@ class SwedishLegalSource(DocumentRepository):
 
 
     _relate_fulltext_value_cache = {}
+    _default_creator_predicate = RPUBL.departement 
     _default_creator = "Regeringen"
-
     def _relate_fulltext_value_rootlabel(self, desc):
         if desc.getvalues(DCTERMS.title):
             title = desc.getvalue(DCTERMS.title)
@@ -1305,8 +1313,8 @@ class SwedishLegalSource(DocumentRepository):
             rooturi = resourceuri.split("#")[0]
             if "#" not in resourceuri and rooturi not in self._relate_fulltext_value_cache:
                 l = self._relate_fulltext_value_rootlabel(desc)
-                if desc.getrels(RPUBL.departement):
-                    c = desc.getrel(RPUBL.departement)
+                if desc.getrels(self._default_creator_predicate):
+                    c = desc.getrel(self._default_creator_predicate)
                 else:
                     c = self.lookup_resource(self._default_creator)
                 if desc.getvalues(DCTERMS.issued):
@@ -1509,6 +1517,7 @@ class SwedishLegalSource(DocumentRepository):
         else:
             return util.gYear(year)
 
+
     def temp_sfs_uri(self, lawname):
         # Propositions and other preparatory works may suggest new
         # laws. At that point in time, no SFS number for the proposed
@@ -1532,7 +1541,8 @@ class SwedishLegalSource(DocumentRepository):
             {"rdf:type": RPUBL.Lag,
              "rpubl:arsutgava": "0000",
              "rpubl:lopnummer": str(numslug),
-             "rpubl:forfattningssamling": URIRef(self.lookup_resource("SFS", SKOS.altLabel))})
+             "rpubl:forfattningssamling": URIRef(self.lookup_resource("SFS", SKOS.altLabel))},
+        basefile=None)
         return str(resource.identifier)
 
     # hook for RepoTester to call

@@ -7,6 +7,7 @@ from collections import OrderedDict
 import os
 import re
 import json
+from io import BytesIO
 
 from rdflib import URIRef
 from rdflib.namespace import DCTERMS
@@ -14,9 +15,10 @@ from lxml import etree
 
 from . import SwedishLegalStore, SwedishLegalSource, SwedishLegalHandler
 from ferenda import util
-from ferenda import CompositeRepository
+from ferenda import CompositeRepository, PDFReader
 from ferenda.errors import DocumentRemovedError, RequestHandlerError, PDFFileIsEmpty
 from ferenda.pdfreader import StreamingPDFReader
+from ferenda.elements import Body
 
 
 class FixedLayoutHandler(SwedishLegalHandler):
@@ -118,6 +120,7 @@ class FixedLayoutSource(SwedishLegalSource):
     def get_default_options(cls):
         opts = super(FixedLayoutSource, cls).get_default_options()
         opts['imgfiles'] = ['img/spinner.gif']
+        opts['ocr'] = True
         return opts
 
     def downloaded_to_intermediate(self, basefile, attachment=None):
@@ -137,14 +140,25 @@ class FixedLayoutSource(SwedishLegalSource):
                                   keep_xml=keep_xml,
                                   ocr_lang=ocr_lang)
         except PDFFileIsEmpty as e:
-            self.log.warning("%s: %s was empty, attempting OCR" % (basefile, downloaded_path))
-            ocr_lang = "swe" # reasonable guess
-            return reader.convert(filename=downloaded_path,
-                                  workdir=intermediate_dir,
-                                  images=self.config.pdfimages,
-                                  convert_to_pdf=convert_to_pdf,
-                                  keep_xml=keep_xml,
-                                  ocr_lang=ocr_lang)
+            if self.config.ocr:
+                self.log.warning("%s: %s was empty, attempting OCR" % (basefile, downloaded_path))
+                ocr_lang = "swe" # reasonable guess
+                return reader.convert(filename=downloaded_path,
+                                      workdir=intermediate_dir,
+                                      images=self.config.pdfimages,
+                                      convert_to_pdf=convert_to_pdf,
+                                      keep_xml=keep_xml,
+                                      ocr_lang=ocr_lang)
+            else:
+                self.log.warning("%s: %s was empty, returning placeholder" % (basefile, downloaded_path))
+                fp = BytesIO(b"""<pdf2xml>
+                <page number="1" position="absolute" top="0" left="0" height="1029" width="701">
+	        <fontspec id="0" size="12" family="TimesNewRomanPSMT" color="#000000"/>
+                <text top="67" left="77" width="287" height="26" font="0">[Avg&#246;randetext saknas]</text>
+                </page>
+                </pdf2xml>""")
+                fp.name = "dummy.xml"
+                return fp
             
     def extract_head(self, fp, basefile):
         # at this point, fp points to the PDF file itself, which is
@@ -202,6 +216,45 @@ class FixedLayoutSource(SwedishLegalSource):
             pageno = resourceuri.split("#sid")[1]
             return "%s s. %s" % (desc.graph.value(URIRef(rooturi), DCTERMS.identifier),
                                  pageno)
+
+    # FIXME: THis is copied verbatim from PDFDocumentRepository --
+    def create_external_resources(self, doc):
+        resources = []
+
+        if isinstance(doc.body, Body):
+            # document wasn't derived from a PDF file, probably from HTML instead
+            return resources
+        cssfile = self.store.parsed_path(doc.basefile, attachment="index.css")
+        urltransform = self.get_url_transform_func([self], os.path.dirname(cssfile),
+                                                   develurl=self.config.develurl)
+        resources.append(cssfile)
+        util.ensure_dir(cssfile)
+        with open(cssfile, "w") as fp:
+            # Create CSS header with fontspecs
+            assert isinstance(doc.body, PDFReader), "doc.body is %s, not PDFReader -- still need to access fontspecs etc" % type(doc.body)
+            for spec in list(doc.body.fontspec.values()):
+                fp.write(".fontspec%s {font: %spx %s; color: %s;}\n" %
+                         (spec['id'], spec['size'], spec['family'],
+                          spec.get('color', 'black')))
+
+            # 2 Copy all created png files to their correct locations
+            for cnt, page in enumerate(doc.body):
+                if page.background:
+                    src = self.store.intermediate_path(
+                        doc.basefile, attachment=os.path.basename(page.background))
+                    dest = self.store.parsed_path(
+                        doc.basefile, attachment=os.path.basename(page.background))
+                    resources.append(dest)
+                    if util.copy_if_different(src, dest):
+                        self.log.debug("Copied %s to %s" % (src, dest))
+                    desturi = "%s?dir=parsed&attachment=%s" % (doc.uri, os.path.basename(dest))
+                    desturi = urltransform(desturi)
+                    background = " background: url('%s') no-repeat grey;" % desturi
+                else:
+                    background = ""
+                fp.write("#page%03d {width: %spx; height: %spx;%s}\n" %
+                         (cnt+1, page.width, page.height, background))
+        return resources
 
 
     def _relate_fulltext_value_label(self, resourceuri, rooturi, desc):

@@ -75,6 +75,7 @@ class WSGIApp(OrigWSGIApp):
                 q = q.lower()
                 q = re.sub(r"\s*s\s*(\d)", " s. \\1", q)
                 q = re.sub(r"^prop(\s+|$)", "prop. ", q)
+                # param['comment.keyword'] = q + "*"
                 param['comment.keyword'] = "*" + q + "*"
             q = None
         return q, param, pagenum, pagelen, stats

@@ -1491,3 +1491,117 @@
 <http://rinfo.lagrummet.se/org/statens_jordbruksverk> a foaf:Organization ;
     foaf:name "Statens jordbruksverk"@sv .
 
+<http://rinfo.lagrummet.se/org/laensraetten_i_blekinge_laen> a foaf:Organization ;
+    foaf:name "Länsrätten i Blekinge län"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_dalarnas_laen> a foaf:Organization ;
+    foaf:name "Länsrätten i Dalarnas län"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_gotlands_laen> a foaf:Organization ;
+    foaf:name "Länsrätten i Gotlands län"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_gaevleborgs_laen> a foaf:Organization ;
+    foaf:name "Länsrätten i Gävleborgs län"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_goeteborg> a foaf:Organization ;
+    foaf:name "Länsrätten i Göteborg"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_hallands_laen> a foaf:Organization ;
+    foaf:name "Länsrätten i Hallands län"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_jaemtlands_laen> a foaf:Organization ;
+    foaf:name "Länsrätten i Jämtlands län"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_joenköpings_laen> a foaf:Organization ;
+    foaf:name "Länsrätten i Jönköpings län"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_kalmars_laen> a foaf:Organization ;
+    foaf:name "Länsrätten i Kalmars län"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_kronobergs_laen> a foaf:Organization ;
+    foaf:name "Länsrätten i Kronobergs län"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_mariestad> a foaf:Organization ;
+    foaf:name "Länsrätten i Mariestad"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_norrbottens_laen> a foaf:Organization ;
+    foaf:name "Länsrätten i Norrbottens län"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_skaane_laen> a foaf:Organization ;
+    foaf:name "Länsrätten i Skåne län"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_stockholms_laen> a foaf:Organization ;
+    foaf:name "Länsrätten i Stockholms län"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_soedermanlands_laen> a foaf:Organization ;
+    foaf:name "Länsrätten i Södermanlands län"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_uppsala_laen> a foaf:Organization ;
+    foaf:name "Länsrätten i Uppsala län"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_vaenersborg> a foaf:Organization ;
+    foaf:name "Länsrätten i Vänersborg"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_vaermlands_laen> a foaf:Organization ;
+    foaf:name "Länsrätten i Värmlands län"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_vaesterbottens_laen> a foaf:Organization ;
+    foaf:name "Länsrätten i Västerbottens län"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_vaesternorrlands_laen> a foaf:Organization ;
+    foaf:name "Länsrätten i Västernorrlands län"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_vaestmanlands_laen> a foaf:Organization ;
+    foaf:name "Länsrätten i Västmanlands län"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_vaestra_goetaland> a foaf:Organization ;
+    foaf:name "Länsrätten i Västra götaland"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_oerebro_laen> a foaf:Organization ;
+    foaf:name "Länsrätten i Örebro län"@sv .
+
+<http://rinfo.lagrummet.se/org/laensraetten_i_oestergoetlands_laen> a foaf:Organization ;
+    foaf:name "Länsrätten i Östergötlands län"@sv .
+
+<http://rinfo.lagrummet.se/org/eu-domstolen> a foaf:Organization ;
+    foaf:name "EU-domstolen"@sv .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_falun> a foaf:Organization ;
+    foaf:name "Förvaltningsrätten i Falun"@sv .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_goeteborg> a foaf:Organization ;
+    foaf:name "Förvaltningsrätten i Göteborg"@sv .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_haernoesand> a foaf:Organization ;
+    foaf:name "Förvaltningsrätten i Härnösand"@sv .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_joenkoeping> a foaf:Organization ;
+    foaf:name "Förvaltningsrätten i Jönköping"@sv .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_karlstad> a foaf:Organization ;
+    foaf:name "Förvaltningsrätten i Karlstad"@sv .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_linkoeping> a foaf:Organization ;
+    foaf:name "Förvaltningsrätten i Linköping"@sv .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_luleaa> a foaf:Organization ;
+    foaf:name "Förvaltningsrätten i Luleå"@sv .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_malmoe> a foaf:Organization ;
+    foaf:name "Förvaltningsrätten i Malmö"@sv .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_stockholm> a foaf:Organization ;
+    foaf:name "Förvaltningsrätten i Stockholm"@sv .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_umeå> a foaf:Organization ;
+    foaf:name "Förvaltningsrätten i Umeå"@sv .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_uppsala> a foaf:Organization ;
+    foaf:name "Förvaltningsrätten i Uppsala"@sv .
+
+<http://rinfo.lagrummet.se/org/foervaltningsraetten_i_vaexjoe> a foaf:Organization ;
+    foaf:name "Förvaltningsrätten i Växjö"@sv .
+
+<http://rinfo.lagrummet.se/org/stockholms_tingsraett> a foaf:Organization ;
+    foaf:name "Stockholms tingsrätt"@sv .
+

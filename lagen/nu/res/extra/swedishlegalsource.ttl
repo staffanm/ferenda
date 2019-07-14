@@ -1439,6 +1439,10 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/jordbruksdepartementet> ;
     foaf:name "Jordbruksdepartementet"@sv .
 
+<https://lagen.nu/org/2019/infrastrukturdepartementet> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/infrastrukturdepartementet> ;
+    foaf:name "Infrastrukturdepartementet"@sv .
+
 <https://lagen.nu/org/2008/kammarkollegiet> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/kammarkollegiet> ;
     foaf:name "Kammarkollegiet"@sv .

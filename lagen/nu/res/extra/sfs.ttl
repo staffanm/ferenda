@@ -238,6 +238,7 @@
 <https://lagen.nu/2010:1846> rdfs:label "konsumentkreditlagen" ; dcterms:alternate "KKrL" .
 <https://lagen.nu/2011:1244> dcterms:alternate "SFL" .
 <https://lagen.nu/2015:315> rdfs:label "läkemedelslagen" .
+<https://lagen.nu/2016:749> rdfs:label "visselblåsarlagen" . 
 <https://lagen.nu/2017:30> dcterms:alternate "HSL" .
 <https://lagen.nu/2017:900> rdfs:label "förvaltningslagen" ; dcterms:alternate "FL" .
 			    
