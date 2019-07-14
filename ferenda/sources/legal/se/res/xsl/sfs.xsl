@@ -55,11 +55,14 @@
       </xsl:choose>
       <section id="top" class="col-sm-7">
 	<h1><xsl:value-of select="../xhtml:head/xhtml:title"/></h1>
-	<h2>Version: <xsl:value-of select="$version"/></h2>
+	<!--
+	<xsl:if test="$version">
+	  <h2>Version: <xsl:value-of select="$version"/></h2>
+        </xsl:if>
+        -->
 	<xsl:if test="$label or $alternate">
 	  <p class="lead">(<xsl:value-of select="$label"/><xsl:if test="$label and $alternate">, </xsl:if><xsl:value-of select="$alternate"/>)</p>
 	</xsl:if>
-	<xsl:call-template name="docversions"/>
 	<xsl:call-template name="docmetadata"/>
 	<xsl:if test="../../xhtml:head/xhtml:meta[@rel='rinfoex:upphavdAv']">
 	  <div class="ui-state-error">
@@ -127,7 +130,6 @@
     <xsl:variable name="versions" select="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/dcterms:hasVersion/rdf:Description"/>
     <div class="docversions">
       <xsl:if test="$versions">
-	<h2>Jämför med tidigare versioner</h2>
 	<!--
 	<ul>
 	<xsl:for-each select="$versions">
@@ -137,12 +139,16 @@
 	-->
 	<form action="" method="GET">
 	  <input type="hidden" name="diff" value="true"/>
-	  <select name="from">
+	  <select name="from" id="from" onchange="if (this.options[this.selectedIndex] != 'None') {{ this.form.submit(); }}">
+	    <!--<select name="from" id="from" onchange="this.form.submit()">-->
+	    <option value="None">Jämför med tidigare lydelser</option>
 	    <xsl:for-each select="$versions">
-	      <option value="{substring(dcterms:identifier, 5)}"><xsl:value-of select="dcterms:identifier"/></option>
+	      <option value="{substring(dcterms:identifier, 5)}"><xsl:value-of select="dcterms:identifier"/>
+	      <xsl:if test="rpubl:forarbete"> (<xsl:value-of select="rpubl:forarbete/rdf:Description/dcterms:identifier"/>: <xsl:value-of select="rpubl:forarbete/rdf:Description/dcterms:title"/> <xsl:if test="rpubl:ikrafttradandedatum and rpubl:ikrafttradandedatum != 'None'">, ikraft <xsl:value-of select="rpubl:ikrafttradandedatum"/></xsl:if>)</xsl:if>
+	      <!-- fixme: if the version is the first version (x = y in the url .../x/konsolidering/y), state "(ursprunglig lydelse)" -->
+	      </option>
 	    </xsl:for-each>
 	  </select>
-	  <input type="submit" value="Jämför"/>
 	</form>
       </xsl:if>
     </div>
@@ -156,7 +162,10 @@
       <dt>Utfärdad</dt>
       <dd><xsl:value-of select="//xhtml:meta[@property='rpubl:utfardandedatum']/@content"/></dd>
       <dt>Ändring införd</dt>
-      <dd><xsl:value-of select="//xhtml:meta[@property='dcterms:identifier']/@content"/></dd>
+      <dd><xsl:value-of select="//xhtml:meta[@property='dcterms:identifier']/@content"/>
+	<xsl:call-template name="docversions"/>
+
+      </dd>
       <xsl:if test="//xhtml:meta[@property='rpubl:ikrafttradandedatum']/@content">
 	<dt>Ikraft</dt>
 	<dd><xsl:value-of select="//xhtml:meta[@property='rpubl:ikrafttradandedatum']/@content"/></dd>

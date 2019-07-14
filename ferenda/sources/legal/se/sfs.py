@@ -225,6 +225,8 @@ class SFS(Trips):
         revisit = []
         if 'revisit' in self.config and self.config.revisit:
             last_revisit = self.config.revisit
+            if not isinstance(last_revisit, list):
+                last_revisit = [last_revisit]
             for wanted_sfs_nr in last_revisit:
                 self.log.info('Revisiting %s' % wanted_sfs_nr)
                 try:
@@ -806,11 +808,6 @@ class SFS(Trips):
                                              dummyfile=self.store.parsed_path(basefile))
 
             elif key in ('Departement', 'Departement/ myndighet'):
-                # the split is only needed because of SFS 1942:724,
-                # which has "Försvarsdepartementet,
-                # Socialdepartementet"...
-                if "departementet, " in val:
-                    val = val.split(", ")[0]
                 d["dcterms:creator"] = val
             elif (key == 'Ändring införd' and re_sfs(val)):
                 uppdaterad = re_sfs(val).group(1)
@@ -871,7 +868,12 @@ class SFS(Trips):
             if val == cleaned:
                 break
             val = cleaned
-        return cleaned
+        # SFS 1942:723: has "Försvarsdepartementet, Socialdepartementet",
+        # SFS 1941:846 has "Miljödepartementet Justitiedepartementet"...
+        # ... just grab the first in these rare cases
+        if re.search("departementet,? [A-Z]", val):
+            val = re.split(",? ", val)[0]
+        return val
 
     def polish_metadata(self, attributes, basefile, infer_nodes=True):
         # attributes will be a nested dict with some values being
@@ -1416,7 +1418,7 @@ class SFS(Trips):
         if ikraft:
             summary += "Ikraftträder: %s\n" % ikraft
         if forarb:
-            display = ", ".join([regpost.meta.value(x, DCTERMS.identifier) for x in forarb])
+            display = ", ".join([regpost.meta.value(x, DCTERMS.identifier) for x in forarb if regpost.meta.value(x, DCTERMS.identifier)])
             summary += "Förarbeten: %s\n" % display
         return summary
 
@@ -2081,7 +2083,7 @@ WHERE {
                 Facet(RPUBL.arsutgava,
                       use_for_toc=True,
                       label="Ordnade efter utgivningsår",
-                      pagetitle='Författningar utgivna %(selected)s',
+                      pagetitle='Författninagr utgivna %(selected)s',
                       key=sfsnrkey,
                       dimension_label="utgiven",
                       selector_descending=True),

@@ -1083,6 +1083,12 @@ class CommentaryFinder(object):
         return bins, scale
         
     def threshold(self, series, resolution=1000, bandwidth=200):
+        # in the degenerate case that we have a single element series,
+        # there is no way to calculate a threshold between "low" and
+        # "high" values. Just return whatever that element is.
+        assert len(series), "Impossible to calculate a KDE threshold for an empty series"
+        if len(series) == 1:
+            return series[0]
         bins, scale = self.estimate_density(series, resolution, bandwidth)      
 
         # find the valley after the first (significant, not less than
