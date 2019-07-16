@@ -917,8 +917,14 @@ class AFS(MyndFskrBase):
             norm = util.normalize_space
             match = lambda x: identifier in norm(x.text) or short_identifier in norm(x.text)
             links = [x for x in pdfs if match(x)]
+            # a (short) list of identifiers that isn't present in the
+            # list of change acts, even though they should
+            whitelist = ['AFS 1994:53',]
             if not links:
-                self.log.error("Can't find PDF link to %s amongst %s" % (identifier, [x.text for x in pdfs]))
+                if identifier not in whitelist:
+                    self.log.error("Can't find PDF link to %s amongst %s" % (identifier, [x.text for x in pdfs]))
+                else:
+                    raise errors.DocumentRemovedError(basefile, dummyfile=self.store.downloaded_path(basefile))
                 return False
             link = [x for x in pdfs if match(x)][0]
             pdfurl = urljoin(url, link["href"])
@@ -1067,6 +1073,13 @@ class DVFS(MyndFskrBase):
             for (element, attribute, link, pos) in source:
                 elementtext = " ".join(element.itertext())
                 m = re.search(self.basefile_regex, elementtext)
+                # FIXME: we should look at the date (given as
+                # <br>[YYYY-MM-DD] following the link) and only look
+                # for additional basefiles if the date is newer than
+                # the last recorded change for that basefile. But in
+                # order to do that, we need to get CompositeRepository
+                # to support persistant configuration options for
+                # subrepos.
                 if m:
                     self.log.debug("%s: Looking at %s for additional basefiles" %
                                    (m.group("basefile"), link))

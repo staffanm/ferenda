@@ -841,6 +841,15 @@ with the *config* object as single parameter.
                         ret = False
                     else:
                         raise e
+                except errors.DocumentRemovedError as e:
+                    # download_single has signalled that a document
+                    # that download_get_basefiles thought would exist
+                    # did not in fact exist. Make a note of this so
+                    # that we don't need to call download_single for
+                    # this basefile ever again:
+                    if e.dummyfile:
+                        util.writefile(e.dummyfile, "")
+                    pass
                 finally:
                     if reporter:
                         reporter(basefile)
