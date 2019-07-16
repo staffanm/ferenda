@@ -63,8 +63,15 @@ class SubrepoB(DocumentRepository):
         opts['customproperty'] = "Hello world!"
         return opts
 
-    def custom(self):
-        return self.config.customproperty
+    def custom(self, *args, **kwargs):
+        if args:
+            if args[0] == "set":
+                setattr(self.config.customproperty, args[1])
+            elif args[0] == "get":
+                return "%s: %s" % (self.__class__.__name__, self.config.customproperty)
+            
+        else:
+            return self.config.customproperty
 
 
 class SubrepoASubclass(SubrepoA): pass
@@ -79,7 +86,7 @@ class CompositeExample(CompositeRepository):
     subrepos = SubrepoBSubclass, SubrepoASubclass
     storage_policy = "dir"
 
-    def custom(self):
+    def custom(self, *args, **kwargs):
         for c in self.subrepos:
             inst = self.get_instance(c)
             ret = inst.custom()
@@ -158,6 +165,13 @@ class TestComposite(RepoTester):
 #        self.repo.config = LayeredConfig(Defaults({'datadir': self.datadir}))
 #        got = self.repo.custom()
 #        self.assertEqual("Hello world!", got)
+
+    def test_persistant_subrepo_config(self):
+         self.repo.custom("set", "blahonga")
+         self.repo = None
+         del self.repo
+         self.setUp()
+         self.assertEqual("SubrepoB: blahonga", self.repo.custom("get"))
 
 
 class Mixin(object):
