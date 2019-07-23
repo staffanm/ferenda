@@ -116,9 +116,9 @@ class DirTrips(Trips):
         else:
             if 'lastdownload' in self.config and self.config.lastdownload and not self.config.refresh:
                 startdate = self.config.lastdownload - timedelta(days=30)
-                self.start_url += "&UDAT=%s+till+%s" % (
-                    datetime.strftime(startdate, "%Y-%m-%d"),
-                    datetime.strftime(datetime.now(), "%Y-%m-%d"))
+                # The search form now only supports whole year
+                # interval on the form "YYYY to YYYY"
+                self.start_url += "&udat=%s+to+%s" % (startdate.year, datetime.now().year)
             super(DirTrips, self).download()
 
 

@@ -99,8 +99,14 @@ class CompositeRepository(DocumentRepository):
                 #
                 # Although not if the subrepo itself has subrepos
                 #
-                # FIXME: This is not good when using a compositerepo
-                # for downloading
+                # NB: This causes problems when using a compositerepo
+                # for downloading, since it's only the suprepos that
+                # know and report on each individual basefile download
+                # (unlike parse/relate/generate, the composite repo
+                # never knows about each individual basefile being
+                # downloaded and so can't provide a INFO logging of
+                # it). We try to work around this in the download
+                # method.
                 if (self.log.getEffectiveLevel() == logging.INFO and
                     inst.log.getEffectiveLevel() == logging.INFO and
                     not isinstance(inst, CompositeRepository)):
@@ -175,7 +181,17 @@ class CompositeRepository(DocumentRepository):
             if c not in self.store.docrepo_instances:
                 self.store.docrepo_instances[c] = inst
             try:
+                # temporarily re-set the logging level so that the
+                # subrepos INFO messages get reported (see note in
+                # get_instance).
+                loglevel_workaround = False
+                if (self.log.getEffectiveLevel() == logging.INFO and
+                    inst.log.getEffectiveLevel() == logging.INFO + 1):
+                    loglevel_workaround = True
+                    inst.log.setLevel(self.log.getEffectiveLevel())
                 ret = inst.download(basefile)
+                if loglevel_workaround:
+                    inst.log.setLevel(self.log.getEffectiveLevel() + 1)
             except Exception as e:  # be resilient
                 loc = util.location_exception(e)
                 self.log.error("download for %s failed: %s (%s)" % (c.alias, e, loc))
