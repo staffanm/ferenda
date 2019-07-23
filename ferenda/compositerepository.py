@@ -72,6 +72,8 @@ class CompositeRepository(DocumentRepository):
             if hasattr(self, '_config'):
                 config = self.config
             else:
+                # if we don't have a config object yet, the created
+                # instance is just temporary -- don't save it
                 config = None
 
             # FIXME: this instance will be using a default
@@ -80,9 +82,13 @@ class CompositeRepository(DocumentRepository):
             # causes problems, primarily if our CompositeRepository is
             # subclassed to somewhere else, eg subclass/bar.py -- we
             # might want to use resources at subclass/res instead.
+
+            # slightly magical: If our config object has a subsection
+            # that matches the instanceclass alias, use that
+            # subsection
+            if hasattr(config, instanceclass.alias):
+                config = getattr(config, instanceclass.alias)
             inst = instanceclass(config)
-            # if we don't have a config object yet, the created
-            # instance is just temporary -- don't save it
             if hasattr(self, '_config') and self.supress_subrepo_logging:
                 # if the composite object has loglevel INFO, make the
                 # subrepo have a slightly higher loglevel to avoid

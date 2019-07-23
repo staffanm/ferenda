@@ -187,7 +187,7 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
                     inst.log.setLevel(self.log.getEffectiveLevel())
                 basefiles = []
                 try:
-                    ret = inst.download(basefile, reporter=basefiles.append)
+                    ret = inst.download(basefile=basefile, reporter=basefiles.append)
                 except Exception as e:
                     loc = util.location_exception(e)
                     self.log.error("download for %s failed: %s (%s)" % (cls.alias, e, loc))

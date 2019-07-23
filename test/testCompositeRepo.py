@@ -4,9 +4,11 @@ from __future__ import (absolute_import, division,
 from builtins import *
 
 import os
+import tempfile
 
 import rdflib
 from rdflib.namespace import DCTERMS
+from layeredconfig import LayeredConfig, Defaults, INIFile
 
 from ferenda import DocumentRepository, util, errors
 from ferenda.testutil import RepoTester
@@ -34,7 +36,7 @@ class SubrepoA(DocumentRepository):
         else:
             return False # we don't even have this basefile
 
-    def custom(self):
+    def custom(self, *args, **kwargs):
         return False
         
 class SubrepoB(DocumentRepository):
@@ -66,10 +68,10 @@ class SubrepoB(DocumentRepository):
     def custom(self, *args, **kwargs):
         if args:
             if args[0] == "set":
-                setattr(self.config.customproperty, args[1])
+                self.config.customproperty = args[1]
+                return args[1]
             elif args[0] == "get":
                 return "%s: %s" % (self.__class__.__name__, self.config.customproperty)
-            
         else:
             return self.config.customproperty
 
@@ -89,7 +91,7 @@ class CompositeExample(CompositeRepository):
     def custom(self, *args, **kwargs):
         for c in self.subrepos:
             inst = self.get_instance(c)
-            ret = inst.custom()
+            ret = inst.custom(*args, **kwargs)
             if ret:
                 return ret
         raise RuntimeError("No subrepo could perform custom method")
@@ -166,16 +168,46 @@ class TestComposite(RepoTester):
 #        got = self.repo.custom()
 #        self.assertEqual("Hello world!", got)
 
+class PersistConfig(RepoTester):
+    repoclass = CompositeExample
+
+    @classmethod
+    def setUpClass(cls):
+        pass
+
+    def setUp(self):
+        self.datadir = tempfile.mkdtemp()
+        configfile = self.datadir + os.sep + "ferenda.ini"
+        with open(configfile, "w") as fp:
+            fp.write("""[__root__]
+datadir = %s
+
+[a]
+class = testCompositeRepo.SubrepoASubclass
+
+[b]
+class = testCompositeRepo.SubrepoBSubclass
+""" % self.datadir)
+        self.repo = self._createrepo()
+    
+    def _createrepo(self):
+        clsdefaults = self.repoclass.get_default_options()
+        configfile = self.datadir + os.sep + "ferenda.ini"
+        config = LayeredConfig(Defaults(clsdefaults),
+                               INIFile(configfile),
+                               cascade=True)
+        return self.repoclass(config)
+
     def test_persistant_subrepo_config(self):
-         self.repo.custom("set", "blahonga")
-         self.repo = None
-         del self.repo
-         self.setUp()
-         self.assertEqual("SubrepoB: blahonga", self.repo.custom("get"))
+        self.repo.custom("set", "blahonga")
+        LayeredConfig.write(self.repo.config)
+        self.repo = self._createrepo()
+        self.assertEqual("SubrepoBSubclass: blahonga", self.repo.custom("get"))
 
 
 class Mixin(object):
     def custom(self):
+
         return "Hello world from mixin"
 
 class CompositeExtrabase(CompositeExample):

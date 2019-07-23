@@ -81,7 +81,9 @@ DEFAULT_CONFIG = {'loglevel': 'DEBUG',
                   'processes': '1',
                   'datadir': 'data',
                   'force': False,
+                  'refresh': False,
                   'downloadmax': nativeint,
+                  'lastdownload': datetime,
                   'combineresources': False,
                   'staticsite': False,
                   'all': False,
@@ -862,7 +864,6 @@ def _load_config(filename=None, argv=None, defaults=None):
     if config_loaded is not False:
         # assert config_loaded is False, "load_config called more than once!"
         getlog().error("load_config called more than once!")
-    
     if not defaults:
         defaults = copy.deepcopy(DEFAULT_CONFIG)
         for alias, classname in _enabled_classes(inifile=filename).items():

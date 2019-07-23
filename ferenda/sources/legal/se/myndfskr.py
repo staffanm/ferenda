@@ -1060,6 +1060,7 @@ class DVFS(MyndFskrBase):
     nextpage_url_regex = None
     basefile_regex = re.compile("^\s*(?P<basefile>\d{4}:\d+)")
     download_formid = "aspnetForm"
+    download_iterlinks = False
 
     @decorators.downloadmax
     def download_get_basefiles(self, source):
@@ -1070,49 +1071,52 @@ class DVFS(MyndFskrBase):
         re_bf = re.compile("^\d{4}:\d+")
         while source:
             nextform = nexturl = None
-            for (element, attribute, link, pos) in source:
-                elementtext = " ".join(element.itertext())
+            soup = BeautifulSoup(source, "lxml")
+            for el in soup.find("div", id="readme").find_all("a"):
+                elementtext = el.text.strip()
                 m = re.search(self.basefile_regex, elementtext)
-                # FIXME: we should look at the date (given as
-                # <br>[YYYY-MM-DD] following the link) and only look
-                # for additional basefiles if the date is newer than
-                # the last recorded change for that basefile. But in
-                # order to do that, we need to get CompositeRepository
-                # to support persistant configuration options for
-                # subrepos.
+                # Look at the date (given as <br>[YYYY-MM-DD]
+                # following the link) and only look for additional
+                # basefiles if the date is newer than the last
+                # recorded change for that basefile. 
                 if m:
+                    if not self.config.refresh and self.config.lastdownload:
+                        changedatestr = el.find_next_sibling("br").next_sibling.strip()[1:-1]
+                        changedate = util.strptime(changedatestr, "%Y-%m-%d")
+                        if self.config.lastdownload.date() > changedate.date():
+                            self.log.debug("%s: Changedate %s is older than lastdownload %s, not going any further" % (m.group(0), changedatestr, str(self.config.lastdownload.date())))
+                            return # does this work in a generator?
+                    link = urljoin(self.start_url, el.get("href"))
                     self.log.debug("%s: Looking at %s for additional basefiles" %
                                    (m.group("basefile"), link))
                     resp = self.session.get(link)
                     resp.raise_for_status()
-                    soup = BeautifulSoup(resp.text, "lxml")
+                    subsoup = BeautifulSoup(resp.text, "lxml")
                     found = False
-                    for sublink in soup.find("div", id="readme").find_all("a", text=re_bf):
+                    for sublink in subsoup.find("div", id="readme").find_all("a", text=re_bf):
                         basefile = re_bf.match(sublink.text).group(0)
                         yield self.sanitize_basefile(basefile), urljoin(link, sublink["href"])
                 if (self.nextpage_regex and elementtext and
                         re.search(self.nextpage_regex, elementtext)):
-                    nexturl = link
-                if (self.download_formid and
-                        element.tag == "form" and
-                        element.get("id") == self.download_formid):
-                    nextform = element
+                    nexturl = el.get("href")
+            if nexturl:
+                nextform = soup.find("form", id="aspnetForm")
             if nextform is not None and nexturl is not None:
                 resp = self.download_post_form(nextform, nexturl)
             else:
                 resp = None
                 source = None
             if resp:
-                tree = lxml.html.document_fromstring(resp.text)
-                tree.make_links_absolute(resp.url,
-                                         resolve_base_href=True)
-                source = tree.iterlinks()
+                source = resp.text
 
     def download_post_form(self, form, url):
         # nexturl == "javascript:__doPostBack('ctl00$MainRegion$"
         #            "MainContentRegion$LeftContentRegion$ctl01$"
         #            "epiNewsList$ctl09$PagingID15','')"
         etgt, earg = [m.group(1) for m in re.finditer("'([^']*)'", url)]
+        form = lxml.html.document_fromstring(str(form)).forms[0]
+        form.make_links_absolute(self.start_url, resolve_base_href=True)
+
         fields = dict(form.fields)
 
         fields['__EVENTTARGET'] = etgt
