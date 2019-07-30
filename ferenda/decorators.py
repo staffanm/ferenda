@@ -73,8 +73,9 @@ def recordlastdownload(f):
         # only update the lastdownload for full downloads (if no
         # specific basefile was specified)
         if not args or not any(args):
-            self.config.lastdownload = datetime.now()
-            LayeredConfig.write(self.config)
+            if self.download_record_last_download:
+                self.config.lastdownload = datetime.now()
+                LayeredConfig.write(self.config)
         return ret
     return wrapper
 

@@ -24,6 +24,7 @@ import datetime
 from rdflib import RDF, Graph
 from rdflib.resource import Resource
 from rdflib.namespace import DCTERMS, SKOS
+from layeredconfig import LayeredConfig
 
 from . import RPUBL, RINFOEX, SwedishLegalSource, FixedLayoutSource
 from .fixedlayoutsource import FixedLayoutStore
@@ -45,7 +46,8 @@ PROV = Namespace(util.ns['prov'])
 class RequiredTextMissing(errors.ParseError): pass
 
 class MyndFskrStore(FixedLayoutStore):
-    downloaded_suffixes = [".pdf", ".html"]
+    # downloaded_suffixes = [".pdf", ".html", ".docx"]
+    pass
 
     
 class MyndFskrBase(FixedLayoutSource):
@@ -73,7 +75,7 @@ class MyndFskrBase(FixedLayoutSource):
     basefile_regex = re.compile('(?P<basefile>\d{4}[:/_-]\d{1,3})(?:|\.\w+)$')
     document_url_regex = re.compile('.*(?P<basefile>\d{4}[:/_-]\d{1,3}).pdf$')
     download_accept_404 = True  # because the occasional 404 is to be expected
-
+    download_record_last_download = False
     nextpage_regex = None
     nextpage_url_regex = None
     download_rewrite_url = False # iff True, use remote_url to rewrite download links instead of
@@ -112,11 +114,11 @@ class MyndFskrBase(FixedLayoutSource):
         # unconditionally set downloaded_suffixes, since the
         # conditions for this re-set in DocumentRepository.__init__ is
         # too rigid
-        if hasattr(self, 'downloaded_suffixes'):
-            self.store.downloaded_suffixes = self.downloaded_suffixes
-        else:
-            self.store.downloaded_suffixes = [self.downloaded_suffix]
-        
+#        if hasattr(self, 'downloaded_suffixes'):
+#            self.store.downloaded_suffixes = self.downloaded_suffixes
+#        else:
+#            self.store.downloaded_suffixes = [self.downloaded_suffix]
+
     @classmethod
     def get_default_options(cls):
         opts = super(MyndFskrBase, cls).get_default_options()
@@ -279,15 +281,23 @@ class MyndFskrBase(FixedLayoutSource):
                 self.log.warning("%s: Couldn't find document from landing page %s" % (basefile, url))
         ret = super(MyndFskrBase, self).download_single(basefile, url, orig_url)
         if self.downloaded_suffix == ".pdf":
-            # assure that the downloaded resource really is a PDF
+            # assure that the downloaded resource really is a PDF, or
+            # possibly rename it if it's one of the other supported
+            # types
             downloaded_file = self.store.downloaded_path(basefile)
             with open(downloaded_file, "rb") as fp:
                 sig = fp.read(4)
-            if sig != b'%PDF':
+            for suffix, typesig in self.store.doctypes.items():
+                import pudb; pu.db
+                if sig == typesig:
+                    if suffix != ".pdf":
+                        other_file = downloaded_file.replace(".pdf", suffix)
+                        util.robust_rename(downloaded_file, other_file)
+                    break
+            else:
                 other_file = downloaded_file.replace(".pdf", ".bak")
                 util.robust_rename(downloaded_file, other_file)
-                raise errors.DownloadFileNotFoundError("%s: Assumed PDF, but downloaded file has sig %r"
-                                                       " (saved at %s)" % (basefile, sig, other_file))
+                raise errors.DownloadFileNotFoundError("%s: downloaded file has sig %r that doesn't match any expected filetype (%s), saved at %s" % (basefile, sig, ",".join(self.store.doctypes.keys()), other_file))
         return ret
 
     def download_post_form(self, form, url):
@@ -371,7 +381,13 @@ class MyndFskrBase(FixedLayoutSource):
         tmpfile = self.store.path(basefile, 'intermediate', '.pdf')
         outfile = self.store.path(basefile, 'intermediate', '.txt')
         if not util.outfile_is_newer([infile], outfile):
-            util.copy_if_different(infile, tmpfile)
+            if infile.endswith(".pdf") or not os.path.exists(tmpfile):
+                # if infile does not end with pdf, an existing tmpfile
+                # means that there has been an eg. doc -> pdf
+                # conversion done by downloaded_to_intermediate. Don't
+                # overwrite that one!
+                util.copy_if_different(infile, tmpfile)
+            from pudb import set_trace; set_trace()
             with open(tmpfile, "rb") as fp:
                 if fp.read(4) != b'%PDF':
                     raise errors.ParseError("%s is not a PDF file" % tmpfile)
@@ -1061,6 +1077,7 @@ class DVFS(MyndFskrBase):
     basefile_regex = re.compile("^\s*(?P<basefile>\d{4}:\d+)")
     download_formid = "aspnetForm"
     download_iterlinks = False
+    download_record_last_download = True
 
     @decorators.downloadmax
     def download_get_basefiles(self, source):
@@ -1193,7 +1210,7 @@ class DVFS(MyndFskrBase):
 
 class EIFS(MyndFskrBase):
     alias = "eifs"
-    start_url = "http://www.ei.se/sv/Publikationer/Foreskrifter/"
+    start_url = "https://www.ei.se/sv/Publikationer/Foreskrifter/"
     basefile_regex = None
     document_url_regex = re.compile('.*(?P<basefile>EIFS_\d{4}_\d+).pdf$')
 
@@ -1205,10 +1222,66 @@ class EIFS(MyndFskrBase):
 class ELSAKFS(MyndFskrBase):
     alias = "elsakfs"  # real name is ELSÄK-FS, but avoid swedchars, uppercase and dashes
     start_url = "https://www.elsakerhetsverket.se/om-oss/lag-och-ratt/foreskrifter/"
-    landingpage = True
     download_stay_on_site = True
+    landingpage_basefile_regex = re.compile("^ELSÄK-FS (?P<basefile>\d{4}:\d+)\s*$")
     basefile_regex = re.compile("^ELSÄK-FS (?P<basefile>\d{4}:\d+)\s*$")
+    basefile_pdf_regex = re.compile("^ELSÄK-FS (?P<basefile>\d{4}:\d+)(?P<typ>| - ändringsföreskrift| - konsoliderad version| - ursprunglig lydelse) \(pdf, \d,\d MB\)")
 
+
+    @decorators.downloadmax
+    def download_get_basefiles(self, source):
+        def linkmatcher(tag):
+            return tag.name == "a" and self.basefile_pdf_regex.match(util.normalize_space(tag.get_text()))
+        try:
+            yielded = set()
+            if 'last_basefile' in self.config:
+                new_last_basefile = self.config.last_basefile
+            else:
+                new_last_basefile = "0000:000"
+            for (element, attribute, link, pos) in source:
+                if element.tag != "a":
+                    continue
+                elementtext = " ".join(element.itertext())
+                m = self.landingpage_basefile_regex.match(elementtext)
+                if m:
+                    # return if basefile is larger than self.config.last_basefile
+                    basefile = m.group("basefile")
+                    if (not self.config.refresh) and 'last_basefile' in self.config:
+                        if (self.config.last_basefile and
+                            util.split_numalpha(basefile) <= util.split_numalpha(self.config.last_basefile)):
+                            self.log.debug("last_basefile is %s, not examining basefile %s or any other after that" % (self.config.last_basefile, basefile))
+                            return
+                    if self.download_stay_on_site and urlparse(self.start_url).netloc != urlparse(link).netloc:
+                        continue
+
+                    self.log.debug("%s: Getting landing page %s" % (basefile, link))
+                    resp = self.session.get(link)
+                    resp.raise_for_status()
+                    soup = BeautifulSoup(resp.text, "lxml")
+                    d = soup.find("div", "maincontent")
+                    els = d.find_all(linkmatcher)
+                    if not els:
+                        self.log.warning("Could not find valid PDF links on landing page %s for basefile %s" % (link, basefile))
+                    for el in els:
+                        m = self.basefile_pdf_regex.match(util.normalize_space(el.get_text()))
+                        sub_basefile = "elsakfs/" + m.group("basefile")
+                        if m.group("typ") == " - konsoliderad version":
+                            sub_basefile = "konsolidering/" + sub_basefile
+                        if sub_basefile not in yielded:
+                            self.log.debug("yielding %s, %s" % (sub_basefile,
+                                                                urljoin(link, el.get("href"))))
+                            yield (sub_basefile, urljoin(link, el.get("href")))
+                            yielded.add(sub_basefile)
+                    if util.split_numalpha(basefile) > util.split_numalpha(new_last_basefile):
+                        new_last_basefile = basefile
+        finally:
+            if 'last_basefile' in self.config:
+                self.config.last_basefile = new_last_basefile
+            else:
+                self.log.warning("Unable to record last_basefile = %s, please add this manually to ferenda.ini" % basefile)
+            LayeredConfig.write(self.config)
+        
+        
     # this repo has a mismatch between basefile prefix and the URI
     # space slug. This is easily fixed.
     def sanitize_basefile(self, basefile):
@@ -1319,6 +1392,7 @@ class KVFS(MyndFskrBase):
     # (finns även konsoliderade på http://www.kriminalvarden.se/
     #  om-kriminalvarden/styrning-och-regelverk/lagar-forordningar-och-
     #  foreskrifter)
+
     download_iterlinks = False
     basefile_regex = re.compile("(?P<basefile>KVV?FS \d{4}:\d+)")
 
@@ -1350,6 +1424,9 @@ class KVFS(MyndFskrBase):
                 m = self.basefile_regex.match(h.text.strip())
                 if not m:
                     continue
+                if "2019:1" in m.group("basefile"):
+                    from pudb import set_trace; set_trace()
+                
                 el = h.parent.parent.find("a")
                 if el:
                     yield self.sanitize_basefile(m.group("basefile")), urljoin(self.start_url, el.get("href"))

@@ -106,7 +106,7 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
     documentstore_class = MyndFskrStore
     requesthandler_class = MyndFskrHandler
     urispace_segment = ""
-
+    download_record_last_download = False
     # mapping to get basefile_from_uri to work. This is a ugly hack,
     # the proper way would be to call the bsefile_from_uri method in
     # the appropriate subrepo, but that turned out to be hard.

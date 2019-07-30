@@ -95,6 +95,7 @@ class FixedLayoutStore(SwedishLegalStore):
         return list(self.doctypes.keys())
 
     def guess_type(self, fp, basefile):
+        assert False, "This seems to never be called?"
         start = fp.tell()
         sig = fp.read(4)
         fp.seek(start)

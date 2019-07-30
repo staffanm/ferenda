@@ -279,6 +279,9 @@ class DocumentRepository(object):
     """It ``True`` (default: ``False``), download_get_basefiles will
     process recieved basefiles in reverse order."""
 
+    download_record_last_download = True
+    
+
     source_encoding = "utf-8"
     """The character set that the source documents use (if
     applicable)."""
@@ -855,7 +858,7 @@ with the *config* object as single parameter.
                         reporter(basefile)
                         
                 updated = updated or ret
-        self.config.lastdownload = datetime.now()
+        # self.config.lastdownload = datetime.now()
         return updated
 
     def download_get_first_page(self):

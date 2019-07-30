@@ -228,6 +228,8 @@ def split_numalpha(s):
     assert isinstance(s, str), "%s is a %s, not a (unicode) string" % (s, str(type(s)))
     res = []
     seg = ''
+    if not s:
+        return res
     digit = s[0].isdecimal()
     for c in s:
         if (c.isdecimal() and digit) or (not c.isdecimal() and not digit):
