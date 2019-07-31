@@ -10,6 +10,7 @@ from io import BytesIO
 import os
 import re
 import json
+import functools
 from collections import OrderedDict
 try:
     from functools import lru_cache
@@ -50,6 +51,38 @@ class MyndFskrStore(FixedLayoutStore):
     pass
 
     
+def recordlastbasefile(f):
+    """Automatically stores last downloaded basefile in config.last_basefile
+    """
+    @functools.wraps(f)
+    def wrapper(self, *args, **kwargs):
+        def fsnr(s):
+            if "/" in s:
+                return s.split("/")[-1]
+            else:
+                return s
+        if 'last_basefile' in self.config:
+            new_last_basefile = self.config.last_basefile
+        else:
+            new_last_basefile = "0000:000"
+        for basefile, link in f(self, *args, **kwargs):
+            if (not self.config.refresh) and 'last_basefile' in self.config:
+                if util.split_numalpha(fsnr(basefile)) <= util.split_numalpha(self.config.last_basefile):
+                    self.log.debug("config.last_basefile is %s, not examining basefile %s or any other after that" % (self.config.last_basefile, basefile))
+                    return
+
+            # FIXME: this can be pretty inaccurate if the source provides multiple FS:s (eg KVFS and the older KVVFS). We should only look at the fsnr part if the fsname is prepended
+            if util.split_numalpha(fsnr(basefile)) > util.split_numalpha(new_last_basefile):
+                new_last_basefile = fsnr(basefile)
+            yield basefile, link
+            
+        if 'last_basefile' in self.config:
+            self.config.last_basefile = new_last_basefile
+        else:
+            self.log.warning("Unable to record last_basefile = %s, please add this manually to ferenda.ini" % new_last_basefile)
+        LayeredConfig.write(self.config)
+    return wrapper
+
 class MyndFskrBase(FixedLayoutSource):
     """A abstract base class for fetching and parsing regulations from
     various swedish government agencies. These documents often have a
@@ -288,7 +321,6 @@ class MyndFskrBase(FixedLayoutSource):
             with open(downloaded_file, "rb") as fp:
                 sig = fp.read(4)
             for suffix, typesig in self.store.doctypes.items():
-                import pudb; pu.db
                 if sig == typesig:
                     if suffix != ".pdf":
                         other_file = downloaded_file.replace(".pdf", suffix)
@@ -387,7 +419,6 @@ class MyndFskrBase(FixedLayoutSource):
                 # conversion done by downloaded_to_intermediate. Don't
                 # overwrite that one!
                 util.copy_if_different(infile, tmpfile)
-            from pudb import set_trace; set_trace()
             with open(tmpfile, "rb") as fp:
                 if fp.read(4) != b'%PDF':
                     raise errors.ParseError("%s is not a PDF file" % tmpfile)
@@ -1229,57 +1260,40 @@ class ELSAKFS(MyndFskrBase):
 
 
     @decorators.downloadmax
+    @recordlastbasefile
     def download_get_basefiles(self, source):
         def linkmatcher(tag):
             return tag.name == "a" and self.basefile_pdf_regex.match(util.normalize_space(tag.get_text()))
-        try:
-            yielded = set()
-            if 'last_basefile' in self.config:
-                new_last_basefile = self.config.last_basefile
-            else:
-                new_last_basefile = "0000:000"
-            for (element, attribute, link, pos) in source:
-                if element.tag != "a":
+        yielded = set()
+        for (element, attribute, link, pos) in source:
+            if element.tag != "a":
+                continue
+            elementtext = " ".join(element.itertext())
+            m = self.landingpage_basefile_regex.match(elementtext)
+            if m:
+                # return if basefile is larger than self.config.last_basefile
+                basefile = m.group("basefile")
+                if self.download_stay_on_site and urlparse(self.start_url).netloc != urlparse(link).netloc:
                     continue
-                elementtext = " ".join(element.itertext())
-                m = self.landingpage_basefile_regex.match(elementtext)
-                if m:
-                    # return if basefile is larger than self.config.last_basefile
-                    basefile = m.group("basefile")
-                    if (not self.config.refresh) and 'last_basefile' in self.config:
-                        if (self.config.last_basefile and
-                            util.split_numalpha(basefile) <= util.split_numalpha(self.config.last_basefile)):
-                            self.log.debug("last_basefile is %s, not examining basefile %s or any other after that" % (self.config.last_basefile, basefile))
-                            return
-                    if self.download_stay_on_site and urlparse(self.start_url).netloc != urlparse(link).netloc:
-                        continue
 
-                    self.log.debug("%s: Getting landing page %s" % (basefile, link))
-                    resp = self.session.get(link)
-                    resp.raise_for_status()
-                    soup = BeautifulSoup(resp.text, "lxml")
-                    d = soup.find("div", "maincontent")
-                    els = d.find_all(linkmatcher)
-                    if not els:
-                        self.log.warning("Could not find valid PDF links on landing page %s for basefile %s" % (link, basefile))
-                    for el in els:
-                        m = self.basefile_pdf_regex.match(util.normalize_space(el.get_text()))
-                        sub_basefile = "elsakfs/" + m.group("basefile")
-                        if m.group("typ") == " - konsoliderad version":
-                            sub_basefile = "konsolidering/" + sub_basefile
-                        if sub_basefile not in yielded:
-                            self.log.debug("yielding %s, %s" % (sub_basefile,
-                                                                urljoin(link, el.get("href"))))
-                            yield (sub_basefile, urljoin(link, el.get("href")))
-                            yielded.add(sub_basefile)
-                    if util.split_numalpha(basefile) > util.split_numalpha(new_last_basefile):
-                        new_last_basefile = basefile
-        finally:
-            if 'last_basefile' in self.config:
-                self.config.last_basefile = new_last_basefile
-            else:
-                self.log.warning("Unable to record last_basefile = %s, please add this manually to ferenda.ini" % basefile)
-            LayeredConfig.write(self.config)
+                self.log.debug("%s: Getting landing page %s" % (basefile, link))
+                resp = self.session.get(link)
+                resp.raise_for_status()
+                soup = BeautifulSoup(resp.text, "lxml")
+                d = soup.find("div", "maincontent")
+                els = d.find_all(linkmatcher)
+                if not els:
+                    self.log.warning("Could not find valid PDF links on landing page %s for basefile %s" % (link, basefile))
+                for el in els:
+                    m = self.basefile_pdf_regex.match(util.normalize_space(el.get_text()))
+                    sub_basefile = "elsakfs/" + m.group("basefile")
+                    if m.group("typ") == " - konsoliderad version":
+                        sub_basefile = "konsolidering/" + sub_basefile
+                    if sub_basefile not in yielded:
+                        self.log.debug("yielding %s, %s" % (sub_basefile,
+                                                            urljoin(link, el.get("href"))))
+                        yield (sub_basefile, urljoin(link, el.get("href")))
+                        yielded.add(sub_basefile)
         
         
     # this repo has a mismatch between basefile prefix and the URI
@@ -1329,7 +1343,8 @@ class FFS(MyndFskrBase):
     start_url = "http://www.forsvarsmakten.se/sv/om-myndigheten/dokument/lagrum"
     document_url_regex = re.compile(".*/lagrum/gallande-ffs.*/ffs.*(?P<basefile>\d{4}[\.:/_-]\d{1,3})[^/]*.pdf$")
 
-
+   
+    
 class KFMFS(MyndFskrBase):
     alias = "kfmfs"
     start_url = "http://www.kronofogden.se/Foreskrifter.html"
@@ -1364,7 +1379,12 @@ class KOVFS(MyndFskrBase):
 
     def download_get_first_page(self):
         payload = '{"id":10,"jsonrpc":"2.0","method":"Article.list","params":[{"uid":true,"name":"sv","articleNumber":true,"introductionText":true,"price":true,"url":"sv","images":true,"unit":true,"articlegroup":true,"news":true,"choices":true,"isBuyable":true,"presentationOnly":true,"choiceSchema":true},{"filters":{"search":{"term":"kovfs*"}},"offset":0,"limit":48,"sort":"name","descending":false}]}'
-        return self.session.post(self.start_url, data=payload)
+        resp = self.session.post(self.start_url, data=payload)
+        # to avoid auto-detecting the charset, which yields a lot of
+        # debug log entries we can do without, as we're sure of the
+        # encoding
+        resp.encoding = "utf-8"
+        return resp
 
     @decorators.downloadmax
     def download_get_basefiles(self, source):
@@ -1399,7 +1419,7 @@ class KVFS(MyndFskrBase):
     def download_get_first_page(self, paging=1):
         self.log.debug("POSTing to search, paging=%s" % paging)
         params = {'publicationKeyword':'',
-                  'sortOrder': 'publish_desc',
+                  'sortOrder': 'publish',
                   'paging': str(paging)}
         headers = {'accept': 'application/json, text/javascript, */*; q=0.01'}
         resp = self.session.post(self.start_url, data=params, headers=headers)
@@ -1410,6 +1430,7 @@ class KVFS(MyndFskrBase):
         return ["kvfs", "kvvfs"]
     
     @decorators.downloadmax
+    @recordlastbasefile
     def download_get_basefiles(self, source):
         lasthref = None
         done = False
@@ -1424,12 +1445,9 @@ class KVFS(MyndFskrBase):
                 m = self.basefile_regex.match(h.text.strip())
                 if not m:
                     continue
-                if "2019:1" in m.group("basefile"):
-                    from pudb import set_trace; set_trace()
-                
                 el = h.parent.parent.find("a")
                 if el:
-                    yield self.sanitize_basefile(m.group("basefile")), urljoin(self.start_url, el.get("href"))
+                    yield self.sanitize_basefile(m.group("basefile")), urljoin(self.start_url,el.get("href"))
             nextlink = soup.find("ul", "pagination").find_all("a")[-1] # last link is Next
             if nextlink and nextlink["href"] != lasthref:
                 paging += 1
@@ -1457,11 +1475,6 @@ class LMFS(MyndFskrBase):
         # spaces ("följande" can be pretty much anything else)
         t["rpubl:beslutadAv"].insert(0, '(?:meddelar|föreskriver)\s(Statens\s+lantmäteriverk)')
         return t
-
-class LIFS(MyndFskrBase):
-    alias = "lifs"
-    start_url = "http://www.lotteriinspektionen.se/sv/Lagar-och-villkor/Foreskrifter/"
-    basefile_regex = re.compile('(?P<basefile>LIFS \d{4}:\d{1,3})')
 
 
 class LVFS(MyndFskrBase):
@@ -1637,11 +1650,12 @@ class NFS(MyndFskrBase):
                         assert base_basefile, "%s: Found consolidated version, but no base act" % (basefile)
                 consolidated_pdfurl = urljoin(url, link["href"])
                 consolidated_basefile = "konsolidering/%s" % base_basefile
-                DocumentRepository.download_single(self, consolidated_basefile, consolidated_pdfurl)
+                ret = DocumentRepository.download_single(self, consolidated_basefile, consolidated_pdfurl)
                 # save the landing page as it contains information
                 # about the consolidation date
                 with self.store.open_downloaded(consolidated_basefile, "w", attachment="landingpage.html") as fp:
                     fp.write(resp.text)
+                return ret
             elif identifier in title:
                 pdfurl = urljoin(url, link["href"])
                 # we assume that we encounter any consolidated
@@ -1778,6 +1792,14 @@ class RIFS(MyndFskrBase):
         return ["rifs", "rnfs"]
 
 
+class SIFS(MyndFskrBase):
+    alias = "sifs"
+    start_url = "https://www.spelinspektionen.se/foreskrifter-och-lagar/nya-foreskrifter/"
+    basefile_regex = re.compile('(?P<basefile>[SL]IFS \d{4}:\d{1,3})')
+
+    def forfattningssamlingar(self):
+        return ["sifs", "lifs"]
+
 class SJVFS(MyndFskrBase):
     alias = "sjvfs"
     start_url = "http://www.jordbruksverket.se/forfattningar/forfattningssamling.4.5aec661121e2613852800012537.html"
@@ -1825,7 +1847,7 @@ class SKVFS(MyndFskrBase):
     source_encoding = "utf-8"
     storage_policy = "dir"
     downloaded_suffix = ".html"
-
+    download_record_last_download = True
     start_url = "https://www4.skatteverket.se/rattsligvagledning/115.html"
     # also consolidated versions
     # http://www.skatteverket.se/rattsinformation/lagrummet/foreskrifterkonsoliderade/aldrear.4.19b9f599116a9e8ef3680004242.html
@@ -1835,7 +1857,6 @@ class SKVFS(MyndFskrBase):
     # URL's are highly unpredictable. We must find the URL for every
     # resource we want to download, we cannot transform the resource
     # id into a URL
-    @decorators.recordlastdownload
     def download_get_basefiles(self, source):
         startyear = str(
             self.config.lastdownload.year) if 'lastdownload' in self.config and not self.config.refresh else "0"
@@ -2196,6 +2217,7 @@ class STFS(MyndFskrBase):
     download_iterlinks = False
     
     @decorators.downloadmax
+    @recordlastbasefile
     def download_get_basefiles(self, source):
         done = False
         soup = BeautifulSoup(source, "lxml")

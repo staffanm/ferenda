@@ -85,9 +85,13 @@ class CompositeRepository(DocumentRepository):
 
             # slightly magical: If our config object has a subsection
             # that matches the instanceclass alias, use that
-            # subsection
+            # subsection. Same if our config object's parent has a
+            # subsection that matches the instanceclass alias.
             if hasattr(config, instanceclass.alias):
                 config = getattr(config, instanceclass.alias)
+            elif  hasattr(config._parent, instanceclass.alias):
+                config = getattr(config._parent, instanceclass.alias)
+                
             inst = instanceclass(config)
             if hasattr(self, '_config') and self.supress_subrepo_logging:
                 # if the composite object has loglevel INFO, make the
