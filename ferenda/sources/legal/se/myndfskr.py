@@ -52,7 +52,12 @@ class MyndFskrStore(FixedLayoutStore):
 
     
 def recordlastbasefile(f):
-    """Automatically stores last downloaded basefile in config.last_basefile
+    """Decorator for download_get_basefiles that automatically stores last
+    downloaded basefile in config.last_basefile, and automatically
+    stops reading from the generator that download_get_basefiles
+    provide once it sees older basefiles that we already have (useful
+    for multi-page listings).
+
     """
     @functools.wraps(f)
     def wrapper(self, *args, **kwargs):
@@ -1533,7 +1538,7 @@ class MPRTFS(MyndFskrBase):
 
 class MSBFS(MyndFskrBase):
     alias = "msbfs"
-    start_url = "https://www.msb.se/sv/Om-MSB/Lag-och-ratt/"
+    start_url = "https://www.msb.se/sv/regler/gallande-regler/"
     # FIXME: start_url now requres a POST but with a bunch of
     # viewstate crap to yield a full list
     download_iterlinks = False # download_get_basefiles will be called
@@ -1551,23 +1556,30 @@ class MSBFS(MyndFskrBase):
         uri = uri.replace("/saeifs/", "/säifs/")
         return super(MyndFskrBase, self).basefile_from_uri(uri)
 
+    @recordlastbasefile
     def download_get_basefiles(self, source):
-        doc = lxml.html.fromstring(source)
-        doc.make_links_absolute(self.start_url)
-        form = doc.forms[0]
-        data=dict(form.fields)
-        data['ctl00$ContentArea$MainContentArea$ctl02$ctl00$ctl06$SearchFormBox$ctl00$cboValidDate'] = ''
-        data['ctl00$SiteTop$SiteQuickSearch$txtSearch'] = ''
-        data['ctl00$ContentArea$MainContentArea$ctl02$ctl00$ctl04$ctl00$txtSearch'] = ''
-        # simulate a click on the lower search button
-        data['ctl00$ContentArea$MainContentArea$ctl02$ctl00$ctl06$SearchFormBox$ctl00$ctl00'] = "Sök"
-        resp = self.session.post(form.action, data=data)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "lxml")
-        for link in soup.find_all("a", text=re.compile(self.basefile_regex),
-                                  href=re.compile("\.pdf$")):
-            basefile = re.match(self.basefile_regex, link.get_text()).group("basefile")
-            yield self.sanitize_basefile(basefile), urljoin(self.start_url, link["href"])
+        selectedpage = 1
+        while source:
+            soup = BeautifulSoup(source, "lxml")
+            for link_el in soup.find_all("a", "law"):
+                m = self.basefile_regex.match(link_el.string)
+                if m:
+                    link = urljoin(self.start_url, link_el.get("href"))
+                    basefile = self.sanitize_basefile(m.group("basefile"))
+                    yield basefile, link
+                else:
+                    self.log.warning("Link titled %s ought to be a basefile, but isn't" % link_el.string)
+            if soup.find("a", "pagination-next") and not soup.find("li", "pagination-next disabled"):
+                selectedpage += 1
+                self.log.debug("Downloading %s, selectedpage %s" % (self.start_url, selectedpage))
+                resp = self.session.post(self.start_url, {"searchQuery": "",
+                                                          "sortOrder": "DescendingYear",
+                                                          "amountToShow": "10",
+                                                          "selectedpage": selectedpage})
+                source = resp.text
+            else:
+                source = None
+                
 
     def fwdtests(self):
         t = super(MSBFS, self).fwdtests()
