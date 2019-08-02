@@ -1963,11 +1963,11 @@ class SKVFS(MyndFskrBase):
             return Body([elements_from_soup(main)],
                         uri=None)
 
-    def parse_open(self, basefile):
-        if os.path.exists(self.store.downloaded_path(basefile, attachment="index.pdf")):
-            return super(SKVFS, self).parse_open(basefile, attachment="index.pdf")
+    def parse_open(self, basefile, version=None):
+        if os.path.exists(self.store.downloaded_path(basefile, version, attachment="index.pdf")):
+            return super(SKVFS, self).parse_open(basefile, attachment="index.pdf", version=version)
         else:
-            return self.store.open_downloaded(basefile)
+            return self.store.open_downloaded(basefile, version=version)
 
     def extract_head(self, fp, basefile, force_ocr=False, attachment=None):
         if os.path.exists(self.store.downloaded_path(basefile, attachment="index.pdf")):

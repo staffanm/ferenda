@@ -91,7 +91,7 @@ class CompositeRepository(DocumentRepository):
                 config = getattr(config, instanceclass.alias)
             elif  hasattr(config._parent, instanceclass.alias):
                 config = getattr(config._parent, instanceclass.alias)
-                
+
             inst = instanceclass(config)
             if hasattr(self, '_config') and self.supress_subrepo_logging:
                 # if the composite object has loglevel INFO, make the
@@ -114,7 +114,9 @@ class CompositeRepository(DocumentRepository):
                 if (self.log.getEffectiveLevel() == logging.INFO and
                     inst.log.getEffectiveLevel() == logging.INFO and
                     not isinstance(inst, CompositeRepository)):
-                    inst.log.setLevel(inst.log.getEffectiveLevel() + 1)
+                    customlevel = inst.log.getEffectiveLevel() + 1
+                    logging.addLevelName(customlevel, "INFOEX")
+                    inst.log.setLevel(customlevel)
             self._instances[instanceclass] = inst
         return self._instances[instanceclass]
 

@@ -860,19 +860,19 @@ def _load_config(filename=None, argv=None, defaults=None):
        line arguments.
 
     """
-    # FIXME: Expand on this list of defaults? Note that it only
-    # pertains to global configuration, not docrepo configuration
-    # (those have the get_default_options() classmethod).
     global config_loaded
     if config_loaded is not False:
         # assert config_loaded is False, "load_config called more than once!"
         getlog().error("load_config called more than once!")
     if not defaults:
+        # FIXME: Expand on this list of defaults? Note that it only
+        # pertains to global configuration, not docrepo configuration
+        # (those have the get_default_options() classmethod).
         defaults = copy.deepcopy(DEFAULT_CONFIG)
         for alias, classname in _enabled_classes(inifile=filename).items():
             assert alias not in defaults, "Collision on key %s" % alias
             defaults[alias] = _load_class(classname).get_default_options()
-
+    from pudb import set_trace; set_trace()
     sources = [Defaults(defaults)]
     if filename:
         sources.append(INIFile(filename))

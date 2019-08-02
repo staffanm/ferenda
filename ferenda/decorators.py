@@ -115,13 +115,7 @@ def ifneeded(action):
                 reason = ""
                 if hasattr(needed, 'reason'):
                     reason = " (%s)" % needed.reason
-                # we should log this msg at DEBUG level, except now
-                # we're troubleshooting why certain files are
-                # re-processed and so we log at a slightly higher
-                # level (INFO + 1, to get around compositerepo's
-                # supress_subrepo_logging feature)
-                # self.log.debug("%s: %s starting%s" % (basefile, action, reason))
-                self.log.log(logging.INFO+1, "%s starting%s" % (action, reason))
+                self.log.debug("%s starting%s" % (action, reason))
                 if 'needed' in getfullargspec(f).args and 'needed' not in kwargs:
                     kwargs['needed'] = needed
                 return f(self, basefile, *args, **kwargs)
