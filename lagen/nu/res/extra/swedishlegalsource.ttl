@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2018-05-17T12:08:35.119027
+# Automatically transformed from sources at 2019-08-04T22:34:59.509145
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -510,6 +510,7 @@
 
 <https://lagen.nu/dataset/lifs> a rpubl:Forfattningssamling ;
     dcterms:publisher <https://lagen.nu/org/2014/lotteriinspektionen> ;
+    rdfs:comment "Har ersatts av Spelinspektionens författningssamling (SIFS)"@sv ;
     rdfs:seeAlso <http://www.lotteriinsp.se/lott_templates/Page____776.aspx> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/lifs> ;
     skos:altLabel "LIFS"@sv ;
@@ -696,6 +697,13 @@
     skos:altLabel "RH"@sv ;
     skos:prefLabel "Rättsfall från hovrätterna"@sv .
 
+<https://lagen.nu/dataset/rifs> a rpubl:Forfattningssamling ;
+    dcterms:publisher <https://lagen.nu/org/2019/revisorsinspektionen> ;
+    rdfs:seeAlso <https://www.revisorsinspektionen.se/regelverk/samtliga-foreskrifter/> ;
+    owl:sameAs <http://rinfo.lagrummet.se/serie/fs/rifs> ;
+    skos:altLabel "RIFS"@sv ;
+    skos:prefLabel "Revisorsinspektionens författningssamling"@sv .
+
 <https://lagen.nu/dataset/rk> a rpubl:Rattsfallspublikation ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/rf/rk> ;
     skos:altLabel "RK"@sv ;
@@ -703,6 +711,7 @@
 
 <https://lagen.nu/dataset/rnfs> a rpubl:Forfattningssamling ;
     dcterms:publisher <https://lagen.nu/org/2014/revisorsnamnden> ;
+    rdfs:comment "Har övertagits av Revisorsinspektionens föreskrifter (RIFS)"@sv ;
     rdfs:seeAlso <http://www.revisorsnamnden.se/rattsinfo/ramar/RNFS_ram.htm> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/rnfs> ;
     skos:altLabel "RNFS"@sv ;
@@ -760,6 +769,13 @@
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/sgu-fs> ;
     skos:altLabel "SGU-FS"@sv ;
     skos:prefLabel "Sveriges geologiska undersöknings författningssamling"@sv .
+
+<https://lagen.nu/dataset/sifs> a rpubl:Forfattningssamling ;
+    dcterms:publisher <https://lagen.nu/org/2019/spelinspektionen> ;
+    rdfs:seeAlso <https://www.spelinspektionen.se/foreskrifter-och-lagar/nya-foreskrifter/> ;
+    owl:sameAs <http://rinfo.lagrummet.se/serie/fs/sifs> ;
+    skos:altLabel "SIFS"@sv ;
+    skos:prefLabel "Spelinspektionens författningssamling"@sv .
 
 <https://lagen.nu/dataset/sind-fs> a rpubl:Forfattningssamling ;
     dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/elsaek-fs> ;
@@ -1426,6 +1442,162 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/statens_lantmaeteriverk> ;
     foaf:name "Statens lantmäteriverk"@sv .
 
+<https://lagen.nu/org/2019/eu-domstolen> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/eu-domstolen> ;
+    foaf:name "EU-domstolen"@sv .
+
+<https://lagen.nu/org/2019/forvaltningsratten-i-falun> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/foervaltningsraetten_i_falun> ;
+    foaf:name "Förvaltningsrätten i Falun"@sv .
+
+<https://lagen.nu/org/2019/forvaltningsratten-i-goteborg> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/foervaltningsraetten_i_goeteborg> ;
+    foaf:name "Förvaltningsrätten i Göteborg"@sv .
+
+<https://lagen.nu/org/2019/forvaltningsratten-i-harnosand> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/foervaltningsraetten_i_haernoesand> ;
+    foaf:name "Förvaltningsrätten i Härnösand"@sv .
+
+<https://lagen.nu/org/2019/forvaltningsratten-i-jonkoping> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/foervaltningsraetten_i_joenkoeping> ;
+    foaf:name "Förvaltningsrätten i Jönköping"@sv .
+
+<https://lagen.nu/org/2019/forvaltningsratten-i-karlstad> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/foervaltningsraetten_i_karlstad> ;
+    foaf:name "Förvaltningsrätten i Karlstad"@sv .
+
+<https://lagen.nu/org/2019/forvaltningsratten-i-linkoping> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/foervaltningsraetten_i_linkoeping> ;
+    foaf:name "Förvaltningsrätten i Linköping"@sv .
+
+<https://lagen.nu/org/2019/forvaltningsratten-i-lulea> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/foervaltningsraetten_i_luleaa> ;
+    foaf:name "Förvaltningsrätten i Luleå"@sv .
+
+<https://lagen.nu/org/2019/forvaltningsratten-i-malmo> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/foervaltningsraetten_i_malmoe> ;
+    foaf:name "Förvaltningsrätten i Malmö"@sv .
+
+<https://lagen.nu/org/2019/forvaltningsratten-i-stockholm> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/foervaltningsraetten_i_stockholm> ;
+    foaf:name "Förvaltningsrätten i Stockholm"@sv .
+
+<https://lagen.nu/org/2019/forvaltningsratten-i-umea> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/foervaltningsraetten_i_umeå> ;
+    foaf:name "Förvaltningsrätten i Umeå"@sv .
+
+<https://lagen.nu/org/2019/forvaltningsratten-i-uppsala> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/foervaltningsraetten_i_uppsala> ;
+    foaf:name "Förvaltningsrätten i Uppsala"@sv .
+
+<https://lagen.nu/org/2019/forvaltningsratten-i-vaxjo> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/foervaltningsraetten_i_vaexjoe> ;
+    foaf:name "Förvaltningsrätten i Växjö"@sv .
+
+<https://lagen.nu/org/2019/infrastrukturdepartementet> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/infrastrukturdepartementet> ;
+    foaf:name "Infrastrukturdepartementet"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-blekinge-lan> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_blekinge_laen> ;
+    foaf:name "Länsrätten i Blekinge län"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-dalarnas-lan> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_dalarnas_laen> ;
+    foaf:name "Länsrätten i Dalarnas län"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-gavleborgs-lan> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_gaevleborgs_laen> ;
+    foaf:name "Länsrätten i Gävleborgs län"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-goteborg> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_goeteborg> ;
+    foaf:name "Länsrätten i Göteborg"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-gotlands-lan> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_gotlands_laen> ;
+    foaf:name "Länsrätten i Gotlands län"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-hallands-lan> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_hallands_laen> ;
+    foaf:name "Länsrätten i Hallands län"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-jamtlands-lan> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_jaemtlands_laen> ;
+    foaf:name "Länsrätten i Jämtlands län"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-jonkopings-lan> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_joenköpings_laen> ;
+    foaf:name "Länsrätten i Jönköpings län"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-kalmars-lan> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_kalmars_laen> ;
+    foaf:name "Länsrätten i Kalmars län"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-kronobergs-lan> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_kronobergs_laen> ;
+    foaf:name "Länsrätten i Kronobergs län"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-mariestad> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_mariestad> ;
+    foaf:name "Länsrätten i Mariestad"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-norrbottens-lan> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_norrbottens_laen> ;
+    foaf:name "Länsrätten i Norrbottens län"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-orebro-lan> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_oerebro_laen> ;
+    foaf:name "Länsrätten i Örebro län"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-ostergotlands-lan> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_oestergoetlands_laen> ;
+    foaf:name "Länsrätten i Östergötlands län"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-skane-lan> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_skaane_laen> ;
+    foaf:name "Länsrätten i Skåne län"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-sodermanlands-lan> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_soedermanlands_laen> ;
+    foaf:name "Länsrätten i Södermanlands län"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-stockholms-lan> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_stockholms_laen> ;
+    foaf:name "Länsrätten i Stockholms län"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-uppsala-lan> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_uppsala_laen> ;
+    foaf:name "Länsrätten i Uppsala län"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-vanersborg> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_vaenersborg> ;
+    foaf:name "Länsrätten i Vänersborg"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-varmlands-lan> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_vaermlands_laen> ;
+    foaf:name "Länsrätten i Värmlands län"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-vasterbottens-lan> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_vaesterbottens_laen> ;
+    foaf:name "Länsrätten i Västerbottens län"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-vasternorrlands-lan> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_vaesternorrlands_laen> ;
+    foaf:name "Länsrätten i Västernorrlands län"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-vastmanlands-lan> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_vaestmanlands_laen> ;
+    foaf:name "Länsrätten i Västmanlands län"@sv .
+
+<https://lagen.nu/org/2019/lansratten-i-vastra-gotaland> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_vaestra_goetaland> ;
+    foaf:name "Länsrätten i Västra götaland"@sv .
+
+<https://lagen.nu/org/2019/stockholms-tingsratt> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/stockholms_tingsraett> ;
+    foaf:name "Stockholms tingsrätt"@sv .
+
 <https://lagen.nu/org/2008/domstolsverket> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/domstolsverket> ;
     foaf:homepage <http://www.domstol.se/> ;
@@ -1438,10 +1610,6 @@
 <https://lagen.nu/org/2008/jordbruksdepartementet> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/jordbruksdepartementet> ;
     foaf:name "Jordbruksdepartementet"@sv .
-
-<https://lagen.nu/org/2019/infrastrukturdepartementet> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/infrastrukturdepartementet> ;
-    foaf:name "Infrastrukturdepartementet"@sv .
 
 <https://lagen.nu/org/2008/kammarkollegiet> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/kammarkollegiet> ;
@@ -1834,6 +2002,14 @@
     rdfs:comment "Ersatt av Migrationsverket"@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/org/statens_invandrarverk> ;
     foaf:name "Statens invandrarverk"@sv .
+
+<https://lagen.nu/org/2019/revisorsinspektionen> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/revisorsinspektionen> ;
+    foaf:name "Revisorsinspektionen"@sv .
+
+<https://lagen.nu/org/2019/spelinspektionen> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/spelinspektionen> ;
+    foaf:name "Spelinspektionen"@sv .
 
 <https://lagen.nu/org/2008/forsakringskassan> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/foersaekringskassan> ;

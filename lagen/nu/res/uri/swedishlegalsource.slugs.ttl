@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2018-04-13T08:57:15.135326
+# Automatically transformed from sources at 2019-08-04T22:32:44.940768
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -215,6 +215,8 @@ rpubl:Skrivelse space:abbrSlug "skr" .
 
 <https://lagen.nu/dataset/rh> space:abbrSlug "rh" .
 
+<https://lagen.nu/dataset/rifs> space:abbrSlug "rifs" .
+
 <https://lagen.nu/dataset/rk> space:abbrSlug "rk" .
 
 <https://lagen.nu/dataset/rnfs> space:abbrSlug "rnfs" .
@@ -232,6 +234,8 @@ rpubl:Skrivelse space:abbrSlug "skr" .
 <https://lagen.nu/dataset/sfs> space:abbrSlug "sfs" .
 
 <https://lagen.nu/dataset/sgu-fs> space:abbrSlug "sgu-fs" .
+
+<https://lagen.nu/dataset/sifs> space:abbrSlug "sifs" .
 
 <https://lagen.nu/dataset/sind-fs> space:abbrSlug "sind-fs" .
 
@@ -334,4 +338,68 @@ rpubl:Skrivelse space:abbrSlug "skr" .
 <https://lagen.nu/org/2014/statens_ansvarsnamnd> space:abbrSlug "san" .
 
 <https://lagen.nu/org/2017/patent-_och_marknadsoverdomstolen> space:abbrSlug "pmod" .
+
+<https://lagen.nu/org/2019/eu-domstolen> space:abbrSlug "eud" .
+
+<https://lagen.nu/org/2019/forvaltningsratten-i-falun> space:abbrSlug "ffa" .
+
+<https://lagen.nu/org/2019/forvaltningsratten-i-goteborg> space:abbrSlug "fgo" .
+
+<https://lagen.nu/org/2019/forvaltningsratten-i-harnosand> space:abbrSlug "fha" .
+
+<https://lagen.nu/org/2019/forvaltningsratten-i-jonkoping> space:abbrSlug "fjo" .
+
+<https://lagen.nu/org/2019/forvaltningsratten-i-karlstad> space:abbrSlug "fka" .
+
+<https://lagen.nu/org/2019/forvaltningsratten-i-linkoping> space:abbrSlug "fli" .
+
+<https://lagen.nu/org/2019/forvaltningsratten-i-lulea> space:abbrSlug "flu" .
+
+<https://lagen.nu/org/2019/lansratten-i-blekinge-lan> space:abbrSlug "lbl" .
+
+<https://lagen.nu/org/2019/lansratten-i-dalarnas-lan> space:abbrSlug "ldl" .
+
+<https://lagen.nu/org/2019/lansratten-i-gavleborgs-lan> space:abbrSlug "lga" .
+
+<https://lagen.nu/org/2019/lansratten-i-goteborg> space:abbrSlug "lgo" .
+
+<https://lagen.nu/org/2019/lansratten-i-gotlands-lan> space:abbrSlug "lgl" .
+
+<https://lagen.nu/org/2019/lansratten-i-hallands-lan> space:abbrSlug "lha" .
+
+<https://lagen.nu/org/2019/lansratten-i-jamtlands-lan> space:abbrSlug "lja" .
+
+<https://lagen.nu/org/2019/lansratten-i-jonkopings-lan> space:abbrSlug "ljo" .
+
+<https://lagen.nu/org/2019/lansratten-i-kalmars-lan> space:abbrSlug "lka" .
+
+<https://lagen.nu/org/2019/lansratten-i-kronobergs-lan> space:abbrSlug "lkr" .
+
+<https://lagen.nu/org/2019/lansratten-i-mariestad> space:abbrSlug "lma" .
+
+<https://lagen.nu/org/2019/lansratten-i-norrbottens-lan> space:abbrSlug "lnl" .
+
+<https://lagen.nu/org/2019/lansratten-i-orebro-lan> space:abbrSlug "lor" .
+
+<https://lagen.nu/org/2019/lansratten-i-ostergotlands-lan> space:abbrSlug "los" .
+
+<https://lagen.nu/org/2019/lansratten-i-skane-lan> space:abbrSlug "lsk" .
+
+<https://lagen.nu/org/2019/lansratten-i-sodermanlands-lan> space:abbrSlug "lsl" .
+
+<https://lagen.nu/org/2019/lansratten-i-stockholms-lan> space:abbrSlug "lsl" .
+
+<https://lagen.nu/org/2019/lansratten-i-uppsala-lan> space:abbrSlug "lul" .
+
+<https://lagen.nu/org/2019/lansratten-i-vanersborg> space:abbrSlug "lva" .
+
+<https://lagen.nu/org/2019/lansratten-i-varmlands-lan> space:abbrSlug "lvl" .
+
+<https://lagen.nu/org/2019/lansratten-i-vasterbottens-lan> space:abbrSlug "lvb" .
+
+<https://lagen.nu/org/2019/lansratten-i-vasternorrlands-lan> space:abbrSlug "lvn" .
+
+<https://lagen.nu/org/2019/lansratten-i-vastmanlands-lan> space:abbrSlug "lvm" .
+
+<https://lagen.nu/org/2019/lansratten-i-vastra-gotaland> space:abbrSlug "lvg" .
 

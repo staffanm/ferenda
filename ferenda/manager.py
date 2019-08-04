@@ -872,7 +872,6 @@ def _load_config(filename=None, argv=None, defaults=None):
         for alias, classname in _enabled_classes(inifile=filename).items():
             assert alias not in defaults, "Collision on key %s" % alias
             defaults[alias] = _load_class(classname).get_default_options()
-    from pudb import set_trace; set_trace()
     sources = [Defaults(defaults)]
     if filename:
         sources.append(INIFile(filename))

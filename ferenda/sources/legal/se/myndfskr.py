@@ -1308,9 +1308,8 @@ class ELSAKFS(MyndFskrBase):
         return super(ELSAKFS, self).sanitize_basefile(basefile)
 
     def basefile_from_uri(self, uri):
-        basefile = super(MyndFskrBase, self).basefile_from_uri(uri)
-        if basefile.startswith("elsaek-fs"):
-                return basefile.replace("elsaek-fs", "elsakfs")
+        uri = uri.replace("elsaek-fs", "elsakfs")
+        return super(ELSAKFS, self).basefile_from_uri(uri)
 
     def fwdtests(self):
         t = super(ELSAKFS, self).fwdtests()
@@ -1318,6 +1317,17 @@ class ELSAKFS(MyndFskrBase):
         # spaces ("följande" can be pretty much anything else)
         t["rpubl:beslutadAv"].insert(0, '(?:meddelar|föreskriver)\s(Sveriges geologiska undersökning)')
         return t
+
+    def parse_metadata_from_consolidated(self, reader, props, basefile):
+        super(ELSAKFS, self).parse_metadata_from_consolidated(reader, props, basefile)
+        # TODO: find out dcterms:issued ("Lydelse per den 8 juni
+        # 2016"), rpubl:konsolideringsunderlag ("Ändringar genom
+        # ELSÄK-FS 2016:4 införda") and dcterms:title
+        # ("Elsäkerhetsverkets föreskrifter om elektromagnetisk
+        # kompatibilitet")
+        
+        props["dcterms:publisher"] = self.lookup_resource("Elsäkerhetsverket")
+        return props
 
 
 class FFFS(MyndFskrBase):
@@ -1787,10 +1797,11 @@ class RGKFS(MyndFskrBase):
     @decorators.downloadmax
     def download_get_basefiles(self, source):
         soup = BeautifulSoup(source, "lxml")
-        for item in soup.find_all("td", text=re.compile("^\d{4}:\d+$")):
-            link = item.find_next_sibling("td").a
-            if link and link["href"].endswith(".pdf"):
-                yield self.sanitize_basefile(item.text.strip()), urljoin(self.start_url, link["href"])
+        for th in soup.find_all("th", text="RGKFS"):
+            for item in th.find_parent("table").find_all("td", text=re.compile("^\d{4}:\d+$")):
+                link = item.find_next_sibling("td").a
+                if link and link["href"].endswith(".pdf"):
+                    yield self.sanitize_basefile(item.text.strip()), urljoin(self.start_url, link["href"])
 
 
 # This is newly renamed from RNFS
@@ -1863,6 +1874,14 @@ class SKVFS(MyndFskrBase):
     start_url = "https://www4.skatteverket.se/rattsligvagledning/115.html"
     # also consolidated versions
     # http://www.skatteverket.se/rattsinformation/lagrummet/foreskrifterkonsoliderade/aldrear.4.19b9f599116a9e8ef3680004242.html
+
+    def __init__(self, config=None, **kwargs):
+        super(SKVFS, self).__init__(config, **kwargs)
+        self.store.doctypes = OrderedDict([
+            (".html", b'<!DO'),
+            (".pdf", b'%PDF')])
+            
+
     def forfattningssamlingar(self):
         return ["skvfs", "rsfs"]
 
