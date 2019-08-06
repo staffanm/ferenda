@@ -76,15 +76,11 @@ def recordlastbasefile(f):
                     self.log.debug("config.last_basefile is %s, not examining basefile %s or any other after that" % (self.config.last_basefile, basefile))
                     return
 
-            # FIXME: this can be pretty inaccurate if the source provides multiple FS:s (eg KVFS and the older KVVFS). We should only look at the fsnr part if the fsname is prepended
             if util.split_numalpha(fsnr(basefile)) > util.split_numalpha(new_last_basefile):
                 new_last_basefile = fsnr(basefile)
             yield basefile, link
             
-        if 'last_basefile' in self.config:
-            self.config.last_basefile = new_last_basefile
-        else:
-            self.log.warning("Unable to record last_basefile = %s, please add this manually to ferenda.ini" % new_last_basefile)
+        self.config.last_basefile = new_last_basefile
         LayeredConfig.write(self.config)
     return wrapper
 
@@ -934,6 +930,11 @@ class AFS(MyndFskrBase):
         # link ("Ladda ner pdf") could be to an official base act, or
         # to an unofficial consolidated version up to and including
         # the latest change act. So, yeah.
+        if basefile == "afs/1987:2":
+            # this is mislabeled in the index page -- it really leads to afs/2016:3
+            e = errors.DocumentRemovedError()
+            e.dummyfile = self.store.parsed_path(basefile)
+            raise e
         assert not url.endswith(".pdf"), ("expected landing page for %s, got direct pdf"
                                           " link %s" % (basefile, url))
         resp = self.session.get(url)
@@ -1133,7 +1134,7 @@ class DVFS(MyndFskrBase):
                 # basefiles if the date is newer than the last
                 # recorded change for that basefile. 
                 if m:
-                    if not self.config.refresh and self.config.lastdownload:
+                    if not self.config.refresh and 'lastdownload' in self.config:
                         changedatestr = el.find_next_sibling("br").next_sibling.strip()[1:-1]
                         changedate = util.strptime(changedatestr, "%Y-%m-%d")
                         if self.config.lastdownload.date() > changedate.date():
@@ -1230,8 +1231,8 @@ class DVFS(MyndFskrBase):
     def extract_head(self, fp, basefile, force_ocr=False, attachment=None):
         return self.textreader_from_basefile(basefile)
 
-    def parse_open(self, basefile):
-        return self.store.open_downloaded(basefile)
+    def parse_open(self, basefile, version=None):
+        return self.store.open_downloaded(basefile, version=version)
 
     def parse_body(self, fp, basefile):
         main = self.main_from_soup(BeautifulSoup(fp, "lxml"))
@@ -1262,6 +1263,7 @@ class ELSAKFS(MyndFskrBase):
     landingpage_basefile_regex = re.compile("^ELSÄK-FS (?P<basefile>\d{4}:\d+)\s*$")
     basefile_regex = re.compile("^ELSÄK-FS (?P<basefile>\d{4}:\d+)\s*$")
     basefile_pdf_regex = re.compile("^ELSÄK-FS (?P<basefile>\d{4}:\d+)(?P<typ>| - ändringsföreskrift| - konsoliderad version| - ursprunglig lydelse) \(pdf, \d,\d MB\)")
+
 
 
     @decorators.downloadmax
@@ -1295,8 +1297,6 @@ class ELSAKFS(MyndFskrBase):
                     if m.group("typ") == " - konsoliderad version":
                         sub_basefile = "konsolidering/" + sub_basefile
                     if sub_basefile not in yielded:
-                        self.log.debug("yielding %s, %s" % (sub_basefile,
-                                                            urljoin(link, el.get("href"))))
                         yield (sub_basefile, urljoin(link, el.get("href")))
                         yielded.add(sub_basefile)
         
@@ -1357,7 +1357,7 @@ class FFS(MyndFskrBase):
     alias = "ffs"
     start_url = "http://www.forsvarsmakten.se/sv/om-myndigheten/dokument/lagrum"
     document_url_regex = re.compile(".*/lagrum/gallande-ffs.*/ffs.*(?P<basefile>\d{4}[\.:/_-]\d{1,3})[^/]*.pdf$")
-
+    basefile_regex = None
    
     
 class KFMFS(MyndFskrBase):
@@ -1440,7 +1440,6 @@ class KVFS(MyndFskrBase):
         resp = self.session.post(self.start_url, data=params, headers=headers)
         return resp
     
-
     def forfattningssamlingar(self):
         return ["kvfs", "kvvfs"]
     
@@ -1627,6 +1626,10 @@ class NFS(MyndFskrBase):
     def forfattningssamlingar(self):
         return ["nfs", "snfs"]
 
+    @recordlastbasefile
+    def download_get_basefiles(self, source):
+        return super(NFS, self).download_get_basefiles(source)
+    
     def download_single(self, basefile, url):
         if url.endswith(".pdf"):
             return super(NFS, self).download_single(basefile, url)
@@ -2246,7 +2249,7 @@ class STFS(MyndFskrBase):
     alias = "stfs"
     start_url = "https://www.sametinget.se/dokument?cat_id=52"
     download_iterlinks = False
-    
+
     @decorators.downloadmax
     @recordlastbasefile
     def download_get_basefiles(self, source):

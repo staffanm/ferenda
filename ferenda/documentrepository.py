@@ -808,6 +808,7 @@ with the *config* object as single parameter.
             source = tree.iterlinks()
         else:
             source = resp.text
+            
         for (basefile, link) in self.download_get_basefiles(source):
             downloaded_path = self.store.downloaded_path(basefile)
             if (refresh or
