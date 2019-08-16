@@ -139,7 +139,9 @@ class MyndFskrBase(FixedLayoutSource):
     # subkeys/multiple options
     baseprops = {'nfs/2004:5': {"rpubl:beslutadAv": "Naturvårdsverket"},
                  'sosfs/1982:13': {"rpubl:beslutadAv": "Socialstyrelsen"},
-                 'sjvfs/1991:2': {"dcterms:identifier": "SJVFS 1991:2"}
+                 'sjvfs/1991:2': {"dcterms:identifier": "SJVFS 1991:2"},
+                 'skvfs/2006:13': {"dcterms:identifier": "SKVFS 2006:13"},
+                 'skvfs/2006:11': {"dcterms:identifier": "SKVFS 2006:11"}
                  }
 
 
@@ -413,6 +415,38 @@ class MyndFskrBase(FixedLayoutSource):
         infile = self.store.downloaded_path(basefile, attachment=attachment)
         tmpfile = self.store.path(basefile, 'intermediate', '.pdf')
         outfile = self.store.path(basefile, 'intermediate', '.txt')
+        # assert attachment is None, "We need to rewrite textreader_from_basefile_pdftotext to support attachments"
+        return self.textreader_from_basefile_pdftotext(infile, tmpfile, outfile, basefile, force_ocr)
+
+    def extract_metadata(self, reader, basefile):
+        props = self.metadata_from_basefile(basefile)
+        if props.get("rdf:type", "").endswith("#KonsolideradGrundforfattning"):
+            props = self.parse_metadata_from_consolidated(reader, props, basefile)
+        else:
+            try:
+                props = self.parse_metadata_from_textreader(reader, props, basefile)
+            except RequiredTextMissing:
+                if self.might_need_ocr:
+                    self.log.warning("%s: reprocessing using OCR" % basefile)
+                    reader = self.textreader_from_basefile(basefile, force_ocr=True)
+                    props = self.parse_metadata_from_textreader(reader, props, basefile)
+                else:
+                    raise
+        return props
+
+    # subclasses should override this and make to add a suitable set
+    # of triples (particularly rpubl:konsolideringsunderlag) to
+    # doc.meta.
+    def parse_metadata_from_consolidated(self, reader, props, basefile):
+        return props
+    
+    def textreader_from_basefile(self, basefile, force_ocr=False, attachment=None):
+        infile = self.store.downloaded_path(basefile, attachment=attachment)
+        tmpfile = self.store.path(basefile, 'intermediate', '.pdf')
+        outfile = self.store.path(basefile, 'intermediate', '.txt')
+        return self.textreader_from_basefile_pdftotext(infile, tmpfile, outfile, basefile, force_ocr)
+
+    def textreader_from_basefile_pdftotext(self, infile, tmpfile, outfile, basefile, force_ocr=False):
         if not util.outfile_is_newer([infile], outfile):
             if infile.endswith(".pdf") or not os.path.exists(tmpfile):
                 # if infile does not end with pdf, an existing tmpfile
@@ -450,96 +484,8 @@ class MyndFskrBase(FixedLayoutSource):
             else:
                 newbuffer.write(bytes((b,)))
         if warnings:
-            self.log.warning("%s: Invalid character(s) at byte pos %s" %
-                             (basefile, ", ".join([str(x) for x in warnings])))
-        newbuffer.seek(0)
-        text = newbuffer.getvalue().decode("utf-8")
-        # if there's less than 100 chars on each page, chances are it's
-        # just watermarks or leftovers from the scanning toolchain,
-        # and that the real text is in non-OCR:ed images.
-        if len(text) / (text.count("\x0c") + 1) < 100:
-            self.log.warning("%s: Extracted text from PDF suspiciously short "
-                             "(%s bytes per page, %s total)" %
-                             (basefile,
-                              len(text) / text.count("\x0c") + 1,
-                              len(text)))
-            # parse_metadata_from_textreader will raise an error if it
-            # can't find what it needs, at which time we might
-            # consider OCR:ing. FIXME: Do something with this
-            # parameter!
-            self.might_need_ocr = True 
-        else:
-            self.might_need_ocr = False
-        util.robust_remove(tmpfile)
-        text = self.sanitize_text(text, basefile)
-        return TextReader(string=text, encoding=self.source_encoding,
-                          linesep=TextReader.UNIX)
-
-    def extract_metadata(self, reader, basefile):
-        props = self.metadata_from_basefile(basefile)
-        if props.get("rdf:type", "").endswith("#KonsolideradGrundforfattning"):
-            props = self.parse_metadata_from_consolidated(reader, props, basefile)
-        else:
-            try:
-                props = self.parse_metadata_from_textreader(reader, props, basefile)
-            except RequiredTextMissing:
-                if self.might_need_ocr:
-                    self.log.warning("%s: reprocessing using OCR" % basefile)
-                    reader = self.textreader_from_basefile(basefile, force_ocr=True)
-                    props = self.parse_metadata_from_textreader(reader, props, basefile)
-                else:
-                    raise
-        return props
-
-    # subclasses should override this and make to add a suitable set
-    # of triples (particularly rpubl:konsolideringsunderlag) to
-    # doc.meta.
-    def parse_metadata_from_consolidated(self, reader, props, basefile):
-        return props
-    
-    def textreader_from_basefile(self, basefile, force_ocr=False, attachment=None):
-        infile = self.store.downloaded_path(basefile, attachment=attachment)
-        tmpfile = self.store.path(basefile, 'intermediate', '.pdf')
-        outfile = self.store.path(basefile, 'intermediate', '.txt')
-        return self.textreader_from_basefile_pdftotext(infile, tmpfile, outfile, basefile, force_ocr)
-
-    def textreader_from_basefile_pdftotext(self, infile, tmpfile, outfile, basefile, force_ocr=False):
-        if not util.outfile_is_newer([infile], outfile):
-            util.copy_if_different(infile, tmpfile)
-            with open(tmpfile, "rb") as fp:
-                if fp.read(4) != b'%PDF':
-                    raise errors.ParseError("%s is not a PDF file" % tmpfile)
-            # this command will create a file named as the val of outfile
-            util.runcmd("pdftotext %s" % tmpfile, require_success=True)
-            # check to see if the outfile actually contains any text. It
-            # might just be a series of scanned images.
-            text = util.readfile(outfile)
-            if not text.strip() or force_ocr:
-                os.unlink(outfile)
-                # OK, it's scanned images. We extract these, put them in a
-                # tif file, and OCR them with tesseract.
-                self.log.debug("%s: No text in PDF, trying OCR" % basefile)
-                p = PDFReader()
-                p._tesseract(tmpfile, os.path.dirname(outfile), "swe", False)
-                tmptif = self.store.path(basefile, 'intermediate', '.tif')
-                util.robust_remove(tmptif)
-
-                
-        # remove control chars so that they don't end up in the XML
-        # (control chars might stem from text segments with weird
-        # character encoding, see pdfreader.BaseTextDecoder)
-        bytebuffer = util.readfile(outfile, "rb")
-        newbuffer = BytesIO()
-        warnings = []
-        for idx, b in enumerate(bytebuffer):
-            # allow CR, LF, FF, TAB
-            if b < 0x20 and b not in (0xa, 0xd, 0xc, 0x9):
-                warnings.append(idx)
-            else:
-                newbuffer.write(bytes((b,)))
-        if warnings:
-            self.log.warning("%s: Invalid character(s) at byte pos %s" %
-                             (basefile, ", ".join([str(x) for x in warnings])))
+            self.log.warning("%s: Invalid character(s) starting at byte pos %s (%s in total)" %
+                             (basefile, ", ".join([str(x) for x in warnings[:6]]), len(warnings)))
         newbuffer.seek(0)
         text = newbuffer.getvalue().decode("utf-8")
         # if there's less than 100 chars on each page, chances are it's
@@ -569,7 +515,7 @@ class MyndFskrBase(FixedLayoutSource):
     def fwdtests(self):
         return {'dcterms:issn': ['^ISSN (\d+\-\d+)$'],
                 'dcterms:title':
-                ['((?:Föreskrifter|[\w ]+s (?:föreskrifter|allmänna råd)).*?)[;\n]\n'],
+                ['((?:Föreskrifter|[\w ]+s (?:föreskrifter|allmänna råd)).*?)[;\n](\n|beslutade den)'],
                 'dcterms:identifier': ['^([A-ZÅÄÖ-]+FS\s\s?\d{4}:\d+)$'],
                 'rpubl:utkomFranTryck':
                 ['Utkom från\strycket\s+den\s(\d+ \w+ \d{4})',
@@ -577,7 +523,7 @@ class MyndFskrBase(FixedLayoutSource):
                 'rpubl:omtryckAv': ['^(Omtryck)$'],
                 'rpubl:genomforDirektiv': ['Celex (3\d{2,4}\w\d{4})'],
                 'rpubl:beslutsdatum':
-                ['(?:har beslutats|[Bb]eslutade|beslutat|[Bb]eslutad)(?: den|) (\d+ \w+( \d{4}|))',
+                ['(?:har beslutats|[Bb]eslutade|beslutat|[Bb]eslutad)(?:\sden|) (\d+ \w+( \d{4}|))',
                  'Beslutade av (?:[A-ZÅÄÖ][\w ]+) den (\d+ \w+ \d{4}).',
                  'utfärdad den (\d+ \w+ \d{4}) tillkännages härmed i andra hand.',
                  '(?:utfärdad|meddelad)e? den (\d+ \w+ \d{4}).'],
@@ -609,44 +555,46 @@ class MyndFskrBase(FixedLayoutSource):
         #    2nd, or 3rd... continue past TOC pages, cover pages etc
         #    until the "real" first page is found) NB: FFFS 2007:1
         #    has ten (10) TOC pages!
-        pagecount = 0
         # It's an open question if we should require all properties on
         # the same page or if we can glean one from page 1, another
         # from page 2 and so on. AFS 2014:44 requires that we glean
         # dcterms:title from page 1 and rpubl:beslutsdatum from page
         # 2.
         props.update(self.baseprops.get(basefile, {}))
-        for page in reader.getiterator(reader.readpage):
-            pagecount += 1
+        for pageidx, page in enumerate(reader.getiterator(reader.readpage)):
+            pageprops = {} 
             for (prop, tests) in list(self.fwdtests().items()):
-                if prop in props:
+                if prop in props or prop in pageprops:
                     continue
                 for test in tests:
                     m = re.search(
                         test, page, re.MULTILINE | re.DOTALL | re.UNICODE)
                     if m:
-                        props[prop] = util.normalize_space(m.group(1))
+                        pageprops[prop] = util.normalize_space(m.group(1))
                         break
             # Single required propery. If we find this, we're done (ie
             # we've skipped past the toc/cover pages).
-            if 'rpubl:beslutsdatum' in props:
+            if 'rpubl:beslutsdatum' in pageprops:
                 break
             self.log.debug("%s: Couldn't find required props on page %s" %
-                           (basefile, pagecount))
-        if 'rpubl:beslutsdatum' not in props:
+                           (basefile, pageidx+1))
+        if 'rpubl:beslutsdatum' not in pageprops:
             # raise errors.ParseError(
             self.log.warning(
                 "%s: Couldn't find required properties on any page, giving up" %
                 basefile)
+            pageprops = {}
+        props.update(pageprops)
 
         # 2. Find some of the properties on the last 'real' page (not
         #    counting appendicies)
         reader.seek(0)
         pagesrev = reversed(list(reader.getiterator(reader.readpage)))
-        # The language used to expres these two properties differ
-        # quite a lot, more than what is reasonable to express in a
-        # single regex. We therefore define a set of possible
-        # expressions and try them in turn.
+        # The language used to expres these two properties
+        # (rpubl:ikrafttradandedatum and rpubl:upphaver) differ quite
+        # a lot, more than what is reasonable to express in a single
+        # regex. We therefore define a set of possible expressions and
+        # try them in turn.
         revtests = self.revtests()
         cnt = 0
         for page in pagesrev:

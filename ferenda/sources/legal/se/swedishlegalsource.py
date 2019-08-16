@@ -668,10 +668,7 @@ class SwedishLegalSource(DocumentRepository):
         streamier API."""
         if self.config.ignorepatch is True:
             return fp
-        # 1. do we have a patch? FIXME: respect the version specifier
-        # (preferably in a smart way, so that we can say that a
-        # specific patch applies to all versions from A to B (possibly
-        # open-ended)
+        # 1. do we have a patch? 
         patchstore = self.documentstore_class(self.config.patchdir +
                                               os.sep + self.alias)
         patchpath = patchstore.path(basefile, "patches", ".patch")
@@ -704,6 +701,10 @@ class SwedishLegalSource(DocumentRepository):
             desc = util.readfile(descpath).strip()
         else:
             desc = "(No patch description available)"
+
+        # respect the version specifier (in a smart way, so that we
+        # can say that a specific patch applies to all versions from A
+        # to B (possibly open-ended)
         if desc.startswith("[version:"):
             # if the desc starts with a string like [version:
             # 2017:1279-] it means that the patch is only working for

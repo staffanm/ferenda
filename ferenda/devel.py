@@ -799,7 +799,7 @@ class Devel(object):
                     row['subobjects'] = len(list(g.subject_objects(RDF.type)))
                 writer.writerow(row)
 
-    def _repo_from_alias(self, alias, datadir=None, repoconfig=None):
+    def _repo_from_alias(self, alias, datadir=None, repoconfig=None, basefile=None):
         #  (FIXME: This uses several undocumented APIs)
         mainconfig = self.config._parent
         assert mainconfig is not None, "Devel must be initialized with a full set of configuration"
@@ -816,6 +816,9 @@ class Devel(object):
         if datadir is None:
             datadir = repo.config.datadir + os.sep + repo.alias
         repo.store.datadir = datadir
+        if isinstance(repo, CompositeRepository) and basefile:
+            # try to get at the actual subrepo responsible for this particular basefile
+            repo = list(repo.get_preferred_instances(basefile))[0]
         return repo
 
 
@@ -847,7 +850,7 @@ class Devel(object):
         # 1. initialize the docrepo indicated by "alias"
         # alias might sometimes be the initialized repo so check for that first...
         if isinstance(alias, str):
-            repo = self._repo_from_alias(alias)
+            repo = self._repo_from_alias(alias, basefile=basefile)
         else:
             repo = alias 
         # 2. find out if there is an intermediate file or downloaded

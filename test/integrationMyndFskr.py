@@ -59,7 +59,7 @@ class Parse(RepoTester):
         reader = TextReader(string=text, encoding='utf-8')
         props = repo.extract_metadata(reader, basefile)
         props = repo.sanitize_metadata(props, basefile)
-        resource = repo.polish_metadata(props)
+        resource = repo.polish_metadata(props, basefile)
         repo.infer_metadata(resource, basefile)
         
         wantfile = filename.replace(".txt", ".n3")
