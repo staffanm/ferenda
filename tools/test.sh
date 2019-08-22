@@ -28,7 +28,7 @@ shift $((OPTIND-1))
 # -Wi::DeprecationWarning:bs4 to ignore warnings in the bs4 module
 PYTHONWARNINGS=
 
-if [ -n "$@" ]
+if [ $# -gt 0 ]
 then
     PYTHONPATH=test python $PYTHONWARNINGS -m unittest $UNITTESTOPTS $@
 else

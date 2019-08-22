@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2019-08-04T22:34:59.509145
+# Automatically transformed from sources at 2019-08-22T22:28:11.242225
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -231,6 +231,7 @@
     skos:prefLabel "Bolagsverkets författningssamling"@sv .
 
 <https://lagen.nu/dataset/bv-fs> a rpubl:Forfattningssamling ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/tsfs> ;
     dcterms:publisher <https://lagen.nu/org/2014/banverket> ;
     rdfs:comment "Har tagits över av Transportstyrelsens författningssamling (TSFS)" ;
     rdfs:seeAlso <http://www.banverket.se/templates/StandardTtH.asp?id=2086> ;
@@ -392,6 +393,7 @@
     dcterms:comment "Har tagits över av Myndigheten för tillväxtpolitiska utvärderingar och analysers författningssamling (MTFS)"@sv ;
     dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/mtfs> ;
     dcterms:publisher <https://lagen.nu/org/2014/institutet_for_tillvaxtpolitiska_studier> ;
+    rdfs:comment "Har tagits över av Myndigheten för tillväxtpolitiska utvärderingar och analysers författningssamling (MTFS)"@sv ;
     rdfs:seeAlso <http://www.itps.se/Listor/Publikationssok.asp?secId=902> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/itpsfs> ;
     skos:altLabel "ITPSFS"@sv ;
@@ -400,6 +402,7 @@
 <https://lagen.nu/dataset/jvsfs> a rpubl:Forfattningssamling ;
     dcterms:comment "Har tagits över av Transportstyrelsens författningssamling (TSFS)"@sv ;
     dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/tsfs> ;
+    rdfs:comment "Har tagits över av Transportstyrelsens författningssamling (TSFS)"@sv ;
     rdfs:seeAlso <http://www.jvs.se/forfattningssamling.htm> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/jvsfs> ;
     skos:altLabel "JvSFS"@sv ;
@@ -509,6 +512,7 @@
     skos:prefLabel "Luftfartsstyrelsens författningssamling "@sv .
 
 <https://lagen.nu/dataset/lifs> a rpubl:Forfattningssamling ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/sifs> ;
     dcterms:publisher <https://lagen.nu/org/2014/lotteriinspektionen> ;
     rdfs:comment "Har ersatts av Spelinspektionens författningssamling (SIFS)"@sv ;
     rdfs:seeAlso <http://www.lotteriinsp.se/lott_templates/Page____776.aspx> ;
@@ -633,6 +637,7 @@
     skos:prefLabel "Naturvårdsverkets råd och riktlinjer"@sv .
 
 <https://lagen.nu/dataset/nutfs> a rpubl:Forfattningssamling ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/trvfs> ;
     dcterms:publisher <https://lagen.nu/org/2014/verket_for_naringslivsutveckling> ;
     rdfs:comment "Har övertagits av EIFS, STEMFS och TRVFS"@sv ;
     rdfs:seeAlso <http://www.nutek.se/sb/d/159/a/1021> ;
@@ -645,6 +650,13 @@
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/pfs> ;
     skos:altLabel "PFS"@sv ;
     skos:prefLabel "Pensionsmyndighetens författningssamling"@sv .
+
+<https://lagen.nu/dataset/pmfs> a rpubl:Forfattningssamling ;
+    dcterms:publisher <https://lagen.nu/org/2014/rikspolisstyrelsen> ;
+    rdfs:seeAlso <http://www.police.se/inter/nodeid=8832&pageversion=1.html> ;
+    owl:sameAs <http://rinfo.lagrummet.se/serie/fs/pmfs> ;
+    skos:altLabel "PMFS"@sv ;
+    skos:prefLabel "Polismyndighetens författningssamling"@sv .
 
 <https://lagen.nu/dataset/pmod> a rpubl:Rattsfallspublikation ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/rf/pmod> ;
@@ -710,6 +722,7 @@
     skos:prefLabel "Rättsfall från kammarrätterna"@sv .
 
 <https://lagen.nu/dataset/rnfs> a rpubl:Forfattningssamling ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/rifs> ;
     dcterms:publisher <https://lagen.nu/org/2014/revisorsnamnden> ;
     rdfs:comment "Har övertagits av Revisorsinspektionens föreskrifter (RIFS)"@sv ;
     rdfs:seeAlso <http://www.revisorsnamnden.se/rattsinfo/ramar/RNFS_ram.htm> ;
@@ -718,7 +731,9 @@
     skos:prefLabel "Revisorsnämndens författningssamling"@sv .
 
 <https://lagen.nu/dataset/rpsfs> a rpubl:Forfattningssamling ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/pmfs> ;
     dcterms:publisher <https://lagen.nu/org/2014/rikspolisstyrelsen> ;
+    rdfs:comment "Har ersatts av Polismyndighetens författningssamling (PMFS)"@sv ;
     rdfs:seeAlso <http://www.police.se/inter/nodeid=8832&pageversion=1.html> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/rpsfs> ;
     skos:altLabel "RPSFS"@sv ;
@@ -733,6 +748,7 @@
     skos:prefLabel "Riksskateverkets författningssamling"@sv .
 
 <https://lagen.nu/dataset/rtvfs> a rpubl:Forfattningssamling ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/mrtvfs> ;
     dcterms:publisher <https://lagen.nu/org/2014/radio-_och_tv-verket> ;
     rdfs:comment "Har övertagits av Myndigheten för press, radio och tvs författningssamling (MPRTFS)"@sv ;
     rdfs:seeAlso <http://www.rtvv.se/se/blanketter/Om_verket/> ;
@@ -846,6 +862,7 @@
     skos:prefLabel "Statens naturvårdsverks författningssamling"@sv .
 
 <https://lagen.nu/dataset/sosfs> a rpubl:Forfattningssamling ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/hslf-fs> ;
     dcterms:publisher <https://lagen.nu/org/2014/socialstyrelsen> ;
     rdfs:comment "Utnyttjas också av Rättsmedicinalverket, Smittskyddsinstitutet och Myndigheten för handikappolitisk samordning."@sv ;
     rdfs:seeAlso <http://www.sos.se/sosfs/search/search.asp> ;
@@ -869,6 +886,7 @@
     skos:prefLabel "Statens räddningsverks författningssamling"@sv .
 
 <https://lagen.nu/dataset/ssifs> a rpubl:Forfattningssamling ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/ssifs> ;
     rdfs:comment "Har ersatts av Strålsäkerhetsmyndighetens författningssamling (SSIFS)"@sv ;
     rdfs:seeAlso <http://www.ssi.se/forfattning/ForfattLista.html> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/ssifs> ;
@@ -1594,6 +1612,14 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/laensraetten_i_vaestra_goetaland> ;
     foaf:name "Länsrätten i Västra götaland"@sv .
 
+<https://lagen.nu/org/2019/polismyndigheten> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/polismyndigheten> ;
+    foaf:name "Polismyndigheten"@sv .
+
+<https://lagen.nu/org/2019/sakerhetspolisen> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/saekerhetspolisen> ;
+    foaf:name "Säkerhetspolisen"@sv .
+
 <https://lagen.nu/org/2019/stockholms-tingsratt> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/stockholms_tingsraett> ;
     foaf:name "Stockholms tingsrätt"@sv .
@@ -1867,10 +1893,6 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/revisorsnaemnden> ;
     foaf:name "Revisorsnämnden"@sv .
 
-<https://lagen.nu/org/2014/rikspolisstyrelsen> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/rikspolisstyrelsen> ;
-    foaf:name "Rikspolisstyrelsen"@sv .
-
 <https://lagen.nu/org/2014/riksskatteverket> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/riksskatteverket> ;
     foaf:name "Riksskatteverket"@sv .
@@ -2026,6 +2048,10 @@
 <https://lagen.nu/org/2014/riksarkivet> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/riksarkivet> ;
     foaf:name "Riksarkivet"@sv .
+
+<https://lagen.nu/org/2014/rikspolisstyrelsen> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/rikspolisstyrelsen> ;
+    foaf:name "Rikspolisstyrelsen"@sv .
 
 <https://lagen.nu/org/2014/socialstyrelsen> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/socialstyrelsen> ;

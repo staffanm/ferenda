@@ -264,12 +264,16 @@ class DocumentEntry(object):
         return "application/octet-stream"
 
     @staticmethod
-    def updateentry(f, section, entrypath, entrypath_arg, *args, **kwargs):
+    def updateentry(f, section, entrypath, entrypath_arg, callback=None, *args, **kwargs):
         """runs the provided function with the provided arguments, captures
         any logged events emitted, catches any errors, and records the
         result in the entry file under the provided section. Entrypath
         should be a function that takes a basefile string and returns
         the full path to the entry file for that basefile.
+
+        Callback should be a function that takes a DocumentEntry
+        object and performs arbitrary transformations on it just
+        before saving it.
 
         """
         def clear(key, d):
@@ -333,6 +337,8 @@ class DocumentEntry(object):
                 else:
                     clear('traceback', entry.status[section])
                     clear('error', entry.status[section])
+                if callback:
+                    callback(entry)
                 entry.save()
     
     

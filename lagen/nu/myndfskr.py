@@ -85,6 +85,7 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
         myndfskr.MSBFS,
         myndfskr.MYHFS,
         myndfskr.NFS,
+        myndfskr.PMFS,
         myndfskr.RAFS,
         myndfskr.RGKFS,
         myndfskr.RIFS,
@@ -245,7 +246,8 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
                 uri = mainuri
             return util.uri_leaf(uri)
         return [Facet(RPUBL.forfattningssamling,
-                      selector=altlabel,
+                      # selector=altlabel,
+                      selector=mainfs,
                       identificator=mainfs,
                       use_for_toc=True,
                       label="Ordnade efter författningssamling",

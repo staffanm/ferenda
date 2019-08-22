@@ -809,17 +809,25 @@ with the *config* object as single parameter.
         else:
             source = resp.text
             
-        for (basefile, link) in self.download_get_basefiles(source):
+        for (basefile, params) in self.download_get_basefiles(source):
+            assert isinstance (params, dict), "You need to update your implementation of download_get_basefiles to return a dict instead of a string"
+            link = params['uri']
             downloaded_path = self.store.downloaded_path(basefile)
             if (refresh or
                 not os.path.exists(downloaded_path) or
                 os.path.getsize(downloaded_path) == 0):
                 ret = None
                 try:
+                    if 'title' in params:
+                        callback = lambda e: setattr(e, 'title', params['title'])
+                        
+                    else:
+                        callback = None
                     ret = DocumentEntry.updateentry(self.download_single,
                                                     'download',
                                                     self.store.documententry_path,
                                                     basefile,
+                                                    callback,
                                                     basefile,
                                                     link)
                 except requests.exceptions.HTTPError as e:
@@ -871,7 +879,22 @@ with the *config* object as single parameter.
     def download_get_basefiles(self, source):
         """Given *source* (a iterator that provides (element, attribute, link,
         pos) tuples, like ``lxml.etree.iterlinks()``), generate tuples
-        (basefile, link) for all document links found in *source*.
+        ``(basefile, parameters)`` for all documents found in
+        *source*. ``basefile`` is a regular string that will be used
+        as the basefile for the identified document. ``parameters`` is
+        a dict that contains various metadata about the identified
+        document. It may be empty, but can also contain various bits
+        of metadata about the document. Three common fields are
+        ``url`` which is the full link to the document (as expected by
+        download_single), ``orig_url`` which is a link to the main
+        page (eg a landing page) that contains the download link to
+        the document in question, and ``title`` which is the title of
+        the document.
+
+        If you override both
+        :py:meth:`~ferenda.DocumentRepository.download` and this
+        method, you can pass whatever useful metadata you like in this
+        dict.
 
         """
         yielded = set()
@@ -895,7 +918,7 @@ with the *config* object as single parameter.
                     basefile = m.group("basefile")
             if basefile and (basefile, link) not in yielded:
                 yielded.add((basefile, link))
-                yield (basefile, link)
+                yield (basefile, {'uri': link})
 
     def download_single(self, basefile, url=None, orig_url=None):
         """Downloads the document from the web (unless explicitly

@@ -4,7 +4,7 @@ from __future__ import (absolute_import, division,
 from builtins import *
 
 from tempfile import mktemp
-from urllib.parse import urljoin, unquote, urlparse
+from urllib.parse import urljoin, unquote, urlparse, urlencode
 from xml.sax.saxutils import escape as xml_escape
 from io import BytesIO
 import os
@@ -255,7 +255,10 @@ class MyndFskrBase(FixedLayoutSource):
                       re.match(self.document_url_regex, link)):
                     m = re.match(self.document_url_regex, link)
                 if m:
+                    params = {'url': link}
                     basefile = self.sanitize_basefile(m.group("basefile"))
+                    if m.group("title"):
+                        params['title'] = title
                     # since download_rewrite_url is potentially
                     # expensive (might do a HTTP request), we should
                     # perhaps check if we really need to download
@@ -265,7 +268,7 @@ class MyndFskrBase(FixedLayoutSource):
                         and not self.config.refresh):
                         continue
                     if basefile not in yielded:
-                        yield (basefile, link)
+                        yield (basefile, params)
                         yielded.add(basefile)
                 if (self.nextpage_regex and elementtext and
                         re.search(self.nextpage_regex, elementtext)):
@@ -664,6 +667,11 @@ class MyndFskrBase(FixedLayoutSource):
             props['dcterms:identifier'] = "%s %s:%s" % (pub, year, ordinal)
             if konsolidering:
                 props['dcterms:identifier'] += " (konsoliderad)"
+        if 'dcterms:title' not in props:
+            # try to find the title from the DocEntry, where the download process might have put it
+            de = DocumentEntry(self.store.documententry_path(basefile))
+            if de.title:
+                props["dcterms:identifier"] = de.title
         return props
 
     def polish_metadata(self, attributes, basefile, infer_nodes=True):
@@ -1489,9 +1497,26 @@ class MPRTFS(MyndFskrBase):
     start_url = "http://www.mprt.se/sv/blanketter--publikationer/foreskrifter/"
     basefile_regex = re.compile("^(?P<basefile>(MPRTFS|MRTVFS|RTVFS) \d+:\d+)$")
     document_url_regex = None
+    download_iterlinks = False
     def forfattningssamlingar(self):
         return ["mprtfs", "mrtvfs", "rtvfs"]
 
+    def download_get_basefiles(self, source):
+        soup = BeautifulSoup(source, "lxml")
+        for doc in soup.find_all("div", "OrderContainer"):
+            d = doc.find("a", "PDF")
+            if not d:
+                continue
+            m = self.basefile_regex.match(d.text)
+            if not m:
+                continue
+            basefile = self.sanitize_basefile(m.group("basefile"))
+            link = urljoin(self.start_url, d.get("href"))
+            props = {"uri": link}
+            t = doc.find("a", "Long")
+            if t:
+                props['title'] = doc.find("a", "Long").get_text().strip()
+            yield(basefile, props)
 
 class MSBFS(MyndFskrBase):
     alias = "msbfs"
@@ -1704,10 +1729,60 @@ class NFS(MyndFskrBase):
         # rudimentary dehyphenation for a special case (snfs/1994:2)
         return text.replace("Statens na—\n\nturvårdsverk", "Statens naturvårdsverk")
 
+class PMFS(MyndFskrBase):
+    alias = "pmfs"
+    start_url = "https://polisen.se/lagar-och-regler/polismyndighetens-forfattningssamling/AjaxApplyFilters"
+    start_url_2 = "https://polisen.se/lagar-och-regler/polismyndighetens-forfattningssamling---upphavda/AjaxApplyFilters"
+    download_iterlinks = False
+    
+    payload = {"lpfm.pid": 0,
+               "lpfm.srt": "du"}
+
+    def forfattningssamlingar(self):
+        return ["pmfs", "rpsfs"]
+
+    def download_get_first_page(self):
+        resp = self.session.post(self.start_url, data=self.payload)
+        return resp
+
+    @decorators.downloadmax
+    def download_get_basefiles(self, source):
+        source_url = self.start_url 
+        source = json.loads(source)
+        while source:
+            soup = BeautifulSoup(source['Html'], "lxml")
+            for d in soup.find_all("li", "list-item"):
+                head = d.find("strong", "list-item-heading")
+                m = re.search("(?P<basefile>(PM|RPS)FS \d{4}[:-]\s?\d+)", head.string)
+                if m:
+                    identifier = m.group("basefile")
+                    basefile = self.sanitize_basefile(identifier)
+                else:
+                    self.log.warning("Could't extract basefile from %s", head.string)
+                    continue
+                title = d.find("span", "list-item-text").text.strip()
+                title = title.split(".")[0]
+                link = urljoin(self.start_url, d.find("a", "document-link").get("href"))
+                yield(basefile, {"uri": link,
+                                 "title": title})
+            if source['HasMore']:
+                if source_url.endswith("AjaxApplyFilters"):
+                    source_url = source_url.replace("AjaxApplyFilters", "AjaxLoadMore")
+                else:
+                    self.payload['lpfm.pid'] += 1
+            elif source_url.rsplit("/",1)[0] == self.start_url.rsplit("/",1)[0]:
+                source_url = self.start_url_2
+            else:
+                source = None
+                # i.e. we're done
+
+            if source:
+                self.log.debug("Downloading %s?%s" % (source_url, urlencode(self.payload)))
+                source = self.session.post(source_url, data=self.payload).json()
 
 class RAFS(MyndFskrBase):
-    #  (efter POST)
     alias = "rafs"
+    #  (efter POST)
     start_url = "https://riksarkivet.se/rafs"
     download_iterlinks = False
     landingpage = True

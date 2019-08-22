@@ -388,6 +388,6 @@ def updateentry(section):
                 entrypath_arg = ".root"
             entrypath = self.store.documententry_path
             args = [self] + list(args)
-            return DocumentEntry.updateentry(f, section, entrypath, entrypath_arg, *args, **kwargs)
+            return DocumentEntry.updateentry(f, section, entrypath, entrypath_arg, None, *args, **kwargs)
         return inner_wrapper
     return outer_wrapper

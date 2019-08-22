@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2019-08-04T22:32:44.940768
+# Automatically transformed from sources at 2019-08-22T22:25:36.668032
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -200,6 +200,8 @@ rpubl:Skrivelse space:abbrSlug "skr" .
 <https://lagen.nu/dataset/nrr> space:abbrSlug "nrr" .
 
 <https://lagen.nu/dataset/nutfs> space:abbrSlug "nutfs" .
+
+<https://lagen.nu/dataset/pmfs> space:abbrSlug "pmfs" .
 
 <https://lagen.nu/dataset/pmod> space:abbrSlug "pmod" .
 
