@@ -16,7 +16,7 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
 		xmlns:ext="http://exslt.org/common"
 		xmlns:str="http://exslt.org/strings"
 		extension-element-prefixes="str"
-		exclude-result-prefixes="xhtml rdf rdfs prov bibo rpubl ext">
+		exclude-result-prefixes="xhtml rdf rdfs prov bibo rpubl rinfoex ext">
   <xsl:include href="base.xsl"/>
   <xsl:include href="metadata-only.xsl"/>
 
@@ -72,12 +72,6 @@ really tested with direktiv, utredningar (SOU/Ds) and propositioner.
   <xsl:param name="fixedtoc" select="true()"/>
   <xsl:param name="content-under-pagetitle" select="false()"/>
 
-
-  <!-- Headings shouldn't be expressed with <h*> tags, but rather with
-       RDFa attribs in <div class="section"> element. However,
-       DirTrips still generates h1 headings, so we can't just ignore
-       these. -->
-  <!-- <xsl:template match="xhtml:h1|xhtml:h2"/> -->
 
   <xsl:template name="aside-annotations">
     <xsl:param name="uri"/>

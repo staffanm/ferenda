@@ -56,16 +56,19 @@ class Forfattning(CompoundElement, Tidsbestamd):
     classname = "konsolideradforfattning"
 
 # Rubrik är en av de få byggstenarna som faktiskt inte kan innehålla
-# något annat (det förekommer "aldrig" en hänvisning i en
-# rubriktext). Den ärver alltså från UnicodeElement, inte
-# CompoundElement.
+# något annat (det förekommer "aldrig" en hänvisning eller delar som
+# är annorlunda formatterade i en rubriktext). Den ärver alltså från
+# UnicodeElement, inte CompoundElement.
 class Rubrik(UnicodeElement, Tidsbestamd):
     """En rubrik av något slag - kan vara en huvud- eller underrubrik
     i löptexten, en kapitelrubrik, eller något annat"""
 
     def _get_tagname(self):
-        if hasattr(self, 'type') and self.type == "underrubrik":
-            return "h3"
+        if hasattr(self, 'type'):
+            if self.type == "underrubrik":
+                return "h3"
+            elif self.type == "dokumentrubrik":
+                return "h1"
         else:
             return "h2"
     tagname = property(_get_tagname, "Docstring here")

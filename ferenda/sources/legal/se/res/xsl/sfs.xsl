@@ -662,9 +662,6 @@
   
   <!-- TABLE OF CONTENTS (TOC) HANDLING -->
 
-  <!-- getting a nested structure of headings and subheadings within a
-       chapter is difficult due to them being on the same nesting, but
-       http://stackoverflow.com/a/2165644/2718243 has an answer -->
   <xsl:template match="xhtml:div[@typeof='rinfoex:Avdelning']" mode="toc">
     <xsl:choose>
       <xsl:when test="xhtml:div[@class='underavdelning']"> <!-- 2010:110 and 1942:740 are the only ones that have these elements -->
@@ -712,6 +709,9 @@
     </li>
   </xsl:template>
   
+  <!-- getting a nested structure of headings and subheadings within a
+       chapter is difficult due to them being on the same nesting, but
+       http://stackoverflow.com/a/2165644/2718243 has an answer -->
   <xsl:template match="xhtml:h2" mode="toc">
     <xsl:variable name="this" select="."/>
     <xsl:variable name="subheadings" select="following-sibling::xhtml:h3[preceding-sibling::xhtml:h2[1] = $this][@id]"/>

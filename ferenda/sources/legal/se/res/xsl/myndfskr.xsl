@@ -14,11 +14,11 @@ sidebar + non-paged (ie. structural) XHTML
 		xmlns:rpubl="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
 		xmlns:ext="http://exslt.org/common"
-		exclude-result-prefixes="xhtml rdf dcterms rpubl rinfoex">
+		exclude-result-prefixes="xhtml rdf dcterms rpubl rinfoex ext">
   <xsl:import href="annotations-panel.xsl"/>
   <xsl:include href="base.xsl"/>
 
-  <xsl:template name="headtitle"><xsl:value-of select="xhtml:title"/> | <xsl:value-of select="$configuration/sitename"/></xsl:template>
+  <xsl:template name="headtitle"><xsl:value-of select="xhtml:meta[@property='dcterms:identifier']/@content"/>: <xsl:value-of select="xhtml:title"/> | <xsl:value-of select="$configuration/sitename"/></xsl:template>
   <xsl:template name="metarobots"><xsl:comment>Robot metatag goes here</xsl:comment></xsl:template>
   <xsl:template name="linkalternate"><xsl:comment>Alternate link(s)</xsl:comment></xsl:template>
   <xsl:template name="headmetadata"><xsl:comment>headmetadata?</xsl:comment></xsl:template>
@@ -70,9 +70,67 @@ sidebar + non-paged (ie. structural) XHTML
       </aside>
     </div>
   </xsl:template>
-  <xsl:param name="dyntoc" select="true()"/>
+  <xsl:param name="dyntoc" select="false()"/>
   <xsl:param name="fixedtoc" select="true()"/>
   <xsl:param name="content-under-pagetitle" select="false()"/>
+
+  <xsl:template match="xhtml:body/*[self::xhtml:p or self::xhtml:span]" priority="10">
+    <div class="row toplevel">
+      <section class="col-sm-8">
+	<xsl:if test="@class='sidbrytning'"><xsl:call-template name="sidbrytning"/></xsl:if><xsl:if test="local-name() != 'span'"><xsl:element name="{local-name()}"><xsl:apply-templates/></xsl:element></xsl:if>
+      </section>
+    </div>
+  </xsl:template>
+
+  <xsl:template match="xhtml:body/xhtml:div">
+    <div class="row toplevel">
+      <section id="{substring-after(@about,'#')}" class="col-sm-8">
+	<xsl:if test="@content">
+	  <h2><xsl:value-of select="@content"/></h2>
+	</xsl:if>
+	<xsl:apply-templates select="*[not(@about)]"/>
+      </section>
+    </div>
+    <xsl:apply-templates select="*[@about]"/>
+  </xsl:template>
+
+  <!-- everything that has an @about attribute, i.e. _is_ something
+       (with a URI) gets a <section> with an <aside> for inbound links etc -->
+  <xsl:template match="xhtml:div[@about and (@class='section' or @class='preamblesection' or @class='unorderedsection')]">
+    <div class="row" about="{@about}"><!-- needed? -->
+      <section id="{substring-after(@about,'#')}" class="col-sm-8">
+	<xsl:variable name="sectionheading"><xsl:if test="xhtml:span/@content"><xsl:value-of select="xhtml:span/@content"/>. </xsl:if><xsl:value-of select="@content"/></xsl:variable>
+	<xsl:if test="count(ancestor::*) = 2">
+	    <h2><xsl:value-of select="$sectionheading"/></h2>
+	</xsl:if>
+	<xsl:if test="count(ancestor::*) = 3">
+	  <h3><xsl:value-of select="$sectionheading"/></h3>
+	</xsl:if>
+	<xsl:if test="count(ancestor::*) = 4">
+	  <h4><xsl:value-of select="$sectionheading"/></h4>
+	</xsl:if>
+       <xsl:apply-templates select="*[not(@about and @class!='forfattningskommentar')]"/>
+      </section>
+      <xsl:call-template name="aside-annotations">
+	<xsl:with-param name="uri" select="@about"/>
+      </xsl:call-template>
+    </div>
+    <xsl:apply-templates select="xhtml:div[@about and @class!='forfattningskommentar']"/>
+  </xsl:template>
+  <!-- remove spans which only purpose is to contain RDFa data -->
+  <xsl:template match="xhtml:span[@property and @content and not(text())]"/>
+
+
+  <xsl:template match="xhtml:span[@class='sidbrytning']" name="sidbrytning">
+    <div class="page">
+      <ul class="nav nav-tabs">
+	<li class="active"><a href="#{@id}-text" class="view-text"><xsl:value-of select="@id"/></a></li>
+	<li><a href="#{@id}-img" class="view-img"><span class="glyphicon glyphicon-picture">&#160;</span>Original</a></li>
+      </ul>
+      <!-- <div class="pdfpage" id="{@id}" style="{@style}"> -->
+      <a href="{@src}" class="facsimile"><img data-src="{@src}"/></a>
+    </div>
+  </xsl:template>
 
   <xsl:template match="xhtml:div[@class='pdfpage']">
     <div class="page">
@@ -114,8 +172,44 @@ sidebar + non-paged (ie. structural) XHTML
     <li><a href="#{@id}"><xsl:value-of select="@id"/></a></li>
   </xsl:template>
 
+  <xsl:template match="xhtml:div[@typeof='rpubl:Kapitel']" mode="toc">
+    <li><a href="#{@id}"><xsl:value-of select="xhtml:h1"/></a>
+    <xsl:if test="xhtml:h2|xhtml:h3">
+      <ul class="nav">
+	<xsl:apply-templates mode="toc"/>
+      </ul>
+    </xsl:if>
+    </li>
+  </xsl:template>
+
+  <xsl:template match="xhtml:h2" mode="toc">
+    <xsl:variable name="this" select="."/>
+    <xsl:variable name="subheadings" select="following-sibling::xhtml:h3[preceding-sibling::xhtml:h2[1] = $this][@id]"/>
+    <xsl:variable name="subparas" select="following-sibling::xhtml:div[preceding-sibling::xhtml:h2[1] = $this]"/>
+    <xsl:variable name="firstpara" select="$subparas[1]/@content"/><!-- select="$subparas[first()]/@content"/> -->
+    <xsl:variable name="lastpara" select="$subparas[last()]/@content"/><!-- select="$subparas[last()]/@content"/> -->
+    <xsl:variable name="scope"><!-- either '4 §' or '4-6 §§' -->
+    <xsl:value-of select="$firstpara"/>&#160;<xsl:if test="$firstpara != $lastpara">- <xsl:value-of select="$lastpara"/> §</xsl:if>§</xsl:variable>
+    <xsl:if test="@id">
+      <li><a href="#{@id}"><xsl:value-of select="."/> (<xsl:value-of select="$scope"/>)</a>
+      <xsl:if test="$subheadings">
+	<ul class="nav">
+	  <xsl:for-each select="$subheadings">
+	    <xsl:if test="@id">
+	      <li><a href="#{@id}"><xsl:value-of select="."/></a></li>
+	    </xsl:if>
+	  </xsl:for-each>
+	</ul>
+      </xsl:if>
+      </li>
+    </xsl:if>
+  </xsl:template>
+
   <!-- toc handling (do nothing) -->
-  <xsl:template match="@*|node()" mode="toc"/>
+  <xsl:template match="xhtml:p" mode="toc"/>
+  <xsl:template match="xhtml:h1" mode="toc"/>
+  <xsl:template match="xhtml:h3" mode="toc"/>
+  <!-- <xsl:template match="@*|node()" mode="toc"/> -->
   
 </xsl:stylesheet>
 

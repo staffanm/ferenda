@@ -159,7 +159,7 @@ that includes this element."""
 """
         attrs = {}
         for stdattr in ('class', 'id', 'dir', 'lang', 'src',
-                        'href', 'name', 'alt', 'role', 'action', 'method'):
+                        'href', 'name', 'alt', 'role', 'action', 'method', 'style'):
             if hasattr(self, stdattr) and getattr(self, stdattr):
                 attrs[stdattr] = getattr(self, stdattr)
         return E(self.tagname, attrs)
@@ -174,6 +174,7 @@ properties (such as ordinal label, date of enactment, etc)."""
     # __new__ method
     def __new__(cls, arg='', *args, **kwargs):
         if not isinstance(arg, str):
+            from pudb import set_trace; set_trace()
             raise TypeError("%r is not a (unicode) str" % arg)
         # obj = str.__new__(cls, arg)
         obj = str.__new__(cls, arg)
@@ -308,10 +309,13 @@ class CompoundElement(AbstractElement, list):
         # RDFa ones). FIXME: There should be an overridable class
         # variable with this list. action and method is really only
         # applicable to html.Form, for is only for html.Label, and
-        # type+name+placeholder for html.Input, and rows+cols for html.Textarea
+        # type+name+placeholder for html.Input, and rows+cols for
+        # html.Textarea. 'style' is useful when handling
+        # FixedLayoutSource documents, but probably harmful in other
+        # cases.
         for stdattr in ('class', 'id', 'dir', 'lang', 'src',
                         'href', 'name', 'alt', 'role', 'typeof',
-                        'datatype', 'property', 'rel', 'about', 'action', 'method', 'for', 'type', 'name', 'value', 'rows', 'cols', 'checked', 'placeholder'):
+                        'datatype', 'property', 'rel', 'about', 'action', 'method', 'for', 'type', 'name', 'value', 'rows', 'cols', 'checked', 'placeholder', 'style'):
             if hasattr(self, stdattr) and getattr(self, stdattr):
                 attrs[stdattr] = getattr(self, stdattr)
 

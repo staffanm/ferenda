@@ -25,16 +25,21 @@ import datetime
 from rdflib import RDF, Graph
 from rdflib.resource import Resource
 from rdflib.namespace import DCTERMS, SKOS
-from layeredconfig import LayeredConfig
+from layeredconfig import LayeredConfig, Defaults
 
 from . import RPUBL, RINFOEX, SwedishLegalSource, FixedLayoutSource
 from .fixedlayoutsource import FixedLayoutStore
 from .swedishlegalsource import SwedishCitationParser, SwedishLegalStore
-from ferenda import TextReader, Describer, Facet, PDFReader, DocumentEntry, DocumentRepository, PDFReader
+from .elements import *
+from ferenda import TextReader, Describer, Facet, PDFReader, DocumentEntry, DocumentRepository, PDFReader, PDFAnalyzer, FSMParser
 from ferenda import util, decorators, errors, fulltextindex
-from ferenda.elements import Body, Page, Preformatted, Link
+from ferenda.decorators import newstate
+from ferenda.elements import (Link, Body, CompoundElement,
+                              Preformatted, UnorderedList, ListItem, serialize)
 from ferenda.elements.html import elements_from_soup
 from ferenda.sources.legal.se.legalref import LegalRef
+from ferenda.pdfreader import Page
+
 
 PROV = Namespace(util.ns['prov'])
 
@@ -1772,13 +1777,504 @@ class PMFS(MyndFskrBase):
                     self.payload['lpfm.pid'] += 1
             elif source_url.rsplit("/",1)[0] == self.start_url.rsplit("/",1)[0]:
                 source_url = self.start_url_2
+                self.payload['lpfm.pid'] = 0
             else:
                 source = None
                 # i.e. we're done
-
             if source:
                 self.log.debug("Downloading %s?%s" % (source_url, urlencode(self.payload)))
                 source = self.session.post(source_url, data=self.payload).json()
+
+    def get_gluefunc(self):
+
+        linespacing = 1.5
+
+        def basefamily(family):
+            return family.replace("-", "").replace("Bold", "").replace("Italic", "").replace("Roman","")
+
+        def leftaligned(t, n, hanging = 0):
+            return 0 <= (t.left - n.left) <= hanging
+
+        def sameline(t, n):
+            return t.top == n.top and t.height == n.height
+
+        def rightof(t, n):
+            # if something is right of something else, but not too far right (max 2x lineheight)
+            return t.right < n.left and (t.left - n.right) < t.height * 2
+
+        def nextline(t, n, p):
+            return (t.top < n.top and t.bottom + (p.height * linespacing) - p.height >= n.top)
+
+        def ordinalitem(b):
+            return bool(re.match("\d+\.\s+", str(b)))
+
+        def unordereditem(b):
+            return str(b).startswith("•")  # Expand on this
+
+        def glue(textbox, nextbox, prevbox):
+            if (basefamily(textbox.font.family) == basefamily(nextbox.font.family) and
+                textbox.font.size == nextbox.font.size and
+                ((leftaligned(textbox, nextbox, textbox.height * 2) and 
+                  nextline(textbox, nextbox, prevbox) and
+                  not ordinalitem(nextbox) and
+                  not unordereditem(nextbox)) or
+                 (sameline(textbox, nextbox) and
+                  rightof(textbox, nextbox)) or
+                 (ordinalitem(textbox) and not ordinalitem(nextbox) and nextline(textbox, nextbox, prevbox)))):
+                return True
+
+        return glue
+
+                
+    def tokenize(self, sanitized):
+        gluefunc = self.get_gluefunc()
+        tokenstream = sanitized.textboxes(gluefunc=gluefunc,
+                                          pageobjects=True,
+                                          startpage=0,
+                                          pagecount=len(sanitized))
+        return tokenstream
+    
+    def get_parser(self, basefile, sanitized, parseconfig):
+        # first: create metrics through a PDFAnalyzer
+        metrics_path = self.store.path(basefile, 'intermediate',
+                                       '.metrics.json')
+        plot_path = None
+        metrics = PDFAnalyzer(sanitized).metrics(metrics_path, plot_path,
+                                        startpage=0,
+                                        pagecount=len(sanitized),
+                                        force=self.config.force)
+        # make them dot-accessible
+        metrics = LayeredConfig(Defaults(metrics))
+
+        defaultstate = {'pageno': 0,
+                        'page': None,
+                        'appendixno': None,
+                        'appendixstarted': False,  
+                        'sectioncache': True}
+        state = LayeredConfig(Defaults(defaultstate))
+        state.sectioncache = {}
+
+        def is_pagebreak(parser):
+            return isinstance(parser.reader.peek(), Page)
+
+        # page numbers, headers
+        def is_nonessential(parser, chunk=None):
+            if not chunk:
+                chunk = parser.reader.peek()
+            strchunk = str(chunk).strip()
+            # everything above or below these margins should be
+            # pagenumbers -- always nonessential
+            if chunk.top > metrics.bottommargin or chunk.bottom < metrics.topmargin:
+                return True
+
+        def is_marginalia(parser, chunk=None):
+            if not chunk:
+                chunk = parser.reader.peek()
+            strchunk = str(chunk).strip()
+            even = state.pageno % 2 == 0
+            if ((not even and chunk.left > metrics_rightmargin()) or
+                (even and chunk.right < metrics_leftmargin())):
+                return True
+
+        def is_kapitel(parser):
+            ordinal = analyze_kapitelstart(parser)
+            if ordinal:
+                return True
+
+        # NB: Don't confuse this (<div typeof="rpubl:Paragraf">) with
+        # is_stycke (<p>)
+        def is_paragraf(parser):
+            ordinal = analyze_paragrafstart(parser)
+            if ordinal:
+                return True
+
+        def is_bulletlist(parser):
+            chunk = parser.reader.peek()
+            strchunk = str(chunk)
+            # different ways of representing bullet points -- U+2022 is
+            # BULLET, while U+F0B7 is a private use codepoint, which,
+            # using the Symbol font, appears to produce something
+            # bullet-like in dir 2016:15. "−" is used in dir 2011:84, but
+            # is maybe semantically different from a bulleted list (a
+            # "dashed list")?
+            if strchunk.startswith(("\u2022", "\uf0b7", "−")):
+                return True
+
+        def is_rubrik(parser, strchunk=None):
+            if not strchunk:
+                chunk = parser.reader.peek()
+                strchunk = str(chunk)
+            return bool(analyze_rubrik(parser, chunk, strchunk))
+
+        def is_appendix(parser):
+            return False
+
+        def is_stycke(parser):
+            return True
+
+        @newstate('body')
+        def make_body(parser):
+            return p.make_children(Body(uri=None))
+
+        @newstate('kapitel')
+        def make_kapitel(parser):
+            chunk = parser.reader.next()
+            strchunk = str(chunk)
+            ordinal, text = analyze_kapitelstart(parser, chunk)
+            chunk[:] = []
+            s = make_element(Kapitel, chunk, {'ordinal': ordinal,
+                                              'rubrik': strchunk})
+            return parser.make_children(s)
+
+        @newstate('paragraf')
+        def make_paragraf(parser):
+            chunk = parser.reader.next()
+            ordinal, text = analyze_paragrafstart(parser, chunk)
+            s = Paragraf(ordinal=ordinal)
+            # can we remove the ordinal from the chunks text somehow?
+            s.append(make_element(Stycke, chunk))
+            return parser.make_children(s)
+
+        def make_rubrik(parser):
+            chunk = parser.reader.next()
+            strchunk = str(chunk)
+            level, text = analyze_rubrik(parser, chunk, strchunk)
+            kwargs = {}
+            if level == 2:
+                kwargs['type'] = "underrubrik"
+            elif level == 0:
+                kwargs['type'] = "dokumentrubrik"
+            return make_element(Rubrik, chunk, kwargs)
+
+        def make_stycke(parser):
+            return make_element(Stycke, parser.reader.next())
+
+        def make_marginalia(parser):
+            return make_element(Stycke, parser.reader.next(), {'class': 'marginalia'})
+
+        def make_element(cls, el, kwargs=None):
+            if not kwargs:
+                kwargs = {}
+            kwargs.update({
+                'style': 'top: %spx; left: %spx; height: %spx; width: %spx' % (el.top, el.left, el.height, el.width)
+                })
+            if 'class' not in kwargs:
+                kwargs['class'] = ''
+            kwargs['class'] += ' textbox fontspec%s' % el.fontid
+            kwargs['class'] = kwargs['class'].strip()
+            args = list(el)
+            if issubclass(cls, CompoundElement):
+                args = [args]
+            return cls(*args, **kwargs)
+        
+        @newstate('bulletlist')
+        def make_bulletlist(parser):
+            ul = UnorderedList(top=None, left=None, bottom=None, right=None, width=None, height=None, font=None)
+            li = make_listitem(parser)
+            ul.append(li)
+            ret = parser.make_children(ul)
+            ret.top = min([li.top for li in ret])
+            ret.bottom = max([li.bottom for li in ret])
+            ret.height = ret.bottom - ret.top
+            ret.font = ret[0].font
+            return ret
+
+        def make_listitem(parser):
+            chunk = parser.reader.next()
+            s = str(chunk)
+            if " " in s:
+                # assume text before first space is the bullet
+                s = s.split(" ",1)[1]
+            else:
+                # assume the bullet is a single char
+                s = s[1:]
+            return ListItem([s], top=chunk.top, left=chunk.left, right=chunk.right, bottom=chunk.bottom,
+                            width=chunk.width, height=chunk.height, font=chunk.font)
+
+        @newstate('appendix')
+        def make_appendix(parser):
+            # now, an appendix can begin with either the actual
+            # headline-like title, or by the sidenote in the
+            # margin. Find out which it is, and plan accordingly.
+            done = False
+            title = None
+            # First, find either an indicator of the appendix number, or
+            # calculate our own
+            chunk = parser.reader.next()
+            strchunk = str(chunk)
+            # correct OCR mistake
+            if state.appendixno and state.appendixno > 1 and strchunk.startswith("Bilaga ll-"):
+                strchunk = strchunk.replace("Bilaga ll-", "Bilaga 4")
+
+            m = re.search("Bilaga( \d+| I| l|$)", str(chunk))
+            if m and m.group(1):
+                match = m.group(1).strip()
+                if match in ("I", "l"):   # correct for OCR mistake
+                    match = "1" 
+                state.appendixno = int(match)
+                # If the text "Bilaga \d" doesn't occur at the start of
+                # this chunk, whatever comes before it might be the real
+                # title (maybe, at least in mashed-together scanned
+                # sources).
+                if metrics.scanned_source and m.start() > 0:
+                    title = util.normalize_space(str(chunk)[:m.start()])
+                    # sanity check -- what comes before might be the prop
+                    # identifier in the margin
+                    if len(title) < 20 and title.lower().startswith("prop."):
+                        title = None
+                chunk = None  # make sure this chunk doesn't go into spill below
+            else:
+                # this probably mean that we have an implicit appendix (se
+                # is_appendix for when that's detected)
+                if state.appendixno:
+                    state.appendixno += 1
+                else:
+                    state.appendixno = 1
+
+            # next up, read the page to find the appendix title
+            spill = []  # save everyting we read up until the appendix
+            if title is None:
+                while not done:
+                    if isinstance(chunk, Page):
+                        title = ""
+                        done = True
+                    if isinstance(chunk, Textbox) and int(chunk.font.size) >= metrics.h2.size:
+                        title = util.normalize_space(str(chunk))
+                        chunk = None
+                        done = True
+                    if not done:
+                        if chunk and not is_nonessential(parser, chunk):
+                            spill.append(chunk)
+                        chunk = parser.reader.next()
+                if chunk and not isinstance(chunk, Page):
+                    spill.append(chunk)
+            s = Appendix(title=title,
+                         ordinal=str(state.appendixno),
+                         uri=None)
+            s.extend(spill)
+            return parser.make_children(s)
+
+
+        def skip_nonessential(parser):
+            parser.reader.next()
+            return None
+
+        def skip_pagebreak(parser):
+            # increment pageno
+            state.page = parser.reader.next()
+            try:
+                state.pageno = int(state.page.number)
+            except ValueError as e:  # state.page.number was probably a roman numeral (typed as string)
+                state.pageno = 0  # or maybe convert roman numeral to int?
+
+            sb = Sidbrytning(width=state.page.width,
+                             height=state.page.height,
+                             src=state.page.src,
+                             ordinal=state.page.number)
+            state.appendixstarted = False
+            return sb
+
+        def analyze_paragrafstart(parser, chunk=None):
+            """returns (ordinal, text) if it looks like the start of a section (eg
+               "7 § Enligt blah blahonga...")
+
+            """
+            if not chunk:
+                chunk = parser.reader.peek()
+            strchunk = str(chunk).strip()
+            m = re.match("(\d+) § (.*)", strchunk, re.DOTALL)
+            if m:
+                return m.groups()
+
+        def analyze_kapitelstart(parser, chunk=None):
+            """returns (ordinal, heading) if it looks like a kapitel start ("2 kap. Om blahonga")
+            heading, None otherwise.
+
+            """
+            if not chunk:
+                chunk = parser.reader.peek()
+            strchunk = str(chunk).strip()
+            m = re.match("(\d+) kap. (.*)", strchunk, re.DOTALL)
+            if not m:
+                return
+
+            if analyze_rubrik(parser, strchunk=m.group(2)):
+                # looks like we've made it!
+                return m.groups()
+
+        def analyze_rubrik(parser, chunk=None, strchunk=None):
+            if not(chunk or strchunk):
+                chunk = parser.reader.peek()
+                strchunk = str(chunk)
+            if chunk and len(chunk) > 1: #  this means that there exists
+                #  multiple textboxes, ie one has a run
+                #  of italizied or bolded text, which
+                #  headings don't have
+                return False
+            if len(strchunk) > 135:
+                return False
+            # Headings should start with an upper case normal character
+            if not strchunk[0].isupper():
+                return False
+            # and they shouldn't end with periods (except in some cases) or other special endings
+            if ((strchunk.endswith(".") and not 
+                 strchunk.endswith(("m.m.", "m. m.", "m.fl.", "m. fl."))) or
+                strchunk.endswith((",", " och", " eller", ":", "-", ";"))):
+                return False
+
+            if chunk and chunk.font.size < metrics.default.size:
+                return False
+            
+            if chunk and "Italic" in chunk.font.family:
+                level = 2
+            elif strchunk.endswith("författningssamling"):
+                level = 0
+            else:
+                level = 1
+            return level, strchunk
+
+
+        def metrics_leftmargin():
+            if state.pageno % 2 == 0:  # even page
+                return metrics.leftmargin_even
+            else:
+                return metrics.leftmargin
+
+
+        def metrics_rightmargin():
+            if state.pageno % 2 == 0:  # even page
+                return metrics.rightmargin_even
+            else:
+                return metrics.rightmargin
+
+        def sizematch(want, got, tolerate_less_ocr=1, tolerate_more_ocr=1):
+            # matches a size 
+            if metrics.scanned_source:
+                # want: 10, got: 9, tolerate_less_ocr: 1, tolerate_more_ocr: 0 => True
+                # 10 + 0 <= 9 + 1
+                return want + tolerate_more_ocr <= got + tolerate_less_ocr
+            else:
+                return want == got
+
+
+        p = FSMParser()
+
+        recognizers = [is_pagebreak,
+                       is_appendix,
+                       is_nonessential,
+                       is_marginalia,
+                       is_kapitel,
+                       is_paragraf,
+                       is_rubrik, 
+                       is_bulletlist,
+                       is_stycke]
+        if parseconfig == "noappendix":
+            recognizers.remove(is_appendix)
+        elif parseconfig == "simple":
+            recognizers = [is_pagebreak, is_stycke]
+        p.set_recognizers(*recognizers)
+
+        commonstates = ("body", "kapitel", "paragraf", "appendix")
+        commonbodystates = commonstates[1:]
+        p.set_transitions({(commonstates, is_nonessential): (skip_nonessential, None),
+                           (commonstates, is_marginalia): (make_marginalia, None),
+                           (commonstates, is_pagebreak): (skip_pagebreak, None),
+                           (commonstates, is_stycke): (make_stycke, None),
+                           (commonstates, is_rubrik): (make_rubrik, None),
+                           (commonstates, is_paragraf): (make_paragraf, "paragraf"),
+                           ("body", is_kapitel): (make_kapitel, "kapitel"),
+                           ("kapitel", is_kapitel): (False, None),
+                           ("kapitel", is_paragraf): (make_paragraf, "paragraf"),
+                           
+                           ("paragraf", is_paragraf): (False, None),
+                           ("paragraf", is_kapitel): (False, None),
+                           ("paragraf", is_rubrik): (False, None),
+                           })
+
+        p.initial_state = "body"
+        p.initial_constructor = make_body
+        p.debug = True
+        return p.parse
+
+    def visitor_functions(self, basefile):
+        return [(self.construct_id, {'basefile': basefile,
+                                    'uris': set()})]
+
+    skipfragments = {}
+    ordinalpredicates = {
+        Kapitel: "rpubl:kapitelnummer",
+        Paragraf: "rpubl:paragrafnummer",
+        Stycke: "rinfoex:styckenummer",
+        Rubrik: "rinfoex:rubriknummer",
+        Listelement: "rinfoex:punktnummer",
+        Bilaga: "rinfoex:bilaganummer"
+    }
+    rootnode = Body
+    def construct_id(self, node, state):
+        # this is copied verbatim from sfs.py
+        state = dict(state)
+        if isinstance(node, self.rootnode):
+            attributes = self.metadata_from_basefile(state['basefile'])
+            state.update(attributes)
+        if self.ordinalpredicates.get(node.__class__):  # could be a qname?
+            if hasattr(node, 'ordinal') and node.ordinal:
+                ordinal = node.ordinal
+            else:
+                # find out which # this is
+                ordinal = 0
+                for othernode in state['parent']:
+                    if type(node) == type(othernode):
+                        ordinal += 1
+                    if node == othernode:
+                        break
+
+            # in the case of Listelement / rinfoex:punktnummer, these
+            # can be nested. In order to avoid overwriting a toplevel
+            # Listelement with the ordinal from a sub-Listelement, we
+            # make up some extra RDF predicates that our URISpace
+            # definition knows how to handle. NB: That def doesn't
+            # support a nesting of arbitrary depth, but this should
+            # not be a problem in practice.
+            ordinalpredicate = self.ordinalpredicates.get(node.__class__)
+            if ordinalpredicate == "rinfoex:punktnummer":
+                while ordinalpredicate in state:
+                    ordinalpredicate = ("rinfoex:sub" +
+                                        ordinalpredicate.split(":")[1])
+            state[ordinalpredicate] = ordinal
+            del state['parent']
+            for skip, ifpresent in self.skipfragments:
+                if skip in state and ifpresent in state:
+                    del state[skip]
+            res = self.attributes_to_resource(state)
+            try:
+                uri = self.minter.space.coin_uri(res)
+            except Exception:
+                self.log.warning("Couldn't mint URI for %s" % type(node))
+                uri = None
+            if uri:
+                # if there's two versions of a para (before and after
+                # a change act), only use a URI for the version
+                # currently in force to avoid having two nodes with
+                # identical @about.
+                if uri not in state['uris'] and (not isinstance(node, Tidsbestamd) or
+                                                 node.in_effect()):
+                    node.uri = uri
+                    state['uris'].add(uri)
+                else:
+                    # No uri added to this node means we shouldn't add
+                    # an id either, and not recurse to it's
+                    # children. Returning None instead of current
+                    # state will prevent recursive calls on this nodes
+                    # childen
+                    return None
+                    
+                # else:
+                #     print("Not assigning %s to another node" % uri)
+                if "#" in uri:
+                    node.id = uri.split("#", 1)[1]
+                pass
+        state['parent'] = node
+        return state
 
 class RAFS(MyndFskrBase):
     alias = "rafs"
