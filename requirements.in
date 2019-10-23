@@ -1,0 +1,30 @@
+beautifulsoup4
+cached_property
+lxml
+rdflib
+rdflib-jsonld
+html5lib
+requests
+future
+configparser
+jsmin
+cssmin
+whoosh
+pyparsing
+SimpleParse
+coverage
+docutils
+wheel
+twine
+psutil
+layeredconfig
+responses
+langdetect
+# importlib
+# the following modules might be needed for older python versions
+# mock
+# bz2file   # backport
+# backports.functools_lru_cache # another backport
+# unittest2 # not needed for py2.7 +
+# ordereddict # not needed for py2.7 +
+# scandir

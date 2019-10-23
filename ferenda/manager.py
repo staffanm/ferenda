@@ -258,7 +258,10 @@ def frontpage(repos,
             transformargs['basedir'] = os.path.dirname(path)
         elif develurl:
             transformargs['develurl'] = develurl
-        urltransform = repos[0].get_url_transform_func(**transformargs)
+        if repos:
+            urltransform = repos[0].get_url_transform_func(**transformargs)
+        else:
+            urltransform = lambda x: x
         if feed:
             params = {"feedfile": feed}
         else:
@@ -2158,10 +2161,11 @@ def _select_triplestore(sitename, log, verbose=False):
                                  'http://localhost:3030')
     if triplestore:
         try:
-            resp = requests.get(triplestore + "/ds/data?default")
-            resp.raise_for_status()
-            if verbose:
-                log.info("Fuseki server responding at %s" % triplestore)
+            if not os.environ.get('FERENDA_SET_TRIPLESTORE_LOCATION'):
+                resp = requests.get(triplestore + "/ds/data?default")
+                resp.raise_for_status()
+                if verbose:
+                    log.info("Fuseki server responding at %s" % triplestore)
             # TODO: Find out how to create a new datastore in Fuseki
             # programatically so we can use
             # http://localhost:3030/$SITENAME instead
@@ -2246,10 +2250,11 @@ def _select_fulltextindex(log, sitename, verbose=False):
                                    'http://localhost:9200/')
     if fulltextindex:
         try:
-            resp = requests.get(fulltextindex)
-            resp.raise_for_status()
-            if verbose:
-                log.info("Elasticsearch server responding at %s" % fulltextindex)
+            if not os.environ.get('FERENDA_SET_FULLTEXTINDEX_LOCATION'):
+                resp = requests.get(fulltextindex)
+                resp.raise_for_status()
+                if verbose:
+                    log.info("Elasticsearch server responding at %s" % fulltextindex)
             return('ELASTICSEARCH', fulltextindex + sitename + "/")
         except (requests.exceptions.HTTPError,
                 requests.exceptions.ConnectionError) as e:

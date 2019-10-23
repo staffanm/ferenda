@@ -1,0 +1,2 @@
+# this file is called whenever services are started the traditional way, to find out whether to proceed or not. Exit status 101 means do not proceed (we start our services as regular programs by supervisord)
+exit 101 
