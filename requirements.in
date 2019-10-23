@@ -3,6 +3,7 @@ cached_property
 lxml
 rdflib
 rdflib-jsonld
+rdfextras
 html5lib
 requests
 future

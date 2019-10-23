@@ -28,6 +28,7 @@ pyparsing==2.4.2
 pyyaml==5.1.2             # via layeredconfig
 rdflib-jsonld==0.4.0
 rdflib==4.2.2
+rdfextras==0.4
 readme-renderer==24.0     # via twine
 requests-toolbelt==0.9.1  # via twine
 requests==2.22.0
