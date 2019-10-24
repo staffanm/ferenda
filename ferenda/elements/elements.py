@@ -174,7 +174,6 @@ properties (such as ordinal label, date of enactment, etc)."""
     # __new__ method
     def __new__(cls, arg='', *args, **kwargs):
         if not isinstance(arg, str):
-            from pudb import set_trace; set_trace()
             raise TypeError("%r is not a (unicode) str" % arg)
         # obj = str.__new__(cls, arg)
         obj = str.__new__(cls, arg)
