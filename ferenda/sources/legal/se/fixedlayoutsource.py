@@ -14,11 +14,13 @@ from rdflib.namespace import DCTERMS
 from lxml import etree
 
 from . import SwedishLegalStore, SwedishLegalSource, SwedishLegalHandler
+from .elements import Sidbrytning
 from ferenda import util
 from ferenda import CompositeRepository, PDFReader
 from ferenda.errors import DocumentRemovedError, RequestHandlerError, PDFFileIsEmpty
 from ferenda.pdfreader import StreamingPDFReader
 from ferenda.elements import Body
+
 
 
 class FixedLayoutHandler(SwedishLegalHandler):
@@ -218,11 +220,21 @@ class FixedLayoutSource(SwedishLegalSource):
             return "%s s. %s" % (desc.graph.value(URIRef(rooturi), DCTERMS.identifier),
                                  pageno)
 
-    # FIXME: THis is copied verbatim from PDFDocumentRepository --
+    # FIXME: This is copied verbatim from PDFDocumentRepository
+
+    
     def create_external_resources(self, doc):
         resources = []
 
-        if isinstance(doc.body, Body):
+        # there are two types of doc.body objects
+
+        # 1. PDFReader objects, ie raw PDF objects, structured by page
+        #    and with a top-level fontspec object
+        # 2. elements.Body objects that are structured by logical
+        #    elements (chapters, sections etc) and where individual
+        #    Sidbrytning objects can be anywhere in the tree.
+        from pudb import set_trace; set_trace()
+        if not hasattr(doc.body, 'fontspec'):
             # document wasn't derived from a PDF file, probably from HTML instead
             return resources
         cssfile = self.store.parsed_path(doc.basefile, attachment="index.css")
@@ -232,14 +244,25 @@ class FixedLayoutSource(SwedishLegalSource):
         util.ensure_dir(cssfile)
         with open(cssfile, "w") as fp:
             # Create CSS header with fontspecs
-            assert isinstance(doc.body, PDFReader), "doc.body is %s, not PDFReader -- still need to access fontspecs etc" % type(doc.body)
             for spec in list(doc.body.fontspec.values()):
                 fp.write(".fontspec%s {font: %spx %s; color: %s;}\n" %
                          (spec['id'], spec['size'], spec['family'],
                           spec.get('color', 'black')))
 
             # 2 Copy all created png files to their correct locations
-            for cnt, page in enumerate(doc.body):
+            if isinstance(doc.body, PDFReader):
+                pageenumerator = enumerate(doc.body)
+            else:
+                sidbrytningar = []
+                def collect(node, state):
+                    if isinstance(node, Sidbrytning):
+                        state.append(node)
+                    return state
+                self.visit_node(doc.body, collect, sidbrytningar)
+                pageenumerator = enumerate(sidbrytningar)
+            # assert isinstance(doc.body, PDFReader), "doc.body is %s, not PDFReader -- still need to access fontspecs etc" % type(doc.body)
+            
+            for cnt, page in pageenumerator:
                 if page.background:
                     src = self.store.intermediate_path(
                         doc.basefile, attachment=os.path.basename(page.background))
@@ -253,8 +276,9 @@ class FixedLayoutSource(SwedishLegalSource):
                     background = " background: url('%s') no-repeat grey;" % desturi
                 else:
                     background = ""
-                fp.write("#page%03d {width: %spx; height: %spx;%s}\n" %
-                         (cnt+1, page.width, page.height, background))
+                    
+                fp.write("#%s {width: %spx; height: %spx;%s}\n" %
+                         (page.id, page.width, page.height, background))
         return resources
 
 

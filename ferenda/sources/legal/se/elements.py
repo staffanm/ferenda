@@ -459,6 +459,11 @@ class VerbatimSection(CompoundElement):
     classname = "verbatim"
 
 class Sidbrytning(OrdinalElement):
+
+    @property
+    def id(self):
+        return 'sid%s' % self.ordinal
+    
     def as_xhtml(self, uri, parent_uri=None):
         attrs = {'id': 'sid%s' % self.ordinal,
                  'class': 'sidbrytning'}

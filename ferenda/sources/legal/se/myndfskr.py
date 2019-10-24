@@ -7,6 +7,7 @@ from tempfile import mktemp
 from urllib.parse import urljoin, unquote, urlparse, urlencode
 from xml.sax.saxutils import escape as xml_escape
 from io import BytesIO
+from itertools import chain
 import os
 import re
 import json
@@ -1832,7 +1833,7 @@ class PMFS(MyndFskrBase):
                                           pageobjects=True,
                                           startpage=0,
                                           pagecount=len(sanitized))
-        return tokenstream
+        return chain(iter([sanitized.fontspec]), tokenstream)
     
     def get_parser(self, basefile, sanitized, parseconfig):
         # first: create metrics through a PDFAnalyzer
@@ -1914,10 +1915,12 @@ class PMFS(MyndFskrBase):
 
         @newstate('body')
         def make_body(parser):
-            return p.make_children(Body(uri=None))
+            fontspec = next(parser.reader)
+            return p.make_children(Body(uri=None, fontspec=fontspec))
 
         @newstate('kapitel')
         def make_kapitel(parser):
+            from pudb import set_trace; set_trace()
             chunk = parser.reader.next()
             strchunk = str(chunk)
             ordinal, text = analyze_kapitelstart(parser, chunk)
@@ -1947,6 +1950,7 @@ class PMFS(MyndFskrBase):
             return make_element(Rubrik, chunk, kwargs)
 
         def make_stycke(parser):
+            from pudb import set_trace; set_trace()
             return make_element(Stycke, parser.reader.next())
 
         def make_marginalia(parser):
@@ -2066,11 +2070,11 @@ class PMFS(MyndFskrBase):
                 state.pageno = int(state.page.number)
             except ValueError as e:  # state.page.number was probably a roman numeral (typed as string)
                 state.pageno = 0  # or maybe convert roman numeral to int?
-
             sb = Sidbrytning(width=state.page.width,
                              height=state.page.height,
                              src=state.page.src,
-                             ordinal=state.page.number)
+                             ordinal=state.page.number,
+                             background=state.page.background)
             state.appendixstarted = False
             return sb
 

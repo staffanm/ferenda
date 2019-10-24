@@ -74,6 +74,10 @@ sidebar + non-paged (ie. structural) XHTML
   <xsl:param name="fixedtoc" select="true()"/>
   <xsl:param name="content-under-pagetitle" select="false()"/>
 
+  <!-- top level marginalia that appears before the chapter/section
+       structures (for docs that contain no structured data, this is
+       all of the content -->
+  <!--
   <xsl:template match="xhtml:body/*[self::xhtml:p or self::xhtml:span]" priority="10">
     <div class="row toplevel">
       <section class="col-sm-8">
@@ -81,57 +85,59 @@ sidebar + non-paged (ie. structural) XHTML
       </section>
     </div>
   </xsl:template>
-
-  <xsl:template match="xhtml:body/xhtml:div">
-    <div class="row toplevel">
-      <section id="{substring-after(@about,'#')}" class="col-sm-8">
-	<xsl:if test="@content">
-	  <h2><xsl:value-of select="@content"/></h2>
-	</xsl:if>
-	<xsl:apply-templates select="*[not(@about)]"/>
-      </section>
-    </div>
-    <xsl:apply-templates select="*[@about]"/>
-  </xsl:template>
-
-  <!-- everything that has an @about attribute, i.e. _is_ something
-       (with a URI) gets a <section> with an <aside> for inbound links etc -->
-  <xsl:template match="xhtml:div[@about and (@class='section' or @class='preamblesection' or @class='unorderedsection')]">
-    <div class="row" about="{@about}"><!-- needed? -->
-      <section id="{substring-after(@about,'#')}" class="col-sm-8">
-	<xsl:variable name="sectionheading"><xsl:if test="xhtml:span/@content"><xsl:value-of select="xhtml:span/@content"/>. </xsl:if><xsl:value-of select="@content"/></xsl:variable>
-	<xsl:if test="count(ancestor::*) = 2">
-	    <h2><xsl:value-of select="$sectionheading"/></h2>
-	</xsl:if>
-	<xsl:if test="count(ancestor::*) = 3">
-	  <h3><xsl:value-of select="$sectionheading"/></h3>
-	</xsl:if>
-	<xsl:if test="count(ancestor::*) = 4">
-	  <h4><xsl:value-of select="$sectionheading"/></h4>
-	</xsl:if>
-       <xsl:apply-templates select="*[not(@about and @class!='forfattningskommentar')]"/>
-      </section>
-      <xsl:call-template name="aside-annotations">
-	<xsl:with-param name="uri" select="@about"/>
-      </xsl:call-template>
-    </div>
-    <xsl:apply-templates select="xhtml:div[@about and @class!='forfattningskommentar']"/>
-  </xsl:template>
-  <!-- remove spans which only purpose is to contain RDFa data -->
-  <xsl:template match="xhtml:span[@property and @content and not(text())]"/>
-
-
+  -->
   <xsl:template match="xhtml:span[@class='sidbrytning']" name="sidbrytning">
+    <xsl:comment>Sida <xsl:value-of select="@id"/></xsl:comment>
     <div class="page">
       <ul class="nav nav-tabs">
 	<li class="active"><a href="#{@id}-text" class="view-text"><xsl:value-of select="@id"/></a></li>
 	<li><a href="#{@id}-img" class="view-img"><span class="glyphicon glyphicon-picture">&#160;</span>Original</a></li>
       </ul>
-      <!-- <div class="pdfpage" id="{@id}" style="{@style}"> -->
-      <a href="{@src}" class="facsimile"><img data-src="{@src}"/></a>
-    </div>
+      <div class="pdfpage" id="{@id}" style="{@style}">
+	<a href="{@src}" class="facsimile"><img data-src="{@src}"/></a>
+	<xsl:variable name="nodeid" select="@id"/>
+	<xsl:variable name="nodes" select="//*[@id]|//xhtml:h1"/>
+	<xsl:variable name="firstposs"><xsl:for-each select="$nodes"><xsl:if test="./@id = $nodeid"><xsl:value-of select="position()"/></xsl:if></xsl:for-each></xsl:variable>
+	<xsl:variable name="firstpos" select="round(number($firstposs))"/>
+	<xsl:variable name="lastposss"><xsl:for-each select="$nodes"><xsl:if test="position() > $firstpos and @class = 'sidbrytning'"><xsl:value-of select="position()"/>/</xsl:if></xsl:for-each></xsl:variable>
+	<xsl:variable name="lastposs"><xsl:choose><xsl:when test="string-length($lastposss) > 0"><xsl:value-of select="substring-before($lastposss, '/')"/></xsl:when><xsl:otherwise>999999</xsl:otherwise></xsl:choose></xsl:variable>
+	<xsl:variable name="lastpos" select="round(number($lastposs))"/>
+	<xsl:comment>Doing page <xsl:value-of select="@id"/> (pos <xsl:value-of select="$firstpos"/>-<xsl:value-of select="$lastpos"/>)</xsl:comment>
+	<xsl:for-each select="$nodes">
+	  <xsl:if test="(position() > $firstpos) and ($lastpos > position())">
+	    <xsl:comment><xsl:value-of select="name()"/> typeof <xsl:value-of select="@typeof"/> id <xsl:value-of select="@id"/> </xsl:comment>
+	  </xsl:if>
+	</xsl:for-each>
+	<xsl:for-each select="$nodes">
+	  <xsl:if test="(position() > $firstpos) and ($lastpos > position())">
+	    <xsl:element name="{name()}">
+	      <xsl:for-each select="@*">
+		<xsl:copy/>
+	      </xsl:for-each>
+	      <xsl:comment>processing element <xsl:value-of select="name()"/> typeof=<xsl:value-of select="@typeof"/> id=<xsl:value-of select="@id"/></xsl:comment>
+	      <xsl:if test="name() = 'p' or name() = 'h1' or name() = 'h2' or name() = 'h3'">
+		<xsl:apply-templates/>
+	      </xsl:if>
+	    </xsl:element>
+	  </xsl:if>
+	</xsl:for-each>
+      </div>
+      </div>
   </xsl:template>
 
+  <!-- remove spans which only purpose is to contain RDFa data -->
+  <xsl:template match="xhtml:span[@property and @content and not(text())]"/>
+  <xsl:template match="xhtml:span[@rel and @href and not(text())]"/>
+
+  <xsl:template match="xhtml:*">
+    <xsl:element name="{name()}">
+      <xsl:for-each select="@*">
+	<xsl:copy/>
+      </xsl:for-each>
+      <xsl:apply-templates/>
+      </xsl:element>
+  </xsl:template>
+  
   <xsl:template match="xhtml:div[@class='pdfpage']">
     <div class="page">
       <!-- Nav tabs -->
@@ -154,10 +160,13 @@ sidebar + non-paged (ie. structural) XHTML
   <xsl:template match="xhtml:body/xhtml:div[@class!='pdfpage']">
     <!-- ie any other documnent wrapper element except .pdfpage,
          mostly used to keep pagewidth down -->
+    <!--
     <section id="top" class="col-sm-7">
       <xsl:apply-templates/>
     </section>
     <aside class="col-sm-5">&#160;</aside>
+    -->
+    <xsl:apply-templates/>
   </xsl:template>
 
   <!-- default rule: Identity transform -->

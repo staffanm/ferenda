@@ -1486,6 +1486,13 @@ class Devel(object):
     def footer(self):
         return []
 
+    def frontpage_content(self, primary=False):
+        return ("<h2>Welcome to ferenda</h2>"
+                "<p>Add a few document repositories and have fun!</p>")
+
+    def get_url_transform_func(self, **transformargs):
+        return lambda x: x
+    
     def facets(self):
         return []
 
