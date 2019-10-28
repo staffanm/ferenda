@@ -13,7 +13,7 @@ if [ ! -f site/ferenda.ini ]; then
     mkdir -p data/dv/generated/
     touch data/dv/generated/uri.map
     ./ferenda-build.py ferenda.Devel enable
-    # enable other modules as needed
+    # maybe enable other modules as needed?
     ./ferenda-build.py all makeresources
     ./ferenda-build.py all frontpage
 fi

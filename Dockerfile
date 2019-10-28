@@ -16,14 +16,19 @@ RUN apt -qq update && \
        antiword \
        cron \
        curl \
+       mariadb-client \
+       mariadb-server \
+       mediawiki \
        elasticsearch \
        emacs24-nox \
        gcc \
+       git \
        imagemagick \
        libreoffice \
        libtiff-tools \
        libxml2-dev \
        libxslt1-dev \
+       mediawiki \
        nginx \
        openjdk-8-jre-headless \
        poppler-utils \
@@ -40,19 +45,18 @@ RUN apt -qq update && \
     mkdir /opt/fuseki && \
        cd /opt/fuseki && \
        (curl -s http://www-eu.apache.org/dist/jena/binaries/apache-jena-fuseki-3.13.1.tar.gz | tar -xvz --strip-components=1 ) && \
-       mkdir run
+       mkdir -p run/databases/lagen && \
+       mkdir -p run/configuration 
 WORKDIR /usr/share/ferenda
-COPY docker /tmp/docker
-RUN mv /tmp/docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf && \
-    mv /tmp/docker/nginx.conf /etc/nginx/sites-enabled/default && \
-    mv /tmp/docker/uwsgi.ini /etc/uwsgi/apps-enabled/ && \
-    mv /tmp/docker/fuseki /etc/default/fuseki && \
-    mv /tmp/docker/start-fuseki.sh /opt/fuseki/
 COPY requirements.txt . 
 RUN python3.7 -m venv .virtualenv && \
     ./.virtualenv/bin/pip install -r requirements.txt
 
 EXPOSE 80 3330 9001 9200 
+COPY docker /tmp/docker
+RUN mv /tmp/docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf && \
+    mv /tmp/docker/nginx.conf /etc/nginx/sites-enabled/default && \
+    mv /tmp/docker/ferenda.ttl /opt/fuseki/run/configuration/
 COPY . .
 
 ENTRYPOINT ["/bin/bash", "/tmp/docker/setup.sh"]
