@@ -27,7 +27,7 @@ from multiprocessing.managers import SyncManager, RemoteError
 from queue import Queue
 from time import sleep
 from urllib.parse import urlsplit
-from wsgiref.simple_server import make_server
+# from wsgiref.simple_server import make_server
 from contextlib import contextmanager
 import argparse
 import builtins
@@ -68,6 +68,7 @@ try:  # optional module
 except ImportError:  # pragma: no cover
     def setproctitle(title): pass
     def getproctitle(): return ""
+from werkzeug.serving import run_simple
 
 # my modules
 from ferenda import DocumentRepository  # needed for a doctest
@@ -316,8 +317,11 @@ def runserver(repos,
         inifile = _find_config_file()
     except errors.ConfigurationError:
         inifile = None
-    httpd = make_server('', port, make_wsgi_app(inifile, config, **kwargs))
-    httpd.serve_forever()
+
+    # httpd = make_server('', port, make_wsgi_app(inifile, config, **kwargs))
+    # httpd.serve_forever()
+    run_simple('127.0.0.1', port, make_wsgi_app(inifile, config, **kwargs),
+               use_debugger=True, use_reloader=True)
 
 def status(repo, samplesize=3):
     """Prints out some basic status information about this repository."""
@@ -383,7 +387,7 @@ def make_wsgi_app(inifile=None, config=None, **kwargs):
             config = _load_config(inifile)
         if not kwargs:
             kwargs = _setup_runserver_args(config, inifile)
-        kwargs['inifile'] = inifile
+        # kwargs['inifile'] = inifile
         # make it possible to specify a different class that implements
         # the wsgi application
         classname = getattr(config, "wsgiappclass", "ferenda.WSGIApp")

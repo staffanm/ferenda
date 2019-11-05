@@ -17,6 +17,7 @@ from copy import deepcopy
 from lxml import etree
 from rdflib import Graph
 from ferenda.thirdparty import httpheader
+from cached_property import cached_property
 
 from ferenda import util
 from ferenda.errors import RequestHandlerError
@@ -85,6 +86,10 @@ class RequestHandler(object):
             return {}
         else:
             return dict(parse_qsl(uri.split("?", 1)[1]))
+
+    @cached_property
+    def rules(self):
+        return []
 
     def supports(self, environ):
         """Returns True iff this particular handler supports this particular request."""
