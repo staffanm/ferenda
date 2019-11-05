@@ -716,6 +716,8 @@ class SwedishLegalSource(DocumentRepository):
                 minver = "0000:0000"
             if not maxver:
                 maxver = "9999:9999"
+            if not version:
+                version = "9999:9998"
             # make the version numbers comparable for numsort
             (minver_s, maxver_s, version_s) = [util.split_numalpha(x) for x in (minver, maxver, version)]
             if not (minver_s <= version_s <= maxver_s):

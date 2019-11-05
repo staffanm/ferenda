@@ -224,7 +224,6 @@ def split_numalpha(s):
     >>> sorted(['2 §', '10 §', '1 §'], key=split_numalpha) == ['1 §', '2 §', '10 §']
     True
     """
-
     assert isinstance(s, str), "%s is a %s, not a (unicode) string" % (s, str(type(s)))
     res = []
     seg = ''

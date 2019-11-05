@@ -56,6 +56,7 @@ class JO(FixedLayoutSource):
     start_url = "http://www.jo.se/sv/JO-beslut/Soka-JO-beslut/?query=*&pn=1"
     document_url_regex = "http://www.jo.se/PageFiles/(?P<dummy>\d+)/(?P<basefile>\d+\-\d+)(?P<junk>[,%\d\-]*).pdf"
     headnote_url_template = "http://www.jo.se/sv/JO-beslut/Soka-JO-beslut/?query=%(basefile)s&pn=1"
+    # headnote_url_template = "http://www.jo.se/sv/JO-beslut/Soka-JO-beslut/?query=%(basefile)s&caseNumber=%(basefile)s"
     rdf_type = RPUBL.VagledandeMyndighetsavgorande
     storage_policy = "dir"
     downloaded_suffix = ".pdf"
@@ -123,6 +124,7 @@ class JO(FixedLayoutSource):
                 done = True
 
     def download_single(self, basefile, url):
+        assert url.endswith(".pdf"), "URL to download must be the PDF file"
         ret = super(JO, self).download_single(basefile, url)
         if ret or self.config.refresh:
             headnote_url = self.headnote_url_template % {'basefile': basefile}

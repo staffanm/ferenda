@@ -117,13 +117,14 @@
 <https://lagen.nu/1987:822> dcterms:alternate "CISG" .
 <https://lagen.nu/1988:220> rdfs:label "strålskyddslagen" .
 <https://lagen.nu/1988:254> rdfs:label "knivlagen" .
+<https://lagen.nu/1988:360> dcterms:alternate "LBH" .
 <https://lagen.nu/1988:534> rdfs:label "djurskyddslagen" .
 <https://lagen.nu/1988:870> dcterms:alternate "LVM" .
 <https://lagen.nu/1989:978> rdfs:label "prisregleringslagen" .
 <https://lagen.nu/1990:1144> rdfs:label "begravningslagen" .
 <https://lagen.nu/1990:324> rdfs:label "taxeringslagen" ; dcterms:alternate "TaxL" .
 <https://lagen.nu/1990:52> dcterms:alternate "LVU" .
-<https://lagen.nu/1990:746> dcterms:alternate "LBH" .
+<https://lagen.nu/1990:746> dcterms:alternate "BfL" .
 <https://lagen.nu/1990:782> dcterms:alternate "ArkivL" .
 <https://lagen.nu/1990:782> rdfs:label "arkivlagen" .
 <https://lagen.nu/1990:931> rdfs:label "köplagen" ; dcterms:alternate "KöpL" .
