@@ -29,12 +29,14 @@ import time
 import traceback
 from wsgiref.util import request_uri
 from urllib.parse import parse_qsl, urlencode
+from cached_property import cached_property
 
 from rdflib import Graph, URIRef, RDF, Literal
 from rdflib.namespace import DCTERMS
 from layeredconfig import LayeredConfig, Defaults
 from lxml import etree
 from ferenda.thirdparty.patchit import PatchSet, PatchSyntaxError, PatchConflictError
+from werkzeug.routing import Rule
 
 from ferenda.compat import Mock
 from ferenda import (TextReader, TripleStore, FulltextIndex, WSGIApp,
@@ -77,9 +79,12 @@ class DevelHandler(RequestHandler):
 
     @cached_property
     def rules(self):
-        return [Rule('/devel/',      self.handle_dashboard),
-                Rule('/devel/build', self.handle_build),
-                Rule('/devel/logs',  self.handle_logs)]
+        return [Rule('/devel/',      endpoint=self.handle_dashboard),
+                Rule('/devel/build', endpoint=self.handle_build),
+                Rule('/devel/logs',  endpoint=self.handle_logs),
+                Rule('/devel/streaming-test',  endpoint=self.handle_streaming_test),
+                Rule('/devel/change-parse-options',  endpoint=self.handle_change_parse_options),
+                Rule('/devel/patch',  endpoint=self.handle_patch)]
 
     def supports(self, environ):
         return environ['PATH_INFO'].startswith("/devel/")

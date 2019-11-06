@@ -27,6 +27,10 @@ from . import SameAs
 
 # class SFSHandler(RequestHandler):
 class SFSHandler(SwedishLegalHandler):
+    # FIXME: write a nice set of rules here. the difficult thing will
+    # be to only match SFS basefiles, but /<int>:<rest> ought to do it
+    # maybe
+    
     def supports(self, environ):
         if environ['PATH_INFO'].startswith("/dataset/"):
             return super(SFSHandler, self).supports(environ)

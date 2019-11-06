@@ -30,8 +30,8 @@ class WSGIApp(OrigWSGIApp):
     """
 
     snippet_length = 160
-    def __init__(self, repos, inifile=None, **kwargs):
-        super(WSGIApp, self).__init__(repos, inifile, **kwargs)
+    def __init__(self, repos, config):
+        super(WSGIApp, self).__init__(repos, config)
         sfsrepo = [repo for repo in repos if repo.alias == "sfs"][0]
         self.parser = SwedishCitationParser(
             LegalRef(LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.KORTLAGRUM, LegalRef.FORARBETEN, LegalRef.MYNDIGHETSBESLUT),

@@ -272,57 +272,6 @@ def frontpage(repos,
     return True
 
 
-def runserver(repos,
-              config=None,
-              port=8000,  # now that we require url, we don't need this
-              documentroot="data",  # relative to cwd
-              apiendpoint="/api/",
-              searchendpoint="/search/",
-              url="http://localhost:8000/",
-              develurl=None,
-              indextype="WHOOSH",
-              indexlocation="data/whooshindex",
-              legacyapi=False):
-    """Starts up a internal webserver and runs the WSGI app (see
-    :py:func:`make_wsgi_app`) using all the specified document
-    repositories. Runs forever (or until interrupted by keyboard).
-
-    :param repos: Object instances for the repositories that should be served
-                  over HTTP
-    :type repos: list
-    :param port: The port to use
-    :type port: int
-    :param documentroot: The root document, used to locate files not directly
-                         handled by any repository
-    :type documentroot: str
-    :param apiendpoint: The part of the URI space handled by the API
-                        functionality
-    :type apiendpoint: str
-    :param searchendpoint: The part of the URI space handled by the search
-                           functionality
-    :type searchendpoint: str
-
-    """
-    getlog().info("Serving wsgi app at http://localhost:%s/" % port)
-    kwargs = {'port': port,
-              'documentroot': documentroot,
-              'apiendpoint': apiendpoint,
-              'searchendpoint': searchendpoint,
-              'indextype': indextype,
-              'indexlocation': indexlocation,
-              'legacyapi': legacyapi,
-              'develurl': develurl,
-              'repos': repos}
-    try:
-        inifile = _find_config_file()
-    except errors.ConfigurationError:
-        inifile = None
-
-    # httpd = make_server('', port, make_wsgi_app(inifile, config, **kwargs))
-    # httpd.serve_forever()
-    run_simple('', port, make_wsgi_app(inifile, config, **kwargs),
-               use_debugger=True, use_reloader=True)
-
 def status(repo, samplesize=3):
     """Prints out some basic status information about this repository."""
     print = builtins.print
@@ -366,39 +315,22 @@ def status(repo, samplesize=3):
         # parsed: None (143 needs parsing)
         # generated: None (143 needs generating)
     
-
-
-def make_wsgi_app(inifile=None, config=None, **kwargs):
+def make_wsgi_app(config, enabled):
     """Creates a callable object that can act as a WSGI application by
     mod_wsgi, gunicorn, the built-in webserver, or any other
     WSGI-compliant webserver.
 
-    :param inifile: The full path to a ``ferenda.ini`` configuration file
-    :type inifile: str
-    :param \*\*kwargs: Configuration values for the wsgi app, overrides those in `inifile`.
+    :param config: Alternatively, a initialized config object
+    :type config: LayeredConfig
+    :param enabled: A alias->class mapping for all enabled datasources
+    :type enabled: dict
     :returns: A WSGI application
     :rtype: callable
 
     """
-    if inifile:
-        assert os.path.exists(
-            inifile), "INI file %s doesn't exist (relative to %s)" % (inifile, os.getcwd())
-        if config is None:
-            config = _load_config(inifile)
-        if not kwargs:
-            kwargs = _setup_runserver_args(config, inifile)
-        # kwargs['inifile'] = inifile
-        # make it possible to specify a different class that implements
-        # the wsgi application
-        classname = getattr(config, "wsgiappclass", "ferenda.WSGIApp")
-    else:
-        classname = "ferenda.WSGIApp"
-    cls = _load_class(classname)
-    # if we have an inifile, we should provide that instead of the
-    # **args we've got from _setup_runserver_args()
-    repos = kwargs['repos']
-    del kwargs['repos']
-    return cls(repos, **kwargs)
+    repos = [_instantiate_class(cls, config) for cls in _classes_from_classname(enabled, 'all')]
+    cls = _load_class(config.wsgiappclass)
+    return cls(repos, config)
 
 
 loglevels = {'DEBUG': logging.DEBUG,
@@ -524,7 +456,7 @@ def run(argv, config=None, subcall=False):
         signal.signal(signal.SIGUSR1, _siginfo_handler)
     
     if not config:
-        config = _load_config(_find_config_file(), argv)
+        config = load_config(find_config_file(), argv)
         alias = getattr(config, 'alias', None)
         action = getattr(config, 'action', None)
     else:
@@ -587,9 +519,29 @@ def run(argv, config=None, subcall=False):
                     log.error(str(e))
                     return None
             elif action == 'runserver':
-                args = _setup_runserver_args(config, _find_config_file())
+                if 'develurl' in config:
+                    url = config.develurl
+                    develurl = config.develurl
+                else:
+                    url = config.url
+                    develurl = None
+                port = urlsplit(url).port or 80
                 # Note: the actual runserver method never returns
-                return runserver(**args)
+                app = make_wsgi_app(config, enabled)
+                getlog().info("Serving wsgi app at http://localhost:%s/" % port)
+                # Maybe make use_debugger and use_reloader
+                # configurable. But when using ./ferenda-build all
+                # runserver, don't you always want a debugger and a
+                # reloader?
+
+                # FIXME: If we set use_reloader=True, werkzeug starts
+                # a new subprocess with the same args, making us run
+                # the expensive setup process twice. Is that
+                # unavoidable (maybe the first process determines
+                # which files to monitor and the second process
+                # actually runs them (and is reloaded by the parent
+                # process whenever a file is changed?
+                run_simple('', port, app, use_debugger=True, use_reloader=True)
             elif action == 'buildclient':
                 args = _setup_buildclient_args(config)
                 return runbuildclient(**args)
@@ -726,7 +678,7 @@ def enable(classname):
     # throws error if unsuccessful
 
     cfg = configparser.ConfigParser()
-    configfilename = _find_config_file(create=True)
+    configfilename = find_config_file(create=True)
     cfg.read([configfilename])
     alias = cls.alias
     if False:
@@ -858,7 +810,7 @@ def setup(argv=None, force=False, verbose=False, unattended=False):
 
 config_loaded = False
 
-def _load_config(filename=None, argv=None, defaults=None):
+def load_config(filename=None, argv=None, defaults=None):
     """Loads general configuration information from ``filename`` (which
        should be a full path to a ferenda.ini file) and/or command
        line arguments into a :py:class:`~layeredconfig.LayeredConfig`
@@ -876,6 +828,7 @@ def _load_config(filename=None, argv=None, defaults=None):
         # pertains to global configuration, not docrepo configuration
         # (those have the get_default_options() classmethod).
         defaults = copy.deepcopy(DEFAULT_CONFIG)
+        
         for alias, classname in _enabled_classes(inifile=filename).items():
             assert alias not in defaults, "Collision on key %s" % alias
             defaults[alias] = _load_class(classname).get_default_options()
@@ -1744,7 +1697,7 @@ def _instantiate_class(cls, config=None, argv=[]):
         defaults = dict(clsdefaults)
         defaults[cls.alias] = {}
         config = LayeredConfig(Defaults(defaults),
-                               INIFile(_find_config_file()),
+                               INIFile(find_config_file()),
                                Commandline(argv),
                                cascade=True)
     clsconfig = getattr(config, cls.alias)
@@ -1787,7 +1740,7 @@ def _enabled_classes(inifile=None):
 
     :param inifile: The full path to a ferenda.ini file. If None, attempts
                     to find ini file using
-                    :py:func:`ferenda.Manager._find_config_file`
+                    :py:func:`ferenda.Manager.find_config_file`
     :type inifile: str
     :returns: A mapping between alias and classname for all registered classes.
     :rtype: dict
@@ -1796,7 +1749,7 @@ def _enabled_classes(inifile=None):
 
     cfg = configparser.ConfigParser()
     if not inifile:
-        inifile = _find_config_file()
+        inifile = find_config_file()
 
     cfg.read([inifile])
     enabled = OrderedDict()
@@ -1933,7 +1886,7 @@ def _load_class(classname):
     raise ImportError("No class named '%s'" % classname)
 
 
-def _find_config_file(path=None, create=False):
+def find_config_file(path=None, create=False):
     """
     :returns: the full path to the configuration ini file
     """
@@ -1944,57 +1897,6 @@ def _find_config_file(path=None, create=False):
         raise errors.ConfigurationError(
             "Config file %s not found (relative to %s)" % (inipath, os.getcwd()))
     return inipath
-
-
-def _setup_runserver_args(config, inifilename):
-    """Given a config object, returns a dict with some of those
-       configuration options, but suitable as arguments for
-       :py:func:`ferenda.Manager.runserver`.
-
-    :param config: An initialized config object with data from a ferenda.ini
-                   file
-    :type config: layeredconfig.LayeredConfig
-    :returns: A subset of the same configuration options
-    :rtype: dict
-
-    """
-    
-    if 'develurl' in config:
-        url = config.develurl
-        develurl = config.develurl
-    else:
-        url = config.url
-        develurl = None
-        
-    port = urlsplit(url).port or 80
-    relativeroot = os.path.join(os.path.dirname(inifilename), config.datadir)
-
-    # create an instance of every enabled repo
-    enabled = _enabled_classes(inifilename)
-    repoclasses = _classes_from_classname(enabled, 'all')
-    repos = []
-    for cls in repoclasses:
-        instconfig = getattr(config, cls.alias)
-        config_as_dict = dict(
-            [(k, getattr(instconfig, k)) for k in instconfig])
-        inst = cls(**config_as_dict)
-        inst.config._parent = config
-        repos.append(inst)
-
-    # for repo in repos:
-    #    print("Repo %r %s: config.datadir is %s" % (repo, id(repo), repo.config.datadir))
-    return {'config':         config,
-            'port':           port,
-            'documentroot':   relativeroot,
-            'apiendpoint':    config.apiendpoint,
-            'searchendpoint': config.searchendpoint,
-            'url':            config.url,
-            'develurl':       develurl,
-            'indextype':      config.indextype,
-            'indexlocation':  config.indexlocation,
-            'legacyapi':      config.legacyapi,
-            'repos':          repos}
-
 
 def _setup_frontpage_args(config, argv):
     # FIXME: This way of instantiating repo classes should maybe be
@@ -2008,7 +1910,6 @@ def _setup_frontpage_args(config, argv):
     repoclasses = _classes_from_classname(enabled, classname="all")
     repos = []
     for cls in repoclasses:
-        # inst = _instantiate_class(cls, _find_config_file(), argv)
         inst = _instantiate_class(cls, config, argv)
         repos.append(inst)
     if 'develurl' in config:

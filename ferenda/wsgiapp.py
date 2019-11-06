@@ -57,16 +57,10 @@ class WSGIApp(object):
     #
     # SETUP
     # 
-    def __init__(self, repos, inifile=None, config=None, **kwargs):
-        assert inifile is None, "I don't think you should specify an inifile, rather pass config values as kwargs"
+    def __init__(self, repos, config):
         self.repos = repos
+        self.config = config
         self.log = logging.getLogger("wsgi")
-        if 'config' in kwargs:
-            self.config = kwargs['config']
-        else:
-            self.config = LayeredConfig(Defaults(DocumentRepository.get_default_options()),
-                                        Defaults(kwargs),
-                                        cascase=True)
         # at this point, we should build our routing map
         rules = [
             Rule(self.config.apiendpoint, endpoint="api"),
@@ -74,7 +68,6 @@ class WSGIApp(object):
         ]
         if self.config.legacyapi:
             rules.append(Rule("/-/publ", endpoint="api"))
-        import pudb; pu.db
         for repo in self.repos:
             # a typical repo might provide two rules:
             # * Rule("/doc/<repo>/<basefile>", endpoint=repo.alias + ".doc")
@@ -82,16 +75,8 @@ class WSGIApp(object):
             # 
             # although werkzeug.routing.RuleTemplate seems like it could do that generically?
             rules.extend(repo.requesthandler.rules)
-
             # at this point, we could maybe write a apache:mod_rewrite
             # or nginx compatible config based on our rules?
-
-        # at this point, we should make sure that anything not matched
-        # by the above rules (eg static files like robots.txt and
-        # rsrc/css/ferenda.css) are handled as efficiently as possible
-        # (and with correct mimetype). Possibly this should happen by
-        # wrapping the entire app within SharedDataMiddleware
-            
         self.routingmap = Map(rules)
         base = self.config.datadir
         exports = {
