@@ -22,6 +22,7 @@ layeredconfig
 responses
 langdetect
 grako
+werkzeug
 # importlib
 # the following modules might be needed for older python versions
 # mock

@@ -18,6 +18,8 @@ from lxml import etree
 from rdflib import Graph
 from ferenda.thirdparty import httpheader
 from cached_property import cached_property
+from werkzeug.routing import Rule
+
 
 from ferenda import util
 from ferenda.errors import RequestHandlerError
@@ -89,7 +91,41 @@ class RequestHandler(object):
 
     @cached_property
     def rules(self):
-        return []
+        return [Rule('/doc/'+self.repo.alias+'/', endpoint=self.handle_doc),
+                Rule('/dataset/'+self.repo.alias, endpoint=self.handle_dataset)]
+
+    def handle_doc(self, request, **values):
+        # request.url is the reconstructed URL used in the request,
+        # request.base_url is the same without any query string
+        basefile = self.repo.basefile_from_uri(request.base_url)
+        if not basefile:
+            raise RequestHandlerError("%s couldn't resolve %s to a basefile" %
+                                      (self.repo.alias, request.base_uri))
+        params = self.params_from_uri(request.url)
+        if 'format' in params:
+            suffix = params['format']
+        else:
+            if 'attachment' in params:
+                leaf = params['attachment']
+            else:
+                leaf = uri.split("/")[-1]
+            if "." in leaf:
+                suffix = leaf.rsplit(".", 1)[1]
+        contenttype = self.contenttype(request.headers, request.url, basefile, params, suffix)
+        path, data = self.lookup_resource(request.headers, basefile, params, contenttype, suffix)
+        return self.prep_request(request.headers, path, data, contenttype)
+
+    def handle_dataset(self, request, **values):
+        tmpuri = request.base_url
+        # remove trailing suffix (the ".nt" in "example.org/dataset/base.nt")
+        if "." in request.url.split("/")[-1]:
+            tmpuri = tmpuri.rsplit(".", 1)[0]
+        if request.query_string:
+            tmpuri += "?" + request.query_string
+        params = self.dataset_params_from_uri(tmpuri)
+        contenttype = self.contenttype(environ, uri, basefile, params, suffix)
+        path, data = self.lookup_dataset(environ, params, contenttype, suffix)
+        return self.prep_request
 
     def supports(self, environ):
         """Returns True iff this particular handler supports this particular request."""
@@ -365,7 +401,7 @@ class RequestHandler(object):
             # no static file exists, we need to call code to produce data
             if basefile.endswith("/data"):
                 extended = True
-                basefile = basefile[:-5]
+                basefile = basefile[:-5] 
             if contenttype in self._rdfformats or suffix in self._rdfsuffixes:
                 g = Graph()
                 g.parse(self.repo.store.distilled_path(basefile))

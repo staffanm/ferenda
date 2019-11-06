@@ -43,6 +43,6 @@ urllib3==1.25.6           # via requests
 webencodings==0.5.1       # via bleach, html5lib
 wheel==0.33.6
 whoosh==2.7.4
-
+werkzeug==0.16.0
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools==41.5.1        # via twine

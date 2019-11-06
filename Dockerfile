@@ -52,7 +52,7 @@ COPY requirements.txt .
 RUN python3.7 -m venv .virtualenv && \
     ./.virtualenv/bin/pip install -r requirements.txt
 
-EXPOSE 80 3330 9001 9200 
+EXPOSE 80 8000 3330 9001 9200 
 COPY docker /tmp/docker
 RUN mv /tmp/docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf && \
     mv /tmp/docker/nginx.conf /etc/nginx/sites-enabled/default && \

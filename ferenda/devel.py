@@ -75,18 +75,37 @@ class WSGIOutputHandler(logging.Handler):
 
 class DevelHandler(RequestHandler):
 
+    @cached_property
+    def rules(self):
+        return [Rule('/devel/',      self.handle_dashboard),
+                Rule('/devel/build', self.handle_build),
+                Rule('/devel/logs',  self.handle_logs)]
+
     def supports(self, environ):
         return environ['PATH_INFO'].startswith("/devel/")
 
     def handle(self, environ):
+        if hasattr(self.repo.config, 'username') and hasattr(self.repo.config, 'password'):
+            if 'HTTP_AUTHORIZATION' not in environ:
+                # login needed
+                return '', 0, 403, "text/plain"
+            else:
+                header = environ['HTTP_AUTHORIZATION'].replace("Basic ", "", 1) 
+                username, password = base64.b64decode(header).decode("utf-8").split(":", 1)
+                if (username != self.repo.config.username or
+                    password != self.repo.config.password):
+                    # login needed
+                    return '', 0, 403, "text/plain"
+
         segments = [x for x in environ['PATH_INFO'].split("/") if x]
         if environ['REQUEST_METHOD'] == 'POST':
             reqbody = environ['wsgi.input'].read(int(environ.get('CONTENT_LENGTH', 0)))
             params = dict(parse_qsl(reqbody.decode("utf-8")))
         else:
             params = dict(parse_qsl(environ['QUERY_STRING']))
-
-        handler = {'patch': self.handle_patch,
+        
+        handler = {'': self.handle_dashboard,
+                   'patch': self.handle_patch,
                    'logs': self.handle_logs,
                    'change-parse-options': self.handle_change_parse_options,
                    'build': self.handle_build,
@@ -157,6 +176,20 @@ class DevelHandler(RequestHandler):
             if isinstance(h, WSGIOutputHandler):
                 h.close()
                 rootlogger.removeHandler(h)
+
+    def handle_dashboard(self, environ, params):
+        if params:
+            # do something smart with the manager api to eg enable modules
+            pass
+        else:
+            # 1 create links to other devel tools (build, mkpatch, logs)
+            # 2 create a list of available repos that we can enable
+            # 3 list currently enabled repos and
+            #   3.1 their current status (downloaded, parsed, generated documents etc)
+            #   3.2 list available build actions for them
+            # Also, user-friendly descriptions for the first few steps that you can take
+            pass
+        
 
     def handle_build(self, environ, params):
         if params:

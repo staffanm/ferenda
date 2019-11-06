@@ -320,7 +320,7 @@ def runserver(repos,
 
     # httpd = make_server('', port, make_wsgi_app(inifile, config, **kwargs))
     # httpd.serve_forever()
-    run_simple('127.0.0.1', port, make_wsgi_app(inifile, config, **kwargs),
+    run_simple('', port, make_wsgi_app(inifile, config, **kwargs),
                use_debugger=True, use_reloader=True)
 
 def status(repo, samplesize=3):
