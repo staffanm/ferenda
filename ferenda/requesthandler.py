@@ -16,10 +16,11 @@ from copy import deepcopy
 
 from lxml import etree
 from rdflib import Graph
-from ferenda.thirdparty import httpheader
 from cached_property import cached_property
 from werkzeug.routing import Rule
-
+from werkzeug.datastructures import Headers
+from werkzeug.wrappers import Response
+from werkzeug.wsgi import wrap_file
 
 from ferenda import util
 from ferenda.errors import RequestHandlerError
@@ -91,16 +92,19 @@ class RequestHandler(object):
 
     @cached_property
     def rules(self):
-        return [Rule('/doc/'+self.repo.alias+'/', endpoint=self.handle_doc),
+        return [Rule('/doc/'+self.repo.alias+'/<basefile>', endpoint=self.handle_doc),
                 Rule('/dataset/'+self.repo.alias, endpoint=self.handle_dataset)]
 
     def handle_doc(self, request, **values):
         # request.url is the reconstructed URL used in the request,
         # request.base_url is the same without any query string
-        basefile = self.repo.basefile_from_uri(request.base_url)
+        if 'basefile' in values:
+            basefile = values['basefile']
+        else:
+            basefile = self.repo.basefile_from_uri(request.base_url)
         if not basefile:
             raise RequestHandlerError("%s couldn't resolve %s to a basefile" %
-                                      (self.repo.alias, request.base_uri))
+                                      (self.repo.alias, request.base_url))
         params = self.params_from_uri(request.url)
         if 'format' in params:
             suffix = params['format']
@@ -108,12 +112,14 @@ class RequestHandler(object):
             if 'attachment' in params:
                 leaf = params['attachment']
             else:
-                leaf = uri.split("/")[-1]
+                leaf = request.base_url.split("/")[-1]
             if "." in leaf:
                 suffix = leaf.rsplit(".", 1)[1]
-        contenttype = self.contenttype(request.headers, request.url, basefile, params, suffix)
+            else:
+                suffix = None
+        contenttype = self.contenttype(request, suffix)
         path, data = self.lookup_resource(request.headers, basefile, params, contenttype, suffix)
-        return self.prep_request(request.headers, path, data, contenttype)
+        return self.prep_response(request.headers, path, data, contenttype)
 
     def handle_dataset(self, request, **values):
         tmpuri = request.base_url
@@ -125,7 +131,7 @@ class RequestHandler(object):
         params = self.dataset_params_from_uri(tmpuri)
         contenttype = self.contenttype(environ, uri, basefile, params, suffix)
         path, data = self.lookup_dataset(environ, params, contenttype, suffix)
-        return self.prep_request
+        return self.prep_response(request.headers, path, data, contenttype)
 
     def supports(self, environ):
         """Returns True iff this particular handler supports this particular request."""
@@ -248,29 +254,18 @@ class RequestHandler(object):
                 leaf = uri.split("/")[-1]
             if "." in leaf:
                 suffix = leaf.rsplit(".", 1)[1]
-        contenttype = self.contenttype(environ, uri, basefile, params, suffix)
+        contenttype = self.contenttype(request, suffix)
         if segments[1] == "dataset":
             path, data = self.lookup_dataset(environ, params, contenttype, suffix)
         else:
             path, data = self.lookup_resource(environ, basefile, params,
                                               contenttype, suffix)
-        return self.prep_request(environ, path, data, contenttype)
+        return self.prep_response(environ, path, data, contenttype)
         
 
-    def contenttype(self, environ, uri, basefile, params, suffix):
-        accept = environ.get('HTTP_ACCEPT')
-        preferred = None
-        if accept:
-            # do proper content-negotiation, but make sure
-            # application/xhtml+xml ISN'T one of the available options (as
-            # modern browsers may prefer it to text/html, and our
-            # application/xhtml+xml isn't what they want) -- ie we only
-            # serve application/xhtml+xml if a client specifically only
-            # asks for that. Yep, that's a big FIXME.
-            available = ("text/html")  # add to this?
-            preferred = httpheader.acceptable_content_type(accept,
-                                                           available,
-                                                           ignore_wildcard=False)
+    def contenttype(self, request, suffix):
+        preferred = request.accept_mimetypes.best_match(["text/html"])
+        accept = request.headers.get("Accept")
         contenttype = None
         if accept != "text/html" and accept in self._mimemap:
             contenttype = accept
@@ -283,11 +278,8 @@ class RequestHandler(object):
         elif suffix and "."+suffix in mimetypes.types_map:
             contenttype = mimetypes.types_map["."+suffix]
         else:
-            if ((not suffix) and
-                    preferred and
-                    preferred[0].media_type == "text/html"):
-                contenttype = preferred[0].media_type
-                # pathfunc = repo.store.generated_path
+            if (not suffix and preferred == "text/html"):
+                contenttype = preferred
         return contenttype
 
     def get_pathfunc(self, environ, basefile, params, contenttype, suffix):
@@ -498,7 +490,7 @@ class RequestHandler(object):
         return path, data
 
 
-    def prep_request(self, environ, path, data, contenttype):
+    def prep_response(self, request, path, data, contenttype):
         if path and os.path.exists(path):
             status = 200
             # FIXME: These are not terribly well designed flow control
@@ -507,21 +499,15 @@ class RequestHandler(object):
                 status = 500
             elif path.endswith(".404"):
                 status = 404
-            fp = open(path, 'rb')
-            return (fp,
-                    os.path.getsize(path),
-                    status,
-                    contenttype)
+            fp = wrap_file(request.environ, open(path, 'rb'))
+            headers = Headers({"Content-length": os.path.getsize(path)})
         elif data:
-            return (BytesIO(data),
-                    len(data),
-                    200,
-                    contenttype)
+            fp = wrap_file(request.environ, BytesIO(data))
+            status = 200
+            headers = Headers({"Content-length": len(data)})
         else:
-            msg = "<h1>406</h1>No acceptable media found for <tt>%s</tt>" % environ.get('HTTP_ACCEPT', 'text/html')
-            return(BytesIO(msg.encode('utf-8')),
-                   len(msg.encode('utf-8')),
-                   406,
-                   "text/html")
-
-
+            msg = "<h1>406</h1>No acceptable media found of type(s) <tt>%s</tt>" % request.headers.get("Accept")
+            fp = wrap_file(request.environ, BytesIO(msg.encode('utf-8')))
+            status = 406
+            headers = Headers({"Content-length": len(msg.encode('utf-8'))})
+        return Response(fp, status, headers, content_type=contenttype, direct_passthrough=True)
