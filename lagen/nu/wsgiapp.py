@@ -13,6 +13,7 @@ from datetime import datetime
 # 3rdparty
 from rdflib import URIRef, Graph
 from rdflib.namespace import SKOS, FOAF, DCTERMS, RDF, RDFS
+from werkzeug.wrappers import Response
 
 # own
 from ferenda import WSGIApp as OrigWSGIApp
@@ -214,7 +215,12 @@ class WSGIApp(OrigWSGIApp):
     def handle_search(self, request, **values):
         """WSGI method, called by the wsgi app for requests that matches
            ``searchendpoint``."""
-        queryparams = dict(request.args)
+        # NOTE: creating a copy of request.args directlry produces a
+        # dict where each value is a list of strings (because that's
+        # allowed in querystrings) instead of a single string. Using
+        # .items() conflates any duplicate keys (of which there should
+        # be none)
+        queryparams = dict(request.args.items())
         # massage queryparams['issued'] if present, then restore it
         y = None
         if 'issued' in queryparams:
@@ -234,7 +240,7 @@ class WSGIApp(OrigWSGIApp):
 
         body = html.Body()
         if hasattr(res, 'aggregations'):
-            body.append(self._search_render_facets(res.aggregations, queryparams, environ))
+            body.append(self._search_render_facets(res.aggregations, queryparams, request.environ))
         for r in res:
             if 'label' not in r:
                 label = r['uri']
@@ -254,14 +260,14 @@ class WSGIApp(OrigWSGIApp):
                 for innerhit in r['innerhits']:
                     rendered_hit.append(self._search_render_innerhit(innerhit))
             body.append(rendered_hit)
-        pagerelem = self._search_render_pager(pager, queryparams,
-                                              environ['PATH_INFO'])
+        pagerelem = self._search_render_pager(pager, queryparams, request.path)
         body.append(html.Div([
             html.P(["Träff %(firstresult)s-%(lastresult)s "
                     "av %(totalresults)s" % pager]), pagerelem],
                                  **{'class':'pager'}))
-        data = self._transform(title, body, environ, template="xsl/search.xsl")
-        return self._return_response(data, start_response)
+        data = self._transform(title, body, request.environ, template="xsl/search.xsl")
+        return Response(data, mimetype="text/html")
+
 
     def _search_render_innerhit(self, innerhit):
         r = innerhit

@@ -179,7 +179,6 @@ class WSGIApp(object):
 
     def handle_search(self, request, **values):
         # return Response("<h1>Hello search: " + request.args.get("q") +" </h1>", mimetype="text/html")
-
         res, pager = self._search_run_query(request.args)
         
         if pager['totalresults'] == 1:
