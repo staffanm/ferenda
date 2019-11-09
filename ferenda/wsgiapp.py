@@ -29,6 +29,7 @@ from werkzeug.routing import Map, Rule
 from werkzeug.exceptions import HTTPException, NotFound
 from werkzeug.middleware.shared_data import SharedDataMiddleware
 from werkzeug.utils import redirect
+from werkzeug.wsgi import wrap_file
 
 from ferenda import (DocumentRepository, FulltextIndex, Transformer,
                      Facet, ResourceLoader)
@@ -63,6 +64,7 @@ class WSGIApp(object):
         self.log = logging.getLogger("wsgi")
         # at this point, we should build our routing map
         rules = [
+            Rule("/", endpoint="frontpage"),
             Rule(self.config.apiendpoint, endpoint="api"),
             Rule(self.config.searchendpoint, endpoint="search")
         ]
@@ -162,15 +164,126 @@ class WSGIApp(object):
     # ENDPOINTS
     # 
 
+    def handle_frontpage(self, request, **values):
+        # this handler would be unnecessary if we could make
+        # SharedDataMiddleware handle it, but it seems like its lists
+        # of exports is always just the prefix of a path, not the
+        # entire path, so we can't just say that "/" should be handled
+        # by it.
+        fp = open(os.path.join(self.config.datadir, "index.html"))
+        return Response(wrap_file(request.environ, fp), mimetype="text/html")
 
     def handle_search(self, request, **values):
-        return Response("<h1>Hello search: " + request.args.get("q") +" </h1>", mimetype="text/html")
+        # return Response("<h1>Hello search: " + request.args.get("q") +" </h1>", mimetype="text/html")
+
+        res, pager = self._search_run_query(request.args)
+        
+        if pager['totalresults'] == 1:
+            title = "1 match"
+        else:
+            title = "%s matches" % pager['totalresults']
+        title += " for '%s'" % request.args.get("q")
+        
+        body = html.Body()
+        for r in res:
+            if not 'dcterms_title' in r or r['dcterms_title'] is None:
+                r['dcterms_title'] = r['uri']
+            if r.get('dcterms_identifier', False):
+                r['dcterms_title'] = r['dcterms_identifier'] + ": " + r['dcterms_title']
+            body.append(html.Div(
+                [html.H2([elements.Link(r['dcterms_title'], uri=r['uri'])]),
+                 r.get('text', '')], **{'class': 'hit'}))
+        pagerelem = self._search_render_pager(pager, dict(request.args), request.path)
+        body.append(html.Div([
+            html.P(["Results %(firstresult)s-%(lastresult)s "
+                    "of %(totalresults)s" % pager]), pagerelem],
+                                 **{'class':'pager'}))
+        data = self._transform(title, body, request.environ, template="xsl/search.xsl")
+        return Response(data, mimetype="text/html")
+
+
+    def _search_run_query(self, queryparams, boost_types=None):
+        idx = FulltextIndex.connect(self.config.indextype,
+                                    self.config.indexlocation,
+                                    self.repos)
+        query = queryparams.get('q')
+        if isinstance(query, bytes):  # happens on py26
+            query = query.decode("utf-8")  # pragma: no cover
+#        query += "*"  # we use a simple_query_string query by default,
+#                      # and we probably want to do a prefix query (eg
+#                      # "personuppgiftslag" should match a label field
+#                      # containing "personuppgiftslag (1998:204)",
+#                      # therefore the "*"
+#
+#        # maybe not, though -- seems to conflict with
+#        # stemming/indexing, ie "bulvanutredningen*" doesn't match the
+#        # indexed "bulvanutredningen" (which has been stemmed to
+#        # "bulvanutredning"
+        pagenum = int(queryparams.get('p', '1'))
+        qpcopy = dict(queryparams)
+        for x in ('q', 'p'):
+            if x in qpcopy:
+                del qpcopy[x]
+        res, pager = idx.query(query, pagenum=pagenum, boost_types=boost_types, **qpcopy)
+        return res, pager
+
+    def _search_render_pager(self, pager, queryparams, path_info):
+        # Create some HTML code for the pagination. FIXME: This should
+        # really be in search.xsl instead
+        pages = []
+        pagenum = pager['pagenum']
+        startpage = max([0, pager['pagenum'] - 4])
+        endpage = min([pager['pagecount'], pager['pagenum'] + 3])
+        if startpage > 0:
+            queryparams['p'] = str(pagenum - 2)
+            url = path_info + "?" + urlencode(queryparams)
+            pages.append(html.LI([html.A(["«"], href=url)]))
+
+        for pagenum in range(startpage, endpage):
+            queryparams['p'] = str(pagenum + 1)
+            url = path_info + "?" + urlencode(queryparams)
+            attrs = {}
+            if pagenum + 1 == pager['pagenum']:
+                attrs['class'] = 'active'
+            pages.append(html.LI([html.A([str(pagenum + 1)], href=url)],
+                                 **attrs))
+
+        if endpage < pager['pagecount']:
+            queryparams['p'] = str(pagenum + 2)
+            url = path_info + "?" + urlencode(queryparams)
+            pages.append(html.LI([html.A(["»"], href=url)]))
+
+        return html.UL(pages, **{'class': 'pagination'})
+
+    def _transform(self, title, body, environ, template="xsl/error.xsl"):
+        fakerepo = self.repos[0]
+        doc = fakerepo.make_document()
+        doc.uri = request_uri(environ)
+        doc.meta.add((URIRef(doc.uri),
+                      DCTERMS.title,
+                      Literal(title, lang="sv")))
+        doc.body = body
+        xhtml = fakerepo.render_xhtml_tree(doc)
+        conffile = os.sep.join([self.config.datadir, 'rsrc',
+                                'resources.xml'])
+        transformer = Transformer('XSLT', template, "xsl",
+                                  resourceloader=fakerepo.resourceloader,
+                                  config=conffile)
+        urltransform = None
+        if 'develurl' in self.config:
+            urltransform = fakerepo.get_url_transform_func(
+                develurl=self.config.develurl)
+        depth = len(doc.uri.split("/")) - 3
+        tree = transformer.transform(xhtml, depth,
+                                     uritransform=urltransform)
+        return etree.tostring(tree, encoding="utf-8")
+
 
     def handle_api(self, request, **values):
         return Reponse("Hello API")
 
 
-    #
+
     # STREAMING
     # 
         

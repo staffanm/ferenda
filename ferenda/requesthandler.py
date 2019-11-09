@@ -119,7 +119,7 @@ class RequestHandler(object):
                 suffix = None
         contenttype = self.contenttype(request, suffix)
         path, data = self.lookup_resource(request.headers, basefile, params, contenttype, suffix)
-        return self.prep_response(request.headers, path, data, contenttype)
+        return self.prep_response(request, path, data, contenttype)
 
     def handle_dataset(self, request, **values):
         tmpuri = request.base_url
@@ -131,7 +131,7 @@ class RequestHandler(object):
         params = self.dataset_params_from_uri(tmpuri)
         contenttype = self.contenttype(environ, uri, basefile, params, suffix)
         path, data = self.lookup_dataset(environ, params, contenttype, suffix)
-        return self.prep_response(request.headers, path, data, contenttype)
+        return self.prep_response(request, path, data, contenttype)
 
     def supports(self, environ):
         """Returns True iff this particular handler supports this particular request."""
@@ -260,7 +260,7 @@ class RequestHandler(object):
         else:
             path, data = self.lookup_resource(environ, basefile, params,
                                               contenttype, suffix)
-        return self.prep_response(environ, path, data, contenttype)
+        return self.prep_response(request, path, data, contenttype)
         
 
     def contenttype(self, request, suffix):
