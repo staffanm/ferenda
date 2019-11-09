@@ -108,7 +108,8 @@ DEFAULT_CONFIG = {'loglevel': 'DEBUG',
                   #'removeinvalidlinks': True,
                   'serverport': 5555,
                   'authkey': b'secret',
-                  'profile': False}
+                  'profile': False,
+                  'wsgiexceptionhandler': True}
 
 class MarshallingHandler(logging.Handler):
     def __init__(self, records):
@@ -527,7 +528,6 @@ def run(argv, config=None, subcall=False):
                     url = config.url
                     develurl = None
                 port = urlsplit(url).port or 80
-                # Note: the actual runserver method never returns
                 app = make_wsgi_app(config, enabled)
                 getlog().info("Serving wsgi app at http://localhost:%s/" % port)
                 # Maybe make use_debugger and use_reloader
@@ -535,14 +535,16 @@ def run(argv, config=None, subcall=False):
                 # runserver, don't you always want a debugger and a
                 # reloader?
 
-                # FIXME: If we set use_reloader=True, werkzeug starts
+                # NOTE: If we set use_reloader=True, werkzeug starts
                 # a new subprocess with the same args, making us run
                 # the expensive setup process twice. Is that
                 # unavoidable (maybe the first process determines
                 # which files to monitor and the second process
                 # actually runs them (and is reloaded by the parent
                 # process whenever a file is changed?
-                run_simple('', port, app, use_debugger=True, use_reloader=True)
+
+                # Note: the actual run_simple method never returns
+                run_simple('', port, app, use_debugger=True, use_reloader=False)
             elif action == 'buildclient':
                 args = _setup_buildclient_args(config)
                 return runbuildclient(**args)

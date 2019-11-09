@@ -211,10 +211,10 @@ class WSGIApp(OrigWSGIApp):
             del hit['iri']
         return hit
 
-    def search(self, environ, start_response):
+    def handle_search(self, request, **values):
         """WSGI method, called by the wsgi app for requests that matches
            ``searchendpoint``."""
-        queryparams = self._search_parse_query(environ['QUERY_STRING'])
+        queryparams = dict(request.args)
         # massage queryparams['issued'] if present, then restore it
         y = None
         if 'issued' in queryparams:

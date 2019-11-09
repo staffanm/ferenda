@@ -96,8 +96,14 @@ class WSGIApp(object):
         self.wsgi_app = SharedDataMiddleware(self.wsgi_app, exports)
 
     def __call__(self, environ, start_response):
-        return self.wsgi_app(environ, start_response)
-
+        try:
+            return self.wsgi_app(environ, start_response)
+        except Exception as e:
+            if self.config.wsgiexceptionhandler:
+                return self.handle_exception(environ, start_response)
+            else:
+                raise e
+            
     #
     # REQUEST ENTRY POINT
     # 
@@ -147,17 +153,15 @@ class WSGIApp(object):
             # add explicit charset if not provided by caller (it isn't by default)
             contenttype = "text/html; charset=utf-8"
         # logging.getLogger("wsgi").info("Calling start_response")
-        start_response(self._str(status), [
-            (self._str("X-WSGI-app"), self._str("ferenda")),
-            (self._str("Content-Type"), self._str(contenttype)),
-            (self._str("Content-Length"), self._str("%s" % length)),
+        start_response(status, [
+            ("X-WSGI-app", "ferenda"),
+            ("Content-Type", contenttype),
+            ("Content-Length", "%s" % length),
         ])
         
         if isinstance(data, Iterable) and not isinstance(data, bytes):
-            # logging.getLogger("wsgi").info("returning data as-is")
             return data
         else:
-            # logging.getLogger("wsgi").info("returning data as-iterable")
             return iter([data])
 
     #
@@ -282,6 +286,35 @@ class WSGIApp(object):
     def handle_api(self, request, **values):
         return Reponse("Hello API")
 
+
+    exception_heading = "Something is broken"
+    exception_description = "Something went wrong when showing the page. Below is some troubleshooting information intended for the webmaster."
+    def handle_exception(self, environ, start_response):
+        import traceback
+        from pprint import pformat
+        exc_type, exc_value, tb = sys.exc_info()
+        tblines = traceback.format_exception(exc_type, exc_value, tb)
+        tbstr = "\n".join(tblines)
+        # render the error
+        title = tblines[-1]
+        body = html.Body([
+            html.Div([html.H1(self.exception_heading),
+                      html.P([self.exception_description]),
+                      html.H2("Traceback"),
+                      html.Pre([tbstr]),
+                      html.H2("Variables"),
+                      html.Pre(["request_uri: %s\nos.getcwd(): %s" % (request_uri(environ), os.getcwd())]),
+                      html.H2("environ"),
+                      html.Pre([pformat(environ)]),
+                      html.H2("sys.path"),
+                      html.Pre([pformat(sys.path)]),
+                      html.H2("os.environ"),
+                      html.Pre([pformat(dict(os.environ))])
+        ])])
+        msg = self._transform(title, body, environ)
+        return self.return_response(msg, start_response,
+                                    status="500 Internal Server Error",
+                                    contenttype="text/html")
 
 
     # STREAMING
