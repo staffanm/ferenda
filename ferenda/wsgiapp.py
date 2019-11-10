@@ -80,6 +80,9 @@ class WSGIApp(object):
             # at this point, we could maybe write a apache:mod_rewrite
             # or nginx compatible config based on our rules?
         self.routingmap = Map(rules)
+        print("Routingmap:")
+        from pprint import pprint
+        pprint(rules)
         base = self.config.datadir
         exports = {
             '/index.html': os.path.join(base, 'index.html'),

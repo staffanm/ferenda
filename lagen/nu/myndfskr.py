@@ -12,10 +12,11 @@ from urllib.parse import unquote
 from wsgiref.util import request_uri
 from itertools import chain
 
-
 from rdflib import RDF, URIRef
 from rdflib.namespace import DCTERMS, SKOS
 from ferenda.sources.legal.se import RPUBL
+from cached_property import cached_property
+from werkzeug.routing import Rule
 
 from ferenda.sources.legal.se import myndfskr
 from ferenda import (CompositeRepository, CompositeStore, Facet, TocPageset,
@@ -32,6 +33,17 @@ class MyndFskrStore(CompositeStore, SwedishLegalStore):
     pass
 
 class MyndFskrHandler(RequestHandler):
+    @cached_property
+    def rules(self):
+        rules = []
+        for cls in self.repo.subrepos:
+            inst = self.repo.get_instance(cls)
+            for fs in inst.forfattningssamlingar():
+                rules.append(Rule('/%s/<basefile>' % fs, endpoint=self.handle_doc))
+        rules.append(Rule('/dataset/'+self.repo.alias, endpoint=self.handle_dataset))
+        return rules
+                             
+
     def supports(self, environ):
         # resources are at /dvfs/2013:1
         # datasets are at /dataset/myndfs?difs=2013

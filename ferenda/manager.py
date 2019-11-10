@@ -89,8 +89,8 @@ DEFAULT_CONFIG = {'loglevel': 'DEBUG',
                   #'lastdownload': datetime,
                   'combineresources': False,
                   'staticsite': False,
-                  #'all': False,
-                  #'allversions': False,
+                  'all': False,
+                  'allversions': False,
                   'relate': True,
                   'download': True,
                   'tabs': True,
@@ -544,7 +544,7 @@ def run(argv, config=None, subcall=False):
                 # process whenever a file is changed?
 
                 # Note: the actual run_simple method never returns
-                run_simple('', port, app, use_debugger=True, use_reloader=False)
+                run_simple('', port, app, use_debugger=True, use_reloader=True)
             elif action == 'buildclient':
                 args = _setup_buildclient_args(config)
                 return runbuildclient(**args)

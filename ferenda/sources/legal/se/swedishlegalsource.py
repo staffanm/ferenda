@@ -12,6 +12,7 @@ from functools import partial, wraps
 from io import BytesIO, StringIO, BufferedIOBase
 from urllib.parse import quote, unquote
 from wsgiref.util import request_uri
+from cached_property import cached_property
 import ast
 import codecs
 import collections
@@ -36,6 +37,7 @@ import six
 import bs4
 from cached_property import cached_property
 from lxml import etree
+from werkzeug.routing import Rule
 
 # own
 from ferenda import (DocumentRepository, DocumentStore, FSMParser,
@@ -107,6 +109,13 @@ def lazyread(f):
     return wrapper
     
 class SwedishLegalHandler(RequestHandler):
+
+    @cached_property
+    def rules(self):
+        return [Rule('/'+self.repo.urispace_segment+'/<basefile>', endpoint=self.handle_doc),
+                Rule('/dataset/'+self.repo.alias, endpoint=self.handle_dataset)]
+        
+        
     def supports(self, environ):
         pathinfo = environ['PATH_INFO']
         if pathinfo.startswith("/dataset/"):

@@ -21,6 +21,7 @@ from werkzeug.routing import Rule
 from werkzeug.datastructures import Headers
 from werkzeug.wrappers import Response
 from werkzeug.wsgi import wrap_file
+from werkzeug.exceptions import NotAcceptable
 
 from ferenda import util
 from ferenda.errors import RequestHandlerError
@@ -506,8 +507,9 @@ class RequestHandler(object):
             status = 200
             headers = Headers({"Content-length": len(data)})
         else:
-            msg = "<h1>406</h1>No acceptable media found of type(s) <tt>%s</tt>" % request.headers.get("Accept")
-            fp = wrap_file(request.environ, BytesIO(msg.encode('utf-8')))
-            status = 406
-            headers = Headers({"Content-length": len(msg.encode('utf-8'))})
+            msg = "No acceptable media could be found for requested type(s) %s" % request.headers.get("Accept")
+            if path:
+                # then os.path.exists(path) must be false
+                msg += " (%s does not exist)" % path
+            raise NotAcceptable(msg)
         return Response(fp, status, headers, content_type=contenttype, direct_passthrough=True)

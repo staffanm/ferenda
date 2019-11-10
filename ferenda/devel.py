@@ -1269,7 +1269,8 @@ class Devel(object):
         idst = destrepo.store.intermediate_path(basefile)
         if destrepo.config.compress == "bz2":
             idst += ".bz2"
-        copy = shutil.copy2
+        copy = shutil.copy
+        copytree = False
         if sourcerepo.store.storage_policy == "dir":
             src = os.path.dirname(src)
             dst = os.path.dirname(dst)
@@ -1279,13 +1280,20 @@ class Devel(object):
                 shutil.rmtree(dst)
             if os.path.exists(idst):
                 shutil.rmtree(idst)
-            copy = shutil.copytree
+            # copy = shutil.copytree
+            copytree = True
         util.ensure_dir(dst)
         try:
-            copy(src, dst)
+            if copytree:
+                shutil.copytree(src,dst,copy_function=copy)
+            else:
+                copy(src, dst)
             if os.path.exists(isrc):
                 util.ensure_dir(idst)
-                copy(isrc, idst)
+                if copytree:
+                    shutil.copytree(isrc, idst, copy_function=copy)
+                else:
+                    copy(isrc, idst)
         except FileNotFoundError as e:
             print("WARNING: %s" % e)
 
@@ -1302,7 +1310,7 @@ class Devel(object):
         # also copy the docentry json file
         if os.path.exists(sourcerepo.store.documententry_path(basefile)):
             util.ensure_dir(destrepo.store.documententry_path(basefile))
-            shutil.copy2(sourcerepo.store.documententry_path(basefile),
+            shutil.copy(sourcerepo.store.documententry_path(basefile),
                          destrepo.store.documententry_path(basefile))
 
 
