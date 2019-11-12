@@ -1920,7 +1920,6 @@ class PMFS(MyndFskrBase):
 
         @newstate('kapitel')
         def make_kapitel(parser):
-            from pudb import set_trace; set_trace()
             chunk = parser.reader.next()
             strchunk = str(chunk)
             ordinal, text = analyze_kapitelstart(parser, chunk)
@@ -1950,7 +1949,6 @@ class PMFS(MyndFskrBase):
             return make_element(Rubrik, chunk, kwargs)
 
         def make_stycke(parser):
-            from pudb import set_trace; set_trace()
             return make_element(Stycke, parser.reader.next())
 
         def make_marginalia(parser):

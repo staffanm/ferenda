@@ -233,7 +233,6 @@ class FixedLayoutSource(SwedishLegalSource):
         # 2. elements.Body objects that are structured by logical
         #    elements (chapters, sections etc) and where individual
         #    Sidbrytning objects can be anywhere in the tree.
-        from pudb import set_trace; set_trace()
         if not hasattr(doc.body, 'fontspec'):
             # document wasn't derived from a PDF file, probably from HTML instead
             return resources

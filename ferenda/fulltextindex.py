@@ -1128,7 +1128,6 @@ class ElasticSearchIndex(RemoteIndex):
             "mappings": {}
         }
         for repo in repos:
-            print("repo %s: %s" % (repo.alias, repo.config.relate))
             if not repo.config.relate:
                 continue
             facets = repo.facets()

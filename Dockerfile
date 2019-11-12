@@ -55,6 +55,7 @@ RUN python3.7 -m venv .virtualenv && \
 EXPOSE 80 8000 3330 9001 9200 
 COPY docker /tmp/docker
 RUN mv /tmp/docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf && \
+    mv /tmp/docker/elasticsearch-jvm.options /etc/elasticsearch/jvm.options && \
     mv /tmp/docker/nginx.conf /etc/nginx/sites-enabled/default && \
     mv /tmp/docker/ferenda.ttl /opt/fuseki/run/configuration/
 COPY . .
