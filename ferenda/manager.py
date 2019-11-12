@@ -105,7 +105,7 @@ DEFAULT_CONFIG = {'loglevel': 'DEBUG',
                   'legacyapi': False,
                   'wsgiappclass': 'ferenda.WSGIApp',
                   #'fulltextindex': True,
-                  #'removeinvalidlinks': True,
+                  'removeinvalidlinks': True,
                   'serverport': 5555,
                   'authkey': b'secret',
                   'profile': False,
@@ -317,22 +317,26 @@ def status(repo, samplesize=3):
         # parsed: None (143 needs parsing)
         # generated: None (143 needs generating)
     
-def make_wsgi_app(config, enabled=None):
+def make_wsgi_app(config, enabled=None, repos=None):
     """Creates a callable object that can act as a WSGI application by
     mod_wsgi, gunicorn, the built-in webserver, or any other
     WSGI-compliant webserver.
 
     :param config: Alternatively, a initialized config object
     :type config: LayeredConfig
-    :param enabled: A alias->class mapping for all enabled datasources
+    :param enabled: A alias->class mapping for all enabled document repositoriees
     :type enabled: dict
+    :param repos: A list of initialized document repositoriees (used in embedded scenarios, including testing)
+    :type enabled: list
     :returns: A WSGI application
     :rtype: callable
 
     """
-    if enabled is None:
-        enabled = _enabled_classes()
-    repos = [_instantiate_class(cls, config) for cls in _classes_from_classname(enabled, 'all')]
+    if repos is None:
+        if enabled is None:
+            enabled = _enabled_classes()
+            repos = [_instantiate_class(cls, config) for cls in _classes_from_classname(enabled, 'all')]
+    
     cls = _load_class(config.wsgiappclass)
     return cls(repos, config)
 
@@ -585,7 +589,7 @@ Disallow: /-/
                     status(inst)
 
             elif action == 'frontpage':
-                repoclasses = _classes_from_classname(enabled, classname)
+                # repoclasses = _classes_from_classname(enabled, classname)
                 args = _setup_frontpage_args(config, argv)
                 return frontpage(**args)
 
@@ -1697,6 +1701,8 @@ def _instantiate_class(cls, config=None, argv=[]):
     """Given a class object, instantiate that class and make sure the
        instance is properly configured given it's own defaults, a
        config file, and command line parameters."""
+    if hasattr(config, cls.alias):
+        return cls(getattr(config, cls.alias))
     clsdefaults = cls.get_default_options()
     if not config:
         defaults = dict(clsdefaults)

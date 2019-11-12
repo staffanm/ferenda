@@ -166,7 +166,7 @@ class=testManager.staticmockclass2
                     'loglevel': 'INFO',
                     'logfile': None,
                     'staticmock': {}}
-        config = manager._load_config(argv=argv, defaults=defaults)
+        config = manager.load_config(argv=argv, defaults=defaults)
         self.assertEqual(manager._run_class(enabled_classes,
                                             argv,
                                             config),
@@ -923,13 +923,13 @@ imgfiles = []
         manager.config_loaded = False
         self._enable_repos()
         argv = ['test', 'inspect', 'config']
-        ourcfg = manager._load_config(argv=argv,
+        ourcfg = manager.load_config(argv=argv,
                                       defaults={'loglevel': 'CRITICAL',
                                                 'logfile': None,
                                                 'datadir': 'data',
                                                 'profile': False,
                                                 'test': {'hello': 'world'}})
-        with patch('ferenda.manager._load_config', return_value=ourcfg):
+        with patch('ferenda.manager.load_config', return_value=ourcfg):
             instcfg = manager.run(argv)
             self.assertIsInstance(instcfg, LayeredConfig)
             self.assertEqual(id(ourcfg.test),
@@ -969,7 +969,7 @@ Available modules:
     def test_runserver(self):
         self._enable_repos()
         m = Mock()
-        with patch('ferenda.manager.make_server', return_value=m) as m2:
+        with patch('ferenda.manager.run_simple', return_value=m) as m2:
             manager.run(["all", "runserver"])
             self.assertTrue(m2.called)
             self.assertTrue(m.serve_forever.called)

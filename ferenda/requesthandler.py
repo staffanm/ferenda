@@ -19,9 +19,10 @@ from rdflib import Graph
 from cached_property import cached_property
 from werkzeug.routing import Rule
 from werkzeug.datastructures import Headers
-from werkzeug.wrappers import Response
+from werkzeug.wrappers import Request, Response
 from werkzeug.wsgi import wrap_file
 from werkzeug.exceptions import NotAcceptable
+from werkzeug.test import EnvironBuilder
 
 from ferenda import util
 from ferenda.errors import RequestHandlerError
@@ -161,12 +162,18 @@ class RequestHandler(object):
         suffix = None
         if urlparse(uri).path.startswith("/dataset/"):
             params = self.dataset_params_from_uri(uri)
+            # at this point, use werkzeug.test.Client or
+            # EnvironmentBuilder to create a fake environ and then a
+            # fake Request object
             if ".atom" in uri:
                 suffix = "atom"
-                environ = {}
+                path = "/index.atom"
+                headers = {}
             else:
-                environ = {"HTTP_ACCEPT": "text/html"}
-            contenttype = self.contenttype(environ, uri, None, params, suffix)
+                headers = {"Accept": "text/html"}
+                path = "/index.html"
+            environ = EnvironBuilder(path=path, headers=headers).get_environ()
+            contenttype = self.contenttype(Request(environ), suffix)
             pathfunc = self.get_dataset_pathfunc(environ, params, contenttype, suffix)
             if pathfunc:
                 return pathfunc()
@@ -189,10 +196,13 @@ class RequestHandler(object):
                     leaf = uri.split("/")[-1]
                 if "." in leaf:
                     suffix = leaf.rsplit(".", 1)[1]
-        environ = {'PATH_INFO': urlparse(uri).path}
+
         if not suffix:
-            environ['HTTP_ACCEPT'] = "text/html"
-        contenttype = self.contenttype(environ, uri, basefile, params, suffix)
+            headers = {'Acccept': 'text/html'}
+        else:
+            headers = {}
+        environ = EnvironBuilder(path=urlparse(uri).path, headers=headers).get_environ()
+        contenttype = self.contenttype(Request(environ), suffix)
         pathfunc = self.get_pathfunc(environ, basefile, params, contenttype, suffix)
         if pathfunc:
             return pathfunc(basefile)

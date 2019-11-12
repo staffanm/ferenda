@@ -12,6 +12,7 @@ import shutil
 
 from lxml import etree
 from rdflib import Graph
+from layeredconfig import LayeredConfig, Defaults
 
 from ferenda.compat import Mock, patch
 from ferenda import manager, util, fulltextindex
@@ -111,17 +112,19 @@ class WSGI(RepoTester): # base class w/o tests
             repos = [self.repo]
             
         # print("making app: %s %s" % (self.storetype, self.indextype))
-        self.app = manager.make_wsgi_app(port=8000,
-                                         documentroot=self.datadir,
-                                         apiendpoint="/myapi/",
-                                         searchendpoint="/mysearch/",
-                                         url="http://localhost:8000/",
-                                         repos=repos,
-                                         storetype=self.storetype,
-                                         storelocation=self.storelocation,
-                                         storerepository=self.storerepository,
-                                         indextype=self.indextype,
-                                         indexlocation=self.indexlocation)
+        config = LayeredConfig(Defaults({'datadir': self.datadir,
+                                         'apiendpoint': '/myapi/',
+                                         'searchendpoint': '/mysearch/',
+                                         'url': 'http://localhost:8000/',
+                                         'storetype': self.storetype,
+                                         'storelocation': self.storelocation,
+                                         'storerepository': self.storerepository,
+                                         'indextype': self.indextype,
+                                         'indexlocation': self.indexlocation,
+                                         'wsgiappclass': 'ferenda.WSGIApp',
+                                         'legacyapi': False,
+                                         'wsgiexceptionhandler': True}))
+        self.app = manager.make_wsgi_app(config, repos=repos)
         self.env = {'HTTP_ACCEPT': DEFAULT_HTTP_ACCEPT,
                     'PATH_INFO':   '/',
                     'SERVER_NAME': 'localhost',

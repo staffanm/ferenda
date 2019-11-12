@@ -172,6 +172,7 @@ class SFS(Trips):
     @classmethod
     def get_default_options(cls):
         opts = super(SFS, cls).get_default_options()
+        opts['random'] = 42
         opts['keepexpired'] = False
         opts['revisit'] = list
         opts['next_sfsnr'] = str

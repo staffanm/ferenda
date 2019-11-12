@@ -1503,7 +1503,7 @@ class Devel(object):
     
     @classmethod
     def get_default_options(cls):
-        return {}  # pragma: no cover
+        return DocumentRepository.get_default_options()
 
     def download(self):
         pass  # pragma: no cover
