@@ -317,7 +317,7 @@ def status(repo, samplesize=3):
         # parsed: None (143 needs parsing)
         # generated: None (143 needs generating)
     
-def make_wsgi_app(config, enabled):
+def make_wsgi_app(config, enabled=None):
     """Creates a callable object that can act as a WSGI application by
     mod_wsgi, gunicorn, the built-in webserver, or any other
     WSGI-compliant webserver.
@@ -330,6 +330,8 @@ def make_wsgi_app(config, enabled):
     :rtype: callable
 
     """
+    if enabled is None:
+        enabled = _enabled_classes()
     repos = [_instantiate_class(cls, config) for cls in _classes_from_classname(enabled, 'all')]
     cls = _load_class(config.wsgiappclass)
     return cls(repos, config)
