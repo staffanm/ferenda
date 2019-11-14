@@ -1,6 +1,6 @@
 FROM python:3.8-slim-buster
-
-RUN apt -qq update && \
+RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections && \
+    apt -qq update && \
     apt -qq -y --no-install-recommends install \
         apt-transport-https \
 	gnupg \
@@ -31,7 +31,7 @@ RUN apt -qq update && \
        mediawiki \
        nginx \
        openjdk-8-jre-headless \
-       poppler-utils \
+       poppler-utils \ 
        procps \
        python3-dev \
        python3-venv \
@@ -50,6 +50,7 @@ RUN apt -qq update && \
 WORKDIR /usr/share/ferenda
 COPY requirements.txt . 
 RUN python3.7 -m venv .virtualenv && \
+    ./.virtualenv/bin/pip install wheel && \
     ./.virtualenv/bin/pip install -r requirements.txt
 
 EXPOSE 80 8000 3330 9001 9200 

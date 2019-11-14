@@ -142,6 +142,7 @@ class WSGIApp(object):
             res = endpoint(request, **values)
             if not isinstance(res, Response):
                 res = Response(res) # set mimetype?
+            # add X-WSGI-App: ferenda and possibly other data as well
             return res(environ, start_response)
 
     #

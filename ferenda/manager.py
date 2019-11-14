@@ -109,7 +109,8 @@ DEFAULT_CONFIG = {'loglevel': 'DEBUG',
                   'serverport': 5555,
                   'authkey': b'secret',
                   'profile': False,
-                  'wsgiexceptionhandler': True}
+                  'wsgiexceptionhandler': True,
+                  'systempaths': list}
 
 class MarshallingHandler(logging.Handler):
     def __init__(self, records):
@@ -334,8 +335,8 @@ def make_wsgi_app(config, enabled=None, repos=None):
     """
     if repos is None:
         if enabled is None:
-            enabled = _enabled_classes()
-            repos = [_instantiate_class(cls, config) for cls in _classes_from_classname(enabled, 'all')]
+            enabled = enabled_classes()
+        repos = [_instantiate_class(cls, config) for cls in _classes_from_classname(enabled, 'all')]
     
     cls = _load_class(config.wsgiappclass)
     return cls(repos, config)
@@ -501,7 +502,7 @@ def run(argv, config=None, subcall=False):
         log.info("run: %s" % " ".join(argv))
     try:
         # reads only ferenda.ini using configparser rather than layeredconfig
-        enabled = _enabled_classes()
+        enabled = enabled_classes()
         # returns {'ferenda.sources.docrepo.DocRepo':'base',...}
         enabled_aliases = dict(reversed(item) for item in enabled.items())
         if len(argv) < 1:
@@ -838,7 +839,7 @@ def load_config(filename=None, argv=None, defaults=None):
         # (those have the get_default_options() classmethod).
         defaults = copy.deepcopy(DEFAULT_CONFIG)
         
-        for alias, classname in _enabled_classes(inifile=filename).items():
+        for alias, classname in enabled_classes(inifile=filename).items():
             assert alias not in defaults, "Collision on key %s" % alias
             defaults[alias] = _load_class(classname).get_default_options()
     sources = [Defaults(defaults)]
@@ -874,7 +875,7 @@ def _classes_from_classname(enabled, classname):
     """Given a classname or alias, returns a list of class objects.
 
     :param enabled: The currently enabled repo classes, as returned by
-                    :py:func:`~ferenda.Manager._enabled_classes`
+                    :py:func:`~ferenda.Manager.enabled_classes`
     :type  enabled: dict
     :param classname: A classname (eg ``'ferenda.DocumentRepository'``) or
                       alias  (eg ``'base'``). The special value ``'all'``
@@ -924,7 +925,7 @@ def _setup_classnames(enabled, classname):
     with the same string is returned.
 
     :param enabled: The currently enabled repo classes, as returned by
-                    :py:func:`~ferenda.Manager._enabled_classes`
+                    :py:func:`~ferenda.Manager.enabled_classes`
     :type  enabled: dict
     :param classname: A classname (eg ``'ferenda.DocumentRepository'``) or
                       alias  (eg ``'base'``). The special value ``'all'``
@@ -957,7 +958,7 @@ def _run_class(enabled, argv, config):
     """Runs a particular action for a particular class.
 
     :param enabled: The currently enabled repo classes, as returned by
-                    :py:func:`~ferenda.Manager._enabled_classes`
+                    :py:func:`~ferenda.Manager.enabled_classes`
     :type  enabled: dict
     :param argv: An argv-style list of strings, see run (but note
                  that run() replaces ``all`` with every
@@ -978,14 +979,14 @@ def _run_class(enabled, argv, config):
     with util.logtime(log.info,
                       "%(alias)s %(action)s finished in %(elapsed).3f sec",
                       {'alias': alias, 'action': action}):
-        _enabled_classes = dict(reversed(item) for item in enabled.items())
-        if alias not in enabled and alias not in _enabled_classes:
+        enabled_classes = dict(reversed(item) for item in enabled.items())
+        if alias not in enabled and alias not in enabled_classes:
             log.error("Class-or-alias '%s' not enabled" % alias)
             return
         if alias in argv:
             argv.remove(alias)
         # ie a fully qualified classname was used
-        if alias in _enabled_classes:
+        if alias in enabled_classes:
             classname = alias
         else:
             classname = enabled[alias]
@@ -1259,7 +1260,7 @@ def _build_worker(jobqueue, resultqueue, clientname):
             if job['classname'] not in repos:
                 otherrepos = []
                 inst = insts[job['classname']]
-                for alias, classname in _enabled_classes().items():
+                for alias, classname in enabled_classes().items():
                     if alias != inst.alias:
                         obj = _instantiate_and_configure(classname, job['config'], logrecords, clientname)
                         if getattr(obj.config, job['command'], True):
@@ -1740,33 +1741,42 @@ def _instantiate_class(cls, config=None, argv=[]):
     return inst
 
 
-def _enabled_classes(inifile=None):
+def enabled_classes(inifile=None, config=None):
     """Returns a mapping (alias -> classname) for all registered classes.
 
     >>> enable("ferenda.DocumentRepository") == 'base'
     True
-    >>> _enabled_classes() == {'base': 'ferenda.DocumentRepository'}
+    >>> enabled_classes() == {'base': 'ferenda.DocumentRepository'}
     True
     >>> os.unlink("ferenda.ini")
 
-    :param inifile: The full path to a ferenda.ini file. If None, attempts
-                    to find ini file using
-                    :py:func:`ferenda.Manager.find_config_file`
+    :param inifile: The full path to a ferenda.ini file.
     :type inifile: str
-    :returns: A mapping between alias and classname for all registered classes.
+    :param config: An instantiated config object, used if inifile is
+                    None. If both inifile and config are None, this
+                    function will attempt to find an ini file using
+                    :py:func:`ferenda.Manager.find_config_file` :type
+                    inifile: str :returns: A mapping between alias and
+                    classname for all registered classes.  :rtype:
+                    dict
+    :returns: a mapping (alias -> classname) for all registered classes
     :rtype: dict
 
     """
-
-    cfg = configparser.ConfigParser()
-    if not inifile:
-        inifile = find_config_file()
-
-    cfg.read([inifile])
     enabled = OrderedDict()
-    for section in cfg.sections():
-        if cfg.has_option(section, "class"):
-            enabled[section] = cfg.get(section, "class")
+    if not inifile and config:
+        for name in config:
+            if ininstance(getattr(config, name), LayeredConfig) and hasattr('class'):
+                enabled[name] = getattr(thing, 'class')
+        
+    else:
+        if not inifile:
+            inifile = find_config_file()
+        cfg = configparser.ConfigParser()
+        cfg.read([inifile])
+        for section in cfg.sections():
+            if cfg.has_option(section, "class"):
+                enabled[section] = cfg.get(section, "class")
     return enabled
 
 
@@ -1801,7 +1811,7 @@ def _list_enabled_classes():
 
     """
     res = OrderedDict()
-    for (alias, classname) in _enabled_classes().items():
+    for (alias, classname) in enabled_classes().items():
         cls = _load_class(classname)
         if cls.__doc__:
             res[alias] = cls.__doc__.split("\n")[0]
@@ -1914,10 +1924,10 @@ def _setup_frontpage_args(config, argv):
     # used by _setup_makeresources_args as well?
     #
     # FIXME: why do we pass a config object when we re-read
-    # ferenda.ini at least twice (_enabled_classes and
+    # ferenda.ini at least twice (enabled_classes and
     # _instantiate_class) ?!
     # reads only ferenda.ini using configparser rather than layeredconfig
-    enabled = _enabled_classes()
+    enabled = enabled_classes()
     repoclasses = _classes_from_classname(enabled, classname="all")
     repos = []
     for cls in repoclasses:

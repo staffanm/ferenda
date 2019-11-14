@@ -17,6 +17,7 @@ from operator import attrgetter
 from pprint import pformat
 import codecs
 import fileinput
+import functools
 import inspect
 import json
 import logging
@@ -27,6 +28,7 @@ import shutil
 import sys
 import time
 import traceback
+import importlib
 from wsgiref.util import request_uri
 from urllib.parse import parse_qsl, urlencode
 from cached_property import cached_property
@@ -37,6 +39,8 @@ from layeredconfig import LayeredConfig, Defaults
 from lxml import etree
 from ferenda.thirdparty.patchit import PatchSet, PatchSyntaxError, PatchConflictError
 from werkzeug.routing import Rule
+from werkzeug.wrappers import Response
+from jinja2 import Template
 
 from ferenda.compat import Mock
 from ferenda import (TextReader, TripleStore, FulltextIndex, WSGIApp,
@@ -74,6 +78,21 @@ class WSGIOutputHandler(logging.Handler):
             # for that.
             pass
 
+def login_required(f):
+    """makes sure that the user is authenticated before calling the endpoint"""
+    @functools.wraps(f)
+    def wrapper(self, request, **values):
+        auth = request.authorization
+        if (not auth or
+            'username' not in self.repo.config or
+            'password' not in self.repo.config or
+            not (self.repo.config.username == auth.username and
+                 self.repo.config.password == auth.password)):
+            return Response("Authentication failed. You will need to use the username and password specified in ferenda.ini", 401,
+                            {"WWW-Authenticate": 'Basic realm="%s"' % self.repo.config.sitename})
+        else:
+            return f(self, request, **values)
+    return wrapper
 
 class DevelHandler(RequestHandler):
 
@@ -145,6 +164,34 @@ class DevelHandler(RequestHandler):
                                      uritransform=urltransform)
         return etree.tostring(tree, encoding="utf-8")
 
+    def render_template(self, jinja_template, page_title, **context):
+        repo = DocumentRepository(config=self.repo.config)
+        jinja_template = """
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>%(page_title)s</title></head>
+<body>
+<div>
+%(jinja_template)s
+</div>
+</body>
+</html>
+""" % (locals())
+        t = Template(jinja_template)
+        xhtml = etree.parse(BytesIO(t.render(context).encode("utf-8")))
+        conffile = os.sep.join([repo.config.datadir, 'rsrc',
+                                'resources.xml'])
+        transformer = Transformer('XSLT', "xsl/generic.xsl", "xsl",
+                                  resourceloader=repo.resourceloader,
+                                  config=conffile)
+        urltransform = None
+        if 'develurl' in repo.config and repo.config.develurl:
+            urltransform = repo.get_url_transform_func(develurl=repo.config.develurl)
+        depth = 2 # len(doc.uri.split("/")) - 3
+        tree = transformer.transform(xhtml, depth,
+                                     uritransform=urltransform)
+        data = etree.tostring(tree, encoding="utf-8")
+        return Response(data, mimetype="text/html")
+
     def stream(self, environ, start_response):
         if environ['PATH_INFO'].endswith('change-parse-options'):
             return self.handle_change_parse_options_stream(environ, start_response)
@@ -182,21 +229,122 @@ class DevelHandler(RequestHandler):
                 h.close()
                 rootlogger.removeHandler(h)
 
-    def handle_dashboard(self, environ, params):
-        if params:
+    @login_required
+    def handle_dashboard(self, request, **values):
+        def compare_classnames(given, inspected):
+            # repoconfig.class can be "lagen.nu.SFS" and classname
+            # "lagen.nu.sfs.SFS". Unify this according to this
+            # heuristic (a proper solution would involve examining
+            # varius import statements in __init__.py files
+            if inspected == given:
+                return True
+            segments = inspected.split(".")
+            if segments[-1].lower() == segments[-2].lower():
+                inspected = ".".join(segments[:-2] + segments[-1:])
+            return inspected == given
+        
+        if values: # or request.method = 'POST'
             # do something smart with the manager api to eg enable modules
             pass
         else:
             # 1 create links to other devel tools (build, mkpatch, logs)
+            tools = []
+            for rule in self.rules:
+                if rule.endpoint == self.handle_dashboard:
+                    continue
+                tools.append({'href': rule.rule,
+                              'name': rule.endpoint.__name__.split("_",1)[1].replace("_", " ").capitalize(),
+                              'doc': rule.endpoint.__doc__})
             # 2 create a list of available repos that we can enable
             # 3 list currently enabled repos and
             #   3.1 their current status (downloaded, parsed, generated documents etc)
             #   3.2 list available build actions for them
             # Also, user-friendly descriptions for the first few steps that you can take
-            pass
-        
+            config = self.repo.config._parent
+            possible_repos = []
+            reported_repos = set()
+            for path in config.systempaths: #  normally [".."] or ["ferenda"]
+                for filename in util.list_dirs(path, ".py"):
+                    if "/doc/" in filename or "/test/" in filename or "/res/" in filename or "/tools/" in filename:
+                        continue
+                    # transform py file "ferenda/lagen/nu/sfs.py" > "lagen.nu.sfs"
+                    modulename = filename[len(path)+1:-3].replace(os.sep, ".")
+                    try:
+                        m = importlib.import_module(modulename)
+                        for cls in [o for (n,o) in inspect.getmembers(m) if inspect.isclass(o) and issubclass(o, DocumentRepository) and o.alias]:
+                            classname = cls.__module__ + "." + cls.__name__
+                            if classname in reported_repos:
+                                continue
+                            repoconfig = getattr(config, cls.alias, None)
+                            enabled = bool(repoconfig and compare_classnames(getattr(repoconfig, 'class'), classname))
+                            r = {'cls': cls,
+                                 'alias': cls.alias,
+                                 'classname': classname,
+                                 'enabled': enabled,
+                                 'toggle': 'Disable' if enabled else 'Enable',
+                                 'doc': str(getattr(cls, '__doc__', '')).split("\n")[0]}
+                            if r['enabled']:
+                                blacklist = ("datadir", "patchdir",
+                                             "processes", "force", "parseforce",
+                                             "generateforce", "fsmdebug",
+                                             "refresh", "download", "url",
+                                             "develurl", "fulltextindex", "relate",
+                                             "clientname", "bulktripleload",
+                                             "class", "storetype", "storelocation",
+                                             "storerepository", "indextype",
+                                             "indexlocation", "combineresources",
+                                             "staticsite", "legacyapi", "sitename",
+                                             "sitedescription", "apiendpoint",
+                                             "searchendpoint", "toc", "news",
+                                             "loglevel", "logfile", "all",
+                                             "disallowrobots", "wsgiappclass",
+                                             "serverport", "authkey", "profile",
+                                             "wsgiexceptionhandler", "systempaths",
+                                             "alias", "action", "arguments")
+                                c = getattr(config, cls.alias)
+                                r['config'] = dict([(k, repr(getattr(c, k))) for k in c if k not in blacklist])
+                            possible_repos.append(r)
+                            reported_repos.add(classname)
+                    except (ImportError, FileNotFoundError, NameError):
+                        pass
+
+            
+            return self.render_template("""
+<h2>Tools</h2>
+<ul>
+{% for tool in tools %}
+<li>
+<a href="{{tool.href}}">{{tool.name}}</a>: {{ tool.doc }}
+</li>
+{% endfor %}
+</ul>
+<h2>Available repositories</h2>
+<table class="table">
+<tr><th>repo</th><th>description</th><th>enabled</th><th>options</th></tr>
+{% for repo in possible_repos %}
+<tr>
+<td><big>{{ repo.alias }}</big><br/><small>{{ repo.classname }}</small></td>
+<td>{{ repo.doc }}</td>
+<td>
+<form method="POST">
+<input type="hidden" name="repo" value="{{repo.alias}}"/>
+<input type="hidden" name="action" value="{{repo.toggle}}"/>
+<button type="submit" class="btn {% if not(repo.enabled) %}btn-primary{% endif %}">{{repo.toggle}}</button>
+</form>
+</td>
+<td><small>{% if repo.enabled %}
+{% for k in repo.config %}
+{{ k }}: {{ repo.config[k] }}<br/>
+{% endfor %}
+{% endif %}</small></td>
+</tr>
+{% endfor %}
+</table>
+""", "Dashboard", possible_repos=possible_repos, enabled=enabled, config=config, tools=tools)
+
 
     def handle_build(self, environ, params):
+        """Perform any action that the command line tool ferenda-build.py can do (download, parse, generate etc), over the web"""
         if params:
             params = defaultdict(str, params)
             label = "Running %(repo)s %(action)s %(basefile)s %(all)s %(force)s %(sefresh)s" % params
@@ -253,6 +401,7 @@ class DevelHandler(RequestHandler):
 
 
     def handle_streaming_test(self, environ, params):
+        """Diagnostic tool to see if long-running processes are able to stream their output to the web browser"""
         return Body([
             Div([H2(["Streaming test"]),
                  Pre(**{'class': 'pre-scrollable',
@@ -287,6 +436,7 @@ class DevelHandler(RequestHandler):
         return []
 
     def handle_change_parse_options(self, environ, params):
+        """Display and change parse options for individual documents"""
         # this method changes the options and creates a response page
         # that, in turn, does an ajax request that ends up calling
         # handle_change_parse_options_stream
@@ -381,6 +531,7 @@ class DevelHandler(RequestHandler):
         return []
 
     def handle_patch(self, environ, params):
+        """Create patch files for documents for redacting or correcting data in the source documents"""
         def open_intermed_text(repo, basefile, mode="rb"):
             intermediatepath = repo.store.intermediate_path(basefile)
             opener = open
@@ -1503,7 +1654,10 @@ class Devel(object):
     
     @classmethod
     def get_default_options(cls):
-        return DocumentRepository.get_default_options()
+        options = DocumentRepository.get_default_options()
+        options.update({'username': str,
+                        'password': str})
+        return options
 
     def download(self):
         pass  # pragma: no cover
@@ -1533,8 +1687,20 @@ class Devel(object):
         return []
 
     def frontpage_content(self, primary=False):
-        return ("<h2>Welcome to ferenda</h2>"
-                "<p>Add a few document repositories and have fun!</p>")
+        return ("""<?xml version='1.0' encoding='utf-8'?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <title>site</title>
+</head>
+<body>
+<div>
+<h2>Welcome to ferenda</h2>
+<p>Add a few document repositories and have fun!</p>
+<p><a href="/devel/">Dashboard</a></p>
+</div>
+</body>
+</html>
+""")
 
     def get_url_transform_func(self, **transformargs):
         return lambda x: x
