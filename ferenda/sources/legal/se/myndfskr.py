@@ -870,6 +870,7 @@ class MyndFskrBase(FixedLayoutSource):
 
 
 class AFS(MyndFskrBase):
+    """Arbetsmiljöverkets författningssamling"""
     alias = "afs"
     start_url = "https://www.av.se/arbetsmiljoarbete-och-inspektioner/publikationer/foreskrifter/foreskrifter-listade-i-nummerordning/"
     landingpage = True

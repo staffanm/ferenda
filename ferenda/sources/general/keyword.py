@@ -40,9 +40,9 @@ class KeywordStore(DocumentStore):
 
 class Keyword(DocumentRepository):
 
-    """Implements support for 'keyword hubs', conceptual resources which
-       themselves aren't related to any document, but to which other
-       documents are related. As an example, if a docrepo has
+    """Implements support for 'keyword hubs', or concepts to which documents in other sources are related. 
+
+       As an example, if a docrepo has
        documents that each contains a set of keywords, and the docrepo
        parse implementation extracts these keywords as ``dcterms:subject``
        resources, this docrepo creates a document resource for each of

@@ -50,6 +50,7 @@ from ferenda import (TextReader, TripleStore, FulltextIndex, WSGIApp,
 from ferenda.elements import serialize
 from ferenda.elements.html import Body, P, H1, H2, H3, Form, Textarea, Input, Label, Button, Textarea, Br, Div, A, Pre, Code, UL, LI
 from ferenda import decorators, util, manager
+from ferenda.manager import enable
 
 class DummyStore(object):
 
@@ -243,73 +244,96 @@ class DevelHandler(RequestHandler):
                 inspected = ".".join(segments[:-2] + segments[-1:])
             return inspected == given
         
-        if values: # or request.method = 'POST'
-            # do something smart with the manager api to eg enable modules
-            pass
-        else:
-            # 1 create links to other devel tools (build, mkpatch, logs)
-            tools = []
-            for rule in self.rules:
-                if rule.endpoint == self.handle_dashboard:
-                    continue
-                tools.append({'href': rule.rule,
-                              'name': rule.endpoint.__name__.split("_",1)[1].replace("_", " ").capitalize(),
-                              'doc': rule.endpoint.__doc__})
-            # 2 create a list of available repos that we can enable
-            # 3 list currently enabled repos and
-            #   3.1 their current status (downloaded, parsed, generated documents etc)
-            #   3.2 list available build actions for them
-            # Also, user-friendly descriptions for the first few steps that you can take
-            config = self.repo.config._parent
-            possible_repos = []
-            reported_repos = set()
-            for path in config.systempaths: #  normally [".."] or ["ferenda"]
-                for filename in util.list_dirs(path, ".py"):
-                    if "/doc/" in filename or "/test/" in filename or "/res/" in filename or "/tools/" in filename:
-                        continue
-                    # transform py file "ferenda/lagen/nu/sfs.py" > "lagen.nu.sfs"
-                    modulename = filename[len(path)+1:-3].replace(os.sep, ".")
-                    try:
-                        m = importlib.import_module(modulename)
-                        for cls in [o for (n,o) in inspect.getmembers(m) if inspect.isclass(o) and issubclass(o, DocumentRepository) and o.alias]:
-                            classname = cls.__module__ + "." + cls.__name__
-                            if classname in reported_repos:
-                                continue
-                            repoconfig = getattr(config, cls.alias, None)
-                            enabled = bool(repoconfig and compare_classnames(getattr(repoconfig, 'class'), classname))
-                            r = {'cls': cls,
-                                 'alias': cls.alias,
-                                 'classname': classname,
-                                 'enabled': enabled,
-                                 'toggle': 'Disable' if enabled else 'Enable',
-                                 'doc': str(getattr(cls, '__doc__', '')).split("\n")[0]}
-                            if r['enabled']:
-                                blacklist = ("datadir", "patchdir",
-                                             "processes", "force", "parseforce",
-                                             "generateforce", "fsmdebug",
-                                             "refresh", "download", "url",
-                                             "develurl", "fulltextindex", "relate",
-                                             "clientname", "bulktripleload",
-                                             "class", "storetype", "storelocation",
-                                             "storerepository", "indextype",
-                                             "indexlocation", "combineresources",
-                                             "staticsite", "legacyapi", "sitename",
-                                             "sitedescription", "apiendpoint",
-                                             "searchendpoint", "toc", "news",
-                                             "loglevel", "logfile", "all",
-                                             "disallowrobots", "wsgiappclass",
-                                             "serverport", "authkey", "profile",
-                                             "wsgiexceptionhandler", "systempaths",
-                                             "alias", "action", "arguments")
-                                c = getattr(config, cls.alias)
-                                r['config'] = dict([(k, repr(getattr(c, k))) for k in c if k not in blacklist])
-                            possible_repos.append(r)
-                            reported_repos.add(classname)
-                    except (ImportError, FileNotFoundError, NameError):
-                        pass
+        if request.method == 'POST':
+            statusmsg = errmsg = ""
+            if request.form['action'].lower() == "enable":
+                alias = enable(request.form['repo'])
+                statusmsg = "Enabled repository %s (%s)" % (alias, request.form['action'])
+            else:
+                errmsg = "Sorry, support for %s %s is not yet implemented -- you'll have to change ferenda.ini by hand" % (
+                    request.form['action'], request.form['repo'])
 
-            
-            return self.render_template("""
+        # 1 create links to other devel tools (build, mkpatch, logs)
+        tools = []
+        for rule in self.rules:
+            if rule.endpoint == self.handle_dashboard:
+                continue
+            tools.append({'href': rule.rule,
+                          'name': rule.endpoint.__name__.split("_",1)[1].replace("_", " ").capitalize(),
+                          'doc': rule.endpoint.__doc__})
+        # 2 create a list of available repos that we can enable
+        # 3 list currently enabled repos and
+        #   3.1 their current status (downloaded, parsed, generated documents etc)
+        #   3.2 list available build actions for them
+        # Also, user-friendly descriptions for the first few steps that you can take
+        config = self.repo.config._parent
+        possible_repos = []
+        reported_repos = set()
+        for path in config.systempaths: #  normally [".."] or ["ferenda"]
+            for filename in util.list_dirs(path, ".py"):
+                if "/doc/" in filename or "/test/" in filename or "/res/" in filename or "/tools/" in filename:
+                    continue
+                # transform py file "ferenda/lagen/nu/sfs.py" > "lagen.nu.sfs"
+                modulename = filename[len(path)+1:-3].replace(os.sep, ".")
+                try:
+                    m = importlib.import_module(modulename)
+                    for cls in [o for (n,o) in inspect.getmembers(m) if inspect.isclass(o) and issubclass(o, DocumentRepository) and o.alias]:
+                        if cls.alias == "base":
+                            continue
+                        classname = cls.__module__ + "." + cls.__name__
+                        if classname in reported_repos:
+                            continue
+                        repoconfig = getattr(config, cls.alias, None)
+                        enabled = bool(repoconfig and compare_classnames(getattr(repoconfig, 'class'), classname))
+                        r = {'cls': cls,
+                             'alias': cls.alias,
+                             'classname': classname,
+                             'enabled': enabled,
+                             'toggle': 'Disable' if enabled else 'Enable',
+                             'doc': str(getattr(cls, '__doc__', '')).split("\n")[0]}
+                        if r['enabled']:
+                            blacklist = ("datadir", "patchdir",
+                                         "processes", "force", "parseforce",
+                                         "generateforce", "fsmdebug",
+                                         "refresh", "download", "url",
+                                         "develurl", "fulltextindex", "relate",
+                                         "clientname", "bulktripleload",
+                                         "class", "storetype", "storelocation",
+                                         "storerepository", "indextype",
+                                         "indexlocation", "combineresources",
+                                         "staticsite", "legacyapi", "sitename",
+                                         "sitedescription", "apiendpoint",
+                                         "searchendpoint", "toc", "news",
+                                         "loglevel", "logfile", "all",
+                                         "disallowrobots", "wsgiappclass",
+                                         "serverport", "authkey", "profile",
+                                         "wsgiexceptionhandler", "systempaths",
+                                         "alias", "action", "arguments")
+                            c = getattr(config, cls.alias)
+                            r['config'] = dict([(k, repr(getattr(c, k))) for k in c if k not in blacklist])
+                        possible_repos.append(r)
+                        reported_repos.add(classname)
+                except (ImportError, FileNotFoundError, NameError):
+                    pass
+        return self.render_template("""
+{% if statusmsg %}
+<div class="alert alert-success" role="alert">
+  {{statusmsg}}
+</div>
+{% endif %}
+
+{% if errmsg %}
+<div class="alert alert-danger" role="alert">
+  {{errmsg}}
+</div>
+{% endif %}
+
+<p>Welcome to the ferenda dashboard. Here you can configure and monitor
+your ferenda installation, and access other tools for maintaining your
+documents.</p>
+<p>{{errmsg}}</p>
+<p>{{statusmsg}}</p>
+
 <h2>Tools</h2>
 <ul>
 {% for tool in tools %}
@@ -323,11 +347,11 @@ class DevelHandler(RequestHandler):
 <tr><th>repo</th><th>description</th><th>enabled</th><th>options</th></tr>
 {% for repo in possible_repos %}
 <tr>
-<td><big>{{ repo.alias }}</big><br/><small>{{ repo.classname }}</small></td>
+<td><big><a href="repo.cls.start_url">{{ repo.alias }}</a></big><br/><small>{{ repo.classname }}</small></td>
 <td>{{ repo.doc }}</td>
 <td>
 <form method="POST">
-<input type="hidden" name="repo" value="{{repo.alias}}"/>
+<input type="hidden" name="repo" value="{{repo.classname}}"/>
 <input type="hidden" name="action" value="{{repo.toggle}}"/>
 <button type="submit" class="btn {% if not(repo.enabled) %}btn-primary{% endif %}">{{repo.toggle}}</button>
 </form>
