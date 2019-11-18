@@ -94,12 +94,12 @@ class DevelHandler(RequestHandler):
         repo = DocumentRepository(config=self.repo.config)
         jinja_template = """
 <html xmlns="http://www.w3.org/1999/xhtml">
-<head><title>%(page_title)s</title></head>
-<body>
-<div>
-%(jinja_template)s
-</div>
-</body>
+  <head><title>%(page_title)s</title></head>
+  <body>
+    <div>
+      %(jinja_template)s
+    </div>
+  </body>
 </html>
 """ % (locals())
         t = Template(jinja_template)
@@ -256,6 +256,7 @@ documents.</p>
 """, "Dashboard", possible_repos=possible_repos, enabled=enabled, config=config, tools=tools)
 
 
+    @login_required
     def handle_build(self, request, **values):
         """Perform any action that the command line tool ferenda-build.py can do (download, parse, generate etc), over the web"""
         if request.args:
@@ -274,25 +275,32 @@ documents.</p>
         else:
             return self.render_template("""
 <form class="form-inline">
-<div class="form-group">
-<label class="sr-only" for="repo">repo</label>
-<input class="form-control" id="repo" name="repo" type="text" placeholder="repo"/>
-<label class="sr-only" for="action">action</label>
-<input class="form-control" id="action" name="action" type="text" placeholder="action"/>
-<label class="sr-only" for="basefile">basefile</label>
-<input class="form-control" id="basefile" name="basefile" type="text" placeholder="basefile"/>
-</div>
-<div class="form-group">
-<input id="all" name="all" type="checkbox" value="--all"/>
-<label for="all">--all</label>
-<input id="force" name="force" type="checkbox" value="--force"/>
-<label for="force">--force</label>
-<input id="refresh" name="refresh" type="checkbox" value="--refresh"/>
-<label for="refresh">--refresh</label>
-<button class="btn btn-default" type="submit">Build</button></div>
-            </form>""", "build")
+  <div class="form-group">
+    <label class="sr-only">repo
+      <input class="form-control" name="repo" type="text" placeholder="repo"/>
+    </label>
+    <label class="sr-only">action
+      <input class="form-control" name="action" type="text" placeholder="action"/>
+    </label>
+    <label class="sr-only">basefile
+      <input class="form-control" name="basefile" type="text" placeholder="basefile"/>
+    </label>
+  </div>
+  <div class="form-group">
+    <label>--all
+      <input id="all" name="all" type="checkbox" value="--all"/>
+    </label>
+    <label>--force
+      <input name="force" type="checkbox" value="--force"/>
+    <label for="refresh">--refresh
+      <input name="refresh" type="checkbox" value="--refresh"/>
+    </label>
+    <button class="btn btn-default" type="submit">Build</button>
+  </div>
+</form>""", "build")
 
 
+    @login_required
     def handle_streaming_test(self, request, **values):
         """Diagnostic tool to see if long-running processes are able to stream their output to the web browser"""
         if request.values.get('stream') == 'true':
@@ -307,6 +315,7 @@ documents.</p>
             <pre class="pre-scrollable" id="streaming-log-output" src="/devel/streaming-test?stream=true"></pre>""", "Streaming-test")
 
 
+    @login_required
     def handle_change_options(self, request, **values):
         """Display and change parse options for individual documents"""
         # this method changes the options and creates a response page
@@ -343,20 +352,19 @@ documents.</p>
                     basefile)
                 return self.render_template("""
 <div>
-<h2>Changing options for {{basefile}} in repo {{repo}}</h2>
-<p>Changed option at line {{lineidx}} from <code>{{currentvalue}}</code> to <code>{{newvalue}}</code></p>
-<p>Now downloading and processing (please be patient...)</p>
-<pre class="pre-scrollable" id="streaming-log-output" src="{{datasrc}}">
-</pre>
-                </div>""", "Change options", basefile=basefile,
-                                            repo=repo, lineidx=lineidx,
-                                            currentvalue=currentvalue,
-                                            newvalue=newvalue, datasrc=datasrc)
+  <h2>Changing options for {{basefile}} in repo {{repo}}</h2>
+  <p>Changed option at line {{lineidx}} from <code>{{currentvalue}}</code> to <code>{{newvalue}}</code></p>
+  <p>Now downloading and processing (please be patient...)</p>
+  <pre class="pre-scrollable" id="streaming-log-output" src="{{datasrc}}"></pre>
+</div>""", "Change options", basefile=basefile,
+                             repo=repo, lineidx=lineidx,
+                             currentvalue=currentvalue,
+                             newvalue=newvalue, datasrc=datasrc)
             else:
                 return self.render_template("""
 <div>
-<h2>Couldn't change options for {{basefile}} in repo {{repo}}</h2>
-<p>Didn't manage to find a line matching <code>{{want}}</code> in <code>{{optionsfile}}</p>
+  <h2>Couldn't change options for {{basefile}} in repo {{repo}}</h2>
+  <p>Didn't manage to find a line matching <code>{{want}}</code> in <code>{{optionsfile}}</p>
 </div>""", "Change options", basefile=basefile, repo=repo, want=want, optionsfile=optionsfile)
         elif request.args.get("stream") == "true":
             repoconfig = getattr(self.repo.config._parent, request.form['repo'])
@@ -385,26 +393,34 @@ documents.</p>
             self.render_template("""
 <div>
 <form method="POST">
-  Repo: 
-  <input name="repo"/> 
-  Subrepo (if applicable):
-  <input name="subrepo"/>
-  Basefile:
-  <input name="basefile"/>
-  Action:
-  <select name="action">
-    <option>download</option>
-    <option selected="selected">parse</option>
-    <option>relate</option>
-    <option>generate</option>
-  </selection>
-  New value:
-  <input name="newvalue">
+  <label>Repo: 
+    <input name="repo"/>
+  </label>
+  <label>Subrepo (if applicable):
+    <input name="subrepo"/>
+  </label>
+  <label>Basefile:
+    <input name="basefile"/>
+  </label>
+  <label>
+    Action:
+    <select name="action">
+      <option>download</option>
+      <option selected="selected">parse</option>
+      <option>relate</option>
+      <option>generate</option>
+    </selection>
+  </label>
+  <label>
+    New value:
+    <input name="newvalue">
+  </label>
   <input type="submit" class="btn btn-default" value="Importera dokument"/>
 <form>
 </div>""", "Change options for a specific basefile")
 
 
+    @login_required
     def handle_patch(self, request, **values):
         """Create patch files for documents for redacting or correcting data in the source documents"""
         def open_intermed_text(repo, basefile, mode="rb"):
@@ -432,15 +448,18 @@ documents.</p>
             # names and textbox for basefile?
             return self.render_template("""
 <div>
-<h2>Create a new patch</h2>
-<form>
-<div class="form-group">
-<label for="repo">repo</label>
-<input type="text" id="repo" name="repo" class="form-control"/>
-<label for="basefile">basefile</label>
-<input type="text" id="basefile" name="basefile" class="form-control"/>
-</form>
-</form>""", "patch")
+  <h2>Create a new patch</h2>
+  <form>
+    <div class="form-group">
+      <label for="repo">repo
+        <input type="text" id="repo" name="repo" class="form-control"/>
+      </label>
+      <label for="basefile">basefile
+        <input type="text" id="basefile" name="basefile" class="form-control"/>
+      </label>
+    </div>
+  </form>
+</div>""", "patch")
         else:
             alias = request.args['repo']
             basefile = request.args['basefile']
@@ -448,7 +467,7 @@ documents.</p>
             patchstore = repo.documentstore_class(repo.config.patchdir +
                                                   os.sep + repo.alias)
             patchpath = patchstore.path(basefile, "patches", ".patch")
-            if environ['REQUEST_METHOD'] == 'POST':
+            if request.method == 'POST':
                 self.repo.mkpatch(repo, basefile, request.args.get('description',''),
                                   request.args['filecontents'].replace("\r\n", "\n"))
                 log = []
@@ -479,19 +498,18 @@ documents.</p>
                     patchcontent = None
                 return self.render_template("""
 <div>
-{% if patchexists %}
-<h2>Patch generated at {{patchpath}}</h2>
-<p>Contents of new patch</p>
-<pre>{{patchcontent}}</pre>
-{% else %}
-<h2>Patch was not generated</h2>
-{% endif %}
-{% for line in log %}
-<p>{{line}}</p>
-{% endfor %)
+  {% if patchexists %}
+  <h2>Patch generated at {{patchpath}}</h2>
+  <p>Contents of new patch</p>
+  <pre>{{patchcontent}}</pre>
+  {% else %}
+  <h2>Patch was not generated</h2>
+  {% endif %}
+  {% for line in log %}
+  <p>{{line}}</p>
+  {% endfor %)
 </div>""", "patch", patchexists=patchexists, patchpath=patchpath, patchcontent=patchcontent, log=log)
             else:
-                print("load up intermediate file, display it in a textarea + textbox for patchdescription")
                 fp = open_intermed_text(repo, basefile)
                 outfile = util.name_from_fp(fp)
                 text = fp.read().decode(repo.source_encoding)
@@ -503,6 +521,7 @@ documents.</p>
                         if repo.config.patchformat == 'rot13':
                             pfp = StringIO(codecs.decode(pfp.read(), "rot13"))
                         try:
+                            patchcontent = util.readfile(patchpath)
                             ps = PatchSet.from_stream(pfp)
                             lines = text.split("\n")
                             offsets = ps.patches[0].adjust(lines)
@@ -511,56 +530,54 @@ documents.</p>
                                 patchdescription = ps.patches[0].hunks[0].comment
                             else:
                                 patchdescription = ""
-                            instructions = Div([
-                                P(["Existing patch at %s has been applied (" % patchpath,
-                                   A("ignore existing patch", href=ignorepatchlink), ")"]),
-                                P(["Contents of that patch, for reference"]),
-                                Pre([util.readfile(patchpath)])])
-                            if any(offsets):
-                                instructions.append(P("Patch did not apply cleanly, the following adjustments were made: %s" % offsets))
+                            instructions = "existing-patch"
                         except (PatchSyntaxError, PatchConflictError) as e:
-                            instructions = Div([
-                                P(["Existing patch at %s could not be applied (" % patchpath,
-                                   A("ignore existing patch", href=ignorepatchlink), ")"]),
-                                P("The error was:"),
-                                Pre([format_exception()])
-                                ])
+                            instructions = "existing-patch-fail"
                             patchdescription = ""
-                else:
-                    instructions = P(["Change the original data as needed"])
 
-                # the extra \n before filecontents text is to
-                # compensate for a missing \n introduced by the
-                # textarea tag
-                self.relate("""
-<h2>Editing {{outfile}}</h2>
-{% for line in instructions %}
-<p>{{line}}</p>
-{% endfor %}
-<p>Change the original data as needed</p>
-<form method="POST">
-<textarea class="form-control" id="filecontents" name="filecontents" rows="30" cols="80"></textarea>
-<br/>
-<div class="form-group">
-<label for="description">Description of patch</label>
-<input class="form-control" id="description" name="description"/>
-</div>
-<div class="form-check">
-<label class="form-check-label">
-  <input class="form-check-input" id="parse" name="parse" type="checkbox" value="true" checked="checked"/>
-  Parse resulting file
-</label>
-</div>
-<div class="form-check">
-<label class="form-check-label">
-  <input class="form-check-input" id="generate" name="generate" type="checkbox" value="true" checked="checked"/>
-  Generate HTML from results of parse
-</label>
-</div>
-<input id="repo" name="repo" type="hidden" value="{{alias}}"/>
-<input id="basefile" name="basefile" type="hidden" value="{{basefile}}"/>
-<button class="btn btn-default" type="submit">Create patch</button>
-</form>""", "patch", outfile=outfile, alias=alias, basefile=basefile)
+                self.render_template("""
+<div>
+  <h2>Editing {{outfile}}</h2>
+  {% if instructions == "existing-patch" %}
+  <p>Existing patch at {{patchpath}} has been applied 
+  (<a href="{{ignorepatchlink}}">ignore existing patch</a>)</p>
+  <p>Contents of that patch, for reference</p>
+  <pre>{{patchcontent}}</pre>
+    {% if offsets %}
+    <p>Patch did not apply cleanly, the following adjustments were made: {{offsets}}</p>
+    {% endif %}                
+  {% elif instructions == "existing-patch-fail" %}
+  <p>Existing patch at {{patchpath}} could not be applied 
+  (<a href="{{ignorepatchlink}}">ignore existing patch</a></p>
+  <p>The error was</p>
+  <pre>{{formatted_exception}}</pre>
+  {% endif %}
+  <p>Change the original data as needed</p>
+  <form method="POST">
+    <textarea class="form-control" id="filecontents" name="filecontents" rows="30" cols="80"></textarea>
+    <br/>
+    <div class="form-group">
+      <label>Description of patch
+        <input class="form-control" name="description"/>
+      </label>
+    </div>
+    <div class="form-check">
+      <label class="form-check-label">
+        Parse resulting file
+        <input class="form-check-input" id="parse" name="parse" type="checkbox" value="true" checked="checked"/>
+      </label>
+    </div>
+    <div class="form-check">
+      <label class="form-check-label">
+        Generate HTML from results of parse
+        <input class="form-check-input"name="generate" type="checkbox" value="true" checked="checked"/>
+      </label>
+    </div>
+    <input id="repo" name="repo" type="hidden" value="{{alias}}"/>
+    <input id="basefile" name="basefile" type="hidden" value="{{basefile}}"/>
+    <button class="btn btn-default" type="submit">Create patch</button>
+  </form>
+</div>""", "patch", outfile=outfile, alias=alias, basefile=basefile)
 
     def analyze_log(self, filename, listerrors=False):
         modules = defaultdict(int)
@@ -649,11 +666,11 @@ documents.</p>
         return output.getvalue()
         
 
+    @login_required
     def handle_logs(self, request, **values):
         """Display and summarize logfiles from recent ferenda-build.py runs"""
         logdir = self.repo.config.datadir + os.sep + "logs"
         def elapsed(f):
-            from pudb import set_trace; set_trace()
             filesize = os.path.getsize(f)
             with open(f) as fp:
                 first = fp.readline()
@@ -709,14 +726,14 @@ documents.</p>
             streamurl = request.url + "&stream=true"
             return self.render_template("""
 <div>
-<p>Log processed in {{"%.3f"|format(processtime)}} s. The logged action took {{"%.0f"|format(elapsedtime)}} s</p>
-<h3>Buildstats</h3>
-<pre>{{buildstats}}</pre>
-<h3>Errors</h3>            
-<pre>{{errorstats}}</pre>
-<h3>Logs</h3>
-<pre class="pre-scrollable logviewer" id="streaming-log-output" src="{{streamurl|e}}">
-</pre>
+  <p>Log processed in {{"%.3f"|format(processtime)}} s. The logged action took {{"%.0f"|format(elapsedtime)}} s</p>
+  <h3>Buildstats</h3>
+  <pre>{{buildstats}}</pre>
+  <h3>Errors</h3>            
+  <pre>{{errorstats}}</pre>
+  <h3>Logs</h3>
+  <pre class="pre-scrollable logviewer" id="streaming-log-output" src="{{streamurl|e}}">
+  </pre>
 </div>""", "log %s" % logfilename, logfilename=logfilename,
                                         processtime=processtime,
                                         elapsedtime=elapsedtime,

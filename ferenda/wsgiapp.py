@@ -81,9 +81,6 @@ class WSGIApp(object):
             # at this point, we could maybe write a apache:mod_rewrite
             # or nginx compatible config based on our rules?
         self.routingmap = Map(rules)
-        print("Routingmap:")
-        from pprint import pprint
-        pprint(rules)
         base = self.config.datadir
         exports = {
             '/index.html': os.path.join(base, 'index.html'),
@@ -219,6 +216,366 @@ class WSGIApp(object):
         data = self._transform(title, body, request.environ, template="xsl/search.xsl")
         return Response(data, mimetype="text/html")
 
+    def stats(self, resultset=()):
+        slices = OrderedDict()
+
+        datadict = defaultdict(list)
+
+        # 1: Create a giant RDF graph consisting of all triples of all
+        #    repos' commondata. To avoid parsing the same RDF files
+        #    over and over, this section duplicates the logic of
+        #    DocumentRepository.commondata to make sure each RDF
+        #    file is loaded only once.
+        ttlfiles = set()
+        resource_graph = Graph()
+        namespaces = {}
+        for repo in self.repos:
+            for prefix, ns in repo.make_graph().namespaces():
+                assert ns not in namespaces or namespaces[ns] == prefix, "Conflicting prefixes for ns %s" % ns
+                namespaces[ns] = prefix
+                resource_graph.bind(prefix, ns)
+                for cls in inspect.getmro(repo.__class__):
+                    if hasattr(cls, "alias"):
+                        commonpath = "res/extra/%s.ttl" % cls.alias
+                        if os.path.exists(commonpath):
+                            ttlfiles.add(commonpath)
+                        elif pkg_resources.resource_exists('ferenda', commonpath):
+                            ttlfiles.add(pkg_resources.resource_filename('ferenda', commonpath))
+
+        self.log.debug("stats: Loading resources %s into a common resource graph" %
+                       list(ttlfiles))
+        for filename in ttlfiles:
+            resource_graph.parse(data=util.readfile(filename), format="turtle")
+        pkg_resources.cleanup_resources()
+
+
+        # 2: if used in the resultset mode, only calculate stats for those
+        # resources/documents that are in the resultset.
+        resultsetmembers = set()
+        if resultset:
+            for r in resultset:
+                resultsetmembers.add(r['iri'])
+
+        # 3: using each repo's faceted_data and its defined facet
+        # selectors, create a set of observations for that repo
+        # 
+        # FIXME: If in resultset mode, we might ask a repo for its
+        # faceted data and then use exactly none of it since it
+        # doesn't match anything in resultsetmembers. We COULD analyze
+        # common resultset iri prefixes and then only call
+        # faceted_data for some (or one) repo.
+        for repo in self.repos:
+            data = repo.faceted_data()
+            if resultsetmembers:
+                data = [r for r in data if r['uri'] in resultsetmembers]
+
+            for facet in repo.facets():
+                if not facet.dimension_type:
+                    continue
+                dimension, obs = self.stats_slice(data, facet, resource_graph)
+                if dimension in slices:
+                    # since observations is a Counter not a regular
+                    # dict, if slices[dimensions] and observations
+                    # have common keys this will add the counts not
+                    # replace them.
+                    slices[dimension].update(obs)
+                else:
+                    slices[dimension] = obs
+
+        # 4. Transform our easily-updated data structures to the list
+        # of dicts of lists that we're supposed to return.
+        res = {"type": "DataSet",
+               "slices": []
+               }
+        for k, v in sorted(slices.items()):
+            observations = []
+            for ok, ov in sorted(v.items()):
+                observations.append({ok[0]: ok[1],
+                                     "count": ov})
+            res['slices'].append({"dimension": k,
+                                  "observations": observations})
+        return res
+
+    def stats_slice(self, data, facet, resource_graph):
+        binding = resource_graph.qname(facet.rdftype).replace(":", "_")
+        if facet.dimension_label:
+            dimension_label = facet.dimension_label
+        elif self.config.legacyapi:
+            dimension_label = util.uri_leaf(str(facet.rdftype))
+        else:
+            dimension_label = binding
+
+        dimension_type = facet.dimension_type
+        if (self.config.legacyapi and
+                dimension_type == "value"):
+            # legacyapi doesn't support the value type, we must
+            # convert it into ref, and convert all string values to
+            # fake resource ref URIs
+            dimension_type = "ref"
+            transformer = lambda x: (
+                "http://example.org/fake-resource/%s" %
+                x).replace(
+                " ",
+                "_")
+        elif self.config.legacyapi and dimension_type == "term":
+            # legacyapi expects "Standard" over "bibo:Standard", which is what
+            # Facet.qname returns
+            transformer = lambda x: x.split(":")[1]
+        else:
+            transformer = lambda x: x
+
+        observations = Counter()
+        # one file per uri+observation seen -- avoid
+        # double-counting
+        observed = {}
+        for row in data:
+            observation = None
+            try:
+                # maybe if facet.dimension_type == "ref", selector
+                # should always be Facet.defaultselector?  NOTE:
+                # we look at facet.dimension_type, not
+                # dimension_type, as the latter may be altered if
+                # legacyapi == True
+                if facet.dimension_type == "ref":
+                    observation = transformer(Facet.defaultselector(
+                        row, binding))
+                else:
+                    observation = transformer(
+                        facet.selector(
+                            row,
+                            binding,
+                            resource_graph))
+
+            except Exception as e:
+                # most of the time, we should swallow this
+                # exception since it's a selector that relies on
+                # information that is just not present in the rows
+                # from some repos. I think.
+                if hasattr(facet.selector, 'im_self'):
+                    # try to find the location of the selector
+                    # function for easier debugging
+                    fname = "%s.%s.%s" % (facet.selector.__module__,
+                                          facet.selector.im_self.__name__,
+                                          facet.selector.__name__)
+                else:
+                    # probably a lambda function
+                    fname = facet.selector.__name__
+                # FIXME: do we need the repo name here to provide useful
+                # messages?
+                # self.log.warning("facet %s (%s) fails for row %s : %s %s" % (binding, fname, row['uri'], e.__class__.__name__, str(e)))
+
+                pass
+            if observation is not None:
+                k = (dimension_type, observation)
+                if (row['uri'], observation) not in observed:
+                    observed[(row['uri'], observation)] = True
+                    observations[k] += 1
+        return dimension_label, observations
+
+    def query(self, request):
+        # this is needed -- but the connect call shouldn't neccesarily
+        # have to call exists() (one HTTP call)
+        idx = FulltextIndex.connect(self.config.indextype,
+                                    self.config.indexlocation,
+                                    self.repos)
+        q, param, pagenum, pagelen, stats = self.parse_parameters(
+            request.query_string, idx)
+        ac_query = request.args.get("_ac") == "true"
+        # not sure these two parameters should come from the query
+        # string or from some other source
+        exclude_types = request.args.get('exclude_types', None)
+        boost_types = request.args.get('boost_types', None)
+        res, pager = idx.query(q=q,
+                               pagenum=pagenum,
+                               pagelen=pagelen,
+                               ac_query=ac_query,
+                               exclude_types=exclude_types,
+                               boost_types=boost_types,
+                               **param)
+        mangled = self.mangle_results(res, ac_query)
+        # 3.1 create container for results
+        res = {"startIndex": pager['firstresult'] - 1,
+               "itemsPerPage": int(param.get('_pageSize', '10')),
+               "totalResults": pager['totalresults'],
+               "duration": None,  # none
+               "current": request.path + "?" + request.query_string,
+               "items": mangled}
+
+        # 4. add stats, maybe
+        if stats:
+            res["statistics"] = self.stats(mangled)
+        return res
+
+
+    def mangle_results(self, res, ac_query):
+        def _elements_to_html(elements):
+            res = ""
+            for e in elements:
+                if isinstance(e, str):
+                    res += e
+                else:
+                    res += '<em class="match">%s</em>' % str(e)
+            return res
+
+        # Mangle res into the expected JSON structure (see qresults.json)
+        if ac_query:
+            # when doing an autocomplete query, we want the relevance order from ES
+            hiterator = res
+        else:
+            # for a regular API query, we need another order (I forgot exactly why...)
+            hiterator = sorted(res, key=itemgetter("uri"), reverse=True)
+        mangled = []
+        for hit in hiterator:
+            mangledhit = {}
+            for k, v in hit.items():
+                if self.config.legacyapi:
+                    if "_" in k:
+                        # drop prefix (dcterms_issued -> issued)
+                        k = k.split("_", 1)[1]
+                    elif k == "innerhits":
+                        continue  # the legacy API has no support for nested/inner hits
+                if k == "uri":
+                    k = "iri"
+                    # change eg https://lagen.nu/1998:204 to
+                    # http://localhost:8080/1998:204 during
+                    # development
+                    if v.startswith(self.config.url) and self.config.develurl:
+                        v = v.replace(self.config.url, self.config.develurl)
+                if k == "text":
+                    mangledhit["matches"] = {"text": _elements_to_html(hit["text"])}
+                elif k in ("basefile", "repo"):
+                    # these fields should not be included in results
+                    pass
+                else:
+                    mangledhit[k] = v
+            mangledhit = self.mangle_result(mangledhit, ac_query)
+            mangled.append(mangledhit)
+        return mangled
+
+    def mangle_result(self, hit, ac_query=False):
+        return hit
+
+    def parse_parameters(self, querystring, idx):
+        def _guess_real_fieldname(k, schema):
+            for fld in schema:
+                if fld.endswith(k):
+                    return fld
+            raise KeyError(
+                "Couldn't find anything that endswith(%s) in fulltextindex schema" %
+                k)
+
+        if isinstance(querystring, bytes):
+            # Assume utf-8 encoded URL -- when is this assumption
+            # incorrect?
+            querystring = querystring.decode("utf-8")
+
+        param = dict(parse_qsl(querystring))
+        filtered = dict([(k, v)
+                         for k, v in param.items() if not (k.startswith("_") or k == "q")])
+        if filtered:
+            # OK, we have some field parameters. We need to get at the
+            # current schema to know how to process some of these and
+            # convert them into fulltextindex.SearchModifier objects
+            
+            # Range: some parameters have additional parameters, eg
+            # "min-dcterms_issued=2014-01-01&max-dcterms_issued=2014-02-01"
+            newfiltered = {}
+            for k, v in list(filtered.items()):
+                if k.startswith("min-") or k.startswith("max-"):
+                    op = k[:4]
+                    compliment = k.replace(op, {"min-": "max-",
+                                                "max-": "min-"}[op])
+                    k = k[4:]
+                    if compliment in filtered:
+                        start = filtered["min-" + k]
+                        stop = filtered["max-" + k]
+                        newfiltered[k] = fulltextindex.Between(datetime.strptime(start, "%Y-%m-%d"),
+                                                               datetime.strptime(stop, "%Y-%m-%d"))
+                    else:
+                        cls = {"min-": fulltextindex.More,
+                               "max-": fulltextindex.Less}[op]
+                        # FIXME: need to handle a greater variety of str->datatype conversions
+                        v = datetime.strptime(v, "%Y-%m-%d")
+                        newfiltered[k] = cls(v)
+                elif k.startswith("year-"):
+                    # eg for year-dcterms_issued=2013, interpret as
+                    # Between(2012-12-31 and 2014-01-01)
+                    k = k[5:]
+                    newfiltered[k] = fulltextindex.Between(date(int(v) - 1, 12, 31),
+                                                           date(int(v) + 1, 1, 1))
+                else:
+                    newfiltered[k] = v
+            filtered = newfiltered
+
+            schema = idx.schema()
+            if self.config.legacyapi:
+                # 2.3 legacyapi requires that parameters do not include
+                # prefix. Therefore, transform publisher.iri =>
+                # dcterms_publisher (ie remove trailing .iri and append a
+                # best-guess prefix
+                newfiltered = {}
+                for k, v in filtered.items():
+                    if k.endswith(".iri"):
+                        k = k[:-4]
+                        # the parameter *looks* like it's a ref, but it should
+                        # be interpreted as a value -- remove starting */ to
+                        # get at actual querystring
+
+                        # FIXME: in order to lookup k in schema, we may need
+                        # to guess its prefix, but we're cut'n pasting the
+                        # strategy from below. Unify.
+                        if k not in schema and "_" not in k and k not in ("uri"):
+                            k = _guess_real_fieldname(k, schema)
+
+                        if v.startswith(
+                                "*/") and not isinstance(schema[k], fulltextindex.Resource):
+                            v = v[2:]
+                    if k not in schema and "_" not in k and k not in ("uri"):
+                        k = _guess_real_fieldname(k, schema)
+                        newfiltered[k] = v
+                    else:
+                        newfiltered[k] = v
+                filtered = newfiltered
+
+            # 2.1 some values need to be converted, based upon the
+            # fulltextindex schema.
+            # if schema[k] == fulltextindex.Datetime, do strptime.
+            # if schema[k] == fulltextindex.Boolean, convert 'true'/'false' to True/False.
+            # if k = "rdf_type" and v looks like a qname or termname, expand v
+            for k, fld in schema.items():
+                # NB: Some values might already have been converted previously!
+                if k in filtered and isinstance(filtered[k], str):
+                    if isinstance(fld, fulltextindex.Datetime):
+                        filtered[k] = datetime.strptime(filtered[k], "%Y-%m-%d")
+                    elif isinstance(fld, fulltextindex.Boolean):
+                        filtered[k] = (filtered[k] == "true")  # only "true" is True
+                    elif k == "rdf_type" and re.match("\w+:[\w\-_]+", filtered[k]):
+                        # expand prefix ("bibo:Standard" -> "http://purl.org/ontology/bibo/")
+                        (prefix, term) = re.match("(\w+):([\w\-_]+)", filtered[k]).groups()
+                        for repo in self.repos:
+                            if prefix in repo.ns:
+                                filtered[k] = str(repo.ns[prefix]) + term
+                                break
+                        else:
+                            self.log.warning("Can't map %s to full URI" % (filtered[k]))
+                        pass
+                    elif k == "rdf_type" and self.config.legacyapi and re.match("[\w\-\_]+", filtered[k]):
+                        filtered[k] = "*" + filtered[k]
+
+        q = param['q'] if 'q' in param else None
+
+        # find out if we need to get all results (needed when stats=on) or
+        # just the first page
+        if param.get("_stats") == "on":
+            pagenum = 1
+            pagelen = 10000 # this is the max that default ES 2.x will allow
+            stats = True
+        else:
+            pagenum = int(param.get('_page', '0')) + 1
+            pagelen = int(param.get('_pageSize', '10'))
+            stats = False
+
+        return q, filtered, pagenum, pagelen, stats
 
     def _search_run_query(self, queryparams, boost_types=None):
         idx = FulltextIndex.connect(self.config.indextype,
@@ -298,7 +655,13 @@ class WSGIApp(object):
 
 
     def handle_api(self, request, **values):
-        return Reponse("Hello API")
+        if request.path.endswith(";stats"):
+            d = self.stats()
+        else:
+            d = self.query(request)
+        data = json.dumps(d, indent=4, default=util.json_default_date,
+                          sort_keys=True).encode('utf-8')
+        return Response(data, content_type="application/json")
 
 
     exception_heading = "Something is broken"

@@ -13,6 +13,7 @@ import shutil
 from lxml import etree
 from rdflib import Graph
 from layeredconfig import LayeredConfig, Defaults
+from werkzeug.test import EnvironBuilder
 
 from ferenda.compat import Mock, patch
 from ferenda import manager, util, fulltextindex
@@ -236,9 +237,11 @@ class API(WSGI):
     def setUp(self):
        super(API, self).setUp()
        self.env['PATH_INFO'] = '/myapi/'
+       self.env['REQUEST_METHOD'] = 'GET'
+       self.env['QUERY_STRING'] = ''
 
     def test_basic(self):
-        status, headers, content = self.call_wsgi(self.env)
+        status, headers, content = self.call_wsgi(EnvironBuilder(environ_base=self.env).get_environ())
         self.assertResponse("200 OK",
                             {'Content-Type': 'application/json'},
                             None,
