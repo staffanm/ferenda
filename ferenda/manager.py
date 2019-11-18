@@ -49,6 +49,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import traceback
 import warnings
 try:
@@ -456,13 +457,17 @@ def run(argv, config=None, subcall=False):
                  prefixed with ``--``, e.g. ``--loglevel=INFO``, or
                  positional arguments to the specified action).
     """
-    # make the process print useful information when ctrl-T is pressed
-    # (only works on Mac and BSD, who support SIGINFO)
-    if hasattr(signal, 'SIGINFO'):
-        signal.signal(signal.SIGINFO, _siginfo_handler)
-    # or when the SIGUSR1 signal is sent ("kill -SIGUSR1 <pid>")
-    if hasattr(signal, 'SIGUSR1'):
-        signal.signal(signal.SIGUSR1, _siginfo_handler)
+    # when running under Werkzeug with the reloader active, the
+    # reloader runs on the main thread and all wsgi code runs on a
+    # separate thread, In these cases signals can't be set.
+    if threading.current_thread() is threading.main_thread():
+        # make the process print useful information when ctrl-T is pressed
+        # (only works on Mac and BSD, who support SIGINFO)
+        if hasattr(signal, 'SIGINFO'):
+            signal.signal(signal.SIGINFO, _siginfo_handler)
+        # or when the SIGUSR1 signal is sent ("kill -SIGUSR1 <pid>")
+        if hasattr(signal, 'SIGUSR1'):
+            signal.signal(signal.SIGUSR1, _siginfo_handler)
     
     if not config:
         config = load_config(find_config_file(), argv)

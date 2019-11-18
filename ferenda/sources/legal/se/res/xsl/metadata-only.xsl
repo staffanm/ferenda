@@ -12,6 +12,7 @@
 	<input type="hidden" name="repo" value="{$repo}"/> 
 	<input type="hidden" name="subrepo" value="{$subrepo}"/> 
 	<input type="hidden" name="basefile" value="{$basefile}"/>
+	<input type="hidden" name="action" value="parse"/>
 	<input type="hidden" name="newvalue" value="default"/>
 	<div class="form-group">
 	  <input type="text" name="reason" class="form-control" placeholder="Beskriv varför dokumentet bör tas med..."/>

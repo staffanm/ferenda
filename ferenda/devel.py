@@ -13,7 +13,7 @@ from itertools import islice
 from io import BytesIO, StringIO
 from tempfile import mkstemp
 from time import sleep
-from operator import attrgetter
+from operator import attrgetter, itemgetter
 from pprint import pformat
 import codecs
 import fileinput
@@ -48,7 +48,6 @@ from ferenda import (TextReader, TripleStore, FulltextIndex, WSGIApp,
                      CompositeRepository, DocumentEntry, Transformer,
                      RequestHandler, ResourceLoader)
 from ferenda.elements import serialize
-from ferenda.elements.html import Body, P, H1, H2, H3, Form, Textarea, Input, Label, Button, Textarea, Br, Div, A, Pre, Code, UL, LI
 from ferenda import decorators, util, manager
 from ferenda.manager import enable
 
@@ -63,21 +62,6 @@ class DummyStore(object):
     def list_versions_for_basefiles(self, basefiles, action):
         return [] # pragma: no cover
 
-class WSGIOutputHandler(logging.Handler):
-    
-    def __init__(self, writer):
-        self.writer = writer
-        super(WSGIOutputHandler, self).__init__()
-
-    def emit(self, record):
-        entry = self.format(record) + "\n"
-        try:
-            self.writer(entry.encode("utf-8"))
-        except OSError as e:
-            # if self.writer has closed, it probably means that the
-            # HTTP client has closed the connection. But we don't stop
-            # for that.
-            pass
 
 def login_required(f):
     """makes sure that the user is authenticated before calling the endpoint"""
@@ -103,67 +87,8 @@ class DevelHandler(RequestHandler):
                 Rule('/devel/build', endpoint=self.handle_build),
                 Rule('/devel/logs',  endpoint=self.handle_logs),
                 Rule('/devel/streaming-test',  endpoint=self.handle_streaming_test),
-                Rule('/devel/change-parse-options',  endpoint=self.handle_change_parse_options),
+                Rule('/devel/change-options',  endpoint=self.handle_change_options),
                 Rule('/devel/patch',  endpoint=self.handle_patch)]
-
-    def supports(self, environ):
-        return environ['PATH_INFO'].startswith("/devel/")
-
-    def handle(self, environ):
-        if hasattr(self.repo.config, 'username') and hasattr(self.repo.config, 'password'):
-            if 'HTTP_AUTHORIZATION' not in environ:
-                # login needed
-                return '', 0, 403, "text/plain"
-            else:
-                header = environ['HTTP_AUTHORIZATION'].replace("Basic ", "", 1) 
-                username, password = base64.b64decode(header).decode("utf-8").split(":", 1)
-                if (username != self.repo.config.username or
-                    password != self.repo.config.password):
-                    # login needed
-                    return '', 0, 403, "text/plain"
-
-        segments = [x for x in environ['PATH_INFO'].split("/") if x]
-        if environ['REQUEST_METHOD'] == 'POST':
-            reqbody = environ['wsgi.input'].read(int(environ.get('CONTENT_LENGTH', 0)))
-            params = dict(parse_qsl(reqbody.decode("utf-8")))
-        else:
-            params = dict(parse_qsl(environ['QUERY_STRING']))
-        
-        handler = {'': self.handle_dashboard,
-                   'patch': self.handle_patch,
-                   'logs': self.handle_logs,
-                   'change-parse-options': self.handle_change_parse_options,
-                   'build': self.handle_build,
-                   'streaming-test': self.handle_streaming_test}[segments[1]]
-        body = handler(environ, params)
-        res = self._render(segments[1], body, request_uri(environ), self.repo.config)
-        length = len(res)
-        fp = BytesIO(res)
-        return fp, length, 200, "text/html"
-
-
-    def _render(self, title, body, uri, config, template="xsl/generic.xsl"):
-        repo = DocumentRepository(config=config)
-        doc = repo.make_document()
-        doc.uri = uri
-        doc.meta.add((URIRef(doc.uri),
-                      DCTERMS.title,
-                      Literal(title, lang="sv")))
-        doc.body = body
-        xhtml = repo.render_xhtml_tree(doc)
-        documentroot = repo.config.datadir
-        conffile = os.sep.join([documentroot, 'rsrc',
-                                'resources.xml'])
-        transformer = Transformer('XSLT', template, "xsl",
-                                  resourceloader=repo.resourceloader,
-                                  config=conffile)
-        urltransform = None
-        if 'develurl' in repo.config and repo.config.develurl:
-            urltransform = repo.get_url_transform_func(develurl=repo.config.develurl)
-        depth = len(doc.uri.split("/")) - 3
-        tree = transformer.transform(xhtml, depth,
-                                     uritransform=urltransform)
-        return etree.tostring(tree, encoding="utf-8")
 
     def render_template(self, jinja_template, page_title, **context):
         repo = DocumentRepository(config=self.repo.config)
@@ -193,42 +118,6 @@ class DevelHandler(RequestHandler):
         data = etree.tostring(tree, encoding="utf-8")
         return Response(data, mimetype="text/html")
 
-    def stream(self, environ, start_response):
-        if environ['PATH_INFO'].endswith('change-parse-options'):
-            return self.handle_change_parse_options_stream(environ, start_response)
-        elif environ['PATH_INFO'].endswith('streaming-test'):
-            return self.handle_streaming_test_stream(environ, start_response)
-        elif environ['PATH_INFO'].endswith('build'):
-            return self.handle_build_stream(environ, start_response)
-        else:
-            start_response('500 Server error', [('Content-Type', 'text/plain')])
-            return ['No streaming handler registered for PATH_INFO %s' % environ['PATH_INFO']]
-
-
-    def _setup_streaming_logger(self, writer):
-        # these internal libs use logging to log things we rather not disturb the user with
-        for logname in ['urllib3.connectionpool',
-                        'chardet.charsetprober',
-                        'rdflib.plugins.parsers.pyRdfa']:
-            log = logging.getLogger(logname)
-            log.propagate = False
-
-        wsgihandler = WSGIOutputHandler(writer)
-        wsgihandler.setFormatter(
-            logging.Formatter("%(asctime)s [%(name)s] %(levelname)s %(message)s",
-                 datefmt="%H:%M:%S"))
-        rootlogger = logging.getLogger()
-        rootlogger.setLevel(logging.DEBUG)
-        for handler in rootlogger.handlers:
-            rootlogger.removeHandler(handler)
-        logging.getLogger().addHandler(wsgihandler)
-        return rootlogger
-        
-    def _shutdown_streaming_logger(self, rootlogger):
-        for h in list(rootlogger.handlers):
-            if isinstance(h, WSGIOutputHandler):
-                h.close()
-                rootlogger.removeHandler(h)
 
     @login_required
     def handle_dashboard(self, request, **values):
@@ -367,194 +256,157 @@ documents.</p>
 """, "Dashboard", possible_repos=possible_repos, enabled=enabled, config=config, tools=tools)
 
 
-    def handle_build(self, environ, params):
+    def handle_build(self, request, **values):
         """Perform any action that the command line tool ferenda-build.py can do (download, parse, generate etc), over the web"""
-        if params:
-            params = defaultdict(str, params)
-            label = "Running %(repo)s %(action)s %(basefile)s %(all)s %(force)s %(sefresh)s" % params
-            params["stream"] = "true"
-            streamurl = environ['PATH_INFO'] + "?" + urlencode(params)
-            return Body([H2(["ferenda-build"]),
-                         Pre(**{'class': 'pre-scrollable',
-                                'id': 'streaming-log-output',
-                                'src': streamurl})
-                         ])
+        if request.args:
+            if request.args.get("stream") == "true":
+                argv = [request.args[x] for x in ('repo', 'action', 'basefile', 'all', 'force', 'refresh') if request.args.get(x)]
+                argv.append('--loglevel=DEBUG')
+                manager.run(argv)
+            else:
+                label = "Running %(repo)s %(action)s %(basefile)s %(all)s %(force)s %(refresh)s" % defaultdict(str, request.args.to_dict())
+                streamurl = request.url + "&stream=true"
+                return self.render_template("""
+<h2>ferenda-build</h2>
+                <pre class="pre-scrollable" id="streaming-log-output" src="{{streamurl|e}}">
+</pre>""", label, streamurl=streamurl)
+            
         else:
-            return Body([
-                Div([H2(["ferenda-build.py"]),
-                     Form([
-                          Div([Label(["repo"], **{'for': "repo", 'class': "sr-only"}),
-                               Input(**{'type': "text", 'id': "repo", 'name': "repo", 'placeholder': "repo", 'class': "form-control"}),
-                               Label(["action"], **{'for': "action", 'class': "sr-only"}),
-                               Input(**{'type': "text", 'id': "action", 'name': "action", 'placeholder': "action", 'class': "form-control"}),
-                               Label(["basefile"], **{'for': "basefile", 'class': "sr-only"}),
-                               Input(**{'type': "text", 'id': "basefile", 'name': "basefile", 'placeholder': "basefile", 'class': "form-control"})
-                          ], **{'class': 'form-group'}),
-                         Div([Input(**{'type': "checkbox", 'id': "all", 'name': "all", 'value': "--all"}),
-                              Label(["--all"], **{'for': "all"}),
-                              Input(**{'type': "checkbox", 'id': "force", 'name': "force", 'value': "--force"}),
-                              Label(["--force"], **{'for': "force"}),
-                              Input(**{'type': "checkbox", 'id': "refresh", 'name': "refresh", 'value': "--refresh"}),
-                              Label(["--refresh"], **{'for': "refresh"}),
-                              Button(["Build"], **{'type': "submit", 'class': "btn btn-default"})
-                         ], **{'class': 'form-group'})
-                         
-                      ], **{'class': 'form-inline'})])])
-
-    def handle_build_stream(self, environ, start_response):
-        content_type = 'application/octet-stream'
-        writer = start_response('200 OK', [('Content-Type', content_type),
-                                           ('X-Accel-Buffering', 'no')]) 
-        rootlogger = self._setup_streaming_logger(writer)
-        log = logging.getLogger(__name__)
-        log.info("Running ...")
-        params = dict(parse_qsl(environ['QUERY_STRING']))
-        argv = [params[x] for x in ('repo', 'action', 'basefile', 'all', 'force', 'refresh') if params.get(x)]
-        argv.append('--loglevel=DEBUG')
-        try:
-            manager.run(argv)
-        except Exception as e:
-            exc_type, exc_value, tb = sys.exc_info()
-            tblines = traceback.format_exception(exc_type, exc_value, tb)
-            msg = "\n".join(tblines)
-            writer(msg.encode("utf-8"))
-        finally:
-            self._shutdown_streaming_logger(rootlogger)
-            # ok we're done
-        return []
+            return self.render_template("""
+<form class="form-inline">
+<div class="form-group">
+<label class="sr-only" for="repo">repo</label>
+<input class="form-control" id="repo" name="repo" type="text" placeholder="repo"/>
+<label class="sr-only" for="action">action</label>
+<input class="form-control" id="action" name="action" type="text" placeholder="action"/>
+<label class="sr-only" for="basefile">basefile</label>
+<input class="form-control" id="basefile" name="basefile" type="text" placeholder="basefile"/>
+</div>
+<div class="form-group">
+<input id="all" name="all" type="checkbox" value="--all"/>
+<label for="all">--all</label>
+<input id="force" name="force" type="checkbox" value="--force"/>
+<label for="force">--force</label>
+<input id="refresh" name="refresh" type="checkbox" value="--refresh"/>
+<label for="refresh">--refresh</label>
+<button class="btn btn-default" type="submit">Build</button></div>
+            </form>""", "build")
 
 
-    def handle_streaming_test(self, environ, params):
+    def handle_streaming_test(self, request, **values):
         """Diagnostic tool to see if long-running processes are able to stream their output to the web browser"""
-        return Body([
-            Div([H2(["Streaming test"]),
-                 Pre(**{'class': 'pre-scrollable',
-                        'id': 'streaming-log-output',
-                        'src': environ['PATH_INFO'] + "?stream=true"})])])
+        if request.values.get('stream') == 'true':
+            log = logging.getLogger(__name__)
+            log.debug("Debug messages should work")
+            sleep(1)
+            log.info("Info messages should work")
+            sleep(1)
+            log.warning("Warnings should, unsurprisingly, work")
+        else:
+            return self.render_template("""
+            <pre class="pre-scrollable" id="streaming-log-output" src="/devel/streaming-test?stream=true"></pre>""", "Streaming-test")
 
-    def handle_streaming_test_stream(self, environ, start_response):
-        # using this instead of text/plain prevent chrome from
-        # buffering at the beginning (according to
-        # https://stackoverflow.com/q/20508788, there are three ways
-        # of overcoming this: The "X-Content-Type-Options: nosniff"
-        # header, sending at least 1024 bytes of data right away, or
-        # using a non text/plain content-type. The latter seems the
-        # easiest.
-        content_type = 'application/octet-stream'
-        # the second header disables nginx/uwsgi buffering so that
-        # results are actually streamed to the client, see
-        # http://nginx.org/en/docs/http/ngx_http_uwsgi_module.html#uwsgi_buffering
-        writer = start_response('200 OK', [('Content-Type', content_type),
-                                           ('X-Accel-Buffering', 'no'),
-                                           ('X-Content-Type-Options', 'nosniff')]) 
-        rootlogger = self._setup_streaming_logger(writer)
-        log = logging.getLogger(__name__)
-        #log.info("1024 bytes of start data: " + "x" * 1024)
-        #sleep(1)
-        log.debug("Debug messages should work")
-        sleep(1)
-        log.info("Info messages should work")
-        sleep(1)
-        log.warning("Warnings should, unsurprisingly, work")
-        self._shutdown_streaming_logger(rootlogger)
-        return []
 
-    def handle_change_parse_options(self, environ, params):
+    def handle_change_options(self, request, **values):
         """Display and change parse options for individual documents"""
         # this method changes the options and creates a response page
         # that, in turn, does an ajax request that ends up calling
         # handle_change_parse_options_stream
-        assert params
-        assert environ['REQUEST_METHOD'] == 'POST'
-        repo = params['repo']
-        subrepo = params['subrepo']
-        basefile = params['basefile']
-        newvalue = params['newvalue']
-        reason = params['reason']
-        inst = self.repo._repo_from_alias(repo)
-        optionsfile = inst.resourceloader.filename("options/options.py")
-        want = '("%s", "%s"):' % (repo, basefile)
-        lineidx = None
-        out = ""
-        with open(optionsfile) as f:
-            for idx, line in enumerate(f):
-                if want in line:
-                    lineidx = idx
-                    currentvalue = re.search(': "([^"]+)",', line).group(1)
-                    line = line.replace(currentvalue, newvalue)
-                    line = line.rstrip() + " # " + reason + "\n"
-                out += line
-        util.writefile(optionsfile, out)
-        # now we must invalidate the cached property
-        if 'parse_options' in inst.__dict__:
-            del inst.__dict__['parse_options']
-        if lineidx:
-            datasrc = "%s?repo=%s&subrepo=%s&basefile=%s&stream=true" % (
-                environ['PATH_INFO'],
-                repo,
-                subrepo,
-                basefile)
-            res = [H2(["Changing options for %s in repo %s" % (basefile, repo)]),
-                   # Pre([pformat(environ)]),
-                   P(["Changed option at line %s from " % lineidx,
-                      Code([currentvalue]),
-                      " to ",
-                      Code([newvalue])]),
-                   P(["Now downloading and processing (please be patient...)"]),
-                   Pre(**{'class': 'pre-scrollable',
-                          'id': 'streaming-log-output',
-                          'src': datasrc})]
+        if request.method == 'POST':
+            repo = request.form['repo']
+            subrepo = request.form['subrepo']
+            basefile = request.form['basefile']
+            newvalue = request.form['newvalue']
+            reason = request.form['reason']
+            inst = self.repo._repo_from_alias(repo)
+            optionsfile = inst.resourceloader.filename("options/options.py")
+            want = '("%s", "%s"):' % (repo, basefile)
+            lineidx = None
+            out = ""
+            with open(optionsfile) as f:
+                for idx, line in enumerate(f):
+                    if want in line:
+                        lineidx = idx
+                        currentvalue = re.search(': "([^"]+)",', line).group(1)
+                        line = line.replace(currentvalue, newvalue)
+                        line = line.rstrip() + " # " + reason + "\n"
+                    out += line
+            util.writefile(optionsfile, out)
+            # now we must invalidate the cached property
+            if 'parse_options' in inst.__dict__:
+                del inst.__dict__['parse_options']
+            if lineidx:
+                datasrc = "%s?repo=%s&subrepo=%s&basefile=%s&stream=true" % (
+                    environ['PATH_INFO'],
+                    repo,
+                    subrepo,
+                    basefile)
+                return self.render_template("""
+<div>
+<h2>Changing options for {{basefile}} in repo {{repo}}</h2>
+<p>Changed option at line {{lineidx}} from <code>{{currentvalue}}</code> to <code>{{newvalue}}</code></p>
+<p>Now downloading and processing (please be patient...)</p>
+<pre class="pre-scrollable" id="streaming-log-output" src="{{datasrc}}">
+</pre>
+                </div>""", "Change options", basefile=basefile,
+                                            repo=repo, lineidx=lineidx,
+                                            currentvalue=currentvalue,
+                                            newvalue=newvalue, datasrc=datasrc)
+            else:
+                return self.render_template("""
+<div>
+<h2>Couldn't change options for {{basefile}} in repo {{repo}}</h2>
+<p>Didn't manage to find a line matching <code>{{want}}</code> in <code>{{optionsfile}}</p>
+</div>""", "Change options", basefile=basefile, repo=repo, want=want, optionsfile=optionsfile)
+        elif request.args.get("stream") == "true":
+            repoconfig = getattr(self.repo.config._parent, request.form['repo'])
+            repoconfig.loglevel = "DEBUG"
+            repo = self.repo._repo_from_alias(request.form['repo'], repoconfig=repoconfig)
+            if 'subrepo' in request.form:
+                subrepoconfig = getattr(self.repo.config._parent, request.form['subrepo'])
+                subrepoconfig.loglevel = "DEBUG"
+                subrepo = self.repo._repo_from_alias(request.form['subrepo'], repoconfig=subrepoconfig)
+            else:
+                subrepo = repo
+            basefile = request.form['basefile']
+            try:
+                rootlogger.info("Downloading %s" % basefile)
+                subrepo.config.refresh = True  # the repo might have a partial download, eg of index HTML page but without PDF document
+                subrepo.download(basefile)
+                # sleep(1)
+                rootlogger.info("Parsing %s" % basefile)
+                repo.parse(basefile)
+                # sleep(1)
+                rootlogger.info("Relating %s" % basefile)
+                repo.relate(basefile)
+                # sleep(1)
+                rootlogger.info("Generating %s" % basefile)
+                repo.generate(basefile)
         else:
-            res = [H2(["Couldn't change options for %s in repo %s" % (basefile, repo)]),
-                   P(["Didn't manage to find a line matching ",
-                      Code([want]),
-                      " in ",
-                      Code([optionsfile])])]
-        return Body([
-            Div(res)
-            ])
+            self.render_template("""
+<div>
+<form method="POST">
+  Repo: 
+  <input name="repo"/> 
+  Subrepo (if applicable):
+  <input name="subrepo"/>
+  Basefile:
+  <input name="basefile"/>
+  Action:
+  <select name="action">
+    <option>download</option>
+    <option selected="selected">parse</option>
+    <option>relate</option>
+    <option>generate</option>
+  </selection>
+  New value:
+  <input name="newvalue">
+  <input type="submit" class="btn btn-default" value="Importera dokument"/>
+<form>
+</div>""", "Change options for a specific basefile")
 
-    def handle_change_parse_options_stream(self, environ, start_response):
-        writer = start_response('200 OK', [('Content-Type', 'application/octet-stream'),
-                                           ('X-Accel-Buffering', 'no')]) 
-        rootlogger = self._setup_streaming_logger(writer)
-        # now do the work
-        params = dict(parse_qsl(environ['QUERY_STRING']))
-        repoconfig = getattr(self.repo.config._parent, params['repo'])
-        repoconfig.loglevel = "DEBUG"
-        repo = self.repo._repo_from_alias(params['repo'], repoconfig=repoconfig)
-        if 'subrepo' in params:
-            subrepoconfig = getattr(self.repo.config._parent, params['subrepo'])
-            subrepoconfig.loglevel = "DEBUG"
-            subrepo = self.repo._repo_from_alias(params['subrepo'], repoconfig=subrepoconfig)
-        else:
-            subrepo = repo
-        basefile = params['basefile']
-        try:
-            rootlogger.info("Downloading %s" % basefile)
-            subrepo.config.refresh = True  # the repo might have a partial download, eg of index HTML page but without PDF document
-            subrepo.download(basefile)
-            # sleep(1)
-            rootlogger.info("Parsing %s" % basefile)
-            repo.parse(basefile)
-            # sleep(1)
-            rootlogger.info("Relating %s" % basefile)
-            repo.relate(basefile)
-            # sleep(1)
-            rootlogger.info("Generating %s" % basefile)
-            repo.generate(basefile)
-            # sleep(1)
-        except Exception as e:
-            exc_type, exc_value, tb = sys.exc_info()
-            tblines = traceback.format_exception(exc_type, exc_value, tb)
-            msg = "\n".join(tblines)
-            writer(msg.encode("utf-8"))
-        finally:
-            self._shutdown_streaming_logger(rootlogger)
-            # ok we're done
-        return []
 
-    def handle_patch(self, environ, params):
+    def handle_change_options(self, request, **values):
         """Create patch files for documents for redacting or correcting data in the source documents"""
         def open_intermed_text(repo, basefile, mode="rb"):
             intermediatepath = repo.store.intermediate_path(basefile)
@@ -576,25 +428,23 @@ documents.</p>
             tbstr = "\n".join(tblines)
             return tbstr
 
-        if not params:
-            # start page: list available patches maybe? form with repo names and textbox for basefile?
-            res = Body([
-                Div([
-                    H2(["Create a new patch"]),
-                    Form([
-                        Div([
-                            Label(["repo"], **{'for': 'repo'}),
-                            Input(**{'type':"text", 'id': "repo", 'name': "repo", 'class': "form-control"}),
-                            Label(["basefile"], **{'for': 'basefile'}),
-                            Input(**{'type':"text", 'id': "basefile", 'name': "basefile", 'class': "form-control"})],
-                            **{'class': 'form-group'}),
-                        Button(["Create"], **{'type': "submit", 'class': "btn btn-default"})],
-                     action=environ['PATH_INFO'], method="GET")
-                ])])
-            return res
+        if not request.args:
+            # start page: list available patches maybe? form with repo
+            # names and textbox for basefile?
+            return self.render_template("""
+<div>
+<h2>Create a new patch</h2>
+<form>
+<div class="form-group">
+<label for="repo">repo</label>
+<input type="text" id="repo" name="repo" class="form-control"/>
+<label for="basefile">basefile</label>
+<input type="text" id="basefile" name="basefile" class="form-control"/>
+</form>
+</form>""", "patch")
         else:
-            alias = params['repo']
-            basefile = params['basefile']
+            alias = request.args['repo']
+            basefile = request.args['basefile']
             repo = self.repo._repo_from_alias(alias)
             patchstore = repo.documentstore_class(repo.config.patchdir +
                                                   os.sep + repo.alias)
@@ -604,12 +454,12 @@ documents.</p>
                 # FIXME: Convert CRLF -> LF. We should determine from
                 # existing intermed file what the correct lineending
                 # convention is
-                # fp.write(params['filecontents'].replace("\r\n", "\n").encode(repo.source_encoding))
+                # fp.write(request.args['filecontents'].replace("\r\n", "\n").encode(repo.source_encoding))
                 # fp.close()
-                self.repo.mkpatch(repo, basefile, params.get('description',''),
-                                  params['filecontents'].replace("\r\n", "\n"))
+                self.repo.mkpatch(repo, basefile, request.args.get('description',''),
+                                  request.args['filecontents'].replace("\r\n", "\n"))
                 log = []
-                if params.get('parse') == "true":
+                if request.args.get('parse') == "true":
                     repo.config.force = True
                     log.append(P(["Parsing %s" % basefile]))
                     try:
@@ -617,9 +467,9 @@ documents.</p>
                         log.append(P(["Parsing successful"]))
                     except Exception:
                         log.append(Pre([format_exception()]))
-                        params['generate'] = "false"
+                        request.args['generate'] = "false"
 
-                if params.get('generate') == "true":
+                if request.args.get('generate') == "true":
                     repo.config.force = True
                     repo.generate(basefile)
                     log.append(P(["Generating %s" % basefile]))
@@ -650,8 +500,8 @@ documents.</p>
                 text = fp.read().decode(repo.source_encoding)
                 fp.close
                 patchdescription = None
-                if os.path.exists(patchpath) and params.get('ignoreexistingpatch') != 'true':
-                    ignorepatchlink = "%s?%s&ignoreexistingpatch=true" % (environ['PATH_INFO'], environ['QUERY_STRING'])
+                if os.path.exists(patchpath) and request.args.get('ignoreexistingpatch') != 'true':
+                    ignorepatchlink = request.url + "&ignoreexistingpatch=true"
                     with codecs.open(patchpath, 'r', encoding=repo.source_encoding) as pfp:
                         if repo.config.patchformat == 'rot13':
                             pfp = StringIO(codecs.decode(pfp.read(), "rot13"))
@@ -782,7 +632,7 @@ documents.</p>
         output = StringIO()
         counters = defaultdict(Counter)
         msgloc = re.compile(" \([\w/]+.py:\d+\)").search
-        eventok = re.compile("[^ ]+: (download|parse|relate|generate|transformlinks) OK").match
+        eventok = re.compile("[^ ]+:? (download|parse|relate|generate|transformlinks) OK").match
         with open(logfilename) as fp:
             for line in fp:
                 try:
@@ -819,12 +669,15 @@ documents.</p>
         return output.getvalue()
         
 
-    def handle_logs(self, environ, params):
+    def handle_logs(self, request, **values):
+        """Display and summarize logfiles from recent ferenda-build.py runs"""
         logdir = self.repo.config.datadir + os.sep + "logs"
-        def elapsedtime(f):
+        def elapsed(f):
+            from pudb import set_trace; set_trace()
+            filesize = os.path.getsize(f)
             with open(f) as fp:
                 first = fp.readline()
-                fp.seek(os.path.getsize(f) - 500)
+                fp.seek(filesize - min(500,filesize - fp.tell()))
                 last = fp.read().split("\n")[-2]
             start = datetime.strptime(first.split(" ")[0], "%H:%M:%S")
             end = datetime.strptime(last.split(" ")[0], "%H:%M:%S")
@@ -840,33 +693,56 @@ documents.</p>
                     return "[log is empty?]"
             
         def linkelement(f):
-            href = environ['PATH_INFO'] + "?file=" + f
-            return LI([A(f, href=href), " ", Code([firstline(f)]), " (%.2f kb)" % (os.path.getsize(logdir+os.sep+f) / 1024)])
+            return {"filename": f,
+                    "href": request.path + "?file=" + f,
+                    "firstline": firstline(f),
+                    "size": os.path.getsize(logdir + os.sep + f)}
 
-        if not params:
-            logfiles = sorted([f for f in os.listdir(logdir) if f.endswith(".log")], reverse=True)
-            return Body([
-                Div([UL([linkelement(f) for f in logfiles])])])
-        elif 'file' in params:
+        if not request.args:
+            logfiles = sorted([linkelement(f) for f in os.listdir(logdir) if f.endswith(".log")], reverse=True, key=itemgetter('filename'))
+            return self.render_template("""
+<div>
+<ul>
+{% for f in logfiles %}
+            <li><a href="{{f.href}}"></a><code>{{f.firstline}}</code> {{f.size|filesizeformat}}</li>
+{% endfor %}
+</ul>
+</div>
+            """, "logfiles", logfiles=logfiles)
+        elif request.args.get('stream'):
+            assert 'writer' in values
+            logfilename = logdir+os.sep+request.args.get('file')
+            with open(logfilename, "rb") as fp:
+                for line in fp:
+                  values['writer'](line)
+        elif request.args.get('file'):
             start = time.time()
-            assert re.match("\d{8}-\d{6}.log$", params['file']), "invalid log file name"
-            logfilename = logdir+os.sep+params['file']
+            assert re.match("\d{8}-\d{6}.log$", request.args.get('file')), "invalid log file name"
+            logfilename = logdir+os.sep+request.args.get('file')
             buildstats = self.analyze_buildstats(logfilename)
             errorstats = self.analyze_log(logfilename)
             if not errorstats:
                 errorstats = "[analyze_log didn't return any output?]"
             logcontents = util.readfile(logfilename)
-            elapsed = elapsedtime(logfilename)
-            return Body([
-                Div([H2([params['file']]),
-                     P(["Log processed in %.3f s. The logged action took %.0f s." % (time.time() - start, elapsed.total_seconds())]),
-                     H3(["Buildstats"]),
-                     Pre([buildstats]),
-                     H3(["Errors"]),
-                     Pre([errorstats]),
-                     H3(["Logs"]),
-                     Pre([logcontents], **{'class': 'logviewer'})])])
-
+            processtime = time.time() - start
+            elapsedtime = elapsed(logfilename).total_seconds()
+            streamurl = request.url + "&stream=true"
+            return self.render_template("""
+<div>
+<p>Log processed in {{"%.3f"|format(processtime)}} s. The logged action took {{"%.0f"|format(elapsedtime)}} s</p>
+<h3>Buildstats</h3>
+<pre>{{buildstats}}</pre>
+<h3>Errors</h3>            
+<pre>{{errorstats}}</pre>
+<h3>Logs</h3>
+<pre class="pre-scrollable logviewer" id="streaming-log-output" src="{{streamurl|e}}">
+</pre>
+</div>""", "log %s" % logfilename, logfilename=logfilename,
+                                        processtime=processtime,
+                                        elapsedtime=elapsedtime,
+                                        buildstats=buildstats,
+                                        errorstats=errorstats,
+                                        streamurl=streamurl)
 
 
 class Devel(object):

@@ -19,6 +19,7 @@ import os
 import pkg_resources
 import re
 import sys
+import traceback
 
 from rdflib import URIRef, Namespace, Literal, Graph
 from rdflib.namespace import DCTERMS
@@ -134,9 +135,19 @@ class WSGIApp(object):
             # http://nginx.org/en/docs/http/ngx_http_uwsgi_module.html#uwsgi_buffering
             writer = start_response('200 OK', [('Content-Type', content_type),
                                                ('X-Accel-Buffering', 'no'),
-                                               ('X-Content-Type-Options', 'nosniff')]) 
+                                               ('X-Content-Type-Options', 'nosniff')])
+            writer(b"")
             rootlogger = self.setup_streaming_logger(writer)
-            endpoint(request, start_response, **values)
+            try:
+                endpoint(request, writer=writer, **values)
+            except Exception as e:
+                exc_type, exc_value, tb = sys.exc_info()
+                tblines = traceback.format_exception(exc_type, exc_value, tb)
+                msg = "\n".join(tblines)
+                writer(msg.encode("utf-8"))
+            finally:
+                self.shutdown_streaming_logger(rootlogger)
+                # ok we're done
             return [] #  an empty iterable -- we've already used the writer object to send our response
         else:
             res = endpoint(request, **values)
@@ -341,6 +352,12 @@ class WSGIApp(object):
             rootlogger.removeHandler(handler)
         logging.getLogger().addHandler(wsgihandler)
         return rootlogger
+
+    def shutdown_streaming_logger(self, rootlogger):
+        for h in list(rootlogger.handlers):
+            if isinstance(h, WSGIOutputHandler):
+                h.close()
+                rootlogger.removeHandler(h)
 
     def streaming_required(self, request):
         return request.args.get('stream', False)
