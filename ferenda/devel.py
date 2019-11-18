@@ -369,19 +369,18 @@ documents.</p>
             else:
                 subrepo = repo
             basefile = request.form['basefile']
-            try:
-                rootlogger.info("Downloading %s" % basefile)
-                subrepo.config.refresh = True  # the repo might have a partial download, eg of index HTML page but without PDF document
-                subrepo.download(basefile)
-                # sleep(1)
-                rootlogger.info("Parsing %s" % basefile)
-                repo.parse(basefile)
-                # sleep(1)
-                rootlogger.info("Relating %s" % basefile)
-                repo.relate(basefile)
-                # sleep(1)
-                rootlogger.info("Generating %s" % basefile)
-                repo.generate(basefile)
+            rootlogger.info("Downloading %s" % basefile)
+            subrepo.config.refresh = True  # the repo might have a partial download, eg of index HTML page but without PDF document
+            subrepo.download(basefile)
+            # sleep(1)
+            rootlogger.info("Parsing %s" % basefile)
+            repo.parse(basefile)
+            # sleep(1)
+            rootlogger.info("Relating %s" % basefile)
+            repo.relate(basefile)
+            # sleep(1)
+            rootlogger.info("Generating %s" % basefile)
+            repo.generate(basefile)
         else:
             self.render_template("""
 <div>
@@ -406,7 +405,7 @@ documents.</p>
 </div>""", "Change options for a specific basefile")
 
 
-    def handle_change_options(self, request, **values):
+    def handle_patch(self, request, **values):
         """Create patch files for documents for redacting or correcting data in the source documents"""
         def open_intermed_text(repo, basefile, mode="rb"):
             intermediatepath = repo.store.intermediate_path(basefile)
@@ -450,49 +449,47 @@ documents.</p>
                                                   os.sep + repo.alias)
             patchpath = patchstore.path(basefile, "patches", ".patch")
             if environ['REQUEST_METHOD'] == 'POST':
-                # fp = open_intermed_text(repo, basefile, mode="wb")
-                # FIXME: Convert CRLF -> LF. We should determine from
-                # existing intermed file what the correct lineending
-                # convention is
-                # fp.write(request.args['filecontents'].replace("\r\n", "\n").encode(repo.source_encoding))
-                # fp.close()
                 self.repo.mkpatch(repo, basefile, request.args.get('description',''),
                                   request.args['filecontents'].replace("\r\n", "\n"))
                 log = []
+                do_generate = request.args.get('generate') == "true"
                 if request.args.get('parse') == "true":
                     repo.config.force = True
-                    log.append(P(["Parsing %s" % basefile]))
+                    log.append("Parsing %s" % basefile)
                     try:
                         repo.parse(basefile)
-                        log.append(P(["Parsing successful"]))
+                        log.append("Parsing successful")
                     except Exception:
-                        log.append(Pre([format_exception()]))
-                        request.args['generate'] = "false"
-
-                if request.args.get('generate') == "true":
+                        log.append(format_exception())
+                        do_generate = False
+                if do_generate:
                     repo.config.force = True
                     repo.generate(basefile)
-                    log.append(P(["Generating %s" % basefile]))
+                    log.append("Generating %s")
                     try:
                         repo.generate(basefile)
-                        log.append(P(["Generation successful: ",
-                                     A([basefile], href=repo.canonical_uri(basefile))]))
+                        log.append('Generation successful: <a href="%s">%s</a>' % (repo.canonical_uri(basefile)), basefile)
                     except Exception:
                         log.append(Pre([format_exception()]))
 
-                if os.path.exists(patchpath):
+                patchexists = os.path.exists(patchpath)
+                if patchexists:
                     patchcontent = util.readfile(patchpath)
-                    res = Body([
-                        Div([
-                            H2(["patch generated at %s" % patchpath]),
-                            P("Contents of the new patch"),
-                            Pre([util.readfile(patchpath)])]),
-                        Div(log)])
                 else:
-                    res = Body([
-                        Div([H2(["patch was not generated"])]),
-                        Div(log)])
-                return res
+                    patchcontent = None
+                return self.render_template("""
+<div>
+{% if patchexists %}
+<h2>Patch generated at {{patchpath}}</h2>
+<p>Contents of new patch</p>
+<pre>{{patchcontent}}</pre>
+{% else %}
+<h2>Patch was not generated</h2>
+{% endif %}
+{% for line in log %}
+<p>{{line}}</p>
+{% endfor %)
+</div>""", "patch", patchexists=patchexists, patchpath=patchpath, patchcontent=patchcontent, log=log)
             else:
                 print("load up intermediate file, display it in a textarea + textbox for patchdescription")
                 fp = open_intermed_text(repo, basefile)
@@ -535,52 +532,35 @@ documents.</p>
                 # the extra \n before filecontents text is to
                 # compensate for a missing \n introduced by the
                 # textarea tag
-                res = Body([
-                    H2(["Editing %s" % outfile]),
-                    instructions,
-                    Div([
-                        Form([Textarea(["\n"+text], **{'id': 'filecontents',
-                                                  'name': 'filecontents',
-                                                  'cols': '80',
-                                                  'rows': '30',
-                                                  'class': 'form-control'}),
-                              Br(),
-                              Div([
-                                  Label(["Description of patch"], **{'for': 'description'}),
-                                  Input(**{'id':'description',
-                                           'name': 'description',
-                                           'value': patchdescription,
-                                           'class': 'form-control'})
-                                  ], **{'class': 'form-group'}),
-                              Div([
-                                  Label([
-                                      Input(**{'type': 'checkbox',
-                                               'id': 'parse',
-                                               'name': 'parse',
-                                               'checked': 'checked',
-                                               'value': 'true',
-                                               'class': 'form-check-input'}),
-                                      "Parse resulting file"], **{'class': 'form-check-label'})],
-                                  **{'class': 'form-check'}),
-                              Div([
-                                  Label([
-                                      Input(**{'type': 'checkbox',
-                                               'id': 'generate',
-                                               'name': 'generate',
-                                               'checked': 'checked',
-                                               'value': 'true',
-                                               'class': 'form-check-input'}),
-                                      "Generate HTML from results of parse"], **{'class': 'form-check-label'})],
-                                  **{'class': 'form-check'}),
-                              Input(id="repo", type="hidden", name="repo", value=alias),
-                              Input(id="basefile", type="hidden", name="basefile", value=basefile),
-                              Button(["Create patch"], **{'type': 'submit',
-                                                          'class': 'btn btn-default'})],
-                             action=environ['PATH_INFO'], method="POST"
-                             )])])
-                             
-                return res
-        # return fp, length, status, mimetype
+                self.relate("""
+<h2>Editing {{outfile}}</h2>
+{% for line in instructions %}
+<p>{{line}}</p>
+{% endfor %}
+<p>Change the original data as needed</p>
+<form method="POST">
+<textarea class="form-control" id="filecontents" name="filecontents" rows="30" cols="80"></textarea>
+<br/>
+<div class="form-group">
+<label for="description">Description of patch</label>
+<input class="form-control" id="description" name="description"/>
+</div>
+<div class="form-check">
+<label class="form-check-label">
+  <input class="form-check-input" id="parse" name="parse" type="checkbox" value="true" checked="checked"/>
+  Parse resulting file
+</label>
+</div>
+<div class="form-check">
+<label class="form-check-label">
+  <input class="form-check-input" id="generate" name="generate" type="checkbox" value="true" checked="checked"/>
+  Generate HTML from results of parse
+</label>
+</div>
+<input id="repo" name="repo" type="hidden" value="{{alias}}"/>
+<input id="basefile" name="basefile" type="hidden" value="{{basefile}}"/>
+<button class="btn btn-default" type="submit">Create patch</button>
+</form>""", "patch", outfile=outfile, alias=alias, basefile=basefile)
 
     def analyze_log(self, filename, listerrors=False):
         modules = defaultdict(int)
