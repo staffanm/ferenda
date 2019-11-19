@@ -67,6 +67,7 @@ class WSGIApp(object):
         rules = [
             Rule("/", endpoint="frontpage"),
             Rule(self.config.apiendpoint, endpoint="api"),
+            Rule(self.config.apiendpoint+";stats", endpoint="api"),
             Rule(self.config.searchendpoint, endpoint="search")
         ]
         if self.config.legacyapi:
@@ -398,7 +399,7 @@ class WSGIApp(object):
                "itemsPerPage": int(param.get('_pageSize', '10')),
                "totalResults": pager['totalresults'],
                "duration": None,  # none
-               "current": request.path + "?" + request.query_string,
+               "current": request.path + "?" + request.query_string.decode("utf-8"),
                "items": mangled}
 
         # 4. add stats, maybe
@@ -689,8 +690,12 @@ class WSGIApp(object):
                       html.Pre([pformat(dict(os.environ))])
         ])])
         msg = self._transform(title, body, environ)
+        if isinstance(exc_value, HTTPException):
+            status = "%s %s" % (exc_value.code, exc_value.name)
+        else:
+            status = "500 Server error"
         return self.return_response(msg, start_response,
-                                    status="500 Internal Server Error",
+                                    status,
                                     contenttype="text/html")
 
 

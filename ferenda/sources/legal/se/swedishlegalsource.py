@@ -110,7 +110,7 @@ def lazyread(f):
     
 class SwedishLegalHandler(RequestHandler):
 
-    @cached_property
+    @property
     def rules(self):
         return [Rule('/'+self.repo.urispace_segment+'/<basefile>', endpoint=self.handle_doc),
                 Rule('/dataset/'+self.repo.alias, endpoint=self.handle_dataset)]

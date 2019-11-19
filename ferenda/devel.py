@@ -81,7 +81,7 @@ def login_required(f):
 
 class DevelHandler(RequestHandler):
 
-    @cached_property
+    @property
     def rules(self):
         return [Rule('/devel/',      endpoint=self.handle_dashboard),
                 Rule('/devel/build', endpoint=self.handle_build),

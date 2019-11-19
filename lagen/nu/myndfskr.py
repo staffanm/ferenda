@@ -33,7 +33,7 @@ class MyndFskrStore(CompositeStore, SwedishLegalStore):
     pass
 
 class MyndFskrHandler(RequestHandler):
-    @cached_property
+    @property
     def rules(self):
         rules = []
         for cls in self.repo.subrepos:

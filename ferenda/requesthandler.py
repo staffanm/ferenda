@@ -79,6 +79,7 @@ class RequestHandler(object):
             params = {}
             if path.startswith("feed"):
                 params['feed'] = True
+                path = path[5:]
             if "=" in path:
                 param, value = path.split("=", 1)
                 params['param'] = param
@@ -92,10 +93,12 @@ class RequestHandler(object):
         else:
             return dict(parse_qsl(uri.split("?", 1)[1]))
 
-    @cached_property
+    @property
     def rules(self):
-        return [Rule('/doc/'+self.repo.alias+'/<basefile>', endpoint=self.handle_doc),
-                Rule('/dataset/'+self.repo.alias, endpoint=self.handle_dataset)]
+        return [Rule('/res/'+self.repo.alias+'/<path:basefile>', endpoint=self.handle_doc),
+                Rule('/dataset/'+self.repo.alias, endpoint=self.handle_dataset),
+                Rule('/dataset/'+self.repo.alias+'.<suffix>', endpoint=self.handle_dataset),
+                Rule('/dataset/'+self.repo.alias+'/<file>', endpoint=self.handle_dataset)]
 
     def handle_doc(self, request, **values):
         # request.url is the reconstructed URL used in the request,
@@ -119,40 +122,44 @@ class RequestHandler(object):
                 suffix = leaf.rsplit(".", 1)[1]
             else:
                 suffix = None
+        if suffix and basefile.endswith("."+suffix):
+            basefile = basefile[:-(len(suffix)+1)]
         contenttype = self.contenttype(request, suffix)
         path, data = self.lookup_resource(request.headers, basefile, params, contenttype, suffix)
         return self.prep_response(request, path, data, contenttype)
 
     def handle_dataset(self, request, **values):
-        tmpuri = request.base_url
         # remove trailing suffix (the ".nt" in "example.org/dataset/base.nt")
+        tmpuri = request.base_url
         if "." in request.url.split("/")[-1]:
-            tmpuri = tmpuri.rsplit(".", 1)[0]
-        if request.query_string:
-            tmpuri += "?" + request.query_string
-        params = self.dataset_params_from_uri(tmpuri)
-        contenttype = self.contenttype(environ, uri, basefile, params, suffix)
-        path, data = self.lookup_dataset(environ, params, contenttype, suffix)
+            tmpuri, suffix = tmpuri.rsplit(".", 1)
+        elif 'ffix' in values:
+            suffix = values['suffix']
+        else:
+            suffix = None
+        params = self.dataset_params_from_uri(tmpuri + "?" + request.query_string.decode("utf-8"))
+        contenttype = self.contenttype(request, suffix)
+        path, data = self.lookup_dataset(request.headers, params, contenttype, suffix)
         return self.prep_response(request, path, data, contenttype)
 
-    def supports(self, environ):
-        """Returns True iff this particular handler supports this particular request."""
-        segments = environ['PATH_INFO'].split("/", 3)
-        # with PATH_INFO like /dataset/base.rdf, we still want the
-        # alias to check to be "base", not "base.rdf"
-        if len(segments) <= 2:
-            return False
-        reponame = segments[2]
-        # this segment might contain suffix or parameters -- remove
-        # them before comparison
-        m = re.search('[^\.\?]*$', reponame)
-        if m and m.start() > 0:
-            reponame = reponame[:m.start()-1]
-        return reponame == self.repo.alias
-
-    def supports_uri(self, uri):
-        return self.supports({'PATH_INFO': urlparse(uri).path})
-
+#    def supports(self, environ):
+#        """Returns True iff this particular handler supports this particular request."""
+#        segments = environ['PATH_INFO'].split("/", 3)
+#        # with PATH_INFO like /dataset/base.rdf, we still want the
+#        # alias to check to be "base", not "base.rdf"
+#        if len(segments) <= 2:
+#            return False
+#        reponame = segments[2]
+#        # this segment might contain suffix or parameters -- remove
+#        # them before comparison
+#        m = re.search('[^\.\?]*$', reponame)
+#        if m and m.start() > 0:
+#            reponame = reponame[:m.start()-1]
+#        return reponame == self.repo.alias
+#
+#    def supports_uri(self, uri):
+#        return self.supports({'PATH_INFO': urlparse(uri).path})
+#
     def path(self, uri):
         """Returns the physical path that the provided URI respolves
         to. Returns None if this requesthandler does not support the
@@ -198,7 +205,7 @@ class RequestHandler(object):
                     suffix = leaf.rsplit(".", 1)[1]
 
         if not suffix:
-            headers = {'Acccept': 'text/html'}
+            headers = {'Accept': 'text/html'}
         else:
             headers = {}
         environ = EnvironBuilder(path=urlparse(uri).path, headers=headers).get_environ()
@@ -206,7 +213,6 @@ class RequestHandler(object):
         pathfunc = self.get_pathfunc(environ, basefile, params, contenttype, suffix)
         if pathfunc:
             return pathfunc(basefile)
-
 
     def request_uri(self, environ):
         rawuri = request_uri(environ)
@@ -230,50 +236,50 @@ class RequestHandler(object):
             uri = self.repo.config.url + uri.split("/", 3)[-1]
         return uri
         
-    def handle(self, environ):
-        """provides a response to a particular request by returning a a tuple
-        *(fp, length, status, mimetype)*, where *fp* is an open file of the
-        document to be returned.
-
-        """
-        segments = environ['PATH_INFO'].split("/", 3)
-        uri = self.request_uri(environ)
-        if "?" in uri:
-            uri, querystring = uri.rsplit("?", 1)
-        else:
-            querystring = None
-        suffix = None
-        if segments[1] == "dataset":
-            basefile = None
-            tmpuri = uri
-            if "." in uri.split("/")[-1]:
-                tmpuri = tmpuri.rsplit(".", 1)[0]
-            if querystring:
-                tmpuri += "?" + querystring
-            params = self.dataset_params_from_uri(tmpuri)
-        else:
-            basefile = self.repo.basefile_from_uri(uri)
-            if not basefile:
-                raise RequestHandlerError("%s couldn't resolve %s to a basefile" % (self.repo.alias, uri))
-            params = self.params_from_uri(uri + ("?" + querystring if querystring else ""))
-        if 'format' in params:
-            suffix = params['format']
-        else:
-            if 'attachment' in params:
-                leaf = params['attachment']
-            else:
-                leaf = uri.split("/")[-1]
-            if "." in leaf:
-                suffix = leaf.rsplit(".", 1)[1]
-        contenttype = self.contenttype(request, suffix)
-        if segments[1] == "dataset":
-            path, data = self.lookup_dataset(environ, params, contenttype, suffix)
-        else:
-            path, data = self.lookup_resource(environ, basefile, params,
-                                              contenttype, suffix)
-        return self.prep_response(request, path, data, contenttype)
-        
-
+#    def handle(self, environ):
+#        """provides a response to a particular request by returning a a tuple
+#        *(fp, length, status, mimetype)*, where *fp* is an open file of the
+#        document to be returned.
+#
+#        """
+#        segments = environ['PATH_INFO'].split("/", 3)
+#        uri = self.request_uri(environ)
+#        if "?" in uri:
+#            uri, querystring = uri.rsplit("?", 1)
+#        else:
+#            querystring = None
+#        suffix = None
+#        if segments[1] == "dataset":
+#            basefile = None
+#            tmpuri = uri
+#            if "." in uri.split("/")[-1]:
+#                tmpuri = tmpuri.rsplit(".", 1)[0]
+#            if querystring:
+#                tmpuri += "?" + querystring
+#            params = self.dataset_params_from_uri(tmpuri)
+#        else:
+#            basefile = self.repo.basefile_from_uri(uri)
+#            if not basefile:
+#                raise RequestHandlerError("%s couldn't resolve %s to a basefile" % (self.repo.alias, uri))
+#            params = self.params_from_uri(uri + ("?" + querystring if querystring else ""))
+#        if 'format' in params:
+#            suffix = params['format']
+#        else:
+#            if 'attachment' in params:
+#                leaf = params['attachment']
+#            else:
+#                leaf = uri.split("/")[-1]
+#            if "." in leaf:
+#                suffix = leaf.rsplit(".", 1)[1]
+#        contenttype = self.contenttype(request, suffix)
+#        if segments[1] == "dataset":
+#            path, data = self.lookup_dataset(environ, params, contenttype, suffix)
+#        else:
+#            path, data = self.lookup_resource(environ, basefile, params,
+#                                              contenttype, suffix)
+#        return self.prep_response(request, path, data, contenttype)
+#        
+#
     def contenttype(self, request, suffix):
         preferred = request.accept_mimetypes.best_match(["text/html"])
         accept = request.headers.get("Accept")
@@ -522,4 +528,4 @@ class RequestHandler(object):
                 # then os.path.exists(path) must be false
                 msg += " (%s does not exist)" % path
             raise NotAcceptable(msg)
-        return Response(fp, status, headers, content_type=contenttype, direct_passthrough=True)
+        return Response(fp, status, headers, mimetype=contenttype, direct_passthrough=True)
