@@ -8,13 +8,14 @@ import re
 import shutil
 from datetime import datetime
 from urllib.parse import quote, unquote
-from wsgiref.util import request_uri
+
 from html import unescape # on py2, use from HTMLParser import HTMLParser; unescape = HTMLParser().unescape
 from rdflib import URIRef
 from rdflib.namespace import DCTERMS, OWL, RDF, RDFS
+from werkzeug.routing import Rule, BaseConverter
+
 from ferenda.sources.legal.se import RPUBL, RINFOEX
 from ferenda.sources.legal.se.swedishlegalsource import SwedishLegalHandler
-
 from ferenda import decorators, util
 from ferenda import TextReader, DocumentEntry, Describer, RequestHandler
 from ferenda.sources.legal.se import SFS as OrigSFS
@@ -25,12 +26,30 @@ from ferenda.sources.legal.se.elements import (Kapitel, Paragraf, Rubrik,
                                                Avdelning, Underavdelning)
 from . import SameAs
 
+class SFSConverter(BaseConverter):
+    regex = "\d{4}:\d[^/]*"
+    def to_url(self, value):
+        return value.replace(" ", "_")
+    def to_python(self, value):
+        return value.replace("_", " ")
+
 # class SFSHandler(RequestHandler):
 class SFSHandler(SwedishLegalHandler):
     # FIXME: write a nice set of rules here. the difficult thing will
     # be to only match SFS basefiles, but /<int>:<rest> ought to do it
     # maybe
     
+    @property
+    def rules(self):
+        return [Rule('/<sfs:basefile>', endpoint=self.handle_doc),
+                Rule('/dataset/'+self.repo.alias, endpoint=self.handle_dataset),
+                Rule('/dataset/'+self.repo.alias+'.<suffix>', endpoint=self.handle_dataset),
+                Rule('/dataset/'+self.repo.alias+'/<file>', endpoint=self.handle_dataset)]
+
+    @property
+    def ruleconverters(self):
+        return (("sfs", SFSConverter),)
+
     def supports(self, environ):
         if environ['PATH_INFO'].startswith("/dataset/"):
             return super(SFSHandler, self).supports(environ)

@@ -261,10 +261,10 @@ class MyndFskrBase(FixedLayoutSource):
                       re.match(self.document_url_regex, link)):
                     m = re.match(self.document_url_regex, link)
                 if m:
-                    params = {'url': link}
+                    params = {'uri': link}
                     basefile = self.sanitize_basefile(m.group("basefile"))
-                    if m.group("title"):
-                        params['title'] = title
+                    if 'title' in m.groupdict():
+                        params['title'] = m.group("title")
                     # since download_rewrite_url is potentially
                     # expensive (might do a HTTP request), we should
                     # perhaps check if we really need to download

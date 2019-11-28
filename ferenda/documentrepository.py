@@ -2528,6 +2528,8 @@ WHERE {
         def getpath(url, repos):
             if url == self.config.url:
                 return self.config.datadir + os.sep + "index.html"
+            # http://example.org/foo/bar.x -> |/foo/bar.x (for Rule.match)
+            matchurl = "|/"+url.split("/", 3)[-1]
             if "/" not in url:
                 # this is definitly not a HTTP(S) url, might be a
                 # mailto:? Anyway, we won't get a usable path from it
@@ -2545,7 +2547,12 @@ WHERE {
                 # options. Another solution would be to make sure all
                 # CompositeRepository repos come before subrepos in
                 # the list.
-                if repo.requesthandler.supports_uri(url):
+                supports = False
+                for rule in wsgiapp.reporules[repo]:
+                    if rule.match(matchurl) is not None:
+                        supports = True
+                        break
+                if supports:
                     if url.endswith(".png"):
                         # FIXME: This is slightly hacky as it returns
                         # the path to the generated HTML file, not the
@@ -2556,6 +2563,8 @@ WHERE {
                         # it will create the facsimile image before
                         # returning the path to it (which would be
                         # very bad).
+                        #
+                        # shouldn't this be repo.store.generated_path ??
                         return self.store.generated_path(self.basefile_from_uri(url))
                     else:
                         return repo.requesthandler.path(url)
@@ -2609,6 +2618,8 @@ WHERE {
         from ferenda import CompositeRepository
         if repos is None:
             repos = []
+        from ferenda.manager import make_wsgi_app
+        wsgiapp = make_wsgi_app(self.config._parent, repos=repos)
         repos = sorted(repos, key=lambda x: isinstance(x, CompositeRepository), reverse=True)
         if develurl:
             return simple_transform

@@ -39,21 +39,9 @@ class MyndFskrHandler(RequestHandler):
         for cls in self.repo.subrepos:
             inst = self.repo.get_instance(cls)
             for fs in inst.forfattningssamlingar():
-                rules.append(Rule('/%s/<basefile>' % fs, endpoint=self.handle_doc))
+                rules.append(Rule('/%s/<x>' % fs, endpoint=self.handle_doc))
         rules.append(Rule('/dataset/'+self.repo.alias, endpoint=self.handle_dataset))
         return rules
-                             
-
-    def supports(self, environ):
-        # resources are at /dvfs/2013:1
-        # datasets are at /dataset/myndfs?difs=2013
-        segment = environ['PATH_INFO'].split("/")[1]
-        if segment == "dataset":
-            return super(MyndFskrHandler, self).supports(environ)
-        # handle RA-FS, ELSÄK-FS and HSLF-FS
-        segment = segment.replace("-", "")
-        fs = chain.from_iterable([self.repo.get_instance(cls).forfattningssamlingar() for cls in self.repo.subrepos])
-        return segment in fs
 
     def get_pathfunc(self, environ, basefile, params, contenttype, suffix):
         if basefile and suffix == "png":

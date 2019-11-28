@@ -112,25 +112,13 @@ class SwedishLegalHandler(RequestHandler):
 
     @property
     def rules(self):
-        return [Rule('/'+self.repo.urispace_segment+'/<basefile>', endpoint=self.handle_doc),
-                Rule('/dataset/'+self.repo.alias, endpoint=self.handle_dataset)]
-        
-        
-    def supports(self, environ):
-        pathinfo = environ['PATH_INFO']
-        if pathinfo.startswith("/dataset/"):
-            return super(SwedishLegalHandler, self).supports(environ)
-        res = pathinfo.startswith("/" + self.repo.urispace_segment + "/")
-        if not res:
-            if (hasattr(self.repo, 'urispace_segment_legacy') and
-                pathinfo.startswith("/" + self.repo.urispace_segment_legacy + "/")):
-                environ['PATH_INFO'] = pathinfo.replace(self.repo.urispace_segment_legacy,
-                                                        self.repo.urispace_segment)
-                return True
-            else:
-                res =  SupportsResult(reason="'%s' didn't start with '/%s/'" %
-                                      (pathinfo, self.repo.urispace_segment))
-        return res
+        rules = []
+        for segment in self.repo.urispace_segments:
+            # some basefiles may contain slashes so we must use routing.PathConverter
+            rules.append(Rule('/'+segment+'/<path:x>', endpoint=self.handle_doc))
+        return rules + [Rule('/dataset/'+self.repo.alias, endpoint=self.handle_dataset),
+                        Rule('/dataset/'+self.repo.alias+'.<suffix>', endpoint=self.handle_dataset),
+                        Rule('/dataset/'+self.repo.alias+'/<file>', endpoint=self.handle_dataset)]
         
     def prep_request(self, environ, path, data, contenttype):
         if path and not os.path.exists(path):
@@ -305,8 +293,12 @@ class SwedishLegalSource(DocumentRepository):
 
     @property
     def urispace_segment(self):
-        return self.alias
-        
+        return self.alias 
+
+    @property
+    def urispace_segments(self):
+        return [self.urispace_segment]
+       
     @classmethod
     def get_default_options(cls):
         opts = super(SwedishLegalSource, cls).get_default_options()

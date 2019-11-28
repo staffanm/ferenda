@@ -33,32 +33,34 @@ class WSGIApp(OrigWSGIApp):
     snippet_length = 160
     def __init__(self, repos, config):
         super(WSGIApp, self).__init__(repos, config)
-        sfsrepo = [repo for repo in repos if repo.alias == "sfs"][0]
-        self.parser = SwedishCitationParser(
-            LegalRef(LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.KORTLAGRUM, LegalRef.FORARBETEN, LegalRef.MYNDIGHETSBESLUT),
-            sfsrepo.minter,
-            sfsrepo.commondata,
-            allow_relative=True)
-        graph = Graph().parse(sfsrepo.resourceloader.filename("extra/sfs.ttl"), format="turtle")
-        self.lagforkortningar = [str(o) for s, o in graph.subject_objects(DCTERMS.alternate)]
-        self.paragraflag = []
-        for s, o in graph.subject_objects(DCTERMS.alternate):
-            basefile = sfsrepo.basefile_from_uri(str(s))
-            distilledpath = sfsrepo.store.distilled_path(basefile)
-            firstpara_uri = str(s) + "#P1"
-            needle = '<rpubl:Paragraf rdf:about="%s">' % firstpara_uri
-            if os.path.exists(distilledpath) and needle in util.readfile(distilledpath):
-                self.paragraflag.append(str(o).lower())
-        self.lagnamn = [str(o) for s, o in graph.subject_objects(RDFS.label)]
-        self.lagforkortningar_regex = "|".join(sorted(self.lagforkortningar, key=len, reverse=True))
+        sfsrepo = [repo for repo in repos if repo.alias == "sfs"]
+        if sfsrepo:
+            sfsrepo = sfsrepo[0]
+            self.parser = SwedishCitationParser(
+                LegalRef(LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.KORTLAGRUM, LegalRef.FORARBETEN, LegalRef.MYNDIGHETSBESLUT),
+                sfsrepo.minter,
+                sfsrepo.commondata,
+                allow_relative=True)
+            graph = Graph().parse(sfsrepo.resourceloader.filename("extra/sfs.ttl"), format="turtle")
+            self.lagforkortningar = [str(o) for s, o in graph.subject_objects(DCTERMS.alternate)]
+            self.paragraflag = []
+            for s, o in graph.subject_objects(DCTERMS.alternate):
+                basefile = sfsrepo.basefile_from_uri(str(s))
+                distilledpath = sfsrepo.store.distilled_path(basefile)
+                firstpara_uri = str(s) + "#P1"
+                needle = '<rpubl:Paragraf rdf:about="%s">' % firstpara_uri
+                if os.path.exists(distilledpath) and needle in util.readfile(distilledpath):
+                    self.paragraflag.append(str(o).lower())
+            self.lagnamn = [str(o) for s, o in graph.subject_objects(RDFS.label)]
+            self.lagforkortningar_regex = "|".join(sorted(self.lagforkortningar, key=len, reverse=True))
             
 
-    def parse_parameters(self, querystring, idx):
+    def parse_parameters(self, request, idx):
         q, param, pagenum, pagelen, stats = super(WSGIApp,
-                                                  self).parse_parameters(querystring, idx)
+                                                  self).parse_parameters(request, idx)
         # if Autocomple call, transform q to suitable parameters (find
         # uri)
-        if querystring.endswith("_ac=true"):
+        if request.args.get("_ac") == "true":
             uri = self.expand_partial_ref(q)
             if uri:
                 param['uri'] = uri.lower()
@@ -186,12 +188,12 @@ class WSGIApp(OrigWSGIApp):
             uri = uri[:-remove]
         return uri
         
-    def query(self, environ):
-        ac_query = environ['QUERY_STRING'].endswith("_ac=true")
+    def query(self, request, options=None):
+        ac_query = bool(request.args.get("_ac"))
+        options = {'boost_types': [('sfs', 10)]}
         if ac_query:
-            environ['exclude_types'] = ('mediawiki', 'mediawiki_child')
-        environ['boost_types'] = [('sfs', 10)]
-        res = super(WSGIApp, self).query(environ)
+            options['exclude_types'] = ('mediawiki', 'mediawiki_child')
+        res = super(WSGIApp, self).query(request, options)
         if ac_query:
             return res['items']
         else:

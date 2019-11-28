@@ -11,6 +11,8 @@ import difflib
 import logging
 import collections
 from math import sqrt, pi, e, floor
+from collections import UserDict
+
 # 3rd party
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
@@ -1518,7 +1520,11 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     if initialstate:
         defaultstate.update(initialstate)
     state = LayeredConfig(Defaults(defaultstate))
-    state.sectioncache = {}
+    # we use UserDict() instead of {} (ie a dict object to get around
+    # a problem with LayeredConfig.Defaults that don't allow dicts to
+    # be configuration values (as they are used internally for nested
+    # config objects)
+    state.sectioncache = UserDict()
 
     def is_pagebreak(parser):
         return isinstance(parser.reader.peek(), Page)

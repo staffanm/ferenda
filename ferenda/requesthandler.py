@@ -100,6 +100,10 @@ class RequestHandler(object):
                 Rule('/dataset/'+self.repo.alias+'.<suffix>', endpoint=self.handle_dataset),
                 Rule('/dataset/'+self.repo.alias+'/<file>', endpoint=self.handle_dataset)]
 
+    @property
+    def ruleconverters(self):
+        return ()
+
     def handle_doc(self, request, **values):
         # request.url is the reconstructed URL used in the request,
         # request.base_url is the same without any query string

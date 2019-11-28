@@ -18,6 +18,7 @@ grako==3.99.9
 html5lib==1.0.1
 idna==2.8                 # via requests
 isodate==0.6.0            # via rdflib
+jinja2==2.10.3
 jsmin==2.2.2
 langdetect==1.0.7
 layeredconfig==0.3.3

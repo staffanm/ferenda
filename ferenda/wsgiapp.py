@@ -72,16 +72,20 @@ class WSGIApp(object):
         ]
         if self.config.legacyapi:
             rules.append(Rule("/-/publ", endpoint="api"))
+        converters = []
+        self.reporules = {}
         for repo in self.repos:
             # a typical repo might provide two rules:
             # * Rule("/doc/<repo>/<basefile>", endpoint=repo.alias + ".doc")
             # * Rule("/dataset/<repo>?param1=x", endpoint=repo.alias + ".ds")
             # 
             # although werkzeug.routing.RuleTemplate seems like it could do that generically?
-            rules.extend(repo.requesthandler.rules)
+            self.reporules[repo] = repo.requesthandler.rules
+            rules.extend(self.reporules[repo])
+            converters.extend(repo.requesthandler.ruleconverters)
             # at this point, we could maybe write a apache:mod_rewrite
             # or nginx compatible config based on our rules?
-        self.routingmap = Map(rules)
+        self.routingmap = Map(rules, converters=dict(converters))
         base = self.config.datadir
         exports = {
             '/index.html': os.path.join(base, 'index.html'),
@@ -373,19 +377,19 @@ class WSGIApp(object):
                     observations[k] += 1
         return dimension_label, observations
 
-    def query(self, request):
+    def query(self, request, options=None):
         # this is needed -- but the connect call shouldn't neccesarily
         # have to call exists() (one HTTP call)
         idx = FulltextIndex.connect(self.config.indextype,
                                     self.config.indexlocation,
                                     self.repos)
-        q, param, pagenum, pagelen, stats = self.parse_parameters(
-            request.query_string, idx)
+        q, param, pagenum, pagelen, stats = self.parse_parameters(request, idx)
         ac_query = request.args.get("_ac") == "true"
-        # not sure these two parameters should come from the query
-        # string or from some other source
-        exclude_types = request.args.get('exclude_types', None)
-        boost_types = request.args.get('boost_types', None)
+
+        exclude_types = boost_types = None
+        if options:
+            exclude_types = options.get('exclude_types', None)
+            boost_types = options.get('boost_types', None)
         res, pager = idx.query(q=q,
                                pagenum=pagenum,
                                pagelen=pagelen,
@@ -456,7 +460,7 @@ class WSGIApp(object):
     def mangle_result(self, hit, ac_query=False):
         return hit
 
-    def parse_parameters(self, querystring, idx):
+    def parse_parameters(self, request, idx):
         def _guess_real_fieldname(k, schema):
             for fld in schema:
                 if fld.endswith(k):
@@ -465,12 +469,7 @@ class WSGIApp(object):
                 "Couldn't find anything that endswith(%s) in fulltextindex schema" %
                 k)
 
-        if isinstance(querystring, bytes):
-            # Assume utf-8 encoded URL -- when is this assumption
-            # incorrect?
-            querystring = querystring.decode("utf-8")
-
-        param = dict(parse_qsl(querystring))
+        param = request.args.to_dict()
         filtered = dict([(k, v)
                          for k, v in param.items() if not (k.startswith("_") or k == "q")])
         if filtered:
@@ -520,7 +519,7 @@ class WSGIApp(object):
                         k = k[:-4]
                         # the parameter *looks* like it's a ref, but it should
                         # be interpreted as a value -- remove starting */ to
-                        # get at actual querystring
+                        # get at actual value
 
                         # FIXME: in order to lookup k in schema, we may need
                         # to guess its prefix, but we're cut'n pasting the
@@ -648,7 +647,7 @@ class WSGIApp(object):
         urltransform = None
         if 'develurl' in self.config:
             urltransform = fakerepo.get_url_transform_func(
-                develurl=self.config.develurl)
+                repos=self.repos, develurl=self.config.develurl)
         depth = len(doc.uri.split("/")) - 3
         tree = transformer.transform(xhtml, depth,
                                      uritransform=urltransform)

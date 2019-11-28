@@ -11,6 +11,7 @@ from collections import OrderedDict
 
 from lxml import etree
 from rdflib.namespace import DCTERMS
+from werkzeug.routing import Rule
 
 from ferenda import util
 from ferenda import TripleStore, Facet, RequestHandler
@@ -21,11 +22,14 @@ from ferenda.sources.legal.se import SwedishLegalSource
 from . import SameAs, SFS  # for the keyword_uri implementation
 
 class LNKeywordHandler(RequestHandler):
-    def supports(self, environ):
-        if environ['PATH_INFO'].startswith("/dataset/"):
-            return super(LNKeywordHandler, self).supports(environ)
-        return environ['PATH_INFO'].startswith("/begrepp/")
 
+    @property
+    def rules(self):
+        rules = super(LNKeywordHandler, self).rules
+        # let basefile_from_uri calculate the basefile, it already
+        # supports changing "_" -> " " 
+        rules[0] = Rule('/' + self.repo.urispace_segment + '/<path:x>', endpoint=self.handle_doc)
+        return rules
 
 class LNKeyword(keyword.Keyword, SameAs):
     """Manages descriptions of legal concepts (Lagen.nu-version of Keyword)
@@ -33,6 +37,7 @@ class LNKeyword(keyword.Keyword, SameAs):
     requesthandler_class = LNKeywordHandler
     namespaces = SwedishLegalSource.namespaces
     lang = "sv"
+    urispace_segment = "begrepp"
     if sys.platform == "darwin":
         collate_locale = "sv_SE.ISO8859-15"
     else:
@@ -59,9 +64,9 @@ class LNKeyword(keyword.Keyword, SameAs):
         return self.keyword_uri(basefile)
 
     def basefile_from_uri(self, uri):
-        prefix = "https://lagen.nu/begrepp/"
-        if prefix in uri:
-            return unquote(uri.replace(prefix, "").replace("_", " ").replace("//", "»"))
+        segments = uri.split("/", 4)
+        if segments[3] == self.urispace_segment:
+            return unquote(segments[4].replace("_", " ").replace("//", "»"))
         else:
             return super(LNKeyword, self).basefile_from_uri(uri)
         

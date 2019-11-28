@@ -13,8 +13,11 @@ mediawiki Missbruksmodellen
 mediawiki Personuppgift
 mediawiki Sekundär_sekretessbestämmelse
 mediawiki SFS/1949:105
-myndfs difs/2010:1
-myndfs difs/2013:1
+myndfs bolfs/2008:1
+myndfs difs/2010:1 # is now expired
+myndfs difs/2013:1 # is now expired
+myndfs difs/2018:1
+myndfs difs/2018:2
 myndfs konsolidering/afs/2011:19
 myndfs afs/2011:19
 myndfs afs/2014:5
@@ -25,12 +28,14 @@ prop 1997/98:44
 prop 1997/98:160
 prop 2000/01:105
 prop 2005/06:173
+sfs 1909:53_s.7 # atypical basefile
+sfs 1949:105 # TF because why not
+sfs 1958:638 # ÄktBP, slightly atypical
+sfs 1991:1469 # YGL because same
 sfs 1998:1191 # PUF
 sfs 1998:204
-sfs 1949:105 # TF because why not
-sfs 1991:1469 # YGL because same
-sfs 1909:53_s.7 # atypical basefile
-sfs 1958:638 # ÄktBP, slightly atypical
+sfs 1999:175
+sfs 2017:900
 sou 1997:39 # regeringen, multipart
 sou 2004:6
 sou 2016:41

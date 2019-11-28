@@ -23,6 +23,7 @@ responses
 langdetect
 grako
 werkzeug
+jinja2
 # importlib
 # the following modules might be needed for older python versions
 # mock

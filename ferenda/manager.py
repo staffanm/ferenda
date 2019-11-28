@@ -27,7 +27,7 @@ from multiprocessing.managers import SyncManager, RemoteError
 from queue import Queue
 from time import sleep
 from urllib.parse import urlsplit
-# from wsgiref.simple_server import make_server
+
 from contextlib import contextmanager
 import argparse
 import builtins
@@ -556,7 +556,7 @@ def run(argv, config=None, subcall=False):
                 # process whenever a file is changed?
 
                 # Note: the actual run_simple method never returns
-                run_simple('', port, app, use_debugger=True, use_reloader=True)
+                run_simple('', port, app, use_debugger=False, use_reloader=True)
             elif action == 'buildclient':
                 args = _setup_buildclient_args(config)
                 return runbuildclient(**args)
