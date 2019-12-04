@@ -123,8 +123,8 @@ class SFS(OrigSFS, SameAs):
             filename = "res/img/sfs/%s.png" % basename
             if not os.path.exists(filename):
                 util.ensure_dir(filename)
-                self.log.info("Creating img %s with label %s" %
-                              (filename, label))
+                #self.log.info("Creating img %s with label %s" %
+                #              (filename, label))
                 cmd = 'convert -background transparent -fill Grey -font %s -pointsize 10 -size 44x14 -gravity East label:"%s " %s' % (font, label, filename)
                 util.runcmd(cmd)
             return filename

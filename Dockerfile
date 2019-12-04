@@ -32,10 +32,10 @@ RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selectio
        libtiff-tools \
        libxml2-dev \
        libxslt1-dev \
+       locales \    
        make \
        mariadb-client \
        mariadb-server \
-       mediawiki \
        mediawiki \
        nginx \
        openjdk-8-jre-headless \
@@ -78,7 +78,8 @@ COPY docker /tmp/docker
 RUN mv /tmp/docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf && \
     mv /tmp/docker/elasticsearch-jvm.options /etc/elasticsearch/jvm.options && \
     mv /tmp/docker/nginx.conf /etc/nginx/sites-enabled/default && \
-    mv /tmp/docker/ferenda.ttl /opt/fuseki/run/configuration/
+    mv /tmp/docker/ferenda.ttl /opt/fuseki/run/configuration/ && \
+    mv /tmp/docker/locale.gen /etc/locale.gen && locale-gen
 COPY . .
 
 ENTRYPOINT ["/bin/bash", "/tmp/docker/setup.sh"]

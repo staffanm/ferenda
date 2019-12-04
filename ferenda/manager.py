@@ -111,7 +111,8 @@ DEFAULT_CONFIG = {'loglevel': 'DEBUG',
                   'authkey': b'secret',
                   'profile': False,
                   'wsgiexceptionhandler': True,
-                  'systempaths': list}
+                  'systempaths': list,
+                  'checktimeskew': False}
 
 class MarshallingHandler(logging.Handler):
     def __init__(self, records):
@@ -504,6 +505,11 @@ def run(argv, config=None, subcall=False):
         setup_logger(level=config.loglevel, filename=logfile)
 
     if not subcall:
+        if config.checktimeskew:
+            skew = timeskew(config)
+            if skew:
+                log.critical("timeskew detected: System time is %s s behind file creation times. If running under docker desktop, try restarting the container" % skew)
+                sys.exit(1)
         log.info("run: %s" % " ".join(argv))
     try:
         # reads only ferenda.ini using configparser rather than layeredconfig
@@ -673,6 +679,16 @@ Disallow: /-/
 def _nativestr(unicodestr, encoding="utf-8"):
     return bytes_to_native_str(unicodestr.encode(encoding))
 
+
+def timeskew(config):
+    """Check to see if system time agrees with filesystem time. If running under docker, and the container system time has drifted from the host system time (due to e.g. host system hiberation), and config.datadir is on a volume mounted from the host, files may appear creater or modified way later. Detect this skew if present and not smaller than a second."""
+    checkfile = config.datadir + os.sep + "checktimeskew.txt"
+    assert not os.path.exists(checkfile)
+    systemtime = datetime.now()
+    util.writefile(checkfile, "dummy")
+    filetime = datetime.fromtimestamp(os.stat(checkfile).st_mtime)
+    util.robust_remove(checkfile)
+    return int((filetime - systemtime).total_seconds())
 
 def enable(classname):
     """Registers a class by creating a section for it in the

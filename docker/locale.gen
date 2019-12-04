@@ -1,0 +1,4 @@
+# this should be copied to /etc/locale.gen, and then locale-gen should
+# run to create the following locales (not setting anyone to default)
+en_US.UTF-8 UTF-8
+sv_SE.UTF-8 UTF-8
