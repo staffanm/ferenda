@@ -96,6 +96,7 @@ class RequestHandler(object):
     @property
     def rules(self):
         return [Rule('/res/'+self.repo.alias+'/<path:basefile>', endpoint=self.handle_doc),
+                Rule('/res/'+self.repo.alias+'/<path:basefile>/data<datasuffix>', endpoint=self.handle_doc),
                 Rule('/dataset/'+self.repo.alias, endpoint=self.handle_dataset),
                 Rule('/dataset/'+self.repo.alias+'.<suffix>', endpoint=self.handle_dataset),
                 Rule('/dataset/'+self.repo.alias+'/<file>', endpoint=self.handle_dataset)]
@@ -134,14 +135,14 @@ class RequestHandler(object):
 
     def handle_dataset(self, request, **values):
         # remove trailing suffix (the ".nt" in "example.org/dataset/base.nt")
-        tmpuri = request.base_url
+        tmpuri = self.request_uri(request.environ)
         if "." in request.url.split("/")[-1]:
             tmpuri, suffix = tmpuri.rsplit(".", 1)
-        elif 'ffix' in values:
+        elif 'suffix' in values:
             suffix = values['suffix']
         else:
             suffix = None
-        params = self.dataset_params_from_uri(tmpuri + "?" + request.query_string.decode("utf-8"))
+        params = self.dataset_params_from_uri(tmpuri)
         contenttype = self.contenttype(request, suffix)
         path, data = self.lookup_dataset(request.headers, params, contenttype, suffix)
         return self.prep_response(request, path, data, contenttype)

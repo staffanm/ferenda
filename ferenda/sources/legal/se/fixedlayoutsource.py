@@ -28,8 +28,9 @@ class FixedLayoutHandler(SwedishLegalHandler):
         if basefile and suffix == "png":
             # OK, this is a request for a particular page. Map this to
             # correct repo, dir and attachment and set those params
-            pi = environ['PATH_INFO']
-            pageno = pi[pi.index("/sid")+4:-(len(suffix)+1)]
+            #pi = environ['PATH_INFO']
+            #pageno = pi[pi.index("/sid")+4:-(len(suffix)+1)]
+            pageno = params['pageno']
             if pageno.isdigit():
                 pageno = int(pageno)
             if isinstance(self.repo, CompositeRepository):

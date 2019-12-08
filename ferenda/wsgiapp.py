@@ -107,13 +107,15 @@ class WSGIApp(object):
         except Exception as e:
             if self.config.wsgiexceptionhandler:
                 return self.handle_exception(environ, start_response)
+            elif isinstance(e, HTTPException):
+                return e.get_response(environ)(environ, start_response)
             else:
                 raise e
             
+
     #
     # REQUEST ENTRY POINT
     # 
-
     def wsgi_app(self, environ, start_response):
         # due to nginx config issues we might have to add a bogus
         # .diff suffix to our path. remove it as early as possible,
@@ -155,6 +157,7 @@ class WSGIApp(object):
             res = endpoint(request, **values)
             if not isinstance(res, Response):
                 res = Response(res) # set mimetype?
+            res.headers["X-WSGI-App"] ="ferenda"
             # add X-WSGI-App: ferenda and possibly other data as well
             return res(environ, start_response)
 

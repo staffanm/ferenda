@@ -21,6 +21,7 @@ from datetime import datetime
 from urllib.parse import urlparse
 
 # 3rdparty
+from layeredconfig import LayeredConfig, Defaults
 import requests
 from bs4 import BeautifulSoup
 from rdflib import Graph, URIRef
@@ -32,6 +33,7 @@ from ferenda.testutil import FerendaTestCase
 from ferenda.sources.legal.se import RPUBL
 from lagen.nu import SFS, LNKeyword
 from lagen.nu.wsgiapp import WSGIApp
+from ferenda import manager
 
 class TestLagen(unittest.TestCase, FerendaTestCase):
 
@@ -113,7 +115,7 @@ class TestPaths(TestLagen):
         self.assertIn('<link rel="stylesheet" href="/bolfs/2008:1?dir=parsed&amp;attachment=index.css"/>', res.text[:1200])
         res = self.get(self.baseurl + "bolfs/2008:1?dir=parsed&attachment=index.css")
         self.assertEqual(200, res.status_code)
-        self.assertEqual("text/css", res.headers["Content-Type"])
+        self.assertEqual("text/css; charset=utf-8", res.headers["Content-Type"])
 
 class TestPages(TestLagen):
     def test_doctype(self):
@@ -197,22 +199,22 @@ class TestConNeg(TestLagen):
         res = self.get(self.baseurl + "1999:175",
                        headers={'Accept': 'application/xhtml+xml'})
         self.assertEqual(200, res.status_code)
-        self.assertEqual("application/xhtml+xml", res.headers['Content-Type'])
+        self.assertEqual("application/xhtml+xml; charset=utf-8", res.headers['Content-Type'])
         # variation: use file extension
         res = self.get(self.baseurl + "1999:175.xhtml")
         self.assertEqual(200, res.status_code)
-        self.assertEqual("application/xhtml+xml", res.headers['Content-Type'])
+        self.assertEqual("application/xhtml+xml; charset=utf-8", res.headers['Content-Type'])
 
     def test_rdf(self):
         # basic test 3: accept: application/rdf+xml -> RDF statements (in XML)
         res = self.get(self.baseurl + "1999:175",
                        headers={'Accept': 'application/rdf+xml'})
         self.assertEqual(200, res.status_code)
-        self.assertEqual("application/rdf+xml", res.headers['Content-Type'])
+        self.assertEqual("application/rdf+xml; charset=utf-8", res.headers['Content-Type'])
         # variation: use file extension
         res = self.get(self.baseurl + "1999:175.rdf")
         self.assertEqual(200, res.status_code)
-        self.assertEqual("application/rdf+xml", res.headers['Content-Type'])
+        self.assertEqual("application/rdf+xml; charset=utf-8", res.headers['Content-Type'])
 
     def test_ntriples(self):
         # transform test 4: accept: application/n-triples -> RDF statements (in NTriples)
@@ -240,14 +242,14 @@ class TestConNeg(TestLagen):
         res = self.get(self.baseurl + "1999:175",
                        headers={'Accept': 'text/turtle'})
         self.assertEqual(200, res.status_code)
-        self.assertEqual("text/turtle", res.headers['Content-Type'])
+        self.assertEqual("text/turtle; charset=utf-8", res.headers['Content-Type'])
         got = Graph().parse(data=res.content, format="turtle")
         self.assertEqualGraphs(g, got)
 
         # variation: use file extension
         res = self.get(self.baseurl + "1999:175.ttl")
         self.assertEqual(200, res.status_code)
-        self.assertEqual("text/turtle", res.headers['Content-Type'])
+        self.assertEqual("text/turtle; charset=utf-8", res.headers['Content-Type'])
         got = Graph()
         got.parse(data=res.content, format="turtle")
         self.assertEqualGraphs(g, got)
@@ -274,12 +276,12 @@ class TestConNeg(TestLagen):
         res = self.get(self.baseurl + "1999:175",
                        headers={'Accept': 'application/pdf'})
         self.assertEqual(res.status_code, 406)
-        self.assertEqual("text/html; charset=utf-8", res.headers['Content-Type'])
+        self.assertEqual("text/html", res.headers['Content-Type'])
 
-        # variation: unknown file extension should also be unacceptable
+        # variation: unknown file extenison should also be unacceptable
         res = self.get(self.baseurl + "1999:175.pdf")
         self.assertEqual(res.status_code, 406)
-        self.assertEqual("text/html; charset=utf-8", res.headers['Content-Type'])
+        self.assertEqual("text/html", res.headers['Content-Type'])
 
     def test_extended_rdf(self):
         # extended test 6: accept: "/data" -> extended RDF statements
@@ -288,7 +290,7 @@ class TestConNeg(TestLagen):
         res = self.get(self.baseurl + "1999:175/data",
                        headers={'Accept': 'application/rdf+xml'})
         self.assertEqual(200, res.status_code)
-        self.assertEqual("application/rdf+xml", res.headers['Content-Type'])
+        self.assertEqual("application/rdf+xml; charset=utf-8", res.headers['Content-Type'])
         got = Graph().parse(data=res.text)
         self.assertEqualGraphs(g, got)
 
@@ -316,13 +318,13 @@ class TestConNeg(TestLagen):
         res = self.get(self.baseurl + "1999:175/data",
                      headers={'Accept': 'text/turtle'})
         self.assertEqual(200, res.status_code)
-        self.assertEqual("text/turtle", res.headers['Content-Type'])
+        self.assertEqual("text/turtle; charset=utf-8", res.headers['Content-Type'])
         got = Graph().parse(data=res.content, format="turtle")
         self.assertEqualGraphs(g, got)
         # variation: use file extension
         res = self.get(self.baseurl + "1999:175/data.ttl")
         self.assertEqual(200, res.status_code)
-        self.assertEqual("text/turtle", res.headers['Content-Type'])
+        self.assertEqual("text/turtle; charset=utf-8", res.headers['Content-Type'])
         got = Graph().parse(data=res.content, format="turtle")
         self.assertEqualGraphs(g, got)
 
@@ -352,22 +354,22 @@ class TestConNeg(TestLagen):
         res = self.get(self.baseurl  + "dataset/sitenews",
                        headers={'Accept': 'text/turtle'})
         self.assertTrue(res.status_code, 200)
-        self.assertEqual("text/turtle", res.headers['Content-Type'])
+        self.assertEqual("text/turtle; charset=utf-8", res.headers['Content-Type'])
         Graph().parse(data=res.text, format="turtle")
         res = self.get(self.baseurl  + "dataset/sitenews.ttl")
         self.assertTrue(res.status_code, 200)
-        self.assertEqual("text/turtle", res.headers['Content-Type'])
+        self.assertEqual("text/turtle; charset=utf-8", res.headers['Content-Type'])
         Graph().parse(data=res.text, format="turtle")
 
     def test_dataset_xml(self):
         res = self.get(self.baseurl  + "dataset/sitenews",
                        headers={'Accept': 'application/rdf+xml'})
         self.assertTrue(res.status_code, 200)
-        self.assertEqual("application/rdf+xml", res.headers['Content-Type'])
+        self.assertEqual("application/rdf+xml; charset=utf-8", res.headers['Content-Type'])
         Graph().parse(data=res.text)
         res = self.get(self.baseurl  + "dataset/sitenews.rdf")
         self.assertTrue(res.status_code, 200)
-        self.assertEqual("application/rdf+xml", res.headers['Content-Type'])
+        self.assertEqual("application/rdf+xml; charset=utf-8", res.headers['Content-Type'])
         Graph().parse(data=res.text)
 
 
@@ -599,7 +601,12 @@ class TestAutocomplete(TestLagen):
 class TestACExpand(unittest.TestCase):
 
     def setUp(self):
-        self.wsgiapp = WSGIApp(repos=[SFS(datadir="tng.lagen.nu/data")])
+        config = LayeredConfig(Defaults(manager.DEFAULT_CONFIG))
+        config.wsgiappclass = 'lagen.nu.wsgiapp.WSGIApp'
+        self.rootdir = os.environ.get("FERENDA_TESTDATA", "tng.lagen.nu/data")
+        self.assertTrue(os.path.exists(self.rootdir), "You probably need to set the FERENDA_TESTDATA environment variable")
+        self.wsgiapp = manager.make_wsgi_app(config=config,
+                                             repos=[SFS(datadir=self.rootdir)])
 
     def test_expand_shortname(self):
         self.assertEqual("https://lagen.nu/1949:105#K",
@@ -618,12 +625,12 @@ class TestACExpand(unittest.TestCase):
                          self.wsgiapp.expand_partial_ref("TF 1:1"))
 
     def test_chapterless_expand_all_sections(self):
-        self.assertTrue(os.path.exists("tng.lagen.nu/data/sfs/distilled/1998/204.rdf"))
+        self.assertTrue(os.path.exists(self.rootdir + "/sfs/distilled/1998/204.rdf"))
         self.assertEqual("https://lagen.nu/1998:204#P",
                          self.wsgiapp.expand_partial_ref("PUL"))
 
     def test_chapterless_expand_prefixed_sections(self):
-        self.assertTrue(os.path.exists("tng.lagen.nu/data/sfs/distilled/1998/204.rdf"))
+        self.assertTrue(os.path.exists(self.rootdir + "/sfs/distilled/1998/204.rdf"))
         self.assertEqual("https://lagen.nu/1998:204#P3",
                          self.wsgiapp.expand_partial_ref("PUL 3"))
 

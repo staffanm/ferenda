@@ -119,7 +119,14 @@ class SwedishLegalHandler(RequestHandler):
         return rules + [Rule('/dataset/'+self.repo.alias, endpoint=self.handle_dataset),
                         Rule('/dataset/'+self.repo.alias+'.<suffix>', endpoint=self.handle_dataset),
                         Rule('/dataset/'+self.repo.alias+'/<file>', endpoint=self.handle_dataset)]
-        
+
+    def params_from_uri(self, uri):
+        p = super(SwedishLegalHandler, self).params_from_uri(uri)
+        if '/sid' in uri and uri.endswith(".png"):
+            uri, pageno = uri.split("/sid")
+            p['pageno'] = pageno[:-4] # remove trailing .png
+        return p
+
     def prep_request(self, environ, path, data, contenttype):
         if path and not os.path.exists(path):
             # OK, we recieved a request for a path that we should have
@@ -511,16 +518,17 @@ class SwedishLegalSource(DocumentRepository):
             uri = uri.split("?")[0]
         if '/sid' in uri and uri.endswith(".png"):
             uri = uri.split("/sid")[0]
-        if uri.startswith(base) and uri[len(base)+1:].startswith(self.urispace_segment):
-            offset = 2 if self.urispace_segment else 1
-            basefile = uri[len(base) + len(self.urispace_segment) + offset:]
-            if spacereplacement:
-                basefile = basefile.replace(spacereplacement, " ")
-            if "#" in basefile:
-                basefile = basefile.split("#", 1)[0]
-            elif basefile.endswith((".rdf", ".xhtml", ".json", ".nt", ".ttl")):
-                basefile = basefile.rsplit(".", 1)[0]
-            return basefile
+        for segment in self.urispace_segments:
+            if uri.startswith(base) and uri[len(base)+1:].startswith(segment):
+                offset = 2 if segment else 1
+                basefile = uri[len(base) + len(segment) + offset:]
+                if spacereplacement:
+                    basefile = basefile.replace(spacereplacement, " ")
+                if "#" in basefile:
+                    basefile = basefile.split("#", 1)[0]
+                elif basefile.endswith((".rdf", ".xhtml", ".json", ".nt", ".ttl")):
+                    basefile = basefile.rsplit(".", 1)[0]
+                return basefile
 
     @cached_property
     def parse_options(self):

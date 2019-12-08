@@ -78,41 +78,51 @@ from ferenda import errors, util
 from ferenda.compat import MagicMock
 
 
-DEFAULT_CONFIG = {'loglevel': 'DEBUG',
-                  'logfile': True,
-                  'processes': '1',
-                  'datadir': 'data',
-                  #'force': False,
-                  #'refresh': False,
-                  #'conditionalget': True,
-                  #'useragent': 'ferenda-bot',
-                  #'downloadmax': nativeint,
-                  #'lastdownload': datetime,
-                  'combineresources': False,
-                  'staticsite': False,
-                  'all': False,
-                  'allversions': False,
-                  'relate': True,
-                  'download': True,
-                  'tabs': True,
-                  #'primaryfrontpage': False,
-                  #'frontpagefeed': False,
-                  'sitename': 'MySite',
-                  'sitedescription': 'Just another Ferenda site',
-                  'cssfiles': ['css/ferenda.css'],
-                  'jsfiles': ['js/ferenda.js'],
-                  'imgfiles': [],
-                  'disallowrobots': False,
-                  'legacyapi': False,
-                  'wsgiappclass': 'ferenda.WSGIApp',
-                  #'fulltextindex': True,
-                  'removeinvalidlinks': True,
-                  'serverport': 5555,
-                  'authkey': b'secret',
-                  'profile': False,
-                  'wsgiexceptionhandler': True,
-                  'systempaths': list,
-                  'checktimeskew': False}
+DEFAULT_CONFIG = {
+    'acceptalldomains': False,
+    'all': False,
+    'allversions': False,
+    'apiendpoint': "/api/",
+    'authkey': b'secret',
+    'checktimeskew': False,
+    'combineresources': False,
+    'cssfiles': ['css/ferenda.css'],
+    'datadir': 'data',
+    'disallowrobots': False,
+    'download': True,
+    'imgfiles': ['img/atom.png'],
+    'indexlocation': 'data/whooshindex',
+    'indextype': 'WHOOSH',
+    'jsfiles': ['js/ferenda.js'],
+    'legacyapi': False,
+    'logfile': True,
+    'loglevel': 'DEBUG',
+    'processes': '1',
+    'profile': False,
+    'relate': True,
+    'removeinvalidlinks': True,
+    'searchendpoint': "/search/",
+    'serverport': 5555,
+    'sitedescription': 'Just another Ferenda site',
+    'sitename': 'MySite',
+    'staticsite': False,
+    'storelocation': 'data/ferenda.sqlite',
+    'storerepository': 'ferenda',
+    'storetype': 'SQLITE',
+    'systempaths': list,
+    'tabs': True,
+    'wsgiappclass': 'ferenda.WSGIApp',
+    'wsgiexceptionhandler': True,
+    #'conditionalget': True,
+    #'downloadmax': nativeint,
+    #'force': False,
+    #'frontpagefeed': False,
+    #'fulltextindex': True,
+    #'lastdownload': datetime,
+    #'primaryfrontpage': False,
+    #'refresh': False,
+    #'useragent': 'ferenda-bot',
+}
 
 class MarshallingHandler(logging.Handler):
     def __init__(self, records):
@@ -855,14 +865,11 @@ def load_config(filename=None, argv=None, defaults=None):
         # assert config_loaded is False, "load_config called more than once!"
         getlog().error("load_config called more than once!")
     if not defaults:
-        # FIXME: Expand on this list of defaults? Note that it only
-        # pertains to global configuration, not docrepo configuration
-        # (those have the get_default_options() classmethod).
         defaults = copy.deepcopy(DEFAULT_CONFIG)
-        
-        for alias, classname in enabled_classes(inifile=filename).items():
-            assert alias not in defaults, "Collision on key %s" % alias
-            defaults[alias] = _load_class(classname).get_default_options()
+        if filename:
+            for alias, classname in enabled_classes(inifile=filename).items():
+                assert alias not in defaults, "Collision on key %s" % alias
+                defaults[alias] = _load_class(classname).get_default_options()
     sources = [Defaults(defaults)]
     if filename:
         sources.append(INIFile(filename))

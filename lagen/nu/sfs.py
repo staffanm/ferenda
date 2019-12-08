@@ -27,7 +27,7 @@ from ferenda.sources.legal.se.elements import (Kapitel, Paragraf, Rubrik,
 from . import SameAs
 
 class SFSConverter(BaseConverter):
-    regex = "\d{4}:\d[^/]*"
+    regex = "\d{4}:\d[^/]*(|/data.*)"
     def to_url(self, value):
         return value.replace(" ", "_")
     def to_python(self, value):
