@@ -15,21 +15,29 @@ from werkzeug.routing import Rule
 
 from ferenda import util
 from ferenda import TripleStore, Facet, RequestHandler
+from ferenda.requesthandler import UnderscoreConverter
 from ferenda.elements import Body, UnorderedList, ListItem, Link
 from ferenda.elements.html import Div, H2
 from ferenda.sources.general import keyword
 from ferenda.sources.legal.se import SwedishLegalSource
 from . import SameAs, SFS  # for the keyword_uri implementation
 
+class KeywordConverter(UnderscoreConverter):
+    regex = "[^/].*?"
+
 class LNKeywordHandler(RequestHandler):
 
     @property
-    def rules(self):
-        rules = super(LNKeywordHandler, self).rules
-        # let basefile_from_uri calculate the basefile, it already
-        # supports changing "_" -> " " 
-        rules[0] = Rule('/' + self.repo.urispace_segment + '/<path:x>', endpoint=self.handle_doc)
-        return rules
+    def doc_roots(self):
+        return ["/"+self.repo.urispace_segment]
+
+    @property
+    def rule_context(self):
+        return {"converter": "keyword"}
+
+    @property
+    def rule_converters(self):
+        return (("keyword", KeywordConverter),)
 
 class LNKeyword(keyword.Keyword, SameAs):
     """Manages descriptions of legal concepts (Lagen.nu-version of Keyword)

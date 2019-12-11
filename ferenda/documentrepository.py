@@ -2515,7 +2515,7 @@ WHERE {
 
 
     def get_url_transform_func(self, repos=None, basedir=None,
-                               develurl=None, remove_missing=False):
+                               develurl=None, remove_missing=False, wsgiapp=None):
         """Returns a function that, when called with a URI, transforms that
         URI to another suitable reference. This can be used to eg. map
         between canonical URIs and local URIs. The function is run on
@@ -2618,8 +2618,9 @@ WHERE {
         from ferenda import CompositeRepository
         if repos is None:
             repos = []
-        from ferenda.manager import make_wsgi_app
-        wsgiapp = make_wsgi_app(self.config._parent, repos=repos)
+        if wsgiapp is None: 
+            from ferenda.manager import make_wsgi_app
+            wsgiapp = make_wsgi_app(self.config._parent, repos=repos)
         repos = sorted(repos, key=lambda x: isinstance(x, CompositeRepository), reverse=True)
         if develurl:
             return simple_transform

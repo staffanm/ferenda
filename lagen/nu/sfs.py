@@ -19,36 +19,25 @@ from ferenda.sources.legal.se.swedishlegalsource import SwedishLegalHandler
 from ferenda import decorators, util
 from ferenda import TextReader, DocumentEntry, Describer, RequestHandler
 from ferenda.sources.legal.se import SFS as OrigSFS
-from ferenda.sources.legal.se import SFS as OrigSFS
+from ferenda.sources.legal.se.sfs import SFSHandler as OrigSFSHandler
 from ferenda.sources.legal.se.elements import (Kapitel, Paragraf, Rubrik,
                                                Stycke, Listelement,
                                                Overgangsbestammelse, Bilaga,
                                                Avdelning, Underavdelning)
 from . import SameAs
 
-class SFSConverter(BaseConverter):
-    regex = "\d{4}:\d[^/]*(|/data.*)"
-    def to_url(self, value):
-        return value.replace(" ", "_")
-    def to_python(self, value):
-        return value.replace("_", " ")
 
 # class SFSHandler(RequestHandler):
-class SFSHandler(SwedishLegalHandler):
+class SFSHandler(OrigSFSHandler):
     # FIXME: write a nice set of rules here. the difficult thing will
     # be to only match SFS basefiles, but /<int>:<rest> ought to do it
     # maybe
     
-    @property
-    def rules(self):
-        return [Rule('/<sfs:basefile>', endpoint=self.handle_doc),
-                Rule('/dataset/'+self.repo.alias, endpoint=self.handle_dataset),
-                Rule('/dataset/'+self.repo.alias+'.<suffix>', endpoint=self.handle_dataset),
-                Rule('/dataset/'+self.repo.alias+'/<file>', endpoint=self.handle_dataset)]
 
     @property
-    def ruleconverters(self):
-        return (("sfs", SFSConverter),)
+    def doc_roots(self):
+        return [""]
+    
 
     def supports(self, environ):
         if environ['PATH_INFO'].startswith("/dataset/"):
@@ -72,6 +61,7 @@ class SFSHandler(SwedishLegalHandler):
             return super(SFSHandler, self).path(uri)
 
     def params_from_uri(self, uri):
+        assert False, "You should remove this and rely on the werkzeug routing rule"
         basefile, version = self._params(uri)
         if version:
             return {'version': version}

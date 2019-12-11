@@ -38,6 +38,8 @@ import bs4
 from cached_property import cached_property
 from lxml import etree
 from werkzeug.routing import Rule
+from werkzeug.wsgi import wrap_file
+from werkzeug.wrappers import Response
 
 # own
 from ferenda import (DocumentRepository, DocumentStore, FSMParser,
@@ -110,90 +112,87 @@ def lazyread(f):
     
 class SwedishLegalHandler(RequestHandler):
 
+
     @property
-    def rules(self):
-        rules = []
-        for segment in self.repo.urispace_segments:
-            # some basefiles may contain slashes so we must use routing.PathConverter
-            rules.append(Rule('/'+segment+'/<path:x>', endpoint=self.handle_doc))
-        return rules + [Rule('/dataset/'+self.repo.alias, endpoint=self.handle_dataset),
-                        Rule('/dataset/'+self.repo.alias+'.<suffix>', endpoint=self.handle_dataset),
-                        Rule('/dataset/'+self.repo.alias+'/<file>', endpoint=self.handle_dataset)]
+    def doc_roots(self):
+        return ["/%s" % x for x in self.repo.urispace_segments]
 
-    def params_from_uri(self, uri):
-        p = super(SwedishLegalHandler, self).params_from_uri(uri)
-        if '/sid' in uri and uri.endswith(".png"):
-            uri, pageno = uri.split("/sid")
-            p['pageno'] = pageno[:-4] # remove trailing .png
-        return p
+    @property
+    def rule_context(self):
+        return {"converter": "path"}
 
-    def prep_request(self, environ, path, data, contenttype):
-        if path and not os.path.exists(path):
-            # OK, we recieved a request for a path that we should have
-            # been able to handle, but weren't. This could mean that
-            # we either don't have the basefile at all, or that we
-            # have it, but for some reason it hasn't been generated.
-            request_uri = self.request_uri(environ)
-            basefile = self.repo.basefile_from_uri(request_uri)
-            assert basefile, "Cannot derive basefile from %s" % request_uri
-            entrypath = self.repo.store.documententry_path(basefile)
-            if os.path.exists(path+".404"):
-                # we have the document, but it contains no actual data
-                # (it might contain links to source data on the
-                # remote/upstream server though) -- serve the page,
-                # but make sure that status is 404
-                return super(SwedishLegalHandler, self).prep_request(environ, path+".404", data, contenttype)
-            elif os.path.exists(entrypath):
-                # We have the resource but cannot for some reason
-                # serve it -- return 500
-                entry = DocumentEntry(entrypath)
-                data = Div([H1(["Något fel är trasigt"]),
-                            P(["Vi har dokumentet %s (%s), men kan inte visa det." % (basefile, path) ])])
-                for stage in ("parse", "relate", "generate"):
-                    if stage in entry.status and entry.status[stage]["success"] is False:
-                        data.extend([H2(["Fel i %s" % stage]),
-                                     P([entry.status[stage]["error"]]),
-                                     Pre([entry.status[stage]["traceback"]])])
-                title = "Dokumentet kan inte visas"
-                status = 500
-            else:
-                data = Div([H1("Något fel är trasigt"),
-                            P(["Vi har inte något dokument %s" % basefile])])
-                title = "Dokumentet saknas"
-                status = 404
+# not needed anymore since a werkzeug routing rule handles this case with a pageno
+#
+#    def params_from_uri(self, uri):
+#        p = super(SwedishLegalHandler, self).params_from_uri(uri)
+#        if '/sid' in uri and uri.endswith(".png"):
+#            uri, pageno = uri.split("/sid")
+#            p['pageno'] = pageno[:-4] # remove trailing .png
+#        return p
 
-            # 1. serialize data to XHTML
-            doc = self.repo.make_document()
-            doc.uri = request_uri
-            doc.meta.add((URIRef(doc.uri),
-                          DCTERMS.title,
-                          Literal(title, lang="sv")))
-            doc.body = Body([data])
-            xhtml = self.repo.render_xhtml_tree(doc)
-
-            # 2. use Transformer with error.xsl to get a tree
-            conffile = os.sep.join([self.repo.config.datadir, 'rsrc',
-                                    'resources.xml'])
-            transformer = Transformer('XSLT', "xsl/error.xsl", "xsl",
-                                      resourceloader=self.repo.resourceloader,
-                                      config=conffile)
-
-            depth = environ["PATH_INFO"].count("/")
-            urltransform = None
-            if 'develurl' in self.repo.config:
-                urltransform = self.repo.get_url_transform_func(
-                    develurl=self.repo.config.develurl)
-            tree = transformer.transform(xhtml, depth,
-                                         uritransform=urltransform)
-
-            # 3. return the data with proper status and headers
-            data = etree.tostring(tree, encoding="utf-8")
-            return (BytesIO(data),
-                    len(data),
-                    status,
-                    contenttype)
+    def prep_response(self, request, path, data, contenttype, params):
+        if not path or os.path.exists(path):
+            return super(SwedishLegalHandler, self).prep_response(request, path, data, contenttype, params)
+        # OK, we recieved a request for a path that we should have
+        # been able to handle, but weren't. This could mean that we
+        # either don't have the basefile at all, or that we have it,
+        # but for some reason it hasn't been generated. Create some
+        # helpful messages with what we know
+        entrypath = self.repo.store.documententry_path(params['basefile'])
+        if os.path.exists(path+".404"):
+            # we have the document, but it contains no actual data
+            # (it might contain links to source data on the
+            # remote/upstream server though) -- serve the page,
+            # but make sure that status is 404
+            return super(SwedishLegalHandler, self).prep_response(request, path+".404", data, contenttype, params)
+        elif os.path.exists(entrypath):
+            # We have the resource but cannot for some reason
+            # serve it -- return 500
+            entry = DocumentEntry(entrypath)
+            data = Div([H1(["Något fel är trasigt"]),
+                        P(["Vi har dokumentet %s (%s), men kan inte visa det." % (params['basefile'], path) ])])
+            for stage in ("parse", "relate", "generate"):
+                if stage in entry.status and entry.status[stage]["success"] is False:
+                    data.extend([H2(["Fel i %s" % stage]),
+                                 P([entry.status[stage]["error"]]),
+                                 Pre([entry.status[stage]["traceback"]])])
+            title = "Dokumentet kan inte visas"
+            status = 500
         else:
-            return super(SwedishLegalHandler, self).prep_request(environ, path, data, contenttype)
+            data = Div([H1("Något fel är trasigt"),
+                        P(["Vi har inte något dokument %s" % params['basefile']])])
+            title = "Dokumentet saknas"
+            status = 404
+
+        # 1. serialize data to XHTML
+        doc = self.repo.make_document()
+        doc.uri = request.url
+        doc.meta.add((URIRef(doc.uri),
+                      DCTERMS.title,
+                      Literal(title, lang="sv")))
+        doc.body = Body([data])
+        xhtml = self.repo.render_xhtml_tree(doc)
+
+        # 2. use Transformer with error.xsl to get a tree
+        conffile = os.sep.join([self.repo.config.datadir, 'rsrc',
+                                'resources.xml'])
+        transformer = Transformer('XSLT', "xsl/error.xsl", "xsl",
+                                  resourceloader=self.repo.resourceloader,
+                                  config=conffile)
+
+        depth = request.path.count("/")
+        urltransform = None
+        if 'develurl' in self.repo.config:
+            urltransform = self.repo.get_url_transform_func(
+                develurl=self.repo.config.develurl,
+                wsgiapp=self)
+        tree = transformer.transform(xhtml, depth,
+                                     uritransform=urltransform)
+
+        # 3. return the data with proper status and headers
+        data = etree.tostring(tree, encoding="utf-8")
+        fp = wrap_file(request.environ, BytesIO(data))
+        return Response(fp, status, mimetype=contenttype)
 
 
 class SwedishLegalSource(DocumentRepository):
@@ -1211,8 +1210,8 @@ class SwedishLegalSource(DocumentRepository):
         metadata from doc.body to doc.head)"""
         pass
 
-    def get_url_transform_func(self, repos=None, basedir=None, develurl=None, remove_missing=False):
-        f = super(SwedishLegalSource, self).get_url_transform_func(repos, basedir, develurl, remove_missing)
+    def get_url_transform_func(self, repos=None, basedir=None, develurl=None, remove_missing=False, wsgiapp=None):
+        f = super(SwedishLegalSource, self).get_url_transform_func(repos, basedir, develurl, remove_missing, wsgiapp)
         if repos:
             urlbase = repos[0].minter.space.base
         else:

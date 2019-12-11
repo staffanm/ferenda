@@ -24,6 +24,19 @@ from ferenda.elements import Body
 
 
 class FixedLayoutHandler(SwedishLegalHandler):
+
+    @property
+    def doc_rules(self):
+        rules = super(FixedLayoutHandler, self).doc_rules
+        rules.append("%(root)s/<%(converter)s:basefile>/sid<pageno>.<suffix>")
+        return rules
+    
+    
+    @property
+    def rule_context(self):
+        return {"converter": "path"}
+
+    
     def get_pathfunc(self, environ, basefile, params, contenttype, suffix):
         if basefile and suffix == "png":
             # OK, this is a request for a particular page. Map this to

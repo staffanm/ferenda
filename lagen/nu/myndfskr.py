@@ -16,7 +16,7 @@ from rdflib import RDF, URIRef
 from rdflib.namespace import DCTERMS, SKOS
 from ferenda.sources.legal.se import RPUBL
 from cached_property import cached_property
-from werkzeug.routing import Rule
+from werkzeug.routing import Rule, BaseConverter
 
 from ferenda.sources.legal.se import myndfskr
 from ferenda import (CompositeRepository, CompositeStore, Facet, TocPageset,
@@ -24,6 +24,7 @@ from ferenda import (CompositeRepository, CompositeStore, Facet, TocPageset,
 from ferenda import util, fulltextindex
 from ferenda.elements import Body, Link, html
 from ferenda.sources.legal.se import (SwedishLegalSource, SwedishLegalStore)
+from ferenda.sources.legal.se.fixedlayoutsource import FixedLayoutHandler
 from . import SameAs, InferTimes
 
 
@@ -32,16 +33,30 @@ from . import SameAs, InferTimes
 class MyndFskrStore(CompositeStore, SwedishLegalStore):
     pass
 
-class MyndFskrHandler(RequestHandler):
+# Similar to AnyConverter in that it takes a list of fs names as arguments, eg "<fs(afs,bfs,ffs):basefile>" to match eg. afs/2019:2 and ffs/2018:1 but not difs/2017:4
+class FSConverter(BaseConverter):
+    def __init__(self, map, *items):
+        BaseConverter.__init__(self, map)
+        self.regex = "(?:%s)/\d{4}:\d+" % "|".join(items)
+
+class MyndFskrHandler(FixedLayoutHandler):
+
     @property
-    def rules(self):
-        rules = []
+    def doc_roots(self):
+        return [""]
+
+    @property
+    def rule_context(self):
+        roots = []
         for cls in self.repo.subrepos:
             inst = self.repo.get_instance(cls)
             for fs in inst.forfattningssamlingar():
-                rules.append(Rule('/%s/<x>' % fs, endpoint=self.handle_doc))
-        rules.append(Rule('/dataset/'+self.repo.alias, endpoint=self.handle_dataset))
-        return rules
+                roots.append('%s' % fs)
+        return {"converter": "fs(%s)" % ",".join(roots)}
+
+    @property
+    def rule_converters(self):
+        return (("fs", FSConverter),)
 
     def get_pathfunc(self, environ, basefile, params, contenttype, suffix):
         if basefile and suffix == "png":

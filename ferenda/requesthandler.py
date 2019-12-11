@@ -17,7 +17,7 @@ from copy import deepcopy
 from lxml import etree
 from rdflib import Graph
 from cached_property import cached_property
-from werkzeug.routing import Rule
+from werkzeug.routing import Rule, BaseConverter
 from werkzeug.datastructures import Headers
 from werkzeug.wrappers import Request, Response
 from werkzeug.wsgi import wrap_file
@@ -27,6 +27,12 @@ from werkzeug.test import EnvironBuilder
 from ferenda import util
 from ferenda.errors import RequestHandlerError
 from ferenda.thirdparty.htmldiff import htmldiff
+
+class UnderscoreConverter(BaseConverter):
+    def to_url(self, value):
+        return value.replace(" ", "_")
+    def to_python(self, value):
+        return value.replace("_", " ")
 
 class RequestHandler(object):
     
@@ -52,100 +58,89 @@ class RequestHandler(object):
     def __init__(self, repo):
         self.repo = repo
 
+    # FIXME: This shouldn't be used as the data should be fetched from
+    # , but since it's called from path() which may be called in a
+    # non-wsgi context, we might not
     def dataset_params_from_uri(self, uri):
-        """Given a parametrized dataset URI, return the parameter and value
-        used (or an empty tuple, if it is a dataset URI handled by
-        this repo, but without any parameters).
-
-        >>> d = DocumentRepository()
-        >>> d.alias
-        'base'
-        >>> d.config.url = "http://example.org/"
-        >>> d.dataset_params_from_uri("http://example.org/dataset/base?title=a")
-        {"param": "title", "value": "a", "feed": False}
-        >>> d.dataset_params_from_uri("http://example.org/dataset/base")
-        {}
-
-        >>> d.dataset_params_from_uri("http://example.org/dataset/base/feed/title")
-        {"param": "title", "feed": True}
-        """
-
-        wantedprefix = self.repo.config.url + "dataset/" + self.repo.alias
-        if (uri == wantedprefix or
-            ("?" in uri and uri.startswith(wantedprefix)) or
-            ("/feed" in uri and uri.startswith(wantedprefix))):
-            
-            path = uri[len(wantedprefix) + 1:]
-            params = {}
-            if path.startswith("feed"):
-                params['feed'] = True
-                path = path[5:]
-            if "=" in path:
-                param, value = path.split("=", 1)
-                params['param'] = param
-                params['value'] = value
-            return params
-        # else return None (which is different from {})
-
-    def params_from_uri(self, uri):
-        if "?" not in uri:
-            return {}
-        else:
-            return dict(parse_qsl(uri.split("?", 1)[1]))
+        assert False, "No!"
 
     @property
     def rules(self):
-        return [Rule('/res/'+self.repo.alias+'/<path:basefile>', endpoint=self.handle_doc),
-                Rule('/res/'+self.repo.alias+'/<path:basefile>/data<datasuffix>', endpoint=self.handle_doc),
-                Rule('/dataset/'+self.repo.alias, endpoint=self.handle_dataset),
-                Rule('/dataset/'+self.repo.alias+'.<suffix>', endpoint=self.handle_dataset),
-                Rule('/dataset/'+self.repo.alias+'/<file>', endpoint=self.handle_dataset)]
+        # things to handle
+        # /res/repo/mybasefile  # that may or may not contain slashes like "prop/1998/99:14"
+        # /res/repo/mybasefile.suffix
+        # /res/repo/mybasefile/data
+        # /res/repo/mybasefile/data.suffix
+        # /dataset/repo
+        # /dataset/repo.suffix
+        # /dataset/repo/feed # with or without parameters like "?rdf_type=type/forordning"
+        #   -- werkzeug.routing does not process this query string
+        # /dataset/repo/feed.suffix # with or without parameters
+        context = self.rule_context
+        rules = []
+        for root in self.doc_roots:
+            context["root"] = root
+            for template in self.doc_rules:
+                rules.append(Rule(template % context, endpoint=self.handle_doc))
+        for root in self.dataset_roots: # almost always just one
+            context["root"] = root
+            for template in self.dataset_rules:
+                rules.append(Rule(template % context, endpoint=self.handle_dataset))
+        return rules
 
     @property
-    def ruleconverters(self):
+    def rule_context(self):
+        return {"converter": "default"}
+
+    @property
+    def doc_roots(self):
+        return ["/res/%s" % self.repo.alias]
+
+    @property
+    def doc_rules(self):
+        return ["%(root)s/<%(converter)s:basefile>",
+                "%(root)s/<%(converter)s:basefile>.<suffix>",
+                "%(root)s/<%(converter)s:basefile>/<any(data):extended>",
+                "%(root)s/<%(converter)s:basefile>/<any(data):extended>.<suffix>"]
+        
+
+    @property
+    def dataset_roots(self):
+        return ["/dataset/%s" % self.repo.alias]
+
+    @property
+    def dataset_rules(self):
+        return ["%(root)s",
+                "%(root)s.<suffix>",
+                "%(root)s/<any(feed):feed>",
+                "%(root)s/<any(feed):feed>.<suffix>"]
+    
+    @property
+    def rule_converters(self):
         return ()
 
-    def handle_doc(self, request, **values):
+    def handle_doc(self, request, **params):
         # request.url is the reconstructed URL used in the request,
         # request.base_url is the same without any query string
-        if 'basefile' in values:
-            basefile = values['basefile']
-        else:
-            basefile = self.repo.basefile_from_uri(request.base_url)
-        if not basefile:
-            raise RequestHandlerError("%s couldn't resolve %s to a basefile" %
-                                      (self.repo.alias, request.base_url))
-        params = self.params_from_uri(request.url)
-        if 'format' in params:
-            suffix = params['format']
-        else:
-            if 'attachment' in params:
-                leaf = params['attachment']
-            else:
-                leaf = request.base_url.split("/")[-1]
-            if "." in leaf:
-                suffix = leaf.rsplit(".", 1)[1]
-            else:
-                suffix = None
-        if suffix and basefile.endswith("."+suffix):
-            basefile = basefile[:-(len(suffix)+1)]
-        contenttype = self.contenttype(request, suffix)
-        path, data = self.lookup_resource(request.headers, basefile, params, contenttype, suffix)
-        return self.prep_response(request, path, data, contenttype)
+        assert 'basefile' in params ,"%s couldn't resolve %s to a basefile" % (
+            self.repo.alias, request.base_url)
+        params.update(dict(request.args))
+        # params = self.params_from_uri(request.url)
+        # params['basefile'] = self.repo.basefile_from_uri(request.url)
+        if 'attachment' in params and 'suffix' not in params:
+            params['suffix'] = params['attachment'].split(".")[-1]
+        contenttype = self.contenttype(request, params.get('suffix', None))
+        path, data = self.lookup_resource(request.headers, params['basefile'], params, contenttype, params.get('suffix', None))
+        return self.prep_response(request, path, data, contenttype, params)
 
-    def handle_dataset(self, request, **values):
-        # remove trailing suffix (the ".nt" in "example.org/dataset/base.nt")
-        tmpuri = self.request_uri(request.environ)
-        if "." in request.url.split("/")[-1]:
-            tmpuri, suffix = tmpuri.rsplit(".", 1)
-        elif 'suffix' in values:
-            suffix = values['suffix']
-        else:
-            suffix = None
-        params = self.dataset_params_from_uri(tmpuri)
-        contenttype = self.contenttype(request, suffix)
-        path, data = self.lookup_dataset(request.headers, params, contenttype, suffix)
-        return self.prep_response(request, path, data, contenttype)
+    def handle_dataset(self, request, **params):
+        assert len(request.args) <= 1, "Can't handle dataset requests with multiple selectors"
+        for (k, v) in request.args.items():
+            params["param"] = k
+            params["value"] = v
+        contenttype = self.contenttype(request, params.get("suffix", None))
+        path, data = self.lookup_dataset(request.headers, params, contenttype, params.get("suffix", None))
+        return self.prep_response(request, path, data, contenttype, params)
 
 #    def supports(self, environ):
 #        """Returns True iff this particular handler supports this particular request."""
@@ -312,6 +307,9 @@ class RequestHandler(object):
         returns None
 
         """
+        if "extended" in params:
+            # by definition, this means that we don't have a static file on disk
+            return None
         # try to lookup pathfunc from contenttype (or possibly suffix, or maybe params)
         if "repo" in params:
             # this must be a CompositeRepository that has the get_instance method
@@ -374,9 +372,9 @@ class RequestHandler(object):
             method = partial(repo.store.generated_path, version=params["version"])
         elif "diff" in params:
             return None
-        elif contenttype in self._mimemap and not basefile.endswith("/data"):
+        elif contenttype in self._mimemap:
             method = getattr(repo.store, self._mimemap[contenttype])
-        elif suffix in self._suffixmap and not basefile.endswith("/data"):
+        elif suffix in self._suffixmap:
             method = getattr(repo.store, self._suffixmap[suffix])
         elif "attachment" in params and mimetypes.guess_extension(contenttype):
             method = repo.store.generated_path
@@ -407,19 +405,15 @@ class RequestHandler(object):
         elif contenttype == "application/n-triples" or suffix == "nt":
             return partial(self.repo.store.resourcepath, "distilled/dump.nt")
         
-
+    # FIXME: basefile and suffix is now part of the params dict 
     def lookup_resource(self, environ, basefile, params, contenttype, suffix):
         pathfunc = self.get_pathfunc(environ, basefile, params, contenttype, suffix)
         if not pathfunc:
-            extended = False
             # no static file exists, we need to call code to produce data
-            if basefile.endswith("/data"):
-                extended = True
-                basefile = basefile[:-5] 
             if contenttype in self._rdfformats or suffix in self._rdfsuffixes:
                 g = Graph()
                 g.parse(self.repo.store.distilled_path(basefile))
-                if extended:
+                if 'extended' in params:
                     annotation_graph = self.repo.annotation_file_to_graph(
                         self.repo.store.annotation_path(basefile))
                     g += annotation_graph
@@ -512,7 +506,7 @@ class RequestHandler(object):
         return path, data
 
 
-    def prep_response(self, request, path, data, contenttype):
+    def prep_response(self, request, path, data, contenttype, params):
         if path and os.path.exists(path):
             status = 200
             # FIXME: These are not terribly well designed flow control

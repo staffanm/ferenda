@@ -82,9 +82,14 @@ class WSGIApp(object):
             # although werkzeug.routing.RuleTemplate seems like it could do that generically?
             self.reporules[repo] = repo.requesthandler.rules
             rules.extend(self.reporules[repo])
-            converters.extend(repo.requesthandler.ruleconverters)
+            converters.extend(repo.requesthandler.rule_converters)
             # at this point, we could maybe write a apache:mod_rewrite
             # or nginx compatible config based on our rules?
+        # from pprint import pprint
+        # pprint(sorted(x.rule for x in rules))
+        # import threading, traceback
+        # print("Pid: %s, thread id: %s" % (os.getpid(), threading.get_ident()))
+        # traceback.print_stack()
         self.routingmap = Map(rules, converters=dict(converters))
         base = self.config.datadir
         exports = {
@@ -650,7 +655,7 @@ class WSGIApp(object):
         urltransform = None
         if 'develurl' in self.config:
             urltransform = fakerepo.get_url_transform_func(
-                repos=self.repos, develurl=self.config.develurl)
+                repos=self.repos, develurl=self.config.develurl,wsgiapp=self)
         depth = len(doc.uri.split("/")) - 3
         tree = transformer.transform(xhtml, depth,
                                      uritransform=urltransform)

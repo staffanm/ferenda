@@ -22,6 +22,7 @@ import tempfile
 import zipfile
 
 # 3rdparty libs
+from ferenda.requesthandler import UnderscoreConverter
 from cached_property import cached_property
 from rdflib import Namespace, URIRef, Graph, RDF, RDFS, BNode
 from rdflib.namespace import DCTERMS, SKOS, FOAF
@@ -29,13 +30,6 @@ import requests
 import lxml.html
 from lxml import etree
 from bs4 import BeautifulSoup, NavigableString
-try:
-    # this is a optional dependency that only works on py3 and which
-    # is only needed when multiple processes write to a single shared
-    # file (generated/uri.map) over NFS
-    from flufl.lock import Lock
-except ImportError:
-    Lock = None
 
 
 # my libs
@@ -49,9 +43,39 @@ from ferenda.elements import (Body, Paragraph, CompoundElement, OrdinalElement,
 from ferenda.elements.html import Strong, Em, Div, P
 from . import SwedishLegalSource, SwedishCitationParser, RPUBL
 from .elements import *
+from .swedishlegalsource import SwedishLegalHandler
 
 
 PROV = Namespace(util.ns['prov'])
+
+class DVConverterBase(UnderscoreConverter):
+    regex = "[^/].*?"
+    repo = None  # we create a subclass of this at runtime, when we have access to the repo object
+    # this converter translates "nja/2015s180" -> "HDO/Ö6229-14"
+    # because this might be an appropriate place to do so in the
+    # werkzeug routing system
+    def to_python(self, value):
+        return self.repo.basefile_from_uri("%s%s/%s" % (self.repo.config.url, self.repo.urispace_segment, value))
+        # return value.replace("_", " ")
+
+    # and maybe vice versa (not super important)
+    def to_url(self, value):
+        return value
+
+    
+
+class DVHandler(SwedishLegalHandler):
+
+    
+    @property
+    def rule_context(self):
+        return {"converter": "dv"}
+
+    @property
+    def rule_converters(self):
+        class DVConverter(DVConverterBase):
+            repo = self.repo
+        return (("dv", DVConverter),)
 
 
 class DVStore(DocumentStore):
@@ -84,6 +108,7 @@ class DV(SwedishLegalSource):
     avgöranden", and are converted from doc/docx format.
 
     """
+    requesthandler_class = DVHandler
     alias = "dv"
     downloaded_suffix = ".zip"
     rdf_type = (RPUBL.Rattsfallsreferat, RPUBL.Rattsfallsnotis)

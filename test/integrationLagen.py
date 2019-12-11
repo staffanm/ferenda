@@ -330,45 +330,45 @@ class TestConNeg(TestLagen):
 
     def test_dataset_html(self):
         res = self.get(self.baseurl  + "dataset/sfs")
-        self.assertTrue(res.status_code, 200)
+        self.assertEqual(res.status_code, 200)
         self.assertEqual("text/html; charset=utf-8", res.headers['Content-Type'])
 
     def test_dataset_html_param(self):
         res = self.get(self.baseurl  + "dataset/sfs?titel=P")
-        self.assertTrue(res.status_code, 200)
+        self.assertEqual(res.status_code, 200)
         self.assertEqual("text/html; charset=utf-8", res.headers['Content-Type'])
         self.assertIn('Författningar som börjar på "P"', res.text)
 
     def test_dataset_ntriples(self):
         res = self.get(self.baseurl  + "dataset/sitenews",
                        headers={'Accept': 'application/n-triples'})
-        self.assertTrue(res.status_code, 200)
+        self.assertEqual(res.status_code, 200)
         #self.assertEqual("application/n-triples", res.headers['Content-Type'])
         #Graph().parse(data=res.text, format="nt")
         res = self.get(self.baseurl  + "dataset/sitenews.nt")
-        self.assertTrue(res.status_code, 200)
+        self.assertEqual(res.status_code, 200)
         self.assertEqual("application/n-triples", res.headers['Content-Type'])
         Graph().parse(data=res.text, format="nt")
 
     def test_dataset_turtle(self):
         res = self.get(self.baseurl  + "dataset/sitenews",
                        headers={'Accept': 'text/turtle'})
-        self.assertTrue(res.status_code, 200)
+        self.assertEqual(res.status_code, 200)
         self.assertEqual("text/turtle; charset=utf-8", res.headers['Content-Type'])
         Graph().parse(data=res.text, format="turtle")
         res = self.get(self.baseurl  + "dataset/sitenews.ttl")
-        self.assertTrue(res.status_code, 200)
+        self.assertEqual(res.status_code, 200)
         self.assertEqual("text/turtle; charset=utf-8", res.headers['Content-Type'])
         Graph().parse(data=res.text, format="turtle")
 
     def test_dataset_xml(self):
         res = self.get(self.baseurl  + "dataset/sitenews",
                        headers={'Accept': 'application/rdf+xml'})
-        self.assertTrue(res.status_code, 200)
+        self.assertEqual(res.status_code, 200)
         self.assertEqual("application/rdf+xml; charset=utf-8", res.headers['Content-Type'])
         Graph().parse(data=res.text)
         res = self.get(self.baseurl  + "dataset/sitenews.rdf")
-        self.assertTrue(res.status_code, 200)
+        self.assertEqual(res.status_code, 200)
         self.assertEqual("application/rdf+xml; charset=utf-8", res.headers['Content-Type'])
         Graph().parse(data=res.text)
 
@@ -1252,5 +1252,35 @@ class SFSHistory(TestLagen):
         self.assertEqual(hits[0]['url'], self.baseurl + "1998:204")
         self.assertEqual(hits[0]['role'], "expired")
         
-        
+class Errorhandling(TestLagen):
+    def test_generated_missing(self):
+        rootdir = os.environ.get("FERENDA_TESTDATA", "tng.lagen.nu/data")
+        entrypath = rootdir + "/sfs/entries/1666/666.json"
+        from ferenda import util
+        import json
+        util.ensure_dir(entrypath)
+        entry = {"basefile": "1666:666",
+                 "status": {
+                     "parse": {
+                         "success": False,
+                         "error": "LedsenError",
+                         "traceback": "tb goes here"
+                         }
+                     }
+                 }
+        util.writefile(entrypath, json.dumps(entry))
+        res = self.get(self.baseurl + "1666:666")
+        self.assertEqual(res.status_code, 500)
+        self.assertIn("Dokumentet kan inte visas", res.text)
+        self.assertIn("LedsenError", res.text)
+        util.robust_remove(entrypath)
+
+
+    def test_entry_missing(self):
+        res = self.get(self.baseurl + "1666:667")
+        self.assertEqual(res.status_code, 404)
+        self.assertIn("Dokumentet saknas", res.text)
+
+
+    
     
