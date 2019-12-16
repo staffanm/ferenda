@@ -1153,5 +1153,4 @@ class ElasticSearchIndex(RemoteIndex):
         return "", None
 
 FulltextIndex.indextypes = {'WHOOSH': WhooshIndex,
-                            'ELASTICSEARCH': ElasticSearchIndex,
-                            'ELASTICSEARCH2': ElasticSearch2x}
+                            'ELASTICSEARCH': ElasticSearchIndex}
