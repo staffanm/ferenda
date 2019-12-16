@@ -395,18 +395,19 @@ class TestAnnotations(TestLagen):
         resource = graph.resource(URIRef("https://lagen.nu/1949:105"))
         self.assertEqual(str(resource.value(DCTERMS.title)), "Tryckfrihetsförordning (1949:105)")
         # Assert a few things about inbound relations
-        resource = graph.resource(URIRef("https://lagen.nu/1949:105#K3P3"))
 
         # see if an expected legal case + inbound statute reference is
         # as expected
+        resource = graph.resource(URIRef("https://lagen.nu/1949:105#K3P3"))
         resource2 = next(x for x in resource.objects(RPUBL.isLagrumFor) if x._identifier == URIRef("https://lagen.nu/dom/nja/2015s166"))
         self.assertEqual("NJA 2015 s. 166",
                          str(resource2.value(DCTERMS.identifier)))
-        resource2 = next(x for x in resource.objects(DCTERMS.isReferencedBy) if x._identifier == URIRef("https://lagen.nu/1991:1469#K10P1S5"))
-        self.assertEqual("10 kap. 1 § 5 st Yttrandefrihetsgrundlag (1991:1469)",
-                         str(resource2.value(DCTERMS.identifier)))
         self.assertIn("Anonymiteten skyddas genom att",
                       resource.value(DCTERMS.description))
+        resource = graph.resource(URIRef("https://lagen.nu/1949:105#K10P3S2"))
+        resource2 = next(x for x in resource.objects(DCTERMS.isReferencedBy) if x._identifier == URIRef("https://lagen.nu/1991:1469#K8P3S1"))
+        self.assertEqual("8 kap. 3 § Yttrandefrihetsgrundlag (1991:1469)",
+                         str(resource2.value(DCTERMS.identifier)))
         
     def test_wiki_comments(self):
         res = self.get(self.baseurl + "1949:105")
@@ -533,6 +534,14 @@ class TestAutocomplete(TestLagen):
                                               # thing
                                               # ("förvaltningslagen
                                               # 3" matches several)
+
+    def test_partial_sfs_name(self):
+        for q in "örvaltningslag", "Förvaltningslag", "förvaltningsl", "Förvaltningsl":
+            res = self.get(self.baseurl + "api/?q=%s&_ac=true" % q.replace(" ", "+"),
+                       headers={'Accept': 'application/json'})   
+            self.assertEqual('application/json', res.headers['Content-Type'])
+            hits = res.json()
+            self.assertEqual(hits[0]['url'], self.baseurl + "2017:900")
 
     def test_shortform_sfs(self):
         res = self.get(self.baseurl + "api/?q=TF+2:&_ac=true",

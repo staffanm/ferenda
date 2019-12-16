@@ -685,26 +685,26 @@ class ElasticSearchIndex(RemoteIndex):
     fieldmapping = ((Identifier(),
                      {"type": "text", "store": True, "analyzer": "lowercase_keyword"}),  # uri -- using type=text with analyzer=keyword (instead of type=keyword) enables us to use regex queries on this field, which is nice for autocomplete
                     (Label(),
-                     {"type": "keyword"}),  # repo, basefile
+                     {"type": "keyword", "copy_to": ["all"]}),  # repo, basefile
                     (Label(boost=16),
-                     {"type": "text", "boost": 16.0, "analyzer": "my_analyzer", "fields": {
+                     {"type": "text", "copy_to": ["all"], "boost": 16.0, "fields": {
                          "keyword": {"type": "text", "analyzer": "lowercase_keyword"}
                      }}),  # identifier
                     (Text(boost=4),
-                     {"type": "text", "boost": 4.0}),  # title
+                     {"type": "text", "copy_to": ["all"], "boost": 4.0}),  # title
                     (Text(boost=2),
-                     {"type": "text", "boost": 2.0}),  # abstract
+                     {"type": "text", "copy_to": ["all"], "boost": 2.0}),  # abstract
                     (Text(),
-                     {"type": "text", "analyzer": "my_analyzer", "store": True}),  # text
+                     {"type": "text", "copy_to": ["all"], "store": True}),  # text
                     (Datetime(),
-                     {"type": "date", "format": "dateOptionalTime"}),
+                     {"type": "date", "format": "strict_date_optional_time"}),
                     (Boolean(),
                      {"type": "boolean"}),
                     (Resource(),
                      {"properties": {"iri": {"type": "keyword"},
-                                     "label": {"type": "keyword"}}}),
+                                     "label": {"type": "keyword", "copy_to": ["all"]}}}),
                     (Keyword(),
-                     {"type": "keyword", "copy_to": ["keyword"]}),
+                     {"type": "keyword", "copy_to": ["keyword", "all"]}),
                     (URI(),
                      {"type": "keyword", "boost": 1.1, "norms": True}),
                     (Integer(),
@@ -767,20 +767,20 @@ class ElasticSearchIndex(RemoteIndex):
 
     def _update_payload(self, uri, repo, basefile, text, **kwargs):
         safe = ''
-        # quote (in python 2) only handles characters from 0x0 - 0xFF,
-        # and basefile might contain characters outside of that (eg
-        # u'MO\u0308D/P11463-12', which is MÖD/P11463-12 on a system
-        # which uses unicode normalization form NFD). To be safe,
-        # encodethe string to utf-8 beforehand (Which is what quote on
-        # python 3 does anyways)
-        if "#" in uri:
-            repo = repo + "_child"
-        relurl = "%s/%s" % (repo, quote(basefile.encode("utf-8"), safe=safe))  # eg type, id
-        if "#" in uri:
-            relurl += uri.split("#", 1)[1]
+        # relurl is really the doc id, from elasticsearchs point of view
+        relurl = "%s%s%s" % (repo, "/", quote(basefile.encode("utf-8"), safe=safe))
         payload = {"uri": uri,
+                   "repo": repo,
                    "basefile": basefile,
-                   "text": text}
+                   "text": text,
+                   "join": "parent"
+        }
+        if "#" in uri:
+            baseuri, extra = uri.split("#", 1)
+            payload["join"] = {"name": "child",
+                                 "parent": relurl}
+            relurl += "#" + extra
+        
         payload.update(kwargs)
         return relurl, json.dumps(payload, default=util.json_default_date)
 
@@ -789,12 +789,16 @@ class ElasticSearchIndex(RemoteIndex):
             self._writer = tempfile.TemporaryFile()
         relurl, payload = self._update_payload(
             uri, repo, basefile, text, **kwargs)
-        metadata = {"index": {"_type": repo, "_id": basefile}}
+        metadata = {"index": {"_id": relurl,
+                              # the need for this is badly documented and
+                              # might go away in future ES versions
+                              "_type": "_doc"}
+        }
         extra = ""
         if "#" in uri:
-            metadata["index"]['_type'] = repo + "_child"
             metadata["index"]['_id'] += uri.split("#", 1)[1]
-            metadata["index"]['parent'] = basefile
+            metadata["index"]["routing"] = relurl.split("#")[0]
+
             extra = " (parent: %s)" % basefile
 
         # print("index: %s, id: %s, uri: %s %s" % (metadata["index"]['_type'],
@@ -807,7 +811,11 @@ class ElasticSearchIndex(RemoteIndex):
         metadata = json.dumps(metadata) + "\n"
         assert "\n" not in payload, "payload contains newlines, must be encoded for bulk API"
         self._writer.write(metadata.encode("utf-8"))
+        # print("----")
+        # print(metadata)
+        # print("-----")
         self._writer.write(payload.encode("utf-8"))
+        # print(payload)
         self._writer.write(b"\n")
 
     def _query_payload(self, q, pagenum=1, pagelen=10, ac_query=False,
@@ -816,16 +824,9 @@ class ElasticSearchIndex(RemoteIndex):
             types = [kwargs.get("type")]
         else:
             types = [repo.alias for repo in self._repos if repo.config.relate]
-        if ac_query:
-            relurl = "_search?from=%s&size=%s" % ((pagenum - 1) * pagelen,
-                                                  pagelen)
-        else:
-            # use a multitype search to specify the types we want so that
-            # we don't go searching in the foo_child types, only parent
-            # types.
-            relurl = "%s/_search?from=%s&size=%s" % (",".join(types),
-                                                     (pagenum - 1) * pagelen,
-                                                     pagelen)
+        relurl = "_search?from=%s&size=%s" % ((pagenum - 1) * pagelen,
+                                              pagelen)
+
         # 1: Filter on all specified fields
         filterterms = {}
         filterregexps = {}
@@ -833,8 +834,6 @@ class ElasticSearchIndex(RemoteIndex):
         for k, v in kwargs.items():
             if isinstance(v, SearchModifier):
                 continue
-            if k in ("type", "repo"):
-                k = "_type"
             elif k.endswith(".keyword"):
                 pass  # leave as-is, don't try to look this up in schema
             elif isinstance(schema[k], Resource):
@@ -848,7 +847,6 @@ class ElasticSearchIndex(RemoteIndex):
                 filterregexps[k] = v.replace(".", "\\.").replace("#", "\\#").replace("*", ".*")
             else:
                 filterterms[k] = v
-
         # 2: Create filterranges if SearchModifier objects are used
         filterranges = {}
         for k, v in kwargs.items():
@@ -875,32 +873,25 @@ class ElasticSearchIndex(RemoteIndex):
                 match['fields'] = self.default_fields
                 match['query'] = q
                 match['default_operator'] = "and"
-                match['analyzer'] = 'my_analyzer'
                 highlight = {'fields': {'text': {},
                                         'label': {}},
                              'fragment_size': self.fragment_size,
                              'number_of_fragments': 2
                 }
                 inner_hits["highlight"] = highlight
-
-                # now, explode the match query into a big OR query for
-                # matching each possible _child type (until someone solves
-                # http://stackoverflow.com/questions/38946547 for me)
                 submatches = [{"simple_query_string": deepcopy(match)}]
-
-                for t in types:
-                    submatches.append(
-                        {"has_child": {"type": t + "_child",
-                                       "inner_hits": inner_hits,
-                                       "query": {
-                                           "bool": {
-                                               "must": {"simple_query_string": deepcopy(match)},
-                                               # some documents are put into the index
-                                               # purely to support ac_query
-                                               # (autocomplete). We don't need them in
-                                               # our main search results.
-                                               "must_not": {"term": {"role": "autocomplete"}}
-                                               }}}})
+                submatches.append(
+                    {"has_child": {"type": "child",
+                                   "inner_hits": inner_hits,
+                                   "query": {
+                                       "bool": {
+                                           "must": {"simple_query_string": deepcopy(match)},
+                                           # some documents are put into the index
+                                           # purely to support ac_query
+                                           # (autocomplete). We don't need them in
+                                           # our main search results.
+                                           "must_not": {"term": {"role": "autocomplete"}}
+                                           }}}})
                 match = {"bool": {"should": submatches}}
             else:
                 # ac_query -- need to work in inner_hits somehow
@@ -912,7 +903,7 @@ class ElasticSearchIndex(RemoteIndex):
         if boost_types:
             boost_functions = []
             for _type, boost in boost_types:
-                boost_functions.append({"filter": {"term": {"_type": _type}},
+                boost_functions.append({"filter": {"term": {"repo": _type}},
                                         "weight": boost})
 
         if filterterms or filterregexps or filterranges:
@@ -928,7 +919,7 @@ class ElasticSearchIndex(RemoteIndex):
             if exclude_types:
                 match["bool"]["must_not"] = []
                 for exclude_type in exclude_types:
-                    match["bool"]["must_not"].append({"type": {"value": exclude_type}})
+                    match["bool"]["must_not"].append({"repo": {"value": exclude_type}})
 
         if boost_types:
             payload = {'query': {'function_score': {'functions': boost_functions,
@@ -948,6 +939,19 @@ class ElasticSearchIndex(RemoteIndex):
             # filter clause) it will add 1 to the score. We therefore
             # require something more than just 1 in score.
             payload["min_score"] = 1.01
+        else:
+            # in other context, we use a fulter clause to make sure
+            # only parent documents are selected. However, that seems
+            # to make sure every document that passes the filter is
+            # included, even though they get 0 score from the should
+            # clause. A low low min score filters those out.x
+            payload["min_score"] = 0.01
+        # make sure only parent documents are returned in the main
+        # list of hits (child documents appear as inner_hits on their
+        # parent documents hit).
+        if "filter" not in match["bool"]:
+            match["bool"]["filter"] = []
+        match["bool"]["filter"].append({"term": {"join": "parent"}})
         # Don't include the full text of every document in every hit
         if not ac_query:
             payload['_source'] = {self.term_excludes: ['text']}
@@ -976,6 +980,8 @@ class ElasticSearchIndex(RemoteIndex):
             # if we don't have an autocomplete query of this kind,
             # exclude fragments (here identified by having a non-zero
             # order)
+            if "must_not" not in match["bool"]:
+                match["bool"]["must_not"] = []
             match['bool']['must_not'].append({"range": {"order": {"gt": 0}}})
             # match['bool']['must_not'].append({"term": {"role": "expired"}})
             pass
@@ -1020,10 +1026,10 @@ class ElasticSearchIndex(RemoteIndex):
                         h["innerhits"].append(self._decode_query_result_hit(inner_hit))
             res.append(h)
         pager = {'pagenum': pagenum,
-                 'pagecount': int(math.ceil(jsonresp['hits']['total'] / float(pagelen))),
+                 'pagecount': int(math.ceil(jsonresp['hits']['total']['value'] / float(pagelen))),
                  'firstresult': (pagenum - 1) * pagelen + 1,
                  'lastresult': (pagenum - 1) * pagelen + len(jsonresp['hits']['hits']),
-                 'totalresults': jsonresp['hits']['total']}
+                 'totalresults': jsonresp['hits']['total']['value']}
         setattr(res, 'pagenum', pager['pagenum'])
         setattr(res, 'pagecount', pager['pagecount'])
         setattr(res, 'lastresult', pager['lastresult'])
@@ -1034,7 +1040,10 @@ class ElasticSearchIndex(RemoteIndex):
 
     def _decode_query_result_hit(self, hit):
         h = hit['_source']
-        h['repo'] = hit['_type']
+        # h['repo'] = hit['_type']
+        if "join" in h:
+            del h["join"]
+            
         if 'highlight' in hit:
             for hlfield in ('text', 'label'):
                 if hlfield in hit['highlight']:
@@ -1064,39 +1073,16 @@ class ElasticSearchIndex(RemoteIndex):
 
     def _decode_schema(self, response):
         indexname = self.location.split("/")[-2]
-        mappings = response.json()[indexname]["mappings"]
+        mappings = response.json()[indexname]["mappings"]["properties"]
         schema = {}
-        # flatten the existing types (pay no mind to duplicate fields):
-        for typename, mapping in mappings.items():
-            for fieldname, fieldobject in mapping["properties"].items():
-                if fieldname == 'keyword':
-                    # our copy_to: keyword definition for the Keyword
-                    # indexed type dynamically creates a new
-                    # field. Skip that.
-                    continue
-                try:
-                    schema[fieldname] = self.from_native_field(fieldobject)
-                except errors.SchemaMappingError as e:
-                    # raise errors.SchemaMappingError("%s/%s: %s" % (typename, fieldname, str(e)))
-                    # try to recover by using the repo's own definition instead
-                    for repo in self._repos:
-                        if repo.alias == typename:
-                            break
-                    else:
-                        raise errors.SchemaMappingError("%s/%s: %s" % (typename, fieldname, str(e)))
-                    g = repo.make_graph()  # for qname lookup
-                    for facet in repo.facets():
-                        if facet.dimension_label:
-                            fld = facet.dimension_label
-                        else:
-                            fld = g.qname(facet.rdftype).replace(":", "_")
-                        if fld == fieldname:
-                            schema[fld] = facet.indexingtype
-                            self.log.error("%s/%s: native field %s couldn't be mapped, fell back on repo.facet.indexingtype" % (typename, fieldname, str(e)))
-                            break
-                    else:
-                        raise errors.SchemaMappingError("%s/%s: %s (no suitable fallback facet)" % (typename, fieldname, str(e)))
-                schema["repo"] = self.get_default_schema()['repo']
+        for fieldname, fieldobject in mappings.items():
+            if fieldname in ('keyword', 'all', 'join', 'parent'):
+                # our copy_to: keyword definition for the Keyword
+                # indexed type dynamically creates a new
+                # field. Skip that.
+                continue
+            schema[fieldname] = self.from_native_field(fieldobject)
+        schema["repo"] = self.get_default_schema()['repo']
         return schema
 
     def _create_schema_payload(self, repos):
@@ -1104,28 +1090,33 @@ class ElasticSearchIndex(RemoteIndex):
                     'sv': 'Swedish'}.get(repos[0].lang, "English")
         payload = {
             # cargo cult configuration
-            "settings": {"number_of_shards": 1,
-                         "analysis": {
-                             "analyzer": {
-                                 "my_analyzer": {
-                                     "filter": ["lowercase", "snowball"],
-                                     "tokenizer": "standard",
-                                     "type": "custom"
-                                 },
-                                 "lowercase_keyword": {
-                                     "tokenizer": "keyword",
-                                     "filter": ["lowercase"]
-                                     }
-                             },
-                             "filter": {
-                                 "snowball": {
-                                     "type": "snowball",
-                                     "language": language
-                                 }
-                             }
-                         }
-                         },
+            "settings": {
+                "analysis": {
+                    "analyzer": {
+                        "default": {
+                            "filter": ["lowercase", "snowball"],
+                            "tokenizer": "standard",
+                            "type": "custom"
+                        },
+                        "lowercase_keyword": {
+                            "tokenizer": "keyword",
+                            "filter": ["lowercase"]
+                        }
+                    },
+                    "filter": {
+                        "snowball": {
+                            "type": "snowball",
+                        "language": language
+                        }
+                    }
+                }
+            },
             "mappings": {}
+        }
+        fields = {}
+        es_fields = {"all": {"type": "text", "store": "false"},
+                     "join": {"type": "join", "relations": {"parent": "child"}},
+                     # "parent": self.to_native_field(Identifier())
         }
         for repo in repos:
             if not repo.config.relate:
@@ -1134,7 +1125,6 @@ class ElasticSearchIndex(RemoteIndex):
             if not facets:
                 continue
             g = repo.make_graph()  # for qname lookup
-            es_fields = {}
             schema = self.get_default_schema()
             childschema = self.get_default_schema()
             for facet in facets:
@@ -1147,177 +1137,20 @@ class ElasticSearchIndex(RemoteIndex):
                 if not facet.toplevel_only:
                     childschema[fld] = idxtype
 
+            schema.update(childschema)
             for key, fieldtype in schema.items():
-                if key == "repo":
-                    continue  # not really needed for ES, as type == repo.alias
-                es_fields[key] = self.to_native_field(fieldtype)
+                native = self.to_native_field(fieldtype)
+                if key not in es_fields:
+                    es_fields[key] = native
+                assert es_fields[key] == native, "incompatible fields for key %s: %s != %s" % (key, es_fields[key], native)
 
-            es_child_fields = {}
-            for key, fieldtype in childschema.items():
-                if key == "repo": continue
-                es_child_fields[key] = self.to_native_field(fieldtype)
-                
-
-            # _source enabled so we can get the text back
-            payload["mappings"][repo.alias] = {"_source": {"enabled": True},
-                                               "_all": {"analyzer": "my_analyzer",
-                                                        "store": True},
-                                               "properties": es_fields}
-
-            childmapping = {"_source": {"enabled": True},
-                            "_all": {"analyzer": "my_analyzer",
-                                     "store": True},
-                            "_parent": {"type": repo.alias},
-                            "properties": es_child_fields
-                            }
-            
-            payload["mappings"][repo.alias+"_child"] = childmapping
+        # _source enabled so we can get the text back
+        payload["mappings"] = {"_source": {"enabled": True},
+                               "properties": es_fields}
         return "", json.dumps(payload, indent=4)
 
     def _destroy_payload(self):
         return "", None
-
-class ElasticSearch2x (ElasticSearchIndex):
-    # "Legacy" versions of ElasticSearch has a simpler text type ("string") and no keyword type
-    fieldmapping = ((Identifier(),
-                     {"type": "string", "index": "not_analyzed", "store": True}),  # uri
-                    (Label(),
-                     {"type": "string", "index": "not_analyzed", }),  # repo, basefile
-                    (Label(boost=16),
-                     {"type": "string", "boost": 16.0, "index": "not_analyzed", "norms": {"enabled": True}}),  # identifier
-                    (Text(boost=4),
-                     {"type": "string", "boost": 4.0, "index": "not_analyzed", "norms": {"enabled": True}}),  # title
-                    (Text(boost=2),
-                     {"type": "string", "boost": 2.0, "index": "not_analyzed", "norms": {"enabled": True}}),  # abstract
-                    (Text(),
-                     {"type": "string", "analyzer": "my_analyzer", "store": True}),  # text
-                    (Datetime(),
-                     {"type": "date", "format": "dateOptionalTime"}),
-                    (Boolean(),
-                     {"type": "boolean"}),
-                    (Resource(),
-                     {"properties": {"iri": {"type": "string", "index": "not_analyzed"},
-                                     "label": {"type": "string", "index": "not_analyzed"}}}),
-                    (Keyword(),
-                     {"type": "string", "copy_to": ["keyword"]}),
-                    (URI(),
-                     {"type": "string", "index": "not_analyzed", "boost": 1.1, "norms": {"enabled": True}}),
-                    )
-    term_excludes = "exclude"
-
-    # This override uses the old style filtering, which uses a
-    # filtered query as the top level query
-    # (https://www.elastic.co/guide/en/elasticsearch/reference/2.4/query-dsl-filtered-query.html),
-    # which was deprecated and removed in ES5
-    # http://stackoverflow.com/questions/40519806/no-query-registered-for-filtered
-    #
-    # NOTE: The "new" logic in the superclass ought to work on ES2
-    # servers as well, so maybe we should just remove this
-    # implementation.
-    def _query_payload(self, q, pagenum=1, pagelen=10, **kwargs):
-        if kwargs.get("repo"):
-            types = [kwargs.get("repo")]
-        else:
-            types = [repo.alias for repo in self._repos if repo.config.relate]
-
-        # use a multitype search to specify the types we want so that
-        # we don't go searching in the foo_child types, only parent
-        # types.
-        relurl = "%s/_search?from=%s&size=%s" % (",".join(types),
-                                                 (pagenum - 1) * pagelen,
-                                                 pagelen)
-        # 1: Filter on all specified fields
-        filterterms = {}
-        filterregexps = {}
-        schema = self.schema()
-        for k, v in kwargs.items():
-            if isinstance(v, SearchModifier):
-                continue
-            if k in ("type", "repo"):  # FIXME: maybe should only be "repo"
-                k = "_type"
-            elif isinstance(schema[k], Resource):
-                # also map k to "%s.iri" % k if k is Resource
-                k += ".iri"
-            if isinstance(v, str) and "*" in v:
-                # if v contains "*", make it a {'regexp': '.*/foo'} instead of a {'term'}
-                # also transform * to .*
-                filterregexps[k] = v.replace("*", ".*")
-            else:
-                filterterms[k] = v
-
-        # 2: Create filterranges if SearchModifier objects are used
-        filterranges = {}
-        for k, v in kwargs.items():
-            if not isinstance(v, SearchModifier):
-                continue
-            if isinstance(v, Less):
-                filterranges[k] = {"lt": v.max}
-            elif isinstance(v, More):
-                filterranges[k] = {"gt": v.min}
-            elif isinstance(v, Between):
-                filterranges[k] = {"lt": v.max,
-                                   "gt": v.min}
-
-        # 3: If freetext param given, search on that
-        match = {}
-        inner_hits = {"_source": {self.term_excludes: "text"}}
-        highlight = None
-        if q:
-            # NOTE: we need to specify highlight parameters for each
-            # subquery when using has_child, see
-            # https://github.com/elastic/elasticsearch/issues/14999
-            match['fields'] = ["label", "text"]
-            match['query'] = q
-            match['default_operator'] = "and"
-            match['analyzer'] = "my_analyzer"
-            highlight = {'fields': {'text': {},
-                                    'label': {}},
-                         'fragment_size': 150,
-                         'number_of_fragments': 2
-            }
-            inner_hits["highlight"] = highlight
-
-        # now, explode the match query into a big OR query for
-        # matching each possible _child type (until someone solves
-        # http://stackoverflow.com/questions/38946547 for me)
-        submatches = [{"simple_query_string": deepcopy(match)}]
-        if kwargs.get("repo"):
-            reponames = [kwargs.get("repo")]
-        else:
-            reponames = [repo.alias for repo in self._repos if repo.config.relate]
-        for reponame in reponames:
-            submatches.append(
-                {"has_child": {"type": reponame + "_child",
-                               "inner_hits": inner_hits,
-                               "query": {"simple_query_string": deepcopy(match)}
-                }})
-
-        match = {"bool": {"should": submatches}}
-
-        if filterterms or filterregexps or filterranges:
-            query = {"filtered":
-                     {"filter": {}
-                      }
-                     }
-            filters = []
-            for key, val in (("term", filterterms),
-                             ("regexp", filterregexps),
-                             ("range", filterranges)):
-                filters.extend([{key: {k: v}} for (k, v) in val.items()])
-            if len(filters) > 1:
-                query["filtered"]["filter"]["bool"] = {"must": filters}
-            else:
-                query["filtered"]["filter"] = filters[0]
-            if match:
-                query["filtered"]["query"] = match
-        else:
-            query = match
-        payload = {'query': query,
-                   'aggs': self._aggregation_payload()}
-        payload['_source'] = {self.term_excludes: ['text']}
-        payload['highlight'] = deepcopy(highlight)
-        return relurl, json.dumps(payload, indent=4, default=util.json_default_date)
-
 
 FulltextIndex.indextypes = {'WHOOSH': WhooshIndex,
                             'ELASTICSEARCH': ElasticSearchIndex,

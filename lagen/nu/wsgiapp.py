@@ -61,6 +61,7 @@ class WSGIApp(OrigWSGIApp):
         # if Autocomple call, transform q to suitable parameters (find
         # uri)
         if request.args.get("_ac") == "true":
+            import pudb; pu.db
             uri = self.expand_partial_ref(q)
             if uri:
                 param['uri'] = uri.lower()

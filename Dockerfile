@@ -9,7 +9,7 @@ RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selectio
 	wget && \
     add-apt-repository "deb http://ftp.us.debian.org/debian stretch main" && \
     wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add - && \
-    add-apt-repository "deb https://artifacts.elastic.co/packages/5.x/apt stable main" && \
+    add-apt-repository "deb https://artifacts.elastic.co/packages/7.x/apt stable main" && \
     apt -qq update && \
     mkdir /usr/share/man/man1 && \
     apt -q -y --no-install-recommends install \
@@ -76,11 +76,11 @@ RUN python3.7 -m venv .virtualenv && \
 EXPOSE 80 8000 3330 9001 9200 
 COPY docker /tmp/docker
 RUN mv /tmp/docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf && \
-    mv /tmp/docker/elasticsearch-jvm.options /etc/elasticsearch/jvm.options && \
     mv /tmp/docker/nginx.conf /etc/nginx/sites-enabled/default && \
     mv /tmp/docker/ferenda.ttl /opt/fuseki/run/configuration/ && \
     mv /tmp/docker/locale.gen /etc/locale.gen && locale-gen
 COPY . .
+# mv /tmp/docker/elasticsearch-jvm.options /etc/elasticsearch/jvm.options && \
 
 ENTRYPOINT ["/bin/bash", "/tmp/docker/setup.sh"]
 CMD ["/usr/bin/supervisord"] # starts nginx, elasticsearch, fuseki, cron etc

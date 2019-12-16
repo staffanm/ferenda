@@ -205,12 +205,7 @@ class BasicQuery(object):
         if type(self) == ESBasicQuery:
             self.assertEqual(len(res),1)
             self.assertEqual(len(res[0]['innerhits']), 2)
-            # NOTE: ES scores all three results equally (1.0), so it doesn't
-            # neccesarily put section 1 in the top
-            if isinstance(self, ESBase):
-                self.assertEqual(res[0]['innerhits'][0]['dcterms_identifier'], 'Doc #1 (section 2)') 
-            else:
-                self.assertEqual(res[0]['innerhits'][0]['dcterms_identifier'], 'Doc #1 (section 1)')
+            self.assertEqual(res[0]['innerhits'][0]['dcterms_identifier'], 'Doc #1 (section 1)')
 
 
     def test_fragmented(self):
