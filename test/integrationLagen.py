@@ -517,7 +517,9 @@ class TestAutocomplete(TestLagen):
         # FIXME: With the new search logic, this query won't match
         # because by default all AC queries disregards individual
         # sections unless it does a URI (not keyword) query. Searching
-        # for "FL 3" works. Not sure this is the best course of action...
+        # for "FL 3" or "3 § förvaltningslagen" works as these gets
+        # transformed into a URI instead of a free text query. Not
+        # sure this is the best course of action...
         res = self.get(self.baseurl + "api/?q=3+§+förvaltningslag&_ac=true",
                        headers={'Accept': 'application/json'})
         # returns eg [{'url': 'http://localhost:8000/2017:900#P3',
@@ -542,6 +544,9 @@ class TestAutocomplete(TestLagen):
             self.assertEqual('application/json', res.headers['Content-Type'])
             hits = res.json()
             self.assertEqual(hits[0]['url'], self.baseurl + "2017:900")
+            # maybe also assert that no individual section is returned
+            # until we get some sort of indication that the user wants
+            # that (eg the inclusion of a digit or § sign)
 
     def test_shortform_sfs(self):
         res = self.get(self.baseurl + "api/?q=TF+2:&_ac=true",

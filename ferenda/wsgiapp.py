@@ -391,32 +391,44 @@ class WSGIApp(object):
         idx = FulltextIndex.connect(self.config.indextype,
                                     self.config.indexlocation,
                                     self.repos)
-        q, param, pagenum, pagelen, stats = self.parse_parameters(request, idx)
-        ac_query = request.args.get("_ac") == "true"
-
-        exclude_types = boost_types = None
-        if options:
-            exclude_types = options.get('exclude_types', None)
-            boost_types = options.get('boost_types', None)
-        res, pager = idx.query(q=q,
-                               pagenum=pagenum,
-                               pagelen=pagelen,
-                               ac_query=ac_query,
-                               exclude_types=exclude_types,
-                               boost_types=boost_types,
-                               **param)
-        mangled = self.mangle_results(res, ac_query)
+        # parse_parameters -> {
+        #  "q": "freetext",
+        #  "fields": {"dcterms_publisher": ".../org/di",
+        #             "dcterms_issued": "2018"}
+        #  "pagenum": 1,
+        #  "pagelen": 10,
+        #  "autocomplete": False,
+        #  "exclude_repos": ["mediawiki"],
+        #  "boost_repos": [("sfs", 10)],
+        #  "include_fragments": False
+        # }
+        if options is None:
+            options = {}
+        options.update(self.parse_parameters(request, idx))
+        res, pager = idx.query(q=options.get("q"),
+                               pagenum=options.get("pagenum"),
+                               pagelen=options.get("pagelen"),
+                               ac_query=options.get("autocomplete"),
+                               exclude_repos=options.get("exclude_repos"),
+                               boost_repos=options.get("boost_repos"),
+                               include_fragments=options.get("include_fragments"),
+                               **options.get("fields"))
+        mangled = self.mangle_results(res, options.get("autocomplete"))
         # 3.1 create container for results
         res = {"startIndex": pager['firstresult'] - 1,
-               "itemsPerPage": int(param.get('_pageSize', '10')),
+               "itemsPerPage": options["pagelen"],
                "totalResults": pager['totalresults'],
                "duration": None,  # none
                "current": request.path + "?" + request.query_string.decode("utf-8"),
                "items": mangled}
 
         # 4. add stats, maybe
-        if stats:
+        if options["stats"]:
             res["statistics"] = self.stats(mangled)
+
+        # 5. possibly trim results for easier json consumption
+        if options["autocomplete"]:
+            res = res["items"]
         return res
 
 
@@ -570,22 +582,23 @@ class WSGIApp(object):
                     elif k == "rdf_type" and self.config.legacyapi and re.match("[\w\-\_]+", filtered[k]):
                         filtered[k] = "*" + filtered[k]
 
-        q = param['q'] if 'q' in param else None
-
+        options = {
+            "q": param.get("q"),
+            "stats": param.get("_stats") == "on",
+            "autocomplete": param.get("_ac") == "true",
+            "fields": filtered
+        }
         # find out if we need to get all results (needed when stats=on) or
         # just the first page
-        if param.get("_stats") == "on":
-            pagenum = 1
-            pagelen = 10000 # this is the max that default ES 2.x will allow
-            stats = True
+        if options["stats"]:
+            options["pagenum"] = 1
+            options["pagelen"] = 10000 # this is the max that default ES 2.x will allow
         else:
-            pagenum = int(param.get('_page', '0')) + 1
-            pagelen = int(param.get('_pageSize', '10'))
-            stats = False
+            options["pagenum"] = int(param.get('_page', '0')) + 1
+            options["pagelen"] = int(param.get('_pageSize', '10'))
+        return options
 
-        return q, filtered, pagenum, pagelen, stats
-
-    def _search_run_query(self, queryparams, boost_types=None):
+    def _search_run_query(self, queryparams, boost_repos=None):
         idx = FulltextIndex.connect(self.config.indextype,
                                     self.config.indexlocation,
                                     self.repos)
@@ -604,10 +617,18 @@ class WSGIApp(object):
 #        # "bulvanutredning"
         pagenum = int(queryparams.get('p', '1'))
         qpcopy = dict(queryparams)
+        # we've changed a parameter name in our internal API:s from
+        # "type" to "repo" since ElasticSearch 7.x doesn't have types
+        # anymore (and the corresponding data is now stored in a
+        # "repo" field), but we haven't changed our URL parameters
+        # (yet). In the meantime, map the external type parameter to
+        # the internal repo parameter
+        if 'type' in qpcopy:
+            qpcopy["repo"] = qpcopy.pop("type")
         for x in ('q', 'p'):
             if x in qpcopy:
                 del qpcopy[x]
-        res, pager = idx.query(query, pagenum=pagenum, boost_types=boost_types, **qpcopy)
+        res, pager = idx.query(query, pagenum=pagenum, boost_repos=boost_repos, **qpcopy)
         return res, pager
 
     def _search_render_pager(self, pager, queryparams, path_info):

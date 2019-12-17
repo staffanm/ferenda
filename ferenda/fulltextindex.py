@@ -6,7 +6,7 @@ from future import standard_library
 standard_library.install_aliases()
 
 from datetime import date, datetime, MAXYEAR, MINYEAR
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 from copy import deepcopy
 import itertools
 import json
@@ -162,7 +162,7 @@ class FulltextIndex(object):
         """Returns the number of currently indexed (non-deleted) documents."""
         raise NotImplementedError  # pragma: no cover
 
-    def query(self, q=None, pagenum=1, pagelen=10, ac_query=False, exclude_types=None, **kwargs):
+    def query(self, q=None, pagenum=1, pagelen=10, ac_query=False, exclude_repos=None, boost_repos=None, include_fragments=False, **kwargs):
         """Perform a free text query against the full text index, optionally
            restricted with parameters for individual fields.
 
@@ -500,7 +500,7 @@ class WhooshIndex(FulltextIndex):
     def doccount(self):
         return self.index.doc_count()
 
-    def query(self, q=None, pagenum=1, pagelen=10, ac_query=False, exclude_types=None, **kwargs):
+    def query(self, q=None, pagenum=1, pagelen=10, ac_query=False, exclude_repos=None, boost_repos=None, include_fragments=False, **kwargs):
         # 1: Filter on all specified fields (exact or by using ranges)
         filter = []
         for k, v in kwargs.items():
@@ -647,8 +647,12 @@ class RemoteIndex(FulltextIndex):
             res = requests.get(self.location + relurl)
         return self._decode_count_result(res)
 
-    def query(self, q=None, pagenum=1, pagelen=10, ac_query=False, exclude_types=None, boost_types=None, **kwargs):
-        relurl, payload = self._query_payload(q, pagenum, pagelen, ac_query, exclude_types, boost_types, **kwargs)
+    def query(self, q=None, pagenum=1, pagelen=10, ac_query=False,
+              exclude_repos=None, boost_repos=None, include_fragments=False,
+              **kwargs):
+        relurl, payload = self._query_payload(q, pagenum, pagelen,
+                                              ac_query, exclude_repos, boost_repos,
+                                              include_fragments, **kwargs)
         if payload:
             # print("query: POST %s:\n%s" % (self.location + relurl, payload))
             res = requests.post(self.location + relurl, payload, headers=self.defaultheaders)
@@ -789,14 +793,14 @@ class ElasticSearchIndex(RemoteIndex):
             self._writer = tempfile.TemporaryFile()
         relurl, payload = self._update_payload(
             uri, repo, basefile, text, **kwargs)
-        metadata = {"index": {"_id": relurl,
+        metadata = {"index": {"_id": unquote(relurl),
                               # the need for this is badly documented and
                               # might go away in future ES versions
                               "_type": "_doc"}
         }
         extra = ""
         if "#" in uri:
-            metadata["index"]['_id'] += uri.split("#", 1)[1]
+            # metadata["index"]['_id'] += uri.split("#", 1)[1]
             metadata["index"]["routing"] = relurl.split("#")[0]
 
             extra = " (parent: %s)" % basefile
@@ -811,15 +815,16 @@ class ElasticSearchIndex(RemoteIndex):
         metadata = json.dumps(metadata) + "\n"
         assert "\n" not in payload, "payload contains newlines, must be encoded for bulk API"
         self._writer.write(metadata.encode("utf-8"))
+        self._writer.write(payload.encode("utf-8"))
+        # if "#" not in uri:
         # print("----")
         # print(metadata)
         # print("-----")
-        self._writer.write(payload.encode("utf-8"))
         # print(payload)
         self._writer.write(b"\n")
 
     def _query_payload(self, q, pagenum=1, pagelen=10, ac_query=False,
-                       exclude_types=None, boost_types=None, **kwargs):
+                       exclude_repos=None, boost_repos=None, include_fragments=False, **kwargs):
         if kwargs.get("type"):
             types = [kwargs.get("type")]
         else:
@@ -881,17 +886,24 @@ class ElasticSearchIndex(RemoteIndex):
                 inner_hits["highlight"] = highlight
                 submatches = [{"simple_query_string": deepcopy(match)}]
                 submatches.append(
-                    {"has_child": {"type": "child",
-                                   "inner_hits": inner_hits,
-                                   "query": {
-                                       "bool": {
-                                           "must": {"simple_query_string": deepcopy(match)},
-                                           # some documents are put into the index
-                                           # purely to support ac_query
-                                           # (autocomplete). We don't need them in
-                                           # our main search results.
-                                           "must_not": {"term": {"role": "autocomplete"}}
-                                           }}}})
+                    {"has_child": {
+                        "type": "child",
+                        "inner_hits": inner_hits,
+                        "query": {
+                            "bool": {
+                                "must": {"simple_query_string": deepcopy(match)},
+                                # some documents are put into the
+                                # index purely to support ac_query
+                                # (autocomplete), eg page-oriented
+                                # documents from FixedLayoutSource
+                                # that uses the autocomplete
+                                # functionality to match and display
+                                # the first few lines of eg
+                                # "prop. 2018/19:42 s 12". We don't
+                                # need them in our main search
+                                # results.
+                                "must_not": {"term": {"role": "autocomplete"}}
+                }}}})
                 match = {"bool": {"should": submatches}}
             else:
                 # ac_query -- need to work in inner_hits somehow
@@ -900,9 +912,9 @@ class ElasticSearchIndex(RemoteIndex):
         else:
             match = {"bool": {}}
 
-        if boost_types:
+        if boost_repos:
             boost_functions = []
-            for _type, boost in boost_types:
+            for _type, boost in boost_repos:
                 boost_functions.append({"filter": {"term": {"repo": _type}},
                                         "weight": boost})
 
@@ -916,12 +928,16 @@ class ElasticSearchIndex(RemoteIndex):
                 match["bool"]["must"] = {"bool": {"must": filters}}
             else:
                 match["bool"]["must"] = filters[0]
-            if exclude_types:
+            if exclude_repos:
                 match["bool"]["must_not"] = []
-                for exclude_type in exclude_types:
-                    match["bool"]["must_not"].append({"repo": {"value": exclude_type}})
+                for exclude_type in exclude_repos:
+                    # Not entirely sure this works for filtering out
+                    # multiple repos -- we only ever filter out the
+                    # mediawiki repo (and even then we probably
+                    # shouldn't index that in the first place)
+                    match["bool"]["must_not"].append({"term": {"repo": exclude_type}})
 
-        if boost_types:
+        if boost_repos:
             payload = {'query': {'function_score': {'functions': boost_functions,
                                                     'query': match}}}
         else:
@@ -951,7 +967,9 @@ class ElasticSearchIndex(RemoteIndex):
         # parent documents hit).
         if "filter" not in match["bool"]:
             match["bool"]["filter"] = []
-        match["bool"]["filter"].append({"term": {"join": "parent"}})
+        if not ac_query:
+            # autocomplete queries must match 
+            match["bool"]["filter"].append({"term": {"join": "parent"}})
         # Don't include the full text of every document in every hit
         if not ac_query:
             payload['_source'] = {self.term_excludes: ['text']}
@@ -960,31 +978,29 @@ class ElasticSearchIndex(RemoteIndex):
         # revisit once Elasticsearch 2.4 is released.
         if highlight:
             payload['highlight'] = deepcopy(highlight)
-        # if q:
-        #    payload['highlight']['highlight_query'] = {'match': {'_all': q}}
 
-        # FIXME: This below adjustments should not be done in a
-        # general-purpose implementation!
-        #
-        # for autocomplete queries when not using any "natural
-        # language" queries (ie. only query based on a identifer like
-        # "TF 2:" -- in these cases we'd like to use natural order of
-        # the results if available
-        #
-        # maybe do that for all searches (so that full documents
-        # appear before fragments of documents)?
-        if ac_query and q is None and 'uri' in kwargs:
-            payload['sort'] = [{"order": "asc"},
-                               "_score"]
-        elif q is None:
-            # if we don't have an autocomplete query of this kind,
-            # exclude fragments (here identified by having a non-zero
-            # order)
+        if ac_query and q is None:
+            if 'uri' in kwargs:
+                # for autocomplete queries when not using any "natural
+                # language" queries (ie. only query based on a
+                # identifer like "TF 2:" that gets transformed into a
+                # URI)-- in these cases we'd like to use natural order
+                # of the results if available
+                payload['sort'] = [{"order": "asc"},
+                                   "_score"]
+            elif not include_fragments:
+                # if we don't have an autocomplete query of this kind,
+                # exclude fragments (here identified by having a non-zero
+                # order). 
+                match["bool"]["filter"].append({"term": {"join": "parent"}})
+
             if "must_not" not in match["bool"]:
                 match["bool"]["must_not"] = []
-            match['bool']['must_not'].append({"range": {"order": {"gt": 0}}})
+            # FIXME: This is very specific to lagen.nu and should
+            # preferably be controlled through some sort of extra
+            # arguments
             # match['bool']['must_not'].append({"term": {"role": "expired"}})
-            pass
+
         return relurl, json.dumps(payload, indent=4, default=util.json_default_date)
 
     def _aggregation_payload(self):

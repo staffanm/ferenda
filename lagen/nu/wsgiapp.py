@@ -56,12 +56,14 @@ class WSGIApp(OrigWSGIApp):
             
 
     def parse_parameters(self, request, idx):
-        q, param, pagenum, pagelen, stats = super(WSGIApp,
-                                                  self).parse_parameters(request, idx)
+        options = super(WSGIApp, self).parse_parameters(request, idx)
         # if Autocomple call, transform q to suitable parameters (find
         # uri)
-        if request.args.get("_ac") == "true":
-            import pudb; pu.db
+        param = options["fields"]
+        q = options["q"]
+        options['boost_repos'] =  [('sfs', 10)]
+        if options["autocomplete"]:
+            options['exclude_repos'] = ('mediawiki',)
             uri = self.expand_partial_ref(q)
             if uri:
                 param['uri'] = uri.lower()
@@ -71,6 +73,7 @@ class WSGIApp(OrigWSGIApp):
                 else:
                     # prefer document-level resources, not page/section resources
                     param['uri'] = RegexString(param['uri'] + "[^#]*")
+                options["include_fragments"] = True
             else:
                 # normalize any page reference ("nja 2015 s 42" =>
                 # "nja 2015 s. 42") and search in the multi_field
@@ -79,10 +82,18 @@ class WSGIApp(OrigWSGIApp):
                 q = q.lower()
                 q = re.sub(r"\s*s\s*(\d)", " s. \\1", q)
                 q = re.sub(r"^prop(\s+|$)", "prop. ", q)
-                # param['comment.keyword'] = q + "*"
                 param['comment.keyword'] = "*" + q + "*"
-            q = None
-        return q, param, pagenum, pagelen, stats
+                if "§" in q:
+                    # we seem to be writing a legal ref but we can't
+                    # yet turn it into a URI (maybe because so far
+                    # it's just "3 § förvaltningsl"). At that point it
+                    # should be ok for the query to return fragments
+                    # (parts of the regular documents) not just top
+                    # level documents
+                    options['include_fragments'] = True
+
+            options["q"] = None # or del options["q"]?
+        return options
 
     def expand_partial_ref(self, partial_ref):
         if partial_ref.lower().startswith(("prop", "ds", "sou", "dir")):
@@ -189,16 +200,6 @@ class WSGIApp(OrigWSGIApp):
             uri = uri[:-remove]
         return uri
         
-    def query(self, request, options=None):
-        ac_query = bool(request.args.get("_ac"))
-        options = {'boost_types': [('sfs', 10)]}
-        if ac_query:
-            options['exclude_types'] = ('mediawiki', 'mediawiki_child')
-        res = super(WSGIApp, self).query(request, options)
-        if ac_query:
-            return res['items']
-        else:
-            return res
         
     def mangle_result(self, hit, ac_query=False):
         if ac_query:
@@ -230,8 +231,8 @@ class WSGIApp(OrigWSGIApp):
             y = int(queryparams['issued'])
             queryparams['issued'] = Between(datetime(y, 1, 1),
                                             datetime(y, 12, 31, 23, 59, 59))
-        boost_types = [("sfs", 10)]
-        res, pager = self._search_run_query(queryparams, boost_types=boost_types)
+        boost_repos = [("sfs", 10)]
+        res, pager = self._search_run_query(queryparams, boost_repos=boost_repos)
         if y:
             queryparams['issued'] = str(y)
 
