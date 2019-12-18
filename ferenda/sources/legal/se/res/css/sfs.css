@@ -6,9 +6,9 @@
 
 .platsmarkor {
     position: absolute;
-    left: -45px;
+    left: -35px;
     font-size: 0.6em;
-    margin-top: 2px;
+    margin-top: 6px;
     color: #999;
     font-family: Arial;
 }

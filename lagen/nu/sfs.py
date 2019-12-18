@@ -102,7 +102,7 @@ class SFS(OrigSFS, SameAs):
                 util.ensure_dir(filename)
                 self.log.info("Creating img %s with label %s" %
                               (filename, label))
-                cmd = 'convert -background transparent -fill Grey -font %s -pointsize 10 -size 44x14 -gravity East label:"%s " %s' % (font, label, filename)
+                cmd = 'convert -background transparent -fill gray50 -font %s -pointsize 10 -size 44x14 -gravity East label:"%s " %s' % (font, label, filename)
                 util.runcmd(cmd)
             return filename
         ret = []
