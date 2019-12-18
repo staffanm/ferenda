@@ -255,6 +255,8 @@ class WSGIApp(OrigWSGIApp):
                                         # -> foo
             else:
                 label = r['label']
+            if r.get('role') == "expired":
+                label = "[upphävd] " + label
             rendered_hit = html.Div(
                 [html.B([elements.Link(label, uri=r['uri'])], **{'class': 'lead'})],
                 **{'class': 'hit'})

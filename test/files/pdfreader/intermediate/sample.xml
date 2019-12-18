@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE pdf2xml SYSTEM "pdf2xml.dtd">
 
-<pdf2xml producer="poppler" version="0.29.0">
+<pdf2xml producer="poppler" version="0.56.0">
 <page number="1" position="absolute" top="0" left="0" height="1263" width="892">
 	<fontspec id="0" size="21" family="CCQUSK+Calibri-Bold" color="#345a8a"/>
 	<fontspec id="1" size="16" family="TAKDYF+Cambria" color="#000000"/>

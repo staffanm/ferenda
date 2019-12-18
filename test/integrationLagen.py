@@ -611,7 +611,7 @@ class TestAutocomplete(TestLagen):
 
 # this is a local test, don't need to run it if we're running the test
 # suite against a remote server
-@unittest.skipIf(os.environ.get("FERENDA_TESTURL"), "Not testing against local dev server")
+@unittest.skipIf(os.environ.get("FERENDA_TESTURL"), "Skipping when not testing against local dev server")
 class TestACExpand(unittest.TestCase):
 
     def setUp(self):
@@ -1269,6 +1269,7 @@ class SFSHistory(TestLagen):
 class Errorhandling(TestLagen):
     def test_generated_missing(self):
         rootdir = os.environ.get("FERENDA_TESTDATA", "tng.lagen.nu/data")
+        self.assertTrue(os.path.exists(rootdir), "You probably need to set the FERENDA_TESTDATA environment variable")
         entrypath = rootdir + "/sfs/entries/1666/666.json"
         from ferenda import util
         import json

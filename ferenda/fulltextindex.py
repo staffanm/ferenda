@@ -782,9 +782,9 @@ class ElasticSearchIndex(RemoteIndex):
         if "#" in uri:
             baseuri, extra = uri.split("#", 1)
             payload["join"] = {"name": "child",
-                                 "parent": relurl}
+                               "parent": unquote(relurl)}
             relurl += "#" + extra
-        
+
         payload.update(kwargs)
         return relurl, json.dumps(payload, default=util.json_default_date)
 
@@ -793,7 +793,8 @@ class ElasticSearchIndex(RemoteIndex):
             self._writer = tempfile.TemporaryFile()
         relurl, payload = self._update_payload(
             uri, repo, basefile, text, **kwargs)
-        metadata = {"index": {"_id": unquote(relurl),
+        relurl = unquote(relurl)
+        metadata = {"index": {"_id": relurl,
                               # the need for this is badly documented and
                               # might go away in future ES versions
                               "_type": "_doc"}
@@ -917,6 +918,12 @@ class ElasticSearchIndex(RemoteIndex):
             for _type, boost in boost_repos:
                 boost_functions.append({"filter": {"term": {"repo": _type}},
                                         "weight": boost})
+                # FIXME: provide a more general way for the caller to
+                # constrol these score-altering functions. This boosts
+                # expired SFS docs by 0.5 (ie halves teh score)
+                if _type == "sfs":
+                    boost_functions.append({"filter": {"term": {"role": "expired"}},
+                                            "weight": 0.5})
 
         if filterterms or filterregexps or filterranges:
             filters = []
@@ -1004,7 +1011,7 @@ class ElasticSearchIndex(RemoteIndex):
         return relurl, json.dumps(payload, indent=4, default=util.json_default_date)
 
     def _aggregation_payload(self):
-        aggs = {'type': {'terms': {'field': '_type', 'size': 100}}}
+        aggs = {'type': {'terms': {'field': 'repo', 'size': 100}}}
         for repo in self._repos:
             if not repo.config.relate:
                 continue
@@ -1105,7 +1112,6 @@ class ElasticSearchIndex(RemoteIndex):
         language = {'en': 'English',
                     'sv': 'Swedish'}.get(repos[0].lang, "English")
         payload = {
-            # cargo cult configuration
             "settings": {
                 "analysis": {
                     "analyzer": {
@@ -1158,8 +1164,7 @@ class ElasticSearchIndex(RemoteIndex):
                 native = self.to_native_field(fieldtype)
                 if key not in es_fields:
                     es_fields[key] = native
-                assert es_fields[key] == native, "incompatible fields for key %s: %s != %s" % (key, es_fields[key], native)
-
+                    assert es_fields[key] == native, "incompatible fields for key %s: %s != %s" % (key, es_fields[key], native)
         # _source enabled so we can get the text back
         payload["mappings"] = {"_source": {"enabled": True},
                                "properties": es_fields}

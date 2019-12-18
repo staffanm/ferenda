@@ -202,6 +202,7 @@ class BasicQuery(object):
         res, pager = self.index.query("section")
         # can't get these results when using MockESBasicQuery with
         # CREATE_CANNED=True for some reason...
+
         if type(self) == ESBasicQuery:
             self.assertEqual(len(res),1)
             self.assertEqual(len(res[0]['innerhits']), 2)
