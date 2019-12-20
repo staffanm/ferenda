@@ -266,8 +266,9 @@ class API(WSGI):
                 'pagenum': 1,
                 'pagelen': 10,
                 'ac_query': False,
-                'boost_types': None,
-                'exclude_types': None}
+                'boost_repos': None,
+                'exclude_repos': None,
+                'include_fragments': None}
         with patch('ferenda.wsgiapp.FulltextIndex', **config):
             status, headers, content = self.call_wsgi()
             config['connect.return_value'].query.assert_called_once_with(**want)
@@ -294,8 +295,9 @@ class API(WSGI):
                 'pagenum': 1,
                 'pagelen': 10,
                 'ac_query': False,
-                'boost_types': None,
-                'exclude_types': None}
+                'boost_repos': None,
+                'exclude_repos': None,
+                'include_fragments': None}
 
         with patch('ferenda.wsgiapp.FulltextIndex', **config):
             status, headers, content = self.call_wsgi()

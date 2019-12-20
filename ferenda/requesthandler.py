@@ -17,7 +17,7 @@ from copy import deepcopy
 from lxml import etree
 from rdflib import Graph
 from cached_property import cached_property
-from werkzeug.routing import Rule, BaseConverter
+from werkzeug.routing import Rule, BaseConverter, Map
 from werkzeug.datastructures import Headers
 from werkzeug.wrappers import Request, Response
 from werkzeug.wsgi import wrap_file
@@ -33,6 +33,35 @@ class UnderscoreConverter(BaseConverter):
         return value.replace(" ", "_")
     def to_python(self, value):
         return value.replace("_", " ")
+
+class BasefileRule(Rule):
+    # subclass that takes extra care to handle urls ending in
+    # /data[.suffix]
+    def match(self, path, method=None):
+        m = re.search("/data(|.\w+)$", path)
+        if m:
+            assert m.start() #  shoudn't be zero
+            path = path[:m.start()]
+            if m.group(1):
+                path += m.group(1)
+        if 'extended' in self._converters: 
+            # this is SO hacky, but in order to match, we remove the
+            # troublesome <extended> part of the URI rule regex before
+            # calling the superclass, then restore the regex
+            # afterwards
+            real_regex = self._regex
+            self._regex = re.compile(self._regex.pattern.replace("/(?P<extended>(?:data))", ""))
+        res = super(BasefileRule, self).match(path, method)
+        if res and m:
+            if 'extended' in self._converters:
+                self._regex = real_regex
+            res['extended'] = 'data'
+            # if 'suffix' in self._converters and m.groups(1):
+            #     res['suffix'] = m.groups(1)[1:]
+        # if <extended or <suffix> converters are defined, fill that data
+        return res
+
+            
 
 class RequestHandler(object):
     
@@ -58,7 +87,7 @@ class RequestHandler(object):
     def __init__(self, repo):
         self.repo = repo
 
-    # FIXME: This shouldn't be used as the data should be fetched from
+    # FIXME: This shouldn't be used as the data should be fetched from the routing rules
     # , but since it's called from path() which may be called in a
     # non-wsgi context, we might not
     def dataset_params_from_uri(self, uri):
@@ -81,8 +110,8 @@ class RequestHandler(object):
         for root in self.doc_roots:
             context["root"] = root
             for template in self.doc_rules:
-                rules.append(Rule(template % context, endpoint=self.handle_doc))
-        for root in self.dataset_roots: # almost always just one
+                rules.append(BasefileRule(template % context, endpoint=self.handle_doc))
+        for root in self.dataset_roots:
             context["root"] = root
             for template in self.dataset_rules:
                 rules.append(Rule(template % context, endpoint=self.handle_dataset))
@@ -90,7 +119,7 @@ class RequestHandler(object):
 
     @property
     def rule_context(self):
-        return {"converter": "default"}
+        return {"converter": "path"} 
 
     @property
     def doc_roots(self):
@@ -102,7 +131,6 @@ class RequestHandler(object):
                 "%(root)s/<%(converter)s:basefile>.<suffix>",
                 "%(root)s/<%(converter)s:basefile>/<any(data):extended>",
                 "%(root)s/<%(converter)s:basefile>/<any(data):extended>.<suffix>"]
-        
 
     @property
     def dataset_roots(self):
@@ -167,8 +195,17 @@ class RequestHandler(object):
         
         """
         suffix = None
-        if urlparse(uri).path.startswith("/dataset/"):
-            params = self.dataset_params_from_uri(uri)
+        parsedurl = urlparse(uri)
+        args = dict(parse_qsl(parsedurl.query))
+        map = Map(self.rules, converters=self.rule_converters)
+        endpoint, params = map.bind(server_name=parsedurl.netloc.split(":")[0],
+                                    path_info=parsedurl.path).match()
+        if endpoint == self.handle_dataset:
+            # FIXME: This duplicates logic from handle_dataset
+            assert len(args) <= 1, "Can't handle dataset requests with multiple selectors"
+            for (k, v) in args.items():
+                params["param"] = k
+                params["value"] = v
             # at this point, use werkzeug.test.Client or
             # EnvironmentBuilder to create a fake environ and then a
             # fake Request object
@@ -186,13 +223,12 @@ class RequestHandler(object):
                 return pathfunc()
             else:
                 return None
-        else:
-            params = self.params_from_uri(uri)
-            if params:
-                uri = uri.split("?")[0]
-            basefile = self.repo.basefile_from_uri(uri)
+        elif endpoint == self.handle_doc:
+            # params = self.params_from_uri(uri)
+            # if params:
+            params.update(args)
 
-            if basefile is None:
+            if 'basefile' not in params:
                 return None
             if 'format' in params:
                 suffix = params['format']
@@ -210,9 +246,9 @@ class RequestHandler(object):
             headers = {}
         environ = EnvironBuilder(path=urlparse(uri).path, headers=headers).get_environ()
         contenttype = self.contenttype(Request(environ), suffix)
-        pathfunc = self.get_pathfunc(environ, basefile, params, contenttype, suffix)
+        pathfunc = self.get_pathfunc(environ, params['basefile'], params, contenttype, suffix)
         if pathfunc:
-            return pathfunc(basefile)
+            return pathfunc(params['basefile'])
 
     def request_uri(self, environ):
         rawuri = request_uri(environ)
@@ -235,51 +271,7 @@ class RequestHandler(object):
             # request_uri to https://example.org/docs/1
             uri = self.repo.config.url + uri.split("/", 3)[-1]
         return uri
-        
-#    def handle(self, environ):
-#        """provides a response to a particular request by returning a a tuple
-#        *(fp, length, status, mimetype)*, where *fp* is an open file of the
-#        document to be returned.
-#
-#        """
-#        segments = environ['PATH_INFO'].split("/", 3)
-#        uri = self.request_uri(environ)
-#        if "?" in uri:
-#            uri, querystring = uri.rsplit("?", 1)
-#        else:
-#            querystring = None
-#        suffix = None
-#        if segments[1] == "dataset":
-#            basefile = None
-#            tmpuri = uri
-#            if "." in uri.split("/")[-1]:
-#                tmpuri = tmpuri.rsplit(".", 1)[0]
-#            if querystring:
-#                tmpuri += "?" + querystring
-#            params = self.dataset_params_from_uri(tmpuri)
-#        else:
-#            basefile = self.repo.basefile_from_uri(uri)
-#            if not basefile:
-#                raise RequestHandlerError("%s couldn't resolve %s to a basefile" % (self.repo.alias, uri))
-#            params = self.params_from_uri(uri + ("?" + querystring if querystring else ""))
-#        if 'format' in params:
-#            suffix = params['format']
-#        else:
-#            if 'attachment' in params:
-#                leaf = params['attachment']
-#            else:
-#                leaf = uri.split("/")[-1]
-#            if "." in leaf:
-#                suffix = leaf.rsplit(".", 1)[1]
-#        contenttype = self.contenttype(request, suffix)
-#        if segments[1] == "dataset":
-#            path, data = self.lookup_dataset(environ, params, contenttype, suffix)
-#        else:
-#            path, data = self.lookup_resource(environ, basefile, params,
-#                                              contenttype, suffix)
-#        return self.prep_response(request, path, data, contenttype)
-#        
-#
+
     def contenttype(self, request, suffix):
         preferred = request.accept_mimetypes.best_match(["text/html"])
         accept = request.headers.get("Accept")
