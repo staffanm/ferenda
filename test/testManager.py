@@ -166,6 +166,7 @@ class=testManager.staticmockclass2
                     'loglevel': 'INFO',
                     'logfile': None,
                     'staticmock': {}}
+        import pudb; pu.db
         config = manager.load_config(argv=argv, defaults=defaults)
         self.assertEqual(manager._run_class(enabled_classes,
                                             argv,

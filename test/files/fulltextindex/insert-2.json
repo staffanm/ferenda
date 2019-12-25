@@ -1,1 +1,23 @@
-{"_index":"ferenda","_type":"base","_id":"1s1","_version":1,"created":true}
+{
+    "took": 17,
+    "errors": false,
+    "items": [
+        {
+            "index": {
+                "_index": "ferenda",
+                "_type": "_doc",
+                "_id": "base/1#s1",
+                "_version": 1,
+                "result": "created",
+                "_shards": {
+                    "total": 2,
+                    "successful": 1,
+                    "failed": 0
+                },
+                "_seq_no": 1,
+                "_primary_term": 1,
+                "status": 201
+            }
+        }
+    ]
+}

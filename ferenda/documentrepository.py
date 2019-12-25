@@ -550,7 +550,6 @@ class DocumentRepository(object):
         :returns: default configuration properties
         :rtype: dict
         """
-
         return {  # 'loglevel': 'INFO',
             'allversions': False,
             'bulktripleload': False,
@@ -568,6 +567,8 @@ class DocumentRepository(object):
             'fulltextindex': True,
             'generateforce': False,
             'ignorepatch': False,
+            'indexlocation': 'data/whooshindex',
+            'indextype': 'WHOOSH',
             'lastdownload': datetime,
             'parseforce': False,
             'patchdir': 'patches',
@@ -579,21 +580,19 @@ class DocumentRepository(object):
             'removeinvalidlinks': True,
             'republishsource': False,
             'serializejson': False,
+            'storelocation': 'data/ferenda.sqlite',
+            'storerepository': 'ferenda',
+            'storetype': 'SQLITE',
             'tabs': True,
             'url': 'http://localhost:8000/',
-            'useragent': 'ferenda-bot'
+            'useragent': 'ferenda-bot',
             # FIXME: These only make sense at a global level, and
             # furthermore are duplicated in manager._load_config.
 #            'cssfiles': ['css/ferenda.css'],
 #            'jsfiles': ['js/ferenda.js'],
 #            'imgfiles': ['img/atom.png'],
-#            'storetype': 'SQLITE',
-#            'storelocation': 'data/ferenda.sqlite',
-#            'storerepository': 'ferenda',
-#            'indextype': 'WHOOSH',
-#            'indexlocation': 'data/whooshindex',
-#            'combineresources': False,
-#            'staticsite': False,
+            'combineresources': False,
+            'staticsite': False,
 #            'legacyapi': False,
 #            'sitename': 'MySite',
 #            'sitedescription': 'Just another Ferenda site',
@@ -2536,17 +2535,6 @@ WHERE {
                 # so don't bother.
                 return None
             for (repoidx, repo) in enumerate(repos):
-                # FIXME: This works less than optimal when using
-                # CompositeRepository -- the problem is that a subrepo
-                # might come before the main repo in this list, and
-                # yield an improper path (eg
-                # /data/soukb/entries/... when the real entry is at
-                # /data/sou/entries/...). One solution is to remove
-                # subrepos from the ferenda.ini file, but right now we
-                # need them enabled to properly store lastdownload
-                # options. Another solution would be to make sure all
-                # CompositeRepository repos come before subrepos in
-                # the list.
                 supports = False
                 for rule in wsgiapp.reporules[repo]:
                     if rule.match(matchurl) is not None:
@@ -2604,23 +2592,18 @@ WHERE {
         def base_transform(url):
             if remove_missing:
                 path = getpath(url, repos)
-                # If the file being transformed contains references to
-                # itself, this will return False even when it
-                # shouldn't. As a workaround,
-                # Transformer.transform_file now creates a placeholder
-                # file before transform_links is run
                 if path and not (os.path.exists(path) and os.path.getsize(path) > 0):
                     return False
             return url
 
-        # sort repolist so that CompositeRepository instances come
-        # before others (see comment in getpath)
-        from ferenda import CompositeRepository
         if repos is None:
             repos = []
         if wsgiapp is None: 
             from ferenda.manager import make_wsgi_app
             wsgiapp = make_wsgi_app(self.config._parent, repos=repos)
+        # sort repolist so that CompositeRepository instances come
+        # before others (see comment in getpath)
+        from ferenda import CompositeRepository
         repos = sorted(repos, key=lambda x: isinstance(x, CompositeRepository), reverse=True)
         if develurl:
             return simple_transform

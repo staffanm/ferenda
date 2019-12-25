@@ -19,6 +19,7 @@ RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selectio
        curl \
        elasticsearch \
        emacs24-nox \
+       file \
        g++ \
        gcc \
        git \

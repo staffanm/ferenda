@@ -27,3 +27,4 @@ layeredconfig
 grako
 responses
 langdetect
+werkzeug

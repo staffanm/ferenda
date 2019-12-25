@@ -91,8 +91,6 @@ DEFAULT_CONFIG = {
     'disallowrobots': False,
     'download': True,
     'imgfiles': ['img/atom.png'],
-    'indexlocation': 'data/whooshindex',
-    'indextype': 'WHOOSH',
     'jsfiles': ['js/ferenda.js'],
     'legacyapi': False,
     'logfile': True,
@@ -106,9 +104,6 @@ DEFAULT_CONFIG = {
     'sitedescription': 'Just another Ferenda site',
     'sitename': 'MySite',
     'staticsite': False,
-    'storelocation': 'data/ferenda.sqlite',
-    'storerepository': 'ferenda',
-    'storetype': 'SQLITE',
     'systempaths': list,
     'tabs': True,
     'wsgiappclass': 'ferenda.WSGIApp',
@@ -118,10 +113,15 @@ DEFAULT_CONFIG = {
     #'force': False,
     #'frontpagefeed': False,
     #'fulltextindex': True,
+    #'indexlocation': 'data/whooshindex',
+    #'indextype': 'WHOOSH',
     #'lastdownload': datetime,
     #'primaryfrontpage': False,
     #'refresh': False,
+    #'storelocation': 'data/ferenda.sqlite',
+    #'storerepository': 'ferenda',
     #'useragent': 'ferenda-bot',
+    #'storetype': 'SQLITE',
 }
 
 class MarshallingHandler(logging.Handler):
@@ -341,15 +341,18 @@ def make_wsgi_app(config, enabled=None, repos=None):
     :type enabled: dict
     :param repos: A list of initialized document repositoriees (used in embedded scenarios, including testing)
     :type enabled: list
+    :param wsgiappclass: The name of the class to be used to create the WSGI app
+    :type wsgiappclass: str
     :returns: A WSGI application
     :rtype: callable
 
     """
+    if config is None:
+        config = LayeredConfig(Defaults(DEFAULT_CONFIG))
     if repos is None:
         if enabled is None:
             enabled = enabled_classes()
         repos = [_instantiate_class(cls, config) for cls in _classes_from_classname(enabled, 'all')]
-    
     cls = _load_class(config.wsgiappclass)
     return cls(repos, config)
 

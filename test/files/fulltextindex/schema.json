@@ -1,1 +1,84 @@
-{"ferenda":{"mappings":{"base":{"_all":{"store":true,"analyzer":"my_analyzer"},"properties":{"basefile":{"type":"keyword"},"dcterms_identifier":{"type":"text","boost":16.0,"fields":{"keyword":{"type":"text","analyzer":"lowercase_keyword"}},"analyzer":"my_analyzer"},"dcterms_issued":{"type":"date","format":"dateOptionalTime"},"dcterms_publisher":{"properties":{"iri":{"type":"keyword"},"label":{"type":"keyword"}}},"dcterms_title":{"type":"text","boost":4.0},"rdf_type":{"type":"keyword","boost":1.1,"norms":true},"text":{"type":"text","store":true,"analyzer":"my_analyzer"},"uri":{"type":"text","store":true,"analyzer":"lowercase_keyword"}}},"base_child":{"_all":{"store":true,"analyzer":"my_analyzer"},"_parent":{"type":"base"},"_routing":{"required":true},"properties":{"basefile":{"type":"keyword"},"dcterms_identifier":{"type":"text","boost":16.0,"fields":{"keyword":{"type":"text","analyzer":"lowercase_keyword"}},"analyzer":"my_analyzer"},"dcterms_title":{"type":"text","boost":4.0},"rdf_type":{"type":"keyword","boost":1.1,"norms":true},"text":{"type":"text","store":true,"analyzer":"my_analyzer"},"uri":{"type":"text","store":true,"analyzer":"lowercase_keyword"}}}}}}
+{
+    "ferenda": {
+        "mappings": {
+            "properties": {
+                "all": {
+                    "type": "text"
+                },
+                "basefile": {
+                    "type": "keyword",
+                    "copy_to": [
+                        "all"
+                    ]
+                },
+                "dcterms_identifier": {
+                    "type": "text",
+                    "boost": 16.0,
+                    "fields": {
+                        "keyword": {
+                            "type": "text",
+                            "analyzer": "lowercase_keyword"
+                        }
+                    },
+                    "copy_to": [
+                        "all"
+                    ]
+                },
+                "dcterms_issued": {
+                    "type": "date",
+                    "format": "strict_date_optional_time"
+                },
+                "dcterms_publisher": {
+                    "properties": {
+                        "iri": {
+                            "type": "keyword"
+                        },
+                        "label": {
+                            "type": "keyword",
+                            "copy_to": [
+                                "all"
+                            ]
+                        }
+                    }
+                },
+                "dcterms_title": {
+                    "type": "text",
+                    "boost": 4.0,
+                    "copy_to": [
+                        "all"
+                    ]
+                },
+                "join": {
+                    "type": "join",
+                    "eager_global_ordinals": true,
+                    "relations": {
+                        "parent": "child"
+                    }
+                },
+                "rdf_type": {
+                    "type": "keyword",
+                    "boost": 1.1,
+                    "norms": true
+                },
+                "repo": {
+                    "type": "keyword",
+                    "copy_to": [
+                        "all"
+                    ]
+                },
+                "text": {
+                    "type": "text",
+                    "store": true,
+                    "copy_to": [
+                        "all"
+                    ]
+                },
+                "uri": {
+                    "type": "text",
+                    "store": true,
+                    "analyzer": "lowercase_keyword"
+                }
+            }
+        }
+    }
+}

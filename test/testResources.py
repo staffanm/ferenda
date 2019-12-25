@@ -153,7 +153,7 @@ class=testManager.staticmockclass2
         s = os.sep
         repo = DocumentRepository()
         # but remove any external urls -- that's tested separately in Test5
-        repo.config.cssfiles = [x for x in repo.config.cssfiles if not x.startswith("http://")]
+        # repo.config.cssfiles = [x for x in repo.config.cssfiles if not x.startswith("http://")]
         got = Resources([repo],self.tempdir+os.sep+'rsrc',
                         cssfiles=[],
                         jsfiles=[],

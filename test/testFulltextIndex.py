@@ -54,7 +54,10 @@ def canned(*responses, **kwargs):
 
         responsefile = "test/files/fulltextindex/" + responses[len(returned)][1]
         with open(responsefile, 'wb') as fp:
-            fp.write(resp.content)
+            try:
+                fp.write(json.dumps(resp.json(), indent=4).encode("utf-8"))
+            except ValueError:
+                fp.write(resp.content)
         returned.append(True)
         return resp
 

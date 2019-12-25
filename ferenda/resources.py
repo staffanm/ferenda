@@ -19,7 +19,6 @@ from layeredconfig import LayeredConfig, Defaults
 from ferenda import DocumentRepository, ResourceLoader
 from ferenda import util, errors
 
-
 class Resources(object):
 
     """Creates and manages various assets/resources needed for web serving.
@@ -29,7 +28,9 @@ class Resources(object):
         # FIXME: document what kwargs could be (particularly 'combineresources')
         self.repos = repos
         self.resourcedir = resourcedir
-        defaults = DocumentRepository.get_default_options()
+        from ferenda.manager import DEFAULT_CONFIG
+        defaults = dict(DEFAULT_CONFIG)
+        defaults.update(DocumentRepository.get_default_options())
         defaults.update(kwargs)
         self.config = LayeredConfig(Defaults(defaults))
         # the below call to setup_logger alters the logging level of
@@ -200,11 +201,12 @@ class Resources(object):
             if repo.__class__.__name__ == "SFS" and option == "imgfiles":
                 self.log.info("calling into SFS._makeimages()")
                 LayeredConfig.set(repo.config, 'imgfiles', repo._makeimages())
-            for f in getattr(repo.config, option):
-                if f in processed:
-                    continue
-                urls.append(self._process_file(f, buf, filedir, repo.alias))
-                processed.add(f)
+            if hasattr(repo.config, option):
+                for f in getattr(repo.config, option):
+                    if f in processed:
+                        continue
+                    urls.append(self._process_file(f, buf, filedir, repo.alias))
+                    processed.add(f)
         urls = list(filter(None, urls))
         if combinefile:
             txt = buf.getvalue().decode('utf-8')

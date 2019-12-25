@@ -1,7 +1,62 @@
-{"took":1,"timed_out":false,"_shards":{"total":1,"successful":1,"failed":0},"hits":{"total":1,"max_score":0.26189533,"hits":[{"_index":"ferenda","_type":"base","_id":"1","_score":0.26189533, "_source" : {
-    "text": "This is the main text of the document (independent sections excluded)",
-    "uri": "http://example.org/doc/1",
-    "basefile": "1",
-    "dcterms_identifier": "Doc #1",
-    "dcterms_title": "First example"
-},"highlight":{"text":["This is the <strong class='match'>main</strong> text of the document (independent sections excluded)"]}}]}}
+{
+    "took": 10,
+    "timed_out": false,
+    "_shards": {
+        "total": 1,
+        "successful": 1,
+        "skipped": 0,
+        "failed": 0
+    },
+    "hits": {
+        "total": {
+            "value": 1,
+            "relation": "eq"
+        },
+        "max_score": 1.283559,
+        "hits": [
+            {
+                "_index": "ferenda",
+                "_type": "_doc",
+                "_id": "base/1",
+                "_score": 1.283559,
+                "_source": {
+                    "basefile": "1",
+                    "dcterms_title": "First example",
+                    "repo": "base",
+                    "dcterms_identifier": "Doc #1",
+                    "join": "parent",
+                    "uri": "http://example.org/doc/1"
+                },
+                "highlight": {
+                    "text": [
+                        "This is the <em>main</em> text of the document (independent sections excluded)"
+                    ]
+                },
+                "inner_hits": {
+                    "child": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            }
+        ]
+    },
+    "aggregations": {
+        "type": {
+            "doc_count_error_upper_bound": 0,
+            "sum_other_doc_count": 0,
+            "buckets": [
+                {
+                    "key": "base",
+                    "doc_count": 1
+                }
+            ]
+        }
+    }
+}
