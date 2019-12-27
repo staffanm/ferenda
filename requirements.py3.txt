@@ -28,3 +28,4 @@ grako
 responses
 langdetect
 werkzeug
+jinja2

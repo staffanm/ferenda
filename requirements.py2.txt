@@ -34,5 +34,5 @@ langdetect
 bz2file   # backport
 backports.functools_lru_cache # another backport
 werkzeug
-jinja
+jinja2
 
