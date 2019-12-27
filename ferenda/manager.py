@@ -869,10 +869,10 @@ def load_config(filename=None, argv=None, defaults=None):
         getlog().error("load_config called more than once!")
     if not defaults:
         defaults = copy.deepcopy(DEFAULT_CONFIG)
-        if filename:
-            for alias, classname in enabled_classes(inifile=filename).items():
-                assert alias not in defaults, "Collision on key %s" % alias
-                defaults[alias] = _load_class(classname).get_default_options()
+    if filename:
+        for alias, classname in enabled_classes(inifile=filename).items():
+            assert alias not in defaults, "Collision on key %s" % alias
+            defaults[alias] = _load_class(classname).get_default_options()
     sources = [Defaults(defaults)]
     if filename:
         sources.append(INIFile(filename))

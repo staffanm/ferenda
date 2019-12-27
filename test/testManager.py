@@ -165,8 +165,8 @@ class=testManager.staticmockclass2
         defaults = {'datadir': 'data',
                     'loglevel': 'INFO',
                     'logfile': None,
+                    'compress': '',
                     'staticmock': {}}
-        import pudb; pu.db
         config = manager.load_config(argv=argv, defaults=defaults)
         self.assertEqual(manager._run_class(enabled_classes,
                                             argv,
@@ -893,7 +893,8 @@ imgfiles = []
                 'json': [s.join(['rsrc','api','context.json']),
                          s.join(['rsrc','api','common.json']),
                          s.join(['rsrc','api','terms.json'])],
-                'img': [s.join(['rsrc', 'img', 'test.png'])],
+                'img': [s.join(['rsrc', 'img', 'atom.png']),
+                        s.join(['rsrc', 'img', 'test.png'])],
                 'css': [s.join(['rsrc', 'css', 'ferenda.css']),
                         s.join(['rsrc', 'css', 'test.css'])],
                 'js': [s.join(['rsrc', 'js', 'ferenda.js']),
@@ -925,11 +926,13 @@ imgfiles = []
         self._enable_repos()
         argv = ['test', 'inspect', 'config']
         ourcfg = manager.load_config(argv=argv,
-                                      defaults={'loglevel': 'CRITICAL',
-                                                'logfile': None,
-                                                'datadir': 'data',
-                                                'profile': False,
-                                                'test': {'hello': 'world'}})
+                                     defaults={'loglevel': 'CRITICAL',
+                                               'logfile': None,
+                                               'datadir': 'data',
+                                               'profile': False,
+                                               'checktimeskew': False,
+                                               'compress': '',
+                                               'test': {'hello': 'world'}})
         with patch('ferenda.manager.load_config', return_value=ourcfg):
             instcfg = manager.run(argv)
             self.assertIsInstance(instcfg, LayeredConfig)
@@ -973,7 +976,6 @@ Available modules:
         with patch('ferenda.manager.run_simple', return_value=m) as m2:
             manager.run(["all", "runserver"])
             self.assertTrue(m2.called)
-            self.assertTrue(m.serve_forever.called)
 
     def test_run_ctrlc(self):
         self._enable_repos()

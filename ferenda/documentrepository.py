@@ -2528,7 +2528,7 @@ WHERE {
             if url == self.config.url:
                 return self.config.datadir + os.sep + "index.html"
             # http://example.org/foo/bar.x -> |/foo/bar.x (for Rule.match)
-            matchurl = "|/"+url.split("/", 3)[-1]
+            matchurl = "|/"+url.split("/", 3)[-1].split("?")[0]
             if "/" not in url:
                 # this is definitly not a HTTP(S) url, might be a
                 # mailto:? Anyway, we won't get a usable path from it
