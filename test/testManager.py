@@ -554,6 +554,11 @@ class Testrepo(DocumentRepository):
         else:
             return a
 
+    # custom method for the RunMultiproc.test_global_config test
+    @decorators.action
+    def mpinspect(self, arg):
+        return (self.config.fulltextindex, self.config._parent.legacyapi)
+
     # general testing of arguments and return values (or lack thereof)
     @decorators.action
     def mymethod(self, arg):
@@ -1000,6 +1005,16 @@ class RunMultiproc(RunBase, unittest.TestCase):
         self.assertEqual(args, ["arg1", "myarg", "arg2"])
         # assert that all pids are unique
         self.assertEqual(3, len(set(pids)))
+
+    def test_global_config(self):
+        # this makes sure that the subprocesses use instances that
+        # have access to the global/manager-provided DEFAULT_CONFIG
+        # config variables
+        self._enable_repos()
+        argv = ["test", "mpinspect", "--all", "--processes=2"]
+        res = manager.run(argv)
+        import pudb; pu.db
+        self.assertEqual(res, [(True, False), (True, False), (True, False)])
 
     @quiet()
     def test_run_single_all_multiprocessing_fail(self):

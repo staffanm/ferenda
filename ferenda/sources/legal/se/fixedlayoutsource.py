@@ -138,6 +138,7 @@ class FixedLayoutSource(SwedishLegalSource):
         opts = super(FixedLayoutSource, cls).get_default_options()
         opts['imgfiles'] = ['img/spinner.gif']
         opts['ocr'] = True
+        opts['legacytesseract'] = False
         return opts
 
     def downloaded_to_intermediate(self, basefile, attachment=None):
@@ -155,7 +156,8 @@ class FixedLayoutSource(SwedishLegalSource):
                                   images=self.config.pdfimages,
                                   convert_to_pdf=convert_to_pdf,
                                   keep_xml=keep_xml,
-                                  ocr_lang=ocr_lang)
+                                  ocr_lang=ocr_lang,
+                                  legacy_tesseract=self.config.legacytesseract)
         except PDFFileIsEmpty as e:
             if self.config.ocr:
                 self.log.warning("%s: %s was empty, attempting OCR" % (basefile, downloaded_path))

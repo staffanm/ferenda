@@ -1352,7 +1352,6 @@ def _build_worker(jobqueue, resultqueue, clientname):
 
 def _instantiate_and_configure(classname, config, logrecords, clientname):
     log = getlog()
-    # print("Client [pid %s]: supplied config is %s" % (os.getpid(), config))
     log.debug(
         "Client: [pid %s] instantiating and configuring %s" %
         (os.getpid(), classname))
@@ -1363,7 +1362,6 @@ def _instantiate_and_configure(classname, config, logrecords, clientname):
         # if getattr(inst.config, k) != v:
         #    print("pid %s: config %s is %s, should be %s" %
         #          (os.getpid(), k, getattr(inst.config, k), v))
-
     # When running in distributed mode (but not in multiprocessing
     # mode), setup the root logger to log to a StringIO buffer.
     if clientname:
@@ -1712,6 +1710,9 @@ def _run_class_with_basefile(clbl, basefile, version, kwargs, command,
     except Exception as e:
         if 'bdb.BdbQuit' in str(type(e)):
             raise
+        # tb = sys.exc_info()[2]
+        # sys.stderr.write("Client [pid %s]: Traceback:\n" % (os.getpid()))
+        # traceback.print_tb(tb)
         errmsg = str(e)
         loc = util.location_exception(e)
         label = basefile + ("@%s" % version if version else "")
@@ -1737,8 +1738,8 @@ def _instantiate_class(cls, config=None, argv=[]):
         return cls(getattr(config, cls.alias))
     clsdefaults = cls.get_default_options()
     if not config:
-        defaults = dict(clsdefaults)
-        defaults[cls.alias] = {}
+        defaults = dict(DEFAULT_CONFIG)
+        defaults[cls.alias] = clsdefaults
         config = LayeredConfig(Defaults(defaults),
                                INIFile(find_config_file()),
                                Commandline(argv),

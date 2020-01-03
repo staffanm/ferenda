@@ -73,7 +73,8 @@ class PDFReader(CompoundElement):
                  keep_xml=True,
                  ocr_lang=None,
                  fontspec=None,
-                 textdecoder=None):
+                 textdecoder=None,
+                 legacy_tesseract=False):
         """Initializes a PDFReader object from an existing PDF file. After
         initialization, the PDFReader contains a list of
         :py:class:`~ferenda.pdfreader.Page` objects.
@@ -110,7 +111,10 @@ class PDFReader(CompoundElement):
                          neccessarily an IETF language tag like "sv"
                          or "en-GB", but rather whatever the
                          underlying ``tesseract`` program uses).
-        :param ocr_lang: str
+        :type ocr_lang: str
+        :param legacy_tesseract: Specify True if the available tesseract
+                                 version is older than 3.05.
+        :type legacy_tesseract: bool
 
         """
         self.log = logging.getLogger('pdfreader')
@@ -155,7 +159,8 @@ class PDFReader(CompoundElement):
         if ocr_lang:
             suffix = ".hocr.html"
             converter = self._tesseract
-            converter_extra = {'lang': ocr_lang}
+            converter_extra = {'lang': ocr_lang,
+                               'legacy': legacy_tesseract}
             parser = self._parse_hocr
         else:
             suffix = ".xml"
@@ -205,7 +210,7 @@ class PDFReader(CompoundElement):
             os.unlink(convertedfile)
         return res
 
-    def _tesseract(self, pdffile, workdir, lang, hocr=True):
+    def _tesseract(self, pdffile, workdir, lang, hocr=True, legacy=False):
         root = os.path.splitext(os.path.basename(pdffile))[0]
 
         # step 0: copy the pdf into a temp dir (which is probably on
@@ -284,12 +289,15 @@ class PDFReader(CompoundElement):
         # Step 3: OCR the giant tif file to create a .hocr.html file
         # Note that -psm 1 (automatic page segmentation with
         # orientation and script detection) requires the installation
-        # of tesseract-ocr-3.01.osd.tar.gz
+        # of tesseract-ocr-*.osd.tar.gz
         usehocr = "hocr" if hocr else ""
         suffix = ".hocr" if hocr else ""
         pagebreaks = "-c include_page_breaks=1" if not hocr else "" # Tesseract 4.0 removes this option
-        cmd = "tesseract %(tmpdir)s/%(root)s.tif %(tmpdir)s/%(root)s%(suffix)s -l %(lang)s -psm 1 %(usehocr)s %(pagebreaks)s" % locals(
+        cmd = "tesseract %(tmpdir)s/%(root)s.tif %(tmpdir)s/%(root)s%(suffix)s -l %(lang)s --psm 1 %(usehocr)s %(pagebreaks)s" % locals(
         )
+        if legacy:
+            # Tesseract 3.04 and earlier used single dash for the psm option
+            cmd = cmd.replace(" --psm ", " -psm ")
         self.log.debug("running " + cmd)
         # run the command in a more involved way so that we can log its' progress
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
@@ -1081,6 +1089,7 @@ class StreamingPDFReader(PDFReader):
               keep_xml=True,
               ocr_lang=None,
               fontspec=None,
+              legacy_tesseract=False,
               textdecoder=None):
         self.read(self.convert(filename, workdir, images, convert_to_pdf,
                                keep_xml, ocr_lang), textdecoder=textdecoder)
@@ -1100,7 +1109,7 @@ class StreamingPDFReader(PDFReader):
         return real_convertedfile
 
     def convert(self, filename, workdir=None, images=True,
-                convert_to_pdf=False, keep_xml=True, ocr_lang=None):
+                convert_to_pdf=False, keep_xml=True, ocr_lang=None, legacy_tesseract=False):
         self.filename=filename
         self.workdir = workdir
         if self.workdir is None:
@@ -1122,7 +1131,8 @@ class StreamingPDFReader(PDFReader):
         convertedfile = self.intermediate_filename(filename, ocr_lang, keep_xml)
         if ocr_lang:
             converter = self._tesseract
-            converter_extra = {'lang': ocr_lang}
+            converter_extra = {'lang': ocr_lang,
+                               'legacy': legacy_tesseract}
             tmpfilename = filename
         else:
             converter = self._pdftohtml

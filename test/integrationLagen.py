@@ -406,8 +406,14 @@ class TestAnnotations(TestLagen):
                       resource.value(DCTERMS.description))
         resource = graph.resource(URIRef("https://lagen.nu/1949:105#K10P3S2"))
         resource2 = next(x for x in resource.objects(DCTERMS.isReferencedBy) if x._identifier == URIRef("https://lagen.nu/1991:1469#K8P3S1"))
-        self.assertEqual("8 kap. 3 § Yttrandefrihetsgrundlag (1991:1469)",
-                         str(resource2.value(DCTERMS.identifier)))
+        # there might be two (2) DCTERMS.identifiers in the Grit file
+        # that is the basis for the /data RDF file -- one full (from
+        # the context of a particular paragraph in TF) and one
+        # shortened (from the context of anothter paragraph). We
+        # cannot know which one we'll get first. But the shortened
+        # version is a prefix of the full version, so just check
+        # if it .startswith() that
+        self.assertTrue(str(resource2.value(DCTERMS.identifier)).startswith("8 kap. 3 §"), str(resource2.value(DCTERMS.identifier)) + " doesn't start with '8 kap. 3 §'")
         
     def test_wiki_comments(self):
         res = self.get(self.baseurl + "1949:105")
@@ -1295,7 +1301,3 @@ class Errorhandling(TestLagen):
         res = self.get(self.baseurl + "1666:667")
         self.assertEqual(res.status_code, 404)
         self.assertIn("Dokumentet saknas", res.text)
-
-
-    
-    
