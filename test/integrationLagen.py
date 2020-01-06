@@ -294,6 +294,7 @@ class TestConNeg(TestLagen):
         got = Graph().parse(data=res.text)
         self.assertEqualGraphs(g, got)
 
+
     def test_extended_ntriples(self):
         # extended test 7: accept: "/data" + "application/n-triples" -> extended
         # RDF statements in NTriples
@@ -1271,7 +1272,26 @@ class SFSHistory(TestLagen):
         hits = res.json()
         self.assertEqual(hits[0]['url'], self.baseurl + "1998:204")
         self.assertEqual(hits[0]['role'], "expired")
-        
+
+class DV(TestLagen):
+    def test_extended_rdf(self):
+        for doc, exact in (("nja/1996s439", False),
+                              ("nja/2015s180", True)):
+            # first get our reference graph and just assume that it's there
+            g = Graph().parse(data=self.get(self.baseurl + "dom/%s.rdf" % doc).text)
+
+            # then get the extended version and check if it works
+            res = self.get(self.baseurl + "dom/%s/data.rdf" % doc)
+            self.assertEqual(200, res.status_code)
+            self.assertEqual("application/rdf+xml; charset=utf-8", res.headers['Content-Type'])
+            got = Graph().parse(data=res.text)
+            self.assertEqualGraphs(g, got, exact)
+            if exact:
+                self.assertEqual(len(got), len(g))
+            else:
+                # the extended graph should have more data than the reference
+                self.assertGreater(len(got), len(g))
+
 class Errorhandling(TestLagen):
     def test_generated_missing(self):
         rootdir = os.environ.get("FERENDA_TESTDATA", "tng.lagen.nu/data")

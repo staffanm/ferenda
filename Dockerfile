@@ -74,7 +74,7 @@ RUN python3.7 -m venv .virtualenv && \
     ./.virtualenv/bin/pip install wheel && \
     ./.virtualenv/bin/pip install -r requirements.txt
 
-EXPOSE 80 8000 3330 9001 9200 
+EXPOSE 80 8000 3030 9001 9200 
 COPY docker /tmp/docker
 RUN mv /tmp/docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf && \
     mv /tmp/docker/nginx.conf /etc/nginx/sites-enabled/default && \
@@ -86,4 +86,4 @@ COPY . .
 ENTRYPOINT ["/bin/bash", "/tmp/docker/setup.sh"]
 CMD ["/usr/bin/supervisord"] # starts nginx, elasticsearch, fuseki, cron etc
 
-# then: docker run --name ferenda -d -v c:/docker/ferenda:/usr/share/ferenda/site  -p 81:80 -p 3330:3330 -p 9001:9001 -p 9200:9200 -p 8000:8000 <imageid>
+# then: docker run --name ferenda -d -v c:/docker/ferenda:/usr/share/ferenda/site  -p 81:80 -p 3030:3030 -p 9001:9001 -p 9200:9200 -p 8000:8000 <imageid>

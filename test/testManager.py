@@ -1013,7 +1013,6 @@ class RunMultiproc(RunBase, unittest.TestCase):
         self._enable_repos()
         argv = ["test", "mpinspect", "--all", "--processes=2"]
         res = manager.run(argv)
-        import pudb; pu.db
         self.assertEqual(res, [(True, False), (True, False), (True, False)])
 
     @quiet()

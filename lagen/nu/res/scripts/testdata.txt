@@ -7,6 +7,7 @@ dv HDO/B3594-14 # Tystnadsplikt, TF
 dv HFD/4453-10
 dv HFD/4970-14
 dv HDO/Ö3938-14
+dv HDO/Ö1715-96_1 # referred to by another case
 dv HFD/2015_not_1
 dv REG/6970-09 # complicated OOXML structure that needs to be simplified
 mediawiki Missbruksmodellen

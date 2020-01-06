@@ -406,9 +406,10 @@ class RequestHandler(object):
                 g = Graph()
                 g.parse(self.repo.store.distilled_path(basefile))
                 if 'extended' in params:
-                    annotation_graph = self.repo.annotation_file_to_graph(
-                        self.repo.store.annotation_path(basefile))
-                    g += annotation_graph
+                    if os.path.exists(self.repo.store.annotation_path(basefile)):
+                        annotation_graph = self.repo.annotation_file_to_graph(
+                            self.repo.store.annotation_path(basefile))
+                        g += annotation_graph
                 path = None
             if contenttype in self._rdfformats:
                 data = g.serialize(format=self._rdfformats[contenttype])
