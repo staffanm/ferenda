@@ -12,6 +12,8 @@ import shutil
 
 from lxml import etree
 from rdflib import Graph
+from layeredconfig import LayeredConfig, Defaults
+from werkzeug.test import EnvironBuilder
 
 from ferenda.compat import Mock, patch
 from ferenda import manager, util, fulltextindex
@@ -35,7 +37,6 @@ class Pathresolve(RepoTester):
     def setUp(self):
         super(Pathresolve, self).setUp()
         self.p = self.repo.requesthandler.path
-        
     
     def test_basic(self):
         p = self.repo.requesthandler.path
@@ -111,23 +112,21 @@ class WSGI(RepoTester): # base class w/o tests
             repos = [self.repo]
             
         # print("making app: %s %s" % (self.storetype, self.indextype))
-        self.app = manager.make_wsgi_app(port=8000,
-                                         documentroot=self.datadir,
-                                         apiendpoint="/myapi/",
-                                         searchendpoint="/mysearch/",
-                                         url="http://localhost:8000/",
-                                         repos=repos,
-                                         storetype=self.storetype,
-                                         storelocation=self.storelocation,
-                                         storerepository=self.storerepository,
-                                         indextype=self.indextype,
-                                         indexlocation=self.indexlocation)
-        self.env = {'HTTP_ACCEPT': DEFAULT_HTTP_ACCEPT,
-                    'PATH_INFO':   '/',
-                    'SERVER_NAME': 'localhost',
-                    'SERVER_PORT': '8000',
-                    'QUERY_STRING': '',
-                    'wsgi.url_scheme': 'http'}
+        config = LayeredConfig(Defaults({'datadir': self.datadir,
+                                         'apiendpoint': '/myapi/',
+                                         'searchendpoint': '/mysearch/',
+                                         'url': 'http://localhost:8000/',
+                                         'storetype': self.storetype,
+                                         'storelocation': self.storelocation,
+                                         'storerepository': self.storerepository,
+                                         'indextype': self.indextype,
+                                         'indexlocation': self.indexlocation,
+                                         'wsgiappclass': 'ferenda.WSGIApp',
+                                         'legacyapi': False,
+                                         'wsgiexceptionhandler': True}))
+        self.app = manager.make_wsgi_app(config, repos=repos)
+        self.builder = EnvironBuilder('/', base_url="http://localhost:8000/",
+                                      headers={"Accept": DEFAULT_HTTP_ACCEPT})
 
     def ttl_to_rdf_xml(self, inpath, outpath, store=None):
         if not store:
@@ -179,7 +178,9 @@ class WSGI(RepoTester): # base class w/o tests
         with self.repo.store.open("dump", "distilled", ".nt", "wb") as fp:
             fp.write(g.serialize(format="nt"))
 
-    def call_wsgi(self, environ):
+    def call_wsgi(self, environ=None):
+        if not environ:
+            environ = self.builder.get_environ()
         start_response = Mock()
         buf = BytesIO()
         iterable = self.app(environ, start_response)
@@ -208,16 +209,15 @@ class WSGI(RepoTester): # base class w/o tests
 
 class Fileserving(WSGI):
     def test_index_html(self):
-        self.env['PATH_INFO'] = '/'
-        status, headers, content = self.call_wsgi(self.env)
+        status, headers, content = self.call_wsgi()
         self.assertResponse("200 OK",
                             {'Content-Type': 'text/html; charset=utf-8'},
                             b'<h1>index.html</h1>',
                             status, headers, content)
 
     def test_not_found(self):
-        self.env['PATH_INFO'] = '/nonexistent'
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.path = "/nonexistent"
+        status, headers, content = self.call_wsgi()
         # 404 pages now come with a full set of chrome, not suitable
         # for a byte-for-byte comparison. Just chech that the status
         # is 404.
@@ -232,10 +232,10 @@ class Fileserving(WSGI):
 class API(WSGI):
     def setUp(self):
        super(API, self).setUp()
-       self.env['PATH_INFO'] = '/myapi/'
+       self.builder.path = "/myapi/"
 
     def test_basic(self):
-        status, headers, content = self.call_wsgi(self.env)
+        status, headers, content = self.call_wsgi()
         self.assertResponse("200 OK",
                             {'Content-Type': 'application/json'},
                             None,
@@ -253,7 +253,7 @@ class API(WSGI):
         # normal api
         res = ([], {'firstresult': 1,
                     'totalresults': 0})
-        self.env['QUERY_STRING'] = "rdf_type=bibo:Standard&dcterms_title=Hello+World&dcterms_issued=2014-06-30&schema_free=true"
+        self.builder.query_string = "rdf_type=bibo:Standard&dcterms_title=Hello+World&dcterms_issued=2014-06-30&schema_free=true"
         config = {'connect.return_value':
                   Mock(**{'query.return_value': res,
                           'schema.return_value': {'dcterms_issued': fulltextindex.Datetime(),
@@ -266,10 +266,11 @@ class API(WSGI):
                 'pagenum': 1,
                 'pagelen': 10,
                 'ac_query': False,
-                'boost_types': None,
-                'exclude_types': None}
+                'boost_repos': None,
+                'exclude_repos': None,
+                'include_fragments': None}
         with patch('ferenda.wsgiapp.FulltextIndex', **config):
-            status, headers, content = self.call_wsgi(self.env)
+            status, headers, content = self.call_wsgi()
             config['connect.return_value'].query.assert_called_once_with(**want)
 
     def test_parameters_legacy(self):
@@ -277,7 +278,7 @@ class API(WSGI):
         res = ([], {'firstresult': 1,
                     'totalresults': 0})
         # FIXME: we leave out free=true (should map to schema_free=True)
-        self.env['QUERY_STRING'] = "type=Standard&title=Hello+World&issued=2014-06-30&schema_free=true"
+        self.builder.query_string = "type=Standard&title=Hello+World&issued=2014-06-30&schema_free=true"
         self.app.config.legacyapi = True
         config = {'connect.return_value': 
                   Mock(**{'query.return_value': res,
@@ -294,11 +295,12 @@ class API(WSGI):
                 'pagenum': 1,
                 'pagelen': 10,
                 'ac_query': False,
-                'boost_types': None,
-                'exclude_types': None}
+                'boost_repos': None,
+                'exclude_repos': None,
+                'include_fragments': None}
 
         with patch('ferenda.wsgiapp.FulltextIndex', **config):
-            status, headers, content = self.call_wsgi(self.env)
+            status, headers, content = self.call_wsgi()
             config['connect.return_value'].query.assert_called_once_with(**want)
     # this is the same data that can be extracted from
     # test/files/base/distilled/
@@ -322,38 +324,28 @@ class API(WSGI):
                  'uri': 'http://example.org/base/123/c'}]
 
     def test_stats(self):
-        self.env['PATH_INFO'] += ";stats"
+        self.builder.path += ";stats"
         self.app.repos[0].faceted_data = Mock(return_value=self.fakedata)
-        status, headers, content = self.call_wsgi(self.env)
+        status, headers, content = self.call_wsgi()
         got = json.loads(content.decode("utf-8"))
         with open("test/files/api/basicapi-stats.json") as fp:
             want = json.load(fp)
         self.assertEqual(want, got)
 
     def test_stats_legacy(self):
-        self.env['PATH_INFO'] += ";stats"
+        self.builder.path += ";stats"
         self.app.config.legacyapi = True
-        # self.app.repos[0].faceted_data = Mock(return_value=self.fakedata)
-        # status, headers, content = self.call_wsgi(self.env)
-        # got = json.loads(content)
-        # want = json.load(open("test/files/api/basicapi-stats.legacy.json"))
-        # self.assertEqual(want, got)
+        # This used to be commented out -- was there a good reason for that?
+        self.app.repos[0].faceted_data = Mock(return_value=self.fakedata)
+        status, headers, content = self.call_wsgi()
+        got = json.loads(content)
+        with open("test/files/api/basicapi-stats.legacy.json") as fp:
+            want = json.load(fp)
+        self.assertEqual(want, got)
 
-        
-        
-    
-                  
-        
 class Runserver(WSGI):
-    def test_make_wsgi_app_args(self):
-        res = manager.make_wsgi_app(port='8080',
-                                    documentroot=self.datadir,
-                                    apiendpoint='/api-endpoint/',
-                                    searchendpoint='/search-endpoint/',
-                                    repos=[])
-        self.assertTrue(callable(res))
 
-    def test_make_wsgi_app_ini(self):
+    def test_make_wsgi_app(self):
         inifile = self.datadir + os.sep + "ferenda.ini"
         with open(inifile, "w") as fp:
             fp.write("""[__root__]
@@ -364,16 +356,9 @@ searchendpoint = /mysearch/
 indextype = WHOOSH
 indexlocation = data/whooshindex        
 """)
-        res = manager.make_wsgi_app(inifile)
+        res = manager.make_wsgi_app(manager.load_config(inifile), repos=[])
         self.assertTrue(callable(res))
     
-    def test_runserver(self):
-        m = Mock()
-        with patch('ferenda.manager.make_server', return_value=m) as m2:
-            manager.runserver([])
-            self.assertTrue(m2.called)
-            self.assertTrue(m.serve_forever.called)
-
 class Parameters(WSGI):
 
     def test_attachment_param(self):
@@ -383,10 +368,11 @@ class Parameters(WSGI):
         csspath = self.repo.store.generated_path("123/a", attachment="index.css")
         with open(csspath, "wb") as fp:
             fp.write(cssdata)
-        self.env["PATH_INFO"] = "/res/base/123/a?attachment=index.css"
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.path = "/res/base/123/a"
+        self.builder.query_string = "attachment=index.css"
+        status, headers, content = self.call_wsgi()
         want = ["200 OK",
-                {'Content-Type': 'text/css'},
+                {'Content-Type': 'text/css; charset=utf-8'},
                 cssdata]
         self.assertResponse(want[0], want[1], want[2],
                             status, headers, content)
@@ -398,25 +384,26 @@ class Parameters(WSGI):
         tocpath = self.repo.store.resourcepath("toc/title/a.html")
         with open(tocpath, "wb") as fp:
             fp.write(tocdata)
-        self.env["PATH_INFO"] = "/dataset/base?title=a"
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.path = "/dataset/base"
+        self.builder.query_string = "title=a"
+        status, headers, content = self.call_wsgi()
         want = ["200 OK",
                 {'Content-Type': 'text/html; charset=utf-8'},
                 tocdata]
         self.assertResponse(want[0], want[1], want[2],
                             status, headers, content)
         
-
     def test_feed_param(self):
         tocdata = b"<!-- specific feed goes here -->"
         tocpath = self.repo.store.resourcepath("feed/a.atom")
         util.ensure_dir(tocpath)
         with open(tocpath, "wb") as fp:
             fp.write(tocdata)
-        self.env["PATH_INFO"] = "/dataset/base/feed.atom?title=a"
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.path = "/dataset/base/feed.atom"
+        self.builder.query_string = "title=a"
+        status, headers, content = self.call_wsgi()
         want = ["200 OK",
-                {'Content-Type': 'application/atom+xml'},
+                {'Content-Type': 'application/atom+xml; charset=utf-8'},
                 tocdata]
         self.assertResponse(want[0], want[1], want[2],
                             status, headers, content)
@@ -425,13 +412,13 @@ class Parameters(WSGI):
 class ConNeg(WSGI):
     def setUp(self):
        super(ConNeg, self).setUp()
-       self.env['PATH_INFO'] = '/res/base/123/a'
+       self.builder.path = '/res/base/123/a'
 
     def test_basic(self):
         # basic test 1: accept: text/html -> generated file
         # Note that our Accept header has a more complicated value 
         # typical of a real-life browse
-        status, headers, content = self.call_wsgi(self.env)
+        status, headers, content = self.call_wsgi()
         self.assertResponse("200 OK",
                             {'Content-Type': 'text/html; charset=utf-8'},
                             util.readfile(self.repo.store.generated_path("123/a"), "rb"),
@@ -439,32 +426,32 @@ class ConNeg(WSGI):
 
     def test_xhtml(self):
         # basic test 2: accept: application/xhtml+xml -> parsed file
-        self.env['HTTP_ACCEPT'] = 'application/xhtml+xml'
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.headers['Accept'] = 'application/xhtml+xml'
+        status, headers, content = self.call_wsgi()
         want = ["200 OK",
-                {'Content-Type': 'application/xhtml+xml'},
+                {'Content-Type': 'application/xhtml+xml; charset=utf-8'},
                 util.readfile(self.repo.store.parsed_path("123/a"), "rb")]
         self.assertResponse(want[0], want[1], want[2], status, headers, content)
         # variation: use file extension
-        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
-        self.env["PATH_INFO"] += ".xhtml"
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.headers["Accept"] = DEFAULT_HTTP_ACCEPT
+        self.builder.path += ".xhtml"
+        status, headers, content = self.call_wsgi()
         self.assertResponse(want[0], want[1], want[2], status, headers, content)
 
     def test_rdf(self):
 #        # basic test 3: accept: application/rdf+xml -> RDF statements (in XML)
-#        self.env['HTTP_ACCEPT'] = 'application/rdf+xml'
-#        status, headers, content = self.call_wsgi(self.env)
+#        self.builder.headers['Accept'] = 'application/rdf+xml'
+#        status, headers, content = self.call_wsgi()
         want = ["200 OK",
-                {'Content-Type': 'application/rdf+xml'},
+                {'Content-Type': 'application/rdf+xml; charset=utf-8'},
                 util.readfile(self.repo.store.distilled_path("123/a"), "rb")]
 #        self.assertResponse(want[0], want[1], want[2],
 #                            status, headers, content)
 #
         # variation: use file extension
-        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
-        self.env["PATH_INFO"] += ".rdf"
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.headers["Accept"] = DEFAULT_HTTP_ACCEPT
+        self.builder.path += ".rdf"
+        status, headers, content = self.call_wsgi()
         self.assertResponse(want[0], want[1], want[2], status, headers, content)
 
 
@@ -477,8 +464,8 @@ class ConNeg(WSGI):
         # transform test 4: accept: application/n-triples -> RDF statements (in NTriples)
         g = Graph()
         g.parse(source=self.repo.store.distilled_path("123/a"))
-        self.env['HTTP_ACCEPT'] = 'application/n-triples'
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.headers['Accept'] = 'application/n-triples'
+        status, headers, content = self.call_wsgi()
         want = ["200 OK",
                 {'Content-Type': 'application/n-triples'},
                 None]
@@ -489,9 +476,9 @@ class ConNeg(WSGI):
         self.assertEqualGraphs(g, got)
 
         # variation: use file extension
-        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
-        self.env["PATH_INFO"] += ".nt"
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.headers["Accept"] = DEFAULT_HTTP_ACCEPT
+        self.builder.path += ".nt"
+        status, headers, content = self.call_wsgi()
         self.assertResponse(want[0], want[1], want[2], status, headers, content)
         got = Graph()
         got.parse(data=content, format="nt")
@@ -501,10 +488,10 @@ class ConNeg(WSGI):
         # transform test 5: accept: text/turtle -> RDF statements (in Turtle)
         g = Graph()
         g.parse(source=self.repo.store.distilled_path("123/a"))
-        self.env['HTTP_ACCEPT'] = 'text/turtle'
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.headers['Accept'] = 'text/turtle'
+        status, headers, content = self.call_wsgi()
         want = ["200 OK",
-                {'Content-Type': 'text/turtle'},
+                {'Content-Type': 'text/turtle; charset=utf-8'},
                 None]
         self.assertResponse(want[0], want[1], want[2],
                             status, headers, None)
@@ -513,9 +500,9 @@ class ConNeg(WSGI):
         self.assertEqualGraphs(g, got)
 
         # variation: use file extension
-        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
-        self.env["PATH_INFO"] += ".ttl"
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.headers["Accept"] = DEFAULT_HTTP_ACCEPT
+        self.builder.path += ".ttl"
+        status, headers, content = self.call_wsgi()
         self.assertResponse(want[0], want[1], want[2], status, headers, content)
         got = Graph()
         got.parse(data=content, format="turtle")
@@ -525,8 +512,8 @@ class ConNeg(WSGI):
         # transform test 6: accept: application/json -> RDF statements (in JSON-LD)
         g = Graph()
         g.parse(source=self.repo.store.distilled_path("123/a"))
-        self.env['HTTP_ACCEPT'] = 'application/json'
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.headers['Accept'] = 'application/json'
+        status, headers, content = self.call_wsgi()
         want = ["200 OK",
                 {'Content-Type': 'application/json'},
                 None]
@@ -537,17 +524,17 @@ class ConNeg(WSGI):
         self.assertEqualGraphs(g, got)
         
         # variation: use file extension
-        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
-        self.env["PATH_INFO"] += ".json"
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.headers["Accept"] = DEFAULT_HTTP_ACCEPT
+        self.builder.path += ".json"
+        status, headers, content = self.call_wsgi()
         self.assertResponse(want[0], want[1], want[2], status, headers, content)
         got = Graph()
         got.parse(data=content, format="json-ld")
         self.assertEqualGraphs(g, got)
 
     def test_unacceptable(self):
-        self.env['HTTP_ACCEPT'] = 'application/pdf'
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.headers['Accept'] = 'application/pdf'
+        status, headers, content = self.call_wsgi()
         want = ["406 Not Acceptable",
                 {'Content-Type': 'text/html; charset=utf-8'},
                 None]
@@ -555,22 +542,22 @@ class ConNeg(WSGI):
                             status, headers, None)
     
         # variation: unknown file extension should also be unacceptable
-        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
-        self.env["PATH_INFO"] += ".pdf"
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.headers["Accept"] = DEFAULT_HTTP_ACCEPT
+        self.builder.path += ".pdf"
+        status, headers, content = self.call_wsgi()
         self.assertResponse(want[0], want[1], want[2], status, headers, content)
 
 
     def test_extended_rdf(self):
         # extended test 6: accept: "/data" -> extended RDF statements
-        self.env['PATH_INFO'] = self.env['PATH_INFO'] + "/data"
-        self.env['HTTP_ACCEPT'] = 'application/rdf+xml'
+        self.builder.path = self.builder.path + "/data"
+        self.builder.headers['Accept'] = 'application/rdf+xml'
         g = Graph()
         g.parse(source=self.repo.store.distilled_path("123/a"))
         g += self.repo.annotation_file_to_graph(self.repo.store.annotation_path("123/a"))
-        status, headers, content = self.call_wsgi(self.env)
+        status, headers, content = self.call_wsgi()
         want = ["200 OK",
-                {'Content-Type': 'application/rdf+xml'},
+                {'Content-Type': 'application/rdf+xml; charset=utf-8'},
                 None]
         self.assertResponse(want[0], want[1], want[2],
                             status, headers, None)
@@ -579,9 +566,9 @@ class ConNeg(WSGI):
         self.assertEqualGraphs(g, got)
 
         # variation: use file extension
-        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
-        self.env["PATH_INFO"] += ".rdf"
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.headers["Accept"] = DEFAULT_HTTP_ACCEPT
+        self.builder.path += ".rdf"
+        status, headers, content = self.call_wsgi()
         self.assertResponse(want[0], want[1], want[2], status, headers, content)
         got = Graph()
         got.parse(data=content)
@@ -590,12 +577,12 @@ class ConNeg(WSGI):
     def test_extended_ntriples(self):
         # extended test 7: accept: "/data" + "application/n-triples" -> extended
         # RDF statements in NTriples
-        self.env['PATH_INFO'] = self.env['PATH_INFO'] + "/data"       
-        self.env['HTTP_ACCEPT'] = 'application/n-triples'
+        self.builder.path += "/data"       
+        self.builder.headers['Accept'] = 'application/n-triples'
         g = Graph()
         g.parse(source=self.repo.store.distilled_path("123/a"))
         g += self.repo.annotation_file_to_graph(self.repo.store.annotation_path("123/a"))
-        status, headers, content = self.call_wsgi(self.env)
+        status, headers, content = self.call_wsgi()
         want = ["200 OK",
                  {'Content-Type': 'application/n-triples'},
                  None]
@@ -606,9 +593,9 @@ class ConNeg(WSGI):
         self.assertEqualGraphs(g, got)
 
         # variation: use file extension
-        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
-        self.env["PATH_INFO"] += ".nt"
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.headers["Accept"] = DEFAULT_HTTP_ACCEPT
+        self.builder.path += ".nt"
+        status, headers, content = self.call_wsgi()
         self.assertResponse(want[0], want[1], want[2], status, headers, content)
         got = Graph()
         got.parse(data=content, format="nt")
@@ -617,14 +604,14 @@ class ConNeg(WSGI):
     def test_extended_turtle(self):
         # extended test 7: accept: "/data" + "text/turtle" -> extended
         # RDF statements in Turtle
-        self.env['PATH_INFO'] = self.env['PATH_INFO'] + "/data"       
-        self.env['HTTP_ACCEPT'] = 'text/turtle'
+        self.builder.path += "/data"       
+        self.builder.headers['Accept'] = 'text/turtle'
         g = Graph()
         g.parse(source=self.repo.store.distilled_path("123/a"))
         g += self.repo.annotation_file_to_graph(self.repo.store.annotation_path("123/a"))
-        status, headers, content = self.call_wsgi(self.env)
+        status, headers, content = self.call_wsgi()
         want = ["200 OK",
-                {'Content-Type': 'text/turtle'},
+                {'Content-Type': 'text/turtle; charset=utf-8'},
                 None]
         self.assertResponse(want[0], want[1], want[2],
                             status, headers, None)
@@ -633,35 +620,35 @@ class ConNeg(WSGI):
         self.assertEqualGraphs(g, got)
 
         # variation: use file extension
-        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
-        self.env["PATH_INFO"] += ".ttl"
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.headers["Accept"] = DEFAULT_HTTP_ACCEPT
+        self.builder.path += ".ttl"
+        status, headers, content = self.call_wsgi()
         self.assertResponse(want[0], want[1], want[2], status, headers, content)
         got = Graph()
         got.parse(data=content, format="turtle")
         self.assertEqualGraphs(g, got)
 
     def test_dataset_html(self):
-        self.env['PATH_INFO'] = "/dataset/base"
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.path = "/dataset/base"
+        status, headers, content = self.call_wsgi()
         self.assertResponse("200 OK",
                             {'Content-Type': 'text/html; charset=utf-8'},
                             b'<h1>TOC for base</h1>',
                             status, headers, content)
 
     def test_dataset_html_param(self):
-        self.env['PATH_INFO'] = "/dataset/base"
-        self.env['QUERY_STRING'] = "title=a"
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.path = "/dataset/base"
+        self.builder.query_string = "title=a"
+        status, headers, content = self.call_wsgi()
         self.assertResponse("200 OK",
                             {'Content-Type': 'text/html; charset=utf-8'},
                             b'<h1>Title starting with "a"</h1>',
                             status, headers, content)
 
     def test_dataset_ntriples(self):
-        self.env['PATH_INFO'] = "/dataset/base"
-        self.env['HTTP_ACCEPT'] = 'application/n-triples'
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.path = "/dataset/base"
+        self.builder.headers['Accept'] = 'application/n-triples'
+        status, headers, content = self.call_wsgi()
         want = ("200 OK",
                 {'Content-Type': 'application/n-triples'},
                 None)
@@ -675,9 +662,9 @@ class ConNeg(WSGI):
         self.assertEqualGraphs(wantgraph, gotgraph)
 
         # variation: use file extension
-        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
-        self.env["PATH_INFO"] += ".nt"
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.headers["Accept"] = DEFAULT_HTTP_ACCEPT
+        self.builder.path += ".nt"
+        status, headers, content = self.call_wsgi()
         self.assertResponse(want[0], want[1], want[2], status, headers, content)
         gotgraph = Graph()
         gotgraph.parse(data=content, format="nt")
@@ -685,11 +672,11 @@ class ConNeg(WSGI):
 
 
     def test_dataset_turtle(self):
-        self.env['PATH_INFO'] = "/dataset/base"
-        self.env['HTTP_ACCEPT'] = 'text/turtle'
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.path = "/dataset/base"
+        self.builder.headers['Accept'] = 'text/turtle'
+        status, headers, content = self.call_wsgi()
         want = ["200 OK",
-                {'Content-Type': 'text/turtle'},
+                {'Content-Type': 'text/turtle; charset=utf-8'},
                 None]
         self.assertResponse(want[0], want[1], want[2],
                             status, headers, None)
@@ -701,9 +688,9 @@ class ConNeg(WSGI):
         self.assertEqualGraphs(wantgraph, gotgraph)
 
         # variation: use file extension
-        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
-        self.env["PATH_INFO"] += ".ttl"
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.headers["Accept"] = DEFAULT_HTTP_ACCEPT
+        self.builder.path += ".ttl"
+        status, headers, content = self.call_wsgi()
         self.assertResponse(want[0], want[1], want[2], status, headers, content)
         gotgraph = Graph()
         gotgraph.parse(data=content, format="turtle")
@@ -711,11 +698,11 @@ class ConNeg(WSGI):
 
 
     def test_dataset_xml(self):
-        self.env['PATH_INFO'] = "/dataset/base"
-        self.env['HTTP_ACCEPT'] = 'application/rdf+xml'
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.path = "/dataset/base"
+        self.builder.headers['Accept'] = 'application/rdf+xml'
+        status, headers, content = self.call_wsgi()
         want = ["200 OK",
-                {'Content-Type': 'application/rdf+xml'},
+                {'Content-Type': 'application/rdf+xml; charset=utf-8'},
                 None]
         self.assertResponse(want[0], want[1], want[2],
                             status, headers, None)
@@ -727,9 +714,9 @@ class ConNeg(WSGI):
         self.assertEqualGraphs(wantgraph, gotgraph)
 
         # variation: use file extension
-        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
-        self.env["PATH_INFO"] += ".rdf"
-        status, headers, content = self.call_wsgi(self.env)
+        self.builder.headers["Accept"] = DEFAULT_HTTP_ACCEPT
+        self.builder.path += ".rdf"
+        status, headers, content = self.call_wsgi()
         self.assertResponse(want[0], want[1], want[2], status, headers, content)
         gotgraph = Graph()
         gotgraph.parse(data=content, format="xml")
@@ -739,11 +726,11 @@ class Search(WSGI):
 
     def setUp(self):
         super(Search, self).setUp()
-        self.env['PATH_INFO'] = '/mysearch/'
+        self.builder.path = '/mysearch/'
 
 
     def test_search_single(self):
-        self.env['QUERY_STRING'] = "q=subsection"
+        self.builder.query_string = "q=subsection"
         res = ([{'dcterms_title': 'Result #1',
                  'uri': 'http://example.org',
                  'text': 'Text that contains the subsection term'}],
@@ -755,14 +742,14 @@ class Search(WSGI):
         
         config = {'connect.return_value': Mock(**{'query.return_value': res})}
         with patch('ferenda.wsgiapp.FulltextIndex', **config):
-            status, headers, content = self.call_wsgi(self.env)
+            status, headers, content = self.call_wsgi()
         t = etree.fromstring(content)
         resulthead = t.find(".//article/h1").text
         self.assertEqual("1 match for 'subsection'", resulthead)
 
 
     def test_search_multiple(self):
-        self.env['QUERY_STRING'] = "q=part"
+        self.builder.query_string = "q=part"
         res = ([{'dcterms_title':'Introduction',
                  'dcterms_identifier': '123/a¶1',
                  'uri':'http://example.org/base/123/a#S1',
@@ -788,7 +775,7 @@ class Search(WSGI):
         
         config = {'connect.return_value': Mock(**{'query.return_value': res})}
         with patch('ferenda.wsgiapp.FulltextIndex', **config):
-            status, headers, content = self.call_wsgi(self.env)
+            status, headers, content = self.call_wsgi()
         self.assertResponse("200 OK",
                             {'Content-Type': 'text/html; charset=utf-8'},
                             None,
@@ -840,10 +827,10 @@ class Search(WSGI):
                 'lastresult': 1,
                 'totalresults': 1})
 
-        self.env['QUERY_STRING'] = "q=needle"
+        self.builder.query_string = "q=needle"
         config = {'connect.return_value': Mock(**{'query.return_value': res})}
         with patch('ferenda.wsgiapp.FulltextIndex', **config):
-            status, headers, content = self.call_wsgi(self.env)
+            status, headers, content = self.call_wsgi()
         
         self.assertResponse("200 OK",
                             {'Content-Type': 'text/html; charset=utf-8'},
@@ -874,12 +861,12 @@ class Search(WSGI):
                      'lastresult': (page - 1) * pagesize + len(hits),
                      'totalresults': total})
 
-        self.env['QUERY_STRING'] = "q=needle"
+        self.builder.query_string = "q=needle"
         res = mkres()
         
         config = {'connect.return_value': Mock(**{'query.return_value': res})}
         with patch('ferenda.wsgiapp.FulltextIndex', **config):
-            status, headers, content = self.call_wsgi(self.env)
+            status, headers, content = self.call_wsgi()
         self.assertResponse("200 OK",
                             {'Content-Type': 'text/html; charset=utf-8'},
                             None,
@@ -907,11 +894,11 @@ class Search(WSGI):
         self.assertEqual('/mysearch/?q=needle&p=2',
                          pagination[1][0].get('href'))
 
-        self.env['QUERY_STRING'] = "q=needle&p=2"
+        self.builder.query_string = "q=needle&p=2"
         res = mkres(page=2)
         config = {'connect.return_value': Mock(**{'query.return_value': res})}
         with patch('ferenda.wsgiapp.FulltextIndex', **config):
-            status, headers, content = self.call_wsgi(self.env)
+            status, headers, content = self.call_wsgi()
         t = etree.fromstring(content)
         docs = t.findall(".//section[@class='hit']")
         self.assertEqual(10, len(docs))
@@ -921,11 +908,11 @@ class Search(WSGI):
         self.assertEqual(3,len(pagination))
         self.assertEqual('/mysearch/?q=needle&p=1',pagination[0][0].get('href'))
 
-        self.env['QUERY_STRING'] = "q=needle&p=3"
+        self.builder.query_string = "q=needle&p=3"
         res = mkres(page=3)
         config = {'connect.return_value': Mock(**{'query.return_value': res})}
         with patch('ferenda.wsgiapp.FulltextIndex', **config):
-            status, headers, content = self.call_wsgi(self.env)
+            status, headers, content = self.call_wsgi()
         t = etree.fromstring(content)
         docs = t.findall(".//section[@class='hit']")
         self.assertEqual(5, len(docs))  # only 5 remaining docs

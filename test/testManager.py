@@ -165,8 +165,9 @@ class=testManager.staticmockclass2
         defaults = {'datadir': 'data',
                     'loglevel': 'INFO',
                     'logfile': None,
+                    'compress': '',
                     'staticmock': {}}
-        config = manager._load_config(argv=argv, defaults=defaults)
+        config = manager.load_config(argv=argv, defaults=defaults)
         self.assertEqual(manager._run_class(enabled_classes,
                                             argv,
                                             config),
@@ -553,6 +554,11 @@ class Testrepo(DocumentRepository):
         else:
             return a
 
+    # custom method for the RunMultiproc.test_global_config test
+    @decorators.action
+    def mpinspect(self, arg):
+        return (self.config.fulltextindex, self.config._parent.legacyapi)
+
     # general testing of arguments and return values (or lack thereof)
     @decorators.action
     def mymethod(self, arg):
@@ -892,7 +898,8 @@ imgfiles = []
                 'json': [s.join(['rsrc','api','context.json']),
                          s.join(['rsrc','api','common.json']),
                          s.join(['rsrc','api','terms.json'])],
-                'img': [s.join(['rsrc', 'img', 'test.png'])],
+                'img': [s.join(['rsrc', 'img', 'atom.png']),
+                        s.join(['rsrc', 'img', 'test.png'])],
                 'css': [s.join(['rsrc', 'css', 'ferenda.css']),
                         s.join(['rsrc', 'css', 'test.css'])],
                 'js': [s.join(['rsrc', 'js', 'ferenda.js']),
@@ -923,13 +930,15 @@ imgfiles = []
         manager.config_loaded = False
         self._enable_repos()
         argv = ['test', 'inspect', 'config']
-        ourcfg = manager._load_config(argv=argv,
-                                      defaults={'loglevel': 'CRITICAL',
-                                                'logfile': None,
-                                                'datadir': 'data',
-                                                'profile': False,
-                                                'test': {'hello': 'world'}})
-        with patch('ferenda.manager._load_config', return_value=ourcfg):
+        ourcfg = manager.load_config(argv=argv,
+                                     defaults={'loglevel': 'CRITICAL',
+                                               'logfile': None,
+                                               'datadir': 'data',
+                                               'profile': False,
+                                               'checktimeskew': False,
+                                               'compress': '',
+                                               'test': {'hello': 'world'}})
+        with patch('ferenda.manager.load_config', return_value=ourcfg):
             instcfg = manager.run(argv)
             self.assertIsInstance(instcfg, LayeredConfig)
             self.assertEqual(id(ourcfg.test),
@@ -969,10 +978,9 @@ Available modules:
     def test_runserver(self):
         self._enable_repos()
         m = Mock()
-        with patch('ferenda.manager.make_server', return_value=m) as m2:
+        with patch('ferenda.manager.run_simple', return_value=m) as m2:
             manager.run(["all", "runserver"])
             self.assertTrue(m2.called)
-            self.assertTrue(m.serve_forever.called)
 
     def test_run_ctrlc(self):
         self._enable_repos()
@@ -997,6 +1005,15 @@ class RunMultiproc(RunBase, unittest.TestCase):
         self.assertEqual(args, ["arg1", "myarg", "arg2"])
         # assert that all pids are unique
         self.assertEqual(3, len(set(pids)))
+
+    def test_global_config(self):
+        # this makes sure that the subprocesses use instances that
+        # have access to the global/manager-provided DEFAULT_CONFIG
+        # config variables
+        self._enable_repos()
+        argv = ["test", "mpinspect", "--all", "--processes=2"]
+        res = manager.run(argv)
+        self.assertEqual(res, [(True, False), (True, False), (True, False)])
 
     @quiet()
     def test_run_single_all_multiprocessing_fail(self):

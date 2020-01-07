@@ -26,15 +26,17 @@ from layeredconfig import LayeredConfig
 from cached_property import cached_property
 
 # my own libraries
+from . import Trips, SwedishCitationParser, RPUBL, SwedishLegalStore, RINFOEX
+from .elements import *
+from .legalref import LegalRef, LinkSubject
+from .swedishlegalsource import SwedishLegalHandler
 from ferenda import DocumentEntry, TripleStore
 from ferenda import TextReader, Facet
-from ferenda.sources.legal.se import legaluri
 from ferenda import util
 from ferenda.elements.html import UL, LI, Body
 from ferenda.errors import FerendaException, DocumentRemovedError, ParseError
-from .legalref import LegalRef, LinkSubject
-from . import Trips, SwedishCitationParser, RPUBL, SwedishLegalStore, RINFOEX
-from .elements import *
+from ferenda.requesthandler import UnderscoreConverter
+from ferenda.sources.legal.se import legaluri
 
 
 class UpphavdForfattning(DocumentRemovedError):
@@ -71,6 +73,26 @@ class InteExisterandeSFS(DocumentRemovedError):
     # should probably be raised in download_single as well (and
     # possibly not in extract_head)
     
+class SFSConverter(UnderscoreConverter):
+    regex = "\d{4}:\d[^/]*"
+
+
+class SFSHandler(SwedishLegalHandler):
+
+    @property
+    def rule_context(self):
+        return {"converter": "sfs"}
+
+    @property
+    def doc_rules(self):
+        rules = super(SFSHandler, self).doc_rules
+        rules.append("%(root)s/<%(converter)s:basefile>/<any(konsolidering):konsolidering>/<sfs:version>")
+        return rules
+
+    @property
+    def rule_converters(self):
+        return (("sfs", SFSConverter),)
+
 class SFSDocumentStore(SwedishLegalStore):
 
     intermediate_suffixes = [".txt"]
@@ -107,6 +129,7 @@ class SFS(Trips):
     #
     # ./ferenda-build.py sfs parse 2009:924 --force --sfs-trace-tabell=INFO
 
+    requesthandler_class = SFSHandler
     alias = "sfs"
     rdf_type = RPUBL.KonsolideradGrundforfattning
     parse_types = LegalRef.LAGRUM, LegalRef.EULAGSTIFTNING
@@ -172,6 +195,7 @@ class SFS(Trips):
     @classmethod
     def get_default_options(cls):
         opts = super(SFS, cls).get_default_options()
+        opts['random'] = 42
         opts['keepexpired'] = False
         opts['revisit'] = list
         opts['next_sfsnr'] = str

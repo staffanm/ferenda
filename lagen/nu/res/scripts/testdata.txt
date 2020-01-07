@@ -7,14 +7,18 @@ dv HDO/B3594-14 # Tystnadsplikt, TF
 dv HFD/4453-10
 dv HFD/4970-14
 dv HDO/Ö3938-14
+dv HDO/Ö1715-96_1 # referred to by another case
 dv HFD/2015_not_1
 dv REG/6970-09 # complicated OOXML structure that needs to be simplified
 mediawiki Missbruksmodellen
 mediawiki Personuppgift
 mediawiki Sekundär_sekretessbestämmelse
 mediawiki SFS/1949:105
-myndfs difs/2010:1
-myndfs difs/2013:1
+myndfs bolfs/2008:1
+myndfs difs/2010:1 # is now expired
+myndfs difs/2013:1 # is now expired
+myndfs difs/2018:1
+myndfs difs/2018:2
 myndfs konsolidering/afs/2011:19
 myndfs afs/2011:19
 myndfs afs/2014:5
@@ -25,12 +29,15 @@ prop 1997/98:44
 prop 1997/98:160
 prop 2000/01:105
 prop 2005/06:173
+sfs 1909:53_s.7 # atypical basefile
+sfs 1949:105 # TF because why not
+sfs 1958:638 # ÄktBP, slightly atypical
+sfs 1986:223 # old FL -- NOTE: Tests require all archival data
+sfs 1991:1469 # YGL because same
 sfs 1998:1191 # PUF
 sfs 1998:204
-sfs 1949:105 # TF because why not
-sfs 1991:1469 # YGL because same
-sfs 1909:53_s.7 # atypical basefile
-sfs 1958:638 # ÄktBP, slightly atypical
+sfs 1999:175 # RinfF -- NOTE: Tests require all archival dataa
+sfs 2017:900 # old FL
 sou 1997:39 # regeringen, multipart
 sou 2004:6
 sou 2016:41

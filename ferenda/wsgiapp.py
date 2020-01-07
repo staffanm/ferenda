@@ -19,11 +19,18 @@ import os
 import pkg_resources
 import re
 import sys
+import traceback
 
 from rdflib import URIRef, Namespace, Literal, Graph
 from rdflib.namespace import DCTERMS
 from lxml import etree
 from layeredconfig import LayeredConfig, Defaults, INIFile
+from werkzeug.wrappers import Request, Response
+from werkzeug.routing import Map, Rule
+from werkzeug.exceptions import HTTPException, NotFound
+from werkzeug.middleware.shared_data import SharedDataMiddleware
+from werkzeug.utils import redirect
+from werkzeug.wsgi import wrap_file
 
 from ferenda import (DocumentRepository, FulltextIndex, Transformer,
                      Facet, ResourceLoader)
@@ -31,109 +38,180 @@ from ferenda import fulltextindex, util, elements
 from ferenda.elements import html
 
 
+class WSGIOutputHandler(logging.Handler):
+    
+    def __init__(self, writer):
+        self.writer = writer
+        super(WSGIOutputHandler, self).__init__()
+
+    def emit(self, record):
+        entry = self.format(record) + "\n"
+        try:
+            self.writer(entry.encode("utf-8"))
+        except OSError as e:
+            # if self.writer has closed, it probably means that the
+            # HTTP client has closed the connection. But we don't stop
+            # for that.
+            pass
+
 class WSGIApp(object):
 
-    """Implements a WSGI app.
-    """
-
-    def __init__(self, repos, inifile=None, **kwargs):
+    #
+    # SETUP
+    # 
+    def __init__(self, repos, config):
         self.repos = repos
+        self.config = config
         self.log = logging.getLogger("wsgi")
-
-        # FIXME: Cut-n-paste of the method in Resources.__init__
-        loadpaths = [ResourceLoader.make_loadpath(repo) for repo in repos]
-        loadpath = ["."]  # cwd always has priority -- makes sense?
-        for subpath in loadpaths:
-            for p in subpath:
-                if p not in loadpath:
-                    loadpath.append(p)
-        self.resourceloader = ResourceLoader(*loadpath)
-        # FIXME: need to specify documentroot?
-        defaults = DocumentRepository.get_default_options()
-        if inifile:
-            assert os.path.exists(
-                inifile), "INI file %s doesn't exist (relative to %s)" % (inifile, os.getcwd())
-
-        # NB: If both inifile and kwargs are specified, the latter
-        # will take precedence. I think this is the expected
-        # behaviour.
-        self.config = LayeredConfig(Defaults(defaults),
-                                    INIFile(inifile),
-                                    Defaults(kwargs),
-                                    cascade=True)
-
-    ################################################################
-    # Main entry point
+        # at this point, we should build our routing map
+        rules = [
+            Rule("/", endpoint="frontpage"),
+            Rule(self.config.apiendpoint, endpoint="api"),
+            Rule(self.config.apiendpoint+";stats", endpoint="api"),
+            Rule(self.config.searchendpoint, endpoint="search")
+        ]
+        if self.config.legacyapi:
+            rules.append(Rule("/-/publ", endpoint="api"))
+        converters = []
+        self.reporules = {}
+        for repo in self.repos:
+            # a typical repo might provide two rules:
+            # * Rule("/doc/<repo>/<basefile>", endpoint=repo.alias + ".doc")
+            # * Rule("/dataset/<repo>?param1=x", endpoint=repo.alias + ".ds")
+            # 
+            # although werkzeug.routing.RuleTemplate seems like it could do that generically?
+            self.reporules[repo] = repo.requesthandler.rules
+            rules.extend(self.reporules[repo])
+            converters.extend(repo.requesthandler.rule_converters)
+            # at this point, we could maybe write a apache:mod_rewrite
+            # or nginx compatible config based on our rules?
+        # from pprint import pprint
+        # pprint(sorted(x.rule for x in rules))
+        # import threading, traceback
+        # print("Pid: %s, thread id: %s" % (os.getpid(), threading.get_ident()))
+        # traceback.print_stack()
+        self.routingmap = Map(rules, converters=dict(converters))
+        base = self.config.datadir
+        exports = {
+            '/index.html': os.path.join(base, 'index.html'),
+            '/rsrc':       os.path.join(base, 'rsrc'),
+            '/robots.txt': os.path.join(base, 'robots.txt'),
+            '/favicon.ico': os.path.join(base, 'favicon.ico')
+        }
+        if self.config.legacyapi:
+            exports.extend({
+                '/json-ld/context.json': os.path.join(base, 'rsrc/api/context.json'),
+                '/var/terms':            os.path.join(base, 'rsrc/api/terms.json'),
+                '/var/common':           os.path.join(base, 'rsrc/api/common.json')
+                })
+        self.wsgi_app = SharedDataMiddleware(self.wsgi_app, exports)
 
     def __call__(self, environ, start_response):
-        import logging
-        profiling = 'profilepath' in self.config
-        if profiling:
-            import cProfile
-            import pstats
-            import codecs
-            pr = cProfile.Profile()
-            pr.enable()
-
-        # FIXME: Under py2, values in environ are bytestrings, not
-        # unicode strings, leading to random crashes throughout the
-        # codebase when PATH_INFO or QUERY_STRING contains non-ascii
-        # characters and being used with unicode strings (eg
-        # "environ['PATH_INFO'].startswith(<unicodestring>)"). We
-        # clean environ by decoding all bytestrings asap, ie
-        # here. However, this causes request_uri (which expects
-        # bytestrings in environ under py2) to fail...
-
-        log = logging.getLogger("wsgiapp")
-        path = environ['PATH_INFO']
-        if not isinstance(path, str):
-            path = path.decode("utf-8")
-
-        # due to nginx config issues we might have to add a bogus
-        # .diff suffix to our path. remove it as early as possible
-        if path.endswith(".diff"):
-            environ['PATH_INFO'] = environ['PATH_INFO'][:-5]
-        url = request_uri(environ)
-        qs = environ['QUERY_STRING']
-        # self.log.info("Starting process for %s (path_info=%s, query_string=%s)" % (url, path, environ['QUERY_STRING']))
-        # FIXME: routing infrastructure -- could be simplified?
         try:
-            if path.startswith(self.config.searchendpoint):
-                return self.search(environ, start_response)
-            elif (path.startswith(self.config.apiendpoint) or
-                  (self.config.legacyapi and path.startswith("/-/publ"))):
-                return self.api(environ, start_response)
-            elif ('stream' in qs):
-                return self.stream(environ, start_response)
+            return self.wsgi_app(environ, start_response)
+        except Exception as e:
+            if self.config.wsgiexceptionhandler:
+                return self.handle_exception(environ, start_response)
+            elif isinstance(e, HTTPException):
+                return e.get_response(environ)(environ, start_response)
             else:
-                return self.static(environ, start_response)
-        except Exception:
-            return self.exception(environ, start_response)
-        finally:
-            if profiling:
-                pr.disable()
-                sortby = 'cumulative'
-                with codecs.open(self.config.profilepath, mode="a", encoding="utf-8") as fp:
-                    fp.write("="*80 + "\n")
-                    fp.write(url + "\n")
-                    fp.write("Accept: %s\n\n" % environ.get("HTTP_ACCEPT"))
-                    ps = pstats.Stats(pr, stream=fp).sort_stats(sortby)
-                    ps.print_stats()
+                raise e
+            
 
-    ################################################################
-    # WSGI methods
+    #
+    # REQUEST ENTRY POINT
+    # 
+    def wsgi_app(self, environ, start_response):
+        # due to nginx config issues we might have to add a bogus
+        # .diff suffix to our path. remove it as early as possible,
+        # before creating the (immutable) Request object
+        if environ['PATH_INFO'].endswith(".diff"):
+            environ['PATH_INFO'] = environ['PATH_INFO'][:-5]
 
-    def search(self, environ, start_response):
-        """WSGI method, called by the wsgi app for requests that matches
-           ``searchendpoint``."""
-        queryparams = self._search_parse_query(environ['QUERY_STRING'])
-        res, pager = self._search_run_query(queryparams)
+        request = Request(environ)
+        adapter = self.routingmap.bind_to_environ(request.environ)
+        endpoint, values = adapter.match()
+        if not callable(endpoint):
+            endpoint = getattr(self, "handle_" + endpoint)
+            
+        if self.streaming_required(request):
+            # at this point we need to lookup the route, but maybe not
+            # create a proper Response object (which consumes the
+            # start_response callable)
+            content_type = 'application/octet-stream'
+            # the second header disables nginx/uwsgi buffering so that
+            # results are actually streamed to the client, see
+            # http://nginx.org/en/docs/http/ngx_http_uwsgi_module.html#uwsgi_buffering
+            writer = start_response('200 OK', [('Content-Type', content_type),
+                                               ('X-Accel-Buffering', 'no'),
+                                               ('X-Content-Type-Options', 'nosniff')])
+            writer(b"")
+            rootlogger = self.setup_streaming_logger(writer)
+            try:
+                endpoint(request, writer=writer, **values)
+            except Exception as e:
+                exc_type, exc_value, tb = sys.exc_info()
+                tblines = traceback.format_exception(exc_type, exc_value, tb)
+                msg = "\n".join(tblines)
+                writer(msg.encode("utf-8"))
+            finally:
+                self.shutdown_streaming_logger(rootlogger)
+                # ok we're done
+            return [] #  an empty iterable -- we've already used the writer object to send our response
+        else:
+            res = endpoint(request, **values)
+            if not isinstance(res, Response):
+                res = Response(res) # set mimetype?
+            res.headers["X-WSGI-App"] ="ferenda"
+            # add X-WSGI-App: ferenda and possibly other data as well
+            return res(environ, start_response)
+
+    #
+    # HELPERS
+    # 
+
+    def return_response(self, data, start_response, status="200 OK",
+                         contenttype="text/html; charset=utf-8", length=None):
+        if length is None:
+            length = len(data)
+        if contenttype == "text/html":
+            # add explicit charset if not provided by caller (it isn't by default)
+            contenttype = "text/html; charset=utf-8"
+        # logging.getLogger("wsgi").info("Calling start_response")
+        start_response(status, [
+            ("X-WSGI-app", "ferenda"),
+            ("Content-Type", contenttype),
+            ("Content-Length", "%s" % length),
+        ])
+        
+        if isinstance(data, Iterable) and not isinstance(data, bytes):
+            return data
+        else:
+            return iter([data])
+
+    #
+    # ENDPOINTS
+    # 
+
+    def handle_frontpage(self, request, **values):
+        # this handler would be unnecessary if we could make
+        # SharedDataMiddleware handle it, but it seems like its lists
+        # of exports is always just the prefix of a path, not the
+        # entire path, so we can't just say that "/" should be handled
+        # by it.
+        fp = open(os.path.join(self.config.datadir, "index.html"))
+        return Response(wrap_file(request.environ, fp), mimetype="text/html")
+
+    def handle_search(self, request, **values):
+        # return Response("<h1>Hello search: " + request.args.get("q") +" </h1>", mimetype="text/html")
+        res, pager = self._search_run_query(request.args)
         
         if pager['totalresults'] == 1:
             title = "1 match"
         else:
             title = "%s matches" % pager['totalresults']
-        title += " for '%s'" % queryparams.get("q")
+        title += " for '%s'" % request.args.get("q")
+        
         body = html.Body()
         for r in res:
             if not 'dcterms_title' in r or r['dcterms_title'] is None:
@@ -143,217 +221,14 @@ class WSGIApp(object):
             body.append(html.Div(
                 [html.H2([elements.Link(r['dcterms_title'], uri=r['uri'])]),
                  r.get('text', '')], **{'class': 'hit'}))
-        pagerelem = self._search_render_pager(pager, queryparams,
-                                              environ['PATH_INFO'])
+        pagerelem = self._search_render_pager(pager, dict(request.args), request.path)
         body.append(html.Div([
             html.P(["Results %(firstresult)s-%(lastresult)s "
                     "of %(totalresults)s" % pager]), pagerelem],
                                  **{'class':'pager'}))
-        data = self._transform(title, body, environ, template="xsl/search.xsl")
-        return self._return_response(data, start_response)
+        data = self._transform(title, body, request.environ, template="xsl/search.xsl")
+        return Response(data, mimetype="text/html")
 
-    def _return_response(self, data, start_response, status="200 OK",
-                         contenttype="text/html; charset=utf-8", length=None):
-        if length is None:
-            length = len(data)
-        if contenttype == "text/html":
-            # add explicit charset if not provided by caller (it isn't by default)
-            contenttype = "text/html; charset=utf-8"
-        # logging.getLogger("wsgi").info("Calling start_response")
-        start_response(self._str(status), [
-            (self._str("X-WSGI-app"), self._str("ferenda")),
-            (self._str("Content-Type"), self._str(contenttype)),
-            (self._str("Content-Length"), self._str("%s" % length)),
-        ])
-        
-        if isinstance(data, Iterable) and not isinstance(data, bytes):
-            # logging.getLogger("wsgi").info("returning data as-is")
-            return data
-        else:
-            # logging.getLogger("wsgi").info("returning data as-iterable")
-            return iter([data])
-
-
-    def api(self, environ, start_response):
-        """WSGI method, called by the wsgi app for requests that matches
-           ``apiendpoint``."""
-        path = environ['PATH_INFO']
-        if path.endswith(";stats"):
-            d = self.stats()
-        else:
-            d = self.query(environ)
-        data = json.dumps(d, indent=4, default=util.json_default_date,
-                          sort_keys=True).encode('utf-8')
-        return self._return_response(data, start_response,
-                                     contenttype="application/json")
-
-    def static(self, environ, start_response):
-        """WSGI method, called by the wsgi app for all other requests not
-        handled by :py:func:`~ferenda.Manager.search` or
-        :py:func:`~ferenda.Manager.api`
-
-        """
-        path = environ['PATH_INFO']
-        if not isinstance(path, str):
-            path = path.decode("utf-8")
-        fullpath = self.config.documentroot + path
-        # we start by asking all repos "do you handle this path"?
-        # default impl is to say yes if 1st seg == self.alias and the
-        # rest can be treated as basefile yielding a existing
-        # generated file.  a yes answer contains a FileWrapper around
-        # the repo-selected file and optionally length (but not
-        # status, always 200, or mimetype, always text/html). None
-        # means no.
-        fp = None
-        reasons = OrderedDict()
-        if not((path.startswith("/rsrc") or
-                path == "/robots.txt")
-               and os.path.exists(fullpath)):
-            for repo in self.repos:
-                supports = repo.requesthandler.supports(environ)
-                if supports:
-                    fp, length, status, mimetype = repo.requesthandler.handle(environ)
-                elif hasattr(supports, 'reason'):
-                    reasons[repo.alias] = supports.reason
-                else:
-                    reasons[repo.alias] = '(unknown reason)'
-                if fp:
-                    status = {200: "200 OK",
-                              404: "404 Not found",
-                              406: "406 Not Acceptable",
-                              500: "500 Server error"}[status]
-                    iterdata = FileWrapper(fp)
-                    break
-        # no repo handled the path
-        if not fp:
-            if self.config.legacyapi:  # rewrite the path to some resources. FIXME:
-                          # shouldn't hardcode the "rsrc" path of the path
-                if path == "/json-ld/context.json":
-                    fullpath = self.config.documentroot + "/rsrc/api/context.json"
-                elif path == "/var/terms":
-                    fullpath = self.config.documentroot + "/rsrc/api/terms.json"
-                elif path == "/var/common":
-                    fullpath = self.config.documentroot + "/rsrc/api/common.json"
-            if os.path.isdir(fullpath):
-                fullpath = fullpath + "index.html"
-            if os.path.exists(fullpath):
-                ext = os.path.splitext(fullpath)[1]
-                # if not mimetypes.inited:
-                #     mimetypes.init()
-                mimetype = mimetypes.types_map.get(ext, 'text/plain')
-                status = "200 OK"
-                length = os.path.getsize(fullpath)
-                fp = open(fullpath, "rb")
-                iterdata = FileWrapper(fp)
-            else:
-                mimetype = "text/html"
-                reasonmsg = "\n".join(["%s: %s" % (k, reasons[k]) for k in reasons])
-                msgbody = html.Body([html.H1("Document not found"),
-                                     html.P(["The path %s was not found at %s" % (path, fullpath)]),
-                                     html.P(["Examined %s repos" % (len(self.repos))]),
-                                     html.Pre([reasonmsg])])
-                iterdata = self._transform("404 Not found", msgbody, environ)
-                status = "404 Not Found"
-                length = None
-        return self._return_response(iterdata, start_response, status, mimetype, length)
-
-    def stream(self, environ, start_response):
-        """WSGI method, called by the wsgi app for requests that indicate the
-        need for a streaming response."""
-
-        path = environ['PATH_INFO']
-        if not isinstance(path, str):
-            path = path.decode("utf-8")
-        fullpath = self.config.documentroot + path
-        # we start by asking all repos "do you handle this path"?
-        # default impl is to say yes if 1st seg == self.alias and the
-        # rest can be treated as basefile yielding a existing
-        # generated file.  a yes answer contains a FileWrapper around
-        # the repo-selected file and optionally length (but not
-        # status, always 200, or mimetype, always text/html). None
-        # means no.
-        fp = None
-        reasons = OrderedDict()
-        if not((path.startswith("/rsrc") or
-                path == "/robots.txt")
-               and os.path.exists(fullpath)):
-            for repo in self.repos:
-                supports = repo.requesthandler.supports(environ)
-                if supports:
-                    return repo.requesthandler.stream(environ, start_response)
-                elif hasattr(supports, 'reason'):
-                    reasons[repo.alias] = supports.reason
-                else:
-                    reasons[repo.alias] = '(unknown reason)'
-        # if we reach this, no repo handled the path
-        mimetype = "text/html"
-        reasonmsg = "\n".join(["%s: %s" % (k, reasons[k]) for k in reasons])
-        msgbody = html.Body([html.H1("Document not found"),
-                             html.P(["The path %s was not found at %s" % (path, fullpath)]),
-                             html.P(["Examined %s repos" % (len(self.repos))]),
-                             html.Pre([reasonmsg])])
-        iterdata = self._transform("404 Not found", msgbody, environ)
-        status = "404 Not Found"
-        length = None
-        return self._return_response(iterdata, start_response, status, mimetype, length)
-
-
-    exception_heading = "Something is broken"
-    exception_description = "Something went wrong when showing the page. Below is some troubleshooting information intended for the webmaster."
-    def exception(self, environ, start_response):
-        import traceback
-        from pprint import pformat
-        exc_type, exc_value, tb = sys.exc_info()
-        tblines = traceback.format_exception(exc_type, exc_value, tb)
-        tbstr = "\n".join(tblines)
-        # render the error
-        title = tblines[-1]
-        body = html.Body([
-            html.Div([html.H1(self.exception_heading),
-                      html.P([self.exception_description]),
-                      html.H2("Traceback"),
-                      html.Pre([tbstr]),
-                      html.H2("Variables"),
-                      html.Pre(["request_uri: %s\nos.getcwd(): %s" % (request_uri(environ), os.getcwd())]),
-                      html.H2("environ"),
-                      html.Pre([pformat(environ)]),
-                      html.H2("sys.path"),
-                      html.Pre([pformat(sys.path)]),
-                      html.H2("os.environ"),
-                      html.Pre([pformat(dict(os.environ))])
-        ])])
-        msg = self._transform(title, body, environ)
-        return self._return_response(msg, start_response,
-                                     status="500 Internal Server Error",
-                                     contenttype="text/html")
-
-    def _transform(self, title, body, environ, template="xsl/error.xsl"):
-        fakerepo = self.repos[0]
-        doc = fakerepo.make_document()
-        doc.uri = request_uri(environ)
-        doc.meta.add((URIRef(doc.uri),
-                      DCTERMS.title,
-                      Literal(title, lang="sv")))
-        doc.body = body
-        xhtml = fakerepo.render_xhtml_tree(doc)
-        conffile = os.sep.join([self.config.documentroot, 'rsrc',
-                                'resources.xml'])
-        transformer = Transformer('XSLT', template, "xsl",
-                                  resourceloader=fakerepo.resourceloader,
-                                  config=conffile)
-        urltransform = None
-        if 'develurl' in self.config:
-            urltransform = fakerepo.get_url_transform_func(
-                develurl=self.config.develurl)
-        depth = len(doc.uri.split("/")) - 3
-        tree = transformer.transform(xhtml, depth,
-                                     uritransform=urltransform)
-        return etree.tostring(tree, encoding="utf-8")
-        
-        
-
-    ################################################################
-    # API Helper methods
     def stats(self, resultset=()):
         slices = OrderedDict()
 
@@ -510,36 +385,50 @@ class WSGIApp(object):
                     observations[k] += 1
         return dimension_label, observations
 
-    def query(self, environ):
+    def query(self, request, options=None):
         # this is needed -- but the connect call shouldn't neccesarily
         # have to call exists() (one HTTP call)
         idx = FulltextIndex.connect(self.config.indextype,
                                     self.config.indexlocation,
                                     self.repos)
-        q, param, pagenum, pagelen, stats = self.parse_parameters(
-            environ['QUERY_STRING'], idx)
-        ac_query = environ['QUERY_STRING'].endswith("_ac=true")
-        exclude_types = environ.get('exclude_types', None)
-        boost_types = environ.get('boost_types', None)
-        res, pager = idx.query(q=q,
-                               pagenum=pagenum,
-                               pagelen=pagelen,
-                               ac_query=ac_query,
-                               exclude_types=exclude_types,
-                               boost_types=boost_types,
-                               **param)
-        mangled = self.mangle_results(res, ac_query)
+        # parse_parameters -> {
+        #  "q": "freetext",
+        #  "fields": {"dcterms_publisher": ".../org/di",
+        #             "dcterms_issued": "2018"}
+        #  "pagenum": 1,
+        #  "pagelen": 10,
+        #  "autocomplete": False,
+        #  "exclude_repos": ["mediawiki"],
+        #  "boost_repos": [("sfs", 10)],
+        #  "include_fragments": False
+        # }
+        if options is None:
+            options = {}
+        options.update(self.parse_parameters(request, idx))
+        res, pager = idx.query(q=options.get("q"),
+                               pagenum=options.get("pagenum"),
+                               pagelen=options.get("pagelen"),
+                               ac_query=options.get("autocomplete"),
+                               exclude_repos=options.get("exclude_repos"),
+                               boost_repos=options.get("boost_repos"),
+                               include_fragments=options.get("include_fragments"),
+                               **options.get("fields"))
+        mangled = self.mangle_results(res, options.get("autocomplete"))
         # 3.1 create container for results
         res = {"startIndex": pager['firstresult'] - 1,
-               "itemsPerPage": int(param.get('_pageSize', '10')),
+               "itemsPerPage": options["pagelen"],
                "totalResults": pager['totalresults'],
                "duration": None,  # none
-               "current": environ['PATH_INFO'] + "?" + environ['QUERY_STRING'],
+               "current": request.path + "?" + request.query_string.decode("utf-8"),
                "items": mangled}
 
         # 4. add stats, maybe
-        if stats:
+        if options["stats"]:
             res["statistics"] = self.stats(mangled)
+
+        # 5. possibly trim results for easier json consumption
+        if options["autocomplete"]:
+            res = res["items"]
         return res
 
 
@@ -591,7 +480,7 @@ class WSGIApp(object):
     def mangle_result(self, hit, ac_query=False):
         return hit
 
-    def parse_parameters(self, querystring, idx):
+    def parse_parameters(self, request, idx):
         def _guess_real_fieldname(k, schema):
             for fld in schema:
                 if fld.endswith(k):
@@ -600,12 +489,7 @@ class WSGIApp(object):
                 "Couldn't find anything that endswith(%s) in fulltextindex schema" %
                 k)
 
-        if isinstance(querystring, bytes):
-            # Assume utf-8 encoded URL -- when is this assumption
-            # incorrect?
-            querystring = querystring.decode("utf-8")
-
-        param = dict(parse_qsl(querystring))
+        param = request.args.to_dict()
         filtered = dict([(k, v)
                          for k, v in param.items() if not (k.startswith("_") or k == "q")])
         if filtered:
@@ -655,7 +539,7 @@ class WSGIApp(object):
                         k = k[:-4]
                         # the parameter *looks* like it's a ref, but it should
                         # be interpreted as a value -- remove starting */ to
-                        # get at actual querystring
+                        # get at actual value
 
                         # FIXME: in order to lookup k in schema, we may need
                         # to guess its prefix, but we're cut'n pasting the
@@ -698,28 +582,23 @@ class WSGIApp(object):
                     elif k == "rdf_type" and self.config.legacyapi and re.match("[\w\-\_]+", filtered[k]):
                         filtered[k] = "*" + filtered[k]
 
-        q = param['q'] if 'q' in param else None
-
+        options = {
+            "q": param.get("q"),
+            "stats": param.get("_stats") == "on",
+            "autocomplete": param.get("_ac") == "true",
+            "fields": filtered
+        }
         # find out if we need to get all results (needed when stats=on) or
         # just the first page
-        if param.get("_stats") == "on":
-            pagenum = 1
-            pagelen = 10000 # this is the max that default ES 2.x will allow
-            stats = True
+        if options["stats"]:
+            options["pagenum"] = 1
+            options["pagelen"] = 10000 # this is the max that default ES 2.x will allow
         else:
-            pagenum = int(param.get('_page', '0')) + 1
-            pagelen = int(param.get('_pageSize', '10'))
-            stats = False
+            options["pagenum"] = int(param.get('_page', '0')) + 1
+            options["pagelen"] = int(param.get('_pageSize', '10'))
+        return options
 
-        return q, filtered, pagenum, pagelen, stats
-
-    def _search_parse_query(self, querystring):
-        # FIXME: querystring should probably be sanitized before
-        # calling .query() - but in what way?
-        queryparams = OrderedDict(parse_qsl(querystring))
-        return queryparams
-    
-    def _search_run_query(self, queryparams, boost_types=None):
+    def _search_run_query(self, queryparams, boost_repos=None):
         idx = FulltextIndex.connect(self.config.indextype,
                                     self.config.indexlocation,
                                     self.repos)
@@ -738,12 +617,19 @@ class WSGIApp(object):
 #        # "bulvanutredning"
         pagenum = int(queryparams.get('p', '1'))
         qpcopy = dict(queryparams)
+        # we've changed a parameter name in our internal API:s from
+        # "type" to "repo" since ElasticSearch 7.x doesn't have types
+        # anymore (and the corresponding data is now stored in a
+        # "repo" field), but we haven't changed our URL parameters
+        # (yet). In the meantime, map the external type parameter to
+        # the internal repo parameter
+        if 'type' in qpcopy:
+            qpcopy["repo"] = qpcopy.pop("type")
         for x in ('q', 'p'):
             if x in qpcopy:
                 del qpcopy[x]
-        res, pager = idx.query(query, pagenum=pagenum, boost_types=boost_types, **qpcopy)
+        res, pager = idx.query(query, pagenum=pagenum, boost_repos=boost_repos, **qpcopy)
         return res, pager
-
 
     def _search_render_pager(self, pager, queryparams, path_info):
         # Create some HTML code for the pagination. FIXME: This should
@@ -772,15 +658,102 @@ class WSGIApp(object):
             pages.append(html.LI([html.A(["»"], href=url)]))
 
         return html.UL(pages, **{'class': 'pagination'})
-    
-    def _str(self, s, encoding="ascii"):
-        """If running under python2, return byte string version of the
-        argument, otherwise return the argument unchanged.
 
-        Needed since wsgiref under python 2 hates unicode.
+    def _transform(self, title, body, environ, template="xsl/error.xsl"):
+        fakerepo = self.repos[0]
+        doc = fakerepo.make_document()
+        doc.uri = request_uri(environ)
+        doc.meta.add((URIRef(doc.uri),
+                      DCTERMS.title,
+                      Literal(title, lang="sv")))
+        doc.body = body
+        xhtml = fakerepo.render_xhtml_tree(doc)
+        conffile = os.sep.join([self.config.datadir, 'rsrc',
+                                'resources.xml'])
+        transformer = Transformer('XSLT', template, "xsl",
+                                  resourceloader=fakerepo.resourceloader,
+                                  config=conffile)
+        urltransform = None
+        if 'develurl' in self.config:
+            urltransform = fakerepo.get_url_transform_func(
+                repos=self.repos, develurl=self.config.develurl,wsgiapp=self)
+        depth = len(doc.uri.split("/")) - 3
+        tree = transformer.transform(xhtml, depth,
+                                     uritransform=urltransform)
+        return etree.tostring(tree, encoding="utf-8")
 
-        """
-        if sys.version_info < (3, 0, 0):
-            return s.encode("ascii")  # pragma: no cover
+
+    def handle_api(self, request, **values):
+        if request.path.endswith(";stats"):
+            d = self.stats()
         else:
-            return s
+            d = self.query(request)
+        data = json.dumps(d, indent=4, default=util.json_default_date,
+                          sort_keys=True).encode('utf-8')
+        return Response(data, content_type="application/json")
+
+
+    exception_heading = "Something is broken"
+    exception_description = "Something went wrong when showing the page. Below is some troubleshooting information intended for the webmaster."
+    def handle_exception(self, environ, start_response):
+        import traceback
+        from pprint import pformat
+        exc_type, exc_value, tb = sys.exc_info()
+        tblines = traceback.format_exception(exc_type, exc_value, tb)
+        tbstr = "\n".join(tblines)
+        # render the error
+        title = tblines[-1]
+        body = html.Body([
+            html.Div([html.H1(self.exception_heading),
+                      html.P([self.exception_description]),
+                      html.H2("Traceback"),
+                      html.Pre([tbstr]),
+                      html.H2("Variables"),
+                      html.Pre(["request_uri: %s\nos.getcwd(): %s" % (request_uri(environ), os.getcwd())]),
+                      html.H2("environ"),
+                      html.Pre([pformat(environ)]),
+                      html.H2("sys.path"),
+                      html.Pre([pformat(sys.path)]),
+                      html.H2("os.environ"),
+                      html.Pre([pformat(dict(os.environ))])
+        ])])
+        msg = self._transform(title, body, environ)
+        if isinstance(exc_value, HTTPException):
+            status = "%s %s" % (exc_value.code, exc_value.name)
+        else:
+            status = "500 Server error"
+        return self.return_response(msg, start_response,
+                                    status,
+                                    contenttype="text/html")
+
+
+    # STREAMING
+    # 
+        
+    def setup_streaming_logger(self, writer):
+        # these internal libs use logging to log things we rather not disturb the user with
+        for logname in ['urllib3.connectionpool',
+                        'chardet.charsetprober',
+                        'rdflib.plugins.parsers.pyRdfa']:
+            log = logging.getLogger(logname)
+            log.propagate = False
+
+        wsgihandler = WSGIOutputHandler(writer)
+        wsgihandler.setFormatter(
+            logging.Formatter("%(asctime)s [%(name)s] %(levelname)s %(message)s",
+                 datefmt="%H:%M:%S"))
+        rootlogger = logging.getLogger()
+        rootlogger.setLevel(logging.DEBUG)
+        for handler in rootlogger.handlers:
+            rootlogger.removeHandler(handler)
+        logging.getLogger().addHandler(wsgihandler)
+        return rootlogger
+
+    def shutdown_streaming_logger(self, rootlogger):
+        for h in list(rootlogger.handlers):
+            if isinstance(h, WSGIOutputHandler):
+                h.close()
+                rootlogger.removeHandler(h)
+
+    def streaming_required(self, request):
+        return request.args.get('stream', False)

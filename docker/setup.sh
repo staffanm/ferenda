@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+cd /usr/share/ferenda
+
 if [ -f site/ferenda.ini ]; then
     echo "site/ferenda.ini exists, not setting up a new site"
 fi 

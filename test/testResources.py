@@ -149,21 +149,22 @@ class=testManager.staticmockclass2
 
     def test_default_docrepo(self):
         # Test3: No combining, make sure that a non-customized
-        # DocumentRepository works
+        # DocumentRepository works. It should not specify any
+        # resources (global resources are now specified in
+        # ferenda.manager.DEFAULT_CONFIG and not in the base docrepo
+        # class) except for the resulting xml file
         s = os.sep
         repo = DocumentRepository()
-        # but remove any external urls -- that's tested separately in Test5
-        repo.config.cssfiles = [x for x in repo.config.cssfiles if not x.startswith("http://")]
         got = Resources([repo],self.tempdir+os.sep+'rsrc',
                         cssfiles=[],
                         jsfiles=[],
                         imgfiles=[]).make(api=False)
         s = os.sep
-        want = {'css':[s.join(['rsrc', 'css','ferenda.css'])],
-                'img':[s.join(['rsrc', 'img', 'atom.png'])],
-                'js':[s.join(['rsrc', 'js','ferenda.js'])],
+        want = {'css':[],
+                'img':[],
+                'js':[],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
-                      }
+        }
         self.assertEqual(want,got)
 
     def test_staticsite(self):

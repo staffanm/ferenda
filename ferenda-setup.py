@@ -1,4 +1,5 @@
 #!/usr/bin/env python
 from ferenda import manager
-manager.runsetup()
+if __name__ == '__main__':
+    manager.runsetup()
 

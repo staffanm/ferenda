@@ -550,56 +550,55 @@ class DocumentRepository(object):
         :returns: default configuration properties
         :rtype: dict
         """
-
         return {  # 'loglevel': 'INFO',
-            'datadir': 'data',
-            'patchdir': 'patches',
-            'patchformat': 'default',
-            'processes': '1',
-            'force': False,
-            'parseforce': False,
-            'serializejson': False,
-            'compress': "",  # don't compress by default
-            'generateforce': False,
-            'fsmdebug': False,
-            'refresh': False,
-            'download': True,
-            'lastdownload': datetime,
-            'downloadmax': nativeint,
-            'conditionalget': True,
-            'url': 'http://localhost:8000/',
-            'develurl': None,
-            'fulltextindex': True,
-            'useragent': 'ferenda-bot',
-            'relate': True,
-            'republishsource': False,
-            'tabs': True,
-            'primaryfrontpage': False,
-            'frontpagefeed': False,
-            'removeinvalidlinks': True,
-            'ignorepatch': False,
-            'clientname': '',
+            'allversions': False,
             'bulktripleload': False,
             'class': cls.__module__ + "." + cls.__name__,
-            # FIXME: These only make sense at a global level, and
-            # furthermore are duplicated in manager._load_config.
-            'cssfiles': ['css/ferenda.css'],
-            'jsfiles': ['js/ferenda.js'],
-            'imgfiles': ['img/atom.png'],
-            'storetype': 'SQLITE',
+            'clientname': '',
+            'compress': "",  # don't compress by default
+            'conditionalget': True,
+            'datadir': 'data',
+            'develurl': None,
+            'download': True,
+            'downloadmax': nativeint,
+            'force': False,
+            'frontpagefeed': False,
+            'fsmdebug': False,
+            'fulltextindex': True,
+            'generateforce': False,
+            'ignorepatch': False,
+            'indexlocation': 'data/whooshindex',
+            'indextype': 'WHOOSH',
+            'lastdownload': datetime,
+            'parseforce': False,
+            'patchdir': 'patches',
+            'patchformat': 'default',
+            'primaryfrontpage': False,
+            'processes': '1',
+            'refresh': False,
+            'relate': True,
+            'removeinvalidlinks': True,
+            'republishsource': False,
+            'serializejson': False,
             'storelocation': 'data/ferenda.sqlite',
             'storerepository': 'ferenda',
-            'indextype': 'WHOOSH',
-            'indexlocation': 'data/whooshindex',
+            'storetype': 'SQLITE',
+            'tabs': True,
+            'url': 'http://localhost:8000/',
+            'useragent': 'ferenda-bot',
+            # FIXME: These only make sense at a global level, and
+            # furthermore are duplicated in manager._load_config.
+#            'cssfiles': ['css/ferenda.css'],
+#            'jsfiles': ['js/ferenda.js'],
+#            'imgfiles': ['img/atom.png'],
             'combineresources': False,
             'staticsite': False,
-            'legacyapi': False,
-            'sitename': 'MySite',
-            'sitedescription': 'Just another Ferenda site',
-            'apiendpoint': "/api/",
-            'searchendpoint': "/search/",
-            'acceptalldomains': False,
-            'allversions': False
+#            'legacyapi': False,
+#            'sitename': 'MySite',
+#            'sitedescription': 'Just another Ferenda site',
+#            'apiendpoint': "/api/",
+#            'searchendpoint': "/search/",
+#            'acceptalldomains': False,
         }
 
     @classmethod
@@ -2515,7 +2514,7 @@ WHERE {
 
 
     def get_url_transform_func(self, repos=None, basedir=None,
-                               develurl=None, remove_missing=False):
+                               develurl=None, remove_missing=False, wsgiapp=None):
         """Returns a function that, when called with a URI, transforms that
         URI to another suitable reference. This can be used to eg. map
         between canonical URIs and local URIs. The function is run on
@@ -2528,24 +2527,20 @@ WHERE {
         def getpath(url, repos):
             if url == self.config.url:
                 return self.config.datadir + os.sep + "index.html"
+            # http://example.org/foo/bar.x -> |/foo/bar.x (for Rule.match)
+            matchurl = "|/"+url.split("/", 3)[-1].split("?")[0]
             if "/" not in url:
                 # this is definitly not a HTTP(S) url, might be a
                 # mailto:? Anyway, we won't get a usable path from it
                 # so don't bother.
                 return None
             for (repoidx, repo) in enumerate(repos):
-                # FIXME: This works less than optimal when using
-                # CompositeRepository -- the problem is that a subrepo
-                # might come before the main repo in this list, and
-                # yield an improper path (eg
-                # /data/soukb/entries/... when the real entry is at
-                # /data/sou/entries/...). One solution is to remove
-                # subrepos from the ferenda.ini file, but right now we
-                # need them enabled to properly store lastdownload
-                # options. Another solution would be to make sure all
-                # CompositeRepository repos come before subrepos in
-                # the list.
-                if repo.requesthandler.supports_uri(url):
+                supports = False
+                for rule in wsgiapp.reporules[repo]:
+                    if rule.match(matchurl) is not None:
+                        supports = True
+                        break
+                if supports:
                     if url.endswith(".png"):
                         # FIXME: This is slightly hacky as it returns
                         # the path to the generated HTML file, not the
@@ -2556,6 +2551,8 @@ WHERE {
                         # it will create the facsimile image before
                         # returning the path to it (which would be
                         # very bad).
+                        #
+                        # shouldn't this be repo.store.generated_path ??
                         return self.store.generated_path(self.basefile_from_uri(url))
                     else:
                         return repo.requesthandler.path(url)
@@ -2595,20 +2592,18 @@ WHERE {
         def base_transform(url):
             if remove_missing:
                 path = getpath(url, repos)
-                # If the file being transformed contains references to
-                # itself, this will return False even when it
-                # shouldn't. As a workaround,
-                # Transformer.transform_file now creates a placeholder
-                # file before transform_links is run
                 if path and not (os.path.exists(path) and os.path.getsize(path) > 0):
                     return False
             return url
 
+        if repos is None:
+            repos = []
+        if wsgiapp is None: 
+            from ferenda.manager import make_wsgi_app
+            wsgiapp = make_wsgi_app(self.config._parent, repos=repos)
         # sort repolist so that CompositeRepository instances come
         # before others (see comment in getpath)
         from ferenda import CompositeRepository
-        if repos is None:
-            repos = []
         repos = sorted(repos, key=lambda x: isinstance(x, CompositeRepository), reverse=True)
         if develurl:
             return simple_transform

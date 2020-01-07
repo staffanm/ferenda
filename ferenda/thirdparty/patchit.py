@@ -270,6 +270,8 @@ class PatchSetReader(object):
         :raises: :class:`PatchSyntaxError`
         """
         for line in lines:
+            if line.endswith('\r\n'): # patch had CRLF line endings, silently adjust for this
+                line = line[:-2] + "\n"
             if not line.strip('\n'):
                 continue
 

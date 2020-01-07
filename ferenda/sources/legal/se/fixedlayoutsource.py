@@ -24,12 +24,26 @@ from ferenda.elements import Body
 
 
 class FixedLayoutHandler(SwedishLegalHandler):
+
+    @property
+    def doc_rules(self):
+        rules = super(FixedLayoutHandler, self).doc_rules
+        rules.append("%(root)s/<%(converter)s:basefile>/sid<pageno>.<suffix>")
+        return rules
+    
+    
+    @property
+    def rule_context(self):
+        return {"converter": "path"}
+
+    
     def get_pathfunc(self, environ, basefile, params, contenttype, suffix):
         if basefile and suffix == "png":
             # OK, this is a request for a particular page. Map this to
             # correct repo, dir and attachment and set those params
-            pi = environ['PATH_INFO']
-            pageno = pi[pi.index("/sid")+4:-(len(suffix)+1)]
+            #pi = environ['PATH_INFO']
+            #pageno = pi[pi.index("/sid")+4:-(len(suffix)+1)]
+            pageno = params['pageno']
             if pageno.isdigit():
                 pageno = int(pageno)
             if isinstance(self.repo, CompositeRepository):
@@ -124,6 +138,7 @@ class FixedLayoutSource(SwedishLegalSource):
         opts = super(FixedLayoutSource, cls).get_default_options()
         opts['imgfiles'] = ['img/spinner.gif']
         opts['ocr'] = True
+        opts['legacytesseract'] = False
         return opts
 
     def downloaded_to_intermediate(self, basefile, attachment=None):
@@ -141,7 +156,8 @@ class FixedLayoutSource(SwedishLegalSource):
                                   images=self.config.pdfimages,
                                   convert_to_pdf=convert_to_pdf,
                                   keep_xml=keep_xml,
-                                  ocr_lang=ocr_lang)
+                                  ocr_lang=ocr_lang,
+                                  legacy_tesseract=self.config.legacytesseract)
         except PDFFileIsEmpty as e:
             if self.config.ocr:
                 self.log.warning("%s: %s was empty, attempting OCR" % (basefile, downloaded_path))
@@ -233,7 +249,6 @@ class FixedLayoutSource(SwedishLegalSource):
         # 2. elements.Body objects that are structured by logical
         #    elements (chapters, sections etc) and where individual
         #    Sidbrytning objects can be anywhere in the tree.
-        from pudb import set_trace; set_trace()
         if not hasattr(doc.body, 'fontspec'):
             # document wasn't derived from a PDF file, probably from HTML instead
             return resources

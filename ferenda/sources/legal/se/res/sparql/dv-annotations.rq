@@ -17,7 +17,7 @@ CONSTRUCT {
 } WHERE
 {
    {
-    ?inboundavgorande rpubl:rattsfall <%(uri)s> .
+    ?inboundavgorande rpubl:rattsfallshanvisning <%(uri)s> .
     ?inboundreferat rpubl:referatAvDomstolsavgorande ?inboundavgorande ;
                     rdf:type ?referattyp ;
                     dcterms:identifier ?referatid .

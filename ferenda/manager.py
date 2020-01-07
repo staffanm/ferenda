@@ -27,7 +27,7 @@ from multiprocessing.managers import SyncManager, RemoteError
 from queue import Queue
 from time import sleep
 from urllib.parse import urlsplit
-from wsgiref.simple_server import make_server
+
 from contextlib import contextmanager
 import argparse
 import builtins
@@ -49,6 +49,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import traceback
 import warnings
 try:
@@ -68,6 +69,7 @@ try:  # optional module
 except ImportError:  # pragma: no cover
     def setproctitle(title): pass
     def getproctitle(): return ""
+from werkzeug.serving import run_simple
 
 # my modules
 from ferenda import DocumentRepository  # needed for a doctest
@@ -76,37 +78,51 @@ from ferenda import errors, util
 from ferenda.compat import MagicMock
 
 
-DEFAULT_CONFIG = {'loglevel': 'DEBUG',
-                  'logfile': True,
-                  'processes': '1',
-                  'datadir': 'data',
-                  'force': False,
-                  'refresh': False,
-                  'conditionalget': True,
-                  'useragent': 'ferenda-bot',
-                  'downloadmax': nativeint,
-                  'lastdownload': datetime,
-                  'combineresources': False,
-                  'staticsite': False,
-                  'all': False,
-                  'allversions': False,
-                  'relate': True,
-                  'download': True,
-                  'tabs': True,
-                  'primaryfrontpage': False,
-                  'frontpagefeed': False,
-                  'sitename': 'MySite',
-                  'sitedescription': 'Just another Ferenda site',
-                  'cssfiles': ['css/ferenda.css'],
-                  'jsfiles': ['js/ferenda.js'],
-                  'imgfiles': [],
-                  'disallowrobots': False,
-                  'legacyapi': False,
-                  'fulltextindex': True,
-                  'removeinvalidlinks': True,
-                  'serverport': 5555,
-                  'authkey': b'secret',
-                  'profile': False}
+DEFAULT_CONFIG = {
+    'acceptalldomains': False,
+    'all': False,
+    'allversions': False,
+    'apiendpoint': "/api/",
+    'authkey': b'secret',
+    'checktimeskew': False,
+    'combineresources': False,
+    'cssfiles': ['css/ferenda.css'],
+    'datadir': 'data',
+    'disallowrobots': False,
+    'download': True,
+    'imgfiles': ['img/atom.png'],
+    'jsfiles': ['js/ferenda.js'],
+    'legacyapi': False,
+    'logfile': True,
+    'loglevel': 'DEBUG',
+    'processes': '1',
+    'profile': False,
+    'relate': True,
+    'removeinvalidlinks': True,
+    'searchendpoint': "/search/",
+    'serverport': 5555,
+    'sitedescription': 'Just another Ferenda site',
+    'sitename': 'MySite',
+    'staticsite': False,
+    'systempaths': list,
+    'tabs': True,
+    'wsgiappclass': 'ferenda.WSGIApp',
+    'wsgiexceptionhandler': True,
+    #'conditionalget': True,
+    #'downloadmax': nativeint,
+    #'force': False,
+    #'frontpagefeed': False,
+    #'fulltextindex': True,
+    #'indexlocation': 'data/whooshindex',
+    #'indextype': 'WHOOSH',
+    #'lastdownload': datetime,
+    #'primaryfrontpage': False,
+    #'refresh': False,
+    #'storelocation': 'data/ferenda.sqlite',
+    #'storerepository': 'ferenda',
+    #'useragent': 'ferenda-bot',
+    #'storetype': 'SQLITE',
+}
 
 class MarshallingHandler(logging.Handler):
     def __init__(self, records):
@@ -271,54 +287,6 @@ def frontpage(repos,
     return True
 
 
-def runserver(repos,
-              config=None,
-              port=8000,  # now that we require url, we don't need this
-              documentroot="data",  # relative to cwd
-              apiendpoint="/api/",
-              searchendpoint="/search/",
-              url="http://localhost:8000/",
-              develurl=None,
-              indextype="WHOOSH",
-              indexlocation="data/whooshindex",
-              legacyapi=False):
-    """Starts up a internal webserver and runs the WSGI app (see
-    :py:func:`make_wsgi_app`) using all the specified document
-    repositories. Runs forever (or until interrupted by keyboard).
-
-    :param repos: Object instances for the repositories that should be served
-                  over HTTP
-    :type repos: list
-    :param port: The port to use
-    :type port: int
-    :param documentroot: The root document, used to locate files not directly
-                         handled by any repository
-    :type documentroot: str
-    :param apiendpoint: The part of the URI space handled by the API
-                        functionality
-    :type apiendpoint: str
-    :param searchendpoint: The part of the URI space handled by the search
-                           functionality
-    :type searchendpoint: str
-
-    """
-    getlog().info("Serving wsgi app at http://localhost:%s/" % port)
-    kwargs = {'port': port,
-              'documentroot': documentroot,
-              'apiendpoint': apiendpoint,
-              'searchendpoint': searchendpoint,
-              'indextype': indextype,
-              'indexlocation': indexlocation,
-              'legacyapi': legacyapi,
-              'develurl': develurl,
-              'repos': repos}
-    try:
-        inifile = _find_config_file()
-    except errors.ConfigurationError:
-        inifile = None
-    httpd = make_server('', port, make_wsgi_app(inifile, config, **kwargs))
-    httpd.serve_forever()
-
 def status(repo, samplesize=3):
     """Prints out some basic status information about this repository."""
     print = builtins.print
@@ -362,39 +330,31 @@ def status(repo, samplesize=3):
         # parsed: None (143 needs parsing)
         # generated: None (143 needs generating)
     
-
-
-def make_wsgi_app(inifile=None, config=None, **kwargs):
+def make_wsgi_app(config, enabled=None, repos=None):
     """Creates a callable object that can act as a WSGI application by
     mod_wsgi, gunicorn, the built-in webserver, or any other
     WSGI-compliant webserver.
 
-    :param inifile: The full path to a ``ferenda.ini`` configuration file
-    :type inifile: str
-    :param \*\*kwargs: Configuration values for the wsgi app, overrides those in `inifile`.
+    :param config: Alternatively, a initialized config object
+    :type config: LayeredConfig
+    :param enabled: A alias->class mapping for all enabled document repositoriees
+    :type enabled: dict
+    :param repos: A list of initialized document repositoriees (used in embedded scenarios, including testing)
+    :type enabled: list
+    :param wsgiappclass: The name of the class to be used to create the WSGI app
+    :type wsgiappclass: str
     :returns: A WSGI application
     :rtype: callable
 
     """
-    if inifile:
-        assert os.path.exists(
-            inifile), "INI file %s doesn't exist (relative to %s)" % (inifile, os.getcwd())
-        if config is None:
-            config = _load_config(inifile)
-        if not kwargs:
-            kwargs = _setup_runserver_args(config, inifile)
-        kwargs['inifile'] = inifile
-        # make it possible to specify a different class that implements
-        # the wsgi application
-        classname = getattr(config, "wsgiappclass", "ferenda.WSGIApp")
-    else:
-        classname = "ferenda.WSGIApp"
-    cls = _load_class(classname)
-    # if we have an inifile, we should provide that instead of the
-    # **args we've got from _setup_runserver_args()
-    repos = kwargs['repos']
-    del kwargs['repos']
-    return cls(repos, **kwargs)
+    if config is None:
+        config = LayeredConfig(Defaults(DEFAULT_CONFIG))
+    if repos is None:
+        if enabled is None:
+            enabled = enabled_classes()
+        repos = [_instantiate_class(cls, config) for cls in _classes_from_classname(enabled, 'all')]
+    cls = _load_class(config.wsgiappclass)
+    return cls(repos, config)
 
 
 loglevels = {'DEBUG': logging.DEBUG,
@@ -511,16 +471,20 @@ def run(argv, config=None, subcall=False):
                  prefixed with ``--``, e.g. ``--loglevel=INFO``, or
                  positional arguments to the specified action).
     """
-    # make the process print useful information when ctrl-T is pressed
-    # (only works on Mac and BSD, who support SIGINFO)
-    if hasattr(signal, 'SIGINFO'):
-        signal.signal(signal.SIGINFO, _siginfo_handler)
-    # or when the SIGUSR1 signal is sent ("kill -SIGUSR1 <pid>")
-    if hasattr(signal, 'SIGUSR1'):
-        signal.signal(signal.SIGUSR1, _siginfo_handler)
+    # when running under Werkzeug with the reloader active, the
+    # reloader runs on the main thread and all wsgi code runs on a
+    # separate thread, In these cases signals can't be set.
+    if threading.current_thread() is threading.main_thread():
+        # make the process print useful information when ctrl-T is pressed
+        # (only works on Mac and BSD, who support SIGINFO)
+        if hasattr(signal, 'SIGINFO'):
+            signal.signal(signal.SIGINFO, _siginfo_handler)
+        # or when the SIGUSR1 signal is sent ("kill -SIGUSR1 <pid>")
+        if hasattr(signal, 'SIGUSR1'):
+            signal.signal(signal.SIGUSR1, _siginfo_handler)
     
     if not config:
-        config = _load_config(_find_config_file(), argv)
+        config = load_config(find_config_file(), argv)
         alias = getattr(config, 'alias', None)
         action = getattr(config, 'action', None)
     else:
@@ -554,10 +518,15 @@ def run(argv, config=None, subcall=False):
         setup_logger(level=config.loglevel, filename=logfile)
 
     if not subcall:
+        if config.checktimeskew:
+            skew = timeskew(config)
+            if skew:
+                log.critical("timeskew detected: System time is %s s behind file creation times. If running under docker desktop, try restarting the container" % skew)
+                sys.exit(1)
         log.info("run: %s" % " ".join(argv))
     try:
         # reads only ferenda.ini using configparser rather than layeredconfig
-        enabled = _enabled_classes()
+        enabled = enabled_classes()
         # returns {'ferenda.sources.docrepo.DocRepo':'base',...}
         enabled_aliases = dict(reversed(item) for item in enabled.items())
         if len(argv) < 1:
@@ -583,9 +552,30 @@ def run(argv, config=None, subcall=False):
                     log.error(str(e))
                     return None
             elif action == 'runserver':
-                args = _setup_runserver_args(config, _find_config_file())
-                # Note: the actual runserver method never returns
-                return runserver(**args)
+                if 'develurl' in config:
+                    url = config.develurl
+                    develurl = config.develurl
+                else:
+                    url = config.url
+                    develurl = None
+                port = urlsplit(url).port or 80
+                app = make_wsgi_app(config, enabled)
+                getlog().info("Serving wsgi app at http://localhost:%s/" % port)
+                # Maybe make use_debugger and use_reloader
+                # configurable. But when using ./ferenda-build all
+                # runserver, don't you always want a debugger and a
+                # reloader?
+
+                # NOTE: If we set use_reloader=True, werkzeug starts
+                # a new subprocess with the same args, making us run
+                # the expensive setup process twice. Is that
+                # unavoidable (maybe the first process determines
+                # which files to monitor and the second process
+                # actually runs them (and is reloaded by the parent
+                # process whenever a file is changed?
+
+                # Note: the actual run_simple method never returns
+                run_simple('', port, app, use_debugger=False, use_reloader=True)
             elif action == 'buildclient':
                 args = _setup_buildclient_args(config)
                 return runbuildclient(**args)
@@ -624,7 +614,7 @@ Disallow: /-/
                     status(inst)
 
             elif action == 'frontpage':
-                repoclasses = _classes_from_classname(enabled, classname)
+                # repoclasses = _classes_from_classname(enabled, classname)
                 args = _setup_frontpage_args(config, argv)
                 return frontpage(**args)
 
@@ -703,6 +693,16 @@ def _nativestr(unicodestr, encoding="utf-8"):
     return bytes_to_native_str(unicodestr.encode(encoding))
 
 
+def timeskew(config):
+    """Check to see if system time agrees with filesystem time. If running under docker, and the container system time has drifted from the host system time (due to e.g. host system hiberation), and config.datadir is on a volume mounted from the host, files may appear creater or modified way later. Detect this skew if present and not smaller than a second."""
+    checkfile = config.datadir + os.sep + "checktimeskew.txt"
+    assert not os.path.exists(checkfile)
+    systemtime = datetime.now()
+    util.writefile(checkfile, "dummy")
+    filetime = datetime.fromtimestamp(os.stat(checkfile).st_mtime)
+    util.robust_remove(checkfile)
+    return int((filetime - systemtime).total_seconds())
+
 def enable(classname):
     """Registers a class by creating a section for it in the
     configuration file (``ferenda.ini``). Returns the short-form
@@ -722,7 +722,7 @@ def enable(classname):
     # throws error if unsuccessful
 
     cfg = configparser.ConfigParser()
-    configfilename = _find_config_file(create=True)
+    configfilename = find_config_file(create=True)
     cfg.read([configfilename])
     alias = cls.alias
     if False:
@@ -854,7 +854,7 @@ def setup(argv=None, force=False, verbose=False, unattended=False):
 
 config_loaded = False
 
-def _load_config(filename=None, argv=None, defaults=None):
+def load_config(filename=None, argv=None, defaults=None):
     """Loads general configuration information from ``filename`` (which
        should be a full path to a ferenda.ini file) and/or command
        line arguments into a :py:class:`~layeredconfig.LayeredConfig`
@@ -868,11 +868,9 @@ def _load_config(filename=None, argv=None, defaults=None):
         # assert config_loaded is False, "load_config called more than once!"
         getlog().error("load_config called more than once!")
     if not defaults:
-        # FIXME: Expand on this list of defaults? Note that it only
-        # pertains to global configuration, not docrepo configuration
-        # (those have the get_default_options() classmethod).
         defaults = copy.deepcopy(DEFAULT_CONFIG)
-        for alias, classname in _enabled_classes(inifile=filename).items():
+    if filename:
+        for alias, classname in enabled_classes(inifile=filename).items():
             assert alias not in defaults, "Collision on key %s" % alias
             defaults[alias] = _load_class(classname).get_default_options()
     sources = [Defaults(defaults)]
@@ -908,7 +906,7 @@ def _classes_from_classname(enabled, classname):
     """Given a classname or alias, returns a list of class objects.
 
     :param enabled: The currently enabled repo classes, as returned by
-                    :py:func:`~ferenda.Manager._enabled_classes`
+                    :py:func:`~ferenda.Manager.enabled_classes`
     :type  enabled: dict
     :param classname: A classname (eg ``'ferenda.DocumentRepository'``) or
                       alias  (eg ``'base'``). The special value ``'all'``
@@ -958,7 +956,7 @@ def _setup_classnames(enabled, classname):
     with the same string is returned.
 
     :param enabled: The currently enabled repo classes, as returned by
-                    :py:func:`~ferenda.Manager._enabled_classes`
+                    :py:func:`~ferenda.Manager.enabled_classes`
     :type  enabled: dict
     :param classname: A classname (eg ``'ferenda.DocumentRepository'``) or
                       alias  (eg ``'base'``). The special value ``'all'``
@@ -991,7 +989,7 @@ def _run_class(enabled, argv, config):
     """Runs a particular action for a particular class.
 
     :param enabled: The currently enabled repo classes, as returned by
-                    :py:func:`~ferenda.Manager._enabled_classes`
+                    :py:func:`~ferenda.Manager.enabled_classes`
     :type  enabled: dict
     :param argv: An argv-style list of strings, see run (but note
                  that run() replaces ``all`` with every
@@ -1012,14 +1010,14 @@ def _run_class(enabled, argv, config):
     with util.logtime(log.info,
                       "%(alias)s %(action)s finished in %(elapsed).3f sec",
                       {'alias': alias, 'action': action}):
-        _enabled_classes = dict(reversed(item) for item in enabled.items())
-        if alias not in enabled and alias not in _enabled_classes:
+        enabled_classes = dict(reversed(item) for item in enabled.items())
+        if alias not in enabled and alias not in enabled_classes:
             log.error("Class-or-alias '%s' not enabled" % alias)
             return
         if alias in argv:
             argv.remove(alias)
         # ie a fully qualified classname was used
-        if alias in _enabled_classes:
+        if alias in enabled_classes:
             classname = alias
         else:
             classname = enabled[alias]
@@ -1293,7 +1291,7 @@ def _build_worker(jobqueue, resultqueue, clientname):
             if job['classname'] not in repos:
                 otherrepos = []
                 inst = insts[job['classname']]
-                for alias, classname in _enabled_classes().items():
+                for alias, classname in enabled_classes().items():
                     if alias != inst.alias:
                         obj = _instantiate_and_configure(classname, job['config'], logrecords, clientname)
                         if getattr(obj.config, job['command'], True):
@@ -1354,7 +1352,6 @@ def _build_worker(jobqueue, resultqueue, clientname):
 
 def _instantiate_and_configure(classname, config, logrecords, clientname):
     log = getlog()
-    # print("Client [pid %s]: supplied config is %s" % (os.getpid(), config))
     log.debug(
         "Client: [pid %s] instantiating and configuring %s" %
         (os.getpid(), classname))
@@ -1365,7 +1362,6 @@ def _instantiate_and_configure(classname, config, logrecords, clientname):
         # if getattr(inst.config, k) != v:
         #    print("pid %s: config %s is %s, should be %s" %
         #          (os.getpid(), k, getattr(inst.config, k), v))
-
     # When running in distributed mode (but not in multiprocessing
     # mode), setup the root logger to log to a StringIO buffer.
     if clientname:
@@ -1714,6 +1710,9 @@ def _run_class_with_basefile(clbl, basefile, version, kwargs, command,
     except Exception as e:
         if 'bdb.BdbQuit' in str(type(e)):
             raise
+        # tb = sys.exc_info()[2]
+        # sys.stderr.write("Client [pid %s]: Traceback:\n" % (os.getpid()))
+        # traceback.print_tb(tb)
         errmsg = str(e)
         loc = util.location_exception(e)
         label = basefile + ("@%s" % version if version else "")
@@ -1735,12 +1734,14 @@ def _instantiate_class(cls, config=None, argv=[]):
     """Given a class object, instantiate that class and make sure the
        instance is properly configured given it's own defaults, a
        config file, and command line parameters."""
+    if hasattr(config, cls.alias):
+        return cls(getattr(config, cls.alias))
     clsdefaults = cls.get_default_options()
     if not config:
-        defaults = dict(clsdefaults)
-        defaults[cls.alias] = {}
+        defaults = dict(DEFAULT_CONFIG)
+        defaults[cls.alias] = clsdefaults
         config = LayeredConfig(Defaults(defaults),
-                               INIFile(_find_config_file()),
+                               INIFile(find_config_file()),
                                Commandline(argv),
                                cascade=True)
     clsconfig = getattr(config, cls.alias)
@@ -1772,33 +1773,42 @@ def _instantiate_class(cls, config=None, argv=[]):
     return inst
 
 
-def _enabled_classes(inifile=None):
+def enabled_classes(inifile=None, config=None):
     """Returns a mapping (alias -> classname) for all registered classes.
 
     >>> enable("ferenda.DocumentRepository") == 'base'
     True
-    >>> _enabled_classes() == {'base': 'ferenda.DocumentRepository'}
+    >>> enabled_classes() == {'base': 'ferenda.DocumentRepository'}
     True
     >>> os.unlink("ferenda.ini")
 
-    :param inifile: The full path to a ferenda.ini file. If None, attempts
-                    to find ini file using
-                    :py:func:`ferenda.Manager._find_config_file`
+    :param inifile: The full path to a ferenda.ini file.
     :type inifile: str
-    :returns: A mapping between alias and classname for all registered classes.
+    :param config: An instantiated config object, used if inifile is
+                    None. If both inifile and config are None, this
+                    function will attempt to find an ini file using
+                    :py:func:`ferenda.Manager.find_config_file` :type
+                    inifile: str :returns: A mapping between alias and
+                    classname for all registered classes.  :rtype:
+                    dict
+    :returns: a mapping (alias -> classname) for all registered classes
     :rtype: dict
 
     """
-
-    cfg = configparser.ConfigParser()
-    if not inifile:
-        inifile = _find_config_file()
-
-    cfg.read([inifile])
     enabled = OrderedDict()
-    for section in cfg.sections():
-        if cfg.has_option(section, "class"):
-            enabled[section] = cfg.get(section, "class")
+    if not inifile and config:
+        for name in config:
+            if ininstance(getattr(config, name), LayeredConfig) and hasattr('class'):
+                enabled[name] = getattr(thing, 'class')
+        
+    else:
+        if not inifile:
+            inifile = find_config_file()
+        cfg = configparser.ConfigParser()
+        cfg.read([inifile])
+        for section in cfg.sections():
+            if cfg.has_option(section, "class"):
+                enabled[section] = cfg.get(section, "class")
     return enabled
 
 
@@ -1833,7 +1843,7 @@ def _list_enabled_classes():
 
     """
     res = OrderedDict()
-    for (alias, classname) in _enabled_classes().items():
+    for (alias, classname) in enabled_classes().items():
         cls = _load_class(classname)
         if cls.__doc__:
             res[alias] = cls.__doc__.split("\n")[0]
@@ -1929,7 +1939,7 @@ def _load_class(classname):
     raise ImportError("No class named '%s'" % classname)
 
 
-def _find_config_file(path=None, create=False):
+def find_config_file(path=None, create=False):
     """
     :returns: the full path to the configuration ini file
     """
@@ -1941,70 +1951,18 @@ def _find_config_file(path=None, create=False):
             "Config file %s not found (relative to %s)" % (inipath, os.getcwd()))
     return inipath
 
-
-def _setup_runserver_args(config, inifilename):
-    """Given a config object, returns a dict with some of those
-       configuration options, but suitable as arguments for
-       :py:func:`ferenda.Manager.runserver`.
-
-    :param config: An initialized config object with data from a ferenda.ini
-                   file
-    :type config: layeredconfig.LayeredConfig
-    :returns: A subset of the same configuration options
-    :rtype: dict
-
-    """
-    
-    if 'develurl' in config:
-        url = config.develurl
-        develurl = config.develurl
-    else:
-        url = config.url
-        develurl = None
-        
-    port = urlsplit(url).port or 80
-    relativeroot = os.path.join(os.path.dirname(inifilename), config.datadir)
-
-    # create an instance of every enabled repo
-    enabled = _enabled_classes(inifilename)
-    repoclasses = _classes_from_classname(enabled, 'all')
-    repos = []
-    for cls in repoclasses:
-        instconfig = getattr(config, cls.alias)
-        config_as_dict = dict(
-            [(k, getattr(instconfig, k)) for k in instconfig])
-        inst = cls(**config_as_dict)
-        inst.config._parent = config
-        repos.append(inst)
-
-    # for repo in repos:
-    #    print("Repo %r %s: config.datadir is %s" % (repo, id(repo), repo.config.datadir))
-    return {'config':         config,
-            'port':           port,
-            'documentroot':   relativeroot,
-            'apiendpoint':    config.apiendpoint,
-            'searchendpoint': config.searchendpoint,
-            'url':            config.url,
-            'develurl':       develurl,
-            'indextype':      config.indextype,
-            'indexlocation':  config.indexlocation,
-            'legacyapi':      config.legacyapi,
-            'repos':          repos}
-
-
 def _setup_frontpage_args(config, argv):
     # FIXME: This way of instantiating repo classes should maybe be
     # used by _setup_makeresources_args as well?
     #
     # FIXME: why do we pass a config object when we re-read
-    # ferenda.ini at least twice (_enabled_classes and
+    # ferenda.ini at least twice (enabled_classes and
     # _instantiate_class) ?!
     # reads only ferenda.ini using configparser rather than layeredconfig
-    enabled = _enabled_classes()
+    enabled = enabled_classes()
     repoclasses = _classes_from_classname(enabled, classname="all")
     repos = []
     for cls in repoclasses:
-        # inst = _instantiate_class(cls, _find_config_file(), argv)
         inst = _instantiate_class(cls, config, argv)
         repos.append(inst)
     if 'develurl' in config:

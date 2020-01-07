@@ -38,9 +38,11 @@ class KKVHandler(FixedLayoutHandler):
             
 
 class KKV(FixedLayoutSource):
-    """Hanterar konkurrensverkets databas över upphandlingsmål. Dokumenten
-härstammar alltså inte från konkurrensverket, men det är den myndighet
-som samlar, strukturerar och tillgängliggör dem."""
+    """Hanterar konkurrensverkets databas över upphandlingsmål. 
+
+Dokumenten härstammar alltså inte från konkurrensverket, men det är
+den myndighet som samlar, strukturerar och tillgängliggör dem.
+"""
 
     alias = "kkv"
     storage_policy = "dir"

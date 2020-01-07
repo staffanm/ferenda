@@ -13,10 +13,11 @@ from itertools import islice
 from io import BytesIO, StringIO
 from tempfile import mkstemp
 from time import sleep
-from operator import attrgetter
+from operator import attrgetter, itemgetter
 from pprint import pformat
 import codecs
 import fileinput
+import functools
 import inspect
 import json
 import logging
@@ -27,14 +28,19 @@ import shutil
 import sys
 import time
 import traceback
+import importlib
 from wsgiref.util import request_uri
 from urllib.parse import parse_qsl, urlencode
+from cached_property import cached_property
 
 from rdflib import Graph, URIRef, RDF, Literal
 from rdflib.namespace import DCTERMS
 from layeredconfig import LayeredConfig, Defaults
 from lxml import etree
 from ferenda.thirdparty.patchit import PatchSet, PatchSyntaxError, PatchConflictError
+from werkzeug.routing import Rule
+from werkzeug.wrappers import Response
+from jinja2 import Template
 
 from ferenda.compat import Mock
 from ferenda import (TextReader, TripleStore, FulltextIndex, WSGIApp,
@@ -42,8 +48,8 @@ from ferenda import (TextReader, TripleStore, FulltextIndex, WSGIApp,
                      CompositeRepository, DocumentEntry, Transformer,
                      RequestHandler, ResourceLoader)
 from ferenda.elements import serialize
-from ferenda.elements.html import Body, P, H1, H2, H3, Form, Textarea, Input, Label, Button, Textarea, Br, Div, A, Pre, Code, UL, LI
 from ferenda import decorators, util, manager
+from ferenda.manager import enable
 
 class DummyStore(object):
 
@@ -56,269 +62,321 @@ class DummyStore(object):
     def list_versions_for_basefiles(self, basefiles, action):
         return [] # pragma: no cover
 
-class WSGIOutputHandler(logging.Handler):
-    
-    def __init__(self, writer):
-        self.writer = writer
-        super(WSGIOutputHandler, self).__init__()
 
-    def emit(self, record):
-        entry = self.format(record) + "\n"
-        try:
-            self.writer(entry.encode("utf-8"))
-        except OSError as e:
-            # if self.writer has closed, it probably means that the
-            # HTTP client has closed the connection. But we don't stop
-            # for that.
-            pass
-
+def login_required(f):
+    """makes sure that the user is authenticated before calling the endpoint"""
+    @functools.wraps(f)
+    def wrapper(self, request, **values):
+        auth = request.authorization
+        if (not auth or
+            'username' not in self.repo.config or
+            'password' not in self.repo.config or
+            not (self.repo.config.username == auth.username and
+                 self.repo.config.password == auth.password)):
+            return Response("Authentication failed. You will need to use the username and password specified in ferenda.ini", 401,
+                            {"WWW-Authenticate": 'Basic realm="%s"' % self.repo.config.sitename})
+        else:
+            return f(self, request, **values)
+    return wrapper
 
 class DevelHandler(RequestHandler):
 
-    def supports(self, environ):
-        return environ['PATH_INFO'].startswith("/devel/")
+    @property
+    def rules(self):
+        return [Rule('/devel/',      endpoint=self.handle_dashboard),
+                Rule('/devel/build', endpoint=self.handle_build),
+                Rule('/devel/logs',  endpoint=self.handle_logs),
+                Rule('/devel/streaming-test',  endpoint=self.handle_streaming_test),
+                Rule('/devel/change-options',  endpoint=self.handle_change_options),
+                Rule('/devel/patch',  endpoint=self.handle_patch)]
 
-    def handle(self, environ):
-        segments = [x for x in environ['PATH_INFO'].split("/") if x]
-        if environ['REQUEST_METHOD'] == 'POST':
-            reqbody = environ['wsgi.input'].read(int(environ.get('CONTENT_LENGTH', 0)))
-            params = dict(parse_qsl(reqbody.decode("utf-8")))
-        else:
-            params = dict(parse_qsl(environ['QUERY_STRING']))
-
-        handler = {'patch': self.handle_patch,
-                   'logs': self.handle_logs,
-                   'change-parse-options': self.handle_change_parse_options,
-                   'build': self.handle_build,
-                   'streaming-test': self.handle_streaming_test}[segments[1]]
-        body = handler(environ, params)
-        res = self._render(segments[1], body, request_uri(environ), self.repo.config)
-        length = len(res)
-        fp = BytesIO(res)
-        return fp, length, 200, "text/html"
-
-
-    def _render(self, title, body, uri, config, template="xsl/generic.xsl"):
-        repo = DocumentRepository(config=config)
-        doc = repo.make_document()
-        doc.uri = uri
-        doc.meta.add((URIRef(doc.uri),
-                      DCTERMS.title,
-                      Literal(title, lang="sv")))
-        doc.body = body
-        xhtml = repo.render_xhtml_tree(doc)
-        documentroot = repo.config.datadir
-        conffile = os.sep.join([documentroot, 'rsrc',
+    def render_template(self, jinja_template, page_title, **context):
+        repo = DocumentRepository(config=self.repo.config)
+        jinja_template = """
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head><title>%(page_title)s</title></head>
+  <body>
+    <div>
+      %(jinja_template)s
+    </div>
+  </body>
+</html>
+""" % (locals())
+        t = Template(jinja_template)
+        xhtml = etree.parse(BytesIO(t.render(context).encode("utf-8")))
+        conffile = os.sep.join([repo.config.datadir, 'rsrc',
                                 'resources.xml'])
-        transformer = Transformer('XSLT', template, "xsl",
+        transformer = Transformer('XSLT', "xsl/generic.xsl", "xsl",
                                   resourceloader=repo.resourceloader,
                                   config=conffile)
         urltransform = None
         if 'develurl' in repo.config and repo.config.develurl:
             urltransform = repo.get_url_transform_func(develurl=repo.config.develurl)
-        depth = len(doc.uri.split("/")) - 3
+        depth = 2 # len(doc.uri.split("/")) - 3
         tree = transformer.transform(xhtml, depth,
                                      uritransform=urltransform)
-        return etree.tostring(tree, encoding="utf-8")
-
-    def stream(self, environ, start_response):
-        if environ['PATH_INFO'].endswith('change-parse-options'):
-            return self.handle_change_parse_options_stream(environ, start_response)
-        elif environ['PATH_INFO'].endswith('streaming-test'):
-            return self.handle_streaming_test_stream(environ, start_response)
-        elif environ['PATH_INFO'].endswith('build'):
-            return self.handle_build_stream(environ, start_response)
-        else:
-            start_response('500 Server error', [('Content-Type', 'text/plain')])
-            return ['No streaming handler registered for PATH_INFO %s' % environ['PATH_INFO']]
+        data = etree.tostring(tree, encoding="utf-8")
+        return Response(data, mimetype="text/html")
 
 
-    def _setup_streaming_logger(self, writer):
-        # these internal libs use logging to log things we rather not disturb the user with
-        for logname in ['urllib3.connectionpool',
-                        'chardet.charsetprober',
-                        'rdflib.plugins.parsers.pyRdfa']:
-            log = logging.getLogger(logname)
-            log.propagate = False
-
-        wsgihandler = WSGIOutputHandler(writer)
-        wsgihandler.setFormatter(
-            logging.Formatter("%(asctime)s [%(name)s] %(levelname)s %(message)s",
-                 datefmt="%H:%M:%S"))
-        rootlogger = logging.getLogger()
-        rootlogger.setLevel(logging.DEBUG)
-        for handler in rootlogger.handlers:
-            rootlogger.removeHandler(handler)
-        logging.getLogger().addHandler(wsgihandler)
-        return rootlogger
+    @login_required
+    def handle_dashboard(self, request, **values):
+        def compare_classnames(given, inspected):
+            # repoconfig.class can be "lagen.nu.SFS" and classname
+            # "lagen.nu.sfs.SFS". Unify this according to this
+            # heuristic (a proper solution would involve examining
+            # varius import statements in __init__.py files
+            if inspected == given:
+                return True
+            segments = inspected.split(".")
+            if segments[-1].lower() == segments[-2].lower():
+                inspected = ".".join(segments[:-2] + segments[-1:])
+            return inspected == given
         
-    def _shutdown_streaming_logger(self, rootlogger):
-        for h in list(rootlogger.handlers):
-            if isinstance(h, WSGIOutputHandler):
-                h.close()
-                rootlogger.removeHandler(h)
+        if request.method == 'POST':
+            statusmsg = errmsg = ""
+            if request.form['action'].lower() == "enable":
+                alias = enable(request.form['repo'])
+                statusmsg = "Enabled repository %s (%s)" % (alias, request.form['action'])
+            else:
+                errmsg = "Sorry, support for %s %s is not yet implemented -- you'll have to change ferenda.ini by hand" % (
+                    request.form['action'], request.form['repo'])
 
-    def handle_build(self, environ, params):
-        if params:
-            params = defaultdict(str, params)
-            label = "Running %(repo)s %(action)s %(basefile)s %(all)s %(force)s %(sefresh)s" % params
-            params["stream"] = "true"
-            streamurl = environ['PATH_INFO'] + "?" + urlencode(params)
-            return Body([H2(["ferenda-build"]),
-                         Pre(**{'class': 'pre-scrollable',
-                                'id': 'streaming-log-output',
-                                'src': streamurl})
-                         ])
+        # 1 create links to other devel tools (build, mkpatch, logs)
+        tools = []
+        for rule in self.rules:
+            if rule.endpoint == self.handle_dashboard:
+                continue
+            tools.append({'href': rule.rule,
+                          'name': rule.endpoint.__name__.split("_",1)[1].replace("_", " ").capitalize(),
+                          'doc': rule.endpoint.__doc__})
+        # 2 create a list of available repos that we can enable
+        # 3 list currently enabled repos and
+        #   3.1 their current status (downloaded, parsed, generated documents etc)
+        #   3.2 list available build actions for them
+        # Also, user-friendly descriptions for the first few steps that you can take
+        config = self.repo.config._parent
+        possible_repos = []
+        reported_repos = set()
+        for path in config.systempaths: #  normally [".."] or ["ferenda"]
+            for filename in util.list_dirs(path, ".py"):
+                if "/doc/" in filename or "/test/" in filename or "/res/" in filename or "/tools/" in filename:
+                    continue
+                # transform py file "ferenda/lagen/nu/sfs.py" > "lagen.nu.sfs"
+                modulename = filename[len(path)+1:-3].replace(os.sep, ".")
+                try:
+                    m = importlib.import_module(modulename)
+                    for cls in [o for (n,o) in inspect.getmembers(m) if inspect.isclass(o) and issubclass(o, DocumentRepository) and o.alias]:
+                        if cls.alias == "base":
+                            continue
+                        classname = cls.__module__ + "." + cls.__name__
+                        if classname in reported_repos:
+                            continue
+                        repoconfig = getattr(config, cls.alias, None)
+                        enabled = bool(repoconfig and compare_classnames(getattr(repoconfig, 'class'), classname))
+                        r = {'cls': cls,
+                             'alias': cls.alias,
+                             'classname': classname,
+                             'enabled': enabled,
+                             'toggle': 'Disable' if enabled else 'Enable',
+                             'doc': str(getattr(cls, '__doc__', '')).split("\n")[0]}
+                        if r['enabled']:
+                            blacklist = ("datadir", "patchdir",
+                                         "processes", "force", "parseforce",
+                                         "generateforce", "fsmdebug",
+                                         "refresh", "download", "url",
+                                         "develurl", "fulltextindex", "relate",
+                                         "clientname", "bulktripleload",
+                                         "class", "storetype", "storelocation",
+                                         "storerepository", "indextype",
+                                         "indexlocation", "combineresources",
+                                         "staticsite", "legacyapi", "sitename",
+                                         "sitedescription", "apiendpoint",
+                                         "searchendpoint", "toc", "news",
+                                         "loglevel", "logfile", "all",
+                                         "disallowrobots", "wsgiappclass",
+                                         "serverport", "authkey", "profile",
+                                         "wsgiexceptionhandler", "systempaths",
+                                         "alias", "action", "arguments")
+                            c = getattr(config, cls.alias)
+                            r['config'] = dict([(k, repr(getattr(c, k))) for k in c if k not in blacklist])
+                        possible_repos.append(r)
+                        reported_repos.add(classname)
+                except (ImportError, FileNotFoundError, NameError):
+                    pass
+        return self.render_template("""
+{% if statusmsg %}
+<div class="alert alert-success" role="alert">
+  {{statusmsg}}
+</div>
+{% endif %}
+
+{% if errmsg %}
+<div class="alert alert-danger" role="alert">
+  {{errmsg}}
+</div>
+{% endif %}
+
+<p>Welcome to the ferenda dashboard. Here you can configure and monitor
+your ferenda installation, and access other tools for maintaining your
+documents.</p>
+<p>{{errmsg}}</p>
+<p>{{statusmsg}}</p>
+
+<h2>Tools</h2>
+<ul>
+{% for tool in tools %}
+<li>
+<a href="{{tool.href}}">{{tool.name}}</a>: {{ tool.doc }}
+</li>
+{% endfor %}
+</ul>
+<h2>Available repositories</h2>
+<table class="table">
+<tr><th>repo</th><th>description</th><th>enabled</th><th>options</th></tr>
+{% for repo in possible_repos %}
+<tr>
+<td><big><a href="repo.cls.start_url">{{ repo.alias }}</a></big><br/><small>{{ repo.classname }}</small></td>
+<td>{{ repo.doc }}</td>
+<td>
+<form method="POST">
+<input type="hidden" name="repo" value="{{repo.classname}}"/>
+<input type="hidden" name="action" value="{{repo.toggle}}"/>
+<button type="submit" class="btn {% if not(repo.enabled) %}btn-primary{% endif %}">{{repo.toggle}}</button>
+</form>
+</td>
+<td><small>{% if repo.enabled %}
+{% for k in repo.config %}
+{{ k }}: {{ repo.config[k] }}<br/>
+{% endfor %}
+{% endif %}</small></td>
+</tr>
+{% endfor %}
+</table>
+""", "Dashboard", possible_repos=possible_repos, enabled=enabled, config=config, tools=tools)
+
+
+    @login_required
+    def handle_build(self, request, **values):
+        """Perform any action that the command line tool ferenda-build.py can do (download, parse, generate etc), over the web"""
+        if request.args:
+            if request.args.get("stream") == "true":
+                argv = [request.args[x] for x in ('repo', 'action', 'basefile', 'all', 'force', 'refresh') if request.args.get(x)]
+                argv.append('--loglevel=DEBUG')
+                manager.run(argv)
+            else:
+                label = "Running %(repo)s %(action)s %(basefile)s %(all)s %(force)s %(refresh)s" % defaultdict(str, request.args.to_dict())
+                streamurl = request.url + "&stream=true"
+                return self.render_template("""
+<h2>ferenda-build</h2>
+                <pre class="pre-scrollable" id="streaming-log-output" src="{{streamurl|e}}">
+</pre>""", label, streamurl=streamurl)
+            
         else:
-            return Body([
-                Div([H2(["ferenda-build.py"]),
-                     Form([
-                          Div([Label(["repo"], **{'for': "repo", 'class': "sr-only"}),
-                               Input(**{'type': "text", 'id': "repo", 'name': "repo", 'placeholder': "repo", 'class': "form-control"}),
-                               Label(["action"], **{'for': "action", 'class': "sr-only"}),
-                               Input(**{'type': "text", 'id': "action", 'name': "action", 'placeholder': "action", 'class': "form-control"}),
-                               Label(["basefile"], **{'for': "basefile", 'class': "sr-only"}),
-                               Input(**{'type': "text", 'id': "basefile", 'name': "basefile", 'placeholder': "basefile", 'class': "form-control"})
-                          ], **{'class': 'form-group'}),
-                         Div([Input(**{'type': "checkbox", 'id': "all", 'name': "all", 'value': "--all"}),
-                              Label(["--all"], **{'for': "all"}),
-                              Input(**{'type': "checkbox", 'id': "force", 'name': "force", 'value': "--force"}),
-                              Label(["--force"], **{'for': "force"}),
-                              Input(**{'type': "checkbox", 'id': "refresh", 'name': "refresh", 'value': "--refresh"}),
-                              Label(["--refresh"], **{'for': "refresh"}),
-                              Button(["Build"], **{'type': "submit", 'class': "btn btn-default"})
-                         ], **{'class': 'form-group'})
-                         
-                      ], **{'class': 'form-inline'})])])
-
-    def handle_build_stream(self, environ, start_response):
-        content_type = 'application/octet-stream'
-        writer = start_response('200 OK', [('Content-Type', content_type),
-                                           ('X-Accel-Buffering', 'no')]) 
-        rootlogger = self._setup_streaming_logger(writer)
-        log = logging.getLogger(__name__)
-        log.info("Running ...")
-        params = dict(parse_qsl(environ['QUERY_STRING']))
-        argv = [params[x] for x in ('repo', 'action', 'basefile', 'all', 'force', 'refresh') if params.get(x)]
-        argv.append('--loglevel=DEBUG')
-        try:
-            manager.run(argv)
-        except Exception as e:
-            exc_type, exc_value, tb = sys.exc_info()
-            tblines = traceback.format_exception(exc_type, exc_value, tb)
-            msg = "\n".join(tblines)
-            writer(msg.encode("utf-8"))
-        finally:
-            self._shutdown_streaming_logger(rootlogger)
-            # ok we're done
-        return []
+            return self.render_template("""
+<form class="form-inline">
+  <div class="form-group">
+    <label class="sr-only">repo
+      <input class="form-control" name="repo" type="text" placeholder="repo"/>
+    </label>
+    <label class="sr-only">action
+      <input class="form-control" name="action" type="text" placeholder="action"/>
+    </label>
+    <label class="sr-only">basefile
+      <input class="form-control" name="basefile" type="text" placeholder="basefile"/>
+    </label>
+  </div>
+  <div class="form-group">
+    <label>--all
+      <input id="all" name="all" type="checkbox" value="--all"/>
+    </label>
+    <label>--force
+      <input name="force" type="checkbox" value="--force"/>
+    <label for="refresh">--refresh
+      <input name="refresh" type="checkbox" value="--refresh"/>
+    </label>
+    <button class="btn btn-default" type="submit">Build</button>
+  </div>
+</form>""", "build")
 
 
-    def handle_streaming_test(self, environ, params):
-        return Body([
-            Div([H2(["Streaming test"]),
-                 Pre(**{'class': 'pre-scrollable',
-                        'id': 'streaming-log-output',
-                        'src': environ['PATH_INFO'] + "?stream=true"})])])
+    @login_required
+    def handle_streaming_test(self, request, **values):
+        """Diagnostic tool to see if long-running processes are able to stream their output to the web browser"""
+        if request.values.get('stream') == 'true':
+            log = logging.getLogger(__name__)
+            log.debug("Debug messages should work")
+            sleep(1)
+            log.info("Info messages should work")
+            sleep(1)
+            log.warning("Warnings should, unsurprisingly, work")
+        else:
+            return self.render_template("""
+            <pre class="pre-scrollable" id="streaming-log-output" src="/devel/streaming-test?stream=true"></pre>""", "Streaming-test")
 
-    def handle_streaming_test_stream(self, environ, start_response):
-        # using this instead of text/plain prevent chrome from
-        # buffering at the beginning (according to
-        # https://stackoverflow.com/q/20508788, there are three ways
-        # of overcoming this: The "X-Content-Type-Options: nosniff"
-        # header, sending at least 1024 bytes of data right away, or
-        # using a non text/plain content-type. The latter seems the
-        # easiest.
-        content_type = 'application/octet-stream'
-        # the second header disables nginx/uwsgi buffering so that
-        # results are actually streamed to the client, see
-        # http://nginx.org/en/docs/http/ngx_http_uwsgi_module.html#uwsgi_buffering
-        writer = start_response('200 OK', [('Content-Type', content_type),
-                                           ('X-Accel-Buffering', 'no'),
-                                           ('X-Content-Type-Options', 'nosniff')]) 
-        rootlogger = self._setup_streaming_logger(writer)
-        log = logging.getLogger(__name__)
-        #log.info("1024 bytes of start data: " + "x" * 1024)
-        #sleep(1)
-        log.debug("Debug messages should work")
-        sleep(1)
-        log.info("Info messages should work")
-        sleep(1)
-        log.warning("Warnings should, unsurprisingly, work")
-        self._shutdown_streaming_logger(rootlogger)
-        return []
 
-    def handle_change_parse_options(self, environ, params):
+    @login_required
+    def handle_change_options(self, request, **values):
+        """Display and change parse options for individual documents"""
         # this method changes the options and creates a response page
         # that, in turn, does an ajax request that ends up calling
         # handle_change_parse_options_stream
-        assert params
-        assert environ['REQUEST_METHOD'] == 'POST'
-        repo = params['repo']
-        subrepo = params['subrepo']
-        basefile = params['basefile']
-        newvalue = params['newvalue']
-        reason = params['reason']
-        inst = self.repo._repo_from_alias(repo)
-        optionsfile = inst.resourceloader.filename("options/options.py")
-        want = '("%s", "%s"):' % (repo, basefile)
-        lineidx = None
-        out = ""
-        with open(optionsfile) as f:
-            for idx, line in enumerate(f):
-                if want in line:
-                    lineidx = idx
-                    currentvalue = re.search(': "([^"]+)",', line).group(1)
-                    line = line.replace(currentvalue, newvalue)
-                    line = line.rstrip() + " # " + reason + "\n"
-                out += line
-        util.writefile(optionsfile, out)
-        # now we must invalidate the cached property
-        if 'parse_options' in inst.__dict__:
-            del inst.__dict__['parse_options']
-        if lineidx:
-            datasrc = "%s?repo=%s&subrepo=%s&basefile=%s&stream=true" % (
-                environ['PATH_INFO'],
-                repo,
-                subrepo,
-                basefile)
-            res = [H2(["Changing options for %s in repo %s" % (basefile, repo)]),
-                   # Pre([pformat(environ)]),
-                   P(["Changed option at line %s from " % lineidx,
-                      Code([currentvalue]),
-                      " to ",
-                      Code([newvalue])]),
-                   P(["Now downloading and processing (please be patient...)"]),
-                   Pre(**{'class': 'pre-scrollable',
-                          'id': 'streaming-log-output',
-                          'src': datasrc})]
-        else:
-            res = [H2(["Couldn't change options for %s in repo %s" % (basefile, repo)]),
-                   P(["Didn't manage to find a line matching ",
-                      Code([want]),
-                      " in ",
-                      Code([optionsfile])])]
-        return Body([
-            Div(res)
-            ])
-
-    def handle_change_parse_options_stream(self, environ, start_response):
-        writer = start_response('200 OK', [('Content-Type', 'application/octet-stream'),
-                                           ('X-Accel-Buffering', 'no')]) 
-        rootlogger = self._setup_streaming_logger(writer)
-        # now do the work
-        params = dict(parse_qsl(environ['QUERY_STRING']))
-        repoconfig = getattr(self.repo.config._parent, params['repo'])
-        repoconfig.loglevel = "DEBUG"
-        repo = self.repo._repo_from_alias(params['repo'], repoconfig=repoconfig)
-        if 'subrepo' in params:
-            subrepoconfig = getattr(self.repo.config._parent, params['subrepo'])
-            subrepoconfig.loglevel = "DEBUG"
-            subrepo = self.repo._repo_from_alias(params['subrepo'], repoconfig=subrepoconfig)
-        else:
-            subrepo = repo
-        basefile = params['basefile']
-        try:
+        if request.method == 'POST':
+            repo = request.form['repo']
+            subrepo = request.form['subrepo']
+            basefile = request.form['basefile']
+            newvalue = request.form['newvalue']
+            reason = request.form['reason']
+            inst = self.repo._repo_from_alias(repo)
+            optionsfile = inst.resourceloader.filename("options/options.py")
+            want = '("%s", "%s"):' % (repo, basefile)
+            lineidx = None
+            out = ""
+            with open(optionsfile) as f:
+                for idx, line in enumerate(f):
+                    if want in line:
+                        lineidx = idx
+                        currentvalue = re.search(': "([^"]+)",', line).group(1)
+                        line = line.replace(currentvalue, newvalue)
+                        line = line.rstrip() + " # " + reason + "\n"
+                    out += line
+            util.writefile(optionsfile, out)
+            # now we must invalidate the cached property
+            if 'parse_options' in inst.__dict__:
+                del inst.__dict__['parse_options']
+            if lineidx:
+                datasrc = "%s?repo=%s&subrepo=%s&basefile=%s&stream=true" % (
+                    environ['PATH_INFO'],
+                    repo,
+                    subrepo,
+                    basefile)
+                return self.render_template("""
+<div>
+  <h2>Changing options for {{basefile}} in repo {{repo}}</h2>
+  <p>Changed option at line {{lineidx}} from <code>{{currentvalue}}</code> to <code>{{newvalue}}</code></p>
+  <p>Now downloading and processing (please be patient...)</p>
+  <pre class="pre-scrollable" id="streaming-log-output" src="{{datasrc}}"></pre>
+</div>""", "Change options", basefile=basefile,
+                             repo=repo, lineidx=lineidx,
+                             currentvalue=currentvalue,
+                             newvalue=newvalue, datasrc=datasrc)
+            else:
+                return self.render_template("""
+<div>
+  <h2>Couldn't change options for {{basefile}} in repo {{repo}}</h2>
+  <p>Didn't manage to find a line matching <code>{{want}}</code> in <code>{{optionsfile}}</p>
+</div>""", "Change options", basefile=basefile, repo=repo, want=want, optionsfile=optionsfile)
+        elif request.args.get("stream") == "true":
+            repoconfig = getattr(self.repo.config._parent, request.form['repo'])
+            repoconfig.loglevel = "DEBUG"
+            repo = self.repo._repo_from_alias(request.form['repo'], repoconfig=repoconfig)
+            if 'subrepo' in request.form:
+                subrepoconfig = getattr(self.repo.config._parent, request.form['subrepo'])
+                subrepoconfig.loglevel = "DEBUG"
+                subrepo = self.repo._repo_from_alias(request.form['subrepo'], repoconfig=subrepoconfig)
+            else:
+                subrepo = repo
+            basefile = request.form['basefile']
             rootlogger.info("Downloading %s" % basefile)
             subrepo.config.refresh = True  # the repo might have a partial download, eg of index HTML page but without PDF document
             subrepo.download(basefile)
@@ -331,18 +389,40 @@ class DevelHandler(RequestHandler):
             # sleep(1)
             rootlogger.info("Generating %s" % basefile)
             repo.generate(basefile)
-            # sleep(1)
-        except Exception as e:
-            exc_type, exc_value, tb = sys.exc_info()
-            tblines = traceback.format_exception(exc_type, exc_value, tb)
-            msg = "\n".join(tblines)
-            writer(msg.encode("utf-8"))
-        finally:
-            self._shutdown_streaming_logger(rootlogger)
-            # ok we're done
-        return []
+        else:
+            self.render_template("""
+<div>
+<form method="POST">
+  <label>Repo: 
+    <input name="repo"/>
+  </label>
+  <label>Subrepo (if applicable):
+    <input name="subrepo"/>
+  </label>
+  <label>Basefile:
+    <input name="basefile"/>
+  </label>
+  <label>
+    Action:
+    <select name="action">
+      <option>download</option>
+      <option selected="selected">parse</option>
+      <option>relate</option>
+      <option>generate</option>
+    </selection>
+  </label>
+  <label>
+    New value:
+    <input name="newvalue">
+  </label>
+  <input type="submit" class="btn btn-default" value="Importera dokument"/>
+<form>
+</div>""", "Change options for a specific basefile")
 
-    def handle_patch(self, environ, params):
+
+    @login_required
+    def handle_patch(self, request, **values):
+        """Create patch files for documents for redacting or correcting data in the source documents"""
         def open_intermed_text(repo, basefile, mode="rb"):
             intermediatepath = repo.store.intermediate_path(basefile)
             opener = open
@@ -363,86 +443,85 @@ class DevelHandler(RequestHandler):
             tbstr = "\n".join(tblines)
             return tbstr
 
-        if not params:
-            # start page: list available patches maybe? form with repo names and textbox for basefile?
-            res = Body([
-                Div([
-                    H2(["Create a new patch"]),
-                    Form([
-                        Div([
-                            Label(["repo"], **{'for': 'repo'}),
-                            Input(**{'type':"text", 'id': "repo", 'name': "repo", 'class': "form-control"}),
-                            Label(["basefile"], **{'for': 'basefile'}),
-                            Input(**{'type':"text", 'id': "basefile", 'name': "basefile", 'class': "form-control"})],
-                            **{'class': 'form-group'}),
-                        Button(["Create"], **{'type': "submit", 'class': "btn btn-default"})],
-                     action=environ['PATH_INFO'], method="GET")
-                ])])
-            return res
+        if not request.args:
+            # start page: list available patches maybe? form with repo
+            # names and textbox for basefile?
+            return self.render_template("""
+<div>
+  <h2>Create a new patch</h2>
+  <form>
+    <div class="form-group">
+      <label for="repo">repo
+        <input type="text" id="repo" name="repo" class="form-control"/>
+      </label>
+      <label for="basefile">basefile
+        <input type="text" id="basefile" name="basefile" class="form-control"/>
+      </label>
+    </div>
+  </form>
+</div>""", "patch")
         else:
-            alias = params['repo']
-            basefile = params['basefile']
+            alias = request.args['repo']
+            basefile = request.args['basefile']
             repo = self.repo._repo_from_alias(alias)
             patchstore = repo.documentstore_class(repo.config.patchdir +
                                                   os.sep + repo.alias)
             patchpath = patchstore.path(basefile, "patches", ".patch")
-            if environ['REQUEST_METHOD'] == 'POST':
-                # fp = open_intermed_text(repo, basefile, mode="wb")
-                # FIXME: Convert CRLF -> LF. We should determine from
-                # existing intermed file what the correct lineending
-                # convention is
-                # fp.write(params['filecontents'].replace("\r\n", "\n").encode(repo.source_encoding))
-                # fp.close()
-                self.repo.mkpatch(repo, basefile, params.get('description',''),
-                                  params['filecontents'].replace("\r\n", "\n"))
+            if request.method == 'POST':
+                self.repo.mkpatch(repo, basefile, request.args.get('description',''),
+                                  request.args['filecontents'].replace("\r\n", "\n"))
                 log = []
-                if params.get('parse') == "true":
+                do_generate = request.args.get('generate') == "true"
+                if request.args.get('parse') == "true":
                     repo.config.force = True
-                    log.append(P(["Parsing %s" % basefile]))
+                    log.append("Parsing %s" % basefile)
                     try:
                         repo.parse(basefile)
-                        log.append(P(["Parsing successful"]))
+                        log.append("Parsing successful")
                     except Exception:
-                        log.append(Pre([format_exception()]))
-                        params['generate'] = "false"
-
-                if params.get('generate') == "true":
+                        log.append(format_exception())
+                        do_generate = False
+                if do_generate:
                     repo.config.force = True
                     repo.generate(basefile)
-                    log.append(P(["Generating %s" % basefile]))
+                    log.append("Generating %s")
                     try:
                         repo.generate(basefile)
-                        log.append(P(["Generation successful: ",
-                                     A([basefile], href=repo.canonical_uri(basefile))]))
+                        log.append('Generation successful: <a href="%s">%s</a>' % (repo.canonical_uri(basefile)), basefile)
                     except Exception:
                         log.append(Pre([format_exception()]))
 
-                if os.path.exists(patchpath):
+                patchexists = os.path.exists(patchpath)
+                if patchexists:
                     patchcontent = util.readfile(patchpath)
-                    res = Body([
-                        Div([
-                            H2(["patch generated at %s" % patchpath]),
-                            P("Contents of the new patch"),
-                            Pre([util.readfile(patchpath)])]),
-                        Div(log)])
                 else:
-                    res = Body([
-                        Div([H2(["patch was not generated"])]),
-                        Div(log)])
-                return res
+                    patchcontent = None
+                return self.render_template("""
+<div>
+  {% if patchexists %}
+  <h2>Patch generated at {{patchpath}}</h2>
+  <p>Contents of new patch</p>
+  <pre>{{patchcontent}}</pre>
+  {% else %}
+  <h2>Patch was not generated</h2>
+  {% endif %}
+  {% for line in log %}
+  <p>{{line}}</p>
+  {% endfor %)
+</div>""", "patch", patchexists=patchexists, patchpath=patchpath, patchcontent=patchcontent, log=log)
             else:
-                print("load up intermediate file, display it in a textarea + textbox for patchdescription")
                 fp = open_intermed_text(repo, basefile)
                 outfile = util.name_from_fp(fp)
                 text = fp.read().decode(repo.source_encoding)
                 fp.close
                 patchdescription = None
-                if os.path.exists(patchpath) and params.get('ignoreexistingpatch') != 'true':
-                    ignorepatchlink = "%s?%s&ignoreexistingpatch=true" % (environ['PATH_INFO'], environ['QUERY_STRING'])
+                if os.path.exists(patchpath) and request.args.get('ignoreexistingpatch') != 'true':
+                    ignorepatchlink = request.url + "&ignoreexistingpatch=true"
                     with codecs.open(patchpath, 'r', encoding=repo.source_encoding) as pfp:
                         if repo.config.patchformat == 'rot13':
                             pfp = StringIO(codecs.decode(pfp.read(), "rot13"))
                         try:
+                            patchcontent = util.readfile(patchpath)
                             ps = PatchSet.from_stream(pfp)
                             lines = text.split("\n")
                             offsets = ps.patches[0].adjust(lines)
@@ -451,73 +530,54 @@ class DevelHandler(RequestHandler):
                                 patchdescription = ps.patches[0].hunks[0].comment
                             else:
                                 patchdescription = ""
-                            instructions = Div([
-                                P(["Existing patch at %s has been applied (" % patchpath,
-                                   A("ignore existing patch", href=ignorepatchlink), ")"]),
-                                P(["Contents of that patch, for reference"]),
-                                Pre([util.readfile(patchpath)])])
-                            if any(offsets):
-                                instructions.append(P("Patch did not apply cleanly, the following adjustments were made: %s" % offsets))
+                            instructions = "existing-patch"
                         except (PatchSyntaxError, PatchConflictError) as e:
-                            instructions = Div([
-                                P(["Existing patch at %s could not be applied (" % patchpath,
-                                   A("ignore existing patch", href=ignorepatchlink), ")"]),
-                                P("The error was:"),
-                                Pre([format_exception()])
-                                ])
+                            instructions = "existing-patch-fail"
                             patchdescription = ""
-                else:
-                    instructions = P(["Change the original data as needed"])
 
-                # the extra \n before filecontents text is to
-                # compensate for a missing \n introduced by the
-                # textarea tag
-                res = Body([
-                    H2(["Editing %s" % outfile]),
-                    instructions,
-                    Div([
-                        Form([Textarea(["\n"+text], **{'id': 'filecontents',
-                                                  'name': 'filecontents',
-                                                  'cols': '80',
-                                                  'rows': '30',
-                                                  'class': 'form-control'}),
-                              Br(),
-                              Div([
-                                  Label(["Description of patch"], **{'for': 'description'}),
-                                  Input(**{'id':'description',
-                                           'name': 'description',
-                                           'value': patchdescription,
-                                           'class': 'form-control'})
-                                  ], **{'class': 'form-group'}),
-                              Div([
-                                  Label([
-                                      Input(**{'type': 'checkbox',
-                                               'id': 'parse',
-                                               'name': 'parse',
-                                               'checked': 'checked',
-                                               'value': 'true',
-                                               'class': 'form-check-input'}),
-                                      "Parse resulting file"], **{'class': 'form-check-label'})],
-                                  **{'class': 'form-check'}),
-                              Div([
-                                  Label([
-                                      Input(**{'type': 'checkbox',
-                                               'id': 'generate',
-                                               'name': 'generate',
-                                               'checked': 'checked',
-                                               'value': 'true',
-                                               'class': 'form-check-input'}),
-                                      "Generate HTML from results of parse"], **{'class': 'form-check-label'})],
-                                  **{'class': 'form-check'}),
-                              Input(id="repo", type="hidden", name="repo", value=alias),
-                              Input(id="basefile", type="hidden", name="basefile", value=basefile),
-                              Button(["Create patch"], **{'type': 'submit',
-                                                          'class': 'btn btn-default'})],
-                             action=environ['PATH_INFO'], method="POST"
-                             )])])
-                             
-                return res
-        # return fp, length, status, mimetype
+                self.render_template("""
+<div>
+  <h2>Editing {{outfile}}</h2>
+  {% if instructions == "existing-patch" %}
+  <p>Existing patch at {{patchpath}} has been applied 
+  (<a href="{{ignorepatchlink}}">ignore existing patch</a>)</p>
+  <p>Contents of that patch, for reference</p>
+  <pre>{{patchcontent}}</pre>
+    {% if offsets %}
+    <p>Patch did not apply cleanly, the following adjustments were made: {{offsets}}</p>
+    {% endif %}                
+  {% elif instructions == "existing-patch-fail" %}
+  <p>Existing patch at {{patchpath}} could not be applied 
+  (<a href="{{ignorepatchlink}}">ignore existing patch</a></p>
+  <p>The error was</p>
+  <pre>{{formatted_exception}}</pre>
+  {% endif %}
+  <p>Change the original data as needed</p>
+  <form method="POST">
+    <textarea class="form-control" id="filecontents" name="filecontents" rows="30" cols="80"></textarea>
+    <br/>
+    <div class="form-group">
+      <label>Description of patch
+        <input class="form-control" name="description"/>
+      </label>
+    </div>
+    <div class="form-check">
+      <label class="form-check-label">
+        Parse resulting file
+        <input class="form-check-input" id="parse" name="parse" type="checkbox" value="true" checked="checked"/>
+      </label>
+    </div>
+    <div class="form-check">
+      <label class="form-check-label">
+        Generate HTML from results of parse
+        <input class="form-check-input"name="generate" type="checkbox" value="true" checked="checked"/>
+      </label>
+    </div>
+    <input id="repo" name="repo" type="hidden" value="{{alias}}"/>
+    <input id="basefile" name="basefile" type="hidden" value="{{basefile}}"/>
+    <button class="btn btn-default" type="submit">Create patch</button>
+  </form>
+</div>""", "patch", outfile=outfile, alias=alias, basefile=basefile)
 
     def analyze_log(self, filename, listerrors=False):
         modules = defaultdict(int)
@@ -569,7 +629,7 @@ class DevelHandler(RequestHandler):
         output = StringIO()
         counters = defaultdict(Counter)
         msgloc = re.compile(" \([\w/]+.py:\d+\)").search
-        eventok = re.compile("[^ ]+: (download|parse|relate|generate|transformlinks) OK").match
+        eventok = re.compile("[^ ]+:? (download|parse|relate|generate|transformlinks) OK").match
         with open(logfilename) as fp:
             for line in fp:
                 try:
@@ -606,12 +666,15 @@ class DevelHandler(RequestHandler):
         return output.getvalue()
         
 
-    def handle_logs(self, environ, params):
+    @login_required
+    def handle_logs(self, request, **values):
+        """Display and summarize logfiles from recent ferenda-build.py runs"""
         logdir = self.repo.config.datadir + os.sep + "logs"
-        def elapsedtime(f):
+        def elapsed(f):
+            filesize = os.path.getsize(f)
             with open(f) as fp:
                 first = fp.readline()
-                fp.seek(os.path.getsize(f) - 500)
+                fp.seek(filesize - min(500,filesize - fp.tell()))
                 last = fp.read().split("\n")[-2]
             start = datetime.strptime(first.split(" ")[0], "%H:%M:%S")
             end = datetime.strptime(last.split(" ")[0], "%H:%M:%S")
@@ -627,33 +690,56 @@ class DevelHandler(RequestHandler):
                     return "[log is empty?]"
             
         def linkelement(f):
-            href = environ['PATH_INFO'] + "?file=" + f
-            return LI([A(f, href=href), " ", Code([firstline(f)]), " (%.2f kb)" % (os.path.getsize(logdir+os.sep+f) / 1024)])
+            return {"filename": f,
+                    "href": request.path + "?file=" + f,
+                    "firstline": firstline(f),
+                    "size": os.path.getsize(logdir + os.sep + f)}
 
-        if not params:
-            logfiles = sorted([f for f in os.listdir(logdir) if f.endswith(".log")], reverse=True)
-            return Body([
-                Div([UL([linkelement(f) for f in logfiles])])])
-        elif 'file' in params:
+        if not request.args:
+            logfiles = sorted([linkelement(f) for f in os.listdir(logdir) if f.endswith(".log")], reverse=True, key=itemgetter('filename'))
+            return self.render_template("""
+<div>
+<ul>
+{% for f in logfiles %}
+            <li><a href="{{f.href}}"></a><code>{{f.firstline}}</code> {{f.size|filesizeformat}}</li>
+{% endfor %}
+</ul>
+</div>
+            """, "logfiles", logfiles=logfiles)
+        elif request.args.get('stream'):
+            assert 'writer' in values
+            logfilename = logdir+os.sep+request.args.get('file')
+            with open(logfilename, "rb") as fp:
+                for line in fp:
+                  values['writer'](line)
+        elif request.args.get('file'):
             start = time.time()
-            assert re.match("\d{8}-\d{6}.log$", params['file']), "invalid log file name"
-            logfilename = logdir+os.sep+params['file']
+            assert re.match("\d{8}-\d{6}.log$", request.args.get('file')), "invalid log file name"
+            logfilename = logdir+os.sep+request.args.get('file')
             buildstats = self.analyze_buildstats(logfilename)
             errorstats = self.analyze_log(logfilename)
             if not errorstats:
                 errorstats = "[analyze_log didn't return any output?]"
             logcontents = util.readfile(logfilename)
-            elapsed = elapsedtime(logfilename)
-            return Body([
-                Div([H2([params['file']]),
-                     P(["Log processed in %.3f s. The logged action took %.0f s." % (time.time() - start, elapsed.total_seconds())]),
-                     H3(["Buildstats"]),
-                     Pre([buildstats]),
-                     H3(["Errors"]),
-                     Pre([errorstats]),
-                     H3(["Logs"]),
-                     Pre([logcontents], **{'class': 'logviewer'})])])
-
+            processtime = time.time() - start
+            elapsedtime = elapsed(logfilename).total_seconds()
+            streamurl = request.url + "&stream=true"
+            return self.render_template("""
+<div>
+  <p>Log processed in {{"%.3f"|format(processtime)}} s. The logged action took {{"%.0f"|format(elapsedtime)}} s</p>
+  <h3>Buildstats</h3>
+  <pre>{{buildstats}}</pre>
+  <h3>Errors</h3>            
+  <pre>{{errorstats}}</pre>
+  <h3>Logs</h3>
+  <pre class="pre-scrollable logviewer" id="streaming-log-output" src="{{streamurl|e}}">
+  </pre>
+</div>""", "log %s" % logfilename, logfilename=logfilename,
+                                        processtime=processtime,
+                                        elapsedtime=elapsedtime,
+                                        buildstats=buildstats,
+                                        errorstats=errorstats,
+                                        streamurl=streamurl)
 
 
 class Devel(object):
@@ -1231,7 +1317,8 @@ class Devel(object):
         idst = destrepo.store.intermediate_path(basefile)
         if destrepo.config.compress == "bz2":
             idst += ".bz2"
-        copy = shutil.copy2
+        copy = shutil.copy
+        copytree = False
         if sourcerepo.store.storage_policy == "dir":
             src = os.path.dirname(src)
             dst = os.path.dirname(dst)
@@ -1241,13 +1328,20 @@ class Devel(object):
                 shutil.rmtree(dst)
             if os.path.exists(idst):
                 shutil.rmtree(idst)
-            copy = shutil.copytree
+            # copy = shutil.copytree
+            copytree = True
         util.ensure_dir(dst)
         try:
-            copy(src, dst)
+            if copytree:
+                shutil.copytree(src,dst,copy_function=copy)
+            else:
+                copy(src, dst)
             if os.path.exists(isrc):
                 util.ensure_dir(idst)
-                copy(isrc, idst)
+                if copytree:
+                    shutil.copytree(isrc, idst, copy_function=copy)
+                else:
+                    copy(isrc, idst)
         except FileNotFoundError as e:
             print("WARNING: %s" % e)
 
@@ -1264,7 +1358,7 @@ class Devel(object):
         # also copy the docentry json file
         if os.path.exists(sourcerepo.store.documententry_path(basefile)):
             util.ensure_dir(destrepo.store.documententry_path(basefile))
-            shutil.copy2(sourcerepo.store.documententry_path(basefile),
+            shutil.copy(sourcerepo.store.documententry_path(basefile),
                          destrepo.store.documententry_path(basefile))
 
 
@@ -1457,7 +1551,10 @@ class Devel(object):
     
     @classmethod
     def get_default_options(cls):
-        return {}  # pragma: no cover
+        options = DocumentRepository.get_default_options()
+        options.update({'username': str,
+                        'password': str})
+        return options
 
     def download(self):
         pass  # pragma: no cover
@@ -1487,8 +1584,20 @@ class Devel(object):
         return []
 
     def frontpage_content(self, primary=False):
-        return ("<h2>Welcome to ferenda</h2>"
-                "<p>Add a few document repositories and have fun!</p>")
+        return ("""<?xml version='1.0' encoding='utf-8'?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <title>site</title>
+</head>
+<body>
+<div>
+<h2>Welcome to ferenda</h2>
+<p>Add a few document repositories and have fun!</p>
+<p><a href="/devel/">Dashboard</a></p>
+</div>
+</body>
+</html>
+""")
 
     def get_url_transform_func(self, **transformargs):
         return lambda x: x

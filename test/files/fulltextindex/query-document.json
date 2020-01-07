@@ -1,13 +1,93 @@
-{"took":3,"timed_out":false,"_shards":{"total":1,"successful":1,"failed":0},"hits":{"total":2,"max_score":1.1267219,"hits":[{"_index":"ferenda","_type":"base","_id":"2","_score":1.1267219, "_source" : {
-    "text": "This is the second document (not the first)",
-    "uri": "http://example.org/doc/2",
-    "basefile": "2",
-    "dcterms_identifier": "Doc #2",
-    "dcterms_title": "Second document"
-},"highlight":{"text":["This is the second <strong class='match'>document</strong> (not the first)"]}},{"_index":"ferenda","_type":"base","_id":"1","_score":0.19917816, "_source" : {
-    "text": "This is the main text of the document (independent sections excluded)",
-    "uri": "http://example.org/doc/1",
-    "basefile": "1",
-    "dcterms_identifier": "Doc #1",
-    "dcterms_title": "First example"
-},"highlight":{"text":["This is the main text of the <strong class='match'>document</strong> (independent sections excluded)"]}}]}}
+{
+    "took": 10,
+    "timed_out": false,
+    "_shards": {
+        "total": 1,
+        "successful": 1,
+        "skipped": 0,
+        "failed": 0
+    },
+    "hits": {
+        "total": {
+            "value": 2,
+            "relation": "eq"
+        },
+        "max_score": 0.9248166,
+        "hits": [
+            {
+                "_index": "ferenda",
+                "_type": "_doc",
+                "_id": "base/2",
+                "_score": 0.9248166,
+                "_source": {
+                    "basefile": "2",
+                    "dcterms_title": "Second document",
+                    "repo": "base",
+                    "dcterms_identifier": "Doc #2",
+                    "join": "parent",
+                    "uri": "http://example.org/doc/2"
+                },
+                "highlight": {
+                    "text": [
+                        "This is the second <em>document</em> (not the first)"
+                    ]
+                },
+                "inner_hits": {
+                    "child": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            },
+            {
+                "_index": "ferenda",
+                "_type": "_doc",
+                "_id": "base/1",
+                "_score": 0.81058955,
+                "_source": {
+                    "basefile": "1",
+                    "dcterms_title": "First example",
+                    "repo": "base",
+                    "dcterms_identifier": "Doc #1",
+                    "join": "parent",
+                    "uri": "http://example.org/doc/1"
+                },
+                "highlight": {
+                    "text": [
+                        "This is the main text of the <em>document</em> (independent sections excluded)"
+                    ]
+                },
+                "inner_hits": {
+                    "child": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            }
+        ]
+    },
+    "aggregations": {
+        "type": {
+            "doc_count_error_upper_bound": 0,
+            "sum_other_doc_count": 0,
+            "buckets": [
+                {
+                    "key": "base",
+                    "doc_count": 2
+                }
+            ]
+        }
+    }
+}

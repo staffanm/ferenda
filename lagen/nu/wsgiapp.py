@@ -13,6 +13,7 @@ from datetime import datetime
 # 3rdparty
 from rdflib import URIRef, Graph
 from rdflib.namespace import SKOS, FOAF, DCTERMS, RDF, RDFS
+from werkzeug.wrappers import Response
 
 # own
 from ferenda import WSGIApp as OrigWSGIApp
@@ -30,34 +31,39 @@ class WSGIApp(OrigWSGIApp):
     """
 
     snippet_length = 160
-    def __init__(self, repos, inifile=None, **kwargs):
-        super(WSGIApp, self).__init__(repos, inifile, **kwargs)
-        sfsrepo = [repo for repo in repos if repo.alias == "sfs"][0]
-        self.parser = SwedishCitationParser(
-            LegalRef(LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.KORTLAGRUM, LegalRef.FORARBETEN, LegalRef.MYNDIGHETSBESLUT),
-            sfsrepo.minter,
-            sfsrepo.commondata,
-            allow_relative=True)
-        graph = Graph().parse(sfsrepo.resourceloader.filename("extra/sfs.ttl"), format="turtle")
-        self.lagforkortningar = [str(o) for s, o in graph.subject_objects(DCTERMS.alternate)]
-        self.paragraflag = []
-        for s, o in graph.subject_objects(DCTERMS.alternate):
-            basefile = sfsrepo.basefile_from_uri(str(s))
-            distilledpath = sfsrepo.store.distilled_path(basefile)
-            firstpara_uri = str(s) + "#P1"
-            needle = '<rpubl:Paragraf rdf:about="%s">' % firstpara_uri
-            if os.path.exists(distilledpath) and needle in util.readfile(distilledpath):
-                self.paragraflag.append(str(o).lower())
-        self.lagnamn = [str(o) for s, o in graph.subject_objects(RDFS.label)]
-        self.lagforkortningar_regex = "|".join(sorted(self.lagforkortningar, key=len, reverse=True))
+    def __init__(self, repos, config):
+        super(WSGIApp, self).__init__(repos, config)
+        sfsrepo = [repo for repo in repos if repo.alias == "sfs"]
+        if sfsrepo:
+            sfsrepo = sfsrepo[0]
+            self.parser = SwedishCitationParser(
+                LegalRef(LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.KORTLAGRUM, LegalRef.FORARBETEN, LegalRef.MYNDIGHETSBESLUT),
+                sfsrepo.minter,
+                sfsrepo.commondata,
+                allow_relative=True)
+            graph = Graph().parse(sfsrepo.resourceloader.filename("extra/sfs.ttl"), format="turtle")
+            self.lagforkortningar = [str(o) for s, o in graph.subject_objects(DCTERMS.alternate)]
+            self.paragraflag = []
+            for s, o in graph.subject_objects(DCTERMS.alternate):
+                basefile = sfsrepo.basefile_from_uri(str(s))
+                distilledpath = sfsrepo.store.distilled_path(basefile)
+                firstpara_uri = str(s) + "#P1"
+                needle = '<rpubl:Paragraf rdf:about="%s">' % firstpara_uri
+                if os.path.exists(distilledpath) and needle in util.readfile(distilledpath):
+                    self.paragraflag.append(str(o).lower())
+            self.lagnamn = [str(o) for s, o in graph.subject_objects(RDFS.label)]
+            self.lagforkortningar_regex = "|".join(sorted(self.lagforkortningar, key=len, reverse=True))
             
 
-    def parse_parameters(self, querystring, idx):
-        q, param, pagenum, pagelen, stats = super(WSGIApp,
-                                                  self).parse_parameters(querystring, idx)
+    def parse_parameters(self, request, idx):
+        options = super(WSGIApp, self).parse_parameters(request, idx)
         # if Autocomple call, transform q to suitable parameters (find
         # uri)
-        if querystring.endswith("_ac=true"):
+        param = options["fields"]
+        q = options["q"]
+        options['boost_repos'] =  [('sfs', 10)]
+        if options["autocomplete"]:
+            options['exclude_repos'] = ('mediawiki',)
             uri = self.expand_partial_ref(q)
             if uri:
                 param['uri'] = uri.lower()
@@ -67,6 +73,7 @@ class WSGIApp(OrigWSGIApp):
                 else:
                     # prefer document-level resources, not page/section resources
                     param['uri'] = RegexString(param['uri'] + "[^#]*")
+                options["include_fragments"] = True
             else:
                 # normalize any page reference ("nja 2015 s 42" =>
                 # "nja 2015 s. 42") and search in the multi_field
@@ -75,10 +82,18 @@ class WSGIApp(OrigWSGIApp):
                 q = q.lower()
                 q = re.sub(r"\s*s\s*(\d)", " s. \\1", q)
                 q = re.sub(r"^prop(\s+|$)", "prop. ", q)
-                # param['comment.keyword'] = q + "*"
                 param['comment.keyword'] = "*" + q + "*"
-            q = None
-        return q, param, pagenum, pagelen, stats
+                if "§" in q:
+                    # we seem to be writing a legal ref but we can't
+                    # yet turn it into a URI (maybe because so far
+                    # it's just "3 § förvaltningsl"). At that point it
+                    # should be ok for the query to return fragments
+                    # (parts of the regular documents) not just top
+                    # level documents
+                    options['include_fragments'] = True
+
+            options["q"] = None # or del options["q"]?
+        return options
 
     def expand_partial_ref(self, partial_ref):
         if partial_ref.lower().startswith(("prop", "ds", "sou", "dir")):
@@ -185,16 +200,6 @@ class WSGIApp(OrigWSGIApp):
             uri = uri[:-remove]
         return uri
         
-    def query(self, environ):
-        ac_query = environ['QUERY_STRING'].endswith("_ac=true")
-        if ac_query:
-            environ['exclude_types'] = ('mediawiki', 'mediawiki_child')
-        environ['boost_types'] = [('sfs', 10)]
-        res = super(WSGIApp, self).query(environ)
-        if ac_query:
-            return res['items']
-        else:
-            return res
         
     def mangle_result(self, hit, ac_query=False):
         if ac_query:
@@ -211,18 +216,23 @@ class WSGIApp(OrigWSGIApp):
             del hit['iri']
         return hit
 
-    def search(self, environ, start_response):
+    def handle_search(self, request, **values):
         """WSGI method, called by the wsgi app for requests that matches
            ``searchendpoint``."""
-        queryparams = self._search_parse_query(environ['QUERY_STRING'])
+        # NOTE: creating a copy of request.args directlry produces a
+        # dict where each value is a list of strings (because that's
+        # allowed in querystrings) instead of a single string. Using
+        # .items() conflates any duplicate keys (of which there should
+        # be none)
+        queryparams = dict(request.args.items())
         # massage queryparams['issued'] if present, then restore it
         y = None
         if 'issued' in queryparams:
             y = int(queryparams['issued'])
             queryparams['issued'] = Between(datetime(y, 1, 1),
                                             datetime(y, 12, 31, 23, 59, 59))
-        boost_types = [("sfs", 10)]
-        res, pager = self._search_run_query(queryparams, boost_types=boost_types)
+        boost_repos = [("sfs", 10)]
+        res, pager = self._search_run_query(queryparams, boost_repos=boost_repos)
         if y:
             queryparams['issued'] = str(y)
 
@@ -234,7 +244,7 @@ class WSGIApp(OrigWSGIApp):
 
         body = html.Body()
         if hasattr(res, 'aggregations'):
-            body.append(self._search_render_facets(res.aggregations, queryparams, environ))
+            body.append(self._search_render_facets(res.aggregations, queryparams, request.environ))
         for r in res:
             if 'label' not in r:
                 label = r['uri']
@@ -245,6 +255,8 @@ class WSGIApp(OrigWSGIApp):
                                         # -> foo
             else:
                 label = r['label']
+            if r.get('role') == "expired":
+                label = "[upphävd] " + label
             rendered_hit = html.Div(
                 [html.B([elements.Link(label, uri=r['uri'])], **{'class': 'lead'})],
                 **{'class': 'hit'})
@@ -254,14 +266,14 @@ class WSGIApp(OrigWSGIApp):
                 for innerhit in r['innerhits']:
                     rendered_hit.append(self._search_render_innerhit(innerhit))
             body.append(rendered_hit)
-        pagerelem = self._search_render_pager(pager, queryparams,
-                                              environ['PATH_INFO'])
+        pagerelem = self._search_render_pager(pager, queryparams, request.path)
         body.append(html.Div([
             html.P(["Träff %(firstresult)s-%(lastresult)s "
                     "av %(totalresults)s" % pager]), pagerelem],
                                  **{'class':'pager'}))
-        data = self._transform(title, body, environ, template="xsl/search.xsl")
-        return self._return_response(data, start_response)
+        data = self._transform(title, body, request.environ, template="xsl/search.xsl")
+        return Response(data, mimetype="text/html")
+
 
     def _search_render_innerhit(self, innerhit):
         r = innerhit
