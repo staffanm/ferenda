@@ -1321,3 +1321,23 @@ class Errorhandling(TestLagen):
         res = self.get(self.baseurl + "1666:667")
         self.assertEqual(res.status_code, 404)
         self.assertIn("Dokumentet saknas", res.text)
+
+
+class RobotBan(TestLagen):
+    def test_ban_img_bad_ua(self):
+        res = requests.get(self.baseurl + "prop/1997/98:44/sid1.png",
+                           headers={"User-Agent":"Googlebot-Image/1.0"})
+        self.assertEqual(res.status_code, 403)
+        res = requests.get(self.baseurl + "prop/1997/98:44/sid1.png",
+                           headers={"User-Agent":"Mozilla/5.0 (compatible; AhrefsBot/6.1; +http://ahrefs.com/robot/)"})
+        self.assertEqual(res.status_code, 403)
+
+    def test_ban_img_legit_ua(self):
+        res = requests.get(self.baseurl + "prop/1997/98:44/sid1.png",
+                           headers={"User-Agent":"Mozilla/5.0 (compatible; legit)"})
+        self.assertEqual(res.status_code, 200)
+
+    def test_pass_other_resources(self):
+        res = requests.get(self.baseurl + "prop/1997/98:44",
+                           headers={"User-Agent":"Googlebot-Image"})
+        self.assertEqual(res.status_code, 200)

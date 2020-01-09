@@ -21,7 +21,7 @@ from werkzeug.routing import Rule, BaseConverter, Map
 from werkzeug.datastructures import Headers
 from werkzeug.wrappers import Request, Response
 from werkzeug.wsgi import wrap_file
-from werkzeug.exceptions import NotAcceptable
+from werkzeug.exceptions import NotAcceptable, Forbidden
 from werkzeug.test import EnvironBuilder
 
 from ferenda import util
@@ -320,6 +320,12 @@ class RequestHandler(object):
                       'intermediate': repo.store.intermediate_path,
                       'parsed': repo.store.parsed_path}[params["dir"]]
             if "page" in params and "format" in params:
+                # check if this is a robot we need to ban (we try to
+                # ban them through robots.txt but not all are well
+                # behaved)
+                if getattr(self.repo.config, 'imagerobots', None):
+                    if re.search(self.repo.config.imagerobots, environ.get("User-Agent")):
+                        raise Forbidden()
                 baseparam = "-size 400x300 -pointsize 12 -gravity center"
                 baseattach = None
                 try:
