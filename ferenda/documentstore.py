@@ -414,7 +414,7 @@ dependencies (in the form of source files for the action).
         elif action == "generate":
             infile = self.parsed_path(basefile, version)
             annotations = self.annotation_path(basefile, version)
-            if os.path.exists(self.dependencies_path(basefile)):
+            if version is None and os.path.exists(self.dependencies_path(basefile)):
                 deptxt = util.readfile(self.dependencies_path(basefile))
                 dependencies = deptxt.strip().split("\n")
             else:
@@ -534,26 +534,25 @@ dependencies (in the form of source files for the action).
                     durations = d[action]
         yielded_paths = set()
         for basefile, duration in sorted(durations.items(), key=operator.itemgetter(1), reverse=True):
+            path = None
+            intermediate_path_exists = False
+            if action == "parse":
+                path = self.downloaded_path(basefile)
+                intermediate_path_exists = os.path.exists(self.intermediate_path(basefile))
+            elif action == "relate":
+                path = self.distilled_path(basefile)
+            elif action == "generate":
+                path = self.parsed_path(basefile)
             if duration == -1 and not force:
                 # Skip files that will raise DocumentRemovedError ?
-                pass
+                yielded_paths.add(path)
             elif not force and not self.needed(basefile, action):
                 # Skip files for which no action will be performed
-                pass
+                yielded_paths.add(path)
             else:
-                # make sure the underlying file really still exists
-                path = None
-                intermediate_path = False
-                if action == "parse":
-                    path = self.downloaded_path(basefile)
-                    intermediate_path = os.path.exists(self.intermediate_path(basefile))
-                elif action == "relate":
-                    path = self.distilled_path(basefile)
-                elif action == "generate":
-                    path = self.parsed_path(basefile)
                 if os.path.exists(path):
                     yielded_paths.add(path)
-                    if os.path.getsize(path) > 0 or intermediate_path:
+                    if os.path.getsize(path) > 0 or intermediate_path_exists:
                         yield basefile
                     else:
                         trim_documententry(basefile)
@@ -650,7 +649,7 @@ dependencies (in the form of source files for the action).
                         yielded_basefiles.append(basefile)
                         yield basefile
 
-    def list_versions_for_basefiles(self, basefiles, action):
+    def list_versions_for_basefiles(self, basefiles, action, force=False):
         adjective = {'parse': 'downloaded',
                      'generate': 'parsed',
                      'transformlinks': 'generated'}
@@ -658,7 +657,8 @@ dependencies (in the form of source files for the action).
             yield (basefile, None)
             if action in adjective:
                 for version in self.list_versions(basefile, adjective[action]):
-                    yield (basefile, version)
+                    if force or self.needed(basefile, action, version):
+                        yield (basefile, version)
 
     def list_attachments(self, basefile, action, version=None):
         """Get all attachments for a basefile in a specified state

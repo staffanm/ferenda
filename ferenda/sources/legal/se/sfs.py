@@ -1491,6 +1491,11 @@ class SFS(Trips):
         return result
 
     def prep_annotation_file(self, basefile, version):
+        # we don't need to create annotation files for anything other
+        # than the current version (ie the version that's genereated
+        # w/o a version number)
+        if version:
+            return None 
         sfsdataset = self.dataset_uri()
         assert "sfs" in sfsdataset
         dvdataset = sfsdataset.replace("sfs", "dv")
@@ -1521,6 +1526,9 @@ class SFS(Trips):
 
         specifics = {}
         for row in rattsfall:
+            assert 'id' in row, "invalid rattsfall row %s" % row
+            assert 'desc' in row, "invalid rattsfall row %s" % row
+            assert 'uri' in row, "invalid rattsfall row %s" % row
             if 'lagrum' not in row:
                 lagrum = baseuri
             else:
@@ -1572,6 +1580,7 @@ class SFS(Trips):
         # "Rättsinformationsförordning (1999:175)"
         specifics = {}
         for row in inboundlinks:
+            assert 'uri' in row, "incomplete row %s" % row
             if not (row['uri'].startswith(("http://", "https://"))):
                 # we once had a condition where some rows were like 
                 # {'lagrum': 'https://lagen.nu/sfs/1998:204#L2015:589', 'uri': 'b0'}
@@ -1862,6 +1871,7 @@ class SFS(Trips):
                 for upphaver in stuff[l]['upphaver']:
                     uh_node = etree.Element(ns("rinfoex:upphaver"))
                     uhf_node = etree.SubElement(uh_node, ns("rdf:Description"))
+                    assert 'uri' in upphaver, "invalid upphaver row %s" % upphaver
                     uhf_node.set(ns("rdf:about"), upphaver['uri'])
                     uhf_title_node = etree.SubElement(uhf_node, ns("dcterms:title"))
                     uhf_title_node.text = upphaver['title']

@@ -464,7 +464,7 @@ class WSGIApp(object):
                     # change eg https://lagen.nu/1998:204 to
                     # http://localhost:8080/1998:204 during
                     # development
-                    if v.startswith(self.config.url) and self.config.develurl:
+                    if v.startswith(self.config.url) and 'develurl' in self.config:
                         v = v.replace(self.config.url, self.config.develurl)
                 if k == "text":
                     mangledhit["matches"] = {"text": _elements_to_html(hit["text"])}

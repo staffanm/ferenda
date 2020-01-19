@@ -86,7 +86,8 @@ class JK(SwedishLegalSource):
         soup = BeautifulSoup(source, "lxml")
         for link in soup.find_all("a", href=document_url_regex):
             basefile = document_url_regex.search(link["href"]).group("basefile")
-            yield basefile, urljoin(self.start_url, link["href"])
+            params = {'uri': urljoin(self.start_url, link["href"])}
+            yield basefile, params
 
     def adjust_basefile(self, doc, orig_uri):
         pass # See comments in swedishlegalsource.py 

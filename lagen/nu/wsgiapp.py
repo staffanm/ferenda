@@ -6,7 +6,7 @@ from builtins import *
 # sys
 import os
 import re
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote_plus
 from wsgiref.util import request_uri
 from datetime import datetime
 
@@ -245,6 +245,8 @@ class WSGIApp(OrigWSGIApp):
         body = html.Body()
         if hasattr(res, 'aggregations'):
             body.append(self._search_render_facets(res.aggregations, queryparams, request.environ))
+        googleurl = "https://www.google.se/search?hl=sv&as_q=%s&as_sitesearch=lagen.nu" % quote_plus(queryparams.get("q"))
+        body.append(html.P([html.A("Pröva samma sökning på Google", href=googleurl)]))
         for r in res:
             if 'label' not in r:
                 label = r['uri']

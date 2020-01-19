@@ -1377,7 +1377,7 @@ class SwedishLegalSource(DocumentRepository):
         else:
             # we don't have any title/label for whatever
             # reason. Uniquify this by using the URI fragment
-            v = "%s, %s" % (v, resourceuri.split("#", 1)[1])
+            v = "%s" % (resourceuri.split("#", 1)[1])
         return v
 
     def _relate_fulltext_value_comment(self, resourceuri, rooturi, desc):

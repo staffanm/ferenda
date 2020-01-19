@@ -37,6 +37,7 @@ from rdflib import Graph, URIRef, RDF, Literal
 from rdflib.namespace import DCTERMS
 from layeredconfig import LayeredConfig, Defaults
 from lxml import etree
+from lxml.etree import XMLSyntaxError
 from ferenda.thirdparty.patchit import PatchSet, PatchSyntaxError, PatchConflictError
 from werkzeug.routing import Rule
 from werkzeug.wrappers import Response
@@ -102,8 +103,12 @@ class DevelHandler(RequestHandler):
   </body>
 </html>
 """ % (locals())
-        t = Template(jinja_template)
-        xhtml = etree.parse(BytesIO(t.render(context).encode("utf-8")))
+        t = Template(jinja_template, autoescape=True)
+        text = t.render(context).encode("utf-8")
+        try:
+            xhtml = etree.parse(BytesIO(text))
+        except XMLSyntaxError as e:
+            raise ValueError("invalid xhtml from template: %s\n%s" % (e, text.decode("utf-8")))
         conffile = os.sep.join([repo.config.datadir, 'rsrc',
                                 'resources.xml'])
         transformer = Transformer('XSLT', "xsl/generic.xsl", "xsl",
@@ -723,7 +728,12 @@ documents.</p>
             logcontents = util.readfile(logfilename)
             processtime = time.time() - start
             elapsedtime = elapsed(logfilename).total_seconds()
-            streamurl = request.url + "&stream=true"
+            if self.repo.config.develurl:
+                baseurl = self.repo.config.develurl
+            else:
+                baseurl = self.repo.config.url
+            streamurl = "%s%s?file=%s&stream=true" % (baseurl, request.path[1:], request.args.get('file'))
+            pagetitle = "log %s" % logfilename
             return self.render_template("""
 <div>
   <p>Log processed in {{"%.3f"|format(processtime)}} s. The logged action took {{"%.0f"|format(elapsedtime)}} s</p>
@@ -734,12 +744,12 @@ documents.</p>
   <h3>Logs</h3>
   <pre class="pre-scrollable logviewer" id="streaming-log-output" src="{{streamurl|e}}">
   </pre>
-</div>""", "log %s" % logfilename, logfilename=logfilename,
-                                        processtime=processtime,
-                                        elapsedtime=elapsedtime,
-                                        buildstats=buildstats,
-                                        errorstats=errorstats,
-                                        streamurl=streamurl)
+</div>""", pagetitle, logfilename=logfilename,
+                      processtime=processtime,
+                      elapsedtime=elapsedtime,
+                      buildstats=buildstats,
+                      errorstats=errorstats,
+                      streamurl=streamurl)
 
 
 class Devel(object):

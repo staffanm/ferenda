@@ -603,6 +603,11 @@ Disallow: /
 Disallow: /api/
 Disallow: /search/
 Disallow: /-/
+Disallow: /prop/*.png
+Disallow: /sou/*.png
+Disallow: /ds/*.png
+Disallow: /dir/*.png
+Disallow: /*fs/*.png
 """)
                 log.info("Wrote %s" % robotstxt)
                 return Resources(repos, **args).make()
@@ -1054,9 +1059,15 @@ def _run_class(enabled, argv, config):
             # pairs. If config.allversions is not set to True, the
             # version element will always be None (meaning we'll only
             # parse the current version, not any archived versions)
+            if inst.config.loglevel == "DEBUG":
+                x = list(inst.store.list_basefiles_for(action, force=inst.config.force))
+                log.debug("%s %s: processing %s basefiles (%s...)" % (alias, action, len(x), x[:3]))
             iterable = inst.store.list_basefiles_for(action, force=inst.config.force)
             if inst.config.allversions:
-                iterable = inst.store.list_versions_for_basefiles(iterable, action)
+                if inst.config.loglevel == "DEBUG":
+                    x = list(inst.store.list_versions_for_basefiles(x, action, force=inst.config.force))
+                    log.debug("%s %s: Processing %s versions (%s...)" % (alias, action, len(x), x[:3]))
+                iterable = inst.store.list_versions_for_basefiles(iterable, action, force=inst.config.force)
             else:
                 iterable = ((x, None) for x in iterable)
             if action == "parse" and not inst.config.force:
@@ -1117,7 +1128,7 @@ def _run_class(enabled, argv, config):
                 basefile = config.arguments[0]
                 version = getattr(config, 'version', None)
                 with adaptlogger(inst, basefile, version):
-                    res = _run_class_with_basefile(clbl, basefile, None, kwargs, action, alias)
+                    res = _run_class_with_basefile(clbl, basefile, version, kwargs, action, alias)
                 adjective = {'parse': 'downloaded',
                              'generate': 'parsed',
                              'transformlinks': 'generated'}

@@ -191,9 +191,9 @@ class DocumentEntry(object):
             d["summary_type"] = "html"
 
         util.ensure_dir(path)
+        s = json.dumps(d, default=util.json_default_date, indent=2,
+                       separators=(', ', ': '), sort_keys=True)
         with open(path, "w") as fp:
-            s = json.dumps(d, default=util.json_default_date, indent=2,
-                           separators=(', ', ': '), sort_keys=True)
             fp.write(s)
 
     # If inline=True, the contents of filename is included in the Atom

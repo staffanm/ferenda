@@ -1059,7 +1059,8 @@ class BOLFS(MyndFskrBase):
             linklist = h.parent.find_next_sibling("ul")
             if linklist:
                 el = linklist.find("a")
-                yield self.sanitize_basefile(h.text), urljoin(self.start_url, el.get("href"))
+                params = {'uri': urljoin(self.start_url, el.get("href"))}
+                yield self.sanitize_basefile(h.text), params
 
 
 class DIFS(MyndFskrBase):
@@ -1069,7 +1070,7 @@ class DIFS(MyndFskrBase):
 
 class DVFS(MyndFskrBase):
     alias = "dvfs"
-    start_url = "http://www.domstol.se/Ladda-ner--bestall/Verksamhetsstyrning/DVFS/DVFS1/"
+    start_url = "http://old.domstol.se/Ladda-ner--bestall/Verksamhetsstyrning/DVFS/DVFS1/"
     downloaded_suffix = ".html"
 
     nextpage_regex = re.compile(">")
@@ -1112,7 +1113,8 @@ class DVFS(MyndFskrBase):
                     found = False
                     for sublink in subsoup.find("div", id="readme").find_all("a", text=re_bf):
                         basefile = re_bf.match(sublink.text).group(0)
-                        yield self.sanitize_basefile(basefile), urljoin(link, sublink["href"])
+                        params = {'uri': urljoin(link, sublink["href"])}
+                        yield self.sanitize_basefile(basefile), params
                 if (self.nextpage_regex and elementtext and
                         re.search(self.nextpage_regex, elementtext)):
                     nexturl = el.get("href")
@@ -1260,7 +1262,8 @@ class ELSAKFS(MyndFskrBase):
                     if m.group("typ") == " - konsoliderad version":
                         sub_basefile = "konsolidering/" + sub_basefile
                     if sub_basefile not in yielded:
-                        yield (sub_basefile, urljoin(link, el.get("href")))
+                        params = {'uri': urljoin(link, el.get("href"))}
+                        yield (sub_basefile, params)
                         yielded.add(sub_basefile)
         
         
@@ -1339,7 +1342,8 @@ class KFMFS(MyndFskrBase):
             m = self.basefile_regex.search(ns.strip())
             basefile = m.group("basefile")
             link = ns.parent.find("a", href=re.compile(".*\.pdf"))
-            yield self.sanitize_basefile(basefile), urljoin(self.start_url, link["href"])
+            params = {'uri': urljoin(self.start_url, link["href"])}
+            yield self.sanitize_basefile(basefile), params
     
 
 class KOVFS(MyndFskrBase):
@@ -1380,7 +1384,8 @@ class KOVFS(MyndFskrBase):
         resp = self.session.get(articleurl)
         res = resp.json()
         for uid in res.keys():
-            yield(self.sanitize_basefile(docs[uid]), res[uid]['preselected']['url'])
+            params = {'uri': res[uid]['preselected']['url']}
+            yield(self.sanitize_basefile(docs[uid]), params)
 
 
 class KVFS(MyndFskrBase):
@@ -1424,7 +1429,8 @@ class KVFS(MyndFskrBase):
                     continue
                 el = h.parent.parent.find("a")
                 if el:
-                    yield self.sanitize_basefile(m.group("basefile")), urljoin(self.start_url,el.get("href"))
+                    params ={'uri': urljoin(self.start_url,el.get("href"))}
+                    yield self.sanitize_basefile(m.group("basefile")), params
             nextlink = soup.find("ul", "pagination").find_all("a")[-1] # last link is Next
             if nextlink and nextlink["href"] != lasthref:
                 paging += 1
@@ -1519,11 +1525,11 @@ class MPRTFS(MyndFskrBase):
                 continue
             basefile = self.sanitize_basefile(m.group("basefile"))
             link = urljoin(self.start_url, d.get("href"))
-            props = {"uri": link}
+            params = {"uri": link}
             t = doc.find("a", "Long")
             if t:
-                props['title'] = doc.find("a", "Long").get_text().strip()
-            yield(basefile, props)
+                params['title'] = doc.find("a", "Long").get_text().strip()
+            yield(basefile, params)
 
 class MSBFS(MyndFskrBase):
     alias = "msbfs"
@@ -1555,7 +1561,8 @@ class MSBFS(MyndFskrBase):
                 if m:
                     link = urljoin(self.start_url, link_el.get("href"))
                     basefile = self.sanitize_basefile(m.group("basefile"))
-                    yield basefile, link
+                    params = {'uri': link}
+                    yield basefile, params
                 else:
                     self.log.warning("Link titled %s ought to be a basefile, but isn't" % link_el.string)
             if soup.find("a", "pagination-next") and not soup.find("li", "pagination-next disabled"):
@@ -1588,7 +1595,8 @@ class MYHFS(MyndFskrBase):
         soup = BeautifulSoup(source, "lxml")
         for basefile in soup.find("div", "article-text").find_all("strong", text=re.compile("\d+:\d+")):
             link = basefile.find_parent("td").find_next_sibling("td").a
-            yield self.sanitize_basefile(basefile.text.strip()), urljoin(self.start_url, link["href"])
+            params = {'uri': urljoin(self.start_url, link["href"])}
+            yield self.sanitize_basefile(basefile.text.strip()), params
         
 
 class NFS(MyndFskrBase):
@@ -2311,12 +2319,13 @@ class RAFS(MyndFskrBase):
         for item in soup.find_all("div", "dataitem"):
             link = urljoin(self.start_url, item.a["href"])
             basefile = item.find("dt", text="Nummer:").find_next_sibling("dd").text
-            yield self.sanitize_basefile(basefile), link
+            params = {'uri': link}
+            yield self.sanitize_basefile(basefile), params
             
     
 class RGKFS(MyndFskrBase):
     alias = "rgkfs"
-    start_url = "https://www.riksgalden.se/sv/omriksgalden/Pressrum/publicerat/Foreskrifter/"
+    start_url = "https://www.riksgalden.se/sv/press-och-publicerat/foreskrifter/"
     download_iterlinks = False
 
     @decorators.downloadmax
@@ -2326,7 +2335,8 @@ class RGKFS(MyndFskrBase):
             for item in th.find_parent("table").find_all("td", text=re.compile("^\d{4}:\d+$")):
                 link = item.find_next_sibling("td").a
                 if link and link["href"].endswith(".pdf"):
-                    yield self.sanitize_basefile(item.text.strip()), urljoin(self.start_url, link["href"])
+                    params = {'uri':  urljoin(self.start_url, link["href"])}
+                    yield self.sanitize_basefile(item.text.strip()), params
 
 
 # This is newly renamed from RNFS
@@ -2387,7 +2397,8 @@ class SJVFS(MyndFskrBase):
                         fs = "sjvfs"
                     basefile = "%s/%s" % (fs, fsnr)
                     suburl = unquote(urljoin(url, a['href']))
-                    yield(basefile, suburl)
+                    params = {'uri': suburl}
+                    yield basefile, params
 
 
 class SKVFS(MyndFskrBase):
@@ -2434,7 +2445,8 @@ class SKVFS(MyndFskrBase):
                 for basefile_el in soup.find_all("td", text=re.compile("^\w+FS \d+:\d+")):
                     relurl = basefile_el.find_next_sibling("td").a["href"]
                     basefile = self.sanitize_basefile(basefile_el.get_text().replace(" ", "/"))
-                    yield basefile, urljoin(link, relurl)
+                    params = {'uri': urljoin(link, relurl)}
+                    yield basefile, params
 
     def download_single(self, basefile, url):
         # The HTML version is the one we always can count on being
@@ -2527,6 +2539,12 @@ class SOSFS(MyndFskrBase):
     # of HSLF-FS, so we'll keep it
     alias = "sosfs"
     start_url = "http://www.socialstyrelsen.se/sosfs"
+    #
+    # NOTE: The above should really be the line below, but the new URL
+    # has a whole new structure which we'll need to adapt
+    # download_get_basefiles for
+    #
+    # start_url = "https://www.socialstyrelsen.se/regler-och-riktlinjer/foreskrifter-och-allmanna-rad/"
     storage_policy = "dir"  # must be able to handle attachments
     download_iterlinks = False
     downloaded_suffixes = [".pdf", ".html"]
@@ -2571,7 +2589,8 @@ class SOSFS(MyndFskrBase):
             # FIXME: This yields a single basefile that's something
             # like "hslffs/hslf/fs 2017:27" (note the embedded nbsp --
             # basefile_from_text should handle this probably
-            yield basefile, link
+            params = {'uri': link}
+            yield basefile, params
 
     def download_single(self, basefile, url, orig_url=None):
         resp = self.session.get(url)
@@ -2782,7 +2801,8 @@ class STFS(MyndFskrBase):
                 title = item.h3.text.strip() # eg. 'STFS 2018:1 Föreskrifter om partistöd'
                 basefile = " ".join(title.split(" ")[:2])
                 link = item.find("a", href=re.compile("file_id=\d+$"))
-                yield self.sanitize_basefile(basefile), urljoin(self.start_url, link["href"])
+                params = {'uri': urljoin(self.start_url, link["href"])}
+                yield self.sanitize_basefile(basefile), params
             nextpage = soup.find("a", text="»")
             if nextpage:
                 nexturl = urljoin(self.start_url, nextpage["href"])

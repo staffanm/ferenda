@@ -137,18 +137,14 @@ class MediaWiki(DocumentRepository):
             basefile = page_el.find(MW_NS + "title").text
             if basefile == "Huvudsida":  # FIXME: generalize/make configurable
                 continue
+            # skip redirecting pages entirely
+            if page_el.find(MW_NS+"redirect") is not None:
+                continue
             if ":" in basefile and basefile.split(":")[0] in wikinamespaces:
                 (namespace, localtitle) = basefile.split(":", 1)
                 if namespace not in self.config.mediawikinamespaces:
                     continue
-                # defer writing of this one, so that it overwrites any
-                # similarly named pages from teh main namespace. This
-                # is so that Category pages about $TOPIC take
-                # precedence over ordinary pages about $TOPIC
-                deferred[localtitle] = page_el
-            else:
-                write_doc(basefile, page_el)
-        for basefile, page_el in deferred.items():
+                basefile = localtitle
             write_doc(basefile, page_el)
 
         if 'dump' in basefiles:  # never remove

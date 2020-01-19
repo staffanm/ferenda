@@ -152,7 +152,7 @@ class RequestHandler(object):
         # request.base_url is the same without any query string
         assert 'basefile' in params ,"%s couldn't resolve %s to a basefile" % (
             self.repo.alias, request.base_url)
-        params.update(dict(request.args))
+        params.update(request.args.to_dict())
         # params = self.params_from_uri(request.url)
         # params['basefile'] = self.repo.basefile_from_uri(request.url)
         if 'attachment' in params and 'suffix' not in params:
@@ -355,6 +355,9 @@ class RequestHandler(object):
                         cmdline = "convert %s -trim %s" % (outfile.replace(".png", ".tmp.png"), outfile)
                         util.runcmd(cmdline, require_success=True)
                         os.unlink(outfile.replace(".png", ".tmp.png"))
+                        logfile = self.repo.config._parent.datadir + os.sep + "ua.log"
+                        with open(logfile, "a") as fp:
+                            fp.write("%s\t%s\t%s\n" % (outfile, environ.get("User-Agent"), environ.get("Referer")))
                 except Exception as e:
                     if not baseattach:
                         baseattach = "page_error.png"
@@ -368,7 +371,7 @@ class RequestHandler(object):
                                # this method again below
         elif "version" in params:
             method = partial(repo.store.generated_path, version=params["version"])
-        elif "diff" in params:
+        elif "diff" in params and params.get("from") != "None":
             return None
         elif contenttype in self._mimemap:
             method = getattr(repo.store, self._mimemap[contenttype])
@@ -421,7 +424,7 @@ class RequestHandler(object):
                 data = g.serialize(format=self._rdfformats[contenttype])
             elif suffix in self._rdfsuffixes:
                 data = g.serialize(format=rdfsuffixes[suffix])
-            elif 'diff' in params:
+            elif 'diff' in params and params.get('from') != "None":
                 data = self.diff_versions(basefile, params.get('from'), params.get('to'))
             else:
                 data = None

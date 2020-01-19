@@ -9,6 +9,8 @@ import os
 from collections import defaultdict
 import unicodedata
 import gzip
+import json
+
 
 # 3rdparty libs
 import requests
@@ -136,7 +138,10 @@ class Keyword(DocumentRepository):
             if sanitized:
                 if sanitized not in terms:
                     terms[sanitized]['subjects'] = []
-                terms[sanitized]['subjects'].append(row['uri'])
+                if 'uri' not in row:
+                    self.log.warning("%s: Invalid row from triplestore: %s" % (sanitized, row))
+                else: 
+                    terms[sanitized]['subjects'].append(row['uri'])
 
         self.log.debug("Retrieved %s subject terms from triplestore" % len(terms))
 
@@ -148,12 +153,15 @@ class Keyword(DocumentRepository):
             if not term:
                 continue
             oldterms = ""
+            if 'subjects' in terms[term]:
+                terms[term]['subjects'].sort()
             termpath = self.store.downloaded_path(term)
+            # this gets quite slow for 20000 basefiles, maybe we should use json instead of yaml?
             if os.path.exists(termpath):
-                oldterms = yaml.load(util.readfile(termpath))
+                oldterms = json.loads(util.readfile(termpath))
             if terms[term] != oldterms:
                 util.ensure_dir(termpath)
-                util.writefile(termpath, yaml.dump(terms[term], default_flow_style=False))
+                util.writefile(termpath, json.dumps(terms[term], ensure_ascii=False, indent=4))
                 self.log.info("%s: in %s termsets" % (term, len(terms[term])))
             else:
                 self.log.debug("%s: skipped" % term)
