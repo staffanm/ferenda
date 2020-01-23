@@ -8,7 +8,7 @@ hämtas fran DV:s (ickepublika) FTP-server, eller fran lagen.nu."""
 # system libraries (incl six-based renames)
 from bz2 import BZ2File
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from ftplib import FTP
 from io import BytesIO
 from time import mktime
@@ -438,6 +438,7 @@ class DV(SwedishLegalSource):
                 fp.close()
                 tempname = fp.name
                 r = self.extract_notis(tempname, year, coll)
+                assert r[0] + r[1], "No notices extracted from %s in %s" % (bname, zipfilename)
                 created += r[0]
                 untouched += r[1]
                 os.unlink(tempname)
@@ -547,14 +548,17 @@ class DV(SwedishLegalSource):
         # intermediate file.
         if coll == "HDO":
             re_notisstart = re.compile(
-                "(?P<day>Den \d+:[ae]. |)(?P<ordinal>\d+)\s*\.\s*\((?P<malnr>\w\s\d+-\d+)\)",
+                "(?P<day>Den\s+\d+\s*:[ae].\s+|)(?P<ordinal>\d+)\s*\.\s*\((?P<malnr>\w\s\d+-\d+)\)",
                 flags=re.UNICODE)
             re_avdstart = re.compile(
                 "(Januari|Februari|Mars|April|Maj|Juni|Juli|Augusti|September|Oktober|November|December)$")
         else:  # REG / HFD
-            re_notisstart = re.compile(
-                "[\w\: ]*Lnr:(?P<court>\w+) ?(?P<year>\d+) ?not ?(?P<ordinal>\d+)",
-                flags=re.UNICODE)
+            if int(year) < 2016:
+                re_notisstart = re.compile(
+                    "[\w\: ]*Lnr:(?P<court>\w+) ?(?P<year>\d+) ?not ?(?P<ordinal>\d+)",
+                    flags=re.UNICODE)
+            else:
+                re_notisstart = re.compile("Not (?P<ordinal>\d+)$")
             re_avdstart = None
         created = untouched = 0
         intermediatefile = os.path.splitext(docfile)[0] + ".xml"
@@ -818,6 +822,7 @@ class DV(SwedishLegalSource):
 
         m = basefile_regex.match(basefile).groupdict()
         coll = m['type']
+        year = int(m['year'])
         head["Referat"] = referat_templ[coll] % m
 
         soup = BeautifulSoup(text, "lxml")
@@ -856,16 +861,23 @@ class DV(SwedishLegalSource):
                                       
         else:  # "REG", "HFD"
             # keep in sync like above
-            re_notisstart = re.compile(
-                "[\w\: ]*Lnr:(?P<court>\w+) ?(?P<year>\d+) ?not ?(?P<ordinal>\d+)")
-            re_malnr = re.compile(r"[AD][:-] ?(?P<malnr>\d+\-\d+)")
-            # the avgdatum regex attempts to include valid dates, eg
-            # not "2770-71-12".It's also somewhat tolerant of
-            # formatting mistakes, eg accepts " :03-06-16" instead of
-            # "A:03-06-16"
-            re_avgdatum = re.compile(r"[AD ]: ?(?P<avgdatum>\d{2,4}\-[01]\d\-\d{2})")
-            re_sokord = re.compile("Uppslagsord: ?(?P<sokord>.*)", flags=re.DOTALL)
-            re_lagrum = re.compile("Lagrum: ?(?P<lagrum>.*)", flags=re.DOTALL)
+            if year < 2016:
+                re_notisstart = re.compile(
+                    "[\w\: ]*Lnr:(?P<court>\w+) ?(?P<year>\d+) ?not ?(?P<ordinal>\d+)")
+                re_malnr = re.compile(r"[AD][:-] ?(?P<malnr>\d+\-\d+)")
+                # the avgdatum regex attempts to include valid dates, eg
+                # not "2770-71-12".It's also somewhat tolerant of
+                # formatting mistakes, eg accepts " :03-06-16" instead of
+                # "A:03-06-16"
+                re_avgdatum = re.compile(r"[AD ]: ?(?P<avgdatum>\d{2,4}\-[01]\d\-\d{2})")
+                re_sokord = re.compile("Uppslagsord: ?(?P<sokord>.*)", flags=re.DOTALL)
+                re_lagrum = re.compile("Lagrum: ?(?P<lagrum>.*)", flags=re.DOTALL)
+            else:
+                re_notisstart = re.compile("Not (?P<ordinal>\d+)")
+                re_malnr = re.compile("Högsta förvaltningsdomstolen meddelade den (?P<avgdatum>\d+ \w+ \d{4}) följande dom \(mål nr (?P<malnr>\d+-\d+)\)")
+                re_avgdatum = re_malnr
+                re_sokord = None
+                re_lagrum = None
             # headers consists of the first five or six
             # chunks. Doesn't end until "^Not \d+."
             header = []
@@ -876,7 +888,9 @@ class DV(SwedishLegalSource):
                 # "Not. 109." (RÅ 1998 not 109). There might be a
                 # space separating the notis from the next sentence,
                 # but there might also not be!
-                if re.match("Not(is|)\.? \d+[abc]?\.? ?", line):
+                # Also, avoid matchin the very first line of 2016+ style headers
+                if re.match("Not(is|)\.? \d+[abc]?\.? ?", line) and not re.match("Not \d+$", line):
+                    # this means a 2015 or earlier header
                     done = True
                     if ". - " in line[:2000]:
                         # Split out "Not 56" and the first
@@ -890,6 +904,8 @@ class DV(SwedishLegalSource):
                             raise errors.DocumentRemovedError(basefile, dummyfile=self.store.parsed_path(basefile))
                 else:
                     tmp = iterator.pop(0)
+                    if re_malnr.match(line):
+                        done = True
                     if tmp.get_text().strip():
                         # REG specialcase
                         if header and header[-1].get_text().strip() == "Lagrum:":
@@ -1218,21 +1234,8 @@ class DV(SwedishLegalSource):
                     head["Rubrik"] = rubrik
             head["Sökord"] = res
 
-        # 8. Convert Avgörandedatum to a sensible value in the face of
-        # irregularities like '2010-11 30', '2011 03-23' '2011-
-        # 01-27', '2009.08.28' or '07-12-28'
-        m = date_regex.match(head["Avgörandedatum"])
-        if m:
-            if len(m.group(1)) < 4:
-                if int(m.group(1)) >= 80:  # '80-01-01' => '1980-01-01',
-                    year = '19' + m.group(1)
-                else:                     # '79-01-01' => '2079-01-01',
-                    year = '20' + m.group(1)
-            else:
-                year = m.group(1)
-            head["Avgörandedatum"] = "%s-%s-%s" % (year, m.group(2), m.group(3))
-        else:
-            raise errors.ParseError("Unparseable date %s" % head["Avgörandedatum"])
+        # 8. Convert Avgörandedatum to a sensible value
+        head["Avgörandedatum"] = self.parse_swedish_date(head["Avgörandedatum"])
 
         # 9. Done!
         return head
@@ -1396,7 +1399,8 @@ class DV(SwedishLegalSource):
                 if m:
                     refdesc.value(RPUBL.lopnummer, m.group(1))
             elif label == "Avgörandedatum":
-                domdesc.value(RPUBL.avgorandedatum, self.parse_iso_date(value))
+                assert isinstance(value, date) # should have been done by sanitize metadata
+                domdesc.value(RPUBL.avgorandedatum, value)
 
 
             # The following metadata (Lagrum, Rättsfall and
