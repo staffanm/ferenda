@@ -5,7 +5,7 @@
 #    pip-compile requirements.in
 #
 beautifulsoup4==4.8.1
-bleach==3.1.0             # via readme-renderer
+bleach==3.1.1             # via readme-renderer
 cached-property==1.5.1
 certifi==2019.9.11        # via requests
 chardet==3.0.4            # via requests
@@ -23,6 +23,7 @@ jsmin==2.2.2
 langdetect==1.0.7
 layeredconfig==0.3.3
 lxml==4.4.1
+markupsafe==1.1.1         # via jinja2
 pkginfo==1.5.0.1          # via twine
 psutil==5.6.3
 pygments==2.4.2           # via readme-renderer
@@ -42,8 +43,9 @@ tqdm==4.36.1              # via twine
 twine==2.0.0
 urllib3==1.25.6           # via requests
 webencodings==0.5.1       # via bleach, html5lib
+werkzeug==0.16.0
 wheel==0.33.6
 whoosh==2.7.4
-werkzeug==0.16.0
+
 # The following packages are considered to be unsafe in a requirements file:
-# setuptools==41.5.1        # via twine
+# setuptools
