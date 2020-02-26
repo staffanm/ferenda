@@ -824,7 +824,6 @@ class DV(SwedishLegalSource):
         coll = m['type']
         year = int(m['year'])
         head["Referat"] = referat_templ[coll] % m
-
         soup = BeautifulSoup(text, "lxml")
         if filetype == "docx":
             ptag = "w:p", "para" # support intermediate files with a
@@ -836,7 +835,7 @@ class DV(SwedishLegalSource):
         if coll == "HDO":
             # keep this in sync w extract_notis
             re_notisstart = re.compile(
-                "(?:Den (?P<avgdatum>\d+):[ae].\s+|)(?P<ordinal>\d+)\s*\.\s*\((?P<malnr>\w[ \xa0]\d+-\d+)\)",
+                "(?:Den (?P<avgdatum>\d+)\s*:[ae].\s+|)(?P<ordinal>\d+)\s*\.\s*\((?P<malnr>\w[ \xa0]\d+-\d+)\)",
                 flags=re.UNICODE)
             re_avgdatum = re_malnr = re_notisstart
             re_lagrum = re_sokord = None
@@ -874,7 +873,7 @@ class DV(SwedishLegalSource):
                 re_lagrum = re.compile("Lagrum: ?(?P<lagrum>.*)", flags=re.DOTALL)
             else:
                 re_notisstart = re.compile("Not (?P<ordinal>\d+)")
-                re_malnr = re.compile("Högsta förvaltningsdomstolen meddelade den (?P<avgdatum>\d+ \w+ \d{4}) följande dom \(mål nr (?P<malnr>\d+-\d+)\)")
+                re_malnr = re.compile("Högsta förvaltningsdomstolen meddelade den (?P<avgdatum>\d+ \w+ \d{4}) följande (dom|beslut) \(mål nr (?P<malnr>[\d\-–]+(| och [\d\-–]+))\)")
                 re_avgdatum = re_malnr
                 re_sokord = None
                 re_lagrum = None

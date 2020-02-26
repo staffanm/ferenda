@@ -207,8 +207,10 @@ class SOUKB(Offtryck, PDFDocumentRepository):
                 m = re.search(self.basefile_regex, element.text)
                 basefile = m.group("basefile")
             if basefile and (basefile, link) not in yielded:
+                params = {'uri': link,
+                          'title': element.tail.strip()}
                 yielded.add((basefile, link))
-                yield (basefile, (link, element.tail.strip()))
+                yield (basefile, params)
 
     def download_single(self, basefile, url):
         if self.get_parse_options(basefile) == "skip":
