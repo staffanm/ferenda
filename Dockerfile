@@ -86,4 +86,5 @@ COPY . .
 ENTRYPOINT ["/bin/bash", "/tmp/docker/setup.sh"]
 CMD ["/usr/bin/supervisord"] # starts nginx, elasticsearch, fuseki, cron etc
 
-# then: docker run --name ferenda -d -v c:/docker/ferenda:/usr/share/ferenda/site  -p 81:80 -p 3030:3030 -p 9001:9001 -p 9200:9200 -p 8000:8000 <imageid>
+# docker build -t ferenda-image .
+# then: docker run --name ferenda -d -v c:/docker/ferenda:/usr/share/ferenda/site  -p 81:80 -p 3030:3030 -p 9001:9001 -p 9200:9200 -p 8000:8000 ferenda-image

@@ -27,6 +27,7 @@ from rdflib import RDF, Graph
 from rdflib.resource import Resource
 from rdflib.namespace import DCTERMS, SKOS
 from layeredconfig import LayeredConfig, Defaults
+from cached_property import cached_property
 
 from . import RPUBL, RINFOEX, SwedishLegalSource, FixedLayoutSource
 from .fixedlayoutsource import FixedLayoutStore
@@ -1744,6 +1745,21 @@ class NFS(MyndFskrBase):
         # rudimentary dehyphenation for a special case (snfs/1994:2)
         return text.replace("Statens na—\n\nturvårdsverk", "Statens naturvårdsverk")
 
+
+class MyndFskrAnalyzer(PDFAnalyzer):
+    @cached_property
+    def documents(self):
+        # this analyzer only separates the main content from the
+        # endmatter (the last page, containing only the year of
+        # printing)
+        res = self(super, MyndFskrAnalyzer).documents
+        # check only the last page
+        if re.match("Elanders Sverige AB, \d{4}", self.pdf[-1].as_plaintext()):
+            res =  [(0, len(self.pdf)-1, 'main'),
+                    (len(self.pdf), 1, 'endmatter')]
+        return res
+            
+
 class PMFS(MyndFskrBase):
     alias = "pmfs"
     start_url = "https://polisen.se/lagar-och-regler/polismyndighetens-forfattningssamling/AjaxApplyFilters"
@@ -1773,7 +1789,9 @@ class PMFS(MyndFskrBase):
                     identifier = m.group("basefile")
                     basefile = self.sanitize_basefile(identifier)
                 else:
-                    self.log.warning("Could't extract basefile from %s", head.string)
+                    # some known exceptions w/o a RPSFS identifier -- allmänna råd
+                    if head.string.strip() not in ("FAP 799-1 - 1974", "FAP 208-5 1987", "FAP 206-6 1994"):
+                        self.log.warning("Couldn't extract basefile from %s", head.string.strip())
                     continue
                 title = d.find("span", "list-item-text").text.strip()
                 title = title.split(".")[0]

@@ -6,11 +6,8 @@ import sys
 sys.path.append("..")
 
 try:
-    from ferenda.manager import make_wsgi_app
-
-    # FIXME: should we chdir to os.path.dirname(__file__) instead?
-    inifile = os.path.join(os.path.dirname(__file__), "ferenda.ini")
-    application = make_wsgi_app(inifile=inifile)
+    from ferenda.manager import make_wsgi_app, find_config_file, load_config
+    application = make_wsgi_app(load_config(find_config_file()))
 except ImportError as e:
     exception_data = str(e)
 

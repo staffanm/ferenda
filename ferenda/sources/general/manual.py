@@ -18,3 +18,30 @@
 
 # in both cases, the dcterms:subjects should then be used in toc
 # generation and in other places where it makes sense
+
+class ManualHandler(RequestHandler):
+
+    @property
+    def rules(self):
+        return [Rule('/manual/add', endpoint=self.handle_add)] + super(ManualHandler.self).rules
+
+
+    @login_required
+    def handle_add(self, request, **values):
+        if request.method == 'GET':
+            return self.render_template("""
+<div>
+  <form method="POST">
+    <div class="form-group">
+      <label for="title">Document title
+        <input type="text" id="title" name="title" class="form-control"/>
+      </label>
+      <label for="identifier">Document identifier (if applicable)
+        <input type="text" id="identifier" name="identifier" class="form-control>
+      </label>
+      <label class="form-check-label<input type="file" name="doc">
+</form>
+</div>""", "Add new document")
+        elif request.method == 'POST':
+            # TBW...
+            pass

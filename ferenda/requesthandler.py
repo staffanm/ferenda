@@ -23,6 +23,7 @@ from werkzeug.wrappers import Request, Response
 from werkzeug.wsgi import wrap_file
 from werkzeug.exceptions import NotAcceptable, Forbidden
 from werkzeug.test import EnvironBuilder
+from jinja2 import Template
 
 from ferenda import util
 from ferenda.errors import RequestHandlerError
@@ -62,6 +63,21 @@ class BasefileRule(Rule):
         return res
 
             
+def login_required(f):
+    """makes sure that the user is authenticated before calling the endpoint"""
+    @functools.wraps(f)
+    def wrapper(self, request, **values):
+        auth = request.authorization
+        if (not auth or
+            'username' not in self.repo.config or
+            'password' not in self.repo.config or
+            not (self.repo.config.username == auth.username and
+                 self.repo.config.password == auth.password)):
+            return Response("Authentication failed. You will need to use the username and password specified in ferenda.ini", 401,
+                            {"WWW-Authenticate": 'Basic realm="%s"' % self.repo.config.sitename})
+        else:
+            return f(self, request, **values)
+    return wrapper
 
 class RequestHandler(object):
     
@@ -530,3 +546,36 @@ class RequestHandler(object):
                 msg += " (%s does not exist)" % path
             raise NotAcceptable(msg)
         return Response(fp, status, headers, mimetype=contenttype, direct_passthrough=True)
+
+
+    def render_template(self, jinja_template, page_title, **context):
+        repo = DocumentRepository(config=self.repo.config)
+        jinja_template = """
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head><title>%(page_title)s</title></head>
+  <body>
+    <div>
+      %(jinja_template)s
+    </div>
+  </body>
+</html>
+""" % (locals())
+        t = Template(jinja_template, autoescape=True)
+        text = t.render(context).encode("utf-8")
+        try:
+            xhtml = etree.parse(BytesIO(text))
+        except XMLSyntaxError as e:
+            raise ValueError("invalid xhtml from template: %s\n%s" % (e, text.decode("utf-8")))
+        conffile = os.sep.join([repo.config.datadir, 'rsrc',
+                                'resources.xml'])
+        transformer = Transformer('XSLT', "xsl/generic.xsl", "xsl",
+                                  resourceloader=repo.resourceloader,
+                                  config=conffile)
+        urltransform = None
+        if 'develurl' in repo.config and repo.config.develurl:
+            urltransform = repo.get_url_transform_func(develurl=repo.config.develurl)
+        depth = 2 # len(doc.uri.split("/")) - 3
+        tree = transformer.transform(xhtml, depth,
+                                     uritransform=urltransform)
+        data = etree.tostring(tree, encoding="utf-8")
+        return Response(data, mimetype="text/html")
