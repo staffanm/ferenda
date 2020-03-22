@@ -1113,6 +1113,9 @@ class ElasticSearchIndex(RemoteIndex):
                     'sv': 'Swedish'}.get(repos[0].lang, "English")
         payload = {
             "settings": {
+                "highlight": {
+                    "max_analyzed_offset": 10000000
+                },
                 "analysis": {
                     "analyzer": {
                         "default": {
