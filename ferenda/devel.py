@@ -234,25 +234,26 @@ documents.</p>
             return self.render_template("""
 <form class="form-inline">
   <div class="form-group">
-    <label class="sr-only">repo
-      <input class="form-control" name="repo" type="text" placeholder="repo"/>
-    </label>
-    <label class="sr-only">action
-      <input class="form-control" name="action" type="text" placeholder="action"/>
-    </label>
-    <label class="sr-only">basefile
-      <input class="form-control" name="basefile" type="text" placeholder="basefile"/>
-    </label>
+    <label class="sr-only" for="repo">repo</label>
+    <input class="form-control" id="repo" name="repo" type="text" placeholder="repo"/>
+    <label class="sr-only" for="action">action</label>
+    <input class="form-control" name="action" id="action" type="text" placeholder="action"/>
+    <label class="sr-only" for="basefile">basefile</label>
+    <input class="form-control" name="basefile" id="basefile" type="text" placeholder="basefile"/>
+  </div>
+  <div class="form-check form-check-inline">
+    <input class="form-check-input" id="all" name="all" type="checkbox" value="--all"/>
+    <label class="form-check-label" for="all">--all</label>
+  </div>
+  <div class="form-check form-check-inline">
+    <input class="form-check-input" id="force" name="force" type="checkbox" value="--force"/>
+    <label class="form-check-label" for="force">--force</label>
+  </div>
+  <div class="form-check form-check-inline">
+    <input class="form-check-input" id="refresh" name="refresh" type="checkbox" value="--refresh"/>
+    <label class="form-check-label" for="refresh">--refresh</label>
   </div>
   <div class="form-group">
-    <label>--all
-      <input id="all" name="all" type="checkbox" value="--all"/>
-    </label>
-    <label>--force
-      <input name="force" type="checkbox" value="--force"/>
-    <label for="refresh">--refresh
-      <input name="refresh" type="checkbox" value="--refresh"/>
-    </label>
     <button class="btn btn-default" type="submit">Build</button>
   </div>
 </form>""", "build")

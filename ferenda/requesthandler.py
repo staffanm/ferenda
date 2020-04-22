@@ -15,6 +15,7 @@ import traceback
 from copy import deepcopy
 
 from lxml import etree
+from lxml.etree import XMLSyntaxError
 from rdflib import Graph
 from cached_property import cached_property
 from werkzeug.routing import Rule, BaseConverter, Map
@@ -26,6 +27,7 @@ from werkzeug.test import EnvironBuilder
 from jinja2 import Template
 
 from ferenda import util
+from ferenda import Transformer
 from ferenda.errors import RequestHandlerError
 from ferenda.thirdparty.htmldiff import htmldiff
 
@@ -549,6 +551,7 @@ class RequestHandler(object):
 
 
     def render_template(self, jinja_template, page_title, **context):
+        from ferenda import DocumentRepository
         repo = DocumentRepository(config=self.repo.config)
         jinja_template = """
 <html xmlns="http://www.w3.org/1999/xhtml">
