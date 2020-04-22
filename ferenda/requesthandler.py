@@ -8,7 +8,7 @@ import re
 import os
 import sys
 from io import BytesIO
-from functools import partial
+from functools import partial, wraps
 from urllib.parse import urlparse, unquote, parse_qsl
 import mimetypes
 import traceback
@@ -65,7 +65,7 @@ class BasefileRule(Rule):
             
 def login_required(f):
     """makes sure that the user is authenticated before calling the endpoint"""
-    @functools.wraps(f)
+    @wraps(f)
     def wrapper(self, request, **values):
         auth = request.authorization
         if (not auth or

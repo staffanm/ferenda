@@ -79,7 +79,8 @@ COPY docker /tmp/docker
 RUN mv /tmp/docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf && \
     mv /tmp/docker/nginx.conf /etc/nginx/sites-enabled/default && \
     mv /tmp/docker/ferenda.ttl /opt/fuseki/run/configuration/ && \
-    mv /tmp/docker/locale.gen /etc/locale.gen && locale-gen
+    mv /tmp/docker/locale.gen /etc/locale.gen && locale-gen && \
+    chmod +x /tmp/docker/build && mv /tmp/docker/build /usr/local/bin/build
 COPY . .
 # mv /tmp/docker/elasticsearch-jvm.options /etc/elasticsearch/jvm.options && \
 
@@ -88,3 +89,4 @@ CMD ["/usr/bin/supervisord"] # starts nginx, elasticsearch, fuseki, cron etc
 
 # docker build -t ferenda-image .
 # then: docker run --name ferenda -d -v c:/docker/ferenda:/usr/share/ferenda/site  -p 81:80 -p 3030:3030 -p 9001:9001 -p 9200:9200 -p 8000:8000 ferenda-image
+# and then: docker exec ferenda build all all --force --refresh

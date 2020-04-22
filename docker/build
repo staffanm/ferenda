@@ -1,0 +1,4 @@
+#!/bin/sh
+
+cd /usr/share/ferenda/site
+./ferenda-build.py $@
