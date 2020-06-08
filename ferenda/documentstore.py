@@ -522,6 +522,7 @@ dependencies (in the form of source files for the action).
         # devel.statusreport
         durations_path = self.path(".durations", "entries", ".json", storage_policy="file")
         durations = {}
+        # print("%s: About to check durations at %s" % (datetime.now(), durations_path))
         if os.path.exists(durations_path):
             with open(durations_path) as fp:
                 try:
@@ -533,7 +534,9 @@ dependencies (in the form of source files for the action).
                 if action in d:
                     durations = d[action]
         yielded_paths = set()
+        # print("%s: Loaded %s durations" % (datetime.now(), len(durations)))
         for basefile, duration in sorted(durations.items(), key=operator.itemgetter(1), reverse=True):
+            # print("Handling %s %s" % (basefile, duration))
             path = None
             intermediate_path_exists = False
             if action == "parse":
@@ -556,7 +559,7 @@ dependencies (in the form of source files for the action).
                         yield basefile
                     else:
                         trim_documententry(basefile)
-        
+        # print("%s: Processing non-duration files" % datetime.now())
         for x in util.list_dirs(directory, suffixes, reverse=True):
             if x in yielded_paths:
                 continue
@@ -751,7 +754,7 @@ dependencies (in the form of source files for the action).
             pathfrag = pathfrag.replace("\\", "/")
         return unquote(pathfrag.replace('/%', '%'))
 
-    def archive(self, basefile, version, overwrite=False):
+    def archive(self, basefile, version, overwrite=False, copy=False):
         """Moves the current version of a document to an archive. All
         files related to the document are moved (downloaded, parsed,
         generated files and any existing attachment files).
@@ -786,7 +789,10 @@ dependencies (in the form of source files for the action).
             # self.log.debug("Archiving %s to %s" % (src,dest))
             # print("Archiving %s to %s" % (src,dest))
             util.ensure_dir(dest)
-            shutil.move(src, dest)
+            if copy:
+                shutil.copy2(src, dest)
+            else:
+                shutil.move(src, dest)
 
     def downloaded_path(self, basefile, version=None, attachment=None):
         """Get the full path for the downloaded file for the given

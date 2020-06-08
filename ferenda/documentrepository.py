@@ -257,6 +257,13 @@ class DocumentRepository(object):
     `~ferenda.DocumentRepository.get_archive_version()` returns the
     same version id for both."""
 
+    download_archive_copy = False
+    """If ``True``, any attempt to archive a version will copy the current
+    version to its archived location. If ``False`` (the default), the
+    current version will be moved instead, which means that for a brief
+    time, there will exist no current version (in any of its forms, eg
+    parsed or generated)."""
+
     download_iterlinks = True
     """If ``True`` (the default),
     :py:meth:`~ferenda.DocumentRepository.download_get_basefiles`
@@ -1048,7 +1055,7 @@ with the *config* object as single parameter.
         elif self.download_is_different(filename, tmpfile):
             if archive:
                 version = self.get_archive_version(basefile)
-                self.store.archive(basefile, version, overwrite=self.download_archive_overwrite)
+                self.store.archive(basefile, version, overwrite=self.download_archive_overwrite, copy=self.download_archive_copy)
             util.robust_rename(tmpfile, filename)
             updated = True
         else:

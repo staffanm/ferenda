@@ -138,6 +138,7 @@ class SFS(Trips):
     base = "SFSR"  # DIR, THWALLPROP, SFSR
     # This must be pretty lax, basefile is sanitized later
     download_archive_overwrite = True
+    download_archive_copy = True
     basefile_regex = r"(?P<basefile>\d{4}:(bih. ?|)\d+( ?s\. ?\d+| \d|))$"
     document_url_template = "http://rkrattsbaser.gov.se/sfst?bet=%(basefile)s"
     document_sfsr_url_template = "http://rkrattsbaser.gov.se/sfsr?bet=%(basefile)s"
