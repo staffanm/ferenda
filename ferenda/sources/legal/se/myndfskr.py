@@ -13,6 +13,7 @@ import re
 import json
 import functools
 from collections import OrderedDict
+from copy import deepcopy
 try:
     from functools import lru_cache
 except ImportError:
@@ -2319,13 +2320,15 @@ class RAFS(MyndFskrBase):
         form = tree.forms[1]
         assert form.action == self.start_url
         fields = dict(form.fields)
-
+        formid = 'ctl00$cphMasterFirstRow$ctl02$InsertFieldWithControlsOnInit1$SearchRafsForm_ascx1$'
         formid = 'ctl00$cphMasterFirstRow$ctl02$InsertFieldWithControlsOnInit1$SearchRafsForm_ascx1$'
         fields['__EVENTTARGET'] = formid + 'lnkVisaAllaGiltiga'
         fields['__EVENTARGUMENT'] = ''
-        for f in ('btAdvancedSearch', 'btSimpleSearch', 'chkSokUpphavda'):
+        # for f in ('btAdvancedSearch', 'btSimpleSearch', 'chkSokUpphavda'):
+        for f in ('btAdvancedSearch', 'chkSokUpphavda'):
             del fields[formid + f]
-        for f in ('tbSearch', 'tbRafsnr', 'tbRubrik', 'tbBemyndigande', 'tbGrundforfattning', 'tbFulltext'):
+        # for f in ('tbSearch', 'tbRafsnr', 'tbRubrik', 'tbBemyndigande', 'tbGrundforfattning', 'tbFulltext'):
+        for f in ('tbRafsnr', 'tbRubrik', 'tbBemyndigande', 'tbGrundforfattning', 'tbFulltext'):
             fields[formid + f] = ''
         resp = self.session.post(self.start_url, data=fields)
         assert 'Antal träffar:' in resp.text, "ASP.net event lnkVisaAllaGiltiga was not properly called"
@@ -2370,7 +2373,7 @@ class RIFS(MyndFskrBase):
 
 class SIFS(MyndFskrBase):
     alias = "sifs"
-    start_url = "https://www.spelinspektionen.se/foreskrifter-och-lagar/nya-foreskrifter/"
+    start_url = "https://www.spelinspektionen.se/Regler-och-beslut/nya-foreskrifter/"
     basefile_regex = re.compile('(?P<basefile>[SL]IFS \d{4}:\d{1,3})')
 
     def forfattningssamlingar(self):
@@ -2378,46 +2381,64 @@ class SIFS(MyndFskrBase):
 
 class SJVFS(MyndFskrBase):
     alias = "sjvfs"
-    start_url = "http://www.jordbruksverket.se/forfattningar/forfattningssamling.4.5aec661121e2613852800012537.html"
+    # NOTE: The search start URL may possibly change -- in that case we'll have to dig the new URL out from the following
+    # start_url = "https://jordbruksverket.se/om-jordbruksverket/forfattningar"
+    start_url = "https://jordbruksverket.se/appresource/4.3b03b79b16ee86d57cada45c/12.3b03b79b16ee86d57cada465/search"
     download_iterlinks = False
-
+    search_payload = {"searchData":
+                      {"newSearch": False,
+                       "querytext": "null",
+                       "paginationPage": 1,
+                       "refinementfilters": [
+                           {"alias": "Författningsstatus",
+                            "values": ["Aktuell"]}]},
+                      "svAjaxReqParam": "ajax"}
     def forfattningssamlingar(self):
-        return ["sjvfs", "dfs", "lvfs"]
+        return ["sjvfs", "lsfs", "lbs"]
+
+    def download_get_first_page(self):
+        resp = self.session.post(self.start_url, data=json.dumps(self.search_payload))
+        return resp
 
     @decorators.downloadmax
+    @recordlastbasefile
     def download_get_basefiles(self, source):
-        soup = BeautifulSoup(source, "lxml")
-        main = soup.find_all("ul", "consid-submenu")
-        assert len(main) == 1
-        extra = []
-        for a in list(main[0].find_all("a")):
-            # only fetch subsections that start with a year, not
-            # "Allmänna råd"/"Notiser"/"Meddelanden"
-            label = a.text.split()[0]
-            if not label.isdigit():
-                continue
-            # if lastdownload was 2015-02-24, dont download 2014
-            # and earlier
-            if (not self.config.refresh and
-                    'lastdownload' in self.config and self.config.lastdownload and
-                    self.config.lastdownload.year > int(label)):
-                continue
-            url = urljoin(self.start_url, a['href'])
-            self.log.debug("Fetching index page for %s" % (a.text))
-            subsoup = BeautifulSoup(self.session.get(url).text, "lxml")
-            submain = subsoup.find("div", "pagecontent")
-            for a in submain.find_all("a", href=re.compile(".pdf$", re.I)):
-                if re.search('\d{4}:\d+', a.text):
-                    m = re.search('(\w+FS|) ?(\d{4}:\d+)', a.text)
-                    fs = m.group(1).lower()
-                    fsnr = m.group(2)
-                    if not fs:
-                        fs = "sjvfs"
-                    basefile = "%s/%s" % (fs, fsnr)
-                    suburl = unquote(urljoin(url, a['href']))
-                    params = {'uri': suburl}
-                    yield basefile, params
-
+        page = 1
+        done = False
+        resp = json.loads(source)
+        while not done:
+            hits = {}
+            for hit in resp['hits']:
+                basefile = hit["Ändringsföreskriftnr"]
+                if basefile == "":
+                    basefile = hit["Grundföreskriftnr"]
+                if "bilaga" in basefile:
+                    continue
+                if " " in basefile:
+                    # 'LSFS 1986:18' => 'lsfs/1986:18'
+                    basefile = basefile.lower().replace(" ", "/")
+                else:
+                    basefile = self.forfattningssamlingar()[0] + "/" + basefile
+                hits[basefile] = hit
+            # basefiles appear unsorted in the JSON response. Sort
+            # them descendingly in order for @recordlastbasefile to
+            # work
+            for basefile in sorted(hits, key=util.split_numalpha, reverse=True):
+                hit = hits[basefile]
+                params = {'uri': hit["Nedladdningslank"],
+                          'title': hit["Heading"]}
+                # FIXME: We'd really like to save the json metadata in
+                # the hit dict, but we have no easy way of passing it
+                # to download_single and it would be wrong to
+                # eg. create downloaded/[basefile]/metadata.json here
+                yield basefile, params
+            if resp["pagination"]["max"] > page:
+                page += 1
+                payload = deepcopy(self.search_payload)
+                payload["searchData"]["paginationPage"] = page
+                resp = self.session.post(self.start_url, data=json.dumps(payload)).json()
+            else:
+                done = True
 
 class SKVFS(MyndFskrBase):
     alias = "skvfs"
@@ -2556,13 +2577,7 @@ class SOSFS(MyndFskrBase):
     # kinda misnamed, but other docrepos handle other agencies parts
     # of HSLF-FS, so we'll keep it
     alias = "sosfs"
-    start_url = "http://www.socialstyrelsen.se/sosfs"
-    #
-    # NOTE: The above should really be the line below, but the new URL
-    # has a whole new structure which we'll need to adapt
-    # download_get_basefiles for
-    #
-    # start_url = "https://www.socialstyrelsen.se/regler-och-riktlinjer/foreskrifter-och-allmanna-rad/"
+    start_url = "https://www.socialstyrelsen.se/regler-och-riktlinjer/foreskrifter-och-allmanna-rad/"
     storage_policy = "dir"  # must be able to handle attachments
     download_iterlinks = False
     downloaded_suffixes = [".pdf", ".html"]
@@ -2592,65 +2607,59 @@ class SOSFS(MyndFskrBase):
 
     @decorators.downloadmax
     def download_get_basefiles(self, source):
-        soup = BeautifulSoup(source, "lxml")
-        for td in soup.find_all("td", "col3"):
-            txt = td.get_text().strip()
-            basefile = self._basefile_from_text(txt)
-            if basefile is None:
-                continue
-            link_el = td.find_previous_sibling("td").a
-            link = urljoin(self.start_url, link_el.get("href"))
-            if link.startswith("javascript:"):
-                continue
-            if txt.startswith("Konsoliderad"):
-                basefile = "konsolidering/%s" % basefile
-            # FIXME: This yields a single basefile that's something
-            # like "hslffs/hslf/fs 2017:27" (note the embedded nbsp --
-            # basefile_from_text should handle this probably
-            params = {'uri': link}
-            yield basefile, params
-
+        # the source of the HTML page contains all the information we
+        # need for all documents available, however only as a JSON
+        # blob argument to a ReactDOM.hydrate call amongst many. We
+        # start by string-munging to get at the JSON blob:
+        startmark = "SOS.Components.FileInformation, "
+        start = source.index(startmark) + len(startmark)
+        endmark = "), document.getElementById("
+        end = source.index(endmark, start)
+        data = json.loads(source[start:end])
+        for doc in data['SharePointItem']:
+            if doc['IconClass'] == 'pdf':
+                # Titel: HSLF-FS 2020:17 Socialstyrelsens allmänna råd om tillämpningen av ...
+                basefile = self._basefile_from_text(doc['Titel'])
+                if basefile is None:  # eg "Förteckning över den 1 januari 2020 gällande författningar ...", "HSLF-FS Register över författningar m.m. som ..."
+                    continue
+            elif not(doc['IconClass']):
+                # Titel: Senaste versionen av SOSFS 2015:8 Socialstyrelsens föreskrifter och allmänna råd om ...
+                titel = re.sub('Senaste version(en|) av ', '', doc['Titel'])
+                basefile = self._basefile_from_text(titel)
+                assert basefile, "Can't find basefile in " + doc['Titel']
+                basefile = "konsolidering/" + basefile
+            basefile = basefile.lower().replace("-", "").replace(" ", "/")
+            params = {'uri': urljoin(self.start_url, doc['FileUrl']),
+                      'title': doc['Titel']}
+            yield(basefile, params)
+                
+ 
     def download_single(self, basefile, url, orig_url=None):
-        resp = self.session.get(url)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "lxml")
         if basefile.startswith("konsolidering"):
+            resp = self.session.get(url)
+            resp.raise_for_status()
             # that HTML page is the best available representation of
-            # the consolidated version, and we already have it, so we
-            # could save it, but if we call
+            # the consolidated version, so we save it, but also call
             # DocumentRepository.download_single(self, basefile, link,
-            # url), our documententry JSON file will be updated.
+            # url)to make sure our documententry JSON file will be
+            # updated.
+            #
             # and since we're here already, download all PDF
             # base/change acts we can find (some might not be linked
             # from the front page)
+            soup = BeautifulSoup(resp.text, "lxml")
             with self.store.open_downloaded(basefile, "wb", attachment="index.html") as fp:
                 fp.write(resp.content)            
             DocumentRepository.download_single(self, basefile, url, orig_url)
-            linkhead = soup.find(text=re.compile(
-                "(Ladda ner eller beställ|Beställ eller ladda ner)"))
-            if linkhead:
-                for link_el in linkhead.find_parent("div").find_all("a"):
-                    if '/publikationer' in link_el.get("href"):
-                        link = urljoin(url, link_el["href"])
-                        subbasefile = self._basefile_from_text(link_el.text)
-                        if (subbasefile and
-                            (self.config.refresh or
-                             not os.path.exists(self.store.downloaded_path(subbasefile)))):
-                            self.download_single(subbasefile, link)
-            else:
-                self.log.warning("%s: Can't find links to base/change"
-                                 " acts" % basefile)
+            for div in soup.find_all("div", "fileinformation"):
+                link = urljoin(url, div.find("a", "file-extension-icon pdf")["href"])
+                subbasefile = self._basefile_from_text(div.find("span", "fileinformation__item-title").text)
+                if (subbasefile and
+                    (self.config.refresh or
+                    not os.path.exists(self.store.downloaded_path(subbasefile)))):
+                    self.download_single(subbasefile, link)
         else:
-            # the url will be to a HTML landing page. We extract the link
-            # to the actual PDF file and then call default impl of
-            # download_single in order to update documententry.
-            link_el = soup.find("a", text=re.compile("^\s*Ladda ner\s*$"))
-            if link_el:
-                link = urljoin(url, link_el.get("href"))
-                return DocumentRepository.download_single(self, basefile, link, url)
-            else:
-                self.log.warning("%s: No link to PDF file found at %s" % (basefile, url))
-                return False
+            return DocumentRepository.download_single(self, basefile, url)
 
     def sanitize_text(self, text, basefile):
         # sosfs 1996:21 is so badly scanned that tesseract fails to

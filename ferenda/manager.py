@@ -1059,15 +1059,17 @@ def _run_class(enabled, argv, config):
             # pairs. If config.allversions is not set to True, the
             # version element will always be None (meaning we'll only
             # parse the current version, not any archived versions)
-            if inst.config.loglevel == "DEBUG":
-                x = list(inst.store.list_basefiles_for(action, force=inst.config.force))
-                log.debug("%s %s: processing %s basefiles (%s...)" % (alias, action, len(x), x[:3]))
             iterable = inst.store.list_basefiles_for(action, force=inst.config.force)
+            if inst.config.loglevel == "DEBUG":
+                log.debug("%s %s: about to list basefiles" % (alias, action))
+                iterable = list(iterable)
+                log.debug("%s %s: processing %s basefiles (%s...)" % (alias, action, len(iterable), ", ".join(iterable[:3])))
+                
             if inst.config.allversions:
-                if inst.config.loglevel == "DEBUG":
-                    x = list(inst.store.list_versions_for_basefiles(x, action, force=inst.config.force))
-                    log.debug("%s %s: Processing %s versions (%s...)" % (alias, action, len(x), x[:3]))
                 iterable = inst.store.list_versions_for_basefiles(iterable, action, force=inst.config.force)
+                if inst.config.loglevel == "DEBUG":
+                    iterable = list(iterable)
+                    log.debug("%s %s: processing %s versions (%s...)" % (alias, action, len(iterable), iterable[:3]))
             else:
                 iterable = ((x, None) for x in iterable)
             if action == "parse" and not inst.config.force:

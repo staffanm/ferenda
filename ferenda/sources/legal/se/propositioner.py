@@ -311,6 +311,9 @@ class PropTrips(Trips, Offtryck, FixedLayoutSource):
         if os.path.exists(urlmap_path):
             with codecs.open(urlmap_path, encoding="utf-8") as fp:
                 for line in fp:
+                    if len(line.split("\t")) < 2:
+                        self.log.warning("Malformed url.map line: %r" % line)
+                        continue
                     url, attachment = line.split("\t")
                     self.urlmap[url] = attachment.strip()
         if basefile:
