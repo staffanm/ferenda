@@ -490,7 +490,8 @@ class DocumentRepository(object):
             downloaded_suffixes = self.store.downloaded_suffixes
         self.store = self.documentstore_class(
             config.datadir + os.sep + self.alias,
-            storage_policy=self.storage_policy)
+            storage_policy=self.storage_policy,
+            compression=config.compress)
         if downloaded_suffixes and downloaded_suffixes != self.store.downloaded_suffixes:
             self.store.downloaded_suffixes.clear()
             self.store.downloaded_suffixes.extend(downloaded_suffixes)

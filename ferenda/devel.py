@@ -907,8 +907,6 @@ class Devel(object):
         # file for basefile. FIXME: unify this with open_intermed_patchedtext
         # in handle_patch
         intermediatepath = repo.store.intermediate_path(basefile)
-        if repo.config.compress == "bz2":
-            intermediatepath += ".bz2"
         if os.path.exists(intermediatepath):
             stage = "intermediate"
             outfile = intermediatepath
@@ -929,7 +927,9 @@ class Devel(object):
             # intermediate file
             fileno, patchedtext_path = mkstemp()
             with os.fdopen(fileno, "wb") as fp:
-                patchedtext_lines = util.readfile(outfile, encoding=repo.source_encoding).split("\n")
+                # patchedtext_lines = util.readfile(outfile, encoding=repo.source_encoding).split("\n")
+                with repo.store.open_intermediate(basefile) as fp2:
+                    patchedtext_lines = fp2.read().split("\n")
                 fp.write("\n".join(patchedtext_lines).encode(repo.source_encoding))
 
             # 2.1 if intermediate: after stashing a copy of the
