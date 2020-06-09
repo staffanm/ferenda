@@ -1492,8 +1492,9 @@ class SwedishLegalSource(DocumentRepository):
             month = self.swedish_months[month]
             year = int(year)
             day = calendar.monthrange(year, month)[1]
-        elif re.match(r'\d{4}-\d{2}-\d{2}', datestr): # well-formed
-            year, month, day = [int(x) for x in datestr.split("-")]
+        elif re.match(r'\d{4}-\d{2}-\d{2}', datestr): # well-formed, but might have a trailing hyphen 
+            m = re.match(r'(\d{4})-(\d{2})-(\d{2})', datestr)
+            year, month, day = [int(x) for x in m.groups()]
         elif re.match(r'(\d+)[^\d]+(\d+)[^\d]+(\d+)', datestr):
             m = re.match(r'(\d+)[^\d]+(\d+)[^\d]+(\d+)', datestr) # typical anomalies in the wild
             if len(m.group(1)) < 4:

@@ -873,7 +873,7 @@ class DV(SwedishLegalSource):
                 re_lagrum = re.compile("Lagrum: ?(?P<lagrum>.*)", flags=re.DOTALL)
             else:
                 re_notisstart = re.compile("Not (?P<ordinal>\d+)")
-                re_malnr = re.compile("Högsta förvaltningsdomstolen meddelade den (?P<avgdatum>\d+ \w+ \d{4}) följande (dom|beslut) \(mål nr (?P<malnr>[\d\-–]+(| och [\d\-–]+))\)")
+                re_malnr = re.compile("Högsta förvaltningsdomstolen meddelade( den|) (?P<avgdatum>\d+ \w+ \d{4}) följande (dom|beslut) \((mål nr |)(?P<malnr>[\d\-–]+(| och [\d\-–]+))\)")
                 re_avgdatum = re_malnr
                 re_sokord = None
                 re_lagrum = None
