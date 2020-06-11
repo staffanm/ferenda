@@ -929,8 +929,6 @@ class SwedishLegalSource(DocumentRepository):
         allbody = Body()
         for parseconfig in self.parse_body_parseconfigs():
             try:
-                for (startpage, pagecount, tag) in documents:
-                    if tag == 'main':
                 parser = self.get_parser(basefile, sanitized, parseconfig)
                 tokenstream = self.tokenize(sanitized)
                 body = parser(tokenstream)
