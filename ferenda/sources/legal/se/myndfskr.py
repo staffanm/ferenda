@@ -396,7 +396,7 @@ class MyndFskrBase(FixedLayoutSource):
 
     def consolidation_date(self, basefile):
         # subclasses should override this and dig out real data somewhere
-        return datetime.date.today() 
+        return datetime.today() 
 
     urispace_segment = ""
     
@@ -1002,7 +1002,7 @@ class AFS(MyndFskrBase):
         # look at the first TWO pages for consolidation info
         for page in reader.readpage(), reader.readpage():
             # All these variants exists:
-            m = re.search(r"Ändringar (?:införda|gjorda|är gjorda) (?:t\.o\.m\.?|till och med) ?(?:|den )(\d+ \w+ \d+|\d+-\d+-\d+)", page)
+            m = re.search(r"(?:Beslutade ä|Ä)ndringar (?:införda|gjorda|är gjorda) (?:t\.o\.m\.?|till och med) ?(?:|den )(\d+ \w+ \d+|\d+-\d+-\d+)", page)
             if m:
                 return self.parse_swedish_date(m.group(1))
         else:
@@ -1753,7 +1753,8 @@ class MyndFskrAnalyzer(PDFAnalyzer):
         # this analyzer only separates the main content from the
         # endmatter (the last page, containing only the year of
         # printing)
-        res = self(super, MyndFskrAnalyzer).documents
+        
+        res = super(MyndFskrAnalyzer, self).documents
         # check only the last page
         if re.match("Elanders Sverige AB, \d{4}", self.pdf[-1].as_plaintext()):
             res =  [(0, len(self.pdf)-1, 'main'),
@@ -1863,15 +1864,18 @@ class PMFS(MyndFskrBase):
                                           pagecount=len(sanitized))
         return chain(iter([sanitized.fontspec]), tokenstream)
     
+    def get_pdf_analyzer(self, reader):
+        return MyndFskrAnalyzer(reader)
+
     def get_parser(self, basefile, sanitized, parseconfig):
         # first: create metrics through a PDFAnalyzer
         metrics_path = self.store.path(basefile, 'intermediate',
                                        '.metrics.json')
         plot_path = None
-        metrics = PDFAnalyzer(sanitized).metrics(metrics_path, plot_path,
-                                        startpage=0,
-                                        pagecount=len(sanitized),
-                                        force=self.config.force)
+        metrics = sanitized.analyzer.metrics(metrics_path, plot_path,
+                                             startpage=0,
+                                             pagecount=len(sanitized),
+                                             force=self.config.force)
         # make them dot-accessible
         metrics = LayeredConfig(Defaults(metrics))
 
@@ -2719,27 +2723,18 @@ class SOSFS(MyndFskrBase):
         return re.search("(SOSFS |HSLF-FS |)(\d+:\d+)", change).group(2)
 
     def consolidation_basis(self, soup):
-        res = []
-        linkhead = soup.find(text=re.compile(
-            "(Ladda ne[rd] (och|eller) beställ|Beställ eller ladda ne[rd])"))
-        for link_el in linkhead.find_parent("div").find_all("a"):
-            if '/publikationer' not in link_el.get("href"):
-                continue
-            fsnummer = self._basefile_from_text(link_el.text)
-            if fsnummer:
-                res.append(fsnummer)
-        return res
+        return [self._basefile_from_text(x.text) for x in soup.find_all("div", "fileinformation__heading")]
 
     def maintext_from_soup(self, soup):
-        main = soup.find("div", id="socextPageBody").find("div", "ms-rtestate-field")
-        assert main
-        return str(main)
+        main = soup.find("main").find("div", "row").find("div", "main-body")
+        assert main, "Could not find main body text"
+        return main
 
-    def parse_open(self, basefile):
+    def parse_open(self, basefile, version=None):
         if basefile.startswith("konsolidering"):
-            return self.store.open_downloaded(basefile, attachment="index.html")
+            return self.store.open_downloaded(basefile, attachment="index.html", version=version)
         else:
-            return super(SOSFS,self).parse_open(basefile)
+            return super(SOSFS,self).parse_open(basefile, version=version)
 
     def extract_head(self, fp, basefile, force_ocr=False, attachment=None):
         if basefile.startswith("konsolidering"):

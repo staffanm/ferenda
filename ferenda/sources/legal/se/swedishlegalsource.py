@@ -926,8 +926,11 @@ class SwedishLegalSource(DocumentRepository):
         rawbody = self.extract_body(fp, basefile)
         sanitized = self.sanitize_body(rawbody)
         lastexception = None
+        allbody = Body()
         for parseconfig in self.parse_body_parseconfigs():
             try:
+                for (startpage, pagecount, tag) in documents:
+                    if tag == 'main':
                 parser = self.get_parser(basefile, sanitized, parseconfig)
                 tokenstream = self.tokenize(sanitized)
                 body = parser(tokenstream)
@@ -1026,8 +1029,13 @@ class SwedishLegalSource(DocumentRepository):
         The default implementation returns its input unchanged.
 
         """
+        if isinstance(rawbody, PDFReader):
+            rawbody.analyzer = self.get_pdf_analyzer(rawbody)
         return rawbody
 
+    def get_pdf_analyzer(self, reader):
+        return PDFAnalyzer(reader)
+    
     def get_parser(self, basefile, sanitized, initialstate=None, parseconfig="default"):
         """should return a function that gets any iterable (the output
         from tokenize) and returns a ferenda.elements.Body object.
