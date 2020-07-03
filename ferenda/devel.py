@@ -349,33 +349,36 @@ documents.</p>
             rootlogger.info("Generating %s" % basefile)
             repo.generate(basefile)
         else:
-            self.render_template("""
+            return self.render_template("""
 <div>
-<form method="POST">
-  <label>Repo: 
-    <input name="repo"/>
-  </label>
-  <label>Subrepo (if applicable):
-    <input name="subrepo"/>
-  </label>
-  <label>Basefile:
-    <input name="basefile"/>
-  </label>
-  <label>
-    Action:
-    <select name="action">
-      <option>download</option>
-      <option selected="selected">parse</option>
-      <option>relate</option>
-      <option>generate</option>
-    </selection>
-  </label>
-  <label>
-    New value:
-    <input name="newvalue">
-  </label>
-  <input type="submit" class="btn btn-default" value="Importera dokument"/>
-<form>
+  <form method="POST">
+    <div class="form-group">   
+      <label for="repo">Repo:</label>
+      <input id="repo" name="repo" class="form-control"/>
+    </div>
+    <div class="form-group">
+      <label for="subrepo">Subrepo (if applicable):</label>
+      <input id="subrepo" name="subrepo" class="form-control"/>
+    </div>
+    <div class="form-group">
+      <label for="basefile">Basefile:</label>
+      <input id="basefile" name="basefile" class="form-control"/>
+    </div>
+    <div class="form-group">
+      <label for="action">Action:</label>
+      <select id="action" name="action" class="form-control">
+        <option>download</option>
+        <option selected="selected">parse</option>
+        <option>relate</option>
+        <option>generate</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="newvalue">New value:</label>
+      <input id="newvalue" name="newvalue" class="form-control"/>
+    </div>
+    <button type="submit" class="btn btn-default">Change option</button>
+  </form>
 </div>""", "Change options for a specific basefile")
 
 
@@ -410,12 +413,10 @@ documents.</p>
   <h2>Create a new patch</h2>
   <form>
     <div class="form-group">
-      <label for="repo">repo
-        <input type="text" id="repo" name="repo" class="form-control"/>
-      </label>
-      <label for="basefile">basefile
-        <input type="text" id="basefile" name="basefile" class="form-control"/>
-      </label>
+      <label for="repo">repo</label>
+      <input type="text" id="repo" name="repo" class="form-control"/>
+      <label for="basefile">basefile</label>
+      <input type="text" id="basefile" name="basefile" class="form-control"/>
     </div>
   </form>
 </div>""", "patch")

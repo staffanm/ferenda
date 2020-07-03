@@ -2623,7 +2623,14 @@ class SOSFS(MyndFskrBase):
         for doc in data['SharePointItem']:
             if doc['IconClass'] == 'pdf':
                 # Titel: HSLF-FS 2020:17 Socialstyrelsens allmänna råd om tillämpningen av ...
+                #
+                # Unfortunately, sometimes documents that are neither
+                # real regulations nor consolidated versions, occur in
+                # the feed. Filter such documents that we know about.
+                if "utvärdering av Socialstyrelsens föreskrifter" in doc['Titel']:
+                    continue
                 basefile = self._basefile_from_text(doc['Titel'])
+                # print("%s -> %s" % (doc['Titel'], basefile))
                 if basefile is None:  # eg "Förteckning över den 1 januari 2020 gällande författningar ...", "HSLF-FS Register över författningar m.m. som ..."
                     continue
             elif not(doc['IconClass']):
@@ -2632,6 +2639,7 @@ class SOSFS(MyndFskrBase):
                 basefile = self._basefile_from_text(titel)
                 assert basefile, "Can't find basefile in " + doc['Titel']
                 basefile = "konsolidering/" + basefile
+                # print("%s => %s" % (doc['Titel'], basefile))
             basefile = basefile.lower().replace("-", "").replace(" ", "/")
             params = {'uri': urljoin(self.start_url, doc['FileUrl']),
                       'title': doc['Titel']}
