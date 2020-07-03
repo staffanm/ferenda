@@ -62,10 +62,10 @@ RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selectio
        rm -r poppler-0.56.0 && \
        ldconfig && \
     wget https://github.com/htacg/tidy-html5/releases/download/5.4.0/tidy-5.4.0-64bit.deb && \
-       dpkg -i tidy-5.4.0-64bit.deb && \
-    mkdir /opt/fuseki && \
+       dpkg -i tidy-5.4.0-64bit.deb
+RUN mkdir /opt/fuseki && \
        cd /opt/fuseki && \
-       (curl -s http://www-eu.apache.org/dist/jena/binaries/apache-jena-fuseki-3.13.1.tar.gz | tar -xvz --strip-components=1 ) && \
+       (curl -s http://apache.mirrors.spacedump.net/jena/binaries/apache-jena-fuseki-3.15.0.tar.gz | tar -xvz --strip-components=1 ) && \
        mkdir -p run/databases/lagen && \
        mkdir -p run/configuration 
 WORKDIR /usr/share/ferenda

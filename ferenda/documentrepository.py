@@ -451,6 +451,7 @@ class DocumentRepository(object):
                     o.bind(prefix, uri)
         return o
 
+
     @cached_property
     def commondata(self):
         """Provides a :py:class:`~rdflib.graph.Graph` containing any extra data that is common to
