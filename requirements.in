@@ -24,6 +24,7 @@ langdetect
 grako
 werkzeug
 jinja2
+gunicorn
 # importlib
 # the following modules might be needed for older python versions
 # mock
