@@ -154,3 +154,11 @@ div.betankande, div.skiljaktig, div.tillagg {
 		   
     }
 }
+
+/* Optional dark mode */
+
+@media (prefers-color-scheme: dark) {
+    body.forarbete div.sida {
+	background-color: #000;
+    }
+}

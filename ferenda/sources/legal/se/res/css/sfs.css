@@ -69,3 +69,12 @@ body.sfs article {
 select#from {
     width: 98%;
 }
+
+
+/* Optional dark mode */
+
+@media (prefers-color-scheme: dark) {
+    .paragrafbeteckning {
+	color: #fff;
+    }
+}

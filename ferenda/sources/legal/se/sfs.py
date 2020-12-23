@@ -2119,7 +2119,7 @@ WHERE {
                 Facet(RPUBL.arsutgava,
                       use_for_toc=True,
                       label="Ordnade efter utgivningsår",
-                      pagetitle='Författninagr utgivna %(selected)s',
+                      pagetitle='Författningar utgivna %(selected)s',
                       key=sfsnrkey,
                       dimension_label="utgiven",
                       selector_descending=True),

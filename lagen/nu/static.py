@@ -36,5 +36,5 @@ class Static(BaseStatic, SwedishLegalSource):
 
     def footer(self):
         res = super(Static, self).footer()
-        res.append(("Hostas av Kodapan", "http://kodapan.se/"))
+        res.append(("Hostas av Lysator", "https://www.lysator.liu.se/"))
         return res

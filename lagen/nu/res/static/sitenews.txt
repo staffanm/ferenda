@@ -1,3 +1,16 @@
+2020-09-17 23:00:00 Lagen.nu får stöd av föreningen Lysator
+
+<p>Lagen.nu är nu möjlig tack vare datorföreningen <a
+href="https://www.lysator.liu.se/">Lysator</a> vid Linköpings
+universitet. De stöttar lagen.nu med servrar och nätverk för att vi
+ska kunna fortsätta driva tjänsten. Ett stort tack till Lysator för
+detta!</p>
+
+<p>Vi vill också uppmärksamma företaget <a
+href="http://kodapan.se/">Kodapan</a> som har stöttat Lagen.nu med
+motsvarande resurser under de senaste åren. Tack för den här
+tiden!</p>
+
 2019-06-25 00:18:00 Ny funktion: Tidsmaskin för lagtext
 
 <p>Det är nu möjligt att få upp äldre lydelser av en viss lag eller

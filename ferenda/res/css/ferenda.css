@@ -27,6 +27,7 @@
      2.5 Autocomplete/typeahead styling
      2.6 Misc styling
    3. Footer
+   4. Optional dark mode
 
 */
 
@@ -665,3 +666,23 @@ footer li + li::before {
 }
 
 
+/* PART 4: Optional dark mode */
+
+@media (prefers-color-scheme: dark) {
+    body {
+	color: #ccc;
+	background-color: #000;
+    }
+    .row-offcanvas-left .sidebar-offcanvas {
+	color: #ccc;
+	background-color: #000;
+	
+    }
+    .panel {
+	background-color: #000;
+    }
+    .panel-default>.panel-heading {
+	background-color: #222;
+	color: #eee;
+    }
+}

@@ -307,6 +307,9 @@ class WSGIApp(OrigWSGIApp):
         facetgroups = []
         commondata = self.repos[0].commondata
         searchurl = request_uri(environ, include_query=False)
+        # make server relative, since request_uri may reflect the
+        # internal docker-based URI
+        searchurl = "/"+searchurl.split("/",3)[-1]
         for facetresult in ('type', 'creator', 'issued'):
             if facetresult in facets:
                 if facetresult in queryparams:
