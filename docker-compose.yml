@@ -1,0 +1,79 @@
+version: '3.4'
+services:
+  nginx:
+    build:
+      context: nginx
+      # The Dockerfile builds on the base Nginx image but adds configuration, letsencrypt integration etc
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /mnt/data/lagen/data:/usr/share/nginx/html:ro
+    environment:
+      - "DOMAIN=lagen.nu"
+      - "EMAIL=staffan.malmgren@gmail.com"
+    restart: always
+    depends_on:
+      - ferenda
+      - mediawiki
+      - matomo
+  ferenda:
+    build:
+      context: ../ferenda
+      dockerfile: Dockerfile.slim
+    volumes:
+      - /mnt/data/lagen:/usr/share/site
+      - /home/staffan/wds/ferenda:/usr/share/ferenda
+    restart: always
+    depends_on:
+      - elasticsearch
+      - fuseki
+  elasticsearch:
+    image: elasticsearch:7.7.1
+    volumes:
+      - /mnt/data/elasticsearch:/usr/share/elasticsearch/data
+    environment:
+      - "discovery.type=single-node"
+      - "ES_JAVA_OPTS=-Xms8g -Xmx8g"
+    restart: always
+  fuseki:
+    image: stain/jena-fuseki
+    volumes:
+      - fuseki:/fuseki
+    environment:
+      - "JVM_ARGS=-Xmx2g"
+      - "FUSEKI_DATASET_1=lagen"
+    restart: always
+  mediawiki:
+    build: 
+      context: mediawiki
+    volumes:
+      - /mnt/data/mediawiki/db:/var/www/data
+      - /mnt/data/mediawiki/images:/var/www/html/w/images
+    restart: always
+  db:
+    image: mariadb
+    command: --max-allowed-packet=64MB
+    restart: always
+    volumes:
+      - db:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=ncfeGpSR63xmnyTa
+  matomo:
+    image: matomo
+    restart: always
+    volumes:
+      - matomo:/var/www/html
+    environment:
+      - MATOMO_DATABASE_HOST=db
+      - MYSQL_PASSWORD=ncfeGpSR63xmnyTa
+      - MYSQL_DATABASE=matomo
+      - MYSQL_USER=root
+    ports:
+      - 8123:80
+
+volumes:
+  db:
+  matomo:
+  fuseki:
+  elasticsearch:

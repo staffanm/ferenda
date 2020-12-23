@@ -1,4 +1,4 @@
-FROM python:3.8-slim-buster
+FROM ubuntu:20.04
 RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections && \
     apt -qq update && \
     apt -qq -y --no-install-recommends install \
@@ -7,18 +7,15 @@ RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selectio
 	man-db \
 	software-properties-common \
 	wget && \
-    add-apt-repository "deb http://ftp.us.debian.org/debian stretch main" && \
     wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add - && \
     add-apt-repository "deb https://artifacts.elastic.co/packages/7.x/apt stable main" && \
-    apt -qq update && \
-    mkdir /usr/share/man/man1 && \
-    apt -q -y --no-install-recommends install \
+    apt -qq update
+RUN apt -q -y --no-install-recommends install \
        antiword \
        bzip2 \
        cron \
        curl \
-       elasticsearch \
-       emacs24-nox \
+       emacs-nox \
        file \
        g++ \
        gcc \
@@ -35,17 +32,11 @@ RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selectio
        libxslt1-dev \
        locales \    
        make \
-       mariadb-client \
-       mariadb-server \
-       mediawiki \
-       nginx \
-       openjdk-8-jre-headless \
        pkg-config \
        procps \
        python3-dev \
        python3-venv \
        silversearcher-ag \
-       supervisor \
        tesseract-ocr \
        tesseract-ocr-swe \
        uwsgi \
@@ -63,30 +54,21 @@ RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selectio
        ldconfig && \
     wget https://github.com/htacg/tidy-html5/releases/download/5.4.0/tidy-5.4.0-64bit.deb && \
        dpkg -i tidy-5.4.0-64bit.deb
-RUN mkdir /opt/fuseki && \
-       cd /opt/fuseki && \
-       (curl -s http://apache.mirrors.spacedump.net/jena/binaries/apache-jena-fuseki-3.15.0.tar.gz | tar -xvz --strip-components=1 ) && \
-       mkdir -p run/databases/lagen && \
-       mkdir -p run/configuration 
 WORKDIR /usr/share/ferenda
 COPY requirements.txt . 
-RUN python3.7 -m venv .virtualenv && \
-    ./.virtualenv/bin/pip install wheel && \
-    ./.virtualenv/bin/pip install -r requirements.txt
+RUN python3 -m venv /usr/share/.virtualenv && \
+    /usr/share/.virtualenv/bin/pip install wheel && \
+    /usr/share/.virtualenv/bin/pip install -r requirements.txt
 
-EXPOSE 80 8000 3030 9001 9200 
+EXPOSE 8000 8001
 COPY docker /tmp/docker
-RUN mv /tmp/docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf && \
-    mv /tmp/docker/nginx.conf /etc/nginx/sites-enabled/default && \
-    mv /tmp/docker/ferenda.ttl /opt/fuseki/run/configuration/ && \
-    mv /tmp/docker/locale.gen /etc/locale.gen && locale-gen && \
+RUN mv /tmp/docker/locale.gen /etc/locale.gen && locale-gen && \
     chmod +x /tmp/docker/build && mv /tmp/docker/build /usr/local/bin/build
 COPY . .
-# mv /tmp/docker/elasticsearch-jvm.options /etc/elasticsearch/jvm.options && \
 
 ENTRYPOINT ["/bin/bash", "/tmp/docker/setup.sh"]
-CMD ["/usr/bin/supervisord"] # starts nginx, elasticsearch, fuseki, cron etc
+CMD ["/usr/share/.virtualenv/bin/gunicorn", "--bind=0.0.0.0:8000", "--access-logfile", "-", "--error-logfile", "-", "--workers=5", "--chdir=/usr/share/site", "wsgi:application"] 
 
 # docker build -t ferenda-image .
-# then: docker run --name ferenda -d -v c:/docker/ferenda:/usr/share/ferenda/site  -p 81:80 -p 3030:3030 -p 9001:9001 -p 9200:9200 -p 8000:8000 ferenda-image
+# then: docker run --name ferenda -d -v c:/docker/ferenda:/usr/share/site -p 8000:8000 -p 8001:8001 ferenda-image
 # and then: docker exec ferenda build all all --force --refresh
