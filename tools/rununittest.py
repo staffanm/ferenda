@@ -6,5 +6,5 @@ import sys
 from pprint import pprint
 if __name__ == '__main__':
     sys.path.append(".")
-    pprint(sys.path)
+    # pprint(sys.path)
     main(module=None)

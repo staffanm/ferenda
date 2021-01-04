@@ -1,21 +1,19 @@
 FROM ubuntu:20.04
 RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections && \
-    apt -qq update && \
+    apt -qq update --fix-missing && \
     apt -qq -y --no-install-recommends install \
         apt-transport-https \
-	gnupg \
-	man-db \
-	software-properties-common \
-	wget && \
-    wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add - && \
-    add-apt-repository "deb https://artifacts.elastic.co/packages/7.x/apt stable main" && \
+	    gnupg \
+	    man-db \
+	    software-properties-common \
+	    wget && \
     apt -qq update
 RUN apt -q -y --no-install-recommends install \
        antiword \
        bzip2 \
        cron \
        curl \
-       emacs-nox \
+#       emacs-nox \
        file \
        g++ \
        gcc \
@@ -25,7 +23,7 @@ RUN apt -q -y --no-install-recommends install \
        libjpeg-dev \
        liblcms2-dev \
        libopenjp2-7-dev \
-       libreoffice \
+#       libreoffice \
        libtiff-dev \
        libtiff-tools \
        libxml2-dev \
@@ -36,7 +34,7 @@ RUN apt -q -y --no-install-recommends install \
        procps \
        python3-dev \
        python3-venv \
-       silversearcher-ag \
+#       silversearcher-ag \
        tesseract-ocr \
        tesseract-ocr-swe \
        uwsgi \
@@ -60,15 +58,11 @@ RUN python3 -m venv /usr/share/.virtualenv && \
     /usr/share/.virtualenv/bin/pip install wheel && \
     /usr/share/.virtualenv/bin/pip install -r requirements.txt
 
-EXPOSE 8000 8001
-COPY docker /tmp/docker
+EXPOSE 8080
+COPY docker/ferenda /tmp/docker
 RUN mv /tmp/docker/locale.gen /etc/locale.gen && locale-gen && \
     chmod +x /tmp/docker/build && mv /tmp/docker/build /usr/local/bin/build
 COPY . .
 
 ENTRYPOINT ["/bin/bash", "/tmp/docker/setup.sh"]
-CMD ["/usr/share/.virtualenv/bin/gunicorn", "--bind=0.0.0.0:8000", "--access-logfile", "-", "--error-logfile", "-", "--workers=5", "--chdir=/usr/share/site", "wsgi:application"] 
-
-# docker build -t ferenda-image .
-# then: docker run --name ferenda -d -v c:/docker/ferenda:/usr/share/site -p 8000:8000 -p 8001:8001 ferenda-image
-# and then: docker exec ferenda build all all --force --refresh
+CMD ["/usr/share/.virtualenv/bin/gunicorn", "--bind=0.0.0.0:8080", "--access-logfile", "-", "--error-logfile", "-", "--workers=5", "--chdir=/usr/share/site", "wsgi:application"] 

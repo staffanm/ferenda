@@ -9,6 +9,7 @@ import shutil
 import tempfile
 import time
 from datetime import datetime, timedelta
+from zipfile import ZipFile
 
 from ferenda.compat import unittest
 
@@ -526,9 +527,218 @@ class Needed(unittest.TestCase):
         self.create_file(self.store.generated_path("a"))
         self.assertFalse(self.store.needed("a", "transformlinks"))
 
+
+class ZipArchive(Store):
+
+    def setUp(self):
+        super(ZipArchive, self).setUp()
+        self.datadir = tempfile.mkdtemp()
+        self.store = DocumentStore(self.datadir)
+        self.store.archiving_policy = "zip"
+
+    def test_archive_path(self):
+        self.assertEqual(self.store.archive_path("123/a"),
+                         self.p("archive/123/a.zip"))
+
+    def test_path_version(self):
+        eq = self.assertEqual
+        eq(self.p("archive/123.zip#foo/42.bar"),
+           self.store.path("123","foo", ".bar", version="42"))
+        eq(self.p("archive/123/a.zip#foo/42.bar"),
+           self.store.path("123/a","foo", ".bar", version="42"))
+        eq(self.p("archive/123/%3Aa.zip#foo/42.bar"),
+           self.store.path("123:a","foo", ".bar", version="42"))
+        eq(self.p("archive/123/%3Aa.zip#foo/42/%3A1.bar"),
+           self.store.path("123:a","foo", ".bar", version="42:1"))
+        self.store.storage_policy = "dir"
+        eq(self.p("archive/123.zip#foo/42/index.bar"),
+           self.store.path("123","foo", ".bar", version="42"))
+        eq(self.p("archive/123/a.zip#foo/42/index.bar"),
+           self.store.path("123/a","foo", ".bar", version="42"))
+        eq(self.p("archive/123/%3Aa.zip#foo/42/index.bar"),
+           self.store.path("123:a","foo", ".bar", version="42"))
+        eq(self.p("archive/123/%3Aa.zip#foo/42/%3A1/index.bar"),
+           self.store.path("123:a","foo", ".bar", version="42:1"))
+
+
+    def test_path_version_attachment(self):
+        eq = self.assertEqual
+        self.store.storage_policy = "dir"
+        eq(self.store.path("123","foo", None,
+                                  version="42", attachment="external.foo"),
+           self.p("archive/123.zip#foo/42/external.foo"))
+        eq(self.store.path("123/a","foo", None,
+                                  version="42", attachment="external.foo"),
+           self.p("archive/123/a.zip#foo/42/external.foo"))
+
+        eq(self.store.path("123:a","foo", None,
+                                  version="42", attachment="external.foo"),
+           self.p("archive/123/%3Aa.zip#foo/42/external.foo"))
         
-import doctest
-from ferenda import documentstore
-def load_tests(loader,tests,ignore):
-    tests.addTests(doctest.DocTestSuite(documentstore))
-    return tests
+        
+    def test_specific_path_methods(self):
+        self.assertEqual(self.store.downloaded_path('123/a', version="1"),
+                         self.p("archive/123/a.zip#downloaded/1.html"))
+        self.assertEqual(self.store.parsed_path('123/a', version="1"),
+                         self.p("archive/123/a.zip#parsed/1.html"))
+        self.assertEqual(self.store.generated_path('123/a', version="1"),
+                         self.p("archive/123/a.zip#generated/1.html"))
+        self.store.storage_policy = "dir"
+        self.assertEqual(self.store.downloaded_path('123/a', version="1"),
+                         self.p("archive/123/a.zip#downloaded/1/index.html"))
+        self.assertEqual(self.store.parsed_path('123/a', version="1"),
+                         self.p("archive/123/a.zip#parsed/1/index.xhtml"))
+        self.assertEqual(self.store.generated_path('123/a', version="1"),
+                         self.p("archive/123/a.zip#generated/1/index.html"))
+
+
+    def _writezip(self, zip, files):
+        util.ensure_dir(zip)
+        with ZipFile(zip, "w") as zipfile:
+            for f in files:
+                with zipfile.open(f, "w") as fp:
+                    fp.write(b"nonempty")
+    
+    def test_list_versions_file(self):
+        self._writezip(self.store.archive_path("123/a"), 
+                       ["downloaded/1.html",
+                        "downloaded/2.html",
+                        "downloaded/2bis.html",
+                        "downloaded/10.html"])
+        
+        versions = ["1","2", "2bis", "10"]
+        self.assertEqual(list(self.store.list_versions("123/a","downloaded")),
+                         versions)
+
+    def test_list_versions_dir(self):
+        self._writezip(self.store.archive_path("123/a"), 
+                       ["downloaded/1/index.html",
+                        "downloaded/2/index.html",
+                        "downloaded/2bis/index.html",
+                        "downloaded/10/index.html"])
+        versions = ["1","2", "2bis", "10"]
+        self.store.storage_policy = "dir"
+        self.assertEqual(list(self.store.list_versions("123/a", "downloaded")),
+                         versions)
+
+    def test_list_complicated_versions(self):
+        # the test here is that basefile + version might be ambigious
+        # as to where to split unless we add the reserved .versions
+        # directory. This should not even be an issue with the zip archiving_policy, but...
+        versions = ["a/27", "a/27/b"]
+        b_versions = ["27", "27/b"]
+        self._writezip(self.store.archive_path("123"),
+                       ["downloaded/a/27.html",
+                        "downloaded/a/27/b.html"])
+        self._writezip(self.store.archive_path("123/b"),
+                       ["downloaded/27.html",
+                        "downloaded/27/b.html"])
+        self.assertEqual(list(self.store.list_versions("123","downloaded")),
+                         versions)
+        self.assertEqual(list(self.store.list_versions("123/b","downloaded")),
+                         b_versions)
+        
+        
+    def test_list_attachments_version(self):
+        self.store.storage_policy = "dir" # attachments require this
+        self._writezip(self.store.archive_path("123/a"),
+                       ["downloaded/1/index.html",
+                        "downloaded/1/attachment.txt",
+                        "downloaded/index.html",
+                        "downloaded/attachment.txt",
+                        "downloaded/other.txt"])
+        self.assertEqual(list(self.store.list_attachments("123/a","downloaded", "1")),
+                         ['attachment.txt'])
+        self.assertEqual(list(self.store.list_attachments("123/a","downloaded", "2")),
+                         ['attachment.txt', 'other.txt'])
+
+    def test_write_versions(self):
+        # this uses the DocumentStore API
+        def write_files(files):
+            for f in files:
+                m = getattr(self.store, "open_" + f[1])
+                with m(f[0], version=f[3], attachment=f[4]) as fp:
+                    # path(basefile, maindir, suffix, version=None, attachment=None, storage_policy=None, archiving_policy=None):
+                    fp.write("contents of %s (but in a zip file)" % self.store.path(f[0], f[1], f[2], f[3], f[4], archive_policy="file"))
+ 
+        # this uses the raw zipfile API
+        def read_files(files):
+            for f in files:
+                zip = self.store.archive_path(f[0])
+                with ZipFile(zip) as zipfile:
+                    if self.store.storage_policy == "dir":
+                        subpath = "%s/%s%s" % (f[1], f[3], f[2])
+                    else: 
+                        subpath = "%s/%s/%s" % (f[1], f[3], f[4] or "index" + f[2])
+                    with zipfile.open(subpath) as fp:
+                        msg = "contents of %s (but in a zip file)" % self.store.path(f[0], f[1], f[2], f[3], f[4], archive_policy="file")
+                        self.assertEqual(msg, fp.read())
+
+        files = [
+            # [0] = basefile, [1] = maindir, [2] = suffix, [3] = version, [4] = attachment
+            ("123/a", "downloaded", ".html", "1", None),
+            ("123/a", "downloaded", ".html", "2", None),
+        ] 
+        write_files(files)
+        # assert that self.store.archive_path() is a zipfile with the contents we expect
+        read_files(files)
+        self.store.storage_policy = "dir"
+        write_files([
+            ("123/a", "downloaded", ".html", "1", None),
+            ("123/a", "downloaded", ".html", "1", "attachment.txt"),
+            ("123/a", "downloaded", ".html", "2", None),
+            ("123/a", "downloaded", ".html", "2", "attachment.txt"),
+            ("123/a", "downloaded", ".html", "2", "other.txt"),
+        ])
+        # assert that self.store.archive_path() is a zipfile with the contents we expect
+        read_files(files)
+ 
+    def test_read_versions(self):
+        # do the same thing as test_write_versions but with the Documentstore API/raw zipfile API swapped
+        # this uses the DocumentStore API
+
+        def write_files(files):
+            for f in files:
+                zip = self.store.archive_path(f[0])
+                with ZipFile(zip, "w") as zipfile:
+                    if self.store.storage_policy == "dir":
+                        subpath = "%s/%s%s" % (f[1], f[3], f[2])
+                    else: 
+                        subpath = "%s/%s/%s" % (f[1], f[3], f[4] or "index" + f[2])
+                    with zipfile.open(subpath, "w") as fp:
+                        msg = "contents of %s (but in a zip file)" % self.store.path(f[0], f[1], f[2], f[3], f[4], archive_policy="file")
+                        fp.write(msg)
+ 
+        def read_files(files):
+            for f in files:
+                m = getattr(self.store, "open_" + f[1])
+                with m(f[0], version=f[3], attachment=f[4]) as fp:
+                    msg = "contents of %s (but in a zip file)" % self.store.path(f[0], f[1], f[2], f[3], f[4], archive_policy="file")
+                    self.assertEqual(msg, fp.read())
+
+
+
+        files = [
+            # [0] = basefile, [1] = maindir, [2] = suffix, [3] = version, [4] = attachment
+            ("123/a", "downloaded", ".html", "1", None),
+            ("123/a", "downloaded", ".html", "2", None),
+        ] 
+        write_files(files)
+        # assert that self.store.archive_path() is a zipfile with the contents we expect
+        read_files(files)
+        self.store.storage_policy = "dir"
+        write_files([
+            ("123/a", "downloaded", ".html", "1", None),
+            ("123/a", "downloaded", ".html", "1", "attachment.txt"),
+            ("123/a", "downloaded", ".html", "2", None),
+            ("123/a", "downloaded", ".html", "2", "attachment.txt"),
+            ("123/a", "downloaded", ".html", "2", "other.txt"),
+        ])
+        # assert that self.store.archive_path() is a zipfile with the contents we expect
+        read_files(files)
+
+# import doctest
+# from ferenda import documentstore
+# def load_tests(loader,tests,ignore):
+#     tests.addTests(doctest.DocTestSuite(documentstore))
+#     return tests

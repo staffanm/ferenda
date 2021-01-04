@@ -1760,6 +1760,9 @@ class Archive(RepoTester):
         super(Archive, self).tearDown()
         if hasattr(Archive, 'repo'):
             delattr(Archive, 'repo')
+
+    def _read_archived_file(path):
+        return util.readfile(path)
     
     def test_archive(self):
         # create an existing thing
@@ -1779,13 +1782,13 @@ class Archive(RepoTester):
 
         eq = self.assertEqual
         # make sure archived files ended up in the right places
-        eq(util.readfile(self.repo.store.downloaded_path("123/a", version="1")),
+        eq(self._read_archived_file(self.repo.store.downloaded_path("123/a", version="1")),
                          "This is the original document, downloaded")
-        eq(util.readfile(self.repo.store.parsed_path("123/a", version="1")),
+        eq(self._read_archived_file(self.repo.store.parsed_path("123/a", version="1")),
                          "This is the original document, parsed")
-        eq(util.readfile(self.repo.store.distilled_path("123/a", version="1")),
+        eq(self._read_archived_file(self.repo.store.distilled_path("123/a", version="1")),
                          "This is the original document, distilled")
-        eq(util.readfile(self.repo.store.generated_path("123/a", version="1")),
+        eq(self._read_archived_file(self.repo.store.generated_path("123/a", version="1")),
                          "This is the original document, generated")
         # and that no files exists in the current directories
         self.assertFalse(os.path.exists(self.repo.store.downloaded_path("123/a")))
@@ -1832,7 +1835,7 @@ class Archive(RepoTester):
         eq = self.assertEqual
         eq(util.readfile(self.p("base/downloaded/123/a.html")),
            util.readfile("test/files/base/downloaded/123/a-version2.htm"))
-        eq(util.readfile(self.p("base/archive/downloaded/123/a/.versions/1.html")),
+        eq(self._read_archived_file(self.p("base/archive/downloaded/123/a/.versions/1.html")),
            util.readfile("test/files/base/downloaded/123/a-version1.htm"))
 
 
@@ -1863,14 +1866,14 @@ class Archive(RepoTester):
         version = self.repo.get_archive_version("123/a")
         self.repo.store.archive("123/a",version)
         self.assertEqual(version, "4")
-        self.assertEqual(sorted(os.listdir(self.p("base/archive/downloaded/123/a/.versions"))),
-                         ['1.html', '2.html', '3.html'])
-        self.assertEqual(sorted(os.listdir(self.p("base/archive/parsed/123/a/.versions"))),
-                         ['1.xhtml', '2.xhtml'])
-        self.assertEqual(sorted(os.listdir(self.p("/base/archive/generated/123/a/.versions"))),
-                         ['1.html', '4.html'])
+        self.assertEqual(list(self.repo.store.list_versions("123/a", "downloaded")),
+                         ['1', '2', '3'])
+        self.assertEqual(list(self.repo.store.list_versions("123/a", "parsed")),
+                         ['1', '2'])
+        self.assertEqual(list(self.repo.store.list_versions("123/a", "generated")),
+                         ['1', '4'])
         self.assertEqual(list(self.repo.store.list_versions("123/a")),
-                         ['1','2','3', '4'])
+                         ['1', '2', '3', '4'])
 
         
         util.writefile(self.repo.store.downloaded_path("123"),
@@ -1883,6 +1886,21 @@ class Archive(RepoTester):
                          ['1'])
         self.assertEqual(list(self.repo.store.list_versions("123/a")),
                          ['1','2','3', '4'])
+
+class ZipArchive(Archive):
+    def setUp(self):
+        super(ZipArchive, self).setUp()
+        self.repo.store.archiving_policy = "zip"
+
+    def _read_archived_file(path):
+        if "#" not in path:
+            return super(ZipArchive, self)._read_archived_file(path)
+        else:
+            zip, path = path.split("#", 1)
+            with ZipFile(zip) as zipfile:
+                with zipfile.open(path) as fp
+                    return fp.read()
+    
 
 
 class Patch(RepoTester):

@@ -1,4 +1,4 @@
-#!/usr/share/ferenda/.virtualenv/bin/python
+#!/usr/share/.virtualenv/bin/python
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 

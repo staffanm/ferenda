@@ -23,7 +23,7 @@ try:
     from ferenda.thirdparty import SQLite
 except ImportError:
     # not a required dependency
-    print("WARNING: cannot import SQLite but trying to go on anyway")
+    # print("WARNING: cannot import SQLite but trying to go on anyway")
     pass
 
 from ferenda import util, errors

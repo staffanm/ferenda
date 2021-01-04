@@ -8,8 +8,8 @@ if [ -f site/ferenda.ini ]; then
 fi 
 
 if [ ! -f site/ferenda.ini ]; then
-    /usr/share/.virtualenv/bin/activate
-    FERENDA_SET_TRIPLESTORE_LOCATION=1 FERENDA_SET_FULLTEXTINDEX_LOCATION=1 /usr/share/.virtualenv/bin/python ferenda-setup.py site --unattended --force
+    . /usr/share/.virtualenv/bin/activate
+    FERENDA_SET_TRIPLESTORE_LOCATION=1 FERENDA_SET_FULLTEXTINDEX_LOCATION=1 /usr/share/.virtualenv/bin/python -c "from ferenda import manager; manager.setup(['','site'], force=True, unattended=True)"
     cp /tmp/docker/ferenda-build.py site/
     cd site
     mkdir -p data/dv/generated/

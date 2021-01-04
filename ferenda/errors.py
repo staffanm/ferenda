@@ -98,6 +98,10 @@ class AttachmentPolicyError(ValueError):
     set to ``dir``.
     """
 
+class ArchivingPolicyError(ValueError):
+    """Raised when calling archive_path with
+    :py:meth:`~ferenda.DocumentStore.archiving_policy` not set to ``zip``."""
+
 
 class ArchivingError(FerendaException):
     """Raised whenever an attempt to archive a document version using

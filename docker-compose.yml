@@ -2,7 +2,7 @@ version: '3.4'
 services:
   nginx:
     build:
-      context: nginx
+      context: docker/nginx
       # The Dockerfile builds on the base Nginx image but adds configuration, letsencrypt integration etc
     ports:
       - "80:80"
@@ -12,22 +12,18 @@ services:
     environment:
       - "DOMAIN=lagen.nu"
       - "EMAIL=staffan.malmgren@gmail.com"
-    restart: always
     depends_on:
       - ferenda
       - mediawiki
       - matomo
   ferenda:
     build:
-      context: ../ferenda
-      dockerfile: Dockerfile.slim
+      context: .
     volumes:
-      - /mnt/data/lagen:/usr/share/site
-      - /home/staffan/wds/ferenda:/usr/share/ferenda
-    restart: always
-    depends_on:
-      - elasticsearch
-      - fuseki
+      - ../lagen.nu:/usr/share/site
+      - ./ferenda:/usr/share/ferenda  # during development, for easy source code sharing
+    ports:
+      - "80:80"
   elasticsearch:
     image: elasticsearch:7.7.1
     volumes:
@@ -43,14 +39,12 @@ services:
     environment:
       - "JVM_ARGS=-Xmx2g"
       - "FUSEKI_DATASET_1=lagen"
-    restart: always
   mediawiki:
     build: 
-      context: mediawiki
+      context: docker/mediawiki
     volumes:
       - /mnt/data/mediawiki/db:/var/www/data
       - /mnt/data/mediawiki/images:/var/www/html/w/images
-    restart: always
   db:
     image: mariadb
     command: --max-allowed-packet=64MB

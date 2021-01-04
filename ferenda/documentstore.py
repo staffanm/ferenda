@@ -6,6 +6,7 @@ from builtins import *
 from contextlib import contextmanager
 from collections import namedtuple
 from tempfile import NamedTemporaryFile
+from zipfile import ZipFile
 import json
 try:
     from json.decoder import JSONDecodeError
@@ -250,11 +251,27 @@ class DocumentStore(object):
     intermediate_suffixes = [".xml"]
     invalid_suffixes = [".invalid"]
     
-    def __init__(self, datadir, storage_policy="file", compression=None):
+    def __init__(self, datadir, storage_policy="file", compression=None, archiving_policy="file"):
         self.datadir = datadir  # docrepo.datadir + docrepo.alias
         self.storage_policy = storage_policy
         assert self.storage_policy in ("dir", "file")
         self.compression = compression
+        self.archiving_policy = archiving_policy
+        assert self.storage_policy in ("zip", "file")
+
+        # store1 = DocStore("data/sfs", archiving_policy="file")
+        # store2 = DocStore("data/sfs", archiving_policy="zip")
+        # methnames = ("downloaded_path", "documententry_path", "parsed_path", "serialized_path", "distilled_path", "annotation_path", "generated_path")
+        # for basefile, version in store1.basefile_versions():
+        #     for methname in methnames:
+        #         meth = getattr(store1, methname)
+        #         path = meth(basefile, version=version)
+        #         if os.path.exists(path):
+        #             for path in ["path"] + store1.list_attachments(...)
+        #                 with store1.open(path) as srcfp:
+        #                     with store2.open(path, compressed) as tgtfp:
+        #                         tgtfp.write(srcfp.read())
+    
 
 
     # TODO: Maybe this is a worthwhile extension to the API? Could ofc
@@ -268,7 +285,7 @@ class DocumentStore(object):
         return _open(filename, mode)
 
     def path(self, basefile, maindir, suffix, version=None, attachment=None,
-             storage_policy=None):
+             storage_policy=None, archiving_policy=None):
         """Calculate a full filesystem path for the given parameters.
 
         :param basefile: The basefile of the resource we're calculating a filename for
@@ -280,9 +297,10 @@ class DocumentStore(object):
         :type  version: str
         :param attachment: Optional. Any associated file needed by the main file.
         :type  attachment: str
-        :param storage_policy: Optional. Used to override `storage_policy` if needed
+        :param storage_policy: Optional. Used to override `storage_policy` of the store if needed
         :type  attachment: str
-
+        :param archiving_policy: Optional. Used to override `archiving_policy` of the store if needed
+        :type  attachment: str
         .. note::
 
            This is a generic method with many parameters. In order to
@@ -324,10 +342,16 @@ class DocumentStore(object):
         if not storage_policy:
             storage_policy = self.storage_policy
 
+        if not archiving_policy:
+            archiving_policy = self.archiving_policy
+
         if version:
             v_pathfrag = self.basefile_to_pathfrag(version)
-            segments = [self.datadir,
-                        'archive', maindir, pathfrag, '.versions', v_pathfrag]
+            if archiving_policy == "zip":
+                segments = [self.datadir, 'archive', pathfrag + ".zip#" + maindir, v_pathfrag]
+            elif archiving_policy == "file":
+                segments = [self.datadir,
+                            'archive', maindir, pathfrag, '.versions', v_pathfrag]
         else:
             segments = [self.datadir, maindir, pathfrag]
 
@@ -1051,3 +1075,11 @@ dependencies (in the form of source files for the action).
 
         """
         return self.path(basefile, 'feed', '.atom', storage_policy="file")
+
+    def archive_path(self, basefile):
+        """Get the full path to the archive zipfile, iff we are using
+        archiving_policy "zip"
+        """
+        if self.archiving_policy != "zip":
+            raise errors.ArchivingPolicyError()
+        return self.path(basefile, "archive", ".zip", storage_policy="file")
