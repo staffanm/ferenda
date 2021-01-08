@@ -16,14 +16,18 @@ services:
       - ferenda
       - mediawiki
       - matomo
+    restart: always
   ferenda:
     build:
       context: .
     volumes:
-      - ../lagen.nu:/usr/share/site
-      - ./ferenda:/usr/share/ferenda  # during development, for easy source code sharing
-    ports:
-      - "80:80"
+      - /mnt/data/lagen:/usr/share/site
+      - ./ferenda:/usr/share/ferenda
+    restart: always
+    depends_on:
+      - elasticsearch
+      - fuseki
+    stdin_open: true
   elasticsearch:
     image: elasticsearch:7.7.1
     volumes:
@@ -33,29 +37,32 @@ services:
       - "ES_JAVA_OPTS=-Xms8g -Xmx8g"
     restart: always
   fuseki:
-    image: stain/jena-fuseki
+    # image: stain/jena-fuseki
+    build:
+      context: docker/fuseki
     volumes:
       - fuseki:/fuseki
     environment:
       - "JVM_ARGS=-Xmx2g"
       - "FUSEKI_DATASET_1=lagen"
+    restart: always
   mediawiki:
     build: 
       context: docker/mediawiki
     volumes:
       - /mnt/data/mediawiki/db:/var/www/data
       - /mnt/data/mediawiki/images:/var/www/html/w/images
+    restart: always
   db:
     image: mariadb
     command: --max-allowed-packet=64MB
-    restart: always
     volumes:
       - db:/var/lib/mysql
     environment:
       - MYSQL_ROOT_PASSWORD=ncfeGpSR63xmnyTa
+    restart: always
   matomo:
     image: matomo
-    restart: always
     volumes:
       - matomo:/var/www/html
     environment:
@@ -65,6 +72,7 @@ services:
       - MYSQL_USER=root
     ports:
       - 8123:80
+    restart: always
 
 volumes:
   db:

@@ -23,7 +23,7 @@ RUN apt -q -y --no-install-recommends install \
        libjpeg-dev \
        liblcms2-dev \
        libopenjp2-7-dev \
-#       libreoffice \
+       libreoffice \
        libtiff-dev \
        libtiff-tools \
        libxml2-dev \
@@ -65,4 +65,4 @@ RUN mv /tmp/docker/locale.gen /etc/locale.gen && locale-gen && \
 COPY . .
 
 ENTRYPOINT ["/bin/bash", "/tmp/docker/setup.sh"]
-CMD ["/usr/share/.virtualenv/bin/gunicorn", "--bind=0.0.0.0:8080", "--access-logfile", "-", "--error-logfile", "-", "--workers=5", "--chdir=/usr/share/site", "wsgi:application"] 
+CMD ["/usr/share/.virtualenv/bin/gunicorn", "--bind=0.0.0.0:8000", "--access-logfile", "-", "--error-logfile", "-", "--workers=5", "--chdir=/usr/share/site", "wsgi:application"] 

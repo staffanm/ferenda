@@ -106,18 +106,23 @@ class SFS(OrigSFS, SameAs):
     }
 
     def _makeimages(self):
-        # FIXME: make sure a suitable font exists
-        font = "Helvetica"
+        # FIXME: make sure a suitable font exists -- we used to use
+        # Helvetica but I think DejaVu is more commonly available on
+        # generic linuxes
+        font = "DejaVu-Sans"
 
         def makeimage(basename, label):
-            filename = "res/img/sfs/%s.png" % basename
-            if not os.path.exists(filename):
+            resourcename = "img/sfs/%s.png" % basename
+            if not self.resourceloader.exists(resourcename):
+                # create the resource in the first available place
+                filename = self.resourceloader.loadpath[0] + os.sep + resourcename
+                assert not(os.path.exists(filename))
                 util.ensure_dir(filename)
-                self.log.info("Creating img %s with label %s" %
-                              (filename, label))
+                self.log.info("Creating resource %s" % resourcename)
                 cmd = 'convert -background transparent -fill gray50 -font %s -pointsize 10 -size 44x14 -gravity East label:"%s " %s' % (font, label, filename)
-                util.runcmd(cmd)
-            return filename
+                self.log.debug("Running %s in %s" % (cmd, os.getcwd()))
+                util.runcmd(cmd, require_success=True)
+            return resourcename
         ret = []
         for i in range(1, 150):
             for j in ('', 'a', 'b'):

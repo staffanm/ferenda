@@ -2785,6 +2785,7 @@ WHERE {
     # pages of new/updated documents, and other odds'n ends.
     #
 
+    @decorators.action
     def toc(self, otherrepos=[]):
         """Creates a set of pages that together acts as a table of contents
         for all documents in the repository. For smaller repositories
@@ -3099,6 +3100,7 @@ WHERE {
 
 
     news_sortkey = 'updated'
+    @decorators.action
     def news(self, otherrepos=[]):
         """Create a set of Atom feeds and corresponding HTML pages for
         new/updated documents in different categories in the
@@ -3165,7 +3167,7 @@ WHERE {
             # FIXME: Individual repos must be responsible for which
             # fields (apart from published/updated) that might contain
             # dates/datetimes
-            datehook = util.make_json_date_object_hook('published', 'updated', 'dcterms_issued', 'rpubl_avgorandedatum')
+            datehook = util.make_json_date_object_hook('published', 'updated', 'dcterms_issued', 'rpubl_avgorandedatum', 'orig_created', 'orig_updated')
             ret = json.load(open(cachepath),
                             object_hook=datehook)
         else:
@@ -3738,7 +3740,21 @@ WHERE {
                                'todo': todo}
         return status
 
+    @decorators.action
+    def remove(self, basefile):
+        """Removes all traces of the specified basefile. This is only used
+        manually for cleaning up invalid basefiles that may have been
+        created by a buggy implementation of
+        :py:meth:`~ferenda.DocumentRepository.remove`."""
+        removed = self.store.remove(basefile)
+        if removed:
+            self.log.info("Removed %s files/directories related to %s" % (removed, basefile))
+        else:
+            raise errors.DocumentNotFound("No files/directories related to %s found" % (basefile))
+            
+
     def tabs(self):
+
         """Get the navigation menu segment(s) provided by this docrepo.
 
         Returns a list of tuples, where each tuple will be rendered

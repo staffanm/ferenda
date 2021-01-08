@@ -214,6 +214,7 @@ class SFS(Trips):
             ret = super(SFS, self).download(basefile)
             self._set_last_sfsnr()
             self.config.revisit = []
+            LayeredConfig.write(self.config)
         else:
             # in this case, super().download is never called so we'll
             # have to make sure this runs anyway:

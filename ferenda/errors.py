@@ -103,6 +103,9 @@ class ArchivingPolicyError(ValueError):
     :py:meth:`~ferenda.DocumentStore.archiving_policy` not set to ``zip``."""
 
 
+class DocumentNotFound(FerendaException):
+    """Raised whenever an attempt to remove all traces of a particular basefile failed since there were no traces of any such basefile."""
+
 class ArchivingError(FerendaException):
     """Raised whenever an attempt to archive a document version using
     :py:meth:`~ferenda.DocumentStore.archive` fails (for example,

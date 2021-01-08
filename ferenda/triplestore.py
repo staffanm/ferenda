@@ -430,7 +430,9 @@ class RemoteStore(TripleStore):
             raise errors.TriplestoreError(
                 "Triplestore %s not responding: %s" % (url, e))
         except requests.exceptions.HTTPError as e:
-            if (self.__class__ == FusekiStore) and ("No such graph" in str(e)):
+            if e.response.status_code == 404:
+                pass
+            elif (self.__class__ == FusekiStore) and ("No such graph" in str(e)):
                 pass
             else:
                 raise errors.TriplestoreError(

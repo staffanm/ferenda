@@ -59,7 +59,7 @@ class Trips(SwedishLegalSource):
         addrs = socket.getaddrinfo("rkrattsbaser.gov.se", 80)
         # grab the first IPv4 number
         ip = [addr[4][0] for addr in addrs if addr[0] == socket.AF_INET][0]
-        self.log.warning("Changing rkrattsbaser.gov.se to %s in all URLs" % ip)
+        self.log.debug("Changing rkrattsbaser.gov.se to %s in all URLs" % ip)
         for p in ('start_url',
                   'document_url_template',
                   'document_sfsr_url_template',

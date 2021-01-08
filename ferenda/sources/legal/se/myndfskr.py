@@ -549,7 +549,7 @@ class MyndFskrBase(FixedLayoutSource):
 
     def revtests(self):
         return {'rpubl:ikrafttradandedatum':
-                ['(?:Denna författning|Dessa föreskrifter|Dessa allmänna råd|Dessa föreskrifter och allmänna råd)\d* träder i ?kraft den (\d+ \w+ \d{4})',
+                ['(?:Denna författning|Dessa föreskrifter|Dessa allmänna råd|Dessa föreskrifter och allmänna råd)\d* träder i ?kraft (?:den |)(\d+ \w+ \d{4})',
                  'Dessa föreskrifter träder i kraft, (?:.*), i övrigt den (\d+ \w+ \d{4})',
                  'ska(?:ll|)\supphöra att gälla (?:den |)(\d+ \w+ \d{4}|denna dag|vid utgången av \w+ \d{4})',
                  'träder i kraft den dag då författningen enligt uppgift på den (utkom från trycket)'],
@@ -1392,8 +1392,7 @@ class KOVFS(MyndFskrBase):
 
 class KVFS(MyndFskrBase):
     alias = "kvfs"
-    start_url = ("https://www.kriminalvarden.se/om-kriminalvarden/"
-                 "publikationer/regelverk/search")
+    start_url = ("https://www.kriminalvarden.se/om-kriminalvarden/publikationer/foreskrifter/search")
     # (finns även konsoliderade på http://www.kriminalvarden.se/
     #  om-kriminalvarden/styrning-och-regelverk/lagar-forordningar-och-
     #  foreskrifter)
@@ -1425,7 +1424,7 @@ class KVFS(MyndFskrBase):
                                                  # since
                                                  # download_iterlinks is
                                                  # False
-            for h in soup.find_all("h3"):
+            for h in soup.find_all("h2"):
                 m = self.basefile_regex.match(h.text.strip())
                 if not m:
                     continue
@@ -1542,7 +1541,11 @@ class MSBFS(MyndFskrBase):
                                # with start_url text, not result from
                                # .iterlinks()
 
-    basefile_regex = re.compile("^(?P<basefile>(MSBFS|SRVFS|KBMFS|SÄIFS) \d+:\d+)")
+    # titles are usually on the form "MSBFS 2020:6 föreskrifter om
+    # informationssäkerhet för statliga myndigheter" but may in cases
+    # be on the form "Föreskrifter om rapportering av it-incidenter
+    # för statliga myndigheter (MSBFS 2020:8)"...
+    basefile_regex = re.compile("(^| \()(?P<basefile>(MSBFS|SRVFS|KBMFS|SÄIFS) \d+:\d+)")
 
     def forfattningssamlingar(self):
         return ["msbfs", "srvfs", "kbmfs", "säifs"]
@@ -1559,7 +1562,7 @@ class MSBFS(MyndFskrBase):
         while source:
             soup = BeautifulSoup(source, "lxml")
             for link_el in soup.find_all("a", "law"):
-                m = self.basefile_regex.match(link_el.string)
+                m = self.basefile_regex.search(link_el.string)
                 if m:
                     link = urljoin(self.start_url, link_el.get("href"))
                     basefile = self.sanitize_basefile(m.group("basefile"))
@@ -1582,6 +1585,8 @@ class MSBFS(MyndFskrBase):
     def fwdtests(self):
         t = super(MSBFS, self).fwdtests()
         # cf. NFS.fwdtests()
+        # ((?:Föreskrifter|[\w ]+s (?:föreskrifter|allmänna råd)).*?)[;\n](\n|beslutade den)
+        t["dcterms:title"].append("((?:Föreskrift).*?)[;\n](\n|beslutade den)"),
         t["rpubl:beslutadAv"].insert(0, '(?:meddelar|föreskriver) (Statens räddningsverk)')
         return t
             
@@ -2393,9 +2398,7 @@ class SJVFS(MyndFskrBase):
                       {"newSearch": False,
                        "querytext": "null",
                        "paginationPage": 1,
-                       "refinementfilters": [
-                           {"alias": "Författningsstatus",
-                            "values": ["Aktuell"]}]},
+                       "refinementfilters": []},
                       "svAjaxReqParam": "ajax"}
     def forfattningssamlingar(self):
         return ["sjvfs", "lsfs", "lbs"]
@@ -2413,6 +2416,8 @@ class SJVFS(MyndFskrBase):
         while not done:
             hits = {}
             for hit in resp['hits']:
+                if "Upphävd" in hit["tagProperties"]:
+                    continue
                 basefile = hit["Ändringsföreskriftnr"]
                 if basefile == "":
                     basefile = hit["Grundföreskriftnr"]
@@ -2440,8 +2445,16 @@ class SJVFS(MyndFskrBase):
                 page += 1
                 payload = deepcopy(self.search_payload)
                 payload["searchData"]["paginationPage"] = page
-                resp = self.session.post(self.start_url, data=json.dumps(payload)).json()
+                self.log.info("Getting page %s" % page)
+                # resp = self.session.post(self.start_url, data=json.dumps(payload)).json()
+                resp = util.robust_fetch(self.session.post, self.start_url, self.log, data=json.dumps(payload)).json()
             else:
+                # after having downloaded all current versions, we
+                # want to download previous versions (ie if Doc B
+                # changes doc A, B is marked Aktuell and A is marked
+                # Historik, but since there is a rpubl:andrar link
+                # between B and A we want to have the latter
+                # accessible as well)
                 done = True
 
 class SKVFS(MyndFskrBase):

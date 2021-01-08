@@ -254,10 +254,10 @@ class DocumentStore(object):
     def __init__(self, datadir, storage_policy="file", compression=None, archiving_policy="file"):
         self.datadir = datadir  # docrepo.datadir + docrepo.alias
         self.storage_policy = storage_policy
-        assert self.storage_policy in ("dir", "file")
+        assert self.storage_policy in ("dir", "file"), "unknown storage policy %s" % self.storage_policy
         self.compression = compression
         self.archiving_policy = archiving_policy
-        assert self.storage_policy in ("zip", "file")
+        assert self.archiving_policy in ("zip", "file"), "unknown archiving policy %s" % self.archiving_policy
 
         # store1 = DocStore("data/sfs", archiving_policy="file")
         # store2 = DocStore("data/sfs", archiving_policy="zip")
@@ -343,7 +343,7 @@ class DocumentStore(object):
             storage_policy = self.storage_policy
 
         if not archiving_policy:
-            archiving_policy = self.archiving_policy
+            archiving_policy = getattr(self, 'archiving_policy', 'dir')
 
         if version:
             v_pathfrag = self.basefile_to_pathfrag(version)
@@ -817,6 +817,27 @@ dependencies (in the form of source files for the action).
                 shutil.copy2(src, dest)
             else:
                 shutil.move(src, dest)
+
+    def remove(self, basefile):
+        """Like archive, but doesn't actually archive anything, just removes the current version"""
+        removed = 0
+        for meth in (self.downloaded_path, self.documententry_path,
+                     self.intermediate_path,
+                     self.parsed_path, self.serialized_path,
+                     self.distilled_path,
+                     self.annotation_path, self.generated_path):
+            src = meth(basefile)
+            if self.storage_policy == "dir" and meth in (self.downloaded_path,
+                                                         self.parsed_path,
+                                                         self.generated_path):
+                src = os.path.dirname(src)
+            if not os.path.exists(src):
+                continue
+            else:
+                # print("removing %s" % src)
+                util.robust_remove(src)
+                removed += 1
+        return removed
 
     def downloaded_path(self, basefile, version=None, attachment=None):
         """Get the full path for the downloaded file for the given

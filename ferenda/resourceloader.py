@@ -180,6 +180,7 @@ class ResourceLoader(object):
                 raise ResourceNotFound(resourcename)
         for path in self.loadpath:
             candidate = path + os.sep + resourcename
+            # print("looking for %s in %s: %s" % (resourcename, candidate, os.path.exists(candidate)))
             if os.path.exists(candidate):
                 return candidate
         if self.use_pkg_resources:

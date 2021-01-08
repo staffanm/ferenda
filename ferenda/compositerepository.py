@@ -47,6 +47,12 @@ class CompositeStore(DocumentStore):
                                   self).list_basefiles_for(action, basedir, force):
                 yield basefile
 
+    def remove(self, basefile):
+        removed = 0
+        for cls, inst in self.docrepo_instances.items():
+            removed += inst.store.remove(basefile)
+        removed += super(CompositeStore, self).remove(basefile)
+        return removed
 
 class CompositeRepository(DocumentRepository):
     """Acts as a proxy for a list of sub-repositories.

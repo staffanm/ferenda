@@ -1,0 +1,7 @@
+# the image on dockerhub is currently outdated and contains a bug
+# which was fixed in 3.16.0
+# (https://issues.apache.org/jira/browse/JENA-1890) that we trip over
+
+FROM stain/jena-fuseki
+ENV FUSEKI_SHA512 321c763fa3b3532fa06bb146363722e58e10289194f622f2e29117b610521e62e7ea51b9d06cd366570ed143f2ebbeded22e5302d2375b49da253b7ddef86d34
+ENV FUSEKI_VERSION 3.17.0
