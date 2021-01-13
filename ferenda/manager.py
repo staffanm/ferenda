@@ -404,7 +404,8 @@ def setup_logger(level='INFO', filename=None,
                     'urllib3.connectionpool',
                     'rdflib.plugins.sleepycat',
                     'rdflib.plugins.parsers.pyRdfa',
-                    'ferenda.thirdparty.patch']:
+                    'ferenda.thirdparty.patch',
+                    'chardet.charsetprober']:
         log = getlog(logname)
         log.propagate = False
         if log.handlers == []:

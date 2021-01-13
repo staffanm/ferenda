@@ -891,11 +891,11 @@ class DV(SwedishLegalSource):
                 if re.match("Not(is|)\.? \d+[abc]?\.? ?", line) and not re.match("Not \d+$", line):
                     # this means a 2015 or earlier header
                     done = True
-                    if ". - " in line[:2000]:
+                    if ". -" in line[:2000]:
                         # Split out "Not 56" and the first
                         # sentence up to ". -", signalling that is the
                         # equiv of referatrubrik
-                        rubr = line.split(". - ", 1)[0]
+                        rubr = line.split(". -", 1)[0]
                         rubr = re.sub("Not(is|)\.? \d+[abc]?\.? ", "", rubr)
                         head['Rubrik'] = rubr
                     else:

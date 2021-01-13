@@ -128,7 +128,7 @@ class RequestHandler(object):
         for root in self.doc_roots:
             context["root"] = root
             for template in self.doc_rules:
-                rules.append(BasefileRule(template % context, endpoint=self.handle_doc))
+                rules.append(BasefileRule(template % context, endpoint=self.handle_doc, merge_slashes=False))
         for root in self.dataset_roots:
             context["root"] = root
             for template in self.dataset_rules:

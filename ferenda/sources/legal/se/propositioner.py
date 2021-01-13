@@ -320,6 +320,7 @@ class PropTrips(Trips, Offtryck, FixedLayoutSource):
             return super(PropTrips, self).download(basefile)
         try:
             now = datetime.now()
+            r = False
             if ('lastyear' in self.config and
                     self.config.lastyear and
                     not self.config.refresh):
@@ -367,7 +368,7 @@ class PropTrips(Trips, Offtryck, FixedLayoutSource):
     def find_attachment(self, soup):
         results = soup.find("div", "search-results-content")
         dokid = results.find("span", string="Dokument:")
-        if not dokid:
+        if not dokid or not dokid.next_sibling:
             return None
         dokid = dokid.next_sibling.strip().split(" ")[-1]
         if "/" in dokid:
@@ -406,7 +407,12 @@ class PropTrips(Trips, Offtryck, FixedLayoutSource):
                 continue
             docurl = urljoin(self.start_url, hit.parent.a["href"])
             yield(self.sanitize_basefile(basefile), docurl)
-        nextpage = soup.find("div", "search-opt-next").a
+        nextpage = soup.find("div", "search-opt-next")
+        if nextpage:
+            nextpage = nextpage.a
+        else:
+            raise NoMoreLinks()
+            
         if nextpage:
             nextpage = urljoin(self.start_url,
                                nextpage.get("href"))

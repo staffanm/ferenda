@@ -1502,7 +1502,7 @@ class SwedishLegalSource(DocumentRepository):
             m = re.match(r'(\d{4})-(\d{2})-(\d{2})', datestr)
             year, month, day = [int(x) for x in m.groups()]
         elif re.match(r'(\d+)[^\d]{1,3}(\d+)[^\d]{1,3}(\d+)', datestr):
-            m = re.match(r'(\d+)[^\d]({1,3}(\d+)[^\d]{1,3}(\d+)', datestr) # typical anomalies in the wild
+            m = re.match(r'(\d+)[^\d]{1,3}(\d+)[^\d]{1,3}(\d+)', datestr) # typical anomalies in the wild
             if len(m.group(1)) < 4:
                 if int(m.group(1)) >= 80:  # '80-01-01' => '1980-01-01',
                     year = 1900 + int(m.group(1))

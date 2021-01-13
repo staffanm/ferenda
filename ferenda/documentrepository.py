@@ -2547,6 +2547,7 @@ WHERE {
                 supports = False
                 for rule in wsgiapp.reporules[repo]:
                     if rule.match(matchurl) is not None:
+                        rule.match(matchurl)
                         supports = True
                         break
                 if supports:
