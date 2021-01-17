@@ -8,7 +8,7 @@ RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selectio
 	    software-properties-common \
 	    wget && \
     apt -qq update
-RUN apt -q -y --no-install-recommends install \
+RUN apt -q -y --no-install-recommends --fix-missing install \
        antiword \
        bzip2 \
        cron \

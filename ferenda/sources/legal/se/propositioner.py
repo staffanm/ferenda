@@ -422,7 +422,7 @@ class PropTrips(Trips, Offtryck, FixedLayoutSource):
             else:
                 now = datetime.now()
                 b = "%s/%s" % (now.year - 1, (now.year) % 100)
-            self.log.info("Advancing year from %s to %s" % (self.config.lastyear, b))
+            self.log.debug("Advancing year from %s to %s" % (self.config.lastyear, b))
             self.config.lastyear = b
 
         raise NoMoreLinks(nextpage)

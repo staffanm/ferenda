@@ -389,7 +389,6 @@ documents.</p>
             intermediatepath = repo.store.intermediate_path(basefile)
             opener = open
             if repo.config.compress == "bz2":
-                intermediatepath += ".bz2"
                 opener = BZ2File
             if os.path.exists(intermediatepath):
                 stage = "intermediate"
@@ -418,6 +417,7 @@ documents.</p>
       <label for="basefile">basefile</label>
       <input type="text" id="basefile" name="basefile" class="form-control"/>
     </div>
+    <button type="submit" class="btn btn-primary">Load basefile source text</button>
   </form>
 </div>""", "patch")
         else:
@@ -428,11 +428,11 @@ documents.</p>
                                                   os.sep + repo.alias)
             patchpath = patchstore.path(basefile, "patches", ".patch")
             if request.method == 'POST':
-                self.repo.mkpatch(repo, basefile, request.args.get('description',''),
-                                  request.args['filecontents'].replace("\r\n", "\n"))
+                self.repo.mkpatch(repo, basefile, request.form.get('description',''),
+                                  request.form['filecontents'].replace("\r\n", "\n"))
                 log = []
-                do_generate = request.args.get('generate') == "true"
-                if request.args.get('parse') == "true":
+                do_generate = request.form.get('generate') == "true"
+                if request.form.get('parse') == "true":
                     repo.config.force = True
                     log.append("Parsing %s" % basefile)
                     try:
@@ -467,13 +467,13 @@ documents.</p>
   {% endif %}
   {% for line in log %}
   <p>{{line}}</p>
-  {% endfor %)
+  {% endfor %}
 </div>""", "patch", patchexists=patchexists, patchpath=patchpath, patchcontent=patchcontent, log=log)
             else:
                 fp = open_intermed_text(repo, basefile)
                 outfile = util.name_from_fp(fp)
                 text = fp.read().decode(repo.source_encoding)
-                fp.close
+                fp.close()
                 patchdescription = None
                 if os.path.exists(patchpath) and request.args.get('ignoreexistingpatch') != 'true':
                     ignorepatchlink = request.url + "&ignoreexistingpatch=true"
@@ -495,7 +495,8 @@ documents.</p>
                             instructions = "existing-patch-fail"
                             patchdescription = ""
 
-                self.render_template("""
+                context = dict(filter(lambda e: not(e[0].startswith(("_", "self"))), locals().items()))
+                return self.render_template("""
 <div>
   <h2>Editing {{outfile}}</h2>
   {% if instructions == "existing-patch" %}
@@ -514,7 +515,7 @@ documents.</p>
   {% endif %}
   <p>Change the original data as needed</p>
   <form method="POST">
-    <textarea class="form-control" id="filecontents" name="filecontents" rows="30" cols="80"></textarea>
+    <textarea class="form-control" id="filecontents" name="filecontents" rows="30" cols="80">{{text|e}}</textarea>
     <br/>
     <div class="form-group">
       <label>Description of patch
@@ -530,14 +531,14 @@ documents.</p>
     <div class="form-check">
       <label class="form-check-label">
         Generate HTML from results of parse
-        <input class="form-check-input"name="generate" type="checkbox" value="true" checked="checked"/>
+        <input class="form-check-input" id="generate" name="generate" type="checkbox" value="true" checked="checked"/>
       </label>
     </div>
     <input id="repo" name="repo" type="hidden" value="{{alias}}"/>
     <input id="basefile" name="basefile" type="hidden" value="{{basefile}}"/>
     <button class="btn btn-default" type="submit">Create patch</button>
   </form>
-</div>""", "patch", outfile=outfile, alias=alias, basefile=basefile)
+</div>""", "patch", **context)
 
     def analyze_log(self, filename, listerrors=False):
         modules = defaultdict(int)

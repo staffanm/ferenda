@@ -1200,6 +1200,8 @@ class SwedishLegalSource(DocumentRepository):
         elif self.rdf_type == RPUBL.Utredningsbetankande:
             if self.alias.startswith("sou"):  # FIXME: only ever used by soukb
                 prefix = "SOU "
+                if basefile.endswith("fs"):
+                    basefile = basefile.replace("fs", " första serien")
             else:
                 prefix = "Ds "
         elif self.rdf_type == RPUBL.Proposition:

@@ -115,7 +115,7 @@ class MediaWiki(DocumentRepository):
         if self.config.mediawikidump:
             xmldumppath = self.store.path('dump', 'downloaded', '.xml')
             resp = requests.get(self.config.mediawikidump)
-            self.log.info("Loaded XML dump from %s" % self.config.mediawikidump)
+            self.log.debug("Loaded XML dump from %s" % self.config.mediawikidump)
             from ferenda.documentstore import _open
             with _open(xmldumppath, mode="wb") as fp:
                 fp.write(resp.content)

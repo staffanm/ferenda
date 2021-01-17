@@ -867,13 +867,13 @@ class DV(SwedishLegalSource):
                 # the avgdatum regex attempts to include valid dates, eg
                 # not "2770-71-12".It's also somewhat tolerant of
                 # formatting mistakes, eg accepts " :03-06-16" instead of
-                # "A:03-06-16"
+               # "A:03-06-16"
                 re_avgdatum = re.compile(r"[AD ]: ?(?P<avgdatum>\d{2,4}\-[01]\d\-\d{2})")
                 re_sokord = re.compile("Uppslagsord: ?(?P<sokord>.*)", flags=re.DOTALL)
                 re_lagrum = re.compile("Lagrum: ?(?P<lagrum>.*)", flags=re.DOTALL)
             else:
                 re_notisstart = re.compile("Not (?P<ordinal>\d+)")
-                re_malnr = re.compile("Högsta förvaltningsdomstolen meddelade( den|) (?P<avgdatum>\d+ \w+ \d{4}) följande (dom|beslut) \((mål nr |)(?P<malnr>[\d\-–]+(| och [\d\-–]+))\)")
+                re_malnr = re.compile("Högsta förvaltningsdomstolen meddelade( den|) (?P<avgdatum>\d+ \w+ \d{4}) (följande |)(?P<avgtyp>dom|beslut) \((mål nr |)(?P<malnr>[\d\-–]+(| och [\d\-–]+))\)")
                 re_avgdatum = re_malnr
                 re_sokord = None
                 re_lagrum = None
@@ -904,6 +904,15 @@ class DV(SwedishLegalSource):
                 else:
                     tmp = iterator.pop(0)
                     if re_malnr.match(line):
+                        # For HFD notises from 2016 there is no data
+                        # that could serve as a rubrik. We could
+                        # transform "Högsta förvaltningsdomstolen
+                        # meddelade den 17 januari 2020 följande dom
+                        # (mål nr 4430-19)." to "Dom den 17 januari
+                        # 2020 i mål nr 4430" which I guess is better
+                        # than nothing
+                        m = re_malnr.match(line)
+                        head['Rubrik'] = ("%(avgtyp)s den %(avgdatum)s i mål %(malnr)s" % m).capitalize()
                         done = True
                     if tmp.get_text().strip():
                         # REG specialcase

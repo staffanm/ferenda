@@ -14,6 +14,7 @@ from urllib.parse import urljoin
 import requests.exceptions
 from rdflib import URIRef, Literal, Graph, Namespace
 from rdflib.namespace import SKOS, DC, RDF, XSD, DCTERMS
+from rdflib.exceptions import ParserError
 BIBO = Namespace("http://purl.org/ontology/bibo/")
 from bs4 import BeautifulSoup
 import lxml.html
@@ -152,7 +153,7 @@ class SOUKB(Offtryck, PDFDocumentRepository):
     alias = "soukb"
     storage_policy = "dir"
     downloaded_suffix = ".pdf"
-    basefile_regex = "(?P<basefile>\d{4}:\d+)"
+    basefile_regex = "(?P<basefile>\d{4}:\d+(?:| A| B)(?:| första serien))$"
     start_url = "http://regina.kb.se/sou/"
     download_reverseorder = True
     rdf_type = RPUBL.Utredningsbetankande
@@ -190,8 +191,8 @@ class SOUKB(Offtryck, PDFDocumentRepository):
         # that also yields the link title, based on the assumption
         # that this is valuable to download_single. 
         yielded = set()
-        if self.download_reverseorder:
-            source = reversed(list(source))
+        # if self.download_reverseorder:
+        #     source = reversed(list(source))
         for (element, attribute, link, pos) in source:
             # Also makes sure the link is not external (SOU 1997:119
             # links to external site regeringen.se for some reason...)
@@ -205,7 +206,11 @@ class SOUKB(Offtryck, PDFDocumentRepository):
                 element.text and
                     re.search(self.basefile_regex, element.text)):
                 m = re.search(self.basefile_regex, element.text)
-                basefile = m.group("basefile")
+                # for the first year, they did 34 issues and then
+                # restarted the numbering, so we have two SOU
+                # 1922:1. To distinguish, the first was retroactively
+                # called "första serien" ("fs")
+                basefile = m.group("basefile").replace(" första serien", "fs").replace(" ", "").lower()
             if basefile and (basefile, link) not in yielded:
                 params = {'uri': link,
                           'title': element.tail.strip()}
@@ -224,52 +229,34 @@ class SOUKB(Offtryck, PDFDocumentRepository):
             # download_single.
             return False
         
-        # url is really a 2-tuple
-        url, title = url
         resp = self.session.get(url)
         soup = BeautifulSoup(resp.text, "lxml")
         pdflink = soup.find("a", href=re.compile(".*\.pdf$"))
         pdfurl = pdflink.get("href")
+        pdfpath = self.store.downloaded_path(basefile).replace(".rdf", ".pdf")
         thumburl = urljoin(url, soup.find("img", "tumnagel").get("src"))
         librisid = url.rsplit("-")[1]
-        rdfurl = "http://data.libris.kb.se/open/bib/%s.rdf" % librisid
+        
+        # rdfurl = "http://data.libris.kb.se/open/bib/%s.rdf" % librisid
+        #
+        # the old data.libris.kb.se service stopped working. the new
+        # xsearch based service can return sort-of the same data, but
+        # not as pure RDF/XML. It will have to do.
+        rdfurl = "http://libris.kb.se/xsearch?format=rdfdc&query=ONR%3A" + librisid
         filename = self.store.downloaded_path(basefile)
         created = not os.path.exists(filename)
         updated = False
         
         # download rdf metadata before actual content
-        try:
-            # it appears that URLs like
-            # http://data.libris.kb.se/open/bib/8351225.rdf now
-            # returns empty responses. Until we find out the proper
-            # RDF endpoint URLs, we should check and warn for this
-            # (and infer a minimal RDF by hand from what we can, eg
-            # dc:title from the link text)
-            self.download_if_needed(rdfurl, basefile,
-                                    filename=rdffilename,
-                                    archive=False)
-            if os.path.getsize(rdffilename) == 0:
-                self.log.warning("%s: %s returned 0 response, infer RDF" %
-                                 (basefile, rdfurl))
-                base = URIRef("http://libris.kb.se/resource/bib/%s" %
-                              librisid)
-                fakegraph = Graph()
-                fakegraph.bind("dc", str(DC))
-                fakegraph.add((base, DC.title, Literal(title, lang="sv")))
-                year = basefile.split(":")[0] # Libris uses str type
-                fakegraph.add((base, DC.date, Literal(year)))
-                with open(rdffilename, "wb") as fp:
-                    fakegraph.serialize(fp, format="pretty-xml")
-        except requests.exceptions.HTTPError as e:
-            self.log.error("Failed to load attachment: %s" % e)
-            raise
-
+        self.download_if_needed(rdfurl, basefile,
+                                filename=rdffilename,
+                                archive=False)
         if self.get_parse_options(basefile) == "metadataonly":
             self.log.debug("%s: Marked as 'metadataonly', not downloading actual PDF file" % basefile)
             with self.store.open_downloaded(basefile, "w") as fp:
-                pass
+                 pass
         else:
-            if self.download_if_needed(pdfurl, basefile) or self.config.refresh:
+            if self.download_if_needed(pdfurl, basefile, filename=pdfpath) or self.config.refresh:
                 if created:
                     self.log.info("%s: download OK from %s" % (basefile, pdfurl))
                 else:
@@ -285,15 +272,6 @@ class SOUKB(Offtryck, PDFDocumentRepository):
                     raise
             else:
                 self.log.debug("%s: exists and is unchanged" % basefile)
-        entry = DocumentEntry(self.store.documententry_path(basefile))
-        now = datetime.now()
-        entry.orig_url = url  # or pdfurl?
-        if created:
-            entry.orig_created = now
-        if updated:
-            entry.orig_updated = now
-        entry.orig_checked = now
-        entry.save()
         return updated
 
     def source_url(self, basefile):
@@ -336,7 +314,12 @@ class SOUKB(Offtryck, PDFDocumentRepository):
         # For some reason these RDF files might use canonical
         # decomposition form (NFD) which is less optimal. Fix this.
         metadata = unicodedata.normalize("NFC", metadata)
-        sourcegraph = Graph().parse(data=metadata)
+        try:
+            sourcegraph = Graph().parse(data=metadata)
+        except ParserError:
+            # remove xsearch wrapping around the rdf/xml content
+            metadata = metadata[metadata.index("<rdf:Description"):metadata.index("</collection>")]
+            sourcegraph = Graph().parse(data=metadata)
         rooturi = sourcegraph.value(predicate=RDF.type, object=BIBO.Book)
         if rooturi is None:
             # then just try to identify the main uri and use that 

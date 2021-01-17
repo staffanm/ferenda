@@ -22,7 +22,8 @@ services:
       context: .
     volumes:
       - /mnt/data/lagen:/usr/share/site
-      - ./ferenda:/usr/share/ferenda
+      - .:/usr/share/ferenda
+      - ./lagen/nu/res/patches:/usr/share/lagen/nu/res/patches
     restart: always
     depends_on:
       - elasticsearch
