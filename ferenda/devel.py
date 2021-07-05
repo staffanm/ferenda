@@ -625,7 +625,26 @@ documents.</p>
         else:
             output.write("[no successful processing actions found]\n")
         return output.getvalue()
-        
+
+    def analyze_timestats(self, logfilename):
+        """Stats for a logfile"""
+        finished = re.compile("(?P<repo>\w+) (?P<stage>\w+) finished in (?P<elapsed>\d+\.\d+) sec").search
+        stats = defaultdict(dict)
+        with open(logfilename) as fp:
+            for line in fp:
+                try:
+                    timestamp, module, level, message = line.split(" ", 3)
+                except ValueError:
+                    continue
+                m = finished(message)
+                if m:
+                    elapsed = float(m['elapsed'])
+                    if elapsed > 3: # corresponds to a single pixe when 1200 px is one hour -- anything less doesn't show up
+                        stats[m['stage']][m['repo']] = {'elapsed': float(m['elapsed']),
+                                                        'width':   int(elapsed / 3),
+                                                        'color':   format((abs(hash(m['repo'])) % 256**3)|0x808080, "04x")}
+        return stats
+                        
 
     @login_required
     def handle_logs(self, request, **values):
@@ -678,6 +697,7 @@ documents.</p>
             assert re.match("\d{8}-\d{6}.log$", request.args.get('file')), "invalid log file name"
             logfilename = logdir+os.sep+request.args.get('file')
             buildstats = self.analyze_buildstats(logfilename)
+            timestats = self.analyze_timestats(logfilename)
             errorstats = self.analyze_log(logfilename)
             if not errorstats:
                 errorstats = "[analyze_log didn't return any output?]"
@@ -694,6 +714,19 @@ documents.</p>
 <div>
   <p>Log processed in {{"%.3f"|format(processtime)}} s. The logged action took {{"%.0f"|format(elapsedtime)}} s</p>
   <h3>Buildstats</h3>
+  {% for stage, repos in timestats.items() %}
+  <h4 style="margin-bottom: 0">{{stage}}: {{repos.values()|sum(attribute='elapsed')}} s</h4>
+  <div class="timestats-stage">
+    {% for repo, vals in repos.items() %} 
+    <div class="timestats-repo" title="{{repo}}" style="display: inline-block; font-size: xx-small; vertical-align: top; 
+                                       width: {{vals.width}}px; 
+                                       height: 35px;
+                                       background-color: #{{vals.color}}">&#160;
+      {% if vals.width >= 30 %}{{repo}}<br/>{{"%.1f"|format(vals.elapsed)}}s{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
   <pre>{{buildstats}}</pre>
   <h3>Errors</h3>            
   <pre>{{errorstats}}</pre>
@@ -705,7 +738,7 @@ documents.</p>
                       elapsedtime=elapsedtime,
                       buildstats=buildstats,
                       errorstats=errorstats,
-                      streamurl=streamurl)
+                      streamurl=streamurl,timestats=timestats)
 
 
 class Devel(object):

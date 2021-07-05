@@ -649,7 +649,7 @@ Disallow: /*fs/*.png
                             # set, we should not call run at all
                             # (there's no reason to transform links)
                             argscopy.insert(0, action)
-                            argscopy.insert(0, classname)
+                            argscopy.insert(0, alias)
                             try:
                                 results[action][alias] = run(argscopy, config, subcall=True)
                             except Exception as e:

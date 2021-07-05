@@ -1,28 +1,20 @@
---- data/sfs/intermediate/1979/1152.txt
-+++ /tmp/tmpvv6a7f_6
-@@ -218,12 +218,14 @@ [version: 2009:105-] Justeringar för tabellformattering i 2:2
-                 lagring av bränsle och annan byggnad för produktionen utgör
-                 kraftverksbyggnad.
+--- data/sfs/intermediate/1979/1152.txt.bz2
++++ /tmp/tmpxa6hhgrp
+@@ -222,13 +222,15 @@ Justering
+ 		annan byggnad för produktionen utgör 
+ 		kraftverksbyggnad.	
  
--Industribyggnad Byggnad som är inrättad för industriell verksamhet och som
-+Industri-       
-+byggnad         Byggnad som är inrättad för industriell verksamhet och som
-                 inte utgör kraftverksbyggnad.
+-Industribyggnad	Byggnad som är inrättad för industriell 
++Industri-
++byggnad		Byggnad som är inrättad för industriell 
+ 		verksamhet och som inte utgör 
+ 		kraftverksbyggnad.
  
- Specialbyggnad  Med specialbyggnad avses
+ Specialbyggnad	Med specialbyggnad avses		
  
--                Försvarsbyggnad Byggnad som används för försvarsändamål eller
-+                Försvars-       
-+                byggnad         Byggnad som används för försvarsändamål eller
-                                 ekonomisk försvarsberedskap, om byggnaden
-                                 inte är en fristående industriellanläggning.
-                                 Även mässbyggnad ska utgöra försvarsbyggnad.
-@@ -263,7 +265,7 @@
-                                 inte anläggning där verksamheten i allt
-                                 väsentligt utgör ett led i en industriell
-                                 process.
--
-+ 
-                 Vårdbyggnad     Byggnad som används för sjukvård,
-                                 missbrukarvård, omsorger om barn och ungdom,
-                                 kriminalvård, åldringsvård eller omsorger om
+-		Försvarsbyggnad	Byggnad som används för 
++		Försvars-
++		byggnad		Byggnad som används för 
+ 				försvarsändamål eller 
+ 				ekonomisk försvarsberedskap, 
+ 				om byggnaden inte är en 

@@ -745,6 +745,11 @@ with the *config* object as single parameter.
     def get_required_predicates(self, doc):
         return list(self.required_predicates)
 
+
+    # @decorators.action
+    # def null(self):
+    #     print("%s: null" % self.alias)
+    
     #
     # STEP 1: Download documents from the web
     #
@@ -2246,6 +2251,7 @@ parsed document path to that documents dependency file."""
         dumppath = self.store.resourcepath("distilled/dump.nt")
         if ((not self.config.force) and
                 os.path.exists(cachepath) and
+                os.path.getsize(cachepath) > 2 and  # a empty resultset is '[]' ie two bytes
                 util.outfile_is_newer([dumppath], cachepath)):
             self.log.debug("Loading faceted_data from %s" % cachepath)
             hook = util.make_json_date_object_hook('dcterms_issued')

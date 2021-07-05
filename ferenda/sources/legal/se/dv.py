@@ -810,7 +810,28 @@ class DV(SwedishLegalSource):
 
         return result
 
-
+    def glue_shortlines(self, iterator, shortlen=62):
+        buffer = None
+        for line in iterator:
+            # if the last line is short, and the current starts with a
+            # lower case, the current line is probably a continuation
+            # of the last
+            if buffer and len(buffer.contents[-1].string) < shortlen and line.get_text()[0].islower():
+                buffer.append(line)
+            else:
+                if buffer:
+                    yield buffer
+                    buffer = None
+                if len(line.get_text()) < shortlen:
+                    if buffer:
+                        buffer.append(line)
+                    else:
+                        buffer = line #
+        if buffer:
+            yield buffer
+            buffer = None
+            
+    
     def parse_not(self, text, basefile, filetype):
         basefile_regex = re.compile("(?P<type>\w+)/(?P<year>\d+)_not_(?P<ordinal>\d+)")
         referat_templ = {'REG': 'RÅ %(year)s not %(ordinal)s',
@@ -881,8 +902,10 @@ class DV(SwedishLegalSource):
             # chunks. Doesn't end until "^Not \d+."
             header = []
             done = False
+            print("Maybe testing the new code")
+            iterator = self.glue_shortlines(iterator)
             while not done and iterator:
-                line = iterator[0].get_text().strip()
+                line = next(iterator).get_text().strip()
                 # can possibly be "Not 1a." (RÅ 1994 not 1) or
                 # "Not. 109." (RÅ 1998 not 109). There might be a
                 # space separating the notis from the next sentence,
@@ -902,7 +925,7 @@ class DV(SwedishLegalSource):
                         if line.endswith("Notisen har utgått."):
                             raise errors.DocumentRemovedError(basefile, dummyfile=self.store.parsed_path(basefile))
                 else:
-                    tmp = iterator.pop(0)
+                    tmp = next(iterator)
                     if re_malnr.match(line):
                         # For HFD notises from 2016 there is no data
                         # that could serve as a rubrik. We could
@@ -1000,7 +1023,7 @@ class DV(SwedishLegalSource):
                     else:
                         line.append(t)
             if line:
-                body.append(line)
+                body.append(util.normalize_space(x) for x in line)
         return head, body
 
 
