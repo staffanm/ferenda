@@ -152,12 +152,12 @@ class Betankande(DocumentRepository):
 
                         for idx, row in votes[["Parti", "Röst"]].value_counts().rename("count").reset_index().iterrows():
                             with desc.rel(self.ns["dcterms"].hasPart, BNode(urllib.parse.quote("%(Parti)s-%(Röst)s" % row))):
-                                desc.value(self.ns["dcterms"].party, URIRef("http://rinfo.lagrummet.se/org/riksdag/member/%(Parti)s" % row))
-                                desc.value(self.ns["dcterms"].vote, row["Röst"])
-                                desc.value(self.ns["dcterms"]["count"], row["count"])
+                                desc.value(self.ns["sfscreator"].party, URIRef("http://rinfo.lagrummet.se/org/riksdag/member/%(Parti)s" % row))
+                                desc.value(self.ns["sfscreator"].vote, row["Röst"])
+                                desc.value(self.ns["sfscreator"]["count"], row["count"])
                     
                 desc.value(self.ns["dcterms"].valid, {True: "yes", False: "no", "partial": "partial"}[proposal["resultat"]])
 
-        print(doc.meta.serialize(format="trig").decode("utf-8"))
-        print()
-        print()
+        #print(doc.meta.serialize(format="trig").decode("utf-8"))
+        #print()
+        #print()
