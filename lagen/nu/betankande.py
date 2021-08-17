@@ -111,7 +111,7 @@ class Betankande(DocumentRepository):
                   'dcterms',  # title, identifier, etc
                   'bibo', # Standard and DocumentPart classes, chapter prop
                   'xsd',  # datatypes
-                  ('sfscreator', 'http://lagen.nu/lagstiftning/')
+                  ('parliament', 'http://lagen.nu/vocab/parliament#')
                   )
 
     @managedparsing
@@ -125,22 +125,21 @@ class Betankande(DocumentRepository):
         desc.value(self.ns['dcterms'].identifier, "Betänkande " + bet["id"])
 
         for url in bet["Riksdagsskrivelse"]["links"].values():
-            desc.value(self.ns["sfscreator"].riksdagsskrivelse, URIRef(url))
+            desc.value(self.ns["parliament"].communication, URIRef(url))
         for url in bet["Protokoll med beslut"]["links"].values():
-            desc.value(self.ns["sfscreator"].protokoll, URIRef(url))
+            desc.value(self.ns["parliament"].record, URIRef(url))
 
         for title, proposal in bet["Förslagspunkter och beslut i kammaren"].items():
             with desc.rel(self.ns["dcterms"].hasPart, BNode(urllib.parse.quote(title))):
                 desc.value(self.ns['dcterms'].title, title)
                 for key, value in proposal.items():
                     if key in ("votering", "resultat"): continue
-                    desc.value(getattr(self.ns["sfscreator"],
-                                     {True: "bifaller",
-                                      False: "avslaar",
-                                      "bifaller-delvis": "partial"}[value]),
+                    desc.value({True: self.ns["parliament"].approve,
+                                False: self.ns["parliament"].reject,
+                                "bifaller-delvis": self.ns["parliament"].partial}[value],
                                URIRef(key))
                 if proposal["votering"] == "acklamation":
-                    desc.value(self.ns["dcterms"].creator, proposal["votering"])
+                    desc.value(self.ns["dcterms"].creator, self.ns["parliament"].acclamation)
                 else:
                     with desc.rel(self.ns["dcterms"].creator, proposal["votering"]):
                         with open(os.path.join(dirname, proposal["votering"].split("/")[-1])) as f:
@@ -152,11 +151,19 @@ class Betankande(DocumentRepository):
 
                         for idx, row in votes[["Parti", "Röst"]].value_counts().rename("count").reset_index().iterrows():
                             with desc.rel(self.ns["dcterms"].hasPart, BNode(urllib.parse.quote("%(Parti)s-%(Röst)s" % row))):
-                                desc.value(self.ns["sfscreator"].party, URIRef("http://rinfo.lagrummet.se/org/riksdag/member/%(Parti)s" % row))
-                                desc.value(self.ns["sfscreator"].vote, row["Röst"])
-                                desc.value(self.ns["sfscreator"]["count"], row["count"])
+                                desc.value(self.ns["parliament"].party, URIRef("http://rinfo.lagrummet.se/org/riksdag/member/%(Parti)s" % row))
+                                desc.value(self.ns["parliament"].vote,
+                                           {"Ja": self.ns["parliament"].yes,
+                                            "Nej": self.ns["parliament"].no,
+                                            "Frånvarande": self.ns["parliament"].absent
+                                           }[row["Röst"]])
+                                desc.value(self.ns["parliament"]["count"], row["count"])
                     
-                desc.value(self.ns["dcterms"].valid, {True: "yes", False: "no", "partial": "partial"}[proposal["resultat"]])
+                desc.value(self.ns["dcterms"].valid,
+                           {True: self.ns["parliament"].yes,
+                            False: self.ns["parliament"].no,
+                            "partial": self.ns["parliament"].partial
+                           }[proposal["resultat"]])
 
         #print(doc.meta.serialize(format="trig").decode("utf-8"))
         #print()
