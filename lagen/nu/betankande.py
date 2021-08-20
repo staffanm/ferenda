@@ -85,6 +85,14 @@ class Betankande(DocumentRepository):
                 voteurl = self.start_baseurl + m.string[m.start():m.end()]
                 votefilename = self.store.downloaded_path(basefile, attachment=voteurl.split("/")[-1])
                 self.download_if_needed(voteurl, basefile, filename=votefilename, archive=self.download_archive)
+            for m in re.finditer(r"""/sv/dokument-lagar/dokument/proposition/[^"']*""", content):
+                propurl = self.start_baseurl + m.string[m.start():m.end()]
+                propfilename = self.store.downloaded_path(basefile, attachment=propurl.split("/")[-1])
+                self.download_if_needed(propurl, basefile, filename=propfilename, archive=self.download_archive)
+            for m in re.finditer(r"""/sv/dokument-lagar/dokument/motion/[^"']*""", content):
+                moturl = self.start_baseurl + m.string[m.start():m.end()]
+                motfilename = self.store.downloaded_path(basefile, attachment=moturl.split("/")[-1])
+                self.download_if_needed(moturl, basefile, filename=motfilename, archive=self.download_archive)
             bet_id = re.findall(r'<span class="big">.* ([0-9][0-9][0-9][0-9]/[0-9][0-9]:.*)</span>', content)[0]
             lawlisturl = 'https://svenskforfattningssamling.se/sok/?q="' + urllib.parse.quote_plus(bet_id) + '"&op=S%C3%B6k'
             lawlistfilename = self.store.downloaded_path(basefile, attachment="lawlist")
@@ -134,10 +142,28 @@ class Betankande(DocumentRepository):
                 desc.value(self.ns['dcterms'].title, title)
                 for key, value in proposal.items():
                     if key in ("votering", "resultat"): continue
-                    desc.rel({True: self.ns["parliament"].approve,
-                                False: self.ns["parliament"].reject,
-                                "bifaller-delvis": self.ns["parliament"].partial}[value],
-                               URIRef(key))
+                    with desc.rel({True: self.ns["parliament"].approve,
+                                   False: self.ns["parliament"].reject,
+                                   "partial": self.ns["parliament"].partial}[value],
+                                  URIRef(key)):
+                        if key in bet["proposal-actions"]:
+                            for propactkey, propactvalue in bet["proposal-actions"][key].items():
+                                desc.rel({True: self.ns["parliament"].approve,
+                                          False: self.ns["parliament"].reject,
+                                          "partial": self.ns["parliament"].partial}[propactvalue],
+                                         URIRef(propactkey))
+
+                    # Collapse a votation that approved a proposal
+                    # that in turn approves or rejects something into
+                    # the votation approving or rejecting that
+                    # directly.
+                    if value is True and key in bet["proposal-actions"]:
+                        for propactkey, propactvalue in bet["proposal-actions"][key].items():
+                            desc.rel({True: self.ns["parliament"].approve,
+                                      False: self.ns["parliament"].reject,
+                                      "partial": self.ns["parliament"].partial}[propactvalue],
+                                     URIRef(propactkey))
+                        
                 if proposal["votering"] == "acklamation":
                     desc.rel(self.ns["dcterms"].creator, URIRef(self.ns["parliament"].acclamation))
                 else:
@@ -155,6 +181,7 @@ class Betankande(DocumentRepository):
                                 desc.rel(self.ns["parliament"].vote,
                                            {"Ja": URIRef(self.ns["parliament"].yes),
                                             "Nej": URIRef(self.ns["parliament"].no),
+                                            "Avstår": URIRef(self.ns["parliament"].blank),
                                             "Frånvarande": URIRef(self.ns["parliament"].absent)
                                            }[row["Röst"]])
                                 desc.value(self.ns["parliament"]["count"], row["count"])

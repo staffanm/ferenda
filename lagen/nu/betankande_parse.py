@@ -69,6 +69,7 @@ MULTIACTION_DETAIL_ITEM_RE = re.compile(r"""
   $
 """, re.VERBOSE | re.MULTILINE)
 POINT_SPLIT_RE = re.compile(r"\s*(?:samt|och|,)\s*")
+MOTPROP_RE = re.compile(r"(?P<type>Motion|Proposition) \s+ (?P<id>[0-9]{4}/[0-9]{2}:[A-Za-z0-9]+)", re.VERBOSE)
 
 class ParseBetankande(object):
     def genlawurl(self, **graph):
@@ -106,6 +107,7 @@ class ParseBetankande(object):
     def add_action(self, groups):
         if groups["points"]:
             for point in re.split(POINT_SPLIT_RE, groups["points"]):
+                point = point.strip()
                 partial = False
                 if groups["partial"]:
                     partial = "partial"
@@ -210,6 +212,26 @@ class ParseBetankande(object):
             laws[title] = id
         return laws
 
+    def parse_motorprop(self, motorprop):
+        with open(motorprop) as f:
+            content = f.read()
+        doc = bs4.BeautifulSoup(content, features="lxml")
+
+        header = doc.find(class_="module-header")
+        self.pthlen = 1
+        motprop = re.match(MOTPROP_RE, header.find(class_="big").get_text()).groupdict()
+
+        motpropurl = "%s%s" % ({"Motion": "http://rinfo.lagrummet.se/publ/motion/",
+                             "Proposition": "http://rinfo.lagrummet.se/publ/prop/"}[motprop["type"]],
+                            motprop["id"])
+        idx = 1
+        for child in doc.find(id="item0").children:
+            if isinstance(child, bs4.element.Tag):
+                self.pth[1] = "%s#P%s" % (motpropurl, idx)
+                idx += 1
+                self.content.append(child.p.get_text().strip())
+                self.handle_content()
+    
     def __new__(cls, path):
         self = object.__new__(cls)
 
@@ -217,10 +239,8 @@ class ParseBetankande(object):
         with open(path + "/index.html") as f:
             content = f.read()
         
-        self.pth = [None, None, None, None]
-        self.pthlen = 0
         self.levels = {"big": 0, "medium": 1, "small": 2}
-        self.contents = {}
+        self.contents = {"proposals": {}}
         self.content = []
         
         self.bet_document = bs4.BeautifulSoup(content, features="lxml")
@@ -231,12 +251,32 @@ class ParseBetankande(object):
         self.contents["title"] = header.find(class_="biggest").get_text().strip()
         self.contents["id"] = header.find(class_="big").get_text().split("betänkande")[1].strip()
         
+        self.pth = ["proposals", None, None, None]
+        self.pthlen = 0
+        for col in self.bet_document.find(id="step1").find_all(class_="columns"):
+            for item in col.children:
+                self.handle(item)
+        self.handle_content()
+        
+        self.pth = [None, None, None, None]
+        self.pthlen = 0
         for col in self.bet_document.find(id="step4").find_all(class_="columns"):
             for item in col.children:
                 self.handle(item)
-
+        self.handle_content()
+                
+        self.pth = ["proposal-actions", None, None, None]
+        self.pthlen = 0
+        for propgroup in self.contents["proposals"].values():
+            for key, url in propgroup["links"].items():
+                self.parse_motorprop(path + "/" + url.split("/")[-1])
+        
         for key, value in self.contents["Förslagspunkter och beslut i kammaren"].items():
             if "resultat" not in value:
                 value["resultat"] = False
                 
         return self.contents
+
+if __name__ == "__main__":
+    import sys, json
+    print(json.dumps(ParseBetankande(sys.argv[1]), indent=2))
