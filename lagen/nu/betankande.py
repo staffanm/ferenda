@@ -20,6 +20,18 @@ import pandas as pd
 from .betankande_parse import ParseBetankande
 
 class Betankande(DocumentRepository):
+    # Files produced by the download action:
+    #
+    # * index.html is the Betänkande page itself    
+    # * lawlist is the search results for new laws that references the
+    #   Betänkande as Förarbete. This is used to match law proposals
+    #   in Propositioner to actual, published laws in SFS and their
+    #   ID:s there (they do not have ID:s yet when they're just
+    #   proposals).
+    # * other files are Motioner and Propositioner referenced by the
+    #   Betänkande. This is used to match votations to the law
+    #   proposals that they approve or reject.
+    
     alias = "betankande"
     start_url_pattern = "https://www.riksdagen.se/api/search/GetDocumentsAndLawSearch?doktyp=bet&p=%(page)s"
     document_url_template = "https://www.riksdagen.se/sv/dokument-lagar/arende/betankande/%(basefile)s"
@@ -81,7 +93,7 @@ class Betankande(DocumentRepository):
                     "%s: download OK (new version) from %s" % (basefile, url))
             with open(filename) as f:
                 content = f.read()
-            for m in re.finditer(r"/api/vote/get/[-0-9a-f]*", content):
+            for m in re.finditer(r"""/api/vote/get/[^"']*""", content):
                 voteurl = self.start_baseurl + m.string[m.start():m.end()]
                 votefilename = self.store.downloaded_path(basefile, attachment=voteurl.split("/")[-1])
                 self.download_if_needed(voteurl, basefile, filename=votefilename, archive=self.download_archive)
@@ -93,10 +105,14 @@ class Betankande(DocumentRepository):
                 moturl = self.start_baseurl + m.string[m.start():m.end()]
                 motfilename = self.store.downloaded_path(basefile, attachment=moturl.split("/")[-1])
                 self.download_if_needed(moturl, basefile, filename=motfilename, archive=self.download_archive)
-            bet_id = re.findall(r'<span class="big">.* ([0-9][0-9][0-9][0-9]/[0-9][0-9]:.*)</span>', content)[0]
-            lawlisturl = 'https://svenskforfattningssamling.se/sok/?q="' + urllib.parse.quote_plus(bet_id) + '"&op=S%C3%B6k'
-            lawlistfilename = self.store.downloaded_path(basefile, attachment="lawlist")
-            self.download_if_needed(lawlisturl, basefile, filename=lawlistfilename, archive=self.download_archive)
+            bet_ids = re.findall(r'<span class="big">.* ([0-9][0-9][0-9][0-9]/[0-9][0-9]:.*)</span>', content)
+            if not bet_ids:
+                self.log.debug("%s: Unable to find ID for betänkande, no way to find matching laws" % basefile)                
+            else:
+                bet_id = bet_ids[0]
+                lawlisturl = 'https://svenskforfattningssamling.se/sok/?q="' + urllib.parse.quote_plus(bet_id) + '"&op=S%C3%B6k'
+                lawlistfilename = self.store.downloaded_path(basefile, attachment="lawlist")
+                self.download_if_needed(lawlisturl, basefile, filename=lawlistfilename, archive=self.download_archive)
             updated = True
         else:
             self.log.debug("%s: exists and is unchanged" % basefile)
