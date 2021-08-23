@@ -78,7 +78,15 @@ class Betankande(DocumentRepository):
 
 
     def download_single(self, basefile, url=None, orig_url=None):
-
+        try:
+            return self._download_single(basefile, url, orig_url)
+        except Exception as e:
+            print(e)
+            import sys, pdb
+            sys.last_traceback = sys.exc_info()[2]
+            pdb.pm()
+        
+    def _download_single(self, basefile, url=None, orig_url=None):
         updated = False
         created = False
 

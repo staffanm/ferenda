@@ -1,3 +1,17 @@
+.kapitelrubrik, .paragraf, .stycke {
+  position: relative;
+  padding-right: 40px;
+}
+
+.aside-attribution {
+  background: red;
+  width: 19px;
+  height: 100%;
+  right: 0;
+  position: absolute;
+  right: 0;
+}
+
 .paragrafbeteckning {
     font-weight: bold;
     text-decoration: none;

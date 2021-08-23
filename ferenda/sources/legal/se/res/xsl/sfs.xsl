@@ -7,6 +7,7 @@
 		xmlns:rpubl="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
 		xmlns:ext="http://exslt.org/common"
+                xmlns:ferenda="http://lagen.nu/xslt"
 		exclude-result-prefixes="xhtml rdf rpubl ext rinfoex">
 
   <xsl:import href="tune-width.xsl"/>
@@ -225,6 +226,9 @@
     </xsl:variable>
     <div class="row" about="{//html/@about}#{@id}">
       <section id="{@id}" class="col-sm-7 kapitelrubrik">
+        <xsl:call-template name="aside-attribution">
+          <xsl:with-param name="uri" select="@about"/>
+        </xsl:call-template>        
 	<xsl:copy-of select="$andringsmarkering"/>
 	<xsl:apply-templates select="*[1]"/>
       </section>
@@ -247,7 +251,10 @@
 
     <xsl:if test="@id">
       <div class="row" about="{//html/@about}#{@id}">
-	<section id="{@id}" class="col-sm-7">
+	<section id="{@id}" class="col-sm-7 paragraf">
+          <xsl:call-template name="aside-attribution">
+            <xsl:with-param name="uri" select="@about"/>
+          </xsl:call-template>
 	  <xsl:copy-of select="$andringsmarkering"/>
 	  <xsl:apply-templates mode="in-paragraf"/>
 	</section>
@@ -294,6 +301,29 @@
     </div>
   </xsl:template>
 
+  <xsl:template name="aside-attribution">
+    <xsl:param name="uri"/>
+
+    <div class="aside-attribution">
+NANANA
+      <xsl:for-each select="ferenda:sparql('
+         select ?subj ?pred ?obj
+         where {
+           ?subj [http://lagen.nu/vocab/parliament#approve] [http://rinfo.lagrummet.se/publ/sfs/2021:743] .
+           ?subj ?pred ?obj .
+         }
+     ')">
+        <li>
+          Subj: <xsl:value-of select="@subj"/>
+          Pred: <xsl:value-of select="@pred"/>
+          Obj: <xsl:value-of select="@obj"/>
+        </li>
+      </xsl:for-each>
+MUMUMU
+       &#160;
+    </div>
+  </xsl:template>
+    
   <xsl:template name="aside-annotations">
     <xsl:param name="uri"/>
     <!-- plocka fram referenser kring/till denna paragraf -->
@@ -417,8 +447,11 @@
   <!-- FIXME: This is identical to the template that matches rpubl:Paragraf, that template should match this one as well. -->
   <xsl:template match="xhtml:p[@typeof='rinfoex:Stycke']">
     <div class="row" about="{//html/@about}#{@id}">
-      <section id="{@id}" class="col-sm-7">
+      <section id="{@id}" class="col-sm-7 stycke">
 	<xsl:apply-templates/>
+        <xsl:call-template name="aside-attribution">
+          <xsl:with-param name="uri" select="@about"/>
+        </xsl:call-template>
       </section>
       <xsl:call-template name="aside-annotations">
 	<xsl:with-param name="uri" select="@about"/>
