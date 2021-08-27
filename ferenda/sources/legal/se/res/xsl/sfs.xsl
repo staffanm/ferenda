@@ -305,22 +305,44 @@
     <xsl:param name="uri"/>
 
     <div class="aside-attribution">
-NANANA
       <xsl:for-each select="ferenda:sparql('
-         select ?subj ?pred ?obj
-         where {
-           ?subj [http://lagen.nu/vocab/parliament#approve] [http://rinfo.lagrummet.se/publ/sfs/2021:743] .
-           ?subj ?pred ?obj .
-         }
-     ')">
-        <li>
-          Subj: <xsl:value-of select="@subj"/>
-          Pred: <xsl:value-of select="@pred"/>
-          Obj: <xsl:value-of select="@obj"/>
-        </li>
+        select
+          ?votation ?date
+        where {
+          ?grp [http://purl.org/dc/terms/creator] ?votation .
+          ?grp [http://lagen.nu/vocab/parliament#approve] ?sfs .
+          ?sfslagennu [http://www.w3.org/2002/07/owl#sameAs] ?sfs .
+          ?sfslagennu [http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#ersatter] [%s] .
+          ?sfslagennu [http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#ikrafttradandedatum] ?date .
+        }
+        ', $uri)[1]">
+        <xsl:choose>
+          <xsl:when test="@votation = 'http://lagen.nu/vocab/parliament#acclamation'">
+            <div class="acclamation">&#160;</div>
+          </xsl:when>
+          <xsl:otherwise>
+            <xsl:for-each select="ferenda:sparql('
+              select
+                ?vote ?party ?count
+              where {
+                [%s] [http://purl.org/dc/terms/hasPart] ?part .
+                ?part [http://lagen.nu/vocab/parliament#party] ?party .
+                ?part [http://lagen.nu/vocab/parliament#vote] ?vote .
+                ?part [http://lagen.nu/vocab/parliament#count] ?count .
+              }
+              ', @votation)">
+              <xsl:sort select="concat(@party,@vote)" order="ascending" />
+              <div>
+                <xsl:attribute name="class">vote party-<xsl:value-of select="substring-after(@party, 'http://rinfo.lagrummet.se/org/riksdag/member/')" /> vote-<xsl:value-of select="substring-after(@vote, 'http://lagen.nu/vocab/parliament#')" /></xsl:attribute>
+                <xsl:attribute name="style">width: <xsl:value-of select="@count" />em;</xsl:attribute>
+                <xsl:attribute name="title"><xsl:value-of select="substring-after(@party, 'http://rinfo.lagrummet.se/org/riksdag/member/')" /></xsl:attribute>
+                &#160;
+              </div>
+            </xsl:for-each>
+          </xsl:otherwise>
+        </xsl:choose>
       </xsl:for-each>
-MUMUMU
-       &#160;
+      &#160;
     </div>
   </xsl:template>
     

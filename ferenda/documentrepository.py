@@ -82,7 +82,9 @@ class RDFQuery(object):
         
     @classmethod
     def rdf_query(cls, dummy, query, *arg):
-        res = json.loads(cls.store.select(query.replace("[", "<").replace("]", ">") % arg, format="json"))
+        arg = [a[0] if isinstance(a, (list, tuple)) and a else a for a in arg]
+        query = query.replace("[", "<").replace("]", ">") % tuple(arg)
+        res = json.loads(cls.store.select(query, format="json"))
         
         return [etree.Element("{http://lagen.nu/xslt}SparqlResult",
                               {key: value["value"]
