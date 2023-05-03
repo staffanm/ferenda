@@ -12,6 +12,7 @@ import codecs
 import json
 from datetime import datetime
 from urllib.parse import urljoin, urlencode
+from io import BytesIO
 
 import requests
 import requests.exceptions
@@ -216,14 +217,14 @@ class Regeringen(Offtryck):
         while not done:
             qsparams = urlencode(params)
             searchurl = self.start_url + "?" + qsparams
-            self.log.debug("Loading page #%s" % params.get('page', 1))
+            self.log.debug("Loading page #%s from %s" % (params.get('page', 1), searchurl))
             try:
                 resp = util.robust_fetch(self.session.get, searchurl, self.log)
             except requests.exceptions.HTTPError as e:
                 assert e.response.status_code == 404
                 done = True
                 continue
-            tree = lxml.etree.fromstring(resp.text)
+            tree = lxml.etree.parse(BytesIO(resp.content))
             done = True
             for item in tree.findall(".//item"):
                 done = False

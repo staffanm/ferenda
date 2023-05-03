@@ -101,7 +101,7 @@ class Trips(SwedishLegalSource):
                 continue
             sbasefile = self.sanitize_basefile(basefile)
             if sbasefile != basefile:
-                self.log.warning("%s: normalized from %s" % (sbasefile, basefile))
+                self.log.debug("%s: normalized from %s" % (sbasefile, basefile))
             year, ordinal = basefile.split(":")
             docurl = self.document_url_template % locals()
             yield(sbasefile, docurl)

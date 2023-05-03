@@ -123,6 +123,14 @@ class DevelHandler(RequestHandler):
                 # transform py file "ferenda/lagen/nu/sfs.py" > "lagen.nu.sfs"
                 modulename = filename[len(path)+1:-3].replace(os.sep, ".")
                 try:
+                    possible_repos.append({'config': {},
+                                           'cls': {'start_url': 'http://example.org/'},
+                                           'alias': modulename.split(".")[-1],
+                                           'classname': modulename,
+                                           'toggle': 'Disable',
+                                           'doc': "doc here"})
+                    enabled = False
+                    continue
                     m = importlib.import_module(modulename)
                     for cls in [o for (n,o) in inspect.getmembers(m) if inspect.isclass(o) and issubclass(o, DocumentRepository) and o.alias]:
                         if cls.alias == "base":
@@ -211,7 +219,7 @@ documents.</p>
 </tr>
 {% endfor %}
 </table>
-""", "Dashboard", possible_repos=possible_repos, enabled=enabled, config=config, tools=tools)
+""", "Dashboard", possible_repos=possible_repos, tools=tools)
 
 
     @login_required

@@ -17,6 +17,10 @@ services:
       - mediawiki
       - matomo
     restart: always
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "10"
   ferenda:
     build:
       context: .
@@ -29,6 +33,10 @@ services:
       - elasticsearch
       - fuseki
     stdin_open: true
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "10"
   elasticsearch:
     image: elasticsearch:7.7.1
     volumes:
@@ -37,6 +45,10 @@ services:
       - "discovery.type=single-node"
       - "ES_JAVA_OPTS=-Xms8g -Xmx8g"
     restart: always
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "10"
   fuseki:
     # image: stain/jena-fuseki
     build:
@@ -47,6 +59,10 @@ services:
       - "JVM_ARGS=-Xmx2g"
       - "FUSEKI_DATASET_1=lagen"
     restart: always
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "10"
   mediawiki:
     build: 
       context: docker/mediawiki
@@ -54,6 +70,10 @@ services:
       - /mnt/data/mediawiki/db:/var/www/data
       - /mnt/data/mediawiki/images:/var/www/html/w/images
     restart: always
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "10"
   db:
     image: mariadb
     command: --max-allowed-packet=64MB
@@ -62,6 +82,10 @@ services:
     environment:
       - MYSQL_ROOT_PASSWORD=ncfeGpSR63xmnyTa
     restart: always
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "10"
   matomo:
     image: matomo
     volumes:
@@ -74,7 +98,10 @@ services:
     ports:
       - 8123:80
     restart: always
-
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "10"
 volumes:
   db:
   matomo:

@@ -546,9 +546,9 @@ class SFS(Trips):
     def downloaded_to_intermediate(self, basefile, attachment=None, version=None):
         filename = self.store.downloaded_path(basefile, version)
         if not os.path.exists(filename):
-            self.log.warning("Fulltext is missing")
+            self.log.warning("Fulltext is missing: %s" % filename)
             # FIXME: This code (which only runs when fulltext is
-            # missong) needs to be rewritten
+            # missing) needs to be rewritten
             baseuri = self.canonical_uri(basefile)
             if baseuri in registry:
                 title = registry[baseuri].value(URIRef(baseuri),
@@ -1713,6 +1713,9 @@ class SFS(Trips):
                 stuff[lagrum] = {}
             descfile = proprepo.store.parsed_path(proprepo.basefile_from_uri(row['kommentar']))
             if descfile not in descriptions:
+                if not os.path.exists(descfile):
+                    self.log.warning("Couldn't find descfile %s" % descfile)
+                    continue
                 descriptions[descfile] = {}
                 tree = etree.parse(descfile)
                 for desc in tree.findall(".//{http://www.w3.org/1999/xhtml}div[@class='forfattningskommentar']"):
@@ -1721,6 +1724,9 @@ class SFS(Trips):
                         continue
                     descriptions[descfile][about] = desc.find("{http://www.w3.org/1999/xhtml}div")
 
+            if row['kommentar'] not in descriptions[descfile]:
+                self.log.warning("Couldn't find node %s in %s" % (row['kommentar'], descfile))
+                continue
             descnode = descriptions[descfile][row['kommentar']]
             shortdesc = etree.tostring(descnode, encoding="utf-8").decode()
             # remove start and end div
