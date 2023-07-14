@@ -60,9 +60,37 @@ from ferenda.elements import (Body, Link,
                               UnorderedList, ListItem, Paragraph)
 from ferenda.elements.html import elements_from_soup
 from ferenda.documentstore import RelateNeeded
+
+import contextlib
+
 # establish two central RDF Namespaces at the top level
 DCTERMS = Namespace(util.ns['dcterms'])
 PROV = Namespace(util.ns['prov'])
+
+
+class RDFQuery(object):
+    store = None
+    
+    @classmethod
+    @contextlib.contextmanager
+    def enable(cls, config):
+        cls.store = TripleStore.connect(config.storetype,
+                                        config.storelocation,
+                                        config.storerepository)
+        yield 
+        cls.store.close()
+        
+    @classmethod
+    def rdf_query(cls, dummy, query, *arg):
+        res = json.loads(cls.store.select(query.replace("[", "<").replace("]", ">") % arg, format="json"))
+        
+        return [etree.Element("{http://lagen.nu/xslt}SparqlResult",
+                              {key: value["value"]
+                               for key, value in binding.items()})
+                for binding in res["results"]["bindings"]]
+        
+ns = etree.FunctionNamespace("http://lagen.nu/xslt")
+ns['sparql'] = RDFQuery.rdf_query
 
 
 class DocumentRepository(object):
@@ -2509,7 +2537,8 @@ WHERE {
                     # constructed with the depth argument to
                     # transform_file
                     depth = urlparse(self.canonical_uri(basefile, version)).path[1:-1].count("/")
-                transformer.transform_file(infile, outfile, params, depth=depth)
+                with RDFQuery.enable(self.config):
+                    transformer.transform_file(infile, outfile, params, depth=depth)
 
             # At this point, outfile may appear untouched if it already
             # existed and wasn't actually changed. But this will cause the
