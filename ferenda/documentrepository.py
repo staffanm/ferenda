@@ -60,9 +60,39 @@ from ferenda.elements import (Body, Link,
                               UnorderedList, ListItem, Paragraph)
 from ferenda.elements.html import elements_from_soup
 from ferenda.documentstore import RelateNeeded
+from ferenda.rdfa import dump as dump_rdfa
+import contextlib
+
 # establish two central RDF Namespaces at the top level
 DCTERMS = Namespace(util.ns['dcterms'])
 PROV = Namespace(util.ns['prov'])
+
+
+class RDFQuery(object):
+    store = None
+    
+    @classmethod
+    @contextlib.contextmanager
+    def enable(cls, config):
+        cls.store = TripleStore.connect(config.storetype,
+                                        config.storelocation,
+                                        config.storerepository)
+        yield 
+        cls.store.close()
+        
+    @classmethod
+    def rdf_query(cls, dummy, query, *arg):
+        arg = [a[0] if isinstance(a, (list, tuple)) and a else a for a in arg]
+        query = query.replace("[", "<").replace("]", ">") % tuple(arg)
+        res = json.loads(cls.store.select(query, format="json"))
+        
+        return [etree.Element("{http://lagen.nu/xslt}SparqlResult",
+                              {key: value["value"]
+                               for key, value in binding.items()})
+                for binding in res["results"]["bindings"]]
+        
+ns = etree.FunctionNamespace("http://lagen.nu/xslt")
+ns['sparql'] = RDFQuery.rdf_query
 
 
 class DocumentRepository(object):
@@ -1506,120 +1536,10 @@ with the *config* object as single parameter.
         TITLE = "{http://www.w3.org/1999/xhtml}title"
         LINK = "{http://www.w3.org/1999/xhtml}link"
         HEAD = "{http://www.w3.org/1999/xhtml}head"
-
-        def render_head(g, uri, children=None):
-            if not children:
-                children = []
-                # if revlink == True, we're serializing triples for
-                # the main subject. So other triples that references
-                # the main subject should have the @rev attribute
-                # set. This also means we don't have to set @about
-                # below, and that we should create a <title> tag for
-                # any dcterms:title triple (ideally, for any property
-                # that is rdfs:subPropertyOf dcterms:title, but...
-                revlink = True
-            else:
-                revlink = False
-            # we sort to get a predictable order (by predicate, then by object)
-            for (subj, pred, obj) in sorted(g, key=lambda t: (t[1], t[2])):
-                if str(subj) != uri and str(obj) != uri:
-                    # This isn't a triple we should serialize to RDFa,
-                    # at least not in this iteration
-                    continue
-
-                if g.qname(pred) == "dcterms:title" and revlink:
-                    childattrs = OrderedDict([('property', 'dcterms:title')])
-                    if obj.language != doc.lang:
-                        childattrs[XML_LANG] = obj.language or ""
-                    e = Element(TITLE, childattrs)
-                    e.text = str(obj)
-                    children.append(e)
-
-                elif isinstance(obj, URIRef) and str(subj) == uri:
-                    childattrs = OrderedDict([('rel', g.qname(pred)),
-                                              ('href', str(obj))])
-                    children.append(Element(LINK, childattrs))
-                    if not revlink:
-                        children[-1].set('about', uri)
-                    if str(obj) == doc.uri:
-                        self.log.warning(
-                            "Avoiding serializing circular graph (%s)" %
-                            doc.uri)
-                    else:
-                        render_head(g, str(obj), children)
-
-                elif isinstance(obj, URIRef):
-                    if revlink:
-                        childattrs = OrderedDict([('rev', g.qname(pred)),
-                                                  ('href', str(subj))])
-                        children.append(Element(LINK, childattrs))
-                elif isinstance(obj, BNode):
-                    if g.value(obj, RDF.first):
-                        # the BNode is really a RDF list
-                        coll = Collection(g, obj)
-                        for thing in coll:
-                            if isinstance(thing, URIRef):
-                                childattrs = OrderedDict([('rel', g.qname(pred)),
-                                                          ('inlist', ''),
-                                                          ('href', str(thing))])
-                                children.append(Element(LINK, childattrs))
-                            elif isinstance(thing, Literal):
-                                childattrs = OrderedDict([('property', g.qname(pred)),
-                                                          ('inlist', ''),
-                                                          ('content', str(obj))])
-                                # FIXME possibly add datatype and/or lang
-                                children.append(Element(META, childattrs))
-                        for thing in coll:
-                            if isinstance(thing, URIRef):
-                                render_head(g, str(thing), children)
-
-                    else:
-                        # serialize this triple and any other triples
-                        # where this BNode is a subject of a triple with a
-                        # URIRef or Literal as object (bnodes pointing to
-                        # bnodes not supported)
-                        childattrs = OrderedDict([('rel', g.qname(pred)),
-                                                  ('resource', obj.n3())])
-                        children.append(Element(LINK, childattrs))
-                        if not revlink:
-                            children[-1].set('about', uri)
-                        for (p, o) in sorted(g.predicate_objects(obj)):
-                            if isinstance(o, URIRef):
-                                childattrs = OrderedDict([('about', obj.n3()),
-                                                         ('rel', g.qname(p)),
-                                                         ('href', str(o))])
-                                children.append(Element(LINK, childattrs))
-                            elif isinstance(o, Literal):
-                                childattrs = OrderedDict([('about', obj.n3()),
-                                                          ('property', g.qname(p)),
-                                                          ('content', str(o))])
-                                if o.datatype:
-                                    childattrs['datatype'] = g.qname(o.datatype)
-                                if o.language:
-                                    childattrs[XML_LANG] = o.language
-                                children.append(Element(META, childattrs))
-                            else:
-                                raise errors.ParseError("Can't serialize a BNode-%s triple" % o.__class__.__name__)
-                else:  # this must be a literal, ie something to be
-                       # rendered as <meta property="..."
-                       # content="..."/>
-                    childattrs = OrderedDict([('property', g.qname(pred)),
-                                              ('content', str(obj))])
-                    if obj.datatype:
-                        childattrs['datatype'] = g.qname(obj.datatype)
-                    elif obj.language:
-                        childattrs[XML_LANG] = obj.language
-                    elif doc.lang:
-                        childattrs[XML_LANG] = ""
-                    if not revlink:
-                        childattrs['about'] = uri
-                    children.append(Element(META, childattrs))
-            e = Element(HEAD, {'about': uri})
-            e.extend(children)
-            return e
+                    
         bodycontent = doc.body.as_xhtml(doc.uri)
-        headcontent = render_head(doc.meta, doc.uri)
-
+        headcontent = dump_rdfa(doc.meta, doc.uri, doc.lang)
+        
         # add any css files to headcontent
         if hasattr(doc, 'cssuris'):
             for cssuri in doc.cssuris:
@@ -2509,7 +2429,8 @@ WHERE {
                     # constructed with the depth argument to
                     # transform_file
                     depth = urlparse(self.canonical_uri(basefile, version)).path[1:-1].count("/")
-                transformer.transform_file(infile, outfile, params, depth=depth)
+                with RDFQuery.enable(self.config):
+                    transformer.transform_file(infile, outfile, params, depth=depth)
 
             # At this point, outfile may appear untouched if it already
             # existed and wasn't actually changed. But this will cause the

@@ -7,6 +7,7 @@
 		xmlns:rpubl="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
 		xmlns:ext="http://exslt.org/common"
+                xmlns:ferenda="http://lagen.nu/xslt"
 		exclude-result-prefixes="xhtml rdf rpubl ext rinfoex">
 
   <xsl:import href="tune-width.xsl"/>
@@ -225,6 +226,9 @@
     </xsl:variable>
     <div class="row" about="{//html/@about}#{@id}">
       <section id="{@id}" class="col-sm-7 kapitelrubrik">
+        <xsl:call-template name="aside-attribution">
+          <xsl:with-param name="uri" select="@about"/>
+        </xsl:call-template>        
 	<xsl:copy-of select="$andringsmarkering"/>
 	<xsl:apply-templates select="*[1]"/>
       </section>
@@ -247,7 +251,10 @@
 
     <xsl:if test="@id">
       <div class="row" about="{//html/@about}#{@id}">
-	<section id="{@id}" class="col-sm-7">
+	<section id="{@id}" class="col-sm-7 paragraf">
+          <xsl:call-template name="aside-attribution">
+            <xsl:with-param name="uri" select="@about"/>
+          </xsl:call-template>
 	  <xsl:copy-of select="$andringsmarkering"/>
 	  <xsl:apply-templates mode="in-paragraf"/>
 	</section>
@@ -294,6 +301,51 @@
     </div>
   </xsl:template>
 
+  <xsl:template name="aside-attribution">
+    <xsl:param name="uri"/>
+
+    <div class="aside-attribution">
+      <xsl:for-each select="ferenda:sparql('
+        select
+          ?votation ?date
+        where {
+          ?grp [http://purl.org/dc/terms/creator] ?votation .
+          ?grp [http://lagen.nu/vocab/parliament#approve] ?sfs .
+          ?sfslagennu [http://www.w3.org/2002/07/owl#sameAs] ?sfs .
+          ?sfslagennu [http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#ersatter] [%s] .
+          ?sfslagennu [http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#ikrafttradandedatum] ?date .
+        }
+        ', $uri)[1]">
+        <xsl:choose>
+          <xsl:when test="@votation = 'http://lagen.nu/vocab/parliament#acclamation'">
+            <div class="acclamation">&#160;</div>
+          </xsl:when>
+          <xsl:otherwise>
+            <xsl:for-each select="ferenda:sparql('
+              select
+                ?vote ?party ?count
+              where {
+                [%s] [http://purl.org/dc/terms/hasPart] ?part .
+                ?part [http://lagen.nu/vocab/parliament#party] ?party .
+                ?part [http://lagen.nu/vocab/parliament#vote] ?vote .
+                ?part [http://lagen.nu/vocab/parliament#count] ?count .
+              }
+              ', @votation)">
+              <xsl:sort select="concat(@party,@vote)" order="ascending" />
+              <div>
+                <xsl:attribute name="class">vote party-<xsl:value-of select="substring-after(@party, 'http://rinfo.lagrummet.se/org/riksdag/member/')" /> vote-<xsl:value-of select="substring-after(@vote, 'http://lagen.nu/vocab/parliament#')" /></xsl:attribute>
+                <xsl:attribute name="style">width: <xsl:value-of select="@count" />em;</xsl:attribute>
+                <xsl:attribute name="title"><xsl:value-of select="substring-after(@party, 'http://rinfo.lagrummet.se/org/riksdag/member/')" /></xsl:attribute>
+                &#160;
+              </div>
+            </xsl:for-each>
+          </xsl:otherwise>
+        </xsl:choose>
+      </xsl:for-each>
+      &#160;
+    </div>
+  </xsl:template>
+    
   <xsl:template name="aside-annotations">
     <xsl:param name="uri"/>
     <!-- plocka fram referenser kring/till denna paragraf -->
@@ -417,8 +469,11 @@
   <!-- FIXME: This is identical to the template that matches rpubl:Paragraf, that template should match this one as well. -->
   <xsl:template match="xhtml:p[@typeof='rinfoex:Stycke']">
     <div class="row" about="{//html/@about}#{@id}">
-      <section id="{@id}" class="col-sm-7">
+      <section id="{@id}" class="col-sm-7 stycke">
 	<xsl:apply-templates/>
+        <xsl:call-template name="aside-attribution">
+          <xsl:with-param name="uri" select="@about"/>
+        </xsl:call-template>
       </section>
       <xsl:call-template name="aside-annotations">
 	<xsl:with-param name="uri" select="@about"/>
