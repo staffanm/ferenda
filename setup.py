@@ -15,7 +15,6 @@ install_requires = ['beautifulsoup4 >= 4.3.0',
                     'lxml >= 3.2.0',
                     'rdflib >= 4.0.1',
                     'html5lib >= 1.0b1',
-                    'rdfextras >= 0.4',
                     'rdflib-jsonld >= 0.2',
                     'requests >= 1.2.0',
                     'Whoosh >= 2.4.1',
@@ -26,12 +25,11 @@ install_requires = ['beautifulsoup4 >= 4.3.0',
                     'SimpleParse >= 2.2.0',
                     'cached_property >= 1.3.0',
                     'langdetect >= 1.0.0',
-                    # 'patchit >= 1.2',   # not released yet, using vendorized copy
 ]
 
 if sys.version_info < (3,0,0):
     install_requires.append("configparser")
-    
+
 if sys.version_info < (2,7,0):
     install_requires.append('ordereddict >= 1.1')
     install_requires.append("importlib")
@@ -66,7 +64,7 @@ setup(name='ferenda',
       author_email='staffan.malmgren@gmail.com',
       url='https://github.com/staffanm/ferenda/',
       license='BSD',
-      keywords='rdf linkeddata parsing', 
+      keywords='rdf linkeddata parsing',
       install_requires=install_requires,
       tests_require=tests_require,
       entry_points = {
@@ -77,7 +75,7 @@ setup(name='ferenda',
       # package_data = {'ferenda':['res/css/*.css', 'res/js/*.js', 'res/xsl/*.xsl']},
       include_package_data = True,
       zip_safe = False,
-      classifiers=[ 
+      classifiers=[
           'Development Status :: 3 - Alpha',
           'Environment :: Console',
           'Environment :: Web Environment',
@@ -85,14 +83,12 @@ setup(name='ferenda',
           'License :: OSI Approved :: BSD License',
           'Operating System :: OS Independent',
           'Programming Language :: Python',
-          'Programming Language :: Python :: 2',
-          'Programming Language :: Python :: 2.6',
-          'Programming Language :: Python :: 2.7',
           'Programming Language :: Python :: 3',
-          'Programming Language :: Python :: 3.2',
-          'Programming Language :: Python :: 3.3',
-          'Programming Language :: Python :: 3.4',
-          'Programming Language :: Python :: 3.5',
+          'Programming Language :: Python :: 3.8',
+          'Programming Language :: Python :: 3.9',
+          'Programming Language :: Python :: 3.10',
+          'Programming Language :: Python :: 3.11',
+          'Programming Language :: Python :: 3.12',
           'Topic :: Software Development :: Libraries :: Python Modules',
           'Topic :: Internet :: WWW/HTTP :: WSGI :: Application',
           'Topic :: Text Processing',

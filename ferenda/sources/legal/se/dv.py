@@ -23,7 +23,7 @@ import zipfile
 
 # 3rdparty libs
 from ferenda.requesthandler import UnderscoreConverter
-from cached_property import cached_property
+from functools import cached_property
 from rdflib import Namespace, URIRef, Graph, RDF, RDFS, BNode
 from rdflib.namespace import DCTERMS, SKOS, FOAF
 import requests
@@ -36,7 +36,8 @@ from bs4 import BeautifulSoup, NavigableString
 from ferenda import (Document, DocumentStore, Describer, WordReader, FSMParser, Facet)
 from ferenda.decorators import newstate, action
 from ferenda import util, errors, fulltextindex
-from ferenda.sources.legal.se.legalref import LegalRef
+# from ferenda.sources.legal.se.lagrum import LegalRef
+from ferenda.sources.legal.se.lagrum import LegalRef
 from ferenda.elements import (Body, Paragraph, CompoundElement, OrdinalElement,
                               Heading, Link)
 

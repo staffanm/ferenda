@@ -22,7 +22,7 @@ import bs4
 import requests
 import requests.exceptions
 from layeredconfig import LayeredConfig
-from cached_property import cached_property
+from functools import cached_property
 
 # my own libraries
 from ferenda import DocumentEntry, TripleStore
@@ -30,7 +30,7 @@ from ferenda import TextReader, Facet
 from ferenda.sources.legal.se import legaluri
 from ferenda import util
 from ferenda.errors import FerendaException, DocumentRemovedError, ParseError
-from ferenda.sources.legal.se.legalref import LegalRef, LinkSubject
+from ferenda.sources.legal.se.lagrum import LegalRef, LinkSubject
 from ferenda.sources.legal.se import SwedishCitationParser, RPUBL, SwedishLegalStore
 from ferenda.sources.legal.se.elements import *
 from . import SameAs

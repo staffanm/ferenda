@@ -6,7 +6,7 @@ from builtins import *
 import os
 import json
 
-from ferenda.compat import unittest
+import unittest
 
 from ferenda import URIFormatter
 import ferenda.uriformats

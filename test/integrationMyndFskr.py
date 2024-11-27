@@ -9,7 +9,7 @@ import inspect
 
 from ferenda import TextReader, util
 from ferenda.testutil import RepoTester, file_parametrize
-from ferenda.compat import unittest
+import unittest
 
 # SUT
 from ferenda.sources.legal.se import myndfskr

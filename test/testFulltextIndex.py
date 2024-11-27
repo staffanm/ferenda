@@ -12,7 +12,9 @@ import json
 import requests.exceptions
 
 from ferenda import util
-from ferenda.compat import patch, Mock, unittest
+
+import unittest
+from unittest.mock import patch, Mock
 
 # SUT
 from ferenda import FulltextIndex, DocumentRepository

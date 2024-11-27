@@ -1,4 +1,3 @@
-version: '3.4'
 services:
   nginx:
     build:
@@ -25,7 +24,7 @@ services:
     build:
       context: .
     volumes:
-      - /mnt/data/lagen:/usr/share/site
+      - ../lagen.nu-data:/usr/share/site
       - .:/usr/share/ferenda
       - ./lagen/nu/res/patches:/usr/share/lagen/nu/res/patches
     restart: always
@@ -37,22 +36,26 @@ services:
       options:
         max-size: "10m"
         max-file: "10"
+    ports:
+      - "5678:5678"
   elasticsearch:
-    image: elasticsearch:7.7.1
+    image: elasticsearch:7.17.24
     volumes:
-      - /mnt/data/elasticsearch:/usr/share/elasticsearch/data
+      - elasticsearch:/usr/share/elasticsearch/data
     environment:
       - "discovery.type=single-node"
-      - "ES_JAVA_OPTS=-Xms8g -Xmx8g"
-    restart: always
+      - "ES_JAVA_OPTS=-Xms4g -Xmx4g"
+    restart: no
     logging:
       options:
         max-size: "10m"
         max-file: "10"
+    ports:
+      - "9200:9200"
   fuseki:
-    # image: stain/jena-fuseki
-    build:
-      context: docker/fuseki
+    image: stain/jena-fuseki
+    # build:
+    #   context: docker/fuseki
     volumes:
       - fuseki:/fuseki
     environment:
@@ -63,8 +66,11 @@ services:
       options:
         max-size: "10m"
         max-file: "10"
+    ports:
+      - "3030:3030"
+    # admin=WpjeehYsRgH3LF0
   mediawiki:
-    build: 
+    build:
       context: docker/mediawiki
     volumes:
       - /mnt/data/mediawiki/db:/var/www/data

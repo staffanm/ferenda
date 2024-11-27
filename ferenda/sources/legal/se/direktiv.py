@@ -26,7 +26,7 @@ from ferenda import PDFAnalyzer, Facet, FSMParser
 from ferenda.decorators import downloadmax, recordlastdownload, newstate
 from ferenda.elements import Body, Heading, ListItem, Paragraph
 from ferenda.errors import DocumentRemovedError
-from ferenda.compat import urljoin
+from urllib.parse import urljoin
 from ferenda.pdfreader import Page
 
 def dir_sanitize_identifier(identifier):

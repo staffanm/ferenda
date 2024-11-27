@@ -21,7 +21,9 @@ import pyparsing
 from rdflib import Graph, URIRef, RDFS, Literal
 import requests.exceptions
 
-from ferenda.compat import patch, Mock, unittest
+import unittest
+from unittest.mock import patch, Mock
+
 from ferenda import util, errors
 from ferenda.testutil import FerendaTestCase
 

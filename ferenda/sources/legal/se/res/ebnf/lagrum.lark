@@ -1,0 +1,26 @@
+%import common.NUMBER
+%import common.LCASE_LETTER
+%import common.WS
+%ignore WS
+
+_UNWANTED_TEXT: /.+?/s
+_unwanted: _UNWANTED_TEXT
+start: (lagrum | _unwanted )+
+
+
+lagrum: chapter_section_ref
+      | section_ref
+
+
+chapter_section_ref : chapter_ref_id CM section_ref
+
+CM: "kap."
+SM: "§"
+
+section_ref: section_ref_id SM
+
+chapter_ref_id: ref_id 
+section_ref_id: ref_id
+
+
+ref_id: NUMBER LCASE_LETTER? 

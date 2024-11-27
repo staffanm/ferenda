@@ -19,7 +19,7 @@ import unicodedata
 from lxml import etree
 from lxml.builder import ElementMaker
 from layeredconfig import LayeredConfig, Defaults
-from cached_property import cached_property
+from functools import cached_property
 
 from ferenda import util, errors
 from ferenda.fsmparser import Peekable
@@ -271,7 +271,7 @@ class PDFReader(CompoundElement):
         # and occasionally write status updates to the log (like with
         # tesseract below). tiffcp itself doesn't seem to be very
         # verbose though.
-        
+
         cmd = "tiffcp -c zip %(tmpdir)s/%(root)s_tmp*.tif %(tmpdir)s/%(root)s.tif" % locals()
         self.log.debug("- running " + cmd)
         # (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
@@ -326,8 +326,8 @@ class PDFReader(CompoundElement):
         else:
             util.robust_rename("%(tmpdir)s/%(root)s.txt" % locals(),
                                "%(workdir)s/%(root)s.txt" % locals())
-            
-        shutil.rmtree(tmpdir)        
+
+        shutil.rmtree(tmpdir)
 
     def _pdftohtml(self, tmppdffile, workdir, images, keeppdffile):
         root = os.path.splitext(os.path.basename(tmppdffile))[0]
@@ -366,7 +366,7 @@ class PDFReader(CompoundElement):
             # non-text dot, resulting in thousands of images per
             # page. So always ignore images.
             imgflag = "-i"
-            
+
             # Without -fontfullname, all fonts are just reported as
             # having family="Times"...
             # Without -hidden, some scanned-and-OCR:ed files turn up
@@ -412,7 +412,7 @@ class PDFReader(CompoundElement):
             if m.group("confidence"):
                 res["confidence"] = int(m.group("confidence"))
             return res
-        
+
         tree = etree.parse(fp)
         for pageelement in tree.findall(
                 "//{http://www.w3.org/1999/xhtml}div[@class='ocr_page']"):
@@ -451,7 +451,7 @@ class PDFReader(CompoundElement):
                     if not t.strip():
                         continue  # strip empty things
                     t = t.replace("\n", " ")
-                    
+
                     if element.getchildren():  # probably a <em> or <strong> element
                         tag = {'{http://www.w3.org/1999/xhtml}em': 'i',
                                '{http://www.w3.org/1999/xhtml}strong': 'b'}[element.getchildren()[0].tag]
@@ -467,14 +467,14 @@ class PDFReader(CompoundElement):
                     tlen = len(t.strip())
                     confidence += dim['confidence'] * tlen
                     conflen += tlen
-                    
+
                 # try to determine footnotes by checking if first
                 # element is numeric and way smaller than the
                 # others. in that case, set it's tag to "sup" (for
                 # superscript)
                 if len(textelements) == 0:
                     continue # the box didn't contain any real text, only lines of whitespace
-                
+
                 avgheight = sum([x.height for x in textelements]) // len(textelements)
                 if textelements[0].strip().isdigit() and textelements[0].height <= avgheight / 2:
                     textelements[0].tag = "sup"
@@ -490,7 +490,7 @@ class PDFReader(CompoundElement):
                     if (fontspec['size'] == spec['size'] and
                         fontspec['family'] == spec['family']):
                         fontid = specid
-                        
+
                 # None was found, create a new
                 if not fontid:
                     fontid = str(len(self.fontspec))  # start at 0
@@ -624,7 +624,7 @@ class PDFReader(CompoundElement):
             root = etree.parse(xmlfp).getroot()[0][0]
             self.log.debug("BeautifulSoup workaround successful")
 
-        
+
         assert root.tag == "pdf2xml", "Unexpected root node from pdftohtml -xml: %s" % root.tag
         # We're experimenting with a auto-detecting decoder, which
         # needs a special API call in order to do the detection. If
@@ -707,7 +707,7 @@ class PDFReader(CompoundElement):
             self.append(page)
         self.log.debug("PDFReader initialized: %d pages, %d fontspecs" %
                        (len(self), len(self.fontspec)))
-        
+
 
     def _parse_xml_make_textbox(self, element, nextelement, after_footnote, lastbox, page):
         textelements = self._parse_xml_make_textelement(element)
@@ -741,9 +741,9 @@ class PDFReader(CompoundElement):
                     textelements[0].tag += "s"
                 else:
                     textelements[0].tag = "sup"
-            
+
                 # is it in the main text, ie immediately
-                # following the last textbox? Then append it to that textbox 
+                # following the last textbox? Then append it to that textbox
                 if lastbox and abs(lastbox.right - int(attribs['left'])) < 3:
                     # return a Box that the caller will merge with current
                     attribs['fontid'] = attribs.pop('font')
@@ -813,8 +813,8 @@ class PDFReader(CompoundElement):
 
     def _parse_xml_make_textelement(self, element, keep_ws_only=False, **origkwargs):
         # the complication is that a hierarchical sequence of tags
-        # should be converted to a list of 
-        # 
+        # should be converted to a list of
+        #
         # case 1: plain text -> Textelement
         # case 2: tag = a -> LinkedTextelement
         # case 3: tab=b/i -> Textelement, tag=...
@@ -823,7 +823,7 @@ class PDFReader(CompoundElement):
         # complicated cases:
         # TE = Textelement
         # LTE = LinkedTextelement
-        # 
+        #
         # 1: <text>Here <b>is <i> some <a href="...">text</a></i></b></text>
         #     -> <b>is <i> some <a href="...">text</a></i></b>
         #       -> <i> some <a href="...">text</a></i>, tag="b"
@@ -832,7 +832,7 @@ class PDFReader(CompoundElement):
         # 2: <text><b><i><a href="...">1</a></i>/<b></text>
         #    -> LTE("1", tag="bis", uri="..."), footnote=True (shld caller determine that?)
         # 3: <text><b></i>that </i> is </b> complicated</text>, after_footnote=True
-        #    -> TextElement("that", tag="bi"), TE("is", tag="i"), TE("complicated"), 
+        #    -> TextElement("that", tag="bi"), TE("is", tag="i"), TE("complicated"),
         # 4: <text>2</text>
         #    -> TE("2", tag="sup")
         #
@@ -857,7 +857,7 @@ class PDFReader(CompoundElement):
             endspace = " " if txt.endswith(" ") and len(txt) > 1 else ""
             startspace = " " if txt.startswith(" ") else ""
             return startspace + util.normalize_space(txt) + endspace
-        
+
         res = []
         cls = origcls = Textelement
         origtag = None
@@ -902,7 +902,7 @@ class PDFReader(CompoundElement):
                 # indications that it's not needed)
                 res[-1] = res[-1] + " "
         return res
-    
+
 
     def _parse_xml_add_fontspec(self, element, fontinfo, fontspec):
         fontid = int(element.attrib['id'])
@@ -1315,7 +1315,7 @@ all text in a Textbox has the same font and size.
         self.bottom = self.top + self.height
         self.lines = int(kwargs.get("lines", 0))
         self.lineheight = int(kwargs.get("lineheight", 0)) # a running average
-        
+
         # self._fontspecid = kwargs['fontid']
         self.fontid = kwargs['fontid'] or 0
         if 'fontspec' in kwargs:
@@ -1378,7 +1378,7 @@ all text in a Textbox has the same font and size.
         if self.bottom > other.top + (other.height / 2) and self.lines and other.lines:
             # self and other is really on the same line
             lines -= 1
-            
+
         res = Textbox(top=top, left=left, width=width, height=height,
                       fontid=self.fontid,
                       fontspec=self._fontspec,
@@ -1394,7 +1394,7 @@ all text in a Textbox has the same font and size.
         # not before superscript elements
         if (self and other and
             not (self[-1].tag and "s" in self[-1].tag or
-                 other[0].tag and "s" in other[0].tag) and 
+                 other[0].tag and "s" in other[0].tag) and
             not self[-1].endswith((" ", "-", "–"))):
             self.append(Textelement(" ", tag=self[-1].tag))
         for e in itertools.chain(self, other):
@@ -1462,7 +1462,7 @@ all text in a Textbox has the same font and size.
 #            # concatenate adjacent TE:s if their tags match.
 #            self[-1] = self[-1] + thing
 #            return
-#            
+#
 
 
     def as_xhtml(self, uri, parent_uri=None):
@@ -1496,9 +1496,9 @@ all text in a Textbox has the same font and size.
         if prevpart is not None:
             children.append(self._cleanstring(prevpart))
 
-        attribs = {}    
+        attribs = {}
         if hasattr(self, 'fontid'):
-            attribs['class'] = 'textbox fontspec%s' % self.fontid 
+            attribs['class'] = 'textbox fontspec%s' % self.fontid
         element = E("p", attribs, *children)
         # FIXME: we should output these positioned style attributes
         # only when the resulting document is being serialized in a
@@ -1518,7 +1518,7 @@ all text in a Textbox has the same font and size.
             if unicodedata.category(char) != "Cc":
                 newstring += char
         return newstring
-                
+
 
     @cached_property
     def font(self):
@@ -1549,7 +1549,7 @@ class Textelement(UnicodeElement):
     as a whole is bold (``'b'``) , italic(``'i'`` bold + italic
     (``'bi'``) or regular (``None``).
     """
-        
+
     def _get_tagname(self):
         if self.tag:
             return self.tag
@@ -1609,7 +1609,7 @@ class Textelement(UnicodeElement):
         strother = str(other)
         # mandatory dehyphenation. FIXME: we'd like to make this
         # configurable (but where?).
-        # 
+        #
         # FIXME: This dehyphenates eg "EG-" + "direktiv". How many
         # other exceptions to this algorithm are needed.
         if strself and strself[-1] == '-' and strother and strother[0].islower():
@@ -1621,12 +1621,12 @@ class LinkedTextelement(Textelement):
 
     """Like Textelement, but with a uri property.
     """
-        
+
     def __init__(self, *args, **kwargs):
         kwargs['tag'] = kwargs.get('tag')
         kwargs['uri'] = kwargs.get('uri')
         super(LinkedTextelement, self).__init__(*args, **kwargs)
-    
+
     def _get_tagname(self):
         return "a"
     tagname = property(_get_tagname)

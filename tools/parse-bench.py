@@ -27,7 +27,7 @@ from ferenda.manager import _load_class, _load_config, _find_config_file, DEFAUL
 from ferenda.elements import deserialize, Link
 from ferenda import util
 from ferenda.thirdparty.coin import URIMinter
-from ferenda.sources.legal.se.legalref import LegalRef
+from ferenda.sources.legal.se.lagrum import LegalRef
 from ferenda.sources.legal.se import RPUBL
 
 class LegalRefTest(object):

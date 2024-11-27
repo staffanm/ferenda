@@ -6,7 +6,7 @@ from builtins import *
 import sys
 import os
 
-from ferenda.compat import unittest, patch, MagicMock
+import unittest, patch, MagicMock
 from ferenda import util
 
 

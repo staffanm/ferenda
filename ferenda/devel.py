@@ -31,7 +31,8 @@ import traceback
 import importlib
 from wsgiref.util import request_uri
 from urllib.parse import parse_qsl, urlencode
-from cached_property import cached_property
+from functools import cached_property
+from unittest.mock import Mock, MagicMock, patch, call
 
 from rdflib import Graph, URIRef, RDF, Literal
 from rdflib.namespace import DCTERMS
@@ -41,8 +42,6 @@ from lxml.etree import XMLSyntaxError
 from ferenda.thirdparty.patchit import PatchSet, PatchSyntaxError, PatchConflictError
 from werkzeug.routing import Rule
 from werkzeug.wrappers import Response
-
-from ferenda.compat import Mock
 from ferenda import (TextReader, TripleStore, FulltextIndex, WSGIApp,
                      Document, DocumentRepository,
                      CompositeRepository, DocumentEntry, Transformer,
@@ -90,7 +89,7 @@ class DevelHandler(RequestHandler):
             if segments[-1].lower() == segments[-2].lower():
                 inspected = ".".join(segments[:-2] + segments[-1:])
             return inspected == given
-        
+
         if request.method == 'POST':
             statusmsg = errmsg = ""
             if request.form['action'].lower() == "enable":
@@ -237,7 +236,7 @@ documents.</p>
 <h2>ferenda-build</h2>
                 <pre class="pre-scrollable" id="streaming-log-output" src="{{streamurl|e}}">
 </pre>""", label, streamurl=streamurl)
-            
+
         else:
             return self.render_template("""
 <form class="form-inline">
@@ -360,7 +359,7 @@ documents.</p>
             return self.render_template("""
 <div>
   <form method="POST">
-    <div class="form-group">   
+    <div class="form-group">
       <label for="repo">Repo:</label>
       <input id="repo" name="repo" class="form-control"/>
     </div>
@@ -508,15 +507,15 @@ documents.</p>
 <div>
   <h2>Editing {{outfile}}</h2>
   {% if instructions == "existing-patch" %}
-  <p>Existing patch at {{patchpath}} has been applied 
+  <p>Existing patch at {{patchpath}} has been applied
   (<a href="{{ignorepatchlink}}">ignore existing patch</a>)</p>
   <p>Contents of that patch, for reference</p>
   <pre>{{patchcontent}}</pre>
     {% if offsets %}
     <p>Patch did not apply cleanly, the following adjustments were made: {{offsets}}</p>
-    {% endif %}                
+    {% endif %}
   {% elif instructions == "existing-patch-fail" %}
-  <p>Existing patch at {{patchpath}} could not be applied 
+  <p>Existing patch at {{patchpath}} could not be applied
   (<a href="{{ignorepatchlink}}">ignore existing patch</a></p>
   <p>The error was</p>
   <pre>{{formatted_exception}}</pre>
@@ -652,7 +651,7 @@ documents.</p>
                                                         'width':   int(elapsed / 3),
                                                         'color':   format((abs(hash(m['repo'])) % 256**3)|0x808080, "04x")}
         return stats
-                        
+
 
     @login_required
     def handle_logs(self, request, **values):
@@ -676,7 +675,7 @@ documents.</p>
                     return l
                 else:
                     return "[log is empty?]"
-            
+
         def linkelement(f):
             return {"filename": f,
                     "href": request.path + "?file=" + f,
@@ -725,9 +724,9 @@ documents.</p>
   {% for stage, repos in timestats.items() %}
   <h4 style="margin-bottom: 0">{{stage}}: {{repos.values()|sum(attribute='elapsed')}} s</h4>
   <div class="timestats-stage">
-    {% for repo, vals in repos.items() %} 
-    <div class="timestats-repo" title="{{repo}}" style="display: inline-block; font-size: xx-small; vertical-align: top; 
-                                       width: {{vals.width}}px; 
+    {% for repo, vals in repos.items() %}
+    <div class="timestats-repo" title="{{repo}}" style="display: inline-block; font-size: xx-small; vertical-align: top;
+                                       width: {{vals.width}}px;
                                        height: 35px;
                                        background-color: #{{vals.color}}">&#160;
       {% if vals.width >= 30 %}{{repo}}<br/>{{"%.1f"|format(vals.elapsed)}}s{% endif %}
@@ -736,7 +735,7 @@ documents.</p>
   </div>
   {% endfor %}
   <pre>{{buildstats}}</pre>
-  <h3>Errors</h3>            
+  <h3>Errors</h3>
   <pre>{{errorstats}}</pre>
   <h3>Logs</h3>
   <pre class="pre-scrollable logviewer" id="streaming-log-output" src="{{streamurl|e}}">
@@ -833,7 +832,7 @@ class Devel(object):
 
     @decorators.action
     def csvinventory(self, alias, predicates=None):
-        """Create an inventory of documents, as a CSV file. 
+        """Create an inventory of documents, as a CSV file.
 
         Only documents that have been parsed and yielded some minimum
         amount of RDF metadata will be included.
@@ -945,7 +944,7 @@ class Devel(object):
         if isinstance(alias, str):
             repo = self._repo_from_alias(alias, basefile=basefile)
         else:
-            repo = alias 
+            repo = alias
         # 2. find out if there is an intermediate file or downloaded
         # file for basefile. FIXME: unify this with open_intermed_patchedtext
         # in handle_patch
@@ -1230,7 +1229,7 @@ class Devel(object):
 
     @decorators.action
     def samplerepo(self, alias, sourcedir, sourcerepo=None, destrepo=None, samplesize=None):
-        """Copy a random selection of documents from an external docrepo to the current datadir.""" 
+        """Copy a random selection of documents from an external docrepo to the current datadir."""
         if not samplesize:
             if 'samplesize' in self.config:
                 samplesize = int(self.config.samplesize)
@@ -1371,7 +1370,7 @@ class Devel(object):
 
     @decorators.action
     def samplerepos(self, sourcedir):
-        """Copy a random selection of external documents to the current datadir - for all docrepos.""" 
+        """Copy a random selection of external documents to the current datadir - for all docrepos."""
         # from ferenda.sources.general import Static
         from lagen.nu import Static
         if 'samplesize' in self.config:
@@ -1555,7 +1554,7 @@ class Devel(object):
     storage_policy = "file"
     ns = {}
     resourceloader = ResourceLoader()
-    
+
     @classmethod
     def get_default_options(cls):
         options = DocumentRepository.get_default_options()
@@ -1608,7 +1607,7 @@ class Devel(object):
 
     def get_url_transform_func(self, **transformargs):
         return lambda x: x
-    
+
     def facets(self):
         return []
 

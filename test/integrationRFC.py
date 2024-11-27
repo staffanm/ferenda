@@ -6,7 +6,7 @@ from builtins import *
 import sys
 import os
 
-from ferenda.compat import unittest
+import unittest
 from ferenda.testutil import FerendaTestCase, testparser, file_parametrize
 from ferenda.sources.tech import RFC
 

@@ -8,7 +8,7 @@ import os
 import datetime
 import shutil
 import tempfile
-from ferenda.compat import unittest, Mock, MagicMock, patch
+import unittest, Mock, MagicMock, patch
 
 from ferenda import util
 from ferenda import DocumentRepository, DocumentStore, Document, DocumentEntry

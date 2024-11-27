@@ -12,7 +12,7 @@ import tempfile
 import shutil
 
 from lxml import etree
-from ferenda.compat import unittest
+import unittest
 from ferenda.errors import ExternalCommandError
 
 from quiet import silence

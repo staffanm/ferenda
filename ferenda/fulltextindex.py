@@ -2,8 +2,6 @@
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 from builtins import *
-from future import standard_library
-standard_library.install_aliases()
 
 from datetime import date, datetime, MAXYEAR, MINYEAR
 from urllib.parse import quote, unquote
@@ -341,267 +339,6 @@ class Results(list):
     # this is just so that we can add arbitrary attributes to a
     # list-like object.
     pass
-
-import whoosh.index
-import whoosh.fields
-import whoosh.analysis
-import whoosh.query
-import whoosh.qparser
-import whoosh.writing
-import whoosh.highlight
-
-from ferenda.elements import html
-
-
-class ElementsFormatter(whoosh.highlight.Formatter):
-
-    """Returns a tree of ferenda.elements representing the formatted hit."""
-
-    def __init__(self, wrapelement=html.P, hitelement=html.Strong,
-                 classname="match", between=" ... "):
-        self.wrapelement = wrapelement
-        self.hitelement = hitelement
-        self.classname = classname
-        self.between = between
-
-    def format(self, fragments, replace=False):
-        res = self.wrapelement()
-        first = True
-        for fragment in fragments:
-            if not first:
-                res.append(self.between)
-            res.extend(self.format_fragment(fragment, replace=replace))
-            first = False
-        return res
-
-    re_collapse = re.compile("\s+").sub
-
-    def format_fragment(self, fragment, replace):
-        output = []
-        index = fragment.startchar
-        text = fragment.text
-
-        for t in fragment.matches:
-            if t.startchar > index:
-                output.append(self.re_collapse(" ", text[index:t.startchar]))
-            hittext = whoosh.highlight.get_text(text, t, False)
-            output.append(self.hitelement([hittext], **{'class': self.classname}))
-            index = t.endchar
-        if index < len(text):
-            output.append(self.re_collapse(" ", text[index:fragment.endchar]))
-        return output
-
-
-class WhooshIndex(FulltextIndex):
-
-    fieldmapping = ((Identifier(),    whoosh.fields.ID(unique=True, stored=True)),
-                    (Label(),         whoosh.fields.ID(stored=True)),
-                    (Label(boost=16), whoosh.fields.ID(field_boost=16, stored=True)),
-                    (Text(boost=4),   whoosh.fields.TEXT(field_boost=4, stored=True,
-                                                         analyzer=whoosh.analysis.StemmingAnalyzer(
-                                                         ))),
-                    (Text(boost=2),   whoosh.fields.TEXT(field_boost=2, stored=True,
-                                                         analyzer=whoosh.analysis.StemmingAnalyzer(
-                                                         ))),
-                    (Text(),          whoosh.fields.TEXT(stored=True,
-                                                         analyzer=whoosh.analysis.StemmingAnalyzer())),
-                    (Datetime(),      whoosh.fields.DATETIME(stored=True)),
-                    (Boolean(),       whoosh.fields.BOOLEAN(stored=True)),
-                    (URI(),           whoosh.fields.ID(stored=True, field_boost=1.1)),
-                    (Keyword(),       whoosh.fields.KEYWORD(stored=True)),
-                    (Resource(),      whoosh.fields.IDLIST(stored=True)),
-                    )
-
-    def __init__(self, location, repos):
-        self._writer = None
-        super(WhooshIndex, self).__init__(location, repos)
-        self._multiple = {}
-        # Initialize self._multiple so that we know which fields may
-        # contain multiple values. FIXME: v. similar to the code in
-        # make_schema
-        for repo in repos:
-            g = repo.make_graph()  # for qname lookup
-            for facet in repo.facets():
-                if facet.dimension_label:
-                    fld = facet.dimension_label
-                else:
-                    fld = g.qname(facet.rdftype).replace(":", "_")
-                self._multiple[fld] = facet.multiple_values
-
-    def exists(self):
-        return whoosh.index.exists_in(self.location)
-
-    def open(self):
-        return whoosh.index.open_dir(self.location)
-
-    def create(self, repos):
-        schema = self.make_schema(repos)
-        whoosh_fields = {}
-        for key, fieldtype in schema.items():
-            whoosh_fields[key] = self.to_native_field(fieldtype)
-
-        schema = whoosh.fields.Schema(**whoosh_fields)
-        util.mkdir(self.location)
-        return whoosh.index.create_in(self.location, schema)
-
-    def destroy(self):
-        shutil.rmtree(self.location)
-
-    def schema(self):
-        used_schema = {}
-        for fieldname, field_object in self.index.schema.items():
-            used_schema[fieldname] = self.from_native_field(field_object)
-        return used_schema
-
-    def update(self, uri, repo, basefile, text, **kwargs):
-        if not self._writer:
-            self._writer = self.index.writer()
-
-        s = self.schema()
-        for key in kwargs:
-            # special-handling of the Resource type -- this is provided as
-            # a dict with 'iri' and 'label' keys, and we flatten it to a
-            # 2-element list (stored in an IDLIST)
-            if isinstance(s[key], Resource):
-                # might be multiple values, in which case we create a
-                # n-element list, still stored as IDLIST
-                if isinstance(kwargs[key], list):
-                    # or if self._multiple[key]:
-                    kwargs[key] = list(
-                        itertools.chain.from_iterable([(x['iri'], x['label'])for x in kwargs[key]]))
-                else:
-                    kwargs[key] = [kwargs[key]['iri'],
-                                   kwargs[key]['label']]
-            elif isinstance(s[key], Datetime):
-                if (isinstance(kwargs[key], date) and
-                        not isinstance(kwargs[key], datetime)):
-                    # convert date to datetime
-                    kwargs[key] = datetime(kwargs[key].year,
-                                           kwargs[key].month,
-                                           kwargs[key].day)
-
-        self._writer.update_document(uri=uri,
-                                     repo=repo,
-                                     basefile=basefile,
-                                     text=text,
-                                     **kwargs)
-
-    def commit(self):
-        if self._writer:
-            self._writer.commit()
-            if not isinstance(self._writer, whoosh.writing.BufferedWriter):
-                # A bufferedWriter can be used again after commit(), a regular writer cannot
-                self._writer = None
-
-    def close(self):
-        self.commit()
-        self.index.close()
-
-    def doccount(self):
-        return self.index.doc_count()
-
-    def query(self, q=None, pagenum=1, pagelen=10, ac_query=False, exclude_repos=None, boost_repos=None, include_fragments=False, **kwargs):
-        # 1: Filter on all specified fields (exact or by using ranges)
-        filter = []
-        for k, v in kwargs.items():
-            if isinstance(v, SearchModifier):
-                # Create a Range query
-                if isinstance(v.values[0], datetime):
-                    cls = whoosh.query.DateRange
-                    max = datetime(MAXYEAR, 12, 31)
-                    min = datetime(MINYEAR, 1, 1)
-                else:
-                    cls = whoosh.query.NumericRange
-                    max = datetime(2**31)
-                    min = datetime(0)
-                if isinstance(v, Less):
-                    start = min
-                    end = v.max
-                elif isinstance(v, More):
-                    start = v.min
-                    end = max
-                elif isinstance(v, Between):
-                    start = v.min
-                    end = v.max
-                filter.append(cls(k, start, end))
-            elif isinstance(v, str) and "*" in v:
-                filter.append(whoosh.query.Wildcard(k, v))
-            else:
-                # exact field match
-                #
-                # Things to handle: Keyword, Boolean, Resource (must
-                # be able to match on iri only)
-                filter.append(whoosh.query.Term(k, v))
-
-        # 3: If freetext param given, query on that
-        freetext = None
-        if q or not kwargs:
-            if not q:
-                q = "*"
-            searchfields = []
-            for fldname, fldtype in self.index.schema.items():
-                if isinstance(fldtype, whoosh.fields.TEXT):
-                    searchfields.append(fldname)
-            mparser = whoosh.qparser.MultifieldParser(searchfields,
-                                                      self.index.schema)
-            freetext = mparser.parse(q)
-
-        if filter:
-            if freetext:
-                filter.append(freetext)
-            query = whoosh.query.And(filter)
-        elif freetext:
-            query = freetext
-        else:
-            raise ValueError("Neither q or kwargs specified")
-        with self.index.searcher() as searcher:
-            page = searcher.search_page(query, pagenum, pagelen)
-            res = self._convert_result(page)
-            pager = {'pagenum': pagenum,
-                     'pagecount': page.pagecount,
-                     'firstresult': page.offset + 1,
-                     'lastresult': page.offset + page.pagelen,
-                     'totalresults': page.total}
-        return res, pager
-
-    def _convert_result(self, res):
-        # converts a whoosh.searching.ResultsPage object to a plain
-        # list of dicts
-        l = Results()
-        hl = whoosh.highlight.Highlighter(formatter=ElementsFormatter())
-        resourcefields = []
-        for key, fldobj in self.schema().items():
-            if isinstance(fldobj, Resource):
-                resourcefields.append(key)
-
-        for hit in res:
-            fields = hit.fields()
-            highlighted = hl.highlight_hit(hit, "text", fields['text'])
-            if highlighted:
-                fields['text'] = highlighted
-            else:
-                del fields['text']
-            # de-marschal Resource objects from list to dict
-            for key in resourcefields:
-                if key in fields:
-                    # need to return a list of dicts if
-                    # multiple_values was specified, and a simple dict
-                    # otherwise... (note that just examining if
-                    # len(fields[key]) == 2 isn't enough)
-                    if self._multiple[key]:
-                        fields[key] = [{'iri': x[0], 'label': x[1]}
-                                       for x in zip(fields[key][0::2], fields[key][1::2])]
-                    else:
-                        fields[key] = {'iri': fields[key][0],
-                                       'label': fields[key][1]}
-            l.append(fields)
-        return l
-
-# Base class for a HTTP-based API (eg. ElasticSearch) the base class
-# delegate the formulation of queries, updates etc to concrete
-# subclasses, expected to return a formattted query/payload etc, and
-# be able to decode responses to queries, but the base class handles
-# the actual HTTP call, inc error handling.
 
 
 class RemoteIndex(FulltextIndex):
@@ -1109,8 +846,14 @@ class ElasticSearchIndex(RemoteIndex):
         return schema
 
     def _create_schema_payload(self, repos):
+        for r in repos:
+            if hasattr(r, 'lang'):
+                langcode = r.lang
+                break
+        else:
+            langcode = "en"
         language = {'en': 'English',
-                    'sv': 'Swedish'}.get(repos[0].lang, "English")
+                    'sv': 'Swedish'}.get(langcode, "English")
         payload = {
             "settings": {
                 "highlight": {
@@ -1176,5 +919,5 @@ class ElasticSearchIndex(RemoteIndex):
     def _destroy_payload(self):
         return "", None
 
-FulltextIndex.indextypes = {'WHOOSH': WhooshIndex,
+FulltextIndex.indextypes = {
                             'ELASTICSEARCH': ElasticSearchIndex}

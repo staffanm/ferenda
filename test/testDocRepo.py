@@ -21,7 +21,7 @@ import rdflib
 from rdflib.namespace import DCTERMS
 import requests.exceptions
 
-from ferenda.compat import Mock, patch, call, unittest
+from unittest.mock import Mock, patch, call, unittest
 from ferenda import DocumentEntry, Describer, Facet, Transformer
 from ferenda.fulltextindex import WhooshIndex
 from ferenda.elements.html import Body, H1
@@ -41,7 +41,7 @@ from examplerepos import DocRepo1, DocRepo2, DocRepo3
 from ferenda import util
 from ferenda.elements import serialize, Link
 
-from ferenda.compat import unittest
+import unittest
 
 
 class Repo(RepoTester):

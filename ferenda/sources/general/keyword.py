@@ -42,7 +42,7 @@ class KeywordStore(DocumentStore):
 
 class Keyword(DocumentRepository):
 
-    """Implements support for 'keyword hubs', or concepts to which documents in other sources are related. 
+    """Implements support for 'keyword hubs', or concepts to which documents in other sources are related.
 
        As an example, if a docrepo has
        documents that each contains a set of keywords, and the docrepo
@@ -133,14 +133,14 @@ class Keyword(DocumentRepository):
                 if label is None:
                     self.log.warning("could not determine keyword from %s" % row['subject'])
                     continue
-            
+
             sanitized = self.sanitize_term(label)
             if sanitized:
                 if sanitized not in terms:
                     terms[sanitized]['subjects'] = []
                 if 'uri' not in row:
                     self.log.warning("%s: Invalid row from triplestore: %s" % (sanitized, row))
-                else: 
+                else:
                     terms[sanitized]['subjects'].append(row['uri'])
 
         self.log.debug("Retrieved %s subject terms from triplestore" % len(terms))
@@ -170,12 +170,12 @@ class Keyword(DocumentRepository):
         # sanity checking -- not everything can be a legit
         # keyword. Must be under 100 chars and not start with . or /
         term = util.normalize_space(term)
-        if (self.term_max_len >= len(term) >= self.term_min_len and 
-            term[0] not in self.invalid_term_start and 
+        if (self.term_max_len >= len(term) >= self.term_min_len and
+            term[0] not in self.invalid_term_start and
             term[-1] not in self.invalid_term_end):
             return term
         # else return None
-                
+
     def download_termset_mediawiki(self, terms):
         if 'mediawikidump' in self.config:
             # 2) Download the wiki.lagen.nu dump from
@@ -214,7 +214,7 @@ class Keyword(DocumentRepository):
         # http://download.wikimedia.org/svwiki/latest/svwiki-latest-all-titles-in-ns0.gz
         # -- term set "wikipedia"
         filename = self.store.datadir + "/downloaded/wikititles.gz"
-        
+
         updated = self.download_if_needed(self.config.wikipediatitles, None,
                                           archive=self.download_archive,
                                           filename=filename)

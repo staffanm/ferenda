@@ -1,10 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
-from future import standard_library
-standard_library.install_aliases()
-from future.utils import exec_
 
 import sys
 import os
@@ -25,7 +19,7 @@ def urljoin(root, other):
     return urljoin_orig (root, other)
     
 from ferenda import util
-from ferenda.compat import unittest, patch
+import unittest, patch
 from ferenda.testutil import FerendaTestCase
 # This testcase tests those examples in the documentation that are
 # more unit-like and can run without downloading stuff from the

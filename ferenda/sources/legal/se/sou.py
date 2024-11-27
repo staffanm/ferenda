@@ -18,7 +18,7 @@ from rdflib.exceptions import ParserError
 BIBO = Namespace("http://purl.org/ontology/bibo/")
 from bs4 import BeautifulSoup
 import lxml.html
-from cached_property import cached_property
+from functools import cached_property
 
 from ferenda import (PDFAnalyzer, CompositeRepository, DocumentEntry,
                      PDFDocumentRepository, CompositeStore, Facet, DocumentStore)

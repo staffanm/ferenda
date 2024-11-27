@@ -6,7 +6,7 @@ from builtins import *
 import sys
 import os
 
-from ferenda.compat import unittest
+import unittest
 from ferenda import util
 
 # SUT

@@ -9,7 +9,7 @@ import itertools
 from rdflib import Graph
 
 from ferenda import DocumentRepository
-from ferenda.sources.legal.se.legalref import LegalRef
+from ferenda.sources.legal.se.lagrum import LegalRef
 from ferenda.elements import Paragraph
 from . import EURLex
 

@@ -7,7 +7,7 @@ import datetime
 
 from rdflib import Graph, Namespace
 
-from ferenda.compat import unittest
+import unittest
 
 # SUT
 from ferenda import Describer
@@ -35,7 +35,7 @@ class TestDescriber(unittest.TestCase):
         self.desc = Describer(self.graph, "http://example.org/doc")
 
     def test_getvalues(self):
-        self.assertEqual(self.desc.getvalues(DCTERMS.alternate),
+        self.assertEqual(self.desc.getvalues(DCTERMS.alternative),
                          [])
         self.assertEqual(self.desc.getvalues(DCTERMS.title),
                          ["Hello world"])
@@ -48,7 +48,7 @@ class TestDescriber(unittest.TestCase):
         self.assertEqual(self.desc.getvalue(DCTERMS.issued),
                          datetime.date(2013,10,11))
         with self.assertRaises(KeyError):
-            self.desc.getvalue(DCTERMS.alternate)
+            self.desc.getvalue(DCTERMS.alternative)
         with self.assertRaises(KeyError):
             self.desc.getvalue(DCTERMS.identifier)
 

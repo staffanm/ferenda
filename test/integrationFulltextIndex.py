@@ -4,7 +4,7 @@ from __future__ import (absolute_import, division,
 from builtins import *
 
 import sys, os
-from ferenda.compat import unittest
+import unittest
 
 from datetime import datetime
 from tempfile import mkdtemp

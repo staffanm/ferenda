@@ -20,7 +20,7 @@ from ferenda import WSGIApp as OrigWSGIApp
 from ferenda import elements, util
 from ferenda.elements import html
 from ferenda.fulltextindex import Between, RegexString
-from ferenda.sources.legal.se.legalref import LegalRef
+from ferenda.sources.legal.se.lagrum import LegalRef
 from ferenda.sources.legal.se import SwedishCitationParser
 
 
@@ -42,9 +42,9 @@ class WSGIApp(OrigWSGIApp):
                 sfsrepo.commondata,
                 allow_relative=True)
             graph = Graph().parse(sfsrepo.resourceloader.filename("extra/sfs.ttl"), format="turtle")
-            self.lagforkortningar = [str(o) for s, o in graph.subject_objects(DCTERMS.alternate)]
+            self.lagforkortningar = [str(o) for s, o in graph.subject_objects(DCTERMS.alternative)]
             self.paragraflag = []
-            for s, o in graph.subject_objects(DCTERMS.alternate):
+            for s, o in graph.subject_objects(DCTERMS.alternative):
                 basefile = sfsrepo.basefile_from_uri(str(s))
                 distilledpath = sfsrepo.store.distilled_path(basefile)
                 firstpara_uri = str(s) + "#P1"

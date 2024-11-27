@@ -10,7 +10,7 @@ import codecs
 import lxml
 import rdflib
 
-from ferenda.compat import unittest
+import unittest
 from ferenda.sources.legal.se.legaluri import (construct, parse,
                                                coinstruct_from_graph)
 from ferenda.testutil import file_parametrize, parametrize

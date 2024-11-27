@@ -1,8 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
-from future.utils import exec_, native
 
 import sys
 import os
@@ -19,7 +15,7 @@ except ImportError:
     
 
 from ferenda import util
-from ferenda.compat import unittest
+import unittest
 from ferenda.testutil import FerendaTestCase
 
 # imports needed by the scripts. I do not fully understand exactly how

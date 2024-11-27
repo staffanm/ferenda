@@ -18,7 +18,7 @@ from lxml import etree
 from rdflib import Graph
 from bs4 import BeautifulSoup
 
-from ferenda.compat import unittest, Mock, patch
+import unittest, Mock, patch
 from ferenda import util
 from ferenda import DocumentRepository
 

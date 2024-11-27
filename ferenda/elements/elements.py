@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+    # -*- coding: utf-8 -*-
 """This module contains classes that are based on native types (lists,
 dicts, string, datetime), but adds support for general attributes. The
 attributes are set when the object is created (as keyword arguments to
@@ -14,14 +14,6 @@ The module also contains the convenience functions
 hierarchies to and from strings.
 
 """
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
-from future import standard_library
-standard_library.install_aliases()
-import builtins
-from future.utils import native
-
 from operator import itemgetter
 import ast
 import datetime
@@ -33,7 +25,8 @@ import unicodedata
 import xml.etree.cElementTree as ET
 import sys
 from collections import OrderedDict
-
+import builtins
+native = lambda x: x
 
 from layeredconfig import LayeredConfig
 from lxml.builder import ElementMaker

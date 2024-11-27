@@ -20,7 +20,7 @@ import lxml.html
 from bs4 import BeautifulSoup
 from rdflib import URIRef
 from rdflib.namespace import SKOS
-from cached_property import cached_property
+from functools import cached_property
 
 from ferenda import Describer, DocumentEntry, PDFAnalyzer
 from ferenda import util
@@ -29,7 +29,7 @@ from ferenda.elements import Section, Link, Body, CompoundElement
 from ferenda.pdfreader import PDFReader, Textbox, Textelement, Page, BaseTextDecoder
 from ferenda.errors import DocumentRemovedError, DownloadError, DocumentSkippedError
 from . import SwedishLegalSource, SwedishLegalStore, Offtryck, RPUBL
-from .legalref import LegalRef
+from .lagrum import LegalRef
 from .elements import PreambleSection, UnorderedSection, Forfattningskommentar, Sidbrytning, VerbatimSection
 from .decoders import OffsetDecoder1d, OffsetDecoder20, DetectingDecoder
 

@@ -11,7 +11,7 @@ from copy import deepcopy
 
 from pyparsing import Word, nums
 
-from ferenda.compat import unittest
+import unittest
 from ferenda.citationparser import CitationParser
 from ferenda.uriformatter import URIFormatter
 from ferenda.elements import (Body, Heading, Paragraph, Footnote,

@@ -16,7 +16,7 @@ from io import BytesIO
 
 from lxml import etree
 
-from ferenda.compat import unittest
+import unittest
 from ferenda import errors, util
 from ferenda.testutil import FerendaTestCase
 from ferenda.elements import serialize, LinkSubject
@@ -373,7 +373,9 @@ class ParseXML(unittest.TestCase):
     def test_whitespace_normalization(self):
         pdf = self._parse_xml("""
 <fontspec id="0" size="21" family="CCQUSK+Calibri-Bold" color="#345a8a"/>
-<text top="146" left="135" width="155" height="29" font="0"><b>Document	  title	  </b></text>""")
+<text top="146" left="135" width="155" height="29" font="0"><b>Document	
+  title	
+  </b></text>""")
         self.assertEqual("Document title ", str(pdf[0][0]))
 
 

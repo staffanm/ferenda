@@ -1,11 +1,6 @@
 # -*- coding: utf-8 -*-
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
-from future import standard_library
-standard_library.install_aliases()
-
-from collections import defaultdict, OrderedDict, Counter, Iterable
+from collections import defaultdict, OrderedDict, Counter
+from collections.abc import Iterable
 from datetime import date, datetime
 from io import BytesIO
 from operator import itemgetter
@@ -16,7 +11,8 @@ import json
 import logging
 import mimetypes
 import os
-import pkg_resources
+# import pkg_resources
+import importlib.resources
 import re
 import sys
 import traceback

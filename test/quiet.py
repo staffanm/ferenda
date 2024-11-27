@@ -5,7 +5,7 @@ import os
 import tempfile
 from contextlib import contextmanager
 
-from ferenda.compat import patch
+from unittest.mock import patch
 
 class TempFileHandler(logging.FileHandler): pass
 

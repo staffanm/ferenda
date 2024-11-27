@@ -9,7 +9,7 @@ import os
 import sys
 
 from ferenda import errors
-from ferenda.compat import unittest, patch
+import unittest, patch
 
 # SUT
 from ferenda import util

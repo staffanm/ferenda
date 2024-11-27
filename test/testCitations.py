@@ -7,7 +7,7 @@ import codecs
 
 from ferenda import CitationParser
 from ferenda import util
-from ferenda.compat import unittest
+import unittest
 from ferenda.testutil import file_parametrize, FerendaTestCase
 import ferenda.citationpatterns
 

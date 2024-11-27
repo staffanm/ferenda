@@ -14,7 +14,7 @@ import json
 from rdflib import Graph
 from ferenda import util, errors
 
-from ferenda.compat import unittest
+import unittest
 from ferenda.triplestore import TripleStore, SleepycatStore, FusekiStore
 
 from ferenda.testutil import FerendaTestCase

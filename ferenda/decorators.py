@@ -203,7 +203,7 @@ def render(f):
         distilled_graph = Graph()
         with codecs.open(self.store.parsed_path(doc.basefile, version=doc.version),
                          encoding="utf-8") as fp:  # unicode
-            distilled_graph.parse(data=fp.read(), format="rdfa",
+            distilled_graph.parse(data=fp.read(), format="html",
                                   publicID=doc.uri)
 
         # The act of parsing from RDFa binds a lot of namespaces

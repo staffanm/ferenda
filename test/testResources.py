@@ -12,7 +12,7 @@ from lxml import etree as ET
 from ferenda import DocumentRepository
 from ferenda import util, errors
 from ferenda.testutil import RepoTester, FerendaTestCase
-from ferenda.compat import unittest
+import unittest
 
 from examplerepos import staticmockclass, staticmockclass2, staticmockclass3
 # SUT

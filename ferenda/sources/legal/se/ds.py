@@ -9,7 +9,7 @@ from collections import OrderedDict, Counter
 
 from rdflib import Literal
 from rdflib.namespace import SKOS
-from cached_property import cached_property
+from functools import cached_property
 
 from ferenda import PDFAnalyzer
 from ferenda.errors import ParseError

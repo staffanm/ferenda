@@ -28,7 +28,7 @@ from rdflib import RDF, Graph
 from rdflib.resource import Resource
 from rdflib.namespace import DCTERMS, SKOS
 from layeredconfig import LayeredConfig, Defaults
-from cached_property import cached_property
+from functools import cached_property
 
 from . import RPUBL, RINFOEX, SwedishLegalSource, FixedLayoutSource
 from .fixedlayoutsource import FixedLayoutStore
@@ -40,7 +40,7 @@ from ferenda.decorators import newstate
 from ferenda.elements import (Link, Body, CompoundElement,
                               Preformatted, UnorderedList, ListItem, serialize)
 from ferenda.elements.html import elements_from_soup
-from ferenda.sources.legal.se.legalref import LegalRef
+from ferenda.sources.legal.se.lagrum import LegalRef
 from ferenda.pdfreader import Page
 
 

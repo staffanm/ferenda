@@ -22,7 +22,7 @@ import time
 import unicodedata
 from urllib.parse import unquote
 
-from ferenda.compat import unittest
+import unittest
 
 import rdflib
 from rdflib.compare import graph_diff

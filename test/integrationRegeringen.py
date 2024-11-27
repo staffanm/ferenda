@@ -6,7 +6,7 @@ from builtins import *
 import sys
 import os
 
-from ferenda.compat import unittest
+import unittest
 
 # SUT
 from ferenda.sources.legal.se import Regeringen

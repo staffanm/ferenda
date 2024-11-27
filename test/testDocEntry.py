@@ -9,7 +9,7 @@ import os
 from datetime import datetime
 from io import StringIO
 
-from ferenda.compat import unittest
+import unittest
 from ferenda import DocumentRepository, util
 
 # SUT

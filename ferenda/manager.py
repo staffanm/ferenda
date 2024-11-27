@@ -10,13 +10,8 @@ tool, you don't need to directly call any of these methods --
 else, for you.
 
 """
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
 nativeint = int
 from builtins import *
-from future import standard_library
-standard_library.install_aliases()
-from future.utils import bytes_to_native_str
 
 # stdlib
 from collections import OrderedDict, Counter
@@ -61,6 +56,7 @@ except NameError:
 # 3rd party
 import requests
 import requests.exceptions
+from requests.auth import HTTPBasicAuth
 import lxml.etree
 from layeredconfig import (LayeredConfig, Defaults, INIFile, Commandline,
                            Environment)
@@ -70,12 +66,14 @@ except ImportError:  # pragma: no cover
     def setproctitle(title): pass
     def getproctitle(): return ""
 from werkzeug.serving import run_simple
+from rdflib.plugin import PluginException
+
 
 # my modules
 from ferenda import DocumentRepository  # needed for a doctest
 from ferenda import Transformer, TripleStore, ResourceLoader, WSGIApp, Resources
 from ferenda import errors, util
-from ferenda.compat import MagicMock
+from unittest.mock import MagicMock
 
 
 DEFAULT_CONFIG = {
@@ -128,11 +126,11 @@ class MarshallingHandler(logging.Handler):
     def __init__(self, records):
         self.records = records
         super(MarshallingHandler, self).__init__()
-        
+
     def emit(self, record):
         self.records.append(self.marshal(record))
 
-    def marshal(self, record): 
+    def marshal(self, record):
         # Based on SocketHandler.makePickle
         ei = record.exc_info
         if ei:
@@ -151,7 +149,7 @@ class BasefileLoggerAdapter(logging.LoggerAdapter):
         e = self.extra
         label = e['basefile'] + "@" + e['version'] if e['version'] else e['basefile']
         return '[{%s}] %s' % (label, msg), kwargs
-    
+
 
 def makeresources(repos,
                   resourcedir="data/rsrc",
@@ -223,7 +221,7 @@ def frontpage(repos,
                 xhtml = inst.frontpage_content(primary=True)
             if inst.config.frontpagefeed and not feed:
                 feed = inst.store.resourcepath("feed/main.atom")
-                
+
         if not xhtml:
             for inst in repos:
                 content = inst.frontpage_content()
@@ -267,7 +265,7 @@ def frontpage(repos,
                                   resourceloader=ResourceLoader(*loadpath),
                                   config=conffile,
                                   documentroot=docroot)
-        
+
         transformargs = {'repos': repos,
                          'remove_missing': removeinvalidlinks}
         if staticsite:
@@ -329,7 +327,7 @@ def status(repo, samplesize=3):
         # downloaded: rdb-direct-mapping r2rml ... (141 more)
         # parsed: None (143 needs parsing)
         # generated: None (143 needs generating)
-    
+
 def make_wsgi_app(config, enabled=None, repos=None):
     """Creates a callable object that can act as a WSGI application by
     mod_wsgi, gunicorn, the built-in webserver, or any other
@@ -483,7 +481,7 @@ def run(argv, config=None, subcall=False):
         # or when the SIGUSR1 signal is sent ("kill -SIGUSR1 <pid>")
         if hasattr(signal, 'SIGUSR1'):
             signal.signal(signal.SIGUSR1, _siginfo_handler)
-    
+
     if not config:
         config = load_config(find_config_file(), argv)
         alias = getattr(config, 'alias', None)
@@ -688,16 +686,12 @@ Disallow: /*fs/*.png
                 # select the top 10 calls not part of manager.py or decorators.py
                 restrictions = ('^(?!.*(manager|decorators).py:)', 10)
                 ps.print_stats(20)
-                print(s.getvalue())            
+                print(s.getvalue())
         if not subcall:
             _shutdown_buildserver()
             shutdown_logger()
             global config_loaded
             config_loaded = False
-
-def _nativestr(unicodestr, encoding="utf-8"):
-    return bytes_to_native_str(unicodestr.encode(encoding))
-
 
 def timeskew(config):
     """Check to see if system time agrees with filesystem time. If running under docker, and the container system time has drifted from the host system time (due to e.g. host system hiberation), and config.datadir is on a volume mounted from the host, files may appear creater or modified way later. Detect this skew if present and not smaller than a second."""
@@ -762,7 +756,8 @@ def runsetup():
     force = ('--force' in sys.argv)
     verbose = ('--verbose' in sys.argv)
     unattended = ('--unattended' in sys.argv)
-    if not setup(sys.argv, force, verbose, unattended):
+    argv = [x for x in sys.argv if not x.startswith("--")]
+    if not setup(argv, force, verbose, unattended):
         sys.exit(-1)
 
 
@@ -1065,7 +1060,7 @@ def _run_class(enabled, argv, config):
                 log.debug("%s %s: about to list basefiles" % (alias, action))
                 iterable = list(iterable)
                 log.debug("%s %s: processing %s basefiles (%s...)" % (alias, action, len(iterable), ", ".join(iterable[:3])))
-                
+
             if inst.config.allversions:
                 iterable = inst.store.list_versions_for_basefiles(iterable, action, force=inst.config.force)
                 if inst.config.loglevel == "DEBUG":
@@ -1243,7 +1238,7 @@ def _start_proc(jobqueue, resultqueue, clientname):
         p.start()
         return p
 
-    
+
 def _finish_multiprocessing(procs, join=True):
     # we could either send a DONE signal to each proc or we could just
     # kill them
@@ -1312,7 +1307,7 @@ def _build_worker(jobqueue, resultqueue, clientname):
                             otherrepos.append(obj)
                 repos[job['classname']] = otherrepos
             kwargs['otherrepos'] = repos[job['classname']]
-                        
+
         # proctitle = re.sub(" [now: .*]$", "", getproctitle())
         proctitle = getproctitle()
         newproctitle = proctitle + " [%(alias)s %(command)s %(basefile)s]" % job
@@ -1477,7 +1472,7 @@ def _queue_jobs(manager, iterable, inst, classname, command):
     clients = Counter()
     signal.signal(signal.SIGALRM, _resultqueue_get_timeout)
     # FIXME: be smart about how long we wait before timing out the resultqueue.get() call
-    timeout_length = 900 
+    timeout_length = 900
     while len(processing) > 0:
         try:
             r = resultqueue.get()
@@ -1532,7 +1527,7 @@ def _log_record(marshalled_record, clientname, log):
     record = logging.makeLogRecord(pickle.loads(marshalled_record))
     record.msg = "[%s] %s" % (clientname, record.msg)
     log.handle(record)
-                            
+
 buildmanager = None
 if sys.version_info[0] < 3:
     jobqueue_id = b'jobqueue'
@@ -1559,7 +1554,7 @@ def _make_server_manager(port, authkey, start=True):
         class JobQueueManager(SyncManager):
             pass
 
-        
+
         JobQueueManager.register(jobqueue_id, callable=lambda: job_q)
         JobQueueManager.register(resultqueue_id, callable=lambda: result_q)
 
@@ -1678,8 +1673,8 @@ def _siginfo_handler(signum, frame):
     print("In %s (%s:%s)" % (frame.f_code.co_name, frame.f_code.co_filename, frame.f_lineno))
     if frame.f_code.co_name == "_queue_jobs":
         print("Queued %s jobs, recieved %s results" % (frame.f_locals['number_of_jobs'], len(frame.f_locals['res'])))
-    
-    
+
+
 def _run_class_with_basefile(clbl, basefile, version, kwargs, command,
                              alias="(unknown)", wrapctrlc=False):
     try:
@@ -1712,7 +1707,7 @@ def _run_class_with_basefile(clbl, basefile, version, kwargs, command,
         # 2 args (self, message). So if we get that particular
         # error, stuff the extra args in the message of our own
         # substitute exception.
-        # 
+        #
         # FIXME: Maybe this could be done by registering custom
         # picklers for ParseError objects, see the copyreg module
         # and https://stackoverflow.com/a/25994232/2718243
@@ -1814,7 +1809,7 @@ def enabled_classes(inifile=None, config=None):
         for name in config:
             if ininstance(getattr(config, name), LayeredConfig) and hasattr('class'):
                 enabled[name] = getattr(thing, 'class')
-        
+
     else:
         if not inifile:
             inifile = find_config_file()
@@ -1996,7 +1991,7 @@ def _process_count(setting):
         return multiprocessing.cpu_count()
     else:
         return int(setting)
-    
+
 
 def _setup_buildclient_args(config):
     import socket
@@ -2033,21 +2028,7 @@ def _filepath_to_urlpath(path, keep_segments=2):
 
 def _preflight_check(log, verbose=False):
     """Perform a check of needed modules and binaries."""
-    pythonver = (2, 6, 0)
-
-    # Module, min ver, required
-    modules = (
-        ('bs4', '4.3.0', True),
-        # ('lxml', '3.2.0', True), # has no top level __version__ property
-        ('rdflib', '4.0', True),
-        ('html5lib', '0.99', True),
-        ('requests', '1.2.0', True),
-        # ('six', '1.4.0', True),
-        ('future', '0.15.0', True),
-        ('jsmin', '2.0.2', True),
-        ('cssmin', '0.2.0', True),
-        ('whoosh', '2.4.1', True),
-        ('pyparsing', '1.5.7', True))
+    pythonver = (3, 8, 0)
 
     binaries = (('pdftotext', '-v'),  # FIXME: we also now require pdfimages, at least version 0.25 (which supports the -png flag)
                 ('pdftohtml', '-v'),
@@ -2067,42 +2048,42 @@ def _preflight_check(log, verbose=False):
             log.info("Python version %s OK" % sys.version.split()[0])
 
     # 2: Check modules -- TODO: Do we really need to do this?
-    for (mod, ver, required) in modules:
-        try:
-            m = importlib.import_module(mod)
-            version = getattr(m, '__version__', None)
-            if isinstance(version, bytes):
-                version = version.decode()
-            if isinstance(version, tuple):
-                version = ".".join([str(x) for x in version])
-            # print("version of %s is %s" % (mod, version))
-            if not hasattr(m, '__version__'):
-                log.warning("Module %s has no version information,"
-                            "it might be older than required" % mod)
-            elif util.numcmp(version, ver) < 0:
-                if required:
-                    log.error("Module %s has version %s, need %s" %
-                              (mod, version, ver))
-                    success = False
-                else:
-                    log.warning(
-                        "Module %s has version %s, would like to have %s" %
-                        (mod, version, ver))
-            else:
-                if verbose:
-                    log.info("Module %s OK" % mod)
-        except ImportError:
-            if required:
-                log.error("Missing module %s" % mod)
-                success = False
-            else:
-                log.warning("Missing (non-essential) module %s" % mod)
+    # for (mod, ver, required) in modules:
+    #     try:
+    #         m = importlib.import_module(mod)
+    #         version = getattr(m, '__version__', None)
+    #         if isinstance(version, bytes):
+    #             version = version.decode()
+    #         if isinstance(version, tuple):
+    #             version = ".".join([str(x) for x in version])
+    #         # print("version of %s is %s" % (mod, version))
+    #         if not hasattr(m, '__version__'):
+    #             log.warning("Module %s has no version information,"
+    #                         "it might be older than required" % mod)
+    #         elif util.numcmp(version, ver) < 0:
+    #             if required:
+    #                 log.error("Module %s has version %s, need %s" %
+    #                           (mod, version, ver))
+    #                 success = False
+    #             else:
+    #                 log.warning(
+    #                     "Module %s has version %s, would like to have %s" %
+    #                     (mod, version, ver))
+    #         else:
+    #             if verbose:
+    #                 log.info("Module %s OK" % mod)
+    #     except ImportError:
+    #         if required:
+    #             log.error("Missing module %s" % mod)
+    #             success = False
+    #         else:
+    #             log.warning("Missing (non-essential) module %s" % mod)
 
-    # a thing needed by testManager.Setup.test_preflight
-    if (MagicMock is not None and
-            isinstance(__import__, MagicMock) and
-            __import__.side_effect is not None):
-        __import__.side_effect = None
+    # # a thing needed by testManager.Setup.test_preflight
+    # if (MagicMock is not None and
+    #         isinstance(__import__, MagicMock) and
+    #         __import__.side_effect is not None):
+    #     __import__.side_effect = None
 
     # 3: Check binaries
     for (cmd, arg) in binaries:
@@ -2133,8 +2114,11 @@ def _select_triplestore(sitename, log, verbose=False):
                                  'http://localhost:3030')
     if triplestore:
         try:
-            if not os.environ.get('FERENDA_SET_TRIPLESTORE_LOCATION'):
-                resp = requests.get(triplestore + "/ds/data?default")
+            if (not os.environ.get('FERENDA_SET_TRIPLESTORE_LOCATION')) and os.environ.get('FERENDA_FUSEKI_ADMIN'):
+                # new fuseki containers auto-create a admin passsword. Inspect
+                # logs to find it and set the environment variable
+                # FERENDA_FUSEKI_ADMIN to it
+                resp = requests.get(triplestore + "/ds/data?default", auth=HTTPBasicAuth('admin', os.environ.get('FERENDA_FUSEKI_ADMIN')))
                 resp.raise_for_status()
                 if verbose:
                     log.info("Fuseki server responding at %s" % triplestore)
@@ -2144,6 +2128,9 @@ def _select_triplestore(sitename, log, verbose=False):
             return('FUSEKI', triplestore, 'ds')
         except (requests.exceptions.HTTPError,
                 requests.exceptions.ConnectionError) as e:
+            if isinstance(e, requests.exceptions.HTTPError) and e.response.status_code == 404:
+                # this is ok
+                return('FUSEKI', triplestore, 'ds')
             if verbose:
                 log.info("... Fuseki not available at %s: %s" %
                          (triplestore, e))
@@ -2189,7 +2176,7 @@ def _select_triplestore(sitename, log, verbose=False):
         if verbose:
             log.info("SQLite-backed RDFLib triplestore seems to work")
         return ('SQLITE', 'data/ferenda.sqlite', 'ferenda')
-    except ImportError as e:
+    except (ImportError, PluginException) as e:
         if verbose:
             log.info("...SQLite not available: %s" % e)
     finally:

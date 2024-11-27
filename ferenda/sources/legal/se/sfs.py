@@ -23,16 +23,18 @@ from bs4 import BeautifulSoup
 import requests
 import requests.exceptions
 from layeredconfig import LayeredConfig
-from cached_property import cached_property
+from functools import cached_property
 
 # my own libraries
 from . import Trips, SwedishCitationParser, RPUBL, SwedishLegalStore, RINFOEX
 from .elements import *
-from .legalref import LegalRef, LinkSubject
+# from .lagrum import LegalRef, LinkSubject
+from .lagrum import LegalRef
 from .swedishlegalsource import SwedishLegalHandler
 from ferenda import DocumentEntry, TripleStore
 from ferenda import TextReader, Facet
 from ferenda import util
+from ferenda.elements import LinkSubject
 from ferenda.elements.html import UL, LI, Body
 from ferenda.errors import FerendaException, DocumentRemovedError, ParseError
 from ferenda.requesthandler import UnderscoreConverter
@@ -74,7 +76,7 @@ class InteExisterandeSFS(DocumentRemovedError):
     # possibly not in extract_head)
     
 class SFSConverter(UnderscoreConverter):
-    regex = "\d{4}:\d[^/]*"
+    regex = r"\d{4}:\d[^/]*"
 
 
 class SFSHandler(SwedishLegalHandler):
@@ -182,14 +184,15 @@ class SFS(Trips):
     @cached_property
     def lagrum_parser(self):
         return SwedishCitationParser(LegalRef(LegalRef.LAGRUM,
-                                              LegalRef.EULAGSTIFTNING),
+                                              LegalRef.EULAGSTIFTNING,
+                                              minter=self.minter),
                                      self.minter,
                                      self.commondata,
                                      allow_relative=True)
 
     @cached_property
     def forarbete_parser(self):
-        return SwedishCitationParser(LegalRef(LegalRef.FORARBETEN),
+        return SwedishCitationParser(LegalRef(LegalRef.FORARBETEN, minter=self.minter),
                                      self.minter,
                                      self.commondata)
 
@@ -2179,9 +2182,9 @@ WHERE {
                 }
             if facet.dimension_label == "comment":
                 v = self.display_title(resourceuri)
-                # optionally add rdfs:label and dcterms:alternate
+                # optionally add rdfs:label and dcterms:alternative
                 alts = []
-                for pred in RDFS.label, DCTERMS.alternate:
+                for pred in RDFS.label, DCTERMS.alternative:
                     val = desc.graph.value(URIRef(rooturi), pred)
                     if val:
                         alts.append(val)

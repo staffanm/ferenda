@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
-from future import standard_library
-standard_library.install_aliases()
 
 from collections import OrderedDict
 from subprocess import Popen, PIPE
@@ -20,7 +15,7 @@ from lxml import etree as ET
 import requests.exceptions
 from layeredconfig import LayeredConfig
 
-from ferenda.compat import unittest, Mock, patch
+import unittest, Mock, patch
 from ferenda.testutil import RepoTester, FerendaTestCase
 from ferenda import manager, decorators, util, errors
 from ferenda import (DocumentRepository, DocumentStore,

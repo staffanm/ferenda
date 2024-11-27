@@ -5,7 +5,7 @@ from builtins import *
 
 from rdflib import Graph, Namespace, RDF, URIRef, Literal
 from rdflib.namespace import OWL, DCTERMS
-from cached_property import cached_property
+from functools import cached_property
 
 from ferenda import util
 from ferenda import ResourceLoader

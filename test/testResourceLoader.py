@@ -7,7 +7,7 @@ import tempfile
 import shutil
 import os
 
-from ferenda.compat import unittest
+import unittest
 from ferenda.errors import ResourceNotFound
 from ferenda import DocumentEntry  # just used for test_loadpath
 from ferenda import DocumentRepository

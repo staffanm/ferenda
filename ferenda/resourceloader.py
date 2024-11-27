@@ -8,7 +8,8 @@ import inspect
 import logging
 import os
 import sys
-import pkg_resources
+# import pkg_resources
+import importlib.resources # FIXME: we need to change all calls to pkg_resources as well (c.f. https://importlib-resources.readthedocs.io/en/latest/migration.html#pkg-resources-resource-filename)
 import shutil
 
 from ferenda import util
@@ -65,7 +66,7 @@ class ResourceLoader(object):
 
         """
         self.loadpath = loadpath
-        self.use_pkg_resources = kwargs.get("use_pkg_resources", True)
+        self.use_pkg_resources = kwargs.get("use_pkg_resources", False)
         self.modulename = "ferenda"
         self.resourceprefix = "res"
         self.log = logging.getLogger(__name__)
@@ -179,7 +180,7 @@ class ResourceLoader(object):
             else:
                 raise ResourceNotFound(resourcename)
         for path in self.loadpath:
-            candidate = path + os.sep + resourcename
+            candidate = os.path.normpath(path + os.sep + resourcename)
             # print("looking for %s in %s: %s" % (resourcename, candidate, os.path.exists(candidate)))
             if os.path.exists(candidate):
                 return candidate

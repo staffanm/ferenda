@@ -1,10 +1,5 @@
 # -*- coding: utf-8 -*-
 """General  library of small utility functions."""
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
-from future.standard_library import install_aliases
-install_aliases()
 
 import codecs
 import datetime
@@ -544,7 +539,7 @@ def extract_text(html, start, end, decode_entities=True, strip_tags=True):
     text = html[startidx + len(start):endidx]
     if decode_entities:
         from html.entities import name2codepoint
-        entities = re.compile("&(\w+?);")
+        entities = re.compile(r"&(\w+?);")
         text = entities.sub(
             lambda m: chr(
                 name2codepoint[
@@ -552,7 +547,7 @@ def extract_text(html, start, end, decode_entities=True, strip_tags=True):
             text)
     if strip_tags:
         # http://stackoverflow.com/a/1732454
-        tags = re.compile("</?\w+>")
+        tags = re.compile(r"</?\w+>")
         text = tags.sub('', text)
     return text
 
@@ -732,7 +727,7 @@ def title_sortkey(s):
     if s.startswith("the "):
         s = s[4:]
     # filter away all non-word characters (but not digits)
-    s = re.sub("\W+", "", s)
+    s = re.sub(r"\W+", "", s)
     # remove spaces
     return "".join(s.split())
 

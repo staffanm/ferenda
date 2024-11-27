@@ -12,7 +12,7 @@ from functools import partial, wraps
 from io import BytesIO, StringIO, BufferedIOBase
 from urllib.parse import quote, unquote
 from wsgiref.util import request_uri
-from cached_property import cached_property
+from functools import cached_property
 import ast
 import codecs
 import collections
@@ -35,9 +35,8 @@ XHV = Namespace("http://www.w3.org/1999/xhtml/vocab#")
 from six import text_type as str
 import six
 import bs4
-from cached_property import cached_property
+from functools import cached_property
 from lxml import etree
-from werkzeug.routing import Rule
 from werkzeug.wsgi import wrap_file
 from werkzeug.wrappers import Response
 
@@ -46,10 +45,10 @@ from ferenda import (DocumentRepository, DocumentStore, FSMParser,
                      CitationParser, Describer, Facet, RequestHandler,
                      Transformer, DocumentEntry)
 from ferenda import util, fulltextindex, errors
-from ferenda.sources.legal.se.legalref import Link, LegalRef, RefParseError
+# from ferenda.sources.legal.se.legalref import Link, LegalRef, RefParseError
+from ferenda.sources.legal.se.lagrum import LegalRef, RefParseError
 from ferenda.elements.html import A, H1, H2, H3, P, Strong, Pre, Div, Body, DL, DT, DD
-from ferenda.elements import serialize, Section, Body, CompoundElement, UnicodeElement, Preformatted
-from ferenda.pdfreader import Page, BaseTextDecoder, Textelement
+from ferenda.elements import serialize, Section, Body, CompoundElement, UnicodeElement, Preformatted, Link
 from ferenda.pdfreader import PDFReader
 from ferenda.pdfanalyze import PDFAnalyzer
 from ferenda.decorators import action, managedparsing, newstate, ifneeded, updateentry
@@ -267,12 +266,12 @@ class SwedishLegalSource(DocumentRepository):
         filename = self.resourceloader.filename
         spacefile = filename("uri/swedishlegalsource.space.ttl")
         slugsfile = filename("uri/swedishlegalsource.slugs.ttl")
-        self.log.debug("Loading URISpace from %s" % spacefile)
+        self.log.debug("Loading URISpace <%s" % spacefile)
         with codecs.open(spacefile, encoding="utf-8") as space:
             with codecs.open(slugsfile, encoding="utf-8") as slugs:
                 cfg = Graph().parse(space,
-                                    format="turtle").parse(slugs,
-                                                           format="turtle")
+                                    format="turtle", publicID="http://example.org/").parse(slugs,
+                                                           format="turtle", publicID="http://example.org/")
         COIN = Namespace("http://purl.org/court/def/2009/coin#")
         # select correct URI for the URISpace definition by
         # finding a single coin:URISpace object
@@ -287,7 +286,8 @@ class SwedishLegalSource(DocumentRepository):
                 cd.parse(data=fp.read(), format="turtle")
         filter = SwedishCitationParser.FILTER_LAW if self.alias == "sfs" else SwedishCitationParser.FILTER_ALL
         return SwedishCitationParser(LegalRef(*self.parse_types,
-                                              logger=self.log),
+                                              logger=self.log,
+                                              minter=self.minter),
                                      self.minter,
                                      cd,
                                      allow_relative=self.parse_allow_relative,
@@ -717,7 +717,7 @@ class SwedishLegalSource(DocumentRepository):
             # if the desc starts with a string like [version:
             # 2017:1279-] it means that the patch is only working for
             # versions equal to or above version 2017:1279.
-            m = re.match("\[version: ([^-]*)-([^\]]*)]", desc)
+            m = re.match(r"\[version: ([^-]*)-([^\]]*)]", desc)
             assert m, "version specifier malformed"
             minver, maxver = m.groups()
             if not minver:
@@ -850,7 +850,7 @@ class SwedishLegalSource(DocumentRepository):
                            "rpubl:ikrafttradandedatum",
                            "rpubl:beslutsdatum",
                            "rpubl:upphavandedatum"):
-                    if re.match("\d{4}-\d{2}-\d{2}", value):
+                    if re.match(r"\d{4}-\d{2}-\d{2}", value):
                         # iso8859-1 date (no time portion)
                         dt = datetime.strptime(value, "%Y-%m-%d")
                         result.append(Literal(date(dt.year, dt.month, dt.day)))

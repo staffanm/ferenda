@@ -6,7 +6,7 @@ from builtins import *
 from rdflib import Graph
 
 from ferenda.elements import Body
-from ferenda.compat import unittest
+import unittest
 # SUT
 from ferenda import Document
 

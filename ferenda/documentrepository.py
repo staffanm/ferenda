@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
 nativeint = int
 from builtins import *
-from future.utils import native_str
 
 # stdlib
 from collections import defaultdict, OrderedDict
@@ -46,7 +43,7 @@ import bs4
 import lxml.html
 import requests
 import requests.exceptions
-from cached_property import cached_property
+from functools import cached_property
 
 # mine
 import ferenda
@@ -1334,7 +1331,7 @@ with the *config* object as single parameter.
         :type   doc: ferenda.Document
         :returns: None
         """
-        soups = soup.select(native_str(self.parse_content_selector))
+        soups = soup.select(self.parse_content_selector)
         if len(soups) == 0:
             raise errors.ParseError("%s: parse_content_selector %r matches nothing" %
                                     (doc.basefile, self.parse_content_selector))
@@ -1343,7 +1340,7 @@ with the *config* object as single parameter.
                              (self.parse_content_selector))
         soup = soups[0]
         for filter_selector in self.parse_filter_selectors:
-            for tag in soup.select(native_str(filter_selector)):
+            for tag in soup.select(filter_selector):
                 # tag.decompose()
                 tag.extract()  # decompose fails on some trees
 

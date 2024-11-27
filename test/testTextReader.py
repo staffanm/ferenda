@@ -7,7 +7,7 @@ import os
 import sys
 import codecs
 
-from ferenda.compat import unittest
+import unittest
 
 # SUT
 from ferenda.textreader import TextReader

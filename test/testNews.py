@@ -13,7 +13,7 @@ import rdflib
 from rdflib import RDF
 from rdflib.namespace import DCTERMS
 
-from ferenda.compat import Mock, MagicMock
+from unittest.mock import Mock, MagicMock
 from ferenda import util
 from ferenda.testutil import RepoTester
 

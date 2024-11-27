@@ -308,8 +308,7 @@ class RDFLibStore(TripleStore):
 class SleepycatStore(RDFLibStore):
 
     def _storeid(self):
-        return "Sleepycat"
-
+        return "BerkeleyDB"
 
 class SQLiteStore(RDFLibStore):
 

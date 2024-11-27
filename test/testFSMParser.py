@@ -10,9 +10,9 @@ import re
 
 from ferenda import elements
 from ferenda.testutil import file_parametrize
-from ferenda.compat import patch
+from unittest.mock import patch
 from ferenda.decorators import newstate
-from ferenda.compat import unittest
+import unittest
 # SUT
 from ferenda import FSMParser, TextReader
 from ferenda.fsmparser import Peekable

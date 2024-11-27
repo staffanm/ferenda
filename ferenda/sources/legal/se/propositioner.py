@@ -1,10 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
-from future import standard_library
-standard_library.install_aliases()
-
 import re
 import os
 from datetime import datetime
@@ -20,7 +14,7 @@ from lxml import etree
 import lxml.html
 import requests
 from layeredconfig import LayeredConfig
-from cached_property import cached_property
+from functools import cached_property
 from rdflib import Literal, URIRef
 from rdflib.namespace import DCTERMS
 

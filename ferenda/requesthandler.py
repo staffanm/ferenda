@@ -17,7 +17,7 @@ from copy import deepcopy
 from lxml import etree
 from lxml.etree import XMLSyntaxError
 from rdflib import Graph
-from cached_property import cached_property
+from functools import cached_property
 from werkzeug.routing import Rule, BaseConverter, Map
 from werkzeug.datastructures import Headers
 from werkzeug.wrappers import Request, Response

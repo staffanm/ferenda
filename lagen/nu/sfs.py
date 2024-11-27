@@ -164,9 +164,9 @@ class SFS(OrigSFS, SameAs):
             desc.value(RINFOEX.senastKontrollerad, de.orig_checked)
         rooturi = URIRef(desc.getrel(RPUBL.konsoliderar))
 
-        v = self.commondata.value(rooturi, DCTERMS.alternate, any=True)
+        v = self.commondata.value(rooturi, DCTERMS.alternative, any=True)
         if v:
-            desc.value(DCTERMS.alternate, v)
+            desc.value(DCTERMS.alternative, v)
         v = self.commondata.value(rooturi, RDFS.label, any=True)
         if v:
             # don't include labels if they're essentially the same as

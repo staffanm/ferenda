@@ -8,7 +8,7 @@ import os
 import doctest
 import rdflib
 
-from ferenda.compat import patch
+from unittest.mock import patch
 from ferenda.testutil import RepoTester
 
 # SUT

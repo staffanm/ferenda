@@ -28,7 +28,7 @@ RUN apt -q -y --no-install-recommends --fix-missing install \
        libtiff-tools \
        libxml2-dev \
        libxslt1-dev \
-       locales \    
+       locales \
        make \
        pkg-config \
        procps \
@@ -53,7 +53,7 @@ RUN apt -q -y --no-install-recommends --fix-missing install \
     wget https://github.com/htacg/tidy-html5/releases/download/5.4.0/tidy-5.4.0-64bit.deb && \
        dpkg -i tidy-5.4.0-64bit.deb
 WORKDIR /usr/share/ferenda
-COPY requirements.txt . 
+COPY requirements.txt .
 RUN python3 -m venv /usr/share/.virtualenv && \
     /usr/share/.virtualenv/bin/pip install wheel && \
     /usr/share/.virtualenv/bin/pip install -r requirements.txt
@@ -65,4 +65,5 @@ RUN mv /tmp/docker/locale.gen /etc/locale.gen && locale-gen && \
 COPY . .
 
 ENTRYPOINT ["/bin/bash", "/tmp/docker/setup.sh"]
-CMD ["/usr/share/.virtualenv/bin/gunicorn", "--bind=0.0.0.0:8000", "--access-logfile", "-", "--error-logfile", "-", "--workers=5", "--chdir=/usr/share/site", "wsgi:application"] 
+# CMD ["/usr/share/.virtualenv/bin/gunicorn", "--bind=0.0.0.0:8000", "--access-logfile", "-", "--error-logfile", "-", "--workers=5", "--chdir=/usr/share/site", "wsgi:application"]
+CMD bash

@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
-from future import standard_library
-standard_library.install_aliases()
 
 # A abstract base class for fetching documents from data.riksdagen.se
 from collections import OrderedDict
@@ -24,7 +19,7 @@ from ferenda.elements import Body, Paragraph, Preformatted
 from ferenda.pdfreader import StreamingPDFReader
 from .fixedlayoutsource import FixedLayoutSource, FixedLayoutStore
 from . import Offtryck
-from .legalref import LegalRef
+from .lagrum import LegalRef
 from .swedishlegalsource import Lazyfile
 
 

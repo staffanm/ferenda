@@ -19,6 +19,8 @@ from ferenda.sources.general import Keyword
 # from keywords import Keyword
 
 try:
+    # FIXME: smc.mw is abandoned, consider https://github.com/5j9/wikitextparser or 
+    # https://github.com/earwig/mwparserfromhell instead
     from ferenda.thirdparty.mw import Parser, Semantics, Settings, Preprocessor
 except ImportError as e:
     import sys
@@ -27,8 +29,11 @@ except ImportError as e:
             "ferenda.sources.general.Wiki is not supported under python 2.6: %s" %
             str(e))
     else:
-        raise e  # dunno
-
+        pass # latest grako (dependency of mw) isnt compatible with py3.10+
+        # raise e  # dunno
+        Semantics = object
+        Settings = object
+        Preprocessor = object
 import unicodedata
 
 

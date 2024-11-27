@@ -5,7 +5,7 @@ from builtins import *
 
 from bs4 import BeautifulSoup
 from datetime import date, datetime
-from ferenda.compat import unittest
+import unittest
 from lxml import etree
 from lxml.builder import ElementMaker
 from rdflib import Graph, Namespace

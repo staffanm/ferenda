@@ -12,7 +12,7 @@ from lxml import etree
 from rdflib import RDF, Graph
 from rdflib.namespace import DCTERMS
 
-from ferenda.compat import Mock, MagicMock, patch
+from unittest.mock import Mock, MagicMock, patch
 from ferenda import util
 from ferenda.testutil import RepoTester
 from ferenda.elements import Link

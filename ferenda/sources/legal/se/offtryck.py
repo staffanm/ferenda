@@ -18,7 +18,7 @@ from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
 from rdflib.namespace import DCTERMS
 import six
 from bs4 import BeautifulSoup
-from cached_property import cached_property
+from functools import cached_property
 
 # own
 from ferenda import util, errors
@@ -31,7 +31,7 @@ from ferenda.decorators import newstate
 from ferenda.errors import ParseError, DocumentSkippedError, FSMStateError
 
 from . import SwedishLegalSource, RPUBL
-from .legalref import Link, LegalRef, RefParseError
+from .lagrum import Link, LegalRef, RefParseError
 from .elements import *
 
 class Offtryck(SwedishLegalSource):
@@ -214,7 +214,7 @@ class Offtryck(SwedishLegalSource):
 
         def unreliable_familymatch(prevbox, nextbox):
             def normalize_family(fontfamily):
-                return re.sub("[\-,](Italic|Bold|BoldItalic)", "", fontfamily)
+                return re.sub(r"[\-,](Italic|Bold|BoldItalic)", "", fontfamily)
             
             # older native (non-scanned) pdfs from regeringen.se
             # contains very unreliable font information sometimes
@@ -225,7 +225,7 @@ class Offtryck(SwedishLegalSource):
                 # through the skippedempty attribute
                 return True
             elif (len(prevbox) > 1 and prevbox[0].tag == "b" and
-                  re.match("\d+(| \w) §", prevbox[0]) and
+                  re.match(r"\d+(| \w) §", prevbox[0]) and
                   not nextbox[0][0].isupper()):
                 # looks like the start of a paragraph? See if nextbox
                 # looks like the continuation of a sentence (ie not
@@ -325,7 +325,7 @@ class Offtryck(SwedishLegalSource):
             # Any line that ONLY contains a section reference should
             # probably be interpreted as a header. (also handle dual
             # refs "4 kap. 9 c och 10 §§", prop 1997/98:44 s 148)
-            sectionref = re.compile("(\d+ kap. |)\d+( \w och \d+| \w| och \d+|) §§?$")
+            sectionref = re.compile(r"(\d+ kap. |)\d+( \w och \d+| \w| och \d+|) §§?$")
             if ((sectionref.match(strprevbox) or sectionref.match(strnextbox))
                 and prevbox.bottom <= nextbox.top):
                 return False
@@ -335,11 +335,11 @@ class Offtryck(SwedishLegalSource):
             # short (one line) they might not catch it.:
             if re.match("Skälen för (min bedömning|mitt förslag): ", strnextbox):
                 return False
-            if re.match("\d\. +", strnextbox):  # item in ordered list
+            if re.match(r"\d\. +", strnextbox):  # item in ordered list
                 return False
-            if re.match("[a-z]\) +", strnextbox):  # item in alphabetized ordered list
+            if re.match(r"[a-z]\) +", strnextbox):  # item in alphabetized ordered list
                 return False
-            if (re.match("\d+ §", strnextbox) and
+            if (re.match(r"\d+ §", strnextbox) and
                  (strprevbox[-1] not in ("–", "-") and # make sure this isn't really a continuation
                   not strprevbox.endswith(("och", "enligt", "kap.", "lagens", "före", "i"))) and
                 (nextbox.top - prevbox.bottom >= (prevbox.font.size * 0.3))):  # new section (with a suitable linespacing (30% of a line))
@@ -772,14 +772,14 @@ class Offtryck(SwedishLegalSource):
                    self.SOU: "%s %s:%s",
                    self.SO: "%s %s:%s"}
         try:
-            parts = re.split("[\.:/ ]+", identifier.strip())
+            parts = re.split(r"[\.:/ ]+", identifier.strip())
             id_template = pattern[self.document_type]
             # do we have enough parts for our template?
             if len(parts) == id_template.count("%s") - 1:
                 # we're probably missing the first part (eg "Prop",
                 # "Ds") and so what we have is a basefile-like
                 # thing. Reconstruct the first part.
-                parts.insert(0, re.split("[\.:/ ]+", self.infer_identifier(identifier))[0])
+                parts.insert(0, re.split(r"[\.:/ ]+", self.infer_identifier(identifier))[0])
             # make sure the initial char is capitalized (this is
             # preferred to .capitalize() for strings that should be
             # all-caps, eg "SOU"
@@ -833,7 +833,7 @@ class Offtryck(SwedishLegalSource):
                 return None  # visit_node won't call any subnode
         commentary = []
         sectiontext = util.normalize_space(str(node))
-        m = re.search("(SOU|Ds) (\d+:\d+)", sectiontext)
+        m = re.search(r"(SOU|Ds) (\d+:\d+)", sectiontext)
         if m:
             state['kommittensbetankande'] = m.group(2)
         return None
@@ -886,7 +886,7 @@ class Offtryck(SwedishLegalSource):
         # section mark, ie "1§". It should be low-risk to expand this
         # with a space, at least when interpreting a subsection title.
         # FIXME: This doesn't fix "20a§"
-        text = re.sub("(\d+)(§)", r"\1 \2", text)
+        text = re.sub(r"(\d+)(§)", r"\1 \2", text)
         m = self.re_urisegments.match(baseuri)
         if m:
             attributes = {'law':m.group(2),
@@ -1181,7 +1181,7 @@ class CommentaryFinder(object):
         def is_chapter_header(parser):
             text = str(parser.reader.peek()).strip()
             return bool(len(text) < 20 and text.endswith((" kap.", " kap")) or
-                        re.match("\d+( \w|)\s[Kk]ap. +[^\d]", text))
+                        re.match(r"\d+( \w|)\s[Kk]ap. +[^\d]", text))
 
         # "4 §" or "4 kap. 4 §"
         def is_section_header(parser):
@@ -1191,7 +1191,7 @@ class CommentaryFinder(object):
         # "4 § Lagtext lagtext och mera lagtext"
         def is_section_start(parser):
             text = str(parser.reader.peek()).strip()
-            return bool(re.match("\d+(| \w) § +[A-ZÅÄÖ]", text))
+            return bool(re.match(r"\d+(| \w) § +[A-ZÅÄÖ]", text))
 
         def is_transition_regs(parser):
             return str(parser.reader.peek()).strip() in  (
@@ -1403,7 +1403,7 @@ class CommentaryFinder(object):
             # elif re.match("(I f|F)örsta stycket", text):  # this overmatches, eg ÅRL 7:31 2 st
             elif re.match("I första stycket", text): 
                 return True
-            elif re.match("\((Jfr|Paragrafen)", text):
+            elif re.match(r"\((Jfr|Paragrafen)", text):
                 return True
             elif metrics['defaultsize'] >= para.font.size + 2:
                 return False
@@ -1618,7 +1618,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             return False
         if chunk.font.size >= metrics.h1.size:
             strchunk = str(chunk).strip()
-            if re.match("Regeringens proposition \d{4}(|/\d{2,4}):\d+", strchunk):
+            if re.match(r"Regeringens proposition \d{4}(|/\d{2,4}):\d+", strchunk):
                 return True
 
     def is_proprubrik(parser):
@@ -1630,7 +1630,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         if (chunk.top < state.page.height / 4 and
             chunk.font.size > metrics.default.size):
             strchunk = str(chunk).strip()
-            if not re.match("(Prop. \d{4}(|/\d{2,4}):\d+|Propositionens huvudsakliga innehåll)", strchunk):
+            if not re.match(r"(Prop. \d{4}(|/\d{2,4}):\d+|Propositionens huvudsakliga innehåll)", strchunk):
                 return True
 
     def is_preamblesection(parser):
@@ -1692,7 +1692,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             return False
 
         if (isinstance(title, str) and
-            re.search("\d+$", title) and
+            re.search(r"\d+$", title) and
             "...." in str(parser.reader.peek(2))): # might still be TOC
             return False
 
@@ -1727,7 +1727,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         # subsection headers (might otherwise happen due to
         # irregular font size estimates or irregular font size usage
         # The regex is forgiving of OCR errors.
-        if re.match("\.?[l\d]\s*(|\w )§$", str(chunk).strip()):
+        if re.match(r"\.?[l\d]\s*(|\w )§$", str(chunk).strip()):
             return False
         if (sizematch(metrics.h2.size, chunk.font.size, tolerate_less_ocr=0, tolerate_more_ocr=1) and
                 chunk.font.family == metrics.h2.family):
@@ -1815,7 +1815,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             # (it's always more complicated, eg with a five-line heading)
             txtchunk = str(chunk).strip()
             txtlen = len(txtchunk)
-            m = re.search("Bilaga (\d+)", txtchunk)
+            m = re.search(r"Bilaga (\d+)", txtchunk)
             # an indicator of mashed-ness is that the textbox sticks outside of the margins (maybe we should only check the rightmargin?)
             if m and (m.end() == txtlen or
                       metrics_leftmargin() > chunk.left or 
@@ -1875,7 +1875,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             if placement(chunk):
                 # NOTE: filter out indications of nested
                 # appendicies (eg "Bilaga 5 till RSVs skrivelse")
-                m = re.search("Bilaga( \d+| I| l|$)(?!(\d| *till))", txtchunk)
+                m = re.search(r"Bilaga( \d+| I| l|$)(?!(\d| *till))", txtchunk)
                 if m:
                     if m.group(1):
                         match = m.group(1).strip()
@@ -2028,7 +2028,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         if state.appendixno and state.appendixno > 1 and strchunk.startswith("Bilaga ll-"):
             strchunk = strchunk.replace("Bilaga ll-", "Bilaga 4")
             
-        m = re.search("Bilaga( \d+| I| l|$)", str(chunk))
+        m = re.search(r"Bilaga( \d+| I| l|$)", str(chunk))
         if m and m.group(1):
             match = m.group(1).strip()
             if match in ("I", "l"):   # correct for OCR mistake
@@ -2132,7 +2132,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     # eliminates misinterpretation of things like "5 a
     # kap. Referensland för..." being interpreted as ordinal "5" and
     # title "a kap. Referensland för...")
-    re_sectionstart = re.compile("^(\d[\.\d]*) +([A-ZÅÄÖ].*)$").match
+    re_sectionstart = re.compile(r"^(\d[\.\d]*) +([A-ZÅÄÖ].*)$").match
 
 
     def analyze_sectionstart(parser, chunk=None):
@@ -2149,10 +2149,10 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                 strchunk = "1" + strchunk[1:]
             # "3. 12" -> "3.12" FIXME: Generalize to handle phantom
             # spaces in other places (3- or 4 level section headings)
-            strchunk = re.sub("(\d+)\.\s+(\d+)", r"\1.\2", strchunk)
+            strchunk = re.sub(r"(\d+)\.\s+(\d+)", r"\1.\2", strchunk)
 
             # "1 1 Hemställan" -> "11 Hemställan"
-            strchunk = re.sub("^(\d+) (\d+)(?= +[A-ZÅÄÖ])", r"\1\2", strchunk)
+            strchunk = re.sub(r"^(\d+) (\d+)(?= +[A-ZÅÄÖ])", r"\1\2", strchunk)
 
         m = re_sectionstart(strchunk)
         if not m:

@@ -16,7 +16,7 @@ from rdflib import Graph, URIRef, Namespace, Literal
 DCTERMS = Namespace("http://purl.org/dc/terms/")
 
 
-from ferenda.compat import unittest, patch, call,  Mock, MagicMock
+import unittest, patch, call,  Mock, MagicMock
 from ferenda import DocumentRepository, DocumentStore, util
 
 # SUT

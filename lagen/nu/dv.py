@@ -9,7 +9,7 @@ from datetime import date, datetime, time
 
 from rdflib import RDF, URIRef, BNode, Graph, Literal
 from rdflib.namespace import DCTERMS, OWL, RDFS
-from cached_property import cached_property
+from functools import cached_property
 
 from ferenda import Facet, Describer, TocPageset, TocPage, Feed, Feedset
 from ferenda import fulltextindex, util

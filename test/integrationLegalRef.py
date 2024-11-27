@@ -11,11 +11,11 @@ import re
 
 from rdflib import Namespace, Graph, RDF, URIRef
 
-from ferenda.compat import unittest
+import unittest
 from ferenda import ResourceLoader
-from ferenda.sources.legal.se.legalref import LegalRef
+from ferenda.sources.legal.se.lagrum import LegalRef
 from ferenda.elements import serialize
-from ferenda.testutil import file_parametrize
+from ferenda.testutil import file_para      metrize
 from ferenda.thirdparty.coin import URIMinter
 
 class TestLegalRef(unittest.TestCase):

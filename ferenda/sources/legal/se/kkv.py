@@ -16,7 +16,7 @@ import re
 import lxml.html
 from bs4 import BeautifulSoup
 from rdflib import URIRef, Literal
-from cached_property import cached_property
+from functools import cached_property
 
 from ferenda import util, errors
 from ferenda import PDFReader

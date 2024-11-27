@@ -16,17 +16,17 @@ md virtualenvs
 cd virtualenvs
 
 virtualenv -p C:\Python26\python.exe --system-site-packages frnd-py26
-frnd-py26\Scripts\pip install beautifulsoup4 rdflib html5lib rdfextras rdflib-jsonld requests six jsmin cssmin whoosh pyparsing unittest2 ordereddict mock coverage
+frnd-py26\Scripts\pip install beautifulsoup4 rdflib html5lib rdflib-jsonld requests six jsmin cssmin whoosh pyparsing unittest2 ordereddict mock coverage
 
 virtualenv -p C:\Python27\python.exe --system-site-packages frnd-py27
-frnd-py27\Scripts\pip install beautifulsoup4 rdflib html5lib rdfextras rdflib-jsonld requests six jsmin cssmin whoosh pyparsing mock coverage
+frnd-py27\Scripts\pip install beautifulsoup4 rdflib html5lib rdflib-jsonld requests six jsmin cssmin whoosh pyparsing mock coverage
 
 virtualenv -p C:\Python32\python.exe --system-site-packages frnd-py32
-frnd-py32\Scripts\pip install beautifulsoup4 rdflib html5lib rdfextras rdflib-jsonld requests six jsmin cssmin whoosh pyparsing mock coverage
+frnd-py32\Scripts\pip install beautifulsoup4 rdflib html5lib rdflib-jsonld requests six jsmin cssmin whoosh pyparsing mock coverage
 
 virtualenv -p C:\Python33\python.exe --system-site-packages frnd-py33
-frnd-py33\Scripts\pip install beautifulsoup4 rdflib html5lib rdfextras rdflib-jsonld requests six jsmin cssmin whoosh pyparsing coverage
+frnd-py33\Scripts\pip install beautifulsoup4 rdflib html5lib rdflib-jsonld requests six jsmin cssmin whoosh pyparsing coverage
 
 virtualenv -p C:\Python34\python.exe --system-site-packages frnd-py34
-frnd-py34\Scripts\pip install beautifulsoup4 rdflib html5lib rdfextras rdflib-jsonld requests six jsmin cssmin whoosh pyparsing coverage tox
+frnd-py34\Scripts\pip install beautifulsoup4 rdflib html5lib rdflib-jsonld requests six jsmin cssmin whoosh pyparsing coverage tox
 

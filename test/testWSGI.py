@@ -15,7 +15,7 @@ from rdflib import Graph
 from layeredconfig import LayeredConfig, Defaults
 from werkzeug.test import EnvironBuilder
 
-from ferenda.compat import Mock, patch
+from unittest.mock import Mock, patch
 from ferenda import manager, util, fulltextindex
 from ferenda.documentstore import _open
 from ferenda.elements import html

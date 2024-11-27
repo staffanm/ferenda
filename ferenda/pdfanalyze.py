@@ -15,7 +15,7 @@ from itertools import chain
 from math import floor, ceil
 
 # 3rd party
-from cached_property import cached_property
+from functools import cached_property
 
 # mine
 from .pdfreader import Page

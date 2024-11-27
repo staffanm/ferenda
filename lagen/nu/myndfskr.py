@@ -15,7 +15,7 @@ from itertools import chain
 from rdflib import RDF, URIRef
 from rdflib.namespace import DCTERMS, SKOS
 from ferenda.sources.legal.se import RPUBL
-from cached_property import cached_property
+from functools import cached_property
 from werkzeug.routing import Rule, BaseConverter
 
 from ferenda.sources.legal.se import myndfskr

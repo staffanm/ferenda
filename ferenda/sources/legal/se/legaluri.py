@@ -17,7 +17,9 @@ from rdflib import RDF
 from rdflib.namespace import DCTERMS
 
 # my own libraries
-from ferenda.sources.legal.se.legalref import LegalRef
+# from ferenda.sources.legal.se.lagrum import LegalRef
+from ferenda.sources.legal.se.lagrum import LegalRef
+
 from ferenda import util
 from ferenda.thirdparty.coin import URIMinter
 from . import RPUBL, RINFOEX

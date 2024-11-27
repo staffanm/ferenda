@@ -11,7 +11,7 @@ import time
 from datetime import datetime, timedelta
 from zipfile import ZipFile
 
-from ferenda.compat import unittest
+import unittest
 
 #SUT
 from ferenda import DocumentStore, DocumentEntry

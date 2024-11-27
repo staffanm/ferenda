@@ -14,14 +14,14 @@ import re
 # 3rdparty
 from lxml import etree
 from rdflib import Graph, Namespace, RDF
-from cached_property import cached_property
+from functools import cached_property
 
 # mine
 from ferenda import util
 from ferenda import DocumentStore
 from ferenda.decorators import action
 from ferenda.sources.legal.se import SwedishLegalSource, SwedishCitationParser
-from ferenda.sources.legal.se.legalref import LegalRef
+from ferenda.sources.legal.se.lagrum import LegalRef
 from ferenda.sources.general import wiki
 from ferenda.thirdparty.coin import URIMinter
 from . import LNKeyword 
@@ -46,7 +46,7 @@ class LNMediaWiki(wiki.MediaWiki):
     documentstore_class = LNMediaWikiStore
     download_archive = False
 
-    from ferenda.sources.legal.se.legalref import LegalRef
+    from ferenda.sources.legal.se.lagrum import LegalRef
     keyword_class = LNKeyword
 
 
