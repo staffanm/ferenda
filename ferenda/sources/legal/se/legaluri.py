@@ -58,13 +58,13 @@ dicttypes = dict([[v, k] for k, v in list(types.items())])
 
 patterns = {LegalRef.RATTSFALL:
             re.compile(
-                "http://rinfo.lagrummet.se/publ/rattsfall/(?P<publikation>\w+)/(?P<arsutgava>\d+)(s(?P<sidnummer>\d+)|((:| nr | ref )(?P<lopnummer>\d+)))").match,
+                r"http://rinfo.lagrummet.se/publ/rattsfall/(?P<publikation>\w+)/(?P<arsutgava>\d+)(s(?P<sidnummer>\d+)|((:| nr | ref )(?P<lopnummer>\d+)))").match,
             LegalRef.MYNDIGHETSBESLUT:
             re.compile(
-                "http://rinfo.lagrummet.se/publ/beslut/(?P<myndighet>\w+)/(?P<dnr>.*)").match,
+                r"http://rinfo.lagrummet.se/publ/beslut/(?P<myndighet>\w+)/(?P<dnr>.*)").match,
             LegalRef.LAGRUM:
             re.compile(
-                "http://rinfo.lagrummet.se/publ/sfs/(?P<law>\d{4}:\w+)#?(K(?P<chapter>[0-9a-z]+))?(P(?P<section>[0-9a-z]+))?(S(?P<piece>[0-9a-z]+))?(N(?P<item>[0-9a-z]+))?").match
+                r"http://rinfo.lagrummet.se/publ/sfs/(?P<law>\d{4}:\w+)#?(K(?P<chapter>[0-9a-z]+))?(P(?P<section>[0-9a-z]+))?(S(?P<piece>[0-9a-z]+))?(N(?P<item>[0-9a-z]+))?").match
             }
 
 

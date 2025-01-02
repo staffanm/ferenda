@@ -71,9 +71,9 @@ class DocumentRepository(object):
     class, and then override methods in order to customize the
     downloading, parsing and generation behaviour.
 
-    :param \*\*kwargs: Any named argument overrides any
-                   similarly-named :ref:`configuration` file
-                   parameter.
+    :param **kwargs: Any named argument overrides any
+                     similarly-named :ref:`configuration` file
+                     parameter.
 
     Example:
 
@@ -218,7 +218,7 @@ class DocumentRepository(object):
     :py:meth:`~ferenda.DocumentRepository.remote_url` and indirectly
     by :py:meth:`~ferenda.DocumentRepository.download_single`."""
 
-    document_url_regex = "http://example.org/docs/(?P<basefile>\w+).html"
+    document_url_regex = r"http://example.org/docs/(?P<basefile>\w+).html"
     """A regex that matches URLs for individual documents -- the
     reverse of what
     :py:data:`~ferenda.DocumentRepository.document_url_template` is
@@ -229,7 +229,7 @@ class DocumentRepository(object):
     ``(?P<basefile>...)`` syntax"""
 
     # matches "ID: foo/123" or "ID: Bar:Baz/Quux" but not "ID: Foo bar"
-    basefile_regex = "^ID: ?(?P<basefile>[\w\d\:\/]+)$"
+    basefile_regex = r"^ID: ?(?P<basefile>[\w\d\:\/]+)$"
     """A regex for matching document names in link text, as used by
     :py:meth:`~ferenda.DocumentRepository.download()`. Must define a
     named group ``basefile``, just like
@@ -268,6 +268,7 @@ class DocumentRepository(object):
     attribute, link, pos) tuples (like ``lxml.etree.iterlinks()``
     does). Othervise, it will be called with the downloaded index page
     as a string."""
+
 
 
     download_accept_404 = False
@@ -822,7 +823,10 @@ with the *config* object as single parameter.
         for (basefile, params) in self.download_get_basefiles(source):
             assert isinstance (params, dict), "You need to update your implementation of download_get_basefiles to return a dict instead of a string"
             link = params['uri']
-            downloaded_path = self.store.downloaded_path(basefile)
+            if 'language' in params:
+                downloaded_path = self.store.downloaded_path(basefile, language=params['language'], create=True)
+            else:
+                downloaded_path = self.store.downloaded_path(basefile, create=True)
             if (refresh or
                 not os.path.exists(downloaded_path) or
                 os.path.getsize(downloaded_path) == 0):
@@ -830,16 +834,25 @@ with the *config* object as single parameter.
                 try:
                     if 'title' in params:
                         callback = lambda e: setattr(e, 'title', params['title'])
-                        
                     else:
                         callback = None
+                    if 'language' in params:
+                        kwargs = {'language': params['language']}
+                        # maybe create a curried version of self.store.documententry_path that uses a language param?
+                        from functools import partial
+                        docentrypath = partial(self.store.documententry_path, language=params['language'])
+
+                    else:
+                        kwargs = {}
+                        docentrypath = self.store.documententry_path
                     ret = DocumentEntry.updateentry(self.download_single,
                                                     'download',
-                                                    self.store.documententry_path,
+                                                    docentrypath,
                                                     basefile,
                                                     callback,
                                                     basefile,
-                                                    link)
+                                                    link, # part of *args
+                                                    **kwargs)
                 except requests.exceptions.HTTPError as e:
                     if self.download_accept_404 and e.response.status_code == 404:
                         self.log.error("%s: %s %s" % (basefile, link, e))
@@ -930,7 +943,7 @@ with the *config* object as single parameter.
                 yielded.add((basefile, link))
                 yield (basefile, {'uri': link})
 
-    def download_single(self, basefile, url=None, orig_url=None):
+    def download_single(self, basefile, url=None, orig_url=None, language=None):
         """Downloads the document from the web (unless explicitly
         specified, the URL to download is determined by
         :py:data:`~ferenda.DocumentRepository.document_url_template` combined
@@ -961,17 +974,23 @@ with the *config* object as single parameter.
         created = not os.path.exists(filename) or os.path.getsize(filename) == 0
         # util.print_open_fds()
         
-        if self.download_if_needed(url, basefile, archive=self.download_archive):
+        if self.download_if_needed(url, basefile, archive=self.download_archive, language=language):
             if created:
-                self.log.info("%s: download OK from %s" % (basefile, url))
+                if language:
+                    self.log.info("%s@%s: download OK from %s" % (basefile, language, url))
+                else:
+                    self.log.info("%s: download OK from %s" % (basefile, url))
             else:
-                self.log.info(
-                    "%s: download OK (new version) from %s" % (basefile, url))
+                if language:
+                    self.log.info("%s@%s: download OK (new version) from %s" % (basefile, language, url))
+                else:
+                    self.log.info(
+                        "%s: download OK (new version) from %s" % (basefile, url))
             updated = True
         else:
             self.log.debug("%s: exists and is unchanged" % basefile)
 
-        entry = DocumentEntry(self.store.documententry_path(basefile))
+        entry = DocumentEntry(self.store.documententry_path(basefile, language=language))
         now = datetime.now()
         if orig_url is None:
             orig_url = url
@@ -985,7 +1004,7 @@ with the *config* object as single parameter.
 
         return updated
 
-    def _addheaders(self, url, filename=None):
+    def _addheaders(self, url, filename=None, basefile=None, language=None):
         headers = {"User-agent": self.config.useragent}
         if filename:
             # we set both if-none-match and if-modified-since if we
@@ -1000,7 +1019,7 @@ with the *config* object as single parameter.
                 headers["If-modified-since"] = format_http_date(stamp)
         return headers
 
-    def download_if_needed(self, url, basefile, archive=True, filename=None, sleep=1, extraheaders=None):
+    def download_if_needed(self, url, basefile, archive=True, filename=None, sleep=1, extraheaders=None, language=None):
         """Downloads a remote resource to a local file. If a different
         version is already in place, archive that old version.
 
@@ -1022,7 +1041,7 @@ with the *config* object as single parameter.
 
         """
         if not filename:
-            assumedfilename = self.store.downloaded_path(basefile)
+            assumedfilename = self.store.downloaded_path(basefile, language=language)
         else:
             assumedfilename = filename
 
@@ -1052,6 +1071,7 @@ with the *config* object as single parameter.
         if not filename:
             filename = self.download_name_file(tmpfile,
                                                basefile,
+                                               language,
                                                assumedfilename)
         if not os.path.exists(filename):
             util.robust_rename(tmpfile, filename)
@@ -1086,7 +1106,7 @@ with the *config* object as single parameter.
             os.chmod(filename, stat.S_IRUSR|stat.S_IWUSR|stat.S_IRGRP|stat.S_IWGRP|stat.S_IROTH)
         return updated
 
-    def download_name_file(self, tmpfile, basefile, assumedfile):
+    def download_name_file(self, tmpfile, basefile, language, assumedfile):
         """TBD"""
         return assumedfile
 

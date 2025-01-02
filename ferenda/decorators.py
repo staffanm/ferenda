@@ -201,10 +201,11 @@ def render(f):
         # Extract all triples on the XHTML/RDFa data to a separate
         # RDF/XML file
         distilled_graph = Graph()
-        with codecs.open(self.store.parsed_path(doc.basefile, version=doc.version),
-                         encoding="utf-8") as fp:  # unicode
-            distilled_graph.parse(data=fp.read(), format="html",
-                                  publicID=doc.uri)
+        with open(self.store.parsed_path(doc.basefile, version=doc.version), "rb") as fp:    
+            from pyRdfa import pyRdfa
+            distilled_graph = pyRdfa().graph_from_source(fp) 
+            #distilled_graph.parse(data=fp.read(), format="html",
+            #                      publicID=doc.uri)
 
         # The act of parsing from RDFa binds a lot of namespaces
         # in the graph in an unneccesary manner. Particularly it

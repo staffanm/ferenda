@@ -27,3 +27,4 @@ responses
 langdetect
 werkzeug
 jinja2
+pyRDFa3

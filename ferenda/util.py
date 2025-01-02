@@ -846,7 +846,7 @@ def base27decode(num):
     return ((num == 0) and base27alphabet[0] ) or (base27decode(num // b ).lstrip(base27alphabet[0]) + base27alphabet[num % b])
 
 
-def robust_fetch(method, url, logger, attempts=5, sleep=1, raise_for_status=True,
+def robust_fetch(method, url, logger, attempts=5, sleep=1, raise_for_status=True, reset_method=None,
                  *args, **kwargs):
     fetched = False
     lastexception = None
@@ -864,6 +864,9 @@ def robust_fetch(method, url, logger, attempts=5, sleep=1, raise_for_status=True
                     (url, e, attempts))
                 lastexception = e
                 time.sleep(sleep)
+                if reset_method:
+                    logger.info("Calling reset_method")
+                    reset_method()
             if response and response.status_code >= 400 and response.status_code != 404:
                 fetched = False  # let's retry even for 400 or 500 class errors, maybe it'll go better in a second
                 logger.warning("Failed to fetch %s: status %s (%s remaining attempts)" % (url, response.status_code, attempts))

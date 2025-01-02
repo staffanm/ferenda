@@ -2,6 +2,7 @@
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 from builtins import *
+import os
 
 from rdflib import Graph, Namespace, RDF, URIRef, Literal
 from rdflib.namespace import OWL, DCTERMS
@@ -19,14 +20,14 @@ class SameAs(object):
         # superclasses, not this actual class. This'll make it
         # look in ferenda/sources/legal/se/res, not lagen/nu/res.
         loadpath = ResourceLoader.make_loadpath(self)
-        if "lagen/nu/" in loadpath[0]:
+        if os.path.sep.join(["lagen", "nu"]) in loadpath[0]:
             loadpath = loadpath[1:]
         rl = ResourceLoader(*loadpath)
         spacefile = rl.filename("uri/swedishlegalsource.space.ttl")
         # print("sameas: Loading URISpace from %s" % spacefile)
         self.log.debug("Loading URISpace from %s" % spacefile)
         with open(spacefile) as space:
-            cfg = Graph().parse(space, format="turtle")
+            cfg = Graph().parse(data=space.read(), format="turtle")
         # slugs contains space:abbrSlug, but space contains
         # urispace:abbrSlug... We do a little translation
         src = URIRef("http://rinfo.lagrummet.se/sys/uri/space#abbrSlug")
@@ -43,7 +44,7 @@ class SameAs(object):
         slugsfile = self.resourceloader.filename("uri/swedishlegalsource.slugs.ttl")
         # self.log.debug("sameas: Loading slugs from %s" % slugsfile)
         with open(slugsfile) as slugs:
-            cfg.parse(slugs, format="turtle")
+            cfg.parse(data=slugs.read(), format="turtle")
         COIN = Namespace("http://purl.org/court/def/2009/coin#")
         # select correct URI for the URISpace definition by
         # finding a single coin:URISpace object

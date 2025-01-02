@@ -285,7 +285,7 @@ class DocumentStore(object):
         return _open(filename, mode)
 
     def path(self, basefile, maindir, suffix, version=None, attachment=None,
-             storage_policy=None, archiving_policy=None):
+             storage_policy=None, archiving_policy=None, language=None):
         """Calculate a full filesystem path for the given parameters.
 
         :param basefile: The basefile of the resource we're calculating a filename for
@@ -354,7 +354,8 @@ class DocumentStore(object):
                             'archive', maindir, pathfrag, '.versions', v_pathfrag]
         else:
             segments = [self.datadir, maindir, pathfrag]
-
+        if language:
+            segments[-1] += "." + language
         if storage_policy == "dir":
             if attachment:
                 for illegal in ':/':
@@ -839,7 +840,7 @@ dependencies (in the form of source files for the action).
                 removed += 1
         return removed
 
-    def downloaded_path(self, basefile, version=None, attachment=None):
+    def downloaded_path(self, basefile, version=None, attachment=None, language=None, create=False):
         """Get the full path for the downloaded file for the given
         basefile (and optionally archived version and/or attachment
         filename).
@@ -850,15 +851,17 @@ dependencies (in the form of source files for the action).
         :type   version: str
         :param attachment: Optional. Any associated file needed by the main file.
         :type  attachment: str
+        :param  language: Optional. The language id, if the documentstore supports multiple languages
+        :type   language: str
         :returns: The full filesystem path
         :rtype:   str
         """
         for suffix in self.downloaded_suffixes:
-            path = self.path(basefile, "downloaded", suffix, version, attachment)
-            if os.path.exists(path):
+            path = self.path(basefile, "downloaded", suffix, version, attachment, language=language)
+            if os.path.exists(path) or create:
                 return path
         else:
-            return self.path(basefile, 'downloaded', self.downloaded_suffixes[0], version, attachment)
+            return self.path(basefile, 'downloaded', self.downloaded_suffixes[0], version, attachment, language=language)
 
     def open_downloaded(self, basefile, mode="r", version=None, attachment=None):
         """Opens files for reading and writing,
@@ -871,7 +874,7 @@ dependencies (in the form of source files for the action).
         filename = self.downloaded_path(basefile, version, attachment)
         return _open(filename, mode)
 
-    def documententry_path(self, basefile, version=None):
+    def documententry_path(self, basefile, version=None, language=None):
         """Get the full path for the documententry JSON file for the given
         basefile (and optionally archived version).
 
@@ -883,7 +886,7 @@ dependencies (in the form of source files for the action).
         :rtype:   str
         """
         return self.path(basefile, 'entries', '.json', version,
-                         storage_policy="file")
+                         storage_policy="file", language=language)
 
     def intermediate_path(self, basefile, version=None, attachment=None, suffix=None):
         """Get the full path for the main intermediate file for the given

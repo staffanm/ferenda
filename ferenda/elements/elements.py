@@ -382,7 +382,10 @@ class CompoundElement(AbstractElement, list):
             }
             if graph:
                 for sub_pred, sub_obj in sorted(graph.predicate_objects(subject=obj)):
-                    children.append(self._span(obj, sub_pred, sub_obj, graph))
+                    if sub_obj == subj:
+                        log.warning("Circular reference detected %s %s %s" % (subj, sub_pred, sub_obj))
+                    else:
+                        children.append(self._span(obj, sub_pred, sub_obj, graph))
         else:
             attrs = {}
         # Theoretical, obj could be a BNode, but that should never happen. If

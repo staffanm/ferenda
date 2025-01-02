@@ -20,7 +20,7 @@ class EURLexTreaties(EURLex):
     # articles (around 2000 other resources). Need to find some way of
     # filtering out the crap.
     expertquery_template = "DN = 1*/TXT"
-    celexfilter = re.compile("(1\d{4}[A-Z]{1,2})/TXT$").match
+    celexfilter = re.compile(r"(1\d{4}[A-Z]{1,2})/TXT$").match
 
 
 
@@ -122,15 +122,15 @@ class OldEurlexTreaties(DocumentRepository):
 #
 # Parsing -- FIXME: this should be easily ported to FSMParser
 
-    re_part = re.compile("PART (ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN)$").match
-    re_title = re.compile("TITLE ([IVX]+)$").match
-    re_chapter = re.compile("CHAPTER (\d+)$").match
-    re_section = re.compile("SECTION (\d+)$").match
-    re_article = re.compile("Article (\d+)$").match
-    re_subarticle = re.compile("^(\d+)\. ").search
-    re_unorderedliststart = re.compile("^- ").search
-    re_orderedliststart = re.compile("^\(\w\) ").search
-    re_romanliststart = re.compile("^\([ivx]+\) ").search
+    re_part = re.compile(r"PART (ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN)$").match
+    re_title = re.compile(r"TITLE ([IVX]+)$").match
+    re_chapter = re.compile(r"CHAPTER (\d+)$").match
+    re_section = re.compile(r"SECTION (\d+)$").match
+    re_article = re.compile(r"Article (\d+)$").match
+    re_subarticle = re.compile(r"^(\d+)\. ").search
+    re_unorderedliststart = re.compile(r"^- ").search
+    re_orderedliststart = re.compile(r"^\(\w\) ").search
+    re_romanliststart = re.compile(r"^\([ivx]+\) ").search
     ordinal_list = ('ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN',
                     'EIGHT', 'NINE', 'TEN', 'ELEVEN', 'TWELVE')
     ordinal_dict = dict(

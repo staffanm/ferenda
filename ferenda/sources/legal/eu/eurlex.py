@@ -4,12 +4,14 @@
 from lxml import etree
 from io import BytesIO
 import requests
+import json
 import os
 import re
 from math import ceil
 from html import escape
 import email
 import tempfile
+from collections import defaultdict
 
 import requests
 from bs4 import BeautifulSoup
@@ -19,7 +21,7 @@ from rdflib.namespace import OWL
 from lxml.etree import XSLT
 
 from ferenda import util, decorators, errors
-from ferenda import DocumentRepository, DocumentStore, Describer
+from ferenda import DocumentRepository, DocumentStore, Describer, DocumentEntry
 from . import CDM
 
 class EURLexStore(DocumentStore):
@@ -58,7 +60,8 @@ class FakeResponse(object):
         if self.status_code >= 400:
             raise ValueError(self.status_code)
         
-        
+from collections import namedtuple
+Manifestation = namedtuple('Manifestation', ['lang', 'filetype', 'mimetype', 'url'])
     
 class EURLex(DocumentRepository):
     alias = "eurlex"
@@ -89,7 +92,7 @@ class EURLex(DocumentRepository):
 
     def dump_graph(self, celexid, graph):
         with self.store.open_intermediate(celexid, "wb", suffix=".ttl") as fp:
-            fp.write(graph.serialize(format="ttl"))
+            fp.write(graph.serialize(format="ttl").encode("utf-8"))
 
     def query_webservice(self, query, page):
         # this is the only soap template we'll need, so we include it
@@ -123,17 +126,21 @@ class EURLex(DocumentRepository):
             for k, v in headers.items():
                 assert "'" not in v  # if it is, we need to work on escaping it
                 headerstr += " --header '%s: %s'" % (k, v)
-            with tempfile.NamedTemporaryFile() as fp:
+            with tempfile.NamedTemporaryFile(delete_on_close=False) as fp:
                 fp.write(envelope.encode("utf-8"))
                 fp.flush()
                 envelopename = fp.name
+                fp.close()
                 headerfiledesc, headerfilename = tempfile.mkstemp()
                 cmd = 'curl -L -X POST -D %(headerfilename)s --data-binary "@%(envelopename)s" %(headerstr)s %(endpoint)s' % locals()
                 (ret, stdout, stderr) = util.runcmd(cmd)
+                if ret:
+                    raise ValueError(f"Curling to {endpoint} resulted in return code {ret}: {stderr}")
             headerfp = os.fdopen(headerfiledesc)
             header = headerfp.read()
             headerfp.close()
             util.robust_remove(headerfilename)
+            print(f"HEADER:\n\n{header}")
             status, headers = header.split('\n', 1)
             prot, code, msg = status.split(" ", 2)
             headers = dict(email.message_from_string(headers).items())
@@ -142,7 +149,8 @@ class EURLex(DocumentRepository):
             res = util.robust_fetch(self.session.post, endpoint, self.log,
                                     raise_for_status=False,
                                     data=envelope, headers=headers,
-                                    timeout=10)
+                                    timeout=10, 
+                                    reset_method=self.reset_session)
             
         if res.status_code == 500:
             tree = etree.parse(BytesIO(res.content))
@@ -156,11 +164,15 @@ class EURLex(DocumentRepository):
             raise errors.DownloadError("%s: was redirected to %s" % (endpoint, res.headers['Location']))
         return res
         
+    def reset_session(self):
+        self.session.close()
+        self.session = requests.session()
+
     def construct_expertquery(self, query_template):
         if 'lastdownload' in self.config and not self.config.refresh:
             query_template += self.config.lastdownload.strftime(" AND DD >= %d/%m/%Y")
-        query_template += " ORDER BY DD ASC"
-        self.log.info("Query: %s" % query_template)
+        query_template += " ORDER BY DD DESC"
+        self.log.info(f"Query: {query_template}")
         return query_template
     
     def download_get_first_page(self):
@@ -169,110 +181,106 @@ class EURLex(DocumentRepository):
     def get_treenotice_graph(self, cellarurl, celexid):
         # avoid HTTP call if we already have the data
         if os.path.exists(self.store.intermediate_path(celexid, suffix=".ttl")):
-            self.log.info("%s: Opening existing TTL file" % celexid)
-            with self.store.open_intermediate(celexid, suffix=".ttl") as fp:
-                return Graph().parse(data=fp.read(), format="ttl")
+            self.log.debug(f"{celexid}: Opening existing TTL file")
+            with self.store.open_intermediate(celexid, mode="rb", suffix=".ttl") as fp:
+                return Graph().parse(data=fp.read().decode("utf-8"), format="ttl")
         # FIXME: read the rdf-xml data line by line and construct a
         # graph by regex-parsing interesting lines with a very simple
         # state machine, rather than doing a full parse, to speed
         # things up
-        resp = util.robust_fetch(self.session.get, cellarurl, self.log, headers={"Accept": "application/rdf+xml;notice=tree"}, timeout=10)
+        # FIXME; Eurlex takes a long time (> 10 sec) for very large treenotices. The robust_fetch method should increase the timeout from 2 to 4, 8, 16, 32 and end with 64 seconds before giving up. Or maybe we should always use a 120 sec timeout?
+        resp = util.robust_fetch(self.session.get, cellarurl, self.log, headers={"Accept": "application/rdf+xml;notice=tree"}, timeout=120, reset_method=self.reset_session)
         if not resp:
             return None
-        with util.logtime(self.log.info,
-                          "%(basefile)s: parsing the tree notice took %(elapsed).3f s",
+        with util.logtime(self.log.debug,
+                          f"{celexid}: parsing the tree notice took %(elapsed).3f s",
                           {'basefile': celexid}):
-            graph = Graph().parse(data=resp.content)
+            graph = Graph().parse(data=resp.content, format="xml")
         return graph
     
-    def find_manifestation(self, cellarid, celexid):
-        cellarurl = "http://publications.europa.eu/resource/cellar/%s?language=%s" % (cellarid, self.languages[0])
-        graph = self.get_treenotice_graph(cellarurl, celexid)
-        if graph is None:
-            return None, None, None, None
-        
-        # find the root URI -- it might be on the form
-        # "http://publications.europa.eu/resource/celex/%s", but can
-        # also take other forms (at least for legislation)
-        # At the same time, find all expressions of this work (ie language versions).
-        CDM = Namespace("http://publications.europa.eu/ontology/cdm#")
-        CMR = Namespace("http://publications.europa.eu/ontology/cdm/cmr#")
-        root = None
-        candidateexpressions = {}
-        for expression, work in graph.subject_objects(CDM.expression_belongs_to_work):
-            assert root is None or work == root
-            root = work
-            expression = Resource(graph, expression)
-            lang = expression.value(CDM.expression_uses_language)
-            lang = str(lang.identifier).rsplit("/", 1)[1].lower()
-            if lang in self.config.languages:
+    def find_manifestations(self, cellarid, celexid):
+        # returns a list of (lang, filetype, mimetype, url) tuples, one for each language found (compared to self.config.languages)
+        if not self.config.force and os.path.exists(self.store.intermediate_path(celexid, suffix='.manifestations.json')):
+            with self.store.open_intermediate(celexid, suffix=".manifestations.json") as fp:
+                self.log.debug(f"{celexid}: Opening existing manifestations.json file")
+                manifestations = json.load(fp)
+        else:
+            manifestations = []
+            cellarurl = "https://publications.europa.eu/resource/cellar/%s?language=%s" % (cellarid, self.languages[0])
+            graph = self.get_treenotice_graph(cellarurl, celexid)
+            if graph is None:
+                return manifestations
+            
+            # find the root URI -- it might be on the form
+            # "http://publications.europa.eu/resource/celex/%s", but can
+            # also take other forms (at least for legislation)
+            # At the same time, find all expressions of this work (ie language versions).
+            CDM = Namespace("http://publications.europa.eu/ontology/cdm#")
+            CMR = Namespace("http://publications.europa.eu/ontology/cdm/cmr#")
+            root = None
+            candidateexpressions = {}
+            for expression, work in graph.subject_objects(CDM.expression_belongs_to_work):
+                # assert root is None or work == root, f"Expected {expression} to belong to {root}, got {work} instead"
+                root = work
+                expression = Resource(graph, expression)
+                lang = expression.value(CDM.expression_uses_language)
+                lang = str(lang.identifier).rsplit("/", 1)[1].lower()
+                assert lang not in candidateexpressions, f"Found two manifestations for an expression in {lang}: {candidateexpressions[lang]} and {expression}"
                 candidateexpressions[lang] = expression
 
-        if not candidateexpressions:
-            self.log.warning("%s: Found no suitable languages" % celexid)
-            self.dump_graph(celexid, graph)
-            return None, None, None, None
+            if not candidateexpressions:
+                self.log.warning(f"{celexid}: Found no expressions")
+            else:
+                for lang, expression in candidateexpressions.items():
+                    candidateitem = {}
+                    # we'd like to order the manifestations in some preference order -- fmx4 > xhtml > html > pdf
+                    for manifestation in expression.objects(CDM.expression_manifested_by_manifestation):
+                        manifestationtype = str(manifestation.value(CDM.type))
+                        # there might be multiple equivalent
+                        # manifestations, eg
+                        # ...celex/62001CJ0101.SWE.fmx4,
+                        # ...ecli/ECLI%3AEU%3AC%3A2003%3A596.SWE.fmx4 and
+                        # ...cellar/bcc476ae-43f8-4668-8404-09fad89c202a.0011.01. Try
+                        # to find out if that is the case, and get the "root" manifestation
+                        rootmanifestations = list(manifestation.subjects(OWL.sameAs))
+                        if rootmanifestations:
+                            manifestation = rootmanifestations[0]
+                        items = list(manifestation.subjects(CDM.item_belongs_to_manifestation))
+                        if len(items) == 1: 
+                            candidateitem[manifestationtype] = items[0]
+                        elif len(items) == 2:
+                            # NOTE: for at least 32016L0680, there can be
+                            # two items of the fmx4 manifestation, where
+                            # one (DOC_1) is bad (eg only a reference to
+                            # the pdf file) and the other (DOC_2) is
+                            # good. The heuristic for choosing the good
+                            # one: if the owl:sameAs property ends in .xml
+                            # but not .doc.xml...
+                            for item in items:
+                                # this picks a random object if there are
+                                # two or more owl:sameAs triples, but the
+                                # heuristic seems to work with all
+                                # owl:sameAs objects
+                                sameas = str(item.value(OWL.sameAs).identifier)
+                                if sameas.endswith(".xml") and not sameas.endswith(".doc.xml"):
+                                    candidateitem[manifestationtype] = item
+                                    break
 
-        for lang in self.config.languages:
-            if lang in candidateexpressions:
-                expression = candidateexpressions[lang]
-                candidateitem = {}
-                # we'd like to order the manifestations in some preference order -- fmx4 > xhtml > html > pdf
-                for manifestation in expression.objects(CDM.expression_manifested_by_manifestation):
-                    manifestationtype = str(manifestation.value(CDM.type))
-                    # there might be multiple equivalent
-                    # manifestations, eg
-                    # ...celex/62001CJ0101.SWE.fmx4,
-                    # ...ecli/ECLI%3AEU%3AC%3A2003%3A596.SWE.fmx4 and
-                    # ...cellar/bcc476ae-43f8-4668-8404-09fad89c202a.0011.01. Try
-                    # to find out if that is the case, and get the "root" manifestation
-                    rootmanifestations = list(manifestation.subjects(OWL.sameAs))
-                    if rootmanifestations:
-                        manifestation = rootmanifestations[0]
-                    items = list(manifestation.subjects(CDM.item_belongs_to_manifestation))
-                    if len(items) == 1: 
-                        candidateitem[manifestationtype] = items[0]
-                    elif len(items) == 2:
-                        # NOTE: for at least 32016L0680, there can be
-                        # two items of the fmx4 manifestation, where
-                        # one (DOC_1) is bad (eg only a reference to
-                        # the pdf file) and the other (DOC_2) is
-                        # good. The heuristic for choosing the good
-                        # one: if the owl:sameAs property ends in .xml
-                        # but not .doc.xml...
-                        for item in items:
-                            # this picks a random object if there are
-                            # two or more owl:sameAs triples, but the
-                            # heuristic seems to work with all
-                            # owl:sameAs objects
-                            sameas = str(item.value(OWL.sameAs).identifier)
-                            if sameas.endswith(".xml") and not sameas.endswith(".doc.xml"):
-                                candidateitem[manifestationtype] = item
-                                break
-
-                if candidateitem:
-                    for t in ("fmx4", "xhtml", "html", "pdf", "pdfa1a"):
-                        if t in candidateitem:
-                            item = candidateitem[t]
-                            mimetype = str(item.value(CMR.manifestationMimeType))
-                            self.log.info("%s: Has manifestation %s (%s) in language %s" % (celexid, t,mimetype, lang))
-                            # we might need this even outside of
-                            # debugging (eg when downloading
-                            # eurlexcaselaw, the main document lacks
-                            # keywords, classifications, instruments
-                            # cited etc.
-                            self.dump_graph(celexid, graph) 
-                            return lang, t, mimetype, str(item.identifier)
-                else:
                     if candidateitem:
-                        self.log.warning("%s: Language %s had no suitable manifestations" %
-                                         (celexid, lang))
-        self.log.warning("%s: No language (tried %s) had any suitable manifestations" % (celexid, ", ".join(candidateexpressions.keys())))
-        self.dump_graph(celexid, graph)
-        return None, None, None, None
+                        for t, item in candidateitem.items():
+                            mimetype = str(item.value(CMR.manifestationMimeType))
+                            self.log.debug(f"{celexid}: Has manifestation {t} ({mimetype}) in language {lang}")
+                            manifestations.append({'language': lang, 'filetype': t, 'mimetype': mimetype, 'uri': str(item.identifier)})
+                    else:
+                        if candidateitem:
+                            self.log.warning(f"{celexid}: Language {lang} had no manifestations")
+            with self.store.open_intermediate(celexid, mode="w", suffix=".manifestations.json") as fp:
+                json.dump(manifestations, fp, indent=2)
+            self.dump_graph(celexid, graph)
+        return manifestations
 
     
-    def download_single(self, basefile, url=None):
+    def download_single(self, basefile, url=None, language=None):
         if url is None:
             result = self.query_webservice("DN = %s" % basefile, page=1)
             result.raise_for_status()
@@ -289,14 +297,25 @@ class EURLex(DocumentRepository):
             celex = match.group(1)
             assert celex == basefile
             lang, filetype, mimetype, url = self.find_manifestation(cellarid, celex)
-            # FIXME: This is an ugly way of making sure the downloaded
-            # file gets the right suffix (due to
-            # DocumentStore.downloaded_path choosing a filename from among
-            # several possible suffixes based on what file already exists
-            downloaded_path = self.store.path(basefile, 'downloaded', '.'+filetype)
-            if not os.path.exists(downloaded_path):
-                util.writefile(downloaded_path, "")
-        return super(EURLex, self).download_single(basefile, url)
+        return super(EURLex, self).download_single(basefile, url, language=language)
+
+    def download_name_file(self, tmpfile, basefile, language, assumedfile):
+        if assumedfile.endswith(".fmx4"):
+            with open(tmpfile, "rb") as fp:
+                sig = fp.read(80)
+            if sig[:4] == b'PK\x03\x04':
+                doctype = "fmx4.zip"
+            elif sig[:67] ==  b'\r\n<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML//EN" "xhtml-strict.dtd">':
+                doctype = ".xhtml"
+            elif sig[:4]== b'<?xm':
+                doctype = ".xhtml" # this might be wrong -- could be a FMX4 file with proper xml declaration
+            else:
+                self.log.warning(
+                    f"{tmpfile} has unknown signature {sig} -- don't know what kind of file it is")
+                return assumedfile
+            return self.store.path(basefile, 'downloaded', doctype, language=language)
+        else:
+            return assumedfile
 
     @decorators.downloadmax
     def download_get_basefiles(self, source):
@@ -308,9 +327,9 @@ class EURLex(DocumentRepository):
             tree = etree.parse(BytesIO(source.encode("utf-8")))
             if totalhits is None:
                 totalhits = int(tree.find(".//{http://eur-lex.europa.eu/search}totalhits").text)
-                self.log.info("Total hits: %s" % totalhits)
+                self.log.info(f"Total hits: {totalhits}")
             results = tree.findall(".//{http://eur-lex.europa.eu/search}result")
-            self.log.info("Page %s: %s results" % (page, len(results)))
+            self.log.info(f"Page {page}: {len(results)} results")
             for idx, result in enumerate(results):
                 processedhits += 1
                 cellarid = result.find(".//{http://eur-lex.europa.eu/search}reference").text
@@ -319,27 +338,47 @@ class EURLex(DocumentRepository):
                 try:
                     title = result.find(".//{http://eur-lex.europa.eu/search}EXPRESSION_TITLE")[0].text
                 except TypeError:
-                    self.log.info("%s: Lacks title, the resource might not be available in %s" % (celex, self.lang))
+                    self.log.info(f"{celex}: Lacks title, the resource might not be available?")
                 match = self.celexfilter(celex)
                 if not match:
-                    self.log.info("%s: Not matching current filter, skipping" % celex)
+                    self.log.info(f"{celex}: Not matching current filter, skipping")
                     continue
                 celex = match.group(1)
-                self.log.debug("%3s: %s %.55s %s" % (idx + 1, celex, title, cellarid))
-                lang, filetype, mimetype, url = self.find_manifestation(cellarid, celex)
-                if filetype:
-                    # FIXME: This is an ugly way of making sure the downloaded
-                    # file gets the right suffix (due to
-                    # DocumentStore.downloaded_path choosing a filename from among
-                    # several possible suffixes based on what file already exists
-                    downloaded_path = self.store.path(celex, 'downloaded', '.'+filetype)
-                    if not os.path.exists(downloaded_path):
-                        util.writefile(downloaded_path, "")
-                    yield celex, url
+                self.log.debug(f"{idx + 1}: {celex} {title:.55} {cellarid}")
+                #entry = DocumentEntry(self.store.documententry_path(celex))
+                #if entry.content and not self.config.refresh:
+                #    # if we've already processed this file earlier, it's faster to determine if we need to update it based on the DocuemntEntry rather than the tree notice
+                #    lang = self.config.languages[0] # hardcode
+                #    filetype = entry.content['filename'].split(".")[-1]
+                #    mimetype = entry.content['mimetype']
+                #    url = entry.orig_url
+                #
+                #elif 'download' in entry.status and entry.status['download'] == "removed" and not self.config.refresh:
+                #    continue
+                #else:
+                # 
+                candidates = defaultdict(list)
+                for manifestation in self.find_manifestations(cellarid, celex):
+                    if manifestation['language'] in self.config.languages:
+                        candidates[manifestation['language']].append(manifestation) 
+                    
+                for lang in self.config.languages:
+                    if lang not in candidates:
+                        continue
+                    found = False
+                    for t in ("fmx4", "xhtml", "html", "pdf", "pdfa1a"):
+                        if not found:
+                            for m in candidates[lang]:
+                                if t == m['filetype']:
+                                    yield celex, m
+                                    found = True
+                    if not found:
+                        self.log.warning(f"{celex}: No suitable manifestation for language {lang}")
+
             page += 1
             done = processedhits >= totalhits
             if not done:
-                self.log.info("Getting page %s (out of %s)" % (page, ceil(totalhits/self.pagesize)))
+                self.log.info(f"Getting page {page} (out of {ceil(totalhits/self.pagesize)})")
                 result = self.query_webservice(self.construct_expertquery(self.expertquery_template), page)
                 result.raise_for_status()
                 source = result.text
@@ -395,7 +434,7 @@ class EURLex(DocumentRepository):
     def render_xhtml_validate(self, xhtmldoc):
         def checknode(node):
             if node.tag.split("}")[-1].isupper():
-                raise errors.InvalidTree("Node %s has not been properly transformed from Formex to XHTML" % node.tag)
+                raise errors.InvalidTree(f"Node {node.tag} has not been properly transformed from Formex to XHTML")
             for child in node:
                 if type(child).__name__ == "_Element":
                     checknode(child)

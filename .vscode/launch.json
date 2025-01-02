@@ -20,6 +20,7 @@
             "program": "ferenda-build.py",
             "cwd": "${workspaceFolder}/site",            
             "console": "integratedTerminal",
+            "justMyCode": false,
             "env": {"PYTHONPATH": "${workspaceFolder}"},
             "args": ["${input:args}"]
         },        {
@@ -43,7 +44,7 @@
           "id": "args",
           "type": "promptString",
           "description": "argument till ferenda-build",
-          "default": "sfs parse 2009:400"
+          "default": "eurlexacts download"
         }
     ]
 }

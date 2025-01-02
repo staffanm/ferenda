@@ -15,7 +15,7 @@ from wsgiref.util import request_uri
 from functools import cached_property
 import ast
 import codecs
-import collections
+import collections.abc
 import logging
 import operator
 import os
@@ -976,7 +976,7 @@ class SwedishLegalSource(DocumentRepository):
                     raise errors.InvalidTree("%s: Encountered %s twice" % (basefile, id))
                 ids.add(id)
             for thing in node:
-                if (isinstance(thing, collections.Iterable) and
+                if (isinstance(thing, collections.abc.Iterable) and
                     not isinstance(thing, six.string_types)):
                     find_ids(thing)
         find_ids(body)
@@ -1647,7 +1647,9 @@ class SwedishCitationParser(CitationParser):
 
         # first, do a quick check to see if we even need to parse
         if self.filter and not self.filter.search(string):
+            self.log.info("Skipped parsing %s due to filter" % string[:40])
             return [string]
+        self.log.info("Gonna parse %s since it might contain ref" % string[:40])
         self.parsed_strings += 1
 
         # transform self._currenturl => attributes.

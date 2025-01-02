@@ -7,7 +7,7 @@ import re
 import datetime
 import itertools
 from rdflib import Graph
-
+from rdflib.extras.describer import Describer
 from ferenda import DocumentRepository
 from ferenda.sources.legal.se.lagrum import LegalRef
 from ferenda.elements import Paragraph
@@ -23,7 +23,7 @@ class EURLexCaselaw(EURLex):
                                # indicates that they are, but in
                                # reality they're not.
     downloaded_suffix = ".html"
-    celexfilter = re.compile("(6\d{4}[A-Z]{2}\d{4})$").match
+    celexfilter = re.compile(r"(6\d{4}[A-Z]{2}\d{4})$").match
 
     def parse_metadata_from_soup(self, soup, doc):
         # AVAILABLE METADATA IN CASES
@@ -198,9 +198,9 @@ class EURLexCaselaw(EURLex):
                     for node in item.childGenerator():
                         if not hasattr(node, "name"):
                             nodetext = node.strip()
-                            if re.match("([ABCDEFGIJKLNPRST]+\d*)+$", nodetext):
+                            if re.match(r"([ABCDEFGIJKLNPRST]+\d*)+$", nodetext):
                                 continue
-                            if re.match("\d[\d\-]*[ABC]?$", nodetext):
+                            if re.match(r"\d[\d\-]*[ABC]?$", nodetext):
                                 continue
                             if predicate == "affects" and nodetext:
                                 if nodetext in affects_predicates:

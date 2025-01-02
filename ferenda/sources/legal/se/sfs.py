@@ -587,7 +587,7 @@ class SFS(Trips):
         # custom func isn't mocked by ferenda.testutil.RepoTester,
         # and downloaded_path is. So we call that one and munge it.
         filename = self.store.downloaded_path(basefile).replace(
-            "/downloaded/", "/register/")
+            "downloaded", "register")
         with codecs.open(filename, encoding=self.source_encoding) as rfp:
             soup = BeautifulSoup(rfp.read(), "lxml")
         # do we really have a registry?

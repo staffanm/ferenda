@@ -181,7 +181,7 @@ class ARN(FixedLayoutSource):
                     soup = BeautifulSoup(resp.text, "lxml")
                     action = soup.find("form")["action"]
 
-    def download_name_file(self, tmpfile, basefile, assumedfile):
+    def download_name_file(self, tmpfile, basefile, language, assumedfile):
         with open(tmpfile, "rb") as fp:
             sig = fp.read(4)
             if sig == b'\xffWPC':

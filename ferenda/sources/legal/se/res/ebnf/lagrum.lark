@@ -3,24 +3,25 @@
 %import common.WS
 %ignore WS
 
-_UNWANTED_TEXT: /.+?/s
-_unwanted: _UNWANTED_TEXT
-start: (lagrum | _unwanted )+
 
+start: (lagrum | _unwanted)+
 
 lagrum: chapter_section_ref
       | section_ref
+      | fallback_to_unwanted
 
-
-chapter_section_ref : chapter_ref_id CM section_ref
-
+chapter_section_ref: chapter_ref_id CM section_ref
 CM: "kap."
 SM: "§"
 
 section_ref: section_ref_id SM
 
-chapter_ref_id: ref_id 
+chapter_ref_id: ref_id
 section_ref_id: ref_id
 
+ref_id: NUMBER LCASE_LETTER?
 
-ref_id: NUMBER LCASE_LETTER? 
+_unwanted: UNWANTED_TEXT
+UNWANTED_TEXT: /(?!\d+\s*kap\.|\d+\s*§).+/s
+
+fallback_to_unwanted: /.+?/s -> _unwanted
