@@ -14,8 +14,11 @@ class EURLexActs(EURLex):
     # expertquery_template = "SELECT CELLAR_ID, TI_DISPLAY, DN, DD WHERE DTS_SUBDOM = EU_LAW_ALL AND (DTT = R OR DTT = L) AND DD >= 01/01/2017 <= 31/12/2017 ORDER BY DD ASC"
     expertquery_template = "DTS_SUBDOM = EU_LAW_ALL AND (DTT = R OR DTT = L)"
     # Match 31960R0009 and 31960R0009(01) and 31960R0009R(01) or  02002L0057-20241224 (consolidated version of 32002L0057 on date 2024-12-24)
-
     celexfilter = re.compile(r"((3|0)\d{4}[RL]\d{4}(|-\d{8}|R?\(\d+\)))$").match
+
+    # only match 31960R0009
+    celexfilter = re.compile(r"((3|0)\d{4}[RL]\d{4})$").match
+
 
     rdf_type = (CDM.directive, CDM.regulation)
     xslt_template = "xsl/eurlexacts.xsl"

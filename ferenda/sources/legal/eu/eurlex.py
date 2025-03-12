@@ -25,7 +25,7 @@ from ferenda import DocumentRepository, DocumentStore, Describer, DocumentEntry
 from . import CDM
 
 class EURLexStore(DocumentStore):
-    downloaded_suffixes = [".fmx4", ".xhtml", ".html", ".pdf"]
+    downloaded_suffixes = [".fmx4.zip", ".fmx4", ".xhtml", ".html", ".pdf"]
     def basefile_to_pathfrag(self, basefile):
         if basefile.startswith("."):
             return basefile
@@ -39,7 +39,7 @@ class EURLexStore(DocumentStore):
             return pathfrag
         year, basefile = pathfrag.split("/", 1)
         return basefile
-    
+
 
 # this implements some common request.Response properties/methods so
 # that it can be used in plpace of a real request.Response object
@@ -59,10 +59,10 @@ class FakeResponse(object):
     def raise_for_status(self):
         if self.status_code >= 400:
             raise ValueError(self.status_code)
-        
+
 from collections import namedtuple
 Manifestation = namedtuple('Manifestation', ['lang', 'filetype', 'mimetype', 'url'])
-    
+
 class EURLex(DocumentRepository):
     alias = "eurlex"
     start_url = "http://eur-lex.europa.eu/eurlex-ws?wsdl"
@@ -74,13 +74,13 @@ class EURLex(DocumentRepository):
     documentstore_class = EURLexStore
     downloaded_suffix = ".xhtml"
     download_accept_406 = True
-    contenttype = "application/xhtml+xml" 
+    contenttype = "application/xhtml+xml"
     namespace = "{http://eur-lex.europa.eu/search}"
     download_archive = False
     namespaces = ['rdf', 'rdfs', 'xsd', 'dcterms', 'prov',
                   ('cdm', str(CDM))]
     sparql_annotations = None
-    
+
     @classmethod
     def get_default_options(cls):
         opts = super(EURLex, cls).get_default_options()
@@ -149,9 +149,9 @@ class EURLex(DocumentRepository):
             res = util.robust_fetch(self.session.post, endpoint, self.log,
                                     raise_for_status=False,
                                     data=envelope, headers=headers,
-                                    timeout=10, 
+                                    timeout=10,
                                     reset_method=self.reset_session)
-            
+
         if res.status_code == 500:
             tree = etree.parse(BytesIO(res.content))
             statuscode = tree.find(".//{http://www.w3.org/2003/05/soap-envelope}Subcode")[0].text
@@ -163,7 +163,7 @@ class EURLex(DocumentRepository):
             # report the error
             raise errors.DownloadError("%s: was redirected to %s" % (endpoint, res.headers['Location']))
         return res
-        
+
     def reset_session(self):
         self.session.close()
         self.session = requests.session()
@@ -174,7 +174,7 @@ class EURLex(DocumentRepository):
         query_template += " ORDER BY DD DESC"
         self.log.info(f"Query: {query_template}")
         return query_template
-    
+
     def download_get_first_page(self):
         return self.query_webservice(self.construct_expertquery(self.expertquery_template), 1)
 
@@ -197,7 +197,7 @@ class EURLex(DocumentRepository):
                           {'basefile': celexid}):
             graph = Graph().parse(data=resp.content, format="xml")
         return graph
-    
+
     def find_manifestations(self, cellarid, celexid):
         # returns a list of (lang, filetype, mimetype, url) tuples, one for each language found (compared to self.config.languages)
         if not self.config.force and os.path.exists(self.store.intermediate_path(celexid, suffix='.manifestations.json')):
@@ -210,7 +210,7 @@ class EURLex(DocumentRepository):
             graph = self.get_treenotice_graph(cellarurl, celexid)
             if graph is None:
                 return manifestations
-            
+
             # find the root URI -- it might be on the form
             # "http://publications.europa.eu/resource/celex/%s", but can
             # also take other forms (at least for legislation)
@@ -246,7 +246,7 @@ class EURLex(DocumentRepository):
                         if rootmanifestations:
                             manifestation = rootmanifestations[0]
                         items = list(manifestation.subjects(CDM.item_belongs_to_manifestation))
-                        if len(items) == 1: 
+                        if len(items) == 1:
                             candidateitem[manifestationtype] = items[0]
                         elif len(items) == 2:
                             # NOTE: for at least 32016L0680, there can be
@@ -279,7 +279,7 @@ class EURLex(DocumentRepository):
             self.dump_graph(celexid, graph)
         return manifestations
 
-    
+
     def download_single(self, basefile, url=None, language=None):
         if url is None:
             result = self.query_webservice("DN = %s" % basefile, page=1)
@@ -296,15 +296,20 @@ class EURLex(DocumentRepository):
             assert match
             celex = match.group(1)
             assert celex == basefile
-            lang, filetype, mimetype, url = self.find_manifestation(cellarid, celex)
-        return super(EURLex, self).download_single(basefile, url, language=language)
+            # call super().
+            res = []
+            for manifestation in self.find_manifestations(cellarid, celex):
+                res.append(super(EURLex, self).download_single(basefile, manifestation['url'], language=language))
+            return res
+        else:
+            return super(EURLex, self).download_single(basefile, url, language=language)
 
     def download_name_file(self, tmpfile, basefile, language, assumedfile):
         if assumedfile.endswith(".fmx4"):
             with open(tmpfile, "rb") as fp:
                 sig = fp.read(80)
             if sig[:4] == b'PK\x03\x04':
-                doctype = "fmx4.zip"
+                doctype = ".fmx4.zip"
             elif sig[:67] ==  b'\r\n<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML//EN" "xhtml-strict.dtd">':
                 doctype = ".xhtml"
             elif sig[:4]== b'<?xm':
@@ -338,13 +343,13 @@ class EURLex(DocumentRepository):
                 try:
                     title = result.find(".//{http://eur-lex.europa.eu/search}EXPRESSION_TITLE")[0].text
                 except TypeError:
-                    self.log.info(f"{celex}: Lacks title, the resource might not be available?")
+                    self.log.debug(f"{celex}: Lacks title, the resource might not be available?")
                 match = self.celexfilter(celex)
                 if not match:
-                    self.log.info(f"{celex}: Not matching current filter, skipping")
+                    self.log.debug(f"{celex}: Not matching current filter, skipping")
                     continue
                 celex = match.group(1)
-                self.log.debug(f"{idx + 1}: {celex} {title:.55} {cellarid}")
+                self.log.debug(f"{idx + 1}: {celex} {cellarid}")
                 #entry = DocumentEntry(self.store.documententry_path(celex))
                 #if entry.content and not self.config.refresh:
                 #    # if we've already processed this file earlier, it's faster to determine if we need to update it based on the DocuemntEntry rather than the tree notice
@@ -356,12 +361,12 @@ class EURLex(DocumentRepository):
                 #elif 'download' in entry.status and entry.status['download'] == "removed" and not self.config.refresh:
                 #    continue
                 #else:
-                # 
+                #
                 candidates = defaultdict(list)
                 for manifestation in self.find_manifestations(cellarid, celex):
                     if manifestation['language'] in self.config.languages:
-                        candidates[manifestation['language']].append(manifestation) 
-                    
+                        candidates[manifestation['language']].append(manifestation)
+
                 for lang in self.config.languages:
                     if lang not in candidates:
                         continue
@@ -391,14 +396,14 @@ class EURLex(DocumentRepository):
     def metadata_from_basefile(self, doc):
         desc = Describer(doc.meta, doc.uri)
         desc.rel(CDM.resource_legal_id_celex, Literal(doc.basefile))
-        # the sixth letter in 
+        # the sixth letter in
         rdftype = {"R": CDM.regulation,
                    "L": CDM.directive,
                    "C": CDM.decision_cjeu}[doc.basefile[5]]
         desc.rel(RDF.type, rdftype)
         return doc.meta
-        
-    
+
+
     @decorators.managedparsing
     def parse(self, doc):
         doc.meta = self.metadata_from_basefile(doc)
@@ -444,7 +449,7 @@ class EURLex(DocumentRepository):
             return str(e)
         return super(EURLex, self).render_xhtml_validate(xhtmldoc)
 
-        
+
     def tabs(self):
         return []
 

@@ -970,7 +970,7 @@ with the *config* object as single parameter.
         updated = False
         created = False
 
-        filename = self.store.downloaded_path(basefile)
+        filename = self.store.downloaded_path(basefile, language=language)
         created = not os.path.exists(filename) or os.path.getsize(filename) == 0
         # util.print_open_fds()
         

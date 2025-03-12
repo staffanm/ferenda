@@ -114,8 +114,8 @@ class MyndFskrBase(FixedLayoutSource):
     # shoud not be present), rpubl:ikrafttradandedatum,
     # rpubl:utkomFranTryck
     
-    basefile_regex = re.compile('(?P<basefile>\d{4}[:/_-]\d{1,3})(?:|\.\w+)$')
-    document_url_regex = re.compile('.*(?P<basefile>\d{4}[:/_-]\d{1,3}).pdf$')
+    basefile_regex = re.compile(r'(?P<basefile>\d{4}[:/_-]\d{1,3})(?:|\.\w+)$')
+    document_url_regex = re.compile(r'.*(?P<basefile>\d{4}[:/_-]\d{1,3}).pdf$')
     download_accept_404 = True  # because the occasional 404 is to be expected
     download_record_last_download = False
     nextpage_regex = None
@@ -208,7 +208,7 @@ class MyndFskrBase(FixedLayoutSource):
         return [self.alias]
 
     def sanitize_basefile(self, basefile):
-        segments = re.split('[ \./:_-]+', basefile.lower())
+        segments = re.split(r'[ \./:_-]+', basefile.lower())
         # force "01" to "1" (and check integerity (not integrity))
         segments[-1] = str(int(segments[-1]))
         if len(segments) == 2:
@@ -247,7 +247,8 @@ class MyndFskrBase(FixedLayoutSource):
                 # see if document_url_regex
                 # print("examining %s (%s)" % (link, bool(re.match(self.document_url_regex, link))))
                 # continue
-                elementtext = " ".join(element.itertext())
+
+                elementtext = util.normalize_space(" ".join(element.itertext()))
                 m = None
                 if self.download_stay_on_site and urlparse(self.start_url).netloc != urlparse(link).netloc:
                     continue
@@ -524,39 +525,39 @@ class MyndFskrBase(FixedLayoutSource):
         return text
 
     def fwdtests(self):
-        return {'dcterms:issn': ['^ISSN (\d+\-\d+)$'],
+        return {'dcterms:issn': [r'^ISSN (\d+\-\d+)$'],
                 'dcterms:title':
-                ['((?:Föreskrifter|[\w ]+s (?:föreskrifter|allmänna råd)).*?)[;\n](\n|beslutade den)'],
-                'dcterms:identifier': ['^([A-ZÅÄÖ-]+FS\s\s?\d{4}:\d+)$'],
+                [r'((?:Föreskrifter|[\w ]+s (?:föreskrifter|allmänna råd)).*?)[;\n](\n|beslutade den)'],
+                'dcterms:identifier': [r'^([A-ZÅÄÖ-]+FS\s\s?\d{4}:\d+)$'],
                 'rpubl:utkomFranTryck':
-                ['Utkom från\strycket\s+den\s(\d+ \w+ \d{4})',
-                 'Utkom från\strycket\s+(\d{4}-\d{2}-\d{2})'],
-                'rpubl:omtryckAv': ['^(Omtryck)$'],
-                'rpubl:genomforDirektiv': ['Celex (3\d{2,4}\w\d{4})'],
+                [r'Utkom från\strycket\s+den\s(\d+ \w+ \d{4})',
+                 r'Utkom från\strycket\s+(\d{4}-\d{2}-\d{2})'],
+                'rpubl:omtryckAv': [r'^(Omtryck)$'],
+                'rpubl:genomforDirektiv': [r'Celex (3\d{2,4}\w\d{4})'],
                 'rpubl:beslutsdatum':
-                ['(?:har beslutats|[Bb]eslutade|beslutat|[Bb]eslutad)(?:\sden|) (\d+ \w+( \d{4}|))',
-                 'Beslutade av (?:[A-ZÅÄÖ][\w ]+) den (\d+ \w+ \d{4}).',
-                 'utfärdad den (\d+ \w+ \d{4}) tillkännages härmed i andra hand.',
-                 '(?:utfärdad|meddelad)e? den (\d+ \w+ \d{4}).'],
+                [r'(?:har beslutats|[Bb]eslutade|beslutat|[Bb]eslutad)(?:\sden|) (\d+ \w+( \d{4}|))',
+                 r'Beslutade av (?:[A-ZÅÄÖ][\w ]+) den (\d+ \w+ \d{4}).',
+                 r'utfärdad den (\d+ \w+ \d{4}) tillkännages härmed i andra hand.',
+                 r'(?:utfärdad|meddelad)e? den (\d+ \w+ \d{4}).'],
                 'rpubl:beslutadAv':
-                ['\s(?:meddelar|lämnar|föreskriver|beslutar)\s([A-ZÅÄÖ][\w ]+?)\d?\s',
-                 '\n\s*([A-ZÅÄÖ][\w ]+?)\d? (?:meddelar|lämnar|föreskriver|beslutar)',
+                [r'\s(?:meddelar|lämnar|föreskriver|beslutar)\s([A-ZÅÄÖ][\w ]+?)\d?\s',
+                 r'\n\s*([A-ZÅÄÖ][\w ]+?)\d? (?:meddelar|lämnar|föreskriver|beslutar)',
                  ],
                 'rpubl:bemyndigande':
-                [' ?(?:meddelar|föreskriver|Föreskrifterna meddelas|Föreskrifterna upphävs)\d?,? (?:följande |)med stöd av\s(.*?) ?(?:att|efter\ssamråd|dels|följande|i fråga om|och lämnar allmänna råd|och beslutar följande allmänna råd|\.\n)',
-                 '^Med stöd av (.*)\s(?:meddelar|föreskriver)']
+                [r' ?(?:meddelar|föreskriver|Föreskrifterna meddelas|Föreskrifterna upphävs)\d?,? (?:följande |)med stöd av\s(.*?) ?(?:att|efter\ssamråd|dels|följande|i fråga om|och lämnar allmänna råd|och beslutar följande allmänna råd|\.\n)',
+                 r'^Med stöd av (.*)\s(?:meddelar|föreskriver)']
                 }
 
     def revtests(self):
         return {'rpubl:ikrafttradandedatum':
-                ['(?:Denna författning|Dessa föreskrifter|Dessa allmänna råd|Dessa föreskrifter och allmänna råd)\d* träder i ?kraft (?:den |)(\d+ \w+ \d{4})',
-                 'Dessa föreskrifter träder i kraft, (?:.*), i övrigt den (\d+ \w+ \d{4})',
-                 'ska(?:ll|)\supphöra att gälla (?:den |)(\d+ \w+ \d{4}|denna dag|vid utgången av \w+ \d{4})',
-                 'träder i kraft den dag då författningen enligt uppgift på den (utkom från trycket)'],
+                [r'(?:Denna författning|Dessa föreskrifter|Dessa allmänna råd|Dessa föreskrifter och allmänna råd)\d* träder i ?kraft (?:den |)(\d+ \w+ \d{4})',
+                 r'Dessa föreskrifter träder i kraft, (?:.*), i övrigt den (\d+ \w+ \d{4})',
+                 r'ska(?:ll|)\supphöra att gälla (?:den |)(\d+ \w+ \d{4}|denna dag|vid utgången av \w+ \d{4})',
+                 r'träder i kraft den dag då författningen enligt uppgift på den (utkom från trycket)'],
                 'rpubl:upphaver':
-                ['träder i kraft den (?:\d+ \w+ \d{4}), då(.*)ska upphöra att gälla',
-                 'ska(?:ll|)\supphöra att gälla vid utgången av \w+ \d{4}, nämligen(.*?)\n\n',
-                 'att (.*) skall upphöra att gälla (denna dag|vid utgången av \w+ \d{4})']
+                [r'träder i kraft den (?:\d+ \w+ \d{4}), då(.*)ska upphöra att gälla',
+                 r'ska(?:ll|)\supphöra att gälla vid utgången av \w+ \d{4}, nämligen(.*?)\n\n',
+                 r'att (.*) skall upphöra att gälla (denna dag|vid utgången av \w+ \d{4})']
                 }
 
                  
@@ -652,7 +653,7 @@ class MyndFskrBase(FixedLayoutSource):
                 'rpubl:bemyndigande'].replace('\u2013', '-')
         if 'dcterms:identifier' in props:
             # "DVFS 2012-4" -> "DVFS 2012:4"
-            if re.search("\d{4}-\d+", props['dcterms:identifier']):
+            if re.search(r"\d{4}-\d+", props['dcterms:identifier']):
                 props['dcterms:identifier'] = re.sub(r"(\d{4})-(\d+)", r"\1:\2", props['dcterms:identifier'])
             # if the found dcterms:identifier differs from what has
             # been inferred by metadata_from_basefile, the keys
@@ -735,12 +736,12 @@ class MyndFskrBase(FixedLayoutSource):
                     raise e
                 
         if 'dcterms:title' in attributes:
-            if re.search('^(Föreskrifter|[\w ]+s föreskrifter) om ändring (i|av) ',
+            if re.search(r'^(Föreskrifter|[\w ]+s föreskrifter) om ändring (i|av) ',
                          attributes['dcterms:title'], re.UNICODE):
                 # There should be something like FOOFS 2013:42 (or
                 # possibly just 2013:42) in the title. The regex is
                 # forgiving about spurious spaces, seee LVFS 1998:5
-                m = re.search('(?P<fs>[A-ZÅÄÖ-]+FS|) ?(?P<year>\d{4}) ?:(?P<ordinal>\d+)',
+                m = re.search(r'(?P<fs>[A-ZÅÄÖ-]+FS|) ?(?P<year>\d{4}) ?:(?P<ordinal>\d+)',
                               attributes['dcterms:title'])
                 if not m:
                     # raise errors.ParseError(
@@ -763,7 +764,7 @@ class MyndFskrBase(FixedLayoutSource):
                     attributes["rpubl:andrar"] =  URIRef(origuri)
 
             # FIXME: is this a sensible value for rpubl:upphaver?
-            if (re.search('^(Föreskrifter|[\w ]+s föreskrifter) om upphävande '
+            if (re.search(r'^(Föreskrifter|[\w ]+s föreskrifter) om upphävande '
                           'av', attributes['dcterms:title'], re.UNICODE)
                     and not 'rpubl:upphaver' in attributes):
                 attributes['rpubl:upphaver'] = attributes['dcterms:title']
@@ -814,7 +815,7 @@ class MyndFskrBase(FixedLayoutSource):
 
         if 'rpubl:upphaver' in attributes:
             upphaver = []
-            for upph in re.findall('([A-ZÅÄÖ-]+FS \d{4}:\d+)',
+            for upph in re.findall(r'([A-ZÅÄÖ-]+FS \d{4}:\d+)',
                                    util.normalize_space(attributes['rpubl:upphaver'])):
                 (fs, year, ordinal) = re.split('[ :]', upph)
                 upphaver.append(makeurl(
@@ -874,13 +875,13 @@ class MyndFskrBase(FixedLayoutSource):
 class AFS(MyndFskrBase):
     """Arbetsmiljöverkets författningssamling"""
     alias = "afs"
-    start_url = "https://www.av.se/arbetsmiljoarbete-och-inspektioner/publikationer/foreskrifter/foreskrifter-listade-i-nummerordning/"
-    landingpage = True
+    start_url = "https://www.av.se/arbetsmiljoarbete-och-inspektioner/publikationer/foreskrifter/"
+    landingpage = False
 
-    basefile_regex = re.compile("^(?P<basefile>AFS \d+: ?\d+)")
+    basefile_regex = re.compile(r"^(?P<basefile>AFS \d+: ?\d+)")
     # we need a slighly more forgiving regex beause of AFS 2017:1,
     # which has the url "...afs-1-2017.pdf" ...
-    document_url_regex = re.compile('.*(?P<basefile>\d+[:/_-]\d+).pdf$')
+    document_url_regex = re.compile(r'.*(?P<basefile>\d+[:/_-]\d+).pdf$')
 
     # Note that the url for AFS 2015:6 doesn't include the basefile at
     # all. There seems to be no way of constructing a
@@ -890,16 +891,10 @@ class AFS(MyndFskrBase):
     # re.compile(".*/publikationer/foreskrifter/.*\.pdf$")
 
     def download_single(self, basefile, url=None):
-        # the basefile might be the lastest change act, while the url
-        # could be a landing page for the base act. The most prominent
-        # link ("Ladda ner pdf") could be to an official base act, or
-        # to an unofficial consolidated version up to and including
-        # the latest change act. So, yeah.
-        if basefile == "afs/1987:2":
-            # this is mislabeled in the index page -- it really leads to afs/2016:3
-            e = errors.DocumentRemovedError()
-            e.dummyfile = self.store.parsed_path(basefile)
-            raise e
+
+        
+        DocumentRepository.download_single(self, consolidated_basefile, consolidated_pdfurl)
+
         assert not url.endswith(".pdf"), ("expected landing page for %s, got direct pdf"
                                           " link %s" % (basefile, url))
         resp = self.session.get(url)
@@ -929,7 +924,7 @@ class AFS(MyndFskrBase):
             if not changeheader:
                 self.log.error("%s: Can't find a list of change acts at %s" % (basefile, url))
                 return False
-            pdfs = changeheader.parent.find_all("a", href=re.compile("\.pdf$"))
+            pdfs = changeheader.parent.find_all("a", href=re.compile(r"\.pdf$"))
             # first, get the actual basefile we're looking for (assume
             # there really is one)
             norm = util.normalize_space
@@ -953,13 +948,13 @@ class AFS(MyndFskrBase):
             # then, 1) find out what change act the consolidated
             # version might be updated to. FIXME: we don't DO anything
             # with this information!
-            ids = [norm(x.text).split(" ")[1] for x in pdfs if re.match("AFS \d+:\d+", norm(x.text))]
+            ids = [norm(x.text).split(" ")[1] for x in pdfs if re.match(r"AFS \d+:\d+", norm(x.text))]
             updated_to = sorted(ids, key=util.split_numalpha)[-1]
 
             # 2) find the url to the consolidated pdf and store that
             # as a separate basefile, using the html page as an
             # attachment
-            base_basefile = re.search("AFS \d+:\d+", title).group(0).lower().replace(" ", "/")
+            base_basefile = re.search(r"AFS \d+:\d+", title).group(0).lower().replace(" ", "/")
             link = soup.find("a", text="Ladda ner pdf")
             consolidated_pdfurl = urljoin(url, link["href"])
             consolidated_basefile = "konsolidering/%s" % base_basefile
@@ -975,10 +970,10 @@ class AFS(MyndFskrBase):
         with self.store.open_downloaded(basefile, attachment="landingpage.html") as fp:
             soup = BeautifulSoup(fp.read(), "lxml")
         changeheader = soup.find(["h2", "h3"], text="Ursprungs- och ändringsföreskrifter")
-        pdfs = changeheader.parent.find_all("a", href=re.compile("\.pdf$"))
+        pdfs = changeheader.parent.find_all("a", href=re.compile(r"\.pdf$"))
         norm = util.normalize_space
         # in some cases the leading AFS is missing
-        matcher = re.compile("(?:|AFS )(\d+:\d+)").match
+        matcher = re.compile(r"(?:|AFS )(\d+:\d+)").match
         fsnummer = [matcher(norm(x.text)).group(1) for x in pdfs if matcher(norm(x.text))]
         props['rpubl:konsolideringsunderlag'] = []
         for f in fsnummer:
@@ -989,7 +984,7 @@ class AFS(MyndFskrBase):
         if ", föreskrifter" in title:
             title = title.split(", föreskrifter")[0].strip()
         identifier = "%s (konsoliderad tom. %s)" % (
-            re.search("AFS \d+:\d+", title).group(0),
+            re.search(r"AFS \d+:\d+", title).group(0),
             self.consolidation_date(basefile))
         props['dcterms:identifier'] = identifier
         props['dcterms:title'] = Literal(title, lang="sv")
@@ -1015,7 +1010,7 @@ class AFS(MyndFskrBase):
         newtext = ""
         margin = ""
         inmargin = False
-        datematch = re.compile("den \d+ \w+ \d{4}$").search
+        datematch = re.compile(r"den \d+ \w+ \d{4}$").search
         for line in text.split("\n"):
             newline = True
             if line.endswith(probable_id) and not margin and len(
@@ -1077,7 +1072,7 @@ class DVFS(MyndFskrBase):
 
     nextpage_regex = re.compile(">")
     nextpage_url_regex = None
-    basefile_regex = re.compile("^\s*(?P<basefile>\d{4}:\d+)")
+    basefile_regex = re.compile(r"^\s*(?P<basefile>\d{4}:\d+)")
     download_formid = "aspnetForm"
     download_iterlinks = False
     download_record_last_download = True
@@ -1088,7 +1083,7 @@ class DVFS(MyndFskrBase):
         # downloads each landing page found in the regular list to
         # find the URLs for base and change acts (the regular list
         # only lists base acts)
-        re_bf = re.compile("^\d{4}:\d+")
+        re_bf = re.compiler(r"^\d{4}:\d+")
         while source:
             nextform = nexturl = None
             soup = BeautifulSoup(source, "lxml")
@@ -1156,7 +1151,7 @@ class DVFS(MyndFskrBase):
         if isinstance(body, bytes):
             body = body.decode()  # should be pure ascii
         req.body = re.sub(
-            '; filename="[\w\-\/]+"', '', body).encode()
+            r'; filename="[\w\-\/]+"', '', body).encode()
         req.headers['Content-Length'] = str(len(req.body))
         # self.log.debug("posting to event %s" % etgt)
         resp = self.session.send(req, allow_redirects=True)
@@ -1208,7 +1203,7 @@ class DVFS(MyndFskrBase):
 
     def fwdtests(self):
         t = super(DVFS, self).fwdtests()
-        t["dcterms:identifier"] = ['(DVFS\s\s?\d{4}[:\-]\d+)']
+        t["dcterms:identifier"] = [r'(DVFS\s\s?\d{4}[:\-]\d+)']
         return t
 
 
@@ -1216,7 +1211,7 @@ class EIFS(MyndFskrBase):
     alias = "eifs"
     start_url = "https://www.ei.se/sv/Publikationer/Foreskrifter/"
     basefile_regex = None
-    document_url_regex = re.compile('.*(?P<basefile>EIFS_\d{4}_\d+).pdf$')
+    document_url_regex = re.compile(r'.*(?P<basefile>EIFS_\d{4}_\d+).pdf$')
 
     def sanitize_basefile(self, basefile):
         basefile = basefile.replace("_", "/", 1)
@@ -1227,9 +1222,9 @@ class ELSAKFS(MyndFskrBase):
     alias = "elsakfs"  # real name is ELSÄK-FS, but avoid swedchars, uppercase and dashes
     start_url = "https://www.elsakerhetsverket.se/om-oss/lag-och-ratt/foreskrifter/"
     download_stay_on_site = True
-    landingpage_basefile_regex = re.compile("^ELSÄK-FS (?P<basefile>\d{4}:\d+)\s*$")
-    basefile_regex = re.compile("^ELSÄK-FS (?P<basefile>\d{4}:\d+)\s*$")
-    basefile_pdf_regex = re.compile("^ELSÄK-FS (?P<basefile>\d{4}:\d+)(?P<typ>| - ändringsföreskrift| - konsoliderad version| - ursprunglig lydelse) \(pdf, \d,\d MB\)")
+    landingpage_basefile_regex = re.compile(r"^ELSÄK-FS (?P<basefile>\d{4}:\d+)\s*$")
+    basefile_regex = re.compile(r"^ELSÄK-FS (?P<basefile>\d{4}:\d+)\s*$")
+    basefile_pdf_regex = re.compile(r"^ELSÄK-FS (?P<basefile>\d{4}:\d+)(?P<typ>| - ändringsföreskrift| - konsoliderad version| - ursprunglig lydelse) \(pdf, \d,\d MB\)")
 
 
 
@@ -1283,7 +1278,7 @@ class ELSAKFS(MyndFskrBase):
         t = super(ELSAKFS, self).fwdtests()
         # it's hard to match "...föreskriver X följande" if X contains
         # spaces ("följande" can be pretty much anything else)
-        t["rpubl:beslutadAv"].insert(0, '(?:meddelar|föreskriver)\s(Sveriges geologiska undersökning)')
+        t["rpubl:beslutadAv"].insert(0, r'(?:meddelar|föreskriver)\s(Sveriges geologiska undersökning)')
         return t
 
     def parse_metadata_from_consolidated(self, reader, props, basefile):
@@ -1302,8 +1297,8 @@ class FFFS(MyndFskrBase):
     alias = "fffs"
     start_url = "https://www.fi.se/sv/vara-register/forteckning-fffs/"
     landingpage = True
-    landingpage_url_regex = re.compile(".*/sok-fffs/\d{4}/((?P<baseact>\d{5,}/)|)(?P<basefile>\d{5,})/$")
-    document_url_regex = re.compile(".*/contentassets/.*\.pdf$")
+    landingpage_url_regex = re.compile(r".*/sok-fffs/\d{4}/((?P<baseact>\d{5,}/)|)(?P<basefile>\d{5,})/$")
+    document_url_regex = re.compile(r".*/contentassets/.*\.pdf$")
     def forfattningssamlingar(self):
         return ["fffs", "bffs"]
 
@@ -1324,7 +1319,7 @@ class FFFS(MyndFskrBase):
 class FFS(MyndFskrBase):
     alias = "ffs"
     start_url = "http://www.forsvarsmakten.se/sv/om-myndigheten/dokument/lagrum"
-    document_url_regex = re.compile(".*/lagrum/gallande-ffs.*/ffs.*(?P<basefile>\d{4}[\.:/_-]\d{1,3})[^/]*.pdf$")
+    document_url_regex = re.compile(r".*/lagrum/gallande-ffs.*/ffs.*(?P<basefile>\d{4}[\.:/_-]\d{1,3})[^/]*.pdf$")
     basefile_regex = None
    
     
@@ -1343,7 +1338,7 @@ class KFMFS(MyndFskrBase):
                 text=re.compile("KFMFS")):
             m = self.basefile_regex.search(ns.strip())
             basefile = m.group("basefile")
-            link = ns.parent.find("a", href=re.compile(".*\.pdf"))
+            link = ns.parent.find("a", href=re.compile(r".*\.pdf"))
             params = {'uri': urljoin(self.start_url, link["href"])}
             yield self.sanitize_basefile(basefile), params
     
@@ -1398,7 +1393,7 @@ class KVFS(MyndFskrBase):
     #  foreskrifter)
 
     download_iterlinks = False
-    basefile_regex = re.compile("(?P<basefile>KVV?FS \d{4}:\d+)")
+    basefile_regex = re.compile(r"(?P<basefile>KVV?FS \d{4}:\d+)")
 
     def download_get_first_page(self, paging=1):
         self.log.debug("POSTing to search, paging=%s" % paging)
@@ -1448,7 +1443,7 @@ class KVFS(MyndFskrBase):
 class LMFS(MyndFskrBase):
     alias = "lmfs"
     start_url = "http://www.lantmateriet.se/sv/Om-Lantmateriet/Rattsinformation/Foreskrifter/"
-    basefile_regex = re.compile('(?P<basefile>LMV?FS \d{4}:\d{1,3})')
+    basefile_regex = re.compile(r'(?P<basefile>LMV?FS \d{4}:\d{1,3})')
 
     def forfattningssamlingar(self):
         return ["lmfs", "lmvfs"]
@@ -1457,7 +1452,7 @@ class LMFS(MyndFskrBase):
         t = super(LMFS, self).fwdtests()
         # it's hard to match "...föreskriver X följande" if X contains
         # spaces ("följande" can be pretty much anything else)
-        t["rpubl:beslutadAv"].insert(0, '(?:meddelar|föreskriver)\s(Statens\s+lantmäteriverk)')
+        t["rpubl:beslutadAv"].insert(0, r'(?:meddelar|föreskriver)\s(Statens\s+lantmäteriverk)')
         return t
 
 
@@ -1466,7 +1461,7 @@ class LVFS(MyndFskrBase):
     start_url = "http://www.lakemedelsverket.se/overgripande/Lagar--regler/Lakemedelsverkets-foreskrifter---LVFS/"
     basefile_regex = None # urls are consistent enough and contain FS
                           # information, which link text lacks
-    document_url_regex = re.compile(".*/(?P<basefile>[LVHSF\-]+FS_ ?\d{4}[_\-]\d+)\.pdf$")
+    document_url_regex = re.compile(r".*/(?P<basefile>[LVHSF\-]+FS_ ?\d{4}[_\-]\d+)\.pdf$")
 
     def sanitize_basefile(self, basefile):
         # fix accidental misspellings found in 2015:35 and 2017:31
@@ -1479,19 +1474,19 @@ class LVFS(MyndFskrBase):
     def fwdtests(self):
         t = super(LVFS, self).fwdtests()
         # extra lax regex needed for LVFS 1992:4
-        t["rpubl:beslutsdatum"].append("^den (\d+ \w+ \d{4})$")
+        t["rpubl:beslutsdatum"].append(r"^den (\d+ \w+ \d{4})$")
         return t
 
 class MIGRFS(MyndFskrBase):
     alias = "migrfs"
     start_url = "https://www.migrationsverket.se/Om-Migrationsverket/Vart-uppdrag/Styrning-och-uppfoljning/Foreskrifter.html"
-    basefile_regex = re.compile("(?P<basefile>(MIGR|SIV)FS \d+[:/]\d+)$")
+    basefile_regex = re.compile(r"(?P<basefile>(MIGR|SIV)FS \d+[:/]\d+)$")
 
     def sanitize_basefile(self, basefile):
         # older MIGRFS uses non-standard identifiers like MIGRFS
         # 04/2017. We normalize this to migrfs/2017-4 because who do
         # they think they are?
-        if re.search("\d{1,2}/\d{4}$", basefile):
+        if re.search(r"\d{1,2}/\d{4}$", basefile):
             fs, ordinal, year = re.split("[ /]", basefile)
             basefile = "%s %s:%s" % (fs, year, int(ordinal))
         return super(MIGRFS, self).sanitize_basefile(basefile)
@@ -1503,13 +1498,13 @@ class MIGRFS(MyndFskrBase):
         t = super(MIGRFS, self).fwdtests()
         # it's hard to match "...föreskriver X följande" if X contains
         # spaces ("följande" can be pretty much anything else)
-        t["rpubl:beslutadAv"].insert(0, '(?:meddelar|föreskriver)\s(Statens\s+invandrarverk)')
+        t["rpubl:beslutadAv"].insert(0, r'(?:meddelar|föreskriver)\s(Statens\s+invandrarverk)')
         return t
 
 class MPRTFS(MyndFskrBase):
     alias = "mprtfs"
     start_url = "http://www.mprt.se/sv/blanketter--publikationer/foreskrifter/"
-    basefile_regex = re.compile("^(?P<basefile>(MPRTFS|MRTVFS|RTVFS) \d+:\d+)$")
+    basefile_regex = re.compile(r"^(?P<basefile>(MPRTFS|MRTVFS|RTVFS) \d+:\d+)$")
     document_url_regex = None
     download_iterlinks = False
     def forfattningssamlingar(self):
@@ -1545,7 +1540,7 @@ class MSBFS(MyndFskrBase):
     # informationssäkerhet för statliga myndigheter" but may in cases
     # be on the form "Föreskrifter om rapportering av it-incidenter
     # för statliga myndigheter (MSBFS 2020:8)"...
-    basefile_regex = re.compile("(^| \()(?P<basefile>(MSBFS|SRVFS|KBMFS|SÄIFS) \d+:\d+)")
+    basefile_regex = re.compile(r"(^| \()(?P<basefile>(MSBFS|SRVFS|KBMFS|SÄIFS) \d+:\d+)")
 
     def forfattningssamlingar(self):
         return ["msbfs", "srvfs", "kbmfs", "säifs"]
@@ -1600,7 +1595,7 @@ class MYHFS(MyndFskrBase):
     @decorators.downloadmax
     def download_get_basefiles(self, source):
         soup = BeautifulSoup(source, "lxml")
-        for basefile in soup.find("div", "article-text").find_all("strong", text=re.compile("\d+:\d+")):
+        for basefile in soup.find("div", "article-text").find_all("strong", text=re.compile(r"\d+:\d+")):
             link = basefile.find_parent("td").find_next_sibling("td").a
             params = {'uri': urljoin(self.start_url, link["href"])}
             yield self.sanitize_basefile(basefile.text.strip()), params
@@ -1609,7 +1604,7 @@ class MYHFS(MyndFskrBase):
 class NFS(MyndFskrBase):
     alias = "nfs"
     start_url = "http://www.naturvardsverket.se/nfs"
-    basefile_regex = re.compile("^(?P<basefile>S?NFS \d+:\d+)$")
+    basefile_regex = re.compile(r"^(?P<basefile>S?NFS \d+:\d+)$")
     document_url_regex = None
     nextpage_regex = "Nästa"
     storage_policy = "dir"
@@ -1643,7 +1638,7 @@ class NFS(MyndFskrBase):
         base_basefile = None
         basehead = soup.find("h3", text=re.compile("Grundföreskrift$"))
         if basehead:
-            m = re.match("(S?NFS)\s+(\d+:\d+)", util.normalize_space(basehead.text))
+            m = re.match(r"(S?NFS)\s+(\d+:\d+)", util.normalize_space(basehead.text))
             base_basefile = m.group(1).lower() + "/" + m.group(2)
         # find all pdf links, identify consolidated version if present
         # [1:] in order to skip header
@@ -1651,7 +1646,7 @@ class NFS(MyndFskrBase):
         links = []
         for row in rows:
             title = util.normalize_space(row.find("h3").text)
-            link = row.find("a", href=re.compile("\.pdf$", re.I))
+            link = row.find("a", href=re.compile(r"\.pdf$", re.I))
             if not link:
                 continue
             if "Konsoliderad" in title or "-k" in link.get("href"):
@@ -1663,7 +1658,7 @@ class NFS(MyndFskrBase):
                     # we could wither get the row with the lowest
                     # fsnummer, or the last row. Lets try with the
                     # last one
-                    m = re.match("(S?NFS)\s+(\d+:\d+)", util.normalize_space(rows[-1].h3.text))
+                    m = re.match(r"(S?NFS)\s+(\d+:\d+)", util.normalize_space(rows[-1].h3.text))
                     if m:
                         base_basefile = m.group(1).lower() + "/" + m.group(2)
                     else:
@@ -1696,7 +1691,7 @@ class NFS(MyndFskrBase):
 
         # [2:] == skip header and first real row (that only contains
         # the consolidated version
-        matcher = re.compile("(S?NFS \d+:\d+)").match
+        matcher = re.compile(r"(S?NFS \d+:\d+)").match
         norm = util.normalize_space
 
         props['rpubl:konsolideringsunderlag'] = []
@@ -1735,7 +1730,7 @@ class NFS(MyndFskrBase):
         rowidx = self._consolidation_row_index(rows)
         if rowidx:
             tr_text = rows[rowidx].text
-            m = re.search('\d{4}-\d{2}-\d{2}', tr_text)
+            m = re.search(r'\d{4}-\d{2}-\d{2}', tr_text)
             if m:
                 return datetime.datetime.strptime(m.group(0), '%Y-%m-%d').date()
         self.log.warning("%s: Could not find consolidation date" % basefile)
@@ -1744,7 +1739,7 @@ class NFS(MyndFskrBase):
     def fwdtests(self):
         t = super(NFS, self).fwdtests()
         # it's hard to match "...föreskriver X följande" if X contains spaces ("följande" can be pretty much anything else)
-        t["rpubl:beslutadAv"].insert(0, '(?:meddelar|föreskriver)\s([Ss]tatens\s*naturvårdsverk)')
+        t["rpubl:beslutadAv"].insert(0, r'(?:meddelar|föreskriver)\s([Ss]tatens\s*naturvårdsverk)')
         return t
 
     def sanitize_text(self, text, basefile):
@@ -1761,7 +1756,7 @@ class MyndFskrAnalyzer(PDFAnalyzer):
         
         res = super(MyndFskrAnalyzer, self).documents
         # check only the last page
-        if re.match("Elanders Sverige AB, \d{4}", self.pdf[-1].as_plaintext()):
+        if re.match(r"Elanders Sverige AB, \d{4}", self.pdf[-1].as_plaintext()):
             res =  [(0, len(self.pdf)-1, 'main'),
                     (len(self.pdf), 1, 'endmatter')]
         return res
@@ -1791,7 +1786,7 @@ class PMFS(MyndFskrBase):
             soup = BeautifulSoup(source['Html'], "lxml")
             for d in soup.find_all("li", "list-item"):
                 head = d.find("strong", "list-item-heading")
-                m = re.search("(?P<basefile>(PM|RPS)FS \d{4}[:-]\s?\d+)", head.string)
+                m = re.search(r"(?P<basefile>(PM|RPS)FS \d{4}[:-]\s?\d+)", head.string)
                 if m:
                     identifier = m.group("basefile")
                     basefile = self.sanitize_basefile(identifier)
@@ -1841,7 +1836,7 @@ class PMFS(MyndFskrBase):
             return (t.top < n.top and t.bottom + (p.height * linespacing) - p.height >= n.top)
 
         def ordinalitem(b):
-            return bool(re.match("\d+\.\s+", str(b)))
+            return bool(re.match(r"\d+\.\s+", str(b)))
 
         def unordereditem(b):
             return str(b).startswith("•")  # Expand on this
@@ -2045,7 +2040,7 @@ class PMFS(MyndFskrBase):
             if state.appendixno and state.appendixno > 1 and strchunk.startswith("Bilaga ll-"):
                 strchunk = strchunk.replace("Bilaga ll-", "Bilaga 4")
 
-            m = re.search("Bilaga( \d+| I| l|$)", str(chunk))
+            m = re.search(r"Bilaga( \d+| I| l|$)", str(chunk))
             if m and m.group(1):
                 match = m.group(1).strip()
                 if match in ("I", "l"):   # correct for OCR mistake
@@ -2121,7 +2116,7 @@ class PMFS(MyndFskrBase):
             if not chunk:
                 chunk = parser.reader.peek()
             strchunk = str(chunk).strip()
-            m = re.match("(\d+) § (.*)", strchunk, re.DOTALL)
+            m = re.match(r"(\d+) § (.*)", strchunk, re.DOTALL)
             if m:
                 return m.groups()
 
@@ -2133,7 +2128,7 @@ class PMFS(MyndFskrBase):
             if not chunk:
                 chunk = parser.reader.peek()
             strchunk = str(chunk).strip()
-            m = re.match("(\d+) kap. (.*)", strchunk, re.DOTALL)
+            m = re.match(r"(\d+) kap. (.*)", strchunk, re.DOTALL)
             if not m:
                 return
 
@@ -2362,7 +2357,7 @@ class RGKFS(MyndFskrBase):
     def download_get_basefiles(self, source):
         soup = BeautifulSoup(source, "lxml")
         for th in soup.find_all("th", text="RGKFS"):
-            for item in th.find_parent("table").find_all("td", text=re.compile("^\d{4}:\d+$")):
+            for item in th.find_parent("table").find_all("td", text=re.compile(r"^\d{4}:\d+$")):
                 link = item.find_next_sibling("td").a
                 if link and link["href"].endswith(".pdf"):
                     params = {'uri':  urljoin(self.start_url, link["href"])}
@@ -2373,7 +2368,7 @@ class RGKFS(MyndFskrBase):
 class RIFS(MyndFskrBase):
     alias = "rifs"
     start_url = "https://www.revisorsinspektionen.se/regelverk/samtliga-foreskrifter/"
-    basefile_regex = re.compile('(?P<basefile>(RIFS|RNFS) \d{4}[:/_-]\d{1,3})$')
+    basefile_regex = re.compile(r'(?P<basefile>(RIFS|RNFS) \d{4}[:/_-]\d{1,3})$')
     document_url_regex = None
 
     def forfattningssamlingar(self):
@@ -2383,7 +2378,7 @@ class RIFS(MyndFskrBase):
 class SIFS(MyndFskrBase):
     alias = "sifs"
     start_url = "https://www.spelinspektionen.se/Regler-och-beslut/nya-foreskrifter/"
-    basefile_regex = re.compile('(?P<basefile>[SL]IFS \d{4}:\d{1,3})')
+    basefile_regex = re.compile(r'(?P<basefile>[SL]IFS \d{4}:\d{1,3})')
 
     def forfattningssamlingar(self):
         return ["sifs", "lifs"]
@@ -2489,7 +2484,7 @@ class SKVFS(MyndFskrBase):
             # the "/rattsligvagledning/edition/" is to avoid false
             # positives in a hidden mobile menu
             if not attribute == "href" or not element.text or not re.match(
-                    '\d{4}', element.text) or "/rattsligvagledning/edition/" in element.get("href"):
+                    r'\d{4}', element.text) or "/rattsligvagledning/edition/" in element.get("href"):
                 continue
             year = element.text
             if year >= startyear and year not in years:   # string comparison is ok in this case
@@ -2498,7 +2493,7 @@ class SKVFS(MyndFskrBase):
                 resp = self.session.get(link)
                 resp.raise_for_status()
                 soup = BeautifulSoup(resp.text, "lxml")
-                for basefile_el in soup.find_all("td", text=re.compile("^\w+FS \d+:\d+")):
+                for basefile_el in soup.find_all("td", text=re.compile(r"^\w+FS \d+:\d+")):
                     relurl = basefile_el.find_next_sibling("td").a["href"]
                     basefile = self.sanitize_basefile(basefile_el.get_text().replace(" ", "/"))
                     params = {'uri': urljoin(link, relurl)}
@@ -2516,7 +2511,7 @@ class SKVFS(MyndFskrBase):
         pdffilename = self.store.downloaded_path(basefile,
                                                  attachment="index.pdf")
         if (self.config.refresh or not(os.path.exists(pdffilename))):
-            pdflinkel = soup.find(href=re.compile('\.pdf$'))
+            pdflinkel = soup.find(href=re.compile(r'\.pdf$'))
             if pdflinkel:
                 pdflink = urljoin(url, pdflinkel.get("href"))
                 self.log.debug("%s: Found PDF at %s" % (basefile, pdflink))
@@ -2610,7 +2605,7 @@ class SOSFS(MyndFskrBase):
             # if fs is missing, we should prepend either SOSFS or
             # HSLF-FS to it, depending on year (< 2015 -> SOSFS, >
             # 2015 -> HSLFS, if == 2015, raise hands and scream)
-            m = re.search("(SOSFS\s+|HSLF-FS\s+|)(\d+):(\d+)", linktext)
+            m = re.search(r"(SOSFS\s+|HSLF-FS\s+|)(\d+):(\d+)", linktext)
             if m:
                 fs, year, no = m.groups()
                 if not fs:
@@ -2707,7 +2702,7 @@ class SOSFS(MyndFskrBase):
         if title.startswith("Senaste version av "):
             title = title.replace("Senaste version av ", "")
         identifier = "%s (konsoliderad tom. %s)" % (
-            re.search("(SOSFS|HSLF-FS) \d+:\d+", title).group(0),
+            re.search(r"(SOSFS|HSLF-FS) \d+:\d+", title).group(0),
             self.consolidation_date(basefile))
         props['dcterms:identifier'] = identifier
         props['dcterms:title'] = Literal(title, lang="sv")
@@ -2740,8 +2735,8 @@ class SOSFS(MyndFskrBase):
                 # act, and assume that the consolidated version is
                 # consolidated up to and including that
                 change = sorted(self.consolidation_basis(soup), key=util.split_numalpha)[-1]
-        assert len(re.findall('(\d+:\d+)', change)) == 1, "Didn't find exactly one change (fsnummer) in '%s'" % change
-        return re.search("(SOSFS |HSLF-FS |)(\d+:\d+)", change).group(2)
+        assert len(re.findall(r'(\d+:\d+)', change)) == 1, "Didn't find exactly one change (fsnummer) in '%s'" % change
+        return re.search(r"(SOSFS |HSLF-FS |)(\d+:\d+)", change).group(2)
 
     def consolidation_basis(self, soup):
         return [self._basefile_from_text(x.text) for x in soup.find_all("div", "fileinformation__heading")]
@@ -2792,7 +2787,7 @@ class SOSFS(MyndFskrBase):
 
     def fwdtests(self):
         t = super(SOSFS, self).fwdtests()
-        t["dcterms:identifier"] = ['^([A-ZÅÄÖ-]+FS\s\s?\d{4}:\d+)']
+        t["dcterms:identifier"] = [r'^([A-ZÅÄÖ-]+FS\s\s?\d{4}:\d+)']
         return t
 
     def parse_metadata_from_textreader(self, reader, props, basefile):
@@ -2843,7 +2838,7 @@ class STFS(MyndFskrBase):
             for item in soup.find_all("div", "item"):
                 title = item.h3.text.strip() # eg. 'STFS 2018:1 Föreskrifter om partistöd'
                 basefile = " ".join(title.split(" ")[:2])
-                link = item.find("a", href=re.compile("file_id=\d+$"))
+                link = item.find("a", href=re.compile(r"file_id=\d+$"))
                 params = {'uri': urljoin(self.start_url, link["href"])}
                 yield self.sanitize_basefile(basefile), params
             nextpage = soup.find("a", text="»")
@@ -2859,4 +2854,4 @@ class STFS(MyndFskrBase):
 class SvKFS(MyndFskrBase):
     alias = "svkfs"
     start_url = "http://www.svk.se/om-oss/foreskrifter/"
-    basefile_regex = re.compile("^SvKFS (?P<basefile>\d{4}:\d{1,3})")
+    basefile_regex = re.compile(r"^SvKFS (?P<basefile>\d{4}:\d{1,3})")

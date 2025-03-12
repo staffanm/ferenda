@@ -44,15 +44,15 @@ def dir_sanitize_identifier(identifier):
     if identifier.startswith("Dir:"):
         identifier = identifier.replace("Dir:", "Dir.")
     # "Dir.1994:111" -> "Dir. 1994:111"
-    if re.match("Dir\.\d+", identifier):
+    if re.match(r"Dir\.\d+", identifier):
         identifier = "Dir. " + identifier[4:]
     # Dir. 2006.44 -> Dir. 2006:44
-    if re.match("Dir\. \d+\.\d+", identifier):
+    if re.match(r"Dir\. \d+\.\d+", identifier):
         # replace the rightmost . with a :
         identifier = identifier[::-1].replace(".", ":", 1)[::-1]
     if not identifier.startswith("Dir. "):
         identifier = "Dir. " + identifier
-    if not re.match("Dir\. (19|20)\d{2}:[1-9]\d{0,2}$", identifier):
+    if not re.match(r"Dir\. (19|20)\d{2}:[1-9]\d{0,2}$", identifier):
         raise ValueError("Irregular identifier %s (after mangling)" %  identifier)
     return Literal(identifier)
 
@@ -260,7 +260,7 @@ class DirTrips(Trips):
                                   p.endswith("m.fl.") or
                                   p.endswith("m. fl."))))
 
-        re_sectionstart = re.compile("^(\d[\.\d]*) +([A-ZÅÄÖ].*)$").match
+        re_sectionstart = re.compile(r"^(\d[\.\d]*) +([A-ZÅÄÖ].*)$").match
         def analyze_sectionstart(parser, chunk=None):
             """returns (ordinal, headingtype, text) if it looks like a section
             heading, (None, None, chunk) otherwise."""
@@ -317,8 +317,8 @@ class DirAsp(FixedLayoutSource):
     # that URI similar to what required the config.ipbasedurls option
     # in trips.py -- maybe we need something similar here (or fix our
     # systems at a lower level...)
-    start_url = "http://193.188.157.100/kompdf/search.asp"
-    document_url = "http://193.188.157.100/KOMdoc/%(yy)02d/%(yy)02d%(num)04d.PDF"
+    start_url = "http://rkrattsdb.gov.se/kompdf/search.asp"
+    document_url = "https://rkrattsdb.gov.se/KOMdoc/%(yy)02d/%(yy)02d%(num)04d.PDF"
     source_encoding = "iso-8859-1"
     rdf_type = RPUBL.Kommittedirektiv
     storage_policy = "dir"
@@ -328,6 +328,8 @@ class DirAsp(FixedLayoutSource):
     document_type = KOMMITTEDIREKTIV
     urispace_segment = "dir"
     
+    # Note: This DB is not updated after 2019-05-31 so once all is fetched, set
+    # download = False in config.ini
     def download(self, basefile=None):
         if basefile:
             return super(DirAsp, self).download(basefile)
@@ -356,7 +358,7 @@ class DirAsp(FixedLayoutSource):
             for hit in hits:
                 link = hit.find_parent("a")
                 # convert 2006:02 to 2006:2 for consistency
-                segments = re.search("(\d+):(\d+)", link.text).groups()
+                segments = re.search(r"(\d+):(\d+)", link.text).groups()
                 basefile = ":".join([str(int(x)) for x in segments])
                 # we use link.absolute_url rather than relying on our
                 # own basefile -> url code in remote_url. It seems
@@ -412,8 +414,8 @@ class DirRegeringen(Regeringen):
     jsfiles = ['pdfviewer.js']
     re_basefile_strict = re.compile(r'Dir\. (\d{4}:\d+)')
     re_basefile_lax = re.compile(r'(?:[Dd]ir\.?|) ?(\d{4}:\d+)')
-    re_urlbasefile_strict = re.compile("kommittedirektiv/\d+/\d+/[a-z]*\.?-?(\d{4})(\d+)-?/$")
-    re_urlbasefile_lax = re.compile("kommittedirektiv/\d+/\d+/.*?(\d{4})_?(\d+)")
+    re_urlbasefile_strict = re.compile(r"kommittedirektiv/\d+/\d+/[a-z]*\.?-?(\d{4})(\d+)-?/$")
+    re_urlbasefile_lax = re.compile(r"kommittedirektiv/\d+/\d+/.*?(\d{4})_?(\d+)")
     rdf_type = RPUBL.Kommittedirektiv
     document_type = Regeringen.KOMMITTEDIREKTIV
 
