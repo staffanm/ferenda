@@ -3,19 +3,13 @@ cached_property
 lxml
 rdflib
 rdflib-jsonld
-html5lib<=0.9999999   # later versions incompatible with current beautifulsoup
+html5lib
 requests
 jsmin
 cssmin
 whoosh
 pyparsing
-SimpleParse  # 2.2 is now py3 compatible -- but not available for python 3.12 on windows
-scandir # not needed for py3.5 +
-# patchit -- waiting for 1.2 so that we can drop our vendorized version
-# sphinx
-mock # not needed for py3.3 +
 coverage
-# bsddb3
 pyScss
 docutils
 wheel
@@ -28,3 +22,4 @@ langdetect
 werkzeug
 jinja2
 pyRDFa3
+lark
