@@ -836,14 +836,12 @@ with the *config* object as single parameter.
                         callback = lambda e: setattr(e, 'title', params['title'])
                     else:
                         callback = None
+                    kwargs = {}
                     if 'language' in params:
-                        kwargs = {'language': params['language']}
-                        # maybe create a curried version of self.store.documententry_path that uses a language param?
+                        kwargs['language'] = params['language']
                         from functools import partial
                         docentrypath = partial(self.store.documententry_path, language=params['language'])
-
                     else:
-                        kwargs = {}
                         docentrypath = self.store.documententry_path
                     ret = DocumentEntry.updateentry(self.download_single,
                                                     'download',

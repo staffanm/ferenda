@@ -879,10 +879,10 @@ def robust_fetch(method, url, logger, attempts=5, sleep=1, raise_for_status=True
     except requests.exceptions.RequestException as e:
             logger.error("Failed to fetch %s: error %s" % (url, e))
             raise e
-    if response.status_code == 304:
+    if response and response.status_code == 304:
         logger.debug("%s: 304 Not modified" % url)
         return False  # ie not updated
-    elif raise_for_status and response.status_code >= 400:
+    elif raise_for_status and response and response.status_code >= 400:
         logger.error("Failed to retrieve %s" % url)
         response.raise_for_status()
     else:

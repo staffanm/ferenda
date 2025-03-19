@@ -12,6 +12,7 @@ from html import escape
 import email
 import tempfile
 from collections import defaultdict
+from zipfile import ZipFile, ZIP_DEFLATED
 
 import requests
 from bs4 import BeautifulSoup
@@ -25,7 +26,7 @@ from ferenda import DocumentRepository, DocumentStore, Describer, DocumentEntry
 from . import CDM
 
 class EURLexStore(DocumentStore):
-    downloaded_suffixes = [".fmx4.zip", ".fmx4", ".xhtml", ".html", ".pdf"]
+    downloaded_suffixes = [".fmx4", ".fmx4.zip", ".xhtml", ".html", ".pdf"]
     def basefile_to_pathfrag(self, basefile):
         if basefile.startswith("."):
             return basefile
@@ -198,6 +199,7 @@ class EURLex(DocumentRepository):
             graph = Graph().parse(data=resp.content, format="xml")
         return graph
 
+    @decorators.action
     def find_manifestations(self, cellarid, celexid):
         # returns a list of (lang, filetype, mimetype, url) tuples, one for each language found (compared to self.config.languages)
         if not self.config.force and os.path.exists(self.store.intermediate_path(celexid, suffix='.manifestations.json')):
@@ -232,8 +234,7 @@ class EURLex(DocumentRepository):
                 self.log.warning(f"{celexid}: Found no expressions")
             else:
                 for lang, expression in candidateexpressions.items():
-                    candidateitem = {}
-                    # we'd like to order the manifestations in some preference order -- fmx4 > xhtml > html > pdf
+                    candidateitems = {}
                     for manifestation in expression.objects(CDM.expression_manifested_by_manifestation):
                         manifestationtype = str(manifestation.value(CDM.type))
                         # there might be multiple equivalent
@@ -245,42 +246,25 @@ class EURLex(DocumentRepository):
                         rootmanifestations = list(manifestation.subjects(OWL.sameAs))
                         if rootmanifestations:
                             manifestation = rootmanifestations[0]
-                        items = list(manifestation.subjects(CDM.item_belongs_to_manifestation))
-                        if len(items) == 1:
-                            candidateitem[manifestationtype] = items[0]
-                        elif len(items) == 2:
-                            # NOTE: for at least 32016L0680, there can be
-                            # two items of the fmx4 manifestation, where
-                            # one (DOC_1) is bad (eg only a reference to
-                            # the pdf file) and the other (DOC_2) is
-                            # good. The heuristic for choosing the good
-                            # one: if the owl:sameAs property ends in .xml
-                            # but not .doc.xml...
+                        candidateitems[manifestationtype] = list(manifestation.subjects(CDM.item_belongs_to_manifestation))
+                    if candidateitems:
+                        for t, items in candidateitems.items():
                             for item in items:
-                                # this picks a random object if there are
-                                # two or more owl:sameAs triples, but the
-                                # heuristic seems to work with all
-                                # owl:sameAs objects
-                                sameas = str(item.value(OWL.sameAs).identifier)
-                                if sameas.endswith(".xml") and not sameas.endswith(".doc.xml"):
-                                    candidateitem[manifestationtype] = item
-                                    break
-
-                    if candidateitem:
-                        for t, item in candidateitem.items():
-                            mimetype = str(item.value(CMR.manifestationMimeType))
-                            self.log.debug(f"{celexid}: Has manifestation {t} ({mimetype}) in language {lang}")
-                            manifestations.append({'language': lang, 'filetype': t, 'mimetype': mimetype, 'uri': str(item.identifier)})
+                                mimetype = str(item.value(CMR.manifestationMimeType))
+                                filename = str(item.value(OWL.sameAs).identifier).rsplit("/")[-1]
+                                if not filename.endswith(".zip"):
+                                    filename = re.split(r'(xhtml|fmx4|pdfa1a)\.', filename)[-1]
+                                self.log.debug(f"{celexid}: Has manifestation {t} ({mimetype}) in language {lang}")
+                                manifestations.append({'language': lang, 'filetype': t, 'filename': filename, 'mimetype': mimetype, 'uri': str(item.identifier)})
                     else:
-                        if candidateitem:
-                            self.log.warning(f"{celexid}: Language {lang} had no manifestations")
+                        self.log.warning(f"{celexid}: Language {lang} had no manifestations")
             with self.store.open_intermediate(celexid, mode="w", suffix=".manifestations.json") as fp:
                 json.dump(manifestations, fp, indent=2)
             self.dump_graph(celexid, graph)
         return manifestations
 
 
-    def download_single(self, basefile, url=None, language=None):
+    def download_single(self, basefile, url=None):
         if url is None:
             result = self.query_webservice("DN = %s" % basefile, page=1)
             result.raise_for_status()
@@ -296,13 +280,33 @@ class EURLex(DocumentRepository):
             assert match
             celex = match.group(1)
             assert celex == basefile
-            # call super().
-            res = []
-            for manifestation in self.find_manifestations(cellarid, celex):
-                res.append(super(EURLex, self).download_single(basefile, manifestation['url'], language=language))
-            return res
+            url = f"http://publications.europa.eu/resource/cellar/{cellarid}"
         else:
-            return super(EURLex, self).download_single(basefile, url, language=language)
+            cellarid = url.split("/")[-1]
+            celex = basefile
+        res = []
+        manifestations = self.find_manifestations(cellarid, celex)
+        for lang in self.config.languages:
+            for t in ("zip", "fmx4", "xhtml", "html", "pdf", "pdfa2a", "pdfa1a"):
+                bundle = [m for m in manifestations if m['language'] == lang and m['filetype'] == t]
+                if bundle:
+                    if len(bundle) == 1:
+                        res.append(super(EURLex, self).download_single(basefile, bundle[0]['uri'], language=lang))
+                    else:
+                        # create a zip of everything
+                        path = self.store.path(basefile, "downloaded", f".{t}.zip", language=lang)
+                        util.ensure_dir(path)
+                        with ZipFile(path, "w", ZIP_DEFLATED) as z:
+                        
+                            for m in bundle:
+                                resp = self.session.get(m['uri'])
+                                resp.raise_for_status()
+                                z.writestr(m['filename'], resp.content)
+                            self.log.info("%s@%s: download OK (bundle) from %s" % (basefile, lang, url))
+                    break
+            else: 
+                self.log.warning(f"No suitable manifestation for language {lang}")
+        return res
 
     def download_name_file(self, tmpfile, basefile, language, assumedfile):
         if assumedfile.endswith(".fmx4"):
@@ -314,6 +318,8 @@ class EURLex(DocumentRepository):
                 doctype = ".xhtml"
             elif sig[:4]== b'<?xm':
                 doctype = ".xhtml" # this might be wrong -- could be a FMX4 file with proper xml declaration
+            elif sig[:4] == b'%PDF':
+                doctype = ".pdf"
             else:
                 self.log.warning(
                     f"{tmpfile} has unknown signature {sig} -- don't know what kind of file it is")
@@ -350,36 +356,7 @@ class EURLex(DocumentRepository):
                     continue
                 celex = match.group(1)
                 self.log.debug(f"{idx + 1}: {celex} {cellarid}")
-                #entry = DocumentEntry(self.store.documententry_path(celex))
-                #if entry.content and not self.config.refresh:
-                #    # if we've already processed this file earlier, it's faster to determine if we need to update it based on the DocuemntEntry rather than the tree notice
-                #    lang = self.config.languages[0] # hardcode
-                #    filetype = entry.content['filename'].split(".")[-1]
-                #    mimetype = entry.content['mimetype']
-                #    url = entry.orig_url
-                #
-                #elif 'download' in entry.status and entry.status['download'] == "removed" and not self.config.refresh:
-                #    continue
-                #else:
-                #
-                candidates = defaultdict(list)
-                for manifestation in self.find_manifestations(cellarid, celex):
-                    if manifestation['language'] in self.config.languages:
-                        candidates[manifestation['language']].append(manifestation)
-
-                for lang in self.config.languages:
-                    if lang not in candidates:
-                        continue
-                    found = False
-                    for t in ("fmx4", "xhtml", "html", "pdf", "pdfa1a"):
-                        if not found:
-                            for m in candidates[lang]:
-                                if t == m['filetype']:
-                                    yield celex, m
-                                    found = True
-                    if not found:
-                        self.log.warning(f"{celex}: No suitable manifestation for language {lang}")
-
+                yield celex, {'uri': f"http://publications.europa.eu/resource/cellar/{cellarid}"}
             page += 1
             done = processedhits >= totalhits
             if not done:
