@@ -21,3 +21,4 @@ from .propositioner import Propositioner
 from .sfs import SFS
 from .sou import SOU
 from .kkv import KKV
+from .rattspraxis import Rattspraxis

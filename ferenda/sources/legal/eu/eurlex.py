@@ -38,7 +38,10 @@ class EURLexStore(DocumentStore):
     def pathfrag_to_basefile(self, pathfrag):
         if pathfrag.startswith("."):
             return pathfrag
-        year, basefile = pathfrag.split("/", 1)
+        year, basefile = pathfrag.split(os.sep, 1)
+        if "." in basefile and len(basefile.split(".",1)[-1]) == 3:
+            # this is a language code, not a file extension
+            return basefile.split(".",1)[0]
         return basefile
 
 
@@ -257,7 +260,7 @@ class EURLex(DocumentRepository):
                                 self.log.debug(f"{celexid}: Has manifestation {t} ({mimetype}) in language {lang}")
                                 manifestations.append({'language': lang, 'filetype': t, 'filename': filename, 'mimetype': mimetype, 'uri': str(item.identifier)})
                     else:
-                        self.log.warning(f"{celexid}: Language {lang} had no manifestations")
+                        self.log.warning(f"{celexid}@{lang}: No manifestations found")
             with self.store.open_intermediate(celexid, mode="w", suffix=".manifestations.json") as fp:
                 json.dump(manifestations, fp, indent=2)
             self.dump_graph(celexid, graph)
@@ -305,7 +308,7 @@ class EURLex(DocumentRepository):
                             self.log.info("%s@%s: download OK (bundle) from %s" % (basefile, lang, url))
                     break
             else: 
-                self.log.warning(f"No suitable manifestation for language {lang}")
+                self.log.warning(f"{basefile}@{lang}: No suitable manifestation found")
         return res
 
     def download_name_file(self, tmpfile, basefile, language, assumedfile):
@@ -320,6 +323,8 @@ class EURLex(DocumentRepository):
                 doctype = ".xhtml" # this might be wrong -- could be a FMX4 file with proper xml declaration
             elif sig[:4] == b'%PDF':
                 doctype = ".pdf"
+            elif sig == b'<HTML>\n<HEAD>\n<META http-equiv="Content-Type" content="text/html; charset=UTF-8"':
+                doctype = ".html"
             else:
                 self.log.warning(
                     f"{tmpfile} has unknown signature {sig} -- don't know what kind of file it is")
@@ -389,6 +394,17 @@ class EURLex(DocumentRepository):
         # basefile? It's probably not warranted to have a special
         # parse_metadata stage for these documents, we can extract
         # title, dates and other essential metadata from the body.
+        if source.endswith(".fmx4.zip"):
+            # unzip source file and parse the .doc.fmx.xml file found there
+            with util.unzip(source) as tmpdir:
+                for f in os.listdir(tmpdir):
+                    if f.endswith(".doc.fmx.xml"):
+                        doc.body = etree.parse(os.path.join(tmpdir, f))
+                        break
+                else:              
+                    raise errors.ParseError("No .doc.fmx.xml file found in %s" % source)
+            # now parse the .doc.fmx.xml file and call self.parse_formex for all DOC.MAIN.PUB elements found there (should only be one)
+            
         if source.endswith(".fmx4"):
             doc.body = self.parse_formex(doc, source)
         elif source.endswith(".html"):

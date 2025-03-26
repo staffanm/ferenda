@@ -16,3 +16,4 @@ from .myndprax import MyndPrax
 from .forarbeten import Forarbeten
 from .static import Static
 from .sitenews import Sitenews
+from .rattspraxis import Rattspraxis

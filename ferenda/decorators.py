@@ -75,6 +75,7 @@ def recordlastdownload(f):
         if not args or not any(args):
             if self.download_record_last_download:
                 self.config.lastdownload = datetime.now()
+                self.log.info(f"Setting lastdownload to {self.config.lastdownload}")
                 LayeredConfig.write(self.config)
         return ret
     return wrapper
