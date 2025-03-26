@@ -21,6 +21,7 @@ class EURLexTreaties(EURLex):
     # filtering out the crap.
     expertquery_template = "DN = 1*/TXT"
     celexfilter = re.compile(r"(1\d{4}[A-Z]{1,2})/TXT$").match
+    download_accept_404 = True # 12005S contains a bunch of references to fmx4 files that don't exist and a fmx4.zip that do exist.
 
 
 

@@ -254,13 +254,20 @@ class EURLex(DocumentRepository):
                         for t, items in candidateitems.items():
                             for item in items:
                                 mimetype = str(item.value(CMR.manifestationMimeType))
+                                if not item.value(OWL.sameAs):
+                                    self.log.warning(f"{celexid}: No owl:sameAs for type {t} in language {lang}, cannot name file")
+                                    continue
                                 filename = str(item.value(OWL.sameAs).identifier).rsplit("/")[-1]
                                 if not filename.endswith(".zip"):
                                     filename = re.split(r'(xhtml|fmx4|pdfa1a)\.', filename)[-1]
                                 self.log.debug(f"{celexid}: Has manifestation {t} ({mimetype}) in language {lang}")
                                 manifestations.append({'language': lang, 'filetype': t, 'filename': filename, 'mimetype': mimetype, 'uri': str(item.identifier)})
                     else:
+<<<<<<< HEAD
                         self.log.warning(f"{celexid}@{lang}: No manifestations found")
+=======
+                        self.log.debug(f"{celexid}: Language {lang} had no manifestations")
+>>>>>>> 5b329fa0 (eurlex now useable to download cases+treaties)
             with self.store.open_intermediate(celexid, mode="w", suffix=".manifestations.json") as fp:
                 json.dump(manifestations, fp, indent=2)
             self.dump_graph(celexid, graph)
@@ -280,8 +287,10 @@ class EURLex(DocumentRepository):
 
             celex = result.find(".//{http://eur-lex.europa.eu/search}ID_CELEX")[0].text
             match = self.celexfilter(celex)
-            assert match
-            celex = match.group(1)
+            # this doesn't work great for eurlextreaties that have basefiles like 12021S0001/TXT which really is 12021S
+            # assert match
+            # celex = match.group(1)
+            celex = basefile
             assert celex == basefile
             url = f"http://publications.europa.eu/resource/cellar/{cellarid}"
         else:
@@ -290,7 +299,7 @@ class EURLex(DocumentRepository):
         res = []
         manifestations = self.find_manifestations(cellarid, celex)
         for lang in self.config.languages:
-            for t in ("zip", "fmx4", "xhtml", "html", "pdf", "pdfa2a", "pdfa1a"):
+            for t in ("zip", "fmx4", "xml", "xhtml", "html", "pdf", "pdfa2a", "pdfa1a", "pdfa1b"):
                 bundle = [m for m in manifestations if m['language'] == lang and m['filetype'] == t]
                 if bundle:
                     if len(bundle) == 1:
@@ -299,12 +308,24 @@ class EURLex(DocumentRepository):
                         # create a zip of everything
                         path = self.store.path(basefile, "downloaded", f".{t}.zip", language=lang)
                         util.ensure_dir(path)
+                        downloadedbundle = []
                         with ZipFile(path, "w", ZIP_DEFLATED) as z:
-                        
                             for m in bundle:
-                                resp = self.session.get(m['uri'])
-                                resp.raise_for_status()
-                                z.writestr(m['filename'], resp.content)
+                                try:
+                                    resp = self.session.get(m['uri'])
+                                    resp.raise_for_status()
+                                    z.writestr(m['filename'], resp.content)
+                                    downloadedbundle.append(m)
+                                except requests.exceptions.HTTPError as e:
+                                    if self.download_accept_404 and e.response.status_code == 404:
+                                        self.log.warning(f"{basefile}@{lang}: Resource {m['uri']} ({m['filename']}) returns 404, skipping")
+                                    else:
+                                        raise e
+                        if len(downloadedbundle) == 1:
+                            res.append(super(EURLex, self).download_single(basefile, downloadedbundle[0]['uri'], language=lang))
+                        elif len(m) == 0:
+                            self.log.warning(f"{basefile}@{lang}: No resources in bundle was actually available for download")
+                        else:
                             self.log.info("%s@%s: download OK (bundle) from %s" % (basefile, lang, url))
                     break
             else: 
@@ -319,12 +340,25 @@ class EURLex(DocumentRepository):
                 doctype = ".fmx4.zip"
             elif sig[:67] ==  b'\r\n<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML//EN" "xhtml-strict.dtd">':
                 doctype = ".xhtml"
+            elif sig[:63] == b'<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">':
+                doctype = ".html"
+            elif sig[:80] == b'<HTML>\n<HEAD>\n<META http-equiv="Content-Type" content="text/html; charset=UTF-8"':
+                doctype = ".html"
+            elif sig[:80] == b'<HTML>\n   <HEAD>\n      <meta http-equiv="Content-Type" content="text/html; chars':
+                doctype = '.html'
             elif sig[:4]== b'<?xm':
                 doctype = ".xhtml" # this might be wrong -- could be a FMX4 file with proper xml declaration
+            elif sig[:48] == b'<!DOCTYPE html PUBLIC "yes" "xhtml1-strict.dtd">':
+                doctype = ".xhtml"
             elif sig[:4] == b'%PDF':
                 doctype = ".pdf"
+<<<<<<< HEAD
             elif sig == b'<HTML>\n<HEAD>\n<META http-equiv="Content-Type" content="text/html; charset=UTF-8"':
                 doctype = ".html"
+=======
+            elif sig[:30] == b"Resource [system 'cellar' - id":
+                raise errors.DownloadError(f"{basefile}@{language} - the request resource was not found")
+>>>>>>> 5b329fa0 (eurlex now useable to download cases+treaties)
             else:
                 self.log.warning(
                     f"{tmpfile} has unknown signature {sig} -- don't know what kind of file it is")
@@ -337,7 +371,10 @@ class EURLex(DocumentRepository):
     def download_get_basefiles(self, source):
         totalhits = None
         done = False
-        page = 1
+        try:
+            page = int(self.config.startpage)
+        except AttributeError:
+            page = 1
         processedhits = 0
         while not done:
             tree = etree.parse(BytesIO(source.encode("utf-8")))
