@@ -105,7 +105,11 @@ class Trips(SwedishLegalSource):
             year, ordinal = basefile.split(":")
             docurl = self.document_url_template % locals()
             yield(sbasefile, docurl)
-        nextpage = soup.find("div", "search-opt-next").a
+        nextdiv = soup.find("div", "search-opt-next")
+        if nextdiv:
+            nextpage = nextdiv.a
+        else:
+            raise NoMoreLinks()
         if nextpage:
             nextpage = urljoin(self.start_url,
                                nextpage.get("href"))

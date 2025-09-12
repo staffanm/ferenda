@@ -20,6 +20,9 @@ import string
 import subprocess
 import sys
 import time
+import gc
+import select
+import signal
 from collections import Counter
 from contextlib import contextmanager
 from email.utils import parsedate_tz
@@ -851,28 +854,40 @@ def base27decode(num):
     return ((num == 0) and base27alphabet[0] ) or (base27decode(num // b ).lstrip(base27alphabet[0]) + base27alphabet[num % b])
 
 
-def robust_fetch(method, url, logger, attempts=5, sleep=1, raise_for_status=True,
+def robust_fetch(method, url, logger, attempts=5, sleep=1, raise_for_status=True, reset=None,
                  *args, **kwargs):
     fetched = False
     lastexception = None
     response = None
+    intermittent_errors = (requests.exceptions.ConnectionError,
+                           requests.exceptions.Timeout,
+                           socket.timeout)
+    if " " in url:
+        url = url.replace(" ", "%20")
     try:
         while (not fetched) and (attempts > 0):
             try:
                 response = method(url, *args, **kwargs)
                 fetched = True
-            except (requests.exceptions.ConnectionError,
-                        requests.exceptions.Timeout,
-                        socket.timeout) as e:
+            except intermittent_errors as e:
                 logger.warning(
                     "Failed to fetch %s: err %s (%s remaining attempts)" %
                     (url, e, attempts))
                 lastexception = e
                 time.sleep(sleep)
-            if response and response.status_code >= 400 and response.status_code != 404:
+            if response is not None and response.status_code >= 400 and response.status_code != 404:
                 fetched = False  # let's retry even for 400 or 500 class errors, maybe it'll go better in a second
-                logger.warning("Failed to fetch %s: status %s (%s remaining attempts)" % (url, response.status_code, attempts))
+                if reset: # maybe it'll go better if we close down the current connection?
+                    logger.debug("Got a %s, closing any existing connections" % response.status_code)
+                    reset()
+                # Forcefully drain & close on error (safe even if stream=False)
+                try:
+                    _ = response.content  # forces a full read if streaming was on
+                finally:
+                    response.close()                    
+                logger.warning("Failed to fetch %s: status %s (%s remaining attempts, sleeping %s secs)" % (url, response.status_code, attempts, sleep))
                 time.sleep(sleep)
+            sleep *= 2 # exponential backoff
             attempts -= 1
         if not fetched:
             logger.error("Failed to fetch %s, giving up" % url)
@@ -889,6 +904,9 @@ def robust_fetch(method, url, logger, attempts=5, sleep=1, raise_for_status=True
         response.raise_for_status()
     else:
         return response
+
+def handler(signum, frame):
+    print("SIGALRM delivered")
 
 def cluster(iterable, maxgap=None, maxgap_ratio=10, remove_outliers=True):
     data = sorted(iterable)

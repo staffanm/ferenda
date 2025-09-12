@@ -4,13 +4,12 @@ from __future__ import unicode_literals, print_function
 # system libraries
 from collections import defaultdict, OrderedDict
 from datetime import datetime, date
-from time import time
+import time
 import codecs
 import logging
 import os
 import re
 import sys
-
 from html.parser import HTMLParser
 from urllib.parse import quote, unquote
 
@@ -140,13 +139,13 @@ class SFS(Trips):
     download_archive_overwrite = True
     download_archive_copy = True
     basefile_regex = r"(?P<basefile>\d{4}:(bih. ?|)\d+( ?s\. ?\d+| \d|))$"
-    document_url_template = "http://rkrattsbaser.gov.se/sfst?bet=%(basefile)s"
-    document_sfsr_url_template = "http://rkrattsbaser.gov.se/sfsr?bet=%(basefile)s"
-    document_sfsr_change_url_template = "http://rkrattsbaser.gov.se/sfsr?%%C3%%A4bet=%(basefile)s"
+    document_url_template = "https://rkrattsbaser.gov.se/sfst?bet=%(basefile)s"
+    document_sfsr_url_template = "https://rkrattsbaser.gov.se/sfsr?bet=%(basefile)s"
+    document_sfsr_change_url_template = "https://rkrattsbaser.gov.se/sfsr?%%C3%%A4bet=%(basefile)s"
     xslt_template = "xsl/sfs.xsl"
     max_resources = 2500  # SFS 2010:110 currently has 2063 legitimate subresources
     documentstore_class = SFSDocumentStore
-
+    extraheaders = {"Connection": "close"}
     def __init__(self, config=None, **kwargs):
         super(SFS, self).__init__(config, **kwargs)
         self.current_section = '0'
@@ -169,7 +168,7 @@ class SFS(Trips):
                 # shut up logger
                 self.trace[logname].propagate = False
 
-    _start_url = "http://rkrattsbaser.gov.se/sfsr/adv?sort=asc"
+    _start_url = "https://rkrattsbaser.gov.se/sfsr/adv?sort=asc"
     @property
     def start_url(self):
         return self._start_url + ("&upph=false" if not self.config.keepexpired and "&upph=false" not in self._start_url else "")
@@ -384,41 +383,50 @@ class SFS(Trips):
         downloaded_path = self.store.downloaded_path(basefile)
         created = not os.path.exists(downloaded_path)
         updated = False
-        if self.download_if_needed(url, basefile):
-            if created:
-                text = util.readfile(downloaded_path, encoding=self.source_encoding)
-                if "<div>Inga träffar</div>" in text:
-                    self.log.warning("%s: Is not really an base SFS, search results must have contained an invalid entry" % basefile)
-                    util.robust_remove(downloaded_path)
-                    return False
-                self.log.info("%s: download OK from %s" % (basefile, url))
-            else:
-                self.log.info(
-                    "%s: download OK (new version) from %s" % (basefile, url))
-            updated = True
-        # using the attachment functionality makes some sense, but
-        # requires that self.store.storage_policy = "dir"
-        # regfilename= self.store.downloaded_path(basefile,attachment="register")
-        # The method used by download_new does not allow us to
-        # discover the magic URL to the database view containing
-        # metadata
-        if url:
-            metadatafilename = self.store.metadata_path(basefile)
-            self.download_if_needed(url, basefile, archive=False, filename=metadatafilename)
-        regfilename = self.store.register_path(basefile)
-        self.download_if_needed(sfsr_url, basefile, archive=False, filename=regfilename)
-        entry = DocumentEntry(self.store.documententry_path(basefile))
-        now = datetime.now()
-        entry.orig_url = url
+        checked = False
+        try:
+            if self.download_if_needed(url, basefile, extraheaders=self.extraheaders):
+                if created:
+                    text = util.readfile(downloaded_path, encoding=self.source_encoding)
+                    if "<div>Inga träffar</div>" in text:
+                        self.log.warning("%s: Is not really an base SFS, search results must have contained an invalid entry" % basefile)
+                        util.robust_remove(downloaded_path)
+                        return False
+                    self.log.info("%s: download OK from %s" % (basefile, url))
+                else:
+                    self.log.info(
+                        "%s: download OK (new version) from %s" % (basefile, url))
+                    updated = True
+            # using the attachment functionality makes some sense, but
+            # requires that self.store.storage_policy = "dir"
+            # regfilename= self.store.downloaded_path(basefile,attachment="register")
+            # The method used by download_new does not allow us to
+            # discover the magic URL to the database view containing
+            # metadata
+            if url:
+                metadatafilename = self.store.metadata_path(basefile)
+                self.download_if_needed(url, basefile, archive=False, filename=metadatafilename, extraheaders=self.extraheaders)
+                regfilename = self.store.register_path(basefile)
+                self.download_if_needed(sfsr_url, basefile, archive=False, filename=regfilename, extraheaders=self.extraheaders)
+                entry = DocumentEntry(self.store.documententry_path(basefile))
+                now = datetime.now()
+                entry.orig_url = url
+        except requests.exceptions.HTTPError:
+            # if we get here, download_if_needed will have tried over
+            # and over again and logged their failure so we'll just
+            # keep going with the next base file and hope the server
+            # feels better in the morning
+            pass
         if created:
             entry.orig_created = now
         if updated:
             entry.orig_updated = now
-        checked = True
+            checked = True
         if checked:
             entry.orig_checked = now
-        entry.save()
+            entry.save()
 
+        time.sleep(1)
         return updated
 
     # FIXME: rename once we are sure it is in fact working
@@ -1757,7 +1765,7 @@ class SFS(Trips):
         # need repetition in order to make the XSLT processing simple.
         # FIXME: Preferred way would be to serialize the RDF graph as GRIT
         
-        start = time()
+        start = time.time()
         # compatibility hack to enable lxml to process qnames for namespaces
         def ns(string):
             if ":" in string:

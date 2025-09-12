@@ -1044,8 +1044,11 @@ with the *config* object as single parameter.
         # Take extra precautions in the event of temporary network
         # failures etc -- try 5 times with 1 second pause inbetween
         # before giving up.
+        
         response = util.robust_fetch(self.session.get, url, self.log,
                                      sleep=sleep, headers=headers, timeout=10)
+        # response = util.robust_fetch(self.session.get, url, self.log,
+        #                              sleep=sleep, headers=headers, timeout=10)
 
         if response is False:  # not modified
             return False
