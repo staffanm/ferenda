@@ -18,8 +18,8 @@
   <!-- Implementationer av templates som anropas från base.xsl -->
   <xsl:template name="headtitle">
     <xsl:value-of select="//xhtml:title"/>
-    <xsl:if test="//xhtml:meta[@property='dcterms:alternate']/@content">
-      (<xsl:value-of select="//xhtml:meta[@property='dcterms:alternate']/@content"/>)
+    <xsl:if test="//xhtml:meta[@property='dcterms:alternative']/@content">
+      (<xsl:value-of select="//xhtml:meta[@property='dcterms:alternative']/@content"/>)
     </xsl:if> | Lagen.nu
   </xsl:template>
 
@@ -43,7 +43,7 @@
     <xsl:variable name="myndfs" select="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/rpubl:isBemyndigandeFor/rdf:Description"/>
     <xsl:variable name="forfattningskommentar" select="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/rinfoex:forfattningskommentar/xhtml:div/*"/>
     <xsl:variable name="label" select="//xhtml:meta[@property='rdfs:label' and not(@about)]/@content"/>
-    <xsl:variable name="alternate" select="//xhtml:meta[@property='dcterms:alternate']/@content"/>
+    <xsl:variable name="alternate" select="//xhtml:meta[@property='dcterms:alternative']/@content"/>
     <div class="row">
       <xsl:choose>
 	<xsl:when test="$expired">

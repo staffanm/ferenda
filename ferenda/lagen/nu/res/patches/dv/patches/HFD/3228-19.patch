@@ -1,0 +1,10 @@
+--- data/dv/intermediate/HFD/3228-19.xml.bz2
++++ 
+@@ -142,6 +142,7 @@ Added missing avgörandedatum
+      <w:p>
+       <w:r>
+        <w:t>
++	2020-02-11
+        </w:t>
+       </w:r>
+      </w:p>
