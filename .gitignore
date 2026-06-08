@@ -24,3 +24,6 @@ __pycache__/
 .direnv/
 /mediawiki-db-backup-230502/
 /mediawiki-html-backup-230502/
+
+# Site config holds live credentials -- never track
+/site/ferenda.ini
