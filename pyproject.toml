@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ferenda"
+version = "0.3.1.dev1"
+description = "Transform unstructured document collections to structured Linked Data"
+readme = "README.rst"
+license = "BSD-3-Clause"
+requires-python = ">=3.10"
+authors = [
+    { name = "Staffan Malmgren", email = "staffan.malmgren@gmail.com" },
+]
+keywords = ["rdf", "linkeddata", "parsing"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Internet :: WWW/HTTP :: WSGI :: Application",
+    "Topic :: Text Processing",
+    "Topic :: Text Processing :: Indexing",
+    "Topic :: Text Processing :: Markup :: XML",
+]
+dependencies = [
+    "beautifulsoup4",
+    "cached-property",
+    "cssmin",
+    "docutils",
+    "grako",
+    "html5lib",
+    "jinja2",
+    "jsmin",
+    "langdetect",
+    "layeredconfig",
+    "lxml",
+    "pyparsing",
+    "rdflib",
+    "rdflib-jsonld",
+    "requests",
+    "responses",
+    "simpleparse",
+    "werkzeug",
+    "whoosh",
+    "wikitextparser",
+]
+
+[project.optional-dependencies]
+dev = [
+    "coverage",
+    "psutil",
+]
+
+[project.scripts]
+ferenda-setup = "ferenda.manager:runsetup"
+
+[project.urls]
+Homepage = "https://github.com/staffanm/ferenda/"
+
+[tool.setuptools.packages.find]
+exclude = ["test", "docs", "site", "data"]
+
+[tool.setuptools]
+include-package-data = true
+zip-safe = false

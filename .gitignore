@@ -15,8 +15,12 @@ devtools.py
 /htmlcov/
 /netstandards
 /lagen.nu
-/test/files/repo/sfs/intermediate
+/test/files/repo/
 /tng.lagen.nu
 /wip
 __pycache__/
 /doc/_build/
+/data/
+.direnv/
+/mediawiki-db-backup-230502/
+/mediawiki-html-backup-230502/
