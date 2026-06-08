@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
 nativeint = int
-from builtins import *
-from future.utils import native_str
 
 # stdlib
 from collections import defaultdict, OrderedDict
@@ -1337,7 +1333,7 @@ with the *config* object as single parameter.
         :type   doc: ferenda.Document
         :returns: None
         """
-        soups = soup.select(native_str(self.parse_content_selector))
+        soups = soup.select(self.parse_content_selector)
         if len(soups) == 0:
             raise errors.ParseError("%s: parse_content_selector %r matches nothing" %
                                     (doc.basefile, self.parse_content_selector))
@@ -1346,7 +1342,7 @@ with the *config* object as single parameter.
                              (self.parse_content_selector))
         soup = soups[0]
         for filter_selector in self.parse_filter_selectors:
-            for tag in soup.select(native_str(filter_selector)):
+            for tag in soup.select(filter_selector):
                 # tag.decompose()
                 tag.extract()  # decompose fails on some trees
 
@@ -3731,6 +3727,16 @@ WHERE {
                 exists.append(basefile)
             # Note: duplication of (part of) parseifneeded logic
             if not util.outfile_is_newer([dependency], target):
+                # Check DocumentEntry to see if this document was marked as removed
+                entry_path = self.store.documententry_path(basefile)
+                if os.path.exists(entry_path):
+                    from ferenda import DocumentEntry
+                    entry = DocumentEntry(entry_path)
+                    # Don't add to todo if parse was marked as "removed"
+                    if ('parse' in entry.status and 
+                        'success' in entry.status['parse'] and 
+                        entry.status['parse']['success'] == "removed"):
+                        continue
                 todo.append(basefile)
         status['parse'] = {'exists': exists,
                            'todo': todo}

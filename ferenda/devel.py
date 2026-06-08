@@ -1,7 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
 import builtins
 
 from ast import literal_eval
@@ -42,7 +39,7 @@ from ferenda.thirdparty.patchit import PatchSet, PatchSyntaxError, PatchConflict
 from werkzeug.routing import Rule
 from werkzeug.wrappers import Response
 
-from ferenda.compat import Mock
+from unittest.mock import Mock
 from ferenda import (TextReader, TripleStore, FulltextIndex, WSGIApp,
                      Document, DocumentRepository,
                      CompositeRepository, DocumentEntry, Transformer,
@@ -855,10 +852,6 @@ class Devel(object):
             # predicates are given as a comma separated list, eg ./ferenda-build.py devel csvinventory kkv rpubl:malnummer,rpubl:avgorandedatum,rinfoex:instanstyp,rinfoex:domstol,rinfoex:upphandlande,rinfoex:leverantor,rinfoex:arendetyp,rinfoex:avgorande
             predicates = predicates.split(",")
         import csv
-        # if six.PY2:
-        #     delimiter = b';'
-        #     out = sys.stdout
-        # else:
         import codecs
         delimiter = ';'
         out = codecs.getwriter("latin-1")(sys.stdout.detach())
@@ -885,8 +878,6 @@ class Devel(object):
                             # values), while py3 CSV expects unicode
                             # (sensibly)
                             fld = str(o)
-                            # if six.PY2:
-                            #     fld = fld.encode("latin-1", errors="replace")
                             row[qname] = fld
                 if 'subobjects' in predicates:
                     row['subobjects'] = len(list(g.subject_objects(RDF.type)))

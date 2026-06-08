@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
 
 # system libraries
 from collections import defaultdict, OrderedDict
@@ -2177,7 +2176,7 @@ WHERE {
                 v = self.display_title(resourceuri)
                 # optionally add rdfs:label and dcterms:alternate
                 alts = []
-                for pred in RDFS.label, DCTERMS.alternate:
+                for pred in RDFS.label, DCTERMS.alternative:
                     val = desc.graph.value(URIRef(rooturi), pred)
                     if val:
                         alts.append(val)

@@ -1,19 +1,10 @@
 # -*- coding: utf-8 -*-
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
-from future import standard_library
-standard_library.install_aliases()
-
 from io import StringIO
 from traceback import format_tb
 import datetime
 import hashlib
 import json
-try:
-    from json.decoder import JSONDecodeError
-except ImportError:
-    JSONDecodeError = ValueError  # what json on python < 3.5 uses instead
+from json.decoder import JSONDecodeError
 import logging
 import os
 import sys

@@ -1,7 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
 
 import logging
 import os
@@ -262,7 +259,7 @@ class LegalRef:
                                                          self.metadata_graph))
 
         if self.KORTLAGRUM in self.args:
-            d = self.get_relations(DCTERMS.alternate, self.metadata_graph)
+            d = self.get_relations(DCTERMS.alternative, self.metadata_graph)
             self.namedlaws.update(d)
 
             if not self.lawlist and "LawAbbreviation ::= " not in self.decl:

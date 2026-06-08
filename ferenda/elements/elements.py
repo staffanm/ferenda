@@ -14,13 +14,7 @@ The module also contains the convenience functions
 hierarchies to and from strings.
 
 """
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
-from future import standard_library
-standard_library.install_aliases()
 import builtins
-from future.utils import native
 
 from operator import itemgetter
 import ast
@@ -540,11 +534,6 @@ class Link(UnicodeElement):
 
     # FIXME: can __repr__ on PY2 return unicode data?
     def __repr__(self):
-        # convoluted way around a UnicodeEncode error on py2 when self contains
-        # non-ascii characters
-        # if six.PY2:
-        #     rep = repr(str(self))[2:-1]
-        # else:
         rep = self
         return 'Link(\'%s\', uri=%s)' % (rep, self.uri)
 
@@ -728,7 +717,7 @@ def __serialize_json(node):
     elif type(node) == list:
         return [__serialize_json(x) for x in node]
     elif type(node) == dict or type(node).__name__ == "dict":
-        return native(dict([(k, __serialize_json(v)) for k, v in node.items()]))
+        return dict([(k, __serialize_json(v)) for k, v in node.items()])
     else:
         if node.__class__.__module__ in ('builtins', '__builtin__'):
             # py2 workaround -- we want a str to be known as 'str' always, but py2
@@ -894,7 +883,7 @@ def __serialize_xml(node, serialize_hidden_attrs=False):
             if val is None:
                 continue
             if (isinstance(val, (str, bytes))):
-                e.set(key, native(val))
+                e.set(key, val)
             elif isinstance(val, LayeredConfig):  # FIXME: this is an
                                                   # ugly hack to avoid
                                                   # problems with

@@ -84,7 +84,7 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
     subrepos = [
         myndfskr.AFS,
         myndfskr.BOLFS,
-        myndfskr.DIFS,
+        myndfskr.IMYFS,
         myndfskr.DVFS,
         myndfskr.EIFS,
         myndfskr.ELSAKFS,
@@ -96,7 +96,7 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
         myndfskr.LMFS,
         myndfskr.LVFS,
         myndfskr.MIGRFS,
-        myndfskr.MPRTFS,
+        myndfskr.MEMYFS,
         myndfskr.MSBFS,
         myndfskr.MYHFS,
         myndfskr.NFS,

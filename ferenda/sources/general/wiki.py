@@ -1,7 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
 
 # system
 import re
@@ -18,16 +15,11 @@ from ferenda import util
 from ferenda.sources.general import Keyword
 # from keywords import Keyword
 
-try:
-    from ferenda.thirdparty.mw import Parser, Semantics, Settings, Preprocessor
-except ImportError as e:
-    import sys
-    if sys.version_info < (2, 7):
-        raise RuntimeError(
-            "ferenda.sources.general.Wiki is not supported under python 2.6: %s" %
-            str(e))
-    else:
-        raise e  # dunno
+# TODO: Port MediaWiki parsing code from grako-based ferenda.thirdparty.mw 
+# to wikitextparser. The old Parser, Semantics, Settings, Preprocessor 
+# classes need to be reimplemented using wikitextparser API.
+# See: https://github.com/5j9/wikitextparser for documentation
+import wikitextparser as wtp
 
 import unicodedata
 
@@ -202,17 +194,18 @@ class MediaWiki(DocumentRepository):
         # find its uri.
         return self.keywordrepo.canonical_uri(basefile, version)
 
-    def get_wikiparser(self):
-        return Parser(parseinfo=False, whitespace='', nameguard=False)
+    # TODO: Reimplement these methods using wikitextparser
+    # def get_wikiparser(self):
+    #     return Parser(parseinfo=False, whitespace='', nameguard=False)
 
-    def get_wikisemantics(self, parser, settings):
-        return WikiSemantics(parser, settings)
+    # def get_wikisemantics(self, parser, settings):
+    #     return WikiSemantics(parser, settings)
 
-    def get_wikisettings(self):
-        return WikiSettings(lang=self.lang)
+    # def get_wikisettings(self):
+    #     return WikiSettings(lang=self.lang)
 
-    def get_wikipreprocessor(self, settings):
-        return WikiPreprocessor(settings)
+    # def get_wikipreprocessor(self, settings):
+    #     return WikiPreprocessor(settings)
 
     def postprocess(self, doc, xhtmltree, toplevel_property=True):
         body = xhtmltree.getchildren()[0]
@@ -310,43 +303,44 @@ class MediaWiki(DocumentRepository):
 #            ts.add_serialized(data, format="xml", context=context)
 
 
-class WikiSemantics(Semantics):
+# TODO: These classes need to be reimplemented using wikitextparser
+# class WikiSemantics(Semantics):
 
-    def document(self, ast):
-        html = super(WikiSemantics, self).document(ast)
-        # remove the newly-created toc. If postprocess_toc was a
-        # Semantics method we could just override this in this
-        # superclass, now we'll have to rip it out after the fact.
-        toc = html.find(".//div[@id='toc']")
-        if toc is not None:
-            toc.getparent().remove(toc)
-        return html
+#     def document(self, ast):
+#         html = super(WikiSemantics, self).document(ast)
+#         # remove the newly-created toc. If postprocess_toc was a
+#         # Semantics method we could just override this in this
+#         # superclass, now we'll have to rip it out after the fact.
+#         toc = html.find(".//div[@id='toc']")
+#         if toc is not None:
+#             toc.getparent().remove(toc)
+#         return html
 
-    def internal_link(self, ast):
-        el = super(WikiSemantics, self).internal_link(ast)
-        target = "".join(ast.target).strip()
-        name = self.settings.canonical_page_name(target)
-        if name[0].prefix == 'category':
-            el.set("rel", "dcterms:subject")
-        return el
-
-
-class WikiSettings(Settings):
-
-    def make_url(self, name, **kwargs):
-        uri = super(WikiSettings, self).make_url(name, **kwargs)
-        return uri
+#     def internal_link(self, ast):
+#         el = super(WikiSemantics, self).internal_link(ast)
+#         target = "".join(ast.target).strip()
+#         name = self.settings.canonical_page_name(target)
+#         if name[0].prefix == 'category':
+#             el.set("rel", "dcterms:subject")
+#         return el
 
 
-class WikiPreprocessor(Preprocessor):
+# class WikiSettings(Settings):
 
-    def get_template(self, namespace, pagename):
-        # FIXME: This is a special hack for supporting
-        # {{DISPLAYTITLE}} (not a proper template? Check if smc.mw is
-        # supposed to have support for wgAllowDisplayTitle
-        if pagename.startswith("DISPLAYTITLE:"):
-            pagename = "DISPLAYTITLE"
-        if namespace.prefix != "template":
-            return None
-        tmpl = self.settings.templates.get((namespace.prefix, pagename), None)
-        return tmpl
+#     def make_url(self, name, **kwargs):
+#         uri = super(WikiSettings, self).make_url(name, **kwargs)
+#         return uri
+
+
+# class WikiPreprocessor(Preprocessor):
+
+#     def get_template(self, namespace, pagename):
+#         # FIXME: This is a special hack for supporting
+#         # {{DISPLAYTITLE}} (not a proper template? Check if smc.mw is
+#         # supposed to have support for wgAllowDisplayTitle
+#         if pagename.startswith("DISPLAYTITLE:"):
+#             pagename = "DISPLAYTITLE"
+#         if namespace.prefix != "template":
+#             return None
+#         tmpl = self.settings.templates.get((namespace.prefix, pagename), None)
+#         return tmpl

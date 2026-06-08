@@ -9,9 +9,6 @@
 # inheriting from DocumentRepository and this class). For the time
 # being though, the code should not be included in tests and coverage
 # -- it's dead code, but with a hope of resuscitation.
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
 
 import os
 import subprocess

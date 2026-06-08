@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 """:py:mod:`unittest`-based classes and accompanying functions to
 create some types of ferenda-specific tests easier."""
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
 
 from difflib import unified_diff
 from io import BytesIO
@@ -22,7 +19,7 @@ import time
 import unicodedata
 from urllib.parse import unquote
 
-from ferenda.compat import unittest
+import unittest
 
 import rdflib
 from rdflib.compare import graph_diff

@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
 
 from tempfile import mktemp
 from urllib.parse import urljoin, unquote, urlparse, urlencode
 from xml.sax.saxutils import escape as xml_escape
 from io import BytesIO
 from itertools import chain
+from time import sleep
 import os
 import re
 import json
@@ -874,101 +872,13 @@ class MyndFskrBase(FixedLayoutSource):
 class AFS(MyndFskrBase):
     """Arbetsmiljöverkets författningssamling"""
     alias = "afs"
-    start_url = "https://www.av.se/arbetsmiljoarbete-och-inspektioner/publikationer/foreskrifter/foreskrifter-listade-i-nummerordning/"
+    start_url = "https://www.av.se/arbetsmiljoarbete-och-inspektioner/publikationer/foreskrifter/"
     landingpage = True
 
     basefile_regex = re.compile("^(?P<basefile>AFS \d+: ?\d+)")
     # we need a slighly more forgiving regex beause of AFS 2017:1,
     # which has the url "...afs-1-2017.pdf" ...
     document_url_regex = re.compile('.*(?P<basefile>\d+[:/_-]\d+).pdf$')
-
-    # Note that the url for AFS 2015:6 doesn't include the basefile at
-    # all. There seems to be no way of constructing a
-    # document_url_regex that matches that, but not invalid PDFs (such
-    # as consolidated versions). The following is too greedy.
-    # document_url_regex =
-    # re.compile(".*/publikationer/foreskrifter/.*\.pdf$")
-
-    def download_single(self, basefile, url=None):
-        # the basefile might be the lastest change act, while the url
-        # could be a landing page for the base act. The most prominent
-        # link ("Ladda ner pdf") could be to an official base act, or
-        # to an unofficial consolidated version up to and including
-        # the latest change act. So, yeah.
-        if basefile == "afs/1987:2":
-            # this is mislabeled in the index page -- it really leads to afs/2016:3
-            e = errors.DocumentRemovedError()
-            e.dummyfile = self.store.parsed_path(basefile)
-            raise e
-        assert not url.endswith(".pdf"), ("expected landing page for %s, got direct pdf"
-                                          " link %s" % (basefile, url))
-        resp = self.session.get(url)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "lxml")
-        title = soup.find("h1").text
-        # afs/2017:4 -> "AFS 2017:4"
-        identifier = basefile.upper().replace("/", " ")
-        # AFS 2017:4 -> 2017:4
-        short_identifier = identifier.split(" ")[1] 
-        # the test of wheter base act: It doesn't contain any change
-        # acts.
-        changeheader = soup.find(["h2", "h3"], text="Ursprungs- och ändringsföreskrifter")
-        is_baseact = not(changeheader)
-        if is_baseact:
-            link = soup.find("a", text="Ladda ner pdf")
-            pdfurl = urljoin(url, link["href"])
-            # do something smart to actually download the basefile
-            # from the pdfurl (saving url as orig_url). We'd like to
-            # call DocumentRepository.download_single, since
-            # super(...).download_single will call
-            # MyndFskrBase.download_single, which does too much. This
-            # is a clear sign that I don't understand OOP
-            # design. Anyway, this might work.
-            DocumentRepository.download_single(self, basefile, pdfurl, url)
-        else:
-            if not changeheader:
-                self.log.error("%s: Can't find a list of change acts at %s" % (basefile, url))
-                return False
-            pdfs = changeheader.parent.find_all("a", href=re.compile("\.pdf$"))
-            # first, get the actual basefile we're looking for (assume
-            # there really is one)
-            norm = util.normalize_space
-            match = lambda x: identifier in norm(x.text) or short_identifier in norm(x.text)
-            links = [x for x in pdfs if match(x)]
-            # a (short) list of identifiers that isn't present in the
-            # list of change acts, even though they should
-            whitelist = ['AFS 1994:53',]
-            if not links:
-                if identifier not in whitelist:
-                    self.log.error("Can't find PDF link to %s amongst %s" % (identifier, [x.text for x in pdfs]))
-                else:
-                    raise errors.DocumentRemovedError(basefile, dummyfile=self.store.downloaded_path(basefile))
-                return False
-            link = [x for x in pdfs if match(x)][0]
-            pdfurl = urljoin(url, link["href"])
-            # note: the actual downloading (call to
-            # DocumentRepository.download_single) happens at the very
-            # end
-            
-            # then, 1) find out what change act the consolidated
-            # version might be updated to. FIXME: we don't DO anything
-            # with this information!
-            ids = [norm(x.text).split(" ")[1] for x in pdfs if re.match("AFS \d+:\d+", norm(x.text))]
-            updated_to = sorted(ids, key=util.split_numalpha)[-1]
-
-            # 2) find the url to the consolidated pdf and store that
-            # as a separate basefile, using the html page as an
-            # attachment
-            base_basefile = re.search("AFS \d+:\d+", title).group(0).lower().replace(" ", "/")
-            link = soup.find("a", text="Ladda ner pdf")
-            consolidated_pdfurl = urljoin(url, link["href"])
-            consolidated_basefile = "konsolidering/%s" % base_basefile
-            DocumentRepository.download_single(self, consolidated_basefile, consolidated_pdfurl)
-            with self.store.open_downloaded(consolidated_basefile, "w", attachment="landingpage.html") as fp:
-                fp.write(resp.text)
-            
-            # 4) Actually download the main basefile
-            return DocumentRepository.download_single(self, basefile, pdfurl, url)
 
     def parse_metadata_from_consolidated(self, reader, props, basefile):
         super(AFS, self).parse_metadata_from_consolidated(reader, props, basefile)
@@ -1041,6 +951,49 @@ class AFS(MyndFskrBase):
             newtext += newline + "\n"
         return newtext
 
+    def download_single(self, basefile, url=None):
+        """Download AFS PDFs. Handles base regulations (with consolidated versions), change regulations, and repealed regulations."""
+        url = url or self.remote_url(basefile)
+        resp = self.session.get(url)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.content, "lxml")
+        
+        # Case 1: Base regulation with consolidated version - has "föreskrifternas ursprungliga lydelse" link
+        download_link = soup.find("a", href=True, string=re.compile("föreskrifternas ursprungliga lydelse och ändringar", re.IGNORECASE))
+        if download_link:
+            with self.store.open_downloaded(basefile, "w", attachment="konsolidering.html") as fp:
+                fp.write(resp.text)
+            
+            download_resp = self.session.get(urljoin(url, download_link['href']))
+            download_resp.raise_for_status()
+            download_soup = BeautifulSoup(download_resp.content, "lxml")
+            
+            pdf_links = [urljoin(download_resp.url, link['href']) for link in download_soup.find_all("a", href=re.compile(r'\.pdf$')) 
+                        if urljoin(download_resp.url, link['href']).startswith('https://www.av.se/')]
+            assert pdf_links, f"{basefile}: No PDF links found"
+            
+            # Download consolidated version if available
+            consolidated_pattern = re.compile(r'konsoliderad', re.IGNORECASE)
+            for pdf_url in pdf_links:
+                if consolidated_pattern.search(pdf_url):
+                    self.download_if_needed(pdf_url, f"konsolidering/{basefile}")
+                    break
+            
+            # Download main PDF
+            basefile_pattern = basefile.lower().replace(' ', '').replace(':', '')
+            main_pdf = next((url for url in pdf_links if basefile_pattern in url.split('/')[-1].lower().replace('-', '').replace('_', '')), None)
+            assert main_pdf, f"{basefile}: Could not identify main PDF"
+            self.download_if_needed(main_pdf, basefile)
+            
+        else:
+            # Case 2: Change regulation (direct PDF link) or Case 3: Repealed regulation ("Ladda ner PDF" link)
+            basefile_pattern = basefile.lower().replace(' ', '').replace(':', '')
+            pdf_link = soup.find("a", href=lambda x: x and x.endswith('.pdf') and basefile_pattern in x.lower().replace('-', '').replace('_', '')) or soup.find("a", string=re.compile("ladda ner pdf", re.IGNORECASE))
+            assert pdf_link, f"{basefile}: No PDF link found"
+            self.download_if_needed(urljoin(url, pdf_link['href']), basefile)
+        
+        return True
+
 
 class BOLFS(MyndFskrBase):
     alias = "bolfs"
@@ -1065,9 +1018,15 @@ class BOLFS(MyndFskrBase):
                 yield self.sanitize_basefile(h.text), params
 
 
-class DIFS(MyndFskrBase):
-    alias = "difs"
-    start_url = "http://www.datainspektionen.se/lagar-och-regler/datainspektionens-foreskrifter/"
+class IMYFS(MyndFskrBase):
+    alias = "imyfs"
+    start_url = "https://www.imy.se/om-oss/aktuellt-fran-oss/foreskrifter-och-allmanna-rad/"
+    
+    # Match both current IMYFS and legacy DIFS series
+    basefile_regex = re.compile(r"(?P<basefile>(IMYFS|DIFS) \d+:\d+)")
+    
+    def forfattningssamlingar(self):
+        return ["imyfs", "difs"]
 
 
 class DVFS(MyndFskrBase):
@@ -1506,31 +1465,16 @@ class MIGRFS(MyndFskrBase):
         t["rpubl:beslutadAv"].insert(0, '(?:meddelar|föreskriver)\s(Statens\s+invandrarverk)')
         return t
 
-class MPRTFS(MyndFskrBase):
-    alias = "mprtfs"
-    start_url = "http://www.mprt.se/sv/blanketter--publikationer/foreskrifter/"
-    basefile_regex = re.compile("^(?P<basefile>(MPRTFS|MRTVFS|RTVFS) \d+:\d+)$")
-    document_url_regex = None
-    download_iterlinks = False
+class MEMYFS(MyndFskrBase):
+    alias = "memyfs"
+    start_url = "https://mediemyndigheten.se/om-oss/lagar-forordningar-och-foreskrifter/"
+    
+    # Match current MEMYFS and legacy MPRTFS, MRTVFS, RTVFS series
+    # Note: Legacy series sometimes use dash instead of colon
+    basefile_regex = re.compile(r"(?P<basefile>(MEMYFS|MPRTFS|MRTVFS|RTVFS) \d+[:-]\d+)")
+    
     def forfattningssamlingar(self):
-        return ["mprtfs", "mrtvfs", "rtvfs"]
-
-    def download_get_basefiles(self, source):
-        soup = BeautifulSoup(source, "lxml")
-        for doc in soup.find_all("div", "OrderContainer"):
-            d = doc.find("a", "PDF")
-            if not d:
-                continue
-            m = self.basefile_regex.match(d.text)
-            if not m:
-                continue
-            basefile = self.sanitize_basefile(m.group("basefile"))
-            link = urljoin(self.start_url, d.get("href"))
-            params = {"uri": link}
-            t = doc.find("a", "Long")
-            if t:
-                params['title'] = doc.find("a", "Long").get_text().strip()
-            yield(basefile, params)
+        return ["memyfs", "mprtfs", "mrtvfs", "rtvfs"]
 
 class MSBFS(MyndFskrBase):
     alias = "msbfs"
@@ -1545,7 +1489,7 @@ class MSBFS(MyndFskrBase):
     # informationssäkerhet för statliga myndigheter" but may in cases
     # be on the form "Föreskrifter om rapportering av it-incidenter
     # för statliga myndigheter (MSBFS 2020:8)"...
-    basefile_regex = re.compile("(^| \()(?P<basefile>(MSBFS|SRVFS|KBMFS|SÄIFS) \d+:\d+)")
+    basefile_regex = re.compile("(^| \()(?P<basefile>(MSBFS|SRVFS|KBMFS|<<) \d+:\d+)")
 
     def forfattningssamlingar(self):
         return ["msbfs", "srvfs", "kbmfs", "säifs"]
@@ -1559,28 +1503,79 @@ class MSBFS(MyndFskrBase):
     @recordlastbasefile
     def download_get_basefiles(self, source):
         selectedpage = 1
+        found_any = False
         while source:
             soup = BeautifulSoup(source, "lxml")
-            for link_el in soup.find_all("a", "law"):
-                m = self.basefile_regex.search(link_el.string)
-                if m:
+            page_found_any = False
+            # Updated selector - find all links that match our basefile regex
+            for link_el in soup.find_all("a"):
+                link_text = link_el.get_text().strip()
+                if not link_text:
+                    continue
+                m = self.basefile_regex.search(link_text)
+                if m and '/regler/gallande-regler/' in link_el.get("href", ""):
                     link = urljoin(self.start_url, link_el.get("href"))
                     basefile = self.sanitize_basefile(m.group("basefile"))
                     params = {'uri': link}
                     yield basefile, params
-                else:
-                    self.log.warning("Link titled %s ought to be a basefile, but isn't" % link_el.string)
-            if soup.find("a", "pagination-next") and not soup.find("li", "pagination-next disabled"):
+                    found_any = True
+                    page_found_any = True
+            
+            # Improved pagination logic with safety checks
+            pagination_next = soup.find("a", "pagination-next")
+            pagination_disabled = soup.find("li", "pagination-next disabled")
+            
+            if (pagination_next and not pagination_disabled and 
+                page_found_any and selectedpage < 50):  # Safety limit to prevent infinite loops
                 selectedpage += 1
                 self.log.debug("Downloading %s, selectedpage %s" % (self.start_url, selectedpage))
+                
+                # Add throttling between pagination requests to avoid anti-scraping protection
+                sleep(1)
+                
                 resp = self.session.post(self.start_url, {"searchQuery": "",
                                                           "sortOrder": "DescendingYear",
                                                           "amountToShow": "10",
                                                           "selectedpage": selectedpage})
                 source = resp.text
             else:
+                self.log.debug("Stopping pagination: pagination_next=%s, pagination_disabled=%s, page_found_any=%s, selectedpage=%s" % 
+                              (bool(pagination_next), bool(pagination_disabled), page_found_any, selectedpage))
                 source = None
-                
+        
+        if not found_any:
+            self.log.warning("No basefiles found matching pattern %s" % self.basefile_regex.pattern)
+
+    def download_single(self, basefile, url):
+        """Download a single document. Fetches the landing page to find the direct PDF link."""
+        if url.endswith(".pdf"):
+            # If we already have the direct PDF URL, use it directly
+            return super(MSBFS, self).download_single(basefile, url)
+        
+        # Visit the landing page to get the direct PDF link
+        self.log.debug("Fetching landing page for %s: %s" % (basefile, url))
+        
+        # Add throttling to be gentle with the server
+        sleep(2)
+        resp = self.session.get(url)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "lxml")
+        
+        # Look for the download button: a.btn.secondary-purple-download-sm
+        download_link = soup.find("a", class_="btn secondary-purple-download-sm")
+        if not download_link:
+            # Fallback: look for any PDF link
+            download_link = soup.find("a", href=re.compile(r'\.pdf$', re.I))
+            
+        if download_link:
+            pdf_url = urljoin(url, download_link.get("href"))
+            self.log.debug("Found PDF link for %s: %s" % (basefile, pdf_url))
+            
+            # Use the parent's download_single with throttling
+            return self.download_if_needed(pdf_url, basefile, sleep=2)
+        else:
+            self.log.error("%s: Couldn't find PDF download link at %s" % (basefile, url))
+            return False
 
     def fwdtests(self):
         t = super(MSBFS, self).fwdtests()
@@ -1592,18 +1587,59 @@ class MSBFS(MyndFskrBase):
             
 
 class MYHFS(MyndFskrBase):
-    #  (id vs länk)
     alias = "myhfs"
-    start_url = "https://www.myh.se/Lagar-regler-och-tillsyn/Foreskrifter/"
+    start_url = "https://www.myh.se/lag-och-ratt/foreskrifter-och-allmanna-rad/gallande-foreskrifter-och-allmanna-rad"
     download_iterlinks = False
+    
+    # URLs for all three types of regulations
+    active_url = "https://www.myh.se/lag-och-ratt/foreskrifter-och-allmanna-rad/gallande-foreskrifter-och-allmanna-rad"
+    repealed_url = "https://www.myh.se/lag-och-ratt/foreskrifter-och-allmanna-rad/upphavda-foreskrifter-och-allmanna-rad"
+    removed_url = "https://www.myh.se/lag-och-ratt/foreskrifter-och-allmanna-rad/borttagna-foreskrifter-och-forteckningar"
 
     @decorators.downloadmax
     def download_get_basefiles(self, source):
-        soup = BeautifulSoup(source, "lxml")
-        for basefile in soup.find("div", "article-text").find_all("strong", text=re.compile("\d+:\d+")):
-            link = basefile.find_parent("td").find_next_sibling("td").a
-            params = {'uri': urljoin(self.start_url, link["href"])}
-            yield self.sanitize_basefile(basefile.text.strip()), params
+        # Multi-URL scraping for active, repealed, and removed regulations
+        urls = [self.active_url, self.repealed_url, self.removed_url]
+        myhfs_regex = re.compile(r'MYHFS (\d{4}):(\d+)')
+        
+        yielded_basefiles = set()  # Track to avoid duplicates
+        
+        for url in urls:
+            self.log.debug("Scraping MYHFS documents from: %s" % url)
+            try:
+                resp = self.session.get(url)
+                resp.raise_for_status()
+                soup = BeautifulSoup(resp.text, "lxml")
+                
+                # Find all PDF links and extract MYHFS numbers
+                for link in soup.find_all('a', href=True):
+                    if not link['href'].endswith('.pdf'):
+                        continue
+                        
+                    link_text = link.get_text(strip=True)
+                    match = myhfs_regex.search(link_text)
+                    
+                    if match:
+                        year = match.group(1)
+                        number = match.group(2)
+                        raw_basefile = f"MYHFS {year}:{number}"
+                        basefile = self.sanitize_basefile(raw_basefile)
+                        
+                        # Avoid duplicates across the three URLs
+                        if basefile not in yielded_basefiles:
+                            yielded_basefiles.add(basefile)
+                            
+                            # Handle relative vs absolute URLs
+                            pdf_url = link['href']
+                            if not pdf_url.startswith('http'):
+                                pdf_url = urljoin(url, pdf_url)
+                            
+                            params = {'uri': pdf_url}
+                            self.log.debug("Found MYHFS document: %s -> %s" % (raw_basefile, pdf_url))
+                            yield basefile, params
+                            
+            except Exception as e:
+                self.log.warning("Error scraping %s: %s" % (url, e))
         
 
 class NFS(MyndFskrBase):

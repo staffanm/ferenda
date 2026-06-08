@@ -1,7 +1,6 @@
 # Copyright 2013 semantics GmbH
 # Written by Marcus Brinkmann <m.brinkmann@semantics.de>
 
-from __future__ import print_function, absolute_import, division
 
 import re
 from bisect import bisect_left

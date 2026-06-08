@@ -68,7 +68,6 @@ class Main(unittest.TestCase):
             # 1. write a new python module containing a class with a staticmethod
             with open("testparser.py", "w") as fp:
                 fp.write("""
-from six import text_type as str
 from ferenda.elements import Body, Paragraph
 
 class Testobject(object):

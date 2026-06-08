@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
 """A bunch of helper functions for analyzing pdf files."""
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
 
 # stdlib
 import os

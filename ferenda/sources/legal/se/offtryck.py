@@ -1,7 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
 
 # stdlib
 import os
@@ -16,7 +13,6 @@ from math import sqrt, pi, e, floor
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
 from rdflib.namespace import DCTERMS
-import six
 from bs4 import BeautifulSoup
 from cached_property import cached_property
 
@@ -545,8 +541,8 @@ class Offtryck(SwedishLegalSource):
                                          (basefile, getattr(node, 'comment_on', '(Unknown)')))
             else:
                 for thing in node:
-                    if (isinstance(thing, collections.Iterable) and
-                        not isinstance(thing, six.string_types)):
+                    if (isinstance(thing, collections.abc.Iterable) and
+                        not isinstance(thing, str)):
                         validate_forfattningskommentar(thing)
         validate_forfattningskommentar(body)
                                 

@@ -231,82 +231,83 @@ class LNMediaWiki(wiki.MediaWiki):
             return super(LNMediaWiki, self).frontpage_content()
                             
 
-class LNSemantics(wiki.WikiSemantics):
+# TODO: These classes need to be reimplemented using wikitextparser
+# class LNSemantics(wiki.WikiSemantics):
 
-    def internal_link(self, ast):
-        el = super(LNSemantics, self).internal_link(ast)
-        return el
+#     def internal_link(self, ast):
+#         el = super(LNSemantics, self).internal_link(ast)
+#         return el
 
-    def external_link(self, ast):
-        el = super(LNSemantics, self).external_link(ast)
-        if el.get("href", "").startswith("https://lagen.nu/om/"):
-            newlink = el.get("href").replace(".html", "")
-            if newlink.endswith("/om/"):
-                newlink += "index"
-            el.set("href", newlink)
-        return el
+#     def external_link(self, ast):
+#         el = super(LNSemantics, self).external_link(ast)
+#         if el.get("href", "").startswith("https://lagen.nu/om/"):
+#             newlink = el.get("href").replace(".html", "")
+#             if newlink.endswith("/om/"):
+#                 newlink += "index"
+#             el.set("href", newlink)
+#         return el
 
-    def heading(self, ast):
-        el = super(LNSemantics, self).heading(ast)
-        # <h2><span class="mw-headline" id="[[:Kategori:Familjerätt|Familjerätt]]">
-        if el[0].text.startswith("[[:Kategori"):
-            # [[:Kategori:Familjerätt|Familjerätt]] -> https://lagen.nu/concept/Familjerätt
-            # 
-            # FIXME: there should be a way of getting mw to do this
-            # for us (by calling settings.make_url like internal_link
-            # does
-            basefile = el[0].text.split("|")[1][:-2]
-            href = self.settings.make_keyword_url(basefile)
-            link = etree.Element("a", **{'href': href,
-                                         'id': basefile})
-            link.text = basefile
-            el[0] = link
-        return el
+#     def heading(self, ast):
+#         el = super(LNSemantics, self).heading(ast)
+#         # <h2><span class="mw-headline" id="[[:Kategori:Familjerätt|Familjerätt]]">
+#         if el[0].text.startswith("[[:Kategori"):
+#             # [[:Kategori:Familjerätt|Familjerätt]] -> https://lagen.nu/concept/Familjerätt
+#             # 
+#             # FIXME: there should be a way of getting mw to do this
+#             # for us (by calling settings.make_url like internal_link
+#             # does
+#             basefile = el[0].text.split("|")[1][:-2]
+#             href = self.settings.make_keyword_url(basefile)
+#             link = etree.Element("a", **{'href': href,
+#                                          'id': basefile})
+#             link.text = basefile
+#             el[0] = link
+#         return el
     
 
-class LNSettings(wiki.WikiSettings):
-    def __init__(self, lang="en"):
-        super(LNSettings, self).__init__(lang)
-        from ferenda.thirdparty.mw.settings import Namespace as MWNamespace
-        template_ns = MWNamespace({"prefix": "template",
-                                   "ident": 10,
-                                   "name": {"en": "Template",
-                                            "de": "Vorlage",
-                                            "sv": "Mall"}})
-        self.namespaces.add(MWNamespace({"prefix": "category",
-                                         "ident": 14,
-                                         "name": {"en": "Category",
-                                                  "de": "Kategorie",
-                                                  "sv": "Kategori"}}))
-        self.namespaces.add(template_ns)
-        self.namespaces.add(MWNamespace({"prefix": "user",
-                                         "ident": 2,
-                                         "name": {"en": "User",
-                                                  "de": "Benutzer",
-                                                  "sv": "Användare"}}))
-        self.msgcat["toc"]["sv"] = "Innehåll"
-        self.templates = {("template", "TranslatedAct"):
-                          "\n<small>[{{{href}}} An unofficial translation of "
-                          "{{{actname}}} is available from "
-                          "{{{source}}}]</small>\n",
-                          ("template", "DISPLAYTITLE"): ""}
+# class LNSettings(wiki.WikiSettings):
+#     def __init__(self, lang="en"):
+#         super(LNSettings, self).__init__(lang)
+#         from ferenda.thirdparty.mw.settings import Namespace as MWNamespace
+#         template_ns = MWNamespace({"prefix": "template",
+#                                    "ident": 10,
+#                                    "name": {"en": "Template",
+#                                             "de": "Vorlage",
+#                                             "sv": "Mall"}})
+#         self.namespaces.add(MWNamespace({"prefix": "category",
+#                                          "ident": 14,
+#                                          "name": {"en": "Category",
+#                                                   "de": "Kategorie",
+#                                                   "sv": "Kategori"}}))
+#         self.namespaces.add(template_ns)
+#         self.namespaces.add(MWNamespace({"prefix": "user",
+#                                          "ident": 2,
+#                                          "name": {"en": "User",
+#                                                   "de": "Benutzer",
+#                                                   "sv": "Användare"}}))
+#         self.msgcat["toc"]["sv"] = "Innehåll"
+#         self.templates = {("template", "TranslatedAct"):
+#                           "\n<small>[{{{href}}} An unofficial translation of "
+#                           "{{{actname}}} is available from "
+#                           "{{{source}}}]</small>\n",
+#                           ("template", "DISPLAYTITLE"): ""}
 
-    def make_url(self, name, **kwargs):
-        # uri = super(LNSettings, self).make_url(name, **kwargs)
-        if name[1].startswith("SFS/"):
-            basefile = name[1][4:]
-            # sometimes it seems mwparser returns "SFS/1957:390 Lagen
-            # (1957:390) om fiskearrenden" instead of just
-            # "SFS/1957:390". However, we must handle "SFS/1845:50
-            # s.1" correctly
-            if " " in basefile: 
-                root, extra = basefile.split(" ",1)
-                if not re.match(r"s\.\d+$", extra):
-                    basefile = root
-            uri = self.make_sfs_url(basefile)
-        else:
-            if name[0].prefix == "user":
-                uri = "https://lagen.nu/wiki/%s" % self.expand_page_name(*name)
-            else:
-                uri = self.make_keyword_url(name[1])
-        return uri
+#     def make_url(self, name, **kwargs):
+#         # uri = super(LNSettings, self).make_url(name, **kwargs)
+#         if name[1].startswith("SFS/"):
+#             basefile = name[1][4:]
+#             # sometimes it seems mwparser returns "SFS/1957:390 Lagen
+#             # (1957:390) om fiskearrenden" instead of just
+#             # "SFS/1957:390". However, we must handle "SFS/1845:50
+#             # s.1" correctly
+#             if " " in basefile: 
+#                 root, extra = basefile.split(" ",1)
+#                 if not re.match(r"s\.\d+$", extra):
+#                     basefile = root
+#             uri = self.make_sfs_url(basefile)
+#         else:
+#             if name[0].prefix == "user":
+#                 uri = "https://lagen.nu/wiki/%s" % self.expand_page_name(*name)
+#             else:
+#                 uri = self.make_keyword_url(name[1])
+#         return uri

@@ -1,8 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
-from future.utils import exec_, native
 
 import sys
 import os
@@ -52,7 +48,7 @@ class Examples(unittest.TestCase, FerendaTestCase):
         os.chdir(workingdir)
         try:
             reload(ferenda)  # so that ferenda.__file__ might return a abspath
-            result = exec_(pycode, globals(), locals())
+            result = exec(pycode, globals(), locals())
         finally:
             os.chdir(oldwd)
         # the exec:ed code is expected to set return_value
@@ -146,7 +142,7 @@ class Examples(unittest.TestCase, FerendaTestCase):
         self.maxDiff = None
         # these are not normal shell scripts, but rather docutils-like
         # interminglings of commands (prefixed by "$ ") and output.
-        env = native(dict(os.environ)) # create a copy which we'll modify (maybe?)
+        env = dict(os.environ)  # create a copy which we'll modify (maybe?)
         env.update(extraenv)
         expected = ""
         out = b""

@@ -10,13 +10,7 @@ tool, you don't need to directly call any of these methods --
 else, for you.
 
 """
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
 nativeint = int
-from builtins import *
-from future import standard_library
-standard_library.install_aliases()
-from future.utils import bytes_to_native_str
 
 # stdlib
 from collections import OrderedDict, Counter
@@ -75,7 +69,7 @@ from werkzeug.serving import run_simple
 from ferenda import DocumentRepository  # needed for a doctest
 from ferenda import Transformer, TripleStore, ResourceLoader, WSGIApp, Resources
 from ferenda import errors, util
-from ferenda.compat import MagicMock
+from unittest.mock import MagicMock
 
 
 DEFAULT_CONFIG = {
@@ -287,8 +281,12 @@ def frontpage(repos,
     return True
 
 
-def status(repo, samplesize=3):
-    """Prints out some basic status information about this repository."""
+def status(repo, samplesize=3, stage=None):
+    """Prints out some basic status information about this repository.
+    
+    If stage is specified, shows detailed error information for documents
+    in the Todo state for that stage.
+    """
     print = builtins.print
     if not hasattr(repo, 'get_status'):
         return
@@ -329,6 +327,38 @@ def status(repo, samplesize=3):
         # downloaded: rdb-direct-mapping r2rml ... (141 more)
         # parsed: None (143 needs parsing)
         # generated: None (143 needs generating)
+    
+    # If a specific stage was requested, show detailed error information
+    if stage and stage in s:
+        todo_list = s[stage]['todo']
+        if todo_list:
+            # Print all basefiles in todo state on one line
+            print(f"\nBasefiles in Todo state for {stage} stage: {', '.join(todo_list)}")
+            print(f"\nDetailed error information for {stage} stage:")
+            print("=" * 50)
+            
+            for basefile in todo_list:
+                # Get the DocumentEntry to check for error information
+                entry_path = repo.store.documententry_path(basefile)
+                if os.path.exists(entry_path):
+                    from ferenda import DocumentEntry
+                    entry = DocumentEntry(entry_path)
+                    
+                    # Check if this stage has been attempted but failed
+                    if (stage in entry.status and 
+                        'date' in entry.status[stage] and 
+                        entry.status[stage].get('success') is False):
+                        
+                        print(f"\n{basefile}:")
+                        if 'error' in entry.status[stage]:
+                            print(f"  Error: {entry.status[stage]['error']}")
+                        if 'traceback' in entry.status[stage]:
+                            print(f"  Traceback:")
+                            for line in entry.status[stage]['traceback'].strip().split('\n'):
+                                print(f"    {line}")
+                        print()
+        else:
+            print(f"\nNo documents in Todo state for {stage} stage.")
     
 def make_wsgi_app(config, enabled=None, repos=None):
     """Creates a callable object that can act as a WSGI application by
@@ -616,9 +646,11 @@ Disallow: /*fs/*.png
             elif action == 'status':
                 repoclasses = _classes_from_classname(enabled, classname)
                 args = _setup_makeresources_args(config)
+                # Check if a stage parameter was provided
+                stage = argv[2] if len(argv) > 2 else None
                 for cls in repoclasses:
                     inst = _instantiate_class(cls, config, argv)
-                    status(inst)
+                    status(inst, stage=stage)
 
             elif action == 'frontpage':
                 # repoclasses = _classes_from_classname(enabled, classname)
@@ -697,7 +729,7 @@ Disallow: /*fs/*.png
             config_loaded = False
 
 def _nativestr(unicodestr, encoding="utf-8"):
-    return bytes_to_native_str(unicodestr.encode(encoding))
+    return unicodestr.encode(encoding).decode(encoding)
 
 
 def timeskew(config):

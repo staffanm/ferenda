@@ -1,7 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
 
 # Intermediate base class containing some functionality useful
 # for handling data sources of swedish law, including minting URIs etc..
@@ -32,8 +29,6 @@ from rdflib.namespace import DCTERMS, SKOS, FOAF, RDFS
 BIBO = Namespace("http://purl.org/ontology/bibo/")
 OLO = Namespace("http://purl.org/ontology/olo/core#")
 XHV = Namespace("http://www.w3.org/1999/xhtml/vocab#")
-from six import text_type as str
-import six
 import bs4
 from cached_property import cached_property
 from lxml import etree
@@ -66,12 +61,14 @@ class SwedishLegalStore(DocumentStore):
     def basefile_to_pathfrag(self, basefile):
         # "2012/13:152" => "2012-13/152"
         # "2012:152"    => "2012/152"
-        return basefile.replace("/", "-").replace(":", "/")
+        # "1845:50 s.1" => "1845/50_s.1"
+        return basefile.replace("/", "-").replace(":", "/").replace(" ", "_")
 
     def pathfrag_to_basefile(self, pathfrag):
         # "2012-13/152" => "2012/13:152"
         # "2012/152"    => "2012:152"
-        return pathfrag.replace("/", ":").replace("-", "/")
+        # "1845/50_s.1" => "1845:50 s.1"
+        return pathfrag.replace("/", ":").replace("-", "/").replace("_", " ")
 
 
 # used instead of False when we need to provide more information (yet
@@ -976,8 +973,8 @@ class SwedishLegalSource(DocumentRepository):
                     raise errors.InvalidTree("%s: Encountered %s twice" % (basefile, id))
                 ids.add(id)
             for thing in node:
-                if (isinstance(thing, collections.Iterable) and
-                    not isinstance(thing, six.string_types)):
+                if (isinstance(thing, collections.abc.Iterable) and
+                    not isinstance(thing, str)):
                     find_ids(thing)
         find_ids(body)
         if self.max_resources and len(ids) > self.max_resources:

@@ -1,7 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
 
 from bz2 import BZ2File
 from glob import glob
@@ -603,7 +600,6 @@ class PDFReader(CompoundElement):
                     entity = "&amp;#%s;" % b
                     newfp.write(entity.encode())
                 else:
-                    # newfp.write(six.int2byte(b))
                     newfp.write(bytes((b,)))
             newfp.seek(0)
             xmlfp = newfp
@@ -1348,9 +1344,6 @@ all text in a Textbox has the same font and size.
         if len(s) > 40:
             s = s[:25] + "[...]" + s[-10:]
 
-        #if six.PY2:
-        #    # s = repr(s)
-        #    s = s.encode('ascii', 'replace')
         if self.font:
             fontinfo = "%s@%s " % (self.font.family,
                                    self.font.size)

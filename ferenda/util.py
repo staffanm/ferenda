@@ -1,10 +1,5 @@
 # -*- coding: utf-8 -*-
 """General  library of small utility functions."""
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
-from future.standard_library import install_aliases
-install_aliases()
 
 import codecs
 import datetime
@@ -29,7 +24,7 @@ from email.utils import parsedate_tz
 from ast import literal_eval
 from urllib.parse import urlsplit, urlunsplit
 
-from docutils.utils import roman
+from docutils.utils._roman_numerals import RomanNumeral
 import requests.exceptions
 
 from . import errors
@@ -261,8 +256,6 @@ def runcmd(cmdline, require_success=False, cwd=None,
     :returns: The returncode, all stdout output, all stderr output
     :rtype: tuple
     """
-    # if sys.platform == "win32" and six.PY2:
-    #     cmdline_encoding = "windows-1252"
     if cmdline_encoding:
         cmdline = cmdline.encode(cmdline_encoding)
 
@@ -313,10 +306,7 @@ def list_dirs(d, suffix=None, reverse=False):
     :rtype: generator
 
     """
-    try:
-        from scandir import walk
-    except ImportError:
-        from os import walk
+    from os import walk
     if isinstance(suffix, str):
         suffix = [suffix]
     for (dirpath, dirnames, filenames) in walk(d, topdown=True):
@@ -698,18 +688,23 @@ def from_roman(s):
     """
     if s.islower():
         s = s.upper()
-    return roman.fromRoman(s)
+    return int(RomanNumeral.from_string(s))
 
 def to_roman(i, lower=False):
-    s = roman.toRoman(i)
+    rn = RomanNumeral(i)
     if lower:
-        s = s.lower()
-    return s
+        return rn.to_lowercase()
+    else:
+        return rn.to_uppercase()
     
 def is_roman(s):
     if not isinstance(s, str) or len(s) == 0:
         return False
-    return roman.romanNumeralPattern.match(s.upper()) is not None
+    try:
+        RomanNumeral.from_string(s.upper())
+        return True
+    except Exception:
+        return False
 
 
 def increment(s, amount=1):

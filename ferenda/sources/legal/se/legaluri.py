@@ -1,7 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
 """This module constructs URIs for a document based on the properties
 of that document. Alternatively, given a URI for a document, parse the
 different properties for the document"""

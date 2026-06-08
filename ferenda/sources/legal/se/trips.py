@@ -1,7 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
 
 # Base class for fetching data from an ancient database system used by
 # swedish gov IT...  FIXME: Now that the ancient database system has

@@ -1,10 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
-from future import standard_library
-standard_library.install_aliases()
-from future.utils import exec_
 
 import sys
 import os
@@ -47,7 +41,7 @@ class TestExamples(unittest.TestCase, FerendaTestCase):
     def _test_pyfile(self, pyfile, want=True, comparator=None):
         with open(pyfile, 'rb') as fp:
             pycode = compile(fp.read(), pyfile, 'exec')
-        result = exec_(pycode, globals(), locals())
+        result = exec(pycode, globals(), locals())
         # the exec:ed code is expected to set return_value
         got = locals()['return_value']
         if not comparator:

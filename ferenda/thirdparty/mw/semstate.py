@@ -1,8 +1,6 @@
 # Copyright 2013 semantics GmbH
 # Written by Marcus Brinkmann <m.brinkmann@semantics.de>
 
-from __future__ import print_function, division
-from __future__ import absolute_import, unicode_literals
 
 class SemanticsState(dict):
     # Internalize frozen states to conserve memory.

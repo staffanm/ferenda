@@ -8,9 +8,6 @@ aside from the standards (``download``, ``parse``, ``generate`` et
 al), you should also use :py:func:`~ferenda.decorators.action` so that
 manage.py will be able to call it.
 """
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
 
 from datetime import datetime
 from traceback import format_tb
@@ -22,13 +19,18 @@ import os
 import sys
 import time
 import logging
-try:
-    from inspect import getfullargspec
-except ImportError: # py 2 doesn't have getfullargspec, use getargspec instead
-    from inspect import getargspec as getfullargspec
+from inspect import getfullargspec
 
 from rdflib import Graph, URIRef
 from rdflib.compare import graph_diff
+from rdflib.namespace import DCTERMS
+
+# Import pyRdfa for RDFa parsing
+try:
+    from pyRdfa import pyRdfa
+    PYRDFA_AVAILABLE = True
+except ImportError:
+    PYRDFA_AVAILABLE = False
 from layeredconfig import LayeredConfig
 
 from ferenda import util
@@ -200,11 +202,18 @@ def render(f):
 
         # Extract all triples on the XHTML/RDFa data to a separate
         # RDF/XML file
-        distilled_graph = Graph()
-        with codecs.open(self.store.parsed_path(doc.basefile, version=doc.version),
-                         encoding="utf-8") as fp:  # unicode
-            distilled_graph.parse(data=fp.read(), format="rdfa",
-                                  publicID=doc.uri)
+        if PYRDFA_AVAILABLE:
+            # Use pyRdfa3 to parse RDFa content
+            distilled_graph = pyRdfa().graph_from_source(
+                self.store.parsed_path(doc.basefile, version=doc.version)
+            )
+        else:
+            # Fallback: try using rdflib's built-in parser (may not work)
+            distilled_graph = Graph()
+            with codecs.open(self.store.parsed_path(doc.basefile, version=doc.version),
+                             encoding="utf-8") as fp:  # unicode
+                distilled_graph.parse(data=fp.read(), format="rdfa",
+                                      publicID=doc.uri)
 
         # The act of parsing from RDFa binds a lot of namespaces
         # in the graph in an unneccesary manner. Particularly it
@@ -260,11 +269,33 @@ def render(f):
 
         # Validate that entry.title and entry.id has been filled
         # (might be from doc.meta and doc.uri, might be other things
-        entry = DocumentEntry(self.store.documententry_path(doc.basefile, version=doc.version))
+        entry_path = self.store.documententry_path(doc.basefile, version=doc.version)
+        entry = DocumentEntry(entry_path)
+        
+        # If entry is missing essential data, create/update it from the document
+        missing_data = False
         if not entry.id:
-            self.log.warning("entry.id missing")
+            entry.id = doc.uri
+            missing_data = True
         if not entry.title:
-            self.log.warning("entry.title missing")
+            # Try to get title from document meta or generate a basic one
+            if hasattr(doc, 'meta') and hasattr(doc.meta, 'value') and doc.meta.value(DCTERMS.title):
+                entry.title = str(doc.meta.value(DCTERMS.title))
+            else:
+                # Generate basic title from basefile and version
+                title = doc.basefile
+                if doc.version and doc.version != doc.basefile:
+                    title += f" (version {doc.version})"
+                entry.title = title
+            missing_data = True
+            
+        # Save the entry if we added missing data
+        if missing_data:
+            # Ensure directory exists
+            entry_dir = os.path.dirname(entry_path)
+            os.makedirs(entry_dir, exist_ok=True)
+            entry.save(entry_path)
+            self.log.debug("Created missing entry file: %s", entry_path)
         return ret
     return wrapper
 

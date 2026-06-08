@@ -1,10 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
-from future import standard_library
-standard_library.install_aliases()
-
 from datetime import date, datetime, MAXYEAR, MINYEAR
 from urllib.parse import quote, unquote
 from copy import deepcopy

@@ -1,12 +1,9 @@
 # -*- coding: utf-8 -*-
-from __future__ import print_function, unicode_literals
-__metaclass__ = type
 import re
 from operator import attrgetter
+from urllib.parse import urljoin
 from rdflib import Graph, Literal, Namespace, URIRef, RDF, RDFS, BNode
 from rdflib.resource import Resource
-from six.moves.urllib_parse import urljoin
-from six import text_type as str
 
 COIN = Namespace("http://purl.org/court/def/2009/coin#")
 

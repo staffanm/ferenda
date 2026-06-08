@@ -1,7 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
 
 from contextlib import contextmanager
 from collections import namedtuple
@@ -611,10 +608,6 @@ dependencies (in the form of source files for the action).
             if action == "parse":
                 intermediate_path = os.path.exists(self.intermediate_path(basefile))
             if os.path.getsize(x) > 0 or intermediate_path:
-                if os.path.getsize(x):
-                    print(f"{basefile}: {x}")
-                elif intermediate_path:
-                    print(f"{basefile} <= {self.intermediate_path(basefile)}")
                 yield basefile
             elif action in ("relate", "generate"):
                 trim_documententry(basefile)
