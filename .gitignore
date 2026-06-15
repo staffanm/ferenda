@@ -24,6 +24,10 @@ __pycache__/
 .direnv/
 /mediawiki-db-backup-230502/
 /mediawiki-html-backup-230502/
-
+/site/data/
+.playwright-mcp/
 # Site config holds live credentials -- never track
 /site/ferenda.ini
+
+# Vendored POI jars (fetch via tools/fetch_poi.sh)
+vendor/poi/*.jar

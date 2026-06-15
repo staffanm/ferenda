@@ -38,8 +38,10 @@ dependencies = [
     "grako",
     "html5lib",
     "jinja2",
+    "jpype1>=1.7.1",
     "jsmin",
     "langdetect",
+    "lark",
     "layeredconfig",
     "lxml",
     "pyparsing",
@@ -57,10 +59,12 @@ dependencies = [
 dev = [
     "coverage",
     "psutil",
+    "pytest",
 ]
 
 [project.scripts]
 ferenda-setup = "ferenda.manager:runsetup"
+lagen = "accommodanda.build:main"
 
 [project.urls]
 Homepage = "https://github.com/staffanm/ferenda/"
