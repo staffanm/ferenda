@@ -80,6 +80,10 @@ def doc_relpath(uri):
         source = "kommentar"
     elif loc.startswith("begrepp/"):
         source = "begrepp"
+    elif loc.startswith("ext/celex/"):
+        # EU acts keep the CELEX as the page name (slashes in treaty CELEX ->
+        # '_', as the downloader stores them)
+        return "eurlex/%s.html" % loc[len("ext/celex/"):].replace("/", "_")
     elif loc.startswith(FORARBETE):
         source = "fa"
     else:
@@ -103,12 +107,18 @@ def is_external(uri):
 
 
 def href(uri):
-    if uri.startswith(CELEX):
-        return EURLEX % uri[len(CELEX):].split("#")[0]  # -> EUR-Lex
     if not uri.startswith(BASE):
         return uri  # already-absolute external
     _, frag = split_uri(uri)
     return "/" + doc_relpath(uri) + ("#" + frag if frag else "")
+
+
+def external_href(uri):
+    """Where an ``ext/`` reference we don't host resolves -- EUR-Lex for a
+    CELEX (the EU act on the official site), else the uri itself."""
+    if uri.startswith(CELEX):
+        return EURLEX % catalog.local(uri)[len("ext/celex/"):].split("#")[0]
+    return uri
 
 
 # a minted fragment id decomposes into K(ap)/§/mom/stycke/punkt/mening segments
@@ -207,21 +217,29 @@ def render_runs(runs, site):
     for run in runs:
         if isinstance(run, str):
             out.append(escape(run))
-        elif is_external(run["uri"]):
-            out.append('<a class="ext" href="%s" rel="external">%s</a>'
-                       % (escape(href(run["uri"])), escape(run["text"])))
-        elif run["uri"].startswith(BASE) and not site.has(run["uri"]):
-            # we cite a document we don't have a page for -- show the text,
-            # not a link that would 404. Becomes live once that doc is parsed.
-            out.append('<span class="noref" title="%s">%s</span>'
-                       % (escape(catalog.local(run["uri"])), escape(run["text"])))
-        else:
-            # live link; hover shows the target paragraph (+ its list items)
-            tip = site.snippet(run["uri"])
+            continue
+        uri = run["uri"]
+        if site.has(uri):
+            # a document we host (incl. EU acts we've parsed) -- local link;
+            # hover shows the target paragraph (+ its list items)
+            tip = site.snippet(uri)
             out.append('<a href="%s"%s>%s</a>'
-                       % (escape(href(run["uri"])),
+                       % (escape(href(uri)),
                           (' title="%s"' % escape(tip)) if tip else "",
                           escape(run["text"])))
+        elif is_external(uri):
+            # an ext/ reference we don't host -- out to the external service
+            # (EUR-Lex for a CELEX); becomes a local link once we parse it
+            out.append('<a class="ext" href="%s" rel="external">%s</a>'
+                       % (escape(external_href(uri)), escape(run["text"])))
+        elif uri.startswith(BASE):
+            # a lagen.nu document with no page yet -- show the text, not a
+            # link that would 404. Becomes live once that doc is parsed.
+            out.append('<span class="noref" title="%s">%s</span>'
+                       % (escape(catalog.local(uri)), escape(run["text"])))
+        else:
+            out.append('<a class="ext" href="%s" rel="external">%s</a>'
+                       % (escape(uri), escape(run["text"])))
     return "".join(out)
 
 
@@ -277,7 +295,6 @@ def _id_attr(nid):
 def render_node(node, site, doc_uri, toc):
     t = node.get("type")
     nid = node.get("id")
-    anno = margin_inbound(site, doc_uri + "#" + nid) if nid else ""
 
     if t == "tabell":
         rows = "".join(render_node(c, site, doc_uri, toc)
@@ -297,6 +314,11 @@ def render_node(node, site, doc_uri, toc):
         lvl = min(node.get("level") or 2, 5) + 1
         return '<h%d id="%s" class="rubrik">%s</h%d>' % (
             lvl, escape(anchor), render_runs(text, site), lvl)
+
+    # inbound-link annotation, queried only for the node kinds that render it
+    # (text blocks, paragraf and generic containers) -- not for the leaf
+    # rubrik/tabell/rad/lista nodes handled above, which discard it
+    anno = margin_inbound(site, doc_uri + "#" + nid) if nid else ""
 
     if "text" in node:  # stycke/punkt/listelement/upphavd/moment (may nest)
         marker = node.get("beteckning") or node.get("ordinal")
@@ -489,10 +511,62 @@ def render_begrepp(art, site):
     return page(title, "Begrepp", meta, body, render_toc(toc))
 
 
+EURLEX_KIND = {"regulation": "EU-förordning", "directive": "EU-direktiv",
+               "decision": "EU-beslut", "judgment": "EU-domstolen",
+               "treaty": "Fördrag", "act": "EU-rättsakt"}
+
+# block type -> css class for the generic (paragraph-like) EU blocks
+EURLEX_CLASS = {"recital": "recital", "citation": "visa", "preamble": "preamble",
+                "point": "point", "ruling": "ruling", "note": "note", "row": "row"}
+
+
+def _render_eurlex_block(b, site, doc_uri, toc):
+    runs = render_runs(b["text"], site)
+    bid = b.get("id")
+    anno = margin_inbound(site, doc_uri + "#" + bid) if bid else ""
+    t = b["type"]
+    if t == "heading":
+        level = b.get("level") or 1
+        anchor = toc.add(bid, plain(b["text"]), level)
+        lvl = min(level + 1, 5)
+        return '<h%d id="%s" class="rubrik">%s</h%d>' % (lvl, escape(anchor),
+                                                         runs, lvl)
+    if t == "article":
+        # the article is a citation target (id == its number); annotate it with
+        # who cites it, like an SFS paragraph
+        anchor = toc.add(bid, plain(b["text"]), 2)
+        return '%s<h3 id="%s" class="artikel">%s</h3>' % (anno, escape(anchor),
+                                                          runs)
+    if t == "keyword":
+        return '<span class="sokord">%s</span>' % runs
+    num = b.get("num")
+    marker = '<span class="num">%s</span> ' % escape(num) if num else ""
+    cls = EURLEX_CLASS.get(t, "")
+    return '%s<p%s>%s%s</p>' % (anno, ' class="%s"' % cls if cls else "",
+                                marker, runs)
+
+
+def render_eurlex(art, site):
+    title = art.get("title") or catalog.local(art["uri"])
+    meta = _meta_dl([
+        ("CELEX", art.get("celex")),
+        ("Typ", EURLEX_KIND.get(art.get("doctype"), art.get("doctype"))),
+        ("Datum", art.get("date")),
+        ("EUT", art.get("oj")),
+        ("ECLI", art.get("ecli")),
+    ])
+    toc = Toc()
+    body = document_inbound(site, art["uri"]) + "".join(
+        _render_eurlex_block(b, site, art["uri"], toc)
+        for b in art.get("body", []))
+    kind = EURLEX_KIND.get(art.get("doctype"), "EU-rättsakt")
+    return page(title, kind, meta, body, render_toc(toc))
+
+
 def render_document(art, source, site):
     return {"sfs": render_sfs, "dv": render_dv, "forarbete": render_forarbete,
-            "kommentar": render_kommentar, "begrepp": render_begrepp}[source](
-        art, site)
+            "kommentar": render_kommentar, "begrepp": render_begrepp,
+            "eurlex": render_eurlex}[source](art, site)
 
 
 # --------------------------------------------------------------------------

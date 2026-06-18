@@ -178,10 +178,19 @@ def begrepp_document(art, path):
     return (art["uri"], "begrepp", "begrepp", title, title, str(path))
 
 
+def eurlex_document(art, path):
+    # kind is the doctype (regulation/directive/judgment/treaty); label is the
+    # CELEX (the short id citations use)
+    label = art.get("celex") or local(art["uri"])
+    return (art["uri"], "eurlex", art.get("doctype", "eurlex"),
+            label, art.get("title") or label, str(path))
+
+
 def document_row(art, path, source):
     return {"sfs": sfs_document, "dv": dv_document,
             "forarbete": forarbete_document, "kommentar": kommentar_document,
-            "begrepp": begrepp_document}[source](art, path)
+            "begrepp": begrepp_document, "eurlex": eurlex_document}[source](
+                art, path)
 
 
 # --------------------------------------------------------------------------

@@ -43,6 +43,8 @@ from .dv import download as dv_download
 from .dv import identity as dv_identity
 from .forarbete import download as fa_download
 from .forarbete import parse as fa_parse
+from .eurlex import download as eurlex_download
+from .eurlex import parse as eurlex_parse
 from .wiki import parse as wiki_parse
 from .dv.parse import api_member, parse_api_record, slug, to_artifact
 from .lib import catalog, render
@@ -506,6 +508,82 @@ SOURCES["forarbete"] = Source("forarbete", fa_list, {
 
 
 # --------------------------------------------------------------------------
+# EUR-Lex source (EU treaties, legislation, case law from CELLAR; CELEX ids)
+# --------------------------------------------------------------------------
+
+EURLEX_ROOT = DATA / "eurlex"
+EURLEX_CODE = (PKG / "eurlex" / "parse.py", PKG / "eurlex" / "model.py",
+               PKG / "lib" / "lagrum.py")
+
+
+@functools.cache
+def _eurlex_session():
+    return eurlex_download.make_session(eurlex_download.USER_AGENT)
+
+
+def eurlex_notice(basefile):
+    """The tree-notice graph -- the freshness marker for a downloaded CELEX."""
+    return eurlex_download.doc_dir(EURLEX_ROOT, basefile) / "notice.ttl"
+
+
+def eurlex_content(basefile):
+    """The Formex content file parse reads (zip bundle or single file), if any
+    was downloaded in a wanted language."""
+    path, _lang = eurlex_parse.content_file(
+        eurlex_download.doc_dir(EURLEX_ROOT, basefile))
+    return [path] if path else []
+
+
+def eurlex_artifact(basefile):
+    return eurlex_download.doc_dir(EURLEX_ROOT, basefile) / "artifact.json"
+
+
+def eurlex_parse_run(basefile):
+    path, lang = eurlex_parse.content_file(
+        eurlex_download.doc_dir(EURLEX_ROOT, basefile))
+    if path is None:
+        raise SkipDocument("%s: no swe/eng Formex content" % basefile)
+    art = eurlex_parse.to_artifact(eurlex_parse.parse_document(
+        eurlex_parse.load_formex(path), basefile, lang))
+    eurlex_artifact(basefile).write_text(
+        json.dumps(art, ensure_ascii=False, indent=2))
+
+
+def eurlex_download_run(basefile):
+    """Fetch one CELEX (tree notice + best content per language) from CELLAR.
+    Discovery of new CELEX is eurlex_harvest (bare `lagen eurlex download`)."""
+    stored = eurlex_download.download_document(
+        _eurlex_session(), EURLEX_ROOT, basefile,
+        eurlex_download.LANGUAGES, POLITENESS)
+    if not stored:
+        print("%s: no manifestation in %s" % (
+            basefile, "/".join(eurlex_download.LANGUAGES)), flush=True)
+
+
+def eurlex_harvest():
+    """Bulk discovery sweep of all three sectors (treaties/acts/caselaw) via the
+    CELLAR SPARQL endpoint. Incremental by default (skips CELEX already on disk);
+    --force re-fetches everything."""
+    if RUN.dry_run:
+        print("eurlex download: would harvest treaties/acts/caselaw into %s"
+              % EURLEX_ROOT)
+        return
+    for sector in eurlex_download.SECTORS:
+        seen, stored, skipped = eurlex_download.sync(
+            EURLEX_ROOT, sector, full=RUN.force)
+        print("eurlex %s: %d seen, %d stored, %d skipped"
+              % (sector, seen, stored, skipped))
+
+
+SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
+    EURLEX_ROOT), {
+    "download": Stage("download", eurlex_download_run, eurlex_notice),
+    "parse": Stage("parse", eurlex_parse_run, eurlex_artifact,
+                   inputs=eurlex_content, depends="download", code=EURLEX_CODE),
+}, harvest=eurlex_harvest)
+
+
+# --------------------------------------------------------------------------
 # wiki sources: kommentar (SFS commentary) + begrepp (concept glossary), both
 # parsed from the MediaWiki dump
 # --------------------------------------------------------------------------
@@ -577,6 +655,7 @@ ARTIFACTS = {
     "forarbete": lambda: sorted(FA_ROOT.glob("*/artifact/*.json")),
     "kommentar": lambda: sorted((DATA / "kommentar" / "artifact").glob("*.json")),
     "begrepp": lambda: sorted((DATA / "begrepp" / "artifact").glob("*.json")),
+    "eurlex": lambda: sorted(EURLEX_ROOT.glob("*/*/artifact.json")),
 }
 
 
