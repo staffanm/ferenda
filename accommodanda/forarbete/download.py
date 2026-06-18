@@ -212,10 +212,14 @@ def download_document(session, root, item, delay):
 # harvest
 # --------------------------------------------------------------------------
 
-def sync(root, types=None, full=False, limit=None, delay=0.5, log=print):
+def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
+         only=None):
     """Harvest the named types (default all). Incremental: newest-first, stop a
     type at the first document already on disk; `--full` re-walks everything,
-    skipping existing. Returns {type: (seen, new)}."""
+    skipping existing. `only` (a basefile) downloads just that one document --
+    walking the listing until it is found (ignoring the on-disk stop), the way
+    to fetch a single named förarbete that has no id->URL endpoint. Returns
+    {type: (seen, new)}."""
     session = make_session(USER_AGENT)
     totals = {}
     for typ in (types or list(TYPES)):
@@ -224,6 +228,12 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print):
         for items in iter_listing(session, typ, delay):
             for item in items:
                 seen += 1
+                if only is not None:
+                    if item["basefile"] != only:
+                        continue
+                    download_document(session, root, item, delay)
+                    new, done = 1, True
+                    break
                 if record_path(root, typ, item["basefile"]).exists():
                     if not full:
                         done = True   # newest-first => everything after is older
@@ -257,13 +267,18 @@ def main():
     ap.add_argument("--full", action="store_true",
                     help="re-walk the whole listing (default: stop at first seen)")
     ap.add_argument("--limit", type=int, help="max new docs per type")
+    ap.add_argument("--only", metavar="BASEFILE",
+                    help="download just this one document, e.g. --only 2025/26:28 "
+                         "(give the single type it belongs to)")
     ap.add_argument("--delay", type=float, default=0.5)
     args = ap.parse_args()
     bad = [t for t in args.types if t not in TYPES]
     if bad:
         ap.error("unknown type(s): %s (have: %s)" % (bad, ", ".join(TYPES)))
+    if args.only and len(args.types) != 1:
+        ap.error("--only needs exactly one type, e.g. `prop --only 2025/26:28`")
     totals = sync(args.root, args.types or None, full=args.full,
-                  limit=args.limit, delay=args.delay)
+                  limit=args.limit, delay=args.delay, only=args.only)
     for typ, (seen, new) in totals.items():
         print("%s: %d seen, %d new" % (typ, seen, new))
 
