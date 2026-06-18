@@ -23,9 +23,9 @@ from pathlib import Path
 
 import pytest
 
-from accommodanda.lib.lagrum import (ENKLALAGRUM, EURATTSFALL, FORARBETEN,
-                                MYNDIGHETSBESLUT, RATTSFALL, LagrumParser,
-                                load_abbreviations, load_namedlaws)
+from accommodanda.lib.lagrum import (ENKLALAGRUM, EULAGSTIFTNING, EURATTSFALL,
+                                FORARBETEN, MYNDIGHETSBESLUT, RATTSFALL,
+                                LagrumParser, load_abbreviations, load_namedlaws)
 from accommodanda.lib.util import normalize_space
 
 TESTROOT = Path(__file__).parent / "files" / "legalref"
@@ -130,6 +130,35 @@ EURATTSFALL_CASES = [
 @pytest.mark.parametrize("text,uri", EURATTSFALL_CASES)
 def test_eurattsfall(text, uri):
     parser = LagrumParser(NAMEDLAWS, basefile="x", parse_types=[EURATTSFALL])
+    assert [r.uri for r in parser.parse_text(text, context={})] == [uri]
+
+
+# EU legislation CELEX minting. The act-number's year/number order differs by
+# act type and flipped for all types in the 2015 reform, so the only robust
+# rule is the invariant that a CELEX year is in 1950-2050 (celex_year). The
+# year/number swap must not regress the pre-2015 forms.
+EULAGSTIFTNING_CASES = [
+    # post-2015: "(EU) <year>/<number>", year-first for every act type
+    ("Europaparlamentets och rådets direktiv (EU) 2016/1148",
+     "https://lagen.nu/ext/celex/32016L1148"),
+    ("Europaparlamentets och rådets förordning (EU) 2016/679",
+     "https://lagen.nu/ext/celex/32016R0679"),
+    # the sequence number can exceed the year range -- only the year is checked
+    ("Europaparlamentets och rådets direktiv (EU) 2022/2555",
+     "https://lagen.nu/ext/celex/32022L2555"),
+    # pre-2015 directive: "<year>/<number>/<coop>" (2- and 4-digit years)
+    ("rådets direktiv 85/337/EEG", "https://lagen.nu/ext/celex/31985L0337"),
+    ("Europaparlamentets och rådets direktiv 95/46/EG",
+     "https://lagen.nu/ext/celex/31995L0046"),
+    # pre-2015 regulation: "(coop) nr <number>/<year>", number-first
+    ("rådets förordning (EEG) nr 1234/85",
+     "https://lagen.nu/ext/celex/31985R1234"),
+]
+
+
+@pytest.mark.parametrize("text,uri", EULAGSTIFTNING_CASES)
+def test_eulagstiftning_celex(text, uri):
+    parser = LagrumParser(NAMEDLAWS, basefile="x", parse_types=[EULAGSTIFTNING])
     assert [r.uri for r in parser.parse_text(text, context={})] == [uri]
 
 

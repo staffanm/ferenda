@@ -693,10 +693,21 @@ def lagrum_uri(attrs, base='https://lagen.nu/'):
     return uri + ('#' + fragment if fragment else '')
 
 
+def celex_year(value):
+    """A parsed act number interpreted as a CELEX year (a two-digit year is
+    1900s -- the oldest EU acts are from the 1950s), or None when it falls
+    outside 1950-2050 and so cannot be a year."""
+    year = int(value) + (1900 if len(value) <= 2 else 0)
+    return year if 1950 <= year <= 2050 else None
+
+
 def celex_uri(attrs, base='https://lagen.nu/'):
-    """Compute a celex URI, including the old engine's year/number swap
-    heuristic with its date-dependence and all -- the golden corpus
-    reflects it (e.g. "(EU) 2016/679" without a date became 3679R2016)."""
+    """Compute a celex URI (``3<year><type><number>``). The year/number order
+    in a cited act number differs by act type and flipped for all types in the
+    2015 numbering reform, so fmt_eu_ref puts the structurally-likeliest year in
+    ``ar``; here we settle it by the one invariant that always holds -- a CELEX
+    year is in 1950-2050 -- taking the other value when ``ar`` isn't a year, and
+    refusing to mint a (broken) link when neither is."""
     if 'akttyp' not in attrs:
         if 'forordning' in attrs:
             attrs['akttyp'] = 'förordning'
@@ -704,15 +715,15 @@ def celex_uri(attrs, base='https://lagen.nu/'):
             attrs['akttyp'] = 'direktiv'
     if 'akttyp' not in attrs or 'ar' not in attrs or 'lopnummer' not in attrs:
         raise NoLink()
-    m = re.search(r'\d{4}', attrs.get('datum', ''))
-    realyear = int(m.group(0)) if m else 0
-    if int(attrs['lopnummer']) > 2014 and realyear > 2014:
-        attrs['lopnummer'], attrs['ar'] = attrs['ar'], attrs['lopnummer']
-    if len(attrs['ar']) == 2:
-        attrs['ar'] = '19' + attrs['ar']
+    year = celex_year(attrs['ar'])
+    if year is not None:
+        number = int(attrs['lopnummer'])
+    else:
+        year, number = celex_year(attrs['lopnummer']), int(attrs['ar'])
+    if year is None:
+        raise NoLink()
     letter = {'direktiv': 'L', 'förordning': 'R'}[attrs['akttyp']]
-    uri = base + 'ext/celex/3%s%s%04d' % (attrs['ar'], letter,
-                                          int(attrs['lopnummer']))
+    uri = base + 'ext/celex/3%04d%s%04d' % (year, letter, number)
     if attrs.get('artikel'):
         uri += '#' + attrs['artikel']
         if attrs.get('underartikel'):
@@ -1223,15 +1234,24 @@ class LagrumParser:
 
     def fmt_eu_ref(self, node, match, out, context):
         attrs = find_refids(node)
-        for t in tree_tokens(node):
+        tokens = tree_tokens(node)
+        for t in tokens:
             if t.type in ('DIREKTIV', 'FORORDNING'):
                 attrs['akttyp'] = t.value
+        parts = {sub.data for sub in node.iter_subtrees()}
         if 'akttyp' not in attrs:  # bare "95/46/EG" / "(EEG) nr 2092/91"
-            for sub in node.iter_subtrees():
-                if sub.data == 'direktiv_part':
-                    attrs['akttyp'] = 'direktiv'
-                elif sub.data == 'forordning_part':
-                    attrs['akttyp'] = 'förordning'
+            if 'direktiv_part' in parts:
+                attrs['akttyp'] = 'direktiv'
+            elif 'forordning_part' in parts:
+                attrs['akttyp'] = 'förordning'
+        # The pre-2015 "(EU) No <number>/<year>" regulation form is number-first;
+        # directives and the post-2015 "(EU) <year>/<number>" form (all act
+        # types) are year-first. forordning_part labels its first value
+        # lopnummer, so for a year-first one (no "nr"/"No" token) move the year
+        # into `ar` -- celex_uri range-checks and corrects either way.
+        if ('forordning_part' in parts and 'ar' in attrs and 'lopnummer' in attrs
+                and not any(t.type == 'NR' for t in tokens)):
+            attrs['ar'], attrs['lopnummer'] = attrs['lopnummer'], attrs['ar']
         self.emit(attrs, match, out, context, span=node_span(node))
 
     # --- RATTSFALL (Swedish case law) ---
