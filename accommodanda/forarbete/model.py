@@ -12,10 +12,13 @@ from dataclasses import dataclass, field
 
 @dataclass
 class Block:
-    kind: str                 # "rubrik" (heading) | "stycke" (paragraph)
+    kind: str                 # "rubrik" (numbered section heading) | "stycke"
+                              # (paragraph) | "kapitel" / "paragraf" (a law's
+                              # bold chapter/§ markers, recovered from font)
     text: str
     page: int | None = None   # printed page number (the #sid{N} anchor)
     level: int | None = None  # heading depth = dotted segments ("4.1.2" -> 3)
+    num: str | None = None     # chapter/§ number for kapitel/paragraf markers
 
 
 @dataclass

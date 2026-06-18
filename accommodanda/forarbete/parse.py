@@ -25,12 +25,17 @@ import json
 import re
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
+from lxml import etree
+
+from .download import basefile_slug
 from .model import Block, Forarbete
 from ..lib.lagrum import (EULAGSTIFTNING, EURATTSFALL, FORARBETEN, KORTLAGRUM,
                           LAGRUM, MYNDIGHETSBESLUT, RATTSFALL, LagrumParser,
                           interleave, load_abbreviations, load_namedlaws)
+from ..lib.util import normalize_space
 
 SFS_TTL = "lagen/nu/res/extra/sfs.ttl"
 
@@ -41,6 +46,12 @@ PARSE_TYPES = [LAGRUM, KORTLAGRUM, EULAGSTIFTNING, RATTSFALL, FORARBETEN,
 RE_DOTS = re.compile(r"\.{4,}")                       # TOC dotted leaders
 RE_HEADING_NUM = re.compile(r"^\d+(?:\.\d+)*$")       # "4" / "4.3.2" (own line)
 RE_HEADING_INLINE = re.compile(r"^(\d+(?:\.\d+)+)\s+\S")   # "4.3.2 Title"
+RE_NUM_TITLE = re.compile(r"^(\d+(?:\.\d+)*)\s+\S")        # "15 Title" / "4.3 T"
+RE_KAP_MARK = re.compile(r"^(\d+)\s*kap\.\s")             # bold "2 kap. ..."
+RE_PARA_MARK = re.compile(r"^(\d+\s*[a-z]?)\s*§(?:\s|$)")  # bold "3 §" / "3 a §"
+
+LINE_TOL = 4          # spans within this many y-units are the same visual line
+PARA_GAP = 1.5        # a vertical gap > PARA_GAP x line-height starts a paragraph
 
 
 def mint_uri(typ, basefile):
@@ -49,10 +60,65 @@ def mint_uri(typ, basefile):
     return "https://lagen.nu/%s/%s" % (typ, basefile)
 
 
-def pdf_to_pages(pdf_path):
-    out = subprocess.run(["pdftotext", "-enc", "UTF-8", str(pdf_path), "-"],
-                         capture_output=True, check=True)
-    return out.stdout.decode("utf-8", "replace").split("\f")
+# --------------------------------------------------------------------------
+# font-aware extraction (pdftohtml -xml: poppler speed + bold/italic markup)
+# --------------------------------------------------------------------------
+
+@dataclass
+class Line:
+    text: str
+    top: int
+    bold: bool          # the whole visual line is bold (an unnumbered heading)
+    lead_bold: bool     # the leftmost run is bold (a bold §/chapter marker that
+                        # leads regular statutory text on the same line)
+    italic: bool
+
+
+@dataclass
+class Para:
+    text: str
+    bold: bool = False
+    lead_bold: bool = False
+    italic: bool = False
+
+
+def pdf_pages(pdf_path):
+    """(pageno, [Line]) per page via `pdftohtml -xml`. Each <text> fragment is
+    one font run carrying <b>/<i>; fragments on the same `top` are one visual
+    line, bold/italic when all their runs are."""
+    xml = subprocess.run(
+        ["pdftohtml", "-xml", "-i", "-nodrm", "-stdout", str(pdf_path)],
+        capture_output=True, check=True).stdout
+    # pdftohtml emits occasionally malformed XML (overlapping <b>/<i>, stray &),
+    # so parse leniently rather than abort the document
+    root = etree.fromstring(xml, etree.XMLParser(recover=True, load_dtd=False,
+                                                 no_network=True))
+    for page in root.findall("page"):
+        spans = []
+        for t in page.findall("text"):
+            text = normalize_space("".join(t.itertext()))
+            if text:
+                spans.append((int(t.get("top")), int(t.get("left")), text,
+                              t.find(".//b") is not None,
+                              t.find(".//i") is not None))
+        yield int(page.get("number")), _lines(spans)
+
+
+def _lines(spans):
+    """Group same-`top` spans (left to right) into visual lines."""
+    lines = []
+    for top, left, text, bold, italic in sorted(spans):
+        if lines and abs(top - lines[-1][0]) <= LINE_TOL:
+            lines[-1][1].append((left, text, bold, italic))
+        else:
+            lines.append((top, [(left, text, bold, italic)]))
+    out = []
+    for top, runs in lines:
+        runs.sort()
+        out.append(Line(normalize_space(" ".join(r[1] for r in runs)), top,
+                        all(r[2] for r in runs), runs[0][2],
+                        all(r[3] for r in runs)))
+    return out
 
 
 def _dehyphenate(acc, line):
@@ -61,67 +127,80 @@ def _dehyphenate(acc, line):
     return (acc + " " + line) if acc else line
 
 
-def page_paragraphs(text, identifier, pageno):
-    """Reflow one page into paragraphs, dropping the running header (the
-    identifier), the page-number line (== pageno) and TOC dotted-leader lines.
-    A page dominated by dotted leaders is the table of contents -- skipped
-    whole (its residual bare section numbers would otherwise become junk)."""
-    if len(RE_DOTS.findall(text)) >= 5:
+def page_paragraphs(lines, identifier, pageno):
+    """Reflow a page's lines into paragraphs, dropping the running header (the
+    identifier), the page-number line and TOC dotted-leader lines. A bold line
+    (heading or a §/chapter marker) always begins its own paragraph; otherwise
+    a vertical gap larger than the body line-height does. A page dominated by
+    dotted leaders is the table of contents -- skipped whole."""
+    if sum(RE_DOTS.search(l.text) is not None for l in lines) >= 5:
         return []
-    # the running header is the identifier; plain pdftotext sometimes merges it
-    # into an adjacent body line, so strip it as a substring anywhere (tolerant
-    # of its internal spacing), not only as a whole line
     header_re = re.compile(r"\s*".join(re.escape(t) for t in identifier.split()))
-    paras, cur = [], ""
-    for raw in text.split("\n"):
-        line = re.sub(r"\s+", " ", header_re.sub(" ", raw)).strip()
-        if not line:
-            if cur:
-                paras.append(cur)
-                cur = ""
-            continue
-        if line == str(pageno):
-            continue                      # printed page number (== pdf index)
-        if RE_DOTS.search(line):
-            continue                      # table-of-contents leader
-        cur = _dehyphenate(cur, line)
-    if cur:
+    kept = []
+    for l in lines:
+        text = normalize_space(header_re.sub(" ", l.text))
+        if text and text != str(pageno) and not RE_DOTS.search(text):
+            kept.append(Line(text, l.top, l.bold, l.lead_bold, l.italic))
+    gaps = sorted(b.top - a.top for a, b in zip(kept, kept[1:]) if b.top > a.top)
+    body_gap = gaps[len(gaps) // 2] if gaps else 0      # median line-height
+    paras, cur, prev = [], None, None
+    for l in kept:
+        marker = l.lead_bold and (RE_KAP_MARK.match(l.text)
+                                  or RE_PARA_MARK.match(l.text))
+        starts = (cur is None or l.bold or marker or (prev and prev.bold)
+                  or (body_gap and l.top - prev.top > PARA_GAP * body_gap))
+        if starts and cur is not None:
+            paras.append(cur)
+            cur = None
+        if cur is None:
+            cur = Para(l.text, l.bold, bool(marker), l.italic)
+        else:
+            cur.text = _dehyphenate(cur.text, l.text)
+            cur.italic = cur.italic and l.italic
+        prev = l
+    if cur is not None:
         paras.append(cur)
     return paras
 
 
 def classify(paras, page):
-    """Paragraphs -> Blocks. A lone section number merges with the following
-    paragraph as its heading; a dotted section number with inline title is a
-    heading; everything else is a stycke. All carry the page."""
+    """Paragraphs -> Blocks. Bold chapter/§ markers (recovered from font) become
+    `kapitel`/`paragraf` blocks -- the structure that lets commentary be tied to
+    a paragraf; other bold or numbered paragraphs are headings; the rest stycken."""
     blocks = []
     i = 0
     while i < len(paras):
         p = paras[i]
-        nxt = paras[i + 1] if i + 1 < len(paras) else ""
-        # a lone section number is a heading only if a title (uppercase-led,
-        # not itself a number) follows -- else it is stray noise, dropped
-        if RE_HEADING_NUM.match(p):
+        mk, mp, mt = (RE_KAP_MARK.match(p.text), RE_PARA_MARK.match(p.text),
+                      RE_NUM_TITLE.match(p.text))
+        if p.lead_bold and mk:
+            blocks.append(Block("kapitel", p.text, page, num=mk.group(1)))
+        elif p.lead_bold and mp:
+            blocks.append(Block("paragraf", p.text, page,
+                                num=re.sub(r"\s+", "", mp.group(1))))
+        elif (p.bold or mt) and mt and len(p.text) < 120:
+            blocks.append(Block("rubrik", p.text, page,
+                                mt.group(1).count(".") + 1))
+        elif p.bold and len(p.text) < 120:
+            blocks.append(Block("rubrik", p.text, page, 3))   # unnumbered subhead
+        elif RE_HEADING_NUM.match(p.text):
+            nxt = paras[i + 1].text if i + 1 < len(paras) else ""
             if nxt[:1].isupper() and not RE_HEADING_NUM.match(nxt):
-                blocks.append(Block("rubrik", "%s %s" % (p, nxt),
-                                    page, p.count(".") + 1))
+                blocks.append(Block("rubrik", "%s %s" % (p.text, nxt), page,
+                                    p.text.count(".") + 1))
                 i += 2
-            else:
-                i += 1
-        elif RE_HEADING_INLINE.match(p) and len(p) < 120:
-            blocks.append(Block("rubrik", p, page, p.split()[0].count(".") + 1))
-            i += 1
+                continue
         else:
-            blocks.append(Block("stycke", p, page))
-            i += 1
+            blocks.append(Block("stycke", p.text, page))
+        i += 1
     return blocks
 
 
 def parse_pdf(pdf_path, identifier):
     """All body blocks of a förarbete PDF, page by page (page = pdf index)."""
     blocks = []
-    for i, text in enumerate(pdf_to_pages(pdf_path), start=1):
-        blocks += classify(page_paragraphs(text, identifier, i), i)
+    for pageno, lines in pdf_pages(pdf_path):
+        blocks += classify(page_paragraphs(lines, identifier, pageno), pageno)
     return blocks
 
 
@@ -155,6 +234,7 @@ def to_artifact(fa):
     body = [{"type": b.kind, "page": b.page,
              "text": interleave(b.text, parser.parse_text(b.text, context={}))}
             | ({"level": b.level} if b.level else {})
+            | ({"num": b.num} if b.num else {})
             for b in fa.body]
     return {"uri": fa.uri, "type": fa.type, "identifier": fa.identifier,
             "basefile": fa.basefile, "title": fa.title, "date": fa.date,
@@ -193,14 +273,13 @@ def cmd_batch(root, typ, limit):
         links += sum(1 for b in art["body"] for r in b["text"]
                      if isinstance(r, dict))
         empty += not art["body"]
-        json.dump(art, open(art_path(root, record), "w"),
-                  ensure_ascii=False, indent=2)
+        art_path(root, record).write_text(
+            json.dumps(art, ensure_ascii=False, indent=2))
     print("%d records: %d blocks, %d links, %d empty-body, %d failed"
           % (len(records), blocks, links, empty, fail))
 
 
 def art_path(root, record):
-    from .download import basefile_slug
     out = Path(root) / record["type"] / "artifact"
     out.mkdir(parents=True, exist_ok=True)
     return out / (basefile_slug(record["basefile"]) + ".json")

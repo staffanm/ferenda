@@ -1,10 +1,7 @@
-"""Tests for the förarbete PDF parser's text->blocks logic (PDF-free)."""
+"""Tests for the förarbete PDF parser's font-aware blocks logic (PDF-free)."""
 
-from accommodanda.forarbete.parse import (classify, mint_uri, page_paragraphs)
-
-
-def texts(blocks):
-    return [(b.kind, b.text, b.page, b.level) for b in blocks]
+from accommodanda.forarbete.parse import (classify, mint_uri, page_paragraphs,
+                                          Line, Para)
 
 
 def test_mint_uri_matches_citation_form():
@@ -13,43 +10,60 @@ def test_mint_uri_matches_citation_form():
     assert mint_uri("dir", "2020:1") == "https://lagen.nu/dir/2020:1"
 
 
+def test_classify_recovers_chapter_and_paragraf_markers():
+    # a bold "N kap."/"N §" lead (lead_bold) is structure; the same token in
+    # regular text is a cross-reference, not a marker
+    paras = [Para("1 kap. Inledande bestämmelser", bold=True, lead_bold=True),
+             Para("3 § Verksamhetsutövare ska vidta åtgärder.", lead_bold=True),
+             Para("Paragrafen genomför artikel 21.")]
+    assert [(b.kind, b.num) for b in classify(paras, 243)] == [
+        ("kapitel", "1"), ("paragraf", "3"), ("stycke", None)]
+
+
+def test_classify_cross_reference_is_not_a_marker():
+    # "7 §" in regular (non-bold) prose must stay body text
+    assert classify([Para("som anges i 7 § ska anmälan göras")], 1)[0].kind \
+        == "stycke"
+
+
+def test_classify_numbered_and_unnumbered_headings():
+    paras = [Para("15 Författningskommentar", bold=True, lead_bold=True),
+             Para("4.3.2 Inledande granskning", bold=True, lead_bold=True),
+             Para("Säkerhetsåtgärder", bold=True, lead_bold=True),
+             Para("En vanlig brödtext här.")]
+    assert [(b.kind, b.level) for b in classify(paras, 5)] == [
+        ("rubrik", 1), ("rubrik", 3), ("rubrik", 3), ("stycke", None)]
+
+
+def _line(text, top, bold=False, lead_bold=False, italic=False):
+    return Line(text, top, bold, lead_bold, italic)
+
+
 def test_page_paragraphs_strips_header_pagenumber_and_reflows():
-    page = ("Prop. 2025/26:161\n"
-            "Detta är en mening som bryts mitt i ett ord för-\n"
-            "fogar över resten.\n"
-            "\n"
-            "Ett nytt stycke börjar här.\n"
-            "40\n")
-    paras = page_paragraphs(page, "Prop. 2025/26:161", 40)
-    assert paras == ["Detta är en mening som bryts mitt i ett ord förfogar över resten.",
-                     "Ett nytt stycke börjar här."]
+    lines = [_line("Prop. 2025/26:161", 40),                 # running header
+             _line("en mening som bryts mitt i ett ord för-", 70),
+             _line("fogar över resten.", 90),                 # body gap 20
+             _line("och fortsätter på nästa rad.", 110),      # body gap 20
+             _line("Ett nytt stycke börjar längre ned.", 180),  # big gap -> break
+             _line("42", 800)]                                 # page number
+    paras = page_paragraphs(lines, "Prop. 2025/26:161", 42)
+    assert [p.text for p in paras] == [
+        "en mening som bryts mitt i ett ord förfogar över resten. "
+        "och fortsätter på nästa rad.",
+        "Ett nytt stycke börjar längre ned."]
 
 
-def test_page_paragraphs_strips_header_that_bled_into_a_line():
-    # plain pdftotext sometimes merges the running header into a body line
-    page = "Bland Prop. 2025/26:161 andra kommuner yttrade sig.\n"
-    assert page_paragraphs(page, "Prop. 2025/26:161", 31) == \
-        ["Bland andra kommuner yttrade sig."]
+def test_page_paragraphs_breaks_at_bold_marker():
+    # a bold §-marker line starts its own paragraph even without a gap
+    lines = [_line("slutet på föregående paragrafs kommentar.", 70),
+             _line("3 § Verksamhetsutövare ska vidta åtgärder.", 92, lead_bold=True)]
+    paras = page_paragraphs(lines, "Prop. X", 5)
+    assert [(p.text, p.lead_bold) for p in paras] == [
+        ("slutet på föregående paragrafs kommentar.", False),
+        ("3 § Verksamhetsutövare ska vidta åtgärder.", True)]
 
 
 def test_page_paragraphs_skips_table_of_contents():
-    toc = "\n".join("%d Avsnitt ........................ %d" % (i, i + 10)
-                    for i in range(1, 8))
+    toc = [_line("%d Avsnitt ........................ %d" % (i, i + 10), 50 + i * 20)
+           for i in range(1, 8)]
     assert page_paragraphs(toc, "Prop. 2025/26:161", 3) == []
-
-
-def test_classify_headings_and_paragraphs():
-    blocks = classify(["1", "Förslag till riksdagsbeslut",
-                       "4.3.2 Inledande granskning",
-                       "En vanlig brödtext här."], 5)
-    assert texts(blocks) == [
-        ("rubrik", "1 Förslag till riksdagsbeslut", 5, 1),
-        ("rubrik", "4.3.2 Inledande granskning", 5, 3),
-        ("stycke", "En vanlig brödtext här.", 5, None)]
-
-
-def test_classify_drops_lone_number_without_a_title():
-    # a stray digit (TOC residue / footnote marker) with no title following
-    # must not swallow the next number into a "3 4" heading
-    blocks = classify(["3", "4", "Riktig text."], 2)
-    assert [b.text for b in blocks] == ["4 Riktig text."]  # "3" dropped, no "3 4"
