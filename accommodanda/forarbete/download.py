@@ -50,6 +50,8 @@ from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
 
+from ..lib.net import make_session
+
 BASE = "https://www.regeringen.se"
 FILTER = (BASE + "/Filter/GetFilteredItems?lang=sv&filterType=Taxonomy"
           "&filterByType=FilterablePageBase&rootPageReference=0"
@@ -77,17 +79,15 @@ PDF_HREF = re.compile(r"/(?:contentassets|globalassets)/[^\"']+\.(?:pdf|docx?|rt
                       re.IGNORECASE)
 
 
-def make_session():
-    session = requests.Session()
-    session.headers["User-Agent"] = USER_AGENT
-    return session
-
-
 def write_atomic(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_bytes(data if isinstance(data, bytes) else data.encode("utf-8"))
-    os.replace(tmp, path)
+    try:
+        tmp.write_bytes(data if isinstance(data, bytes) else data.encode("utf-8"))
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def basefile_slug(basefile):
@@ -216,7 +216,7 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print):
     """Harvest the named types (default all). Incremental: newest-first, stop a
     type at the first document already on disk; `--full` re-walks everything,
     skipping existing. Returns {type: (seen, new)}."""
-    session = make_session()
+    session = make_session(USER_AGENT)
     totals = {}
     for typ in (types or list(TYPES)):
         seen = new = 0

@@ -33,21 +33,31 @@ changed records.
 import argparse
 import json
 import os
+import re
 import time
 from pathlib import Path
 from urllib.parse import quote
 
-import requests
+from ..lib.net import make_session
 
 API = "https://rattspraxis.etjanst.domstol.se/api/v1"
 PAGE_SIZE = 100
 USER_AGENT = "lagen.nu harvester (https://lagen.nu/, staffan@tomtebo.org)"
 
+# record path segments come straight from the API response; validate them so a
+# malformed/compromised record can't escape destdir via "..", "/" or an
+# absolute path. id is a UUID, domstolKod a short alphabetic court code.
+UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}"
+                     r"-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+DOMSTOLKOD_RE = re.compile(r"[A-Za-zÅÄÖåäö0-9]+")
 
-def make_session():
-    session = requests.Session()
-    session.headers["User-Agent"] = USER_AGENT
-    return session
+
+def record_dir(destdir, record):
+    """``destdir/{domstolKod}/{id}`` with both segments validated."""
+    kod, rid = record["domstol"]["domstolKod"], record["id"]
+    assert DOMSTOLKOD_RE.fullmatch(kod), "unexpected domstolKod: %r" % kod
+    assert UUID_RE.fullmatch(rid), "unexpected record id: %r" % rid
+    return destdir / kod / rid
 
 
 def search_page(session, index, asc):
@@ -70,13 +80,17 @@ def fetch_record(session, record_id):
 def write_atomic(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_bytes(data)
-    os.replace(tmp, path)
+    try:
+        tmp.write_bytes(data)
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def save_record(destdir, record):
     """Store the record verbatim; returns True if new or changed."""
-    path = destdir / record["domstol"]["domstolKod"] / (record["id"] + ".json")
+    path = record_dir(destdir, record).with_suffix(".json")
     if path.exists() and json.loads(path.read_text()) == record:
         return False
     write_atomic(path, json.dumps(record, ensure_ascii=False,
@@ -85,7 +99,7 @@ def save_record(destdir, record):
 
 
 def download_bilagor(session, destdir, record, delay):
-    dirpath = (destdir / record["domstol"]["domstolKod"] / record["id"])
+    dirpath = record_dir(destdir, record)
     for bilaga in record["bilagaLista"]:
         if not bilaga.get("fillagringId"):
             # seen in the wild: an attachment entry with a filename but
@@ -93,7 +107,12 @@ def download_bilagor(session, destdir, record, delay):
             print("%s: bilaga %r has no fillagringId, skipping"
                   % (record["id"], bilaga.get("filnamn")), flush=True)
             continue
-        target = dirpath / bilaga["filnamn"].replace("/", "_")
+        # the API-supplied filename is reduced to its basename so it can't
+        # carry directory components out of dirpath
+        name = Path(bilaga["filnamn"]).name
+        assert name and name not in (".", ".."), \
+            "unexpected bilaga filename: %r" % bilaga["filnamn"]
+        target = dirpath / name
         if target.exists() and target.stat().st_size > 0:
             continue
         url = API + "/bilagor/" + quote(bilaga["fillagringId"], safe="")
@@ -106,7 +125,7 @@ def download_bilagor(session, destdir, record, delay):
 def sync(destdir, full=False, bilagor=True, limit=None, delay=0.3):
     """Harvest publications into destdir. Returns (seen, changed)."""
     destdir = Path(destdir)
-    session = make_session()
+    session = make_session(USER_AGENT)
     seen = changed = index = 0
     while True:
         page = search_page(session, index, asc=full)

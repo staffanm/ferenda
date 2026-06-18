@@ -27,7 +27,9 @@ semantics); `--no-deps` scopes to just the named stage.
 import argparse
 import functools
 import hashlib
+import http.server
 import json
+import socketserver
 import sys
 import time
 from concurrent.futures import ProcessPoolExecutor
@@ -279,7 +281,7 @@ def _namedlaws():
 
 @functools.cache
 def _sfs_session():
-    return sfs_download.make_session()
+    return sfs_download.make_session(sfs_download.USER_AGENT)
 
 
 def _sfs_paths(basefile):
@@ -389,7 +391,7 @@ def _dv_cases():
 
 @functools.cache
 def _dv_session():
-    return dv_download.make_session()
+    return dv_download.make_session(dv_download.USER_AGENT)
 
 
 def dv_artifact(basefile):
@@ -627,13 +629,11 @@ def cmd_generate():
 
 
 def cmd_serve(port=8000):
-    import functools as ft
-    import http.server
-    import socketserver
-    handler = ft.partial(http.server.SimpleHTTPRequestHandler,
-                         directory=str(GENERATED))
+    handler = functools.partial(http.server.SimpleHTTPRequestHandler,
+                                directory=str(GENERATED))
     socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("", port), handler) as httpd:
+    # bind loopback only: this is a local preview, not a public file server
+    with socketserver.TCPServer(("127.0.0.1", port), handler) as httpd:
         print("serving %s at http://localhost:%d/  (Ctrl-C to stop)"
               % (GENERATED, port))
         httpd.serve_forever()

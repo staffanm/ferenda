@@ -42,7 +42,7 @@ import re
 import time
 from pathlib import Path
 
-import requests
+from ..lib.net import make_session
 
 ENDPOINT = "https://beta.rkrattsbaser.gov.se/elasticsearch/SearchEsByRawJson"
 PAGE_SIZE = 100
@@ -50,12 +50,6 @@ USER_AGENT = "lagen.nu harvester (https://lagen.nu/, staffan@tomtebo.org)"
 
 # fulltext.andringInford looks like "t.o.m. SFS 2026:764"; pull the SFS nr
 RE_VERSION = re.compile(r"(\d+:\s?\d+)")
-
-
-def make_session():
-    session = requests.Session()
-    session.headers["User-Agent"] = USER_AGENT
-    return session
 
 
 def fetch_one(session, beteckning):
@@ -91,13 +85,22 @@ def search(session, sort_field, order, search_after=None):
 def write_atomic(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_bytes(data)
-    os.replace(tmp, path)
+    try:
+        tmp.write_bytes(data)
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def _split_beteckning(beteckning):
     year, nr = beteckning.split(":", 1)
-    return year, nr.replace(" ", "_")
+    nr = nr.replace(" ", "_")
+    # beteckning comes from the remote _source and becomes path segments;
+    # assert it can't carry a path separator or "..".
+    assert year.isdigit() and "/" not in nr and "\\" not in nr \
+        and ".." not in nr, "unexpected beteckning: %r" % beteckning
+    return year, nr
 
 
 def source_path(destdir, beteckning):
@@ -107,7 +110,7 @@ def source_path(destdir, beteckning):
 
 def archive_path(destdir, beteckning, version):
     year, nr = _split_beteckning(beteckning)
-    safe = version.replace(":", "_").replace(" ", "_")
+    safe = version.replace(":", "_").replace(" ", "_").replace("/", "_")
     return destdir / "source" / "archive" / year / nr / ("%s.json" % safe)
 
 
@@ -155,7 +158,7 @@ def sync(destdir, full=False, limit=None, delay=0.3):
     newest-first by uppdateradDateTime and stops at the first page with no
     new or changed document. Returns (seen, new, updated)."""
     destdir = Path(destdir)
-    session = make_session()
+    session = make_session(USER_AGENT)
     sort_field, order = (("grundforfattningId", "asc") if full
                          else ("uppdateradDateTime", "desc"))
     after = None
