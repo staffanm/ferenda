@@ -143,12 +143,19 @@ def scan_body(body):
     (relative refs without a named law stay unlinked); one parser threads
     the whole body in document order so "samma lag" and in-document
     law-name learning carry across blocks."""
-    namedlaws, abbreviations = legal_vocab()
-    parser = LagrumParser(namedlaws, basefile="dom",
-                          abbreviations=abbreviations,
-                          parse_types=DV_PARSE_TYPES)
+    parser = _scanner()
+    parser.state = type(parser.state)()   # fresh per-document state
     return [interleave(b.text, parser.parse_text(b.text, context={}))
             for b in body]
+
+
+@functools.cache
+def _scanner():
+    """The body citation scanner, built once (grammar compilation is the
+    expensive part); scan_body resets its per-document state each call."""
+    namedlaws, abbreviations = legal_vocab()
+    return LagrumParser(namedlaws, basefile="dom", abbreviations=abbreviations,
+                        parse_types=DV_PARSE_TYPES)
 
 
 def body_links(runs_per_block):

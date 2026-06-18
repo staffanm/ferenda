@@ -57,43 +57,51 @@ def _clean(text):
 
 
 def _read_hwpf(path):
+    # POI/jpype classes resolve only after startJVM, so unlike every other
+    # import in this package these must stay in-function (see _ensure_jvm).
     from java.io import FileInputStream
     from org.apache.poi.hwpf import HWPFDocument
 
     doc = HWPFDocument(FileInputStream(str(path)))
-    rng = doc.getRange()
-    out = []
-    for i in range(rng.numParagraphs()):
-        p = rng.getParagraph(i)
-        bold = any(p.getCharacterRun(j).isBold()
-                   for j in range(p.numCharacterRuns()))
-        out.append(Para(_clean(str(p.text())), bold, bool(p.isInTable())))
-    doc.close()
-    return out
+    try:
+        rng = doc.getRange()
+        out = []
+        for i in range(rng.numParagraphs()):
+            p = rng.getParagraph(i)
+            bold = any(p.getCharacterRun(j).isBold()
+                       for j in range(p.numCharacterRuns()))
+            out.append(Para(_clean(str(p.text())), bold, bool(p.isInTable())))
+        return out
+    finally:
+        doc.close()   # also closes the FileInputStream; skipping it on a
+        # malformed doc would leak a JVM-side file handle per failure
 
 
 def _read_xwpf(path):
+    # POI/jpype classes resolve only after startJVM (see _read_hwpf).
     from java.io import FileInputStream
     from org.apache.poi.xwpf.usermodel import XWPFDocument
 
     doc = XWPFDocument(FileInputStream(str(path)))
-    out = []
+    try:
+        out = []
 
-    def emit(p, in_table):
-        bold = any(r.isBold() for r in p.getRuns())
-        out.append(Para(_clean(str(p.getText())), bold, in_table))
+        def emit(p, in_table):
+            bold = any(r.isBold() for r in p.getRuns())
+            out.append(Para(_clean(str(p.getText())), bold, in_table))
 
-    for el in doc.getBodyElements():
-        kind = str(el.getClass().getSimpleName())
-        if kind == "XWPFParagraph":
-            emit(el, False)
-        elif kind == "XWPFTable":
-            for row in el.getRows():
-                for cell in row.getTableCells():
-                    for p in cell.getParagraphs():
-                        emit(p, True)
-    doc.close()
-    return out
+        for el in doc.getBodyElements():
+            kind = str(el.getClass().getSimpleName())
+            if kind == "XWPFParagraph":
+                emit(el, False)
+            elif kind == "XWPFTable":
+                for row in el.getRows():
+                    for cell in row.getTableCells():
+                        for p in cell.getParagraphs():
+                            emit(p, True)
+        return out
+    finally:
+        doc.close()
 
 
 def read(path):
