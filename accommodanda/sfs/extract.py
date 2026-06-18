@@ -8,18 +8,18 @@ from bs4 import BeautifulSoup
 from ..lib.errors import SkipDocument
 
 
-def sniff_encoding(path):
+def sniff_encoding(raw):
     # only utf-8 pages use the html5 doctype; archival pages are latin-1
-    with open(path, "rb") as fp:
-        return "utf-8" if b"<!DOCTYPE html>" in fp.read(256) else "latin-1"
+    return "utf-8" if b"<!DOCTYPE html>" in raw[:256] else "latin-1"
 
 
 def extract_body(path, keep_expired=True):
     """Return the statute body text (the part below the header) as a
     string with LF line separators."""
-    encoding = sniff_encoding(path)
-    with open(path, encoding=encoding) as fp:
-        rawtext = fp.read()
+    with open(path, "rb") as fp:
+        raw = fp.read()
+    encoding = sniff_encoding(raw)
+    rawtext = raw.decode(encoding)
 
     # expired statutes are published with an expiry note in the header;
     # lagen.nu keeps them (they remain reachable as historical law)
