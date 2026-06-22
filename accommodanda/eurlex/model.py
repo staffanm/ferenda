@@ -16,6 +16,22 @@ act and the act itself agree by construction.
 
 from dataclasses import dataclass, field
 
+# the language-neutral CELEX URI the citation engine mints for EU references, so
+# a citation to an act and the act itself agree by construction
+BASE = "https://lagen.nu/ext/celex/%s"
+
+
+def doctype(celex):
+    """The document family from the CELEX sector digit (+ the act descriptor)."""
+    if celex.startswith("6"):
+        return "judgment"
+    if celex.startswith("1"):
+        return "treaty"
+    if celex.startswith("3") and len(celex) > 5:
+        return {"R": "regulation", "L": "directive",
+                "D": "decision"}.get(celex[5], "act")
+    return "act"
+
 
 @dataclass
 class Block:
