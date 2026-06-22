@@ -21,13 +21,17 @@ devtools.py
 __pycache__/
 /doc/_build/
 /data/
-.direnv/
+/.direnv/
+/.claude/
+/.env
 /mediawiki-db-backup-230502/
 /mediawiki-html-backup-230502/
 /site/data/
 .playwright-mcp/
 # Site config holds live credentials -- never track
 /site/ferenda.ini
+# Machine-local runtime config (data_root etc.)
+/config.yml
 
 # Vendored POI jars (fetch via tools/fetch_poi.sh)
 vendor/poi/*.jar

@@ -32,27 +32,14 @@ classifiers = [
 ]
 dependencies = [
     "beautifulsoup4",
-    "cached-property",
-    "cssmin",
-    "docutils",
-    "grako",
-    "html5lib",
-    "jinja2",
     "jpype1>=1.7.1",
-    "jsmin",
-    "langdetect",
     "lark",
-    "layeredconfig",
     "lxml",
-    "pyparsing",
+    "pillow",
     "rdflib",
-    "rdflib-jsonld",
     "requests",
-    "responses",
-    "simpleparse",
-    "werkzeug",
-    "whoosh",
-    "wikitextparser",
+    "ruamel-yaml>=0.19.1",
+    "urllib3",
 ]
 
 [project.optional-dependencies]
@@ -63,7 +50,6 @@ dev = [
 ]
 
 [project.scripts]
-ferenda-setup = "ferenda.manager:runsetup"
 lagen = "accommodanda.build:main"
 
 [project.urls]
