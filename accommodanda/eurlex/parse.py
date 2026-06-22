@@ -7,7 +7,7 @@ bibliographic header, an optional preamble (recitals + visas) and a body
 (enacting terms / judgment contents + ruling). We walk the known structure into
 an ordered list of typed blocks; inline markup (highlights, dates, OJ
 references) is flattened to text and footnote NOTEs are dropped from the running
-text. A `.zip.fmx4` manifestation bundles the main act with its annexes as
+text. A `.fmx4.zip` manifestation bundles the main act with its annexes as
 separate Formex files; we parse the main act (the lowest-sequence file) and note
 the annexes (parsing them is a later step).
 
@@ -24,15 +24,17 @@ import functools
 import json
 import sys
 import zipfile
+from collections import Counter
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from .model import Block, EurlexDoc
+from .model import BASE, Block, EurlexDoc, doctype
+from .parse_html import parse_html
+from .parse_pdf import parse_pdf
 from ..lib.lagrum import (EULAGSTIFTNING, EURATTSFALL, LagrumParser, interleave)
 from ..lib.util import from_roman
 
 LANG_PREFERENCE = ("swe", "eng")
-BASE = "https://lagen.nu/ext/celex/%s"
 
 # footnote subtrees are dropped from the running text (their content is a note,
 # not body prose)
@@ -51,13 +53,13 @@ INLINE = {"HT", "IE", "FT", "DATE", "QUOT.START", "QUOT.END", "QUOT.S",
 def load_formex(path):
     """The Formex roots of a downloaded manifestation, in document order: the
     main act/judgment first, then any annexes. A single `.fmx4` yields one
-    root; a `.zip.fmx4` bundle yields the main act (lowest-sequence member)
+    root; a `.fmx4.zip` bundle yields the main act (lowest-sequence member)
     followed by its annexes (the `.doc.xml` wrappers are skipped)."""
     path = Path(path)
     if zipfile.is_zipfile(path):
         with zipfile.ZipFile(path) as zf:
             members = sorted(n for n in zf.namelist()
-                             if not n.endswith(".doc.xml"))
+                             if n.endswith(".xml") and not n.endswith(".doc.xml"))
             assert members, "%s: zip has no Formex member" % path
             return [ET.fromstring(zf.read(m)) for m in members]
     return [ET.parse(path).getroot()]
@@ -112,7 +114,7 @@ def _emit_list(lst, blocks):
     for item in lst.findall("ITEM"):
         np = item.find("NP")
         marker = _text(np, "NO.P").strip("().") if np is not None else None
-        blocks.append(Block("point", _text(np or item, "TXT", "P"),
+        blocks.append(Block("point", _text(np if np is not None else item, "TXT", "P"),
                             num=marker or None))
 
 
@@ -332,17 +334,6 @@ def collect_notes(root, blocks):
 # top level
 # --------------------------------------------------------------------------
 
-def doctype(celex):
-    if celex.startswith("6"):
-        return "judgment"
-    if celex.startswith("1"):
-        return "treaty"
-    if celex.startswith("3") and len(celex) > 5:
-        return {"R": "regulation", "L": "directive",
-                "D": "decision"}.get(celex[5], "act")
-    return "act"
-
-
 def parse_formex(root, celex, lang):
     """A Formex root element -> EurlexDoc."""
     doc = EurlexDoc(celex=celex, uri=BASE % celex, doctype=doctype(celex),
@@ -423,21 +414,54 @@ def _celex_from_path(path):
     return Path(path).parent.name.replace("_", "/")
 
 
+# format precedence -> parser route: (filename token, route). fmx4 (richest) >
+# xhtml > html > pdf (last resort). xhtml is checked before html since "html" is
+# a substring of "xhtml".
+_TIERS = (("fmx4.zip", "fmx4"), ("fmx4", "fmx4"), ("xhtml", "html"),
+          ("html", "html"), ("pdf", "pdf"))
+
+
+def _route(path):
+    """(rank, parser-route) for a content file by format precedence, or None."""
+    for rank, (token, route) in enumerate(_TIERS):
+        if token in path.name:
+            return rank, route
+    return None
+
+
 def content_file(doc_dir, languages=LANG_PREFERENCE):
-    """The best per-language content file in a document dir (zip or single
-    Formex), preferring swe then eng. (file, lang) or (None, None)."""
+    """The best content file in a document dir as (path, lang, route), preferring
+    language (swe then eng) then format (fmx4 > xhtml > html > pdf). The download
+    already kept only the best format per language; this picks across what landed.
+    (None, None, None) if the dir has no content file."""
     for lang in languages:
-        for cand in (doc_dir / (lang + ".zip.fmx4"), doc_dir / (lang + ".fmx4")):
-            if cand.exists():
-                return cand, lang
-    return None, None
+        ranked = sorted((rank, route, cand)
+                        for cand in doc_dir.glob(lang + ".*")
+                        if (r := _route(cand)) for rank, route in (r,))
+        if ranked:
+            _, route, path = ranked[0]
+            return path, lang, route
+    return None, None, None
+
+
+def parse_content(path, route, celex, lang):
+    """Dispatch a content file to its format's parser -> EurlexDoc."""
+    if route == "fmx4":
+        return parse_document(load_formex(path), celex, lang)
+    if route == "html":
+        return parse_html(path.read_bytes(), celex, lang)
+    if route == "pdf":
+        return parse_pdf(path, celex, lang)
+    raise ValueError("no parser for route %r" % route)
 
 
 def cmd_one(path, celex):
+    path = Path(path)
     celex = celex or _celex_from_path(path)
-    lang = next((l for l in LANG_PREFERENCE if Path(path).name.startswith(l)),
+    lang = next((l for l in LANG_PREFERENCE if path.name.startswith(l)),
                 LANG_PREFERENCE[0])
-    json.dump(to_artifact(parse_document(load_formex(path), celex, lang)),
+    route = (_route(path) or (0, "fmx4"))[1]
+    json.dump(to_artifact(parse_content(path, route, celex, lang)),
               sys.stdout, ensure_ascii=False, indent=2)
     print()
 
@@ -447,16 +471,18 @@ def cmd_batch(root, limit):
     if limit:
         dirs = dirs[:limit]
     blocks = links = empty = fail = 0
+    by_route = Counter()
     for doc_dir in dirs:
         celex = doc_dir.name.replace("_", "/")
-        path, lang = content_file(doc_dir)
+        path, lang, route = content_file(doc_dir)
         if path is None:
             continue
+        by_route[route] += 1
         try:
-            art = to_artifact(parse_document(load_formex(path), celex, lang))
+            art = to_artifact(parse_content(path, route, celex, lang))
         except Exception as exc:
             fail += 1
-            print("  FAIL %s: %s: %s" % (celex, type(exc).__name__, exc))
+            print("  FAIL %s [%s]: %s: %s" % (celex, route, type(exc).__name__, exc))
             continue
         blocks += len(art["body"])
         links += sum(1 for b in art["body"] for r in b["text"]
@@ -464,8 +490,8 @@ def cmd_batch(root, limit):
         empty += not art["body"]
         (doc_dir / "artifact.json").write_text(
             json.dumps(art, ensure_ascii=False, indent=2))
-    print("%d docs: %d blocks, %d links, %d empty, %d failed"
-          % (len(dirs), blocks, links, empty, fail))
+    print("%d docs (%s): %d blocks, %d links, %d empty, %d failed"
+          % (len(dirs), dict(by_route), blocks, links, empty, fail))
 
 
 def main():

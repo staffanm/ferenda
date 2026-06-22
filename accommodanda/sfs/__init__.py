@@ -34,8 +34,13 @@ def parse_sfs_source(source, basefile):
     """Parse a downloaded JSON ``_source`` (the new beta API) into a
     Forfattning tree. ``fulltext.forfattningstext`` is already the plain body
     text that extract_body recovers from the legacy HTML."""
-    return _assemble(source["fulltext"]["forfattningstext"].replace("\r", ""),
-                     basefile)
+    text = source["fulltext"]["forfattningstext"]
+    if text is None:
+        # the act is in the register but carries no body text: repealed long
+        # ago, or published then withdrawn before entering force. Nothing to
+        # parse -- a deliberately empty document, not a failure.
+        raise SkipDocument("%s: no forfattningstext" % basefile)
+    return _assemble(text.replace("\r", ""), basefile)
 
 
 def load_inputs(json_path, html_path, register_path, basefile):

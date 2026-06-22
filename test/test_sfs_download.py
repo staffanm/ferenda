@@ -30,14 +30,14 @@ def test_version_id_unamended_act_is_its_own_version():
 
 def test_paths():
     dest = d.Path("/data/sfs")
-    assert d.source_path(dest, "2018:585") == dest / "source/2018/585.json"
+    assert d.source_path(dest, "2018:585") == dest / "2018/585.json"
     assert d.archive_path(dest, "2018:585", "2020:1007") == \
-        dest / "source/archive/2018/585/2020_1007.json"
+        dest / "archive/2018/585/2020_1007.json"
 
 
 def test_beteckning_with_space_in_number(tmp_path):
     d.save_document(tmp_path, src("1976:725 s.1", None, "x"))
-    assert (tmp_path / "source/1976/725_s.1.json").exists()
+    assert (tmp_path / "1976/725_s.1.json").exists()
     assert d.list_basefiles(tmp_path) == ["1976:725 s.1"]
 
 
@@ -56,9 +56,9 @@ def test_version_bump_archives_old_consolidation(tmp_path):
     d.save_document(tmp_path, src("2018:585", "t.o.m. SFS 2020:1007", "v1"))
     assert d.save_document(
         tmp_path, src("2018:585", "t.o.m. SFS 2025:1472", "v2")) == "updated"
-    archived = tmp_path / "source/archive/2018/585/2020_1007.json"
+    archived = tmp_path / "archive/2018/585/2020_1007.json"
     assert json.loads(archived.read_text())["fulltext"]["forfattningstext"] == "v1"
-    current = tmp_path / "source/2018/585.json"
+    current = tmp_path / "2018/585.json"
     assert json.loads(current.read_text())["fulltext"]["forfattningstext"] == "v2"
 
 
@@ -66,15 +66,15 @@ def test_same_version_correction_does_not_archive(tmp_path):
     d.save_document(tmp_path, src("2018:585", "t.o.m. SFS 2025:1472", "v2"))
     assert d.save_document(
         tmp_path, src("2018:585", "t.o.m. SFS 2025:1472", "v2-fixed")) == "updated"
-    assert not (tmp_path / "source/archive").exists()
-    current = tmp_path / "source/2018/585.json"
+    assert not (tmp_path / "archive").exists()
+    current = tmp_path / "2018/585.json"
     assert json.loads(current.read_text())["fulltext"]["forfattningstext"] == "v2-fixed"
 
 
 def test_first_amendment_archives_base_under_its_beteckning(tmp_path):
     d.save_document(tmp_path, src("2018:585", None, "base"))
     d.save_document(tmp_path, src("2018:585", "t.o.m. SFS 2020:1007", "amended"))
-    archived = tmp_path / "source/archive/2018/585/2018_585.json"
+    archived = tmp_path / "archive/2018/585/2018_585.json"
     assert json.loads(archived.read_text())["fulltext"]["forfattningstext"] == "base"
 
 

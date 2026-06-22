@@ -53,12 +53,14 @@ def assemble(tokens):
 
     def wrap_ob_content(node):
         # content directly in the OB section (no SFS-number line seen) gets
-        # wrapped in an Overgangsbestammelse assumed to belong to the act
-        # itself
+        # wrapped in an Overgangsbestammelse assumed to belong to the act itself
+        # -- the common case for a law with a single set of transitional
+        # provisions (which implicitly carry the act's own SFS number), so this
+        # is routine, not a problem worth warning about
         if (isinstance(stack[-1], Overgangsbestammelser) and
                 not isinstance(node, Overgangsbestammelse)):
-            log.warning("%s: övergångsbestämmelse without SFS number",
-                        tokens.basefile)
+            log.debug("%s: övergångsbestämmelse without SFS number, "
+                      "assuming the act's own", tokens.basefile)
             ob = Overgangsbestammelse(sfsnr=tokens.basefile)
             stack[-1].children.append(ob)
             stack.append(ob)
@@ -123,8 +125,8 @@ def assemble(tokens):
                            for n in stack):
                     # an SFS-number line without the customary separator
                     # heading still starts the transitional provisions
-                    log.warning("%s: övergångsbestämmelser without separator"
-                                " heading", tokens.basefile)
+                    log.debug("%s: övergångsbestämmelser without separator"
+                              " heading", tokens.basefile)
                     open_node(Overgangsbestammelser(
                         rubrik="[Övergångsbestämmelser]"))
                 close_to(RANK[Overgangsbestammelse])

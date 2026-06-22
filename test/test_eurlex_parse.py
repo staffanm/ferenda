@@ -186,7 +186,7 @@ def test_annex_anchor():
 
 def test_content_file_prefers_swe_zip(tmp_path):
     (tmp_path / "eng.fmx4").write_bytes(b"x")
-    (tmp_path / "swe.zip.fmx4").write_bytes(b"x")
+    (tmp_path / "swe.fmx4.zip").write_bytes(b"x")
     (tmp_path / "swe.fmx4").write_bytes(b"x")
-    path, lang = content_file(tmp_path)
-    assert lang == "swe" and path.name == "swe.zip.fmx4"
+    path, lang, route = content_file(tmp_path)
+    assert lang == "swe" and path.name == "swe.fmx4.zip" and route == "fmx4"

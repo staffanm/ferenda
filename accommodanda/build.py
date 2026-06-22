@@ -32,32 +32,36 @@ import json
 import socketserver
 import sys
 import time
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import Callable
+from urllib.parse import urlsplit
 
+from . import config
 from .sfs import load_inputs
 from .sfs import download as sfs_download
 from .dv import download as dv_download
 from .dv import identity as dv_identity
 from .forarbete import download as fa_download
 from .forarbete import parse as fa_parse
+from .eurlex import bulk as eurlex_bulk
 from .eurlex import download as eurlex_download
 from .eurlex import parse as eurlex_parse
 from .wiki import parse as wiki_parse
-from .dv.parse import api_member, parse_api_record, slug, to_artifact
-from .lib import catalog, render
+from .dv.parse import api_member, parse_api_record, to_artifact
+from .lib import catalog, layout, render
 from .lib.errors import SkipDocument
 from .lib.lagrum import LagrumParser, load_namedlaws
 from .sfs.nf import to_normalform
 
 POLITENESS = 0.3   # seconds between per-document network fetches
-ROOT = Path(__file__).parent.parent
-DATA = ROOT / "site" / "data"
+ROOT = Path(__file__).parent.parent          # repo source tree (curated resources)
+DATA = config.DATA                            # corpus location (config.yml: data_root)
 MANIFEST = DATA / ".build" / "manifest.json"
 CATALOG = DATA / "catalog.sqlite"
-GENERATED = DATA / "generated"
+GENERATED = layout.GENERATED
 NAMEDLAWS_TTL = ROOT / "lagen" / "nu" / "res" / "extra" / "sfs.ttl"
 
 
@@ -80,10 +84,20 @@ class Source:
     name: str
     list_basefiles: Callable[[], list]
     stages: dict                          # name -> Stage
-    harvest: Callable[[], None] | None = None   # bulk download (discovery)
+    harvest: Callable[[list], None] | None = None  # bulk download (discovery)
+    origin: str | None = None             # human base URL, shown when harvesting
+    actions: dict = field(default_factory=dict)  # name -> source-specific verb()
+    scopes: frozenset = field(default_factory=frozenset)  # harvest sub-corpora
+    notes: str = ""                       # extra `lagen <src> -h` help (flags etc.)
 
 
 SOURCES: dict = {}
+
+
+def _origin(url):
+    """The scheme://host/ base of an endpoint, for the harvest banner."""
+    parts = urlsplit(url)
+    return "%s://%s/" % (parts.scheme, parts.netloc)
 
 
 # --------------------------------------------------------------------------
@@ -122,7 +136,8 @@ def is_fresh(manifest, source, stage, basefile):
     entry = manifest.get(manifest_key(source.name, stage.name, basefile))
     return bool(entry) \
         and entry["inputs"] == hash_files(stage.inputs(basefile)) \
-        and entry["version"] == recipe_version(stage.code)
+        and (RUN.ignore_code_changes
+             or entry["version"] == recipe_version(stage.code))
 
 
 # --------------------------------------------------------------------------
@@ -175,6 +190,12 @@ class RunOptions:
     dry_run: bool = False
     force: bool = False
     no_deps: bool = False
+    ignore_code_changes: bool = False  # skip the recipe-version check (dev:
+                                       # don't rebuild all when parse code changes)
+    since: date | None = None    # eurlex: discovery floor (overrides watermark)
+    lang: str | None = None      # eurlex: comma-separated languages
+    source: str = "sparql"       # eurlex: discovery backend (sparql|soap)
+    only: str | None = None      # forarbete: fetch a single document
 
 
 RUN = RunOptions()
@@ -202,44 +223,59 @@ def _worker_init(manifest, run_options):
     RUN = run_options
 
 
-def _progress(action, done, total, merged):
-    """Live one-line counter on stderr (the per-document loop is otherwise
-    silent until the final report). Throttled to every 50 docs + the last."""
-    if done % 50 and done != total:
-        return
+def _progress(source, action, done, total, merged, basefile):
+    """Live one-line counter on stderr, refreshed per document (it overwrites in
+    place via \\r). Carries the source name, the running counts, and the most
+    recently completed basefile; \\033[K clears any longer previous line."""
     verb = "planned" if RUN.dry_run else "ran"
     count = len(merged.planned) if RUN.dry_run else len(merged.done)
-    sys.stderr.write("\r  %s %d/%d  %s %d  err %d "
-                     % (action, done, total, verb, count, len(merged.errors)))
+    sys.stderr.write("\r%s %s %d/%d  %s %d  err %d %s\033[K"
+                     % (source, action, done, total, verb, count,
+                        len(merged.errors), basefile))
     sys.stderr.flush()
+
+
+SAVE_EVERY = 1000      # checkpoint the manifest mid-run, every this many docs
 
 
 def run_action(source, action, basefiles, jobs):
     manifest = load_manifest()
     merged = Result()
-    total = done = 0
     total = len(basefiles)
+    done = 0
 
-    def absorb(res):
+    def persist():
+        if merged.updates and not RUN.dry_run:
+            manifest.update(merged.updates)
+            save_manifest(manifest)
+
+    def absorb(res, basefile):
         nonlocal done
         _absorb(merged, res)
         done += 1
-        _progress(action, done, total, merged)
+        _progress(source.name, action, done, total, merged, basefile)
+        if done % SAVE_EVERY == 0:
+            persist()       # checkpoint so a kill mid-run doesn't lose progress
 
-    if jobs > 1 and not RUN.dry_run:
-        jobspec = [(source.name, action, bf) for bf in basefiles]
-        with ProcessPoolExecutor(max_workers=jobs, initializer=_worker_init,
-                                 initargs=(manifest, RUN)) as pool:
-            for res in pool.map(_worker, jobspec, chunksize=16):
-                absorb(res)
-    else:
-        for bf in basefiles:
-            absorb(build_one(source, action, bf, manifest))
-    if total:
-        sys.stderr.write("\n")
-    if merged.updates and not RUN.dry_run:
-        manifest.update(merged.updates)
-        save_manifest(manifest)
+    try:
+        if jobs > 1 and not RUN.dry_run:
+            with ProcessPoolExecutor(max_workers=jobs, initializer=_worker_init,
+                                     initargs=(manifest, RUN)) as pool:
+                # as_completed -> results in completion order (a slow doc no
+                # longer stalls the display), each paired with its basefile
+                futures = {pool.submit(_worker, (source.name, action, bf)): bf
+                           for bf in basefiles}
+                for fut in as_completed(futures):
+                    absorb(fut.result(), futures[fut])
+        else:
+            for bf in basefiles:
+                absorb(build_one(source, action, bf, manifest), bf)
+    finally:
+        # always flush what was done -- on normal completion AND on Ctrl-C, so an
+        # interrupted slow source (forarbete) keeps the docs it already parsed
+        if total:
+            sys.stderr.write("\n")
+        persist()
     return merged
 
 
@@ -269,7 +305,7 @@ def save_manifest(manifest):
 # SFS source
 # --------------------------------------------------------------------------
 
-SFS_ROOT = DATA / "sfs"
+SFS_ROOT = layout.SFS_ROOT
 PKG = Path(__file__).parent
 SFS_CODE = tuple(PKG / "sfs" / ("%s.py" % m) for m in (
     "__init__", "extract", "reader", "tokenizer", "assembler", "model", "nf",
@@ -286,25 +322,17 @@ def _sfs_session():
     return sfs_download.make_session(sfs_download.USER_AGENT)
 
 
-def _sfs_paths(basefile):
-    year, nr = basefile.split(":", 1)
-    return year, nr.replace(" ", "_")
-
-
 def sfs_downloaded(basefile):
-    year, nr = _sfs_paths(basefile)
-    return SFS_ROOT / "downloaded" / year / ("%s.html" % nr)
+    return layout.sfs_sfst(basefile)
 
 
 def sfs_source(basefile):
     """The new beta API _source (its own tree, parallel to the legacy HTML)."""
-    year, nr = _sfs_paths(basefile)
-    return SFS_ROOT / "source" / year / ("%s.json" % nr)
+    return layout.sfs_source(basefile)
 
 
 def sfs_register(basefile):
-    year, nr = _sfs_paths(basefile)
-    return SFS_ROOT / "register" / year / ("%s.html" % nr)
+    return layout.sfs_sfsr(basefile)
 
 
 def sfs_inputs(basefile):
@@ -316,8 +344,7 @@ def sfs_inputs(basefile):
 
 
 def sfs_artifact(basefile):
-    year, nr = _sfs_paths(basefile)
-    return SFS_ROOT / "artifact" / year / ("%s.json" % nr)
+    return layout.artifact("sfs", basefile)
 
 
 def sfs_download_run(basefile):
@@ -327,21 +354,23 @@ def sfs_download_run(basefile):
     source = sfs_download.fetch_one(_sfs_session(), basefile)
     if source is None:
         raise RuntimeError("no published act %s in the beta database" % basefile)
-    sfs_download.save_document(SFS_ROOT, source)
+    sfs_download.save_document(layout.SFS_DOWNLOADED, source)
     time.sleep(POLITENESS)
 
 
-def sfs_harvest():
+def sfs_harvest(scopes):
     """Bulk discovery harvest -- a search_after sweep of the whole corpus, the
     only way to find acts not yet on disk (the old download_new). Incremental
     by default (stops at the first page with nothing new); `--force` walks the
     entire corpus oldest-first. Throttled and self-logging (per page)."""
     if RUN.dry_run:
         print("sfs download: would harvest the corpus into %s"
-              % (SFS_ROOT / "source"))
+              % (layout.SFS_DOWNLOADED / "source"))
         return
-    seen, new, updated = sfs_download.sync(SFS_ROOT, full=RUN.force)
-    print("sfs download: %d seen, %d new, %d updated" % (seen, new, updated))
+    seen, new, updated, skipped = sfs_download.sync(layout.SFS_DOWNLOADED,
+                                                    full=RUN.force)
+    print("sfs download: %d seen, %d new, %d updated, %d skipped"
+          % (seen, new, updated, skipped))
 
 
 def sfs_parse_run(basefile):
@@ -356,12 +385,18 @@ def sfs_parse_run(basefile):
 
 
 def sfs_list():
-    """Every basefile with a source: the new beta JSON (source/) or the
-    legacy SFST HTML (downloaded/)."""
+    """Every *regular* SFS basefile with a source: the new beta JSON
+    (source/) or the legacy SFST HTML (downloaded/).
+
+    Acts whose year segment is non-numeric -- amendments to government-agency
+    regulations carrying a letter prefix, e.g. 'N2026:3' -- are harvested and
+    stored but excluded here: they don't belong in the SFS-centric publication
+    and will be picked up by the myndfskr (myndighetsföreskrifter) port."""
     return sorted({"%s:%s" % (p.parent.name, p.stem.replace("_", " "))
-                   for p in (SFS_ROOT / "source").glob("*/*.json")}
+                   for p in layout.SFS_DOWNLOADED.glob("*/*.json")
+                   if p.parent.name.isdigit()}
                   | {"%s:%s" % (p.parent.name, p.stem.replace("_", " "))
-                     for p in (SFS_ROOT / "downloaded").glob("*/*.html")})
+                     for p in (layout.SFS_DOWNLOADED / "sfst").glob("*/*.html")})
 
 
 SOURCES["sfs"] = Source("sfs", sfs_list, {
@@ -371,16 +406,16 @@ SOURCES["sfs"] = Source("sfs", sfs_list, {
     "download": Stage("download", sfs_download_run, sfs_source),
     "parse": Stage("parse", sfs_parse_run, sfs_artifact,
                    inputs=sfs_inputs, code=SFS_CODE),
-}, harvest=sfs_harvest)
+}, harvest=sfs_harvest, origin=_origin(sfs_download.ENDPOINT))
 
 
 # --------------------------------------------------------------------------
 # DV source
 # --------------------------------------------------------------------------
 
-DV_ROOT = DATA / "dv"
-DOMSTOL_DOWNLOADED = DATA / "domstol" / "downloaded"
-DV_INDEX = DV_ROOT / "identity-index.json"
+DOM_DOWNLOADED = layout.DOM_DOWNLOADED            # dv api records (primary)
+DV_LEGACY_DOWNLOADED = layout.DV_LEGACY_DOWNLOADED  # legacy raw feed
+DV_INDEX = layout.DOM_INDEX
 DV_CODE = (PKG / "dv" / "parse.py", PKG / "dv" / "model.py",
            PKG / "lib" / "lagrum.py")
 
@@ -397,7 +432,7 @@ def _dv_session():
 
 
 def dv_artifact(basefile):
-    return DV_ROOT / "artifact" / ("%s.json" % slug(basefile))
+    return layout.artifact("dv", basefile)
 
 
 def dv_record(basefile):
@@ -419,7 +454,7 @@ def dv_download_run(basefile):
     time.sleep(POLITENESS)
 
 
-def dv_harvest():
+def dv_harvest(scopes):
     """Bulk discovery harvest of the courts' publication API -- the only way to
     find cases not yet on disk (paginates the whole corpus). Incremental by
     default; `--force` walks it all oldest-first. Throttled, self-logging.
@@ -431,18 +466,30 @@ def dv_harvest():
     the end rather than per page."""
     if RUN.dry_run:
         print("dv download: would harvest into %s, then rebuild %s"
-              % (DOMSTOL_DOWNLOADED, DV_INDEX))
+              % (DOM_DOWNLOADED, DV_INDEX))
         return
-    seen, changed = dv_download.sync(DOMSTOL_DOWNLOADED, full=RUN.force)
+    seen, changed = dv_download.sync(DOM_DOWNLOADED, full=RUN.force)
     print("dv download: %d records seen, %d new/changed" % (seen, changed))
     if changed or not DV_INDEX.exists():
-        print("dv download: rebuilding identity index ...")
-        dv_identity.reindex(dvdir=str(DV_ROOT / "downloaded"),
-                            domstoldir=str(DOMSTOL_DOWNLOADED),
-                            out=str(DV_INDEX))
-        _dv_cases.cache_clear()
+        dv_reindex()
     else:
         print("dv download: no new records, identity index left as is")
+
+
+def dv_reindex(args=()):
+    """Rebuild the identity index from the records already on disk -- one
+    whole-corpus union-find pass, no network and no parsing. Runs automatically
+    after a harvest that changed anything, and on demand as `lagen dv reindex`
+    (e.g. after revising the entity-resolution rules)."""
+    if RUN.dry_run:
+        print("dv reindex: would rebuild %s from %s + %s"
+              % (DV_INDEX, DOM_DOWNLOADED, DV_LEGACY_DOWNLOADED))
+        return
+    print("dv reindex: rebuilding identity index ...")
+    dv_identity.reindex(dvdir=str(DV_LEGACY_DOWNLOADED),
+                        domstoldir=str(DOM_DOWNLOADED),
+                        out=str(DV_INDEX))
+    _dv_cases.cache_clear()
 
 
 def dv_parse_run(basefile):
@@ -455,41 +502,49 @@ SOURCES["dv"] = Source("dv", lambda: sorted(_dv_cases()), {
     "download": Stage("download", dv_download_run, dv_record),
     "parse": Stage("parse", dv_parse_run, dv_artifact,
                    inputs=lambda bf: [dv_record(bf)], code=DV_CODE),
-}, harvest=dv_harvest)
+}, harvest=dv_harvest, origin=_origin(dv_download.API),
+   actions={"reindex": dv_reindex})
 
 
 # --------------------------------------------------------------------------
 # förarbete source (preparatory works from regeringen.se)
 # --------------------------------------------------------------------------
 
-FA_ROOT = DATA / "forarbete"
+FA_ROOT = layout.FA_ROOT
 FA_CODE = (PKG / "forarbete" / "parse.py", PKG / "forarbete" / "model.py",
            PKG / "lib" / "lagrum.py")
 
 
 def fa_record(basefile):
-    typ, slug = basefile.split("/", 1)
-    return FA_ROOT / typ / (slug + ".json")
+    return layout.fa_record(basefile)
 
 
 def fa_artifact(basefile):
-    typ, slug = basefile.split("/", 1)
-    return FA_ROOT / typ / "artifact" / (slug + ".json")
+    return layout.artifact("forarbete", basefile)
 
 
 def fa_list():
     """Every harvested record as 'type/slug' (the artifact subdir excluded by
     the single-level glob)."""
     return sorted("%s/%s" % (p.parent.name, p.stem)
-                  for p in FA_ROOT.glob("*/*.json"))
+                  for p in layout.FA_DOWNLOADED.glob("*/*.json"))
 
 
-def fa_harvest():
-    """Bulk harvest of all regeringen.se types (the old download_new)."""
+def fa_harvest(scopes):
+    """Bulk harvest of regeringen.se (the old download_new). `scopes` narrows it
+    to the named doctypes (prop/sou/ds/...); empty = all. `--only BASEFILE`
+    (with exactly one scope) fetches just that one document, walking the listing
+    until it is found."""
+    if RUN.only and len(scopes) != 1:
+        sys.exit("forarbete --only needs exactly one doctype, e.g. "
+                 "`lagen forarbete download prop --only 2025/26:28`")
     if RUN.dry_run:
-        print("forarbete download: would harvest regeringen.se into %s" % FA_ROOT)
+        print("forarbete download: would harvest %s into %s"
+              % (RUN.only or ", ".join(scopes) or "all types",
+                 layout.FA_DOWNLOADED))
         return
-    totals = fa_download.sync(str(FA_ROOT), full=RUN.force)
+    totals = fa_download.sync(str(layout.FA_DOWNLOADED), types=scopes or None,
+                              full=RUN.force, only=RUN.only)
     for typ, (seen, new) in totals.items():
         print("forarbete %s: %d seen, %d new" % (typ, seen, new))
 
@@ -497,23 +552,26 @@ def fa_harvest():
 def fa_parse_run(basefile):
     record = json.loads(fa_record(basefile).read_text())
     fa_artifact(basefile).write_text(json.dumps(
-        fa_parse.to_artifact(fa_parse.parse_record(record, FA_ROOT)),
+        fa_parse.to_artifact(fa_parse.parse_record(record, layout.FA_DOWNLOADED)),
         ensure_ascii=False, indent=2))
 
 
 SOURCES["forarbete"] = Source("forarbete", fa_list, {
     "parse": Stage("parse", fa_parse_run, fa_artifact,
                    inputs=lambda bf: [fa_record(bf)], code=FA_CODE),
-}, harvest=fa_harvest)
+}, harvest=fa_harvest, origin=_origin(fa_download.BASE),
+   scopes=frozenset(fa_download.TYPES),
+   notes="download flag: --only BASEFILE (fetch one document; needs one scope)")
 
 
 # --------------------------------------------------------------------------
 # EUR-Lex source (EU treaties, legislation, case law from CELLAR; CELEX ids)
 # --------------------------------------------------------------------------
 
-EURLEX_ROOT = DATA / "eurlex"
-EURLEX_CODE = (PKG / "eurlex" / "parse.py", PKG / "eurlex" / "model.py",
-               PKG / "lib" / "lagrum.py")
+EURLEX_ROOT = layout.EURLEX_ROOT
+EURLEX_CODE = (PKG / "eurlex" / "parse.py", PKG / "eurlex" / "parse_html.py",
+               PKG / "eurlex" / "parse_pdf.py", PKG / "eurlex" / "lang.py",
+               PKG / "eurlex" / "model.py", PKG / "lib" / "lagrum.py")
 
 
 @functools.cache
@@ -523,28 +581,26 @@ def _eurlex_session():
 
 def eurlex_notice(basefile):
     """The tree-notice graph -- the freshness marker for a downloaded CELEX."""
-    return eurlex_download.doc_dir(EURLEX_ROOT, basefile) / "notice.ttl"
+    return layout.eurlex_dir(basefile) / "notice.ttl"
 
 
 def eurlex_content(basefile):
-    """The Formex content file parse reads (zip bundle or single file), if any
-    was downloaded in a wanted language."""
-    path, _lang = eurlex_parse.content_file(
-        eurlex_download.doc_dir(EURLEX_ROOT, basefile))
+    """The content file parse reads (Formex/HTML/PDF), if any was obtained in a
+    wanted language."""
+    path, _lang, _route = eurlex_parse.content_file(layout.eurlex_dir(basefile))
     return [path] if path else []
 
 
 def eurlex_artifact(basefile):
-    return eurlex_download.doc_dir(EURLEX_ROOT, basefile) / "artifact.json"
+    return layout.artifact("eurlex", basefile)
 
 
 def eurlex_parse_run(basefile):
-    path, lang = eurlex_parse.content_file(
-        eurlex_download.doc_dir(EURLEX_ROOT, basefile))
+    path, lang, route = eurlex_parse.content_file(layout.eurlex_dir(basefile))
     if path is None:
-        raise SkipDocument("%s: no swe/eng Formex content" % basefile)
-    art = eurlex_parse.to_artifact(eurlex_parse.parse_document(
-        eurlex_parse.load_formex(path), basefile, lang))
+        raise SkipDocument("%s: no swe/eng content" % basefile)
+    art = eurlex_parse.to_artifact(
+        eurlex_parse.parse_content(path, route, basefile, lang))
     eurlex_artifact(basefile).write_text(
         json.dumps(art, ensure_ascii=False, indent=2))
 
@@ -553,34 +609,55 @@ def eurlex_download_run(basefile):
     """Fetch one CELEX (tree notice + best content per language) from CELLAR.
     Discovery of new CELEX is eurlex_harvest (bare `lagen eurlex download`)."""
     stored = eurlex_download.download_document(
-        _eurlex_session(), EURLEX_ROOT, basefile,
+        _eurlex_session(), layout.EURLEX_DOWNLOADED, basefile,
         eurlex_download.LANGUAGES, POLITENESS)
     if not stored:
         print("%s: no manifestation in %s" % (
             basefile, "/".join(eurlex_download.LANGUAGES)), flush=True)
 
 
-def eurlex_harvest():
-    """Bulk discovery sweep of all three sectors (treaties/acts/caselaw) via the
-    CELLAR SPARQL endpoint. Incremental by default (skips CELEX already on disk);
-    --force re-fetches everything."""
+def eurlex_harvest(scopes):
+    """Bulk discovery sweep via the CELLAR SPARQL endpoint. `scopes` narrows it
+    to the named sectors (treaties/acts/caselaw); empty = all. Incremental by
+    default (watermark-bounded, skips CELEX already on disk); --force re-fetches
+    everything. --since/--lang/--source tune discovery (see RunOptions)."""
     if RUN.dry_run:
-        print("eurlex download: would harvest treaties/acts/caselaw into %s"
-              % EURLEX_ROOT)
+        print("eurlex download: would harvest %s into %s"
+              % (", ".join(scopes) or "treaties/acts/caselaw",
+                 layout.EURLEX_DOWNLOADED))
         return
-    for sector in eurlex_download.SECTORS:
+    languages = tuple(RUN.lang.split(",")) if RUN.lang else eurlex_download.LANGUAGES
+    for sector in (scopes or list(eurlex_download.SECTORS)):
         seen, stored, skipped = eurlex_download.sync(
-            EURLEX_ROOT, sector, full=RUN.force)
+            layout.EURLEX_DOWNLOADED, sector, full=RUN.force, since=RUN.since,
+            languages=languages, source=RUN.source)
         print("eurlex %s: %d seen, %d stored, %d skipped"
               % (sector, seen, stored, skipped))
 
 
+def eurlex_unpack(args):
+    """`lagen eurlex unpack-bulk <dir-or-zip>` -- import a CELLAR bulk
+    legislation dump into the per-CELEX layout, so `parse` then treats the works
+    exactly like downloaded documents (no network)."""
+    if len(args) != 1:
+        sys.exit("usage: lagen eurlex unpack-bulk <bulk-dir-or-zip>")
+    if RUN.dry_run:
+        print("eurlex unpack-bulk: would import %s into %s"
+              % (args[0], layout.EURLEX_DOWNLOADED))
+        return
+    eurlex_bulk.unpack_bulk(args[0], layout.EURLEX_DOWNLOADED)
+
+
 SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
-    EURLEX_ROOT), {
+    layout.EURLEX_DOWNLOADED), {
     "download": Stage("download", eurlex_download_run, eurlex_notice),
     "parse": Stage("parse", eurlex_parse_run, eurlex_artifact,
                    inputs=eurlex_content, depends="download", code=EURLEX_CODE),
-}, harvest=eurlex_harvest)
+}, harvest=eurlex_harvest, origin=_origin(eurlex_download.SOAP_ENDPOINT),
+   scopes=frozenset(eurlex_download.SECTORS),
+   actions={"unpack-bulk": eurlex_unpack},
+   notes="download flags: --since YYYY-MM-DD, --lang swe,eng, --source sparql|soap\n"
+         "unpack-bulk <dir|zip>: import a CELLAR bulk legislation dump")
 
 
 # --------------------------------------------------------------------------
@@ -588,13 +665,9 @@ SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
 # parsed from the MediaWiki dump
 # --------------------------------------------------------------------------
 
-WIKI_ROOT = DATA / "mediawiki" / "downloaded"
+WIKI_ROOT = layout.WIKI_ROOT
 WIKI_CODE = (PKG / "wiki" / "parse.py", PKG / "lib" / "wikitext.py",
              PKG / "lib" / "lagrum.py")
-
-
-def _wiki_slug(basefile):
-    return "".join(c if c.isalnum() else "_" for c in basefile).strip("_")
 
 
 def kommentar_record(basefile):
@@ -602,7 +675,7 @@ def kommentar_record(basefile):
 
 
 def kommentar_artifact(basefile):
-    return DATA / "kommentar" / "artifact" / (_wiki_slug(basefile) + ".json")
+    return layout.artifact("kommentar", basefile)
 
 
 def kommentar_parse_run(basefile):
@@ -616,7 +689,7 @@ def begrepp_record(basefile):
 
 
 def begrepp_artifact(basefile):
-    return DATA / "begrepp" / "artifact" / (_wiki_slug(basefile) + ".json")
+    return layout.artifact("begrepp", basefile)
 
 
 def begrepp_parse_run(basefile):
@@ -651,11 +724,11 @@ SOURCES["begrepp"] = Source(
 
 ARTIFACTS = {
     "sfs": lambda: sorted((SFS_ROOT / "artifact").glob("*/*.json")),
-    "dv": lambda: sorted((DV_ROOT / "artifact").glob("*.json")),
-    "forarbete": lambda: sorted(FA_ROOT.glob("*/artifact/*.json")),
-    "kommentar": lambda: sorted((DATA / "kommentar" / "artifact").glob("*.json")),
-    "begrepp": lambda: sorted((DATA / "begrepp" / "artifact").glob("*.json")),
-    "eurlex": lambda: sorted(EURLEX_ROOT.glob("*/*/artifact.json")),
+    "dv": lambda: sorted((layout.DOM_ROOT / "artifact").glob("*.json")),
+    "forarbete": lambda: sorted((FA_ROOT / "artifact").glob("*/*.json")),
+    "kommentar": lambda: sorted((layout.KOMMENTAR_ROOT / "artifact").glob("*.json")),
+    "begrepp": lambda: sorted((layout.BEGREPP_ROOT / "artifact").glob("*.json")),
+    "eurlex": lambda: sorted((EURLEX_ROOT / "artifact").glob("*/*.json")),
 }
 
 
@@ -687,23 +760,68 @@ def stale_sources():
             if any(p.stat().st_mtime > cutoff for p in lister())]
 
 
+# a page's rendered HTML is a function of the render/query code plus the
+# artifacts in its prerequisite set (computed per page from the catalog)
+GENERATE_CODE = (PKG / "lib" / "render.py", PKG / "lib" / "catalog.py",
+                 PKG / "lib" / "wikitext.py", PKG / "lib" / "layout.py")
+
+
 def cmd_generate():
     """Render every catalogued document to static HTML, with live outbound
     links and inbound annotations queried from the catalog, plus a frontpage.
     Auto-runs `relate` first for any source whose artifacts are newer than the
-    catalog -- relate is generate's upstream dependency."""
+    catalog -- relate is generate's upstream dependency.
+
+    Incremental like parse: a page is re-rendered only when its prerequisite
+    artifacts (itself + the documents citing it + the documents it cites) or the
+    render code changed. `--force` rebuilds all; `--ignore-code-changes` ignores
+    the render-code version (rebuild only on data changes)."""
     stale = stale_sources()
     if stale:
         print("catalog stale for %s -- relating first" % ", ".join(stale))
         cmd_relate(stale)
 
+    manifest = load_manifest()
+    code_version = recipe_version(GENERATE_CODE)
+    updates = {}
+    own_hash = {}                # artifact path -> content hash, memoized per run
+
+    def page_signature(art_path, dep_digest):
+        # only the page's OWN artifact is content-hashed (it changes when the doc
+        # is re-parsed); its neighbours enter via dep_digest as a set of
+        # relationships, not their contents -- an immutable case re-appearing
+        # unchanged must not invalidate every law it cites
+        p = str(art_path)
+        if p not in own_hash:
+            fp = Path(p)
+            own_hash[p] = (hashlib.sha256(fp.read_bytes()).hexdigest()
+                           if fp.exists() else "0")
+        return hashlib.sha256((own_hash[p] + dep_digest).encode()).hexdigest()
+
+    def fresh(uri, out_path, art_path, dep_digest):
+        if RUN.force or not out_path.exists():
+            return False
+        entry = manifest.get(manifest_key("generate", "page", uri))
+        return bool(entry) \
+            and entry["inputs"] == page_signature(art_path, dep_digest) \
+            and (RUN.ignore_code_changes or entry["version"] == code_version)
+
+    def record(uri, art_path, dep_digest):
+        updates[manifest_key("generate", "page", uri)] = {
+            "inputs": page_signature(art_path, dep_digest), "version": code_version}
+
     def progress(done, total):
         sys.stderr.write("\r  generate %d/%d pages " % (done, total))
         sys.stderr.flush()
 
-    n = render.generate_site(CATALOG, GENERATED, progress=progress)
+    total, rendered = render.generate_site(CATALOG, GENERATED, progress=progress,
+                                           fresh=fresh, record=record)
     sys.stderr.write("\n")
-    print("generate: %d pages -> %s" % (n, GENERATED))
+    if updates:
+        manifest.update(updates)
+        save_manifest(manifest)
+    print("generate: %d pages (%d rendered, %d fresh) -> %s"
+          % (total, rendered, total - rendered, GENERATED))
     print("serve with: lagen all serve   (then open http://localhost:8000/)")
 
 
@@ -750,25 +868,75 @@ def report(source, action, result, requested):
         print("  ERROR %s %s: %s" % (stage, bf, msg))
 
 
+def _help(name):
+    """Contextual `lagen <source> -h`: the source's actions, harvest scopes and
+    any source-specific flags."""
+    src = SOURCES[name]
+    verbs = ["download"] if src.harvest else []
+    verbs += [s for s in src.stages if s not in verbs] + list(src.actions)
+    print("usage: lagen %s <action> [ids|scopes] [options]" % name)
+    if src.origin:
+        print("\nsource:  %s" % src.origin)
+    print("actions: %s" % ", ".join(verbs))
+    if src.scopes:
+        print("\ndownload scopes (narrow the harvest to sub-corpora):")
+        print("  %s" % ", ".join(sorted(src.scopes)))
+        print("  e.g. `lagen %s download %s`   (no scope = the whole corpus)"
+              % (name, sorted(src.scopes)[0]))
+    if src.harvest is not None and "download" in src.stages:
+        print("\n`lagen %s download <id>` refetches a single document by id." % name)
+    if src.notes:
+        print("\n%s" % src.notes)
+    print("\nglobal options: `lagen -h`")
+
+
 def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    # contextual help: `lagen <source> [action] -h` -> that source's help
+    if "-h" in argv or "--help" in argv:
+        leading = next((a for a in argv if not a.startswith("-")), None)
+        if leading in SOURCES:
+            _help(leading)
+            return
     p = argparse.ArgumentParser(prog="lagen", description=__doc__.split("\n")[0])
     p.add_argument("source", help="source name (%s) or 'all'"
                    % ", ".join(SOURCES))
     p.add_argument("action",
-                   help="download | parse | relate | generate | serve | status")
-    p.add_argument("basefiles", nargs="*", help="ids; empty = all stale")
+                   help="download | parse | relate | generate | serve | status "
+                        "| a source action (e.g. dv reindex)")
+    p.add_argument("basefiles", nargs="*",
+                   help="ids to act on (empty = all stale); for download, names "
+                        "harvest sub-scopes, e.g. 'prop' or 'acts'")
     p.add_argument("-f", "--force", action="store_true",
                    help="rebuild the named stage even if fresh")
     p.add_argument("--no-deps", action="store_true",
                    help="run only the named stage, not its upstream deps")
+    p.add_argument("--ignore-code-changes", action="store_true",
+                   help="treat outputs as fresh even when the parsing code "
+                        "changed -- rebuild only docs whose input data changed, "
+                        "are missing, or failed (dev convenience; off in production)")
     p.add_argument("-j", "--jobs", type=int, default=1, help="parallel workers")
     p.add_argument("-n", "--dry-run", action="store_true",
                    help="print the plan, do nothing")
     p.add_argument("--port", type=int, default=8000,
                    help="port for `serve` (default 8000)")
+    p.add_argument("--since", type=date.fromisoformat, metavar="YYYY-MM-DD",
+                   help="eurlex download: only discover documents dated on/after "
+                        "this (overrides the per-sector watermark for this run)")
+    p.add_argument("--lang", metavar="CODES",
+                   help="eurlex download: comma-separated languages (default swe,eng)")
+    p.add_argument("--source", dest="discovery", choices=("sparql", "soap"),
+                   default="sparql",
+                   help="eurlex download: discovery backend (default sparql)")
+    p.add_argument("--only", metavar="BASEFILE",
+                   help="forarbete download: fetch just this one document "
+                        "(needs exactly one doctype scope)")
     args = p.parse_args(argv)
 
     RUN.dry_run, RUN.force, RUN.no_deps = args.dry_run, args.force, args.no_deps
+    RUN.ignore_code_changes = args.ignore_code_changes
+    RUN.since, RUN.lang, RUN.source = args.since, args.lang, args.discovery
+    RUN.only = args.only
 
     # corpus-wide derived actions: source is irrelevant, run exactly once
     if args.action == "generate":
@@ -786,27 +954,46 @@ def main(argv=None):
         cmd_relate(names)
         return
 
+    had_errors = False
     for name in names:
         source = SOURCES[name]
         if args.action == "status":
             cmd_status(source)
             continue
-        if args.action == "download" and not args.basefiles:
-            # no basefile = harvest the whole corpus (discovery). The per-doc
-            # stage can only refetch known ids; new docs are found only by the
-            # bulk sweep, so this must NOT fall back to list_basefiles().
-            if source.harvest is None:
+        if args.action == "download":
+            scopes = args.basefiles
+            if source.harvest is not None and (
+                    not scopes or all(s in source.scopes for s in scopes)):
+                # bulk discovery, optionally narrowed to named sub-scopes
+                # (forarbete doctypes / eurlex sectors). The per-doc stage only
+                # refetches known ids; new docs come only from the bulk sweep,
+                # so this must NOT fall back to list_basefiles().
+                if source.origin:
+                    label = "%s %s" % (name, "/".join(scopes)) if scopes else name
+                    print("Downloading %s from %s" % (label, source.origin),
+                          flush=True)
+                source.harvest(scopes)
+                continue
+            if scopes and source.scopes and "download" not in source.stages:
+                bad = [s for s in scopes if s not in source.scopes]
+                p.error("unknown %s scope(s): %s (have: %s)"
+                        % (name, ", ".join(bad), ", ".join(sorted(source.scopes))))
+            if not scopes and source.harvest is None:
                 p.error("source %r has no bulk harvest" % name)
-            source.harvest()
+            # scopes are document ids -> fall through to the per-doc download stage
+        if args.action in source.actions:
+            source.actions[args.action](args.basefiles)
             continue
         if args.action not in source.stages:
             p.error("source %r has no action %r (have: %s)"
-                    % (name, args.action, ", ".join(source.stages)))
+                    % (name, args.action,
+                       ", ".join([*source.stages, *source.actions])))
         basefiles = args.basefiles or source.list_basefiles()
         result = run_action(source, args.action, basefiles, args.jobs)
         report(source, args.action, result, len(basefiles))
-        if result.errors:
-            sys.exit(1)
+        had_errors |= bool(result.errors)
+    if had_errors:                 # report every source first, then signal failure
+        sys.exit(1)
 
 
 if __name__ == "__main__":

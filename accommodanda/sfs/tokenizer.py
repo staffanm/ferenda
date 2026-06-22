@@ -767,8 +767,8 @@ class Tokenizer:
         if l not in OB_SEPARATORS:
             fuzz = difflib.get_close_matches(l, OB_SEPARATORS, 1, 0.9)
             if fuzz:
-                log.warning("%s: assuming '%s' means '%s'",
-                            self.basefile, l, fuzz[0])
+                log.debug("%s: assuming '%s' means '%s'",
+                          self.basefile, l, fuzz[0])
             else:
                 return False
         try:

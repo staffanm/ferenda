@@ -15,6 +15,7 @@ uniformly across SFS and DV, and both verticals mint the same
 the edges from either source.
 """
 
+import hashlib
 import json
 import sqlite3
 from pathlib import Path
@@ -279,3 +280,36 @@ def snippet(con, uri):
 def counts(con):
     return dict(con.execute(
         "SELECT source, COUNT(*) FROM documents GROUP BY source").fetchall())
+
+
+def page_dependency_digest(con, uri):
+    """A digest of everything *besides uri's own artifact* that its rendered page
+    depends on, for incremental generate. Identity/set-based, not content-based:
+    cited and citing documents are effectively immutable (a case or förarbete
+    never changes once published), so a page goes stale when the *set* of its
+    relationships changes -- a new case starts citing it, an old one drops out,
+    or a document it links to appears/disappears -- not when an unchanged
+    neighbour's bytes change. Two parts:
+
+      * inbound -- the (citing doc, pinpoint, label) rows it renders in its
+        margins and panel: a new or removed citer changes this;
+      * outbound -- the set of hosted documents it links to, so a link goes live
+        the moment its target is parsed (and dims if the target disappears).
+
+    Self-citations excluded; external targets we don't host drop out of the join."""
+    h = hashlib.sha256()
+    for row in con.execute(
+            "SELECT l.from_uri, l.from_anchor, d.label, d.title, d.source "
+            "FROM links l JOIN documents d ON d.uri = l.from_uri "
+            "WHERE l.to_root = ?1 AND l.from_uri <> l.to_root "
+            "ORDER BY 1, 2", (uri,)):
+        h.update(("\x1f".join("" if c is None else c for c in row)).encode())
+        h.update(b"\x1e")
+    h.update(b"\x00")
+    for (target,) in con.execute(
+            "SELECT DISTINCT l.to_root FROM links l "
+            "JOIN documents d ON d.uri = l.to_root "
+            "WHERE l.from_uri = ?1 AND l.to_root <> l.from_uri ORDER BY 1", (uri,)):
+        h.update(target.encode())
+        h.update(b"\x1e")
+    return h.hexdigest()

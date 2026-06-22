@@ -30,17 +30,13 @@ Error modes are asymmetric and both reported: under-linking leaves the same
 case as two single-source components (a duplicate downstream); over-linking
 fuses distinct cases (a component spanning >1 court is flagged).
 
-  python -m accommodanda.dv_identity [DVDIR] [DOMSTOLDIR] [--out index.json]
+Rebuilt from the records already on disk (no network) via `lagen dv reindex`.
 """
 
-import argparse
 import json
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
-
-DV_DEFAULT = "site/data/dv/downloaded"
-DOMSTOL_DEFAULT = "site/data/domstol/downloaded"
 
 # legacy court dir code -> code used by the new API (others are identical)
 COURT_CANON = {"REG": "REGR", "MÖD": "MOD", "MMD": "MMOD",
@@ -216,10 +212,7 @@ def report(cases, unrecognized):
           dict(sorted(by_court.items(), key=lambda kv: -kv[1])))
 
 
-INDEX_DEFAULT = "site/data/dv/identity-index.json"
-
-
-def reindex(dvdir=DV_DEFAULT, domstoldir=DOMSTOL_DEFAULT, out=INDEX_DEFAULT):
+def reindex(dvdir, domstoldir, out):
     """Rebuild the whole identity index from the two raw stores and write it to
     `out`. A full rebuild, not an incremental update: build_index is a global
     union-find over every record, so a single new record can merge components.
@@ -230,20 +223,8 @@ def reindex(dvdir=DV_DEFAULT, domstoldir=DOMSTOL_DEFAULT, out=INDEX_DEFAULT):
           % (len(api_records), len(legacy_records), len(unrecognized)))
     cases = build_index(api_records, legacy_records)
     cases.sort(key=lambda c: (c["avgorandedatum"] or "", c["canonical_id"]))
+    Path(out).parent.mkdir(parents=True, exist_ok=True)
     Path(out).write_text(json.dumps(cases, ensure_ascii=False, indent=2))
     report(cases, unrecognized)
     print("index written to %s" % out)
     return cases
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("dvdir", nargs="?", default=DV_DEFAULT)
-    parser.add_argument("domstoldir", nargs="?", default=DOMSTOL_DEFAULT)
-    parser.add_argument("--out", default=INDEX_DEFAULT)
-    args = parser.parse_args()
-    reindex(args.dvdir, args.domstoldir, args.out)
-
-
-if __name__ == "__main__":
-    main()

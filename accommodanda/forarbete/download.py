@@ -31,7 +31,8 @@ source (riksdagen, KB) for older periods reconciles by identity, exactly as the
 user requires. The two types regeringen.se publishes without a number (SÖ,
 lagrådsremiss) fall back to the landing-page slug as basefile.
 
-    python -m accommodanda.forarbete.download [TYPE ...] [--full] [--limit N]
+Harvested via `lagen forarbete download [prop|sou|ds|...]`; no doctype = all.
+A single document: `lagen forarbete download <doctype> --only <basefile>`.
 
 Stored under `site/data/forarbete/<type>/`: one `<slug>.json` record (identifier,
 title, date, landing url, downloaded files) + the landing `<slug>.html` + the
@@ -39,7 +40,6 @@ content file(s). Incremental by default (newest-first, stop at the first
 already-downloaded doc); `--full` re-walks the whole listing, skipping existing.
 """
 
-import argparse
 import json
 import os
 import re
@@ -51,6 +51,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from ..lib.net import make_session
+from ..lib.util import progress
 
 BASE = "https://www.regeringen.se"
 FILTER = (BASE + "/Filter/GetFilteredItems?lang=sv&filterType=Taxonomy"
@@ -157,13 +158,14 @@ def listing_page(session, typ, page):
 
 
 def iter_listing(session, typ, delay):
-    """Yield successive listing pages' descriptor lists until one is empty."""
+    """Yield (descriptors, total_count, page_number) per listing page until one
+    is empty."""
     page = 1
     while True:
-        items, _ = listing_page(session, typ, page)
+        items, total = listing_page(session, typ, page)
         if not items:
             return
-        yield items
+        yield items, total, page
         page += 1
         time.sleep(delay)
 
@@ -214,18 +216,25 @@ def download_document(session, root, item, delay):
 
 def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
          only=None):
-    """Harvest the named types (default all). Incremental: newest-first, stop a
-    type at the first document already on disk; `--full` re-walks everything,
-    skipping existing. `only` (a basefile) downloads just that one document --
-    walking the listing until it is found (ignoring the on-disk stop), the way
-    to fetch a single named förarbete that has no id->URL endpoint. Returns
-    {type: (seen, new)}."""
+    """Harvest the named types (default all).
+
+    A type is *backfilled* -- the whole listing walked, downloading whatever is
+    missing -- when `--full` is given or the type has never been cleanly walked
+    (no `.complete` marker yet: a first run, or one interrupted partway). The
+    marker is written only after a full walk with no download errors, so an
+    interrupted or partially-failed initial load is resumed, not mistaken for a
+    finished one. Once complete, later runs go *incremental*: newest-first,
+    stopping at the first document already on disk. `only` (a basefile)
+    downloads just that one document, walking the listing until it is found
+    (ignoring the on-disk stop). Returns {type: (seen, new)}."""
     session = make_session(USER_AGENT)
     totals = {}
     for typ in (types or list(TYPES)):
-        seen = new = 0
+        marker = Path(root) / typ / ".complete"
+        backfill = full or not marker.exists()
+        seen = new = errors = 0
         done = False
-        for items in iter_listing(session, typ, delay):
+        for items, total, page in iter_listing(session, typ, delay):
             for item in items:
                 seen += 1
                 if only is not None:
@@ -235,7 +244,7 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
                     new, done = 1, True
                     break
                 if record_path(root, typ, item["basefile"]).exists():
-                    if not full:
+                    if not backfill:
                         done = True   # newest-first => everything after is older
                         break
                     continue
@@ -243,13 +252,21 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
                     download_document(session, root, item, delay)
                     new += 1
                 except requests.HTTPError as exc:
+                    errors += 1
                     log("  %s %s: %s" % (typ, item["basefile"], exc))
                 if limit and new >= limit:
                     done = True
                     break
-            log("  %s: %d seen, %d new%s" % (typ, seen, new, " …" if not done else ""))
+            progress(seen, total, scope=typ, page=page, new=new)
             if done:
                 break
+        else:
+            # the listing was exhausted with no early stop -> the whole type
+            # was walked. Mark it complete (once clean) so later runs can go
+            # incremental instead of re-walking everything.
+            if not only and errors == 0:
+                marker.parent.mkdir(parents=True, exist_ok=True)
+                marker.write_text("")
         totals[typ] = (seen, new)
     return totals
 
@@ -257,31 +274,3 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
 def list_basefiles(root, typ):
     return sorted(json.loads(p.read_text())["basefile"]
                   for p in (Path(root) / typ).glob("*.json"))
-
-
-def main():
-    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("types", nargs="*",
-                    help="types to harvest (default all): " + ", ".join(TYPES))
-    ap.add_argument("--root", default="site/data/forarbete")
-    ap.add_argument("--full", action="store_true",
-                    help="re-walk the whole listing (default: stop at first seen)")
-    ap.add_argument("--limit", type=int, help="max new docs per type")
-    ap.add_argument("--only", metavar="BASEFILE",
-                    help="download just this one document, e.g. --only 2025/26:28 "
-                         "(give the single type it belongs to)")
-    ap.add_argument("--delay", type=float, default=0.5)
-    args = ap.parse_args()
-    bad = [t for t in args.types if t not in TYPES]
-    if bad:
-        ap.error("unknown type(s): %s (have: %s)" % (bad, ", ".join(TYPES)))
-    if args.only and len(args.types) != 1:
-        ap.error("--only needs exactly one type, e.g. `prop --only 2025/26:28`")
-    totals = sync(args.root, args.types or None, full=args.full,
-                  limit=args.limit, delay=args.delay, only=args.only)
-    for typ, (seen, new) in totals.items():
-        print("%s: %d seen, %d new" % (typ, seen, new))
-
-
-if __name__ == "__main__":
-    main()

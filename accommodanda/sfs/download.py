@@ -25,12 +25,12 @@ old copy is moved to the archive under its own version id before the new one
 overwrites it, so every historical consolidation stays retrievable -- the
 job the old downloader's get_archive_version/archive machinery did.
 
-The new harvest lives in its own tree, parallel to (not mixed with) the
-legacy SFST/SFSR HTML pages -- mirroring the dv/ vs domstol/ split, so the
-frozen HTML corpus the golden was derived from stays pristine:
+The harvest writes the beta-API JSON flat under the download root, with
+superseded consolidations tucked into a sibling archive/ subtree (any legacy
+SFST/SFSR HTML lives in its own sfst/, sfsr/ siblings):
 
-  source/{year}/{nr}.json                     the current consolidation
-  source/archive/{year}/{nr}/{version}.json   superseded consolidations
+  {year}/{nr}.json                     the current consolidation
+  archive/{year}/{nr}/{version}.json   superseded consolidations
 
   python -m accommodanda.sfs.download DESTDIR [--full] [--limit N]
 """
@@ -42,44 +42,43 @@ import re
 import time
 from pathlib import Path
 
-from ..lib.net import make_session
+from ..lib.net import make_session, request
+from ..lib.util import progress
 
 ENDPOINT = "https://beta.rkrattsbaser.gov.se/elasticsearch/SearchEsByRawJson"
 PAGE_SIZE = 100
+PAGE_DELAY = 1.0           # seconds between pages -- conservative vs. throttling
 USER_AGENT = "lagen.nu harvester (https://lagen.nu/, staffan@tomtebo.org)"
+WATERMARK = ".watermark"   # file under destdir: max uppdateradDateTime harvested
 
 # fulltext.andringInford looks like "t.o.m. SFS 2026:764"; pull the SFS nr
 RE_VERSION = re.compile(r"(\d+:\s?\d+)")
 
 
+def _es(session, esquery):
+    """Run an ES query through the rkrattsbaser passthrough and return the
+    parsed response, with lib.net's retry/throttle/diagnostics handling."""
+    return request(session, "POST", ENDPOINT, parse_json=True, json={
+        "searchIndexes": ["Sfs"], "api": "search", "json": esquery})
+
+
 def fetch_one(session, beteckning):
     """Fetch a single published act's ``_source`` by beteckning, or None if
     the beta database has no published act with that number."""
-    query = {"query": {"bool": {"must": [
+    hits = _es(session, {"query": {"bool": {"must": [
         {"term": {"beteckning.keyword": beteckning}},
-        {"term": {"publicerad": True}}]}}, "size": 1}
-    response = session.post(ENDPOINT, timeout=60, json={
-        "searchIndexes": ["Sfs"], "api": "search", "json": query})
-    response.raise_for_status()
-    hits = response.json()["hits"]["hits"]
+        {"term": {"publicerad": True}}]}}, "size": 1})["hits"]["hits"]
     return hits[0]["_source"] if hits else None
 
 
-def search(session, sort_field, order, search_after=None):
-    """One page of published acts, sorted for stable search_after paging.
-    grundforfattningId is the immutable tiebreaker."""
-    query = {
-        "query": {"term": {"publicerad": True}},
-        "size": PAGE_SIZE,
-        "track_total_hits": True,
-        "sort": [{sort_field: order}, {"grundforfattningId": "asc"}],
-    }
+def search(session, query, search_after=None):
+    """POST one page (PAGE_SIZE hits) for the given ES `query`, which must
+    carry its own `sort`; returns the parsed response. search_after pages past
+    ES's 10k from+size ceiling."""
+    body = dict(query, size=PAGE_SIZE, track_total_hits=True)
     if search_after is not None:
-        query["search_after"] = search_after
-    response = session.post(ENDPOINT, timeout=60, json={
-        "searchIndexes": ["Sfs"], "api": "search", "json": query})
-    response.raise_for_status()
-    return response.json()
+        body["search_after"] = search_after
+    return _es(session, body)
 
 
 def write_atomic(path, data):
@@ -93,25 +92,48 @@ def write_atomic(path, data):
         raise
 
 
+def read_watermark(destdir):
+    """The max uppdateradDateTime harvested by a previous clean run, or None
+    when there is no prior run (so a full backfill is due)."""
+    path = Path(destdir) / WATERMARK
+    return path.read_text().strip() if path.exists() else None
+
+
+def write_watermark(destdir, value):
+    write_atomic(Path(destdir) / WATERMARK, value.encode())
+
+
+class MalformedBeteckning(ValueError):
+    """A document's beteckning is missing or unusable as a path segment.
+    Raised so the harvest can skip the one record instead of aborting the
+    whole sweep."""
+
+
 def _split_beteckning(beteckning):
+    """Split a beteckning ("year:nr") into the two path segments it becomes
+    on disk. The year is not always purely numeric -- some acts carry a
+    letter-prefixed series (e.g. 'N2026:3') -- so we validate *path safety*
+    rather than a digit year: a beteckning that could escape destdir is a
+    corrupt record, not something to store."""
+    if not isinstance(beteckning, str) or ":" not in beteckning:
+        raise MalformedBeteckning("missing or malformed beteckning: %r" % beteckning)
     year, nr = beteckning.split(":", 1)
     nr = nr.replace(" ", "_")
-    # beteckning comes from the remote _source and becomes path segments;
-    # assert it can't carry a path separator or "..".
-    assert year.isdigit() and "/" not in nr and "\\" not in nr \
-        and ".." not in nr, "unexpected beteckning: %r" % beteckning
+    for seg in (year, nr):
+        if not seg or seg.startswith(".") or "/" in seg or "\\" in seg:
+            raise MalformedBeteckning("unsafe beteckning: %r" % beteckning)
     return year, nr
 
 
 def source_path(destdir, beteckning):
     year, nr = _split_beteckning(beteckning)
-    return destdir / "source" / year / ("%s.json" % nr)
+    return destdir / year / ("%s.json" % nr)
 
 
 def archive_path(destdir, beteckning, version):
     year, nr = _split_beteckning(beteckning)
     safe = version.replace(":", "_").replace(" ", "_").replace("/", "_")
-    return destdir / "source" / "archive" / year / nr / ("%s.json" % safe)
+    return destdir / "archive" / year / nr / ("%s.json" % safe)
 
 
 def version_id(source):
@@ -152,48 +174,89 @@ def save_document(destdir, source):
     return "updated"
 
 
-def sync(destdir, full=False, limit=None, delay=0.3):
-    """Harvest published acts into destdir. Full mode walks the whole corpus
-    oldest-first by the immutable grundforfattningId; incremental mode walks
-    newest-first by uppdateradDateTime and stops at the first page with no
-    new or changed document. Returns (seen, new, updated)."""
+def sync(destdir, full=False, limit=None, delay=PAGE_DELAY):
+    """Harvest published acts into destdir, returning (seen, new, updated,
+    skipped). The mode is chosen automatically from the stored watermark (the
+    max uppdateradDateTime harvested by the last clean run):
+
+    * **Backfill** -- `full` is set, or no watermark exists yet. Sweeps the
+      whole corpus oldest-first by the immutable grundforfattningId, so even
+      acts with no uppdateradDateTime are captured. The watermark is written
+      only on clean completion; a crashed backfill leaves none and restarts.
+
+    * **Incremental** -- a watermark exists. Asks the server for only the acts
+      changed since (uppdateradDateTime >= watermark), oldest-change-first.
+      Changes therefore arrive in timestamp order, so the watermark is
+      checkpointed after every page and an interrupted run resumes where it
+      stopped. An amendment to an old base act bumps that act's
+      uppdateradDateTime, so it surfaces here despite its old SFS number.
+    """
     destdir = Path(destdir)
     session = make_session(USER_AGENT)
-    sort_field, order = (("grundforfattningId", "asc") if full
-                         else ("uppdateradDateTime", "desc"))
+    watermark = read_watermark(destdir)
+    backfill = full or watermark is None
+    if backfill:
+        query = {"query": {"term": {"publicerad": True}},
+                 "sort": [{"grundforfattningId": "asc"}]}
+    else:
+        query = {"query": {"bool": {"must": [
+                     {"term": {"publicerad": True}},
+                     {"range": {"uppdateradDateTime": {"gte": watermark}}}]}},
+                 "sort": [{"uppdateradDateTime": "asc"},
+                          {"grundforfattningId": "asc"}]}
+    print("sfs harvest: %s (since %s)"
+          % ("full backfill" if backfill else "incremental",
+             watermark or "scratch"), flush=True)
+
     after = None
-    seen = new = updated = 0
+    seen = new = updated = skipped = page_no = 0
+    high = watermark
+    truncated = False
     while True:
-        page = search(session, sort_field, order, after)
+        page = search(session, query, after)
         hits = page["hits"]["hits"]
         if not hits:
             break
-        page_changed = 0
+        page_no += 1
         for hit in hits:
-            status = save_document(destdir, hit["_source"])
-            new += status == "new"
-            updated += status == "updated"
-            page_changed += status != "unchanged"
             after = hit["sort"]
             seen += 1
+            try:
+                status = save_document(destdir, hit["_source"])
+            except MalformedBeteckning as exc:
+                skipped += 1
+                print("  skipped: %s" % exc, flush=True)
+                continue
+            new += status == "new"
+            updated += status == "updated"
+            ts = hit["_source"].get("uppdateradDateTime")
+            if ts and (high is None or ts > high):
+                high = ts
             if limit and seen >= limit:
+                truncated = True
                 break
-        total = page["hits"]["total"]["value"]
-        print("%d/%d seen: %d new/changed this page"
-              % (seen, total, page_changed), flush=True)
-        if limit and seen >= limit:
+        progress(seen, page["hits"]["total"]["value"], page=page_no,
+                 new=new, updated=updated)
+        # incremental arrives in timestamp order, so the running max is a safe
+        # resume point -- checkpoint each page. Backfill arrives in base-id
+        # order, so its max is only valid once the whole sweep completes.
+        if not backfill and high and high != watermark:
+            write_watermark(destdir, high)
+            watermark = high
+        if truncated:
             break
-        if not full and page_changed == 0:
-            break  # incremental: everything older is already harvested
         time.sleep(delay)
-    return seen, new, updated
+    if backfill and high and not truncated:
+        write_watermark(destdir, high)
+    return seen, new, updated, skipped
 
 
 def list_basefiles(destdir):
-    """SFS basefiles ("year:nr") harvested into destdir, for the build
-    driver. The archive/ subtree is excluded (only top-level year dirs)."""
+    """SFS basefiles ("year:nr") harvested into destdir, for the build driver.
+    The deeper archive/<year>/<nr>/ subtree of superseded versions is naturally
+    excluded by the one-level-deep year/nr.json glob."""
     return sorted("%s:%s" % (p.parent.name, p.stem.replace("_", " "))
-                  for p in (Path(destdir) / "source").glob("*/*.json"))
+                  for p in Path(destdir).glob("*/*.json"))
 
 
 def main():
@@ -206,9 +269,10 @@ def main():
     parser.add_argument("--delay", type=float, default=0.3,
                         help="seconds between pages (default 0.3)")
     args = parser.parse_args()
-    seen, new, updated = sync(args.destdir, full=args.full, limit=args.limit,
-                              delay=args.delay)
-    print("%d seen, %d new, %d updated" % (seen, new, updated))
+    seen, new, updated, skipped = sync(args.destdir, full=args.full,
+                                       limit=args.limit, delay=args.delay)
+    print("%d seen, %d new, %d updated, %d skipped"
+          % (seen, new, updated, skipped))
 
 
 if __name__ == "__main__":

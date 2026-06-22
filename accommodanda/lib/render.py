@@ -29,6 +29,7 @@ from html import escape
 from pathlib import Path
 
 from . import catalog
+from . import layout
 from .catalog import BASE
 from .wikitext import begrepp_uri
 
@@ -64,35 +65,9 @@ def split_uri(uri):
     return catalog.local(base), frag
 
 
-# förarbete uri prefixes (prop/2025/26:161, sou/2020:1, …) -> the fa/ tree
-FORARBETE = ("prop/", "sou/", "ds/", "dir/", "fm/", "skr/", "so/", "lr/", "bet/",
-             "rskr/")
-
-
-def doc_relpath(uri):
-    """Output path (== href, sans fragment) for a document uri, routed by uri
-    shape: dom/ -> cases, a förarbete prefix -> fa/, kommentar/ + begrepp/ to
-    their own trees, else statutes."""
-    loc, _ = split_uri(uri)
-    if loc.startswith("dom/"):
-        source = "dom"
-    elif loc.startswith("kommentar/"):
-        source = "kommentar"
-    elif loc.startswith("begrepp/"):
-        source = "begrepp"
-    elif loc.startswith("ext/celex/"):
-        # EU acts keep the CELEX as the page name (slashes in treaty CELEX ->
-        # '_', as the downloader stores them)
-        return "eurlex/%s.html" % loc[len("ext/celex/"):].replace("/", "_")
-    elif loc.startswith(FORARBETE):
-        source = "fa"
-    else:
-        source = "sfs"
-    return "%s/%s.html" % (source, _slug(loc))
-
-
-def _slug(loc):
-    return "".join(c if c.isalnum() else "_" for c in loc).strip("_")
+# the uri -> output-path / public-route rule now lives in lib.layout (the single
+# home for on-disk and on-web location rules)
+doc_relpath = layout.page_relpath
 
 
 EXT = BASE + "ext/"                          # the "external reference" namespace
@@ -638,7 +613,14 @@ def render_browse(con, source):
 # generate the whole site
 # --------------------------------------------------------------------------
 
-def generate_site(catalog_path, out_root, progress=None):
+def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None):
+    """Render every catalogued document to static HTML. `fresh(uri, out_path,
+    art_path, dep_digest) -> bool` lets the caller skip a page whose inputs are
+    unchanged (incremental generate); `record(uri, art_path, dep_digest)` is
+    called after a page is (re)rendered so the caller can store its new
+    signature. `art_path` is the page's own artifact (content-hashed by the
+    caller); `dep_digest` captures its citation relationships (set-based).
+    Returns (total_pages, rendered) -- rendered < total when pages were skipped."""
     out_root = Path(out_root)
     con = catalog.connect(catalog_path)
     site = Site.from_catalog(con)
@@ -647,13 +629,21 @@ def generate_site(catalog_path, out_root, progress=None):
     (out_root / "scrollspy.js").write_text(SCROLLSPY)
     rows = con.execute(
         "SELECT uri, source, path FROM documents ORDER BY source, uri").fetchall()
+    rendered = 0
     for i, (uri, source, path) in enumerate(rows):
-        art = json.loads(Path(path).read_bytes())
         out = out_root / doc_relpath(uri)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(render_document(art, source, site))
+        dep = catalog.page_dependency_digest(con, uri)
+        if not (fresh and fresh(uri, out, path, dep)):
+            art = json.loads(Path(path).read_bytes())
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(render_document(art, source, site))
+            rendered += 1
+            if record:
+                record(uri, path, dep)
         if progress and (i % 200 == 0):
             progress(i + 1, len(rows))
+    # corpus-aggregate pages (frontpage + browse indexes) depend on the whole
+    # document set, so they are cheap and always rebuilt
     (out_root / "index.html").write_text(render_index(con))
     for source in ("sfs", "dom"):
         (out_root / source).mkdir(parents=True, exist_ok=True)
@@ -662,7 +652,7 @@ def generate_site(catalog_path, out_root, progress=None):
     if progress:
         progress(len(rows), len(rows))
     con.close()
-    return len(rows)
+    return len(rows), rendered
 
 
 CSS = """

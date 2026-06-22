@@ -32,15 +32,17 @@ expert search service (--source soap) -- a cross-check/fallback for the
 unmetered but SLA-less SPARQL endpoint. It reads credentials from the
 environment (EURLEX_USERNAME / EURLEX_PASSWORD); they are never stored on disk.
 
-  python -m accommodanda.eurlex.download acts     [--full] [--since YYYY-MM-DD] [--limit N]
-  python -m accommodanda.eurlex.download treaties
-  python -m accommodanda.eurlex.download caselaw  [--lang swe,eng] [--source soap]
+Harvested via `lagen eurlex download [treaties|acts|caselaw]
+[--since YYYY-MM-DD] [--lang swe,eng] [--source sparql|soap]`; no sector = all
+three. CELEX-specific refetch is `lagen eurlex download <CELEX>`.
 """
 
-import argparse
 import os
 import re
+import subprocess
+import sys
 import time
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
 from html import escape
@@ -48,10 +50,8 @@ from pathlib import Path
 from urllib.parse import quote
 from xml.etree import ElementTree as ET
 
-from rdflib import Graph, Namespace
-from rdflib.namespace import OWL
-
-from ..lib.net import make_session
+from ..lib.net import make_session, request
+from ..lib.util import progress
 
 SPARQL = "https://publications.europa.eu/webapi/rdf/sparql"
 CELLAR = "http://publications.europa.eu/resource/celex/%s"
@@ -65,8 +65,30 @@ TEXT_PREFERENCE = ("fmx4", "xhtml", "html")
 SUFFIX = {"fmx4": ".fmx4", "xhtml": ".xhtml", "html": ".html"}
 ZIP_MAGIC = b"PK\x03\x04"
 
-CDM = Namespace("http://publications.europa.eu/ontology/cdm#")
+CDM = "http://publications.europa.eu/ontology/cdm#"
+OWL_SAMEAS = "http://www.w3.org/2002/07/owl#sameAs"
 SEARCH_NS = "{http://eur-lex.europa.eu/search}"
+
+# A CELLAR tree notice is huge (a court judgment's runs to 500k+ triples across
+# 24 languages, citation closure and provenance) and we read ~6 edges out of it.
+# rdflib parsing + turtle re-serialising those is the dominant per-document cost
+# on case law. Instead we stream the rdf/xml through raptor's `rapper` (C,
+# constant-memory) to n-triples, keep only the predicates the selection and a
+# little metadata need, and store that subset -- itself valid turtle.
+P_EXPR_WORK = CDM + "expression_belongs_to_work"
+P_EXPR_LANG = CDM + "expression_uses_language"
+P_EXPR_MANIF = CDM + "expression_manifested_by_manifestation"
+P_MANIF_EXPR = CDM + "manifestation_manifests_expression"   # the inverse edge
+P_MANIF_TYPE = CDM + "manifestation_type"
+P_ITEM_MANIF = CDM + "item_belongs_to_manifestation"
+# selection needs these edges; the rest are metadata worth keeping in the subset
+SELECT_PREDICATES = {P_EXPR_WORK, P_EXPR_LANG, P_EXPR_MANIF, P_MANIF_EXPR,
+                     P_MANIF_TYPE, P_ITEM_MANIF, OWL_SAMEAS}
+META_PREDICATES = {CDM + p for p in (
+    "resource_legal_id_celex", "resource_legal_id_sector", "work_date_document",
+    "expression_title", "expression_subtitle", "start_of_validity",
+    "end_of_validity", "work_is_about_concept_eurovoc")}
+KEEP_PREDICATES = SELECT_PREDICATES | META_PREDICATES
 
 
 @dataclass(frozen=True)
@@ -77,17 +99,27 @@ class Sector:
     celex_re: re.Pattern       # the accepted CELEX shape within the sector
     first_year: int
 
-# acts query R and L separately (one prefix each) so each yearly slice is
-# small; treaties and case law take the whole sector-year prefix and filter by
-# shape. The treaty filter keeps only the consolidated treaty texts (.../TXT),
-# not the ~9800 other sector-1 documents.
+# The CELEX descriptor (the 2-letter code after the year) names the court and
+# document kind: first letter C/T/F = Court of Justice / General Court / Civil
+# Service Tribunal; second letter J = judgment, C = Advocate-General opinion.
+# We want the rulings and opinions, not the OJ C-series notices that dominate
+# sector 6 by volume (N = notice a case was lodged, A = summary of the ruling,
+# B = summary of an order -- all redundant pointers to the J/O documents) nor
+# the procedural orders (O). For 2008 that is 914 of 3220 documents.
+CASELAW_TYPES = ("CJ", "CC", "TJ", "TC", "FJ")
+
+# acts query R and L separately, case law per wanted descriptor (one prefix
+# each) so each yearly slice is small and the unwanted bulk is never fetched;
+# treaties take the whole sector-year prefix and filter by shape (keeping only
+# the consolidated treaty texts .../TXT, not the ~9800 other sector-1 docs).
 SECTORS = {
     "treaties": Sector("treaties", "1", ("",),
                        re.compile(r"1\d{4}[A-Z]{1,2}/TXT"), 1951),
     "acts": Sector("acts", "3", ("R", "L"),
                    re.compile(r"3\d{4}[RL]\d{4}(\(\d+\))?$"), 1952),
-    "caselaw": Sector("caselaw", "6", ("",),
-                      re.compile(r"6\d{4}[A-Z]{2}\d{4}$"), 1954),
+    "caselaw": Sector("caselaw", "6", CASELAW_TYPES,
+                      re.compile(r"6\d{4}(?:%s)\d{4}$" % "|".join(CASELAW_TYPES)),
+                      1954),
 }
 
 
@@ -117,38 +149,49 @@ def doc_dir(root, celex):
 # --------------------------------------------------------------------------
 
 def sparql_select(session, query):
-    response = session.get(SPARQL, timeout=90,
-                           params={"query": query,
-                                   "format": "application/sparql-results+json"})
-    response.raise_for_status()
-    return response.json()["results"]["bindings"]
+    return request(session, "GET", SPARQL, parse_json=True, timeout=90,
+                   params={"query": query,
+                           "format": "application/sparql-results+json"}
+                   )["results"]["bindings"]
 
 
 def _enum_query(celex_prefix, since):
-    """A DISTINCT CELEX listing for one sector-year-descriptor prefix; `since`
-    (a date) restricts to documents whose work date is on/after it."""
-    datejoin = "?w cdm:work_date_document ?d ." if since else ""
+    """A DISTINCT (CELEX, work-date) listing for one sector-year-descriptor
+    prefix; the date feeds the watermark. `since` (a date) restricts to
+    documents whose work date is on/after it."""
     datefilter = (' FILTER(?d >= "%s"^^xsd:date)' % since.isoformat()
                   if since else "")
     return ("PREFIX cdm: <http://publications.europa.eu/ontology/cdm#> "
             "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> "
-            "SELECT DISTINCT ?celex WHERE { "
-            "?w cdm:resource_legal_id_celex ?celex . %s "
+            "SELECT DISTINCT ?celex ?d WHERE { "
+            "?w cdm:resource_legal_id_celex ?celex . "
+            "OPTIONAL { ?w cdm:work_date_document ?d . } "
             'FILTER(STRSTARTS(STR(?celex), "%s"))%s } ORDER BY ?celex'
-            % (datejoin, celex_prefix, datefilter))
+            % (celex_prefix, datefilter))
 
 
 def enumerate_celex(session, sector, since=None):
-    """Yield the sector's CELEX numbers, oldest year first, one yearly SPARQL
-    slice at a time (each slice is far under the endpoint's practical limits)."""
-    for year in range(sector.first_year, date.today().year + 1):
+    """Yield (year, [(CELEX, work_date), ...]) per year, oldest first. Each
+    year's slice is fetched whole (one SPARQL query, or two for acts' R/L
+    prefixes), so the caller knows the year's exact size up front. With `since`
+    set, the walk starts at that year, never re-querying the decades below it."""
+    start = max(sector.first_year, since.year) if since else sector.first_year
+    for year in range(start, date.today().year + 1):
+        print("  querying %s %d ..." % (sector.name, year),
+              file=sys.stderr, flush=True)
+        items, seen = [], set()
         for prefix in sector.prefixes:
             rows = sparql_select(session, _enum_query(
                 "%s%d%s" % (sector.digit, year, prefix), since))
             for row in rows:
                 celex = row["celex"]["value"]
-                if sector.celex_re.match(celex):
-                    yield celex
+                if celex in seen or not sector.celex_re.match(celex):
+                    continue
+                seen.add(celex)
+                wdate = row.get("d", {}).get("value")
+                items.append((celex, wdate[:10] if wdate else None))
+        if items:
+            yield year, sorted(items)
 
 
 # --------------------------------------------------------------------------
@@ -176,18 +219,22 @@ def soap_search(session, expert_query, page):
     envelope = SOAP_ENVELOPE % (user, password,
                                 escape(expert_query, quote=False),
                                 page, SOAP_PAGESIZE)
-    response = session.post(SOAP_ENDPOINT, timeout=60, data=envelope.encode(),
-                            headers={"Content-Type": 'application/soap+xml; '
-                                     'charset=utf-8; action="https://eur-lex.'
-                                     'europa.eu/EURLexWebService/doQuery"'})
-    response.raise_for_status()
+    response = request(session, "POST", SOAP_ENDPOINT, timeout=60,
+                       data=envelope.encode(),
+                       headers={"Content-Type": 'application/soap+xml; '
+                                'charset=utf-8; action="https://eur-lex.'
+                                'europa.eu/EURLexWebService/doQuery"'})
     return ET.fromstring(response.content)
 
 
 def enumerate_celex_soap(session, sector, since=None):
-    """Same contract as enumerate_celex, over the SOAP service. Slices the DN
-    (CELEX) wildcard query by year to stay under the per-search cap."""
-    for year in range(sector.first_year, date.today().year + 1):
+    """Same contract as enumerate_celex, over the SOAP service (which exposes no
+    per-hit work date, so it pairs each CELEX with None -- a soap run does not
+    advance the watermark). Slices the DN (CELEX) wildcard query by year to stay
+    under the per-search cap, starting at the `since` year."""
+    start = max(sector.first_year, since.year) if since else sector.first_year
+    for year in range(start, date.today().year + 1):
+        items, seen = [], set()
         for prefix in sector.prefixes:
             query = "DN = %s%d%s*" % (sector.digit, year, prefix)
             if since:
@@ -199,48 +246,118 @@ def enumerate_celex_soap(session, sector, since=None):
                 for result in hits:
                     node = result.find(".//%sID_CELEX" % SEARCH_NS)
                     celex = node[0].text if node is not None and len(node) else None
-                    if celex and sector.celex_re.match(celex):
-                        yield celex
+                    if celex and celex not in seen and sector.celex_re.match(celex):
+                        seen.add(celex)
+                        items.append((celex, None))
                 if len(hits) < SOAP_PAGESIZE:
                     break
                 page += 1
+        if items:
+            yield year, sorted(items)
 
 
 # --------------------------------------------------------------------------
 # content -- tree notice -> best manifestation per language -> item
 # --------------------------------------------------------------------------
 
+def _term(token):
+    """The bare value of an n-triples term: a URI/blank-node id, or a literal's
+    lexical value (we never join on literals, so datatype/language are dropped)."""
+    if token.startswith("<"):
+        return token[1:-1]
+    if token.startswith('"'):
+        return token[1:token.rfind('"')]
+    return token                                  # _:blank node
+
+
+def _ntriples(rdfxml):
+    """Stream rdf/xml bytes through raptor's `rapper` (C, constant-memory) to
+    n-triples, returning the kept lines as (raw_line, subject, predicate, object)
+    -- only lines whose predicate is in KEEP_PREDICATES. The raw lines double as
+    the stored notice, since n-triples is a subset of turtle."""
+    out = subprocess.run(
+        ["rapper", "-q", "-i", "rdfxml", "-o", "ntriples", "-",
+         "http://publications.europa.eu/"],
+        input=rdfxml, capture_output=True, check=True).stdout.decode()
+    kept = []
+    for line in out.splitlines():
+        if not line:
+            continue
+        s, p, rest = line.split(" ", 2)
+        pred = p[1:-1]
+        if pred in KEEP_PREDICATES:
+            obj = rest.rstrip()[:-1].rstrip()     # drop the trailing ' .'
+            kept.append((line, _term(s), pred, _term(obj)))
+    return kept
+
+
+class Notice:
+    """The kept triples of a tree notice, indexed for the few lookups selection
+    needs -- a tiny stand-in for the rdflib Graph we used to materialise."""
+
+    def __init__(self, triples):
+        self.lines = [line for line, *_ in triples]
+        self._spo = defaultdict(list)             # (subject, predicate) -> objects
+        self._pos = defaultdict(list)             # (predicate, object) -> subjects
+        self._by_pred = defaultdict(list)         # predicate -> [(subject, object)]
+        for _line, s, p, o in triples:
+            self._spo[(s, p)].append(o)
+            self._pos[(p, o)].append(s)
+            self._by_pred[p].append((s, o))
+
+    def value(self, s, p):
+        objs = self._spo.get((s, p))
+        return objs[0] if objs else None
+
+    def objects(self, s, p):
+        return self._spo.get((s, p), ())
+
+    def subjects(self, p, o):
+        return self._pos.get((p, o), ())
+
+    def subject_objects(self, p):
+        return self._by_pred.get(p, ())
+
+    def ttl(self):
+        return ("\n".join(self.lines) + "\n").encode()
+
+
+def parse_notice(rdfxml):
+    """A Notice from rdf/xml bytes -- the download path fetches them from CELLAR,
+    the bulk unpacker reads them out of a dump."""
+    return Notice(_ntriples(rdfxml))
+
+
 def fetch_notice(session, celex):
-    """The CDM tree notice for a CELEX as an rdflib Graph (the work, its
-    language expressions, their manifestations and downloadable items)."""
-    response = session.get(CELLAR % quote(celex, safe=""), timeout=90,
-                           headers={"Accept": "application/rdf+xml;notice=tree"})
-    response.raise_for_status()
-    return Graph().parse(data=response.content, format="xml")
+    """The CDM tree notice for a CELEX, filtered to the predicates we keep."""
+    response = request(session, "GET", CELLAR % quote(celex, safe=""),
+                       timeout=90,
+                       headers={"Accept": "application/rdf+xml;notice=tree"})
+    return parse_notice(response.content)
 
 
-def _manifestation_items(graph, manifestation):
+def _manifestation_items(notice, manifestation):
     """Items of a manifestation. The CELEX/OJ-form manifestation node usually
     carries no items directly -- they hang off the cellar-form manifestation it
     is owl:sameAs -- so resolve through sameAs in both directions."""
-    nodes = ({manifestation} | set(graph.objects(manifestation, OWL.sameAs))
-             | set(graph.subjects(OWL.sameAs, manifestation)))
+    nodes = ({manifestation} | set(notice.objects(manifestation, OWL_SAMEAS))
+             | set(notice.subjects(OWL_SAMEAS, manifestation)))
     items = []
     for node in nodes:
-        items += graph.subjects(CDM.item_belongs_to_manifestation, node)
+        items += notice.subjects(P_ITEM_MANIF, node)
     return items
 
 
-def _is_wrapper(graph, item):
+def _is_wrapper(notice, item):
     """A Formex manifestation carries both the real `.xml` and a `.doc.xml`
     wrapper item; the wrapper's stream URIs (owl:sameAs) all end in `.doc.xml`."""
-    streams = [str(o) for o in graph.objects(item, OWL.sameAs)]
+    streams = list(notice.objects(item, OWL_SAMEAS))
     return bool(streams) and all(s.endswith((".doc.xml", ".doc")) for s in streams)
 
 
-def _choose_item(graph, items):
+def _choose_item(notice, items):
     """The real content item -- drop the `.doc.xml` wrapper when present."""
-    real = [i for i in items if not _is_wrapper(graph, i)]
+    real = [i for i in items if not _is_wrapper(notice, i)]
     return (real or items)[0]
 
 
@@ -253,14 +370,22 @@ def _best_type(by_type):
     return pdfs[0] if pdfs else None
 
 
-def select_items(graph, languages):
+def _manifestations(notice, expr):
+    """Manifestations of an expression, from whichever direction the notice
+    carries the edge: the inferred live notice has the forward edge; a notice
+    built from a non-inferred dump may only have the inverse."""
+    return list(dict.fromkeys(list(notice.objects(expr, P_EXPR_MANIF))
+                              + list(notice.subjects(P_MANIF_EXPR, expr))))
+
+
+def select_items(notice, languages):
     """For each requested language with an expression, the best available
     (lang, filetype, item_url), preferring fmx4 > xhtml > html > pdf."""
     expressions = {}
-    for expr, _work in graph.subject_objects(CDM.expression_belongs_to_work):
-        lang = graph.value(expr, CDM.expression_uses_language)
+    for expr, _work in notice.subject_objects(P_EXPR_WORK):
+        lang = notice.value(expr, P_EXPR_LANG)
         if lang is not None:
-            expressions.setdefault(str(lang).rsplit("/", 1)[1].lower(), expr)
+            expressions.setdefault(lang.rsplit("/", 1)[1].lower(), expr)
 
     out = []
     for code in languages:
@@ -268,25 +393,25 @@ def select_items(graph, languages):
         if expr is None:
             continue
         by_type = {}
-        for m in graph.objects(expr, CDM.expression_manifested_by_manifestation):
-            mtype = graph.value(m, CDM.manifestation_type)
-            items = _manifestation_items(graph, m)
+        for m in _manifestations(notice, expr):
+            mtype = notice.value(m, P_MANIF_TYPE)
+            items = _manifestation_items(notice, m)
             if mtype is not None and items:
-                by_type[str(mtype)] = _choose_item(graph, items)
+                by_type[mtype] = _choose_item(notice, items)
         filetype = _best_type(by_type)
         if filetype:
-            out.append((code, filetype, str(by_type[filetype])))
+            out.append((code, filetype, by_type[filetype]))
     return out
 
 
 def content_filename(code, filetype, content):
     """The stored filename for a fetched item. CELLAR often returns a Formex
     manifestation not as a single .fmx4 but as a zip of several .fmx4 files (the
-    act plus one per annex); flag that as `{lang}.zip.fmx4` so the parser and
+    act plus one per annex); flag that as `{lang}.fmx4.zip` so the parser and
     other consumers can tell without sniffing."""
     suffix = SUFFIX.get(filetype, ".pdf")
     if content.startswith(ZIP_MAGIC):
-        suffix = ".zip" + suffix
+        suffix = suffix + ".zip"
     return code + suffix
 
 
@@ -294,12 +419,11 @@ def download_document(session, root, celex, languages, delay):
     """Fetch a CELEX's tree notice and its best content per language. Returns
     the languages stored (empty if none of the requested languages exist)."""
     target = doc_dir(root, celex)
-    graph = fetch_notice(session, celex)
-    write_atomic(target / "notice.ttl", graph.serialize(format="turtle").encode())
+    notice = fetch_notice(session, celex)
+    write_atomic(target / "notice.ttl", notice.ttl())
     stored = []
-    for code, filetype, url in select_items(graph, languages):
-        response = session.get(url, timeout=180)
-        response.raise_for_status()
+    for code, filetype, url in select_items(notice, languages):
+        response = request(session, "GET", url, timeout=180)
         name = content_filename(code, filetype, response.content)
         write_atomic(target / name, response.content)
         # a re-fetch may land a different manifestation type or zip-ness, so
@@ -320,33 +444,100 @@ def is_downloaded(root, celex):
     return (doc_dir(root, celex) / "notice.ttl").exists()
 
 
+def read_watermark(root, sector_name):
+    """The max work date harvested for this sector in a previous clean run, or
+    None (no prior run -> enumerate from the sector's first year)."""
+    path = Path(root) / (".watermark-" + sector_name)
+    return date.fromisoformat(path.read_text().strip()) if path.exists() else None
+
+
+def write_watermark(root, sector_name, value):
+    write_atomic(Path(root) / (".watermark-" + sector_name), str(value).encode())
+
+
 def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
          languages=LANGUAGES, source="sparql"):
-    """Harvest a sector into root. Incremental by default: re-fetches only
-    CELEX not already on disk (`--full` re-fetches everything, `--since` narrows
-    discovery to recently dated documents). Returns (seen, stored, skipped)."""
+    """Harvest a sector into root, returning (seen, stored, skipped).
+
+    Incremental by default: re-fetches only CELEX not already on disk, and
+    bounds discovery by a per-sector watermark (the max work date harvested in
+    the last clean run) -- so an incremental run enumerates only from the
+    watermark's year onward, never re-querying the decades below it. `--full`
+    re-fetches every document and re-walks from the sector's first year; an
+    explicit `--since` is a manual one-off window that overrides, but does not
+    move, the watermark. A clean (un-truncated) run advances it.
+
+    Edits to already-stored documents surface only under `--full`: discovery
+    keys on work date, so a re-dated/corrected old document is not re-seen."""
     root = Path(root)
     sector = SECTORS[sector_name]
     session = make_session(USER_AGENT)
     enumerate_fn = enumerate_celex_soap if source == "soap" else enumerate_celex
+
+    manual = since is not None        # explicit --since: don't move the watermark
+    watermark = None if (full or manual) else read_watermark(root, sector_name)
+    if since is None and not full:
+        since = watermark             # incremental discovery floor
+
     seen = stored = skipped = 0
-    for celex in enumerate_fn(session, sector, since):
-        if limit and seen >= limit:
+    high = watermark.isoformat() if watermark else None
+    truncated = False
+    last_t = time.perf_counter()
+
+    def emit(year, y_seen, total, y_stored, y_skipped):
+        nonlocal last_t
+        now = time.perf_counter()
+        progress(y_seen, total, scope="%s %d" % (sector_name, year),
+                 stored=y_stored, skipped=y_skipped, elapsed=now - last_t,
+                 stamp=True)
+        last_t = now
+
+    for year, items in enumerate_fn(session, sector, since):
+        total = len(items)                       # the year-slice's exact size
+        y_seen = y_stored = y_skipped = last_emit = 0
+        for celex, wdate in items:
+            if limit and seen >= limit:
+                truncated = True
+                break
+            seen += 1
+            y_seen += 1
+            if not full and is_downloaded(root, celex):
+                skipped += 1
+                y_skipped += 1          # already on disk: no network, no delay
+                fetched = False
+            else:
+                if download_document(session, root, celex, languages, delay):
+                    stored += 1
+                    y_stored += 1
+                else:
+                    print("%s: no manifestation in %s"
+                          % (celex, "/".join(languages)), flush=True)
+                time.sleep(delay)       # politeness applies only to real fetches
+                fetched = True
+            if wdate and (high is None or wdate > high):
+                high = wdate
+            # each download is a slow network round-trip (~10s): show progress as
+            # they happen (with the elapsed since the last line, so the per-fetch
+            # cost is visible), plus a periodic tick through long stretches of skips
+            if fetched or y_seen % 50 == 0:
+                emit(year, y_seen, total, y_stored, y_skipped)
+                last_emit = y_seen
+        if y_seen != last_emit:     # final line for the year, if not just emitted
+            emit(year, y_seen, total, y_stored, y_skipped)
+        if truncated:
             break
-        seen += 1
-        if not full and is_downloaded(root, celex):
-            skipped += 1
-            continue
-        langs = download_document(session, root, celex, languages, delay)
-        if langs:
-            stored += 1
-        else:
-            print("%s: no manifestation in %s" % (celex, "/".join(languages)),
-                  flush=True)
-        if seen % 50 == 0:
-            print("%s: %d seen, %d stored, %d skipped"
-                  % (sector_name, seen, stored, skipped), flush=True)
-        time.sleep(delay)
+        # Resume safety net: persist progress after each completed past year, so
+        # an interrupted run resumes from there instead of re-enumerating every
+        # year from the sector's first (the per-year SPARQL query is the real
+        # cost, not the on-disk skips). We store the *next* year's start, not the
+        # max work date: a caselaw work date can fall years after its CELEX year
+        # (a case filed in 2000, decided 2005), so a max-date floor would skip
+        # the years between on resume; a work date is always >= its CELEX year,
+        # so a year-start floor never hides a document.
+        if not manual and year < date.today().year:
+            write_watermark(root, sector_name, date(year + 1, 1, 1).isoformat())
+    if not manual and not truncated and high:
+        write_watermark(root, sector_name, high)   # precise floor for incrementals
     return seen, stored, skipped
 
 
@@ -354,32 +545,3 @@ def list_basefiles(root):
     """CELEX basefiles harvested into root, recovered from the path."""
     return sorted(p.parent.name.replace("_", "/")
                   for p in Path(root).glob("*/*/notice.ttl"))
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("sector", choices=sorted(SECTORS))
-    parser.add_argument("root", nargs="?", default="site/data/eurlex",
-                        help="target directory (default site/data/eurlex)")
-    parser.add_argument("--full", action="store_true",
-                        help="re-fetch every document, not just new ones")
-    parser.add_argument("--since", type=date.fromisoformat, metavar="YYYY-MM-DD",
-                        help="only discover documents dated on/after this")
-    parser.add_argument("--limit", type=int, help="stop after N documents")
-    parser.add_argument("--lang", default=",".join(LANGUAGES),
-                        help="comma-separated languages (default swe,eng)")
-    parser.add_argument("--source", choices=("sparql", "soap"), default="sparql",
-                        help="discovery backend (default sparql)")
-    parser.add_argument("--delay", type=float, default=0.3,
-                        help="seconds between requests (default 0.3)")
-    args = parser.parse_args()
-    seen, stored, skipped = sync(
-        args.root, args.sector, full=args.full, since=args.since,
-        limit=args.limit, delay=args.delay,
-        languages=tuple(args.lang.split(",")), source=args.source)
-    print("%s: %d seen, %d stored, %d skipped"
-          % (args.sector, seen, stored, skipped))
-
-
-if __name__ == "__main__":
-    main()

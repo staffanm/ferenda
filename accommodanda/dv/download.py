@@ -38,10 +38,12 @@ import time
 from pathlib import Path
 from urllib.parse import quote
 
-from ..lib.net import make_session
+from ..lib.net import make_session, request
+from ..lib.util import progress
 
 API = "https://rattspraxis.etjanst.domstol.se/api/v1"
 PAGE_SIZE = 100
+COMPLETE = ".complete"   # marker under destdir: corpus walked clean at least once
 USER_AGENT = "lagen.nu harvester (https://lagen.nu/, staffan@tomtebo.org)"
 
 # record path segments come straight from the API response; validate them so a
@@ -61,20 +63,17 @@ def record_dir(destdir, record):
 
 
 def search_page(session, index, asc):
-    response = session.post(API + "/sok", timeout=60, json={
+    return request(session, "POST", API + "/sok", parse_json=True, json={
         "antalPerSida": PAGE_SIZE, "asc": asc, "sidIndex": index,
         "filter": None, "sortorder": "avgorandedatum"})
-    response.raise_for_status()
-    return response.json()
 
 
 def fetch_record(session, record_id):
     """Fetch a single publication record by its UUID (the per-document path,
     `GET /api/v1/publiceringar/{id}` -- same fields as a search hit)."""
-    response = session.get(
-        API + "/publiceringar/" + quote(record_id, safe=""), timeout=60)
-    response.raise_for_status()
-    return response.json()
+    return request(session, "GET",
+                   API + "/publiceringar/" + quote(record_id, safe=""),
+                   parse_json=True)
 
 
 def write_atomic(path, data):
@@ -116,23 +115,36 @@ def download_bilagor(session, destdir, record, delay):
         if target.exists() and target.stat().st_size > 0:
             continue
         url = API + "/bilagor/" + quote(bilaga["fillagringId"], safe="")
-        response = session.get(url, timeout=120)
-        response.raise_for_status()
+        response = request(session, "GET", url, timeout=120)
         write_atomic(target, response.content)
         time.sleep(delay)
 
 
 def sync(destdir, full=False, bilagor=True, limit=None, delay=0.3):
-    """Harvest publications into destdir. Returns (seen, changed)."""
+    """Harvest publications into destdir, returning (seen, changed).
+
+    Backfilled -- the whole corpus walked oldest-first, downloading whatever is
+    missing -- when `--full` is given or it has never been cleanly walked (no
+    `.complete` marker: a first run, or one interrupted partway). The marker is
+    written only on a clean full pass, so an interrupted initial load is
+    resumed, not mistaken for finished. Once complete, later runs go
+    incremental: newest-first, stopping at the first page with nothing new or
+    changed. (Edits to old records still surface only under `--full` -- the API
+    exposes no last-modified field to walk by.)"""
     destdir = Path(destdir)
     session = make_session(USER_AGENT)
+    marker = destdir / COMPLETE
+    backfill = full or not marker.exists()
     seen = changed = index = 0
+    completed = False
     while True:
-        page = search_page(session, index, asc=full)
+        page = search_page(session, index, asc=backfill)
         records = page["publiceringLista"]
         if not records:
+            completed = True   # exhausted the corpus, not an early stop
             break
         page_changed = 0
+        truncated = False
         for record in records:
             if save_record(destdir, record):
                 page_changed += 1
@@ -142,16 +154,19 @@ def sync(destdir, full=False, bilagor=True, limit=None, delay=0.3):
                 download_bilagor(session, destdir, record, delay)
             seen += 1
             if limit and seen >= limit:
+                truncated = True
                 break
         changed += page_changed
-        print("page %d (%d/%d): %d new/changed" %
-              (index, seen, page["total"], page_changed), flush=True)
-        if limit and seen >= limit:
+        progress(seen, page["total"], page=index + 1, changed=page_changed)
+        if truncated:
             break
-        if not full and page_changed == 0:
+        if not backfill and page_changed == 0:
             break  # incremental: everything older is already harvested
         index += 1
         time.sleep(delay)
+    if completed and backfill:
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text("")
     return seen, changed
 
 

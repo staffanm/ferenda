@@ -272,6 +272,12 @@ def build_metadata(sfst_header, register, basefile):
     base_uri = amendment_uri(basefile, BASE)
     m = re.search(r"t\.o\.m\.\s*SFS\s+(.+)$", sfst_header.get("Ändring införd", ""))
     cutoff = m.group(1).strip() if m else None
+    if cutoff and ":" not in cutoff:
+        # the source occasionally drops the year ("t.o.m. SFS 1043"); the full
+        # number is the change act in the register whose löpnummer matches
+        match = [c.sfsnr for c in register.changes
+                 if c.sfsnr.endswith(":" + cutoff)]
+        cutoff = match[0] if match else None
     version = cutoff or basefile
     # the identifier keeps the nicely-spaced SFS number ("1829:49 s. 279");
     # the cutoff only governs the version, never underlag membership (a
