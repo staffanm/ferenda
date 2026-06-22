@@ -1,6 +1,39 @@
-"""Small text utilities (ported from ferenda.util)."""
+"""Small shared utilities (ported from ferenda.util)."""
 
 import re
+import time
+
+
+def hms(seconds):
+    """A compact human duration: '9.1s', '1m42s', '1h07m'."""
+    if seconds < 60:
+        return "%.1fs" % seconds
+    minutes, secs = divmod(int(seconds), 60)
+    if minutes < 60:
+        return "%dm%02ds" % (minutes, secs)
+    hours, minutes = divmod(minutes, 60)
+    return "%dh%02dm" % (hours, minutes)
+
+
+def progress(seen, total=None, *, scope=None, page=None, elapsed=None,
+             stamp=False, **counts):
+    """One uniform harvest-progress line across the source downloaders:
+
+        [HH:MM:SS] [scope ]page <p> (<seen>/<total>): <n> <label>, ... [+<dt>]
+
+    `total` None renders as '?'; `page` is omitted when None; `counts` are
+    label=value pairs (new=..., updated=..., changed=...) shown in call order.
+    `stamp` prefixes the wall-clock time; `elapsed` (seconds since the previous
+    line) is appended -- so a slow per-document fetch is visible as it happens."""
+    clock = time.strftime("[%H:%M:%S] ") if stamp else ""
+    head = "%s " % scope if scope else ""
+    pg = "page %d " % page if page is not None else ""
+    tally = ", ".join("%d %s" % (value, label) for label, value in counts.items())
+    tail = " [+%s]" % hms(elapsed) if elapsed is not None else ""
+    print("%s%s%s(%d/%s): %s%s"
+          % (clock, head, pg, seen, "?" if total is None else total, tally, tail),
+          flush=True)
+
 
 ROMAN_VALUES = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100, "D": 500, "M": 1000}
 

@@ -1,11 +1,20 @@
-"""Shared HTTP session setup for the source downloaders.
+"""Shared HTTP session setup and a resilient request helper for the source
+downloaders.
 
 A single transient 5xx/429 or connection blip during a multi-thousand-document
-harvest would otherwise abort the whole walk, so every session retries those
-with exponential backoff. POST is included because the SFS and DV search
-endpoints page over POST. ``raise_on_status=False`` leaves the final response
+harvest would otherwise abort the whole walk, so every session retries those at
+the transport layer with exponential backoff (POST included -- the search
+endpoints page over POST). ``raise_on_status=False`` leaves the final response
 for the caller's ``raise_for_status()`` so error semantics are unchanged.
+
+On top of that, ``request()`` rides out what the transport layer cannot see --
+an empty/non-JSON 2xx body, or a 403/429 throttle -- honouring Retry-After, and
+logs every failed response (status, headers, body) to stderr so a WAF/rate-limit
+block is distinguishable from a genuine error.
 """
+
+import sys
+import time
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -16,6 +25,13 @@ _RETRY = Retry(total=4, backoff_factor=0.5,
                allowed_methods=frozenset({"GET", "POST"}),
                raise_on_status=False)
 
+# request()-level retry: covers the gaps urllib3 cannot -- a 2xx with an
+# empty/non-JSON body, and a 403/429 throttle (some gateways send no Retry-After)
+RETRIES = 6
+RETRY_BACKOFF = 2.0        # seconds, doubled each attempt, capped at RETRY_MAX
+RETRY_MAX = 60.0
+RETRY_STATUS = frozenset({403, 408, 425, 429, 500, 502, 503, 504})
+
 
 def make_session(user_agent):
     session = requests.Session()
@@ -24,3 +40,64 @@ def make_session(user_agent):
     session.mount("https://", adapter)
     session.mount("http://", adapter)
     return session
+
+
+def _log_failure(exc, response):
+    """Write what the server actually returned to stderr, so a throttle/WAF
+    block (a 403/429 with Retry-After or an HTML body) can be told apart from a
+    genuine error or a one-off empty body."""
+    if response is None:
+        print("harvest request failed: %s: %s" % (type(exc).__name__, exc),
+              file=sys.stderr, flush=True)
+        return
+    lines = ["harvest request failed: HTTP %d for %s"
+             % (response.status_code, response.url)]
+    for header in ("Retry-After", "RateLimit-Reset", "X-RateLimit-Remaining",
+                   "X-RateLimit-Limit", "Server", "Via", "CF-Ray", "X-Cache",
+                   "X-Amzn-Trace-Id", "Content-Type", "Set-Cookie"):
+        if header in response.headers:
+            lines.append("  %s: %s" % (header, response.headers[header]))
+    body = " ".join((response.text or "").split())
+    if body:
+        lines.append("  body[:600]: %s" % body[:600])
+    print("\n".join(lines), file=sys.stderr, flush=True)
+
+
+def _retry_after(response):
+    """The server-requested cooldown in seconds, if it sent a numeric
+    Retry-After; else None (fall back to exponential backoff)."""
+    value = response.headers.get("Retry-After") if response is not None else None
+    return float(value) if value and value.isdigit() else None
+
+
+def request(session, method, url, *, parse_json=False, retries=RETRIES, **kwargs):
+    """Perform an HTTP request, riding out the transient failures a long
+    unattended harvest meets: an empty/non-JSON 2xx body, a throttle (403/429),
+    a 5xx that outlived the session's own retries, and connection drops or
+    timeouts. Backoff is exponential (capped at RETRY_MAX) but defers to
+    Retry-After. A non-throttle 4xx is a genuine error and is raised at once.
+    Every failed response is logged once. Returns the parsed JSON when
+    ``parse_json`` is set, else the Response (e.g. for binary downloads)."""
+    kwargs.setdefault("timeout", 60)
+    diagnosed = False
+    for attempt in range(retries):
+        response = None
+        try:
+            response = session.request(method, url, **kwargs)
+            response.raise_for_status()
+            return response.json() if parse_json else response
+        except requests.exceptions.RequestException as exc:
+            response = getattr(exc, "response", None) or response
+            status = getattr(response, "status_code", None)
+            if not diagnosed:
+                _log_failure(exc, response)
+                diagnosed = True
+            transient = (isinstance(exc, requests.exceptions.JSONDecodeError)
+                         or status is None or status in RETRY_STATUS)
+            if not transient or attempt == retries - 1:
+                raise
+            wait = _retry_after(response) or min(RETRY_MAX, RETRY_BACKOFF * 2 ** attempt)
+            print("  retry %d/%d in %.0fs (HTTP %s)"
+                  % (attempt + 1, retries - 1, wait, status or "-"),
+                  file=sys.stderr, flush=True)
+            time.sleep(wait)
