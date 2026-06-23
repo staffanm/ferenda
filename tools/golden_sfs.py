@@ -521,6 +521,92 @@ def compare(old, new, sections=ALL_SECTIONS):
     return problems
 
 
+# --- adjudication -------------------------------------------------------
+#
+# The golden corpus is a change-detector, not an oracle (§2): a fraction of
+# the diffs are the new pipeline being *right* where the golden is stale or
+# carries an old-pipeline defect. Rather than re-investigate those every run,
+# classify whole *families* of them with a few predicates. An adjudicated diff
+# is still reported (so a class that suddenly grows stays visible) but does not
+# count as a regression -- only the *unexplained* residual does.
+#
+# A predicate works from the problem string plus the golden normal form alone
+# (the new normal form is not threaded in). So a predicate that needs to know
+# the document is stale relies on the post-freeze-amendment diff being present
+# in the same run -- i.e. the amendments section must be among those compared.
+
+re_sfs_number = re.compile(r"(\d{4}):(\d+)")
+
+
+def sfs_key(text):
+    """(year, nr) sort key for the first SFS number in `text`, else None."""
+    m = re_sfs_number.search(text or "")
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def golden_freeze_horizon(golden):
+    """The latest change-act SFS number the golden knew -- the cutoff the
+    post-freeze-amendment predicate measures an extra amendment against."""
+    keys = [k for a in golden.get("amendments", [])
+            for k in (sfs_key(a.get("uri")),) if k]
+    return max(keys) if keys else None
+
+
+# document-level metadata that is the *consolidation envelope* -- it moves as
+# new amending acts fold in: the konsolidering cutoff URI, the "i lydelse
+# enligt SFS …" identifier, the underlag list, the responsible department.
+# Drift here is accepted only once a post-freeze amendment has independently
+# shown the document stale (§3c).
+ENVELOPE_PREFIXES = (
+    "metadata.uri",
+    "metadata.properties.dcterms:identifier",
+    "metadata.properties.rpubl:konsolideringsunderlag",
+    "metadata.properties.rpubl:konsoliderar",
+    "metadata.properties.dcterms:creator",
+    "metadata.secondary",
+)
+
+
+def _post_freeze_amendment(problem, ctx):
+    """An amending act the new pipeline has and the golden lacks, whose SFS
+    number postdates everything the golden knew = added after the freeze."""
+    if not problem.startswith("amendments: extra "):
+        return False
+    key = sfs_key(problem)
+    return key is not None and ctx["horizon"] is not None and key > ctx["horizon"]
+
+
+def _stale_consolidation_drift(problem, ctx):
+    """Consolidation-envelope metadata that drifts as amendments land, on a
+    document a post-freeze amendment already marked stale."""
+    return ctx["stale"] and problem.startswith(ENVELOPE_PREFIXES)
+
+
+# (rule name, predicate). The families are disjoint, so order only decides
+# which rule is credited in the unlikely event two would match.
+PREDICATES = (
+    ("post-freeze-amendment", _post_freeze_amendment),
+    ("stale-consolidation-drift", _stale_consolidation_drift),
+)
+
+
+def adjudicate(problems, golden):
+    """Partition `problems` against `golden` into (unexplained, accepted).
+    `accepted` is a list of (rule, problem) the change-detector posture
+    forgives; `unexplained` is the residual -- the regressions that count."""
+    ctx = {"horizon": golden_freeze_horizon(golden), "stale": False}
+    ctx["stale"] = any(_post_freeze_amendment(p, ctx) for p in problems)
+    unexplained, accepted = [], []
+    for problem in problems:
+        for rule, predicate in PREDICATES:
+            if predicate(problem, ctx):
+                accepted.append((rule, problem))
+                break
+        else:
+            unexplained.append(problem)
+    return unexplained, accepted
+
+
 def load(path):
     path = Path(path)
     if path.suffix == ".json":
@@ -642,14 +728,19 @@ def main():
                   ensure_ascii=False, indent=2, sort_keys=True)
         print()
     else:
-        problems = compare(load(args.old), load(args.new),
-                           sections=args.sections.split(","))
-        if problems:
-            print("%d difference(s):" % len(problems))
-            for problem in problems:
+        old = load(args.old)
+        problems = compare(old, load(args.new), sections=args.sections.split(","))
+        unexplained, accepted = adjudicate(problems, old)
+        if accepted:
+            print("%d adjudicated (new-is-right):" % len(accepted))
+            for rule, problem in accepted:
+                print("  [%s] %s" % (rule, problem.splitlines()[0]))
+        if unexplained:
+            print("%d difference(s):" % len(unexplained))
+            for problem in unexplained:
                 print("  " + problem)
             sys.exit(1)
-        print("identical")
+        print("identical" if not problems else "identical after adjudication")
 
 
 if __name__ == "__main__":

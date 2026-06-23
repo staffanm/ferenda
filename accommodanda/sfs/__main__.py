@@ -5,33 +5,20 @@
 """
 
 import argparse
-import functools
-import importlib.util
 import json
 import logging
 import re
 import sys
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
-from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import parse_sfs, parse_sfs_source
-from ..lib.errors import SkipDocument
+from . import load_inputs
 from ..lib.lagrum import LagrumParser, load_namedlaws
-from .nf import inline_references, temporal_dates, to_normalform
-from .register import (parse_register, parse_sfst_header,
-                       register_from_source, sfst_header_from_source)
+from .nf import inline_references, to_normalform
+from ._validate import load_golden_module, validate_one
 
 NAMEDLAWS_TTL = Path(__file__).parent.parent.parent / "lagen/nu/res/extra/sfs.ttl"
-
-
-def load_golden_module():
-    spec = importlib.util.spec_from_file_location(
-        "golden_sfs", Path(__file__).parent.parent.parent / "tools" / "golden_sfs.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 def basefile_from_path(path, root):
@@ -45,124 +32,74 @@ def signature(problem):
     return re.sub(r"'[^']*'", "'…'", sig)
 
 
-@functools.cache
-def namedlaws():
-    return load_namedlaws(NAMEDLAWS_TTL)
+def describe(problem):
+    """Render a raw diff line for the report as (category, golden, new) -- the
+    golden being the *expected* value and the new pipeline the *actual* one.
+    `golden`/`new` are None when only the category is meaningful (then it is
+    printed alone). A diff is one of: a value that changed (both sides shown),
+    or something present on only one side (the other side shown as '—')."""
+    head = problem.split("\n")[0]
+    m = re.search(r"\bold: (.*)\n\s*new: (.*)", problem, re.S)
+    if m and head.endswith("changed:"):
+        return (head[:-len(" changed:")] + " differs", m.group(1), m.group(2))
+    m = re.match(r"(uri|metadata\.uri): (.+) != (.+)$", head)
+    if m:
+        return ("%s differs" % m.group(1), m.group(2), m.group(3))
+    m = re.match(r"references: (missing|extra) (\S*) --\S+--> (.+)$", head)
+    if m:
+        kind, src, uri = m.groups()
+        ref = "%s → %s" % (src or "(no source fragment)", uri)
+        # the buckets differ by the *shape* of the source/target fragments
+        # (a whole-chapter source K1 vs a stycke source K10P1S1 are different
+        # kinds of diff); spell that out so same-direction buckets aren't
+        # indistinguishable
+        where = "source %s → target %s" % (
+            _fragment_level(src) or "(none)",
+            _fragment_level(uri.split("#", 1)[1] if "#" in uri else "")
+            or "whole document")
+        return (("reference only in golden (new omitted it) — %s" % where, ref, "—")
+                if kind == "missing" else
+                ("reference only in new (golden lacks it) — %s" % where, "—", ref))
+    m = re.match(r"amendments: (missing|extra) (.+)$", head)
+    if m:
+        kind, uri = m.groups()
+        return (("amendment only in golden (new pipeline omitted it)", uri, "—")
+                if kind == "missing" else
+                ("amendment only in new (golden lacks it)", "—", uri))
+    m = re.match(r"(.+): (missing|extra) node (.+)$", head)
+    if m:
+        path, kind, label = m.groups()
+        return (("node only in golden, under %s" % path, label, "—")
+                if kind == "missing" else
+                ("node only in new, under %s" % path, "—", label))
+    m = re.match(r"(.+): missing (.+) \(was (.*)\)$", head)
+    if m:
+        return ("%s.%s only in golden" % (m.group(1), m.group(2)), m.group(3), "—")
+    m = re.match(r"(.+): extra (.+) \(= (.*)\)$", head)
+    if m:
+        return ("%s.%s only in new" % (m.group(1), m.group(2)), "—", m.group(3))
+    return (head, None, None)
 
 
-def load_register(downloadedfile):
-    """The SFSR register page sits parallel to the downloaded SFST page.
-    Returns None when it's absent or empty (the doc has no register)."""
-    path = Path(str(downloadedfile).replace("/downloaded/", "/register/"))
-    if not path.exists():
-        return None
-    try:
-        return parse_register(path)
-    except SkipDocument:
-        return None
+def _clip(text, width=160):
+    text = str(text)
+    return text if len(text) <= width else text[:width - 1] + "…"
 
 
-def compare_refs(golden, doc, basefile, now, golden_sfs):
-    """Reference tuples vs golden, excluding what the new pipeline does
-    not produce yet: register/övergångsbestämmelse tuples (L* source
-    fragments) and begrepp links (dcterms:subject)."""
-    nf = to_normalform(doc, basefile, now=now,
-                       refparser=LagrumParser(namedlaws(), basefile))
-    new = golden_sfs.canonicalize_refs(inline_references(nf["structure"]))
-    want = golden_sfs.canonicalize_refs(
-        r for r in golden["references"]
-        if not r[0].startswith("L") and r[1] != "dcterms:subject")
-    return (["references: missing %s --%s--> %s" % r
-             for r in sorted(want - new)] +
-            ["references: extra %s --%s--> %s" % r
-             for r in sorted(new - want)])
+# fragment letters finest -> coarsest, for naming a fragment's granularity
+# (K kapitel · P paragraf · O moment · S stycke · N punkt · M mening · L ändring)
+_FRAG_LEVELS = (("M", "mening"), ("N", "punkt"), ("S", "stycke"),
+                ("O", "moment"), ("P", "paragraf"), ("K", "kapitel"),
+                ("L", "ändring"))
 
 
-def validate_one(job):
-    goldenfile, downloadedfile, basefile, sections = job
-    golden_sfs = load_golden_module()
-    golden = json.loads(Path(goldenfile).read_text())
-    golden_sfs.canonicalize_node_texts(golden["structure"])
-    try:
-        doc = parse_sfs(downloadedfile, basefile)
-    except SkipDocument as e:
-        return (basefile, "skipped", [str(e)])
-    except Exception as e:
-        return (basefile, "error", ["%s: %s" % (type(e).__name__, e)])
-
-    # The golden output's id suppression depends on which temporal variants
-    # were in force at parse time -- which is unknowable (download date is
-    # recorded, parse date is not). Bracket it: try the download date, each
-    # temporal boundary in the document since then, and today; accept the
-    # best-matching evaluation moment.
-    candidates = []
-    issued = golden["metadata"]["properties"].get("dcterms:issued")
-    if isinstance(issued, str) and re.match(r"\d{4}-\d{2}-\d{2}$", issued):
-        candidates.append(datetime.strptime(issued, "%Y-%m-%d"))
-    candidates += [d + timedelta(seconds=1) for d in temporal_dates(doc)
-                   if not candidates or d >= candidates[0]]
-    candidates.append(datetime.now())
-
-    best, best_now = None, None
-    for now in candidates:
-        new_nf = to_normalform(doc, basefile, now=now)
-        golden_sfs.canonicalize_node_texts(new_nf["structure"])
-        problems = []
-        golden_sfs.diff_nodelists(golden["structure"], new_nf["structure"],
-                                  "structure", problems)
-        if best is None or len(problems) < len(best):
-            best, best_now = problems, now
-        if not problems:
-            break
-
-    if "structure" not in sections:
-        best = []
-    if "references" in sections:
-        try:
-            best = best + compare_refs(golden, doc, basefile, best_now,
-                                       golden_sfs)
-        except Exception as e:
-            return (basefile, "error",
-                    ["refparse %s: %s" % (type(e).__name__, e)])
-    if "amendments" in sections:
-        try:
-            best = best + compare_amendments(golden, doc, basefile, best_now,
-                                             downloadedfile, golden_sfs)
-        except Exception as e:
-            return (basefile, "error",
-                    ["amendments %s: %s" % (type(e).__name__, e)])
-    if "metadata" in sections:
-        try:
-            best = best + compare_metadata(golden, doc, basefile,
-                                           downloadedfile, golden_sfs)
-        except Exception as e:
-            return (basefile, "error",
-                    ["metadata %s: %s" % (type(e).__name__, e)])
-    return (basefile, "match" if not best else "diff", best)
-
-
-def compare_metadata(golden, doc, basefile, downloadedfile, golden_sfs):
-    register = load_register(downloadedfile)
-    if register is None:
-        return ["metadata: no register page for %s" % basefile]
-    nf = to_normalform(doc, basefile, register=register,
-                       refparser=LagrumParser(namedlaws(), basefile),
-                       sfst_header=parse_sfst_header(downloadedfile))
-    problems = []
-    golden_sfs.diff_metadata(golden, nf, problems)
-    return problems
-
-
-def compare_amendments(golden, doc, basefile, now, downloadedfile, golden_sfs):
-    register = load_register(downloadedfile)
-    if register is None:
-        return ["amendments: no register page for %s" % basefile]
-    nf = to_normalform(doc, basefile, now=now,
-                       refparser=LagrumParser(namedlaws(), basefile),
-                       register=register)
-    problems = []
-    golden_sfs.diff_amendments(golden["amendments"], nf["amendments"], problems)
-    return problems
+def _fragment_level(frag):
+    """The depth a fragment id reaches, e.g. 'K1' -> 'kapitel',
+    'K10P1S1' -> 'stycke', '' -> None."""
+    for letter, name in _FRAG_LEVELS:
+        if letter in (frag or ""):
+            return name
+    return None
 
 
 def cmd_parse(args):
@@ -171,17 +108,14 @@ def cmd_parse(args):
     path = Path(args.file).resolve()
     basefile = args.basefile or "%s:%s" % (path.parent.name,
                                            path.stem.replace("_", " "))
-    if path.suffix == ".json":
-        source = json.loads(path.read_text())
-        doc = parse_sfs_source(source, basefile)
-        register = register_from_source(source)
-        sfst_header = sfst_header_from_source(source)
-    else:
-        doc = parse_sfs(path, basefile)
-        register = load_register(path)
-        sfst_header = parse_sfst_header(path) if register else None
+    json_path = path if path.suffix == ".json" else None
+    html_path = path if path.suffix != ".json" else None
+    register_path = (Path(str(path).replace("/downloaded/", "/register/"))
+                     if html_path else None)
+    doc, register, sfst_header = load_inputs(
+        json_path, html_path, register_path, basefile)
     nf = to_normalform(doc, basefile,
-                       refparser=LagrumParser(namedlaws(), basefile),
+                       refparser=LagrumParser(load_namedlaws(NAMEDLAWS_TTL), basefile),
                        register=register, sfst_header=sfst_header)
     json.dump(nf, sys.stdout, ensure_ascii=False, indent=2, sort_keys=True)
     print()
@@ -189,13 +123,18 @@ def cmd_parse(args):
 
 def cmd_refs(args):
     """Compare one document's extracted references against its golden
-    counterpart. Register-derived tuples (L* source fragments) and
-    begrepp links (dcterms:subject) are reported but not yet compared --
-    those parts of the pipeline don't exist yet."""
+    counterpart. Register-derived tuples (L* source fragments) and begrepp
+    links (dcterms:subject) are reported but not yet compared -- those parts
+    of the pipeline don't exist yet."""
     path = Path(args.file).resolve()
     basefile = args.basefile or "%s:%s" % (path.parent.name,
                                            path.stem.replace("_", " "))
-    doc = parse_sfs(args.file, basefile)
+    json_path = path if path.suffix == ".json" else None
+    html_path = path if path.suffix != ".json" else None
+    register_path = (Path(str(path).replace("/downloaded/", "/register/"))
+                     if html_path else None)
+    doc, _register, _sfst_header = load_inputs(
+        json_path, html_path, register_path, basefile)
     refparser = LagrumParser(load_namedlaws(NAMEDLAWS_TTL), basefile)
     nf = to_normalform(doc, basefile, refparser=refparser)
     golden_sfs = load_golden_module()
@@ -223,8 +162,12 @@ def cmd_validate(args):
     for goldenfile in sorted(goldendir.rglob("*.json")):
         if goldenfile.name == "freeze-report.json":
             continue
-        downloaded = (downloaddir / goldenfile.relative_to(goldendir)
-                      ).with_suffix(".html")
+        rel = goldenfile.relative_to(goldendir)
+        # the downloaded tree is now JSON (the new beta API source); the
+        # legacy SFST HTML tree (downloaded/sfst/…/*.html) is the fallback
+        downloaded = downloaddir / rel.with_suffix(".json")
+        if not downloaded.exists():
+            downloaded = (downloaddir / "sfst" / rel).with_suffix(".html")
         if not downloaded.exists():
             continue
         jobs.append((goldenfile, downloaded,
@@ -235,12 +178,14 @@ def cmd_validate(args):
 
     counts = Counter()
     buckets = Counter()
+    accepted_rules = Counter()
     examples = {}
     diffdocs = {}
     with ProcessPoolExecutor(max_workers=args.jobs) as pool:
-        for i, (basefile, status, problems) in enumerate(
+        for i, (basefile, status, problems, accepted) in enumerate(
                 pool.map(validate_one, jobs, chunksize=8), 1):
             counts[status] += 1
+            accepted_rules.update(accepted)
             if status in ("diff", "error"):
                 diffdocs[basefile] = problems
                 for problem in problems:
@@ -253,20 +198,36 @@ def cmd_validate(args):
     print()
 
     report = {"counts": dict(counts),
+              "adjudicated": dict(accepted_rules.most_common()),
               "buckets": dict(buckets.most_common()),
               "documents": diffdocs}
     Path(args.report).write_text(
         json.dumps(report, ensure_ascii=False, indent=2))
     total = sum(counts.values())
-    print("%d documents: %d match (%.1f%%), %d diff, %d error, %d skipped"
-          % (total, counts["match"],
-             100 * counts["match"] / total if total else 0,
+    # an adjudicated document had diffs, but every one was forgiven as
+    # new-is-right, so it passes alongside the clean matches; "diff" is now
+    # the count of genuine regressions
+    passing = counts["match"] + counts["adjudicated"]
+    print("%d documents: %d match + %d adjudicated = %d passing (%.1f%%), "
+          "%d diff, %d error, %d skipped"
+          % (total, counts["match"], counts["adjudicated"], passing,
+             100 * passing / total if total else 0,
              counts["diff"], counts["error"], counts["skipped"]))
-    print("top diff buckets:")
+    if accepted_rules:
+        print("adjudicated as new-is-right:")
+        for rule, n in accepted_rules.most_common():
+            print("  %5d  %s" % (n, rule))
+    print("top regression buckets (golden = expected, new pipeline = actual):")
     for sig, n in buckets.most_common(args.top):
         basefile, example = examples[sig]
-        print("  %5d  %s" % (n, sig))
-        print("         e.g. %s: %s" % (basefile, example.split("\n")[0][:120]))
+        category, golden_val, new_val = describe(example)
+        print("  %5d  %s" % (n, category))
+        if golden_val is None:
+            print("         e.g. %s: %s" % (basefile, _clip(example.split("\n")[0])))
+        else:
+            print("         e.g. %s" % basefile)
+            print("           golden: %s" % _clip(golden_val))
+            print("           new:    %s" % _clip(new_val))
     print("full report in %s" % args.report)
 
 

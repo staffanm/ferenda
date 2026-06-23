@@ -159,15 +159,22 @@ class Projection:
     minter: "IdMinter"
     refparser: object = None
 
-    def inline(self, text, context):
+    def inline(self, text, context, live=True):
         """Return `text` as a list of inline nodes: plain `str` runs and
         `{"predicate", "uri", "text"}` link objects, one per reference
         found, in document order. `context` is the node's own fragment,
         used for relative-reference resolution (the old _currenturl).
-        Text without a refparser or a FILTER_LAW hit is a single run."""
+        Text without a refparser or a FILTER_LAW hit is a single run.
+
+        `live` is False for content not in force at the projection date (a
+        future/sunset temporal variant): such text carries no reference links.
+        Its provision is id-suppressed, so any link would fall back to a bare
+        ancestor fragment (a chapter), and it is not part of the consolidated
+        citation graph anyway -- the old pipeline omitted it too."""
         if not text:
             return []
-        if self.refparser is None or not lagrum.FILTER_LAW.search(text):
+        if (not live or self.refparser is None
+                or not lagrum.FILTER_LAW.search(text)):
             return [text]
         return lagrum.interleave(
             text, self.refparser.parse_text(text, context or None))
@@ -212,6 +219,14 @@ def in_effect(node, now):
 
 
 TEMPORAL = (Kapitel, Paragraf, Rubrik, Bilaga)
+
+
+def _in_force(node, minter):
+    """Whether `node` is in force at the projection date -- the same test the
+    minter uses to suppress its id. Not-in-force content keeps its place in the
+    structure but emits no references (see Projection.inline)."""
+    return not (minter.suppress_temporal and isinstance(node, TEMPORAL)
+                and not in_effect(node, minter.now))
 
 
 def temporal_dates(doc):
@@ -303,7 +318,7 @@ def extend(pairs, letter, frag):
     return None if pairs is None else pairs + ((letter, frag),)
 
 
-def project_children(children, pairs, proj, frag):
+def project_children(children, pairs, proj, frag, live=True):
     out = []
     for node in children:
         match node:
@@ -311,75 +326,79 @@ def project_children(children, pairs, proj, frag):
                 sub = extend(pairs, "A", ordfrag(node.ordinal))
                 node_id = proj.minter.mint(sub, node)
                 ctx = node_id or frag
-                kids = [rubrik_nf(node.rubrik, 1, proj, ctx)]
+                kids = [rubrik_nf(node.rubrik, 1, proj, ctx, live=live)]
                 if node.underrubrik:
-                    kids.append(rubrik_nf(node.underrubrik, 2, proj, ctx))
+                    kids.append(rubrik_nf(node.underrubrik, 2, proj, ctx, live=live))
                 kids += project_children(node.children,
-                                         sub if node_id else None, proj, ctx)
+                                         sub if node_id else None, proj, ctx, live)
                 out.append({"type": "avdelning", "id": node_id,
                             "ordinal": node.ordinal, "children": kids})
             case Underavdelning():
                 sub = extend(pairs, "U", ordfrag(node.ordinal))
                 node_id = proj.minter.mint(sub, node)
                 ctx = node_id or frag
-                kids = [rubrik_nf(node.rubrik, 1, proj, ctx)]
+                kids = [rubrik_nf(node.rubrik, 1, proj, ctx, live=live)]
                 kids += project_children(node.children,
-                                         sub if node_id else None, proj, ctx)
+                                         sub if node_id else None, proj, ctx, live)
                 out.append({"type": "underavdelning", "id": node_id,
                             "children": kids})
             case Kapitel():
                 sub = extend(pairs, "K", ordfrag(node.ordinal))
                 node_id = proj.minter.mint(sub, node)
                 ctx = node_id or frag
-                kids = [rubrik_nf(node.rubrik, 1, proj, ctx)]
+                clive = live and _in_force(node, proj.minter)
+                kids = [rubrik_nf(node.rubrik, 1, proj, ctx, live=clive)]
                 kids += project_children(node.children,
-                                         sub if node_id else None, proj, ctx)
+                                         sub if node_id else None, proj, ctx, clive)
                 out.append({"type": "kapitel", "id": node_id,
                             "ordinal": node.ordinal, "children": kids})
             case UpphavtKapitel() | UpphavdParagraf():
                 out.append({"type": "upphavd",
                             "text": proj.inline(
-                                util.normalize_space(node.text), frag)})
+                                util.normalize_space(node.text), frag, live)})
             case Paragraf():
                 sub = extend(pairs, "P", ordfrag(node.ordinal))
                 node_id = proj.minter.mint(sub, node)
+                plive = live and _in_force(node, proj.minter)
                 out.append({"type": "paragraf", "id": node_id,
                             "ordinal": node.ordinal,
                             "children": project_paragraf(
                                 node, sub if node_id else None, proj,
-                                node_id or frag)})
+                                node_id or frag, plive)})
             case Rubrik():
                 sub = extend(pairs, "R", position_ordinal(node, children))
                 node_id = proj.minter.mint(sub, node)
                 out.append(rubrik_nf(node.text,
                                      3 if node.underrubrik else 2,
-                                     proj, node_id or frag, id=node_id))
+                                     proj, node_id or frag, id=node_id,
+                                     live=live and _in_force(node, proj.minter)))
             case Stycke():
                 sub = extend(pairs, "S", position_ordinal(node, children))
-                out.append(stycke_nf(node, sub, proj, frag))
+                out.append(stycke_nf(node, sub, proj, frag, live))
             case Lista():
                 out.append({"type": "lista", "id": None,
-                            "children": flatten_list(node, pairs, proj, frag)})
+                            "children": flatten_list(node, pairs, proj, frag, live)})
             case Tabell():
-                out.append(tabell_nf(node, proj, frag))
+                out.append(tabell_nf(node, proj, frag, live))
             case Bilaga():
                 sub = extend(pairs, "B", position_ordinal(node, children))
                 node_id = proj.minter.mint(sub, node)
                 ctx = node_id or frag
-                kids = [rubrik_nf(node.rubrik, 1, proj, ctx)]
+                blive = live and _in_force(node, proj.minter)
+                kids = [rubrik_nf(node.rubrik, 1, proj, ctx, live=blive)]
                 kids += project_children(node.children,
-                                         sub if node_id else None, proj, ctx)
+                                         sub if node_id else None, proj, ctx, blive)
                 out.append({"type": "bilaga", "id": node_id, "children": kids})
             case Overgangsbestammelser():
                 pass  # redistributed into the amendment register downstream
     return out
 
 
-def project_paragraf(paragraf, pairs, proj, frag):
+def project_paragraf(paragraf, pairs, proj, frag, live=True):
     out = []
     for node in paragraf.children:
         sub = extend(pairs, "S", position_ordinal(node, paragraf.children))
-        nf = stycke_nf(node, sub, proj, frag)
+        nf = stycke_nf(node, sub, proj, frag, live)
         if node is paragraf.children[0]:
             nf["beteckning"] = beteckning(paragraf)
         out.append(nf)
@@ -393,24 +412,24 @@ def beteckning(paragraf):
     return b
 
 
-def stycke_nf(stycke, pairs, proj, frag):
+def stycke_nf(stycke, pairs, proj, frag, live=True):
     node_id = proj.minter.mint(pairs, stycke)
     eff = node_id or frag
     nf = {"type": "stycke", "id": node_id,
-          "text": proj.inline(util.normalize_space(stycke.text), eff)}
+          "text": proj.inline(util.normalize_space(stycke.text), eff, live)}
     items = []
     for child in stycke.children:
         if isinstance(child, Lista):
             items.extend(flatten_list(child, pairs if node_id else None,
-                                      proj, eff))
+                                      proj, eff, live))
         elif isinstance(child, Tabell):
-            items.append(tabell_nf(child, proj, eff))
+            items.append(tabell_nf(child, proj, eff, live))
     if items:
         nf["children"] = items
     return nf
 
 
-def flatten_list(lista, pairs, proj, frag):
+def flatten_list(lista, pairs, proj, frag, live=True):
     """Golden normal form flattens nested lists into document order.
     References in each item resolve against the item's own id."""
     out = []
@@ -419,21 +438,21 @@ def flatten_list(lista, pairs, proj, frag):
         item_id = proj.minter.mint(sub, item)
         eff = item_id or frag
         out.append({"type": "punkt", "id": item_id, "ordinal": item.ordinal,
-                    "text": proj.inline(util.normalize_space(item.text), eff)})
+                    "text": proj.inline(util.normalize_space(item.text), eff, live)})
         for sublist in item.children:
             out.extend(flatten_list(sublist, sub if item_id else None,
-                                    proj, eff))
+                                    proj, eff, live))
     return out
 
 
-def tabell_nf(tabell, proj, context):
+def tabell_nf(tabell, proj, context, live=True):
     return {"type": "tabell", "id": None,
             "children": [{"type": "rad",
                           "cells": [proj.inline(util.normalize_space(cell),
-                                                context) for cell in row.cells]}
+                                                context, live) for cell in row.cells]}
                          for row in tabell.rows]}
 
 
-def rubrik_nf(text, level, proj, context, id=None):
+def rubrik_nf(text, level, proj, context, id=None, live=True):
     return {"type": "rubrik", "id": id, "level": level,
-            "text": proj.inline(util.normalize_space(text or ""), context)}
+            "text": proj.inline(util.normalize_space(text or ""), context, live)}
