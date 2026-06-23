@@ -15,12 +15,16 @@ which CELEX numbers exist -- so we enumerate that from the auth-free CELLAR
 SPARQL endpoint (no 10,000-result cap, unlike the SOAP service) and fetch each
 document's content from CELLAR by CELEX.
 
-Per document we fetch the CDM "tree notice" (work -> language expressions ->
-manifestations -> items) directly by CELEX -- no need to discover the opaque
-cellar id first -- pick the best manifestation per language (fmx4 > xhtml >
-html > pdf), and store:
+Per document we need the best manifestation per language (fmx4 > xhtml > html >
+pdf) and its content item URL. The CDM "tree notice" carries that, but CELLAR
+spends ~10s assembling one (a judgment's runs to 500k+ triples across 24
+languages and the citation closure) for the ~6 edges we use -- the dominant cost
+of the whole harvest. So instead we read the same work -> expression ->
+manifestation -> item edges straight from the SPARQL endpoint, one batched query
+per year-slice of CELEX rather than one notice per document, and store:
 
-  {root}/{year}/{celex}/notice.ttl       the tree-notice graph (metadata)
+  {root}/{year}/{celex}/notice.ttl       the metadata we keep (celex, sector,
+                                         work date, eurovoc), synthesized
   {root}/{year}/{celex}/{lang}.{ext}     content per language (e.g. swe.fmx4)
 
 CELEX is the basefile throughout (treaty CELEX contain '/', stored with '/'
@@ -51,7 +55,7 @@ from urllib.parse import quote
 from xml.etree import ElementTree as ET
 
 from ..lib.net import make_session, request
-from ..lib.util import progress
+from ..lib.util import Reporter
 
 SPARQL = "https://publications.europa.eu/webapi/rdf/sparql"
 CELLAR = "http://publications.europa.eu/resource/celex/%s"
@@ -69,12 +73,13 @@ CDM = "http://publications.europa.eu/ontology/cdm#"
 OWL_SAMEAS = "http://www.w3.org/2002/07/owl#sameAs"
 SEARCH_NS = "{http://eur-lex.europa.eu/search}"
 
-# A CELLAR tree notice is huge (a court judgment's runs to 500k+ triples across
-# 24 languages, citation closure and provenance) and we read ~6 edges out of it.
-# rdflib parsing + turtle re-serialising those is the dominant per-document cost
-# on case law. Instead we stream the rdf/xml through raptor's `rapper` (C,
-# constant-memory) to n-triples, keep only the predicates the selection and a
-# little metadata need, and store that subset -- itself valid turtle.
+# The bulk unpacker still turns a dump's per-work rdf/xml notice into our stored
+# notice.ttl. Such a notice is huge (a court judgment's runs to 500k+ triples
+# across 24 languages, citation closure and provenance) and we read ~6 edges out
+# of it, so we stream the rdf/xml through raptor's `rapper` (C, constant-memory)
+# to n-triples, keep only the predicates a little metadata needs, and store that
+# subset -- itself valid turtle. (The live download path no longer fetches these
+# notices at all; it selects over SPARQL -- see fetch_selection.)
 P_EXPR_WORK = CDM + "expression_belongs_to_work"
 P_EXPR_LANG = CDM + "expression_uses_language"
 P_EXPR_MANIF = CDM + "expression_manifested_by_manifestation"
@@ -149,9 +154,11 @@ def doc_dir(root, celex):
 # --------------------------------------------------------------------------
 
 def sparql_select(session, query):
-    return request(session, "GET", SPARQL, parse_json=True, timeout=90,
-                   params={"query": query,
-                           "format": "application/sparql-results+json"}
+    # POST: the selection/metadata queries pass the year's CELEX in a VALUES
+    # block, far past what a GET URL holds (the endpoint accepts either).
+    return request(session, "POST", SPARQL, parse_json=True, timeout=120,
+                   data={"query": query,
+                         "format": "application/sparql-results+json"}
                    )["results"]["bindings"]
 
 
@@ -328,37 +335,65 @@ def parse_notice(rdfxml):
     return Notice(_ntriples(rdfxml))
 
 
-def fetch_notice(session, celex):
-    """The CDM tree notice for a CELEX, filtered to the predicates we keep."""
-    response = request(session, "GET", CELLAR % quote(celex, safe=""),
-                       timeout=90,
-                       headers={"Accept": "application/rdf+xml;notice=tree"})
-    return parse_notice(response.content)
+# --- selection over SPARQL: the live path's replacement for the tree notice ---
+# We read the work -> expression -> manifestation -> item edges straight from the
+# endpoint in batches keyed by CELEX, instead of assembling a ~10s tree notice
+# per document. The endpoint's query planner chokes on the manifestation join
+# combined with an owl:sameAs OPTIONAL over a whole year, so streams (needed only
+# to drop the .doc.xml wrapper item) are resolved in a second, item-scoped query.
+
+PREFIXES = ("PREFIX cdm: <http://publications.europa.eu/ontology/cdm#> "
+            "PREFIX owl: <http://www.w3.org/2002/07/owl#> ")
+XSD_STRING = "http://www.w3.org/2001/XMLSchema#string"
+XSD_DATE = "http://www.w3.org/2001/XMLSchema#date"
+SELECT_CHUNK = 1000        # CELEX per selection/metadata query
+STREAM_CHUNK = 500         # items per wrapper-resolution query
 
 
-def _manifestation_items(notice, manifestation):
-    """Items of a manifestation. The CELEX/OJ-form manifestation node usually
-    carries no items directly -- they hang off the cellar-form manifestation it
-    is owl:sameAs -- so resolve through sameAs in both directions."""
-    nodes = ({manifestation} | set(notice.objects(manifestation, OWL_SAMEAS))
-             | set(notice.subjects(OWL_SAMEAS, manifestation)))
-    items = []
-    for node in nodes:
-        items += notice.subjects(P_ITEM_MANIF, node)
-    return items
+def _literals(values):
+    return " ".join('"%s"^^<%s>' % (v, XSD_STRING) for v in values)
 
 
-def _is_wrapper(notice, item):
-    """A Formex manifestation carries both the real `.xml` and a `.doc.xml`
-    wrapper item; the wrapper's stream URIs (owl:sameAs) all end in `.doc.xml`."""
-    streams = list(notice.objects(item, OWL_SAMEAS))
-    return bool(streams) and all(s.endswith((".doc.xml", ".doc")) for s in streams)
+def _uris(values):
+    return " ".join("<%s>" % v for v in values)
 
 
-def _choose_item(notice, items):
-    """The real content item -- drop the `.doc.xml` wrapper when present."""
-    real = [i for i in items if not _is_wrapper(notice, i)]
-    return (real or items)[0]
+def _chunked(session, build_query, terms, size):
+    """Run a VALUES-based query over `terms` in chunks, concatenating the result
+    bindings -- the endpoint takes these by POST, so chunking only keeps a single
+    query (and its result) a sane size."""
+    rows = []
+    for i in range(0, len(terms), size):
+        rows += sparql_select(session, build_query(terms[i:i + size]))
+    return rows
+
+
+def _selection_query(celexes, languages):
+    langs = ", ".join('"%s"' % code.upper() for code in languages)
+    return (PREFIXES +
+            "SELECT ?celex ?lang ?mtype ?item WHERE { VALUES ?celex { %s } "
+            "?w cdm:resource_legal_id_celex ?celex . "
+            "?expr cdm:expression_belongs_to_work ?w ; "
+            "cdm:expression_uses_language ?langc . "
+            "?manif cdm:manifestation_manifests_expression ?expr ; "
+            "cdm:manifestation_type ?mtype . "
+            "?item cdm:item_belongs_to_manifestation ?manif . "
+            "BIND(REPLACE(STR(?langc), '.*/', '') AS ?lang) "
+            "FILTER(?lang IN (%s)) }" % (_literals(celexes), langs))
+
+
+def _stream_query(items):
+    return (PREFIXES + "SELECT ?item ?stream WHERE { VALUES ?item { %s } "
+            "?item owl:sameAs ?stream }" % _uris(items))
+
+
+def _metadata_query(celexes):
+    return (PREFIXES +
+            "SELECT ?celex ?wdate ?concept WHERE { VALUES ?celex { %s } "
+            "?w cdm:resource_legal_id_celex ?celex . "
+            "OPTIONAL { ?w cdm:work_date_document ?wdate } "
+            "OPTIONAL { ?w cdm:work_is_about_concept_eurovoc ?concept } }"
+            % _literals(celexes))
 
 
 def _best_type(by_type):
@@ -370,38 +405,82 @@ def _best_type(by_type):
     return pdfs[0] if pdfs else None
 
 
-def _manifestations(notice, expr):
-    """Manifestations of an expression, from whichever direction the notice
-    carries the edge: the inferred live notice has the forward edge; a notice
-    built from a non-inferred dump may only have the inverse."""
-    return list(dict.fromkeys(list(notice.objects(expr, P_EXPR_MANIF))
-                              + list(notice.subjects(P_MANIF_EXPR, expr))))
+def _is_wrapper(streams):
+    """A Formex manifestation carries both the real `.xml` content item and a
+    `.doc.xml` wrapper item; the wrapper's stream URIs all end in `.doc.xml`."""
+    return bool(streams) and all(s.endswith((".doc.xml", ".doc")) for s in streams)
 
 
-def select_items(notice, languages):
-    """For each requested language with an expression, the best available
-    (lang, filetype, item_url), preferring fmx4 > xhtml > html > pdf."""
-    expressions = {}
-    for expr, _work in notice.subject_objects(P_EXPR_WORK):
-        lang = notice.value(expr, P_EXPR_LANG)
-        if lang is not None:
-            expressions.setdefault(lang.rsplit("/", 1)[1].lower(), expr)
+def _resolve_streams(session, items):
+    """item URL -> its owl:sameAs stream URIs, for the few items that need
+    wrapper disambiguation (a manifestation carrying more than one item)."""
+    streams = defaultdict(list)
+    for row in _chunked(session, _stream_query, sorted(items), STREAM_CHUNK):
+        streams[row["item"]["value"]].append(row["stream"]["value"])
+    return streams
 
-    out = []
-    for code in languages:
-        expr = expressions.get(code)
-        if expr is None:
-            continue
-        by_type = {}
-        for m in _manifestations(notice, expr):
-            mtype = notice.value(m, P_MANIF_TYPE)
-            items = _manifestation_items(notice, m)
-            if mtype is not None and items:
-                by_type[mtype] = _choose_item(notice, items)
-        filetype = _best_type(by_type)
-        if filetype:
-            out.append((code, filetype, by_type[filetype]))
+
+def fetch_selection(session, celexes, languages):
+    """For each CELEX, the best (lang, filetype, item_url) per requested language
+    -- the bulk replacement for per-document tree-notice selection. Mirrors it:
+    fmx4 > xhtml > html > pdf, with the .doc.xml wrapper item dropped."""
+    code_of = {code.upper(): code for code in languages}
+    tree = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    for row in _chunked(session, lambda c: _selection_query(c, languages),
+                        celexes, SELECT_CHUNK):
+        code = code_of.get(row["lang"]["value"])
+        if code:
+            (tree[row["celex"]["value"]][code]
+                 [row["mtype"]["value"]].append(row["item"]["value"]))
+
+    chosen, ambiguous = {}, set()
+    for celex, by_lang in tree.items():
+        for code, by_type in by_lang.items():
+            filetype = _best_type(by_type)
+            if filetype:
+                chosen[(celex, code)] = (filetype, by_type[filetype])
+                if len(by_type[filetype]) > 1:
+                    ambiguous.update(by_type[filetype])
+
+    streams = _resolve_streams(session, ambiguous) if ambiguous else {}
+    out = defaultdict(list)
+    for (celex, code), (filetype, items) in chosen.items():
+        real = [i for i in items if not _is_wrapper(streams.get(i, ()))]
+        out[celex].append((code, filetype, (real or items)[0]))
     return out
+
+
+def fetch_metadata(session, celexes):
+    """celex -> (work_date or None, [eurovoc concept URIs]) -- the metadata kept
+    in the synthesized notice (the work date also feeds the per-CELEX refetch)."""
+    wdate, concepts = {}, defaultdict(list)
+    for row in _chunked(session, _metadata_query, celexes, SELECT_CHUNK):
+        celex = row["celex"]["value"]
+        if "wdate" in row:
+            wdate[celex] = row["wdate"]["value"][:10]
+        concept = row.get("concept", {}).get("value")
+        if concept and concept not in concepts[celex]:
+            concepts[celex].append(concept)
+    return wdate, concepts
+
+
+def notice_ttl(celex, wdate, eurovoc):
+    """The metadata we keep for a downloaded CELEX, as n-triples (a subset of
+    turtle) on the stable CELLAR celex URI: celex, sector, work date and any
+    eurovoc concepts. The live path no longer fetches the tree notice, so this
+    stands in for it -- the metadata worth keeping, and the on-disk marker the
+    harvester and parser key on."""
+    subj = "<%s>" % (CELLAR % quote(celex, safe=""))
+    triples = ['%s <%s> "%s" .' % (subj, CDM + "resource_legal_id_celex", celex),
+               '%s <%s> "%s" .' % (subj, CDM + "resource_legal_id_sector",
+                                   celex[0])]
+    if wdate:
+        triples.append('%s <%s> "%s"^^<%s> .'
+                       % (subj, CDM + "work_date_document", wdate, XSD_DATE))
+    for concept in eurovoc:
+        triples.append('%s <%s> <%s> .'
+                       % (subj, CDM + "work_is_about_concept_eurovoc", concept))
+    return ("\n".join(triples) + "\n").encode()
 
 
 def content_filename(code, filetype, content):
@@ -415,14 +494,14 @@ def content_filename(code, filetype, content):
     return code + suffix
 
 
-def download_document(session, root, celex, languages, delay):
-    """Fetch a CELEX's tree notice and its best content per language. Returns
-    the languages stored (empty if none of the requested languages exist)."""
-    target = doc_dir(root, celex)
-    notice = fetch_notice(session, celex)
-    write_atomic(target / "notice.ttl", notice.ttl())
+def store_document(session, target, celex, wdate, selection, eurovoc):
+    """Write a CELEX's synthesized notice and fetch its selected content per
+    language. `selection` is the [(lang, filetype, item_url)] fetch_selection
+    returns for this CELEX. Returns the languages stored. Throttling is the
+    caller's (one delay per document, not per content item)."""
+    write_atomic(target / "notice.ttl", notice_ttl(celex, wdate, eurovoc))
     stored = []
-    for code, filetype, url in select_items(notice, languages):
+    for code, filetype, url in selection:
         response = request(session, "GET", url, timeout=180)
         name = content_filename(code, filetype, response.content)
         write_atomic(target / name, response.content)
@@ -432,7 +511,19 @@ def download_document(session, root, celex, languages, delay):
             if old.name != name:
                 old.unlink()
         stored.append(code)
-        time.sleep(delay)
+    return stored
+
+
+def download_document(session, root, celex, languages, delay):
+    """Fetch a single CELEX's content, selecting over SPARQL. Returns the
+    languages stored (empty if none of the requested languages exist). The sweep
+    (`sync`) selects in bulk; this serves the explicit per-CELEX refetch."""
+    selection = fetch_selection(session, [celex], languages)
+    wdate, eurovoc = fetch_metadata(session, [celex])
+    stored = store_document(session, doc_dir(root, celex), celex,
+                            wdate.get(celex), selection.get(celex, []),
+                            eurovoc.get(celex, []))
+    time.sleep(delay)
     return stored
 
 
@@ -482,19 +573,22 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
     seen = stored = skipped = 0
     high = watermark.isoformat() if watermark else None
     truncated = False
-    last_t = time.perf_counter()
-
-    def emit(year, y_seen, total, y_stored, y_skipped):
-        nonlocal last_t
-        now = time.perf_counter()
-        progress(y_seen, total, scope="%s %d" % (sector_name, year),
-                 stored=y_stored, skipped=y_skipped, elapsed=now - last_t,
-                 stamp=True)
-        last_t = now
+    rep = Reporter()
 
     for year, items in enumerate_fn(session, sector, since):
+        scope = "%s %d" % (sector_name, year)
         total = len(items)                       # the year-slice's exact size
-        y_seen = y_stored = y_skipped = last_emit = 0
+        # one batched selection (+ metadata) query for the whole year's pending
+        # CELEX, replacing a ~10s tree notice per document; a fully-downloaded
+        # year (incremental steady state) queries nothing.
+        pending = [celex for celex, _ in items
+                   if full or not is_downloaded(root, celex)]
+        selection, eurovoc = {}, {}
+        if pending:
+            selection = fetch_selection(session, pending, languages)
+            _meta_wdate, eurovoc = fetch_metadata(session, pending)
+        rep.reset()                     # don't bill the year's queries to doc 1
+        y_seen = y_stored = y_skipped = 0
         for celex, wdate in items:
             if limit and seen >= limit:
                 truncated = True
@@ -506,7 +600,9 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
                 y_skipped += 1          # already on disk: no network, no delay
                 fetched = False
             else:
-                if download_document(session, root, celex, languages, delay):
+                if store_document(session, doc_dir(root, celex), celex, wdate,
+                                  selection.get(celex, []),
+                                  eurovoc.get(celex, [])):
                     stored += 1
                     y_stored += 1
                 else:
@@ -520,10 +616,10 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
             # they happen (with the elapsed since the last line, so the per-fetch
             # cost is visible), plus a periodic tick through long stretches of skips
             if fetched or y_seen % 50 == 0:
-                emit(year, y_seen, total, y_stored, y_skipped)
-                last_emit = y_seen
-        if y_seen != last_emit:     # final line for the year, if not just emitted
-            emit(year, y_seen, total, y_stored, y_skipped)
+                rep.update(y_seen, total, scope=scope,
+                           stored=y_stored, skipped=y_skipped)
+        rep.update(y_seen, total, scope=scope, stored=y_stored, skipped=y_skipped)
+        rep.done()                  # finish the year's overwriting line
         if truncated:
             break
         # Resume safety net: persist progress after each completed past year, so
