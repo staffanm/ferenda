@@ -9,14 +9,21 @@ A dump is a set of big zips for one release date:
   LEG_SV_FMX_<date>.zip    {work-uuid}/fmx4/*.fmx.xml             Formex, Swedish
   LEG_EN_HTML_<date>.zip   {work-uuid}/{html,xhtml}/*             HTML, English
   LEG_SV_HTML_<date>.zip   ...
+  LEG_EN_PDF_<date>.zip    {work-uuid}/{pdf,pdfa1a,pdfa2a,...}/*.pdf  PDF, English
+  LEG_SV_PDF_<date>.zip    ...
 
-Everything is keyed by the opaque cellar work UUID; the CELEX (our basefile) lives
-only in the metadata rdf (`resource_legal_id_celex`). We read that to map each
-UUID to its CELEX, then write, per work and language, the files a download leaves:
+A work's manifestations are split across these per-format dumps, and not every
+work is in every format (an older act is often HTML- or PDF-only -- e.g. directive
+2000/53/EC has no Formex). So, per work and language, we keep the single best
+available -- fmx4 > html > pdf, the same preference the live SPARQL downloader
+applies -- and write the files a download leaves. Everything is keyed by the
+opaque cellar work UUID; the CELEX (our basefile) lives only in the metadata rdf
+(`resource_legal_id_celex`), which we read to map each UUID to its CELEX:
 
   {root}/{year}/{celex}/notice.ttl          the metadata, as turtle
-  {root}/{year}/{celex}/{lang}.fmx4[.zip]   the Formex (bare act, or bundle)
-  {root}/{year}/{celex}/{lang}.{html,xhtml} the HTML manifestation
+  {root}/{year}/{celex}/{lang}.fmx4[.zip]   Formex (bare act, or annex bundle), or
+  {root}/{year}/{celex}/{lang}.{html,xhtml} the HTML manifestation, or
+  {root}/{year}/{celex}/{lang}.pdf          the PDF (last resort)
 
 so `lagen eurlex parse` then treats them exactly like downloaded documents.
 """
@@ -24,6 +31,7 @@ so `lagen eurlex parse` then treats them exactly like downloaded documents.
 import io
 import os
 import re
+import sys
 import zipfile
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -33,6 +41,8 @@ from PIL import Image, UnidentifiedImageError
 
 from .download import (SECTORS, content_filename, doc_dir, parse_notice,
                        write_atomic, write_watermark)
+from .model import doctype
+from ..lib.util import status
 
 LANG = {"EN": "eng", "SV": "swe"}    # dump language code -> our 3-letter code
 
@@ -73,6 +83,14 @@ def _celex_of(rdf_bytes):
 def _workdate_of(rdf_bytes):
     match = RE_WORKDATE.search(rdf_bytes)
     return match.group(1).decode().strip() if match else None
+
+
+def _wanted(celex):
+    """Whether a dump work belongs in the corpus. The "legislation" dumps also
+    carry sector-3 acts we don't publish: of the legal acts (sector 3) we keep
+    only regulations (R) and directives (L), dropping decisions (D) and the
+    minor act types. Other sectors (treaties, case law) pass through unchanged."""
+    return celex[0] != "3" or doctype(celex) in ("regulation", "directive")
 
 
 def _recompress(raw):
@@ -157,6 +175,43 @@ def _pick_html(members):
     return min(pool, key=len) if pool else None
 
 
+def _pick_pdf(members):
+    """The main PDF member. A work carries a single PDF rendition, but in a
+    type-named subdir (pdf, pdfa1a, pdfa1b, pdfa2a, ...) that varies per document
+    -- we take any `.pdf` regardless. The main file is the shortest name; a
+    multi-part act splits into OJ page-range files of equal-length names, so a
+    tie breaks on the name itself -- the lowest page range, i.e. the opening
+    part, first."""
+    cands = [n for n in members if n.endswith(".pdf")]
+    return min(cands, key=lambda n: (len(n), n)) if cands else None
+
+
+def _select_content(lang, uuid, fmx, html, pdf, pool):
+    """The best manifestation for one work in one language as (filename, bytes),
+    or None if the work has no content there. Mirrors the live downloader's
+    preference -- fmx4 > html > pdf -- and degrades the same way: an fmx4 entry
+    that yields no usable Formex (a wrapper-only work) falls through to html,
+    then pdf. Each of `fmx`/`html`/`pdf` is a (zips-by-lang, index-by-lang) pair;
+    a format whose dump was not supplied is simply absent from the chain."""
+    zips, idx = fmx
+    if lang in zips and uuid in idx[lang]:
+        blob = _bundle_fmx(zips[lang], idx[lang][uuid], encode=pool.map)
+        if blob:
+            return content_filename(lang, "fmx4", blob), blob
+    zips, idx = html
+    if lang in zips and uuid in idx[lang]:
+        member = _pick_html(idx[lang][uuid])
+        if member:
+            ext = ".xhtml" if member.endswith(".xhtml") else ".html"
+            return lang + ext, zips[lang].read(member)
+    zips, idx = pdf
+    if lang in zips and uuid in idx[lang]:
+        member = _pick_pdf(idx[lang][uuid])
+        if member:
+            return lang + ".pdf", zips[lang].read(member)
+    return None
+
+
 def unpack_bulk(source, root, languages=("swe", "eng"), limit=None, log=print):
     """Import a bulk dump (a directory, or any file inside it) into root.
     Returns the number of works written."""
@@ -172,51 +227,57 @@ def unpack_bulk(source, root, languages=("swe", "eng"), limit=None, log=print):
            if (z := _find_zip(bundle, "LEG_%s_FMX_*.zip" % code))}
     html = {our: zipfile.ZipFile(z) for code, our in LANG.items()
             if (z := _find_zip(bundle, "LEG_%s_HTML_*.zip" % code))}
-    log("dump: metadata + fmx%s + html%s; indexing ..."
-        % (sorted(fmx), sorted(html)))
+    pdf = {our: zipfile.ZipFile(z) for code, our in LANG.items()
+           if (z := _find_zip(bundle, "LEG_%s_PDF_*.zip" % code))}
+    log("dump: metadata + fmx%s + html%s + pdf%s; indexing ..."
+        % (sorted(fmx), sorted(html), sorted(pdf)))
     fmx_idx = {l: _uuid_index(z) for l, z in fmx.items()}
     html_idx = {l: _uuid_index(z) for l, z in html.items()}
+    pdf_idx = {l: _uuid_index(z) for l, z in pdf.items()}
 
-    written = skipped = 0
+    works = [n for n in mtd.namelist() if n.endswith("tree_non_inferred.rdf")]
+    total = len(works)
+    log("indexed; %d works to unpack" % total)
+
+    written = skipped = filtered = 0
     marks = {}                       # sector digit -> latest work date in the dump
     # recompressing the TIFF graphics to WebP is the bottleneck; fan it out
     # across cores (threads suffice -- libwebp releases the GIL during encode)
     with ThreadPoolExecutor(max_workers=min(8, (os.cpu_count() or 4))) as pool:
-        for name in mtd.namelist():
-            if not name.endswith("tree_non_inferred.rdf"):
-                continue
+        for i, name in enumerate(works, 1):
             uuid = name.split("/", 1)[0]
             rdf = mtd.read(name)
             celex = _celex_of(rdf)
             if not celex or len(celex) < 5:
                 skipped += 1
-                continue
-            wdate = _workdate_of(rdf)
-            if wdate and wdate > marks.get(celex[0], ""):
-                marks[celex[0]] = wdate
-            dest = doc_dir(root, celex)
-            write_atomic(dest / "notice.ttl", parse_notice(rdf).ttl())
-            for lang in languages:
-                if lang in fmx and uuid in fmx_idx[lang]:
-                    blob = _bundle_fmx(fmx[lang], fmx_idx[lang][uuid], encode=pool.map)
-                    if blob:
-                        name = content_filename(lang, "fmx4", blob)
-                        write_atomic(dest / name, blob)
-                        # a re-run may flip zip-ness; drop any other fmx4 variant
-                        # (incl. the legacy `.zip.fmx4` name)
-                        for old in dest.glob(lang + ".*fmx4*"):
-                            if old.name != name:
+            elif not _wanted(celex):
+                # excluded acts must not advance the sector watermark either, so
+                # filter before the mark update below
+                filtered += 1
+            else:
+                wdate = _workdate_of(rdf)
+                if wdate and wdate > marks.get(celex[0], ""):
+                    marks[celex[0]] = wdate
+                dest = doc_dir(root, celex)
+                write_atomic(dest / "notice.ttl", parse_notice(rdf).ttl())
+                for lang in languages:
+                    chosen = _select_content(lang, uuid, (fmx, fmx_idx),
+                                             (html, html_idx), (pdf, pdf_idx), pool)
+                    if chosen:
+                        fname, data = chosen
+                        write_atomic(dest / fname, data)
+                        # one manifestation per language (the best tier): clear any
+                        # other-format/zip-ness content a prior run left for this lang
+                        for old in dest.glob(lang + ".*"):
+                            if old.name != fname:
                                 old.unlink()
-                if lang in html and uuid in html_idx[lang]:
-                    member = _pick_html(html_idx[lang][uuid])
-                    if member:
-                        ext = ".xhtml" if member.endswith(".xhtml") else ".html"
-                        write_atomic(dest / (lang + ext), html[lang].read(member))
-            written += 1
-            if written % 500 == 0:
-                log("  %d works unpacked ..." % written)
+                written += 1
+            status(i, total, "%d unpacked, %d skipped, %d filtered  %s"
+                   % (written, skipped, filtered, celex or "-"))
             if limit and written >= limit:
                 break
+    if total:
+        sys.stderr.write("\n")
     # the dump is the baseline: set each sector's watermark to its latest work
     # date, so a later `download` is incremental from here rather than re-walking
     # the whole sector (and its PDF-only long tail) from the first year.
@@ -226,5 +287,6 @@ def unpack_bulk(source, root, languages=("swe", "eng"), limit=None, log=print):
             if sector:
                 write_watermark(root, sector, date)
                 log("watermark[%s] = %s (dump baseline)" % (sector, date))
-    log("unpacked %d works into %s (%d skipped: no CELEX)" % (written, root, skipped))
+    log("unpacked %d works into %s (%d skipped: no CELEX, %d filtered: sector-3 "
+        "non-regulation/directive)" % (written, root, skipped, filtered))
     return written
