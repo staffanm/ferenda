@@ -51,7 +51,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from ..lib.net import make_session
-from ..lib.util import progress
+from ..lib.util import Reporter
 
 BASE = "https://www.regeringen.se"
 FILTER = (BASE + "/Filter/GetFilteredItems?lang=sv&filterType=Taxonomy"
@@ -229,6 +229,7 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
     (ignoring the on-disk stop). Returns {type: (seen, new)}."""
     session = make_session(USER_AGENT)
     totals = {}
+    rep = Reporter()
     for typ in (types or list(TYPES)):
         marker = Path(root) / typ / ".complete"
         backfill = full or not marker.exists()
@@ -257,7 +258,7 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
                 if limit and new >= limit:
                     done = True
                     break
-            progress(seen, total, scope=typ, page=page, new=new)
+            rep.update(seen, total, scope=typ, page=page, new=new)
             if done:
                 break
         else:
@@ -267,6 +268,7 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
             if not only and errors == 0:
                 marker.parent.mkdir(parents=True, exist_ok=True)
                 marker.write_text("")
+        rep.done()
         totals[typ] = (seen, new)
     return totals
 

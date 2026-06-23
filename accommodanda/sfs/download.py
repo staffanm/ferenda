@@ -43,7 +43,7 @@ import time
 from pathlib import Path
 
 from ..lib.net import make_session, request
-from ..lib.util import progress
+from ..lib.util import Reporter
 
 ENDPOINT = "https://beta.rkrattsbaser.gov.se/elasticsearch/SearchEsByRawJson"
 PAGE_SIZE = 100
@@ -212,6 +212,7 @@ def sync(destdir, full=False, limit=None, delay=PAGE_DELAY):
     seen = new = updated = skipped = page_no = 0
     high = watermark
     truncated = False
+    rep = Reporter()
     while True:
         page = search(session, query, after)
         hits = page["hits"]["hits"]
@@ -235,8 +236,8 @@ def sync(destdir, full=False, limit=None, delay=PAGE_DELAY):
             if limit and seen >= limit:
                 truncated = True
                 break
-        progress(seen, page["hits"]["total"]["value"], page=page_no,
-                 new=new, updated=updated)
+        rep.update(seen, page["hits"]["total"]["value"], page=page_no,
+                   new=new, updated=updated)
         # incremental arrives in timestamp order, so the running max is a safe
         # resume point -- checkpoint each page. Backfill arrives in base-id
         # order, so its max is only valid once the whole sweep completes.
@@ -246,6 +247,7 @@ def sync(destdir, full=False, limit=None, delay=PAGE_DELAY):
         if truncated:
             break
         time.sleep(delay)
+    rep.done()
     if backfill and high and not truncated:
         write_watermark(destdir, high)
     return seen, new, updated, skipped

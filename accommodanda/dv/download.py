@@ -39,7 +39,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from ..lib.net import make_session, request
-from ..lib.util import progress
+from ..lib.util import Reporter
 
 API = "https://rattspraxis.etjanst.domstol.se/api/v1"
 PAGE_SIZE = 100
@@ -137,6 +137,7 @@ def sync(destdir, full=False, bilagor=True, limit=None, delay=0.3):
     backfill = full or not marker.exists()
     seen = changed = index = 0
     completed = False
+    rep = Reporter()
     while True:
         page = search_page(session, index, asc=backfill)
         records = page["publiceringLista"]
@@ -157,13 +158,14 @@ def sync(destdir, full=False, bilagor=True, limit=None, delay=0.3):
                 truncated = True
                 break
         changed += page_changed
-        progress(seen, page["total"], page=index + 1, changed=page_changed)
+        rep.update(seen, page["total"], page=index + 1, changed=page_changed)
         if truncated:
             break
         if not backfill and page_changed == 0:
             break  # incremental: everything older is already harvested
         index += 1
         time.sleep(delay)
+    rep.done()
     if completed and backfill:
         marker.parent.mkdir(parents=True, exist_ok=True)
         marker.write_text("")
