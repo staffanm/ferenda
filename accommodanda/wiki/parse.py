@@ -134,6 +134,8 @@ def begrepp_index(root):
     """concept title -> path, over the top-level concept pages."""
     out = {}
     for path in glob.glob(str(Path(root) / "*.xml")):
+        if Path(path).name == "dump.xml":   # the full export the pages were split from
+            continue
         title, ns, text = wikitext.load_page(path)
         if ns == "0" and not wikitext.is_redirect(text) \
                 and not title.startswith(SKIP_TITLE):
