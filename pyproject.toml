@@ -36,6 +36,7 @@ dependencies = [
     "lark",
     "lxml",
     "pillow",
+    "python-dotenv>=1.2.2",
     "rdflib",
     "requests",
     "ruamel-yaml>=0.19.1",
@@ -43,6 +44,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+dev = [
+    "coverage",
+    "psutil",
+    "pytest",
+]
+
+# PEP 735 group: unlike optional-dependencies above, uv installs this on a
+# plain `uv sync`, so `pytest` is available without `--extra dev`.
+[dependency-groups]
 dev = [
     "coverage",
     "psutil",
