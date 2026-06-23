@@ -1,0 +1,112 @@
+"""`lagen eurlex ai-annotate <CELEX>` -- author the editorial `.ann` layer for a
+sector-3 EU act (regulation/directive/decision) with an LLM.
+
+The act's parsed artifact is flattened to a plain-text/markdown rendering and
+spliced into the preamble-analyzer prompt; an OpenAI-compatible chat-completions
+endpoint (Berget) returns the editorial JSON -- thematic recital groups and the
+article<->recital cross-reference. We validate the shape and write it, wrapped in
+`{"editorialLayer": ...}`, as a `.ann` sidecar next to the artifact, where
+`generate` folds it into the act's page (lib.render.Editorial).
+
+The LLM is called only here, on an explicit `ai-annotate` of named CELEX ids --
+never as part of a corpus-wide parse/relate/generate.
+"""
+
+import json
+import os
+from pathlib import Path
+
+import requests
+from dotenv import load_dotenv
+
+from ..lib import catalog, layout
+
+PROMPT = Path(__file__).with_name("preamble_analyzer_prompt.txt")
+PLACEHOLDER = "[PASTE FULL LEGAL ACT TEXT HERE]"
+API_URL = "https://api.berget.ai/v1/chat/completions"
+MODEL = "google/gemma-4-31B-it"
+TIMEOUT = 600          # the act is large and the model reasons over the whole of it
+
+
+def act_markdown(art):
+    """The parsed artifact flattened to a plain-text/markdown rendering of the
+    act -- the analyzer's input. Keeps exactly the structure the prompt keys on:
+    numbered recitals, article headings, numbered paragraphs and lettered points,
+    so the model can mint the "4(5)" / "6(2)(a)" provision keys it is asked for."""
+    lines = ["# %s" % art.get("title", art["celex"]), ""]
+    for b in art["body"]:
+        text = catalog.runs_text(b["text"]).strip()
+        t, num = b["type"], b.get("num")
+        if t == "recital":
+            lines.append("(%s) %s" % (num, text) if num else text)
+        elif t == "citation":
+            lines.append("- %s" % text)
+        elif t == "heading":
+            lines.append("\n%s %s" % ("#" * min((b.get("level") or 1) + 1, 4), text))
+        elif t == "article":
+            # the block text already reads "Artikel 4 – <title>"; fall back to the
+            # bare number only if it is empty
+            lines.append("\n## %s" % (text or "Artikel %s" % (num or "")))
+        elif t == "paragraph":
+            lines.append("%s%s" % ("%s. " % num if num else "", text))
+        elif t == "point":
+            lines.append("  (%s) %s" % (num, text) if num else "  %s" % text)
+        else:                       # preamble, ruling, note, row, keyword
+            lines.append(text)
+    return "\n".join(lines)
+
+
+def _strip_fence(content):
+    """The model is told to emit bare JSON; if it nonetheless wraps the payload
+    in a ``` fence, peel it so the JSON parses."""
+    s = content.strip()
+    if s.startswith("```"):
+        s = s[s.find("\n") + 1:]
+        if s.rstrip().endswith("```"):
+            s = s.rstrip()[:-3]
+    return s.strip()
+
+
+def _complete(prompt, api_key):
+    resp = requests.post(
+        API_URL, headers={"Authorization": "Bearer %s" % api_key},
+        json={"model": MODEL, "temperature": 0,
+              "messages": [{"role": "user", "content": prompt}]},
+        timeout=TIMEOUT)
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"]
+
+
+def _validate(content):
+    """Parse and shape-check the model's reply: a JSON object with exactly the
+    two expected keys. Raises on anything else (rather than write a bad layer)."""
+    layer = json.loads(_strip_fence(content))
+    assert isinstance(layer, dict), "response is not a JSON object"
+    assert isinstance(layer.get("recitalGroups"), list), \
+        "response lacks a recitalGroups list"
+    assert isinstance(layer.get("articleToRecitals"), dict), \
+        "response lacks an articleToRecitals object"
+    return {"recitalGroups": layer["recitalGroups"],
+            "articleToRecitals": layer["articleToRecitals"]}
+
+
+def annotate(celex):
+    """Author and write the `.ann` editorial layer for one sector-3 CELEX; returns
+    the written path."""
+    assert celex.startswith("3") and len(celex) > 5 and celex[5] in "RLD", \
+        ("%s: ai-annotate handles only sector-3 acts "
+         "(regulation/directive/decision)" % celex)
+    art_path = layout.artifact("eurlex", celex)
+    assert art_path.exists(), \
+        "%s: no parsed artifact at %s -- run `lagen eurlex parse %s` first" \
+        % (celex, art_path, celex)
+    load_dotenv()
+    api_key = os.environ.get("BERGET_API_KEY")
+    assert api_key, "BERGET_API_KEY is not set (add it to .env)"
+    art = json.loads(art_path.read_text())
+    prompt = PROMPT.read_text().replace(PLACEHOLDER, act_markdown(art))
+    layer = _validate(_complete(prompt, api_key))
+    out = art_path.with_suffix(".ann")
+    out.write_text(json.dumps({"editorialLayer": layer},
+                              ensure_ascii=False, indent=2))
+    return out
