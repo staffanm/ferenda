@@ -1,7 +1,8 @@
 """Tests for the författningskommentar implements-extractor."""
 
 from accommodanda.forarbete.kommentar import (parse_articles, resolve_directives,
-                                              _refparser, extract)
+                                              _refparser, extract, article_of,
+                                              pinpoints_by_article)
 
 CELEX = "https://lagen.nu/ext/celex/"
 
@@ -14,6 +15,15 @@ def test_parse_articles_dotted_ranged_listed_lettered():
     assert parse_articles("6.11 och 23.2") == (["6.11", "23.2"], ["6", "23"])
     assert parse_articles("23.4 a") == (["23.4 a"], ["23"])
     assert parse_articles("28") == (["28"], ["28"])
+
+
+def test_pinpoints_grouped_by_article():
+    assert article_of("26.1 c") == "26"
+    assert article_of("2.2 f") == "2"
+    assert article_of("28") == "28"
+    # a statement spanning articles 2 and 26 -> each gets only its own pinpoints
+    assert pinpoints_by_article(["2.1", "2.2 f", "2.5 a", "26.1 c"]) == {
+        "2": ["2.1", "2.2 f", "2.5 a"], "26": ["26.1 c"]}
 
 
 def test_directive_alias_binds_to_subject_not_repealed():

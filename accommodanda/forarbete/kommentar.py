@@ -104,6 +104,22 @@ def parse_articles(refs):
     return pinpoints, [a for a in articles if not (a in seen or seen.add(a))]
 
 
+def article_of(pinpoint):
+    """The bare article number a pinpoint belongs to ('23.4 a' -> '23',
+    '28' -> '28') -- the key tying a pinpoint to its directive-article fragment."""
+    return pinpoint.split(".")[0].split()[0]
+
+
+def pinpoints_by_article(pinpoints):
+    """Group pinpoints under their article number, order preserved -- so a
+    statement spanning several articles shows each article only its own
+    pinpoints ('2.1, 2.2 f' under article 2, '26.1 c' under article 26)."""
+    out = {}
+    for pp in pinpoints:
+        out.setdefault(article_of(pp), []).append(pp)
+    return out
+
+
 def directive_uri(name, aliases):
     """CELEX uri for a directive named in an implements statement, or None."""
     key = name.strip().lower()
@@ -133,11 +149,11 @@ def extract(art):
     blocks the parser emits. Records: {predicate, directive, articles,
     pinpoints, uris, partial, law, chapter, paragraf, sentence, page}."""
     blocks = art["body"]
+    span = find_kommentar(blocks)
+    if span is None:                      # no författningskommentar (most types)
+        return []
     parser = _refparser()
     aliases = resolve_directives(blocks, parser)
-    span = find_kommentar(blocks)
-    if span is None:
-        return []
     out = []
     law = chapter = paragraf = None
     for i in range(*span):
@@ -169,6 +185,42 @@ def extract(art):
                 "page": b.get("page"),
             })
     return out
+
+
+# the law a författningskommentar section comments on, named in its level-2
+# rubrik: "9.2 Förslaget till lag om ändring i marknadsföringslagen (2008:486)"
+# (amends a known SFS) or "9.1 Förslaget till lag om alternativ tvistlösning ..."
+# (a new law, resolved by title). Strip the leading section number + "Förslag(et)
+# till ".
+RUBRIK_SFS_RE = re.compile(r"\((\d{4}:\d+)\)")
+RUBRIK_PREFIX_RE = re.compile(r"^\s*\d+(?:\.\d+)*\s*förslag(?:et|en)?\s*"
+                              r"(?:till\s+)?", re.IGNORECASE)
+
+
+def sfs_number(law):
+    """The SFS number a `lag om ändring i …` rubrik amends ('… (2008:486)' ->
+    '2008:486'), or None for a new law (named by title, no number yet)."""
+    m = RUBRIK_SFS_RE.search(law or "")
+    return m.group(1) if m else None
+
+
+def proposed_name(law):
+    """The bare proposed-law name from a level-2 rubrik, prefix stripped:
+    '9.1 Förslaget till lag om alternativ tvistlösning …' -> 'lag om alternativ
+    tvistlösning …'. The caller matches it against the SFS title index."""
+    return RUBRIK_PREFIX_RE.sub("", law or "").strip().rstrip(".")
+
+
+def paragraf_fragment(chapter, paragraf):
+    """The SFS fragment id for a commented paragraf, matching the SFS vertical's
+    minting: 'K{kap}P{par}' in a chaptered law, 'P{par}' in a flat one
+    (sub-letters kept, spaces dropped: '7 a' -> 'P7a'). None without a paragraf."""
+    if not paragraf:
+        return None
+    par = re.sub(r"\s+", "", str(paragraf))
+    if chapter:
+        return "K%sP%s" % (re.sub(r"\s+", "", str(chapter)), par)
+    return "P%s" % par
 
 
 def main():

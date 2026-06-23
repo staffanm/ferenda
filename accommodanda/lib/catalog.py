@@ -17,10 +17,19 @@ the edges from either source.
 
 import hashlib
 import json
+import re
 import sqlite3
 from pathlib import Path
 
 BASE = "https://lagen.nu/"
+
+
+def norm_title(t):
+    """A law title normalised for matching a proposed-law name against the SFS
+    title index: SFS number dropped, whitespace collapsed, lower-cased -- so
+    'Lag (2015:671) om alternativ tvistlösning …' and the proposition's 'lag om
+    alternativ tvistlösning …' compare equal."""
+    return re.sub(r"\s+", " ", re.sub(r"\(\d{4}:\d+\)", "", t)).strip().lower()
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS documents (
@@ -43,6 +52,17 @@ CREATE TABLE IF NOT EXISTS fragments (
     uri     TEXT PRIMARY KEY,       -- a node's fragment uri (doc#id)
     snippet TEXT                    -- its text + list items, for link tooltips
 );
+CREATE TABLE IF NOT EXISTS genomforande (
+    sfs_uri    TEXT NOT NULL,       -- the statute paragraf transposing the article
+    sfs_anchor TEXT NOT NULL,       -- its fragment id (P3 / K2P1)
+    directive  TEXT NOT NULL,       -- the EU directive uri (ext/celex/...)
+    article    TEXT NOT NULL,       -- the directive article number
+    prop_uri   TEXT NOT NULL,       -- the proposition stating the relation
+    prop_label TEXT,                -- its identifier, for display
+    pinpoint   TEXT,                -- the article pinpoint (e.g. "21.1")
+    partial    INTEGER NOT NULL     -- "genomför delvis"
+);
+CREATE INDEX IF NOT EXISTS idx_genomf_sfs ON genomforande(sfs_uri, sfs_anchor);
 CREATE INDEX IF NOT EXISTS idx_links_to_uri  ON links(to_uri);
 CREATE INDEX IF NOT EXISTS idx_links_to_root ON links(to_root);
 CREATE INDEX IF NOT EXISTS idx_links_from    ON links(from_uri);
@@ -90,14 +110,32 @@ def collect_links(node, anchor, out):
             collect_links(item, anchor, out)
 
 
+def implements_links(art):
+    """The genomför-direktiv edges a förarbete artifact carries (extracted from
+    its författningskommentar into the `implements` section): each statement ->
+    one edge per EU directive article it transposes, anchored to the page the
+    statement sits on (the förarbete's `#sid{N}`, so inbound pinpoints the page).
+    The stronger *implements* relation, kept as a typed section because the
+    parser cannot splice it back into the flat PDF text as an inline link."""
+    out = []
+    for rec in art.get("implements", []):
+        anchor = "sid%d" % rec["page"] if rec.get("page") else None
+        for uri in rec.get("uris", []):
+            out.append((anchor, {"uri": uri, "predicate": rec["predicate"],
+                                 "text": rec.get("sentence")}))
+    return out
+
+
 def artifact_links(art):
     """Every inline citation in an artifact, from the body-bearing sections
-    of either source: SFS `structure` + the amendments' `content`, DV `body`."""
+    of either source: SFS `structure` + the amendments' `content`, DV `body`,
+    plus a förarbete's `implements` (genomför-direktiv) edges."""
     out = []
     collect_links(art.get("structure"), None, out)
     for amendment in art.get("amendments", []):
         collect_links(amendment.get("content"), None, out)
     collect_links(art.get("body"), None, out)
+    out += implements_links(art)
     return out
 
 
@@ -235,6 +273,39 @@ def rebuild(catalog_path, source, artifact_paths, progress=None):
     con.commit()
     con.close()
     return docs, edges
+
+
+# --------------------------------------------------------------------------
+# genomför-direktiv relations (a förarbete pins an EU article to a statute
+# paragraf; resolved cross-document at relate time -- see forarbete.genomforande)
+# --------------------------------------------------------------------------
+
+def set_genomforande(con, rows):
+    """Replace the pinned genomför-direktiv relations. Each row is
+    (sfs_uri, sfs_anchor, directive, article, prop_uri, prop_label, pinpoint,
+    partial). Stored twice: in `genomforande` (the statute paragraf's margin
+    display, with provenance) and as an sfs-paragraf -> directive-article edge in
+    `links` (so the directive article's inbound shows the implementing statute,
+    reusing the generic inbound machinery)."""
+    con.execute("DELETE FROM genomforande")
+    con.execute("DELETE FROM links WHERE predicate = 'rpubl:genomforDirektiv' "
+                "AND from_uri IN (SELECT uri FROM documents WHERE source='sfs')")
+    con.executemany("INSERT INTO genomforande VALUES (?,?,?,?,?,?,?,?)", rows)
+    con.executemany("INSERT INTO links VALUES (?,?,?,?,?,?)",
+                    [(sfs_uri, anchor, "rpubl:genomforDirektiv",
+                      directive + "#" + article, directive, prop_label)
+                     for (sfs_uri, anchor, directive, article, prop_uri,
+                          prop_label, pin, partial) in rows])
+    con.commit()
+
+
+def genomfor_for(con, sfs_uri, anchor):
+    """The EU directive articles a statute paragraf transposes, for its margin:
+    (directive, article, prop_uri, prop_label, pinpoint, partial)."""
+    return con.execute(
+        "SELECT directive, article, prop_uri, prop_label, pinpoint, partial "
+        "FROM genomforande WHERE sfs_uri = ? AND sfs_anchor = ? "
+        "ORDER BY directive, article", (sfs_uri, anchor)).fetchall()
 
 
 # --------------------------------------------------------------------------
