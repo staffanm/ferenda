@@ -590,6 +590,7 @@ class Ref:
     text: str
     predicate: str
     uri: str
+    kind: str | None = None    # link flavour for the renderer (e.g. "term")
 
 
 def interleave(text, refs):
@@ -604,8 +605,10 @@ def interleave(text, refs):
             continue  # disjoint spans expected; ignore any stray overlap
         if ref.start > pos:
             out.append(text[pos:ref.start])
-        out.append({"predicate": ref.predicate, "uri": ref.uri,
-                    "text": ref.text})
+        run = {"predicate": ref.predicate, "uri": ref.uri, "text": ref.text}
+        if ref.kind:
+            run["kind"] = ref.kind
+        out.append(run)
         pos = ref.end
     if pos < len(text):
         out.append(text[pos:])

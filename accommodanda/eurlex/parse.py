@@ -28,6 +28,7 @@ from collections import Counter
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
+from .definitions import build_matcher, extract_definitions, term_refs
 from .model import BASE, Block, EurlexDoc, doctype
 from .parse_html import parse_html
 from .parse_pdf import parse_pdf
@@ -380,21 +381,32 @@ def _refparser():
 
 def to_artifact(doc):
     """Project to the artifact JSON: metadata + body blocks whose text is an
-    inline-run list (plain runs + {predicate,uri,text} citation links)."""
+    inline-run list (plain runs + {predicate,uri,text} citation links). Defined
+    terms are extracted first (anchoring the definition points), then every block
+    is scanned both for citations and for in-act uses of those terms."""
     parser = _refparser()
     parser.state = type(parser.state)()       # fresh per-document state
+    matcher, index = build_matcher(extract_definitions(doc.body, doc.lang),
+                                   doc.lang)
     body = []
     for b in doc.body:
-        block = {"type": b.kind,
-                 "text": interleave(b.text, parser.parse_text(b.text, context={}))}
+        cites = parser.parse_text(b.text, context={})
+        # term-use links yield to a citation wherever the spans overlap (a
+        # citation is the stronger, cross-document link)
+        uses = [u for u in term_refs(b.text, matcher, index, doc.uri, b.anchor)
+                if not any(u.start < c.end and c.start < u.end for c in cites)]
+        block = {"type": b.kind, "text": interleave(b.text, cites + uses)}
         for key in ("num", "level"):
             if getattr(b, key) is not None:
                 block[key] = getattr(b, key)
         # the citation anchor is the artifact `id` -- the key the catalog
         # registers fragments under and the renderer emits as the element id, so
-        # a citation to `<celex>#<article>` resolves to this block
+        # a citation to `<celex>#<article>` (or `#<article>.<point>` for a
+        # definition) resolves to this block
         if b.anchor is not None:
             block["id"] = b.anchor
+        if b.defines is not None:
+            block["defines"] = b.defines
         body.append(block)
     art = {"uri": doc.uri, "celex": doc.celex, "doctype": doc.doctype,
            "lang": doc.lang, "title": doc.title, "date": doc.date, "body": body}

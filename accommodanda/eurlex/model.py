@@ -41,6 +41,7 @@ class Block:
                                # paragraph "2", point "a"
     level: int | None = None   # heading/division depth (1 = outermost)
     anchor: str | None = None  # citation-target fragment (e.g. article "5")
+    defines: str | None = None # a definitions-article point: the term it defines
 
 
 # block kinds, in rough document order of where they occur:
