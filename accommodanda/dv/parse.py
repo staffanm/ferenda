@@ -31,6 +31,7 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 
 from .model import Avgorande, Lagrum, Rubrik, Stycke
+from .structure import segment
 from ..lib.lagrum import (EULAGSTIFTNING, EURATTSFALL, FORARBETEN, KORTLAGRUM,
                      LAGRUM, MYNDIGHETSBESLUT, RATTSFALL, LagrumParser,
                      interleave, load_abbreviations, load_namedlaws)
@@ -218,6 +219,10 @@ def to_artifact(av, canonical_id=None):
             "related": av.related,
         },
         "body": [block(b, text) for b, text in zip(av.body, runs)],
+        # the instance/ruling skeleton (delmål → instans → betänkande/dom →
+        # domskäl/domslut → …) the DV structural golden checks; a pure structural
+        # tree, no text -- paragraph membership for rendering is a later concern
+        "structure": segment(av.body),
         "sources": av.sources,
     }
 
