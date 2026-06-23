@@ -32,6 +32,7 @@ from . import catalog
 from . import layout
 from .catalog import BASE
 from .wikitext import begrepp_uri
+from ..eurlex.model import doctype as eurlex_doctype
 
 
 @dataclass
@@ -548,54 +549,82 @@ def render_document(art, source, site):
 # frontpage
 # --------------------------------------------------------------------------
 
+# the document types, in the order they appear on the frontpage, with their
+# Swedish collection labels. dv's documents (and so its browse index) live under
+# /dom/, lagen.nu's grammar; every other source browses under its own name.
+SOURCE_ORDER = ("sfs", "dv", "forarbete", "eurlex", "kommentar", "begrepp")
+SOURCE_LABEL = {"sfs": "Författningar", "dv": "Rättsfall",
+                "forarbete": "Förarbeten", "eurlex": "EU-rättsakter",
+                "kommentar": "Lagkommentarer", "begrepp": "Begrepp"}
+BROWSE_DIR = {"dv": "dom"}
+
+
+def _browse_dir(source):
+    return BROWSE_DIR.get(source, source)
+
+
+def _most_cited(con, source):
+    """The 25 most-referenced documents of a source as ranked-list <li>s (the
+    highlight reels on the frontpage), or '' if the source is empty."""
+    rows = con.execute(
+        "SELECT d.uri, COALESCE(d.title, d.label), COUNT(DISTINCT l.from_uri) c "
+        "FROM links l JOIN documents d ON d.uri = l.to_root "
+        "WHERE d.source = ? AND l.from_uri <> l.to_root "
+        "GROUP BY l.to_root ORDER BY c DESC LIMIT 25", (source,)).fetchall()
+    return "".join('<li><a href="%s">%s</a> <span class="c">%d</span></li>'
+                   % (escape(href(u)), escape(t), c) for u, t, c in rows)
+
+
 def render_index(con):
     n = catalog.counts(con)
-    top = con.execute(
-        "SELECT d.uri, d.title, COUNT(DISTINCT l.from_uri) c FROM links l "
-        "JOIN documents d ON d.uri = l.to_root "
-        "WHERE d.source = 'sfs' AND l.from_uri <> l.to_root GROUP BY l.to_root "
-        "ORDER BY c DESC LIMIT 25").fetchall()
-    topcases = con.execute(
-        "SELECT d.uri, d.label, COUNT(DISTINCT l.from_uri) c FROM links l "
-        "JOIN documents d ON d.uri = l.to_root "
-        "WHERE d.source = 'dv' AND l.from_uri <> l.to_root GROUP BY l.to_root "
-        "ORDER BY c DESC LIMIT 25").fetchall()
-    most = "".join('<li><a href="%s">%s</a> <span class="c">%d</span></li>'
-                   % (escape(href(u)), escape(t), c) for u, t, c in top)
-    cases = "".join('<li><a href="%s">%s</a> <span class="c">%d</span></li>'
-                    % (escape(href(u)), escape(l), c) for u, l, c in topcases)
-    body = ('<p class="lead">%d författningar och %d rättsfall, '
-            'sammanlänkade.</p>'
-            '<p class="browse"><a href="/sfs/">Bläddra bland alla författningar</a>'
-            ' · <a href="/dom/">bläddra bland alla rättsfall</a></p>'
-            '<div class="cols"><section><h2>Mest hänvisade författningar</h2>'
-            '<ol class="ranked">%s</ol></section>'
-            '<section><h2>Mest hänvisade rättsfall</h2><ol class="ranked">%s</ol>'
-            '</section></div>'
-            % (n.get("sfs", 0), n.get("dv", 0), most, cases))
+    nav = "".join(
+        '<li><a href="/%s/">%s</a> <span class="c">%d</span></li>'
+        % (_browse_dir(s), escape(SOURCE_LABEL.get(s, s)), n[s])
+        for s in SOURCE_ORDER if n.get(s))
+    cols = []
+    for source, heading in (("sfs", "Mest hänvisade författningar"),
+                            ("dv", "Mest hänvisade rättsfall")):
+        items = _most_cited(con, source)
+        if items:
+            cols.append('<section><h2>%s</h2><ol class="ranked">%s</ol></section>'
+                        % (heading, items))
+    body = ('<p class="lead">%d sammanlänkade dokument fördelade på %d '
+            'dokumenttyper.</p>'
+            '<nav class="browse counts"><ul>%s</ul></nav>'
+            '<div class="cols">%s</div>'
+            % (sum(n.values()), sum(1 for s in n if n[s]), nav, "".join(cols)))
     return page("lagen.nu", "Start", "", body)
 
 
 def _group_key(source, uri):
-    """Browse grouping: laws by year, cases by court/series (from the uri)."""
+    """Browse grouping heading for a document: laws by year, cases by court,
+    förarbeten by doctype, EU acts by act family, concepts/commentary by initial
+    letter."""
     loc = catalog.local(uri)
     if source == "sfs":
-        return loc.split(":")[0]                 # "1975:635" -> "1975"
-    parts = loc.split("/")                        # "dom/nja/2011s357" -> "nja"
-    return parts[1].upper() if len(parts) > 1 else "övriga"
+        return loc.split(":")[0]                      # "1975:635" -> "1975"
+    if source == "dv":
+        parts = loc.split("/")                        # "dom/nja/2011s357" -> "NJA"
+        return parts[1].upper() if len(parts) > 1 else "övriga"
+    if source == "forarbete":
+        typ = loc.split("/")[0]                        # "prop/2024/25:1" -> "prop"
+        return FA_TYPE_LABEL.get(typ, typ.upper())
+    if source == "eurlex":
+        celex = loc[len("ext/celex/"):]               # "ext/celex/32016R0679" -> kind
+        return EURLEX_KIND.get(eurlex_doctype(celex), "EU-rättsakt")
+    return loc.split("/")[-1][:1].upper() or "övriga"  # kommentar/begrepp: A–Ö
 
 
 def render_browse(con, source):
-    """A complete, sectioned index of every document of one source: laws
-    grouped by year (newest first), cases grouped by court (A–Ö)."""
+    """A complete, sectioned index of every document of one source, grouped by
+    `_group_key` (laws by year newest-first, the rest A–Ö)."""
     rows = con.execute("SELECT uri, label FROM documents WHERE source = ? "
                        "ORDER BY uri", (source,)).fetchall()
     groups = {}
     for uri, label in rows:
         groups.setdefault(_group_key(source, uri), []).append((uri, label))
     order = sorted(groups, reverse=(source == "sfs"))
-    title, kind = (("Författningar", "Bläddra"), ("Rättsfall", "Bläddra"))[
-        source == "dv"]
+    label = SOURCE_LABEL.get(source, source)
     sections = []
     for key in order:
         items = "".join('<li><a href="%s">%s</a></li>'
@@ -605,8 +634,8 @@ def render_browse(con, source):
                         '<span class="c">%d</span></h2><ul>%s</ul></section>'
                         % (escape(key), len(groups[key]), items))
     body = ('<p class="lead">%d %s</p>%s'
-            % (len(rows), title.lower(), "".join(sections)))
-    return page("Alla " + title.lower(), kind, "", body)
+            % (len(rows), label.lower(), "".join(sections)))
+    return page("Alla " + label.lower(), "Bläddra", "", body)
 
 
 # --------------------------------------------------------------------------
@@ -624,9 +653,6 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
     out_root = Path(out_root)
     con = catalog.connect(catalog_path)
     site = Site.from_catalog(con)
-    (out_root).mkdir(parents=True, exist_ok=True)
-    (out_root / "style.css").write_text(CSS)
-    (out_root / "scrollspy.js").write_text(SCROLLSPY)
     rows = con.execute(
         "SELECT uri, source, path FROM documents ORDER BY source, uri").fetchall()
     rendered = 0
@@ -640,19 +666,30 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
             rendered += 1
             if record:
                 record(uri, path, dep)
-        if progress and (i % 200 == 0):
-            progress(i + 1, len(rows))
-    # corpus-aggregate pages (frontpage + browse indexes) depend on the whole
-    # document set, so they are cheap and always rebuilt
-    (out_root / "index.html").write_text(render_index(con))
-    for source in ("sfs", "dom"):
-        (out_root / source).mkdir(parents=True, exist_ok=True)
-        (out_root / source / "index.html").write_text(
-            render_browse(con, "dv" if source == "dom" else source))
+        if progress:
+            progress(i + 1, len(rows), catalog.local(uri), rendered)
+    render_aggregates(con, out_root)
     if progress:
-        progress(len(rows), len(rows))
+        progress(len(rows), len(rows), "", rendered)
     con.close()
     return len(rows), rendered
+
+
+def render_aggregates(con, out_root):
+    """Write the corpus-wide pages -- stylesheet, scripts, frontpage and the
+    per-source browse indexes -- from the catalog. They depend on the whole
+    document set (not on any single artifact), so they are cheap and always
+    rebuilt; `lagen all generate --aggregates-only` runs just this, skipping the
+    per-document render."""
+    out_root = Path(out_root)
+    out_root.mkdir(parents=True, exist_ok=True)
+    (out_root / "style.css").write_text(CSS)
+    (out_root / "scrollspy.js").write_text(SCROLLSPY)
+    (out_root / "index.html").write_text(render_index(con))
+    for source in catalog.counts(con):
+        browse_dir = out_root / _browse_dir(source)
+        browse_dir.mkdir(parents=True, exist_ok=True)
+        (browse_dir / "index.html").write_text(render_browse(con, source))
 
 
 CSS = """
@@ -749,6 +786,10 @@ td { border-top: 1px solid var(--rule); padding: .3rem .6rem; vertical-align: to
 ol.ranked { padding-left: 1.4rem; } ol.ranked .c { color: var(--muted); font-size: .8rem; }
 .cols ul { list-style: none; padding: 0; } .cols li { margin: .25rem 0; }
 .browse { font-family: system-ui, sans-serif; font-size: .95rem; }
+.counts ul { list-style: none; padding: 0; margin: 1.4rem 0 0; display: flex;
+             flex-wrap: wrap; gap: .5rem 1.6rem; }
+.counts li { font-size: 1.05rem; }
+.counts .c { color: var(--muted); font-size: .8rem; margin-left: .15rem; }
 .browse-group { margin: 1.5rem 0; }
 .browse-group h2 { font-size: 1.05rem; border-bottom: 1px solid var(--rule);
                    padding-bottom: .2rem; }

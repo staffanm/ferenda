@@ -211,27 +211,28 @@ def rebuild(catalog_path, source, artifact_paths, progress=None):
     # any orphaned by a removed doc are harmless (never queried)
     docs = 0
     edges = 0
+    total = len(artifact_paths)
     for i, path in enumerate(map(Path, artifact_paths)):
         raw = path.read_bytes()
-        if not raw.strip():
-            continue
-        art = json.loads(raw)
-        con.execute("INSERT OR REPLACE INTO documents VALUES (?,?,?,?,?,?)",
-                    document_row(art, path, source))
-        rows = [(art["uri"], anchor,
-                 run.get("predicate", "dcterms:references"),
-                 run["uri"], strip_fragment(run["uri"]), run.get("text"))
-                for anchor, run in artifact_links(art)]
-        con.executemany("INSERT INTO links VALUES (?,?,?,?,?,?)", rows)
-        con.executemany("INSERT OR REPLACE INTO fragments VALUES (?,?)",
-                        artifact_fragments(art))
-        docs += 1
-        edges += len(rows)
-        if progress and (i % 500 == 0):
-            progress(i + 1, docs, edges)
+        if raw.strip():
+            art = json.loads(raw)
+            con.execute("INSERT OR REPLACE INTO documents VALUES (?,?,?,?,?,?)",
+                        document_row(art, path, source))
+            rows = [(art["uri"], anchor,
+                     run.get("predicate", "dcterms:references"),
+                     run["uri"], strip_fragment(run["uri"]), run.get("text"))
+                    for anchor, run in artifact_links(art)]
+            con.executemany("INSERT INTO links VALUES (?,?,?,?,?,?)", rows)
+            con.executemany("INSERT OR REPLACE INTO fragments VALUES (?,?)",
+                            artifact_fragments(art))
+            docs += 1
+            edges += len(rows)
+            current = local(art["uri"])
+        else:
+            current = path.stem
+        if progress:
+            progress(i + 1, total, docs, edges, current)
     con.commit()
-    if progress:
-        progress(len(artifact_paths), docs, edges)
     con.close()
     return docs, edges
 

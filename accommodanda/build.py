@@ -51,7 +51,7 @@ from .eurlex import download as eurlex_download
 from .eurlex import parse as eurlex_parse
 from .wiki import parse as wiki_parse
 from .dv.parse import api_member, parse_api_record, to_artifact
-from .lib import catalog, layout, render
+from .lib import catalog, layout, render, util
 from .lib.errors import SkipDocument
 from .lib.lagrum import LagrumParser, load_namedlaws
 from .sfs.nf import to_normalform
@@ -192,6 +192,7 @@ class RunOptions:
     no_deps: bool = False
     ignore_code_changes: bool = False  # skip the recipe-version check (dev:
                                        # don't rebuild all when parse code changes)
+    aggregates_only: bool = False  # generate: only the corpus-wide pages
     since: date | None = None    # eurlex: discovery floor (overrides watermark)
     lang: str | None = None      # eurlex: comma-separated languages
     source: str = "sparql"       # eurlex: discovery backend (sparql|soap)
@@ -224,15 +225,13 @@ def _worker_init(manifest, run_options):
 
 
 def _progress(source, action, done, total, merged, basefile):
-    """Live one-line counter on stderr, refreshed per document (it overwrites in
-    place via \\r). Carries the source name, the running counts, and the most
-    recently completed basefile; \\033[K clears any longer previous line."""
+    """Live one-line counter on stderr (the shared util.status pattern), carrying
+    the source/action, the running counts, and the most recently completed
+    basefile."""
     verb = "planned" if RUN.dry_run else "ran"
     count = len(merged.planned) if RUN.dry_run else len(merged.done)
-    sys.stderr.write("\r%s %s %d/%d  %s %d  err %d %s\033[K"
-                     % (source, action, done, total, verb, count,
-                        len(merged.errors), basefile))
-    sys.stderr.flush()
+    util.status(done, total, "%s %s  %s %d  err %d  %s"
+                % (source, action, verb, count, len(merged.errors), basefile))
 
 
 SAVE_EVERY = 1000      # checkpoint the manifest mid-run, every this many docs
@@ -738,10 +737,9 @@ def cmd_relate(names):
     for name in names:
         paths = ARTIFACTS[name]()
 
-        def progress(seen, docs, edges):
-            sys.stderr.write("\r  relate %s: %d/%d seen, %d docs, %d links "
-                             % (name, seen, len(paths), docs, edges))
-            sys.stderr.flush()
+        def progress(seen, total, docs, edges, current):
+            util.status(seen, total, "relate %s  %d docs, %d links  %s"
+                        % (name, docs, edges, current))
 
         docs, edges = catalog.rebuild(CATALOG, name, paths, progress=progress)
         sys.stderr.write("\n")
@@ -775,7 +773,18 @@ def cmd_generate():
     Incremental like parse: a page is re-rendered only when its prerequisite
     artifacts (itself + the documents citing it + the documents it cites) or the
     render code changed. `--force` rebuilds all; `--ignore-code-changes` ignores
-    the render-code version (rebuild only on data changes)."""
+    the render-code version (rebuild only on data changes).
+
+    `--aggregates-only` rewrites just the corpus-wide pages (frontpage + browse
+    indexes) from the current catalog, skipping the per-document render -- a
+    seconds-long refresh after a frontpage/browse change, not a full rebuild."""
+    if RUN.aggregates_only:
+        con = catalog.connect(CATALOG)
+        render.render_aggregates(con, GENERATED)
+        con.close()
+        print("generate: rebuilt frontpage + browse indexes -> %s" % GENERATED)
+        return
+
     stale = stale_sources()
     if stale:
         print("catalog stale for %s -- relating first" % ", ".join(stale))
@@ -810,9 +819,8 @@ def cmd_generate():
         updates[manifest_key("generate", "page", uri)] = {
             "inputs": page_signature(art_path, dep_digest), "version": code_version}
 
-    def progress(done, total):
-        sys.stderr.write("\r  generate %d/%d pages " % (done, total))
-        sys.stderr.flush()
+    def progress(done, total, current="", rendered=0):
+        util.status(done, total, "generate  %d rendered  %s" % (rendered, current))
 
     total, rendered = render.generate_site(CATALOG, GENERATED, progress=progress,
                                            fresh=fresh, record=record)
@@ -915,6 +923,10 @@ def main(argv=None):
                    help="treat outputs as fresh even when the parsing code "
                         "changed -- rebuild only docs whose input data changed, "
                         "are missing, or failed (dev convenience; off in production)")
+    p.add_argument("--aggregates-only", action="store_true",
+                   help="generate: rewrite only the corpus-wide pages (frontpage "
+                        "+ browse indexes) from the catalog, skipping the "
+                        "per-document render")
     p.add_argument("-j", "--jobs", type=int, default=1, help="parallel workers")
     p.add_argument("-n", "--dry-run", action="store_true",
                    help="print the plan, do nothing")
@@ -935,6 +947,7 @@ def main(argv=None):
 
     RUN.dry_run, RUN.force, RUN.no_deps = args.dry_run, args.force, args.no_deps
     RUN.ignore_code_changes = args.ignore_code_changes
+    RUN.aggregates_only = args.aggregates_only
     RUN.since, RUN.lang, RUN.source = args.since, args.lang, args.discovery
     RUN.only = args.only
 
