@@ -46,6 +46,9 @@ from .dv import download as dv_download
 from .dv import identity as dv_identity
 from .forarbete import download as fa_download
 from .forarbete import parse as fa_parse
+from .forarbete import kommentar as fa_kommentar
+from .forarbete import genomforande as fa_genomforande
+from .eurlex import annotate as eurlex_annotate
 from .eurlex import bulk as eurlex_bulk
 from .eurlex import download as eurlex_download
 from .eurlex import parse as eurlex_parse
@@ -98,6 +101,28 @@ def _origin(url):
     """The scheme://host/ base of an endpoint, for the harvest banner."""
     parts = urlsplit(url)
     return "%s://%s/" % (parts.scheme, parts.netloc)
+
+
+def write_artifact(source, basefile, art, source_url=None):
+    """Serialize a parsed artifact, stamping the one uniform `source_url` key
+    that the renderer turns into the page's "Källa" link. The url is resolved
+    here, once, for every source -- the single point where a downloader and a
+    parser cooperate to supply it, in precedence order:
+
+      1. one the parser set explicitly on the artifact (art["source_url"]);
+      2. `source_url` recorded by the downloader (the real fetched/landing
+         location -- passed in by the parse run that read the record);
+      3. one layout derives by rule from the document's identity (e.g. an EU
+         act's ELI from its CELEX).
+
+    A document with none simply carries no source_url and its page omits the
+    link."""
+    url = (art.get("source_url") or source_url
+           or layout.source_url(source, basefile, art.get("metadata")))
+    if url:
+        art["source_url"] = url
+    layout.artifact(source, basefile).write_text(
+        json.dumps(art, ensure_ascii=False, indent=2, sort_keys=True))
 
 
 # --------------------------------------------------------------------------
@@ -379,8 +404,7 @@ def sfs_parse_run(basefile):
     nf = to_normalform(doc, basefile,
                        refparser=LagrumParser(_namedlaws(), basefile),
                        register=register, sfst_header=sfst_header)
-    sfs_artifact(basefile).write_text(
-        json.dumps(nf, ensure_ascii=False, indent=2, sort_keys=True))
+    write_artifact("sfs", basefile, nf)
 
 
 def sfs_list():
@@ -492,9 +516,13 @@ def dv_reindex(args=()):
 
 
 def dv_parse_run(basefile):
-    av = parse_api_record(json.loads(dv_record(basefile).read_text()))
-    dv_artifact(basefile).write_text(json.dumps(
-        to_artifact(av, canonical_id=basefile), ensure_ascii=False, indent=2))
+    record = json.loads(dv_record(basefile).read_text())
+    av = parse_api_record(record)
+    # the case's public publication-search page is keyed by the record's
+    # gruppKorrelationsnummer (the publication group), not derivable from basefile
+    grupp = record.get("gruppKorrelationsnummer")
+    write_artifact("dv", basefile, to_artifact(av, canonical_id=basefile),
+                   source_url=layout.dv_source_url(grupp) if grupp else None)
 
 
 SOURCES["dv"] = Source("dv", lambda: sorted(_dv_cases()), {
@@ -511,7 +539,7 @@ SOURCES["dv"] = Source("dv", lambda: sorted(_dv_cases()), {
 
 FA_ROOT = layout.FA_ROOT
 FA_CODE = (PKG / "forarbete" / "parse.py", PKG / "forarbete" / "model.py",
-           PKG / "lib" / "lagrum.py")
+           PKG / "forarbete" / "kommentar.py", PKG / "lib" / "lagrum.py")
 
 
 def fa_record(basefile):
@@ -550,9 +578,16 @@ def fa_harvest(scopes):
 
 def fa_parse_run(basefile):
     record = json.loads(fa_record(basefile).read_text())
-    fa_artifact(basefile).write_text(json.dumps(
-        fa_parse.to_artifact(fa_parse.parse_record(record, layout.FA_DOWNLOADED)),
-        ensure_ascii=False, indent=2))
+    art = fa_parse.to_artifact(fa_parse.parse_record(record, layout.FA_DOWNLOADED))
+    # a proposition's författningskommentar states which EU directive article a
+    # provision transposes -- attach those genomför relations as a typed section
+    # so relate emits the implements edges and the page renders them (§7d).
+    implements = fa_kommentar.extract(art)
+    if implements:
+        art["implements"] = implements
+    # the regeringen.se landing page the downloader recorded -- not derivable by
+    # rule, so it travels with the record into the artifact's source_url
+    write_artifact("forarbete", basefile, art, source_url=record.get("url"))
 
 
 SOURCES["forarbete"] = Source("forarbete", fa_list, {
@@ -600,8 +635,7 @@ def eurlex_parse_run(basefile):
         raise SkipDocument("%s: no swe/eng content" % basefile)
     art = eurlex_parse.to_artifact(
         eurlex_parse.parse_content(path, route, basefile, lang))
-    eurlex_artifact(basefile).write_text(
-        json.dumps(art, ensure_ascii=False, indent=2))
+    write_artifact("eurlex", basefile, art)
 
 
 def eurlex_download_run(basefile):
@@ -647,6 +681,22 @@ def eurlex_unpack(args):
     eurlex_bulk.unpack_bulk(args[0], layout.EURLEX_DOWNLOADED)
 
 
+def eurlex_ai_annotate(basefiles):
+    """`lagen eurlex ai-annotate <CELEX> ...` -- author the editorial `.ann` layer
+    (thematic recital groups + article<->recital links) for the named sector-3
+    acts by calling the LLM endpoint. Deliberately one-shot per id: the LLM is
+    never called from parse/relate/generate, only from this explicit action."""
+    if not basefiles:
+        sys.exit("usage: lagen eurlex ai-annotate <CELEX> [<CELEX> ...]")
+    for celex in basefiles:
+        if RUN.dry_run:
+            print("eurlex ai-annotate: would annotate %s -> %s"
+                  % (celex, eurlex_artifact(celex).with_suffix(".ann")))
+            continue
+        out = eurlex_annotate.annotate(celex)
+        print("eurlex ai-annotate %s: wrote %s" % (celex, out))
+
+
 SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
     layout.EURLEX_DOWNLOADED), {
     "download": Stage("download", eurlex_download_run, eurlex_notice),
@@ -654,9 +704,10 @@ SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
                    inputs=eurlex_content, depends="download", code=EURLEX_CODE),
 }, harvest=eurlex_harvest, origin=_origin(eurlex_download.SOAP_ENDPOINT),
    scopes=frozenset(eurlex_download.SECTORS),
-   actions={"unpack-bulk": eurlex_unpack},
+   actions={"unpack-bulk": eurlex_unpack, "ai-annotate": eurlex_ai_annotate},
    notes="download flags: --since YYYY-MM-DD, --lang swe,eng, --source sparql|soap\n"
-         "unpack-bulk <dir|zip>: import a CELLAR bulk legislation dump")
+         "unpack-bulk <dir|zip>: import a CELLAR bulk legislation dump\n"
+         "ai-annotate <CELEX>: LLM-author the editorial .ann layer (sector-3 acts)")
 
 
 # --------------------------------------------------------------------------
@@ -679,8 +730,7 @@ def kommentar_artifact(basefile):
 
 def kommentar_parse_run(basefile):
     art = wiki_parse.kommentar_artifact(str(kommentar_record(basefile)))
-    kommentar_artifact(basefile).write_text(
-        json.dumps(art, ensure_ascii=False, indent=2))
+    write_artifact("kommentar", basefile, art)
 
 
 def begrepp_record(basefile):
@@ -693,8 +743,7 @@ def begrepp_artifact(basefile):
 
 def begrepp_parse_run(basefile):
     art = wiki_parse.begrepp_artifact(str(begrepp_record(basefile)))
-    begrepp_artifact(basefile).write_text(
-        json.dumps(art, ensure_ascii=False, indent=2))
+    write_artifact("begrepp", basefile, art)
 
 
 SOURCES["kommentar"] = Source(
@@ -744,6 +793,12 @@ def cmd_relate(names):
         docs, edges = catalog.rebuild(CATALOG, name, paths, progress=progress)
         sys.stderr.write("\n")
         print("relate %s: %d documents, %d links" % (name, docs, edges))
+    # cross-document post-pass: pin each förarbete genomför-direktiv statement to
+    # the SFS paragraf it transposes (needs the whole catalog, so it runs last).
+    con = catalog.connect(CATALOG)
+    pinned = fa_genomforande.resolve(con)
+    con.close()
+    print("relate: %d genomför-direktiv relations pinned to SFS paragrafs" % pinned)
     print("catalog: %s" % CATALOG)
 
 
@@ -764,7 +819,7 @@ GENERATE_CODE = (PKG / "lib" / "render.py", PKG / "lib" / "catalog.py",
                  PKG / "lib" / "wikitext.py", PKG / "lib" / "layout.py")
 
 
-def cmd_generate():
+def cmd_generate(only=None):
     """Render every catalogued document to static HTML, with live outbound
     links and inbound annotations queried from the catalog, plus a frontpage.
     Auto-runs `relate` first for any source whose artifacts are newer than the
@@ -774,6 +829,10 @@ def cmd_generate():
     artifacts (itself + the documents citing it + the documents it cites) or the
     render code changed. `--force` rebuilds all; `--ignore-code-changes` ignores
     the render-code version (rebuild only on data changes).
+
+    `only`, a set of artifact path strings, restricts the run to those documents
+    (`lagen <source> generate <id>`), leaving the corpus-wide aggregate pages as
+    they are -- a fast single-document re-render during development.
 
     `--aggregates-only` rewrites just the corpus-wide pages (frontpage + browse
     indexes) from the current catalog, skipping the per-document render -- a
@@ -785,7 +844,10 @@ def cmd_generate():
         print("generate: rebuilt frontpage + browse indexes -> %s" % GENERATED)
         return
 
-    stale = stale_sources()
+    # a full generate auto-relates any stale source first (relate is its upstream
+    # dependency); a targeted single-document render skips that corpus-wide scan
+    # and uses the catalog as-is -- run `lagen <source> relate` to refresh it
+    stale = [] if only is not None else stale_sources()
     if stale:
         print("catalog stale for %s -- relating first" % ", ".join(stale))
         cmd_relate(stale)
@@ -799,12 +861,16 @@ def cmd_generate():
         # only the page's OWN artifact is content-hashed (it changes when the doc
         # is re-parsed); its neighbours enter via dep_digest as a set of
         # relationships, not their contents -- an immutable case re-appearing
-        # unchanged must not invalidate every law it cites
+        # unchanged must not invalidate every law it cites. A sibling `.ann`
+        # editorial layer (eurlex ai-annotate) is hashed in too, so authoring or
+        # editing it re-renders just that page.
         p = str(art_path)
         if p not in own_hash:
             fp = Path(p)
-            own_hash[p] = (hashlib.sha256(fp.read_bytes()).hexdigest()
-                           if fp.exists() else "0")
+            ann = fp.with_suffix(".ann")
+            own_hash[p] = hashlib.sha256(
+                (fp.read_bytes() if fp.exists() else b"")
+                + (ann.read_bytes() if ann.exists() else b"")).hexdigest()
         return hashlib.sha256((own_hash[p] + dep_digest).encode()).hexdigest()
 
     def fresh(uri, out_path, art_path, dep_digest):
@@ -823,14 +889,21 @@ def cmd_generate():
         util.status(done, total, "generate  %d rendered  %s" % (rendered, current))
 
     total, rendered = render.generate_site(CATALOG, GENERATED, progress=progress,
-                                           fresh=fresh, record=record)
+                                           fresh=fresh, record=record, only=only)
     sys.stderr.write("\n")
     if updates:
         manifest.update(updates)
         save_manifest(manifest)
-    print("generate: %d pages (%d rendered, %d fresh) -> %s"
-          % (total, rendered, total - rendered, GENERATED))
-    print("serve with: lagen all serve   (then open http://localhost:8000/)")
+    if only is not None and not total:
+        print("generate: no catalogued document matched %d requested id(s) -- "
+              "parse/relate them first" % len(only))
+        return
+    print("generate: %d pages (%d rendered, %d fresh)%s -> %s"
+          % (total, rendered, total - rendered,
+             " [targeted; aggregates untouched]" if only is not None else "",
+             GENERATED))
+    if only is None:
+        print("serve with: lagen all serve   (then open http://localhost:8000/)")
 
 
 def cmd_serve(port=8000):
@@ -951,9 +1024,16 @@ def main(argv=None):
     RUN.since, RUN.lang, RUN.source = args.since, args.lang, args.discovery
     RUN.only = args.only
 
-    # corpus-wide derived actions: source is irrelevant, run exactly once
+    # generate is corpus-wide by default, but `lagen <source> generate <id> ...`
+    # targets just those documents (and leaves the aggregate pages alone)
     if args.action == "generate":
-        cmd_generate()
+        only = None
+        if args.basefiles:
+            if args.source not in SOURCES:
+                p.error("`generate <ids>` needs a specific source, e.g. "
+                        "`lagen eurlex generate 32022L2555` (not %r)" % args.source)
+            only = {str(layout.artifact(args.source, bf)) for bf in args.basefiles}
+        cmd_generate(only)
         return
     if args.action == "serve":
         cmd_serve(args.port)

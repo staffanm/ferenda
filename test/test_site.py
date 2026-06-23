@@ -2,6 +2,7 @@
 HTML renderer (generate) -- REWRITE.md §6."""
 
 import json
+import re
 
 from accommodanda.lib import catalog, render
 
@@ -142,13 +143,20 @@ def test_render_runs_gates_absent_target(tmp_path):
     assert '<span class="noref"' in html and "prop. 1975:1" in html
 
 
+def _island(html):
+    """Parse the rail's JSON island ({anchor id -> panel HTML}) out of a page."""
+    m = re.search(r'id="lagen-context">(.*?)</script>', html, re.S)
+    return json.loads(m.group(1)) if m else {}
+
+
 def test_law_page_has_inbound_annotation(tmp_path):
     site = render.Site.from_catalog(build_catalog(tmp_path))
     html = render.render_sfs(LAW, site)
-    # the citing case appears in the §6 margin, linking back to the case page
-    assert "Hänvisat till av" in html
-    assert 'href="/dom/dom_NJA_1994_s_1.html"' in html
-    assert "NJA 1994 s. 1" in html
+    # the citing case is in §6's context-rail panel, linking back to the case
+    panel = _island(html)["P6"]
+    assert "Hänvisat till av" in panel
+    assert 'href="/dom/dom_NJA_1994_s_1.html"' in panel
+    assert "NJA 1994 s. 1" in panel
 
 
 def test_case_page_links_into_law(tmp_path):
@@ -156,6 +164,71 @@ def test_case_page_links_into_law(tmp_path):
     html = render.render_dv(CASE, site)
     assert 'href="/sfs/1975_635.html#P6"' in html
     assert "Om dröjsmålsränta." in html  # sammanfattning rendered
+
+
+# --- authoritative source url ---------------------------------------------
+
+def test_eurlex_source_url_derives_eli():
+    from accommodanda.lib import layout
+    # sector-3 regulation/directive/decision -> ELI (number's leading zeros gone)
+    assert (layout.source_url("eurlex", "32023R2854")
+            == "https://eur-lex.europa.eu/eli/reg/2023/2854/oj")
+    assert (layout.source_url("eurlex", "32016L0679")
+            == "https://eur-lex.europa.eu/eli/dir/2016/679/oj")
+    # a judgment has no ELI -> the stable CELEX legal-content url
+    assert (layout.source_url("eurlex", "62019CJ0311")
+            == "https://eur-lex.europa.eu/legal-content/SV/TXT/?uri=CELEX:62019CJ0311")
+    # sources with no rule derive nothing (their url is downloader-recorded)
+    assert layout.source_url("forarbete", "prop/2024/25:1") is None
+
+
+def test_sfs_source_url_derives_from_basefile():
+    from accommodanda.lib import layout
+    # the colon in the basefile is percent-encoded into the bet= query param
+    assert (layout.source_url("sfs", "2025:1506")
+            == "https://beta.rkrattsbaser.gov.se/sfs/item"
+               "?bet=2025%3A1506&tab=forfattningstext")
+
+
+def test_dv_source_url_uses_publication_group():
+    from accommodanda.lib import layout
+    # keyed by the record's gruppKorrelationsnummer, not derivable from basefile
+    assert (layout.dv_source_url("50ca363e-bff6-4048-b68f-9409e72381b2")
+            == "https://rattspraxis.etjanst.domstol.se/sok/publicering/"
+               "50ca363e-bff6-4048-b68f-9409e72381b2")
+    # so the by-basefile rule yields nothing for dv on its own
+    assert layout.source_url("dv", "HFD/2023_ref_59") is None
+
+
+def test_write_artifact_stamps_source_url(tmp_path, monkeypatch):
+    from accommodanda.lib import layout
+    monkeypatch.setitem(layout.ARTIFACT_ROOT, "eurlex", tmp_path / "eurlex")
+    monkeypatch.setitem(layout.ARTIFACT_ROOT, "forarbete", tmp_path / "forarbete")
+    from accommodanda import build
+
+    # derived: eurlex gets its ELI even with nothing recorded
+    out = layout.artifact("eurlex", "32023R2854")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    build.write_artifact("eurlex", "32023R2854", {"uri": "x", "celex": "32023R2854"})
+    assert (json.loads(out.read_text())["source_url"]
+            == "https://eur-lex.europa.eu/eli/reg/2023/2854/oj")
+
+    # recorded: the downloader's landing url travels into the artifact
+    out = layout.artifact("forarbete", "prop/2024/25:1")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    build.write_artifact("forarbete", "prop/2024/25:1", {"uri": "y"},
+                         source_url="https://www.regeringen.se/x")
+    assert json.loads(out.read_text())["source_url"] == "https://www.regeringen.se/x"
+
+
+def test_page_renders_source_link(tmp_path):
+    site = render.Site.from_catalog(build_catalog(tmp_path))
+    art = dict(LAW, source_url="https://rkrattsbaser.gov.se/sfst?bet=1975:635")
+    html = render.render_sfs(art, site)
+    assert ('<a class="ext" href="https://rkrattsbaser.gov.se/sfst?bet=1975:635" '
+            'rel="external">Källa</a>') in html
+    # absent source_url -> no Källa link
+    assert "Källa" not in render.render_sfs(LAW, site)
 
 
 PUNKTLAW = {
@@ -196,8 +269,9 @@ def test_inbound_grouped_by_source(tmp_path):
     con = build_catalog(tmp_path)
     site = render.Site.from_catalog(con)
     html = render.render_sfs(LAW, site)   # §6 is cited by the case
-    assert 'class="ingroup dv"' in html
-    assert "Rättsfall" in html            # the source-group heading
+    panel = _island(html)["P6"]
+    assert 'class="ingroup dv"' in panel
+    assert "Rättsfall" in panel           # the source-group heading
 
 
 def test_toc_collects_and_generates_anchors():
@@ -279,3 +353,322 @@ def test_document_level_inbound_for_bare_citation(tmp_path):
     html = render.render_sfs(LAW, site)
     assert '<section class="inbound-doc">' in html
     assert "NJA 2000 s. 1" in html
+
+
+# --- förarbete genomför-direktiv edges (REWRITE.md §7d) -------------------
+
+# a proposition whose författningskommentar transposes a directive article,
+# and the EU directive it points at (article 21 is a citation target).
+PROP = {
+    "uri": "https://lagen.nu/prop/2023/24:1",
+    "type": "prop", "identifier": "Prop. 2023/24:1", "title": "Cybersäkerhetslag",
+    "body": [
+        {"type": "rubrik", "level": 1, "page": 100, "text": ["Författningskommentar"]},
+        {"type": "stycke", "page": 100, "text": ["Paragrafen genomför artikel 21."]},
+    ],
+    "implements": [{
+        "predicate": "rpubl:genomforDirektiv",
+        "directive": "https://lagen.nu/ext/celex/32022L2555",
+        "articles": ["21"], "pinpoints": ["21.1", "21.2"],
+        "uris": ["https://lagen.nu/ext/celex/32022L2555#21"],
+        "partial": False, "law": "Cybersäkerhetslag", "chapter": "2",
+        "paragraf": "1", "page": 100,
+        "sentence": "Paragrafen genomför artikel 21.1-21.2 i NIS 2-direktivet"}],
+}
+DIRECTIVE = {
+    "uri": "https://lagen.nu/ext/celex/32022L2555",
+    "celex": "32022L2555", "doctype": "directive", "title": "NIS 2-direktivet",
+    "body": [{"type": "article", "id": "21", "num": "21",
+              "text": ["Riskhanteringsåtgärder"]}],
+}
+
+
+def build_eu_catalog(tmp_path):
+    db = str(tmp_path / "catalog.sqlite")
+    prop = tmp_path / "prop.json"
+    prop.write_text(json.dumps(PROP))
+    direc = tmp_path / "dir.json"
+    direc.write_text(json.dumps(DIRECTIVE))
+    catalog.rebuild(db, "forarbete", [prop])
+    catalog.rebuild(db, "eurlex", [direc])
+    return catalog.connect(db)
+
+
+def test_implements_links_emits_genomfor_edges():
+    # one edge per transposed article, anchored to the förarbete page (#sid{N})
+    assert catalog.implements_links(PROP) == [
+        ("sid100", {"uri": "https://lagen.nu/ext/celex/32022L2555#21",
+                    "predicate": "rpubl:genomforDirektiv",
+                    "text": "Paragrafen genomför artikel 21.1-21.2 i NIS 2-direktivet"})]
+
+
+def test_genomfor_edge_is_inbound_on_directive_article(tmp_path):
+    # the killer feature for EU law: the directive article shows which Swedish
+    # förarbete implements it, pinpointed to the page of the statement
+    con = build_eu_catalog(tmp_path)
+    assert catalog.inbound(con, "https://lagen.nu/ext/celex/32022L2555#21") == [
+        ("https://lagen.nu/prop/2023/24:1", "sid100",
+         "Prop. 2023/24:1", "Cybersäkerhetslag", "forarbete")]
+
+
+def test_prop_page_renders_genomforande_panel(tmp_path):
+    site = render.Site.from_catalog(build_eu_catalog(tmp_path))
+    html = render.render_forarbete(PROP, site)
+    assert "Genomför EU-direktiv" in html
+    assert "2 kap. 1 § genomför artikel 21.1, 21.2" in html
+    # links to the directive's article on our EU page (we host it)
+    assert 'href="/eurlex/32022L2555.html#21"' in html
+
+
+def test_directive_article_shows_implementing_forarbete(tmp_path):
+    site = render.Site.from_catalog(build_eu_catalog(tmp_path))
+    html = render.render_eurlex(DIRECTIVE, site)
+    # article 21's rail panel shows the implementing förarbete
+    panel = _island(html)["21"]
+    assert "Hänvisat till av" in panel
+    assert 'href="/prop/2023_24_1.html#sid100"' in panel
+    assert "Prop. 2023/24:1 s. 100" in panel
+
+
+def test_genomforande_panel_absent_without_implements(tmp_path):
+    site = render.Site.from_catalog(build_eu_catalog(tmp_path))
+    html = render.render_forarbete({"uri": "https://lagen.nu/prop/x", "type": "prop",
+                                    "identifier": "Prop. X", "body": []}, site)
+    assert "Genomför EU-direktiv" not in html
+
+
+# --- genomför-direktiv pinned to SFS paragrafs (REWRITE.md §7d) -----------
+
+DIR = "https://lagen.nu/ext/celex/32022L2555"
+
+
+def _impl(law, chapter, paragraf, pinpoint, partial=False):
+    return {"predicate": "rpubl:genomforDirektiv", "directive": DIR,
+            "articles": ["21"], "pinpoints": [pinpoint], "uris": [DIR + "#21"],
+            "partial": partial, "law": law, "chapter": chapter,
+            "paragraf": paragraf, "page": 50, "sentence": "genomför artikel 21"}
+
+
+# one proposition exercising all three resolution paths
+PROP_PIN = {
+    "uri": "https://lagen.nu/prop/2021/22:9", "type": "prop",
+    "identifier": "Prop. 2021/22:9", "date": "2021-10-01",
+    "body": [{"type": "rubrik", "level": 1, "page": 50,
+              "text": ["Författningskommentar"]}],
+    "implements": [
+        _impl("5.1 Förslaget till lag om ändring i testlagen (1999:100)",
+              None, "3", "21.1"),                    # Case 1: amending (SFS in rubrik)
+        _impl("5.2 Förslaget till cybersäkerhetslag", "2", "1", "21.2", True),  # Case 2 unique
+        _impl("5.3 Förslaget till konsumentköplag", None, "4", "21.3"),  # Case 2 tie-break
+    ],
+}
+
+
+def _sfs_art(uri, title, ikraft):
+    return {"uri": uri, "metadata": {"properties": {
+        "dcterms:title": title, "rpubl:ikrafttradandedatum": ikraft}},
+        "structure": [
+            {"type": "paragraf", "id": "P3", "ordinal": "3", "children": []},
+            {"type": "paragraf", "id": "P4", "ordinal": "4", "children": []},
+            {"type": "kapitel", "id": "K2", "ordinal": "2", "children": [
+                {"type": "paragraf", "id": "K2P1", "ordinal": "1", "children": []}]}]}
+
+
+SFS_LAWS = [
+    _sfs_art("https://lagen.nu/1999:100", "Testlag (1999:100)", "2000-01-01"),
+    _sfs_art("https://lagen.nu/2021:500", "Cybersäkerhetslag (2021:500)", "2022-01-01"),
+    # konsumentköplag: an older retired law and the new one replacing it
+    _sfs_art("https://lagen.nu/1990:932", "Konsumentköplag (1990:932)", "1991-01-01"),
+    _sfs_art("https://lagen.nu/2022:260", "Konsumentköplag (2022:260)", "2022-06-01"),
+]
+
+
+def build_pin_catalog(tmp_path):
+    from accommodanda.forarbete import genomforande
+    db = str(tmp_path / "catalog.sqlite")
+    prop = tmp_path / "prop.json"
+    prop.write_text(json.dumps(PROP_PIN))
+    sfs_paths = []
+    for art in SFS_LAWS:
+        p = tmp_path / (catalog.local(art["uri"]).replace(":", "_") + ".json")
+        p.write_text(json.dumps(art))
+        sfs_paths.append(p)
+    direc = tmp_path / "dir.json"
+    direc.write_text(json.dumps(DIRECTIVE))
+    catalog.rebuild(db, "forarbete", [prop])
+    catalog.rebuild(db, "sfs", sfs_paths)
+    catalog.rebuild(db, "eurlex", [direc])
+    con = catalog.connect(db)
+    genomforande.resolve(con)
+    return con
+
+
+def test_norm_title_drops_sfs_number():
+    assert catalog.norm_title("Lag (2015:671) om alternativ tvistlösning") \
+        == catalog.norm_title("lag om alternativ tvistlösning")
+
+
+def test_genomfor_resolves_all_three_paths(tmp_path):
+    con = build_pin_catalog(tmp_path)
+    pins = {(s, a): (d, art) for s, a, d, art, *_ in con.execute(
+        "SELECT sfs_uri, sfs_anchor, directive, article FROM genomforande")}
+    # Case 1: amending -> SFS number straight from the rubrik, fragment P3
+    assert ("https://lagen.nu/1999:100", "P3") in pins
+    # Case 2 unique: new law matched by title; chaptered fragment K2P1
+    assert ("https://lagen.nu/2021:500", "K2P1") in pins
+    # Case 2 tie-break: the new konsumentköplag (ikraft after the prop), not the old
+    assert ("https://lagen.nu/2022:260", "P4") in pins
+    assert not any(s == "https://lagen.nu/1990:932" for s, a in pins)
+
+
+def test_genomfor_partial_flag_preserved(tmp_path):
+    con = build_pin_catalog(tmp_path)
+    rows = catalog.genomfor_for(con, "https://lagen.nu/2021:500", "K2P1")
+    assert rows and rows[0][5] == 1   # partial
+
+
+def test_statute_page_shows_genomfor_margin(tmp_path):
+    con = build_pin_catalog(tmp_path)
+    site = render.Site.from_catalog(con)
+    html = render.render_sfs(SFS_LAWS[1], site)   # cybersäkerhetslag 2021:500
+    # the genomför-direktiv block rides in the transposing paragraf's rail panel
+    rail = "".join(_island(html).values())
+    assert "Genomför EU-rätt" in rail
+    assert 'href="/eurlex/32022L2555.html#21"' in rail
+    assert "genomför delvis artikel 21.2" in rail
+    assert "Prop. 2021/22:9" in rail              # provenance
+
+
+def test_directive_article_inbound_shows_statute(tmp_path):
+    con = build_pin_catalog(tmp_path)
+    inbound = catalog.inbound(con, DIR + "#21")
+    sources = {src for _u, _a, _l, _t, src in inbound}
+    # the directive article is now cited by both the proposition and the statutes
+    assert "forarbete" in sources and "sfs" in sources
+
+
+# --- EU act editorial layer: recital groups + article<->recital rail ------
+
+# a small regulation: two grouped recitals, an article with a numbered paragraph
+# and a lettered point, plus the .ann editorial layer linking them both ways
+ACT = {
+    "uri": "https://lagen.nu/ext/celex/32099R0001", "celex": "32099R0001",
+    "doctype": "regulation", "title": "Testförordning",
+    "body": [
+        {"type": "recital", "num": "1", "text": ["Bakgrund."]},
+        {"type": "recital", "num": "2", "text": ["Syfte."]},
+        {"type": "article", "id": "4", "num": "4", "text": ["Artikel 4 – Skyldigheter"]},
+        {"type": "paragraph", "num": "1", "text": ["Datahållaren ska göra data tillgänglig."]},
+        {"type": "point", "num": "a", "text": ["på ett säkert sätt."]},
+    ],
+}
+LAYER = {
+    "recitalGroups": [
+        {"id": "rg", "label": "Bakgrund och syfte", "range": [1, 2],
+         "articleRefs": ["4"]}],
+    "articleToRecitals": {"4": [1, 2], "4(1)": [1], "4(1)(a)": [2]},
+}
+
+
+def _render_act(monkeypatch, tmp_path):
+    monkeypatch.setattr(render, "_load_editorial",
+                        lambda celex: render.Editorial(LAYER))
+    db = str(tmp_path / "catalog.sqlite")
+    act = tmp_path / "act.json"
+    act.write_text(json.dumps(ACT))
+    catalog.rebuild(db, "eurlex", [act])
+    return render.render_eurlex(ACT, render.Site.from_catalog(catalog.connect(db)))
+
+
+def test_editorial_indexes_both_directions():
+    ed = render.Editorial(LAYER)
+    assert ed.group_start[1]["label"] == "Bakgrund och syfte"
+    assert ed.group_of[2]["id"] == "rg"
+    # recital 2 is cited by article 4 (whole) and sub-point 4(1)(a) -> article {4}
+    assert ed.recital_articles[2] == ["4"]
+    assert ed.recitals_for("4(1)(a)") == [2]
+
+
+def test_subarticle_key_grammar():
+    assert render._subarticle_key("paragraph", "1", "4", None) == "4(1)"
+    assert render._subarticle_key("point", "a", "4", "1") == "4(1)(a)"
+    assert render._subarticle_key("point", "a", "4", None) == "4(a)"
+    assert render._subarticle_key("paragraph", "1", None, None) is None
+
+
+def test_act_page_renders_recital_group_heading(monkeypatch, tmp_path):
+    html = _render_act(monkeypatch, tmp_path)
+    # a compact, subdued single-line editorial label (not a prominent heading)
+    assert '<p id="rg" class="recital-group">' in html
+    assert "Skäl 1–2:" in html and "<b>Bakgrund och syfte</b>" in html
+    assert "(jfr art " in html and 'href="#4"' in html
+    # recitals become anchorable targets and drive the rail
+    assert '<p id="recital-1" class="recital" data-rail="recital-1">' in html
+
+
+def test_act_rail_links_articles_and_subarticles_to_recitals(monkeypatch, tmp_path):
+    html = _render_act(monkeypatch, tmp_path)
+    island = _island(html)
+    # article -> its recitals (forward)
+    assert 'href="#recital-1"' in island["4"] and 'href="#recital-2"' in island["4"]
+    # the sub-article paragraph and point each link to their own recitals
+    assert island["4(1)"] and 'href="#recital-1"' in island["4(1)"]
+    assert island["4(1)(a)"] and 'href="#recital-2"' in island["4(1)(a)"]
+    # recital -> back to the articles it underpins, plus its thematic group
+    assert 'href="#4"' in island["recital-1"]
+    assert "Bakgrund och syfte" in island["recital-1"]
+
+
+def test_act_toc_has_preamble_section_with_group_titles(monkeypatch, tmp_path):
+    html = _render_act(monkeypatch, tmp_path)
+    nav = re.search(r'<nav class="toc">.*?</nav>', html, re.S)
+    assert nav, "act page should have a TOC"
+    nav = nav.group(0)
+    # a "Preambel" parent listing the group titles (linked to each group anchor)
+    assert ">Preambel</a>" in nav
+    assert ">Bakgrund och syfte</a>" in nav and 'href="#rg"' in nav
+    # just the titles -- no recital numbers, no "jfr art" article refs in the TOC
+    assert "Skäl" not in nav and "jfr art" not in nav
+
+
+def test_act_without_annotation_has_no_recital_groups(tmp_path):
+    # default _load_editorial: no .ann sidecar for this synthetic celex -> plain page
+    db = str(tmp_path / "catalog.sqlite")
+    act = tmp_path / "act.json"
+    act.write_text(json.dumps(ACT))
+    catalog.rebuild(db, "eurlex", [act])
+    html = render.render_eurlex(ACT, render.Site.from_catalog(catalog.connect(db)))
+    assert "recital-group" not in html
+    assert 'id="recital-1"' not in html
+
+
+def test_genomfor_pinpoints_split_per_article(tmp_path):
+    # a single statement transposing two articles (2 and 26): each genomforande
+    # row shows only its own article's pinpoints, not the whole statement's
+    from accommodanda.forarbete import genomforande
+    db = str(tmp_path / "catalog.sqlite")
+    prop = tmp_path / "prop.json"
+    prop.write_text(json.dumps({
+        "uri": "https://lagen.nu/prop/2025/26:28", "type": "prop",
+        "identifier": "Prop. 2025/26:28", "date": "2025-10-14",
+        "body": [{"type": "rubrik", "level": 1, "page": 1,
+                  "text": ["Författningskommentar"]}],
+        "implements": [{
+            "predicate": "rpubl:genomforDirektiv", "directive": DIR,
+            "articles": ["2", "26"], "pinpoints": ["2.1", "2.2 f", "26.1 c"],
+            "uris": [DIR + "#2", DIR + "#26"], "partial": True,
+            "law": "15.1 Förslaget till cybersäkerhetslag",
+            "chapter": "1", "paragraf": "3", "page": 1, "sentence": "genomför"}]}))
+    sfs = tmp_path / "sfs.json"
+    sfs.write_text(json.dumps(_sfs_art("https://lagen.nu/2025:1506",
+                                       "Cybersäkerhetslag (2025:1506)", "2026-01-15")))
+    direc = tmp_path / "dir.json"
+    direc.write_text(json.dumps(DIRECTIVE))
+    catalog.rebuild(db, "forarbete", [prop])
+    catalog.rebuild(db, "sfs", [sfs])
+    catalog.rebuild(db, "eurlex", [direc])
+    con = catalog.connect(db)
+    genomforande.resolve(con)
+    pins = {a: pin for _d, a, _pu, _pl, pin, _pa
+            in catalog.genomfor_for(con, "https://lagen.nu/2025:1506", "K1P3")}
+    assert pins == {"2": "2.1, 2.2 f", "26": "26.1 c"}
