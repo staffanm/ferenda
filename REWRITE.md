@@ -89,12 +89,17 @@ the new one can be checked against it. The old pipeline can no longer run
 (it depends on `pkg_resources`, dropped by modern setuptools), so its
 final output *is* the spec.
 
-- ✅ `tools/golden_sfs.py` — comparator: `normalize` (old XHTML+RDFa →
-  normal-form JSON), `compare --sections metadata,structure,references,amendments`,
-  `freeze`.
-- ✅ `site/data/sfs/golden/` — frozen golden tree: 11,056 SFS documents
-  (the 174 zero-byte parsed files are old-pipeline dummies for
-  removed/expired docs).
+- ✅ **The golden corpus *is* `site/data/sfs/parsed/`** — the old pipeline's
+  parsed XHTML+RDFa output (11,056 SFS documents; the 174 zero-byte files are
+  old-pipeline dummies for removed/expired docs). There is **no separate frozen
+  golden tree and no `freeze` step**: `tools/golden_sfs.py normalize` transforms a
+  parsed `.xhtml` to normal form **on the fly**, and the corpus `validate`
+  (`accommodanda/sfs validate <parseddir> <downloaddir>`) normalizes each parsed
+  doc per comparison. So the golden is always exactly what the old pipeline
+  emitted — nothing to re-bake when the normalizer changes.
+- ✅ `tools/golden_sfs.py` — comparator: `normalize` (old XHTML+RDFa → NF),
+  `compare A B --sections metadata,structure,references,amendments` (A/B each
+  `.xhtml` or `.json`), plus the adjudication overlay (§3d).
 - ✅ Methodology fixed: the golden corpus is a **change-detector, not an
   oracle**. When new and old differ, the new pipeline is right maybe ~5%
   of the time — so differences are investigated, not blindly accepted.
@@ -134,233 +139,128 @@ final output *is* the spec.
 
 ### 3a. Structural parser ✅ (98.7%)
 
-`accommodanda/` — new architecture, recognition heuristics ported from the
-old `sfs_parser` but the structure redesigned.
+`accommodanda/sfs/` — heuristics ported from the old `sfs_parser`, structure
+redesigned, as a pipeline of small modules: `extract` (body from rkrattsbaser
+HTML) → `reader` (`TextReader`) → `tokenizer` (flat event stream) → `assembler`
+(RANK-driven stack machine) → typed `model` dataclasses → `nf` (projection to
+golden normal form, **replicating the old URI-minting quirks exactly**:
+continuous-§ numbering, content-equality dedup, temporal suppression,
+skipfragments). CLI: `python -m accommodanda.sfs parse|validate`.
 
-- ✅ `extract.py` — body extraction from rkrattsbaser HTML (+ archival
-  `<pre>` path), encoding sniffing, `SkipDocument`.
-- ✅ `reader.py` — `TextReader`, faithful port incl. autostrip-dependent
-  blank-line semantics (matters inside tables).
-- ✅ `model.py` — typed dataclasses: `Forfattning`, `Avdelning`,
-  `Underavdelning`, `Kapitel`, `Paragraf` (temporal variants, moment),
-  `Rubrik`, `Stycke`, `Lista`/`Listelement`, `Tabell`,
-  `Overgangsbestammelser`, `Bilaga`, etc.
-- ✅ `tokenizer.py` — ported recognizers emit a flat event stream.
-- ✅ `assembler.py` — RANK-driven stack machine builds the tree.
-- ✅ `nf.py` — projects the tree to golden normal form, **replicating the
-  old URI-minting quirks exactly** (continuous-§ numbering, content-equality
-  ordinal dedup, `in_effect` temporal suppression, skipfragments).
-- ✅ `sfs/__main__.py` (`python -m accommodanda.sfs`) — `parse FILE` and `validate GOLDEN DOWNLOADED
-  --sections …` (process-pool, diff bucketing).
-- **Status:** structure match **98.7%** (10,912/11,056). Remaining ~144
-  docs: övergångsbestämmelse-inside-kapitel (deliberate deviation), stale
-  golden vs freshly downloaded amended laws, long-tail numbering.
+- **Status:** structure match **98.7%** (10,912/11,056). The ~144 residual:
+  övergångsbestämmelse-inside-kapitel (deliberate), stale golden vs amended
+  laws, long-tail numbering.
 
 ### 3b. Citation recognition (legalref → Lark) ✅
 
-`accommodanda/lib/lagrum.py` — Lark port of the old `legalref.py`
-LAGRUM + EULAGSTIFTNING grammars.
+`accommodanda/lib/lagrum.py` — Lark (Earley) port of the old `legalref.py`
+LAGRUM + EULAGSTIFTNING grammars, trigger-regex scanning with longest-prefix
+retry. Ported formatter semantics: relative-ref completion from structural
+context, sticky-chapter, external-law combined link, in-document law-name
+learning, direct URI minting (no COIN); fragment letters K/P/O/S/N/M/L. The old
+`-_och_-` preprocessing corruption is gone by construction; the `FILTER_LAW`
+pre-filter is deliberately reproduced. Wired into `nf.py` as **inline links**
+(§3d), with per-link sub-spans recovered from the parse tree.
+`test/test_lagrum.py` ports the old `integrationLegalRef` oracle (only the old
+engine's own failures fail).
 
-- ✅ Earley grammar; trigger-regex scanning with longest-prefix retry
-  (mirrors the old `(ref/plain)+` PEG root).
-- ✅ Ported formatter semantics: relative-ref completion from structural
-  context, sticky-chapter rules, external-law combined-link rule,
-  "samma lag"/lastlaw, in-document law-name learning, direct URI minting
-  (no COIN). Fragment letters K/P/O(mom)/S/N/M(mening)/L(ändring).
-- ✅ The old `-_och_-` / `|lagen` preprocessing corruption is **gone by
-  construction** — Lark regex terminals match `-lagen`-suffixed words
-  directly.
-- ✅ `FILTER_LAW` pre-filter ported to `nf.Projection.inline` (behaviorally
-  significant and deliberately reproduced: lowercase "lag (1988:1556)" /
-  "förordning (…)" is still never parsed, as in the old pipeline).
-- ✅ Wired into `nf.py` as **inline links** (see §3d): every text node
-  becomes a list of `str` runs + `{predicate,uri,text}` link objects at
-  exact positions, with per-link sub-spans recovered from the parse tree.
-  Refs in nested lists still attribute (for the reconstructed tuple oracle)
-  to the stycke fragment but resolve against the item's own id.
-- ✅ `test/test_lagrum.py` — pytest port of the old `integrationLegalRef`
-  driver over `test/files/legalref/{SFS,EGLag}`; the only expected failures
-  are exactly the cases the old engine also failed.
-- ✅ `validate --sections references` extended; `refs` CLI for single docs.
-- **Status:** 2018:585 = 219/222 tuples, 0 extra. Corpus-wide
-  structure+references **86.7%** (9,581/11,056). Sampling shows the bulk
-  of remaining diffs are **old-pipeline defects, not new gaps**:
-  cross-document `lastlaw`/`namedlaws` state leaks, chain fragmentation
-  linking chapters to the wrong law, and all-or-nothing `RefParseError`
-  holes the new scanner fills.
+- **Status:** 2018:585 = 219/222 tuples, 0 extra. The corpus-wide reference
+  diffs are now characterized per-family and largely adjudicated or fixed —
+  see §3d. ("Leak" is reserved for its literal sense: the old pipeline's
+  `lastlaw`/`namedlaws` law-context surviving past a document boundary — not a
+  synonym for "the two pipelines disagree.")
 
 ### 3c. SFSR register / amendments / förarbeten / metadata ✅
 
-`accommodanda/sfs/register.py` — parses the downloaded SFSR register page
-(`site/data/sfs/register/{year}/{nr}.html`) into one amendment entry per
-change act (base act first), keyed by URI. Port of the old
-`extract_metadata_register` (sfs.py:604-789) minus the framework.
+`accommodanda/sfs/register.py` — parses the SFSR register into one amendment
+entry per change act (port of the old `extract_metadata_register`). Covers:
+property mapping to the golden's polished form (departement→org URI, publisher
+constants, dates, CELEX→`genomforDirektiv`); **Omfattning → `L*` change tuples**
+(`ersatter`/`upphaver`/`inforsI`, resolved against the base law); the
+**övergångsbestämmelse join** (OB blocks → `L{sfsnr}` ids + `content`, fed to the
+reference scan); **per-amendment Förarbeten** (FORARBETEN grammar); and
+**document-level metadata** — the *konsolidering envelope* (identifier "i lydelse
+enligt SFS …", `konsolideringsunderlag`, dates, the `/konsolidering/<cutoff>` URI),
+with the responsible department from the authoritative SFST header. Run-date
+fields and the selectively-emitted `rdfs:label` are canonicalized away.
 
-- ✅ Property mapping in the post-`polish_metadata` form the golden records:
-  identifier/arsutgava/lopnummer, departement → org URI (rdflib resolver
-  over `swedishlegalsource.ttl`, with `sanitize_departement`),
-  publisher/beslutadAv/forfattningssamling constants → URIs, the rinfo
-  `owl:sameAs`, dates, CELEX → `genomforDirektiv` + `celexNummer`.
-- ✅ **Omfattning → the `L*` change tuples** (`rpubl:ersatter`/`upphaver`/
-  `inforsI`): each changecat classified by prefix, resolved against the base
-  law via a fresh `LagrumParser` (forced predicate), plus raw `rpubl:andrar`.
-- ✅ **Övergångsbestämmelse join** (`nf.py`): the OB blocks the structure
-  parser drops are projected with `L{sfsnr}`/`L{sfsnr}S{n}` ids and joined
-  onto their change act's entry as `content`; their text feeds the same
-  reference scan (the `L`-source ref tuples).
-- ✅ List/scalar normalization mirrors the golden's `add_meta` (single value
-  of a non-multivalued property collapses to a scalar).
-- ✅ `validate --sections amendments` + `diff_amendments` in `golden_sfs.py`
-  (URI-slug canonicalized; the old serializer's `dcterms:isPartOf`
-  containment is a redundant derived artifact — not reproduced; per-amendment
-  `forarbeten` deferred, see below). `test/test_sfs_register.py` —.
-- **Status:** amendments match **97.5%** (10,775/11,056). The 281 diffs:
-  ~128 **extra amendments = change acts added after the golden freeze**
-  (new-is-right — adjudication, below); ~69 docs where the old pipeline
-  suppressed a base-act/fallback övergångsbestämmelse `L`-id and the new one
-  mints it (faithful-reproduction gap in the `coin_uri` collision rule);
-  the rest mixed Omfattning-tuple defects/edges.
-- ✅ **Per-amendment Förarbeten** — the FORARBETEN grammar landed, so
-  `parse_forarbeten` now scans each "Förarbeten:" field and emits the
-  identifier form the golden records (`ucfirst(ref.text)` + prop spelling
-  normalization). **99% per-entry** on a 120-doc sample; the comparison no
-  longer excludes it.
-- ✅ **Document-level metadata** (94.8%) — `parse_sfst_header` + `build_metadata`.
-  The `metadata` section is the *konsolidering envelope*: register/SFST-header
-  descriptive fields (title, departement→creator org, utfärdande/ikraft/upphävd
-  dates, omtryck, CELEX) plus the derived consolidation fields (identifier
-  "i lydelse enligt SFS …", `konsoliderar`, `konsolideringsunderlag` = base +
-  all change acts, `rdf:type`, the `/konsolidering/<cutoff>` URI). The
-  responsible department comes from the SFST header (authoritative, as in the
-  old pipeline); sub-org suffixes ("Finansdepartementet BA") are canonicalized
-  out of the comparison as drift. The run-date fields (`dcterms:issued`, the
-  date-stamped `owl:sameAs`) are not reproduced — canonicalized away.
-  **metadata match 94.8%** (1,895/2,000 sample); the residual is the same
-  stale-golden drift (cutoff + department both move as new amendments land)
-  plus golden title-truncation — all new-is-right. `dcterms:alternate` comes
-  from `sfs.ttl`; `rdfs:label` (emitted selectively by the old pipeline) and
-  the date-form konsolidering version for un-amended laws are not reproduced.
+- **Status:** amendments **97.5%**, förarbeten **99%** per-entry, metadata
+  **94.8%**. Residual is mostly stale-golden / post-freeze drift (adjudicated,
+  §3d) plus a faithful-reproduction gap in the övergångsbestämmelse `L`-id
+  collision rule.
 
 ### 3d. Remaining SFS work ⬜ / 🚧
 
-- ✅ **SFS downloader** `accommodanda/sfs/download.py` — harvests the new beta
-  database (`beta.rkrattsbaser.gov.se`), an ASP.NET SPA over an **open raw-
-  Elasticsearch passthrough** (`POST /elasticsearch/SearchEsByRawJson`, body
-  `{"searchIndexes":["Sfs"],"api":"search","json":<ES query>}`). The ES
-  `_source` is the **entire consolidated act in one JSON** — body text
-  (`fulltext.forfattningstext`, already the parser's plain-text layout),
-  register, and the amendment list — so one request replaces the old two-page
-  SFST+SFSR scrape. Enumeration is `match_all` + sort + `search_after` (past
-  ES's 10k window); no SFS-number guessing. Incremental (newest-first by
-  `uppdateradDateTime`, stop at first unchanged page) + `--full` modes, atomic
-  writes, idempotent, politeness delay, `list_basefiles()`. **13,789 acts.**
-  - **Consolidation archiving** (the SFS-only complication the DV path lacks):
-    a `grundforfattning`'s content changes as amending acts fold in. Each
-    distinct consolidation is identified by `fulltext.andringInford`
-    ("t.o.m. SFS 2026:764", = the old `_find_uppdaterad_tom`). When a
-    re-download carries a different `andringInford`, the on-disk copy is moved
-    to `source/archive/{year}/{nr}/{version}.json` before the new one
-    overwrites `source/{year}/{nr}.json` — recreating the old downloader's
-    get_archive_version/archive machinery. A same-version data correction
-    overwrites without archiving (keyed on legal version, not checksum).
-    `test/test_sfs_download.py`.
-  - **Layout** mirrors the dv/ vs domstol/ split (user decision): the new
-    harvest lives in its own `site/data/sfs/source/` tree, leaving the frozen
-    legacy `downloaded/`+`register/` HTML (which the golden was derived from)
-    pristine. They are the *same* documents keyed by beteckning, so the new
-    simply supersedes the old — no identity reconciliation as DV needed.
-- ✅ **JSON-or-HTML parse selection** (DV single-best-source pattern) —
-  `sfs.load_inputs` prefers the new JSON `_source` over the legacy SFST+SFSR
-  HTML when present, so `lagen sfs parse 2018:585` / `python -m accommodanda.sfs
-  parse` transparently use whichever exists. `register.register_from_source` /
-  `sfst_header_from_source` map the JSON's structured fields back onto the same
-  `Register`/header intermediates the HTML parsers emit, so **all** of
-  `amendment_properties`/`build_metadata`/`parse_forarbeten` is reused
-  untouched. Verified faithful: parsing 2018:585 from JSON vs HTML gives **0
-  field diffs** across the 10 shared amendments and identical base metadata —
-  the only deltas are genuine freshness (JSON cutoff 2026:764/13 amendments vs
-  frozen HTML 2023:390/10). Build `parse` now also emits the `metadata` section
-  for both paths. (Also fixed: `SFS_CODE`/`DV_CODE` recipe-hash paths pointed at
-  pre-reorg flat module locations, so recipe-versioning silently no-op'd.)
-- 🚧 **Adjudication overlay** — **per-class predicates** (not per-tuple
-  corrections), the codified form of the "change-detector, not oracle" posture
-  (§2): a predicate forgives a whole *family* of diffs where the new pipeline is
-  right against a stale or defective golden, so they stop counting as
-  regressions while still being *reported* (a forgiven class that suddenly grows
-  stays visible). `golden_sfs.adjudicate(problems, golden)` partitions a
-  document's diffs into `(unexplained, accepted)`; `validate` now reports
-  `match + adjudicated = passing` with a per-rule accept tally, so **`diff` is
-  the genuine-regression count** — the number that should trend to zero.
-  Predicates read the golden NF + the diff string only (no new NF threaded in),
-  so a staleness-dependent rule needs the amendments section in the run.
-  - ✅ **First cut, two predicates landed.** `post-freeze-amendment` (an extra
-    amending act whose SFS number postdates the golden's freeze horizon = the
-    max change-act number it knew — accepts the ~128 stale extras, while a
-    *mid-sequence* extra stays unexplained, since that's a real divergence) and
-    `stale-consolidation-drift` (the consolidation-envelope metadata — cutoff
-    URI, "i lydelse enligt SFS …" identifier, underlag, department — once a
-    post-freeze amendment has shown the doc stale, §3c). Wired into both the
-    `validate` corpus run and the single-doc `compare` CLI.
-    `test/test_golden_adjudicate.py`. *(Effect on the corpus numbers not yet
-    measured here — the golden tree lives on the data disk, not this checkout.)*
-  - 🚧 **The reference-leak family** (old-pipeline defects: cross-document
-    `lastlaw`/`namedlaws` state leaks, chain-fragmentation wrong-law links, the
-    all-or-nothing `RefParseError` holes the new scanner fills). Reference-section
-    sampling done (500-doc `--sections references` run): ~1237 diffs, falling
-    into three mechanically distinct families —
-    * **Chain-fragment extras/missing (~68%)** — the actual `lastlaw` state
-      leak: the new scanner attributes a ref to a bare chapter id (`K4`) where
-      the golden has it from a specific paragraph-stycke (`K4P1S3`). Same
-      target URI, coarser source — a misattribution, not a phantom ref.
-    * **Self-link extras (~24%)** — empty-source refs to the document's own
-      `L*`/`P#O#`/`S#` fragments, from stycken in un-id'd paragrafer (repealed
-      paragraphs the assembler didn't number). NOT an old-pipeline defect — a
-      new-pipeline numbering gap; forgiving these would mask it.
-    * **Long tail (~8%)** — mixed, not yet characterized.
-    First predicate landed: `chapter-state-leak`
-    (`golden_sfs._chapter_state_leak`) forgives the chain-fragment extras where
-    the golden has the same target URI from a more specific source fragment in
-    the same chapter. Conservative — rejects phantom refs (target absent from
-    golden), specific-source extras (not the bare-chapter shape), and all
-    missing diffs. Fires 129× on the 500-doc sample, accepting ~5 of ~28 diffs
-    on a typical chain-fragment doc. `test/test_golden_adjudicate.py` (5 new
-    tests). Still open: the `RefParseError`-hole missing family (needs the new
-    NF to distinguish "old had it, new doesn't" from "new filled a hole"), and
-    the un-id'd-paragraf numbering gap that produces the self-link extras.
-- ⬜ **begrepp / `find_definitions`** port → `dcterms:subject` links to
-  `https://lagen.nu/begrepp/…` (~2% of golden tuples; currently excluded
-  from comparison).
-- ⬜ **Named-law data** — extend `lagen/nu/res/extra/sfs.ttl` to recover
-  the cross-document name resolutions the old leak provided legitimately
-  (it's live site data, so handle carefully).
-- ✅ **Inline links / runs-spans (refs)** — every NF text node (`stycke`,
-  `punkt`, table cell, `rubrik`, `upphavd`) is now a LIST of inline nodes:
-  plain `str` runs interleaved with `{"predicate","uri","text"}` link
-  objects at their exact positions; the flat top-level `references` list is
-  **dropped from the artifact**. Per-link sub-spans recovered by threading
-  each emit's originating-node token span (`node_span`/`law_id_span`)
-  through every LAGRUM+EU `fmt_*` in `lagrum.py`, plus a `link_spans`
-  trailing-marker absorption pass (`§§`/`kap.` attach to the nearest
-  preceding link) — reproducing the fixtures' boundaries exactly: change-note
-  links whole "Lag (2001:1016)."; anonymous law → bare number ("(1976:580)"
-  → "1976:580"); named law → whole "name (number)"; a combined external ref
-  (single section-bearing inner ref) extends to swallow the law expression.
-  **All text nodes are now scanned**, including headings/upphävd/top-level
-  tables — a deliberate divergence (the old pipeline skipped them; this
-  self-links e.g. a chapter heading's own "12 kap."→#K12).
-  `nf.inline_references(structure)` reconstructs the old
-  `(source,predicate,uri)` tuples from the inline links (excluding the
-  newly-scanned node kinds) so the golden refs oracle still runs: 2018:585 =
-  **219/222, 0 extra** (3 missing = golden frozen from a newer doc version;
-  "2018:1177" is absent from the downloaded HTML — data skew, not a parser
-  gap). New oracle `test/test_sfs_parse.py::test_sfs_links` — set-equality
-  vs the fixtures' `<LinkSubject dcterms:references>` leaves, URI
-  base-normalized; the one known gap is `regression-kommentar-inte-rubrik`
-  (the lowercase-`förordning` FILTER_LAW quirk). `golden_sfs.canonicalize_node_texts`
-  folds inline lists → string so the amendment/structure comparators still
-  apply.
-- ⬜ **Bold/italic runs** — the other half of runs/spans; refs done above,
-  character formatting not yet emitted.
+- ✅ **Downloader** (`download.py`) — harvests the beta rkrattsbaser ES
+  passthrough; one JSON `_source` per consolidated act (body + register +
+  amendments) replaces the old two-page SFST+SFSR scrape. `search_after`
+  enumeration (past ES's 10k window), incremental/`--full`, atomic writes.
+  **13,789 acts.** New JSON lives flat at `downloaded/{y}/{n}.json`; legacy HTML
+  in `downloaded/sfst|sfsr/`; superseded consolidations archived to
+  `archive/downloaded/{y}/{n}/.versions/{vy}/{vn}.json` (keyed on the
+  `andringInford` legal version, not checksum). `test/test_sfs_download.py`.
+- ✅ **JSON-or-HTML parse selection** — `load_inputs` prefers the new JSON over the
+  legacy HTML; `register_from_source`/`sfst_header_from_source` map it onto the
+  same intermediates, so all register/amendment/metadata parsing is reused
+  untouched. 2018:585 from JSON vs HTML = **0 field diffs** (only genuine freshness
+  deltas).
+- 🚧 **Adjudication overlay** (`golden_sfs.adjudicate`) — per-class predicates
+  codifying the "change-detector, not oracle" posture (§2): each forgives a whole
+  *family* of diffs where the new pipeline is right against a stale/defective
+  golden, while still *reporting* them (a forgiven class that grows stays visible).
+  `validate` reports `match + adjudicated = passing`, so **`diff` is the
+  genuine-regression count** to drive to zero. Every diff line now carries the
+  source-node **`«clause»`** (both sides — `inline_links` / `extract_references`),
+  the context several predicates key on. Landed predicates (`PREDICATES`):
+  - `post-freeze-amendment` / `stale-consolidation-drift` — amendments and
+    consolidation-envelope metadata that drift as acts land after the golden's
+    snapshot.
+  - `change-reference-staleness` — a paragraf's closing *ändringshänvisning*
+    ("Lag (NNNN:NN)." → internal `#L`) now naming a later act; the matching pre-bump
+    miss forgiven only when that stycke was actually bumped.
+  - `balk-basefile-correction` — the 1734 års lag balkar (1736:0123 1/2): new mints
+    self-refs at the full basefile (`1736:0123_1#…`) where the old collapsed the
+    suffix (conflating the two balkar); mirror pairs forgiven per-source.
+  - `eller-enumeration` — paragraf refs from "1, 3, 5 eller 6 §" lists (single §)
+    the old SimpleParse grammar missed (it parsed only "… och … §§"); forgiven when
+    the target paragraf is an enumerated member and its chapter is named in the clause.
+  - **New-pipeline bugs *fixed* in the parser, not adjudicated:** source-context
+    misattribution (a ref pinned to a bare kapitel where the text sits in a specific
+    stycke); self-links from unanchored (dedup-id-suppressed) provisions; the balk
+    basefile minting. (A `chapter-state-leak` predicate was tried and reverted — it
+    would have masked the first of these.)
+  - ⬜ **Open: the reference-diff residual.** Each remaining bucket is either an
+    old-pipeline gap (→ a clause-keyed predicate, like eller; the `RefParseError`-hole
+    family — refs the old scanner dropped on a failed window — is the main remainder,
+    its clause-on-both-sides groundwork now in place) or a new-pipeline bug
+    (source-attribution: un-numbered-paragraf sources, stycke-renumbering off-by-ones
+    → a parser fix). `test/test_golden_adjudicate.py`.
+  - ⬜ **Open: structure-staleness** — the structure section isn't adjudicated, so an
+    amended law's extra paragrafer count as 3a diffs; applying the post-freeze logic
+    there is the last gap to a unified passing %.
+- ✅ **begrepp / `find_definitions`** (`begrepp.py`) — term-definition heuristics
+  (a paragraf *mode* — `normal`/`brottsrubricering`/`parantes`/`loptext` — + the five
+  `defined_term` cases) → `dcterms:subject` `/begrepp/{Capitalised}` inline links
+  (`Ref kind="term"`), threaded through the projection. Compared as a term-URI set
+  (the source stycke drifts like any reference); **~97% recall** on definition-heavy
+  laws. `test/test_sfs_begrepp.py`.
+- ✅ **Named-law data** — `sfs.ttl` → hand-editable `sfs_namedlaws.json` (187 labels /
+  106 abbrevs; `load_namedlaws`/`load_abbreviations`/`register.abbreviations` read
+  JSON, no rdflib). Complete for SFS's bare-citation class — all 12 balkar + the
+  grundlagar are present (that is where "brottsbalken → 1962:700" comes from). Within
+  SFS the *full* citation form is the convention (resolved by SFS number or in-document
+  learning), so the colloquial long tail (`avtalslagen`, …) is DV/förarbete work, not
+  §3. `riksdagsordningen` de-staled to the current `2014:801`.
+- ✅ **Inline links / runs-spans** — every NF text node is a list of `str` runs +
+  `{predicate,uri,text}` link objects at exact positions (per-link sub-spans recovered
+  from the parse tree, with trailing-marker absorption reproducing the fixtures'
+  boundaries); the flat top-level `references` is dropped. All node kinds are scanned,
+  including headings/upphävd (a deliberate divergence — a heading self-links its own
+  "12 kap."→#K12). `inline_references` reconstructs the old `(source,predicate,uri)`
+  tuples for the oracle (`test_sfs_links`); 2018:585 = **219/222, 0 extra**.
+- 💤 **Bold/italic runs — N/A for SFS** (investigated): no emphasis markup in the JSON
+  source or any of the 11,056 golden XHTMLs. A formatting-bearing-source concern (the
+  DV/POI `bold` flag, §4), already supported by `Ref.kind` where it occurs.
 
 ---
 
@@ -429,9 +329,12 @@ decisions. **Implication:** for these ~1,600 verdicts the legacy Word/OOXML
 is the *only* source (no API record to fall back on), including the entire
 HD notisfall series and a decade of AD referat — so the legacy-OOXML path
 below is not optional polish, it's the only way they enter the corpus.
-- 🚧 **DV parser** — `accommodanda/dv/model.py` (flat Avgorande:
-  metadata + ordered Rubrik/Stycke body blocks — court decisions have no
-  rigid nesting) and `accommodanda/dv/parse.py`. **API path done:** body
+- 🚧 **DV parser** — `accommodanda/dv/model.py` (currently a *flat* Avgorande:
+  metadata + ordered Rubrik/Stycke body blocks) and `accommodanda/dv/parse.py`.
+  The flat shape is provisional — court decisions *do* have a decision structure
+  (the instance/ruling skeleton: instances, betänkande vs dom, domskäl/domslut,
+  skiljaktig), specified by the structural golden below and still to be emitted.
+  **API path done:** body
   from `innehall` HTML (each `<p>` classified heading-vs-paragraph;
   numbered prejudikat paragraphs carry an ordinal; `<br>`/entities/`&nbsp;`
   handled, separators dropped), metadata from the curated fields,
@@ -932,8 +835,8 @@ model + extraction.
 
 | Path | What |
 |---|---|
-| `tools/golden_sfs.py` | golden-corpus comparator / freeze |
-| `site/data/sfs/golden/` | frozen SFS golden tree (11,056 docs) |
+| `tools/golden_sfs.py` | golden-corpus comparator (`normalize` parsed XHTML → NF on the fly) |
+| `site/data/sfs/parsed/` | the golden = old-pipeline parsed XHTML (11,056 docs), normalized per comparison |
 | `accommodanda/lib/` | **shared** horizontal libs: `lagrum` (citation engine), `util`, `errors` (`SkipDocument`) |
 | `accommodanda/sfs/` | **acts vertical**: `{extract,reader,model,tokenizer,assembler,nf}` parser + `register` (SFSR→amendments/förarbeten/metadata) + `__main__` (validate CLI) |
 | `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `word`, `legacy` |
@@ -1007,15 +910,19 @@ so is easy to forget. All are run by hand:
 **The adjudication overlay** (the "change-detector, not oracle" layer, §3d) lives
 in `tools/golden_sfs.py`: `adjudicate(problems, golden) -> (unexplained,
 accepted)`, driven by the `PREDICATES` table (currently `post-freeze-amendment`,
-`stale-consolidation-drift`, `chapter-state-leak`). It runs **automatically**
+`stale-consolidation-drift`, `change-reference-staleness`, `balk-basefile-correction`,
+`eller-enumeration`; a `chapter-state-leak` predicate was tried and removed — see the
+2026-06-24 log entry). Several predicates now read the diff line's `«clause»` (the
+source-node text appended by `format_ref`) — the context that makes them decidable. It runs **automatically**
 inside `validate`, and also in `golden_sfs.py compare`. To add a rule: write a
 `_predicate(problem, ctx)` and add one `(name, fn)` entry to `PREDICATES`
 (extend the `ctx` dict in `adjudicate` if the rule needs more golden context).
 Tests: `test/test_golden_adjudicate.py`.
 
 **`python tools/golden_sfs.py …`** — `compare A B [--sections …]` (diff two docs,
-shows adjudicated-vs-unexplained), `normalize FILE` (XHTML+RDFa → normal form),
-`freeze SRCDIR DESTDIR` (batch-normalize the old parsed corpus into the golden).
+shows adjudicated-vs-unexplained), `normalize FILE` (XHTML+RDFa → normal form).
+The corpus run is `python -m accommodanda.sfs validate <parseddir> <downloaddir>`,
+which normalizes each parsed XHTML to NF on the fly (no frozen golden, no freeze).
 
 **DV goldens — `python tools/golden_dv.py …`** (reference graph vs old distilled
 RDF) and **`python tools/golden_dv_structure.py …`** (`normalize` | `compare
@@ -1026,6 +933,149 @@ segmenter once the parser emits a `structure` section.
 ---
 
 ## Progress log
+
+**2026-06-24 (§3d — eller-enumeration adjudication, the first clause-driven rule)**
+- The old SimpleParse grammar parsed "och … §§" enumerations (double §) but never
+  the "eller … §" form (single §) — a Swedish drafting convention (och→§§, eller→§).
+  So the new pipeline's paragraf refs from "1, 3, 5 eller 6 §"-style lists are extras
+  it is right about. The new `eller-enumeration` predicate keys on the now-available
+  `«clause»`: forgive an extra paragraf ref iff its target paragraf number is one of
+  the `eller`-enumerated members *and* its chapter (if any) is named in the clause —
+  so a spurious add or a different construct (punkt lists, "18 a § andra stycket N")
+  stays visible. On 1942:740 (rättegångsbalken, brottsbalken-citing): **179 ref diffs
+  → 100 adjudicated** (83 eller-enumeration + 17 change-reference-staleness), the 79
+  residual being genuinely different families. `re_eller_enum`/`eller_enum_paragrafs`
+  + `reference_clause`; `test/test_golden_adjudicate.py` (6 new tests, 552 total green).
+  The first predicate to exploit the clause context — the model the `RefParseError`-hole
+  groundwork enables.
+
+**2026-06-24 (§3d — balk-basefile self-reference fix)**
+- The 1734 års lag balkar carry a bare numeric suffix ("1736:0123 1" = byggninga-
+  balken, "1736:0123 2" = handelsbalken). `fragment_context`'s `RE_BASEFILE_LAW`
+  truncated it (faithfully reproducing the old pipeline), so self-references minted
+  against the collapsed "1736:0123" — wrong, and ambiguous between the two balkar.
+  Extended the regex (`(?:[_ ]s\.\d+|[_ ]\d+)?`) so the suffix is kept: self-refs in
+  1736:0123 1 now resolve to `1736:0123_1#K9P2` (full id + chapter-qualified
+  fragment), correctly distinct from `1736:0123_2`. Only 3 docs affected
+  (1723:1016_1, 1736:0123_1/_2). A deliberate divergence from the golden, which
+  collapsed both. `self_law_uri` follows automatically; `test/test_sfs_unanchored_refs.py`
+  updated.
+- **`balk-basefile-correction` adjudication predicate** codifies that divergence as
+  new-is-right: the corrected full-basefile self-ref (extra) and the golden's
+  collapsed self-ref (missing) are a mirror pair, each forgiven only when its
+  counterpart shares the source stycke (so a genuine new drop or spurious add stays
+  visible). On the corpus it fires **106×** across the balk docs; 1736:0123 1 drops
+  from ~28 reference diffs to **1** residual (a lone extra from an un-numbered-paragraf
+  source `K26S1`, correctly left unexplained). `test/test_golden_adjudicate.py`
+  (6 new tests). 546 tests green.
+
+**2026-06-24 (§2 — golden normalized on the fly; freeze step removed)**
+- The golden is now `site/data/sfs/parsed/` (old-pipeline XHTML) **normalized to NF
+  on the fly** at comparison time — there is no frozen `site/data/sfs/golden/` tree
+  and no `freeze` step. Rewired `accommodanda/sfs validate` to glob `parseddir` for
+  `*.xhtml` and `validate_one` to call `golden_sfs.normalize(parsedfile)` instead of
+  loading a frozen `.json`; `refs` likewise normalizes its golden arg via
+  `golden_sfs.load`. Deleted `golden_sfs.py`'s `freeze`/`freeze_one`/`sanity_check`/
+  `count_types`, the `freeze` subcommand, and the now-unused `os`/`ProcessPoolExecutor`
+  imports. Updated README + §2 + the reference card. (The `post-freeze-amendment` /
+  `golden_freeze_horizon` adjudication concept stays — "freeze" there means the parsed
+  snapshot's amendment cutoff, not the deleted step.) Smoke-tested: `validate
+  site/data/sfs/parsed site/data/sfs/downloaded --sections references` runs and the
+  diffs carry the new «clause» context.
+
+**2026-06-24 (§3d — references carry source-clause context, both sides)**
+- Reference tuples gained a 4th element: the **full text of the source node** the
+  link was read from (not just the linked span), so a diff shows the whole clause —
+  the context that resolves a bare "10 §" to a particular chapter/law. `inline_links`
+  (new) builds it from the node run-list; `extract_references` (golden) from the
+  `<a>` container's text. Match key stays `(source, predicate, uri)` —
+  `canonicalize_refs` now returns a `{key: clause}` dict and `format_ref` appends
+  `«clause»` to each diff line (URI capture un-anchored so the staleness predicate
+  still parses). Foundation for the `RefParseError`-hole hole-vs-mistake call. Both
+  sides carry it live (the golden parsed XHTML is normalized per comparison).
+  Zero regressions (540 pass; the 11 register reds are the pre-existing missing-HTML
+  fixtures).
+
+**2026-06-24 (§3d — named-law dataset off RDF; bold/italic N/A)**
+- **`sfs.ttl` → `sfs_namedlaws.json`** (hand-editable, user decision). Flat
+  `law id -> {label?, abbr?}`, `abbr` a list for the 4 multi-abbrev laws (golden's
+  primary first). Rewrote `load_namedlaws`/`load_abbreviations` (dropping rdflib
+  from lagrum) and `register.abbreviations` to read JSON; migrated all 6 consumer
+  modules + 4 test/tool files; deleted the TTL. Verified the loaded dicts are
+  identical to the old TTL loaders and the 4 multi-abbrev metadata picks match
+  golden. 540 tests pass (the 11 `test_sfs_register` reds are pre-existing —
+  legacy SFST/SFSR HTML fixtures absent from this checkout, unrelated).
+- **Bold/italic runs ruled N/A for SFS** — investigated: no emphasis markup in
+  the JSON source or in any of the 11,056 golden XHTMLs. Character formatting is a
+  formatting-bearing-source (DV) concern; the runs/spans infra (`Ref.kind`)
+  already supports it.
+
+**2026-06-24 (§3d — begrepp / find_definitions port)**
+- Ported the SFS term-definition heuristics to `accommodanda/sfs/begrepp.py` (off
+  the old framework): paragraf definition `mode` + the five `defined_term` cases +
+  `/begrepp/{Capitalised}` URI minting. Wired through the projection (mode threads
+  `project_paragraf`→`stycke_nf`/`flatten_list`/`tabell_nf`; `inline` emits a
+  `dcterms:subject` Ref `kind="term"` over the term span), so begrepp now renders
+  inline alongside lagrum links. `compare_refs` includes begrepp as a term-URI set
+  (source attribution is the shared reference-drift issue). ~97% term recall on
+  definition-heavy laws (1962:700 99%, 1998:808 100%, 2010:900 97%).
+  `test/test_sfs_begrepp.py` (12 tests); full SFS suite green (364 passed).
+
+**2026-06-24 (§3d — unanchored self-link fix + SFS archive layout correction)**
+- **Numbering-gap fixed.** Self empty-source ref extras (the `1947:576`-class
+  diffs) come from provisions the minter id-suppressed by content-equality dedup,
+  which stay `live` and so scan refs against a bare ancestor → empty source. Added
+  `LagrumParser.self_law_uri` and made `nf.Projection.inline` drop self-links when
+  `context` is empty (the unanchored signal). Monotonic: keeps external refs, only
+  removes extras. 1947:576 125→16, 1953:272 89→21, 1958:295 41→5, 1902:71 s.1 17→1;
+  controls (1736:0123, 1962:700) unchanged. `test/test_sfs_unanchored_refs.py`
+  (4 tests); full SFS parse/links suite still green (219 passed).
+- **SFS archive layout corrected** (REWRITE.md §3d had it wrong — said `source/` +
+  `source/archive/`; there is no `source/` tree). Reality + user decision: current
+  consolidations at `downloaded/{y}/{n}.json`, legacy HTML at `downloaded/sfst|sfsr/`,
+  and superseded consolidations under a top-level `archive/` tree mirroring the live
+  categories in the old per-document `.versions/` layout:
+  `sfs/archive/downloaded/{y}/{n}/.versions/{vy}/{vn}.json` (the existing tree, now
+  populated with the old site's archived HTML, gains `.json` siblings). `archive_path`
+  rewritten (`destdir.parent/"archive"/destdir.name/…/.versions/…`), docstrings +
+  stale `build.py` "source/" strings fixed, `test_sfs_download.py` updated (10 green).
+
+**2026-06-24 (§3d — terminology fix, `chapter-state-leak` reverted, next bucket)**
+- **Terminology corrected.** "Leak" had drifted into a catch-all for "the two
+  pipelines disagree on references". Pinned it back to its literal sense — the old
+  pipeline's `lastlaw`/`namedlaws` law-context surviving past a document boundary
+  (state escaping its single-document scope). A discrepancy is the symptom; a leak
+  is one possible cause. Reworded §3b status + the §3d reference bullet.
+- **`chapter-state-leak` was implemented, then removed as incorrect** (it is *not*
+  in `PREDICATES`; the 2026-06-23 entry below describing it as "landed" is
+  superseded). The former "chain-fragment" diffs it forgave are a *new*-pipeline
+  defect — the scanner identified the **source** context too coarsely (a bare
+  kapitel `K4` where the citing text sits in stycke `K4P1S3`); the legalref engine
+  and target URI were correct. Forgiving them would have masked a real bug, so the
+  fix went into the parser (correct source-node identification), not the
+  comparator. Most chapter-only source nodes are now resolved to their stycke.
+- **Next large bucket characterized** from a fresh 2,000-doc reference run
+  (`refs-report.json`: 1,625 match / 370 diff / 2,809 ref-diff lines). The next
+  clean, single-cause, adjudicatable family is **ändringshänvisning (change-
+  reference) staleness**: a paragraf's closing "Lag (NNNN:NN)." names the
+  ändringsförfattning that last amended it, as an internal link `#L` into the
+  current doc's `andringsforfattningar` sub-object (the named act is not a
+  consolidated SFS on disk); the freshly-downloaded consolidation has been amended
+  since the golden froze, so the same stycke names a later act. The reference-level
+  shadow of `post-freeze-amendment`. The larger raw buckets (~900 external-with-
+  fragment + the self-reference mass) are still heterogeneous, concentrated in the
+  old chapter-structured balkar; not yet one cause.
+- **Landed `change-reference-staleness`** (`golden_sfs._change_reference_staleness`,
+  added to `PREDICATES`). Extra self-`#L` postdating the doc's own freeze horizon →
+  forgiven; matching missing pre-bump note → forgiven only if that stycke was bumped
+  (a per-source post-freeze extra exists), so stycke-renumbering diffs to pre-horizon
+  acts stay unexplained. Horizon + own-law base read from the golden alone. Replaying
+  `refs-report.json` (370 diffing docs) through the new `adjudicate`: **187 lines
+  accepted** (119 extra + 68 missing), 0 invariant violations (no post-horizon extra
+  rejected, nothing over-accepted). 8 new tests in `test/test_golden_adjudicate.py`
+  (15 total, all green). Wired automatically via `sfs/_validate.py:142`; a
+  `validate --sections references` re-run will reclassify those 187 from `diff` to
+  `adjudicated`.
 
 **2026-06-23 (§3d reference-leak family — first predicate)**
 - Sampled the reference diffs on a 500-doc `--sections references` validate run
@@ -1380,7 +1430,7 @@ segmenter once the parser emits a `structure` section.
   `references` dropped. Per-link sub-spans recovered by threading each
   emit's originating-node token span through every LAGRUM+EU `fmt_*` in
   `lagrum.py` (+ a trailing-marker absorption pass), reproducing the
-  fixtures' link boundaries (change-note whole-span, anonymous-law bare
+  fixtures' link boundaries (ändringshänvisning whole-span, anonymous-law bare
   number, named-law name+number, combined-external-ref law swallow).
 - User decisions: text is **always** a list (even `["plain"]`); **all** text
   nodes scanned incl. headings/upphävd/top-level tables (deliberate
