@@ -35,6 +35,7 @@ reference list instead of inlining.
 from dataclasses import dataclass
 from datetime import datetime
 
+from . import begrepp
 from . import register as register_mod
 from ..lib import lagrum, util
 from .model import (Avdelning, Bilaga, Kapitel, Lista, Listelement,
@@ -66,14 +67,19 @@ def to_normalform(doc, basefile, now=None, refparser=None,
 
 
 def inline_links(inline, source):
-    """The (source, predicate, uri) tuples of the reference links in one
-    inline-list text value."""
-    return [(source, run["predicate"], run["uri"])
+    """The (source, predicate, uri, context) tuples of the reference links in
+    one inline-list text value. `context` is the *full text* of the node the
+    links sit in -- not just each linked span -- so a diff shows the whole
+    clause every reference was read from: the enumeration "… 3 kap. 1, 3, 4
+    eller 10 § … yttrandefrihetsgrundlagen" is what makes a bare "10 §" resolve
+    to that law's chapter 3, and judging the link needs that context."""
+    context = "".join(r if isinstance(r, str) else r["text"] for r in inline)
+    return [(source, run["predicate"], run["uri"], context)
             for run in inline if isinstance(run, dict)]
 
 
 def inline_references(nodes, frag=""):
-    """Reconstruct the flat (source-fragment, predicate, uri) reference
+    """Reconstruct the flat (source-fragment, predicate, uri, text) reference
     tuples the old pipeline emitted, from the links now inlined into the
     structure. Attribution mirrors the old scan exactly: every link in a
     stycke and its nested lists/tables is credited to the stycke's fragment;
@@ -159,7 +165,7 @@ class Projection:
     minter: "IdMinter"
     refparser: object = None
 
-    def inline(self, text, context, live=True):
+    def inline(self, text, context, live=True, subject_term=None):
         """Return `text` as a list of inline nodes: plain `str` runs and
         `{"predicate", "uri", "text"}` link objects, one per reference
         found, in document order. `context` is the node's own fragment,
@@ -170,14 +176,33 @@ class Projection:
         future/sunset temporal variant): such text carries no reference links.
         Its provision is id-suppressed, so any link would fall back to a bare
         ancestor fragment (a chapter), and it is not part of the consolidated
-        citation graph anyway -- the old pipeline omitted it too."""
+        citation graph anyway -- the old pipeline omitted it too.
+
+        An empty `context` marks an *unanchored* provision: one whose id the
+        minter suppressed (content-equality dedup) with no id-bearing ancestor
+        either, so a self-reference would attribute to an empty source. The old
+        pipeline omitted those, so self-links are dropped here; references to
+        other laws still link.
+
+        `subject_term` is a defined begreppsdefinition term found in this node;
+        it becomes a dcterms:subject link over the term's span (kind "term")."""
         if not text:
             return []
-        if (not live or self.refparser is None
-                or not lagrum.FILTER_LAW.search(text)):
+        refs = []
+        if live and self.refparser is not None and lagrum.FILTER_LAW.search(text):
+            refs = self.refparser.parse_text(text, context or None)
+            if not context:
+                selfuri = self.refparser.self_law_uri
+                refs = [r for r in refs
+                        if r.uri != selfuri and not r.uri.startswith(selfuri + "#")]
+        if subject_term and (idx := text.find(subject_term)) >= 0:
+            refs.append(lagrum.Ref(idx, idx + len(subject_term), subject_term,
+                                   "dcterms:subject",
+                                   begrepp.term_to_subject(subject_term),
+                                   kind="term"))
+        if not refs:
             return [text]
-        return lagrum.interleave(
-            text, self.refparser.parse_text(text, context or None))
+        return lagrum.interleave(text, refs)
 
 
 # containers the old _count_elements recursed into (those carrying a
@@ -395,10 +420,12 @@ def project_children(children, pairs, proj, frag, live=True):
 
 
 def project_paragraf(paragraf, pairs, proj, frag, live=True):
+    mode = begrepp.paragraf_mode([getattr(s, "text", "") or ""
+                                  for s in paragraf.children])
     out = []
     for node in paragraf.children:
         sub = extend(pairs, "S", position_ordinal(node, paragraf.children))
-        nf = stycke_nf(node, sub, proj, frag, live)
+        nf = stycke_nf(node, sub, proj, frag, live, mode=mode)
         if node is paragraf.children[0]:
             nf["beteckning"] = beteckning(paragraf)
         out.append(nf)
@@ -412,24 +439,28 @@ def beteckning(paragraf):
     return b
 
 
-def stycke_nf(stycke, pairs, proj, frag, live=True):
+def stycke_nf(stycke, pairs, proj, frag, live=True, mode=None):
     node_id = proj.minter.mint(pairs, stycke)
     eff = node_id or frag
+    text = util.normalize_space(stycke.text)
+    term = begrepp.defined_term(text, mode, "stycke") if mode else None
     nf = {"type": "stycke", "id": node_id,
-          "text": proj.inline(util.normalize_space(stycke.text), eff, live)}
+          "text": proj.inline(text, eff, live, subject_term=term)}
+    # the old find_definitions stops recursing once a term is found in a subtree
+    submode = None if term else mode
     items = []
     for child in stycke.children:
         if isinstance(child, Lista):
             items.extend(flatten_list(child, pairs if node_id else None,
-                                      proj, eff, live))
+                                      proj, eff, live, mode=submode))
         elif isinstance(child, Tabell):
-            items.append(tabell_nf(child, proj, eff, live))
+            items.append(tabell_nf(child, proj, eff, live, mode=submode))
     if items:
         nf["children"] = items
     return nf
 
 
-def flatten_list(lista, pairs, proj, frag, live=True):
+def flatten_list(lista, pairs, proj, frag, live=True, mode=None):
     """Golden normal form flattens nested lists into document order.
     References in each item resolve against the item's own id."""
     out = []
@@ -437,20 +468,29 @@ def flatten_list(lista, pairs, proj, frag, live=True):
         sub = extend(pairs, "N", ordfrag(item.ordinal))
         item_id = proj.minter.mint(sub, item)
         eff = item_id or frag
+        text = util.normalize_space(item.text)
+        term = begrepp.defined_term(text, mode, "listelement") if mode else None
         out.append({"type": "punkt", "id": item_id, "ordinal": item.ordinal,
-                    "text": proj.inline(util.normalize_space(item.text), eff, live)})
+                    "text": proj.inline(text, eff, live, subject_term=term)})
+        submode = None if term else mode
         for sublist in item.children:
             out.extend(flatten_list(sublist, sub if item_id else None,
-                                    proj, eff, live))
+                                    proj, eff, live, mode=submode))
     return out
 
 
-def tabell_nf(tabell, proj, context, live=True):
-    return {"type": "tabell", "id": None,
-            "children": [{"type": "rad",
-                          "cells": [proj.inline(util.normalize_space(cell),
-                                                context, live) for cell in row.cells]}
-                         for row in tabell.rows]}
+def tabell_nf(tabell, proj, context, live=True, mode=None):
+    rows = []
+    for row in tabell.rows:
+        # only the first cell of a row can name a term
+        term = (begrepp.defined_term(util.normalize_space(row.cells[0]),
+                                     mode, "tabellrad")
+                if mode and row.cells else None)
+        cells = [proj.inline(util.normalize_space(cell), context, live,
+                             subject_term=(term if i == 0 else None))
+                 for i, cell in enumerate(row.cells)]
+        rows.append({"type": "rad", "cells": cells})
+    return {"type": "tabell", "id": None, "children": rows}
 
 
 def rubrik_nf(text, level, proj, context, id=None, live=True):
