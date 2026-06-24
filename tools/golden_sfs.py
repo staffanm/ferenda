@@ -19,15 +19,12 @@ The normal form has four sections:
 Usage:
   golden_sfs.py normalize PARSED.xhtml          # normal form to stdout
   golden_sfs.py compare A B                     # A/B are .xhtml or .json
-  golden_sfs.py freeze SRCDIR DESTDIR           # batch-normalize a corpus
 """
 
 import argparse
 import json
-import os
 import re
 import sys
-from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 from lxml import etree
@@ -125,10 +122,14 @@ def normalize_metadata(head):
 
 
 def extract_references(container, fragment, refs):
+    # the full text of the node, shared by every reference in it, so a diff
+    # carries the whole clause the links were read from (the enumeration /
+    # named law that resolves a bare "10 §"), not just the linked span
+    context = " ".join("".join(container.itertext()).split())
     for a in container.iter("{%s}a" % XHTML):
         rel = a.get("rel")
         if rel and a.get("href"):
-            refs.append([fragment, rel, a.get("href")])
+            refs.append([fragment, rel, a.get("href"), context])
 
 
 def normalize_table(table):
@@ -218,7 +219,7 @@ def normalize_body_element(elem, refs, fragment=""):
     if tag in ("p", "div", "li"):
         # safety net: never flatten a container that holds structural
         # children -- recurse and surface it as a generic container so it
-        # shows up in the freeze report instead of vanishing into a blob
+        # shows up as a diff instead of vanishing into a blob
         if any(child.get("typeof") in STRUCTURE_TYPES
                or child.get("typeof") == "rinfoex:Stycke"
                or (child.get("class") or "") in STRUCTURE_CLASSES
@@ -409,8 +410,26 @@ def canonicalize_ref_uri(uri):
 
 
 def canonicalize_refs(refs):
-    return {(source, predicate, canonicalize_ref_uri(uri))
-            for source, predicate, uri in map(tuple, refs)}
+    """Map each reference to its *context* (the full text of the source node it
+    was read from), keyed by the canonical (source, predicate, uri) triple. The
+    triple is the match key; the context is carried for diff readability and may
+    be '' for a pre-text golden (refs without a 4th element)."""
+    out = {}
+    for ref in map(tuple, refs):
+        out[(ref[0], ref[1], canonicalize_ref_uri(ref[2]))] = (
+            ref[3] if len(ref) > 3 else "")
+    return out
+
+
+def format_ref(kind, key, text):
+    """A references diff line. The source node's full clause is appended in
+    guillemets so the diff shows *what* each side read the reference from -- the
+    context that makes a bare "10 §" resolve to a particular chapter/law, which
+    is what distinguishes a real citation from a span that should not have
+    linked. The URI stays the last whitespace-free token so the diff parsers
+    still recover it."""
+    line = "references: %s %s --%s--> %s" % (kind, key[0], key[1], key[2])
+    return line + ("  «%s»" % text if text else "")
 
 
 # amendment properties whose values are paragraph URIs carrying the same
@@ -511,10 +530,10 @@ def compare(old, new, sections=ALL_SECTIONS):
         # both sides are old-style normal forms
         oldrefs = canonicalize_refs(old["references"])
         newrefs = canonicalize_refs(new["references"])
-        for ref in sorted(oldrefs - newrefs):
-            problems.append("references: missing %s --%s--> %s" % ref)
-        for ref in sorted(newrefs - oldrefs):
-            problems.append("references: extra %s --%s--> %s" % ref)
+        for key in sorted(set(oldrefs) - set(newrefs)):
+            problems.append(format_ref("missing", key, oldrefs[key]))
+        for key in sorted(set(newrefs) - set(oldrefs)):
+            problems.append(format_ref("extra", key, newrefs[key]))
 
     if "amendments" in sections:
         diff_amendments(old["amendments"], new["amendments"], problems)
@@ -552,6 +571,57 @@ def golden_freeze_horizon(golden):
     return max(keys) if keys else None
 
 
+# A references-section diff line: "references: <extra|missing> <source>
+# --<predicate>--> <uri>" (source may be empty). Match the source lazily so
+# the predicate arrow is not swallowed.
+# the URI is the first whitespace-free token after the arrow; an optional
+# «linked text» may follow (see format_ref), so don't anchor at end-of-line
+re_reference_diff = re.compile(r"references: (extra|missing) (.*?) --\S+--> (\S+)")
+re_change_ref = re.compile(r"#L(\d{4}):(\d+)$")
+
+
+def reference_diff(problem):
+    """(kind, source, uri) for a references diff line, else None."""
+    m = re_reference_diff.match(problem)
+    return m.groups() if m else None
+
+
+re_clause = re.compile(r"«(.*)»\s*$")
+
+
+def reference_clause(problem):
+    """The source-node clause `format_ref` appended in guillemets, or ''."""
+    m = re_clause.search(problem)
+    return m.group(1) if m else ""
+
+
+def self_change_ref_key(uri, own_base):
+    """(year, nr) if `uri` is an ändringshänvisning into the document's own
+    law (own_base + '#L<year>:<nr>'), else None. An ändringshänvisning is an
+    *internal* link to the act that last amended a paragraf -- that act has no
+    consolidated document of its own, so it lives under the law's own URI."""
+    if not own_base or not uri.startswith(own_base + "#L"):
+        return None
+    m = re_change_ref.search(uri)
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+re_balk_law = re.compile(r"\d+:\d+_\d+$")   # "1736:0123_1" -- a 1734-lag balk
+
+
+def balk_self_ref(uri, own_base, collapsed_base):
+    """Whether `uri` is a self-reference into a 1734 års lag balk -- 'full'
+    (the corrected ".../1736:0123_1#…") or 'collapsed' (the old pipeline's
+    ".../1736:0123#…", which lost the balk suffix), else None."""
+    if collapsed_base is None:
+        return None
+    if uri == own_base or uri.startswith(own_base + "#"):
+        return "full"
+    if uri == collapsed_base or uri.startswith(collapsed_base + "#"):
+        return "collapsed"
+    return None
+
+
 # document-level metadata that is the *consolidation envelope* -- it moves as
 # new amending acts fold in: the konsolidering cutoff URI, the "i lydelse
 # enligt SFS …" identifier, the underlag list, the responsible department.
@@ -582,11 +652,92 @@ def _stale_consolidation_drift(problem, ctx):
     return ctx["stale"] and problem.startswith(ENVELOPE_PREFIXES)
 
 
+def _change_reference_staleness(problem, ctx):
+    """An ändringshänvisning (#L<act>) that drifted because the freshly-
+    downloaded consolidation was amended after the golden froze. A paragraf's
+    closing "Lag (NNNN:NN)." names the act that last amended it; re-amendment
+    bumps it to a later act. The extra names a post-freeze act (new-is-right);
+    the matching missing is the pre-bump note, forgiven only when that same
+    stycke's reference was in fact bumped -- so a stycke-renumbering diff to a
+    pre-horizon act stays unexplained."""
+    parsed = reference_diff(problem)
+    if parsed is None or ctx["horizon"] is None:
+        return False
+    kind, source, uri = parsed
+    key = self_change_ref_key(uri, ctx["own_base"])
+    if key is None:
+        return False
+    if kind == "extra":
+        return key > ctx["horizon"]
+    return source in ctx["bumped_sources"]
+
+
+# An "eller" enumeration of paragraf numbers terminated by a *single* § -- e.g.
+# "1, 3, 5 eller 6 §", "26 eller 26 a §". By Swedish drafting convention an "och"
+# list ends in double §§ ("4, 5 och 6 §§") and an "eller" list in single §; the
+# old SimpleParse grammar parsed the former but never the latter, so the members
+# the new pipeline extracts from an "eller …  §" list are extras it is right about.
+re_eller_enum = re.compile(
+    r"(\d+(?: ?[a-z])?(?: ?, ?\d+(?: ?[a-z])?)* ?eller ?\d+(?: ?[a-z])?) ?§(?! ?§)")
+re_target_paragraf = re.compile(r"#(?:K[0-9a-z]+)?P(\d+[a-z]?)(?:$|[SNO])")
+re_target_chapter = re.compile(r"#K(\d+)[a-z]?")
+
+
+def eller_enum_paragrafs(clause):
+    """Paragraf numbers enumerated with 'eller' and a single § in `clause`,
+    normalized like a fragment ('6 a' -> '6a')."""
+    out = set()
+    for m in re_eller_enum.finditer(clause or ""):
+        out.update(t.replace(" ", "") for t in re.split(r", ?| ?eller ?", m.group(1)))
+    return out
+
+
+def _eller_enumeration(problem, ctx):
+    """An extra paragraf reference the new pipeline read from an "eller … §"
+    enumeration the old grammar could not parse: the target's paragraf number is
+    one of the enumerated members and its chapter, if any, is named in the same
+    clause. A clear old-pipeline grammar gap -- new-is-right."""
+    parsed = reference_diff(problem)
+    if parsed is None or parsed[0] != "extra":
+        return False
+    uri = parsed[2]
+    para = re_target_paragraf.search(uri)
+    if para is None:
+        return False
+    clause = reference_clause(problem)
+    if para.group(1) not in eller_enum_paragrafs(clause):
+        return False
+    chapter = re_target_chapter.search(uri)
+    return chapter is None or re.search(
+        r"\b%s ?[a-z]? ?kap" % chapter.group(1), clause) is not None
+
+
+def _balk_basefile_correction(problem, ctx):
+    """A 1734 års lag balk ("1736:0123 1" = byggningabalken, "… 2" =
+    handelsbalken) whose self-references the new pipeline mints against the full
+    basefile (".../1736:0123_1#…"), where the old pipeline collapsed the bare
+    suffix to ".../1736:0123#…" -- losing the _1/_2 distinction. The corrected
+    extra and the collapsed golden miss form a mirror pair; forgive each only
+    when its counterpart shares the source stycke (so a genuine new drop or a
+    spurious new add stays unexplained)."""
+    parsed = reference_diff(problem)
+    if parsed is None:
+        return False
+    kind, source, uri = parsed
+    flavour = balk_self_ref(uri, ctx["own_base"], ctx["balk_collapsed_base"])
+    if kind == "extra":
+        return flavour == "full" and source in ctx["balk_collapsed_sources"]
+    return flavour == "collapsed" and source in ctx["balk_full_sources"]
+
+
 # (rule name, predicate). The families are disjoint, so order only decides
 # which rule is credited in the unlikely event two would match.
 PREDICATES = (
     ("post-freeze-amendment", _post_freeze_amendment),
     ("stale-consolidation-drift", _stale_consolidation_drift),
+    ("change-reference-staleness", _change_reference_staleness),
+    ("balk-basefile-correction", _balk_basefile_correction),
+    ("eller-enumeration", _eller_enumeration),
 )
 
 
@@ -594,8 +745,29 @@ def adjudicate(problems, golden):
     """Partition `problems` against `golden` into (unexplained, accepted).
     `accepted` is a list of (rule, problem) the change-detector posture
     forgives; `unexplained` is the residual -- the regressions that count."""
-    ctx = {"horizon": golden_freeze_horizon(golden), "stale": False}
+    own_base = golden.get("uri", "").split("/konsolidering")[0]
+    ctx = {"horizon": golden_freeze_horizon(golden), "stale": False,
+           "own_base": own_base}
     ctx["stale"] = any(_post_freeze_amendment(p, ctx) for p in problems)
+    # stycken whose ändringshänvisning was bumped to a post-freeze act -- the
+    # missing pre-bump note from the same source is then forgivable too.
+    ctx["bumped_sources"] = {
+        src for kind, src, uri in filter(None, map(reference_diff, problems))
+        if kind == "extra" and ctx["horizon"] is not None
+        and (key := self_change_ref_key(uri, ctx["own_base"])) is not None
+        and key > ctx["horizon"]}
+    # 1734-lag balk self-reference correction (full vs collapsed basefile): the
+    # collapsed prefix is the own URI with its bare numeric suffix dropped.
+    ctx["balk_collapsed_base"] = (
+        own_base.rsplit("_", 1)[0]
+        if re_balk_law.search(own_base.rsplit("/", 1)[-1]) else None)
+    ctx["balk_full_sources"], ctx["balk_collapsed_sources"] = set(), set()
+    for kind, src, uri in filter(None, map(reference_diff, problems)):
+        flavour = balk_self_ref(uri, own_base, ctx["balk_collapsed_base"])
+        if kind == "extra" and flavour == "full":
+            ctx["balk_full_sources"].add(src)
+        elif kind == "missing" and flavour == "collapsed":
+            ctx["balk_collapsed_sources"].add(src)
     unexplained, accepted = [], []
     for problem in problems:
         for rule, predicate in PREDICATES:
@@ -614,93 +786,6 @@ def load(path):
     return normalize(path)
 
 
-# --- batch freezing ------------------------------------------------------
-
-def count_types(nodes, acc):
-    for node in nodes:
-        acc[node["type"]] = acc.get(node["type"], 0) + 1
-        count_types(node.get("children", []), acc)
-    return acc
-
-
-def sanity_check(normalform):
-    """Heuristics for documents that normalized without error but whose
-    normal form looks too empty to trust."""
-    warnings = []
-    types = count_types(normalform["structure"], {})
-    if not normalform["structure"]:
-        # revoked laws legitimately contain only the amendment register
-        if not normalform["amendments"]:
-            warnings.append("empty structure and no amendments")
-    elif not types.get("stycke"):
-        warnings.append("no stycke nodes (types: %s)" % types)
-    for generic in ("container", "div", "p"):
-        if types.get(generic):
-            warnings.append("%d generic %s nodes (unrecognized vocabulary?)"
-                            % (types[generic], generic))
-    if not normalform["metadata"]["properties"].get("dcterms:title"):
-        warnings.append("no dcterms:title")
-    if not normalform["references"] and types.get("stycke", 0) > 5:
-        warnings.append("no references despite %d stycken" % types["stycke"])
-    return warnings
-
-
-def freeze_one(job):
-    src, dest, force = job
-    if not force and dest.exists() and dest.stat().st_mtime > src.stat().st_mtime:
-        return (str(src), "skipped", [])
-    try:
-        normalform = normalize(src)
-    except Exception as e:
-        return (str(src), "failed", ["%s: %s" % (type(e).__name__, e)])
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    with open(dest, "w") as fp:
-        json.dump(normalform, fp, ensure_ascii=False, indent=2, sort_keys=True)
-        fp.write("\n")
-    return (str(src), "ok", sanity_check(normalform))
-
-
-def freeze(srcdir, destdir, force, jobs):
-    srcdir, destdir = Path(srcdir), Path(destdir)
-    files = sorted(srcdir.rglob("*.xhtml"))
-    if not files:
-        sys.exit("no .xhtml files under %s" % srcdir)
-    jobspec = [(src, destdir / src.relative_to(srcdir).with_suffix(".json"),
-                force) for src in files]
-
-    counts = {"ok": 0, "skipped": 0, "failed": 0}
-    failures, warned = {}, {}
-    with ProcessPoolExecutor(max_workers=jobs) as pool:
-        for i, (src, status, notes) in enumerate(
-                pool.map(freeze_one, jobspec, chunksize=16), 1):
-            counts[status] += 1
-            if status == "failed":
-                failures[src] = notes[0]
-            elif notes:
-                warned[src] = notes
-            if i % 500 == 0 or i == len(files):
-                print("\r%d/%d (%d failed, %d warned)"
-                      % (i, len(files), counts["failed"], len(warned)),
-                      end="", flush=True)
-    print()
-
-    report = {"source": str(srcdir), "total": len(files), **counts,
-              "warned_count": len(warned), "failures": failures,
-              "warnings": warned}
-    reportpath = destdir / "freeze-report.json"
-    with open(reportpath, "w") as fp:
-        json.dump(report, fp, ensure_ascii=False, indent=2, sort_keys=True)
-
-    print("%(total)d documents: %(ok)d frozen, %(skipped)d skipped "
-          "(fresh), %(failed)d failed" % report)
-    print("%d with warnings; full report in %s" % (len(warned), reportpath))
-    for src, error in sorted(failures.items())[:20]:
-        print("  FAILED %s: %s" % (src, error))
-    if len(failures) > 20:
-        print("  ... and %d more failures" % (len(failures) - 20))
-    sys.exit(1 if failures else 0)
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -712,18 +797,9 @@ def main():
     comp.add_argument("--sections", default=",".join(ALL_SECTIONS),
                       help="comma-separated subset of sections to compare "
                            "(default: all)")
-    frz = sub.add_parser("freeze", help="batch-normalize a corpus")
-    frz.add_argument("srcdir", help="directory tree of parsed .xhtml files")
-    frz.add_argument("destdir", help="output tree of golden .json files")
-    frz.add_argument("--force", action="store_true",
-                     help="re-normalize even if output is fresh")
-    frz.add_argument("--jobs", type=int, default=os.cpu_count(),
-                     help="parallel workers (default: cpu count)")
     args = parser.parse_args()
 
-    if args.command == "freeze":
-        freeze(args.srcdir, args.destdir, args.force, args.jobs)
-    elif args.command == "normalize":
+    if args.command == "normalize":
         json.dump(normalize(args.file), sys.stdout,
                   ensure_ascii=False, indent=2, sort_keys=True)
         print()

@@ -81,9 +81,10 @@ uv run python -m pytest \
 **SFS** (operates on the golden / downloaded trees under `site/data/sfs/`):
 
 ```sh
-uv run python -m accommodanda.sfs parse site/data/sfs/downloaded/2018/585.html --basefile 2018:585
-uv run python -m accommodanda.sfs validate site/data/sfs/golden site/data/sfs/downloaded --sections structure,references
-uv run python -m accommodanda.sfs refs FILE GOLDEN        # citation diff for one doc
+uv run python -m accommodanda.sfs parse site/data/sfs/downloaded/2018/585.json --basefile 2018:585
+# golden = the old pipeline's parsed XHTML (site/data/sfs/parsed), normalized to NF on the fly
+uv run python -m accommodanda.sfs validate site/data/sfs/parsed site/data/sfs/downloaded --sections structure,references
+uv run python -m accommodanda.sfs refs FILE PARSED.xhtml  # citation diff for one doc
 ```
 
 **DV** (operates on `site/data/domstol/` (API) and `site/data/dv/` (legacy)):

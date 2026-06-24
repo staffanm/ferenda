@@ -16,7 +16,7 @@ from ..lib.errors import SkipDocument
 from ..lib.lagrum import LagrumParser, load_namedlaws
 from .nf import inline_references, temporal_dates, to_normalform
 
-NAMEDLAWS_TTL = Path(__file__).parent.parent.parent / "lagen/nu/res/extra/sfs.ttl"
+NAMEDLAWS_JSON = Path(__file__).parent.parent.parent / "lagen/nu/res/extra/sfs_namedlaws.json"
 
 
 def load_golden_module():
@@ -29,23 +29,32 @@ def load_golden_module():
 
 @functools.cache
 def namedlaws():
-    return load_namedlaws(NAMEDLAWS_TTL)
+    return load_namedlaws(NAMEDLAWS_JSON)
 
 
 def compare_refs(golden, doc, basefile, now, golden_sfs):
-    """Reference tuples vs golden, excluding what the new pipeline does
-    not produce yet: register/övergångsbestämmelse tuples (L* source
-    fragments) and begrepp links (dcterms:subject)."""
+    """References vs golden. Lagrum citations compare as exact
+    (source, predicate, uri) tuples, excluding register/övergångsbestämmelse
+    tuples (L* source fragments). Begreppsdefinitioner (dcterms:subject) compare
+    as a *term-URI set* -- their source stycke is subject to the same reference
+    source-attribution drift as the lagrum links, so the meaningful begrepp
+    signal is which terms each side defined, not where."""
     nf = to_normalform(doc, basefile, now=now,
                        refparser=LagrumParser(namedlaws(), basefile))
-    new = golden_sfs.canonicalize_refs(inline_references(nf["structure"]))
+    allrefs = inline_references(nf["structure"])
+    new = golden_sfs.canonicalize_refs(r for r in allrefs if r[1] != "dcterms:subject")
     want = golden_sfs.canonicalize_refs(
         r for r in golden["references"]
         if not r[0].startswith("L") and r[1] != "dcterms:subject")
-    return (["references: missing %s --%s--> %s" % r
-             for r in sorted(want - new)] +
-            ["references: extra %s --%s--> %s" % r
-             for r in sorted(new - want)])
+    problems = ([golden_sfs.format_ref("missing", k, want[k])
+                 for k in sorted(set(want) - set(new))] +
+                [golden_sfs.format_ref("extra", k, new[k])
+                 for k in sorted(set(new) - set(want))])
+    new_terms = {r[2] for r in allrefs if r[1] == "dcterms:subject"}
+    gold_terms = {r[2] for r in golden["references"] if r[1] == "dcterms:subject"}
+    return (problems +
+            ["begrepp: missing %s" % u for u in sorted(gold_terms - new_terms)] +
+            ["begrepp: extra %s" % u for u in sorted(new_terms - gold_terms)])
 
 
 def compare_metadata(golden, doc, basefile, register, sfst_header, golden_sfs):
@@ -71,9 +80,19 @@ def compare_amendments(golden, doc, basefile, now, register, golden_sfs):
 
 
 def validate_one(job):
-    goldenfile, downloadedfile, basefile, sections = job
+    parsedfile, downloadedfile, basefile, sections = job
     golden_sfs = load_golden_module()
-    golden = json.loads(Path(goldenfile).read_text())
+    # the "golden" is the old pipeline's parsed XHTML+RDFa, normalized to NF on
+    # the fly (no frozen golden tree / freeze step any more). Some parsed docs
+    # are legitimately empty (removed/expired); a malformed one is a real error.
+    # Convert either to a string status -- an lxml parse error is unpicklable and
+    # would otherwise crash the whole process pool, not just this document.
+    try:
+        golden = golden_sfs.normalize(parsedfile)
+    except Exception as e:
+        empty = not Path(parsedfile).read_text(errors="replace").strip()
+        return (basefile, "skipped" if empty else "error",
+                ["normalize: %s" % e], [])
     golden_sfs.canonicalize_node_texts(golden["structure"])
     # load_inputs prefers the new JSON _source over the legacy SFST+SFSR HTML
     # pair, dispatching on path suffix. The register sibling for an HTML file
@@ -104,16 +123,20 @@ def validate_one(job):
     candidates.append(datetime.now())
 
     best, best_now = None, None
-    for now in candidates:
-        new_nf = to_normalform(doc, basefile, now=now)
-        golden_sfs.canonicalize_node_texts(new_nf["structure"])
-        problems = []
-        golden_sfs.diff_nodelists(golden["structure"], new_nf["structure"],
-                                  "structure", problems)
-        if best is None or len(problems) < len(best):
-            best, best_now = problems, now
-        if not problems:
-            break
+    try:
+        for now in candidates:
+            new_nf = to_normalform(doc, basefile, now=now)
+            golden_sfs.canonicalize_node_texts(new_nf["structure"])
+            problems = []
+            golden_sfs.diff_nodelists(golden["structure"], new_nf["structure"],
+                                      "structure", problems)
+            if best is None or len(problems) < len(best):
+                best, best_now = problems, now
+            if not problems:
+                break
+    except Exception as e:
+        return (basefile, "error",
+                ["structure %s: %s" % (type(e).__name__, e)], [])
 
     if "structure" not in sections:
         best = []

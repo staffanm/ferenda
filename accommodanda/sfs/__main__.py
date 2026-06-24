@@ -18,7 +18,7 @@ from ..lib.lagrum import LagrumParser, load_namedlaws
 from .nf import inline_references, to_normalform
 from ._validate import load_golden_module, validate_one
 
-NAMEDLAWS_TTL = Path(__file__).parent.parent.parent / "lagen/nu/res/extra/sfs.ttl"
+NAMEDLAWS_JSON = Path(__file__).parent.parent.parent / "lagen/nu/res/extra/sfs_namedlaws.json"
 
 
 def basefile_from_path(path, root):
@@ -115,7 +115,7 @@ def cmd_parse(args):
     doc, register, sfst_header = load_inputs(
         json_path, html_path, register_path, basefile)
     nf = to_normalform(doc, basefile,
-                       refparser=LagrumParser(load_namedlaws(NAMEDLAWS_TTL), basefile),
+                       refparser=LagrumParser(load_namedlaws(NAMEDLAWS_JSON), basefile),
                        register=register, sfst_header=sfst_header)
     json.dump(nf, sys.stdout, ensure_ascii=False, indent=2, sort_keys=True)
     print()
@@ -123,9 +123,10 @@ def cmd_parse(args):
 
 def cmd_refs(args):
     """Compare one document's extracted references against its golden
-    counterpart. Register-derived tuples (L* source fragments) and begrepp
-    links (dcterms:subject) are reported but not yet compared -- those parts
-    of the pipeline don't exist yet."""
+    counterpart (the old-pipeline parsed XHTML, normalized on the fly, or a
+    pre-normalized .json). Register-derived tuples (L* source fragments) and
+    begrepp links (dcterms:subject) are excluded here -- the corpus `validate`
+    compares begrepp separately as a term set."""
     path = Path(args.file).resolve()
     basefile = args.basefile or "%s:%s" % (path.parent.name,
                                            path.stem.replace("_", " "))
@@ -135,34 +136,33 @@ def cmd_refs(args):
                      if html_path else None)
     doc, _register, _sfst_header = load_inputs(
         json_path, html_path, register_path, basefile)
-    refparser = LagrumParser(load_namedlaws(NAMEDLAWS_TTL), basefile)
+    refparser = LagrumParser(load_namedlaws(NAMEDLAWS_JSON), basefile)
     nf = to_normalform(doc, basefile, refparser=refparser)
     golden_sfs = load_golden_module()
     new = golden_sfs.canonicalize_refs(inline_references(nf["structure"]))
 
-    golden_all = set(map(tuple, json.loads(
-        Path(args.golden).read_text())["references"]))
+    golden_all = set(map(tuple, golden_sfs.load(args.golden)["references"]))
     deferred = {r for r in golden_all
                 if r[0].startswith("L") or r[1] == "dcterms:subject"}
     golden = golden_sfs.canonicalize_refs(golden_all - deferred)
 
-    missing = sorted(golden - new)
-    extra = sorted(new - golden)
+    missing = sorted(set(golden) - set(new))
+    extra = sorted(set(new) - set(golden))
     print("%d golden (+%d deferred), %d new: %d missing, %d extra"
           % (len(golden), len(deferred), len(new), len(missing), len(extra)))
-    for ref in missing:
-        print("  missing %s --%s--> %s" % ref)
-    for ref in extra:
-        print("  extra   %s --%s--> %s" % ref)
+    for key in missing:
+        print("  " + golden_sfs.format_ref("missing", key, golden[key]))
+    for key in extra:
+        print("  " + golden_sfs.format_ref("extra", key, new[key]))
 
 
 def cmd_validate(args):
-    goldendir, downloaddir = Path(args.goldendir), Path(args.downloaddir)
+    # the "golden" is the old pipeline's parsed XHTML+RDFa (site/data/sfs/parsed);
+    # validate_one normalizes each to NF on the fly -- no frozen golden tree.
+    parseddir, downloaddir = Path(args.parseddir), Path(args.downloaddir)
     jobs = []
-    for goldenfile in sorted(goldendir.rglob("*.json")):
-        if goldenfile.name == "freeze-report.json":
-            continue
-        rel = goldenfile.relative_to(goldendir)
+    for parsedfile in sorted(parseddir.rglob("*.xhtml")):
+        rel = parsedfile.relative_to(parseddir)
         # the downloaded tree is now JSON (the new beta API source); the
         # legacy SFST HTML tree (downloaded/sfst/…/*.html) is the fallback
         downloaded = downloaddir / rel.with_suffix(".json")
@@ -170,8 +170,8 @@ def cmd_validate(args):
             downloaded = (downloaddir / "sfst" / rel).with_suffix(".html")
         if not downloaded.exists():
             continue
-        jobs.append((goldenfile, downloaded,
-                     basefile_from_path(goldenfile, goldendir),
+        jobs.append((parsedfile, downloaded,
+                     basefile_from_path(parsedfile, parseddir),
                      args.sections))
     if args.limit:
         jobs = jobs[:args.limit]
@@ -245,7 +245,8 @@ def main():
     r.add_argument("--basefile")
     r.set_defaults(func=cmd_refs)
     v = sub.add_parser("validate")
-    v.add_argument("goldendir")
+    v.add_argument("parseddir", help="old-pipeline parsed XHTML tree "
+                   "(site/data/sfs/parsed); normalized to NF on the fly")
     v.add_argument("downloaddir")
     v.add_argument("--sections", default="structure",
                    help="comma-separated: structure,references,amendments,metadata")
