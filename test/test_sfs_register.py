@@ -23,7 +23,7 @@ from accommodanda.sfs.register import (amendment_properties, amendment_uri,
                                   sanitize_departement, sfs_slug)
 
 ROOT = Path(__file__).parent.parent
-NAMEDLAWS = ROOT / "lagen/nu/res/extra/sfs.ttl"
+NAMEDLAWS = ROOT / "lagen/nu/res/extra/sfs_namedlaws.json"
 
 
 def golden_module():

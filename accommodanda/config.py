@@ -9,7 +9,7 @@ and round-trip writes (planned) can rewrite one key without disturbing the
 rest of the file.
 
 Scope is deliberately narrow: this module locates the *corpus*, nothing
-else. Curated source resources that ship in the repo (e.g. ``sfs.ttl``) are
+else. Curated source resources that ship in the repo (e.g. ``sfs_namedlaws.json``) are
 anchored to the package source tree by their own callers, not here.
 """
 

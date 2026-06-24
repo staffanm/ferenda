@@ -65,7 +65,7 @@ DATA = config.DATA                            # corpus location (config.yml: dat
 MANIFEST = DATA / ".build" / "manifest.json"
 CATALOG = DATA / "catalog.sqlite"
 GENERATED = layout.GENERATED
-NAMEDLAWS_TTL = ROOT / "lagen" / "nu" / "res" / "extra" / "sfs.ttl"
+NAMEDLAWS_JSON = ROOT / "lagen" / "nu" / "res" / "extra" / "sfs_namedlaws.json"
 
 
 # --------------------------------------------------------------------------
@@ -338,7 +338,7 @@ SFS_CODE = tuple(PKG / "sfs" / ("%s.py" % m) for m in (
 
 @functools.cache
 def _namedlaws():
-    return load_namedlaws(NAMEDLAWS_TTL)
+    return load_namedlaws(NAMEDLAWS_JSON)
 
 
 @functools.cache
@@ -351,7 +351,8 @@ def sfs_downloaded(basefile):
 
 
 def sfs_source(basefile):
-    """The new beta API _source (its own tree, parallel to the legacy HTML)."""
+    """The new beta-API _source JSON (downloaded/{y}/{n}.json), the primary
+    form; the legacy SFST/SFSR HTML sit in downloaded/sfst|sfsr/ siblings."""
     return layout.sfs_source(basefile)
 
 
@@ -389,7 +390,7 @@ def sfs_harvest(scopes):
     entire corpus oldest-first. Throttled and self-logging (per page)."""
     if RUN.dry_run:
         print("sfs download: would harvest the corpus into %s"
-              % (layout.SFS_DOWNLOADED / "source"))
+              % layout.SFS_DOWNLOADED)
         return
     seen, new, updated, skipped = sfs_download.sync(layout.SFS_DOWNLOADED,
                                                     full=RUN.force)
@@ -409,7 +410,7 @@ def sfs_parse_run(basefile):
 
 def sfs_list():
     """Every *regular* SFS basefile with a source: the new beta JSON
-    (source/) or the legacy SFST HTML (downloaded/).
+    (downloaded/{y}/{n}.json) or the legacy SFST HTML (downloaded/sfst/).
 
     Acts whose year segment is non-numeric -- amendments to government-agency
     regulations carrying a letter prefix, e.g. 'N2026:3' -- are harvested and

@@ -37,7 +37,7 @@ from ..lib.lagrum import (EULAGSTIFTNING, EURATTSFALL, FORARBETEN, KORTLAGRUM,
                           interleave, load_abbreviations, load_namedlaws)
 from ..lib.util import normalize_space
 
-SFS_TTL = "lagen/nu/res/extra/sfs.ttl"
+SFS_NAMEDLAWS = "lagen/nu/res/extra/sfs_namedlaws.json"
 
 # förarbeten cite across the whole spectrum, like court decisions
 PARSE_TYPES = [LAGRUM, KORTLAGRUM, EULAGSTIFTNING, RATTSFALL, FORARBETEN,
@@ -220,8 +220,8 @@ def parse_record(record, root):
 
 @functools.cache
 def _refparser():
-    return LagrumParser(load_namedlaws(SFS_TTL), basefile="forarbete",
-                        abbreviations=load_abbreviations(SFS_TTL),
+    return LagrumParser(load_namedlaws(SFS_NAMEDLAWS), basefile="forarbete",
+                        abbreviations=load_abbreviations(SFS_NAMEDLAWS),
                         parse_types=PARSE_TYPES)
 
 

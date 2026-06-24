@@ -18,6 +18,7 @@ resolved here so the output matches the frozen golden form directly.
 """
 
 import functools
+import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -32,7 +33,8 @@ from ..lib.errors import SkipDocument
 BASE = "https://lagen.nu/"
 RESOURCE_TTL = (Path(__file__).parent.parent.parent
                 / "lagen/nu/res/extra/swedishlegalsource.ttl")
-NAMEDLAWS_TTL = Path(__file__).parent.parent.parent / "lagen/nu/res/extra/sfs.ttl"
+NAMEDLAWS_JSON = (Path(__file__).parent.parent.parent
+                  / "lagen/nu/res/extra/sfs_namedlaws.json")
 RINFO_PUBL = "http://rinfo.lagrummet.se/publ/sfs/"
 CELEX_BASE = "https://lagen.nu/ext/celex/"
 KONSOLIDERAD_TYPE = ("http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#"
@@ -255,12 +257,13 @@ def parse_sfst_header(path):
 @functools.cache
 def abbreviations():
     """basefile → abbreviation ("1998:808" → "MB"), from the named-law
-    dataset's dcterms:alternative. (rdfs:label is in the same dataset but
-    the old pipeline emitted it only for a subset we can't reconstruct, so
+    dataset's abbreviations. (The dataset also has labels, but the old
+    pipeline emitted rdfs:label only for a subset we can't reconstruct, so
     it's not reproduced.)"""
-    graph = Graph().parse(NAMEDLAWS_TTL, format="turtle")
-    return {str(s).replace(BASE, ""): str(o)
-            for s, _, o in graph.triples((None, DCTERMS.alternative, None))}
+    data = json.loads(NAMEDLAWS_JSON.read_text(encoding="utf-8"))
+    # a law's primary abbreviation is the first one listed (the golden's pick)
+    return {lawid: (e["abbr"] if isinstance(e["abbr"], str) else e["abbr"][0])
+            for lawid, e in data.items() if "abbr" in e}
 
 
 def build_metadata(sfst_header, register, basefile):

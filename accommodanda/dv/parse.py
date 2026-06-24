@@ -43,7 +43,7 @@ DV_PARSE_TYPES = [LAGRUM, KORTLAGRUM, EULAGSTIFTNING, RATTSFALL, FORARBETEN,
 
 DOMSTOL_DEFAULT = "site/data/domstol/downloaded"
 INDEX_DEFAULT = "site/data/dv/identity-index.json"
-SFS_TTL = "lagen/nu/res/extra/sfs.ttl"
+SFS_NAMEDLAWS = "lagen/nu/res/extra/sfs_namedlaws.json"
 
 # SFS id at the head of a lagen.nu lagrum URI (https://lagen.nu/1995:450#P4)
 RE_SFS_URI = re.compile(r"https://lagen\.nu/(\d{4}:\d+)")
@@ -132,7 +132,7 @@ def legal_vocab():
     """Named-law and abbreviation tables for the citation scanner, loaded
     once. KORTLAGRUM is enabled (court decisions cite both full law names
     and abbreviations -- "12 kap. 57 § JB", "10 kap. 10 § RB")."""
-    return load_namedlaws(SFS_TTL), load_abbreviations(SFS_TTL)
+    return load_namedlaws(SFS_NAMEDLAWS), load_abbreviations(SFS_NAMEDLAWS)
 
 
 def scan_body(body):

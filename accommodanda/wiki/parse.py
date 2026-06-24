@@ -29,7 +29,7 @@ from ..lib.lagrum import (EULAGSTIFTNING, EURATTSFALL, FORARBETEN, KORTLAGRUM,
                           LAGRUM, MYNDIGHETSBESLUT, RATTSFALL, LagrumParser,
                           load_abbreviations, load_namedlaws)
 
-SFS_TTL = "lagen/nu/res/extra/sfs.ttl"
+SFS_NAMEDLAWS = "lagen/nu/res/extra/sfs_namedlaws.json"
 PARSE_TYPES = [LAGRUM, KORTLAGRUM, EULAGSTIFTNING, RATTSFALL, FORARBETEN,
                EURATTSFALL, MYNDIGHETSBESLUT]
 
@@ -43,7 +43,7 @@ SKIP_TITLE = ("Lagar inom", "Kategori:", "Mall:", "Användare:", "MediaWiki:",
 
 @functools.cache
 def _vocab():
-    return load_namedlaws(SFS_TTL), load_abbreviations(SFS_TTL)
+    return load_namedlaws(SFS_NAMEDLAWS), load_abbreviations(SFS_NAMEDLAWS)
 
 
 def _parser(basefile):

@@ -32,13 +32,13 @@ M mening, L ändringsförfattning.
 """
 
 import functools
+import json
 import re
 from dataclasses import dataclass, field
 from datetime import date
+from pathlib import Path
 
 from lark import Lark, Token, Tree
-from rdflib import Graph, RDFS
-from rdflib.namespace import DCTERMS
 
 # --- parse-type configuration ---------------------------------------
 #
@@ -628,15 +628,18 @@ class NoLink(Exception):
     or an EU reference too incomplete for a celex number)."""
 
 
-RE_BASEFILE_LAW = re.compile(r'\d+:(?:bih\.[_ ]?|N)?\d+(?:[_ ]s\.\d+)?')
+RE_BASEFILE_LAW = re.compile(r'\d+:(?:bih\.[_ ]?|N)?\d+(?:[_ ]s\.\d+|[_ ]\d+)?')
 
 
 def fragment_context(basefile, fragment):
     """Decompose a minted fragment id into baseuri attributes, like the
     old re_urisegments did with the node's URI. Bilaga fragments yield
-    law-only context (the old regex never matched past a B segment), and
-    suffixed basefiles truncate the same way the old regex did ("1723:
-    1016 1" resolves relative refs against 1723:1016)."""
+    law-only context (the old regex never matched past a B segment). A bare
+    numeric suffix (the 1734 års lag balkar: "1736:0123 1" = byggningabalken,
+    "1736:0123 2" = handelsbalken) is *kept*, so relative references resolve
+    against the full basefile -- e.g. "1736:0123_1#K9P2", not the old pipeline's
+    "1736:0123#…" (which collapsed both balkar to the same law and is corrected
+    here, a deliberate divergence from the golden's truncation)."""
     m = RE_BASEFILE_LAW.match(basefile.replace(' ', '_'))
     ctx = {'law': (m.group(0) if m else basefile).replace('_', ' ')}
     if fragment:
@@ -658,20 +661,24 @@ def normalize_lawname(lawname):
 
 
 def load_namedlaws(path):
-    g = Graph()
-    g.parse(path, format='turtle')
-    return {str(label): str(subj).rsplit('/', 1)[1].replace('_', ' ')
-            for subj, label in g.subject_objects(RDFS.label)}
+    """Map each named law ("brottsbalken", "miljöbalken", …) to its SFS id,
+    from the hand-editable named-law dataset (law id -> {label?, abbr?})."""
+    data = json.loads(Path(path).read_text(encoding='utf-8'))
+    return {entry["label"]: lawid.replace('_', ' ')
+            for lawid, entry in data.items() if "label" in entry}
 
 
 def load_abbreviations(path):
-    """Map each dcterms:alternative law abbreviation (JB, RB, BrB, …) to
-    its SFS id -- the data the old KORTLAGRUM LawAbbreviation terminal was
-    built from."""
-    g = Graph()
-    g.parse(path, format='turtle')
-    return {str(abbr): str(subj).rsplit('/', 1)[1].replace('_', ' ')
-            for subj, abbr in g.subject_objects(DCTERMS.alternative)}
+    """Map each law abbreviation (JB, RB, BrB, …) to its SFS id -- the data
+    the old KORTLAGRUM LawAbbreviation terminal was built from. A law may have
+    several (its `abbr` is then a list); all of them resolve to the same law."""
+    data = json.loads(Path(path).read_text(encoding='utf-8'))
+    out = {}
+    for lawid, entry in data.items():
+        abbr = entry.get("abbr")
+        for a in ([abbr] if isinstance(abbr, str) else abbr or []):
+            out[a] = lawid.replace('_', ' ')
+    return out
 
 
 def lagrum_uri(attrs, base='https://lagen.nu/'):
@@ -842,6 +849,11 @@ class LagrumParser:
         self.namedlaws = namedlaws
         self.basefile = basefile
         self.base = base
+        # the document's own law URI -- the prefix every self-reference (a
+        # relative "5 §" or an ändringshänvisning "#L<act>") is minted under,
+        # used to recognise self-links from id-suppressed provisions.
+        self.self_law_uri = lagrum_uri(
+            {'law': fragment_context(basefile, None)['law']}, base)
         self.state = DocState()
         self.abbreviations = abbreviations or {}
         # Default set is SFS + EU (the SFS-pipeline behaviour). Supplying

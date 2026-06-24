@@ -49,7 +49,7 @@ class LegalRefTest(object):
         space = basedir + "lagen/nu/res/uri/swedishlegalsource.space.ttl"
         slugs = basedir + "lagen/nu/res/uri/swedishlegalsource.slugs.ttl"
         extra = [basedir + "lagen/nu/res/extra/swedishlegalsource.ttl",
-                 basedir + "lagen/nu/res/extra/sfs.ttl"]
+                 basedir + "lagen/nu/res/extra/sfs_namedlaws.json"]
         cfg = Graph().parse(space,
                             format="turtle").parse(slugs, format="turtle")
         self.metadata = Graph()

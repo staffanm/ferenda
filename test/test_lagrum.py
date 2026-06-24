@@ -29,10 +29,10 @@ from accommodanda.lib.lagrum import (ENKLALAGRUM, EULAGSTIFTNING, EURATTSFALL,
 from accommodanda.lib.util import normalize_space
 
 TESTROOT = Path(__file__).parent / "files" / "legalref"
-SFS_TTL = (Path(__file__).parent.parent / "lagen" / "nu" / "res" / "extra"
-           / "sfs.ttl")
-NAMEDLAWS = load_namedlaws(SFS_TTL)
-ABBREVIATIONS = load_abbreviations(SFS_TTL)
+SFS_NAMEDLAWS = (Path(__file__).parent.parent / "lagen" / "nu" / "res" / "extra"
+                 / "sfs_namedlaws.json")
+NAMEDLAWS = load_namedlaws(SFS_NAMEDLAWS)
+ABBREVIATIONS = load_abbreviations(SFS_NAMEDLAWS)
 
 # Tests the old engine also failed (its driver listed them as broken);
 # the expected output in these files is hand-authored desired behavior.

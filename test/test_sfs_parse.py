@@ -280,8 +280,8 @@ def test_sfs_parse(txt):
 # fixtures were frozen with a localhost res-URI base, the new pipeline mints
 # lagen.nu URIs.
 
-NAMEDLAWS_TTL = Path(__file__).parent.parent / "lagen" / "nu" / "res" \
-    / "extra" / "sfs.ttl"
+NAMEDLAWS_JSON = Path(__file__).parent.parent / "lagen" / "nu" / "res" \
+    / "extra" / "sfs_namedlaws.json"
 
 
 def norm_uri(uri):
@@ -357,7 +357,7 @@ def test_sfs_links(txt):
     reader = TextReader(text)
     reader.autostrip = True
     doc = assemble(Tokenizer(reader, BASEFILE))
-    refparser = LagrumParser(load_namedlaws(NAMEDLAWS_TTL), BASEFILE)
+    refparser = LagrumParser(load_namedlaws(NAMEDLAWS_JSON), BASEFILE)
     nf = to_normalform(doc, BASEFILE, refparser=refparser,
                        suppress_temporal=False)
     # compare as sets: inline links are per-occurrence, but the fixtures

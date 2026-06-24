@@ -26,7 +26,7 @@ class TestLegalRef(unittest.TestCase):
         space = "lagen/nu/res/uri/swedishlegalsource.space.ttl"
         slugs = "lagen/nu/res/uri/swedishlegalsource.slugs.ttl"
         extra = ["lagen/nu/res/extra/swedishlegalsource.ttl",
-                 "lagen/nu/res/extra/sfs.ttl"]
+                 "lagen/nu/res/extra/sfs_namedlaws.json"]
         cfg = Graph().parse(space,
                             format="turtle").parse(slugs, format="turtle")
         cls.metadata = Graph()
