@@ -26,11 +26,12 @@ overwrites it, so every historical consolidation stays retrievable -- the
 job the old downloader's get_archive_version/archive machinery did.
 
 The harvest writes the beta-API JSON flat under the download root, with
-superseded consolidations tucked into a sibling archive/ subtree (any legacy
-SFST/SFSR HTML lives in its own sfst/, sfsr/ siblings):
+superseded consolidations preserved under a top-level ``archive/`` tree that
+mirrors the live categories (any legacy SFST/SFSR HTML lives in its own
+sfst/, sfsr/ siblings of the download root):
 
-  {year}/{nr}.json                     the current consolidation
-  archive/{year}/{nr}/{version}.json   superseded consolidations
+  downloaded/{year}/{nr}.json                              the current consolidation
+  archive/downloaded/{year}/{nr}/.versions/{vy}/{vn}.json  superseded ones
 
   python -m accommodanda.sfs.download DESTDIR [--full] [--limit N]
 """
@@ -131,9 +132,19 @@ def source_path(destdir, beteckning):
 
 
 def archive_path(destdir, beteckning, version):
+    """A superseded consolidation's path. Archived versions live under a
+    top-level archive/ tree mirroring the live categories, in the old site's
+    per-document .versions/ layout -- keyed by the SFS cutoff that identifies
+    the consolidation (year/nr subdirs), .json instead of .html:
+        <root>/downloaded/{y}/{n}.json
+        -> <root>/archive/downloaded/{y}/{n}/.versions/{vy}/{vn}.json
+    """
     year, nr = _split_beteckning(beteckning)
-    safe = version.replace(":", "_").replace(" ", "_").replace("/", "_")
-    return destdir / "archive" / year / nr / ("%s.json" % safe)
+    archive_root = destdir.parent / "archive" / destdir.name / year / nr / ".versions"
+    if ":" in version:
+        vyear, vnr = version.split(":", 1)
+        return archive_root / vyear / ("%s.json" % vnr)
+    return archive_root / ("%s.json" % version.replace(" ", "_"))
 
 
 def version_id(source):
