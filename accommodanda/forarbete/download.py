@@ -76,8 +76,28 @@ TYPES = {
     "lr": ("lagradsremiss", 2085, None),
 }
 
-PDF_HREF = re.compile(r"/(?:contentassets|globalassets)/[^\"']+\.(?:pdf|docx?|rtf)",
-                      re.IGNORECASE)
+# regeringen.se hangs the document download(s) under /contentassets/ or
+# /globalassets/. We match the link by *location*, not by suffix: the redesigned
+# site serves /contentassets/<hash>/<slug> with no extension at all (the type is
+# only in the link text, "… (pdf 2 MB)"), so a suffix filter misses those and the
+# document is read from the served bytes instead -- see document_extension.
+CONTENT_HREF = re.compile(r"/(?:contentassets|globalassets)/", re.IGNORECASE)
+
+
+def document_extension(data):
+    """The file extension for a downloaded document, read from its leading magic
+    bytes (the URL suffix is unreliable; the served bytes are not). None when the
+    bytes are not a document we keep -- so a non-document /contentassets/ asset
+    (an image, an HTML error page) is skipped rather than stored."""
+    if data[:4] == b"%PDF":
+        return ".pdf"
+    if data[:4] == b"PK\x03\x04":          # zip container -> Office Open XML
+        return ".docx"
+    if data[:4] == b"\xd0\xcf\x11\xe0":    # OLE compound document -> legacy .doc
+        return ".doc"
+    if data[:5] == b"{\\rtf":
+        return ".rtf"
+    return None
 
 
 def write_atomic(path, data):
@@ -176,10 +196,11 @@ def iter_listing(session, typ, delay):
 
 def find_content_links(html):
     """Distinct content-file hrefs (the document PDFs/Word files), in page
-    order. regeringen.se hangs them under /contentassets/ or /globalassets/."""
+    order. regeringen.se hangs them under /contentassets/ or /globalassets/;
+    the served bytes (not the href) decide whether each is a document we keep."""
     soup = BeautifulSoup(html, "html.parser")
     seen, out = set(), []
-    for a in soup.find_all("a", href=PDF_HREF):
+    for a in soup.find_all("a", href=CONTENT_HREF):
         href = a["href"]
         if href not in seen:
             seen.add(href)
@@ -194,11 +215,14 @@ def download_document(session, root, item, delay):
     typ, basefile = item["type"], item["basefile"]
     slug = basefile_slug(basefile)
     files = []
-    for i, href in enumerate(find_content_links(landing.text)):
+    for href in find_content_links(landing.text):
         url = (BASE + href) if href.startswith("/") else href
-        ext = os.path.splitext(href.split("?")[0])[1] or ".pdf"
-        name = "%s%s%s" % (slug, ("-%d" % i if i else ""), ext)
-        write_atomic(Path(root) / typ / name, fetch(session, url).content)
+        data = fetch(session, url).content
+        ext = document_extension(data)
+        if ext is None:                    # not a document (image, error page)
+            continue
+        name = "%s%s%s" % (slug, ("-%d" % len(files) if files else ""), ext)
+        write_atomic(Path(root) / typ / name, data)
         files.append(name)
         time.sleep(delay)
     write_atomic(Path(root) / typ / (slug + ".html"), landing.text)
