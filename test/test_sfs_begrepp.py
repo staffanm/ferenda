@@ -76,3 +76,23 @@ def test_overlong_term_rejected():
 def test_no_mode_no_term():
     # without a mode, a stycke with a colon is not treated as a definition
     assert b.defined_term("antisladdsystem: ett system", None, "stycke") is None
+
+
+def test_formula_prefix_stripped_from_term():
+    # a colon-list definition that swept a formula prefix recovers the real term
+    assert b.defined_term("*/k/ utjämningsbelopp: ett belopp", "normal",
+                          "stycke") == "utjämningsbelopp"
+
+
+def test_parenthetical_clarifier_names_the_head_not_the_paren():
+    # "Behandling (av personuppgifter)" -- head is the term, paren is a clarifier
+    assert b.defined_term("Behandling (av personuppgifter).", None, "stycke") \
+        == "Behandling av personuppgifter"
+    # a real coinage still uses the parenthetical
+    assert b.defined_term("Inteckning får dödas (dödning).", None, "stycke") \
+        == "dödning"
+
+
+def test_term_never_starts_with_a_preposition():
+    # a mis-captured prepositional fragment is dropped, not minted as a concept
+    assert b.defined_term("av personuppgifter: data", "normal", "stycke") is None

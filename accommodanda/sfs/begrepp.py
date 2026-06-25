@@ -41,6 +41,25 @@ re_list_prefixes = (re.compile(r'^(\-\-?|\x96) '),         # bullet
 
 MAX_TERM_LEN = 68    # "Valutaväxling, betalningsöverföring och annan ..." cutoff
 
+# a defined term never contains formula/path symbols nor leads with a preposition
+# -- the two ways the heuristics mis-bound a *real* term (not noise): a colon-list
+# definition sweeping a formula prefix into the span ("*/k/ utjämningsbelopp"), and
+# a parenthetical clarifier captured instead of its head ("Behandling (av
+# personuppgifter)" -> "av personuppgifter").
+RE_FORMULA_TOKEN = re.compile(r"[*/=]")
+PREP_RE = re.compile(
+    r"(av|i|för|om|till|på|med|vid|mot|enligt|under|över|genom|från|åt|hos"
+    r"|inom|utan|per|à)\b", re.IGNORECASE)
+
+
+def _strip_formula_prefix(term):
+    """Drop leading formula/path tokens a colon-list definition swept into the
+    term span: '*/k/ utjämningsbelopp' -> 'utjämningsbelopp'."""
+    words = term.split()
+    while len(words) > 1 and RE_FORMULA_TOKEN.search(words[0]):
+        words.pop(0)
+    return " ".join(words)
+
 
 def term_to_subject(term):
     """The begrepp URI for a term (the old _term_to_subject): capitalised,
@@ -86,12 +105,22 @@ def _stycke_term(text, mode):
             delimiter = " "
         if delimiter in text:
             term = text.split(delimiter)[0]
-    # cases 2-5: brottsrubricering / parentes / löptext, checked unconditionally
-    for rx, group in ((re_brottsdef, 2), (re_brottsdef_alt, 1),
-                      (re_parantesdef, 1), (re_loptextdef, 1)):
+    # cases 2-5: brottsrubricering / löptext, checked unconditionally
+    for rx, group in ((re_brottsdef, 2), (re_brottsdef_alt, 1), (re_loptextdef, 1)):
         m = rx(text)
         if m:
             term = m.group(group)
+    # parentes: a coinage ("dödas (dödning)") names the parenthetical, but a
+    # prepositional *clarifier* ("Behandling (av personuppgifter)") names the head
+    # noun before it -- not the parenthetical
+    m = re_parantesdef(text)
+    if m:
+        paren = m.group(1).strip()
+        if PREP_RE.match(paren):
+            head = text[:m.start()].strip().split()
+            term = ("%s %s" % (head[-1], paren)) if head else term
+        else:
+            term = paren
     return term
 
 
@@ -109,7 +138,9 @@ def defined_term(text, mode, kind):
     else:  # stycke
         term = _stycke_term(text, mode)
     if term:
-        term = util.normalize_space(term)
-        if 0 < len(term) < MAX_TERM_LEN:
+        term = _strip_formula_prefix(util.normalize_space(term))
+        # a term that still leads with a preposition is a mis-capture, not a
+        # concept -- drop it rather than mint a bogus begrepp page
+        if not PREP_RE.match(term) and 0 < len(term) < MAX_TERM_LEN:
             return term
     return None
