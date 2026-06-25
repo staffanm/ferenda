@@ -6,6 +6,7 @@ from accommodanda.eurlex.definitions import (_term_of, build_matcher,
                                              extract_definitions, term_refs)
 from accommodanda.eurlex.model import Block
 from accommodanda.eurlex.parse import parse_formex, to_artifact
+from accommodanda.eurlex.structure import flatten
 
 
 # a directive with a definitions article (art. 5) and a later article (art. 7)
@@ -99,14 +100,15 @@ def _runs(block):
 
 def test_to_artifact_definitions_and_uses():
     art = to_artifact(parse_formex(ET.fromstring(DEFN_ACT), "32022L2555", "swe"))
-    by_id = {b.get("id"): b for b in art["body"] if b.get("id")}
+    blocks = flatten(art["structure"])
+    by_id = {b.get("id"): b for b in blocks if b.get("id")}
 
     # the definition points are anchored <article>.<point> and tagged
     assert by_id["5.1"]["defines"] == "incident"
     assert by_id["5.2"]["defines"] == "sårbarhet"
 
     # article 7's paragraph links its inflected uses to the definition points
-    para = next(b for b in art["body"]
+    para = next(b for b in blocks
                 if b["type"] == "paragraph" and b.get("num") == "1")
     links = [r for r in _runs(para) if isinstance(r, dict)]
     assert {(r["text"], r["uri"]) for r in links if r.get("kind") == "term"} == {

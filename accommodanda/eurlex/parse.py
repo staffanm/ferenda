@@ -30,6 +30,7 @@ from xml.etree import ElementTree as ET
 
 from .definitions import build_matcher, extract_definitions, term_refs
 from .model import BASE, Block, EurlexDoc, doctype
+from .structure import flatten as flatten_structure, nest
 from .parse_html import parse_html
 from .parse_pdf import parse_pdf
 from ..lib.lagrum import (EULAGSTIFTNING, EURATTSFALL, LagrumParser, interleave)
@@ -409,7 +410,8 @@ def to_artifact(doc):
             block["defines"] = b.defines
         body.append(block)
     art = {"uri": doc.uri, "celex": doc.celex, "doctype": doc.doctype,
-           "lang": doc.lang, "title": doc.title, "date": doc.date, "body": body}
+           "lang": doc.lang, "title": doc.title, "date": doc.date,
+           "structure": nest(body)}
     if doc.ecli:
         art["ecli"] = doc.ecli
     if doc.oj:
@@ -496,10 +498,11 @@ def cmd_batch(root, limit):
             fail += 1
             print("  FAIL %s [%s]: %s: %s" % (celex, route, type(exc).__name__, exc))
             continue
-        blocks += len(art["body"])
-        links += sum(1 for b in art["body"] for r in b["text"]
+        flat = flatten_structure(art["structure"])
+        blocks += len(flat)
+        links += sum(1 for b in flat for r in b.get("text", [])
                      if isinstance(r, dict))
-        empty += not art["body"]
+        empty += not art["structure"]
         (doc_dir / "artifact.json").write_text(
             json.dumps(art, ensure_ascii=False, indent=2))
     print("%d docs (%s): %d blocks, %d links, %d empty, %d failed"

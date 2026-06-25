@@ -3,6 +3,7 @@
 from accommodanda.forarbete.kommentar import (parse_articles, resolve_directives,
                                               _refparser, extract, article_of,
                                               pinpoints_by_article)
+from accommodanda.forarbete.structure import nest
 
 CELEX = "https://lagen.nu/ext/celex/"
 
@@ -38,10 +39,26 @@ def test_directive_alias_binds_to_subject_not_repealed():
     assert aliases["default"] == CELEX + "32022L2555"
 
 
+def test_default_directive_from_law_level_subject_statement():
+    # no parenthetical alias defines the directive; a repealed predecessor is
+    # cited more often, but the law-level "lagen genomförs … direktiv X" names the
+    # subject -- a bare "direktivet" must resolve to it (2015/2302), not the
+    # more-cited repealed directive (90/314/EEG)
+    blocks = [
+        {"text": ["Genom lagen genomförs delvis Europaparlamentets och rådets "
+                  "direktiv (EU) 2015/2302 av den 25 november 2015 om paketresor."]},
+        {"text": ["Den tidigare regleringen i rådets direktiv 90/314/EEG om "
+                  "paketresor upphävs. Direktiv 90/314/EEG byggde på en annan "
+                  "systematik än direktiv 90/314/EEG."]},
+    ]
+    aliases = resolve_directives(blocks, _refparser())
+    assert aliases["default"] == CELEX + "32015L2302"
+
+
 def test_extract_implements_from_kommentar():
     # a minimal proposition artifact: the directive definition, then a
     # författningskommentar section with one implements statement
-    art = {"body": [
+    art = {"type": "prop", "structure": nest([
         {"type": "stycke", "text": [
             "Europaparlamentets och rådets direktiv (EU) 2022/2555 "
             "(NIS 2-direktivet) ska genomföras."]},
@@ -53,7 +70,7 @@ def test_extract_implements_from_kommentar():
         {"type": "stycke", "page": 243, "text": [
             "Paragrafen genomför artikel 21.1–21.3 i NIS 2-direktivet. "
             "Paragrafen behandlar de säkerhetsåtgärder som ska vidtas."]},
-    ]}
+    ])}
     [rec] = extract(art)
     assert rec["predicate"] == "rpubl:genomforDirektiv"
     assert rec["directive"] == CELEX + "32022L2555"
@@ -70,10 +87,40 @@ def test_extract_implements_from_kommentar():
 def test_extract_ignores_references_outside_kommentar():
     # a "genomför artikel" sentence in the general motivering is not an
     # författningskommentar implements statement
-    art = {"body": [
+    art = {"type": "prop", "structure": nest([
         {"type": "stycke", "text": [
             "Direktiv (EU) 2022/2555 (NIS 2-direktivet)."]},
         {"type": "stycke", "text": [
             "Paragrafen genomför artikel 5 i NIS 2-direktivet."]},  # no FK heading
-    ]}
+    ])}
     assert extract(art) == []
+
+
+def test_extract_only_from_proposition():
+    # the same författningskommentar in a lagrådsremiss yields nothing -- only a
+    # proposition is authoritative for implements relations (the proposed
+    # structure is still renumbered before enactment)
+    body = nest([
+        {"type": "stycke", "text": [
+            "Europaparlamentets och rådets direktiv (EU) 2022/2555 "
+            "(NIS 2-direktivet) ska genomföras."]},
+        {"type": "rubrik", "level": 1, "text": ["15 Författningskommentar"]},
+        {"type": "rubrik", "level": 2, "text": ["15.1 Förslaget till lag"]},
+        {"type": "paragraf", "num": "3", "text": ["3 §"]},
+        {"type": "stycke", "text": [
+            "Paragrafen genomför artikel 21 i NIS 2-direktivet."]},
+    ])
+    assert extract({"type": "prop", "structure": body})      # prop: extracted
+    assert extract({"type": "lr", "structure": body}) == []  # lagrådsremiss: not
+    assert extract({"type": "sou", "structure": body}) == []
+
+
+def test_directive_alias_ignores_co_cited_regulation():
+    # a "(… i direktivet)" parenthetical following a *regulation* citation must
+    # not bind the regulation as a directive -- a "genomför" statement can never
+    # target a regulation, so a non-directive resolution is rejected
+    blocks = [{"text": [
+        "förordning (EG) nr 1107/2006 av den 5 juli 2006 om rättigheter i "
+        "samband med flygresor (jfr artikel 13.8 i direktivet)."]}]
+    aliases = resolve_directives(blocks, _refparser())
+    assert CELEX + "32006R1107" not in aliases.values()

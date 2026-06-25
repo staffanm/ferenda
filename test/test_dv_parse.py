@@ -2,6 +2,7 @@
 
 from accommodanda.dv.parse import (case_uri, parse_innehall, parse_api_record,
                                    to_artifact)
+from accommodanda.dv.structure import flatten
 from accommodanda.dv.model import Rubrik, Stycke
 
 
@@ -112,17 +113,18 @@ def test_artifact_shape():
     assert art["uri"] == "https://lagen.nu/dom/hfd/2016:69"
     assert art["metadata"]["lagrum"][0]["sfsnummer"] == "1999:1229"
     assert "references" not in art  # citations live inline in the body now
-    assert [b["type"] for b in art["body"]] == ["rubrik", "stycke"]
+    body = flatten(art["structure"])
+    assert [b["type"] for b in body] == ["rubrik", "stycke"]
     # every block's text is an inline-run list (plain runs + link dicts),
     # the same shape SFS emits; this body has no citations -> single runs
-    assert all(isinstance(b["text"], list) for b in art["body"])
-    assert art["body"][0]["text"] == ["Bakgrund"]
+    assert all(isinstance(b["text"], list) for b in body)
+    assert body[0]["text"] == ["Bakgrund"]
 
 
 def test_inline_links_in_body():
     html = "<p>Enligt 6 § räntelagen (1975:635) ska ränta utgå.</p>"
     art = to_artifact(parse_api_record({**RECORD, "innehall": html}))
-    runs = art["body"][0]["text"]
+    runs = flatten(art["structure"])[0]["text"]
     links = [r for r in runs if isinstance(r, dict)]
     assert links == [{"predicate": "dcterms:references",
                       "uri": "https://lagen.nu/1975:635#P6",

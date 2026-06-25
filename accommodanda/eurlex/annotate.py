@@ -13,19 +13,13 @@ never as part of a corpus-wide parse/relate/generate.
 """
 
 import json
-import os
 from pathlib import Path
 
-import requests
-from dotenv import load_dotenv
-
-from ..lib import catalog, layout
+from .structure import flatten
+from ..lib import catalog, layout, llm
 
 PROMPT = Path(__file__).with_name("preamble_analyzer_prompt.txt")
 PLACEHOLDER = "[PASTE FULL LEGAL ACT TEXT HERE]"
-API_URL = "https://api.berget.ai/v1/chat/completions"
-MODEL = "google/gemma-4-31B-it"
-TIMEOUT = 600          # the act is large and the model reasons over the whole of it
 
 
 def act_markdown(art):
@@ -34,7 +28,7 @@ def act_markdown(art):
     numbered recitals, article headings, numbered paragraphs and lettered points,
     so the model can mint the "4(5)" / "6(2)(a)" provision keys it is asked for."""
     lines = ["# %s" % art.get("title", art["celex"]), ""]
-    for b in art["body"]:
+    for b in flatten(art["structure"]):
         text = catalog.runs_text(b["text"]).strip()
         t, num = b["type"], b.get("num")
         if t == "recital":
@@ -56,31 +50,10 @@ def act_markdown(art):
     return "\n".join(lines)
 
 
-def _strip_fence(content):
-    """The model is told to emit bare JSON; if it nonetheless wraps the payload
-    in a ``` fence, peel it so the JSON parses."""
-    s = content.strip()
-    if s.startswith("```"):
-        s = s[s.find("\n") + 1:]
-        if s.rstrip().endswith("```"):
-            s = s.rstrip()[:-3]
-    return s.strip()
-
-
-def _complete(prompt, api_key):
-    resp = requests.post(
-        API_URL, headers={"Authorization": "Bearer %s" % api_key},
-        json={"model": MODEL, "temperature": 0,
-              "messages": [{"role": "user", "content": prompt}]},
-        timeout=TIMEOUT)
-    resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"]
-
-
 def _validate(content):
     """Parse and shape-check the model's reply: a JSON object with exactly the
     two expected keys. Raises on anything else (rather than write a bad layer)."""
-    layer = json.loads(_strip_fence(content))
+    layer = json.loads(content)
     assert isinstance(layer, dict), "response is not a JSON object"
     assert isinstance(layer.get("recitalGroups"), list), \
         "response lacks a recitalGroups list"
@@ -100,12 +73,9 @@ def annotate(celex):
     assert art_path.exists(), \
         "%s: no parsed artifact at %s -- run `lagen eurlex parse %s` first" \
         % (celex, art_path, celex)
-    load_dotenv()
-    api_key = os.environ.get("BERGET_API_KEY")
-    assert api_key, "BERGET_API_KEY is not set (add it to .env)"
     art = json.loads(art_path.read_text())
     prompt = PROMPT.read_text().replace(PLACEHOLDER, act_markdown(art))
-    layer = _validate(_complete(prompt, api_key))
+    layer = _validate(llm.complete(prompt))
     out = art_path.with_suffix(".ann")
     out.write_text(json.dumps({"editorialLayer": layer},
                               ensure_ascii=False, indent=2))

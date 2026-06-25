@@ -7,11 +7,21 @@ is a *genomför* (implements) relation, stronger than a bare reference: it ties 
 Swedish provision to the exact EU-law article it transposes, which is the
 machine-readable mapping that otherwise only exists as ad-hoc tables.
 
+Implementation relations are authoritative only in a *proposition*: the bill
+text is the version closest to the enacted law, whereas the structure a
+lagrådsremiss/SOU/Ds proposes is still renumbered and revised (on Lagrådet's and
+the remiss bodies' feedback) before enactment. So `extract` extracts only from
+props; the commentary of other förarbete types is ignored.
+
 This module extracts those statements:
 
-  - the directive is resolved to a CELEX uri. A named directive ("NIS 2-
-    direktivet") is resolved from its defining sentence -- the alias in
-    parentheses binds to the *subject* directive (the first "(EU) yyyy/n"),
+  - the directive is resolved to a CELEX uri -- and only ever to a *directive*
+    (a sector-3 act whose CELEX type letter is 'L'). "Paragrafen genomför …
+    artikel … i direktivet" transposes a directive into national law; a
+    regulation ('R') applies directly and is never "genomförd", so a regulation
+    result is necessarily a misparse and is discarded. A named directive ("NIS
+    2-direktivet") is resolved from its defining sentence -- the alias in
+    parentheses binds to the *subject* directive (the first directive citation),
     not the trailing acts the title mentions amending/repealing. A bare
     "direktivet" falls back to the proposition's dominant directive.
   - the article reference is parsed into pinpoints (dotted, ranged, listed and
@@ -31,6 +41,7 @@ import re
 from pathlib import Path
 
 from .parse import parse_record, to_artifact
+from .structure import flatten
 from ..lib.lagrum import EULAGSTIFTNING, LagrumParser
 
 # "Paragrafen genomför [delvis] artikel(n/na) <refs> i <directive>"; the article
@@ -53,32 +64,68 @@ ARTICLE_RE = re.compile(r"(\d+(?:\.\d+)*)\s*([a-z])?", re.IGNORECASE)
 # direktivet)". The alias binds to the subject (first) directive of the sentence.
 ALIAS_RE = re.compile(r"\(([^()]*?direktivet)\)")
 
+# a law-level statement of what the *statute* transposes: "(Genom) lag(en)/
+# lagförslaget genomför(s) [delvis] … direktiv (EU) 2015/2302 …". The first
+# directive cited after it is the proposition's subject directive -- the
+# authoritative fallback for a bare "direktivet" when (as is normal for a single-
+# directive prop) the directive is never given a parenthetical alias. Beats a
+# raw citation count, which a repealed predecessor directive can dominate.
+SUBJECT_RE = re.compile(
+    r"\b(?:lag|lagen|lagförslaget)\b[^.]*?genomför(?:s|t)?\b", re.IGNORECASE)
+
 
 def plain(runs):
     return "".join(r if isinstance(r, str) else r.get("text", "") for r in runs)
+
+
+def is_directive(uri):
+    """True when `uri` is a CELEX *directive* -- a sector-3 act whose type letter
+    is 'L' (as opposed to a regulation 'R' or decision 'D'). Only a directive can
+    be the target of a "genomför … i direktivet" statement, so a non-directive
+    resolution is rejected rather than recorded."""
+    celex = uri.rsplit("/", 1)[-1].split("#")[0]
+    return len(celex) > 5 and celex[5] == "L"
 
 
 def _refparser():
     return LagrumParser({}, basefile="prop", parse_types=[EULAGSTIFTNING])
 
 
+def _first_directive(parser, text):
+    """The first CELEX *directive* the parser finds in `text` (regulations and
+    other acts skipped), or None."""
+    return next((r.uri for r in parser.parse_text(text, context={})
+                 if is_directive(r.uri)), None)
+
+
 def resolve_directives(blocks, parser):
     """Map each directive alias used in the proposition to a CELEX uri, plus a
     'default' for a bare "direktivet". A defining sentence is one ending in
-    "(<alias>direktivet)"; the alias binds to its first EU-act citation (the
-    subject), not the acts it amends/repeals."""
+    "(<alias>direktivet)"; the alias binds to its first *directive* citation (the
+    subject), not the acts it amends/repeals and not a co-cited regulation
+    (which can never be the subject of a "genomför" statement).
+
+    The 'default' is the directive the statute transposes, named in a law-level
+    "lag(en) genomför(s) … direktiv X" statement (SUBJECT_RE) -- the reliable
+    subject signal when, as for a single-directive prop, the directive is never
+    aliased. Failing that it falls back to the dominant aliased directive."""
     aliases = {}
+    subjects = []
     for b in blocks:
         text = plain(b["text"])
         for m in ALIAS_RE.finditer(text):
-            sentence = text[max(0, m.start() - 400):m.end()]
-            refs = parser.parse_text(sentence, context={})
-            if refs:
-                aliases[m.group(1).lower()] = refs[0].uri   # subject directive
-    # the dominant directive (most-cited CELEX) backs a bare "direktivet"
-    if aliases:
-        aliases["default"] = max(set(aliases.values()), key=list(
-            aliases.values()).count)
+            uri = _first_directive(parser, text[max(0, m.start() - 400):m.end()])
+            if uri:
+                aliases[m.group(1).lower()] = uri           # subject directive
+        for m in SUBJECT_RE.finditer(text):
+            uri = _first_directive(parser, text[m.start():m.end() + 200])
+            if uri:
+                subjects.append(uri)
+    default = (max(set(subjects), key=subjects.count) if subjects else
+               max(set(aliases.values()), key=list(aliases.values()).count)
+               if aliases else None)
+    if default:
+        aliases["default"] = default
     return aliases
 
 
@@ -147,8 +194,15 @@ def extract(art):
     författningskommentar, each tied to the paragraf it comments on. The
     paragraf is tracked from the font-derived `kapitel`/`paragraf` structure
     blocks the parser emits. Records: {predicate, directive, articles,
-    pinpoints, uris, partial, law, chapter, paragraf, sentence, page}."""
-    blocks = art["body"]
+    pinpoints, uris, partial, law, chapter, paragraf, sentence, page}.
+
+    Only a proposition is authoritative for these relations -- the bill text is
+    closest to the enacted law, while a lagrådsremiss/SOU/Ds still has its
+    provisions renumbered and revised before enactment -- so the commentary of
+    any other förarbete type yields nothing."""
+    if art.get("type") != "prop":
+        return []
+    blocks = flatten(art["structure"])      # document-order flat view of the tree
     span = find_kommentar(blocks)
     if span is None:                      # no författningskommentar (most types)
         return []
@@ -229,7 +283,7 @@ def main():
     ap.add_argument("--root", default="site/data/forarbete")
     args = ap.parse_args()
     data = json.loads(Path(args.record).read_text())
-    art = data if "body" in data else to_artifact(parse_record(data, args.root))
+    art = data if "structure" in data else to_artifact(parse_record(data, args.root))
     records = extract(art)
     print("%d implements-statements in författningskommentar" % len(records))
     for r in records:

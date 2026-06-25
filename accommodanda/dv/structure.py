@@ -153,9 +153,15 @@ def _block_text(block):
     return text or ""
 
 
-def segment(blocks):
-    """Group `blocks` (Avgorande body or artifact body) into the structural
-    skeleton: a list of nested ``{type, court?, ordinal?, children}`` nodes."""
+def nest(blocks):
+    """Group body `blocks` into the **content-bearing** instance/ruling structure:
+    the skeleton of nested ``{type, court?, ordinal?, children}`` nodes, with every
+    block -- the structural markers and the plain prose between them -- attached as
+    a leaf to the node it falls under, in document order. So the artifact carries
+    the decision tree *with* its text; the structural golden's reducer
+    (`skeleton_from_artifact`) drops the prose leaves, so the skeleton it compares
+    is exactly what the pure segmenter produced. Blocks before the first instans
+    (the headnote/keyword preamble) sit at the root."""
     root = []
     stack = []                       # [(rank, node)]
 
@@ -165,6 +171,9 @@ def segment(blocks):
     def close_to(rank):
         while stack and stack[-1][0] >= rank:
             stack.pop()
+
+    def attach(block):
+        (stack[-1][1]["children"] if stack else root).append(block)
 
     def push(kind, **attrs):
         node = {"type": kind, "children": []}
@@ -188,6 +197,7 @@ def segment(blocks):
     for block in blocks:
         hit = classify(_block_text(block))
         if not hit:
+            attach(block)             # plain prose -> the current node (or root)
             continue
         kind, attrs = hit
 
@@ -211,7 +221,8 @@ def segment(blocks):
                 inst["court"] = court            # refine the coarse/missing name
             if kind == "betankande" and any(c["type"] == "betankande"
                                             for c in inst["children"]):
-                continue                          # föredragning already opened it
+                attach(block)                     # föredragning already opened it
+                continue
             close_to(3)
             push(kind)
             if kind in ("dom", "betankande"):    # reasoning follows by default
@@ -227,4 +238,18 @@ def segment(blocks):
             close_to(4)
             push(kind)
 
+        attach(block)                 # the marker's own text -> the node it opened
     return root
+
+
+def flatten(structure):
+    """Document-order prose leaves of a content-bearing DV structure -- the
+    structural wrapper nodes (instans/dom/domskäl/…) are transparent, their prose
+    children hoisted -- for the linear renderer."""
+    out = []
+    for node in structure:
+        if node.get("type") in RANK:          # a structural wrapper -> descend
+            out.extend(flatten(node["children"]))
+        else:
+            out.append(node)
+    return out

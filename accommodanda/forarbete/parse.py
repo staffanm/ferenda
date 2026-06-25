@@ -32,6 +32,7 @@ from lxml import etree
 
 from .download import basefile_slug
 from .model import Block, Forarbete
+from .structure import flatten, nest
 from ..lib.lagrum import (EULAGSTIFTNING, EURATTSFALL, FORARBETEN, KORTLAGRUM,
                           LAGRUM, MYNDIGHETSBESLUT, RATTSFALL, LagrumParser,
                           interleave, load_abbreviations, load_namedlaws)
@@ -98,22 +99,30 @@ def pdf_pages(pdf_path):
         for t in page.findall("text"):
             text = normalize_space("".join(t.itertext()))
             if text:
-                spans.append((int(t.get("top")), int(t.get("left")), text,
+                top, height = int(t.get("top")), int(t.get("height") or 0)
+                spans.append((top, int(t.get("left")), top + height, text,
                               t.find(".//b") is not None,
                               t.find(".//i") is not None))
         yield int(page.get("number")), _lines(spans)
 
 
 def _lines(spans):
-    """Group same-`top` spans (left to right) into visual lines."""
+    """Group spans sharing a text baseline (top + height) into visual lines, left
+    to right. We group on the baseline, not the top, because one line may mix font
+    sizes -- a large heading number beside its title ('9' + 'Författnings-
+    kommentar'), a bold §-marker leading body text -- and such spans share a
+    baseline while sitting at different tops; a top-only grouping would split them
+    (and reflow e.g. '9 Författningskommentar' to 'Författningskommentar 9', which
+    then fails heading detection). The line's `top` is the topmost of its spans."""
     lines = []
-    for top, left, text, bold, italic in sorted(spans):
-        if lines and abs(top - lines[-1][0]) <= LINE_TOL:
+    for top, left, base, text, bold, italic in sorted(spans):
+        if lines and abs(base - lines[-1][0]) <= LINE_TOL:
             lines[-1][1].append((left, text, bold, italic))
+            lines[-1][2] = min(lines[-1][2], top)
         else:
-            lines.append((top, [(left, text, bold, italic)]))
+            lines.append([base, [(left, text, bold, italic)], top])
     out = []
-    for top, runs in lines:
+    for base, runs, top in lines:
         runs.sort()
         out.append(Line(normalize_space(" ".join(r[1] for r in runs)), top,
                         all(r[2] for r in runs), runs[0][2],
@@ -226,19 +235,20 @@ def _refparser():
 
 
 def to_artifact(fa):
-    """Project to JSON. Body blocks become inline-run lists (plain runs +
-    {predicate,uri,text} link dicts), scanned with one parser threaded across
-    the document so 'a. prop.'/'samma lag' state carries."""
+    """Project to JSON. Each block becomes an inline-run list (plain runs +
+    {predicate,uri,text} link dicts), scanned with one parser threaded across the
+    document so 'a. prop.'/'samma lag' state carries; the flat block run is then
+    grouped into the nested `structure` tree by heading level (see structure.py)."""
     parser = _refparser()
     parser.state = type(parser.state)()      # fresh per-document state
-    body = [{"type": b.kind, "page": b.page,
-             "text": interleave(b.text, parser.parse_text(b.text, context={}))}
-            | ({"level": b.level} if b.level else {})
-            | ({"num": b.num} if b.num else {})
-            for b in fa.body]
+    blocks = [{"type": b.kind, "page": b.page,
+               "text": interleave(b.text, parser.parse_text(b.text, context={}))}
+              | ({"level": b.level} if b.level else {})
+              | ({"num": b.num} if b.num else {})
+              for b in fa.body]
     return {"uri": fa.uri, "type": fa.type, "identifier": fa.identifier,
             "basefile": fa.basefile, "title": fa.title, "date": fa.date,
-            "body": body}
+            "structure": nest(blocks)}
 
 
 # --------------------------------------------------------------------------
@@ -269,10 +279,11 @@ def cmd_batch(root, typ, limit):
             print("  FAIL %s: %s: %s" % (record["basefile"],
                                          type(exc).__name__, exc))
             continue
-        blocks += len(art["body"])
-        links += sum(1 for b in art["body"] for r in b["text"]
+        flat = flatten(art["structure"])
+        blocks += len(flat)
+        links += sum(1 for b in flat for r in b.get("text", [])
                      if isinstance(r, dict))
-        empty += not art["body"]
+        empty += not art["structure"]
         art_path(root, record).write_text(
             json.dumps(art, ensure_ascii=False, indent=2))
     print("%d records: %d blocks, %d links, %d empty-body, %d failed"

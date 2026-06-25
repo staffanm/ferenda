@@ -2,6 +2,7 @@
 
 from xml.etree import ElementTree as ET
 
+from accommodanda.eurlex.structure import flatten as flatten_structure
 from accommodanda.eurlex.parse import (flatten, doctype, parse_formex,
                                        parse_document, to_artifact,
                                        content_file, _annex_anchor)
@@ -123,9 +124,10 @@ def test_to_artifact_shape_and_runs():
     assert art["uri"] == "https://lagen.nu/ext/celex/32022L2555"
     assert art["celex"] == "32022L2555" and art["oj"] == "L 333"
     # every block text is an inline-run list (plain strings / link dicts)
-    for block in art["body"]:
+    blocks = flatten_structure(art["structure"])
+    for block in blocks:
         assert isinstance(block["text"], list)
-    article = next(b for b in art["body"] if b["type"] == "article")
+    article = next(b for b in blocks if b["type"] == "article")
     assert article["id"] == "1"     # citation anchor -> artifact id
 
 
@@ -172,7 +174,8 @@ def test_footnotes_become_blocks_and_yield_citations():
     assert note.num == "1" and "2016/1148" in note.text
     # the footnote's act reference mints a CELEX link in the artifact
     art = to_artifact(doc)
-    note_runs = next(b for b in art["body"] if b["type"] == "note")["text"]
+    note_runs = next(b for b in flatten_structure(art["structure"])
+                     if b["type"] == "note")["text"]
     assert any(isinstance(r, dict) and r["uri"].endswith("32016L1148")
                for r in note_runs)
 
