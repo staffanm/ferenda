@@ -1,110 +1,54 @@
-version: '3.4'
+# OpenSearch for the rebuilt lagen.nu full-text index
+# (REWRITE.md §6 / accommodanda/lib/search.py).
+#
+# The old pipeline's full nginx + elasticsearch:7.7.1 + fuseki + mediawiki +
+# matomo stack lived here; on the modernization branch it is retired (still in
+# git history). Bring up just OpenSearch with:
+#
+#     docker compose up -d
+#
+# wait for it to report healthy (`docker compose ps`), then build and query:
+#
+#     lagen all relate     # the catalog -- the index's prerequisite
+#     lagen all index      # bulk-index the corpus into this cluster
+#     lagen serve-api      # then search via /api/v1/search (or the site's ⌘K box)
+#
+# A single-node, security-disabled OpenSearch 2.x reachable at the code's default
+# endpoint -- plain http://localhost:9200, no TLS, no auth -- matching
+# config.DEFAULT_OPENSEARCH_URL. Security is OFF on purpose: a local dev index
+# over public data, and the client speaks plain HTTP without credentials.
+# Do NOT expose port 9200 publicly. On WSL2, if it won't boot, raise
+# vm.max_map_count: `sudo sysctl -w vm.max_map_count=262144`.
+
 services:
-  nginx:
-    build:
-      context: docker/nginx
-      # The Dockerfile builds on the base Nginx image but adds configuration, letsencrypt integration etc
+  opensearch:
+    image: opensearchproject/opensearch:2.18.0   # ':2' tracks the latest 2.x
+    container_name: lagen-opensearch
+    environment:
+      - discovery.type=single-node           # one node; relaxes the bootstrap checks
+      - DISABLE_SECURITY_PLUGIN=true          # -> plain http://localhost:9200, no auth
+      - DISABLE_INSTALL_DEMO_CONFIG=true      # skip the demo TLS certs/users
+      - bootstrap.memory_lock=true            # keep the JVM heap out of swap
+      - OPENSEARCH_JAVA_OPTS=-Xms3g -Xmx3g    # headroom for a ~1M+ doc parent-child
+                                              # index; the join field's global ordinals
+                                              # are the main heap consumer (now lazy)
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
     ports:
-      - "80:80"
-      - "443:443"
+      - "9200:9200"        # REST API -- the endpoint the code connects to
+      - "9600:9600"        # performance analyzer (optional)
     volumes:
-      - /mnt/data/lagen/data:/usr/share/nginx/html:ro
-      - /mnt/data/lagen/certificates:/usr/share/nginx/certificates/
-    environment:
-      - "DOMAIN=lagen.nu"
-      - "EMAIL=staffan.malmgren@gmail.com"
-    depends_on:
-      - ferenda
-      - mediawiki
-      - matomo
-    restart: always
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "10"
-  ferenda:
-    build:
-      context: .
-    volumes:
-      - /mnt/data/lagen:/usr/share/site
-      - .:/usr/share/ferenda
-      - ./lagen/nu/res/patches:/usr/share/lagen/nu/res/patches
-    restart: always
-    depends_on:
-      - elasticsearch
-      - fuseki
-    stdin_open: true
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "10"
-  elasticsearch:
-    image: elasticsearch:7.7.1
-    volumes:
-      - /mnt/data/elasticsearch:/usr/share/elasticsearch/data
-    environment:
-      - "discovery.type=single-node"
-      - "ES_JAVA_OPTS=-Xms8g -Xmx8g"
-    restart: always
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "10"
-  fuseki:
-    # image: stain/jena-fuseki
-    build:
-      context: docker/fuseki
-    volumes:
-      - fuseki:/fuseki
-    environment:
-      - "JVM_ARGS=-Xmx2g"
-      - "FUSEKI_DATASET_1=lagen"
-    restart: always
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "10"
-  mediawiki:
-    build: 
-      context: docker/mediawiki
-    volumes:
-      - /mnt/data/mediawiki/db:/var/www/data
-      - /mnt/data/mediawiki/images:/var/www/html/w/images
-    restart: always
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "10"
-  db:
-    image: mariadb
-    command: --max-allowed-packet=64MB
-    volumes:
-      - db:/var/lib/mysql
-    environment:
-      - MYSQL_ROOT_PASSWORD=ncfeGpSR63xmnyTa
-    restart: always
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "10"
-  matomo:
-    image: matomo:5
-    #volumes:
-    #  - matomo:/var/www/html
-    environment:
-      - MATOMO_DATABASE_HOST=db
-      - MYSQL_PASSWORD=ncfeGpSR63xmnyTa
-      - MYSQL_DATABASE=matomo
-      - MYSQL_USER=root
-    #ports:
-    #  - 8123:8123
-    restart: always
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "10"
+      - opensearch-data:/usr/share/opensearch/data   # persist the index across restarts
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 18          # first boot can take a couple of minutes
+
 volumes:
-  db:
-  #matomo:
-  fuseki:
-  elasticsearch:
+  opensearch-data:

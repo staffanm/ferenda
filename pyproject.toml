@@ -32,15 +32,18 @@ classifiers = [
 ]
 dependencies = [
     "beautifulsoup4",
+    "fastapi",
     "jpype1>=1.7.1",
     "lark",
     "lxml",
+    "opensearch-py",
     "pillow",
     "python-dotenv>=1.2.2",
     "rdflib",
     "requests",
     "ruamel-yaml>=0.19.1",
     "urllib3",
+    "uvicorn",
 ]
 
 [project.optional-dependencies]

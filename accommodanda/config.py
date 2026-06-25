@@ -13,6 +13,7 @@ else. Curated source resources that ship in the repo (e.g. ``sfs_namedlaws.json`
 anchored to the package source tree by their own callers, not here.
 """
 
+import os
 from pathlib import Path
 
 from ruamel.yaml import YAML
@@ -21,6 +22,7 @@ from ruamel.yaml.comments import CommentedMap
 REPO = Path(__file__).parent.parent          # the ferenda repo root
 CONFIG_PATH = REPO / "config.yml"
 DEFAULT_DATA = REPO / "site" / "data"
+DEFAULT_OPENSEARCH_URL = "http://localhost:9200"
 
 _yaml = YAML()                               # round-trip mode by default
 
@@ -55,4 +57,22 @@ def resolve_data_root(doc):
     return Path(value).expanduser()
 
 
-DATA = resolve_data_root(load())
+def resolve_opensearch_url(doc):
+    """The OpenSearch endpoint for the search index. Precedence: the
+    ``OPENSEARCH_URL`` environment variable (for ad-hoc overrides), then the
+    ``opensearch_url`` key in config.yml, then ``http://localhost:9200``."""
+    env = os.environ.get("OPENSEARCH_URL")
+    if env:
+        return env
+    if "opensearch_url" not in doc:
+        return DEFAULT_OPENSEARCH_URL
+    value = doc["opensearch_url"]
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError("opensearch_url set to invalid value %r at %s"
+                          % (value, _at(doc, "opensearch_url")))
+    return value
+
+
+_doc = load()                                # parse config.yml once
+DATA = resolve_data_root(_doc)
+OPENSEARCH_URL = resolve_opensearch_url(_doc)
