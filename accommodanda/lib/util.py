@@ -1,18 +1,52 @@
 """Small shared utilities (ported from ferenda.util)."""
 
 import re
+import shutil
 import sys
 import time
 
+# ETA timing state for `status`, self-tracked so callers need not thread a start
+# time. A current/total run (sfs parse, then dv parse, …) is timed from its first
+# line; a new run is detected when `done` restarts or `total` changes, which
+# re-bases the clock -- so each source is estimated on its own pace.
+_eta = {"start": None, "start_done": 0, "last_done": 0, "total": object()}
 
-def status(done, total, message="", *, stream=sys.stderr):
-    """A live one-line progress counter, overwritten in place -- the pattern the
-    per-document loops (parse, generate, bulk unpack) share: ``(<done>/<total>)
-    <message>``, refreshed per item via a leading '\\r'. '\\033[K' clears any tail
-    a longer previous line left. The loop writes one trailing newline at the end
-    (the line lives on stderr, so stdout summaries stay clean)."""
-    stream.write("\r(%d/%s) %s\033[K"
-                 % (done, "?" if total is None else total, message))
+
+def _eta_suffix(done, total):
+    """``ETA MM:SS`` for a current/total sequence, from (elapsed/processed) over
+    the docs since timing began, or '' when there is no usable estimate (the
+    first line of a run, an unknown total, or the final line)."""
+    now = time.monotonic()
+    if done <= 1 or done < _eta["last_done"] or total != _eta["total"]:
+        _eta.update(start=now, start_done=done, last_done=done, total=total)
+        return ""                                  # first line of the run: re-base
+    _eta["last_done"] = done
+    processed = done - _eta["start_done"]
+    elapsed = now - _eta["start"]
+    if total is None or done >= total or processed <= 0 or elapsed <= 0:
+        return ""
+    remaining = (elapsed / processed) * (total - done)
+    return "ETA %02d:%02d" % divmod(int(remaining + 0.5), 60)
+
+
+def status(done, total, message="", *, prefix="", tail="", stream=sys.stderr):
+    """The single live one-line progress counter, overwritten in place -- shared
+    by the per-document build loops (parse, generate, index, dump, bulk unpack)
+    *and* the source-downloader harvest reporter (`progress`). Renders
+    ``[prefix](<done>/<total>) <message>[tail]`` refreshed per item via a leading
+    '\\r', with an ``ETA MM:SS`` estimate right-aligned to the terminal edge.
+    `prefix` (a harvest's clock/scope/page) precedes the counter; `tail` (a
+    harvest's ``[+dt]``) follows the message. '\\033[K' clears any tail a longer
+    previous line left. The loop writes one trailing newline at the end (the line
+    lives on stderr, so stdout summaries stay clean)."""
+    line = "%s(%d/%s) %s%s" % (prefix, done, "?" if total is None else total,
+                               message, tail)
+    eta = _eta_suffix(done, total)
+    if eta:
+        width = shutil.get_terminal_size((80, 24)).columns
+        pad = width - 1 - len(line) - len(eta)
+        line += (" " * pad + eta) if pad > 0 else ("  " + eta)
+    stream.write("\r%s\033[K" % line)
     stream.flush()
 
 
@@ -33,23 +67,23 @@ def progress(seen, total=None, *, scope=None, page=None, elapsed=None,
 
         [HH:MM:SS] [scope ]page <p> (<seen>/<total>): <n> <label>, ... [+<dt>]
 
-    Rewritten in place per call via a leading '\\r' (the parse/unpack pattern),
-    so a long sweep shows one live line instead of a scroll. `total` None renders
-    as '?'; `page` is omitted when None; `counts` are label=value pairs (new=...,
+    Delegates to `status` -- the one renderer -- so the harvest line shares its
+    `\\r` overwrite, '\\033[K', and right-aligned ``ETA MM:SS`` (shown whenever the
+    total is known; '?' totals get none). The clock/scope/page form the `prefix`,
+    the tallies the message, and ``[+<dt>]`` the `tail`. `total` None renders as
+    '?'; `page` is omitted when None; `counts` are label=value pairs (new=...,
     skipped=..., changed=...) shown in call order. `stamp` prefixes the wall
-    clock; `elapsed` (seconds since the previous line) is appended as [+<dt>] --
-    so a slow per-document fetch is visible as it happens. The caller ends a
-    segment (a harvest year / page sweep) with progress_break(), dropping to a
-    fresh line so the finished segment persists above the next live one."""
+    clock; `elapsed` (seconds since the previous line) is the [+<dt>] tail -- so a
+    slow per-document fetch is visible as it happens. The caller ends a segment (a
+    harvest year / page sweep) with progress_break(), dropping to a fresh line so
+    the finished segment persists above the next live one."""
     clock = time.strftime("[%H:%M:%S] ") if stamp else ""
     head = "%s " % scope if scope else ""
     pg = "page %d " % page if page is not None else ""
     tally = ", ".join("%d %s" % (value, label) for label, value in counts.items())
     tail = " [+%s]" % hms(elapsed) if elapsed is not None else ""
-    stream.write("\r%s%s%s(%d/%s): %s%s\033[K"
-                 % (clock, head, pg, seen, "?" if total is None else total,
-                    tally, tail))
-    stream.flush()
+    status(seen, total, tally, prefix="%s%s%s" % (clock, head, pg), tail=tail,
+           stream=stream)
 
 
 def progress_break(stream=sys.stderr):

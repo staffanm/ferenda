@@ -42,6 +42,7 @@ from urllib.parse import urlsplit
 from . import config
 from .sfs import load_inputs
 from .sfs import download as sfs_download
+from .sfs import correspond as sfs_correspond
 from .dv import download as dv_download
 from .dv import identity as dv_identity
 from .forarbete import download as fa_download
@@ -54,7 +55,8 @@ from .eurlex import download as eurlex_download
 from .eurlex import parse as eurlex_parse
 from .wiki import parse as wiki_parse
 from .dv.parse import api_member, parse_api_record, to_artifact
-from .lib import catalog, layout, render, util
+from .api import app as api_app
+from .lib import catalog, dump, layout, render, search, util
 from .lib.errors import SkipDocument
 from .lib.lagrum import LagrumParser, load_namedlaws
 from .sfs.nf import to_normalform
@@ -65,6 +67,7 @@ DATA = config.DATA                            # corpus location (config.yml: dat
 MANIFEST = DATA / ".build" / "manifest.json"
 CATALOG = DATA / "catalog.sqlite"
 GENERATED = layout.GENERATED
+DUMPS = DATA / "dumps"                         # NDJSON bulk exports
 NAMEDLAWS_JSON = ROOT / "lagen" / "nu" / "res" / "extra" / "sfs_namedlaws.json"
 
 
@@ -333,7 +336,7 @@ SFS_ROOT = layout.SFS_ROOT
 PKG = Path(__file__).parent
 SFS_CODE = tuple(PKG / "sfs" / ("%s.py" % m) for m in (
     "__init__", "extract", "reader", "tokenizer", "assembler", "model", "nf",
-    "register")) + (PKG / "lib" / "lagrum.py",)
+    "register", "begrepp")) + (PKG / "lib" / "lagrum.py",)
 
 
 @functools.cache
@@ -423,6 +426,35 @@ def sfs_list():
                      for p in (layout.SFS_DOWNLOADED / "sfst").glob("*/*.html")})
 
 
+def sfs_ai_correspond(basefiles):
+    """`lagen sfs ai-correspond <new-sfs> <prop-basefile> [<old-sfs>]` -- LLM-derive
+    the old->new paragraf correspondence map for a restructured statute from the
+    proposition's författningskommentar, validate every edge against both laws'
+    paragrafs, and write it as a `.corr` sidecar next to the new statute. The old
+    law is read from the new law's repeal clause unless given. One-shot per id,
+    like eurlex ai-annotate; the LLM is never called from parse/relate/generate."""
+    if not 2 <= len(basefiles) <= 3:
+        sys.exit("usage: lagen sfs ai-correspond <new-sfs> <prop-basefile> "
+                 "[<old-sfs>]  (e.g. 2018:585 prop/2017-18-89)")
+    new_sfs, prop = basefiles[0], basefiles[1]
+    new_art = json.loads(sfs_artifact(new_sfs).read_text())
+    prop_art = json.loads(fa_artifact(prop).read_text())
+    old_uri = ("https://lagen.nu/" + basefiles[2] if len(basefiles) == 3
+               else sfs_correspond.detect_old_law(new_art))
+    assert old_uri, ("%s: could not detect the repealed law from its transition "
+                     "clause; pass it as the third argument" % new_sfs)
+    old_art = json.loads(sfs_artifact(old_uri.rsplit("/", 1)[-1]).read_text())
+    out = sfs_artifact(new_sfs).with_suffix(".corr")
+    if RUN.dry_run:
+        print("sfs ai-correspond: would map %s <- %s via %s -> %s"
+              % (new_sfs, old_uri.rsplit("/", 1)[-1], prop, out))
+        return
+    sidecar, stats = sfs_correspond.correspond(new_art, prop_art, old_art)
+    out.write_text(json.dumps(sidecar, ensure_ascii=False, indent=2))
+    print("sfs ai-correspond %s: %d edges from %d (%d rejected), wrote %s"
+          % (new_sfs, stats["emitted"], stats["raw"], stats["rejected"], out))
+
+
 SOURCES["sfs"] = Source("sfs", sfs_list, {
     # download has no input files (the input is the remote DB) and its output
     # is valid regardless of the fetcher's version, so inputs/code stay empty:
@@ -430,7 +462,10 @@ SOURCES["sfs"] = Source("sfs", sfs_list, {
     "download": Stage("download", sfs_download_run, sfs_source),
     "parse": Stage("parse", sfs_parse_run, sfs_artifact,
                    inputs=sfs_inputs, code=SFS_CODE),
-}, harvest=sfs_harvest, origin=_origin(sfs_download.ENDPOINT))
+}, harvest=sfs_harvest, origin=_origin(sfs_download.ENDPOINT),
+   actions={"ai-correspond": sfs_ai_correspond},
+   notes="ai-correspond <new-sfs> <prop> [<old-sfs>]: LLM-derive the old->new "
+         "paragraf correspondence map into a .corr sidecar")
 
 
 # --------------------------------------------------------------------------
@@ -441,7 +476,7 @@ DOM_DOWNLOADED = layout.DOM_DOWNLOADED            # dv api records (primary)
 DV_LEGACY_DOWNLOADED = layout.DV_LEGACY_DOWNLOADED  # legacy raw feed
 DV_INDEX = layout.DOM_INDEX
 DV_CODE = (PKG / "dv" / "parse.py", PKG / "dv" / "model.py",
-           PKG / "lib" / "lagrum.py")
+           PKG / "dv" / "structure.py", PKG / "lib" / "lagrum.py")
 
 
 @functools.cache
@@ -540,7 +575,8 @@ SOURCES["dv"] = Source("dv", lambda: sorted(_dv_cases()), {
 
 FA_ROOT = layout.FA_ROOT
 FA_CODE = (PKG / "forarbete" / "parse.py", PKG / "forarbete" / "model.py",
-           PKG / "forarbete" / "kommentar.py", PKG / "lib" / "lagrum.py")
+           PKG / "forarbete" / "structure.py", PKG / "forarbete" / "kommentar.py",
+           PKG / "lib" / "lagrum.py")
 
 
 def fa_record(basefile):
@@ -606,7 +642,8 @@ SOURCES["forarbete"] = Source("forarbete", fa_list, {
 EURLEX_ROOT = layout.EURLEX_ROOT
 EURLEX_CODE = (PKG / "eurlex" / "parse.py", PKG / "eurlex" / "parse_html.py",
                PKG / "eurlex" / "parse_pdf.py", PKG / "eurlex" / "lang.py",
-               PKG / "eurlex" / "model.py", PKG / "lib" / "lagrum.py")
+               PKG / "eurlex" / "model.py", PKG / "eurlex" / "structure.py",
+               PKG / "lib" / "lagrum.py")
 
 
 @functools.cache
@@ -794,13 +831,60 @@ def cmd_relate(names):
         docs, edges = catalog.rebuild(CATALOG, name, paths, progress=progress)
         sys.stderr.write("\n")
         print("relate %s: %d documents, %d links" % (name, docs, edges))
-    # cross-document post-pass: pin each förarbete genomför-direktiv statement to
-    # the SFS paragraf it transposes (needs the whole catalog, so it runs last).
+    # cross-document post-passes (need the whole catalog, so they run last):
+    # pin each förarbete genomför-direktiv statement to the SFS paragraf it
+    # transposes, and mint a stub begrepp node for every defined term / nyckelord
+    # the corpus references but no wiki page covers.
     con = catalog.connect(CATALOG)
     pinned = fa_genomforande.resolve(con)
+    corr = [row for p in (SFS_ROOT / "artifact").glob("*/*.corr")
+            for row in sfs_correspond.corr_rows(json.loads(p.read_text()))]
+    catalog.set_correspondence(con, corr)
+    folded = catalog.canonicalize_concepts(con)
+    concepts = catalog.synthesize_concepts(con)
     con.close()
     print("relate: %d genomför-direktiv relations pinned to SFS paragrafs" % pinned)
+    print("relate: %d old->new paragraf correspondences loaded from .corr layers"
+          % len(corr))
+    print("relate: %d inflected concept variants folded onto canonical begrepp"
+          % folded)
+    print("relate: %d concept stubs minted from defined terms + nyckelord"
+          % concepts)
     print("catalog: %s" % CATALOG)
+
+
+def cmd_index(names):
+    """(Re)build the OpenSearch full-text index for each named source from the
+    catalog + artifacts -- a parent document plus one child per § fragment, the
+    paragraph-precise search behind the killer feature. Per-source whole rebuild
+    (like `relate`, which is its prerequisite -- run that first). Needs a running
+    OpenSearch (OPENSEARCH_URL, default http://localhost:9200)."""
+    index = search.SearchIndex()
+    con = catalog.connect(CATALOG)
+    for name in names:
+        def progress(seen, total, current="", name=name):
+            util.status(seen, total, "index %s  %s" % (name, current))
+        docs, indexed, errors = index.index_source(con, name, progress=progress)
+        sys.stderr.write("\n")
+        print("index %s: %d documents -> %d docs+fragments indexed, %d errors"
+              % (name, docs, indexed, len(errors)))
+    con.close()
+    print("search index '%s' on %s" % (search.INDEX, config.OPENSEARCH_URL))
+
+
+def cmd_dump(names):
+    """Write a gzipped NDJSON bulk dump per named source -- every artifact, one
+    compact JSON per line, byte-equivalent to the on-disk artifact (the citation
+    graph is already inline, so each line is self-contained). The machine-
+    readable corpus export that replaces the retired RDF/Fuseki dumps."""
+    DUMPS.mkdir(parents=True, exist_ok=True)
+    for name in names:
+        def progress(seen, total, name=name):
+            util.status(seen, total, "dump %s" % name)
+        out = DUMPS / ("%s.ndjson.gz" % name)
+        lines = dump.dump_source(ARTIFACTS[name](), out, progress=progress)
+        sys.stderr.write("\n")
+        print("dump %s: %d documents -> %s" % (name, lines, out))
 
 
 def stale_sources():
@@ -820,7 +904,7 @@ GENERATE_CODE = (PKG / "lib" / "render.py", PKG / "lib" / "catalog.py",
                  PKG / "lib" / "wikitext.py", PKG / "lib" / "layout.py")
 
 
-def cmd_generate(only=None):
+def cmd_generate(only=None, source=None):
     """Render every catalogued document to static HTML, with live outbound
     links and inbound annotations queried from the catalog, plus a frontpage.
     Auto-runs `relate` first for any source whose artifacts are newer than the
@@ -831,9 +915,10 @@ def cmd_generate(only=None):
     render code changed. `--force` rebuilds all; `--ignore-code-changes` ignores
     the render-code version (rebuild only on data changes).
 
-    `only`, a set of artifact path strings, restricts the run to those documents
-    (`lagen <source> generate <id>`), leaving the corpus-wide aggregate pages as
-    they are -- a fast single-document re-render during development.
+    `source` restricts the run to one source's pages (`lagen <source> generate`);
+    `only`, a set of artifact path strings, restricts it to those documents
+    (`lagen <source> generate <id>`). Either scoping leaves the corpus-wide
+    aggregate pages as they are and uses the catalog as-is (no auto-relate).
 
     `--aggregates-only` rewrites just the corpus-wide pages (frontpage + browse
     indexes) from the current catalog, skipping the per-document render -- a
@@ -846,9 +931,10 @@ def cmd_generate(only=None):
         return
 
     # a full generate auto-relates any stale source first (relate is its upstream
-    # dependency); a targeted single-document render skips that corpus-wide scan
-    # and uses the catalog as-is -- run `lagen <source> relate` to refresh it
-    stale = [] if only is not None else stale_sources()
+    # dependency); a scoped render skips that corpus-wide scan and uses the catalog
+    # as-is -- run `lagen <source> relate` to refresh it
+    scoped = only is not None or source is not None
+    stale = [] if scoped else stale_sources()
     if stale:
         print("catalog stale for %s -- relating first" % ", ".join(stale))
         cmd_relate(stale)
@@ -862,16 +948,22 @@ def cmd_generate(only=None):
         # only the page's OWN artifact is content-hashed (it changes when the doc
         # is re-parsed); its neighbours enter via dep_digest as a set of
         # relationships, not their contents -- an immutable case re-appearing
-        # unchanged must not invalidate every law it cites. A sibling `.ann`
-        # editorial layer (eurlex ai-annotate) is hashed in too, so authoring or
-        # editing it re-renders just that page.
+        # unchanged must not invalidate every law it cites. The page's sibling LLM
+        # layers are hashed in too, so authoring or editing one re-renders just
+        # that page: `.ann` (eurlex ai-annotate) and `.corr` (sfs ai-correspond,
+        # the new statute's corresponding-cases margin). The *old* statute's margin
+        # reads a `.corr` next to a different document, so a `.corr` edit reaches it
+        # only via relate + a full/forced generate.
         p = str(art_path)
         if p not in own_hash:
-            fp = Path(p)
-            ann = fp.with_suffix(".ann")
-            own_hash[p] = hashlib.sha256(
-                (fp.read_bytes() if fp.exists() else b"")
-                + (ann.read_bytes() if ann.exists() else b"")).hexdigest()
+            # a synthesized concept stub has no artifact on disk (empty path) and
+            # so no sibling layers -- its signature is just its dep_digest (its
+            # aggregated inbound, which is the stub's whole content)
+            fp = Path(p) if p else None
+            sides = ((fp, fp.with_suffix(".ann"), fp.with_suffix(".corr"))
+                     if fp else ())
+            own_hash[p] = hashlib.sha256(b"".join(
+                s.read_bytes() if s.exists() else b"" for s in sides)).hexdigest()
         return hashlib.sha256((own_hash[p] + dep_digest).encode()).hexdigest()
 
     def fresh(uri, out_path, art_path, dep_digest):
@@ -890,7 +982,8 @@ def cmd_generate(only=None):
         util.status(done, total, "generate  %d rendered  %s" % (rendered, current))
 
     total, rendered = render.generate_site(CATALOG, GENERATED, progress=progress,
-                                           fresh=fresh, record=record, only=only)
+                                           fresh=fresh, record=record, only=only,
+                                           source=source)
     sys.stderr.write("\n")
     if updates:
         manifest.update(updates)
@@ -901,9 +994,8 @@ def cmd_generate(only=None):
         return
     print("generate: %d pages (%d rendered, %d fresh)%s -> %s"
           % (total, rendered, total - rendered,
-             " [targeted; aggregates untouched]" if only is not None else "",
-             GENERATED))
-    if only is None:
+             " [scoped; aggregates untouched]" if scoped else "", GENERATED))
+    if not scoped:
         print("serve with: lagen all serve   (then open http://localhost:8000/)")
 
 
@@ -984,7 +1076,8 @@ def main(argv=None):
     p.add_argument("source", help="source name (%s) or 'all'"
                    % ", ".join(SOURCES))
     p.add_argument("action",
-                   help="download | parse | relate | generate | serve | status "
+                   help="download | parse | relate | generate | index | dump "
+                        "| serve | serve-api | status "
                         "| a source action (e.g. dv reindex)")
     p.add_argument("basefiles", nargs="*",
                    help="ids to act on (empty = all stale); for download, names "
@@ -1006,6 +1099,8 @@ def main(argv=None):
                    help="print the plan, do nothing")
     p.add_argument("--port", type=int, default=8000,
                    help="port for `serve` (default 8000)")
+    p.add_argument("--api-port", type=int, default=8001,
+                   help="port for `serve-api` (default 8001)")
     p.add_argument("--since", type=date.fromisoformat, metavar="YYYY-MM-DD",
                    help="eurlex download: only discover documents dated on/after "
                         "this (overrides the per-sector watermark for this run)")
@@ -1028,16 +1123,29 @@ def main(argv=None):
     # generate is corpus-wide by default, but `lagen <source> generate <id> ...`
     # targets just those documents (and leaves the aggregate pages alone)
     if args.action == "generate":
-        only = None
-        if args.basefiles:
-            if args.source not in SOURCES:
-                p.error("`generate <ids>` needs a specific source, e.g. "
-                        "`lagen eurlex generate 32022L2555` (not %r)" % args.source)
-            only = {str(layout.artifact(args.source, bf)) for bf in args.basefiles}
-        cmd_generate(only)
+        # `all generate` = the whole corpus (+ aggregates); `<source> generate` =
+        # that source's pages (incl. synthesized stubs, which have no artifact
+        # file); `<source> generate <ids>` = just those docs. A scoped run skips
+        # the corpus-wide aggregate pages and the auto-relate.
+        if args.source == "all":
+            if args.basefiles:
+                p.error("`all generate <ids>` needs a specific source, e.g. "
+                        "`lagen eurlex generate 32022L2555`")
+            cmd_generate()
+        elif args.source not in SOURCES:
+            p.error("unknown source %r (have: %s)"
+                    % (args.source, ", ".join(SOURCES)))
+        elif args.basefiles:
+            cmd_generate(only={str(layout.artifact(args.source, bf))
+                               for bf in args.basefiles})
+        else:
+            cmd_generate(source=args.source)
         return
     if args.action == "serve":
         cmd_serve(args.port)
+        return
+    if args.action == "serve-api":
+        api_app.run(port=args.api_port)
         return
 
     names = list(SOURCES) if args.source == "all" else [args.source]
@@ -1046,6 +1154,12 @@ def main(argv=None):
 
     if args.action == "relate":
         cmd_relate(names)
+        return
+    if args.action == "index":
+        cmd_index(names)
+        return
+    if args.action == "dump":
+        cmd_dump(names)
         return
 
     had_errors = False
