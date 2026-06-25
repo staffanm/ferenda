@@ -26,7 +26,7 @@ CASE = {
     "court": "HDO", "court_namn": "Högsta domstolen",
     "referat": ["NJA 1994 s. 1"], "malnummer": ["T 1-94"],
     "metadata": {"sammanfattning": "Om dröjsmålsränta."},
-    "body": [
+    "structure": [
         {"type": "stycke", "text": [
             "Bolaget yrkade ränta enligt ",
             {"predicate": "dcterms:references", "text": "6 § räntelagen (1975:635)",
@@ -344,7 +344,7 @@ def test_document_level_inbound_for_bare_citation(tmp_path):
     bare.write_text(json.dumps({
         "uri": "https://lagen.nu/dom/NJA_2000_s_1", "court": "HDO",
         "referat": ["NJA 2000 s. 1"], "metadata": {},
-        "body": [{"type": "stycke", "text": [
+        "structure": [{"type": "stycke", "text": [
             "enligt ", {"predicate": "dcterms:references", "text": "räntelagen",
                         "uri": "https://lagen.nu/1975:635"}, "."]}]}))
     catalog.rebuild(db, "sfs", [law])
@@ -362,9 +362,11 @@ def test_document_level_inbound_for_bare_citation(tmp_path):
 PROP = {
     "uri": "https://lagen.nu/prop/2023/24:1",
     "type": "prop", "identifier": "Prop. 2023/24:1", "title": "Cybersäkerhetslag",
-    "body": [
-        {"type": "rubrik", "level": 1, "page": 100, "text": ["Författningskommentar"]},
-        {"type": "stycke", "page": 100, "text": ["Paragrafen genomför artikel 21."]},
+    "structure": [
+        {"type": "avsnitt", "id": "sec1", "level": 1, "page": 100,
+         "text": ["Författningskommentar"], "children": [
+            {"type": "stycke", "page": 100,
+             "text": ["Paragrafen genomför artikel 21."]}]},
     ],
     "implements": [{
         "predicate": "rpubl:genomforDirektiv",
@@ -378,8 +380,8 @@ PROP = {
 DIRECTIVE = {
     "uri": "https://lagen.nu/ext/celex/32022L2555",
     "celex": "32022L2555", "doctype": "directive", "title": "NIS 2-direktivet",
-    "body": [{"type": "article", "id": "21", "num": "21",
-              "text": ["Riskhanteringsåtgärder"]}],
+    "structure": [{"type": "article", "id": "21", "num": "21",
+                   "text": ["Riskhanteringsåtgärder"], "children": []}],
 }
 
 
@@ -554,12 +556,14 @@ def test_directive_article_inbound_shows_statute(tmp_path):
 ACT = {
     "uri": "https://lagen.nu/ext/celex/32099R0001", "celex": "32099R0001",
     "doctype": "regulation", "title": "Testförordning",
-    "body": [
+    "structure": [
         {"type": "recital", "num": "1", "text": ["Bakgrund."]},
         {"type": "recital", "num": "2", "text": ["Syfte."]},
-        {"type": "article", "id": "4", "num": "4", "text": ["Artikel 4 – Skyldigheter"]},
-        {"type": "paragraph", "num": "1", "text": ["Datahållaren ska göra data tillgänglig."]},
-        {"type": "point", "num": "a", "text": ["på ett säkert sätt."]},
+        {"type": "article", "id": "4", "num": "4", "text": ["Artikel 4 – Skyldigheter"],
+         "children": [
+            {"type": "paragraph", "num": "1",
+             "text": ["Datahållaren ska göra data tillgänglig."], "children": [
+                {"type": "point", "num": "a", "text": ["på ett säkert sätt."]}]}]},
     ],
 }
 LAYER = {
@@ -672,3 +676,70 @@ def test_genomfor_pinpoints_split_per_article(tmp_path):
     pins = {a: pin for _d, a, _pu, _pl, pin, _pa
             in catalog.genomfor_for(con, "https://lagen.nu/2025:1506", "K1P3")}
     assert pins == {"2": "2.1, 2.2 f", "26": "26.1 c"}
+
+
+def test_commentary_shows_in_paragraph_rail_not_as_page(tmp_path):
+    # wiki SFS commentary is an annotation -- its prose shows in the statute
+    # paragraph's context rail, side-by-side; there is no kommentar page
+    ad = tmp_path / "art"
+    ad.mkdir()
+    law = ad / "law.json"
+    law.write_text(json.dumps({
+        "uri": "https://lagen.nu/1962:700",
+        "metadata": {"properties": {"dcterms:title": "Brottsbalk"}},
+        "structure": [{"type": "paragraf", "id": "K3P1", "ordinal": "1",
+                       "text": ["Den som berövar annan livet döms för mord."]}]}))
+    komm = ad / "komm.json"
+    komm.write_text(json.dumps({
+        "uri": "https://lagen.nu/kommentar/1962:700", "type": "kommentar",
+        "annotates": "https://lagen.nu/1962:700", "author": "Foo Bar",
+        "body": [{"type": "sektion", "id": "K3P1", "heading": "3 kap. 1 §",
+                  "text": ["3 kap. 1 §"],
+                  "children": [{"text": ["Bestämmelsen kräver uppsåt."]}]}]}))
+    db = str(tmp_path / "catalog.sqlite")
+    catalog.rebuild(db, "sfs", [law])
+    catalog.rebuild(db, "kommentar", [komm])
+    con = catalog.connect(db)
+    site = render.Site.from_catalog(con)
+    assert site.commentary[("https://lagen.nu/1962:700", "K3P1")]  # indexed
+
+    html = render.render_sfs(json.loads(law.read_text()), site)
+    island = re.search(r'id="lagen-context">(.*?)</script>', html, re.S).group(1)
+    assert "rail-komm" in island                       # rail section emitted
+    assert "Bestämmelsen kräver uppsåt." in island     # the prose, side-by-side
+    assert "Foo Bar" in island                         # author byline
+
+    # the statute's inbound never lists commentary as a citing document
+    assert catalog.inbound(con, "https://lagen.nu/1962:700#K3P1") == []
+
+
+def test_law_level_commentary_is_the_rail_default_panel(tmp_path):
+    # commentary before the first section heading is about the statute as a whole;
+    # it becomes the rail's default panel (key '') -- shown when no paragraph is
+    # in focus, e.g. at the top of the document
+    ad = tmp_path / "art"
+    ad.mkdir()
+    law = ad / "law.json"
+    law.write_text(json.dumps({
+        "uri": "https://lagen.nu/1915:218",
+        "metadata": {"properties": {"dcterms:title": "Avtalslag"}},
+        "structure": [{"type": "paragraf", "id": "P1", "ordinal": "1",
+                       "text": ["Anbud om slutande av avtal …"]}]}))
+    komm = ad / "komm.json"
+    komm.write_text(json.dumps({
+        "uri": "https://lagen.nu/kommentar/1915:218", "type": "kommentar",
+        "annotates": "https://lagen.nu/1915:218", "author": "Ellinor",
+        "body": [{"type": "stycke", "text": ["Lagen reglerar avtalsslutande."]},
+                 {"type": "sektion", "id": "P1", "heading": "1 §", "text": ["1 §"],
+                  "children": [{"text": ["Om anbud och accept."]}]}]}))
+    db = str(tmp_path / "catalog.sqlite")
+    catalog.rebuild(db, "sfs", [law])
+    catalog.rebuild(db, "kommentar", [komm])
+    con = catalog.connect(db)
+    site = render.Site.from_catalog(con)
+    assert ("https://lagen.nu/1915:218", None) in site.commentary  # preamble indexed
+
+    island = _island(render.render_sfs(json.loads(law.read_text()), site))
+    assert "Lagen reglerar avtalsslutande." in island[""]   # law-level default panel
+    assert "Kommentar till lagen" in island[""]
+    assert "Om anbud och accept." in island["P1"]            # per-paragraph still works

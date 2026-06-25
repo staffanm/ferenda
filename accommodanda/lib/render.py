@@ -24,6 +24,7 @@ than a broken link.
 """
 
 import json
+import os
 import re
 from dataclasses import dataclass
 from html import escape
@@ -33,7 +34,15 @@ from . import catalog
 from . import layout
 from .catalog import BASE
 from .wikitext import begrepp_uri
+from ..dv.structure import flatten as dv_flatten
 from ..eurlex.model import doctype as eurlex_doctype
+from ..eurlex.structure import flatten as eurlex_flatten
+
+# Where the generated static site reaches the REST API for live ⌘K search. The
+# site and the API are separate services (static files vs. uvicorn), so the base
+# is baked into each page as a <meta> tag at generate time; override per
+# deployment with LAGEN_API. Empty = same origin (a reverse proxy fronting both).
+API_BASE = os.environ.get("LAGEN_API", "http://localhost:8001")
 
 
 @dataclass
@@ -41,11 +50,20 @@ class Site:
     con: object
     known: set                          # document root uris present
     snippets: dict = None               # fragment uri -> tooltip text (lazy cache)
+    aliases: dict = None                # variant begrepp uri -> canonical concept
+    commentary: dict = None             # (law_uri, anchor) -> [(author, prose)]
 
     @classmethod
     def from_catalog(cls, con):
         return cls(con, {u for (u,) in con.execute("SELECT uri FROM documents")},
-                   {})
+                   {}, catalog.concept_aliases(con), _commentary_index(con))
+
+    def resolve(self, uri):
+        """Fold a begrepp link baked into an artifact onto its canonical concept
+        uri (inflected/variant forms merged at relate time); other uris (and a
+        non-begrepp uri) pass through unchanged."""
+        base, sep, frag = uri.partition("#")
+        return (self.aliases or {}).get(base, base) + sep + frag
 
     def has(self, uri):
         return catalog.strip_fragment(uri) in self.known
@@ -56,6 +74,36 @@ class Site:
         if uri not in self.snippets:
             self.snippets[uri] = catalog.snippet(self.con, uri) or ""
         return self.snippets[uri]
+
+
+def _commentary_index(con):
+    """Wiki SFS commentary indexed by the statute fragment it annotates:
+    {(law_uri, anchor): [(author, [prose blocks])]} -- the content the rail shows
+    side-by-side with the paragraph. Commentary is an annotation layer (no page of
+    its own); each `== N kap M § ==` section maps onto the statute paragraph's
+    anchor (`K{N}P{M}`), matching the id-bearing node the reader focuses."""
+    index = {}
+    for (path,) in con.execute(
+            "SELECT path FROM documents WHERE source = 'kommentar' AND path <> ''"):
+        art = json.loads(Path(path).read_bytes())
+        law = art.get("annotates")
+        if not law:
+            continue
+        body = art.get("body", [])
+        # leading blocks before the first section heading are commentary on the
+        # statute as a whole -- keyed (law, None), shown in the rail by default
+        preamble = []
+        for b in body:
+            if b.get("type") == "sektion":
+                break
+            preamble.append(b)
+        if preamble:
+            index.setdefault((law, None), []).append((art.get("author"), preamble))
+        for b in body:
+            if b.get("type") == "sektion" and b.get("children"):
+                index.setdefault((law, b["id"]), []).append(
+                    (art.get("author"), b["children"]))
+    return index
 
 
 # --------------------------------------------------------------------------
@@ -135,9 +183,8 @@ def describe_citer(from_uri, anchor, label, title, source):
 
 # inbound panel section order + heading; commentary first (it's the closest
 # reading aid to a paragraph), then the machine-extracted sources, then concepts
-INBOUND_GROUPS = [("kommentar", "Kommentar"), ("sfs", "Författningar"),
-                  ("forarbete", "Förarbeten"), ("dv", "Rättsfall"),
-                  ("begrepp", "Begrepp")]
+INBOUND_GROUPS = [("sfs", "Författningar"), ("forarbete", "Förarbeten"),
+                  ("dv", "Rättsfall"), ("begrepp", "Begrepp")]
 
 
 # --------------------------------------------------------------------------
@@ -195,7 +242,7 @@ def render_runs(runs, site):
         if isinstance(run, str):
             out.append(escape(run))
             continue
-        uri = run["uri"]
+        uri = site.resolve(run["uri"])     # fold a begrepp variant onto its canon
         if site.has(uri):
             # a document we host (incl. EU acts we've parsed) -- local link;
             # hover shows the target paragraph (+ its list items). A "term" run
@@ -282,6 +329,77 @@ def genomfor_margin(site, sfs_uri, anchor):
             '<ul>%s</ul></aside>' % "".join(items))
 
 
+def _law_title(site, base):
+    """A law's display title from the catalog, whitespace-collapsed (SFS titles
+    can carry a trailing CR/LF), falling back to its local id."""
+    return " ".join((_doc_title(site, base) or catalog.local(base)).split())
+
+
+def _corr_phrase(relation, scope):
+    """How an old paragraf's margin names its successor, from the correspondence's
+    relation/scope: "motsvaras numera huvudsakligen av", "har förts över till"."""
+    if relation == "overfort":
+        return "har förts över till"
+    return {"delvis": "motsvaras numera delvis av",
+            "i_huvudsak": "motsvaras numera huvudsakligen av",
+            "i_sak": "motsvaras numera i sak av"}.get(scope, "motsvaras numera av")
+
+
+def corresponds_margin(site, uri):
+    """Old (repealed) statute paragraf margin: the new-law paragraf that now
+    corresponds to this one, from the `.corr` correspondence layer -- "Denna
+    paragraf motsvaras numera huvudsakligen av <ny paragraf>". The new side does
+    not show the mirror line: that the new paragraf corresponds to the old one is
+    already plain from its författningskommentar."""
+    rows = catalog.correspondence_for_old(site.con, uri)
+    if not rows:
+        return ""
+    items, seen = [], set()
+    for new_uri, relation, scope, _prop in rows:
+        if new_uri in seen:        # one line per successor paragraf, not per stycke
+            continue
+        seen.add(new_uri)
+        base = new_uri.split("#")[0]
+        label = ("%s %s" % (human_fragment(new_uri.partition("#")[2]),
+                            _law_title(site, base))).strip()
+        link = ('<a href="%s">%s</a>' % (escape(href(new_uri)), escape(label))
+                if site.has(base) else escape(label))
+        items.append('<li>Denna paragraf %s %s</li>'
+                     % (_corr_phrase(relation, scope), link))
+    return ('<aside class="motsvarighet"><div class="inbound-h">Motsvarighet'
+            '</div><ul>%s</ul></aside>' % "".join(items))
+
+
+def corresponding_cases_margin(site, uri):
+    """New statute paragraf margin: the legal cases (rättsfall) that cite the old,
+    repealed paragraf this one corresponds to -- under a heading naming that old
+    paragraf, so a reader of the new law finds the case law decided under its
+    predecessor. The correspondence is read from the `.corr` layer; the cases are
+    the generic inbound on the old paragraf, filtered to case law."""
+    out, seen = [], set()
+    for old_uri, _rel, _scope, _prop in catalog.correspondence_for_new(
+            site.con, uri):
+        if old_uri in seen:        # one case section per old paragraf, not per stycke
+            continue
+        seen.add(old_uri)
+        rows = [r for r in catalog.inbound(site.con, old_uri, limit=INBOUND_CAP + 1)
+                if r[4] == "dv"]
+        if not rows:
+            continue
+        base = old_uri.split("#")[0]
+        old_label = "%s %s (numera upphävd)" % (
+            human_fragment(old_uri.partition("#")[2]), _law_title(site, base))
+        links = "".join(
+            '<li><a href="%s">%s</a></li>'
+            % (escape(href(from_uri + ("#" + a if a else ""))),
+               escape(describe_citer(from_uri, a, label, title, source)))
+            for from_uri, a, label, title, source in rows[:INBOUND_CAP])
+        out.append('<div class="rail-sec"><div class="rail-sec-h">Rättsfall som '
+                   'hänvisar till motsvarande %s</div><ul>%s</ul></div>'
+                   % (escape(old_label), links))
+    return "".join(out)
+
+
 class Rail:
     """Collects each paragraph's context panel (who cites it, and which EU
     article it transposes) as a document is rendered, keyed by the node's anchor
@@ -297,20 +415,52 @@ class Rail:
         self.data = {}
 
     def add(self, nid, pinpoint="", extra=""):
-        """Record node `nid`'s rail panel if anything cites it, it transposes an
-        EU article, or it carries an editorial `extra` section (the EU
-        article<->recital links). Idempotent per id; no-op for context-less nodes."""
+        """Record node `nid`'s rail panel if it has commentary, anything cites it,
+        it transposes an EU article, or it carries an editorial `extra` section
+        (the EU article<->recital links). Idempotent per id; no-op for
+        context-less nodes."""
         if not nid or nid in self.data:
             return
-        groups = _inbound_groups(self.site, self.doc_uri + "#" + nid)
+        uri = self.doc_uri + "#" + nid
+        commentary = self._commentary(nid)
+        groups = _inbound_groups(self.site, uri)
         genomfor = genomfor_margin(self.site, self.doc_uri, nid)
-        if not groups and not genomfor and not extra:
+        corr_cases = corresponding_cases_margin(self.site, uri)   # new-law side
+        corresponds = corresponds_margin(self.site, uri)          # old-law side
+        if not (commentary or groups or genomfor or extra or corr_cases
+                or corresponds):
             return
         head = ('<div class="rail-h">Kontext%s</div>'
                 % (' för <b>%s</b>' % escape(pinpoint) if pinpoint else ""))
         body = ('<div class="rail-sec"><div class="rail-sec-h">Hänvisat till av</div>'
                 '%s</div>' % groups) if groups else ""
-        self.data[nid] = head + body + extra + genomfor
+        self.data[nid] = (head + commentary + body + corr_cases + extra
+                          + genomfor + corresponds)
+
+    def add_document(self):
+        """The law-level commentary (the kommentar preamble, before any section) as
+        the rail's default panel (key ''), shown when no single paragraph is in
+        focus -- commentary on the statute as a whole."""
+        panel = self._commentary(None)
+        if panel:
+            self.data[""] = '<div class="rail-h">Kommentar till lagen</div>' + panel
+
+    def _commentary(self, nid):
+        """The wiki commentary for the paragraph `nid` (or `None` for the law as a
+        whole), rendered as a rail section (its prose + author byline) -- shown
+        side-by-side with what it comments on, in place of a separate kommentar
+        page."""
+        entries = (self.site.commentary or {}).get((self.doc_uri, nid))
+        if not entries:
+            return ""
+        out = []
+        for author, blocks in entries:
+            prose = "".join("<p>%s</p>" % render_runs(c["text"], self.site)
+                            for c in blocks if c.get("text"))
+            by = '<div class="komm-by">— %s</div>' % escape(author) if author else ""
+            out.append(prose + by)
+        return ('<div class="rail-sec rail-komm"><div class="rail-sec-h">Kommentar'
+                '</div>%s</div>' % "".join(out))
 
     def island(self):
         """The ``<script type=application/json>`` island, or '' if no paragraph
@@ -425,6 +575,7 @@ PAGE = """<!doctype html>
 <html lang="sv"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>%(title)s</title>
+<meta name="lagen-api" content="%(api_base)s">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
@@ -491,7 +642,8 @@ def page(title, kind, meta, body, toc="", eyebrow=None, subtitle=None,
                 '<aside class="rail" id="rail" aria-live="polite"></aside></div>'
                 % (toc, front, body))
     return PAGE % {"title": escape(title), "masthead": _masthead(kind),
-                   "grid": grid, "island": island}
+                   "grid": grid, "island": island,
+                   "api_base": escape(API_BASE)}
 
 
 def render_sfs(art, site):
@@ -507,6 +659,7 @@ def render_sfs(art, site):
     body = document_inbound(site, art["uri"]) + "".join(
         render_node(n, site, art["uri"], toc, rail)
         for n in art.get("structure", []))
+    rail.add_document()        # law-level commentary as the rail's default panel
     return page(title, "Författning", meta, body, render_toc(toc),
                 eyebrow="SFS " + catalog.local(art["uri"]), island=rail.island(),
                 source_url=art.get("source_url"))
@@ -528,7 +681,8 @@ def render_dv(art, site):
     toc = Toc()
     rail = Rail(site, art["uri"])
     body = document_inbound(site, art["uri"]) + sokord + summary + "".join(
-        render_node(b, site, art["uri"], toc, rail) for b in art.get("body", []))
+        render_node(b, site, art["uri"], toc, rail)
+        for b in dv_flatten(art.get("structure", [])))
     return page(title, "Rättsfall", meta, body, render_toc(toc),
                 eyebrow=art.get("court_namn"), island=rail.island(),
                 source_url=art.get("source_url"))
@@ -541,7 +695,7 @@ def _keywords(nyckelord, site):
         return ""
     items = []
     for n in nyckelord:
-        uri = begrepp_uri(n)
+        uri = site.resolve(begrepp_uri(n))      # fold onto the canonical concept
         items.append('<a href="%s">%s</a>' % (escape(href(uri)), escape(n))
                      if site.has(uri) else escape(n))
     return '<p class="sokord"><span>Sökord</span> %s</p>' % " · ".join(items)
@@ -590,25 +744,33 @@ def render_forarbete(art, site):
     parts = [document_inbound(site, art["uri"]), render_implements(art, site)]
     toc = Toc()
     rail = Rail(site, art["uri"])
-    cur = None
-    for b in art.get("body", []):
-        if b.get("page") and b["page"] != cur:
-            cur = b["page"]
-            # page anchor (#sid{N} -- the förarbete citation target); the statute/
-            # case paragraphs citing this very page drive the context rail
-            key = "sid%d" % cur
-            rail.add(key, "s. %d" % cur)
+    state = {"page": None}
+
+    def emit_page(node):
+        # page anchor (#sid{N} -- the förarbete citation target, unchanged by the
+        # hierarchy); the statute/case paragraphs citing this page drive the rail
+        pg = node.get("page")
+        if pg and pg != state["page"]:
+            state["page"] = pg
+            key = "sid%d" % pg
+            rail.add(key, "s. %d" % pg)
             parts.append('<span class="sid" id="%s"%s>%d</span>'
-                         % (key, _rail_attr(rail, key), cur))
-        runs = render_runs(b["text"], site)
-        if b["type"] == "rubrik":
-            level = b.get("level") or 1
-            anchor = toc.add(None, plain(b["text"]), level)
-            parts.append('<h%d id="%s" class="rubrik">%s</h%d>'
-                         % (min(level + 1, 5), escape(anchor), runs,
-                            min(level + 1, 5)))
-        else:
-            parts.append("<p>%s</p>" % runs)
+                         % (key, _rail_attr(rail, key), pg))
+
+    def walk(nodes):
+        for n in nodes:
+            emit_page(n)
+            if n.get("type") == "avsnitt":
+                level = n.get("level") or 1
+                anchor = toc.add(n.get("id"), plain(n["text"]), level)
+                parts.append('<h%d id="%s" class="rubrik">%s</h%d>'
+                             % (min(level + 1, 5), escape(anchor),
+                                render_runs(n["text"], site), min(level + 1, 5)))
+                walk(n.get("children", []))
+            else:
+                parts.append("<p>%s</p>" % render_runs(n["text"], site))
+
+    walk(art.get("structure", []))
     return page(title, "Förarbete", meta, "".join(parts), render_toc(toc),
                 eyebrow=FA_TYPE_LABEL.get(art.get("type"), "Förarbete"),
                 island=rail.island(), source_url=art.get("source_url"))
@@ -626,40 +788,6 @@ def _doc_title(site, uri):
     return row[0] if row else None
 
 
-def render_kommentar(art, site):
-    """Per-paragraph commentary: each section heading links to the statute
-    paragraph it annotates; the whole page also links back to the law."""
-    law = art.get("annotates")
-    law_title = _doc_title(site, law) if law else None
-    title = "Kommentar – " + (law_title or art.get("sfs") or "")
-    meta = _meta_dl([("Författare", art.get("author")),
-                     ("Avser", law_title or art.get("sfs"))])
-    if law:
-        meta = ('<p class="kommentar-law">Kommentar till <a href="%s">%s</a></p>'
-                % (escape(href(law)), escape(law_title or art.get("sfs")))) + meta
-    toc = Toc()
-    rail = Rail(site, art["uri"])
-    parts = [document_inbound(site, art["uri"])]
-    for b in art.get("body", []):
-        t = b.get("type")
-        if t == "sektion":
-            toc.add(b["id"], b.get("heading", b["id"]), 1)
-            rail.add(b["id"], human_fragment(b["id"]))
-            parts.append('<h2 id="%s" class="kaprubrik"%s>%s</h2>'
-                         % (escape(b["id"]), _rail_attr(rail, b["id"]),
-                            render_runs(b["text"], site)))
-            parts += ["<p>%s</p>" % render_runs(c["text"], site)
-                      for c in b.get("children", [])]
-        elif t == "rubrik":
-            parts.append('<h3 class="rubrik">%s</h3>'
-                         % render_runs(b["text"], site))
-        else:
-            parts.append("<p>%s</p>" % render_runs(b["text"], site))
-    return page(title, "Kommentar", meta, "".join(parts), render_toc(toc),
-                eyebrow="Lagkommentar", island=rail.island(),
-                source_url=art.get("source_url"))
-
-
 def render_begrepp(art, site):
     """A concept definition; its inbound panel shows everything (laws, cases,
     förarbeten, commentary, other concepts) that references the concept."""
@@ -667,8 +795,15 @@ def render_begrepp(art, site):
     meta = _meta_dl([("Kategori", ", ".join(art.get("categories") or []))])
     toc = Toc()
     rail = Rail(site, art["uri"])
-    body = document_inbound(site, art["uri"]) + "".join(
-        render_node(b, site, art["uri"], toc, rail) for b in art.get("body", []))
+    nodes = art.get("body", [])
+    # a synthesized stub (a defined term / nyckelord with no wiki page) has no
+    # description -- its value is the aggregated inbound below (what defines and
+    # tags it), so say so instead of showing a blank page
+    note = ("" if nodes else
+            '<p class="stub-note">Det här begreppet har ännu ingen beskrivning. '
+            'Nedan visas var det definieras och används.</p>')
+    body = note + document_inbound(site, art["uri"]) + "".join(
+        render_node(b, site, art["uri"], toc, rail) for b in nodes)
     return page(title, "Begrepp", meta, body, render_toc(toc),
                 eyebrow="Begrepp", island=rail.island(),
                 source_url=art.get("source_url"))
@@ -884,7 +1019,10 @@ def render_eurlex(art, site):
     parts = [document_inbound(site, art["uri"])]
     cur_article = cur_parag = None       # running context for sub-article keys
     preamble_in_toc = False              # the "Preambel" TOC parent is added once
-    for b in art.get("body", []):
+    # the artifact is a nested structure (divisions > articles > paragraphs >
+    # points); render reads it in document order -- the heading levels and the
+    # TOC already convey the hierarchy, so no nested <section> markup is needed
+    for b in eurlex_flatten(art.get("structure", [])):
         t = b["type"]
         if editorial and t == "recital" and (b.get("num") or "").isdigit():
             group = editorial.group_start.get(int(b["num"]))
@@ -909,9 +1047,10 @@ def render_eurlex(art, site):
 
 
 def render_document(art, source, site):
+    # kommentar is not here -- it is an annotation rendered into statute rails
+    # (generate_site skips it), not a page of its own
     return {"sfs": render_sfs, "dv": render_dv, "forarbete": render_forarbete,
-            "kommentar": render_kommentar, "begrepp": render_begrepp,
-            "eurlex": render_eurlex}[source](art, site)
+            "begrepp": render_begrepp, "eurlex": render_eurlex}[source](art, site)
 
 
 # --------------------------------------------------------------------------
@@ -921,7 +1060,9 @@ def render_document(art, source, site):
 # the document types, in the order they appear on the frontpage, with their
 # Swedish collection labels. dv's documents (and so its browse index) live under
 # /dom/, lagen.nu's grammar; every other source browses under its own name.
-SOURCE_ORDER = ("sfs", "dv", "forarbete", "eurlex", "kommentar", "begrepp")
+# kommentar is an annotation layer shown in the rail (no page tree), so it is
+# not a browsable source on the frontpage
+SOURCE_ORDER = ("sfs", "dv", "forarbete", "eurlex", "begrepp")
 SOURCE_LABEL = {"sfs": "Författningar", "dv": "Rättsfall",
                 "forarbete": "Förarbeten", "eurlex": "EU-rättsakter",
                 "kommentar": "Lagkommentarer", "begrepp": "Begrepp"}
@@ -945,7 +1086,7 @@ def _most_cited(con, source):
 
 
 def render_index(con):
-    n = catalog.counts(con)
+    n = {s: c for s, c in catalog.counts(con).items() if s != "kommentar"}
     nav = "".join(
         '<li><a href="/%s/">%s</a> <span class="c">%d</span></li>'
         % (_browse_dir(s), escape(SOURCE_LABEL.get(s, s)), n[s])
@@ -1013,7 +1154,7 @@ def render_browse(con, source):
 # --------------------------------------------------------------------------
 
 def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None,
-                  only=None):
+                  only=None, source=None):
     """Render every catalogued document to static HTML. `fresh(uri, out_path,
     art_path, dep_digest) -> bool` lets the caller skip a page whose inputs are
     unchanged (incremental generate); `record(uri, art_path, dep_digest)` is
@@ -1028,23 +1169,32 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
     con = catalog.connect(catalog_path)
     site = Site.from_catalog(con)
     rows = con.execute(
-        "SELECT uri, source, path FROM documents ORDER BY source, uri").fetchall()
-    if only is not None:
+        "SELECT uri, source, path, title FROM documents "
+        "ORDER BY source, uri").fetchall()
+    if source is not None:                       # whole-source scope (incl. stubs)
+        rows = [r for r in rows if r[1] == source]
+    elif only is not None:                       # specific-document scope
         rows = [r for r in rows if r[2] in only]
+    # commentary is an annotation rendered into statute rails, not a page of its own
+    rows = [r for r in rows if r[1] != "kommentar"]
     rendered = 0
-    for i, (uri, source, path) in enumerate(rows):
+    for i, (uri, src, path, title) in enumerate(rows):
         out = out_root / doc_relpath(uri)
         dep = catalog.page_dependency_digest(con, uri)
         if not (fresh and fresh(uri, out, path, dep)):
-            art = json.loads(Path(path).read_bytes())
+            # a synthesized concept stub has no artifact on disk (path empty) --
+            # render a shell whose content is its aggregated inbound (what defines
+            # and tags the concept); everything else loads its artifact
+            art = (json.loads(Path(path).read_bytes()) if path
+                   else {"uri": uri, "type": src, "title": title})
             out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_text(render_document(art, source, site))
+            out.write_text(render_document(art, src, site))
             rendered += 1
             if record:
                 record(uri, path, dep)
         if progress:
             progress(i + 1, len(rows), catalog.local(uri), rendered)
-    if only is None:
+    if only is None and source is None:          # corpus-wide pages on a full run
         render_aggregates(con, out_root)
     if progress:
         progress(len(rows), len(rows), "", rendered)
@@ -1061,9 +1211,15 @@ def render_aggregates(con, out_root):
     out_root = Path(out_root)
     out_root.mkdir(parents=True, exist_ok=True)
     (out_root / "style.css").write_text(CSS)
-    (out_root / "scrollspy.js").write_text(SCROLLSPY)
+    # the REST API base lives in this one shared asset (not per-page), so
+    # `generate --aggregates-only` -- which rewrites scrollspy.js -- activates the
+    # ⌘K search site-wide without a full per-page regenerate.
+    (out_root / "scrollspy.js").write_text(
+        "var LAGEN_API=%s;\n%s" % (json.dumps(API_BASE), SCROLLSPY))
     (out_root / "index.html").write_text(render_index(con))
     for source in catalog.counts(con):
+        if source == "kommentar":      # an annotation layer, not a browsable source
+            continue
         browse_dir = out_root / _browse_dir(source)
         browse_dir.mkdir(parents=True, exist_ok=True)
         (browse_dir / "index.html").write_text(render_browse(con, source))
@@ -1217,6 +1373,12 @@ section.paragraf.rail-active { background:
               line-height: 1.55; padding: 1rem .25rem; }
 .rail-sec-h { font-family: var(--serif); font-style: italic; font-size: .78rem;
               color: var(--ink-3); margin-bottom: .35rem; }
+/* commentary shown side-by-side in the rail (in place of a kommentar page) */
+.rail-komm { margin-bottom: 1rem; }
+.rail-komm p { font-family: var(--serif); font-size: .9rem; line-height: 1.5;
+               margin: 0 0 .5rem; color: var(--ink); }
+.komm-by { font-family: var(--serif); font-style: italic; font-size: .78rem;
+           color: var(--ink-3); }
 .ingroup { margin-bottom: 1rem; }
 .ingroup-h { font-family: var(--serif); font-style: italic; font-size: .8rem;
              color: var(--accent); font-weight: 500; margin: .35rem 0 .25rem; }
@@ -1227,9 +1389,9 @@ section.paragraf.rail-active { background:
 .ingroup.kommentar a { color: var(--kommentar); font-weight: 500; }
 .ingroup.begrepp a { color: var(--accent); }
 .more { color: var(--ink-3); font-style: italic; font-size: .78rem; margin-top: .25rem; }
-aside.genomfor { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--rule); }
-aside.genomfor ul { list-style: none; margin: 0; padding: 0; font-size: .8rem; }
-aside.genomfor li { margin: .2rem 0; line-height: 1.4; }
+aside.genomfor, aside.motsvarighet { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--rule); }
+aside.genomfor ul, aside.motsvarighet ul { list-style: none; margin: 0; padding: 0; font-size: .8rem; }
+aside.genomfor li, aside.motsvarighet li { margin: .2rem 0; line-height: 1.4; }
 aside.genomfor .prov { color: var(--ink-3); }
 .inbound-h { font-family: var(--serif); font-style: italic; font-size: .8rem;
              color: var(--accent); font-weight: 500; margin-bottom: .35rem; }
@@ -1307,7 +1469,7 @@ ol.ranked { padding-left: 1.4rem; } ol.ranked .c { color: var(--ink-3); font-siz
                    columns: 18rem; column-gap: 2rem; font-size: .92rem; }
 .browse-group li { margin: .18rem 0; break-inside: avoid; }
 
-/* -- search palette (stub: backend deferred) -- */
+/* -- search palette (live full-text search via the REST API) -- */
 .search-overlay { position: fixed; inset: 0; z-index: 100; display: flex;
                   justify-content: center; align-items: flex-start; padding-top: 8rem;
                   background: rgba(20,16,10,.32); }
@@ -1320,6 +1482,20 @@ ol.ranked { padding-left: 1.4rem; } ol.ranked .c { color: var(--ink-3); font-siz
 .search-box .search-note { padding: .9rem 1.25rem; border-top: 1px solid var(--rule);
                            font-family: var(--serif); font-style: italic;
                            color: var(--ink-3); font-size: .9rem; }
+.search-results:not(:empty) { border-top: 1px solid var(--rule);
+                              max-height: 60vh; overflow-y: auto; }
+.search-hit { display: block; padding: .7rem 1.25rem; border-bottom: 1px solid var(--rule);
+              text-decoration: none; color: var(--ink); }
+.search-hit:last-child { border-bottom: 0; }
+.search-hit:hover { background: var(--surf-2); }
+.search-hit .hit-title { display: block; font-family: var(--sans); font-weight: 600;
+                         font-size: .95rem; }
+.search-hit .hit-sub { display: block; font-family: var(--serif); color: var(--ink-2);
+                       font-size: .9rem; }
+.search-hit .hit-snip { display: block; font-family: var(--serif); color: var(--ink-3);
+                        font-size: .82rem; margin-top: .15rem; }
+.search-hit .hit-snip em { font-style: normal; background: var(--mark, #fdf2b8);
+                           border-radius: 2px; padding: 0 1px; }
 
 /* -- Responsive: drop the side columns -- */
 @media (max-width: 64rem) {
@@ -1361,7 +1537,10 @@ SCROLLSPY = """
   var marks = Array.prototype.slice.call(document.querySelectorAll('[data-rail]'));
   var EMPTY = '<div class="rail-empty">Ingen rättspraxis, förarbeten eller annan ' +
               'kontext har ännu knutits till denna del.</div>';
-  if (rail) rail.innerHTML = EMPTY;
+  // the document-level panel (commentary on the statute as a whole), keyed '' --
+  // shown when no single paragraph is in focus (at the top of the document)
+  var DEFAULT = island[''] || EMPTY;
+  if (rail) rail.innerHTML = DEFAULT;
 
   var activeLink = -1, activeRail = '', activeMark = null, ticking = false;
 
@@ -1370,7 +1549,7 @@ SCROLLSPY = """
     if (best === activeMark) return;
     var key = best ? best.getAttribute('data-rail') : '';
     activeRail = key;
-    if (rail) rail.innerHTML = (key && island[key]) ? island[key] : EMPTY;
+    if (rail) rail.innerHTML = (key && island[key]) ? island[key] : DEFAULT;
     if (activeMark) activeMark.classList.remove('rail-active');
     activeMark = best;
     if (best) best.classList.add('rail-active');
@@ -1399,11 +1578,16 @@ SCROLLSPY = """
 
   function update() {
     ticking = false;
-    var y = window.scrollY + 120;
+    // the focus line, 120px below the viewport top. getBoundingClientRect().top is
+    // viewport-relative, so it is correct regardless of a node's offsetParent -- a
+    // [data-rail] ancestor is position:relative, which makes a nested node's
+    // offsetTop reset per-section (the "rail stuck on the section's last paragraf"
+    // bug once chapter sections carry commentary).
+    var LINE = 120;
     if (links.length) {
       var idx = 0;
       for (var i = 0; i < targets.length; i++) {
-        if (targets[i] && targets[i].offsetTop <= y) idx = i;
+        if (targets[i] && targets[i].getBoundingClientRect().top <= LINE) idx = i;
       }
       if (idx !== activeLink) {
         if (links[activeLink]) links[activeLink].classList.remove('active');
@@ -1421,7 +1605,7 @@ SCROLLSPY = """
     if (rail && marks.length) {
       var best = null;
       for (var j = 0; j < marks.length; j++) {
-        if (marks[j].offsetTop <= y) best = marks[j];
+        if (marks[j].getBoundingClientRect().top <= LINE) best = marks[j];
       }
       applyRail(best);
     }
@@ -1431,20 +1615,66 @@ SCROLLSPY = """
   }, { passive: true });
   update();
 
-  // ⌘K palette -- visual stub; site-wide search is a deferred backend.
-  var overlay = null;
+  // ⌘K palette -- live full-text search against the REST API (its base is in
+  // the <meta name="lagen-api"> tag the renderer emitted). Debounced; renders
+  // the top hits as links to each document's matching paragraph.
+  // API base: the value injected into this shared asset wins (so rewriting just
+  // scrollspy.js activates search everywhere); the per-page <meta> is a fallback.
+  var apiMeta = document.querySelector('meta[name="lagen-api"]');
+  var API = (typeof LAGEN_API !== 'undefined' && LAGEN_API) ||
+            (apiMeta && apiMeta.getAttribute('content')) || '';
+  var overlay = null, results = null, timer = null, seq = 0;
+
+  function render(items, q) {
+    if (!results) return;
+    if (!items.length) {
+      results.innerHTML = '<div class="search-note">Inga träffar för ' +
+        '\\u201d' + q + '\\u201d.</div>';
+      return;
+    }
+    results.innerHTML = items.map(function (r) {
+      // r.url is the hosted page path (server-computed via layout.page_relpath);
+      // a fragment hit deep-links to its paragraph anchor (the node id == pinpoint)
+      var frag = r.fragments && r.fragments[0];
+      var hl = (frag && frag.highlight[0]) || (r.highlight && r.highlight[0]) || '';
+      var target = (r.url || '#') + (frag && frag.pinpoint ? '#' + frag.pinpoint : '');
+      return '<a class="search-hit" href="' + target + '">' +
+        '<span class="hit-title">' + (r.identifier || r.title || r.uri) + '</span>' +
+        (r.title && r.identifier ? '<span class="hit-sub">' + r.title + '</span>' : '') +
+        (hl ? '<span class="hit-snip">' + hl + '</span>' : '') + '</a>';
+    }).join('');
+  }
+  function run(q) {
+    var mine = ++seq;
+    if (!q.trim()) { if (results) results.innerHTML = ''; return; }
+    fetch(API + '/api/v1/search?limit=8&q=' + encodeURIComponent(q))
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (mine === seq) render(d.results || [], q); })
+      .catch(function () {
+        if (mine === seq && results)
+          results.innerHTML = '<div class="search-note">Sökningen kunde inte ' +
+            'nås.</div>';
+      });
+  }
   function open() {
     if (overlay) return;
     overlay = document.createElement('div');
     overlay.className = 'search-overlay';
     overlay.innerHTML = '<div class="search-box"><input autofocus ' +
-      'placeholder="Sök lag, paragraf, rättsfall…"><div class="search-note">' +
-      'Sökfunktionen är inte aktiverad ännu.</div></div>';
+      'placeholder="Sök lag, paragraf, rättsfall…">' +
+      '<div class="search-results"></div></div>';
     document.body.appendChild(overlay);
     overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
-    overlay.querySelector('input').focus();
+    var input = overlay.querySelector('input');
+    results = overlay.querySelector('.search-results');
+    input.addEventListener('input', function () {
+      clearTimeout(timer);
+      var q = input.value;
+      timer = setTimeout(function () { run(q); }, 180);
+    });
+    input.focus();
   }
-  function close() { if (overlay) { overlay.remove(); overlay = null; } }
+  function close() { if (overlay) { overlay.remove(); overlay = null; results = null; } }
   document.addEventListener('keydown', function (e) {
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); open(); }
     if (e.key === 'Escape') close();
