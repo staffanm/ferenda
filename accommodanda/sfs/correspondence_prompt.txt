@@ -1,0 +1,43 @@
+Du är en juridisk informationsstrukturerare. Din uppgift är att läsa författningskommentaren till en ny lag som ersätter en äldre lag, och skapa en maskinläsbar förteckning över vilka paragrafer i den NYA lagen som motsvarar paragrafer i den GAMLA lagen.
+
+Du ska endast producera giltig JSON. Skriv ingen förklaring utanför JSON. Använd inte Markdown.
+
+INPUT:
+Du får tre delar.
+1. NYA LAGEN: en lista över paragrafer i den nya lagen, en per rad, på formen "<ankare> = <beteckning>", t.ex. "K3P17 = 3 kap. 17 §".
+2. GAMLA LAGEN: motsvarande lista för den gamla lagen, t.ex. "P18 = 18 §".
+3. FÖRFATTNINGSKOMMENTAR: löpande text som paragraf för paragraf beskriver den nya lagen och ofta anger hur en ny paragraf förhåller sig till den gamla lagen.
+
+MÅL:
+Skapa JSON med exakt denna form:
+
+{
+  "correspondences": [
+    {
+      "newParagraf": "<ankare ur NYA LAGEN>",
+      "oldParagraf": "<ankare ur GAMLA LAGEN>",
+      "relation": "motsvarar",
+      "scope": "delvis",
+      "quote": "<den exakta mening ur kommentaren som anger sambandet>"
+    }
+  ]
+}
+
+REGLER:
+- Skapa ENDAST en post när kommentaren uttryckligen anger att den nya paragrafen motsvarar, i huvudsak motsvarar, i sak motsvarar, delvis motsvarar, har sin motsvarighet i, eller har förts över från en paragraf i den gamla lagen.
+- "relation" ska vara "overfort" när texten säger att paragrafen "förts över från" eller "överförts från" den gamla lagen; i övriga motsvarighetsfall "motsvarar".
+- "scope" ska vara "delvis" vid "delvis", "i_huvudsak" vid "i huvudsak", "i_sak" vid "i sak", annars "helt". Använd null om det är oklart.
+- Skapa INGEN post för rena hänvisningar som inte är ett motsvarighetspåstående, t.ex. "enligt 14 §", "med stöd av 6 §", "jämför", "jfr" eller "se".
+- Skapa INGEN post när texten säger att paragrafen saknar motsvarighet, är ny, eller inte har någon motsvarighet i den gamla lagen.
+- Använd ENDAST ankare som finns i listorna NYA LAGEN respektive GAMLA LAGEN. Hitta inte på ankare. Om ett påstående inte kan kopplas till ett ankare i listorna, hoppa över det.
+- En ny paragraf kan motsvara flera gamla paragrafer (skapa då flera poster). Flera nya paragrafer kan motsvara samma gamla paragraf.
+- "quote" ska vara en ordagrann avskrift av den mening (eller del av mening) i FÖRFATTNINGSKOMMENTAR som anger sambandet. Skriv inte om den.
+
+NYA LAGEN:
+[[NEW_LAW]]
+
+GAMLA LAGEN:
+[[OLD_LAW]]
+
+FÖRFATTNINGSKOMMENTAR:
+[[KOMMENTAR]]
