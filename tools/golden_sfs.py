@@ -622,6 +622,27 @@ def balk_self_ref(uri, own_base, collapsed_base):
     return None
 
 
+# A well-formed sector-3 CELEX in the new pipeline's URI: 3 + year(4) + type
+# (1-2 letters) + number(4, zero-padded), with an optional pinpoint fragment.
+re_celex_uri = re.compile(
+    r"(.*/ext/celex/)3(\d{4})([A-Z]{1,2})(\d{4})(#.*)?$")
+
+
+def celex_descramble(uri):
+    """The *old* pipeline's scrambled rendering of a well-formed new CELEX
+    URI, else None. The old legalref engine built a CELEX as
+    3+number+type+year ("3625R2017") where the correct form is
+    3+year+type+number ("32017R0625") -- so it named a non-existent act
+    (year "0625"). Inverting the new URI gives the exact scrambled string the
+    golden carries, so a corrected extra and the golden's scrambled miss can be
+    recognised as one mirror pair."""
+    m = re_celex_uri.match(uri)
+    if not m:
+        return None
+    base, year, descriptor, number, frag = m.groups()
+    return "%s3%d%s%s%s" % (base, int(number), descriptor, year, frag or "")
+
+
 # document-level metadata that is the *consolidation envelope* -- it moves as
 # new amending acts fold in: the konsolidering cutoff URI, the "i lydelse
 # enligt SFS …" identifier, the underlag list, the responsible department.
@@ -730,6 +751,23 @@ def _balk_basefile_correction(problem, ctx):
     return flavour == "collapsed" and source in ctx["balk_full_sources"]
 
 
+def _celex_correction(problem, ctx):
+    """A CELEX reference the new pipeline mints in the correct sector-3 form
+    where the old pipeline scrambled the year/number fields (§7d). The
+    corrected extra (".../32017R0625") and the golden's scrambled miss
+    (".../3625R2017") are a mirror pair from the same source stycke; forgive
+    each only when its counterpart is present, so a CELEX the new pipeline
+    genuinely added (no scrambled mirror) or one it dropped stays visible."""
+    parsed = reference_diff(problem)
+    if parsed is None:
+        return False
+    kind, source, uri = parsed
+    if kind == "extra":
+        scrambled = celex_descramble(uri)
+        return scrambled is not None and (source, scrambled) in ctx["celex_missing"]
+    return (source, uri) in ctx["celex_extra_scrambled"]
+
+
 # (rule name, predicate). The families are disjoint, so order only decides
 # which rule is credited in the unlikely event two would match.
 PREDICATES = (
@@ -737,6 +775,7 @@ PREDICATES = (
     ("stale-consolidation-drift", _stale_consolidation_drift),
     ("change-reference-staleness", _change_reference_staleness),
     ("balk-basefile-correction", _balk_basefile_correction),
+    ("celex-correction", _celex_correction),
     ("eller-enumeration", _eller_enumeration),
 )
 
@@ -768,6 +807,15 @@ def adjudicate(problems, golden):
             ctx["balk_full_sources"].add(src)
         elif kind == "missing" and flavour == "collapsed":
             ctx["balk_collapsed_sources"].add(src)
+    # CELEX year/number-scramble correction: pair a corrected extra with the
+    # golden's scrambled miss from the same source (keyed (source, scrambled)).
+    ctx["celex_missing"] = {
+        (src, uri) for kind, src, uri in filter(None, map(reference_diff, problems))
+        if kind == "missing"}
+    ctx["celex_extra_scrambled"] = {
+        (src, scrambled)
+        for kind, src, uri in filter(None, map(reference_diff, problems))
+        if kind == "extra" and (scrambled := celex_descramble(uri)) is not None}
     unexplained, accepted = [], []
     for problem in problems:
         for rule, predicate in PREDICATES:

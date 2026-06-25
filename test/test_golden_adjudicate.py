@@ -290,3 +290,54 @@ def test_eller_enum_only_extras():
     p = [_refc("missing", "K1P1S1", "https://lagen.nu/1962:700#K18P1", clause)]
     unexplained, accepted = golden_sfs.adjudicate(p, ENUM_GOLDEN)
     assert unexplained == p and accepted == []
+
+
+# --- celex-correction (§7d): the old engine scrambled sector-3 CELEX year/number ---
+
+CELEX_GOLDEN = {"uri": "https://lagen.nu/2007:1091", "amendments": []}
+
+
+def test_celex_descramble_inverts_field_order():
+    # correct new form 3+year+type+number  ->  old scramble 3+number+type+year
+    assert (golden_sfs.celex_descramble("https://lagen.nu/ext/celex/32017R0625")
+            == "https://lagen.nu/ext/celex/3625R2017")
+    # zero-padded number collapses; pinpoint fragment is preserved
+    assert (golden_sfs.celex_descramble("https://lagen.nu/ext/celex/32016R0679#18")
+            == "https://lagen.nu/ext/celex/3679R2016#18")
+    # non sector-3 (treaty / case law) is out of scope
+    assert golden_sfs.celex_descramble(
+        "https://lagen.nu/ext/celex/12012E047") is None
+    assert golden_sfs.celex_descramble(
+        "https://lagen.nu/1962:700#K2P4") is None
+
+
+def test_celex_correction_mirror_pair_forgiven():
+    new = _ref("extra", "K2P4S1", "https://lagen.nu/ext/celex/32017R0625")
+    old = _ref("missing", "K2P4S1", "https://lagen.nu/ext/celex/3625R2017")
+    unexplained, accepted = golden_sfs.adjudicate([new, old], CELEX_GOLDEN)
+    assert unexplained == []
+    assert sorted(r for r, _ in accepted) == ["celex-correction", "celex-correction"]
+
+
+def test_celex_correction_lone_extra_stays():
+    # new mints a correct CELEX the golden never had (no scrambled mirror) --
+    # a genuine new-pipeline addition, must stay visible
+    p = [_ref("extra", "K3P1S1", "https://lagen.nu/ext/celex/32016R0679")]
+    unexplained, accepted = golden_sfs.adjudicate(p, CELEX_GOLDEN)
+    assert unexplained == p and accepted == []
+
+
+def test_celex_correction_lone_missing_stays():
+    # golden has a CELEX (here well-formed) the new pipeline dropped: a coverage
+    # gap, not a scramble it corrected -- stays visible
+    p = [_ref("missing", "K3P1S1", "https://lagen.nu/ext/celex/32016R0679")]
+    unexplained, accepted = golden_sfs.adjudicate(p, CELEX_GOLDEN)
+    assert unexplained == p and accepted == []
+
+
+def test_celex_correction_requires_same_source():
+    # corrected extra and scrambled miss from *different* stycken do not pair
+    new = _ref("extra", "K2P4S1", "https://lagen.nu/ext/celex/32017R0625")
+    old = _ref("missing", "K9P9S9", "https://lagen.nu/ext/celex/3625R2017")
+    unexplained, accepted = golden_sfs.adjudicate([new, old], CELEX_GOLDEN)
+    assert sorted(unexplained) == sorted([new, old]) and accepted == []
