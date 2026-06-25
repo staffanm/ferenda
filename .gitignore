@@ -28,6 +28,7 @@ __pycache__/
 /mediawiki-html-backup-230502/
 /site/data/
 .playwright-mcp/
+opencode.json
 # Site config holds live credentials -- never track
 /site/ferenda.ini
 # Machine-local runtime config (data_root etc.)

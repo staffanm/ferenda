@@ -70,9 +70,9 @@ accommodanda/
   lib/      shared horizontal libs — lagrum (citation engine), catalog, render, layout, net, wikitext, util, errors
   config.py runtime config (config.yml / data_root)
   sfs/      acts vertical — extract·reader·model·tokenizer·assembler·nf·register (+ __main__)
-  dv/       court-decisions vertical — download·identity·model·parse·word·legacy
-  forarbete/ preparatory-works vertical — download·model·parse·kommentar
-  eurlex/   EU vertical (EUR-Lex/CELLAR) — download·bulk·parse·parse_html·parse_pdf·lang·model
+  dv/       court-decisions vertical — download·identity·model·parse·structure·word·legacy
+  forarbete/ preparatory-works vertical — download·model·parse·structure·kommentar
+  eurlex/   EU vertical (EUR-Lex/CELLAR) — download·bulk·parse·parse_html·parse_pdf·structure·lang·model
   wiki/     kommentar + begrepp sources — parse
   build.py  orchestrator — the `lagen` build driver, composes the verticals
 ```
@@ -224,17 +224,29 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
   - `eller-enumeration` — paragraf refs from "1, 3, 5 eller 6 §" lists (single §)
     the old SimpleParse grammar missed (it parsed only "… och … §§"); forgiven when
     the target paragraf is an enumerated member and its chapter is named in the clause.
+  - `celex-correction` — the old legalref engine scrambled sector-3 CELEX, building
+    `3+number+type+year` (`3625R2017`, a nonexistent "year 0625" act) where the correct
+    form is `3+year+type+number` (`32017R0625` = Reg (EU) 2017/625). The new pipeline
+    mints them right; `celex_descramble` inverts a well-formed new CELEX back to the
+    golden's scramble so the corrected extra and the scrambled miss are recognised as
+    one mirror pair, forgiven per-source (a CELEX the new pipeline genuinely added or
+    dropped, with no mirror, stays visible). Clean A/B on the full corpus: **273 docs
+    move `diff`→adjudicated (2,018→1,745 genuine regressions), 4,690 lines forgiven
+    (2,345 mirror pairs).**
   - **New-pipeline bugs *fixed* in the parser, not adjudicated:** source-context
     misattribution (a ref pinned to a bare kapitel where the text sits in a specific
     stycke); self-links from unanchored (dedup-id-suppressed) provisions; the balk
     basefile minting. (A `chapter-state-leak` predicate was tried and reverted — it
     would have masked the first of these.)
-  - ⬜ **Open: the reference-diff residual.** Each remaining bucket is either an
-    old-pipeline gap (→ a clause-keyed predicate, like eller; the `RefParseError`-hole
-    family — refs the old scanner dropped on a failed window — is the main remainder,
-    its clause-on-both-sides groundwork now in place) or a new-pipeline bug
-    (source-attribution: un-numbered-paragraf sources, stycke-renumbering off-by-ones
-    → a parser fix). `test/test_golden_adjudicate.py`.
+  - 🚧 **Open: the reference-diff residual.** Whole-corpus references run now: 8,857
+    match, 416 adjudicated-docs, **1,745 diff**. The CELEX-scramble family (≈4,840
+    lines) is closed by `celex-correction` above. The remaining residual is dominated
+    by the **SFS-fragment** internal cross-references (≈9,372 extra + 8,002 missing),
+    concentrated in the chapter-structured balkar — still heterogeneous, not yet one
+    cause. Each bucket is either an old-pipeline gap (→ a clause-keyed predicate, like
+    eller; the `RefParseError`-hole family — refs the old scanner dropped on a failed
+    window) or a new-pipeline bug (source-attribution: un-numbered-paragraf sources,
+    stycke-renumbering off-by-ones → a parser fix). `test/test_golden_adjudicate.py`.
   - ⬜ **Open: structure-staleness** — the structure section isn't adjudicated, so an
     amended law's extra paragrafer count as 3a diffs; applying the post-freeze logic
     there is the last gap to a unified passing %.
@@ -419,11 +431,15 @@ below is not optional polish, it's the only way they enter the corpus.
     (`test/test_golden_dv_structure.py`). Verified on real referat (HFD 2011:26
     → 3 instances + dissent; NJA 2017 s. 55 → delmål I/II, HD's betänkande split
     from its dom). This **writes the target down**; it isn't a regression net yet.
-  - ⬜ **The parser work it specifies.** The new DV model is currently *flat*
-    (`metadata + ordered body blocks`) and emits no `structure`, so `validate`
-    reports all-missing until the parser is taught the instance segmentation
-    (porting the old `dv.py` FSM recognizers — `Instans`/`Betankande`/`Domslut`/
-    `Skiljaktig`/… — as domain knowledge into a clean instance-aware model).
+  - ✅ **The parser work it specifies — done.** `dv/structure.py` ports the old
+    `dv.py` FSM recognizers (`Instans`/`Betankande`/`Domslut`/`Skiljaktig`/…) into
+    a RANK-driven stack machine; `nest()` now emits a **content-bearing**
+    `structure` (the instance/ruling tree with the prose attached as leaves),
+    which `to_artifact` ships in place of the flat body. The golden's
+    `skeleton_from_artifact` drops the prose leaves, so `validate` compares the
+    same skeleton it always did; the renderer flattens the tree back
+    (`dv/structure.flatten`). Verified on real referat (AD 1993 nr 101 → an
+    instans with dom/domskäl/domslut; `flatten` round-trips the body).
   - Posture: change-detector, not ground truth — the old FSM segmentation is
     heuristic, so diffs are investigated and the new parser may improve on it
     (a few hand-authored HD fixtures would make good oracle-grade anchors).
@@ -597,8 +613,70 @@ to a future per-doc incremental generate.
   unrelated artifact changes (the old pipeline's deps-file rule, as a catalog
   query). `relate` itself still rebuilds per-source whole (seconds); `parse` stays
   an explicit upstream step.
-- ⬜ Elasticsearch indexing (keep; replaces Fuseki) — deferred (user decision).
-- ⬜ REST/OpenAPI + bulk dumps; MCP later.
+- 🚧 **Publishing layer — search, REST/OpenAPI, bulk dumps** (replaces the
+  retired Fuseki/RDF publishing). All three are **derived & rebuildable** from
+  artifacts + catalog, never a source of truth, and slot in as **corpus-wide
+  verbs** in `build.py` next to `relate`/`generate`/`serve`. Decided with the
+  user: OpenSearch 2.x (not ES — Apache-2, `opensearch-py`); FastAPI + uvicorn
+  (OpenAPI 3 + Swagger for free); parent-child indexing (doc + per-§ fragment);
+  NDJSON bulk dumps (not JSON-LD — no `@context` modeling, dumps are the raw
+  artifacts). Published `lagen.nu` URIs stay byte-identical (standing
+  constraint) — API key, dump `uri`, ES `_id` are all that URI.
+  - ✅ **Shared flattener** (`lib/text.py`) — one definition of "the text of a
+    node / document / fragment" (runs = `str | {uri,text,…}` → join the `text`s,
+    table `cells` joined by space, body sections + amendments concatenated),
+    with `catalog`'s `runs_text` refactored onto it (re-exported, so the two
+    `catalog.runs_text` callers are untouched). The DRY seam indexing and dumps
+    share. `test/test_text.py`.
+  - ✅ **OpenSearch indexing** (`lib/search.py`, `lagen <src> index`) — keeps the
+    old `ferenda/fulltextindex.py:ElasticSearchIndex` domain knowledge (field
+    boosts, paragraph-precise hits, `inbound_count` ranking) but **without a
+    parent-child join** — at corpus scale (~1M+ units, more once the flat
+    verticals gain structure) the join's global ordinals were the dominant heap
+    consumer and kept tripping the parent circuit breaker. Instead every unit is a
+    **standalone document carrying its parent's metadata**, and search
+    **collapses by `doc_uri`** to one result per document: one whole-document unit
+    (`is_doc`, carries the body text only when the doc has no fragments) + one unit
+    per id-bearing fragment (its text + `pinpoint`, with the document's
+    identity denormalised as *non-searchable* `doc_title`/`doc_label` so a title
+    query collapses to the document, a body query to the matching paragraph).
+    Ranking is relevance + `log1p(inbound_count)` (`catalog.document_inbound_count`,
+    the whole-document "most-hänvisade" signal on *to_root*); a `cardinality` agg
+    gives the distinct-doc total. Per-source whole rebuild (drop_source +
+    `helpers.bulk`, 5 MB/chunk). Cluster endpoint from `config.yml`'s
+    `opensearch_url` (env `OPENSEARCH_URL` overrides). **Verified live** against a
+    real OpenSearch 2.18 (`docker-compose.yml`): the collapse round-trip + a real
+    `kommentar` index (212 docs → 1913 units) return one result per document with
+    paragraph pinpoints, no breaker. opensearch-py 3.x bugs the cluster surfaced
+    and fixed along the way: client calls are keyword-only (`index=…`),
+    `doc_actions` must not hardcode `_index`; index settings `number_of_replicas:0`
+    + `refresh_interval:60s`. `test/test_search.py`.
+  - ✅ **REST / OpenAPI** (`accommodanda/api/app.py`, `lagen serve-api`, FastAPI +
+    uvicorn) over three read-only backends (catalog.sqlite · OpenSearch · artifact
+    JSON). `/api/v1`: `search` (each hit carries its hosted-page `url` via
+    `layout.page_relpath`), `documents` (filtered/paginated id+metadata index of
+    the corpus — *not* search, which requires `q`; carries `updated` = artifact
+    mtime and `source_url` denormalised into the catalog like `title`),
+    `document?uri=…` (URI as query param — `lagen.nu` URIs carry `:`/`/`),
+    `document/inbound` (the killer feature as data),
+    `document/outbound` (`hosted` flag for un-parsed targets), `sources`, `dumps`.
+    Auto `/openapi.json` + `/docs`. CORS-open (read-only public data) so the
+    static site reaches it cross-origin. Verified live against the **real
+    1.5 GB catalog**: Brottsbalk inbound 5,153, räntelagen §6 ← 2,783 citers.
+    Closes the ⌘K loop — `render.SCROLLSPY`'s palette now does a debounced
+    `fetch` to `/api/v1/search` (API base baked into each page as
+    `<meta name="lagen-api">`, overridable with `LAGEN_API`). Tested with
+    FastAPI `TestClient` over a fixture catalog + faked search — no live cluster.
+    `test/test_api.py`.
+  - ✅ **NDJSON bulk dumps** (`lib/dump.py`, `lagen <src> dump`) — every
+    `<source>/artifact/**.json` re-serialised one-per-line, gzipped, to
+    `site/data/dumps/<source>.ndjson.gz`. Each line round-trips to its on-disk
+    artifact; the citation graph is already inline, so a line is self-contained
+    (no catalog read, no transform). Listed at `/api/v1/dumps`. Verified on the
+    real `kommentar` source (212 lines). `test/test_dump.py`.
+  - New deps: `opensearch-py`, `fastapi`, `uvicorn` (pyproject). ⬜ Remaining:
+    run `lagen all index` against a provisioned OpenSearch at corpus scale;
+    manifest-incremental indexing (per-source whole rebuild for now); MCP.
 - ✅ **Full corpus now catalogued.** `relate` runs over the whole set —
   `documents`: sfs 11,184 · dv 17,103 · forarbete 15,237 · eurlex 61,146
   (+ kommentar/begrepp) — so the cited law-roots that were dead targets in the
@@ -644,10 +722,10 @@ them resolve.
 - ✅ **Parser** `accommodanda/forarbete/{model,parse}.py` (PDF → artifact). Text
   via poppler `pdftotext` (plain reading-order mode — isolates the running
   header + page number on their own lines, unlike `-layout` which mashes them
-  into the alternating outer margin). Flat model (`Block`: rubrik/stycke + page),
-  like DV. **Page = PDF index = printed page** (modern PDFs number from the
-  title page), so each block carries its `#sid{N}` anchor — the target förarbete
-  citations resolve to (`prop. X s. 39` → `prop/X#sid39`). Reflows wrapped lines
+  into the alternating outer margin). **Page = PDF index = printed page** (modern
+  PDFs number from the title page), so each block carries its `#sid{N}` anchor —
+  the target förarbete citations resolve to (`prop. X s. 39` → `prop/X#sid39`).
+  Reflows wrapped lines
   (de-hyphenates), strips the running header (substring, anywhere — it bleeds
   into body lines), skips TOC pages, detects numbered headings. **URI minted to
   the citation-target form** (`prop/{riksmöte}:{no}`, `sou/{year}:{no}`, …) so
@@ -655,6 +733,20 @@ them resolve.
   for refs (same engine as DV) → inline links. Validated: prop 2025/26:161 →
   284 blocks, 464 links (sfs 320, prop 126, sou 7, bet 4, celex 3, rskr 3).
   `test/test_forarbete_parse.py`.
+- ✅ **Hierarchy materialized** (`forarbete/structure.py`) — förarbeten carry a
+  real numbered outline (14 → 14.3 → 14.3.4, the TOC depth), and the parser
+  already tags each heading with a `level`; `nest` groups the flat block run into
+  a nested `structure` tree (a `rubrik` opens an `avsnitt` under the nearest open
+  section of lower level; other blocks are its content), replacing the flat `body`
+  — so `render` shows true nested headings/TOC, `catalog` gets per-section
+  `fragments`, and search indexes section units (prop 1999/2000:39: 1,499 blocks →
+  4-level tree, **348 fragments where there were 0**). Section `id`s come from the
+  heading number (`a14.3.4`) or a counter — TOC/search anchors, **not** citation
+  targets: leaves keep their `page`, so the `#sid{N}` citation anchors are
+  untouched. `flatten` is the inverse view for the linear consumer
+  (`kommentar.py`'s författningskommentar walk). `test/test_forarbete_structure.py`;
+  the first of the §7-wide "materialize the flat verticals' structure" effort
+  (förarbete → eurlex → DV).
 - ✅ **Wired through build + catalog + render**: `lagen forarbete parse`
   (Stage), `catalog.forarbete_document` (source `forarbete`), `render_forarbete`
   (förarbete page with `#sid{N}` page anchors + page-level inbound margin notes),
@@ -675,15 +767,19 @@ inbound → render pipeline as the machine-extracted sources.
   blocks; each prose paragraph → inline runs combining `[[wikilinks]]` (→
   `begrepp/<Concept>`) **and** the citation engine's law/case/förarbete links,
   non-overlapping. Author byline + `[[Kategori:]]` extracted.
-- ✅ **`kommentar` source** `accommodanda/wiki/parse.py::kommentar_artifact` —
-  per-paragraph SFS commentary. Each `== 21 kap 1 § ==` heading → a section
-  anchored to the statute fragment (`2009:400#K21P1`) and **linking** to it, so
-  `relate` records a kommentar→paragraph edge and the statute paragraph shows
-  the commentary in its margin (the old side-by-side — grouped as "Kommentar",
-  with the comment text as the hover snippet). Prose citation-scanned with the
-  commented law as the relative-reference base (so "7 kap 3 §" resolves to the
-  same law, "tryckfrihetsförordningen" / "NJA 1990 s. 510" to their docs).
-  212 pages, **5,808 commentary→paragraph edges**.
+- ✅ **`kommentar` — an annotation layer, not a page source.** Wiki SFS
+  commentary (`wiki/parse.py::kommentar_artifact`): each `== 21 kap 1 § ==`
+  heading → a section keyed on the statute fragment (`K21P1`), prose
+  citation-scanned with the commented law as the relative-reference base (so "7
+  kap 3 §" resolves to the same law, "tryckfrihetsförordningen" / "NJA 1990 s.
+  510" to their docs). **It has no page tree of its own** (no `/kommentar/`, not
+  on the frontpage/browse, not an inbound citer — `render_kommentar` removed,
+  `catalog.inbound` excludes it): instead the commentary prose is shown
+  **side-by-side in the statute paragraph's context rail** when that paragraph is
+  in focus. `render._commentary_index` builds `{(law_uri, anchor) → prose}` from
+  the kommentar artifacts; `Rail._commentary` renders it as the rail's top
+  "Kommentar" section (with author byline). 212 commentaries. `test/test_site.py`
+  (`test_commentary_shows_in_paragraph_rail_not_as_page`).
 - ✅ **`begrepp` source** `::begrepp_artifact` — concept/keyword glossary,
   published at `begrepp/<Name>` (MediaWiki ucfirst). `[[wikilinks]]` weave the
   concept graph; the concept page's inbound shows everything (laws, cases,
@@ -694,11 +790,57 @@ inbound → render pipeline as the machine-extracted sources.
   `render_{kommentar,begrepp}`; `doc_relpath` → `kommentar/` + `begrepp/` trees;
   inbound groups "Kommentar"/"Begrepp"; inbound entries now link to the citing
   *pinpoint* (`from_uri#anchor`). `test/test_wiki.py`.
-- ⬜ **Next (per the design note)**: case↔concept *edges* (concept page listing
-  its tagged cases — needs nyckelord → begrepp edges in `relate`, with synonym /
-  defined-in-commentary resolution); embed commentary prose *inline* at the
-  paragraph (not only the margin link); topic taxonomy (`Lagar inom …`); and the
-  authoring layer (Git-backed prose editor committing markdown via PRs).
+- ✅ **Concept synthesis — the begrepp layer is now the union of extracted terms
+  and wiki concepts.** Two relate-time additions (`catalog.subject_links` +
+  `synthesize_concepts`, wired into `cmd_relate`):
+  - **case↔concept edges**: a court decision's `nyckelord` (metadata, so the
+    inline-link walk missed them) now emit `dcterms:subject` edges to
+    `begrepp/<Name>`, so a concept page lists the cases tagged with it.
+  - **stub concept nodes**: every concept the corpus *references* — an SFS defined
+    term (`dcterms:subject`) or a nyckelord — that has no wiki page gets a stub
+    `documents` row (empty `path`, rendered as a synthesized shell whose content
+    is its aggregated inbound: what defines and tags it). So a defined term
+    without a hand-written description is still a real node, links to it stop
+    dangling, and DV nyckelord become live links. A `RE_CONCEPT` name filter drops
+    the formula/parenthetical junk the SFS extractor emits (`*/k/ …`,
+    `(av personuppgifter)`) — on the real catalog **~5,690 clean stubs vs 520
+    rejected** (SFS-defined alone, before nyckelord). `render_begrepp` shows the
+    stub note + inbound; `generate_site` renders the path-less stub.
+    `test/test_wiki.py`. **EU defined terms now promoted too**
+    (`catalog.definition_links`): each Swedish EU act's definitions-article point
+    that `defines` a term emits a `dcterms:subject` edge to `begrepp/<Name>`,
+    anchored to the point — so an EU term joins the shared namespace (`ränta`,
+    `royalties`) and the concept page shows which EU act defines it, while the
+    act-local term-use interlinking (a use → the act's own definition point) is
+    untouched. Swedish manifestation only (the namespace is Swedish); English acts
+    excluded. Verified on 32003L0049 → Ränta/Royalties concepts with the act
+    inbound.
+  - **Concept canonicalization** (`lib/concepts.py` + `catalog.canonicalize_concepts`):
+    a hand-rolled, **corpus-aware** Swedish noun de-inflector collapses inflected
+    surface forms onto one concept (`Näringsidkare/Näringsidkaren/Näringsidkarna`),
+    so two laws defining the same term in different inflections no longer mint two
+    nodes. It never strips a bare `-are` (an agent *base*, so `Domare` ≠ `Dom`,
+    `Företagare` ≠ `Företag`) and merges only onto a base that is *itself observed*
+    (resolving the `-arna` ambiguity). Canonical display = a wiki form (the wiki
+    uses base form) else the most base-like member; casing/whitespace folded; a
+    hand-edited `begrepp_aliases.json` forces synonym merges and blocks wrong ones
+    (`keep_distinct`). The relate pass clusters all referenced concepts, **remaps
+    the variant link targets** to the canonical and records the fold in a
+    `concept_alias` table; `render` (`Site.resolve`) folds a variant uri baked into
+    an artifact onto the canonical page. On the real catalog: **355 forms collapse
+    into 347 concepts, 0 wiki URIs changed.** `test/test_concepts.py`,
+    `test/test_wiki.py`.
+  - **`find_definitions` span fixes** (`sfs/begrepp.py`): the two extractor
+    mis-*bindings* (not noise) fixed at source — a colon-list definition sweeping a
+    formula prefix (`*/k/ utjämningsbelopp` → `utjämningsbelopp`), and a
+    parenthetical *clarifier* captured instead of its head (`Behandling
+    (av personuppgifter)`: the head is the term, not the paren — distinguished by
+    the paren starting with a preposition, so the `dödas (dödning)` coinage still
+    works). A term never leads with a preposition or contains `*`/`/`; `RE_CONCEPT`
+    is now just a thin backstop. `test/test_sfs_begrepp.py`.
+- ⬜ **Next**: defined-in-commentary resolution; embed commentary prose *inline*
+  at the paragraph (not only the margin link); topic taxonomy (`Lagar inom …`);
+  the authoring layer (Git-backed prose editor committing markdown via PRs).
 
 ### 7d. EU vertical (EUR-Lex / CELLAR) ✅ (first cut)
 
@@ -853,9 +995,13 @@ model + extraction.
 | `test/test_forarbete_download.py` | förarbete downloader parsing suite |
 | `tools/golden_dv.py` | DV golden cross-check (references vs old distilled RDF) |
 | `tools/golden_dv_structure.py` | DV structural golden (instance/ruling skeleton vs old parsed XHTML) |
-| `accommodanda/build.py` | orchestrator: `lagen <source> <action>` build driver + freshness; corpus verbs `relate`/`generate`/`serve` |
+| `accommodanda/build.py` | orchestrator: `lagen <source> <action>` build driver + freshness; corpus verbs `relate`/`generate`/`index`/`dump`/`serve`/`serve-api` |
 | `accommodanda/lib/catalog.py` | derived SQLite catalog + cross-source citation graph (`relate`) |
-| `accommodanda/lib/render.py` | static HTML site w/ inbound annotations (`generate`) |
+| `accommodanda/lib/render.py` | static HTML site w/ inbound annotations + live ⌘K search (`generate`) |
+| `accommodanda/lib/text.py` | shared artifact text flattener (node/document/fragment plain text) |
+| `accommodanda/lib/search.py` | OpenSearch parent-child full-text indexer (`index`) |
+| `accommodanda/lib/dump.py` | NDJSON bulk corpus dumps (`dump`) |
+| `accommodanda/api/app.py` | FastAPI REST/OpenAPI service (`serve-api`) |
 | `site/data/catalog.sqlite` | derived catalog (documents + links) |
 | `site/data/generated/` | generated static site (`index.html`, `sfs/`, `dom/`) |
 | `test/test_site.py` | derived-layer suite |
@@ -911,8 +1057,8 @@ so is easy to forget. All are run by hand:
 in `tools/golden_sfs.py`: `adjudicate(problems, golden) -> (unexplained,
 accepted)`, driven by the `PREDICATES` table (currently `post-freeze-amendment`,
 `stale-consolidation-drift`, `change-reference-staleness`, `balk-basefile-correction`,
-`eller-enumeration`; a `chapter-state-leak` predicate was tried and removed — see the
-2026-06-24 log entry). Several predicates now read the diff line's `«clause»` (the
+`celex-correction`, `eller-enumeration`; a `chapter-state-leak` predicate was tried and
+removed — see the 2026-06-24 log entry). Several predicates now read the diff line's `«clause»` (the
 source-node text appended by `format_ref`) — the context that makes them decidable. It runs **automatically**
 inside `validate`, and also in `golden_sfs.py compare`. To add a rule: write a
 `_predicate(problem, ctx)` and add one `(name, fn)` entry to `PREDICATES`
@@ -933,6 +1079,203 @@ segmenter once the parser emits a `structure` section.
 ---
 
 ## Progress log
+
+**2026-06-25 (§3d — celex-correction: the largest clean reference family adjudicated)**
+- Characterizing the reference-diff residual (the §3d open item) surfaced that the
+  single biggest clean family is **not** the `RefParseError`-hole but a defective
+  golden: the old legalref engine **scrambled sector-3 CELEX**, building
+  `3+number+type+year` (`3625R2017`) where the correct CELEX is `3+year+type+number`
+  (`32017R0625` = Reg (EU) 2017/625) — it named nonexistent "year 0625" acts. The new
+  pipeline mints them correctly (the URIs are real, famous regs — 2016/679 = GDPR,
+  2017/745 = MDR), so these missing/extra pairs are textbook new-is-right.
+- Landed `celex-correction` (`golden_sfs._celex_correction` + `celex_descramble`,
+  added to `PREDICATES`), mirroring `balk-basefile-correction`: invert a well-formed
+  new CELEX back to the golden's scramble and pair the corrected extra with the
+  scrambled miss **per source stycke**; each is forgiven only when its mirror is
+  present, so a CELEX the new pipeline genuinely added (no scrambled mirror — 887
+  lone extras) or one it dropped (golden has it, new doesn't — 1,899 unmatched
+  missings) stays visible as a potential regression.
+- **Clean A/B on the full 11,039-doc corpus** (identical code, predicate the only
+  variable; `match` unchanged at 8,857, confirming the predicate is purely additive):
+  references `diff` **2,018 → 1,745** (−273 docs now fully adjudicated, a 13.5% cut in
+  genuine regressions), **4,690 lines forgiven** (2,345 mirror pairs). 6 new tests in
+  `test/test_golden_adjudicate.py` (32 total green). The pre-existing
+  `test_sfs_parse::test_sfs_links[tricky-overlappande-tabellrader]` red is unrelated
+  (confirmed on a stashed tree).
+- Methodology note recorded along the way: `validate --limit N` walks the *first* N
+  sorted paths — the 1700s–1900s balkar (1736:0123, 1942:740 rättegångsbalken), the
+  most-amended, structurally-hardest docs — so a `--limit` sample is worst-case, not
+  representative (a 500-doc structure+amendments sample showed 26% passing vs ~90%
+  corpus-wide). Use the whole-corpus `--report` for real numbers.
+
+**2026-06-25 (§7c kommentar → side-by-side rail annotation, not a page source)**
+- Per the user: wiki SFS commentary should display **side-by-side with the
+  paragraph it comments on**, not as a separate `/kommentar/` tree. Made kommentar
+  an annotation layer: removed `render_kommentar` + its dispatch entry and dropped
+  kommentar from `SOURCE_ORDER`/frontpage/browse (`generate_site` skips it,
+  `catalog.inbound` excludes it as a citer so it never 404s). The commentary prose
+  now renders into the statute paragraph's **context rail** — `render._commentary_index`
+  maps `(law_uri, anchor) → [(author, prose)]` from the kommentar artifacts, and
+  `Rail._commentary` emits it as the rail's top "Kommentar" section (with byline).
+  Verified on avtalslagen (1915:218): the chapter rails show the commentary prose
+  (`Löftesprincipen` …). `test/test_site.py`. Existing `site/data/generated/kommentar/`
+  pages are now stale (delete + regenerate). Two follow-ups from testing on
+  avtalslagen: (a) **law-level commentary** — the kommentar preamble (before the
+  first `==` section: the "Huvudförfattare …" intro) is keyed `(law, None)` and
+  becomes the rail's **default panel** (`island['']`, "Kommentar till lagen"),
+  shown when no single paragraph is in focus. (b) **scrollspy fix** — a chapter
+  `<section>` carrying commentary became `[data-rail]{position:relative}`, so its
+  paragraphs' `offsetTop` reset per-section and the rail stuck on the section's
+  last paragraph ("always 40 §"); the scrollspy now uses viewport-relative
+  `getBoundingClientRect().top`, immune to offsetParent.
+
+**2026-06-25 (§7c concept layer: synthesis + canonicalization + extractor fixes)**
+- Turned begrepp into the union of machine-extracted terms and wiki concepts, in
+  layers: (1) **synthesis** — DV nyckelord → `dcterms:subject` concept edges, and
+  a stub `begrepp/<Name>` node for every referenced-but-unauthored defined
+  term/nyckelord, so a term with no wiki description still has a page aggregating
+  what defines/tags it (and its links stop dangling). (2) **canonicalization**
+  (`lib/concepts.py`) — a hand-rolled corpus-aware Swedish noun de-inflector folds
+  inflected variants onto one concept. The crux the data exposed: aggressive
+  stemming over-merges `-are` agent nouns with their base (`Domare`→`Dom`,
+  `Företagare`→`Företag`), so the de-inflector never strips a bare `-are` and only
+  merges onto an *observed* base — validated on the real catalog (355 forms → 347
+  concepts, **0 wiki URIs changed**). The relate pass remaps variant link targets
+  + a `concept_alias` table; `Site.resolve` folds a variant uri in an artifact onto
+  the canonical page. A hand-edited `begrepp_aliases.json` (alias / keep_distinct)
+  on top. (3) **`find_definitions` span fixes** — the user corrected that `*/k/
+  utjämningsbelopp` and `(av personuppgifter)` are mis-*bounded* real terms, not
+  noise; fixed the formula-prefix sweep and the parenthetical-clarifier inversion
+  at source (the `dödas (dödning)` coinage still works), demoting `RE_CONCEPT` to a
+  backstop. (4) **EU promotion** — `catalog.definition_links` emits begrepp
+  `dcterms:subject` edges from a Swedish EU act's `defines` points, so EU terms
+  (`ränta`, `royalties`) join the namespace and fold with SFS/DV variants; English
+  acts excluded; act-local term-use interlinking untouched. Also fixed
+  `lagen <source> generate` to scope to one source (it was re-walking the whole
+  114k-page corpus). `test/test_concepts.py` (9), `test/test_wiki.py`,
+  `test/test_sfs_begrepp.py`. Needs a re-parse (SFS, for the span fix) → re-relate
+  → re-generate to surface.
+
+**2026-06-24 (§7d eurlex + §4 DV hierarchy materialized — flat verticals done)**
+- Completing the "materialize the flat verticals" effort (förarbete landed earlier
+  today; eurlex + DV now). Both follow the förarbete pattern: a `structure.py` with
+  `nest`/`flatten`, the parser emits `structure` instead of the flat `body`,
+  consumers updated, recipe hash extended, verified on real data.
+- **eurlex** (`eurlex/structure.py`): two container kinds — `heading` divisions
+  nest by `level` (part > title > chapter > section), `article` holds its
+  `paragraph`s which hold `point`s; preamble/recital/citation and trailing
+  ruling/signature are leaves. Article/point `id`s (the citation anchors) are
+  untouched. `render_eurlex`/`annotate`/`cmd_batch` read `flatten(structure)`
+  (note: parse.py already had its own inline-markup `flatten`, so the structure
+  one is imported aliased). Verified on a real decision: 188 blocks → depth-6 tree
+  (ANNEX › TITLE › article › paragraph › point), 54 fragments preserved.
+  `test/test_eurlex_structure.py`.
+- **DV** (`dv/structure.py`): the §4 spec-first segmenter was already there
+  (`segment`, skeleton-only) — turned it into a **content-bearing** `nest` that
+  attaches every prose block (and the marker blocks) as leaves of the
+  instance/ruling node it falls under. `to_artifact` ships this `structure` in
+  place of the flat body; the golden's `skeleton_from_artifact` drops the prose
+  leaves so the skeleton it compares is unchanged; `render_dv` flattens back.
+  Verified on AD 1993 nr 101 (instans → dom → domskäl/domslut; flatten==body).
+  Closes the §4 ⬜ "parser work it specifies".
+- All three verticals' artifacts are stale now (recipe hashes bumped); a full
+  `lagen {forarbete,eurlex,dv} parse` → relate → generate → index picks them up.
+  285 tests green (+ the live search round-trip).
+
+**2026-06-24 (§6 search dropped the join; §7a förarbete hierarchy materialized)**
+- **Search index: parent-child join → standalone units + collapse.** Live indexing
+  kept tripping the parent circuit breaker even at 2–3 GB heap: the join field's
+  global ordinals are heap-resident and grow with doc count (the request payloads
+  were tiny — a red herring). Rebuilt `search.py` without the join: every unit is
+  a standalone doc carrying `doc_uri` + denormalised parent metadata, and
+  `collapse:{field:doc_uri}` returns one result per document. The whole-document
+  unit holds body text only when the doc has no fragments (else the fragment owns
+  it, so a body query collapses to a paragraph); fragment identity is non-searchable
+  (`doc_title`/`doc_label`) so a title query collapses to the document. Distinct-doc
+  total via a `cardinality` agg. Verified live (round-trip + real kommentar index,
+  pinpoints surface, no breaker). Also added `number_of_replicas:0` (single-node
+  green) + `refresh_interval:60s`. `test/test_search.py` rewritten.
+- **förarbete hierarchy (the lead vertical of the "materialize the flat verticals"
+  effort).** User pushed back — rightly — that förarbete/eurlex/DV *do* have
+  hierarchy (förarbete's numbered 3-level outline, eurlex part→…→article, DV's
+  instance skeleton), the parsers just flattened it. New `forarbete/structure.py`
+  `nest`s the flat blocks into a nested `structure` by heading `level` (already in
+  the data), replacing `body`; `flatten` is the inverse for `kommentar.py`. Wired
+  through `parse.to_artifact`, `cmd_batch`, `kommentar.extract`, `render_forarbete`
+  (recursive, page anchors preserved), and `FA_CODE` (recipe hash → auto-reparse).
+  Verified on prop 1999/2000:39: 1,499 flat blocks → 4-level tree, 348 fragments
+  (was 0). `test/test_forarbete_structure.py`; consumers' tests updated. eurlex +
+  DV next.
+
+**2026-06-24 (§6 — OpenSearch round-trip verified live; two opensearch-py 3.x bugs)**
+- Ran the index against a real OpenSearch 2.18 (the `docker-compose.yml` cluster).
+  Two runtime bugs the unit tests couldn't catch (they only check dict shape):
+  (1) **opensearch-py 3.x made client args keyword-only** — `indices.exists(self.index)`
+  → `TypeError`; fixed every call to `index=…` (`exists`/`delete`/`create`/`refresh`/
+  `delete_by_query`). (2) **`doc_actions` hardcoded `_index=INDEX`**, so a non-default
+  index name (the integration test's `lagen-test`) silently indexed into `lagen` and
+  searched empty; dropped `_index` from the actions and pass `index=self.index` to
+  `helpers.bulk`. After both, the gated integration test passes, and a real
+  `"skadestånd"` query ranks Skadeståndslagen (1972:207) #1 by `inbound_count` with
+  `has_child` paragraph pinpoints. Confirmed the join mapping + per-source rebuild at
+  scale (sfs 11,184 parents complete). The §6 "unrun at scale" caveat is retired for
+  the search half.
+
+**2026-06-24 (§6 — follow-ups: config key, `/documents` listing, compose file)**
+- **OpenSearch endpoint moved into config** — `config.opensearch_url` (config.yml
+  key, env `OPENSEARCH_URL` overrides, default localhost:9200), so it lives where
+  `data_root` does instead of env-only. `search.py`/`build.py` read
+  `config.OPENSEARCH_URL`.
+- **`GET /api/v1/documents`** — the missing corpus-enumeration endpoint (search
+  is fulltext-only, `q` mandatory; dumps return whole content). Filtered by
+  `source`/`kind`, paginated with a `total`. `source_url` is now a **catalog
+  column**, populated from the artifact at `relate` time exactly like `title`
+  (additive `ALTER` migration in `catalog.connect` for pre-existing catalogs;
+  the API applies it once, lock-guarded, then serves read-only); `updated` is the
+  artifact mtime. New `catalog.documents`/`document_count`/`document_inbound_count`.
+  Verified against the real catalog (eurlex 69,290 / sfs 11,184, paging + filter +
+  timestamps). `test/test_api.py` (+2).
+- **Docker** — overwrote the legacy `docker-compose.yml` (old nginx+ES7+fuseki+
+  mediawiki+matomo stack, retired on this branch, still in git history) with a
+  single-node, security-disabled OpenSearch 2.x at plain `http://localhost:9200`
+  (matching the client default) so `docker compose up -d` gives a working cluster.
+- **Swedish developer guide** `accommodanda/api/README.md` documents all
+  endpoints, the dumps, `docker compose up`, and the ⌘K/`LAGEN_API` wiring.
+
+**2026-06-24 (§6 — publishing layer: OpenSearch + REST/OpenAPI + NDJSON dumps)**
+- Built the three deferred §6 publishing pieces, replacing the retired
+  Fuseki/RDF endpoint. User decisions up front: **OpenSearch 2.x** (Apache-2, not
+  ES), **FastAPI + uvicorn**, **parent-child** indexing (doc + per-§ fragment),
+  **NDJSON** dumps (the raw artifacts — JSON-LD `@context` modeling dropped). All
+  three are derived/rebuildable corpus verbs in `build.py`, beside
+  `relate`/`generate`/`serve`.
+- **Shared flattener** `lib/text.py` first (the DRY seam): one definition of a
+  node's / document's / fragment's plain text (inline runs `str | {uri,text}` →
+  joined, table cells space-joined, body + amendments concatenated).
+  `catalog.runs_text` re-exported off it, so its two callers (`render`,
+  `eurlex/annotate`) are untouched.
+- **OpenSearch indexer** `lib/search.py` (`lagen <src> index`) ports the old
+  `fulltextindex.py:ElasticSearchIndex` knowledge (field boosts, parent-child,
+  bulk, `simple_query_string` + `has_child` + highlight) onto OS 2.x's `join`
+  field. Parent ranks by `catalog.document_inbound_count` — a **new** catalog
+  helper counting whole-document citations (`to_root`), the real "most-hänvisade"
+  authority, broader than the bare-uri `inbound_count`. Pure extraction unit-
+  tested; the cluster round-trip is an `OPENSEARCH_URL`-gated integration test
+  (no cluster in this env, so skipped — the one piece unrun at scale).
+- **REST API** `accommodanda/api/app.py` (`lagen serve-api`): FastAPI over
+  catalog + OpenSearch + artifacts; `search` / `document` / `document/{inbound,
+  outbound}` / `sources` / `dumps`, auto OpenAPI + Swagger, CORS-open, URIs as
+  query params. **Verified live against the real 1.5 GB catalog** (Brottsbalk
+  inbound 5,153; räntelagen §6 ← 2,783 citers; outbound/404/sources all correct).
+  Search hits carry their hosted-page `url` (`layout.page_relpath`).
+- **⌘K palette goes live**: `render.SCROLLSPY`'s stub now debounce-`fetch`es
+  `/api/v1/search` (API base in a `<meta name="lagen-api">`, `LAGEN_API`-
+  overridable) and renders deep-links to each hit's paragraph; JS syntax-checked
+  with node. **NDJSON dumps** `lib/dump.py` (`lagen <src> dump`) — verified on the
+  real `kommentar` source (212 lines round-trip). New deps `opensearch-py`,
+  `fastapi`, `uvicorn`. New suites: `test/test_{text,search,api,dump}.py`
+  (70 green together with site/build; one pre-existing `test_sfs_parse` red,
+  unrelated, confirmed on a clean tree).
 
 **2026-06-24 (§3d — eller-enumeration adjudication, the first clause-driven rule)**
 - The old SimpleParse grammar parsed "och … §§" enumerations (double §) but never
