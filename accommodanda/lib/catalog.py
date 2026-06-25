@@ -21,6 +21,10 @@ import re
 import sqlite3
 from pathlib import Path
 
+from . import concepts
+from .text import runs_text
+from .wikitext import begrepp_uri
+
 BASE = "https://lagen.nu/"
 
 
@@ -33,12 +37,13 @@ def norm_title(t):
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS documents (
-    uri    TEXT PRIMARY KEY,
-    source TEXT NOT NULL,        -- 'sfs' | 'dv'
-    kind   TEXT,                 -- 'law' | 'case'
-    label  TEXT,                 -- short display id (SFS number / referat)
-    title  TEXT,                 -- full heading
-    path   TEXT NOT NULL         -- artifact json on disk
+    uri        TEXT PRIMARY KEY,
+    source     TEXT NOT NULL,    -- 'sfs' | 'dv'
+    kind       TEXT,             -- 'law' | 'case'
+    label      TEXT,             -- short display id (SFS number / referat)
+    title      TEXT,             -- full heading
+    path       TEXT NOT NULL,    -- artifact json on disk
+    source_url TEXT              -- authoritative publisher url ("Källa"), if any
 );
 CREATE TABLE IF NOT EXISTS links (
     from_uri    TEXT NOT NULL,   -- document making the citation (doc-level uri)
@@ -52,6 +57,10 @@ CREATE TABLE IF NOT EXISTS fragments (
     uri     TEXT PRIMARY KEY,       -- a node's fragment uri (doc#id)
     snippet TEXT                    -- its text + list items, for link tooltips
 );
+CREATE TABLE IF NOT EXISTS concept_alias (
+    variant   TEXT PRIMARY KEY,     -- an inflected/variant begrepp uri
+    canonical TEXT NOT NULL         -- the concept it folds onto (lib.concepts)
+);
 CREATE TABLE IF NOT EXISTS genomforande (
     sfs_uri    TEXT NOT NULL,       -- the statute paragraf transposing the article
     sfs_anchor TEXT NOT NULL,       -- its fragment id (P3 / K2P1)
@@ -62,6 +71,15 @@ CREATE TABLE IF NOT EXISTS genomforande (
     pinpoint   TEXT,                -- the article pinpoint (e.g. "21.1")
     partial    INTEGER NOT NULL     -- "genomför delvis"
 );
+CREATE TABLE IF NOT EXISTS correspondence (
+    new_uri  TEXT NOT NULL,         -- the new statute paragraf (full uri, doc#id)
+    old_uri  TEXT NOT NULL,         -- the old (repealed) paragraf it corresponds to
+    relation TEXT NOT NULL,         -- 'motsvarar' | 'overfort'
+    scope    TEXT,                  -- 'helt'|'i_sak'|'i_huvudsak'|'delvis'|NULL
+    prop_uri TEXT                   -- the proposition stating the correspondence
+);
+CREATE INDEX IF NOT EXISTS idx_corr_new ON correspondence(new_uri);
+CREATE INDEX IF NOT EXISTS idx_corr_old ON correspondence(old_uri);
 CREATE INDEX IF NOT EXISTS idx_genomf_sfs ON genomforande(sfs_uri, sfs_anchor);
 CREATE INDEX IF NOT EXISTS idx_links_to_uri  ON links(to_uri);
 CREATE INDEX IF NOT EXISTS idx_links_to_root ON links(to_root);
@@ -73,6 +91,12 @@ CREATE INDEX IF NOT EXISTS idx_docs_source   ON documents(source);
 def connect(path):
     con = sqlite3.connect(path)
     con.executescript(SCHEMA)
+    # additive migration for catalogs built before a column existed -- CREATE
+    # TABLE IF NOT EXISTS never alters an existing table. The new column is NULL
+    # until that source is re-related (which re-reads every artifact anyway).
+    cols = {row[1] for row in con.execute("PRAGMA table_info(documents)")}
+    if "source_url" not in cols:
+        con.execute("ALTER TABLE documents ADD COLUMN source_url TEXT")
     return con
 
 
@@ -139,14 +163,47 @@ def artifact_links(art):
     return out
 
 
+def subject_links(art):
+    """Concept (begrepp) edges from a court decision's `nyckelord`. nyckelord are
+    metadata, not body text, so the inline-link walk misses them; each tags the
+    case with a concept (`dcterms:subject`), so the concept page lists the cases
+    tagged with it -- the case→concept half of the keyword graph."""
+    return [(None, {"uri": begrepp_uri(n), "predicate": "dcterms:subject",
+                    "text": n})
+            for n in art.get("metadata", {}).get("nyckelord", []) if n.strip()]
+
+
+def definition_links(art):
+    """Concept (begrepp) edges from an EU act's defined terms: each
+    definitions-article point whose `defines` names a term tags the act with that
+    concept (`dcterms:subject`), anchored to the point -- so an EU defined term
+    joins the shared begrepp namespace alongside SFS/DV, and the concept page shows
+    which EU act defines it. Only the **Swedish** manifestation contributes: the
+    begrepp namespace is Swedish, so an English act's terms are not concepts here.
+    (The act-local term-use interlinking -- a use links to the act's own definition
+    point -- stays untouched; this only adds the cross-corpus concept edge.)"""
+    if art.get("lang") != "swe":
+        return []
+    out = []
+
+    def walk(node):
+        if isinstance(node, dict):
+            term = node.get("defines")
+            if term and term.strip():
+                out.append((node.get("id"),
+                            {"uri": begrepp_uri(term), "predicate": "dcterms:subject",
+                             "text": term}))
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(art.get("structure"))
+    return out
+
+
 SNIPPET_LEN = 220
-
-
-def runs_text(runs):
-    """Flatten an inline-run list (str runs + link dicts) to plain text."""
-    if isinstance(runs, str):
-        return runs
-    return "".join(r if isinstance(r, str) else r.get("text", "") for r in runs)
 
 
 def node_snippet(node):
@@ -254,12 +311,13 @@ def rebuild(catalog_path, source, artifact_paths, progress=None):
         raw = path.read_bytes()
         if raw.strip():
             art = json.loads(raw)
-            con.execute("INSERT OR REPLACE INTO documents VALUES (?,?,?,?,?,?)",
-                        document_row(art, path, source))
+            con.execute("INSERT OR REPLACE INTO documents VALUES (?,?,?,?,?,?,?)",
+                        (*document_row(art, path, source), art.get("source_url")))
             rows = [(art["uri"], anchor,
                      run.get("predicate", "dcterms:references"),
                      run["uri"], strip_fragment(run["uri"]), run.get("text"))
-                    for anchor, run in artifact_links(art)]
+                    for anchor, run in (artifact_links(art) + subject_links(art)
+                                        + definition_links(art))]
             con.executemany("INSERT INTO links VALUES (?,?,?,?,?,?)", rows)
             con.executemany("INSERT OR REPLACE INTO fragments VALUES (?,?)",
                             artifact_fragments(art))
@@ -273,6 +331,85 @@ def rebuild(catalog_path, source, artifact_paths, progress=None):
     con.commit()
     con.close()
     return docs, edges
+
+
+# --------------------------------------------------------------------------
+# concept synthesis -- a begrepp node for every defined term / nyckelord the
+# corpus references, so the concept layer is the union of the machine-extracted
+# terms and the hand-authored wiki concepts (relate post-pass)
+# --------------------------------------------------------------------------
+
+# a plausible concept name: starts with a letter (Swedish/accented included via
+# \w under unicode), then letters/digits/spaces/hyphens, 2-60 chars. Rejects the
+# formula/parenthetical fragments the SFS definition extractor sometimes emits as
+# "terms" (`*/k/ utjämningsbelopp`, `(av personuppgifter)`) -- noise, not concepts.
+RE_CONCEPT = re.compile(r"^[^\W\d_][\w \-–]{1,59}$")
+
+BEGREPP = BASE + "begrepp/"
+
+
+def _concept_form(uri):
+    return uri[len(BEGREPP):].replace("_", " ")
+
+
+def _concept_uri(form):
+    return BEGREPP + form.replace(" ", "_")
+
+
+def canonicalize_concepts(con):
+    """Collapse the inflected/variant surface forms of each begrepp onto one
+    canonical node (`lib.concepts`): cluster every referenced concept + wiki
+    title, remap the variant link targets to the canonical uri, and record the
+    mapping in `concept_alias` so the renderer resolves a variant uri baked into
+    an artifact to the canonical page (the artifacts keep their variant uris --
+    canonicalisation is a graph + render concern, no re-parse). Runs before
+    `synthesize_concepts`, so stubs are minted for canonical forms. Returns the
+    number of variant forms folded away."""
+    targets = [r[0] for r in con.execute(
+        "SELECT DISTINCT to_root FROM links WHERE to_root LIKE ?", (BEGREPP + "%",))]
+    wiki = {_concept_form(r[0]) for r in con.execute(
+        "SELECT uri FROM documents WHERE source = 'begrepp' AND path <> ''")}
+    forms = {_concept_form(u) for u in targets
+             if RE_CONCEPT.match(_concept_form(u))} | wiki
+    concepts.register_wiki(wiki)
+    con.execute("DELETE FROM concept_alias")
+    folded = 0
+    for canonical, variants in concepts.cluster(forms).items():
+        canon_uri = _concept_uri(canonical)
+        for variant in variants:
+            v_uri = _concept_uri(variant)
+            if v_uri != canon_uri:
+                con.execute("UPDATE links SET to_uri = ?, to_root = ? "
+                            "WHERE to_root = ?", (canon_uri, canon_uri, v_uri))
+                con.execute("INSERT OR REPLACE INTO concept_alias VALUES (?, ?)",
+                            (v_uri, canon_uri))
+                folded += 1
+    con.commit()
+    return folded
+
+
+def synthesize_concepts(con):
+    """Mint a stub begrepp document for every concept the corpus *references* -- a
+    statute's defined term (an SFS `dcterms:subject` link) or a case's nyckelord
+    -- that has no wiki-authored page and whose name looks like a real concept
+    (`RE_CONCEPT`). The stub carries no description (path empty, rendered as a
+    synthesized shell), but it is a real node, so its page shows what defines and
+    tags it, and links pointing at it stop dangling. Re-run on every relate -- the
+    begrepp source rebuild drops the previous stubs. Returns the number minted."""
+    prefix = BASE + "begrepp/"
+    have = {r[0] for r in con.execute(
+        "SELECT uri FROM documents WHERE source = 'begrepp'")}
+    rows = []
+    for (uri,) in con.execute(
+            "SELECT DISTINCT to_root FROM links WHERE to_root LIKE ?",
+            (prefix + "%",)):
+        name = uri[len(prefix):].replace("_", " ")
+        if uri not in have and RE_CONCEPT.match(name):
+            have.add(uri)
+            rows.append((uri, "begrepp", "begrepp", name, name, "", None))
+    con.executemany("INSERT OR IGNORE INTO documents VALUES (?,?,?,?,?,?,?)", rows)
+    con.commit()
+    return len(rows)
 
 
 # --------------------------------------------------------------------------
@@ -309,6 +446,38 @@ def genomfor_for(con, sfs_uri, anchor):
 
 
 # --------------------------------------------------------------------------
+# old-law -> new-law paragraf correspondence (a restructuring proposition's
+# författningskommentar, derived by the LLM `.corr` layer -- sfs.correspond)
+# --------------------------------------------------------------------------
+
+def set_correspondence(con, rows):
+    """Replace the paragraf correspondence layer. Each row is
+    (new_uri, old_uri, relation, scope, prop_uri) -- both endpoints full paragraf
+    uris. Queried in both directions: the old paragraf's margin shows the new
+    paragraf that supersedes it, and the new paragraf's margin shows the cases
+    citing the old one (the generic `inbound` on `old_uri`)."""
+    con.execute("DELETE FROM correspondence")
+    con.executemany("INSERT INTO correspondence VALUES (?,?,?,?,?)", rows)
+    con.commit()
+
+
+def correspondence_for_old(con, old_uri):
+    """The new-law paragraf(s) that now correspond to an old (repealed) paragraf,
+    for its margin: (new_uri, relation, scope, prop_uri)."""
+    return con.execute(
+        "SELECT new_uri, relation, scope, prop_uri FROM correspondence "
+        "WHERE old_uri = ? ORDER BY new_uri", (old_uri,)).fetchall()
+
+
+def correspondence_for_new(con, new_uri):
+    """The old (repealed) paragraf(s) a new-law paragraf corresponds to, for its
+    margin: (old_uri, relation, scope, prop_uri)."""
+    return con.execute(
+        "SELECT old_uri, relation, scope, prop_uri FROM correspondence "
+        "WHERE new_uri = ? ORDER BY old_uri", (new_uri,)).fetchall()
+
+
+# --------------------------------------------------------------------------
 # queries (used by the renderer)
 # --------------------------------------------------------------------------
 
@@ -325,9 +494,11 @@ def inbound(con, uri, limit=None):
     several places shows each pinpoint, and the renderer can group by source
     and render a human-readable label. Self-citations excluded. `limit` caps
     the rows (for display)."""
+    # commentary is an annotation shown side-by-side in the rail, not a citing
+    # document with a page of its own, so it never appears as an inbound link
     sql = ("SELECT l.from_uri, l.from_anchor, d.label, d.title, d.source "
            "FROM links l JOIN documents d ON d.uri = l.from_uri "
-           "WHERE l.to_uri = ?" + _NOT_SELF + " "
+           "WHERE l.to_uri = ?" + _NOT_SELF + " AND d.source <> 'kommentar' "
            "GROUP BY l.from_uri, l.from_anchor "
            "ORDER BY d.source, d.label, l.from_anchor")
     if limit is not None:
@@ -342,6 +513,17 @@ def inbound_count(con, uri):
         + _NOT_SELF + " GROUP BY l.from_uri, l.from_anchor)", (uri,)).fetchone()[0]
 
 
+def document_inbound_count(con, root_uri):
+    """How many (citing document, pinpoint) entries cite a document *as a whole*
+    -- any of its fragments or its bare uri. The 'most-hänvisade' authority
+    signal (search ranking, the API's headline count), broader than
+    `inbound_count`, which counts one exact uri. Self-citations excluded."""
+    return con.execute(
+        "SELECT COUNT(*) FROM (SELECT 1 FROM links l WHERE l.to_root = ?"
+        + _NOT_SELF + " GROUP BY l.from_uri, l.from_anchor)",
+        (root_uri,)).fetchone()[0]
+
+
 def snippet(con, uri):
     """The stored text snippet for a fragment uri (link-tooltip text), or None."""
     row = con.execute("SELECT snippet FROM fragments WHERE uri = ?",
@@ -352,6 +534,65 @@ def snippet(con, uri):
 def counts(con):
     return dict(con.execute(
         "SELECT source, COUNT(*) FROM documents GROUP BY source").fetchall())
+
+
+def concept_aliases(con):
+    """The variant-uri -> canonical-uri map (`concept_alias`), so the renderer can
+    resolve a begrepp link baked into an artifact onto its canonical concept page."""
+    return dict(con.execute("SELECT variant, canonical FROM concept_alias"))
+
+
+def document(con, uri):
+    """A document's catalog row (uri, source, kind, label, title, path), or
+    None -- the metadata behind an API /document lookup."""
+    return con.execute(
+        "SELECT uri, source, kind, label, title, path FROM documents "
+        "WHERE uri = ?", (uri,)).fetchone()
+
+
+def _doc_filter(source, kind):
+    """A (WHERE-clause, params) pair shared by `documents` and `document_count`."""
+    clauses, params = [], []
+    if source:
+        clauses.append("source = ?")
+        params.append(source)
+    if kind:
+        clauses.append("kind = ?")
+        params.append(kind)
+    return (" WHERE " + " AND ".join(clauses) if clauses else ""), params
+
+
+def documents(con, source=None, kind=None, limit=None, offset=0):
+    """A filtered, paginated document listing as (uri, source, kind, label,
+    title, source_url, path) rows, ordered by uri -- the id/metadata index that
+    drives /document lookups (not full-text search). `source`/`kind` filter;
+    `limit`/`offset` page."""
+    where, params = _doc_filter(source, kind)
+    sql = ("SELECT uri, source, kind, label, title, source_url, path "
+           "FROM documents" + where + " ORDER BY uri")
+    if limit is not None:
+        sql += " LIMIT ? OFFSET ?"
+        params += [limit, offset]
+    return con.execute(sql, params).fetchall()
+
+
+def document_count(con, source=None, kind=None):
+    """How many documents match the same `source`/`kind` filter -- the total for
+    a paginated `documents` listing."""
+    where, params = _doc_filter(source, kind)
+    return con.execute("SELECT COUNT(*) FROM documents" + where,
+                       params).fetchone()[0]
+
+
+def outbound(con, uri):
+    """Every citation a document makes, as (to_uri, predicate, text, from_anchor,
+    target_label, target_title, target_source) -- target_* are NULL when the
+    cited document is not (yet) in the corpus. The mirror of `inbound`."""
+    return con.execute(
+        "SELECT l.to_uri, l.predicate, l.text, l.from_anchor, "
+        "       d.label, d.title, d.source "
+        "FROM links l LEFT JOIN documents d ON d.uri = l.to_root "
+        "WHERE l.from_uri = ? ORDER BY l.from_anchor, l.to_uri", (uri,)).fetchall()
 
 
 def page_dependency_digest(con, uri):
