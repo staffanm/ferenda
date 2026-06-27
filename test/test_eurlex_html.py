@@ -30,6 +30,39 @@ def test_oj_class_act_maps_to_blocks():
     assert art.num == "1" and art.anchor == "1"
 
 
+def test_legacy_classless_html_recovers_title_from_header_shape():
+    # the old "Avis juridique important" HTML has no semantic title class; the
+    # title is the class-less header line (act type + number + date), which runs
+    # straight into the OJ publication reference -- both recovered and trimmed
+    html = """<body>
+      <p>31990L0630</p>
+      <p>Kommissionens direktiv 90/630/EEG av den 30 oktober 1990 om anpassning
+         till den tekniska utvecklingen av rådets direktiv 77/649/EEG om
+         siktfältet i motorfordon Europeiska gemenskapernas officiella tidning
+         nr L 341 , 06/12/1990 s. 0020 - 0029</p>
+      <p>med beaktande av rådets direktiv 77/649/EEG av den 27 september 1977 om
+         tillnärmning av medlemsstaternas lagstiftning</p>
+      <p>Artikel 1</p>
+      <p>Bilaga 3 ändras.</p>
+    </body>"""
+    doc = parse_html(html, "31990L0630", "swe")
+    assert doc.title == (
+        "Kommissionens direktiv 90/630/EEG av den 30 oktober 1990 om anpassning "
+        "till den tekniska utvecklingen av rådets direktiv 77/649/EEG om "
+        "siktfältet i motorfordon")
+
+
+def test_legacy_classless_html_does_not_take_a_recital_as_title():
+    # with no title-shaped header line, the visa ("med beaktande av …") -- which
+    # also cites an act by number+date -- must NOT be picked up as the title
+    html = """<body>
+      <p>med beaktande av rådets direktiv 77/649/EEG av den 27 september 1977 om
+         tillnärmning av medlemsstaternas lagstiftning</p>
+      <p>Artikel 1</p>
+    </body>"""
+    assert parse_html(html, "31990L0630", "swe").title == ""
+
+
 def test_recital_and_point_tables_vs_data_table():
     html = """<body>
       <p class="ti-art">Article 1</p>

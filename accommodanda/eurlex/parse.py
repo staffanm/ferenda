@@ -29,7 +29,7 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 from .definitions import build_matcher, extract_definitions, term_refs
-from .model import BASE, Block, EurlexDoc, doctype
+from .model import BASE, Block, EurlexDoc, doctype, short_label
 from .structure import flatten as flatten_structure, nest
 from .parse_html import parse_html
 from .parse_pdf import parse_pdf
@@ -412,6 +412,12 @@ def to_artifact(doc):
     art = {"uri": doc.uri, "celex": doc.celex, "doctype": doc.doctype,
            "lang": doc.lang, "title": doc.title, "date": doc.date,
            "structure": nest(body)}
+    # a short, distinctive human handle derived from the official title (the
+    # browse index / search shows it instead of the bare CELEX). Acts (legislation
+    # /treaties) only -- a judgment's "title" is the case name, already short.
+    label = short_label(doc.title) if doc.doctype != "judgment" else None
+    if label:
+        art["label"] = label
     if doc.ecli:
         art["ecli"] = doc.ecli
     if doc.oj:

@@ -396,13 +396,28 @@ def _metadata_query(celexes):
             % _literals(celexes))
 
 
-def _best_type(by_type):
-    """The richest manifestation type present: fmx4 > xhtml > html > any pdf."""
-    for filetype in TEXT_PREFERENCE:
-        if filetype in by_type:
-            return filetype
-    pdfs = sorted(t for t in by_type if t.startswith("pdf"))
-    return pdfs[0] if pdfs else None
+def _ranked_types(by_type):
+    """The manifestation types present, richest first: fmx4 > xhtml > html >
+    any pdf. A document is fetched down this list until one yields content that
+    matches its declared format (see _content_ok) -- some scanned old judgments
+    expose an `fmx4`-typed manifestation whose item is actually a TIFF image, so
+    the richest *type* is not always the richest *content*."""
+    ranked = [t for t in TEXT_PREFERENCE if t in by_type]
+    return ranked + sorted(t for t in by_type if t.startswith("pdf"))
+
+
+def _content_ok(filetype, content):
+    """Whether a fetched item's bytes match the format its manifestation type
+    promises. CELLAR sometimes serves a scanned image (TIFF: II*\\0 / MM\\0*)
+    under an `fmx4`/`xhtml`/`html` manifestation; such a placeholder fails here so
+    the caller falls back to the next type (which carries the real text)."""
+    if filetype == "fmx4":
+        return content.lstrip()[:1] == b"<" or content.startswith(ZIP_MAGIC)
+    if filetype in ("xhtml", "html"):
+        return content.lstrip()[:1] == b"<"
+    if filetype.startswith("pdf"):
+        return content.startswith(b"%PDF")
+    return True
 
 
 def _is_wrapper(streams):
@@ -421,9 +436,11 @@ def _resolve_streams(session, items):
 
 
 def fetch_selection(session, celexes, languages):
-    """For each CELEX, the best (lang, filetype, item_url) per requested language
-    -- the bulk replacement for per-document tree-notice selection. Mirrors it:
-    fmx4 > xhtml > html > pdf, with the .doc.xml wrapper item dropped."""
+    """For each CELEX, the ranked content candidates per requested language: a
+    list `(code, [(filetype, item_url), ...])` ordered fmx4 > xhtml > html > pdf,
+    with the .doc.xml wrapper item dropped. store_document fetches down each
+    language's list until one item's bytes match its format -- the bulk
+    replacement for per-document tree-notice selection."""
     code_of = {code.upper(): code for code in languages}
     tree = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     for row in _chunked(session, lambda c: _selection_query(c, languages),
@@ -433,20 +450,22 @@ def fetch_selection(session, celexes, languages):
             (tree[row["celex"]["value"]][code]
                  [row["mtype"]["value"]].append(row["item"]["value"]))
 
-    chosen, ambiguous = {}, set()
+    # any manifestation carrying more than one item needs wrapper disambiguation
+    # (the real .xml content item vs its .doc.xml wrapper)
+    ambiguous = {i for by_lang in tree.values() for by_type in by_lang.values()
+                 for items in by_type.values() if len(items) > 1 for i in items}
+    streams = _resolve_streams(session, ambiguous) if ambiguous else {}
+
+    out = defaultdict(list)
     for celex, by_lang in tree.items():
         for code, by_type in by_lang.items():
-            filetype = _best_type(by_type)
-            if filetype:
-                chosen[(celex, code)] = (filetype, by_type[filetype])
-                if len(by_type[filetype]) > 1:
-                    ambiguous.update(by_type[filetype])
-
-    streams = _resolve_streams(session, ambiguous) if ambiguous else {}
-    out = defaultdict(list)
-    for (celex, code), (filetype, items) in chosen.items():
-        real = [i for i in items if not _is_wrapper(streams.get(i, ()))]
-        out[celex].append((code, filetype, (real or items)[0]))
+            candidates = []
+            for filetype in _ranked_types(by_type):
+                items = by_type[filetype]
+                real = [i for i in items if not _is_wrapper(streams.get(i, ()))]
+                candidates.append((filetype, (real or items)[0]))
+            if candidates:
+                out[celex].append((code, candidates))
     return out
 
 
@@ -496,21 +515,37 @@ def content_filename(code, filetype, content):
 
 def store_document(session, target, celex, wdate, selection, eurovoc):
     """Write a CELEX's synthesized notice and fetch its selected content per
-    language. `selection` is the [(lang, filetype, item_url)] fetch_selection
-    returns for this CELEX. Returns the languages stored. Throttling is the
-    caller's (one delay per document, not per content item)."""
+    language. `selection` is the [(lang, [(filetype, item_url), ...])] candidate
+    list fetch_selection returns for this CELEX. Returns the languages stored.
+    Throttling is the caller's (one delay per document, not per content item).
+
+    Each language's candidates are tried richest-first; the first item whose bytes
+    match its format wins. A CELLAR manifestation can promise `fmx4` but serve a
+    scanned TIFF image -- that placeholder is rejected (see _content_ok) and the
+    next type (the one carrying the real text) is fetched instead.
+
+    A CELEX with no Swedish/English manifestation (`selection` empty -- a
+    pre-accession act never translated) is *not* stored at all: a notice with no
+    document is dead weight the parser can only skip, and (is_downloaded keys on
+    the notice) it would mask the work from a later run that does find one."""
+    if not selection:
+        return []
     write_atomic(target / "notice.ttl", notice_ttl(celex, wdate, eurovoc))
     stored = []
-    for code, filetype, url in selection:
-        response = request(session, "GET", url, timeout=180)
-        name = content_filename(code, filetype, response.content)
-        write_atomic(target / name, response.content)
-        # a re-fetch may land a different manifestation type or zip-ness, so
-        # clear any earlier content file for this language
-        for old in target.glob(code + ".*"):
-            if old.name != name:
-                old.unlink()
-        stored.append(code)
+    for code, candidates in selection:
+        for filetype, url in candidates:
+            response = request(session, "GET", url, timeout=180)
+            if not _content_ok(filetype, response.content):
+                continue                # placeholder for this type: try the next
+            name = content_filename(code, filetype, response.content)
+            write_atomic(target / name, response.content)
+            # a re-fetch may land a different manifestation type or zip-ness, so
+            # clear any earlier content file for this language
+            for old in target.glob(code + ".*"):
+                if old.name != name:
+                    old.unlink()
+            stored.append(code)
+            break
     return stored
 
 
@@ -533,6 +568,24 @@ def download_document(session, root, celex, languages, delay):
 
 def is_downloaded(root, celex):
     return (doc_dir(root, celex) / "notice.ttl").exists()
+
+
+def prune_empty(root, remove=True):
+    """Count (and, unless `remove` is False, delete) harvest dirs that hold only
+    a notice.ttl and no Swedish/English content -- metadata-only works (a
+    pre-accession act never translated) that earlier runs left behind before
+    store_document learned to skip them. The harvest dir is rebuildable, so this
+    is safe to re-run. Returns the number of such dirs."""
+    root = Path(root)
+    n = 0
+    for notice in root.glob("*/*/notice.ttl"):
+        d = notice.parent
+        if all(p.name == "notice.ttl" for p in d.iterdir()):
+            if remove:
+                notice.unlink()
+                d.rmdir()
+            n += 1
+    return n
 
 
 def read_watermark(root, sector_name):

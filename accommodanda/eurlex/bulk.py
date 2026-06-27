@@ -239,7 +239,7 @@ def unpack_bulk(source, root, languages=("swe", "eng"), limit=None, log=print):
     total = len(works)
     log("indexed; %d works to unpack" % total)
 
-    written = skipped = filtered = 0
+    written = skipped = filtered = empty = 0
     marks = {}                       # sector digit -> latest work date in the dump
     # recompressing the TIFF graphics to WebP is the bottleneck; fan it out
     # across cores (threads suffice -- libwebp releases the GIL during encode)
@@ -255,25 +255,35 @@ def unpack_bulk(source, root, languages=("swe", "eng"), limit=None, log=print):
                 # filter before the mark update below
                 filtered += 1
             else:
-                wdate = _workdate_of(rdf)
-                if wdate and wdate > marks.get(celex[0], ""):
-                    marks[celex[0]] = wdate
-                dest = doc_dir(root, celex)
-                write_atomic(dest / "notice.ttl", parse_notice(rdf).ttl())
+                contents = []
                 for lang in languages:
                     chosen = _select_content(lang, uuid, (fmx, fmx_idx),
                                              (html, html_idx), (pdf, pdf_idx), pool)
                     if chosen:
-                        fname, data = chosen
+                        contents.append((lang, chosen))
+                if not contents:
+                    # a metadata-only work: no Swedish/English manifestation
+                    # exists (a pre-accession act never translated). Don't create
+                    # an entry -- a notice with no document is dead weight the
+                    # parser can only skip, and (keyed on by is_downloaded) it
+                    # would mask the work from a later run that does find one.
+                    empty += 1
+                else:
+                    wdate = _workdate_of(rdf)
+                    if wdate and wdate > marks.get(celex[0], ""):
+                        marks[celex[0]] = wdate
+                    dest = doc_dir(root, celex)
+                    write_atomic(dest / "notice.ttl", parse_notice(rdf).ttl())
+                    for lang, (fname, data) in contents:
                         write_atomic(dest / fname, data)
                         # one manifestation per language (the best tier): clear any
                         # other-format/zip-ness content a prior run left for this lang
                         for old in dest.glob(lang + ".*"):
                             if old.name != fname:
                                 old.unlink()
-                written += 1
-            status(i, total, "%d unpacked, %d skipped, %d filtered  %s"
-                   % (written, skipped, filtered, celex or "-"))
+                    written += 1
+            status(i, total, "%d unpacked, %d skipped, %d filtered, %d empty  %s"
+                   % (written, skipped, filtered, empty, celex or "-"))
             if limit and written >= limit:
                 break
     if total:
@@ -288,5 +298,6 @@ def unpack_bulk(source, root, languages=("swe", "eng"), limit=None, log=print):
                 write_watermark(root, sector, date)
                 log("watermark[%s] = %s (dump baseline)" % (sector, date))
     log("unpacked %d works into %s (%d skipped: no CELEX, %d filtered: sector-3 "
-        "non-regulation/directive)" % (written, root, skipped, filtered))
+        "non-regulation/directive, %d empty: no swe/eng manifestation)"
+        % (written, root, skipped, filtered, empty))
     return written

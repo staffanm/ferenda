@@ -18,12 +18,25 @@ import re
 from bs4 import BeautifulSoup
 
 from . import lang as L
-from .model import BASE, Block, EurlexDoc, doctype
+from .model import BASE, Block, EurlexDoc, doctype, looks_like_act_title
 from ..lib.util import normalize_space
 
 # CSS classes (language-neutral) whose text is bibliographic, not body
 HEADER = {"hd-date", "hd-lg", "hd-ti", "hd-oj", "hd-coll", "hd-modifier", "hd-2"}
 TITLE = {"doc-ti", "no-doc-c", "ti-doc"}
+
+# the first preamble line, where the header (and so the title recovery) ends:
+# the visa list ("med beaktande av" / "having regard to") or, when there is none,
+# the enacting-formula opener ("HAR ANTAGIT …" / "HAS ADOPTED …")
+_PREAMBLE_START = re.compile(
+    r"^(?:med beaktande av|having regard to|har (?:antagit|beslutat|enats)|"
+    r"has adopted|whereas)\b", re.IGNORECASE)
+
+# in the legacy HTML the title line runs straight into the OJ publication
+# reference ("… i motorfordon Europeiska gemenskapernas officiella tidning nr L
+# 341 …"); the title ends where that reference begins
+_OJ_REF = re.compile(r"\s*(?:Europeiska (?:gemenskapernas|unionens) officiella "
+                     r"tidning|Official Journal)\b", re.IGNORECASE)
 
 
 def _role(el):
@@ -102,6 +115,19 @@ def parse_html(markup, celex, lang):
 
     doc.title = normalize_space(" ".join(
         _flat(p) for p in body.find_all(class_=re.compile(r"^(oj-)?(doc-ti|ti-doc)$"))))
+    if not doc.title:
+        # legacy "Avis juridique important" HTML has no semantic title class -- the
+        # title is the class-less header line carrying the act number + date. Scan
+        # the header (paragraphs before the preamble opens) and take the first line
+        # of that shape, so a recital that merely cites another act isn't mistaken
+        # for it.
+        for p in body.find_all("p"):
+            text = normalize_space(_flat(p))
+            if _PREAMBLE_START.match(text):
+                break
+            if looks_like_act_title(text):
+                doc.title = _OJ_REF.split(text, 1)[0].strip()
+                break
     hd_date = body.find(class_=re.compile(r"^(oj-)?hd-date$"))
     if hd_date is not None:
         doc.date = _eu_date(_flat(hd_date))
