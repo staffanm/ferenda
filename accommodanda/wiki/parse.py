@@ -25,11 +25,11 @@ import sys
 from pathlib import Path
 
 from ..lib import wikitext
+from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from ..lib.lagrum import (EULAGSTIFTNING, EURATTSFALL, FORARBETEN, KORTLAGRUM,
                           LAGRUM, MYNDIGHETSBESLUT, RATTSFALL, LagrumParser,
                           load_abbreviations, load_namedlaws)
 
-SFS_NAMEDLAWS = "lagen/nu/res/extra/sfs_namedlaws.json"
 PARSE_TYPES = [LAGRUM, KORTLAGRUM, EULAGSTIFTNING, RATTSFALL, FORARBETEN,
                EURATTSFALL, MYNDIGHETSBESLUT]
 

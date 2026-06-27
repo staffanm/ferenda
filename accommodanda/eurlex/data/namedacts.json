@@ -1,0 +1,84 @@
+{
+  "_comment": "EU acts by name -> CELEX, for the ⌘K resolver (lib/resolve.py). Hand-edited, and deliberately sparse: this holds only what can't be read off the official title -- `abbr`, the acronym(s) people cite by (GDPR, NIS2, …), and `label`, a genuinely-informal nickname NOT present in the title. An act whose established short title sits in the title's trailing parenthesis (GDPR '(allmän dataskyddsförordning)', DSA '(förordningen om digitala tjänster)', Rom I '(Rom I)') carries no label here -- that name is extracted from the title mechanically (a later step), so an entry may be just an abbr, or empty until then. `abbr`/`label` may each be a string or a list; both are matched case-insensitively, and an `art N`/`artikel N`/`article N` tail becomes the `#N` fragment.",
+  "32016R0679": {
+    "abbr": "GDPR"
+  },
+  "32004L0048": {
+    "abbr": "IPRED",
+    "label": "Civilrättsliga sanktionsdirektivet"
+  },
+  "32000L0031": {
+    "label": "E-handelsdirektivet"
+  },
+  "32001L0029": {
+    "label": ["Infosoc-direktivet", "Infosocdirektivet", "Upphovsrättsdirektivet"]
+  },
+  "32019L0790": {
+    "abbr": "DSM",
+    "label": "DSM-direktivet"
+  },
+  "32022R2065": {
+    "abbr": "DSA"
+  },
+  "32022R1925": {
+    "abbr": "DMA"
+  },
+  "32024R1689": {},
+  "32002L0058": {
+    "label": "ePrivacy"
+  },
+  "32011L0083": {
+    "label": "Konsumenträttighetsdirektivet"
+  },
+  "31993L0013": {
+    "label": "Avtalsvillkorsdirektivet"
+  },
+  "32006L0112": {
+    "label": ["Mervärdesskattedirektivet", "Momsdirektivet"]
+  },
+  "32014L0024": {
+    "label": ["Upphandlingsdirektivet", "LOU-direktivet"]
+  },
+  "32012R1215": {
+    "label": ["Bryssel I-förordningen", "Bryssel Ia-förordningen"]
+  },
+  "32022L2555": {
+    "abbr": ["NIS2", "NIS 2"]
+  },
+  "32016L1148": {
+    "abbr": ["NIS", "NIS1"],
+    "label": "NIS-direktivet"
+  },
+  "32014R0910": {
+    "abbr": "eIDAS",
+    "label": "eIDAS-förordningen"
+  },
+  "32024R1183": {
+    "abbr": ["eIDAS 2.0", "eIDAS2", "EUDI"]
+  },
+  "32024R2847": {
+    "abbr": "CRA"
+  },
+  "32022L2557": {
+    "abbr": "CER",
+    "label": "CER-direktivet"
+  },
+  "32022R2554": {
+    "abbr": "DORA",
+    "label": "DORA-förordningen"
+  },
+  "32015L2366": {
+    "abbr": "PSD2",
+    "label": "Betaltjänstdirektivet"
+  },
+  "32022R0868": {
+    "abbr": "DGA"
+  },
+  "32023R1114": {
+    "abbr": "MiCA",
+    "label": "MiCA-förordningen"
+  },
+  "32019L1937": {
+    "label": "Visselblåsardirektivet"
+  }
+}

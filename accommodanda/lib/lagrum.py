@@ -1128,7 +1128,10 @@ class LagrumParser:
                   span=node_span(section))
         for item in node.children[1:]:
             if isinstance(item, Tree) and item.data == 'item_ref':
-                self.emit({'item': find_refids(item)['item']},
+                # item_ref carries one ref id -- either item_ref_id ("3 a") or
+                # itemnumeric_ref_id ("tredje punkten"); emit whichever it is
+                # (lagrum_uri folds both to the N fragment letter)
+                self.emit(find_refids(item),
                           match, out, context, span=node_span(item))
         match.currentsection = None
 

@@ -35,6 +35,7 @@ from .structure import nest
 from ..lib.lagrum import (EULAGSTIFTNING, EURATTSFALL, FORARBETEN, KORTLAGRUM,
                      LAGRUM, MYNDIGHETSBESLUT, RATTSFALL, LagrumParser,
                      interleave, load_abbreviations, load_namedlaws)
+from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 
 # Court decisions cite across the whole spectrum of legal sources, so the
 # DV citation scanner enables every ported grammar.
@@ -43,7 +44,6 @@ DV_PARSE_TYPES = [LAGRUM, KORTLAGRUM, EULAGSTIFTNING, RATTSFALL, FORARBETEN,
 
 DOMSTOL_DEFAULT = "site/data/domstol/downloaded"
 INDEX_DEFAULT = "site/data/dv/identity-index.json"
-SFS_NAMEDLAWS = "lagen/nu/res/extra/sfs_namedlaws.json"
 
 # SFS id at the head of a lagen.nu lagrum URI (https://lagen.nu/1995:450#P4)
 RE_SFS_URI = re.compile(r"https://lagen\.nu/(\d{4}:\d+)")

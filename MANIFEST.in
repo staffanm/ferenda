@@ -1,1 +1,5 @@
 recursive-include ferenda/res *.xsl *.css *.js *.txt *.png *.rq *.py *.ini *.n3 *.ttl *.ebnf
+# curated named-resource datasets shipped with the accommodanda pipeline
+recursive-include accommodanda/sfs/data *.json
+recursive-include accommodanda/dv/data *.json
+recursive-include accommodanda/eurlex/data *.json

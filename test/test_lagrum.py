@@ -23,14 +23,13 @@ from pathlib import Path
 
 import pytest
 
+from accommodanda.lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from accommodanda.lib.lagrum import (ENKLALAGRUM, EULAGSTIFTNING, EURATTSFALL,
                                 FORARBETEN, MYNDIGHETSBESLUT, RATTSFALL,
                                 LagrumParser, load_abbreviations, load_namedlaws)
 from accommodanda.lib.util import normalize_space
 
 TESTROOT = Path(__file__).parent / "files" / "legalref"
-SFS_NAMEDLAWS = (Path(__file__).parent.parent / "lagen" / "nu" / "res" / "extra"
-                 / "sfs_namedlaws.json")
 NAMEDLAWS = load_namedlaws(SFS_NAMEDLAWS)
 ABBREVIATIONS = load_abbreviations(SFS_NAMEDLAWS)
 
