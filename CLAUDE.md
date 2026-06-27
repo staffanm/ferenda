@@ -105,3 +105,10 @@ These boundaries are load-bearing rules, not suggestions:
 - No glazing
 - Be critical
 - Don't fix what's not broken
+- **Never run a git command that changes state without an explicit
+  instruction to do so.** This includes `commit`, `add`/`stage`, `push`,
+  `reset`, `revert`, `stash`, `checkout`/`switch`, `merge`, `rebase`,
+  `branch`, `tag`, and `restore`. Read-only commands (`status`, `diff`,
+  `log`, `show`) are always fine. Make the file changes and leave them in
+  the working tree; let the user decide when to commit. "Fix X" is not
+  permission to commit X.
