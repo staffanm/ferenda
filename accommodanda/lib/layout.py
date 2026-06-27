@@ -19,6 +19,7 @@ future uniform ``<source>/{downloaded,artifact}/<relpath>`` convention (and the
 will be introduced.
 """
 
+import re
 from pathlib import Path
 from urllib.parse import quote
 
@@ -39,13 +40,14 @@ DOM_ROOT = DATA / "dom"          # case law (source key "dv"): api raw + artifac
 DV_ROOT = DATA / "dv"            # legacy case-law raw feed only
 FA_ROOT = DATA / "forarbete"
 EURLEX_ROOT = DATA / "eurlex"
+FORESKRIFT_ROOT = DATA / "foreskrift"     # agency regulations (per-fs subtrees)
 KOMMENTAR_ROOT = DATA / "kommentar"
 BEGREPP_ROOT = DATA / "begrepp"
 WIKI_ROOT = DATA / "mediawiki" / "downloaded"       # shared by kommentar+begrepp
 
 ARTIFACT_ROOT = {"sfs": SFS_ROOT, "dv": DOM_ROOT, "forarbete": FA_ROOT,
-                 "eurlex": EURLEX_ROOT, "kommentar": KOMMENTAR_ROOT,
-                 "begrepp": BEGREPP_ROOT}
+                 "eurlex": EURLEX_ROOT, "foreskrift": FORESKRIFT_ROOT,
+                 "kommentar": KOMMENTAR_ROOT, "begrepp": BEGREPP_ROOT}
 
 # raw roots -- the download writers put their structure under these
 SFS_DOWNLOADED = SFS_ROOT / "downloaded"
@@ -53,6 +55,7 @@ DOM_DOWNLOADED = DOM_ROOT / "downloaded"            # dv api records
 DV_LEGACY_DOWNLOADED = DV_ROOT / "downloaded"       # dv legacy store
 FA_DOWNLOADED = FA_ROOT / "downloaded"
 EURLEX_DOWNLOADED = EURLEX_ROOT / "downloaded"
+FORESKRIFT_DOWNLOADED = FORESKRIFT_ROOT / "downloaded"   # <fs>/<slug>.{json,pdf}
 
 DOM_INDEX = DOM_ROOT / "identity-index.json"        # case-law identity index
 
@@ -83,6 +86,9 @@ def relpath(source, basefile):
         return Path(typ) / rest
     if source == "eurlex":
         return Path(basefile[1:5]) / basefile.replace("/", "_")
+    if source == "foreskrift":
+        fs, rest = basefile.split("/", 1)        # "fffs/2013:10"
+        return Path(fs) / rest.replace(":", "-").replace(" ", "_")
     if source in ("kommentar", "begrepp"):
         return Path(_alnum_slug(basefile))
     raise ValueError("unknown source %r" % source)
@@ -203,6 +209,16 @@ def page_relpath(uri):
         # prop/2024/25:1 -> prop/2024_25_1.html (served at /prop/…)
         typ, _, rest = loc.partition("/")
         return "%s/%s.html" % (typ, _alnum_slug(rest))
+    elif _FORESKRIFT_LOC.match(loc):
+        # an agency regulation, lagen.nu's /{fs}/{år}:{nr} grammar -- the
+        # författningssamling is the top segment: fffs/2013:10 -> fffs/2013-10.html
+        fs, _, rest = loc.partition("/")
+        return "%s/%s.html" % (fs, _alnum_slug(rest))
     else:
         prefix = "sfs"
     return "%s/%s.html" % (prefix, _alnum_slug(loc))
+
+
+# a föreskrift loc is "<fs>/<år>:<nr>"; every författningssamling code ends in FS
+# (fffs, nfs, kifs, …), which sets it apart from an SFS loc ("2013:635")
+_FORESKRIFT_LOC = re.compile(r"^[a-zåäö]+fs/\d{4}:\d+$")
