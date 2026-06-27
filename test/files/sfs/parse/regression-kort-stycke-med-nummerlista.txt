@@ -1,9 +1,9 @@
 1 § En paragraf som har
 
-1. en inledande nummerlista
+1. en inledande nummerlista.
 
-samt ett kort andra stycke med
+Samt ett kort andra stycke med
 
-1. En avslutande nummerlista
+1. En avslutande nummerlista.
 
 Och ett tredje stycke med punkt.

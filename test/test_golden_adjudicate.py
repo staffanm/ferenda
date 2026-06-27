@@ -341,3 +341,205 @@ def test_celex_correction_requires_same_source():
     old = _ref("missing", "K9P9S9", "https://lagen.nu/ext/celex/3625R2017")
     unexplained, accepted = golden_sfs.adjudicate([new, old], CELEX_GOLDEN)
     assert sorted(unexplained) == sorted([new, old]) and accepted == []
+
+
+# --- golden-chapter-collapse (TOC mis-read as chapter openings) ----------
+#
+# The old pipeline mis-read a chapter list ("N kap. - Title" lines) as chapter
+# openings and dumped the body into one chapter; the new pipeline distributes
+# them. The golden's structure shows the collapse (one chapter holds nearly
+# every paragraf), which gates the rule.
+
+def _kap(cid, npara):
+    return {"type": "kapitel", "id": cid,
+            "children": [{"type": "paragraf", "children": []}
+                         for _ in range(npara)]}
+
+
+# K1=1, K2=1, K9=8 -> >=3 chapters, 80% in one chapter -> collapsed
+COLLAPSE_GOLDEN = {"uri": "https://lagen.nu/2022:964", "amendments": [],
+                   "structure": [_kap("K1", 1), _kap("K2", 1), _kap("K9", 8)]}
+
+
+def test_collapse_detected_from_structure():
+    assert golden_sfs.golden_chapter_collapsed(COLLAPSE_GOLDEN) is True
+    # an evenly distributed golden is not collapsed
+    even = {"structure": [_kap("K1", 3), _kap("K2", 3), _kap("K3", 4)]}
+    assert golden_sfs.golden_chapter_collapsed(even) is False
+
+
+def test_collapse_self_paragraf_mirror_forgiven():
+    # golden read "5 §" from the collapse chapter K9; new distributed it to K3.
+    # Same continuous paragraf number, different chapter -> a mirror, forgiven.
+    collapsed = _ref("missing", "K9P5S1", "https://lagen.nu/2022:964#K9P3")
+    distributed = _ref("extra", "K3P5S1", "https://lagen.nu/2022:964#K3P3")
+    unexplained, accepted = golden_sfs.adjudicate(
+        [collapsed, distributed], COLLAPSE_GOLDEN)
+    assert unexplained == []
+    assert {r for r, _ in accepted} == {"golden-chapter-collapse"}
+    assert len(accepted) == 2
+
+
+def test_collapse_external_target_mirror_forgiven():
+    # an external-law target is identical on both sides; only the source chapter
+    # differs -> still a mirror once the source chapter is stripped
+    collapsed = _ref("missing", "K9P5S1", "https://lagen.nu/2005:551#K11P2")
+    distributed = _ref("extra", "K3P5S1", "https://lagen.nu/2005:551#K11P2")
+    unexplained, accepted = golden_sfs.adjudicate(
+        [collapsed, distributed], COLLAPSE_GOLDEN)
+    assert unexplained == [] and len(accepted) == 2
+
+
+def test_collapse_named_chapter_target_mirror_forgiven():
+    # a self-reference to a whole chapter (#K3) is not renumbered; both sides
+    # agree on it, so the kept target still pairs with the stripped source
+    collapsed = _ref("missing", "K9P5S1", "https://lagen.nu/2022:964#K3")
+    distributed = _ref("extra", "K2P5S1", "https://lagen.nu/2022:964#K3")
+    unexplained, accepted = golden_sfs.adjudicate(
+        [collapsed, distributed], COLLAPSE_GOLDEN)
+    assert unexplained == [] and len(accepted) == 2
+
+
+def test_collapse_lone_diff_stays_unexplained():
+    # a golden link the new pipeline never re-emitted (no distributed mirror) is
+    # a genuine resolution difference, not the structural collapse -> visible
+    lone = [_ref("missing", "K9P5S1", "https://lagen.nu/2005:551#K11P2")]
+    unexplained, accepted = golden_sfs.adjudicate(lone, COLLAPSE_GOLDEN)
+    assert unexplained == lone and accepted == []
+
+
+def test_collapse_inert_on_healthy_golden():
+    # an identical mirror pair against a non-collapsed golden is NOT forgiven --
+    # the rule only fires when the golden itself is structurally collapsed
+    collapsed = _ref("missing", "K9P5S1", "https://lagen.nu/2022:964#K9P3")
+    distributed = _ref("extra", "K3P5S1", "https://lagen.nu/2022:964#K3P3")
+    unexplained, accepted = golden_sfs.adjudicate(
+        [collapsed, distributed], REFS_GOLDEN)
+    assert set(unexplained) == {collapsed, distributed} and accepted == []
+
+
+# --- post-freeze-source-amendment (paragraf rewritten after the freeze) --
+
+def test_paragraf_of_helper():
+    assert golden_sfs.paragraf_of("K2P1S13") == "K2P1"
+    assert golden_sfs.paragraf_of("K10P18S2") == "K10P18"
+    assert golden_sfs.paragraf_of("P5S2") == "P5"
+    assert golden_sfs.paragraf_of("K2P1aS3") == "K2P1a"
+    assert golden_sfs.paragraf_of("K9") is None       # bare chapter
+    assert golden_sfs.paragraf_of("") is None
+
+
+def test_post_freeze_source_amendment_forgives_whole_paragraf():
+    # the paragraf's note bumped to a post-horizon act (2021:50 > 2020:100), so
+    # every other reference the new pipeline read from that paragraf -- a
+    # renumbered cross-reference here -- is stale on the golden side
+    bump = _ref("extra", "K2P1S5", "https://lagen.nu/1962:700#L2021:50")
+    renum_new = _ref("extra", "K2P1S2", "https://lagen.nu/1962:700#K9P67")
+    renum_old = _ref("missing", "K2P1S2", "https://lagen.nu/1962:700#K9P32")
+    unexplained, accepted = golden_sfs.adjudicate(
+        [bump, renum_new, renum_old], REFS_GOLDEN)
+    assert unexplained == []
+    rules = {r for r, _ in accepted}
+    # the #L note credits to change-reference-staleness; the others to the new rule
+    assert "post-freeze-source-amendment" in rules
+
+
+def test_post_freeze_source_amendment_only_the_bumped_paragraf():
+    # a diff from a *different*, un-bumped paragraf stays visible
+    bump = _ref("extra", "K2P1S5", "https://lagen.nu/1962:700#L2021:50")
+    other = _ref("extra", "K5P3S1", "https://lagen.nu/1962:700#K9P67")
+    unexplained, accepted = golden_sfs.adjudicate([bump, other], REFS_GOLDEN)
+    assert other in unexplained
+    assert {r for r, _ in accepted} == {"change-reference-staleness"}
+
+
+def test_post_freeze_source_amendment_needs_post_horizon_bump():
+    # the note names a pre-horizon act (2019:9 <= 2020:100): not a post-freeze
+    # rewrite, so neither the note nor a sibling reference is forgiven
+    prebump = _ref("extra", "K2P1S5", "https://lagen.nu/1962:700#L2019:9")
+    sibling = _ref("extra", "K2P1S2", "https://lagen.nu/1962:700#K9P67")
+    unexplained, accepted = golden_sfs.adjudicate([prebump, sibling], REFS_GOLDEN)
+    assert set(unexplained) == {prebump, sibling} and accepted == []
+
+
+# --- stycke-pinpoint-drift: same edge, back-link re-anchored to a different
+# stycke of the SAME paragraf (the list-continuation parser fix numbers stycken
+# correctly; the golden's stale ordinals run off by one) ---
+
+PIN_GOLDEN = {"uri": "https://lagen.nu/1962:700", "amendments": []}
+
+
+def test_pinpoint_drift_mirror_pair_forgiven():
+    # golden read the closing change-ref from stycke 3 (it split a continuation
+    # into its own stycke); the new pipeline folds the continuation, so the same
+    # edge is read from stycke 2 -- same paragraf, same target
+    old = _ref("missing", "K13P5cS3", "https://lagen.nu/1962:700#L2019:1162")
+    new = _ref("extra", "K13P5cS2", "https://lagen.nu/1962:700#L2019:1162")
+    unexplained, accepted = golden_sfs.adjudicate([old, new], PIN_GOLDEN)
+    assert unexplained == []
+    assert {r for r, _ in accepted} == {"stycke-pinpoint-drift"}
+    assert len(accepted) == 2
+
+
+def test_pinpoint_drift_lone_extra_not_forgiven():
+    new = [_ref("extra", "K13P5cS2", "https://lagen.nu/1962:700#K9P1")]
+    unexplained, accepted = golden_sfs.adjudicate(new, PIN_GOLDEN)
+    assert unexplained == new and accepted == []
+
+
+def test_pinpoint_drift_different_paragraf_not_forgiven():
+    # same target but from a *different paragraf* -- a genuinely different source,
+    # not a re-anchored stycke
+    old = _ref("missing", "K13P5cS3", "https://lagen.nu/1962:700#K9P1")
+    new = _ref("extra", "K13P6S1", "https://lagen.nu/1962:700#K9P1")
+    unexplained, accepted = golden_sfs.adjudicate([old, new], PIN_GOLDEN)
+    assert set(unexplained) == {old, new} and accepted == []
+
+
+def test_pinpoint_drift_bilaga_out_of_scope():
+    # a bilaga source (not paragraf-rooted) is out of scope -- bilaga S# offsets
+    # are structure-staleness, a different family
+    old = _ref("missing", "B1S102", "https://lagen.nu/ext/celex/32012R0648")
+    new = _ref("extra", "B1S179", "https://lagen.nu/ext/celex/32012R0648")
+    unexplained, accepted = golden_sfs.adjudicate([old, new], PIN_GOLDEN)
+    assert set(unexplained) == {old, new} and accepted == []
+
+
+# --- brottsrubricering-begrepp: a crime-name concept the new pipeline extracts
+# from a "döms för X till böter/fängelse" clause that the old pipeline missed ---
+
+def _beg(kind, name, clause):
+    line = "begrepp: %s https://lagen.nu/begrepp/%s" % (kind, name)
+    return line + ("  «%s»" % clause if clause else "")
+
+
+def test_brottsrubricering_begrepp_forgiven():
+    p = _beg("extra", "Kapning",
+             "Den som bemäktigar sig ett fartyg döms för kapning till fängelse "
+             "i högst fyra år.")
+    unexplained, accepted = golden_sfs.adjudicate([p], PIN_GOLDEN)
+    assert unexplained == []
+    assert accepted == [("brottsrubricering-begrepp", p)]
+
+
+def test_brottsrubricering_begrepp_alt_form_forgiven():
+    p = _beg("extra", "Mord", "För mord döms till fängelse på livstid.")
+    _, accepted = golden_sfs.adjudicate([p], PIN_GOLDEN)
+    assert [r for r, _ in accepted] == ["brottsrubricering-begrepp"]
+
+
+def test_non_brottsrubricering_begrepp_stays():
+    # an ordinary defined term (not an offence clause) is not blanket-forgiven
+    p = [_beg("extra", "Konsument",
+              "I denna lag avses med konsument en fysisk person.")]
+    unexplained, accepted = golden_sfs.adjudicate(p, PIN_GOLDEN)
+    assert unexplained == p and accepted == []
+
+
+def test_brottsrubricering_begrepp_missing_not_forgiven():
+    # the predicate only forgives an `extra`; a term the new pipeline dropped
+    # (begrepp: missing) is a real regression and stays visible
+    p = [_beg("missing", "Kapning",
+              "Den som bemäktigar sig ett fartyg döms för kapning till fängelse.")]
+    unexplained, accepted = golden_sfs.adjudicate(p, PIN_GOLDEN)
+    assert unexplained == p and accepted == []

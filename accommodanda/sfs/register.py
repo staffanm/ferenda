@@ -28,13 +28,12 @@ from rdflib import Graph
 from rdflib.namespace import DCTERMS, FOAF, SKOS
 
 from ..lib import util
+from ..lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
 from ..lib.errors import SkipDocument
 
 BASE = "https://lagen.nu/"
 RESOURCE_TTL = (Path(__file__).parent.parent.parent
                 / "lagen/nu/res/extra/swedishlegalsource.ttl")
-NAMEDLAWS_JSON = (Path(__file__).parent.parent.parent
-                  / "lagen/nu/res/extra/sfs_namedlaws.json")
 RINFO_PUBL = "http://rinfo.lagrummet.se/publ/sfs/"
 CELEX_BASE = "https://lagen.nu/ext/celex/"
 KONSOLIDERAD_TYPE = ("http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#"
@@ -190,24 +189,36 @@ def register_from_source(source):
     (and so the golden) lists change acts oldest-first."""
     org = source.get("organisation") or {}
     reg = source.get("register") or {}
-    header = {"SFS-nummer": source["beteckning"], "Rubrik": source["rubrik"]}
+    # collapse whitespace on text values, matching the HTML path (parse_register
+    # normalizes every row); the JSON carries hard \r\n line breaks inside the
+    # Omfattning ("anteckningar") that would otherwise corrupt the raw
+    # rpubl:andrar string and the lagrum scan that resolves ersatter/inforsI.
+    def norm(value):
+        return util.normalize_space(value) if isinstance(value, str) else value
+    header = {"SFS-nummer": source["beteckning"], "Rubrik": norm(source["rubrik"])}
     if org.get("namnOchEnhet"):
-        header["Departement"] = org["namnOchEnhet"]
+        header["Departement"] = norm(org["namnOchEnhet"])
     if reg.get("forarbeten"):
         header["Förarbeten"] = reg["forarbeten"]
     if reg.get("celexnummer"):
         header["CELEX-nr"] = reg["celexnummer"]
     if source.get("ikraftDateTime"):
         header["Ikraft"] = source["ikraftDateTime"]
+    if source.get("upphavdDateTime"):
+        # the base act's repeal date (golden's rpubl:upphavandedatum) -- the SFSR
+        # HTML carried it in the register header, so the JSON path must too
+        # (Register.acts feeds the header to the base act; amendment_properties
+        # takes its first 10 chars).
+        header["Upphävd"] = source["upphavdDateTime"]
     changes = []
     for act in reversed(source.get("andringsforfattningar") or []):
-        rows = {"SFS-nummer": act["beteckning"], "Rubrik": act.get("rubrik", "")}
+        rows = {"SFS-nummer": act["beteckning"], "Rubrik": norm(act.get("rubrik", ""))}
         for json_key, row_key in (("anteckningar", "Omfattning"),
                                   ("forarbeten", "Förarbeten"),
                                   ("ikraftDateTime", "Ikraft"),
                                   ("celexnummer", "CELEX-nr")):
             if act.get(json_key):
-                rows[row_key] = act[json_key]
+                rows[row_key] = norm(act[json_key])
         changes.append(ChangeAct(sfsnr=act["beteckning"], rows=rows))
     return Register(sfsnr=source["beteckning"], header=header, changes=changes)
 
@@ -217,9 +228,11 @@ def sfst_header_from_source(source):
     matching parse_sfst_header's output keys (consumed by build_metadata)."""
     org = source.get("organisation") or {}
     fulltext = source.get("fulltext") or {}
-    header = {"Rubrik": source["rubrik"]}
+    # collapse the JSON's hard \r\n line breaks in the title (the SFST page text
+    # was whitespace-collapsed; build_metadata uses this for dcterms:title)
+    header = {"Rubrik": util.normalize_space(source["rubrik"])}
     if org.get("namnOchEnhet"):
-        header["Departement"] = org["namnOchEnhet"]
+        header["Departement"] = util.normalize_space(org["namnOchEnhet"])
     if fulltext.get("andringInford"):
         header["Ändring införd"] = fulltext["andringInford"]
     for json_key, hdr_key in (("utfardadDateTime", "Utfärdad"),

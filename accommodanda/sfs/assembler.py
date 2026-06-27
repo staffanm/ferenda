@@ -9,6 +9,7 @@ leaf events attach at their natural level.
 
 import logging
 
+from ..lib import util
 from . import tokenizer as t
 from .model import (Avdelning, Bilaga, Forfattning, Kapitel, Lista,
                     Listelement, Overgangsbestammelse, Overgangsbestammelser,
@@ -148,7 +149,23 @@ def assemble(tokens):
                                    ikrafttrader=ev.ikrafttrader),
                             RANK[Paragraf])
             case t.StyckeEv():
-                open_node(Stycke(text=ev.text))
+                # a stycke cannot start mid-sentence: when a numbered list is
+                # embedded in a clause ("Den som ... vållar [1. 2. 3.] döms för
+                # ..."), the text after the list is the sentence continuing, not
+                # a new stycke. Both the old HTML and the new JSON source carry a
+                # blank line before it, so the leading case is the only signal --
+                # a lowercase block right after an open list folds back into the
+                # stycke that owns the list (keeping the following genuine,
+                # capitalised stycke's ordinal). Scoped to an open list so the
+                # lowercase definienda of a definition paragraph ("konsument: ..."
+                # under "I denna lag avses med", which carry no list) stay their
+                # own stycken.
+                if (lists and isinstance(stack[-1], Stycke)
+                        and ev.text[:1].islower()):
+                    stack[-1].text = util.normalize_space(
+                        stack[-1].text + " " + ev.text)
+                else:
+                    open_node(Stycke(text=ev.text))
             case t.ListItemEv():
                 attach_listitem(ev)
             case t.TabellEv():

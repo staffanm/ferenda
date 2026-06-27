@@ -174,6 +174,7 @@ class Tokenizer:
         self.current_chapter = "0"
         self.current_section = "0"
         self.fake_chapter = "0"
+        self.saw_dash_toc = False  # a "N kap. - Title" TOC entry has been seen
         self.headline_level = 0  # 0 = unknown, 1 = normal seen, 2 = in subs
 
     def preamble(self):
@@ -338,9 +339,14 @@ class Tokenizer:
             return False
         # equal ordinal can be a title change for the same chapter
         if util.numcmp(ordinal, self.current_chapter) >= 0:
-            if self.current_chapter == "1" and self.current_section == "1":
-                # a single § so far in chapter 1 suggests the § contains a
-                # TOC whose lines look like chapter headings (2011:1244)
+            if (self.current_chapter == "1" and self.current_section == "1"
+                    and not self.saw_dash_toc):
+                # a single § so far in chapter 1 suggests the § contains a TOC
+                # whose lines look like chapter headings (2011:1244). This high-
+                # water heuristic only covers TOCs without the "N kap. - Title"
+                # dash form (those are rejected by shape in id_of_kapitel, which
+                # leaves fake_chapter at 0 -- so once such a TOC has been seen we
+                # must not let this branch mis-fake the real body chapters).
                 if util.numcmp(ordinal, self.fake_chapter) < 0:
                     return True
                 else:
@@ -355,6 +361,14 @@ class Tokenizer:
         p, upphor, ikrafttrader = andrings_datum(p)
         m = re_ChapterId(p)
         if not m:
+            return None
+        # "N kap. - Title" (a dash separating number and title) is a table-of-
+        # contents entry, not a heading -- the body repeats it as "N kap. Title"
+        # without the dash. The TOC may sit outside 1 kap. 1 § (eg the 2026
+        # "Balkens innehåll" § in 1981:774), so reject it here by shape rather
+        # than relying on the §1 high-water heuristic below.
+        if p[m.span()[1]:].lstrip().startswith(("-", "–", "—")):
+            self.saw_dash_toc = True
             return None
         # paragraphs *referring* to chapters typically end in these ways
         # (a real chapter heading does not), eg a TOC line ending in ","

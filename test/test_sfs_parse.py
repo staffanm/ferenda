@@ -280,8 +280,7 @@ def test_sfs_parse(txt):
 # fixtures were frozen with a localhost res-URI base, the new pipeline mints
 # lagen.nu URIs.
 
-NAMEDLAWS_JSON = Path(__file__).parent.parent / "lagen" / "nu" / "res" \
-    / "extra" / "sfs_namedlaws.json"
+from accommodanda.lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
 
 
 def norm_uri(uri):

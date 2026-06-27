@@ -622,6 +622,58 @@ def balk_self_ref(uri, own_base, collapsed_base):
     return None
 
 
+re_chapter_prefix = re.compile(r"^K\d+[a-z]?")
+re_paragraf_prefix = re.compile(r"^(K\d+[a-z]?)?P\d+[a-z]?")
+
+
+def paragraf_of(fragment):
+    """The paragraf-level prefix of a source fragment ("K2P1S13" -> "K2P1",
+    "P5S2" -> "P5"), or None when the fragment is not paragraf-rooted (a bare
+    chapter or an empty source)."""
+    m = re_paragraf_prefix.match(fragment or "")
+    return m.group(0) if m else None
+
+
+def golden_chapter_collapsed(golden):
+    """True when the golden piled essentially every paragraf into a single
+    chapter -- the old pipeline's table-of-contents collapse, where a chapter
+    list ("N kap. - Title" lines) was mis-read as chapter openings and the body
+    fell into the last one. The new pipeline distributes the chapters correctly,
+    so its references carry the right chapter prefixes and no longer match the
+    golden's collapsed ones; that divergence is the new pipeline being right."""
+    counts = []
+
+    def walk(nodes):
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            if node.get("type") == "kapitel" and node.get("id"):
+                counts.append(sum(
+                    1 for c in node.get("children", [])
+                    if isinstance(c, dict) and c.get("type") == "paragraf"))
+            walk(node.get("children", []))
+
+    walk(golden.get("structure", []))
+    total = sum(counts)
+    return len(counts) >= 3 and total > 0 and max(counts) / total >= 0.8
+
+
+def chapter_collapse_key(source, uri, own_base):
+    """A reference's (source, uri) with the chapter prefix removed, so a link the
+    golden read from its collapse chapter (eg "K29P5") and the one the new
+    pipeline distributed ("K3P5") -- same continuous paragraf number, different
+    chapter -- map together. The chapter is stripped from the source fragment and,
+    for a self-reference to a paragraf, from the target (renumbered the same way);
+    named-chapter and external targets keep their identical-on-both-sides form."""
+    src = re_chapter_prefix.sub("", source or "")
+    if own_base and uri.startswith(own_base + "#"):
+        frag = uri[len(own_base) + 1:]
+        m = re.match(r"K\d+[a-z]?(P.*)$", frag)
+        if m:
+            uri = own_base + "#" + m.group(1)
+    return (src, uri)
+
+
 # A well-formed sector-3 CELEX in the new pipeline's URI: 3 + year(4) + type
 # (1-2 letters) + number(4, zero-padded), with an optional pinpoint fragment.
 re_celex_uri = re.compile(
@@ -693,6 +745,23 @@ def _change_reference_staleness(problem, ctx):
     return source in ctx["bumped_sources"]
 
 
+def _post_freeze_source_amendment(problem, ctx):
+    """A reference diff sourced from a paragraf a post-freeze amendment rewrote.
+    Its closing "Lag (NNNN:NN)." / "Förordning (NNNN:NN)." now names an act later
+    than the golden's freeze horizon (seen as the paragraf bumping its #L
+    ändringshänvisning past the horizon), so the golden's whole reference set for
+    that paragraf predates the current text -- renumbered cross-references, added
+    or removed list members, reworded clauses. None of those can be validated
+    against the stale golden, so every reference sourced from the paragraf is
+    forgiven. The ändringshänvisning note itself is credited to the narrower
+    change-reference-staleness rule, which runs first."""
+    parsed = reference_diff(problem)
+    if parsed is None:
+        return False
+    para = paragraf_of(parsed[1])
+    return para is not None and para in ctx["bumped_paragrafs"]
+
+
 # An "eller" enumeration of paragraf numbers terminated by a *single* § -- e.g.
 # "1, 3, 5 eller 6 §", "26 eller 26 a §". By Swedish drafting convention an "och"
 # list ends in double §§ ("4, 5 och 6 §§") and an "eller" list in single §; the
@@ -751,6 +820,24 @@ def _balk_basefile_correction(problem, ctx):
     return flavour == "collapsed" and source in ctx["balk_full_sources"]
 
 
+def _golden_chapter_collapse(problem, ctx):
+    """A reference diff that is purely the golden's TOC-collapse chapter relabel:
+    the new pipeline's distributed link (extra) mirrors a collapsed golden one
+    (missing) modulo chapter prefix, or vice versa. Fires only when the golden is
+    collapsed; the mirror requirement keeps a genuine new drop/add visible -- the
+    residual is real reference-resolution drift, not the structural collapse."""
+    if not ctx["golden_collapsed"]:
+        return False
+    parsed = reference_diff(problem)
+    if parsed is None:
+        return False
+    kind, source, uri = parsed
+    key = chapter_collapse_key(source, uri, ctx["own_base"])
+    if kind == "extra":
+        return key in ctx["collapse_missing_keys"]
+    return key in ctx["collapse_extra_keys"]
+
+
 def _celex_correction(problem, ctx):
     """A CELEX reference the new pipeline mints in the correct sector-3 form
     where the old pipeline scrambled the year/number fields (§7d). The
@@ -768,6 +855,60 @@ def _celex_correction(problem, ctx):
     return (source, uri) in ctx["celex_extra_scrambled"]
 
 
+def _stycke_pinpoint_drift(problem, ctx):
+    """A reference whose target (predicate + uri) is identical on both sides but
+    read from a different stycke of the *same paragraf* -- the citation graph edge
+    is unchanged; only which stycke of the citing paragraf carries the back-link
+    drifted. The parser now numbers stycken correctly (a list embedded mid-clause
+    keeps its trailing continuation in the stycke, assembler.py), but the old
+    pipeline split that continuation into its own stycke (or, for a different
+    paragraf, folded it into a list item), so its stycken run off by one and its
+    references land on a stale stycke id. Forgive only as a mirror pair -- an extra
+    with a missing counterpart from a *different* stycke of the same paragraf, or
+    vice versa -- so a genuinely added or dropped edge (no counterpart) stays
+    visible. Keyed on paragraf_of, so bilaga `S#` offsets (not paragraf-rooted)
+    and bare-chapter relabels (different paragraf) are out of scope."""
+    parsed = reference_diff(problem)
+    if parsed is None:
+        return False
+    kind, source, uri = parsed
+    para = paragraf_of(source)
+    if para is None:
+        return False
+    others = (ctx["pinpoint_missing"] if kind == "extra"
+              else ctx["pinpoint_extra"]).get((para, uri), set())
+    return any(other != source for other in others)
+
+
+# brottsrubricering definition clauses ("... döms för <offence> till böter/
+# fängelse", "För <offence> döms till ..."); replicated from accommodanda.sfs
+# .begrepp so this standalone comparator stays import-free of the package.
+re_begrepp_diff = re.compile(r"begrepp: (extra|missing) (\S+)")
+re_brottsdef_clause = re.compile(
+    r"\b(?:döms|dömes)(?: han)?(?:,[\w\xa7 ]+,)? för [\w ]{3,50} till "
+    r"(?:böter|fängelse)")
+re_brottsdef_alt_clause = re.compile(
+    r"[Ff]ör [\w ]{3,50} (?:döms|dömas) till (?:böter|fängelse)")
+
+
+def _brottsrubricering_begrepp(problem, ctx):
+    """A begreppsdefinition the new pipeline extracted that the golden lacks,
+    whose defining clause is a criminal-offence definition ("... döms för X till
+    böter/fängelse"). The old pipeline missed these crime names whenever the
+    offence clause sat in a list continuation -- the new parser folds that
+    continuation back into the stycke (assembler.py), so the brottsrubricering
+    fires and the crime becomes a concept. A new-is-right gain, scoped to the
+    offence-clause pattern so an ordinary added term (or extractor noise) is not
+    blanket-forgiven; only an `extra` (the golden cannot newly *lack* a term it
+    never had as a mirror)."""
+    m = re_begrepp_diff.match(problem)
+    if m is None or m.group(1) != "extra":
+        return False
+    clause = reference_clause(problem)
+    return bool(re_brottsdef_clause.search(clause)
+                or re_brottsdef_alt_clause.search(clause))
+
+
 # (rule name, predicate). The families are disjoint, so order only decides
 # which rule is credited in the unlikely event two would match.
 PREDICATES = (
@@ -775,8 +916,14 @@ PREDICATES = (
     ("stale-consolidation-drift", _stale_consolidation_drift),
     ("change-reference-staleness", _change_reference_staleness),
     ("balk-basefile-correction", _balk_basefile_correction),
+    ("golden-chapter-collapse", _golden_chapter_collapse),
     ("celex-correction", _celex_correction),
     ("eller-enumeration", _eller_enumeration),
+    ("stycke-pinpoint-drift", _stycke_pinpoint_drift),
+    ("brottsrubricering-begrepp", _brottsrubricering_begrepp),
+    # broadest last: a post-freeze-rewritten paragraf forgives any of its
+    # references not already claimed by a more specific (new-is-right) family.
+    ("post-freeze-source-amendment", _post_freeze_source_amendment),
 )
 
 
@@ -795,6 +942,11 @@ def adjudicate(problems, golden):
         if kind == "extra" and ctx["horizon"] is not None
         and (key := self_change_ref_key(uri, ctx["own_base"])) is not None
         and key > ctx["horizon"]}
+    # paragrafs holding a post-freeze-bumped stycke -- the whole paragraf was
+    # rewritten, so all of its (renumbered/reworded) references are stale too.
+    ctx["bumped_paragrafs"] = {
+        para for src in ctx["bumped_sources"]
+        if (para := paragraf_of(src)) is not None}
     # 1734-lag balk self-reference correction (full vs collapsed basefile): the
     # collapsed prefix is the own URI with its bare numeric suffix dropped.
     ctx["balk_collapsed_base"] = (
@@ -816,6 +968,26 @@ def adjudicate(problems, golden):
         (src, scrambled)
         for kind, src, uri in filter(None, map(reference_diff, problems))
         if kind == "extra" and (scrambled := celex_descramble(uri)) is not None}
+    # golden TOC-collapse: when the golden dumped the whole body into one chapter,
+    # pair the new pipeline's distributed link with the collapsed golden one by
+    # their chapter-stripped (source, uri) -- a mirror, so unpaired diffs survive.
+    ctx["golden_collapsed"] = golden_chapter_collapsed(golden)
+    ctx["collapse_missing_keys"], ctx["collapse_extra_keys"] = set(), set()
+    if ctx["golden_collapsed"]:
+        for kind, src, uri in filter(None, map(reference_diff, problems)):
+            key = chapter_collapse_key(src, uri, own_base)
+            (ctx["collapse_missing_keys"] if kind == "missing"
+             else ctx["collapse_extra_keys"]).add(key)
+    # stycke-pinpoint drift: index each reference diff by (paragraf, uri) per
+    # side, so a back-link re-anchored to a different stycke of the same paragraf
+    # is recognised as a mirror pair (same edge, drifted citing pinpoint).
+    ctx["pinpoint_missing"], ctx["pinpoint_extra"] = {}, {}
+    for kind, src, uri in filter(None, map(reference_diff, problems)):
+        para = paragraf_of(src)
+        if para is None:
+            continue
+        bucket = ctx["pinpoint_extra"] if kind == "extra" else ctx["pinpoint_missing"]
+        bucket.setdefault((para, uri), set()).add(src)
     unexplained, accepted = [], []
     for problem in problems:
         for rule, predicate in PREDICATES:

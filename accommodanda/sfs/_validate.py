@@ -12,11 +12,10 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from . import load_inputs
+from ..lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
 from ..lib.errors import SkipDocument
 from ..lib.lagrum import LagrumParser, load_namedlaws
 from .nf import inline_references, temporal_dates, to_normalform
-
-NAMEDLAWS_JSON = Path(__file__).parent.parent.parent / "lagen/nu/res/extra/sfs_namedlaws.json"
 
 
 def load_golden_module():
@@ -50,11 +49,27 @@ def compare_refs(golden, doc, basefile, now, golden_sfs):
                  for k in sorted(set(want) - set(new))] +
                 [golden_sfs.format_ref("extra", k, new[k])
                  for k in sorted(set(new) - set(want))])
-    new_terms = {r[2] for r in allrefs if r[1] == "dcterms:subject"}
-    gold_terms = {r[2] for r in golden["references"] if r[1] == "dcterms:subject"}
+    # carry each term's defining-node context (its stycke text) so the
+    # adjudicator can recognise a new-is-right brottsrubricering term -- the crime
+    # name in "döms för X till böter/fängelse" -- the same way reference diffs
+    # carry their «clause». A term may be defined in several nodes; the first
+    # context is representative.
+    new_term_ctx, gold_term_ctx = {}, {}
+    for r in allrefs:
+        if r[1] == "dcterms:subject":
+            new_term_ctx.setdefault(r[2], r[3] if len(r) > 3 else "")
+    for r in golden["references"]:
+        if r[1] == "dcterms:subject":
+            gold_term_ctx.setdefault(r[2], r[3] if len(r) > 3 else "")
+
+    def begrepp_line(kind, uri, ctx):
+        return "begrepp: %s %s" % (kind, uri) + ("  «%s»" % ctx if ctx else "")
+
     return (problems +
-            ["begrepp: missing %s" % u for u in sorted(gold_terms - new_terms)] +
-            ["begrepp: extra %s" % u for u in sorted(new_terms - gold_terms)])
+            [begrepp_line("missing", u, gold_term_ctx[u])
+             for u in sorted(set(gold_term_ctx) - set(new_term_ctx))] +
+            [begrepp_line("extra", u, new_term_ctx[u])
+             for u in sorted(set(new_term_ctx) - set(gold_term_ctx))])
 
 
 def compare_metadata(golden, doc, basefile, register, sfst_header, golden_sfs):
