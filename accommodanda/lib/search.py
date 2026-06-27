@@ -46,6 +46,7 @@ INDEX = "lagen"
 # so retrying with exponential backoff is always safe.
 REQUEST_TIMEOUT = 60      # per-request read timeout (opensearch-py's default is 10s)
 DELETE_TIMEOUT = 600      # delete_by_query over a large source can run minutes
+DELETE_BATCH = 1024       # doc_uris per terms-delete (well under max_terms_count)
 RETRIES = 6               # backoff attempts before surfacing a transient failure
 BACKOFF_CAP = 60          # seconds -- 2, 4, 8, 16, 32, 60, 60 …
 _TRANSIENT = (ConnectionTimeout, OpenSearchConnectionError)
@@ -92,6 +93,9 @@ MAPPING = {
         "dynamic": "strict",
         "properties": {
             "doc_uri":       {"type": "keyword"},   # parent document -- collapse key
+            # the artifact content hash this unit was indexed at (catalog
+            # content_hash); index_source diffs it to skip unchanged documents
+            "version":       {"type": "keyword", "index": False},
             "uri":           {"type": "keyword"},   # this unit (document or fragment)
             "identifier":    {"type": "text", "copy_to": "all"},
             "title":         {"type": "text", "copy_to": "all"},
@@ -121,24 +125,36 @@ HIGHLIGHT = {"fields": {"text": {}, "title": {}},
 # extraction -- artifact + catalog row -> bulk actions (pure)
 # --------------------------------------------------------------------------
 
-def doc_actions(con, row):
+def doc_actions(row, inbound_count, version=None):
     """Yield the index units for one catalogued document: one whole-document unit
     plus one unit per id-bearing fragment, all standalone (no join/routing) and
-    all carrying `doc_uri` (the collapse key) + the document's display metadata
-    and `inbound_count` (read once, denormalised onto the fragments so a fragment
-    that wins its group still ranks and renders with the document's authority).
+    all carrying `doc_uri` (the collapse key) + the document's display metadata,
+    `inbound_count` (denormalised onto the fragments so a fragment that wins its
+    group still ranks and renders with the document's authority) and `version`
+    (the artifact content hash, so a re-index can tell what's already current).
     `row` is a `documents` row (uri, source, kind, label, title, path); the body
     text comes from the artifact JSON on disk.
 
-    No `_index` -- index_source passes index= to helpers.bulk, so the actions
+    Pure: the caller supplies `inbound_count`/`version` (read from the catalog up
+    front), so no DB handle is touched while the bulk helper streams these actions
+    -- which lets index_source feed parallel_bulk from a pool thread safely.
+
+    No `_index` -- index_source passes index= to the bulk helper, so the actions
     follow the SearchIndex instance's index, not a hardcoded constant."""
     uri, source, kind, label, title, path = row
+    shared = {"doc_uri": uri, "source": source, "kind": kind,
+              "version": version, "inbound_count": inbound_count}
+    if not path:
+        # a synthesized stub (e.g. a begrepp concept minted from references) has
+        # no artifact on disk -- only its identity is searchable: one whole-doc
+        # unit carrying its name, no body, no fragments
+        yield {"_id": uri, "_source": {**shared, "uri": uri, "is_doc": True,
+               "identifier": label, "title": title, "label": label}}
+        return
     raw = Path(path).read_bytes()
     if not raw.strip():
         return
     art = json.loads(raw)
-    shared = {"doc_uri": uri, "source": source, "kind": kind,
-              "inbound_count": catalog.document_inbound_count(con, uri)}
     frags = [(fu, ft) for fu, ft in text.fragment_texts(art) if ft]
     # the whole-document unit carries the searchable identity; it carries the body
     # `text` ONLY when there are no fragments to hold it (DV/forarbete/eurlex
@@ -252,50 +268,126 @@ class SearchIndex:
                 "    curl -X DELETE %s/%s\n    lagen all index"
                 % (self.index, props.get("doc_uri", {}).get("type", "missing"),
                    config.OPENSEARCH_URL, self.index))
+        # additive migration: an index built before incremental indexing has no
+        # `version` field, and the strict mapping would reject units carrying one.
+        # Adding a new field by explicit put_mapping is allowed under strict (only
+        # *dynamic* introduction is refused). Its units read back version=None, so
+        # the first incremental run reindexes the whole source once -- as intended.
+        if "version" not in props:
+            self.client.indices.put_mapping(
+                index=self.index,
+                body={"properties": {"version": MAPPING["mappings"]
+                                     ["properties"]["version"]}})
 
-    def drop_source(self, source):
-        """Remove a source's units before reindexing it (the per-source rebuild
-        posture `relate` uses). delete_by_query over a large source can run for
-        minutes, so it gets a long request timeout on top of the backoff retry."""
-        def go():
-            if self.client.indices.exists(index=self.index):
-                self.client.delete_by_query(
-                    index=self.index, body={"query": {"term": {"source": source}}},
-                    refresh=True, conflicts="proceed",
-                    request_timeout=DELETE_TIMEOUT)
-        _retry(go, "delete_by_query(%s)" % source)
+    def exists(self):
+        """Whether the index is present in the cluster -- the caller's gate for a
+        watermark skip: if the index was dropped, a 'fresh' source must still be
+        reindexed rather than skipped into an empty index."""
+        return self.client.indices.exists(index=self.index)
 
-    def index_source(self, con, source, progress=None):
-        """Reindex one source: drop its units, then bulk-stream the document +
-        fragment units for every catalogued document of that source. Returns
-        (documents, indexed, errors)."""
+    def indexed_versions(self, source):
+        """{doc_uri: version} for a source's whole-document units already in the
+        index -- the artifact content hash each was indexed at. The is_doc unit's
+        _id is the doc_uri, so the scan reads identity + version with no body.
+        Drives index_source's diff; empty when the index doesn't exist yet."""
+        if not self.client.indices.exists(index=self.index):
+            return {}
+        scan = helpers.scan(
+            self.client, index=self.index, _source=["version"],
+            query={"query": {"bool": {"filter": [
+                {"term": {"source": source}},
+                {"term": {"is_doc": True}}]}}})
+        return {hit["_id"]: hit["_source"].get("version") for hit in scan}
+
+    def delete_doc_uris(self, doc_uris):
+        """Remove every unit (document + fragments) of the given documents, in
+        terms-query batches so the request stays well under OpenSearch's
+        max_terms_count regardless of how many documents changed/vanished."""
+        uris = list(doc_uris)
+        for start in range(0, len(uris), DELETE_BATCH):
+            batch = uris[start:start + DELETE_BATCH]
+            _retry(lambda b=batch: self.client.delete_by_query(
+                index=self.index, body={"query": {"terms": {"doc_uri": b}}},
+                refresh=True, conflicts="proceed",
+                request_timeout=DELETE_TIMEOUT), "delete_by_query(%d docs)"
+                % len(batch))
+
+    def _bulk(self, actions, jobs):
+        """Stream `actions` into the index. Chunks are bounded by BYTES, not just
+        count: a förarbete/eurlex artifact is full document text, so 500 in one
+        request once ballooned past OpenSearch's parent circuit breaker; 5 MB/chunk
+        keeps the per-request reservation small regardless of document size.
+        jobs>1 fans the round-trips across a thread pool (parallel_bulk); the
+        action generator is still pulled single-threaded, so no DB handle is
+        shared across threads. Returns (indexed, errors)."""
+        common = dict(index=self.index, chunk_size=200,
+                      max_chunk_bytes=5 * 1024 * 1024,
+                      request_timeout=REQUEST_TIMEOUT)
+        if jobs > 1:
+            indexed, errors = 0, []
+            for ok, item in helpers.parallel_bulk(
+                    self.client, actions, thread_count=jobs, queue_size=jobs,
+                    raise_on_exception=False, raise_on_error=False, **common):
+                if ok:
+                    indexed += 1
+                else:
+                    errors.append(item)
+            return indexed, errors
+        # single-threaded path keeps the 429 backoff (parallel_bulk has no retry)
+        return helpers.bulk(self.client, actions, raise_on_error=False,
+                            max_retries=RETRIES, initial_backoff=2,
+                            max_backoff=BACKOFF_CAP, **common)
+
+    def index_source(self, con, source, progress=None, jobs=1, force=False):
+        """Sync one source's units to its catalogued documents. Incremental by
+        content hash: a document already indexed at its current `content_hash` is
+        left untouched; new/changed ones are (re)indexed; units of documents that
+        vanished from the catalog -- or whose artifact is gone from disk -- are
+        dropped. `force` reindexes every document regardless of hash (a full
+        rebuild without deleting the index by hand -- used when the index code
+        changed). `jobs>1` parallelises the bulk round-trips. Returns
+        (documents, indexed, errors, missing, skipped, deleted)."""
         self.ensure_index()
-        self.drop_source(source)
         rows = con.execute(
-            "SELECT uri, source, kind, label, title, path FROM documents "
-            "WHERE source = ? ORDER BY uri", (source,)).fetchall()
+            "SELECT uri, source, kind, label, title, path, content_hash "
+            "FROM documents WHERE source = ? ORDER BY uri", (source,)).fetchall()
+        have = self.indexed_versions(source)
+        present = {row[0] for row in rows}
+
+        todo, missing, skipped = [], [], 0
+        for row in rows:
+            uri, path, chash = row[0], row[5], row[6]
+            if path and not Path(path).exists():
+                # the catalog points at an artifact removed since the last relate;
+                # skip it (re-run relate to prune the stale row for good). A
+                # path-less row is a synthesized stub (no artifact) -- not missing.
+                missing.append(catalog.local(uri))
+            elif not force and chash is not None and have.get(uri) == chash:
+                skipped += 1                          # already current -- skip
+            else:
+                todo.append(row)
+
+        # drop units for documents gone from the catalog, plus the prior units of
+        # the ones we're re-indexing (a changed doc may have shed fragments, whose
+        # stale units a same-_id overwrite wouldn't reach). New docs aren't indexed
+        # yet, so they need no pre-delete.
+        stale = (set(have) - present) | {r[0] for r in todo if r[0] in have}
+        self.delete_doc_uris(stale)
+
+        # everything the threaded bulk needs, read from the DB up front (the action
+        # generator must touch no DB handle -- see doc_actions / _bulk)
+        counts = {r[0]: catalog.document_inbound_count(con, r[0]) for r in todo}
 
         def actions():
-            for i, row in enumerate(rows):
-                yield from doc_actions(con, row)
+            for i, row in enumerate(todo):
+                yield from doc_actions(row[:6], counts[row[0]], version=row[6])
                 if progress:
-                    progress(i + 1, len(rows), catalog.local(row[0]))
+                    progress(i + 1, len(todo), catalog.local(row[0]))
 
-        # Bound each bulk request by BYTES, not just document count: a förarbete
-        # or eurlex artifact is full document text, so 500 of them in one request
-        # ballooned past OpenSearch's parent circuit breaker. 5 MB/chunk keeps the
-        # per-request memory reservation small regardless of document size.
-        # `max_retries`/backoff re-sends a chunk OpenSearch rejects under load
-        # (429); the client's retry_on_timeout covers a chunk's read timeout.
-        indexed, errors = helpers.bulk(self.client, actions(), index=self.index,
-                                       chunk_size=200,
-                                       max_chunk_bytes=5 * 1024 * 1024,
-                                       request_timeout=REQUEST_TIMEOUT,
-                                       max_retries=RETRIES, initial_backoff=2,
-                                       max_backoff=BACKOFF_CAP,
-                                       raise_on_error=False)
-        _retry(lambda: self.client.indices.refresh(index=self.index), "refresh")
-        return len(rows), indexed, errors
+        indexed, errors = (self._bulk(actions(), jobs) if todo else (0, []))
+        if todo or stale:
+            _retry(lambda: self.client.indices.refresh(index=self.index), "refresh")
+        return len(rows), indexed, errors, missing, skipped, len(stale)
 
     def search(self, q, source=None, kind=None, limit=10, offset=0):
         res = _retry(lambda: self.client.search(

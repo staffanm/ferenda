@@ -25,9 +25,10 @@ from pathlib import Path
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from ..lib import catalog, layout, search
+from ..lib import catalog, facets, layout, resolve, search
 from .. import config
 
 CATALOG = config.DATA / "catalog.sqlite"
@@ -153,6 +154,28 @@ class Document(DocumentMeta):
     artifact: dict
 
 
+class BrowseDoc(BaseModel):
+    uri: str
+    url: str                        # the hosted page path (/sfs/1962_700.html)
+    display: str                    # the listing handle (law name / short label / id)
+
+
+class FacetBucket(BaseModel):
+    key: str                        # the raw bucket key ("nja", "2024", "A")
+    label: str                      # its display label ("NJA – Högsta domstolen")
+    slug: str                       # its URL path segment
+    count: int                      # documents in this bucket (incl. children)
+    children: list["FacetBucket"] | None = None   # the next facet level, if any
+    documents: list[BrowseDoc] | None = None      # leaf listing (only from /browse)
+
+
+class FacetTree(BaseModel):
+    source: str
+    levels: list[str]               # the facet axis names, outer-first
+    default: list[str]              # the landing bucket's key path
+    buckets: list[FacetBucket]
+
+
 class SourceInfo(BaseModel):
     source: str
     documents: int
@@ -168,26 +191,108 @@ class DumpInfo(BaseModel):
 # endpoints
 # --------------------------------------------------------------------------
 
+def _resolved_results(con, q, source, kind):
+    """The ⌘K resolver's hits for `q`, shaped as SearchResults: a query that *is*
+    a citation -- a law nickname/abbr + pinpoint ("avtalslagen 36", "BrB 12:1"),
+    an EU act + article ("GDPR art 32") or a case nickname ("Instagrambilden") --
+    maps to one exact, fragment-deep target that full-text can't reach (the name
+    is nowhere in the document). Each candidate is confirmed against the catalog
+    (so an alias for a not-yet-parsed document doesn't surface) and honours the
+    same source/kind filter. The document's own label/title/inbound_count are
+    used, so a pinned hit ranks and renders like any other."""
+    out = []
+    for hit in resolve.resolve(q):
+        if source and hit["source"] != source:
+            continue
+        root, _, frag = hit["uri"].partition("#")
+        row = catalog.document(con, root)
+        if not row:
+            continue
+        _uri, src, kind_, label, title, _path = row
+        if kind and kind_ != kind:
+            continue
+        out.append({
+            "uri": root, "url": "/" + layout.page_relpath(root),
+            "identifier": label, "title": title, "source": src, "kind": kind_,
+            "score": None, "inbound_count": catalog.document_inbound_count(con, root),
+            "highlight": [],
+            "fragments": ([{"uri": hit["uri"], "pinpoint": frag, "highlight": []}]
+                          if frag else []),
+        })
+    return out
+
+
 @app.get("/api/v1/search", response_model=SearchResponse, tags=["search"])
 def search_endpoint(
         q: str = Query(..., description="free-text query"),
         source: str | None = Query(None, description="restrict to a source "
-                                   "(sfs, dv, forarbete, eurlex, kommentar, begrepp)"),
+                                   "(sfs, dv, forarbete, foreskrift, eurlex, kommentar, begrepp)"),
         kind: str | None = Query(None, description="restrict to a document kind"),
         limit: int = Query(10, ge=1, le=100),
         offset: int = Query(0, ge=0)):
-    """Full-text search. Ranks whole documents (relevance combined with citation
-    count) and returns the matching §/article fragments with highlights."""
+    """Full-text search, with a citation-aware twist: when the query reads as a
+    citation (a law nickname/abbreviation + pinpoint, an EU act + article, or a
+    case nickname), the exact resource is resolved and pinned as the first
+    result -- so ⌘K + Enter lands on the right §/article, which plain full-text
+    can't do (the name appears nowhere in the text). The rest is the usual
+    full-text ranking (relevance combined with citation count) with the matching
+    §/article fragments and highlights."""
     res = _index.search(q, source=source, kind=kind, limit=limit, offset=offset)
     results = [{**r, "url": "/" + layout.page_relpath(r["uri"])}
                for r in res["results"]]
-    return SearchResponse(query=q, total=res["total"], results=results)
+    total = res["total"]
+    # the resolved target is the answer to a citation-shaped query, so it leads;
+    # only on the first page (it's one fixed target, not paginated). Drop any
+    # full-text row for the same document -- the pinned hit is more precise.
+    # Resolution confirms its target against the catalog, but a missing catalog
+    # mustn't fail a full-text search, so it's best-effort (no Depends/503).
+    if offset == 0 and CATALOG.exists():
+        _ensure_schema()
+        con = sqlite3.connect("file:%s?mode=ro" % CATALOG, uri=True)
+        try:
+            pinned = _resolved_results(con, q, source, kind)
+        finally:
+            con.close()
+        if pinned:
+            roots = {p["uri"] for p in pinned}
+            kept = [r for r in results if r["uri"] not in roots]
+            total += sum(p["uri"] not in {r["uri"] for r in results} for p in pinned)
+            results = (pinned + kept)[:limit]
+    return SearchResponse(query=q, total=total, results=results)
+
+
+@app.get("/api/v1/facets", response_model=FacetTree, tags=["catalog"])
+def facets_endpoint(
+        source: str = Query(..., description="a faceted source "
+                            "(sfs, dv, forarbete, foreskrift, eurlex, begrepp)"),
+        con: sqlite3.Connection = Depends(get_con)):
+    """The navigation facets for a source: the ordered buckets (one or two levels
+    -- a law's subject initial, a case's court + year) with document counts, plus
+    the default landing bucket. The lightweight navigator; for the listings too
+    use /browse. A flat listing of a whole source is too large to be useful."""
+    if source not in facets.sources():
+        raise HTTPException(404, "source %r is not faceted" % source)
+    return FacetTree(**facets.tree(con, source))
+
+
+@app.get("/api/v1/browse", response_model=FacetTree, tags=["catalog"])
+def browse_endpoint(
+        source: str = Query(..., description="a faceted source "
+                            "(sfs, dv, forarbete, foreskrift, eurlex, begrepp)"),
+        con: sqlite3.Connection = Depends(get_con)):
+    """The complete browse model for a source: the facet navigator *plus* each
+    leaf bucket's ordered, display-labelled documents. The single payload the
+    static-site generator consumes to write the browse pages -- it has no other
+    access to the data store."""
+    if source not in facets.sources():
+        raise HTTPException(404, "source %r is not faceted" % source)
+    return FacetTree(**facets.browse_view(con, source))
 
 
 @app.get("/api/v1/documents", response_model=DocumentList, tags=["document"])
 def documents_endpoint(
         source: str | None = Query(None, description="restrict to a source "
-                                   "(sfs, dv, forarbete, eurlex, kommentar, begrepp)"),
+                                   "(sfs, dv, forarbete, foreskrift, eurlex, kommentar, begrepp)"),
         kind: str | None = Query(None, description="restrict to a document kind "
                                  "(law, case, prop, directive, …)"),
         limit: int = Query(100, ge=1, le=1000),
@@ -264,6 +369,14 @@ def dumps_endpoint():
             for p in sorted(DUMPS.glob("*.ndjson.gz"))]
 
 
-def run(host="127.0.0.1", port=8001):
-    """Launch the API with uvicorn (the `lagen serve-api` entry point)."""
+def serve(directory, host="127.0.0.1", port=8000):
+    """Serve the generated static site *and* the API from one uvicorn process --
+    the only server (`lagen serve`). The REST routes (/api/v1/*, /docs,
+    /openapi.json) answer first; everything else is served from `directory` as
+    static files (html=True maps each dir to its index.html). Because the site and
+    API share an origin, the ⌘K palette calls the API with relative URLs -- there
+    is no separate API server and no configurable API base to go stale. The static
+    mount is added here -- not at import -- so the in-process API client used
+    during `generate` (which only calls /api/v1) never needs a built site."""
+    app.mount("/", StaticFiles(directory=directory, html=True), name="site")
     uvicorn.run(app, host=host, port=port)

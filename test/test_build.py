@@ -107,6 +107,74 @@ def test_recipe_version_invalidates(tmp_path):
     assert not is_fresh(manifest, src, src.stages["parse"], "a")
 
 
+def test_code_version_gate_for_relate_index(tmp_path):
+    # the recipe-version rule extended to relate/index (which are incremental on
+    # data content, not via the per-doc manifest): editing their extraction/index
+    # code re-stales the whole source, per source, suppressed by ignore-code-changes
+    vfile = tmp_path / "extract.py"
+    vfile.write_text("v1")
+    code = (vfile,)
+    manifest = {}
+
+    assert build.code_changed(manifest, "relate", "sfs", code)      # no record yet
+    build.record_code_version(manifest, "relate", "sfs", code)
+    build.recipe_version.cache_clear()
+    assert not build.code_changed(manifest, "relate", "sfs", code)  # now current
+    assert build.code_changed(manifest, "relate", "dv", code)       # per-source
+
+    vfile.write_text("v2")                                          # edit the code
+    build.recipe_version.cache_clear()
+    assert build.code_changed(manifest, "relate", "sfs", code)
+    build.RUN.ignore_code_changes = True                           # pinned fresh
+    assert not build.code_changed(manifest, "relate", "sfs", code)
+    build.RUN.ignore_code_changes = False
+
+    # relate and index are independent namespaces
+    build.record_code_version(manifest, "relate", "sfs", code)
+    build.recipe_version.cache_clear()
+    assert build.code_changed(manifest, "index", "sfs", code)
+
+
+def test_file_watermark_detects_add_remove_modify(tmp_path):
+    a = tmp_path / "a.json"; a.write_text("1")
+    b = tmp_path / "b.json"; b.write_text("2")
+    base = build.file_watermark([a, b])
+    assert build.file_watermark([a, b]) == base          # stable when untouched
+    b.write_text("22")                                   # modify -> new size/mtime
+    assert build.file_watermark([a, b]) != base
+    assert build.file_watermark([a]) != base             # remove one
+    c = tmp_path / "c.json"; c.write_text("3")
+    assert build.file_watermark([a, b, c]) != base       # add one
+
+
+def test_parse_watermark_tracks_inputs(tmp_path):
+    _, src = make_source(tmp_path)
+    manifest = {}
+    build_one(src, "download", "a", manifest)        # materialise the inputs
+    build_one(src, "download", "b", manifest)
+    wm = build.parse_watermark(src)
+    assert build.parse_watermark(src) == wm          # stable while untouched
+    (tmp_path / "dl" / "a.txt").write_text("HELLO AGAIN")   # rewrite one input
+    assert build.parse_watermark(src) != wm
+
+
+def test_up_to_date_combines_watermark_code_and_force(tmp_path):
+    vfile = tmp_path / "code.py"; vfile.write_text("v1")
+    code = (vfile,)
+    manifest = {}
+    wm = "wm-1"
+    assert not build.up_to_date(manifest, "relate", "sfs", wm, code)   # no record
+    build.record_step(manifest, "relate", "sfs", wm, code)
+    build.recipe_version.cache_clear()
+    assert build.up_to_date(manifest, "relate", "sfs", wm, code)       # now fresh
+    assert not build.up_to_date(manifest, "relate", "sfs", "wm-2", code)  # data moved
+    vfile.write_text("v2"); build.recipe_version.cache_clear()
+    assert not build.up_to_date(manifest, "relate", "sfs", wm, code)   # code moved
+    vfile.write_text("v1"); build.recipe_version.cache_clear()
+    build.RUN.force = True
+    assert not build.up_to_date(manifest, "relate", "sfs", wm, code)   # --force
+
+
 def test_no_deps_skips_upstream(tmp_path):
     _, src = make_source(tmp_path)
     manifest = {}

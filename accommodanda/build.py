@@ -20,6 +20,11 @@ semantics); `--no-deps` scopes to just the named stage.
     lagen dv parse -j8              # all court decisions, 8 workers
     lagen sfs status                # per-stage fresh/stale/missing counts
     lagen all parse -n              # dry-run: print the plan, do nothing
+    lagen all rebuild               # parse→relate→index→dump→generate (offline)
+    lagen all all                   # download too, then rebuild — full sync
+
+The parallelisable steps (parse, index) default to all CPU cores; `-j1`
+serialises. relate is single-writer (SQLite) and always serial.
 
 (Also runnable as `python -m accommodanda.build …`.)
 """
@@ -27,9 +32,8 @@ semantics); `--no-deps` scopes to just the named stage.
 import argparse
 import functools
 import hashlib
-import http.server
 import json
-import socketserver
+import os
 import sys
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -39,12 +43,15 @@ from pathlib import Path
 from typing import Callable
 from urllib.parse import urlsplit
 
+import requests
+
 from . import config
 from .sfs import load_inputs
 from .sfs import download as sfs_download
 from .sfs import correspond as sfs_correspond
 from .dv import download as dv_download
 from .dv import identity as dv_identity
+from .dv import namedcases as dv_namedcases_mod
 from .forarbete import download as fa_download
 from .forarbete import parse as fa_parse
 from .forarbete import kommentar as fa_kommentar
@@ -53,22 +60,25 @@ from .eurlex import annotate as eurlex_annotate
 from .eurlex import bulk as eurlex_bulk
 from .eurlex import download as eurlex_download
 from .eurlex import parse as eurlex_parse
+from .foreskrift import download as foreskrift_download
+from .foreskrift.agencies import REGISTRY as FORESKRIFT_AGENCIES
 from .wiki import parse as wiki_parse
 from .dv.parse import api_member, parse_api_record, to_artifact
 from .api import app as api_app
 from .lib import catalog, dump, layout, render, search, util
+from .lib.datasets import NAMEDCASES as NAMEDCASES_JSON
+from .lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
 from .lib.errors import SkipDocument
 from .lib.lagrum import LagrumParser, load_namedlaws
 from .sfs.nf import to_normalform
 
 POLITENESS = 0.3   # seconds between per-document network fetches
-ROOT = Path(__file__).parent.parent          # repo source tree (curated resources)
 DATA = config.DATA                            # corpus location (config.yml: data_root)
 MANIFEST = DATA / ".build" / "manifest.json"
+WATERMARKS = DATA / ".build" / "watermarks.json"   # small per-(step,source) gates
 CATALOG = DATA / "catalog.sqlite"
 GENERATED = layout.GENERATED
 DUMPS = DATA / "dumps"                         # NDJSON bulk exports
-NAMEDLAWS_JSON = ROOT / "lagen" / "nu" / "res" / "extra" / "sfs_namedlaws.json"
 
 
 # --------------------------------------------------------------------------
@@ -166,6 +176,80 @@ def is_fresh(manifest, source, stage, basefile):
         and entry["inputs"] == hash_files(stage.inputs(basefile)) \
         and (RUN.ignore_code_changes
              or entry["version"] == recipe_version(stage.code))
+
+
+def code_changed(store, kind, source, code):
+    """Whether `source`'s extraction/index code changed since its last <kind> run
+    (relate/index/parse/generate -- the steps gated by the coarse watermark store,
+    not the per-doc manifest). True forces a full rebuild of that source, the same
+    recipe-version rule parse/generate use per-doc, so editing catalog.py /
+    search.py / text.py / render.py re-stales the step without a blanket --force;
+    `--ignore-code-changes` pins it fresh. Keyed per source so a partial run can't
+    mark another source current."""
+    if RUN.ignore_code_changes:
+        return False
+    entry = store.get(manifest_key(kind, "__code__", source))
+    return not entry or entry["version"] != recipe_version(code)
+
+
+def record_code_version(store, kind, source, code):
+    store[manifest_key(kind, "__code__", source)] = {
+        "version": recipe_version(code)}
+
+
+def file_watermark(paths):
+    """A cheap, content-insensitive fingerprint of a file set: each path with its
+    size + mtime, no contents read. Detects any add / remove / rewrite (parse
+    rewrites an artifact, bumping its mtime), so relate/dump can skip a source
+    whose artifacts are all untouched since last run -- instead of re-reading and
+    re-hashing every file. --force or a code-version change overrides it."""
+    h = hashlib.sha256()
+    for p in paths:                          # ARTIFACTS yields them already sorted
+        st = p.stat()
+        h.update(("%s\x1f%d\x1f%d\x1e" % (p, st.st_size, st.st_mtime_ns)).encode())
+    return h.hexdigest()
+
+
+def parse_watermark(source):
+    """A cheap fingerprint of a source's parse inputs: each basefile plus its
+    downloaded input files' size+mtime (no content read). Unchanged ⟹ no document
+    needs re-parsing and none appeared, so the whole per-document freshness scan
+    (which content-hashes every input) can be skipped. Basefiles are folded in so
+    a newly-downloaded doc whose input doesn't exist yet still moves the mark."""
+    stage = source.stages["parse"]
+    h = hashlib.sha256()
+    for bf in source.list_basefiles():
+        h.update(bf.encode())
+        for p in sorted(stage.inputs(bf), key=str):
+            if p.exists():
+                st = p.stat()
+                h.update(("\x1f%d\x1f%d" % (st.st_size, st.st_mtime_ns)).encode())
+        h.update(b"\x1e")
+    return h.hexdigest()
+
+
+def watermark_fresh(store, kind, source, wm):
+    """Whether `source`'s last <kind> run saw the same input watermark -- i.e. no
+    input changed since, so the whole step can be skipped (combined with a code
+    check and --force by the caller)."""
+    entry = store.get(manifest_key(kind, "__wm__", source))
+    return bool(entry) and entry["wm"] == wm
+
+
+def record_watermark(store, kind, source, wm):
+    store[manifest_key(kind, "__wm__", source)] = {"wm": wm}
+
+
+def up_to_date(store, kind, source, wm, code):
+    """A relate/index/dump/parse/generate step can be skipped for `source` when
+    neither its inputs (watermark) nor its code changed and --force isn't set."""
+    return (not RUN.force and not code_changed(store, kind, source, code)
+            and watermark_fresh(store, kind, source, wm))
+
+
+def record_step(store, kind, source, wm, code):
+    record_watermark(store, kind, source, wm)
+    record_code_version(store, kind, source, code)
 
 
 # --------------------------------------------------------------------------
@@ -314,18 +398,56 @@ def _absorb(into, res):
 
 
 # --------------------------------------------------------------------------
-# manifest persistence
+# manifest persistence. The manifest is one ~hundreds-of-MB JSON (an entry per
+# (source, stage, basefile)); parsing it costs ~2s, so a single `all` run that
+# loaded it once per step paid that many times over. Cache the parsed dict for
+# the life of the process -- every load_manifest() in one invocation shares (and
+# mutates) the same dict, and save just rewrites it. Workers get an explicit
+# snapshot via the pool initializer, so the cache never crosses a process.
 # --------------------------------------------------------------------------
 
+_MANIFEST_CACHE = None
+
+
 def load_manifest():
-    return json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {}
+    global _MANIFEST_CACHE
+    if _MANIFEST_CACHE is None:
+        _MANIFEST_CACHE = (json.loads(MANIFEST.read_text())
+                           if MANIFEST.exists() else {})
+    return _MANIFEST_CACHE
 
 
 def save_manifest(manifest):
+    global _MANIFEST_CACHE
+    _MANIFEST_CACHE = manifest
     MANIFEST.parent.mkdir(parents=True, exist_ok=True)
     tmp = MANIFEST.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(manifest, ensure_ascii=False, sort_keys=True))
     tmp.replace(MANIFEST)
+
+
+# The coarse per-(step, source) watermarks live in their own tiny file, NOT the
+# big per-doc manifest -- so a no-op run reads only this to decide every step can
+# be skipped, never parsing the ~57 MB manifest (which is loaded only when a
+# source actually changed and needs the per-document freshness scan).
+_WATERMARKS_CACHE = None
+
+
+def load_watermarks():
+    global _WATERMARKS_CACHE
+    if _WATERMARKS_CACHE is None:
+        _WATERMARKS_CACHE = (json.loads(WATERMARKS.read_text())
+                             if WATERMARKS.exists() else {})
+    return _WATERMARKS_CACHE
+
+
+def save_watermarks(store):
+    global _WATERMARKS_CACHE
+    _WATERMARKS_CACHE = store
+    WATERMARKS.parent.mkdir(parents=True, exist_ok=True)
+    tmp = WATERMARKS.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(store, ensure_ascii=False, sort_keys=True, indent=0))
+    tmp.replace(WATERMARKS)
 
 
 # --------------------------------------------------------------------------
@@ -526,6 +648,8 @@ def dv_harvest(scopes):
     if RUN.dry_run:
         print("dv download: would harvest into %s, then rebuild %s"
               % (DOM_DOWNLOADED, DV_INDEX))
+        print("dv download: would refresh named-rättsfall snapshot %s"
+              % NAMEDCASES_JSON)
         return
     seen, changed = dv_download.sync(DOM_DOWNLOADED, full=RUN.force)
     print("dv download: %d records seen, %d new/changed" % (seen, changed))
@@ -533,6 +657,14 @@ def dv_harvest(scopes):
         dv_reindex()
     else:
         print("dv download: no new records, identity index left as is")
+    # also refresh the named-rättsfall snapshot: HD updates that list on its own
+    # cadence (independent of which cases we just downloaded), so a harvest is the
+    # natural moment to re-pull it. Best-effort -- a fetch failure here must not
+    # undo a successful case harvest (the committed snapshot stays the fallback).
+    try:
+        dv_namedcases()
+    except requests.exceptions.RequestException as e:
+        print("dv download: named-rättsfall refresh skipped (%s)" % e)
 
 
 def dv_reindex(args=()):
@@ -551,6 +683,22 @@ def dv_reindex(args=()):
     _dv_cases.cache_clear()
 
 
+def dv_namedcases(args=()):
+    """Refresh the named-rättsfall snapshot (`lagen dv namedcases`): download
+    HD's official list of named precedents and rewrite dv/data/namedcases.json,
+    which the ⌘K resolver reads to turn a nickname ("Instagrambilden") into the
+    published case URI. Independent of the per-document download/parse chain --
+    it's a single small curated dataset, not corpus artifacts."""
+    if RUN.dry_run:
+        print("dv namedcases: would harvest %s -> %s"
+              % (dv_namedcases_mod.URL, NAMEDCASES_JSON))
+        return
+    cases = dv_namedcases_mod.harvest()
+    resolvable = sum(1 for c in cases if c["uri"])
+    print("dv namedcases: %d named cases (%d resolvable) -> %s"
+          % (len(cases), resolvable, NAMEDCASES_JSON))
+
+
 def dv_parse_run(basefile):
     record = json.loads(dv_record(basefile).read_text())
     av = parse_api_record(record)
@@ -566,7 +714,7 @@ SOURCES["dv"] = Source("dv", lambda: sorted(_dv_cases()), {
     "parse": Stage("parse", dv_parse_run, dv_artifact,
                    inputs=lambda bf: [dv_record(bf)], code=DV_CODE),
 }, harvest=dv_harvest, origin=_origin(dv_download.API),
-   actions={"reindex": dv_reindex})
+   actions={"reindex": dv_reindex, "namedcases": dv_namedcases})
 
 
 # --------------------------------------------------------------------------
@@ -719,6 +867,16 @@ def eurlex_unpack(args):
     eurlex_bulk.unpack_bulk(args[0], layout.EURLEX_DOWNLOADED)
 
 
+def eurlex_prune(args=()):
+    """`lagen eurlex prune-empty` -- remove harvest dirs left as a bare notice.ttl
+    with no Swedish/English document (a pre-accession act never translated). The
+    harvest tree is rebuildable, so this only drops dead weight the parser skips."""
+    n = eurlex_download.prune_empty(layout.EURLEX_DOWNLOADED, remove=not RUN.dry_run)
+    print("eurlex prune-empty: %s %d notice-only dir(s) in %s"
+          % ("would remove" if RUN.dry_run else "removed", n,
+             layout.EURLEX_DOWNLOADED))
+
+
 def eurlex_ai_annotate(basefiles):
     """`lagen eurlex ai-annotate <CELEX> ...` -- author the editorial `.ann` layer
     (thematic recital groups + article<->recital links) for the named sector-3
@@ -742,10 +900,50 @@ SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
                    inputs=eurlex_content, depends="download", code=EURLEX_CODE),
 }, harvest=eurlex_harvest, origin=_origin(eurlex_download.SOAP_ENDPOINT),
    scopes=frozenset(eurlex_download.SECTORS),
-   actions={"unpack-bulk": eurlex_unpack, "ai-annotate": eurlex_ai_annotate},
+   actions={"unpack-bulk": eurlex_unpack, "ai-annotate": eurlex_ai_annotate,
+            "prune-empty": eurlex_prune},
    notes="download flags: --since YYYY-MM-DD, --lang swe,eng, --source sparql|soap\n"
          "unpack-bulk <dir|zip>: import a CELLAR bulk legislation dump\n"
+         "prune-empty: remove harvest dirs with only a notice.ttl (no swe/eng doc)\n"
          "ai-annotate <CELEX>: LLM-author the editorial .ann layer (sector-3 acts)")
+
+
+# --------------------------------------------------------------------------
+# föreskrift source (agency regulations: FFFS, … -- per-fs subtrees, PDF body)
+# --------------------------------------------------------------------------
+
+def foreskrift_list():
+    """Every harvested base regulation as 'fs/year:num' (the artifact subdir
+    excluded by the single-level glob)."""
+    return sorted(json.loads(p.read_text())["basefile"]
+                  for p in layout.FORESKRIFT_DOWNLOADED.glob("*/*.json"))
+
+
+def foreskrift_harvest(scopes):
+    """Bulk harvest of the agency författningssamlingar (scopes = fs codes, e.g.
+    'fffs'; empty = all registered). `--full` re-walks and refreshes existing
+    base regulations; `--only fs/year:num` (one scope) fetches a single one."""
+    if RUN.only and len(scopes) != 1:
+        sys.exit("foreskrift --only needs exactly one fs scope, e.g. "
+                 "`lagen foreskrift download fffs --only fffs/2013:10`")
+    if RUN.dry_run:
+        print("foreskrift download: would harvest %s into %s"
+              % (RUN.only or ", ".join(scopes) or "all agencies",
+                 layout.FORESKRIFT_DOWNLOADED))
+        return
+    totals = foreskrift_download.sync(str(layout.FORESKRIFT_DOWNLOADED),
+                                      scopes=scopes or None, full=RUN.force,
+                                      only=RUN.only)
+    for fs, (seen, new) in totals.items():
+        print("foreskrift %s: %d seen, %d new" % (fs, seen, new))
+
+
+SOURCES["foreskrift"] = Source("foreskrift", foreskrift_list, {},
+    harvest=foreskrift_harvest,
+    origin="https://www.lagrummet.se/rattskalla/?filter=foreskrifter",
+    scopes=frozenset(FORESKRIFT_AGENCIES),
+    notes="download flag: --only fs/year:num (fetch one; needs one fs scope)\n"
+          "scopes are författningssamling codes (fffs, …); empty = all agencies")
 
 
 # --------------------------------------------------------------------------
@@ -815,60 +1013,133 @@ ARTIFACTS = {
     "kommentar": lambda: sorted((layout.KOMMENTAR_ROOT / "artifact").glob("*.json")),
     "begrepp": lambda: sorted((layout.BEGREPP_ROOT / "artifact").glob("*.json")),
     "eurlex": lambda: sorted((EURLEX_ROOT / "artifact").glob("*/*.json")),
+    "foreskrift": lambda: sorted(
+        (layout.FORESKRIFT_ROOT / "artifact").glob("*/*.json")),
 }
+
+
+# relate's per-source extraction (the documents/links it derives per artifact)
+# lives wholly in catalog.py; index's unit shape + body extraction in
+# search.py + text.py. A change to these re-stales the corresponding step the same
+# way a parser edit re-stales parse (recipe-version rule).
+RELATE_CODE = (PKG / "lib" / "catalog.py",)
+INDEX_CODE = (PKG / "lib" / "search.py", PKG / "lib" / "text.py")
+DUMP_CODE = (PKG / "lib" / "dump.py",)
 
 
 def cmd_relate(names):
     """(Re)build each named source's rows in the shared catalog from its
-    artifacts on disk -- documents + the citation edges they carry inline."""
+    artifacts on disk -- documents + the citation edges they carry inline.
+    Incremental on artifact content (unchanged artifacts are skipped); editing
+    the extraction code (catalog.py) or passing --force re-extracts every
+    artifact of the affected source."""
+    store = load_watermarks()
+    # a missing catalog invalidates every watermark -- the rows it claims are
+    # current don't exist, so nothing may be skipped (matches stale_sources())
+    catalog_missing = not CATALOG.exists()
+    dirty = False
     for name in names:
         paths = ARTIFACTS[name]()
+        wm = file_watermark(paths)
+        if not catalog_missing and up_to_date(store, "relate", name, wm,
+                                              RELATE_CODE):
+            print("relate %s: up to date (%d artifacts unchanged) -- skipped"
+                  % (name, len(paths)))
+            continue
 
-        def progress(seen, total, docs, edges, current):
-            util.status(seen, total, "relate %s  %d docs, %d links  %s"
-                        % (name, docs, edges, current))
+        def progress(seen, total, changed, current, name=name):
+            util.status(seen, total, "relate %s  %d changed  %s"
+                        % (name, changed, current))
 
-        docs, edges = catalog.rebuild(CATALOG, name, paths, progress=progress)
+        recode = code_changed(store, "relate", name, RELATE_CODE)
+        if recode and not RUN.force:
+            print("relate %s: extraction code changed -- re-extracting all" % name)
+        docs, edges, changed = catalog.rebuild(
+            CATALOG, name, paths, progress=progress, force=RUN.force or recode)
+        record_step(store, "relate", name, wm, RELATE_CODE)
+        dirty = True
         sys.stderr.write("\n")
-        print("relate %s: %d documents, %d links" % (name, docs, edges))
-    # cross-document post-passes (need the whole catalog, so they run last):
-    # pin each förarbete genomför-direktiv statement to the SFS paragraf it
-    # transposes, and mint a stub begrepp node for every defined term / nyckelord
-    # the corpus references but no wiki page covers.
-    con = catalog.connect(CATALOG)
-    pinned = fa_genomforande.resolve(con)
-    corr = [row for p in (SFS_ROOT / "artifact").glob("*/*.corr")
-            for row in sfs_correspond.corr_rows(json.loads(p.read_text()))]
-    catalog.set_correspondence(con, corr)
-    folded = catalog.canonicalize_concepts(con)
-    concepts = catalog.synthesize_concepts(con)
-    con.close()
-    print("relate: %d genomför-direktiv relations pinned to SFS paragrafs" % pinned)
-    print("relate: %d old->new paragraf correspondences loaded from .corr layers"
-          % len(corr))
-    print("relate: %d inflected concept variants folded onto canonical begrepp"
-          % folded)
-    print("relate: %d concept stubs minted from defined terms + nyckelord"
-          % concepts)
+        print("relate %s: %d documents, %d links (%d re-extracted this run)"
+              % (name, docs, edges, changed))
+
+    # cross-document post-passes (need the whole catalog, so they run last): pin
+    # each förarbete genomför-direktiv statement to the SFS paragraf it transposes,
+    # load the SFS correspondence (.corr) layers, and mint a stub begrepp node for
+    # every defined term / nyckelord the corpus references. Their inputs are the
+    # catalog (changed only if a source was re-related above) and the .corr files,
+    # so a no-op run skips them too -- gated on a .corr watermark.
+    corr_wm = file_watermark(sorted((SFS_ROOT / "artifact").glob("*/*.corr")))
+    if dirty or RUN.force or not watermark_fresh(store, "relate", "__corr__",
+                                                 corr_wm):
+        con = catalog.connect(CATALOG)
+        pinned = fa_genomforande.resolve(con)
+        corr = [row for p in (SFS_ROOT / "artifact").glob("*/*.corr")
+                for row in sfs_correspond.corr_rows(json.loads(p.read_text()))]
+        catalog.set_correspondence(con, corr)
+        folded = catalog.canonicalize_concepts(con)
+        concepts = catalog.synthesize_concepts(con)
+        con.close()
+        record_watermark(store, "relate", "__corr__", corr_wm)
+        dirty = True
+        print("relate: %d genomför-direktiv relations pinned to SFS paragrafs"
+              % pinned)
+        print("relate: %d old->new paragraf correspondences loaded from .corr "
+              "layers" % len(corr))
+        print("relate: %d inflected concept variants folded onto canonical begrepp"
+              % folded)
+        print("relate: %d concept stubs minted from defined terms + nyckelord"
+              % concepts)
+    else:
+        print("relate: nothing changed -- cross-document passes skipped")
+    if dirty:
+        save_watermarks(store)
     print("catalog: %s" % CATALOG)
 
 
-def cmd_index(names):
-    """(Re)build the OpenSearch full-text index for each named source from the
-    catalog + artifacts -- a parent document plus one child per § fragment, the
-    paragraph-precise search behind the killer feature. Per-source whole rebuild
-    (like `relate`, which is its prerequisite -- run that first). Needs a running
-    OpenSearch (OPENSEARCH_URL, default http://localhost:9200)."""
+def cmd_index(names, jobs=1):
+    """Sync the OpenSearch full-text index for each named source from the catalog
+    + artifacts -- a whole-document unit plus one fragment per § node, the
+    paragraph-precise search behind the killer feature. Incremental: only new or
+    content-changed documents are (re)indexed and vanished ones dropped, so a
+    re-run with nothing changed is cheap. Editing the index code (search.py /
+    text.py) or passing --force reindexes every document of the affected source.
+    `relate` is its prerequisite (run that first). `jobs>1` fans the bulk
+    round-trips across threads. Needs a running OpenSearch (OPENSEARCH_URL,
+    default http://localhost:9200)."""
+    store = load_watermarks()
+    dirty = False
     index = search.SearchIndex()
     con = catalog.connect(CATALOG)
+    # a dropped index invalidates every watermark -- skipping would leave the
+    # source's docs unindexed, so nothing may be skipped until it's rebuilt
+    index_present = index.exists()
     for name in names:
+        wm = catalog.source_content_signature(con, name)
+        if index_present and up_to_date(store, "index", name, wm, INDEX_CODE):
+            print("index %s: up to date (catalog unchanged) -- skipped" % name)
+            continue
+
         def progress(seen, total, current="", name=name):
             util.status(seen, total, "index %s  %s" % (name, current))
-        docs, indexed, errors = index.index_source(con, name, progress=progress)
+        recode = code_changed(store, "index", name, INDEX_CODE)
+        if recode and not RUN.force:
+            print("index %s: index code changed -- reindexing all" % name)
+        docs, indexed, errors, missing, skipped, deleted = index.index_source(
+            con, name, progress=progress, jobs=jobs, force=RUN.force or recode)
+        record_step(store, "index", name, wm, INDEX_CODE)
+        dirty = True
         sys.stderr.write("\n")
-        print("index %s: %d documents -> %d docs+fragments indexed, %d errors"
-              % (name, docs, indexed, len(errors)))
+        print("index %s: %d documents -> %d units indexed, %d up to date, "
+              "%d deleted, %d errors"
+              % (name, docs, indexed, skipped, deleted, len(errors)))
+        if missing:
+            print("index %s: %d catalogued artifacts gone from disk, skipped "
+                  "(run `lagen %s relate` to prune): %s"
+                  % (name, len(missing), name, ", ".join(missing[:5])
+                     + (" ..." if len(missing) > 5 else "")))
     con.close()
+    if dirty:
+        save_watermarks(store)
     print("search index '%s' on %s" % (search.INDEX, config.OPENSEARCH_URL))
 
 
@@ -878,13 +1149,95 @@ def cmd_dump(names):
     graph is already inline, so each line is self-contained). The machine-
     readable corpus export that replaces the retired RDF/Fuseki dumps."""
     DUMPS.mkdir(parents=True, exist_ok=True)
+    store = load_watermarks()
+    dirty = False
     for name in names:
+        out = DUMPS / ("%s.ndjson.gz" % name)
+        paths = ARTIFACTS[name]()
+        wm = file_watermark(paths)
+        if out.exists() and up_to_date(store, "dump", name, wm, DUMP_CODE):
+            print("dump %s: up to date (%d artifacts unchanged) -- skipped"
+                  % (name, len(paths)))
+            continue
+
         def progress(seen, total, name=name):
             util.status(seen, total, "dump %s" % name)
-        out = DUMPS / ("%s.ndjson.gz" % name)
-        lines = dump.dump_source(ARTIFACTS[name](), out, progress=progress)
+        lines = dump.dump_source(paths, out, progress=progress)
+        record_step(store, "dump", name, wm, DUMP_CODE)
+        dirty = True
         sys.stderr.write("\n")
         print("dump %s: %d documents -> %s" % (name, lines, out))
+    if dirty:
+        save_watermarks(store)
+
+
+def cmd_download_all(names, jobs):
+    """Upstream discovery + fetch for each named source: the bulk harvest where a
+    source has one (sweeping in newly-published documents), else its per-document
+    download stage over the ids it already knows. The slow, network-bound head of
+    the pipeline -- kept separate from `rebuild` so the offline rebuild stays fast.
+    A source derived from another's dump (kommentar/begrepp) has nothing to fetch
+    and is skipped."""
+    for name in names:
+        source = SOURCES[name]
+        if source.harvest is not None:
+            if source.origin:
+                print("Downloading %s from %s" % (name, source.origin), flush=True)
+            source.harvest([])                       # [] = full discovery
+        elif "download" in source.stages:
+            basefiles = source.list_basefiles()
+            report(source, "download",
+                   run_action(source, "download", basefiles, jobs), len(basefiles))
+
+
+def cmd_all(names, jobs, whole_corpus, download=False):
+    """Run the build pipeline for the named sources. The offline core (action
+    `rebuild`) is parse -> relate -> index -> dump -> generate; action `all`
+    prepends the network-bound download. Each step is independently incremental,
+    so a re-run with nothing changed is cheap.
+
+    parse runs over each source's already-downloaded basefiles (bringing only
+    missing/stale parses up to date; with `download=False` it discovers nothing
+    new, so it makes no network calls). relate/index/dump act on the named
+    sources; generate rebuilds the whole corpus when the run targets `all`
+    sources, else just the named sources' pages."""
+    if download:
+        cmd_download_all(names, jobs)
+    store = load_watermarks()
+    parse_dirty = False
+    for name in names:
+        source = SOURCES[name]
+        if "parse" not in source.stages:
+            continue
+        pcode = source.stages["parse"].code
+        wm = parse_watermark(source)
+        # a coarse gate over the source's inputs: if nothing downloaded changed
+        # and the parser is unchanged, skip the per-document freshness scan (which
+        # would content-hash every input) wholesale. A changed source falls through
+        # to run_action, whose per-doc manifest still re-parses only what moved.
+        if up_to_date(store, "parse", name, wm, pcode):
+            print("parse %s: up to date -- skipped" % name)
+            continue
+        basefiles = source.list_basefiles()
+        result = run_action(source, "parse", basefiles, jobs)
+        report(source, "parse", result, len(basefiles))
+        # only watermark a clean sweep: if any document failed to parse, leave the
+        # source un-marked so the next run retries it (and re-surfaces the error)
+        # instead of skipping wholesale on an unchanged input.
+        if result.errors:
+            continue
+        record_step(store, "parse", name, wm, pcode)
+        parse_dirty = True
+    if parse_dirty:
+        save_watermarks(store)
+    cmd_relate(names)
+    cmd_index(names, jobs)
+    cmd_dump(names)
+    if whole_corpus:
+        cmd_generate(jobs=jobs)
+    else:
+        for name in names:
+            cmd_generate(source=name, jobs=jobs)
 
 
 def stale_sources():
@@ -904,7 +1257,21 @@ GENERATE_CODE = (PKG / "lib" / "render.py", PKG / "lib" / "catalog.py",
                  PKG / "lib" / "wikitext.py", PKG / "lib" / "layout.py")
 
 
-def cmd_generate(only=None, source=None):
+def generate_watermark():
+    """The coarse gate for a full-corpus generate: the whole-catalog content
+    signature plus the .corr/.ann sibling layers that relate doesn't fold into
+    content_hash. Unchanged (with the render code) ⟹ every page is fresh, so the
+    ~100k-page freshness scan can be skipped wholesale."""
+    con = catalog.connect(CATALOG)
+    sig = catalog.catalog_signature(con)
+    con.close()
+    sides = file_watermark(sorted(
+        list((SFS_ROOT / "artifact").glob("*/*.corr"))
+        + list((EURLEX_ROOT / "artifact").glob("*/*.ann"))))
+    return hashlib.sha256((sig + "\x1f" + sides).encode()).hexdigest()
+
+
+def cmd_generate(only=None, source=None, jobs=1):
     """Render every catalogued document to static HTML, with live outbound
     links and inbound annotations queried from the catalog, plus a frontpage.
     Auto-runs `relate` first for any source whose artifacts are newer than the
@@ -925,7 +1292,7 @@ def cmd_generate(only=None, source=None):
     seconds-long refresh after a frontpage/browse change, not a full rebuild."""
     if RUN.aggregates_only:
         con = catalog.connect(CATALOG)
-        render.render_aggregates(con, GENERATED)
+        render.render_aggregates(con, GENERATED, CATALOG)
         con.close()
         print("generate: rebuilt frontpage + browse indexes -> %s" % GENERATED)
         return
@@ -938,6 +1305,18 @@ def cmd_generate(only=None, source=None):
     if stale:
         print("catalog stale for %s -- relating first" % ", ".join(stale))
         cmd_relate(stale)
+
+    # full-corpus generate: a coarse gate over the whole catalog + .corr/.ann
+    # layers + render code. All unchanged since the last full generate ⟹ every
+    # page is fresh, so skip the per-page scan entirely (the manifest, big, isn't
+    # even loaded). A scoped render keeps the per-page path.
+    site_wm = None
+    if not scoped:
+        store = load_watermarks()
+        site_wm = generate_watermark()
+        if up_to_date(store, "generate", "__site__", site_wm, GENERATE_CODE):
+            print("generate: up to date -- skipped (%s)" % GENERATED)
+            return
 
     manifest = load_manifest()
     code_version = recipe_version(GENERATE_CODE)
@@ -983,11 +1362,14 @@ def cmd_generate(only=None, source=None):
 
     total, rendered = render.generate_site(CATALOG, GENERATED, progress=progress,
                                            fresh=fresh, record=record, only=only,
-                                           source=source)
+                                           source=source, jobs=jobs)
     sys.stderr.write("\n")
     if updates:
         manifest.update(updates)
         save_manifest(manifest)
+    if not scoped:                       # record the site watermark for next time
+        record_step(store, "generate", "__site__", site_wm, GENERATE_CODE)
+        save_watermarks(store)
     if only is not None and not total:
         print("generate: no catalogued document matched %d requested id(s) -- "
               "parse/relate them first" % len(only))
@@ -1000,14 +1382,14 @@ def cmd_generate(only=None, source=None):
 
 
 def cmd_serve(port=8000):
-    handler = functools.partial(http.server.SimpleHTTPRequestHandler,
-                                directory=str(GENERATED))
-    socketserver.TCPServer.allow_reuse_address = True
-    # bind loopback only: this is a local preview, not a public file server
-    with socketserver.TCPServer(("127.0.0.1", port), handler) as httpd:
-        print("serving %s at http://localhost:%d/  (Ctrl-C to stop)"
-              % (GENERATED, port))
-        httpd.serve_forever()
+    # one process serves the whole thing: the static site and the REST API it
+    # consumes (the API answers under /api/v1/, the site is everything else).
+    # Same origin, so the ⌘K palette needs no second port.
+    if not GENERATED.exists():
+        raise SystemExit("nothing generated yet -- run `lagen all generate` first")
+    print("serving site + API at http://localhost:%d/  "
+          "(API under /api/v1/, docs at /docs, Ctrl-C to stop)" % port)
+    api_app.serve(str(GENERATED), port=port)
 
 
 # --------------------------------------------------------------------------
@@ -1077,8 +1459,12 @@ def main(argv=None):
                    % ", ".join(SOURCES))
     p.add_argument("action",
                    help="download | parse | relate | generate | index | dump "
-                        "| serve | serve-api | status "
-                        "| a source action (e.g. dv reindex)")
+                        "| rebuild | all | serve | status "
+                        "| a source action (e.g. dv reindex). `rebuild` runs the "
+                        "offline pipeline (parse -> relate -> index -> dump -> "
+                        "generate) over already-downloaded data; `all` is "
+                        "download followed by rebuild. Every step is incremental, "
+                        "so a no-change re-run is cheap")
     p.add_argument("basefiles", nargs="*",
                    help="ids to act on (empty = all stale); for download, names "
                         "harvest sub-scopes, e.g. 'prop' or 'acts'")
@@ -1087,20 +1473,21 @@ def main(argv=None):
     p.add_argument("--no-deps", action="store_true",
                    help="run only the named stage, not its upstream deps")
     p.add_argument("--ignore-code-changes", action="store_true",
-                   help="treat outputs as fresh even when the parsing code "
-                        "changed -- rebuild only docs whose input data changed, "
-                        "are missing, or failed (dev convenience; off in production)")
+                   help="treat outputs as fresh even when the recipe code changed "
+                        "(parse/generate, and the extraction/index code behind "
+                        "relate/index) -- rebuild only on input-data changes "
+                        "(dev convenience; off in production)")
     p.add_argument("--aggregates-only", action="store_true",
                    help="generate: rewrite only the corpus-wide pages (frontpage "
                         "+ browse indexes) from the catalog, skipping the "
                         "per-document render")
-    p.add_argument("-j", "--jobs", type=int, default=1, help="parallel workers")
+    p.add_argument("-j", "--jobs", type=int, default=None,
+                   help="parallel workers for the parallelisable steps (parse, "
+                        "index); default = number of CPU cores, `-j1` to serialise")
     p.add_argument("-n", "--dry-run", action="store_true",
                    help="print the plan, do nothing")
     p.add_argument("--port", type=int, default=8000,
-                   help="port for `serve` (default 8000)")
-    p.add_argument("--api-port", type=int, default=8001,
-                   help="port for `serve-api` (default 8001)")
+                   help="port for `serve` -- site + API in one process (default 8000)")
     p.add_argument("--since", type=date.fromisoformat, metavar="YYYY-MM-DD",
                    help="eurlex download: only discover documents dated on/after "
                         "this (overrides the per-sector watermark for this run)")
@@ -1119,6 +1506,8 @@ def main(argv=None):
     RUN.aggregates_only = args.aggregates_only
     RUN.since, RUN.lang, RUN.source = args.since, args.lang, args.discovery
     RUN.only = args.only
+    # the parallelisable steps default to all cores; -j1 serialises
+    jobs = args.jobs if args.jobs is not None else (os.cpu_count() or 1)
 
     # generate is corpus-wide by default, but `lagen <source> generate <id> ...`
     # targets just those documents (and leaves the aggregate pages alone)
@@ -1131,32 +1520,33 @@ def main(argv=None):
             if args.basefiles:
                 p.error("`all generate <ids>` needs a specific source, e.g. "
                         "`lagen eurlex generate 32022L2555`")
-            cmd_generate()
+            cmd_generate(jobs=jobs)
         elif args.source not in SOURCES:
             p.error("unknown source %r (have: %s)"
                     % (args.source, ", ".join(SOURCES)))
         elif args.basefiles:
             cmd_generate(only={str(layout.artifact(args.source, bf))
-                               for bf in args.basefiles})
+                               for bf in args.basefiles}, jobs=jobs)
         else:
-            cmd_generate(source=args.source)
+            cmd_generate(source=args.source, jobs=jobs)
         return
     if args.action == "serve":
         cmd_serve(args.port)
-        return
-    if args.action == "serve-api":
-        api_app.run(port=args.api_port)
         return
 
     names = list(SOURCES) if args.source == "all" else [args.source]
     if any(n not in SOURCES for n in names):
         p.error("unknown source %r (have: %s)" % (args.source, ", ".join(SOURCES)))
 
+    if args.action in ("rebuild", "all"):
+        cmd_all(names, jobs, whole_corpus=args.source == "all",
+                download=args.action == "all")
+        return
     if args.action == "relate":
         cmd_relate(names)
         return
     if args.action == "index":
-        cmd_index(names)
+        cmd_index(names, jobs)
         return
     if args.action == "dump":
         cmd_dump(names)
@@ -1197,7 +1587,7 @@ def main(argv=None):
                     % (name, args.action,
                        ", ".join([*source.stages, *source.actions])))
         basefiles = args.basefiles or source.list_basefiles()
-        result = run_action(source, args.action, basefiles, args.jobs)
+        result = run_action(source, args.action, basefiles, jobs)
         report(source, args.action, result, len(basefiles))
         had_errors |= bool(result.errors)
     if had_errors:                 # report every source first, then signal failure

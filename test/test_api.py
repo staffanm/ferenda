@@ -131,9 +131,53 @@ def test_outbound_marks_unhosted_targets(client):
                for c in rows)
 
 
+def test_facets_returns_navigation_tree(client):
+    # the two fixture laws file under their subject initial: Brottsbalk -> B,
+    # Förvaltningslag -> F (the 'Lag'/'balk' designation isn't the sort word)
+    r = client.get("/api/v1/facets", params={"source": "sfs"})
+    assert r.status_code == 200
+    tree = r.json()
+    assert tree["levels"] == ["Bokstav"]
+    assert [b["slug"] for b in tree["buckets"]] == ["b", "f"]
+    assert tree["default"] == ["B"]
+
+
+def test_facets_unknown_source_404(client):
+    assert client.get("/api/v1/facets",
+                      params={"source": "kommentar"}).status_code == 404
+
+
+def test_browse_returns_navigator_with_leaf_documents(client):
+    r = client.get("/api/v1/browse", params={"source": "sfs"})
+    assert r.status_code == 200
+    view = r.json()
+    # the 'F' bucket (Förvaltningslag) carries its leaf documents, labelled + URL'd
+    f = next(b for b in view["buckets"] if b["slug"] == "f")
+    assert f["count"] == 1 and f["children"] is None
+    assert f["documents"] == [{"uri": "https://lagen.nu/2018:585",
+                               "url": "/sfs/2018_585.html",
+                               "display": "Förvaltningslag (2018:585)"}]
+
+
 def test_sources(client):
     r = client.get("/api/v1/sources")
     assert r.json() == [{"source": "sfs", "documents": 2}]
+
+
+def test_serve_mounts_static_site_alongside_api(client, tmp_path):
+    # `serve()` mounts the generated site at / on the same app: the REST routes
+    # still answer first, everything else falls through to the static files
+    from fastapi.staticfiles import StaticFiles
+    site = tmp_path / "site"
+    site.mkdir()
+    (site / "index.html").write_text("<html>frontpage</html>")
+    api.app.mount("/", StaticFiles(directory=str(site), html=True), name="site")
+    try:
+        assert client.get("/api/v1/sources").status_code == 200   # API wins
+        root = client.get("/")
+        assert root.status_code == 200 and "frontpage" in root.text
+    finally:
+        api.app.router.routes.pop()                               # unmount
 
 
 def test_openapi_served(client):

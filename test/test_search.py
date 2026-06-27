@@ -36,8 +36,11 @@ def _build_catalog(tmp_path):
 
 def test_doc_actions_document_and_fragment_units(tmp_path):
     con = _build_catalog(tmp_path)
-    row = catalog.document(con, "https://lagen.nu/1962:700")
-    actions = list(search.doc_actions(con, row))
+    uri = "https://lagen.nu/1962:700"
+    row = catalog.document(con, uri)
+    actions = list(search.doc_actions(
+        row, catalog.document_inbound_count(con, uri), version="h1"))
+    assert actions[0]["_source"]["version"] == "h1"     # carried for the diff
 
     doc, frag = actions[0], actions[1]
     # the whole-document unit: searchable identity, but NO body text (the
@@ -76,7 +79,7 @@ def test_doc_actions_no_fragments_carries_full_text(tmp_path):
         "uri": "https://lagen.nu/dom/x", "metadata": {"properties": {}},
         "body": [{"type": "stycke", "text": ["Domskälen anför följande."]}]}))
     [unit] = list(search.doc_actions(
-        con, ("https://lagen.nu/dom/x", "dv", "case", "X", "X", str(art))))
+        ("https://lagen.nu/dom/x", "dv", "case", "X", "X", str(art)), 0))
     assert unit["_source"]["is_doc"] is True
     assert unit["_source"]["text"] == "Domskälen anför följande."
 
@@ -87,7 +90,20 @@ def test_doc_actions_skips_empty_artifact(tmp_path):
     empty = tmp_path / "empty.json"
     empty.write_bytes(b"")
     assert list(search.doc_actions(
-        con, ("u", "sfs", "law", "L", "L", str(empty)))) == []
+        ("u", "sfs", "law", "L", "L", str(empty)), 0)) == []
+
+
+def test_doc_actions_pathless_stub_indexes_identity_only():
+    # a synthesized stub (begrepp concept, no artifact on disk -> empty path)
+    # must not read a file; it indexes one whole-doc unit carrying its name
+    [unit] = list(search.doc_actions(
+        ("https://lagen.nu/begrepp/Uppsat", "begrepp", "begrepp",
+         "Uppsåt", "Uppsåt", ""), 3, version="v"))
+    assert unit["_id"] == "https://lagen.nu/begrepp/Uppsat"
+    assert unit["_source"]["is_doc"] is True
+    assert unit["_source"]["title"] == "Uppsåt"
+    assert unit["_source"]["version"] == "v"
+    assert "text" not in unit["_source"]            # no body, no fragments
 
 
 def test_query_body_collapses_by_document_and_ranks_by_inbound():
@@ -162,6 +178,79 @@ def test_index_and_search_round_trip(tmp_path):
         assert top["fragments"][0]["pinpoint"] == "K3P1"     # the matching paragraph
         # a scoped query still works
         assert index.search("brottsbalken", source="sfs")["total"] >= 1
+    finally:
+        if index.client.indices.exists(index="lagen-test"):
+            index.client.indices.delete(index="lagen-test")
+
+
+@pytest.mark.skipif(not os.environ.get("OPENSEARCH_URL"),
+                    reason="needs a running OpenSearch (set OPENSEARCH_URL)")
+def test_index_source_is_incremental(tmp_path):
+    """Against a live cluster: a re-index with nothing changed touches nothing;
+    editing one document re-indexes only it; removing it from the catalog drops
+    its units. Exercises the content-hash diff + deletion sync, with jobs>1."""
+    art = tmp_path / "artifact"
+    art.mkdir()
+    a = art / "a.json"
+    a.write_text(json.dumps({
+        "uri": "https://lagen.nu/1999:1", "metadata": {"properties":
+        {"dcterms:title": "Alfa (1999:1)"}}, "structure": [
+            {"type": "paragraf", "id": "P1", "text": ["Alfaregeln gäller."]}]}))
+    b = art / "b.json"
+    b.write_text(json.dumps({
+        "uri": "https://lagen.nu/1999:2", "metadata": {"properties":
+        {"dcterms:title": "Beta (1999:2)"}}, "structure": [
+            {"type": "paragraf", "id": "P1", "text": ["Betaregeln gäller."]}]}))
+    cat = tmp_path / "catalog.sqlite"
+    catalog.rebuild(cat, "sfs", [a, b])
+    con = catalog.connect(cat)
+    index = search.SearchIndex(index="lagen-test")
+    try:
+        _, indexed, _, _, skipped, deleted = index.index_source(con, "sfs", jobs=2)
+        assert (indexed, skipped, deleted) == (4, 0, 0)   # 2 docs * (doc + frag)
+
+        # nothing changed -> nothing re-indexed, both skipped
+        _, indexed, _, _, skipped, deleted = index.index_source(con, "sfs", jobs=2)
+        assert (indexed, skipped, deleted) == (0, 2, 0)
+
+        # edit one document -> only it is re-indexed
+        a.write_text(json.dumps({
+            "uri": "https://lagen.nu/1999:1", "metadata": {"properties":
+            {"dcterms:title": "Alfa (1999:1)"}}, "structure": [
+                {"type": "paragraf", "id": "P1", "text": ["Alfaregeln ändrad."]}]}))
+        catalog.rebuild(cat, "sfs", [a, b])
+        con = catalog.connect(cat)
+        _, indexed, _, _, skipped, deleted = index.index_source(con, "sfs", jobs=2)
+        assert (indexed, skipped, deleted) == (2, 1, 1)   # re-index a, skip b
+        assert index.search("ändrad")["total"] == 1
+
+        # drop one document from the catalog -> its units are deleted
+        catalog.rebuild(cat, "sfs", [b])
+        con = catalog.connect(cat)
+        _, _, _, _, skipped, deleted = index.index_source(con, "sfs", jobs=2)
+        assert (skipped, deleted) == (1, 1)
+        assert index.search("alfaregeln")["total"] == 0
+        assert index.search("betaregeln")["total"] == 1
+    finally:
+        if index.client.indices.exists(index="lagen-test"):
+            index.client.indices.delete(index="lagen-test")
+
+
+@pytest.mark.skipif(not os.environ.get("OPENSEARCH_URL"),
+                    reason="needs a running OpenSearch (set OPENSEARCH_URL)")
+def test_index_source_force_reindexes_all(tmp_path):
+    """`force=True` reindexes every document regardless of content hash -- the
+    full rebuild used when the index code changed (no hand-deleting the index)."""
+    con = _build_catalog(tmp_path)
+    index = search.SearchIndex(index="lagen-test")
+    try:
+        index.index_source(con, "sfs")
+        _, indexed, _, _, skipped, _ = index.index_source(con, "sfs")
+        assert (indexed, skipped) == (0, 2)              # nothing changed
+        _, indexed, _, _, skipped, deleted = index.index_source(
+            con, "sfs", force=True)
+        assert skipped == 0 and indexed > 0 and deleted == 2   # both re-indexed
+        assert index.search("mord")["total"] == 1        # still correct after
     finally:
         if index.client.indices.exists(index="lagen-test"):
             index.client.indices.delete(index="lagen-test")

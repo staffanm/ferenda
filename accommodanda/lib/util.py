@@ -1,5 +1,6 @@
 """Small shared utilities (ported from ferenda.util)."""
 
+import os
 import re
 import shutil
 import sys
@@ -38,16 +39,37 @@ def status(done, total, message="", *, prefix="", tail="", stream=sys.stderr):
     `prefix` (a harvest's clock/scope/page) precedes the counter; `tail` (a
     harvest's ``[+dt]``) follows the message. '\\033[K' clears any tail a longer
     previous line left. The loop writes one trailing newline at the end (the line
-    lives on stderr, so stdout summaries stay clean)."""
+    lives on stderr, so stdout summaries stay clean).
+
+    On a terminal the line is clipped to one physical row: a line wider than the
+    terminal wraps, and the leading '\\r' then only rewinds to the *last* wrapped
+    row -- so the overflow of a long line (e.g. a sö/lr förarbete basefile) is
+    left on screen instead of being overwritten. Any ETA stays right-aligned; the
+    message is what gets clipped. Off a tty nothing wraps, so the full line is
+    kept (and an 80-col ETA fallback preserved for redirected logs)."""
     line = "%s(%d/%s) %s%s" % (prefix, done, "?" if total is None else total,
                                message, tail)
     eta = _eta_suffix(done, total)
-    if eta:
+    if stream.isatty():
+        line = _fit_line(line, eta, os.get_terminal_size(stream.fileno()).columns)
+    elif eta:
         width = shutil.get_terminal_size((80, 24)).columns
         pad = width - 1 - len(line) - len(eta)
         line += (" " * pad + eta) if pad > 0 else ("  " + eta)
     stream.write("\r%s\033[K" % line)
     stream.flush()
+
+
+def _fit_line(line, eta, width):
+    """Clip `line` to a single `width`-column terminal row, keeping `eta`
+    right-aligned at the edge -- the message is what gets cut. The ETA is dropped
+    only when the row is too narrow to hold it with a gap. Bounds the result to
+    ``width - 1`` columns so it never reaches the auto-wrap column."""
+    budget = max(1, width - 1)
+    if eta and budget > len(eta) + 1:
+        line = line[:budget - len(eta) - 1]       # reserve a gap + the ETA at right
+        return line + " " * (budget - len(line) - len(eta)) + eta
+    return line[:budget]                           # no room for an ETA -- just clip
 
 
 def hms(seconds):

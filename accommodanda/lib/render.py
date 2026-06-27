@@ -24,25 +24,22 @@ than a broken link.
 """
 
 import json
-import os
 import re
+import sqlite3
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from html import escape
 from pathlib import Path
+
+from fastapi.testclient import TestClient
 
 from . import catalog
 from . import layout
 from .catalog import BASE
 from .wikitext import begrepp_uri
+from ..api import app as api_service
 from ..dv.structure import flatten as dv_flatten
-from ..eurlex.model import doctype as eurlex_doctype
 from ..eurlex.structure import flatten as eurlex_flatten
-
-# Where the generated static site reaches the REST API for live ⌘K search. The
-# site and the API are separate services (static files vs. uvicorn), so the base
-# is baked into each page as a <meta> tag at generate time; override per
-# deployment with LAGEN_API. Empty = same origin (a reverse proxy fronting both).
-API_BASE = os.environ.get("LAGEN_API", "http://localhost:8001")
 
 
 @dataclass
@@ -184,6 +181,7 @@ def describe_citer(from_uri, anchor, label, title, source):
 # inbound panel section order + heading; commentary first (it's the closest
 # reading aid to a paragraph), then the machine-extracted sources, then concepts
 INBOUND_GROUPS = [("sfs", "Författningar"), ("forarbete", "Förarbeten"),
+                  ("foreskrift", "Myndighetsföreskrifter"),
                   ("dv", "Rättsfall"), ("begrepp", "Begrepp")]
 
 
@@ -329,6 +327,29 @@ def genomfor_margin(site, sfs_uri, anchor):
             '<ul>%s</ul></aside>' % "".join(items))
 
 
+def bemyndigande_margin(site, uri):
+    """Statute-paragraf margin: the agency föreskrifter issued (meddelade) with
+    stöd av this paragraf -- the inbound side of the bemyndigande edge, mirror of
+    each föreskrift's outbound 'Bemyndigande'. So the paragraf that delegates
+    rule-making power lists the regulations made under it. The föreskrift links to
+    its own page where present, else shows as text (an fs we have not parsed)."""
+    rows = catalog.bemyndigande_inbound(site.con, uri)
+    if not rows:
+        return ""
+    items = []
+    for from_uri, label, title in rows:
+        name = label or catalog.local(from_uri)
+        link = ('<a href="%s">%s</a>' % (escape(href(from_uri)), escape(name))
+                if site.has(from_uri) else '<span class="noref">%s</span>'
+                % escape(name))
+        sub = (' <span class="prov">%s</span>' % escape(title)
+               if title and title != name else "")
+        items.append("<li>%s%s</li>" % (link, sub))
+    return ('<aside class="bemyndigande"><div class="inbound-h">Föreskrifter '
+            'meddelade med stöd av denna paragraf</div><ul>%s</ul></aside>'
+            % "".join(items))
+
+
 def _law_title(site, base):
     """A law's display title from the catalog, whitespace-collapsed (SFS titles
     can carry a trailing CR/LF), falling back to its local id."""
@@ -425,17 +446,18 @@ class Rail:
         commentary = self._commentary(nid)
         groups = _inbound_groups(self.site, uri)
         genomfor = genomfor_margin(self.site, self.doc_uri, nid)
+        bemyndigande = bemyndigande_margin(self.site, uri)        # föreskrifter under it
         corr_cases = corresponding_cases_margin(self.site, uri)   # new-law side
         corresponds = corresponds_margin(self.site, uri)          # old-law side
-        if not (commentary or groups or genomfor or extra or corr_cases
-                or corresponds):
+        if not (commentary or groups or genomfor or bemyndigande or extra
+                or corr_cases or corresponds):
             return
         head = ('<div class="rail-h">Kontext%s</div>'
                 % (' för <b>%s</b>' % escape(pinpoint) if pinpoint else ""))
         body = ('<div class="rail-sec"><div class="rail-sec-h">Hänvisat till av</div>'
                 '%s</div>' % groups) if groups else ""
         self.data[nid] = (head + commentary + body + corr_cases + extra
-                          + genomfor + corresponds)
+                          + genomfor + bemyndigande + corresponds)
 
     def add_document(self):
         """The law-level commentary (the kommentar preamble, before any section) as
@@ -575,7 +597,6 @@ PAGE = """<!doctype html>
 <html lang="sv"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>%(title)s</title>
-<meta name="lagen-api" content="%(api_base)s">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
@@ -593,6 +614,7 @@ MAST_NAV = (("Lagar", "/sfs/", ("Författning",)),
             ("Förarbeten", "/forarbete/", ("Proposition", "SOU", "Ds",
              "Kommittédirektiv", "Förordningsmotiv", "Skrivelse", "Lagrådsremiss",
              "Sveriges internationella överenskommelser", "Förarbete")),
+            ("Föreskrifter", "/foreskrift/", ("Föreskrift",)),
             ("EU-rätt", "/eurlex/", ("EU-förordning", "EU-direktiv", "EU-beslut",
              "EU-domstolen", "Fördrag", "EU-rättsakt")))
 
@@ -642,8 +664,7 @@ def page(title, kind, meta, body, toc="", eyebrow=None, subtitle=None,
                 '<aside class="rail" id="rail" aria-live="polite"></aside></div>'
                 % (toc, front, body))
     return PAGE % {"title": escape(title), "masthead": _masthead(kind),
-                   "grid": grid, "island": island,
-                   "api_base": escape(API_BASE)}
+                   "grid": grid, "island": island}
 
 
 def render_sfs(art, site):
@@ -1046,11 +1067,61 @@ def render_eurlex(art, site):
                 source_url=art.get("source_url"))
 
 
+def _ref_link(site, uri):
+    """A link to a referenced document for a föreskrift's outbound metadata
+    (bemyndigande -> SFS paragraf, genomför -> EU directive): the statute
+    paragraf pinpointed and named, or the CELEX out to EUR-Lex; a plain span
+    for an SFS we have not parsed."""
+    if is_external(uri):
+        return ('<a class="ext" href="%s" rel="external">%s</a>'
+                % (escape(external_href(uri)),
+                   escape(catalog.local(uri).rsplit("/", 1)[-1])))
+    base, _, frag = uri.partition("#")
+    pin = human_fragment(frag)
+    name = _law_title(site, base)
+    label = ("%s %s" % (pin, name)).strip() if pin else name
+    return ('<a href="%s">%s</a>' % (escape(href(uri)), escape(label))
+            if site.has(base) else '<span class="noref">%s</span>' % escape(label))
+
+
+def _ref_list(site, heading, uris):
+    if not uris:
+        return ""
+    items = "".join("<li>%s</li>" % _ref_link(site, u) for u in uris)
+    return ('<section class="refs"><h2>%s</h2><ul>%s</ul></section>'
+            % (escape(heading), items))
+
+
+def render_foreskrift(art, site):
+    md = art.get("metadata", {})
+    ident = art.get("identifier") or catalog.local(art["uri"])
+    title = md.get("title") or ident
+    meta = _meta_dl([
+        ("Utgivare", md.get("publisher")),
+        ("Beslutad", md.get("beslutsdatum")),
+        ("Ikraftträdande", md.get("ikrafttradandedatum")),
+        ("Utkom från trycket", md.get("utkomFranTryck")),
+    ])
+    # outbound: the empowering statute paragrafer (the inbound mirror of which is
+    # the SFS paragraf's "Föreskrifter meddelade med stöd av …" margin) + EU dir
+    refs = (_ref_list(site, "Bemyndigande", md.get("bemyndigande"))
+            + _ref_list(site, "Genomför EU-direktiv", md.get("genomfor")))
+    toc = Toc()
+    rail = Rail(site, art["uri"])
+    body = document_inbound(site, art["uri"]) + refs + "".join(
+        render_node(n, site, art["uri"], toc, rail)
+        for n in art.get("structure", []))
+    return page(title, "Föreskrift", meta, body, render_toc(toc),
+                eyebrow=ident, island=rail.island(),
+                source_url=art.get("source_url"))
+
+
 def render_document(art, source, site):
     # kommentar is not here -- it is an annotation rendered into statute rails
     # (generate_site skips it), not a page of its own
     return {"sfs": render_sfs, "dv": render_dv, "forarbete": render_forarbete,
-            "begrepp": render_begrepp, "eurlex": render_eurlex}[source](art, site)
+            "begrepp": render_begrepp, "eurlex": render_eurlex,
+            "foreskrift": render_foreskrift}[source](art, site)
 
 
 # --------------------------------------------------------------------------
@@ -1062,9 +1133,10 @@ def render_document(art, source, site):
 # /dom/, lagen.nu's grammar; every other source browses under its own name.
 # kommentar is an annotation layer shown in the rail (no page tree), so it is
 # not a browsable source on the frontpage
-SOURCE_ORDER = ("sfs", "dv", "forarbete", "eurlex", "begrepp")
+SOURCE_ORDER = ("sfs", "dv", "forarbete", "foreskrift", "eurlex", "begrepp")
 SOURCE_LABEL = {"sfs": "Författningar", "dv": "Rättsfall",
-                "forarbete": "Förarbeten", "eurlex": "EU-rättsakter",
+                "forarbete": "Förarbeten", "foreskrift": "Myndighetsföreskrifter",
+                "eurlex": "EU-rättsakter",
                 "kommentar": "Lagkommentarer", "begrepp": "Begrepp"}
 BROWSE_DIR = {"dv": "dom"}
 
@@ -1107,54 +1179,156 @@ def render_index(con):
                 eyebrow="Sveriges lagar, med kontext", solo=True)
 
 
-def _group_key(source, uri):
-    """Browse grouping heading for a document: laws by year, cases by court,
-    förarbeten by doctype, EU acts by act family, concepts/commentary by initial
-    letter."""
-    loc = catalog.local(uri)
-    if source == "sfs":
-        return loc.split(":")[0]                      # "1975:635" -> "1975"
-    if source == "dv":
-        parts = loc.split("/")                        # "dom/nja/2011s357" -> "NJA"
-        return parts[1].upper() if len(parts) > 1 else "övriga"
-    if source == "forarbete":
-        typ = loc.split("/")[0]                        # "prop/2024/25:1" -> "prop"
-        return FA_TYPE_LABEL.get(typ, typ.upper())
-    if source == "eurlex":
-        celex = loc[len("ext/celex/"):]               # "ext/celex/32016R0679" -> kind
-        return EURLEX_KIND.get(eurlex_doctype(celex), "EU-rättsakt")
-    return loc.split("/")[-1][:1].upper() or "övriga"  # kommentar/begrepp: A–Ö
+# --------------------------------------------------------------------------
+# faceted browse. A whole source is too large for one flat listing, so it is
+# sliced into one or two facets (a law's subject initial, a case's court + year).
+# The generator is a *client of the REST API*: it reads the browse model from
+# GET /api/v1/browse (the navigator + each leaf bucket's ordered, labelled
+# documents) and writes static HTML -- it never touches the catalog directly.
+# Every leaf bucket becomes its own page ("Författningar som börjar på A",
+# "NJA – Högsta domstolen 2024") with a navigator linking the sibling buckets,
+# so the site is browsable with no JS.
+# --------------------------------------------------------------------------
+
+def _browse_client(catalog_path):
+    """An in-process API client bound to `catalog_path` -- the generator consumes
+    the same REST endpoints a network client would, with no running server. The
+    get_con override is cleared by the caller (render_aggregates)."""
+    def _con():
+        con = sqlite3.connect("file:%s?mode=ro" % catalog_path, uri=True)
+        try:
+            yield con
+        finally:
+            con.close()
+    api_service.app.dependency_overrides[api_service.get_con] = _con
+    return TestClient(api_service.app)
 
 
-def render_browse(con, source):
-    """A complete, sectioned index of every document of one source, grouped by
-    `_group_key` (laws by year newest-first, the rest A–Ö)."""
-    rows = con.execute("SELECT uri, label FROM documents WHERE source = ? "
-                       "ORDER BY uri", (source,)).fetchall()
-    groups = {}
-    for uri, label in rows:
-        groups.setdefault(_group_key(source, uri), []).append((uri, label))
-    order = sorted(groups, reverse=(source == "sfs"))
-    label = SOURCE_LABEL.get(source, source)
-    sections = []
-    for key in order:
-        items = "".join('<li><a href="%s">%s</a></li>'
-                        % (escape(href(u)), escape(lbl or catalog.local(u)))
-                        for u, lbl in groups[key])
-        sections.append('<section class="browse-group"><h2>%s '
-                        '<span class="c">%d</span></h2><ul>%s</ul></section>'
-                        % (escape(key), len(groups[key]), items))
-    body = ('<p class="lead">%d %s</p>%s'
-            % (len(rows), label.lower(), "".join(sections)))
-    return page("Alla " + label.lower(), "Bläddra", "", body, solo=True)
+def _browse_url(source, slugs):
+    """Absolute URL of a browse bucket page (a directory, trailing slash)."""
+    return "/" + "/".join([_browse_dir(source), *slugs]) + "/"
+
+
+def _browse_item(doc):
+    return ('<li><a href="%s">%s</a></li>'
+            % (escape(doc["url"]), escape(doc["display"])))
+
+
+def _facet_links(source, buckets, parent_slugs, active_keys, depth):
+    items = []
+    for b in buckets:
+        url = _browse_url(source, parent_slugs + [b["slug"]])
+        cur = (' aria-current="page"' if depth < len(active_keys)
+               and active_keys[depth] == b["key"] else "")
+        items.append('<li><a href="%s"%s>%s <span class="c">%d</span></a></li>'
+                     % (escape(url), cur, escape(b["label"]), b["count"]))
+    return '<ul class="facet-list">%s</ul>' % "".join(items)
+
+
+def _facet_nav(source, view, active_keys):
+    """The navigator: the primary buckets as links, plus -- under the active
+    primary -- its secondary buckets (the year/… within a court/type)."""
+    levels, buckets = view["levels"], view["buckets"]
+    parts = ['<h2 class="facet-axis">%s</h2>' % escape(levels[0]),
+             _facet_links(source, buckets, [], active_keys, 0)]
+    if len(levels) > 1:
+        cur = next((b for b in buckets if b["key"] == active_keys[0]), None)
+        if cur and cur["children"]:
+            parts.append('<h2 class="facet-axis">%s</h2>' % escape(levels[1]))
+            parts.append(_facet_links(source, cur["children"], [cur["slug"]],
+                                      active_keys, 1))
+    return '<nav class="facets">%s</nav>' % "".join(parts)
+
+
+def _bucket_heading(source, levels, nodes):
+    """The reading heading for a leaf bucket -- 'Författningar som börjar på A',
+    'NJA – Högsta domstolen 2024', 'Förordningar 2016'."""
+    if len(levels) == 1:
+        return "%s som börjar på %s" % (SOURCE_LABEL.get(source, source), nodes[0]["key"])
+    return "%s %s" % (nodes[0]["label"], nodes[1]["key"])
+
+
+def render_facet_page(source, view, nodes):
+    """A single browse bucket page: the navigator + this leaf bucket's document
+    list. `nodes` is the bucket-node path (one per level); the leaf carries its
+    `documents` (from the API, already ordered and labelled)."""
+    heading = _bucket_heading(source, view["levels"], nodes)
+    docs = nodes[-1].get("documents") or []
+    listing = ('<ul class="browse-list">%s</ul>' % "".join(_browse_item(d) for d in docs)
+               if docs else '<p class="empty">Inga dokument.</p>')
+    body = ('%s<section class="browse-group"><h1>%s <span class="c">%d</span></h1>'
+            '%s</section>' % (_facet_nav(source, view, [n["key"] for n in nodes]),
+                              escape(heading), len(docs), listing))
+    return page(heading, "Bläddra", "", body, solo=True)
+
+
+def _write_browse(out_root, source, slugs, html):
+    target = Path(out_root).joinpath(_browse_dir(source), *slugs)
+    target.mkdir(parents=True, exist_ok=True)
+    (target / "index.html").write_text(html)
+
+
+def generate_browse(client, source, out_root):
+    """Write every leaf-bucket page of one source from the API's browse model,
+    plus the landing copies: a primary bucket's directory shows its first
+    (default) child, and the source root shows the overall default bucket -- so
+    /dom/, /dom/nja/ and /dom/nja/2025/ all resolve without a redirect or JS.
+    A source the API does not facet (kommentar) is skipped."""
+    resp = client.get("/api/v1/browse", params={"source": source})
+    if resp.status_code == 404:
+        return
+    view = resp.json()
+    root_html = None
+    for prim in view["buckets"]:
+        leaves = [[prim, sec] for sec in prim["children"]] if prim["children"] \
+            else [[prim]]
+        for i, nodes in enumerate(leaves):
+            slugs = [n["slug"] for n in nodes]
+            html = render_facet_page(source, view, nodes)
+            _write_browse(out_root, source, slugs, html)
+            if len(nodes) > 1 and i == 0:        # primary landing = first child
+                _write_browse(out_root, source, slugs[:1], html)
+            if root_html is None:                # overall default = first leaf
+                root_html = html
+    _write_browse(out_root, source, [], root_html)
 
 
 # --------------------------------------------------------------------------
 # generate the whole site
 # --------------------------------------------------------------------------
 
+# per-worker render state, set once per process by _render_init -- the catalog
+# connection and Site can't cross the ProcessPool fork, so each worker builds its
+# own once and renders many pages against it (mirrors build.run_action's pattern)
+_RENDER: dict = {}
+
+
+def _render_init(catalog_path, out_root):
+    con = catalog.connect(catalog_path)
+    _RENDER.update(con=con, site=Site.from_catalog(con), out_root=Path(out_root))
+
+
+def _write_page(uri, source, path, title, site, out_root):
+    """Render one document to its HTML file. A synthesized concept stub has no
+    artifact on disk (empty path) and renders a shell whose content is its
+    aggregated inbound (what defines/tags the concept); everything else loads its
+    artifact."""
+    art = (json.loads(Path(path).read_bytes()) if path
+           else {"uri": uri, "type": source, "title": title})
+    out = Path(out_root) / doc_relpath(uri)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(render_document(art, source, site))
+
+
+def _render_one(job):
+    """ProcessPool entry point: render `job` (uri, source, path, title) against
+    this worker's prebuilt Site, returning the uri rendered."""
+    _write_page(*job, _RENDER["site"], _RENDER["out_root"])
+    return job[0]
+
+
 def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None,
-                  only=None, source=None):
+                  only=None, source=None, jobs=1):
     """Render every catalogued document to static HTML. `fresh(uri, out_path,
     art_path, dep_digest) -> bool` lets the caller skip a page whose inputs are
     unchanged (incremental generate); `record(uri, art_path, dep_digest)` is
@@ -1163,8 +1337,9 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
     caller); `dep_digest` captures its citation relationships (set-based).
     `only`, a set of artifact path strings, restricts the run to those documents
     (a targeted `lagen <source> generate <id>`) -- the corpus-wide aggregate
-    pages are then left untouched. Returns (total_pages, rendered) -- rendered <
-    total when pages were skipped."""
+    pages are then left untouched. `jobs>1` renders the stale pages across a
+    process pool. Returns (total_pages, rendered) -- rendered < total when pages
+    were skipped."""
     out_root = Path(out_root)
     con = catalog.connect(catalog_path)
     site = Site.from_catalog(con)
@@ -1177,52 +1352,73 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
         rows = [r for r in rows if r[2] in only]
     # commentary is an annotation rendered into statute rails, not a page of its own
     rows = [r for r in rows if r[1] != "kommentar"]
-    rendered = 0
-    for i, (uri, src, path, title) in enumerate(rows):
+
+    # Freshness planning is single-threaded: it reads the catalog + manifest and
+    # hashes inputs (the manifest lives here in the parent). Fresh pages advance
+    # the counter at once; stale ones go to `plan` to be rendered (in parallel).
+    total = len(rows)
+    done = rendered = 0
+    plan = []                       # (uri, source, path, title, dep) needing render
+    for (uri, src, path, title) in rows:
         out = out_root / doc_relpath(uri)
         dep = catalog.page_dependency_digest(con, uri)
-        if not (fresh and fresh(uri, out, path, dep)):
-            # a synthesized concept stub has no artifact on disk (path empty) --
-            # render a shell whose content is its aggregated inbound (what defines
-            # and tags the concept); everything else loads its artifact
-            art = (json.loads(Path(path).read_bytes()) if path
-                   else {"uri": uri, "type": src, "title": title})
-            out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_text(render_document(art, src, site))
-            rendered += 1
-            if record:
-                record(uri, path, dep)
+        if fresh and fresh(uri, out, path, dep):
+            done += 1
+            if progress and done % 500 == 0:
+                progress(done, total, catalog.local(uri), rendered)
+        else:
+            plan.append((uri, src, path, title, dep))
+
+    def finish(uri, path, dep):
+        nonlocal done, rendered
+        done += 1
+        rendered += 1
+        if record:
+            record(uri, path, dep)
         if progress:
-            progress(i + 1, len(rows), catalog.local(uri), rendered)
+            progress(done, total, catalog.local(uri), rendered)
+
+    if jobs > 1 and len(plan) > 1:
+        with ProcessPoolExecutor(max_workers=jobs, initializer=_render_init,
+                                 initargs=(catalog_path, out_root)) as pool:
+            futures = {pool.submit(_render_one, job[:4]): job for job in plan}
+            for fut in as_completed(futures):
+                fut.result()                 # propagate a render error (abort)
+                uri, src, path, title, dep = futures[fut]
+                finish(uri, path, dep)
+    else:
+        for (uri, src, path, title, dep) in plan:
+            _write_page(uri, src, path, title, site, out_root)
+            finish(uri, path, dep)
+
     if only is None and source is None:          # corpus-wide pages on a full run
-        render_aggregates(con, out_root)
+        render_aggregates(con, out_root, catalog_path)
     if progress:
-        progress(len(rows), len(rows), "", rendered)
+        progress(total, total, "", rendered)
     con.close()
-    return len(rows), rendered
+    return total, rendered
 
 
-def render_aggregates(con, out_root):
+def render_aggregates(con, out_root, catalog_path):
     """Write the corpus-wide pages -- stylesheet, scripts, frontpage and the
-    per-source browse indexes -- from the catalog. They depend on the whole
+    per-source faceted browse -- from the catalog. They depend on the whole
     document set (not on any single artifact), so they are cheap and always
     rebuilt; `lagen all generate --aggregates-only` runs just this, skipping the
-    per-document render."""
+    per-document render. The browse pages are written through the REST API (an
+    in-process client over `catalog_path`), the frontpage from the catalog."""
     out_root = Path(out_root)
     out_root.mkdir(parents=True, exist_ok=True)
     (out_root / "style.css").write_text(CSS)
-    # the REST API base lives in this one shared asset (not per-page), so
-    # `generate --aggregates-only` -- which rewrites scrollspy.js -- activates the
-    # ⌘K search site-wide without a full per-page regenerate.
-    (out_root / "scrollspy.js").write_text(
-        "var LAGEN_API=%s;\n%s" % (json.dumps(API_BASE), SCROLLSPY))
+    (out_root / "scrollspy.js").write_text(SCROLLSPY)
     (out_root / "index.html").write_text(render_index(con))
-    for source in catalog.counts(con):
-        if source == "kommentar":      # an annotation layer, not a browsable source
-            continue
-        browse_dir = out_root / _browse_dir(source)
-        browse_dir.mkdir(parents=True, exist_ok=True)
-        (browse_dir / "index.html").write_text(render_browse(con, source))
+    client = _browse_client(catalog_path)
+    try:
+        for source in catalog.counts(con):
+            if source == "kommentar":      # an annotation layer, not a source
+                continue
+            generate_browse(client, source, out_root)
+    finally:
+        api_service.app.dependency_overrides.pop(api_service.get_con, None)
 
 
 CSS = """
@@ -1463,11 +1659,30 @@ ol.ranked { padding-left: 1.4rem; } ol.ranked .c { color: var(--ink-3); font-siz
              flex-wrap: wrap; gap: .5rem 1.75rem; }
 .counts li { font-size: 1.05rem; }
 .counts .c { color: var(--ink-3); font-size: .8rem; margin-left: .2rem; }
-.browse-group { margin: 2rem 0; }
-.browse-group h2 .c { color: var(--ink-3); font-size: .8rem; font-weight: 400; }
-.browse-group ul { list-style: none; padding: 0; margin: .75rem 0 0;
+.browse-group { margin: 1.5rem 0; }
+.browse-group h1 { font-family: var(--serif); font-weight: 500; font-size: 1.5rem;
+                   border-bottom: 1px solid var(--rule); padding-bottom: .3rem; }
+.browse-group h1 .c, .browse-group h2 .c { color: var(--ink-3); font-size: .8rem;
+                   font-weight: 400; }
+.browse-list, .browse-group ul { list-style: none; padding: 0; margin: .75rem 0 0;
                    columns: 18rem; column-gap: 2rem; font-size: .92rem; }
-.browse-group li { margin: .18rem 0; break-inside: avoid; }
+.browse-list li, .browse-group li { margin: .18rem 0; break-inside: avoid; }
+.empty { color: var(--ink-3); font-style: italic; }
+
+/* -- faceted browse navigator -- */
+.facets { margin: 0 0 2rem; }
+.facet-axis { font-family: var(--sans); text-transform: uppercase;
+              letter-spacing: .06em; font-size: .72rem; font-weight: 600;
+              color: var(--ink-3); margin: 1.1rem 0 .4rem; }
+.facet-list { list-style: none; padding: 0; margin: 0; display: flex;
+              flex-wrap: wrap; gap: .35rem .7rem; }
+.facet-list a { display: inline-block; padding: .12rem .55rem; border-radius: 4px;
+                background: var(--surf-2); color: var(--ink-2); font-size: .92rem;
+                text-decoration: none; }
+.facet-list a:hover { background: var(--surf-3); }
+.facet-list a[aria-current] { background: var(--accent); color: #fff; }
+.facet-list .c { color: var(--ink-4); font-size: .72rem; margin-left: .25rem; }
+.facet-list a[aria-current] .c { color: rgba(255,255,255,.75); }
 
 /* -- search palette (live full-text search via the REST API) -- */
 .search-overlay { position: fixed; inset: 0; z-index: 100; display: flex;
@@ -1487,7 +1702,8 @@ ol.ranked { padding-left: 1.4rem; } ol.ranked .c { color: var(--ink-3); font-siz
 .search-hit { display: block; padding: .7rem 1.25rem; border-bottom: 1px solid var(--rule);
               text-decoration: none; color: var(--ink); }
 .search-hit:last-child { border-bottom: 0; }
-.search-hit:hover { background: var(--surf-2); }
+.search-hit:hover, .search-hit.sel { background: var(--surf-2); }
+.search-hit.sel { box-shadow: inset 3px 0 0 var(--accent); }
 .search-hit .hit-title { display: block; font-family: var(--sans); font-weight: 600;
                          font-size: .95rem; }
 .search-hit .hit-sub { display: block; font-family: var(--serif); color: var(--ink-2);
@@ -1615,16 +1831,24 @@ SCROLLSPY = """
   }, { passive: true });
   update();
 
-  // ⌘K palette -- live full-text search against the REST API (its base is in
-  // the <meta name="lagen-api"> tag the renderer emitted). Debounced; renders
-  // the top hits as links to each document's matching paragraph.
-  // API base: the value injected into this shared asset wins (so rewriting just
-  // scrollspy.js activates search everywhere); the per-page <meta> is a fallback.
-  var apiMeta = document.querySelector('meta[name="lagen-api"]');
-  var API = (typeof LAGEN_API !== 'undefined' && LAGEN_API) ||
-            (apiMeta && apiMeta.getAttribute('content')) || '';
-  var overlay = null, results = null, timer = null, seq = 0;
+  // ⌘K palette -- live full-text search against the REST API. The API is always
+  // same-origin (the site and the API are served by one process, lagen serve),
+  // so requests are relative ('/api/v1/...') -- never a baked absolute base, which
+  // can only ever go stale and point a cached page at the wrong/dead port.
+  // Debounced; renders the top hits as links to each document's matching paragraph.
+  var overlay = null, results = null, timer = null, seq = 0, sel = 0;
 
+  function hits() {
+    return results ? Array.prototype.slice.call(
+      results.querySelectorAll('.search-hit')) : [];
+  }
+  function select(i) {
+    var hs = hits();
+    if (!hs.length) return;
+    sel = (i + hs.length) % hs.length;
+    hs.forEach(function (h, n) { h.classList.toggle('sel', n === sel); });
+    hs[sel].scrollIntoView({ block: 'nearest' });
+  }
   function render(items, q) {
     if (!results) return;
     if (!items.length) {
@@ -1643,13 +1867,23 @@ SCROLLSPY = """
         (r.title && r.identifier ? '<span class="hit-sub">' + r.title + '</span>' : '') +
         (hl ? '<span class="hit-snip">' + hl + '</span>' : '') + '</a>';
     }).join('');
+    // the first hit is the resolved target for a citation-shaped query
+    // ("avtalslagen 36" -> §36); selecting it means Enter goes straight there
+    select(0);
   }
-  function run(q) {
+  function go() {
+    // navigate to the selected hit (the first by default == the resolved target)
+    var hs = hits();
+    if (!hs.length) return false;
+    window.location.href = hs[sel].getAttribute('href');
+    return true;
+  }
+  function run(q, andGo) {
     var mine = ++seq;
     if (!q.trim()) { if (results) results.innerHTML = ''; return; }
-    fetch(API + '/api/v1/search?limit=8&q=' + encodeURIComponent(q))
+    fetch('/api/v1/search?limit=8&q=' + encodeURIComponent(q))
       .then(function (r) { return r.json(); })
-      .then(function (d) { if (mine === seq) render(d.results || [], q); })
+      .then(function (d) { if (mine === seq) { render(d.results || [], q); if (andGo) go(); } })
       .catch(function () {
         if (mine === seq && results)
           results.innerHTML = '<div class="search-note">Sökningen kunde inte ' +
@@ -1671,6 +1905,18 @@ SCROLLSPY = """
       clearTimeout(timer);
       var q = input.value;
       timer = setTimeout(function () { run(q); }, 180);
+    });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); select(sel + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); select(sel - 1); }
+      else if (e.key === 'Enter') {
+        // Enter goes to the selected hit -- the first by default, which for a
+        // citation-shaped query is the resolved §/article. If the debounced
+        // results aren't in yet, fetch now and jump to the first hit.
+        e.preventDefault();
+        clearTimeout(timer);
+        if (!go()) run(input.value, true);
+      }
     });
     input.focus();
   }

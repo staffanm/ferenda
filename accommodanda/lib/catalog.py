@@ -37,13 +37,14 @@ def norm_title(t):
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS documents (
-    uri        TEXT PRIMARY KEY,
-    source     TEXT NOT NULL,    -- 'sfs' | 'dv'
-    kind       TEXT,             -- 'law' | 'case'
-    label      TEXT,             -- short display id (SFS number / referat)
-    title      TEXT,             -- full heading
-    path       TEXT NOT NULL,    -- artifact json on disk
-    source_url TEXT              -- authoritative publisher url ("Källa"), if any
+    uri          TEXT PRIMARY KEY,
+    source       TEXT NOT NULL,    -- 'sfs' | 'dv'
+    kind         TEXT,             -- 'law' | 'case'
+    label        TEXT,             -- short display id (SFS number / referat)
+    title        TEXT,             -- full heading
+    path         TEXT NOT NULL,    -- artifact json on disk
+    source_url   TEXT,             -- authoritative publisher url ("Källa"), if any
+    content_hash TEXT              -- sha256 of the artifact bytes (incremental relate)
 );
 CREATE TABLE IF NOT EXISTS links (
     from_uri    TEXT NOT NULL,   -- document making the citation (doc-level uri)
@@ -97,6 +98,8 @@ def connect(path):
     cols = {row[1] for row in con.execute("PRAGMA table_info(documents)")}
     if "source_url" not in cols:
         con.execute("ALTER TABLE documents ADD COLUMN source_url TEXT")
+    if "content_hash" not in cols:
+        con.execute("ALTER TABLE documents ADD COLUMN content_hash TEXT")
     return con
 
 
@@ -171,6 +174,18 @@ def subject_links(art):
     return [(None, {"uri": begrepp_uri(n), "predicate": "dcterms:subject",
                     "text": n})
             for n in art.get("metadata", {}).get("nyckelord", []) if n.strip()]
+
+
+def bemyndigande_links(art):
+    """The bemyndigande edges a föreskrift artifact carries: it is *meddelad* (issued)
+    under one or more empowering SFS paragrafer, a fact that lives in metadata, not
+    the body text, so the inline-link walk misses it. The edge points föreskrift ->
+    SFS paragraf, anchored to the whole regulation (a föreskrift is issued under a
+    paragraf as a whole), so the statute paragraf's page lists the föreskrifter
+    issued under it. `text` carries the föreskrift's id for the margin display."""
+    label = art.get("identifier") or local(art["uri"])
+    return [(None, {"uri": uri, "predicate": "rpubl:bemyndigande", "text": label})
+            for uri in art.get("metadata", {}).get("bemyndigande", [])]
 
 
 def definition_links(art):
@@ -282,55 +297,147 @@ def eurlex_document(art, path):
             label, art.get("title") or label, str(path))
 
 
+def foreskrift_document(art, path):
+    # an agency regulation; kind is the författningssamling (fffs/nfs/…), label
+    # the short id citations + the bemyndigande margin use ("FFFS 2013:10")
+    label = art.get("identifier") or local(art["uri"])
+    title = art.get("metadata", {}).get("title") or label
+    return (art["uri"], "foreskrift", art.get("fs", "foreskrift"),
+            label, title, str(path))
+
+
 def document_row(art, path, source):
     return {"sfs": sfs_document, "dv": dv_document,
             "forarbete": forarbete_document, "kommentar": kommentar_document,
-            "begrepp": begrepp_document, "eurlex": eurlex_document}[source](
-                art, path)
+            "begrepp": begrepp_document, "eurlex": eurlex_document,
+            "foreskrift": foreskrift_document}[source](art, path)
 
 
 # --------------------------------------------------------------------------
 # rebuild
 # --------------------------------------------------------------------------
 
-def rebuild(catalog_path, source, artifact_paths, progress=None):
-    """Drop and re-index one source's rows in the catalog from its artifacts.
-    Single-process and transactional -- a few inserts per doc over ~tens of
-    thousands of docs is seconds, and it sidesteps multi-writer SQLite
-    contention. Empty artifacts (SkipDocument placeholders) are skipped."""
+def content_hash(raw):
+    """The change-detection key for an artifact: sha256 of its on-disk bytes.
+    Stored on the documents row so relate (and, via the row, index) can skip an
+    artifact whose bytes are unchanged since last time."""
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _drop_document(con, uri):
+    """Remove a document and everything keyed off it: its outbound links and its
+    fragment snippets (doc#id and every doc#id child)."""
+    con.execute("DELETE FROM links WHERE from_uri = ?", (uri,))
+    con.execute("DELETE FROM documents WHERE uri = ?", (uri,))
+    con.execute("DELETE FROM fragments WHERE uri = ? OR uri LIKE ?",
+                (uri, uri + "#%"))
+
+
+def _index_document(con, art, path, source):
+    """(Re)write one document's rows: its documents row, outbound links and
+    fragment snippets, replacing any prior version keyed by the same uri."""
+    uri = art["uri"]
+    con.execute("DELETE FROM links WHERE from_uri = ?", (uri,))
+    con.execute("INSERT OR REPLACE INTO documents VALUES (?,?,?,?,?,?,?,?)",
+                (*document_row(art, path, source), art.get("source_url"),
+                 None))   # content_hash filled by the caller (it holds the bytes)
+    rows = [(uri, anchor, run.get("predicate", "dcterms:references"),
+             run["uri"], strip_fragment(run["uri"]), run.get("text"))
+            for anchor, run in (artifact_links(art) + subject_links(art)
+                                + definition_links(art)
+                                + bemyndigande_links(art))]
+    con.executemany("INSERT INTO links VALUES (?,?,?,?,?,?)", rows)
+    con.executemany("INSERT OR REPLACE INTO fragments VALUES (?,?)",
+                    artifact_fragments(art))
+    return len(rows)
+
+
+def source_content_signature(con, source):
+    """A cheap fingerprint of a source's catalogued (uri, content_hash) rows --
+    exactly what `index` syncs to OpenSearch. Unchanged since the last index ⟹
+    the index is already current, so its per-source OpenSearch scan + diff can be
+    skipped wholesale. Covers synthesized stubs (catalog rows with no artifact),
+    which a file-based watermark would miss."""
+    h = hashlib.sha256()
+    for uri, chash in con.execute(
+            "SELECT uri, content_hash FROM documents WHERE source = ? ORDER BY uri",
+            (source,)):
+        h.update(("%s\x1f%s\x1e" % (uri, chash or "")).encode())
+    return h.hexdigest()
+
+
+def catalog_signature(con):
+    """A whole-catalog fingerprint of every document's (uri, content_hash) -- the
+    corpus state `generate` renders from. Unchanged ⟹ no page's content or
+    citation neighbourhood moved (every link traces to some artifact whose hash is
+    here), so a full generate can be skipped. The .corr/.ann sibling layers, which
+    relate doesn't fold into content_hash, are watermarked separately by the
+    caller."""
+    h = hashlib.sha256()
+    for uri, chash in con.execute(
+            "SELECT uri, content_hash FROM documents ORDER BY uri"):
+        h.update(("%s\x1f%s\x1e" % (uri, chash or "")).encode())
+    return h.hexdigest()
+
+
+def rebuild(catalog_path, source, artifact_paths, progress=None, force=False):
+    """Sync one source's rows in the catalog to its artifacts on disk.
+    Incremental by content hash: an artifact whose bytes are unchanged since the
+    last relate is left in place (not re-parsed); new/changed ones are
+    re-extracted; rows whose artifact has vanished are dropped. `force`
+    re-extracts every artifact regardless of hash. Single-process and
+    transactional -- it sidesteps multi-writer SQLite contention. Empty artifacts
+    (SkipDocument placeholders) carry no document.
+
+    Returns (documents, links, changed): the source's row + link totals after the
+    sync, and how many documents were (re)written this run."""
     con = connect(catalog_path)
-    con.execute("DELETE FROM links WHERE from_uri IN "
-                "(SELECT uri FROM documents WHERE source = ?)", (source,))
-    con.execute("DELETE FROM documents WHERE source = ?", (source,))
-    # fragments are keyed by doc#id and refreshed via INSERT OR REPLACE below;
-    # any orphaned by a removed doc are harmless (never queried)
-    docs = 0
-    edges = 0
+    # current catalog state for this source, keyed by artifact path (1:1 with a
+    # document): path -> (uri, content_hash). Path-less rows (synthesized begrepp
+    # stubs) aren't artifact-backed, so they're owned by synthesize_concepts, not
+    # this path-keyed sync.
+    have = {row[0]: (row[1], row[2]) for row in con.execute(
+        "SELECT path, uri, content_hash FROM documents WHERE source = ?",
+        (source,)) if row[0]}
+    seen = set()
+    changed = 0
     total = len(artifact_paths)
     for i, path in enumerate(map(Path, artifact_paths)):
+        key = str(path)
+        seen.add(key)
         raw = path.read_bytes()
-        if raw.strip():
-            art = json.loads(raw)
-            con.execute("INSERT OR REPLACE INTO documents VALUES (?,?,?,?,?,?,?)",
-                        (*document_row(art, path, source), art.get("source_url")))
-            rows = [(art["uri"], anchor,
-                     run.get("predicate", "dcterms:references"),
-                     run["uri"], strip_fragment(run["uri"]), run.get("text"))
-                    for anchor, run in (artifact_links(art) + subject_links(art)
-                                        + definition_links(art))]
-            con.executemany("INSERT INTO links VALUES (?,?,?,?,?,?)", rows)
-            con.executemany("INSERT OR REPLACE INTO fragments VALUES (?,?)",
-                            artifact_fragments(art))
-            docs += 1
-            edges += len(rows)
-            current = local(art["uri"])
-        else:
+        prev = have.get(key)
+        if not raw.strip():
+            # a SkipDocument placeholder: ensure no stale row survives at this path
+            if prev:
+                _drop_document(con, prev[0])
             current = path.stem
+        else:
+            digest = content_hash(raw)
+            if not force and prev and prev[1] == digest:
+                current = local(prev[0])             # unchanged -- skip the parse
+            else:
+                art = json.loads(raw)
+                if prev and prev[0] != art["uri"]:   # uri moved under this path
+                    _drop_document(con, prev[0])
+                _index_document(con, art, path, source)
+                con.execute("UPDATE documents SET content_hash = ? WHERE uri = ?",
+                            (digest, art["uri"]))
+                changed += 1
+                current = local(art["uri"])
         if progress:
-            progress(i + 1, total, docs, edges, current)
+            progress(i + 1, total, changed, current)
+    for path, (uri, _) in have.items():              # artifacts gone from disk
+        if path not in seen:
+            _drop_document(con, uri)
+    docs = con.execute("SELECT COUNT(*) FROM documents WHERE source = ?",
+                       (source,)).fetchone()[0]
+    edges = con.execute(
+        "SELECT COUNT(*) FROM links WHERE from_uri IN "
+        "(SELECT uri FROM documents WHERE source = ?)", (source,)).fetchone()[0]
     con.commit()
     con.close()
-    return docs, edges
+    return docs, edges, changed
 
 
 # --------------------------------------------------------------------------
@@ -394,22 +501,42 @@ def synthesize_concepts(con):
     -- that has no wiki-authored page and whose name looks like a real concept
     (`RE_CONCEPT`). The stub carries no description (path empty, rendered as a
     synthesized shell), but it is a real node, so its page shows what defines and
-    tags it, and links pointing at it stop dangling. Re-run on every relate -- the
-    begrepp source rebuild drops the previous stubs. Returns the number minted."""
+    tags it, and links pointing at it stop dangling. Re-run on every relate;
+    incremental relate no longer wipes the source, so this clears the previous
+    stubs itself (path-less begrepp rows) before re-minting from the current link
+    set, dropping ones the corpus no longer references. Returns the number minted."""
     prefix = BASE + "begrepp/"
-    have = {r[0] for r in con.execute(
-        "SELECT uri FROM documents WHERE source = 'begrepp'")}
-    rows = []
-    for (uri,) in con.execute(
-            "SELECT DISTINCT to_root FROM links WHERE to_root LIKE ?",
-            (prefix + "%",)):
+    authored = {r[0] for r in con.execute(
+        "SELECT uri FROM documents WHERE source = 'begrepp' AND path <> ''")}
+    stubs = {r[0] for r in con.execute(
+        "SELECT uri FROM documents WHERE source = 'begrepp' AND path = ''")}
+    target = {uri for (uri,) in con.execute(
+        "SELECT DISTINCT to_root FROM links WHERE to_root LIKE ?", (prefix + "%",))
+        if uri not in authored
+        and RE_CONCEPT.match(uri[len(prefix):].replace("_", " "))}
+    # drop stubs the corpus no longer references (incremental relate no longer
+    # wipes the source), then mint stubs for newly-referenced concepts
+    for uri in stubs - target:
+        con.execute("DELETE FROM documents WHERE uri = ?", (uri,))
+    new = sorted(target - stubs)
+    # a stub has no artifact; its searchable content is just its name, so give it
+    # a stable content_hash off the name -- the index then skips it on a re-run
+    # (a None hash would force it to re-index every time) instead of file bytes.
+    con.executemany(
+        "INSERT OR IGNORE INTO documents VALUES (?,?,?,?,?,?,?,?)",
+        [(uri, "begrepp", "begrepp", name, name, "", None,
+          content_hash(("begrepp-stub\x1f" + name).encode()))
+         for uri in new
+         for name in [uri[len(prefix):].replace("_", " ")]])
+    # backfill the stable hash on any stub minted before this column existed
+    # (content_hash NULL) so index's content signature stops churning over them
+    for (uri,) in con.execute("SELECT uri FROM documents WHERE source = 'begrepp' "
+                              "AND path = '' AND content_hash IS NULL").fetchall():
         name = uri[len(prefix):].replace("_", " ")
-        if uri not in have and RE_CONCEPT.match(name):
-            have.add(uri)
-            rows.append((uri, "begrepp", "begrepp", name, name, "", None))
-    con.executemany("INSERT OR IGNORE INTO documents VALUES (?,?,?,?,?,?,?)", rows)
+        con.execute("UPDATE documents SET content_hash = ? WHERE uri = ?",
+                    (content_hash(("begrepp-stub\x1f" + name).encode()), uri))
     con.commit()
-    return len(rows)
+    return len(new)
 
 
 # --------------------------------------------------------------------------
@@ -486,6 +613,11 @@ def correspondence_for_new(con, new_uri):
 # internal "enligt 3 §" cross-refs -- 41% of all edges) are excluded: they are
 # the document's own outbound links, navigable in place, not external inbound.
 _NOT_SELF = " AND l.from_uri <> l.to_root"
+# bemyndigande is a typed relation with its own statute-paragraf margin
+# ("Föreskrifter meddelade med stöd av …"), so it is kept out of the generic
+# "Hänvisat till av" citation panel (and its count) -- like genomför, which is
+# stored as an outbound edge and so never lands in the target's inbound at all.
+_NOT_BEMYNDIGANDE = " AND l.predicate <> 'rpubl:bemyndigande'"
 
 
 def inbound(con, uri, limit=None):
@@ -498,7 +630,8 @@ def inbound(con, uri, limit=None):
     # document with a page of its own, so it never appears as an inbound link
     sql = ("SELECT l.from_uri, l.from_anchor, d.label, d.title, d.source "
            "FROM links l JOIN documents d ON d.uri = l.from_uri "
-           "WHERE l.to_uri = ?" + _NOT_SELF + " AND d.source <> 'kommentar' "
+           "WHERE l.to_uri = ?" + _NOT_SELF + _NOT_BEMYNDIGANDE
+           + " AND d.source <> 'kommentar' "
            "GROUP BY l.from_uri, l.from_anchor "
            "ORDER BY d.source, d.label, l.from_anchor")
     if limit is not None:
@@ -506,11 +639,24 @@ def inbound(con, uri, limit=None):
     return con.execute(sql, (uri,)).fetchall()
 
 
+def bemyndigande_inbound(con, uri):
+    """The föreskrifter issued (meddelade) under a statute paragraf -- the inbound
+    side of the bemyndigande edge: (foreskrift_uri, label, title), one per
+    regulation. Drives the paragraf's 'Föreskrifter meddelade med stöd av denna
+    paragraf' margin. Joined to documents for the title; ordered by föreskrift id."""
+    return con.execute(
+        "SELECT DISTINCT l.from_uri, d.label, d.title "
+        "FROM links l JOIN documents d ON d.uri = l.from_uri "
+        "WHERE l.to_uri = ? AND l.predicate = 'rpubl:bemyndigande' "
+        "ORDER BY d.label", (uri,)).fetchall()
+
+
 def inbound_count(con, uri):
     """How many (citing document, pinpoint) entries cite exactly `uri`."""
     return con.execute(
         "SELECT COUNT(*) FROM (SELECT 1 FROM links l WHERE l.to_uri = ?"
-        + _NOT_SELF + " GROUP BY l.from_uri, l.from_anchor)", (uri,)).fetchone()[0]
+        + _NOT_SELF + _NOT_BEMYNDIGANDE
+        + " GROUP BY l.from_uri, l.from_anchor)", (uri,)).fetchone()[0]
 
 
 def document_inbound_count(con, root_uri):

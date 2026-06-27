@@ -1,7 +1,8 @@
 # lagen.nu API — utvecklarguide
 
 Ett läsbart REST/OpenAPI-gränssnitt över hela det parsade rättskällекorpuset
-(författningar, rättsfall, förarbeten, EU-rätt, kommentarer och begrepp). Det
+(författningar, rättsfall, förarbeten, myndighetsföreskrifter, EU-rätt,
+kommentarer och begrepp). Det
 ersätter den gamla pipelinens RDF-/Fuseki-publicering.
 
 API:t exponerar tre saker:
@@ -65,15 +66,21 @@ På WSL2: startar den inte, höj `vm.max_map_count`
 
 ## Starta servern
 
+En enda process serverar både den statiska webbplatsen och API:t (samma origin):
+
 ```sh
-lagen serve-api                 # lyssnar på http://127.0.0.1:8001
-lagen serve-api --api-port 9000 # annan port
+lagen all serve              # webbplats + API på http://127.0.0.1:8000/
+lagen all serve --port 9000  # annan port
 ```
+
+API:t svarar under `/api/v1/*`; allt annat är de genererade sidorna. Eftersom
+sidorna och API:t delar origin anropar ⌘K-sökningen API:t med relativa URL:er –
+ingen separat API-server, ingen konfigurerbar API-bas som kan bli inaktuell.
 
 Interaktiv dokumentation genereras automatiskt:
 
-- **Swagger UI:** <http://127.0.0.1:8001/docs>
-- **OpenAPI-schema (JSON):** <http://127.0.0.1:8001/openapi.json>
+- **Swagger UI:** <http://127.0.0.1:8000/docs>
+- **OpenAPI-schema (JSON):** <http://127.0.0.1:8000/openapi.json>
 
 Allt nedan är `GET`. Svaren är JSON. API:t är skrivskyddat och CORS-öppet (det
 är publik, läsbar data), så det kan anropas direkt från en webbläsare på en
@@ -106,7 +113,7 @@ curl -G http://127.0.0.1:8001/api/v1/document \
 | Parameter | Typ | Förklaring |
 |---|---|---|
 | `q` | sträng (obligatorisk) | sökfrågan |
-| `source` | sträng | begränsa till en källa: `sfs`, `dv`, `forarbete`, `eurlex`, `kommentar`, `begrepp` |
+| `source` | sträng | begränsa till en källa: `sfs`, `dv`, `forarbete`, `foreskrift`, `eurlex`, `kommentar`, `begrepp` |
 | `kind` | sträng | begränsa till en dokumenttyp (`law`, `case`, `prop`, `directive`, …) |
 | `limit` | heltal 1–100 (standard 10) | antal träffar |
 | `offset` | heltal (standard 0) | paginering |
@@ -163,7 +170,7 @@ id + lättviktig metadata, **inte** det fullständiga innehållet.
 
 | Parameter | Typ | Förklaring |
 |---|---|---|
-| `source` | sträng | filtrera på källa (`sfs`, `dv`, `forarbete`, `eurlex`, `kommentar`, `begrepp`) |
+| `source` | sträng | filtrera på källa (`sfs`, `dv`, `forarbete`, `foreskrift`, `eurlex`, `kommentar`, `begrepp`) |
 | `kind` | sträng | filtrera på dokumenttyp (`law`, `case`, `prop`, `directive`, …) |
 | `limit` | heltal 1–1000 (standard 100) | sidstorlek |
 | `offset` | heltal (standard 0) | paginering |
@@ -348,15 +355,11 @@ PY
 ## Webbplatsens ⌘K-sökning
 
 Den genererade statiska webbplatsen (`lagen all generate`, serverad med
-`lagen all serve`) har en ⌘K-sökruta som anropar `/api/v1/search` live.
-Eftersom webbplatsen och API:t körs som skilda tjänster bakas API:ts bas-URL in
-i varje sida som `<meta name="lagen-api">`. Standard är
-`http://localhost:8001`; sätt `LAGEN_API` innan `generate` för att peka om
-(t.ex. till samma origin bakom en reverse proxy):
-
-```sh
-LAGEN_API=https://lagen.nu lagen all generate
-```
+`lagen all serve`) har en ⌘K-sökruta som anropar `/api/v1/search` live. Anropet
+är **relativt** (samma origin som sidan serverades från), så det finns ingen
+inbakad API-bas som kan peka fel om man byter port eller om en sida ligger kvar i
+webbläsarens cache. En sökning på en hänvisning ("avtalslagen 36", "GDPR art 32")
+fäster det exakta målet (§/artikel) överst, så Enter går direkt dit.
 
 ---
 
