@@ -204,49 +204,49 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
   same intermediates, so all register/amendment/metadata parsing is reused
   untouched. 2018:585 from JSON vs HTML = **0 field diffs** (only genuine freshness
   deltas).
-- 🚧 **Adjudication overlay** (`golden_sfs.adjudicate`) — per-class predicates
-  codifying the "change-detector, not oracle" posture (§2): each forgives a whole
-  *family* of diffs where the new pipeline is right against a stale/defective
-  golden, while still *reporting* them (a forgiven class that grows stays visible).
-  `validate` reports `match + adjudicated = passing`, so **`diff` is the
-  genuine-regression count** to drive to zero. Every diff line now carries the
-  source-node **`«clause»`** (both sides — `inline_links` / `extract_references`),
-  the context several predicates key on. Landed predicates (`PREDICATES`):
-  - `post-freeze-amendment` / `stale-consolidation-drift` — amendments and
-    consolidation-envelope metadata that drift as acts land after the golden's
-    snapshot.
-  - `change-reference-staleness` — a paragraf's closing *ändringshänvisning*
-    ("Lag (NNNN:NN)." → internal `#L`) now naming a later act; the matching pre-bump
-    miss forgiven only when that stycke was actually bumped.
-  - `balk-basefile-correction` — the 1734 års lag balkar (1736:0123 1/2): new mints
-    self-refs at the full basefile (`1736:0123_1#…`) where the old collapsed the
-    suffix (conflating the two balkar); mirror pairs forgiven per-source.
-  - `eller-enumeration` — paragraf refs from "1, 3, 5 eller 6 §" lists (single §)
-    the old SimpleParse grammar missed (it parsed only "… och … §§"); forgiven when
-    the target paragraf is an enumerated member and its chapter is named in the clause.
-  - `celex-correction` — the old legalref engine scrambled sector-3 CELEX, building
-    `3+number+type+year` (`3625R2017`, a nonexistent "year 0625" act) where the correct
-    form is `3+year+type+number` (`32017R0625` = Reg (EU) 2017/625). The new pipeline
-    mints them right; `celex_descramble` inverts a well-formed new CELEX back to the
-    golden's scramble so the corrected extra and the scrambled miss are recognised as
-    one mirror pair, forgiven per-source (a CELEX the new pipeline genuinely added or
-    dropped, with no mirror, stays visible). Clean A/B on the full corpus: **273 docs
-    move `diff`→adjudicated (2,018→1,745 genuine regressions), 4,690 lines forgiven
-    (2,345 mirror pairs).**
-  - **New-pipeline bugs *fixed* in the parser, not adjudicated:** source-context
-    misattribution (a ref pinned to a bare kapitel where the text sits in a specific
-    stycke); self-links from unanchored (dedup-id-suppressed) provisions; the balk
-    basefile minting. (A `chapter-state-leak` predicate was tried and reverted — it
-    would have masked the first of these.)
-  - 🚧 **Open: the reference-diff residual.** Whole-corpus references run now: 8,857
-    match, 416 adjudicated-docs, **1,745 diff**. The CELEX-scramble family (≈4,840
-    lines) is closed by `celex-correction` above. The remaining residual is dominated
-    by the **SFS-fragment** internal cross-references (≈9,372 extra + 8,002 missing),
-    concentrated in the chapter-structured balkar — still heterogeneous, not yet one
-    cause. Each bucket is either an old-pipeline gap (→ a clause-keyed predicate, like
-    eller; the `RefParseError`-hole family — refs the old scanner dropped on a failed
-    window) or a new-pipeline bug (source-attribution: un-numbered-paragraf sources,
-    stycke-renumbering off-by-ones → a parser fix). `test/test_golden_adjudicate.py`.
+- 🚧 **Adjudication overlay** (`golden_sfs.adjudicate`, `test/test_golden_adjudicate.py`)
+  — the "change-detector, not oracle" posture (§2) as code: a `PREDICATES` table where
+  each rule forgives a whole *family* of diffs in which the new pipeline is right against
+  a stale/defective golden, while still *reporting* them (a forgiven class that grows stays
+  visible). `validate` reports `match + adjudicated = passing`, so **`diff` is the
+  genuine-regression count** to drive to zero. Every diff line carries the source-node
+  **`«clause»`** (both sides), the context several predicates key on. The forgiveness
+  families: stale-golden drift (`post-freeze-amendment`, `stale-consolidation-drift`,
+  `change-reference-staleness`), old-pipeline corruption the new mints correctly
+  (`celex-correction` — scrambled sector-3 CELEX; `balk-basefile-correction` — the 1734
+  års lag balkar; `golden-chapter-collapse` — the old TOC-collapse), and old-grammar gaps
+  (`eller-enumeration`). All mirror-paired where applicable: an unpaired add/drop stays
+  visible. Some new-pipeline bugs are *fixed in the parser, not adjudicated* (bare-kapitel
+  source misattribution, unanchored self-links).
+  - ✅ **Parser correctness fix: list-embedded-mid-clause continuation.** A sentence with a
+    numbered list embedded mid-clause ("Den som … vållar [1. 2. 3.] döms för …", BrB 13:6 /
+    13:5c): the text after the list is the sentence *continuing*, but the new pipeline
+    opened it as its own stycke — shifting every later `S#`. A stycke cannot start
+    mid-sentence; the old pipeline got this wrong two *different* ways (13:6 folded it into
+    the last list item; 13:5c made it a new stycke). Fix (`assembler.py`): a **lowercase**
+    block immediately after an **open list** folds back into the stycke that owns the list,
+    so the following genuine (capitalised) stycke keeps its ordinal. Scoped to an open list
+    so a definition paragraph's lowercase definienda ("konsument: …" under "I denna lag
+    avses med", no list) stay their own stycken. Oracle fixtures:
+    `regression-stycke-fortsattning-efter-lista` (new) + `regression-kort-stycke-med-
+    nummerlista` (corrected — it had mis-authored a lowercase "samt" as a separate stycke).
+  - ✅ **The fix is new-is-right, so it *raises* the raw diff count** (the golden was
+    inconsistently wrong, so a consistently-correct parser diverges from it) — reconciled by
+    two adjudication predicates, not by weakening the parser. Manual audit of 1962:700: every
+    new reference "extra" is a mirror-paired `S#`-shift against the golden's stale ordinal
+    (0 unpaired, no real misattribution), and the fix surfaces ~25 brottsrubricering begrepp
+    the old pipeline missed because the crime name sat in a list continuation (Häleri,
+    Kapning, Rån, Människohandel, …) — a genuine gain.
+    - `stycke-pinpoint-drift` — a reference whose target is identical on both sides but read
+      from a different stycke of the *same paragraf*; forgiven only as a mirror pair (keyed
+      on `paragraf_of`, so bilaga offsets and bare-chapter relabels are out of scope, and an
+      unpaired add/drop stays visible).
+    - `brottsrubricering-begrepp` — a `begrepp: extra` whose defining clause is an
+      offence definition ("… döms för X till böter/fängelse"); the begrepp diff now carries
+      its «context» so the predicate can see the clause. Scoped to the offence pattern, so
+      an ordinary added term or extractor noise is not blanket-forgiven.
+    Separately, large bilaga `S#` offsets (e.g. 2001:911) are a *different* cause —
+    post-freeze temporal variants, i.e. structure-staleness, below.
   - ⬜ **Open: structure-staleness** — the structure section isn't adjudicated, so an
     amended law's extra paragrafer count as 3a diffs; applying the post-freeze logic
     there is the last gap to a unified passing %.
@@ -674,15 +674,23 @@ to a future per-doc incremental generate.
     artifact; the citation graph is already inline, so a line is self-contained
     (no catalog read, no transform). Listed at `/api/v1/dumps`. Verified on the
     real `kommentar` source (212 lines). `test/test_dump.py`.
-  - New deps: `opensearch-py`, `fastapi`, `uvicorn` (pyproject). ⬜ Remaining:
-    run `lagen all index` against a provisioned OpenSearch at corpus scale;
-    manifest-incremental indexing (per-source whole rebuild for now); MCP.
+  - New deps: `opensearch-py`, `fastapi`, `uvicorn` (pyproject). ✅ **`lagen all
+    index` run at corpus scale** against a provisioned OpenSearch — works.
+    ✅ **Incremental relate + index** (content-hash diff, see 2026-06-26 log);
+    ⬜ Remaining: MCP.
 - ✅ **Full corpus now catalogued.** `relate` runs over the whole set —
   `documents`: sfs 11,184 · dv 17,103 · forarbete 15,237 · eurlex 61,146
   (+ kommentar/begrepp) — so the cited law-roots that were dead targets in the
   first partial cut are now live. A full `lagen all generate` (~100k+ pages,
-  EU-dominated) has been run and completes in acceptable wall-time, with a
-  handful of document-specific errors still to triage.
+  EU-dominated) has been run and completes in acceptable wall-time. The
+  document-specific parse errors were triaged (2026-06-27): 3 forarbete docs hit
+  `KeyError: 'item'` in the citation grammar (the `itemnumeric_ref_id` "tredje
+  punkten" form wasn't handled by `fmt_section_item_refs`); 149 eurlex judgments
+  hit `ParseError: line 1, column 0` (CELLAR served scanned TIFFs under their
+  fmx4 manifestation — now fixed by the downloader's content-format fallback, §7d).
+  `cmd_all`'s parse step also now withholds the source watermark when any doc
+  errored, so a quiet source with failures retries (and re-surfaces them) next run
+  instead of being skipped wholesale.
 
 ## 7. Further verticals 🚧
 
@@ -865,7 +873,14 @@ law, keyed by **CELEX** (the basefile throughout).
   registered SOAP account (`EURLEX_USERNAME`/`EURLEX_PASSWORD`, env-only) gives a
   secondary `--source soap` enumerator as a cross-check for the unmetered but
   SLA-less SPARQL endpoint. `lagen eurlex download [treaties|acts|caselaw]
-  [--since YYYY-MM-DD] [--lang swe,eng] [--source sparql|soap]`.
+  [--since YYYY-MM-DD] [--lang swe,eng] [--source sparql|soap]`. **Content-format
+  fallback** (2026-06-27): the richest *type* is not always the richest *content* —
+  some scanned old judgments (CC/CJ/TJ, ~1993–2002) expose an `fmx4`-typed
+  manifestation whose item is a TIFF *image*, not Formex XML. `store_document` now
+  validates each fetched item against its declared format (`_content_ok`) and falls
+  to the next candidate type (`fmx4 → xhtml → html → pdf`, ranked by `_ranked_types`),
+  so the real text manifestation is stored. Recovered 149 judgments that previously
+  died in parse with `ParseError: line 1, column 0` (ElementTree on TIFF bytes).
 - ✅ **Bulk import** `accommodanda/eurlex/bulk.py` — `lagen eurlex unpack-bulk
   <dir|zip>` unpacks an official CELLAR bulk legislation dump (per-format zips:
   MTD metadata + EN/SV × FMX/HTML/PDF) into the *exact* per-CELEX layout the
@@ -965,6 +980,129 @@ law, keyed by **CELEX** (the basefile throughout).
   (no SFS number to resolve); and embedding the commentary prose inline at the
   statute paragraf (not only the margin link).
 
+### 7e. Myndighetsföreskrifter vertical (agency regulations) 🚧
+
+Binding regulations issued by ~100 agencies into their own författningssamling
+(FFFS, AFS, NFS, …). The value-add: a föreskrift's **`bemyndigande`** points into
+SFS at the empowering paragraf — a *new* edge type (statute → regulation) that
+makes a law's page list the regulations issued under it — plus `genomforDirektiv`
+(→ EU) and `upphaver`/`andrar` (the intra-fs amendment graph). Note the FORESKRIFTER
+*citation* grammar was never implemented in the old engine (§5 💤), so föreskrifter
+are not yet citation *targets*; the inbound value comes from the edges above.
+
+- **Landscape (poked, 2026):** no central API — lagrummet.se is a link directory,
+  the old rinfo aggregation is dead — so harvest is irreducibly per-agency. But the
+  *publishing architectures* are few, so an agency is **configuration over a shared
+  engine**, not a bespoke pipeline (the explicit user constraint: ~100 sources can't
+  be ~100 pipelines). Documents are **PDFs** everywhere (the förarbete parse pipeline
+  applies); landing/listing HTML carries the reliable identity + amendment metadata.
+  **No oracle** (user: the old myndfskr corpus + the `test/files` fixtures are
+  low-quality) — model by judgment off the SFS + förarbete patterns, spot-checked.
+- ✅ **First-class primitives** (`foreskrift/model.py`) — unlike SFS (where the text we
+  handle *is* the consolidated in-force version), föreskrifter are **as-published,
+  immutable documents**: a grundförfattning and each ändringsförfattning is a fixed
+  artifact with no currency metadata. A base `Regulation` embeds its `Amendment`(s) and,
+  for the minority that have one (108/1218), its `Consolidation`(s) — an *inofficial*
+  compilation (the printed text stays officially valid; an official reprint is an
+  *Omtryck*). A consolidation's one pinning fact is `konsolideradTom` — the most recent
+  amendment folded in (a föreskrift uri), **not a date** (a "senast uppdaterad" date is
+  just when the file was regenerated). URI `https://lagen.nu/{fs}/{year}:{lopnummer}`;
+  `bemyndigande` → `https://lagen.nu/{sfs}#P{n}`. `structure` is the förarbete-style
+  nested §§ tree (filled at parse).
+- ✅ **Reusable harvest engine** (`foreskrift/harvest.py`) — the shared loop
+  (incremental newest-first + `.complete` backfill marker, atomic writes, `Reporter`,
+  politeness; generalized `forarbete.sync`) is **architecture-agnostic**. An agency is
+  config naming two seams over it:
+  - **`enumerate`** — *how to list an agency's docs*, the variable axis. Three reusable
+    enumerators cover the wild: `indexed_enumerate` (one static HTML page),
+    `paginated_enumerate` (`?page=N`), `json_enumerate` (a search/REST API in one call);
+    a genuinely idiosyncratic index is a small bespoke function (FFFS, BFS).
+  - **`resolve`** — *item → stored files*. `resolve_landing` (most agencies) scrapes a
+    landing page's PDFs and classifies each via a pluggable **classifier**:
+    `classify_file` (link text), `classify_section` (the `<h2>` a file sits under),
+    `classify_href` (the PDF filename) → regulation / consolidation / amendment / memo /
+    attachment. `resolve_direct` handles **API-direct** sources whose listing already
+    carries the file URLs (no landing page). Only **regulation + consolidation** (the
+    in-force text) are downloaded; amendments/memos/attachments are recorded as
+    references (identifier + href) — the full amendment graph without the fetch cost.
+- ✅ **15 agencies harvested to completion** (`foreskrift/agencies.py`, the
+  `REGISTRY` where the ~100 fs live as config) — a full corpus run: **1218 base
+  regulations, 1203 (98.8 %) with downloaded text** (regulation/consolidation
+  PDF), 0 crashes, 0 unhandled errors. The 15 without local text are genuine
+  edge cases (repeal/amendment-only top-level entries, one memo-only landing,
+  5 pre-1994 NFS `ar-YY-N` two-digit-year filenames). Per-fs: tfs 339, nfs 210,
+  fffs 126, bfs 124, msbfs 97, lmfs 93, ssmfs 46, ptsfs 45, livsfs 32, kovfs 26,
+  stemfs 26, sifs 22, elsakfs 20, rgkfs 9, kifs 3 (only 3 in-force base regs).
+- ✅ **Enumeration resilience** (`harvest.py`) — these agency indexes are flaky and
+  badly maintained, so the harvest survives any single index page failing without
+  losing the rest: `_guarded_enumerate` turns an enumerator that dies outright (a
+  single-call API down, malformed JSON, 403) into a logged `Skip` and moves to the
+  next agency (one bad source can't abort the 15-agency run); multi-page enumerators
+  (`indexed_enumerate` per-year, `paginated`, `sitemap`) yield a `Skip` for one
+  unreachable page and keep walking the tail. A `Skip` is *logged* (never swallowed)
+  and *withholds the `.complete` marker* so the page is retried next run; an
+  *expected* empty page (a year with no regulations — `optional_pages`) is silently
+  skipped, not an error.
+- ✅ **Per-agency parse-coverage fixes** surfaced by the full run: MSBFS 25→96/97
+  PDFs (`classify_default_regulation` for old SÄI/SÄIFS predecessor texts whose
+  designation prefix ≠ the agency fs, + `/siteassets/` ∪ `/contentassets/` selector);
+  NFS 169→205/210 (filenames come both `nfs-2014-29.pdf` and underscored/zero-padded
+  `nfs_2007_09.pdf`).
+- ✅ **Five exemplar architectures** (the seam pressure-test; each agency is ~10 lines):
+  - **FFFS** (Finansinspektionen) — static förteckning, bespoke enumerate (year+lopnr
+    fused in the detail URL), landing + text-classify. ~1.8 s/base, ~335 bases.
+  - **SSMFS** (Strålsäkerhetsmyndigheten) — `paginated_enumerate`, landing + text-classify
+    (PDFs served *without* a `.pdf` suffix → byte-sniffed).
+  - **NFS** (Naturvårdsverket) — `json_enumerate` (an Optimizely search API, `unwrap`
+    a `searchModel` envelope), landing + `classify_href`.
+  - **KIFS** (Kemikalieinspektionen) — `indexed_enumerate`, Sitevision `/download/` PDFs
+    grouped under `<h2>` sections → `classify_section`.
+  - **BFS** (Boverket) — **API-direct**: a key-less REST API returns the whole register
+    with each PDF URL + amendment back-link inline → bespoke enumerate + `resolve_direct`,
+    no landing page.
+  Wired: `lagen foreskrift download [fs…]` (`--full` refreshes existing, `--only
+  fs/year:num`); bare = all agencies.
+- 💤 **Known-hard, deferred:** SKVFS (Skatteverket — behind F5 bot-defense, needs a real
+  browser) and Socialstyrelsen HSLF-FS (React SPA; clean enumeration only via the
+  robots-disallowed sitemap; a *joint* series, agency parsed from the title). Both need a
+  different harvest posture than the five above.
+- ✅ **Shared PDF parser** (`foreskrift/{parse,structure}.py`) — one parser for all 15 fs.
+  The font-aware extraction + paragraph reflow it shares with the förarbete parser was
+  promoted to `lib/pdftext.py` (the rewrite's "extract after the second instance" rule);
+  förarbete re-imports it, its 20 tests unchanged. Föreskrift-specific layers:
+  - `parse.classify` reads the `N kap.`/`N §` markers **from the text, not the font** — bold
+    is reliable on a modern FFFS PDF but gone on a scanned 1984 BOFS one, while the textual
+    convention holds corpus-wide; so the body classifies even when extraction is OCR-mangled.
+  - `structure.nest` builds the statute-shaped `kapitel → paragraf → stycke` tree and mints
+    the SFS `#K2P3` anchor on each paragraf — what makes a föreskrift paragraf a *citation
+    target* (a statute's `bemyndigande`, or a cross-reference, resolves to `…#K2P3`).
+  - `parse.extract_metadata` lifts the masthead facts best-effort: beslutsdatum,
+    ikraftträdande, Utkom-från-trycket, the `bemyndigande` SFS paragrafer (the "med stöd av
+    …" clause through the citation engine, deduped to paragraf-precision), the EU directive a
+    "Jfr … direktiv …" footnote says it `genomför`, the regulations it `upphäver`.
+  - Every step is best-effort: a scanned PDF (no text), a 600-page förteckning (no §§), a
+    short declarative (no §§) all yield a document, never an error. **Full corpus parse: 0
+    failures across all 15 fs.**
+- ✅ **`konsolideradTom`** — a consolidated version's one pinning fact, the most recent
+  amendment it folds in (`parse.konsoliderad_tom`: the highest fs-reference in the
+  konsoliderad masthead, e.g. FFFS "Ändringar: … FFFS 2026:6" / NFS "ändringar till och med
+  NFS 2026:5"), **not a date**. (Fixed `RE_FS_REF` to admit 3-letter codes NFS/TFS/BFS.)
+- ✅ **The `bemyndigande` edge — statute → its föreskrifter — wired end-to-end.** A
+  föreskrift is *meddelad* under one or more SFS paragrafer; `catalog.bemyndigande_links`
+  emits that edge (`rpubl:bemyndigande`, föreskrift→SFS-paragraf) into the shared link
+  graph (1247 edges, 570 empowering paragrafer across 260 statutes), and the SFS paragraf
+  page grows a margin **"Föreskrifter meddelade med stöd av denna paragraf"**
+  (`render.bemyndigande_margin`) listing them — the headline value-add (a statute now lists
+  the regulations issued under it). The edge is a *typed* relation, kept out of the generic
+  "Hänvisat till av" panel (its own `_NOT_BEMYNDIGANDE` filter), and the föreskrift page
+  shows the mirror outbound "Bemyndigande". Föreskrift is now a first-class rendered source
+  (`render_foreskrift`, lagen.nu's `/{fs}/{år}:{nr}` route, browse + frontpage), its
+  `structure` reshaped to the shared statute node convention (`id`/`ordinal`, paragraf body
+  in a `stycke` child) so it reuses `render_node` + the catalog fragment/link walkers. Shared
+  PDF extraction lives in `lib/pdftext`.
+- ⬜ **Next:** the OpenSearch `index` pass for föreskrift (paragraf-precise search), and the
+  intra-fs `upphäver`/`ändrar` + `genomför` edges (same mechanism as bemyndigande).
+
 ### 7b. Remaining verticals ⬜
 
 The rest of `/mnt/data/lagen/data/{…}`. Each built the same way; the horizontal
@@ -984,6 +1122,8 @@ model + extraction.
 | `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `word`, `legacy` |
 | `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, all 8 types), `model`/`parse` (PDF→artifact), `kommentar` (författningskommentar → EU-directive *genomför* edges), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf) |
 | `accommodanda/eurlex/` | **EU vertical (EUR-Lex/CELLAR)**: `download` (SPARQL discovery), `bulk` (dump import), `parse`/`parse_html`/`parse_pdf` (Formex/HTML/PDF → one artifact shape), `definitions` (defined-terms extraction + in-act interlinking), `lang`, `model` |
+| `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (reusable engine — enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct}; `Skip`/`_guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 15 agencies live), `download`, `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors). Corpus: 1218 regs harvested, parsed 0-fail |
+| `accommodanda/lib/pdftext.py` | **shared font-aware PDF extraction** (förarbete + föreskrift): `pdf_pages` (`pdftohtml -xml` → bold/italic-tagged `Line`s) → `page_paragraphs` (reflow, strip running header/page-no/TOC) → the vertical's own `classify` |
 | `accommodanda/config.py`, `lib/layout.py`, `lib/net.py` | runtime config (`config.yml`/`data_root`), centralized document layout, resilient HTTP session + harvest progress reporter |
 | `site/data/eurlex/` | harvested EU corpus (`notice.ttl` + best manifestation per language) + artifacts |
 | `test/test_eurlex_parse.py`, `test/test_eurlex_html.py`, `test/test_eurlex_definitions.py` | EU parser + defined-terms suites |
@@ -1055,10 +1195,11 @@ so is easy to forget. All are run by hand:
 
 **The adjudication overlay** (the "change-detector, not oracle" layer, §3d) lives
 in `tools/golden_sfs.py`: `adjudicate(problems, golden) -> (unexplained,
-accepted)`, driven by the `PREDICATES` table (currently `post-freeze-amendment`,
+accepted)`, driven by the `PREDICATES` table (`post-freeze-amendment`,
 `stale-consolidation-drift`, `change-reference-staleness`, `balk-basefile-correction`,
-`celex-correction`, `eller-enumeration`; a `chapter-state-leak` predicate was tried and
-removed — see the 2026-06-24 log entry). Several predicates now read the diff line's `«clause»` (the
+`golden-chapter-collapse`, `celex-correction`, `eller-enumeration`, `stycke-pinpoint-drift`,
+`brottsrubricering-begrepp`, `post-freeze-source-amendment`; a `chapter-state-leak` predicate
+was tried and removed — it would have masked a real parser bug). Several predicates read the diff line's `«clause»` (the
 source-node text appended by `format_ref`) — the context that makes them decidable. It runs **automatically**
 inside `validate`, and also in `golden_sfs.py compare`. To add a rule: write a
 `_predicate(problem, ctx)` and add one `(name, fn)` entry to `PREDICATES`
@@ -1080,862 +1221,21 @@ segmenter once the parser emits a `structure` section.
 
 ## Progress log
 
-**2026-06-25 (§3d — celex-correction: the largest clean reference family adjudicated)**
-- Characterizing the reference-diff residual (the §3d open item) surfaced that the
-  single biggest clean family is **not** the `RefParseError`-hole but a defective
-  golden: the old legalref engine **scrambled sector-3 CELEX**, building
-  `3+number+type+year` (`3625R2017`) where the correct CELEX is `3+year+type+number`
-  (`32017R0625` = Reg (EU) 2017/625) — it named nonexistent "year 0625" acts. The new
-  pipeline mints them correctly (the URIs are real, famous regs — 2016/679 = GDPR,
-  2017/745 = MDR), so these missing/extra pairs are textbook new-is-right.
-- Landed `celex-correction` (`golden_sfs._celex_correction` + `celex_descramble`,
-  added to `PREDICATES`), mirroring `balk-basefile-correction`: invert a well-formed
-  new CELEX back to the golden's scramble and pair the corrected extra with the
-  scrambled miss **per source stycke**; each is forgiven only when its mirror is
-  present, so a CELEX the new pipeline genuinely added (no scrambled mirror — 887
-  lone extras) or one it dropped (golden has it, new doesn't — 1,899 unmatched
-  missings) stays visible as a potential regression.
-- **Clean A/B on the full 11,039-doc corpus** (identical code, predicate the only
-  variable; `match` unchanged at 8,857, confirming the predicate is purely additive):
-  references `diff` **2,018 → 1,745** (−273 docs now fully adjudicated, a 13.5% cut in
-  genuine regressions), **4,690 lines forgiven** (2,345 mirror pairs). 6 new tests in
-  `test/test_golden_adjudicate.py` (32 total green). The pre-existing
-  `test_sfs_parse::test_sfs_links[tricky-overlappande-tabellrader]` red is unrelated
-  (confirmed on a stashed tree).
-- Methodology note recorded along the way: `validate --limit N` walks the *first* N
-  sorted paths — the 1700s–1900s balkar (1736:0123, 1942:740 rättegångsbalken), the
-  most-amended, structurally-hardest docs — so a `--limit` sample is worst-case, not
-  representative (a 500-doc structure+amendments sample showed 26% passing vs ~90%
-  corpus-wide). Use the whole-corpus `--report` for real numbers.
+The blow-by-blow development history (dates, individual fixes, edge cases) lives
+in `git log`. This document is the forest-level status; section markers
+(✅/🚧/⬜) carry the current state. Milestones, newest first:
 
-**2026-06-25 (§7c kommentar → side-by-side rail annotation, not a page source)**
-- Per the user: wiki SFS commentary should display **side-by-side with the
-  paragraph it comments on**, not as a separate `/kommentar/` tree. Made kommentar
-  an annotation layer: removed `render_kommentar` + its dispatch entry and dropped
-  kommentar from `SOURCE_ORDER`/frontpage/browse (`generate_site` skips it,
-  `catalog.inbound` excludes it as a citer so it never 404s). The commentary prose
-  now renders into the statute paragraph's **context rail** — `render._commentary_index`
-  maps `(law_uri, anchor) → [(author, prose)]` from the kommentar artifacts, and
-  `Rail._commentary` emits it as the rail's top "Kommentar" section (with byline).
-  Verified on avtalslagen (1915:218): the chapter rails show the commentary prose
-  (`Löftesprincipen` …). `test/test_site.py`. Existing `site/data/generated/kommentar/`
-  pages are now stale (delete + regenerate). Two follow-ups from testing on
-  avtalslagen: (a) **law-level commentary** — the kommentar preamble (before the
-  first `==` section: the "Huvudförfattare …" intro) is keyed `(law, None)` and
-  becomes the rail's **default panel** (`island['']`, "Kommentar till lagen"),
-  shown when no single paragraph is in focus. (b) **scrollspy fix** — a chapter
-  `<section>` carrying commentary became `[data-rail]{position:relative}`, so its
-  paragraphs' `offsetTop` reset per-section and the rail stuck on the section's
-  last paragraph ("always 40 §"); the scrollspy now uses viewport-relative
-  `getBoundingClientRect().top`, immune to offsetParent.
-
-**2026-06-25 (§7c concept layer: synthesis + canonicalization + extractor fixes)**
-- Turned begrepp into the union of machine-extracted terms and wiki concepts, in
-  layers: (1) **synthesis** — DV nyckelord → `dcterms:subject` concept edges, and
-  a stub `begrepp/<Name>` node for every referenced-but-unauthored defined
-  term/nyckelord, so a term with no wiki description still has a page aggregating
-  what defines/tags it (and its links stop dangling). (2) **canonicalization**
-  (`lib/concepts.py`) — a hand-rolled corpus-aware Swedish noun de-inflector folds
-  inflected variants onto one concept. The crux the data exposed: aggressive
-  stemming over-merges `-are` agent nouns with their base (`Domare`→`Dom`,
-  `Företagare`→`Företag`), so the de-inflector never strips a bare `-are` and only
-  merges onto an *observed* base — validated on the real catalog (355 forms → 347
-  concepts, **0 wiki URIs changed**). The relate pass remaps variant link targets
-  + a `concept_alias` table; `Site.resolve` folds a variant uri in an artifact onto
-  the canonical page. A hand-edited `begrepp_aliases.json` (alias / keep_distinct)
-  on top. (3) **`find_definitions` span fixes** — the user corrected that `*/k/
-  utjämningsbelopp` and `(av personuppgifter)` are mis-*bounded* real terms, not
-  noise; fixed the formula-prefix sweep and the parenthetical-clarifier inversion
-  at source (the `dödas (dödning)` coinage still works), demoting `RE_CONCEPT` to a
-  backstop. (4) **EU promotion** — `catalog.definition_links` emits begrepp
-  `dcterms:subject` edges from a Swedish EU act's `defines` points, so EU terms
-  (`ränta`, `royalties`) join the namespace and fold with SFS/DV variants; English
-  acts excluded; act-local term-use interlinking untouched. Also fixed
-  `lagen <source> generate` to scope to one source (it was re-walking the whole
-  114k-page corpus). `test/test_concepts.py` (9), `test/test_wiki.py`,
-  `test/test_sfs_begrepp.py`. Needs a re-parse (SFS, for the span fix) → re-relate
-  → re-generate to surface.
-
-**2026-06-24 (§7d eurlex + §4 DV hierarchy materialized — flat verticals done)**
-- Completing the "materialize the flat verticals" effort (förarbete landed earlier
-  today; eurlex + DV now). Both follow the förarbete pattern: a `structure.py` with
-  `nest`/`flatten`, the parser emits `structure` instead of the flat `body`,
-  consumers updated, recipe hash extended, verified on real data.
-- **eurlex** (`eurlex/structure.py`): two container kinds — `heading` divisions
-  nest by `level` (part > title > chapter > section), `article` holds its
-  `paragraph`s which hold `point`s; preamble/recital/citation and trailing
-  ruling/signature are leaves. Article/point `id`s (the citation anchors) are
-  untouched. `render_eurlex`/`annotate`/`cmd_batch` read `flatten(structure)`
-  (note: parse.py already had its own inline-markup `flatten`, so the structure
-  one is imported aliased). Verified on a real decision: 188 blocks → depth-6 tree
-  (ANNEX › TITLE › article › paragraph › point), 54 fragments preserved.
-  `test/test_eurlex_structure.py`.
-- **DV** (`dv/structure.py`): the §4 spec-first segmenter was already there
-  (`segment`, skeleton-only) — turned it into a **content-bearing** `nest` that
-  attaches every prose block (and the marker blocks) as leaves of the
-  instance/ruling node it falls under. `to_artifact` ships this `structure` in
-  place of the flat body; the golden's `skeleton_from_artifact` drops the prose
-  leaves so the skeleton it compares is unchanged; `render_dv` flattens back.
-  Verified on AD 1993 nr 101 (instans → dom → domskäl/domslut; flatten==body).
-  Closes the §4 ⬜ "parser work it specifies".
-- All three verticals' artifacts are stale now (recipe hashes bumped); a full
-  `lagen {forarbete,eurlex,dv} parse` → relate → generate → index picks them up.
-  285 tests green (+ the live search round-trip).
-
-**2026-06-24 (§6 search dropped the join; §7a förarbete hierarchy materialized)**
-- **Search index: parent-child join → standalone units + collapse.** Live indexing
-  kept tripping the parent circuit breaker even at 2–3 GB heap: the join field's
-  global ordinals are heap-resident and grow with doc count (the request payloads
-  were tiny — a red herring). Rebuilt `search.py` without the join: every unit is
-  a standalone doc carrying `doc_uri` + denormalised parent metadata, and
-  `collapse:{field:doc_uri}` returns one result per document. The whole-document
-  unit holds body text only when the doc has no fragments (else the fragment owns
-  it, so a body query collapses to a paragraph); fragment identity is non-searchable
-  (`doc_title`/`doc_label`) so a title query collapses to the document. Distinct-doc
-  total via a `cardinality` agg. Verified live (round-trip + real kommentar index,
-  pinpoints surface, no breaker). Also added `number_of_replicas:0` (single-node
-  green) + `refresh_interval:60s`. `test/test_search.py` rewritten.
-- **förarbete hierarchy (the lead vertical of the "materialize the flat verticals"
-  effort).** User pushed back — rightly — that förarbete/eurlex/DV *do* have
-  hierarchy (förarbete's numbered 3-level outline, eurlex part→…→article, DV's
-  instance skeleton), the parsers just flattened it. New `forarbete/structure.py`
-  `nest`s the flat blocks into a nested `structure` by heading `level` (already in
-  the data), replacing `body`; `flatten` is the inverse for `kommentar.py`. Wired
-  through `parse.to_artifact`, `cmd_batch`, `kommentar.extract`, `render_forarbete`
-  (recursive, page anchors preserved), and `FA_CODE` (recipe hash → auto-reparse).
-  Verified on prop 1999/2000:39: 1,499 flat blocks → 4-level tree, 348 fragments
-  (was 0). `test/test_forarbete_structure.py`; consumers' tests updated. eurlex +
-  DV next.
-
-**2026-06-24 (§6 — OpenSearch round-trip verified live; two opensearch-py 3.x bugs)**
-- Ran the index against a real OpenSearch 2.18 (the `docker-compose.yml` cluster).
-  Two runtime bugs the unit tests couldn't catch (they only check dict shape):
-  (1) **opensearch-py 3.x made client args keyword-only** — `indices.exists(self.index)`
-  → `TypeError`; fixed every call to `index=…` (`exists`/`delete`/`create`/`refresh`/
-  `delete_by_query`). (2) **`doc_actions` hardcoded `_index=INDEX`**, so a non-default
-  index name (the integration test's `lagen-test`) silently indexed into `lagen` and
-  searched empty; dropped `_index` from the actions and pass `index=self.index` to
-  `helpers.bulk`. After both, the gated integration test passes, and a real
-  `"skadestånd"` query ranks Skadeståndslagen (1972:207) #1 by `inbound_count` with
-  `has_child` paragraph pinpoints. Confirmed the join mapping + per-source rebuild at
-  scale (sfs 11,184 parents complete). The §6 "unrun at scale" caveat is retired for
-  the search half.
-
-**2026-06-24 (§6 — follow-ups: config key, `/documents` listing, compose file)**
-- **OpenSearch endpoint moved into config** — `config.opensearch_url` (config.yml
-  key, env `OPENSEARCH_URL` overrides, default localhost:9200), so it lives where
-  `data_root` does instead of env-only. `search.py`/`build.py` read
-  `config.OPENSEARCH_URL`.
-- **`GET /api/v1/documents`** — the missing corpus-enumeration endpoint (search
-  is fulltext-only, `q` mandatory; dumps return whole content). Filtered by
-  `source`/`kind`, paginated with a `total`. `source_url` is now a **catalog
-  column**, populated from the artifact at `relate` time exactly like `title`
-  (additive `ALTER` migration in `catalog.connect` for pre-existing catalogs;
-  the API applies it once, lock-guarded, then serves read-only); `updated` is the
-  artifact mtime. New `catalog.documents`/`document_count`/`document_inbound_count`.
-  Verified against the real catalog (eurlex 69,290 / sfs 11,184, paging + filter +
-  timestamps). `test/test_api.py` (+2).
-- **Docker** — overwrote the legacy `docker-compose.yml` (old nginx+ES7+fuseki+
-  mediawiki+matomo stack, retired on this branch, still in git history) with a
-  single-node, security-disabled OpenSearch 2.x at plain `http://localhost:9200`
-  (matching the client default) so `docker compose up -d` gives a working cluster.
-- **Swedish developer guide** `accommodanda/api/README.md` documents all
-  endpoints, the dumps, `docker compose up`, and the ⌘K/`LAGEN_API` wiring.
-
-**2026-06-24 (§6 — publishing layer: OpenSearch + REST/OpenAPI + NDJSON dumps)**
-- Built the three deferred §6 publishing pieces, replacing the retired
-  Fuseki/RDF endpoint. User decisions up front: **OpenSearch 2.x** (Apache-2, not
-  ES), **FastAPI + uvicorn**, **parent-child** indexing (doc + per-§ fragment),
-  **NDJSON** dumps (the raw artifacts — JSON-LD `@context` modeling dropped). All
-  three are derived/rebuildable corpus verbs in `build.py`, beside
-  `relate`/`generate`/`serve`.
-- **Shared flattener** `lib/text.py` first (the DRY seam): one definition of a
-  node's / document's / fragment's plain text (inline runs `str | {uri,text}` →
-  joined, table cells space-joined, body + amendments concatenated).
-  `catalog.runs_text` re-exported off it, so its two callers (`render`,
-  `eurlex/annotate`) are untouched.
-- **OpenSearch indexer** `lib/search.py` (`lagen <src> index`) ports the old
-  `fulltextindex.py:ElasticSearchIndex` knowledge (field boosts, parent-child,
-  bulk, `simple_query_string` + `has_child` + highlight) onto OS 2.x's `join`
-  field. Parent ranks by `catalog.document_inbound_count` — a **new** catalog
-  helper counting whole-document citations (`to_root`), the real "most-hänvisade"
-  authority, broader than the bare-uri `inbound_count`. Pure extraction unit-
-  tested; the cluster round-trip is an `OPENSEARCH_URL`-gated integration test
-  (no cluster in this env, so skipped — the one piece unrun at scale).
-- **REST API** `accommodanda/api/app.py` (`lagen serve-api`): FastAPI over
-  catalog + OpenSearch + artifacts; `search` / `document` / `document/{inbound,
-  outbound}` / `sources` / `dumps`, auto OpenAPI + Swagger, CORS-open, URIs as
-  query params. **Verified live against the real 1.5 GB catalog** (Brottsbalk
-  inbound 5,153; räntelagen §6 ← 2,783 citers; outbound/404/sources all correct).
-  Search hits carry their hosted-page `url` (`layout.page_relpath`).
-- **⌘K palette goes live**: `render.SCROLLSPY`'s stub now debounce-`fetch`es
-  `/api/v1/search` (API base in a `<meta name="lagen-api">`, `LAGEN_API`-
-  overridable) and renders deep-links to each hit's paragraph; JS syntax-checked
-  with node. **NDJSON dumps** `lib/dump.py` (`lagen <src> dump`) — verified on the
-  real `kommentar` source (212 lines round-trip). New deps `opensearch-py`,
-  `fastapi`, `uvicorn`. New suites: `test/test_{text,search,api,dump}.py`
-  (70 green together with site/build; one pre-existing `test_sfs_parse` red,
-  unrelated, confirmed on a clean tree).
-
-**2026-06-24 (§3d — eller-enumeration adjudication, the first clause-driven rule)**
-- The old SimpleParse grammar parsed "och … §§" enumerations (double §) but never
-  the "eller … §" form (single §) — a Swedish drafting convention (och→§§, eller→§).
-  So the new pipeline's paragraf refs from "1, 3, 5 eller 6 §"-style lists are extras
-  it is right about. The new `eller-enumeration` predicate keys on the now-available
-  `«clause»`: forgive an extra paragraf ref iff its target paragraf number is one of
-  the `eller`-enumerated members *and* its chapter (if any) is named in the clause —
-  so a spurious add or a different construct (punkt lists, "18 a § andra stycket N")
-  stays visible. On 1942:740 (rättegångsbalken, brottsbalken-citing): **179 ref diffs
-  → 100 adjudicated** (83 eller-enumeration + 17 change-reference-staleness), the 79
-  residual being genuinely different families. `re_eller_enum`/`eller_enum_paragrafs`
-  + `reference_clause`; `test/test_golden_adjudicate.py` (6 new tests, 552 total green).
-  The first predicate to exploit the clause context — the model the `RefParseError`-hole
-  groundwork enables.
-
-**2026-06-24 (§3d — balk-basefile self-reference fix)**
-- The 1734 års lag balkar carry a bare numeric suffix ("1736:0123 1" = byggninga-
-  balken, "1736:0123 2" = handelsbalken). `fragment_context`'s `RE_BASEFILE_LAW`
-  truncated it (faithfully reproducing the old pipeline), so self-references minted
-  against the collapsed "1736:0123" — wrong, and ambiguous between the two balkar.
-  Extended the regex (`(?:[_ ]s\.\d+|[_ ]\d+)?`) so the suffix is kept: self-refs in
-  1736:0123 1 now resolve to `1736:0123_1#K9P2` (full id + chapter-qualified
-  fragment), correctly distinct from `1736:0123_2`. Only 3 docs affected
-  (1723:1016_1, 1736:0123_1/_2). A deliberate divergence from the golden, which
-  collapsed both. `self_law_uri` follows automatically; `test/test_sfs_unanchored_refs.py`
-  updated.
-- **`balk-basefile-correction` adjudication predicate** codifies that divergence as
-  new-is-right: the corrected full-basefile self-ref (extra) and the golden's
-  collapsed self-ref (missing) are a mirror pair, each forgiven only when its
-  counterpart shares the source stycke (so a genuine new drop or spurious add stays
-  visible). On the corpus it fires **106×** across the balk docs; 1736:0123 1 drops
-  from ~28 reference diffs to **1** residual (a lone extra from an un-numbered-paragraf
-  source `K26S1`, correctly left unexplained). `test/test_golden_adjudicate.py`
-  (6 new tests). 546 tests green.
-
-**2026-06-24 (§2 — golden normalized on the fly; freeze step removed)**
-- The golden is now `site/data/sfs/parsed/` (old-pipeline XHTML) **normalized to NF
-  on the fly** at comparison time — there is no frozen `site/data/sfs/golden/` tree
-  and no `freeze` step. Rewired `accommodanda/sfs validate` to glob `parseddir` for
-  `*.xhtml` and `validate_one` to call `golden_sfs.normalize(parsedfile)` instead of
-  loading a frozen `.json`; `refs` likewise normalizes its golden arg via
-  `golden_sfs.load`. Deleted `golden_sfs.py`'s `freeze`/`freeze_one`/`sanity_check`/
-  `count_types`, the `freeze` subcommand, and the now-unused `os`/`ProcessPoolExecutor`
-  imports. Updated README + §2 + the reference card. (The `post-freeze-amendment` /
-  `golden_freeze_horizon` adjudication concept stays — "freeze" there means the parsed
-  snapshot's amendment cutoff, not the deleted step.) Smoke-tested: `validate
-  site/data/sfs/parsed site/data/sfs/downloaded --sections references` runs and the
-  diffs carry the new «clause» context.
-
-**2026-06-24 (§3d — references carry source-clause context, both sides)**
-- Reference tuples gained a 4th element: the **full text of the source node** the
-  link was read from (not just the linked span), so a diff shows the whole clause —
-  the context that resolves a bare "10 §" to a particular chapter/law. `inline_links`
-  (new) builds it from the node run-list; `extract_references` (golden) from the
-  `<a>` container's text. Match key stays `(source, predicate, uri)` —
-  `canonicalize_refs` now returns a `{key: clause}` dict and `format_ref` appends
-  `«clause»` to each diff line (URI capture un-anchored so the staleness predicate
-  still parses). Foundation for the `RefParseError`-hole hole-vs-mistake call. Both
-  sides carry it live (the golden parsed XHTML is normalized per comparison).
-  Zero regressions (540 pass; the 11 register reds are the pre-existing missing-HTML
-  fixtures).
-
-**2026-06-24 (§3d — named-law dataset off RDF; bold/italic N/A)**
-- **`sfs.ttl` → `sfs_namedlaws.json`** (hand-editable, user decision). Flat
-  `law id -> {label?, abbr?}`, `abbr` a list for the 4 multi-abbrev laws (golden's
-  primary first). Rewrote `load_namedlaws`/`load_abbreviations` (dropping rdflib
-  from lagrum) and `register.abbreviations` to read JSON; migrated all 6 consumer
-  modules + 4 test/tool files; deleted the TTL. Verified the loaded dicts are
-  identical to the old TTL loaders and the 4 multi-abbrev metadata picks match
-  golden. 540 tests pass (the 11 `test_sfs_register` reds are pre-existing —
-  legacy SFST/SFSR HTML fixtures absent from this checkout, unrelated).
-- **Bold/italic runs ruled N/A for SFS** — investigated: no emphasis markup in
-  the JSON source or in any of the 11,056 golden XHTMLs. Character formatting is a
-  formatting-bearing-source (DV) concern; the runs/spans infra (`Ref.kind`)
-  already supports it.
-
-**2026-06-24 (§3d — begrepp / find_definitions port)**
-- Ported the SFS term-definition heuristics to `accommodanda/sfs/begrepp.py` (off
-  the old framework): paragraf definition `mode` + the five `defined_term` cases +
-  `/begrepp/{Capitalised}` URI minting. Wired through the projection (mode threads
-  `project_paragraf`→`stycke_nf`/`flatten_list`/`tabell_nf`; `inline` emits a
-  `dcterms:subject` Ref `kind="term"` over the term span), so begrepp now renders
-  inline alongside lagrum links. `compare_refs` includes begrepp as a term-URI set
-  (source attribution is the shared reference-drift issue). ~97% term recall on
-  definition-heavy laws (1962:700 99%, 1998:808 100%, 2010:900 97%).
-  `test/test_sfs_begrepp.py` (12 tests); full SFS suite green (364 passed).
-
-**2026-06-24 (§3d — unanchored self-link fix + SFS archive layout correction)**
-- **Numbering-gap fixed.** Self empty-source ref extras (the `1947:576`-class
-  diffs) come from provisions the minter id-suppressed by content-equality dedup,
-  which stay `live` and so scan refs against a bare ancestor → empty source. Added
-  `LagrumParser.self_law_uri` and made `nf.Projection.inline` drop self-links when
-  `context` is empty (the unanchored signal). Monotonic: keeps external refs, only
-  removes extras. 1947:576 125→16, 1953:272 89→21, 1958:295 41→5, 1902:71 s.1 17→1;
-  controls (1736:0123, 1962:700) unchanged. `test/test_sfs_unanchored_refs.py`
-  (4 tests); full SFS parse/links suite still green (219 passed).
-- **SFS archive layout corrected** (REWRITE.md §3d had it wrong — said `source/` +
-  `source/archive/`; there is no `source/` tree). Reality + user decision: current
-  consolidations at `downloaded/{y}/{n}.json`, legacy HTML at `downloaded/sfst|sfsr/`,
-  and superseded consolidations under a top-level `archive/` tree mirroring the live
-  categories in the old per-document `.versions/` layout:
-  `sfs/archive/downloaded/{y}/{n}/.versions/{vy}/{vn}.json` (the existing tree, now
-  populated with the old site's archived HTML, gains `.json` siblings). `archive_path`
-  rewritten (`destdir.parent/"archive"/destdir.name/…/.versions/…`), docstrings +
-  stale `build.py` "source/" strings fixed, `test_sfs_download.py` updated (10 green).
-
-**2026-06-24 (§3d — terminology fix, `chapter-state-leak` reverted, next bucket)**
-- **Terminology corrected.** "Leak" had drifted into a catch-all for "the two
-  pipelines disagree on references". Pinned it back to its literal sense — the old
-  pipeline's `lastlaw`/`namedlaws` law-context surviving past a document boundary
-  (state escaping its single-document scope). A discrepancy is the symptom; a leak
-  is one possible cause. Reworded §3b status + the §3d reference bullet.
-- **`chapter-state-leak` was implemented, then removed as incorrect** (it is *not*
-  in `PREDICATES`; the 2026-06-23 entry below describing it as "landed" is
-  superseded). The former "chain-fragment" diffs it forgave are a *new*-pipeline
-  defect — the scanner identified the **source** context too coarsely (a bare
-  kapitel `K4` where the citing text sits in stycke `K4P1S3`); the legalref engine
-  and target URI were correct. Forgiving them would have masked a real bug, so the
-  fix went into the parser (correct source-node identification), not the
-  comparator. Most chapter-only source nodes are now resolved to their stycke.
-- **Next large bucket characterized** from a fresh 2,000-doc reference run
-  (`refs-report.json`: 1,625 match / 370 diff / 2,809 ref-diff lines). The next
-  clean, single-cause, adjudicatable family is **ändringshänvisning (change-
-  reference) staleness**: a paragraf's closing "Lag (NNNN:NN)." names the
-  ändringsförfattning that last amended it, as an internal link `#L` into the
-  current doc's `andringsforfattningar` sub-object (the named act is not a
-  consolidated SFS on disk); the freshly-downloaded consolidation has been amended
-  since the golden froze, so the same stycke names a later act. The reference-level
-  shadow of `post-freeze-amendment`. The larger raw buckets (~900 external-with-
-  fragment + the self-reference mass) are still heterogeneous, concentrated in the
-  old chapter-structured balkar; not yet one cause.
-- **Landed `change-reference-staleness`** (`golden_sfs._change_reference_staleness`,
-  added to `PREDICATES`). Extra self-`#L` postdating the doc's own freeze horizon →
-  forgiven; matching missing pre-bump note → forgiven only if that stycke was bumped
-  (a per-source post-freeze extra exists), so stycke-renumbering diffs to pre-horizon
-  acts stay unexplained. Horizon + own-law base read from the golden alone. Replaying
-  `refs-report.json` (370 diffing docs) through the new `adjudicate`: **187 lines
-  accepted** (119 extra + 68 missing), 0 invariant violations (no post-horizon extra
-  rejected, nothing over-accepted). 8 new tests in `test/test_golden_adjudicate.py`
-  (15 total, all green). Wired automatically via `sfs/_validate.py:142`; a
-  `validate --sections references` re-run will reclassify those 187 from `diff` to
-  `adjudicated`.
-
-**2026-06-23 (§3d reference-leak family — first predicate)**
-- Sampled the reference diffs on a 500-doc `--sections references` validate run
-  (~1237 diffs) and characterized three families: chain-fragment extras/missing
-  (~68%, the actual `lastlaw` state leak), self-link extras (~24%, from un-id'd
-  paragrafer — a new-pipeline numbering gap, NOT an old-pipeline defect), and a
-  long tail (~8%). Landed the first predicate: `chapter-state-leak`
-  (`golden_sfs._chapter_state_leak`) forgives chain-fragment extras where the
-  golden has the same target URI from a more specific source fragment in the
-  same chapter (e.g. new says `K4 → 1949:381#K12`, golden has `K4P1S3 →
-  1949:381#K12`). Conservative: rejects phantom refs (target absent from
-  golden), specific-source extras, non-chapter sources, and all missing diffs.
-  Fires 129× on the 500-doc sample. 5 new tests in
-  `test/test_golden_adjudicate.py`. Also fixed `sfs/_validate.py`
-  (validate read JSON downloaded files, not just HTML; moved worker functions
-  out of `__main__` so the `ProcessPoolExecutor` can resolve them under
-  `python -m`). The golden freeze was run on this checkout (`tools/golden_sfs.py
-  freeze site/data/sfs/parsed site/data/sfs/golden`): 11,056 frozen, 174 empty-
-  XHTML dummies skipped. Still open: the `RefParseError`-hole missing family
-  (needs the new NF to distinguish from genuine gaps) and the un-id'd-paragraf
-  numbering gap.
-
-**2026-06-23 (§6 full `generate` verified at scale)**
-- A full `lagen all generate` over the whole catalogue (~100k+ pages,
-  EU-dominated: sfs 11,184 · dv 17,103 · forarbete 15,237 · eurlex 61,146)
-  has been run end-to-end and completes in acceptable wall-time. A handful
-  of document-specific render errors remain — to triage as they surface.
-  Retires the "⬜ Unverified at this scale" caveat from the 2026-06-15
-  catch-up entry; §6's "Full corpus now catalogued" bullet now ✅ for the
-  generate-at-scale half too.
-
-**2026-06-23 (§4 DV structural golden — spec-first)**
-- Built a second DV oracle, `tools/golden_dv_structure.py`, capturing the
-  decision *structure* the distilled-RDF reference oracle misses. The old
-  pipeline's parsed XHTML+RDFa (`site/data/dv/parsed/`) segmented each referat
-  into instance stages (`div.instans` + court), the revsekr/föredragande
-  **betänkande** separated from the court's **dom**, **domskäl**/**domslut**,
-  **skiljaktig**/**tillagg**, and **delmål** split cases. `normalize()` reduces
-  it to a coarse `(kind, court, ordinal)` skeleton (no body text — Word/OCR
-  noise; the contract is the segmentation), reusing `golden_sfs.diff_nodelists`.
-  Spec-first per the user decision: the normalizer writes the target down, the
-  reducer defines the new-artifact contract (a nested `structure` list), and
-  `validate` reports all-missing until the new (flat) DV parser is extended to
-  emit the instance tree — the porting of the old `dv.py` FSM recognizers is the
-  ⬜ follow-up. Hermetically tested (`test/test_golden_dv_structure.py`);
-  verified on HFD 2011:26 (3 instances + dissent) and NJA 2017 s. 55 (delmål
-  I/II, HD betänkande split from dom). Change-detector posture (old FSM is
-  heuristic; new parser may improve on it). §4 gains the structural golden.
-
-**2026-06-23 (§3d adjudication overlay — first cut)**
-- Built the adjudication overlay: `golden_sfs.adjudicate(problems, golden)`
-  partitions a document's golden diffs into `(unexplained, accepted)` by a small
-  table of per-class predicates, codifying the "change-detector, not oracle"
-  posture (§2) so diffs where the new pipeline is right against a stale/defective
-  golden stop counting as regressions — but stay *reported* (per-rule accept
-  tally), so a forgiven class that grows is visible. Two predicates landed:
-  `post-freeze-amendment` (extra amending act whose SFS number postdates the
-  golden's freeze horizon; a mid-sequence extra stays unexplained) and
-  `stale-consolidation-drift` (consolidation-envelope metadata once a post-freeze
-  amendment marks the doc stale). `validate` now reports `match + adjudicated =
-  passing` and treats **`diff` as the genuine-regression count**; the single-doc
-  `compare` CLI shows adjudicated-vs-unexplained and only exits non-zero on the
-  latter. The reference-leak family (old-pipeline defects) is left as an
-  extension point pending reference-section sampling. `test/test_golden_adjudicate.py`
-  (corpus-number effect not measured in this checkout — the golden lives on the
-  data disk). §3d adjudication 🚧 → first cut.
-
-**2026-06-23 (EU defined-terms + the 2026 presentation redesign)**
-- **EU defined-terms** (`eurlex/definitions.py`): a modern EU act's dedicated
-  "Definitions" article is parsed into a `{term: anchor}` map, each defining point
-  anchored `<article>.<point>` (the citation-target fragment), and every later use
-  of a defined term linked back to that point — suffix-tolerant, longest-term-first,
-  citations winning over term-uses on overlap. The use carries a `kind="term"` run
-  (new field on `lib.lagrum.Ref` + `interleave`) so the renderer styles it apart.
-  `eurlex/parse.to_artifact` runs it; points gain a `defines` field.
-  `test/test_eurlex_definitions.py` (+ wired into §7d).
-- **2026 presentation redesign** (`render.py`): rebuilt the page shell — sticky
-  masthead, three-column grid (TOC · reading · context rail), serif/sans type on
-  warm paper, hanging §-numerals. Inbound annotations moved out of the inline
-  margin into a **scroll-driven context rail** fed by a JSON island (`Rail` +
-  `SCROLLSPY`); the Källa link, the genomför panels/margins, and the defined-term
-  emphasis all plug into the same shell. ⌘K palette is a visual stub (search
-  backend deferred). Render-only.
-- **wiki**: `begrepp_index` now skips the full `dump.xml` export the per-page XML
-  was split from, so it isn't ingested as a bogus concept page.
-
-**2026-06-23 (§6 catch-up: per-doc incremental generate + "Källa" source links)**
-- Recording two derived-layer features that landed post-06-15 (build commits) but
-  the log had skipped. **Per-doc incremental generate:** `generate` re-renders a
-  page only when its own artifact or its *data-dependent* prerequisite set changed
-  — `page_signature` = artifact hash + `catalog.page_dependency_digest` (the
-  inbound citers it annotates + the hosted targets it links to), manifest-tracked
-  like `parse`. So a page restales when a new case cites it or a link target
-  appears, not on unrelated edits — the old deps-file rule as a catalog query. §6
-  freshness bullet now ✅. **Authoritative-source ("Källa") link:** every artifact
-  carries one uniform `source_url`, resolved once for all sources by
-  `build.write_artifact` (parser-set → downloader-recorded → derived by rule from
-  identity, e.g. an EU act's EUR-Lex URL from its CELEX); `render` emits it as the
-  page's "Källa" external link. Also corrected §6: catalog is four tables now
-  (`documents`/`links` + `fragments`/`genomforande`), and the corpus is fully
-  catalogued (sfs 11,184 · dv 17,103 · forarbete 15,237 · eurlex 61,146), retiring
-  the stale partial-corpus note. ⬜ Unverified: a full `lagen all generate` at
-  ~100k+ pages completing cleanly.
-
-**2026-06-23 (§7d genomför statements pinned to the SFS paragraf)**
-- The genomför-direktiv relation now reaches the *statute* side, not just the
-  förarbete. New `forarbete/genomforande.py` resolves, at relate time, which SFS
-  paragraf each författningskommentar statement transposes — a cross-document join
-  (prop → statute corpus) done through the shared catalog (no SFS-vertical import,
-  respecting the layering rule). Two resolution paths: a **"lag om ändring i X
-  (YYYY:NN)"** rubrik gives the amended SFS directly; a **new law** is matched by
-  normalized title against the catalog's SFS index, ties broken by the **ikraft
-  date closest-but-after the proposition** (the new law replacing an older
-  same-named one — user rule). Each resolved statement → a `genomforande` row
-  (with proposition provenance) **and** an sfs-paragraf → directive-article edge,
-  so the **statute paragraf's margin shows the EU article it implements**
-  ("Genomför EU-rätt") and the **directive article's inbound shows the
-  implementing statute** (next to the proposition). Conservative on the published
-  SFS identifier: exact title equality, unique-or-tie-break-only. Measured on the
-  corpus: of the distinct new-law headings, 17 resolve uniquely and the 3
-  ambiguous ones (konsumentköplag ×3, mervärdesskattelag ×2, företagsrekonstruktion
-  ×2) are exactly the tie-break case. Verified end-to-end (prop 2014/15:128 → SFS
-  2015:671, 8 paragrafs). New catalog table + `set_genomforande`/`genomfor_for`,
-  `render.genomfor_margin`, post-pass wired into `cmd_relate`. 6 new tests in
-  `test/test_site.py`.
-
-**2026-06-23 (§7d genomför-direktiv edges — kommentar.py wired through relate/render)**
-- The `forarbete/kommentar.py` extractor (built but orphaned) is now wired end to
-  end. A proposition's parse stage attaches its författningskommentar *implements*
-  statements to the artifact as a typed `implements` section; `relate`
-  (`catalog.implements_links`) emits one `rpubl:genomforDirektiv` edge per
-  transposed article (`→ ext/celex/{CELEX}#{article}`), anchored to the
-  förarbete's `#sid{page}`. **Render:** the EU directive article's inbound panel
-  now lists the Swedish förarbete that implements it (pinpointed to the page), and
-  the proposition page gains a **"Genomför EU-direktiv"** panel linking each
-  statement to the directive article (local link when we host the act, else
-  EUR-Lex). Kept generic — no new relate/render machinery, just one more edge
-  source in `artifact_links` and one panel. `kommentar.py` added to the förarbete
-  recipe hash (editing it re-stales artifacts). Verified on the real corpus: prop
-  2014/15:128 → 7 statements; directive 2013/11/EU art. 18 ← prop. 2014/15:128
-  s. 56. 5 new tests in `test/test_site.py`. ⬜ Still open: pin each statement to
-  the exact SFS paragraf (backward from the SFSR register) so it annotates the
-  statute paragraph's margin, not only the förarbete page.
-
-**2026-06-23 (§7d EU vertical — EUR-Lex / CELLAR, keyed by CELEX)**
-- Built a fourth vertical: EU treaties, regulations/directives and CJEU case law
-  from the Publications Office **CELLAR** repository. **Downloader**
-  (`eurlex/download.py`) discovers CELEX via the auth-free CELLAR SPARQL endpoint
-  (no 10k cap) and fetches the best manifestation per language
-  (fmx4 > xhtml > html > pdf); the per-document CDM tree-notice (~10s, the
-  dominant cost on case law) was replaced by batched per-year SPARQL selection
-  queries with `notice.ttl` synthesized from a metadata query. **Bulk import**
-  (`bulk.py`, `lagen eurlex unpack-bulk`) ingests official CELLAR legislation
-  dumps into the same per-CELEX layout (sector-3 R/L only). **Three
-  format-precedence parsers to one artifact shape** — Formex (`parse.py`), OJ
-  HTML/XHTML (`parse_html.py`), PDF via `pdftohtml` (`parse_pdf.py`) — sharing a
-  localized structural vocabulary (`lang.py`) and the flat `Block` model. **URI
-  minted to the citation-target CELEX form** (`ext/celex/{CELEX}`) so EU acts and
-  the ~30k EU citations across the corpus agree by construction. Wired through
-  build/catalog/render: a CELEX citation to a parsed act now renders as a
-  **local** link (the §6 "becomes live once parsed" promise, now for EU law);
-  only un-parsed acts fall back to the external EUR-Lex href. ~102k artifacts on
-  disk (~73k Formex / ~11k HTML / 122 PDF). `test/test_eurlex_parse.py`,
-  `test/test_eurlex_html.py`.
-- Landed alongside (shared infra the EU harvest forced): `config.py`
-  (`config.yml`/`data_root`), `lib/layout.py` (centralized document layout
-  replacing ~10 scattered path helpers), `lib/net.py` (resilient retrying session
-  + harvest progress Reporter, adopted by every downloader), and **incremental
-  per-page `generate`** (a page re-renders only when its own artifact or its
-  citation relationships change, tracked by a per-page dependency digest in the
-  catalog).
-- ⬜ Open: annex parsing; an EU golden/metadata cross-check; and wiring
-  `forarbete/kommentar.py`'s genomför (directive-article → CELEX) edges into
-  relate so the EU-implementation relations reach the graph.
-
-**2026-06-15 (wiki value-add: kommentar + begrepp as sources)**
-- Imported the hand-authored MediaWiki dump as two ordinary sources, restoring
-  the per-paragraph **commentary side-by-side** (in the statute paragraph's
-  margin, grouped "Kommentar") and the **concept/keyword glossary** (`begrepp/`
-  pages that act as hubs). Shared `lib/wikitext.py` parses wikitext, merging
-  `[[wikilinks]]`→concepts with the citation engine's law/case/förarbete links;
-  `wiki/parse.py` builds kommentar artifacts (sections anchored to statute
-  fragments) + begrepp artifacts. Wired through build/catalog/render exactly
-  like the other sources — no new integration machinery, just two more
-  artifact producers feeding the inbound graph. 212 + 565 pages; 5,808
-  commentary→paragraph edges; 468 concepts with inbound. Inbound entries now
-  link to the citing pinpoint. `test/test_wiki.py`. The architecture's payoff:
-  manually-written value-add is just another source. (Follow-ups in §7c:
-  case↔concept edges, inline commentary, taxonomy, the authoring layer.)
-
-**2026-06-15 (sticky scrollspy table of contents — all document types)**
-- Every document with ≥3 headings gets a sticky left-hand TOC, scrollspy-driven
-  (the entry for the section at the top of the viewport highlights, and the TOC
-  auto-scrolls to keep it visible). General across SFS / DV / förarbete via a
-  `Toc` collector threaded through the renderer: each heading registers its text
-  + level and gets a stable anchor id (existing node id, or a generated `secN`),
-  so body anchors and TOC links agree by construction. SFS chapters enter the
-  TOC through their title rubrik ("1 kap. Statsskickets grunder"), not a
-  redundant bare "1 kap."; sub-rubriker nest by level. Layout reworked to a
-  flex `.layout` (sticky `nav.toc` + `main`); TOC hidden under 64rem. Vanilla
-  `scrollspy.js` asset (no deps, rAF-throttled scroll handler). `render_toc`,
-  `Toc`, `plain()`, and the `SCROLLSPY` asset. Render-only (regenerate, no relate).
-
-**2026-06-15 (render polish: list items, grouped + pinpointed inbound, tooltips)**
-- **SFS list items now render.** A `stycke` carries both intro text *and* punkt
-  children (`K8P7S1` → text + two punkt); `render_node` returned at the text
-  branch, dropping the list. Now renders the punkt/lista children too
-  (`<ol class="punkter">`) — numbered lists were invisible before.
-- **Inbound panel grouped by source** (Författningar / Förarbeten / Rättsfall),
-  each its own labelled section, instead of one mixed list.
-- **Human-readable, pinpointed inbound labels.** `human_fragment` turns a minted
-  fragment into a lawyer's pinpoint (`K2P16S5` → "2 kap. 16 § 5 st", `sid39` →
-  "s. 39"); `describe_citer` shows the citing document's **name + pinpoint**
-  ("Skollag (2010:800) 2 kap. 16 § 5 st") using the law title + the `from_anchor`
-  already in `links`. Inbound is now keyed per (citer, pinpoint), so a law citing
-  from several places shows each.
-- **Outbound link tooltips.** New `fragments(uri, snippet)` catalog table
-  (populated in `relate`: each id-bearing node → its text + list items, ≤220
-  chars). `render_runs` adds a `title=` with the target paragraph's text, so
-  hovering an SFS→SFS link previews where it points. `Site.snippet` caches lookups.
-- Touched: `lib/catalog.py` (fragments table + snippet + richer `inbound`),
-  `lib/render.py` (`human_fragment`/`describe_citer`/grouped panel/list fix/
-  tooltips). Needs a re-relate (fragments) + regenerate.
-
-**2026-06-14 (§7a förarbeten — PDF parser + the third leg goes live)**
-- Built `accommodanda/forarbete/{model,parse}.py`. PDF text via poppler
-  `pdftotext` (plain mode isolates header/page-number; `-layout` mashes them
-  into the alternating margin). Flat Block model (rubrik/stycke + **page**);
-  page = PDF index = printed page (modern PDFs number from the title page), so
-  each block exposes its `#sid{N}` anchor — the page-precise förarbete citation
-  target. Reflows wrapped lines, strips the running header *as a substring*
-  (it bleeds mid-line in plain mode — the citation scanner was self-linking it),
-  skips TOC pages, detects numbered headings. **URI minted to the citation form**
-  (`prop/{riksmöte}:{no}`, `sou/{year}:{no}`, …) so doc and citation agree by
-  construction. Body ref-scanned (same engine as DV) → inline links.
-- **Wired through the whole derived layer**: `lagen forarbete parse` (Stage),
-  `catalog.forarbete_document`, `render_forarbete` (förarbete page with `#sid{N}`
-  anchors + per-page inbound margin notes), `doc_relpath` → `fa/` tree.
-- **Validated end-to-end** on a 565-doc sample (prop/sou/ds/dir): parse 0
-  failures; relate added 565 docs + 300k links; **the killer feature's third
-  leg is live** — Regeringsformen (1974:152) §8:7 now shows **132 förarbete** in
-  its paragraph inbound margin (alongside case law), and förarbete pages render
-  prose + live citations + page anchors. The cross-source SFS→förarbete fill is
-  modest only because the sample is recent förarbete; the full harvest resolves
-  the bulk of the 51k+15k prop/sou citations.
-
-**2026-06-14 (§7a förarbeten vertical — downloader)**
-- Built `accommodanda/forarbete/download.py` from first principles off the live
-  regeringen.se (the old `Regeringen` source targeted the pre-rebuild site).
-  Harvests all **eight** types under `/rattsliga-dokument/`. Key discovery: the
-  `?p=N` links are inert; the listing is paged by the page's own AJAX call
-  `GET /Filter/GetFilteredItems?…&preFilteredCategories=<taxonomy-id>&page=N`
-  returning `{"Message": <ul.list--block>, "TotalCount": N}` (captured the exact
-  request from the browser network tab). Per-type taxonomy ids (prop 1329 =
-  4,336 docs, sou 1331 = 3,158, dir 1327 = 2,432, ds/fm/skr/so/lr …).
-  **basefile = the document's own identifier** (prop "2025/26:279", sou
-  "2020:1") per the cross-source-identity requirement; SÖ/lagrådsremiss (untitled
-  by number) fall back to the slug. Incremental + `--full`, atomic writes,
-  browser UA (site 403s bots), politeness. Stores record json + landing html +
-  content PDF(s). Validated end-to-end: PDFs are valid `%PDF`, identifiers clean,
-  pagination advances. `test/test_forarbete_download.py`. Parser/model/URI
-  minting + older-period sources (riksdagen/KB) still ⬜.
-
-**2026-06-14 (§4 DV golden cross-check — references)**
-- Built `tools/golden_dv.py` against the old pipeline's distilled RDF (15,858
-  files, the frozen DV oracle). **96.8% old-reference recall** on 3,143 matched
-  referat cases (77.8% exact, 84.7% find ≥ old). Independently **confirms the
-  case-URI re-minting** (old RDF subject is `dom/rh/2009:37`, what the new
-  pipeline now mints). Residual = editor-derived lagrum + new-fills-old-holes.
-  See §4. (Metadata-field comparison still to add.)
-
-**2026-06-14 (§6 follow-ups: EU/celex citations → EUR-Lex external links)**
-- ~30k citations to EU acts (minted as `lagen.nu/ext/celex/{CELEX}`, the `ext/`
-  = external-reference namespace) were rendering as dead `.noref` text. They
-  now render as **external links to EUR-Lex** (`render.is_external` /
-  `href` → `eur-lex.europa.eu/...?uri=CELEX:{n}`, styled with an ↗). The
-  identifier is unchanged (constraint-safe) — only the rendered href resolves
-  to the external service, since the site doesn't host EU acts. 1 new test.
-
-**2026-06-14 (§6 follow-ups: inbound quality — exclude self-citations)**
-- **41% of all edges (334,788) are self-citations** — a document referencing
-  its own fragments (chapter-heading self-links "12 kap."→#K12, internal
-  "enligt 3 §" cross-refs). Excluded these from inbound annotations + the
-  most-cited rankings (`catalog._NOT_SELF`: `from_uri <> to_root`): the panel
-  shows which *other* documents cite a target (the killer feature), not a
-  document's own outbound links (navigable in place). Fixes the long tail —
-  a paragraph cited only internally no longer shows a misleading "Hänvisat
-  till av" panel of its own law's paragraphs. 1 new test.
-
-**2026-06-14 (§6 follow-ups: navigation / browsability)**
-- The 28k-page site had only a ~50-item frontpage and no way to find a specific
-  doc. Added **browse pages** (`render_browse`): a complete sectioned index of
-  every law (grouped by year, newest first) at `/sfs/` and every case (grouped
-  by court/series from the uri) at `/dom/`, linked from the frontpage. Frontpage
-  now shows totals + two ranked "most-hänvisade" columns (laws *and* cases, by
-  inbound count — Miljöbalken/Rättegångsbalken/Brottsbalken lead). 2 new tests.
-
-**2026-06-14 (§6 follow-ups: richer inbound + case-graph reconnection)**
-- **Document-level inbound + dead-link gating** in the renderer. Inbound now
-  shows at two granularities: per-paragraph margin annotation *and* a per-
-  document panel (`document_inbound`) for citations to the law/case as a whole
-  — surfacing the **27% of citations with no `#fragment`** (and all case
-  inbound) that paragraph annotations never showed. A `Site` holds the set of
-  known doc URIs so citations to docs we don't have render as muted `.noref`
-  text, not 404 links (was 14% of links → broken hrefs).
-- **Case-law citation graph reconnected** (the big one). Found 42,281 case→case
-  edges pointing at URIs no document had: the DV vertical minted ad-hoc
-  referat-slugs (`dom/AD_1993_nr_100`) while RATTSFALL citations mint the old
-  rinfo scheme (`dom/ad/1993:100`). Per the **user constraint (published/
-  internal URIs must not change from the old pipeline)**, fixed by minting the
-  DV document URI through the *same RATTSFALL parser citations use*
-  (`dv/parse.py::case_uri`) — byte-identical by construction, the old
-  published id. All 17,393 referat cases parse, 0 fall back. Full DV re-parse →
-  re-relate → re-generate: case→case edges **0 → 31,507 connected (75%)**,
-  **7,083 cases now have inbound** (was 0; the unconnected 25% are genuine pre-
-  1981 / notisfall absences). Verified: NJA 2011 s. 357 shows 38 citing cases.
-  Non-referat cases (~7%, never citation targets) keep a slug URI pending a
-  verified court→org-slug map for the old verdict scheme.
-
-**2026-06-14 (§6 derived layer: relate + generate + the inbound-link site)**
-- Built the corpus-wide derived layer end-to-end. **`relate`**
-  (`accommodanda/lib/catalog.py`) builds a derived SQLite catalog — `documents`
-  + `links` — from the artifacts via one generic edge-extraction walk
-  (`collect_links`) that works for both sources because citations are inline
-  and URIs already agree. **`generate`** (`accommodanda/lib/render.py`) renders
-  a static, interlinked HTML site: a single type-keyed node renderer for both
-  SFS structure and DV body; outbound links live; **inbound links annotated in
-  the margin** (`Hänvisat till av`) from the catalog — the lagen.nu killer
-  feature. Frontpage ranks laws by inbound count. New corpus-level CLI verbs
-  `lagen all {relate,generate,serve}`, special-cased outside the per-doc Stage
-  machinery — a doc's HTML has a *data-dependent* prerequisite set (its own
-  artifact + its inbound set, read from the catalog), which the static
-  `Stage.inputs(basefile)` protocol can't express; `generate` auto-runs
-  `relate` when artifacts are newer than the catalog.
-- Verified end-to-end on the partial corpus (283 laws / 8,374 cases, ~157k
-  edges): case **AD 2024 nr 95** → cites **2018:585 §K2P4/§K3P1** → those
-  paragraphs show the case in their margin → click back. **2,037 cases cite
-  räntelagen § 6.** Screenshotted law/case/frontpage. `test/test_site.py`.
-- DV decisions made earlier in the session: **DV references now inline**
-  (matching SFS) — each body block's `text` is a runs list, top-level
-  `references` dropped; shared `lagrum.interleave(text, refs)` splices runs
-  (SFS `Projection.inline` refactored onto it). Predicate `dcterms:references`
-  (SFS uses it uniformly; `rinfoex:lagrum` abandoned when SFS went inline).
-- Open: relate/generate are full rebuilds (no incremental freshness yet); ES
-  deferred; once the full SFS parse lands, re-relate+generate fills the
-  currently-unrenderable cited law-roots (147/11,133).
-
-**2026-06-14 (inline links / runs-spans in the artifact)**
-- The parsed artifact now carries **discovered links inline** instead of a
-  flat `references` list: every NF text node is a LIST of `str` runs +
-  `{predicate,uri,text}` link objects at exact positions; top-level
-  `references` dropped. Per-link sub-spans recovered by threading each
-  emit's originating-node token span through every LAGRUM+EU `fmt_*` in
-  `lagrum.py` (+ a trailing-marker absorption pass), reproducing the
-  fixtures' link boundaries (ändringshänvisning whole-span, anonymous-law bare
-  number, named-law name+number, combined-external-ref law swallow).
-- User decisions: text is **always** a list (even `["plain"]`); **all** text
-  nodes scanned incl. headings/upphävd/top-level tables (deliberate
-  divergence — produces self-links like a heading's "12 kap."→#K12).
-- `nf.inline_references()` reconstructs the old `(source,predicate,uri)`
-  tuples from inline links (excluding the newly-scanned kinds) so the golden
-  refs oracle keeps working (`sfs refs`/`validate`): 2018:585 = 219/222, **0
-  extra** (3 missing = golden newer than the downloaded HTML). New
-  `test_sfs_links` oracle (set-equality vs fixture `<LinkSubject>`, URI
-  base-normalized). `golden_sfs.canonicalize_node_texts` folds lists→string.
-  Touched: `accommodanda/lib/lagrum.py`, `accommodanda/sfs/nf.py`,
-  `accommodanda/sfs/__main__.py`, `tools/golden_sfs.py`, `test/test_sfs_parse.py`.
- 
-
-**2026-06-14 (download UX: harvest routing, progress, politeness)**
-- **Bare `lagen <src> download` now runs the full bulk harvest** (`Source.harvest`),
-  not a `list_basefiles()` loop — discovery of *new* docs is impossible
-  otherwise. Per-doc targeted fetch stays for explicit basefiles.
-- Added driver **progress logging** (`run_action` → throttled `\r` counter on
-  stderr) so multi-thousand-doc runs aren't silent, and a **politeness delay**
-  on per-doc fetches.
-- `lagen dv download` now **auto-rebuilds the identity index** after the harvest
-  (`identity.reindex`, refactored out of its `main`), gated on records having
-  changed — one global pass, no parsing needed.
-
-**2026-06-14 (download stages)**
-- Wired per-document `download` stages into the build driver for both sources
-  (`lagen sfs download [basefile]`, `lagen dv download [basefile]`) — the old
-  `download_single` shape (optional basefile), not bulk. SFS fetches one act's
-  `_source` (`fetch_one` by beteckning) + archives; DV re-fetches one record
-  (`fetch_record` by the index's uuid, `GET /publiceringar/{id}`). inputs/code
-  empty → on-disk = fresh until `--force`. Independent of `parse` (preserves
-  the JSON-or-HTML fallback). New-doc *discovery* stays in the bulk harvesters
-  (the old `download_new`). Verified end-to-end on 2018:585 (SFS) and a read-
-  only API check (DV).
-
-**2026-06-14 (SFS downloader + JSON parse path)**
-- Discovered the new beta database exposes an **open raw-Elasticsearch
-  passthrough** (`/elasticsearch/SearchEsByRawJson`) returning the whole
-  consolidated act (text+register+amendments) as one JSON `_source`. Built
-  `accommodanda/sfs/download.py`: `search_after` enumeration (13,789 acts),
-  incremental/`--full`, **consolidation archiving** keyed on
-  `fulltext.andringInford` (recreates the old get_archive_version/archive
-  machinery; adds the `archive/` tree). `test/test_sfs_download.py`.
-- Wired **JSON-or-HTML source selection** (`sfs.load_inputs`, DV single-best-
-  source pattern): `register_from_source`/`sfst_header_from_source` map the
-  JSON onto the same intermediates the HTML parsers emit, reusing all
-  downstream code. Verified 0 field-diffs HTML-vs-JSON on 2018:585 (deltas are
-  pure freshness). Build `parse` now emits `metadata` for both paths. Fixed
-  `SFS_CODE`/`DV_CODE` recipe-hash paths (stale pre-reorg locations → no-op).
- 
-
-**2026-06-14 (SFSR register / förarbeten / metadata)**
-- SFSR **amendments** section: `accommodanda/sfs/register.py` + `nf.py` join,
-  **97.5%** corpus match (10,775/11,056). Property mapping, Omfattning → the
-  `L*` change tuples, övergångsbestämmelse content joined with `L`-ids.
-- **Förarbeten** wired in once the FORARBETEN grammar landed
-  (`parse_forarbeten`): **99%** per-entry on a 120-doc sample; comparison
-  un-deferred.
-- **Document-level metadata** built (`parse_sfst_header` + `build_metadata`):
-  the konsolidering envelope (identifier, konsoliderar, konsolideringsunderlag,
-  the `/konsolidering/<cutoff>` URI) + descriptive fields. Climbed 70% → 90% →
-  **94.8%** fixing real bugs as diffs surfaced (underlag = *all* change acts
-  not cutoff-filtered; identifier `s. ` spacing; SFST-header departement is
-  authoritative; sub-org suffix + run-date fields canonicalized away).
-- All three residuals are the same **stale-golden drift** (consolidation
-  cutoff + department move as new amendments land) → motivates the
-  adjudication overlay (§3d). `test/test_sfs_register.py`.
-
-**2026-06-14 (later)**
-- Incremental build driver `accommodanda/build.py` + the `lagen <source>
-  <action> [basefile...]` CLI (console script `lagen`, or `python -m
-  accommodanda.build`). Generic driver over a per-source `Stage` protocol;
-  content-hash + recipe-version freshness (manifest in `.build/`); implicit
-  deps with `--no-deps`; `--force`, `-j`, `--dry-run`, `status`. **`parse`
-  wired for SFS + DV — artifacts now land on disk** (`site/data/{sfs,dv}/
-  artifact/`), the first persisted artifact corpus. `relate`/`generate`
-  slot in next as the DB+HTML slice. `test/test_build.py`.
-  Design decisions taken with the user: source-first ordering,
-  content-hash over mtime, implicit upstream builds. `relate` confirmed
-  **per-document** (upsert into a shared catalog; inbound links are a
-  query at generate time), not a corpus-level batch.
-
-**2026-06-14**
-- Legacy DV Word path built on **Apache POI via jpype** (OpenJDK 21, POI
-  5.4.1 vendored), reading the *original* binary `.doc` (HWPF) and `.docx`
-  (XWPF) rather than the antiword DocBook intermediate — recovers bold
-  runs and table-cell structure antiword flattened. `dv_word.py`
-  (extraction) + `dv_legacy.py` (head/body split → `Avgorande`, identity
-  index supplies canonical referat/court). **15,624 docs, 0 failures.**
-  `test/test_dv_legacy.py`.
-- Field-level merge investigated against the data and **rejected**:
-  body-fallback opportunity is literally 0, other gaps marginal →
-  single-best-source-per-case, not merge.
-- Notisfall (852 sole-source cases) deferred per decision; sources
-  characterized (frozen `<body>` for the pre-2010 bulk, `notiser_*.zip`
-  `.docx` POI-able for ~342 recent, needs `parse_not`-style splitting).
-- **SFSR register / amendments section built** (`accommodanda/sfs/register.py` +
-  `nf.py` join, `test/test_sfs_register.py`). Parses the downloaded
-  register page → one amendment entry per change act with post-polish
-  properties (departement→org-URI via an rdflib `swedishlegalsource.ttl`
-  resolver, CELEX, dates), Omfattning → the `L*` `ersatter`/`upphaver`/
-  `inforsI` change tuples (resolved against the base law), and the dropped
-  övergångsbestämmelse blocks projected + joined as `content` with
-  `L{sfsnr}` ids. `validate --sections amendments` + `diff_amendments`.
-  **Corpus match 97.5% (10,775/11,056).** Diffs: ~128 extra amendments =
-  change acts postdating the golden freeze (new-is-right), ~69 base-OB
-  `L`-id suppression-rule gaps, rest mixed Omfattning defects.
-- Förarbeten (per-amendment) deferred to the FORARBETEN grammar; document-
-  level `metadata` (konsolidering envelope) left for the consolidation step.
-- Adjudication overlay decision recorded: per-class predicates, first rule =
-  accept post-freeze extra amendments.
-
-**2026-06-13 (later still)**
-- Ported the remaining four old-engine grammars as configurable parse
-  types: RATTSFALL (`dom/…` case-law URIs), FORARBETEN (prop/SOU/Ds/bet/
-  rskr/celex with page-lists, "a. prop." state and avsnitt/committee
-  context), EURATTSFALL (CJEU → celex), MYNDIGHETSBESLUT (JO/JK/ARN with
-  JK date-disambiguation), plus ENKLALAGRUM (absolute-only SFS subset).
-  Each validated against its `test/files/legalref/` fixture corpus
-  (EURATTSFALL against a hand-authored table — the ECJ fixtures are
-  broken/encoding-mangled). Refined the framework so roots come from the
-  requested types but rules/triggers from the dependency-expanded set.
-  `dv_parse` now scans court-decision bodies with all seven grammars.
-  All eight old-engine parse types are now ported; the four never
-  implemented in the old engine (FORESKRIFTER, INTL*, DOMSTOLSAVGORANDEN)
-  stay deferred.
-
-**2026-06-13 (later)**
-- KORTLAGRUM ported into `accommodanda/lib/lagrum.py` (abbreviated SFS refs);
-  `load_abbreviations` reads the 110 `dcterms:alternative` entries. Wired
-  into `dv_parse.extract_references`; `references` now populated (was an
-  empty stub). `Short` fixtures added to `test/test_lagrum.py`.
-  Corpus check: 81.2% `lagrumLista` recall on a 500-case sample.
-- **Citation engine made parse-type configurable** (the old
-  `LegalRef(*parse_types)` idea): `LagrumParser(parse_types=…)` composes
-  grammar + roots + trigger from only the requested types via the
-  `ROOTS`/`RULES`/`TRIGGER_SRC`/`DEPENDS` tables. Behaviour-preserving
-  refactor (SFS still {LAGRUM, EULAGSTIFTNING}); a new grammar is now a
-  table entry + formatter. Old engine implements only 8 of its 12 declared
-  types; 3 now ported, 5 remain, 4 were never implemented (see §5).
-
-**2026-06-13**
-- SFS parse fixtures wired in as a second, oracle-grade regression layer:
-  `test/test_sfs_parse.py` over `test/files/sfs/parse/`;
-  added `suppress_temporal` to `nf.to_normalform`; promoted 3 fixtures the
-  old parser failed.
-- DV downloader run to completion — full 17,254-record harvest into
-  `site/data/domstol/` (moved from an initial wrong path; fixed a crash on
-  an attachment lacking `fillagringId`).
-- DV identity indexer built (`dv_identity.py`,): 18,728 canonical
-  cases, 14,838 linked, audited for under/over-linking. Compared against
-  the old `CompositeRepository` (assumed identity + winner-takes-all) —
-  the indexer *manufactures* identity and keeps all sources for a
-  field-level merge.
-- DV parser started (`dv_model.py` + `dv/parse.py`,): API
-  `innehall` path parses all 17,090 API-backed cases with zero failures
-  and zero content dropped.
-- Coverage analysis: characterized + verified the 1,638 legacy-only cases
-  (HD notisfall, AD 2006–2017 referat, non-referat Svea hovrätt) →
-  reprioritized the legacy-OOXML path as the next increment.
-
-**Earlier**
-- Phase 0 golden corpus + comparator; SFS structural parser (98.7%);
-  Lark citation engine (86.7% structure+refs, `test/test_lagrum.py`).
+- **§6/§7e** — incremental `relate`/`index`/`generate` (content-hash sync,
+  per-source watermarks); föreskrift vertical (15 agencies harvested, shared PDF
+  parser, the statute→föreskrift `bemyndigande` edge end-to-end).
+- **§7c/§7d** — EU (EUR-Lex/CELLAR) and wiki (kommentar/begrepp) verticals;
+  the concept layer (synthesis + canonicalization); genomför-direktiv edges
+  pinned statute↔directive↔proposition.
+- **§3d/§5** — adjudication overlay (`change-detector, not oracle`); all 8 legacy
+  citation grammars ported to Lark; named-law dataset off RDF.
+- **§4/§7a** — DV vertical (identity index, API + legacy-Word parse, reference +
+  structural goldens); förarbete vertical (downloader + PDF parser + hierarchy).
+- **§6** — derived layer: SQLite catalog + cross-source inbound graph, static
+  site with context rail + ⌘K search, publishing (OpenSearch/REST/NDJSON dumps).
+- **§2/§3** — Phase 0 golden corpus + comparator; SFS structural parser (98.7%);
+  inline-link artifacts; SFSR register/amendments/förarbeten/metadata.
