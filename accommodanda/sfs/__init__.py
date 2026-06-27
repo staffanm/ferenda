@@ -14,8 +14,12 @@ from ..lib.errors import SkipDocument
 from .assembler import assemble
 from .extract import extract_body
 from .reader import TextReader
-from .register import (parse_register, parse_sfst_header,
-                       register_from_source, sfst_header_from_source)
+from .register import (
+    parse_register,
+    parse_sfst_header,
+    register_from_source,
+    sfst_header_from_source,
+)
 from .tokenizer import Tokenizer
 
 

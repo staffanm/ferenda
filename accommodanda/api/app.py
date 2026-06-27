@@ -28,8 +28,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from ..lib import catalog, facets, layout, resolve, search
 from .. import config
+from ..lib import catalog, facets, layout, resolve, search
 
 CATALOG = config.DATA / "catalog.sqlite"
 DUMPS = config.DATA / "dumps"
@@ -258,7 +258,7 @@ def search_endpoint(
             kept = [r for r in results if r["uri"] not in roots]
             total += sum(p["uri"] not in {r["uri"] for r in results} for p in pinned)
             results = (pinned + kept)[:limit]
-    return SearchResponse(query=q, total=total, results=results)
+    return SearchResponse(query=q, total=total, results=results)  # ty: ignore[invalid-argument-type]
 
 
 @app.get("/api/v1/facets", response_model=FacetTree, tags=["catalog"])

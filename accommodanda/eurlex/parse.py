@@ -28,13 +28,14 @@ from collections import Counter
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
+from ..lib.lagrum import EULAGSTIFTNING, EURATTSFALL, LagrumParser, interleave
+from ..lib.util import from_roman
 from .definitions import build_matcher, extract_definitions, term_refs
 from .model import BASE, Block, EurlexDoc, doctype, short_label
-from .structure import flatten as flatten_structure, nest
 from .parse_html import parse_html
 from .parse_pdf import parse_pdf
-from ..lib.lagrum import (EULAGSTIFTNING, EURATTSFALL, LagrumParser, interleave)
-from ..lib.util import from_roman
+from .structure import flatten as flatten_structure
+from .structure import nest
 
 LANG_PREFERENCE = ("swe", "eng")
 
@@ -516,7 +517,7 @@ def cmd_batch(root, limit):
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     ap.add_argument("file", nargs="?", help="a single Formex file -> stdout")
     ap.add_argument("--celex", help="CELEX id (else recovered from the path)")
     ap.add_argument("--root", default="site/data/eurlex")

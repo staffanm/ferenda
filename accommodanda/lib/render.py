@@ -27,28 +27,27 @@ import json
 import re
 import sqlite3
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from html import escape
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from . import catalog
-from . import layout
-from .catalog import BASE
-from .wikitext import begrepp_uri
 from ..api import app as api_service
 from ..dv.structure import flatten as dv_flatten
 from ..eurlex.structure import flatten as eurlex_flatten
+from . import catalog, layout
+from .catalog import BASE
+from .wikitext import begrepp_uri
 
 
 @dataclass
 class Site:
     con: object
     known: set                          # document root uris present
-    snippets: dict = None               # fragment uri -> tooltip text (lazy cache)
-    aliases: dict = None                # variant begrepp uri -> canonical concept
-    commentary: dict = None             # (law_uri, anchor) -> [(author, prose)]
+    snippets: dict = field(default_factory=dict)               # fragment uri -> tooltip text (lazy cache)
+    aliases: dict = field(default_factory=dict)                # variant begrepp uri -> canonical concept
+    commentary: dict = field(default_factory=dict)             # (law_uri, anchor) -> [(author, prose)]
 
     @classmethod
     def from_catalog(cls, con):
@@ -1323,7 +1322,7 @@ def _write_page(uri, source, path, title, site, out_root):
 def _render_one(job):
     """ProcessPool entry point: render `job` (uri, source, path, title) against
     this worker's prebuilt Site, returning the uri rendered."""
-    _write_page(*job, _RENDER["site"], _RENDER["out_root"])
+    _write_page(*job, _RENDER["site"], _RENDER["out_root"])  # ty: ignore[too-many-positional-arguments]
     return job[0]
 
 

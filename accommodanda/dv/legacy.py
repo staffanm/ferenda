@@ -187,7 +187,7 @@ def cmd_file(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     parser.add_argument("file", nargs="?")
     parser.add_argument("--index")
     parser.add_argument("--limit", type=int)

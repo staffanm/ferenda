@@ -30,12 +30,22 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
+from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
+from ..lib.lagrum import (
+    EULAGSTIFTNING,
+    EURATTSFALL,
+    FORARBETEN,
+    KORTLAGRUM,
+    LAGRUM,
+    MYNDIGHETSBESLUT,
+    RATTSFALL,
+    LagrumParser,
+    interleave,
+    load_abbreviations,
+    load_namedlaws,
+)
 from .model import Avgorande, Lagrum, Rubrik, Stycke
 from .structure import nest
-from ..lib.lagrum import (EULAGSTIFTNING, EURATTSFALL, FORARBETEN, KORTLAGRUM,
-                     LAGRUM, MYNDIGHETSBESLUT, RATTSFALL, LagrumParser,
-                     interleave, load_abbreviations, load_namedlaws)
-from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 
 # Court decisions cite across the whole spectrum of legal sources, so the
 # DV citation scanner enables every ported grammar.
@@ -310,7 +320,7 @@ def cmd_index(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     parser.add_argument("--domstoldir", default=DOMSTOL_DEFAULT)
     parser.add_argument("--uuid")
     parser.add_argument("--index", default=INDEX_DEFAULT)

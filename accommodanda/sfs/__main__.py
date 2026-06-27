@@ -13,11 +13,11 @@ from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
-from . import load_inputs
 from ..lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
 from ..lib.lagrum import LagrumParser, load_namedlaws
-from .nf import inline_references, to_normalform
+from . import load_inputs
 from ._validate import load_golden_module, validate_one
+from .nf import inline_references, to_normalform
 
 
 def basefile_from_path(path, root):

@@ -273,7 +273,7 @@ def list_basefiles(destdir):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     parser.add_argument("destdir", help="target dir, e.g. site/data/sfs")
     parser.add_argument("--full", action="store_true",
                         help="walk the entire corpus oldest-first instead of "

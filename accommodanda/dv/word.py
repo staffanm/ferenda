@@ -59,8 +59,8 @@ def _clean(text):
 def _read_hwpf(path):
     # POI/jpype classes resolve only after startJVM, so unlike every other
     # import in this package these must stay in-function (see _ensure_jvm).
-    from java.io import FileInputStream
-    from org.apache.poi.hwpf import HWPFDocument
+    from java.io import FileInputStream  # ty: ignore[unresolved-import]
+    from org.apache.poi.hwpf import HWPFDocument  # ty: ignore[unresolved-import]
 
     doc = HWPFDocument(FileInputStream(str(path)))
     try:
@@ -79,8 +79,8 @@ def _read_hwpf(path):
 
 def _read_xwpf(path):
     # POI/jpype classes resolve only after startJVM (see _read_hwpf).
-    from java.io import FileInputStream
-    from org.apache.poi.xwpf.usermodel import XWPFDocument
+    from java.io import FileInputStream  # ty: ignore[unresolved-import]
+    from org.apache.poi.xwpf.usermodel import XWPFDocument  # ty: ignore[unresolved-import]
 
     doc = XWPFDocument(FileInputStream(str(path)))
     try:

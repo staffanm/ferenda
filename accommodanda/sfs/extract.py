@@ -3,7 +3,7 @@
 import re
 from datetime import datetime
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from ..lib.errors import SkipDocument
 
@@ -36,13 +36,14 @@ def extract_body(path, keep_expired=True):
 
     soup = BeautifulSoup(rawtext, "lxml")
     if encoding == "utf-8":
-        content = soup.find("div", "search-results-content")
+        content = soup.find("div", class_="search-results-content")
         if not content:
-            errnode = soup.find("div", "info-section-part-desc")
+            errnode = soup.find("div", class_="info-section-part-desc")
             if errnode and "Ett fel har inträffat" in errnode.text:
                 raise SkipDocument("removed: %s" % errnode.text.strip())
             raise SkipDocument("no div.search-results-content")
-        body = content.find("div", "body-text")
+        assert isinstance(content, Tag)
+        body = content.find("div", class_="body-text")
         if not body:
             raise SkipDocument("no div.body-text")
         if body.string:

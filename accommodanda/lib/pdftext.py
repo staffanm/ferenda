@@ -26,7 +26,7 @@ import re
 import subprocess
 from dataclasses import dataclass
 
-from lxml import etree
+from lxml import etree  # ty: ignore[unresolved-import]
 
 from .util import normalize_space
 
@@ -97,7 +97,7 @@ def _lines(spans):
     out = []
     for base, runs, top in lines:
         runs.sort()
-        out.append(Line(normalize_space(" ".join(r[1] for r in runs)), top,
+        out.append(Line(normalize_space(" ".join(r[1] for r in runs)), top,  # ty: ignore[invalid-argument-type]
                         all(r[2] for r in runs), runs[0][2],
                         all(r[3] for r in runs)))
     return out
@@ -130,7 +130,7 @@ def page_paragraphs(lines, identifier, pageno):
         marker = l.lead_bold and (RE_KAP_MARK.match(l.text)
                                   or RE_PARA_MARK.match(l.text))
         starts = (cur is None or l.bold or marker or (prev and prev.bold)
-                  or (body_gap and l.top - prev.top > PARA_GAP * body_gap))
+                  or (body_gap and prev and l.top - prev.top > PARA_GAP * body_gap))
         if starts and cur is not None:
             paras.append(cur)
             cur = None

@@ -26,9 +26,18 @@ from pathlib import Path
 
 from ..lib import wikitext
 from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
-from ..lib.lagrum import (EULAGSTIFTNING, EURATTSFALL, FORARBETEN, KORTLAGRUM,
-                          LAGRUM, MYNDIGHETSBESLUT, RATTSFALL, LagrumParser,
-                          load_abbreviations, load_namedlaws)
+from ..lib.lagrum import (
+    EULAGSTIFTNING,
+    EURATTSFALL,
+    FORARBETEN,
+    KORTLAGRUM,
+    LAGRUM,
+    MYNDIGHETSBESLUT,
+    RATTSFALL,
+    LagrumParser,
+    load_abbreviations,
+    load_namedlaws,
+)
 
 PARSE_TYPES = [LAGRUM, KORTLAGRUM, EULAGSTIFTNING, RATTSFALL, FORARBETEN,
                EURATTSFALL, MYNDIGHETSBESLUT]
@@ -144,7 +153,7 @@ def begrepp_index(root):
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     ap.add_argument("kind", choices=("kommentar", "begrepp"))
     ap.add_argument("file")
     args = ap.parse_args()

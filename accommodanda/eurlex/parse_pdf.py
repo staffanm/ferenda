@@ -14,11 +14,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-from lxml import etree
+from lxml import etree  # ty: ignore[unresolved-import]
 
+from ..lib.util import normalize_space
 from . import lang as L
 from .model import BASE, Block, EurlexDoc, doctype
-from ..lib.util import normalize_space
 
 LINE_TOL = 3         # px: spans within this vertical distance are one visual line
 PARA_GAP = 1.6       # a vertical gap > this * body-line-height starts a paragraph
@@ -148,8 +148,8 @@ def parse_pdf(path, celex, lang):
             in_body = True
         elif voc.heading.match(text) and (text.isupper() or len(text) <= 40):
             doc.body.append(Block("heading", text, level=1))
-        elif L.RE_RECITAL.match(text.split(" ", 1)[0]):
-            num = L.RE_RECITAL.match(text.split(" ", 1)[0]).group(1)
+        elif (m := L.RE_RECITAL.match(text.split(" ", 1)[0])):
+            num = m.group(1)
             body = text.split(" ", 1)[1] if " " in text else ""
             doc.body.append(Block("recital" if not in_body else "point", body, num=num))
         elif in_body:

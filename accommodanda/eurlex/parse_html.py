@@ -17,9 +17,9 @@ import re
 
 from bs4 import BeautifulSoup
 
+from ..lib.util import normalize_space
 from . import lang as L
 from .model import BASE, Block, EurlexDoc, doctype, looks_like_act_title
-from ..lib.util import normalize_space
 
 # CSS classes (language-neutral) whose text is bibliographic, not body
 HEADER = {"hd-date", "hd-lg", "hd-ti", "hd-oj", "hd-coll", "hd-modifier", "hd-2"}
@@ -79,11 +79,11 @@ def _emit_structural_row(marker, text, blocks, in_body, voc):
     elif voc.heading.match(marker):
         blocks.append(Block("heading", normalize_space("%s %s" % (marker, text)),
                             level=1))
-    elif L.RE_RECITAL.match(marker):
-        num = L.RE_RECITAL.match(marker).group(1)
+    elif (m := L.RE_RECITAL.match(marker)):
+        num = m.group(1)
         blocks.append(Block("recital" if not in_body else "point", text, num=num))
-    elif in_body and L.RE_POINT.match(marker):
-        blocks.append(Block("point", text, num=L.RE_POINT.match(marker).group(1)))
+    elif in_body and (m := L.RE_POINT.match(marker)):
+        blocks.append(Block("point", text, num=m.group(1)))
     else:                                   # roman/number heading marker
         blocks.append(Block("heading", normalize_space("%s %s" % (marker, text)),
                             level=1))

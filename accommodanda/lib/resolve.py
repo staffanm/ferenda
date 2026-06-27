@@ -30,10 +30,9 @@ import functools
 import json
 import re
 
-from . import datasets
-from .lagrum import (LagrumParser, lagrum_uri, load_abbreviations,
-                     load_namedlaws)
 from ..dv import namedcases as dv_namedcases
+from . import datasets
+from .lagrum import LagrumParser, lagrum_uri, load_abbreviations, load_namedlaws
 
 CELEX_BASE = "https://lagen.nu/ext/celex/"
 

@@ -31,7 +31,7 @@ import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Iterator
+from typing import Any, Callable
 from urllib.parse import urljoin
 
 import requests
@@ -263,7 +263,7 @@ def resolve_landing(session, agency, ref, root, delay=0.5):
     classify = agency.params.get("classify", classify_file)
     download_roles = agency.params.get("download_roles", DOWNLOAD_ROLES)
 
-    files = {"regulation": None, "consolidation": [], "amendment": [],
+    files: dict[str, Any] = {"regulation": None, "consolidation": [], "amendment": [],
              "memo": [], "attachment": []}
     seen = set()
     for a in soup.select(agency.params.get("pdf_select", 'a[href$=".pdf"]')):
@@ -271,6 +271,7 @@ def resolve_landing(session, agency, ref, root, delay=0.5):
         if not href or href in seen:
             continue
         seen.add(href)
+        assert isinstance(href, str)
         result = classify(a, fs, arsutgava, lopnummer)
         if result is None:
             continue
@@ -320,7 +321,7 @@ def resolve_direct(session, agency, ref, root, delay=0.5):
     enumeration already carries the file URLs."""
     fs = agency.fs
     extra = ref.extra
-    files = {"regulation": None, "consolidation": [], "amendment": [],
+    files: dict[str, Any] = {"regulation": None, "consolidation": [], "amendment": [],
              "memo": [], "attachment": []}
 
     def fetch_pdf(url, name):

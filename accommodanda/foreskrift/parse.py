@@ -37,14 +37,19 @@ import re
 import sys
 from pathlib import Path
 
-from .model import Consolidation, Regulation, regulation_uri
-from .structure import flatten, nest
 from ..lib import layout
 from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
-from ..lib.lagrum import (EULAGSTIFTNING, LAGRUM, LagrumParser, interleave,
-                          load_abbreviations, load_namedlaws)
-from ..lib.pdftext import (RE_KAP_MARK, RE_PARA_MARK, pdf_pages, page_paragraphs)
-from ..lib.util import normalize_space
+from ..lib.lagrum import (
+    EULAGSTIFTNING,
+    LAGRUM,
+    LagrumParser,
+    interleave,
+    load_abbreviations,
+    load_namedlaws,
+)
+from ..lib.pdftext import RE_KAP_MARK, RE_PARA_MARK, page_paragraphs, pdf_pages
+from .model import Consolidation, Regulation, regulation_uri
+from .structure import flatten, nest
 
 # a föreskrift cites SFS (the empowering law) and EU directives (what it
 # implements); it does not cite case law or förarbeten in its operative text.
@@ -112,8 +117,8 @@ def classify(paras):
             out.append(("paragraf", text, re.sub(r"\s+", "", mp.group(1))))
         elif (p.bold or RE_RUBRIK_NUM.match(text)) and len(text) < 120 \
                 and not RE_LIST_ITEM.match(text):
-            num = (RE_RUBRIK_NUM.match(text).group(1)
-                   if RE_RUBRIK_NUM.match(text) else None)
+            m = RE_RUBRIK_NUM.match(text)
+            num = m.group(1) if m else None
             out.append(("rubrik", text, num))
         else:
             out.append(("stycke", text, None))
@@ -350,7 +355,7 @@ def cmd_batch(root, fs, limit):
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     ap.add_argument("record", nargs="?", help="a single record JSON -> stdout")
     ap.add_argument("--root", default="site/data/foreskrift/downloaded")
     ap.add_argument("--fs", help="restrict batch to one författningssamling")

@@ -35,13 +35,25 @@ reference list instead of inlining.
 from dataclasses import dataclass
 from datetime import datetime
 
+from ..lib import lagrum, util
 from . import begrepp
 from . import register as register_mod
-from ..lib import lagrum, util
-from .model import (Avdelning, Bilaga, Kapitel, Lista, Listelement,
-                    Overgangsbestammelse, Overgangsbestammelser, Paragraf,
-                    Rubrik, Stycke, Tabell, Underavdelning, UpphavdParagraf,
-                    UpphavtKapitel)
+from .model import (
+    Avdelning,
+    Bilaga,
+    Kapitel,
+    Lista,
+    Listelement,
+    Overgangsbestammelse,
+    Overgangsbestammelser,
+    Paragraf,
+    Rubrik,
+    Stycke,
+    Tabell,
+    Underavdelning,
+    UpphavdParagraf,
+    UpphavtKapitel,
+)
 
 BASE = "https://lagen.nu/"
 
@@ -163,7 +175,7 @@ def project_overgangsbestammelse(ob, proj):
 @dataclass
 class Projection:
     minter: "IdMinter"
-    refparser: object = None
+    refparser: lagrum.LagrumParser | None = None
 
     def inline(self, text, context, live=True, subject_term=None):
         """Return `text` as a list of inline nodes: plain `str` runs and
@@ -190,9 +202,10 @@ class Projection:
             return []
         refs = []
         if live and self.refparser is not None and lagrum.FILTER_LAW.search(text):
-            refs = self.refparser.parse_text(text, context or None)
+            rp = self.refparser
+            refs = rp.parse_text(text, context or None)
             if not context:
-                selfuri = self.refparser.self_law_uri
+                selfuri = rp.self_law_uri
                 refs = [r for r in refs
                         if r.uri != selfuri and not r.uri.startswith(selfuri + "#")]
         if subject_term and (idx := text.find(subject_term)) >= 0:

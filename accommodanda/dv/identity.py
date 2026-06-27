@@ -74,7 +74,7 @@ def legacy_identity(court, filename):
 
 
 def keys(court, malnummer, referat):
-    out = {("M", court, norm_malnr(m)) for m in malnummer if norm_malnr(m)}
+    out: set[tuple] = {("M", court, norm_malnr(m)) for m in malnummer if norm_malnr(m)}
     out |= {("R", norm_referat(r)) for r in referat if norm_referat(r)}
     return out
 

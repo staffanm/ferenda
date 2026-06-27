@@ -23,9 +23,9 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from rdflib import Graph
-from rdflib.namespace import DCTERMS, FOAF, SKOS
+from rdflib.namespace import FOAF, SKOS
 
 from ..lib import util
 from ..lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
@@ -157,8 +157,9 @@ def parse_register(path):
     soup = BeautifulSoup(Path(path).read_bytes(), "lxml")
     if soup.find(string="Sökningen gav ingen träff!"):
         raise SkipDocument("no register page at %s" % path)
-    content = soup.find("div", "search-results-content")
-    boxes = content.find_all("div", "result-inner-box")
+    content = soup.find("div", class_="search-results-content")
+    assert isinstance(content, Tag)
+    boxes = content.find_all("div", class_="result-inner-box")
     header = {"SFS-nummer": util.normalize_space(boxes[0].text.split("\xb7")[1]),
               "Rubrik": util.normalize_space(boxes[1].text)}
     for box in boxes[2:]:
@@ -166,13 +167,14 @@ def parse_register(path):
         header[key.strip()] = val.strip()
     basefile = header["SFS-nummer"]
     changes = []
-    for container in content.find_all("div", "result-inner-sub-box-container"):
-        sfsnr = container.find(
-            "div", "result-inner-sub-box-header").text.split("SFS ")[1].strip()
+    for container in content.find_all("div", class_="result-inner-sub-box-container"):
+        hdr = container.find("div", class_="result-inner-sub-box-header")
+        assert hdr
+        sfsnr = hdr.text.split("SFS ")[1].strip()
         if basefile == "1993:1637" and sfsnr == "1993:1446":
             sfsnr = "1993:1646"  # uncorrectable error in the register page
         rows = {}
-        for row in container.find_all("div", "result-inner-sub-box"):
+        for row in container.find_all("div", class_="result-inner-sub-box"):
             key, val = row.text.split(":", 1)
             rows[key.strip()] = util.normalize_space(val)
         changes.append(ChangeAct(sfsnr=sfsnr, rows=rows))
@@ -254,8 +256,8 @@ def parse_sfst_header(path):
     the fields the register page lacks: Utfärdad, Ikraft, the
     'Ändring införd: t.o.m. SFS …' consolidation cutoff, Övrigt."""
     soup = BeautifulSoup(Path(path).read_bytes(), "lxml")
-    boxes = [b for b in soup.find_all("div", "result-inner-box")
-             if not b.find("div", "body-text")]
+    boxes = [b for b in soup.find_all("div", class_="result-inner-box")
+             if not b.find("div", class_="body-text")]
     header = {}
     if boxes:
         header["Rubrik"] = util.normalize_space(boxes[1].get_text())
@@ -432,7 +434,7 @@ def amendment_properties(act, basefile, omfattning_parser, base):
                     continue
                 for ref in omfattning_parser.parse_text(
                         changecat, predicate=predicate):
-                    props.setdefault(ref.predicate, []).append(ref.uri)
+                    props.setdefault(ref.predicate, []).append(ref.uri)  # ty: ignore[unresolved-attribute]
             props["rpubl:andrar"] = val
     if sfsnr in UTFARDANDE:
         props["rpubl:utfardandedatum"] = UTFARDANDE[sfsnr]

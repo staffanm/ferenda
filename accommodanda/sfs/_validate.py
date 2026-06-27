@@ -6,21 +6,21 @@ so a top-level function defined there is invisible to forked workers)."""
 
 import functools
 import importlib.util
-import json
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import load_inputs
 from ..lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
 from ..lib.errors import SkipDocument
 from ..lib.lagrum import LagrumParser, load_namedlaws
+from . import load_inputs
 from .nf import inline_references, temporal_dates, to_normalform
 
 
 def load_golden_module():
     spec = importlib.util.spec_from_file_location(
         "golden_sfs", Path(__file__).parent.parent.parent / "tools" / "golden_sfs.py")
+    assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

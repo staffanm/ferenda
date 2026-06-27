@@ -46,31 +46,31 @@ from urllib.parse import urlsplit
 import requests
 
 from . import config
-from .sfs import load_inputs
-from .sfs import download as sfs_download
-from .sfs import correspond as sfs_correspond
+from .api import app as api_app
 from .dv import download as dv_download
 from .dv import identity as dv_identity
 from .dv import namedcases as dv_namedcases_mod
-from .forarbete import download as fa_download
-from .forarbete import parse as fa_parse
-from .forarbete import kommentar as fa_kommentar
-from .forarbete import genomforande as fa_genomforande
+from .dv.parse import api_member, parse_api_record, to_artifact
 from .eurlex import annotate as eurlex_annotate
 from .eurlex import bulk as eurlex_bulk
 from .eurlex import download as eurlex_download
 from .eurlex import parse as eurlex_parse
+from .forarbete import download as fa_download
+from .forarbete import genomforande as fa_genomforande
+from .forarbete import kommentar as fa_kommentar
+from .forarbete import parse as fa_parse
 from .foreskrift import download as foreskrift_download
 from .foreskrift.agencies import REGISTRY as FORESKRIFT_AGENCIES
-from .wiki import parse as wiki_parse
-from .dv.parse import api_member, parse_api_record, to_artifact
-from .api import app as api_app
 from .lib import catalog, dump, layout, render, search, util
 from .lib.datasets import NAMEDCASES as NAMEDCASES_JSON
 from .lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
 from .lib.errors import SkipDocument
 from .lib.lagrum import LagrumParser, load_namedlaws
+from .sfs import correspond as sfs_correspond
+from .sfs import download as sfs_download
+from .sfs import load_inputs
 from .sfs.nf import to_normalform
+from .wiki import parse as wiki_parse
 
 POLITENESS = 0.3   # seconds between per-document network fetches
 DATA = config.DATA                            # corpus location (config.yml: data_root)
@@ -90,7 +90,7 @@ class Stage:
     name: str
     run: Callable[[str], None]            # recipe: read inputs, write output
     output: Callable[[str], Path]         # basefile -> produced file
-    inputs: Callable[[str], list] = lambda bf: []   # dependency files
+    inputs: Callable[[str], list[Path]] = lambda bf: []   # dependency files
     depends: str | None = None            # upstream stage name
     code: tuple = ()                      # impl files; their hash = version
 
@@ -221,8 +221,8 @@ def parse_watermark(source):
     for bf in source.list_basefiles():
         h.update(bf.encode())
         for p in sorted(stage.inputs(bf), key=str):
-            if p.exists():
-                st = p.stat()
+            if p.exists():  # ty: ignore[unresolved-attribute]
+                st = p.stat()  # ty: ignore[unresolved-attribute]
                 h.update(("\x1f%d\x1f%d" % (st.st_size, st.st_mtime_ns)).encode())
         h.update(b"\x1e")
     return h.hexdigest()
@@ -281,7 +281,7 @@ def ensure(source, stage_name, basefile, manifest, res, force, no_deps):
     try:
         stage.output(basefile).parent.mkdir(parents=True, exist_ok=True)
         stage.run(basefile)
-    except SkipDocument as e:
+    except SkipDocument:
         # a deliberately empty document (removed/expired): write an empty
         # artifact so it is considered built and not retried every run
         stage.output(basefile).write_bytes(b"")
@@ -1454,7 +1454,7 @@ def main(argv=None):
         if leading in SOURCES:
             _help(leading)
             return
-    p = argparse.ArgumentParser(prog="lagen", description=__doc__.split("\n")[0])
+    p = argparse.ArgumentParser(prog="lagen", description=(__doc__ or "").split("\n")[0])
     p.add_argument("source", help="source name (%s) or 'all'"
                    % ", ".join(SOURCES))
     p.add_argument("action",

@@ -35,8 +35,8 @@ from opensearchpy import OpenSearch, helpers
 from opensearchpy.exceptions import ConnectionError as OpenSearchConnectionError
 from opensearchpy.exceptions import ConnectionTimeout
 
-from . import catalog, text
 from .. import config
+from . import catalog, text
 
 INDEX = "lagen"
 
@@ -276,7 +276,7 @@ class SearchIndex:
         if "version" not in props:
             self.client.indices.put_mapping(
                 index=self.index,
-                body={"properties": {"version": MAPPING["mappings"]
+                body={"properties": {"version": MAPPING["mappings"]  # ty: ignore[invalid-argument-type, not-subscriptable]
                                      ["properties"]["version"]}})
 
     def exists(self):
@@ -327,7 +327,7 @@ class SearchIndex:
             indexed, errors = 0, []
             for ok, item in helpers.parallel_bulk(
                     self.client, actions, thread_count=jobs, queue_size=jobs,
-                    raise_on_exception=False, raise_on_error=False, **common):
+                    raise_on_exception=False, raise_on_error=False, **common):  # ty: ignore[invalid-argument-type]
                 if ok:
                     indexed += 1
                 else:
@@ -336,7 +336,7 @@ class SearchIndex:
         # single-threaded path keeps the 429 backoff (parallel_bulk has no retry)
         return helpers.bulk(self.client, actions, raise_on_error=False,
                             max_retries=RETRIES, initial_backoff=2,
-                            max_backoff=BACKOFF_CAP, **common)
+                            max_backoff=BACKOFF_CAP, **common)  # ty: ignore[invalid-argument-type]
 
     def index_source(self, con, source, progress=None, jobs=1, force=False):
         """Sync one source's units to its catalogued documents. Incremental by

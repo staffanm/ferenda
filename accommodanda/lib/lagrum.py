@@ -644,6 +644,7 @@ def fragment_context(basefile, fragment):
     ctx = {'law': (m.group(0) if m else basefile).replace('_', ' ')}
     if fragment:
         m = FRAGMENT.match(fragment)
+        assert m
         for key, value in zip(('chapter', 'section', 'piece', 'item'),
                               m.groups()):
             if value:

@@ -15,8 +15,8 @@ never as part of a corpus-wide parse/relate/generate.
 import json
 from pathlib import Path
 
-from .structure import flatten
 from ..lib import catalog, layout, llm
+from .structure import flatten
 
 PROMPT = Path(__file__).with_name("preamble_analyzer_prompt.txt")
 PLACEHOLDER = "[PASTE FULL LEGAL ACT TEXT HERE]"

@@ -39,10 +39,16 @@ from pathlib import Path
 
 from PIL import Image, UnidentifiedImageError
 
-from .download import (SECTORS, content_filename, doc_dir, parse_notice,
-                       write_atomic, write_watermark)
-from .model import doctype
 from ..lib.util import status
+from .download import (
+    SECTORS,
+    content_filename,
+    doc_dir,
+    parse_notice,
+    write_atomic,
+    write_watermark,
+)
+from .model import doctype
 
 LANG = {"EN": "eng", "SV": "swe"}    # dump language code -> our 3-letter code
 

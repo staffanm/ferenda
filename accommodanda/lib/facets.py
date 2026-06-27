@@ -18,9 +18,8 @@ in one pass (what the static generate consumes). The two share one catalog scan.
 import re
 from collections import namedtuple
 
-from . import catalog
-from . import layout
 from ..eurlex.model import short_label as _eu_short_label
+from . import catalog, layout
 
 # a catalog row reduced to what facet-key extraction needs (its host-stripped
 # local id is precomputed once, since most extractors slice it)

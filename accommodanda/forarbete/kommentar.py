@@ -40,9 +40,9 @@ import json
 import re
 from pathlib import Path
 
+from ..lib.lagrum import EULAGSTIFTNING, LagrumParser
 from .parse import parse_record, to_artifact
 from .structure import flatten
-from ..lib.lagrum import EULAGSTIFTNING, LagrumParser
 
 # "Paragrafen genomför [delvis] artikel(n/na) <refs> i <directive>"; the article
 # block is captured loosely (digits, dots, letters, ranges, "och"/"samt"/commas)
@@ -278,7 +278,7 @@ def paragraf_fragment(chapter, paragraf):
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     ap.add_argument("record", help="a förarbete record JSON (or its artifact)")
     ap.add_argument("--root", default="site/data/forarbete")
     args = ap.parse_args()

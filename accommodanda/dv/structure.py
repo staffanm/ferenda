@@ -103,8 +103,8 @@ RE_TILLAGG = re.compile(
 def classify(text):
     """(kind, attrs) for a body block's text, or None for a plain paragraph.
     attrs may carry `court` (instans/dom) or `ordinal` (delmal)."""
-    if RE_DELMAL.match(text):
-        m = RE_DELMAL.match(text)
+    m = RE_DELMAL.match(text)
+    if m:
         return ("delmal", {"ordinal": m.group(1)})
     if RE_BETANKANDE.match(text):
         return ("betankande", {})

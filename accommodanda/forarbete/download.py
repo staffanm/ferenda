@@ -43,7 +43,6 @@ already-downloaded doc); `--full` re-walks the whole listing, skipping existing.
 import json
 import os
 import re
-import sys
 import time
 from pathlib import Path
 
@@ -148,6 +147,7 @@ def parse_listing(html, typ):
         if not a:
             continue
         href = a["href"]
+        assert isinstance(href, str)
         text = a.get_text(" ", strip=True)
         slug = href.rstrip("/").rsplit("/", 1)[-1]
         time_el = li.find("time")

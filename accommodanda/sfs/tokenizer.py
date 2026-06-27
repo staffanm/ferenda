@@ -10,7 +10,7 @@ the event stream into a tree happens in assembler.py.
 import difflib
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 
 from ..lib import util
@@ -555,7 +555,9 @@ class Tokenizer:
             text = re_DottedNumber.sub("", self.reader.readparagraph())
             return ListItemEv(kind=kind, ordinal=ordinal, text=text)
         elif kind == "bokstav":
-            ordinal = re_Bokstavslista.match(self.reader.peekline()).group(1)
+            m = re_Bokstavslista.match(self.reader.peekline())
+            assert m
+            ordinal = m.group(1)
             text = re_Bokstavslista.sub("", self.reader.readparagraph())
             return ListItemEv(kind=kind, ordinal=ordinal.replace(" ", ""),
                               text=text)

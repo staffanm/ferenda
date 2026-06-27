@@ -17,8 +17,6 @@ all) stay at the top level, so a body without a single § still renders.
 
 import re
 
-from ..lib.text import runs_text
-
 RE_LEAD_PARA = re.compile(r"^(\d+\s*[a-z]?)\s*§")     # "3 §" / "3 a §" leading a block
 RE_LEAD_KAP = re.compile(r"^(\d+)\s*kap\.")           # "2 kap." leading a block
 
@@ -82,11 +80,11 @@ def nest(blocks):
                     "ordinal": b.get("num"), "page": b.get("page"),
                     "children": [{"type": "stycke", "text": _strip_marker(b["text"]),
                                   "page": b.get("page")}]}
-            (kap["children"] if kap else root).append(para)
+            (kap["children"] if kap else root).append(para)  # ty: ignore[unresolved-attribute]
         elif t == "rubrik":
             # a heading ends the current paragraf's reach and labels what follows
             para = None
-            (kap["children"] if kap else root).append(b)
+            (kap["children"] if kap else root).append(b)  # ty: ignore[unresolved-attribute]
         else:
             sink().append(b)
     return root

@@ -5,12 +5,13 @@ import re
 import shutil
 import sys
 import time
+from typing import Any
 
 # ETA timing state for `status`, self-tracked so callers need not thread a start
 # time. A current/total run (sfs parse, then dv parse, …) is timed from its first
 # line; a new run is detected when `done` restarts or `total` changes, which
 # re-bases the clock -- so each source is estimated on its own pace.
-_eta = {"start": None, "start_done": 0, "last_done": 0, "total": object()}
+_eta: dict[str, Any] = {"start": None, "start_done": 0, "last_done": 0, "total": object()}
 
 
 def _eta_suffix(done, total):

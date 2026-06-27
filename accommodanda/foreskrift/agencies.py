@@ -28,10 +28,20 @@ from bs4 import BeautifulSoup
 
 from ..lib.net import request
 from . import harvest
-from .harvest import (Agency, DocRef, indexed_enumerate, paginated_enumerate,
-                      json_enumerate, resolve_landing, resolve_direct,
-                      classify_file, classify_section, classify_href, classify_single,
-                      classify_default_regulation)
+from .harvest import (
+    Agency,
+    DocRef,
+    classify_default_regulation,
+    classify_file,
+    classify_href,
+    classify_section,
+    classify_single,
+    indexed_enumerate,
+    json_enumerate,
+    paginated_enumerate,
+    resolve_direct,
+    resolve_landing,
+)
 
 # A full desktop-browser UA, for the few agency sites that gate plain clients.
 BROWSER_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -54,7 +64,9 @@ def fi_enumerate(session, agency):
     soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
     seen = set()
     for a in soup.find_all("a", href=True):
-        m = RE_FI_BASE.search(a["href"])
+        href = a["href"]
+        assert isinstance(href, str)
+        m = RE_FI_BASE.search(href)
         if not m:
             continue
         arsutgava, lopnummer = m.group(1), str(int(m.group(3)))

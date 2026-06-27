@@ -11,16 +11,28 @@ import logging
 
 from ..lib import util
 from . import tokenizer as t
-from .model import (Avdelning, Bilaga, Forfattning, Kapitel, Lista,
-                    Listelement, Overgangsbestammelse, Overgangsbestammelser,
-                    Paragraf, Rubrik, Stycke, Underavdelning, UpphavdParagraf,
-                    UpphavtKapitel)
+from .model import (
+    Avdelning,
+    Bilaga,
+    Forfattning,
+    Kapitel,
+    Lista,
+    Listelement,
+    Overgangsbestammelse,
+    Overgangsbestammelser,
+    Paragraf,
+    Rubrik,
+    Stycke,
+    Underavdelning,
+    UpphavdParagraf,
+    UpphavtKapitel,
+)
 
 log = logging.getLogger(__name__)
 
 # containment hierarchy: opening an element at rank r closes all open
 # elements at rank >= r
-RANK = {
+RANK: dict[type, int] = {
     Forfattning: 0,
     Overgangsbestammelser: 1,
     Bilaga: 1,

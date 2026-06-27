@@ -53,7 +53,7 @@ class Vocab:
         spec = VOCAB.get(lang, VOCAB["eng"])
         self.article = re.compile(r"^%s\.?\s+(\d+\w*)" % spec["article"], re.I)
         self.heading = re.compile(r"^(?:%s)\b" % "|".join(spec["headings"]), re.I)
-        self.enacting = re.compile(spec["enacting"], re.I)
+        self.enacting = re.compile(spec["enacting"], re.I)  # ty: ignore[no-matching-overload]
         self._visa = tuple(spec["visa"])
         self._recital = tuple(spec["recital"])
 

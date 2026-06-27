@@ -55,6 +55,8 @@ dev = [
     "coverage",
     "psutil",
     "pytest",
+    "ruff",
+    "ty",
 ]
 
 # PEP 735 group: unlike optional-dependencies above, uv installs this on a
@@ -64,6 +66,8 @@ dev = [
     "coverage",
     "psutil",
     "pytest",
+    "ruff",
+    "ty",
 ]
 
 [project.scripts]
@@ -78,3 +82,26 @@ exclude = ["test", "docs", "site", "data"]
 [tool.setuptools]
 include-package-data = true
 zip-safe = false
+
+# --- Linting / type checking ---
+# Scoped to the active accommodanda/ package; the legacy ferenda/ and lagen/
+# trees are out of scope. The .claude Stop hook runs `ruff check` + `ty check`
+# on the accommodanda/ files edited each turn. Run the whole package by hand:
+#   uv run ruff check accommodanda
+#   uv run ty check accommodanda
+
+[tool.ruff]
+target-version = "py310"
+# Only the rebuilt package; never lint the legacy tree.
+include = ["accommodanda/**/*.py"]
+extend-exclude = ["ferenda", "lagen", "site", "doc", "tools", "test"]
+
+[tool.ruff.lint]
+# F (pyflakes) + I (import grouping, matches CLAUDE.md) are high-signal and
+# enforced by the Stop hook. ANN (annotation coverage) is NOT enabled: the
+# package is mostly unannotated, so it would block every edited function.
+# Measure coverage on demand with `uv run ruff check --select ANN accommodanda`.
+select = ["F", "I"]
+
+[tool.ty.src]
+include = ["accommodanda"]

@@ -26,17 +26,32 @@ import re
 import sys
 from pathlib import Path
 
+from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
+from ..lib.lagrum import (
+    EULAGSTIFTNING,
+    EURATTSFALL,
+    FORARBETEN,
+    KORTLAGRUM,
+    LAGRUM,
+    MYNDIGHETSBESLUT,
+    RATTSFALL,
+    LagrumParser,
+    interleave,
+    load_abbreviations,
+    load_namedlaws,
+)
+
+# font-aware extraction + paragraph reflow are shared across the PDF verticals
+# (re-exported here so this module's existing import sites keep working)
+from ..lib.pdftext import (
+    RE_KAP_MARK,
+    RE_PARA_MARK,
+    page_paragraphs,
+    pdf_pages,
+)
 from .download import basefile_slug
 from .model import Block, Forarbete
 from .structure import flatten, nest
-from ..lib.lagrum import (EULAGSTIFTNING, EURATTSFALL, FORARBETEN, KORTLAGRUM,
-                          LAGRUM, MYNDIGHETSBESLUT, RATTSFALL, LagrumParser,
-                          interleave, load_abbreviations, load_namedlaws)
-from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
-# font-aware extraction + paragraph reflow are shared across the PDF verticals
-# (re-exported here so this module's existing import sites keep working)
-from ..lib.pdftext import (Line, Para, RE_KAP_MARK, RE_PARA_MARK,
-                           pdf_pages, page_paragraphs)
 
 # förarbeten cite across the whole spectrum, like court decisions
 PARSE_TYPES = [LAGRUM, KORTLAGRUM, EULAGSTIFTNING, RATTSFALL, FORARBETEN,
@@ -178,7 +193,7 @@ def art_path(root, record):
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     ap.add_argument("record", nargs="?", help="a single record JSON -> stdout")
     ap.add_argument("--root", default="site/data/forarbete")
     ap.add_argument("--type", help="restrict batch to one type")
