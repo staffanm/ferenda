@@ -12,8 +12,12 @@ from dataclasses import dataclass, field
 
 @dataclass
 class Rubrik:
-    """A section heading (BAKGRUND, Skälen för avgörandet, DOMSLUT, …)."""
+    """A section heading (BAKGRUND, Skälen för avgörandet, DOMSLUT, …). `level`
+    is the source HTML heading rank -- 1 for an `<h1>` instance name ("Svea
+    hovrätt"), 2/3 for `<h2>/<h3>` sections; 0 for a heading inferred from a `<p>`
+    by the heuristic (the legacy format carries no semantic heading tags)."""
     text: str
+    level: int = 0
 
 
 @dataclass
@@ -46,4 +50,14 @@ class Avgorande:
     sammanfattning: str | None = None
     related: list[str] = field(default_factory=list)
     body: list = field(default_factory=list)        # list[Rubrik | Stycke]
+    footnotes: list = field(default_factory=list)   # list[Fotnot], document end
     sources: list[str] = field(default_factory=list)  # provenance paths
+
+
+@dataclass
+class Fotnot:
+    """An end-of-document footnote (HD started using these in 2023). `num` is
+    the source marker digit; `text` is the footnote body (citation-linked
+    downstream like any other body text)."""
+    num: str
+    text: str

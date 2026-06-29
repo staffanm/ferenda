@@ -1,9 +1,15 @@
 """Tests for the DV decision parser (API innehall path)."""
 
-from accommodanda.dv.parse import (case_uri, parse_innehall, parse_api_record,
-                                   to_artifact)
+from accommodanda.dv.model import Fotnot, Rubrik, Stycke
+from accommodanda.dv.parse import (
+    case_uri,
+    extract_footrefs,
+    parse_api_record,
+    parse_body,
+    parse_innehall,
+    to_artifact,
+)
 from accommodanda.dv.structure import flatten
-from accommodanda.dv.model import Rubrik, Stycke
 
 
 def test_case_uri_mints_old_rinfo_scheme():
@@ -131,3 +137,74 @@ def test_inline_links_in_body():
                       "text": "6 § räntelagen (1975:635)"}]
     assert runs[0] == "Enligt "
     assert runs[-1] == " ska ränta utgå."
+
+
+# --- footnotes (HD's 2023+ format) --------------------------------------------
+
+def test_html_headings_carry_their_level():
+    blocks = parse_innehall("<h1>Svea hovrätt</h1><h2>SKÄL</h2><p>text.</p>")
+    assert blocks == [Rubrik("Svea hovrätt", level=1),
+                      Rubrik("SKÄL", level=2), Stycke("text.")]
+
+
+def test_footnote_definitions_are_lifted_out_of_the_body():
+    # the <sup>[N]</sup> marker (and the digit it doubles) is stripped; the
+    # footnote-def paragraphs leave the block stream
+    html = ("<p>Brödtext.[1]</p>"
+            "<p><sup>[1]</sup>&nbsp;Förordning (EU) 2016/679.</p>"
+            "<p><sup>[2]</sup>2&nbsp;EU:C:2023:145.</p>")
+    blocks, footnotes = parse_body(html)
+    # the body keeps the raw marker (stripped later, at citation-scan time)
+    assert blocks == [Stycke("Brödtext.[1]")]
+    assert footnotes == [Fotnot("1", "Förordning (EU) 2016/679."),
+                         Fotnot("2", "EU:C:2023:145.")]
+
+
+def test_extract_footrefs_strips_marker_and_doubled_digit():
+    # a clean marker: text kept, marker recorded at its position
+    assert extract_footrefs("svar.[10]") == ("svar.", [(5, "10")])
+    # the OOXML artifact "C-268/213,[3]" is the case number + a doubled "3"; both
+    # the stray digit and the marker come out, leaving the real "C-268/21"
+    assert extract_footrefs("mål C-268/213,[3] efter") == (
+        "mål C-268/21 efter", [(12, "3")])
+    # an unrelated trailing digit is real text, only the bracket is the marker
+    assert extract_footrefs("C-268/21.[2]") == ("C-268/21.", [(9, "2")])
+
+
+def test_footnotes_reach_the_artifact_and_are_citation_scanned():
+    html = ("<p>EU-domstolen meddelade dom i mål C-268/213,[3].</p>"
+            "<p><sup>[3]</sup>3&nbsp;EU-domstolens dom i mål C-268/21.</p>")
+    art = to_artifact(parse_api_record({**RECORD, "innehall": html}))
+    # the body ECJ ref is the internal CELEX, not a 3-digit-year external one,
+    # and the doubled "3" is gone from the link text ("mål" is the case prefix)
+    body_links = [r for r in flatten(art["structure"])[0]["text"]
+                  if isinstance(r, dict)]
+    ecj = [r for r in body_links
+           if r["uri"] == "https://lagen.nu/ext/celex/62021CJ0268"]
+    assert ecj and ecj[0]["text"].endswith("C-268/21")
+    # the inline marker became a zero-width footnote run
+    assert {"predicate": "dcterms:references", "uri": "#fn-3",
+            "text": "3", "kind": "footnote"} in body_links
+    # the footnote itself is in the artifact, its case number linked
+    [fn] = art["footnotes"]
+    assert fn["num"] == "3"
+    assert any(isinstance(r, dict) and r["uri"].endswith("62021CJ0268")
+               for r in fn["text"])
+
+
+# --- instance structure from the source's <h1> court headings -----------------
+
+def test_h1_court_headings_build_the_instance_tree():
+    html = ("<h1>Attunda tingsrätt</h1>"
+            "<p>Bolaget väckte vid Attunda tingsrätt talan.</p>"
+            "<p>Tingsrätten (rådmannen N.N.) anförde följande.</p><h2>SKÄL</h2>"
+            "<p>Skäl.</p>"
+            "<h1>Högsta domstolen</h1>"
+            "<p>Bolaget överklagade och yrkade att HD skulle ändra.</p>"
+            "<p>HD (justitierådet A.B.) anförde följande.</p><p>Domskäl.</p>")
+    art = to_artifact(parse_api_record({**RECORD, "innehall": html}))
+    tr, hd = art["structure"]
+    assert (tr["type"], tr["court"]) == ("instans", "Attunda tingsrätt")
+    assert (hd["type"], hd["court"]) == ("instans", "Högsta domstolen")
+    # the prose restating the court ("överklagade ... HD") does not duplicate it
+    assert [n["type"] for n in art["structure"]] == ["instans", "instans"]

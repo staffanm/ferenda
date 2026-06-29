@@ -50,6 +50,7 @@ from .api import app as api_app
 from .dv import download as dv_download
 from .dv import identity as dv_identity
 from .dv import namedcases as dv_namedcases_mod
+from .dv import naming as dv_naming
 from .dv.parse import api_member, parse_api_record, to_artifact
 from .eurlex import annotate as eurlex_annotate
 from .eurlex import bulk as eurlex_bulk
@@ -600,7 +601,8 @@ DOM_DOWNLOADED = layout.DOM_DOWNLOADED            # dv api records (primary)
 DV_LEGACY_DOWNLOADED = layout.DV_LEGACY_DOWNLOADED  # legacy raw feed
 DV_INDEX = layout.DOM_INDEX
 DV_CODE = (PKG / "dv" / "parse.py", PKG / "dv" / "model.py",
-           PKG / "dv" / "structure.py", PKG / "lib" / "lagrum.py")
+           PKG / "dv" / "structure.py", PKG / "dv" / "naming.py",
+           PKG / "lib" / "lagrum.py")
 
 
 @functools.cache
@@ -707,7 +709,12 @@ def dv_parse_run(basefile):
     # the case's public publication-search page is keyed by the record's
     # gruppKorrelationsnummer (the publication group), not derivable from basefile
     grupp = record.get("gruppKorrelationsnummer")
-    write_artifact("dv", basefile, to_artifact(av, canonical_id=basefile),
+    art = to_artifact(av, canonical_id=basefile)
+    # stamp the canonical, name-prefixed display title onto the artifact here (the
+    # source owns its model; to_artifact can't -- dv.naming imports dv.parse), so
+    # the pure catalog reads it without importing a source
+    art["label"] = dv_naming.case_label(art)
+    write_artifact("dv", basefile, art,
                    source_url=layout.dv_source_url(grupp) if grupp else None)
 
 
@@ -1308,7 +1315,8 @@ def stale_sources():
 # a page's rendered HTML is a function of the render/query code plus the
 # artifacts in its prerequisite set (computed per page from the catalog)
 GENERATE_CODE = (PKG / "lib" / "render.py", PKG / "lib" / "catalog.py",
-                 PKG / "lib" / "wikitext.py", PKG / "lib" / "layout.py")
+                 PKG / "lib" / "wikitext.py", PKG / "lib" / "layout.py",
+                 PKG / "dv" / "naming.py")
 
 
 def generate_watermark():

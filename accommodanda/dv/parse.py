@@ -14,22 +14,15 @@ The body HTML is flat: each <p> is either a section heading (a short,
 all-caps or known-label paragraph) or a body paragraph (optionally
 numbered, as in HFD/HD prejudikat). We classify generously -- a
 misclassified heading still keeps its text, so nothing is lost.
-
-  python -m accommodanda.dv_parse --uuid UUID         # one record -> artifact
-  python -m accommodanda.dv_parse --index INDEX [--limit N]  # batch + report
 """
 
-import argparse
 import functools
 import html as htmllib
-import json
 import re
-import sys
-from collections import Counter
-from pathlib import Path
 
 from bs4 import BeautifulSoup
 
+from ..lib.datasets import NAMEDACTS
 from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from ..lib.lagrum import (
     EULAGSTIFTNING,
@@ -40,23 +33,19 @@ from ..lib.lagrum import (
     MYNDIGHETSBESLUT,
     RATTSFALL,
     LagrumParser,
+    Ref,
     interleave,
     load_abbreviations,
+    load_namedacts,
     load_namedlaws,
 )
-from .model import Avgorande, Lagrum, Rubrik, Stycke
+from .model import Avgorande, Fotnot, Lagrum, Rubrik, Stycke
 from .structure import nest
 
 # Court decisions cite across the whole spectrum of legal sources, so the
 # DV citation scanner enables every ported grammar.
 DV_PARSE_TYPES = [LAGRUM, KORTLAGRUM, EULAGSTIFTNING, RATTSFALL, FORARBETEN,
                   EURATTSFALL, MYNDIGHETSBESLUT]
-
-DOMSTOL_DEFAULT = "site/data/domstol/downloaded"
-INDEX_DEFAULT = "site/data/dv/identity-index.json"
-
-# SFS id at the head of a lagen.nu lagrum URI (https://lagen.nu/1995:450#P4)
-RE_SFS_URI = re.compile(r"https://lagen\.nu/(\d{4}:\d+)")
 
 # section labels that are headings even when not all-caps
 KNOWN_HEADINGS = {
@@ -71,6 +60,17 @@ KNOWN_HEADINGS = {
 RE_NUMPARA = re.compile(r"^(\d+)\.\s+(.*)", re.S)
 RE_SEPARATOR = re.compile(r"^[\W_]+$")
 
+# an end-of-document footnote definition (HD's 2023+ format): "[N] text", the
+# marker often a stray <sup>[N]</sup>N pair so the digit leaks in doubled
+RE_FOOTDEF = re.compile(r"^\[(\d{1,2})\]\s*(.*)", re.S)
+
+# an inline footnote reference in body text: "[N]", optionally preceded by the
+# same OOXML artifact -- a duplicated single digit glued onto the word before it
+# (with at most one separating punctuation): "C-268/213,[3]" is "C-268/21" + ref
+# 3, "C-520/184[4]" is "C-520/18" + ref 4. The duplicate must equal N to count
+# as the artifact; an unrelated trailing digit is kept as real text.
+RE_FOOTREF = re.compile(r"(\d)?([.,]?)\[(\d{1,2})\]")
+
 
 def collapse(text):
     text = text.replace("\xa0", " ")
@@ -80,6 +80,9 @@ def collapse(text):
 
 
 def is_heading(text):
+    # a trailing footnote marker must not make a short sentence look like a
+    # heading ("Brödtext.[1]" is body, not a rubrik)
+    text = re.sub(r"\[\d+\]", "", text).strip()
     if "\n" in text or len(text) > 80:
         return False
     if text.lower().rstrip(".") in KNOWN_HEADINGS:
@@ -92,16 +95,36 @@ def is_heading(text):
             and len(text.split()) <= 7)
 
 
-def parse_innehall(html):
-    """Flat list of Rubrik / Stycke blocks from the decision HTML."""
+def _footnote(m):
+    """A Fotnot from an `RE_FOOTDEF` match, stripping the leading digit the
+    OOXML `<sup>[N]</sup>N` artifact duplicates into the footnote body."""
+    num, text = m.group(1), m.group(2)
+    text = re.sub(r"^%s\b[\s.,]*" % re.escape(num), "", text)
+    return Fotnot(num=num, text=collapse(text))
+
+
+def parse_body(html):
+    """`(blocks, footnotes)`: the Rubrik/Stycke body in document order plus the
+    end-of-document footnote definitions lifted out of the block stream.
+
+    Headings come from the source's own `<h1>`–`<h4>` tags as well as the `<p>`
+    heuristic (legacy records carry no heading tags); an `<h1>` is an instance
+    name ("Svea hovrätt"), `<h2>/<h3>` a section, and a `<p>` heading gets level
+    0. `<li>` content is still skipped, as it always was."""
     soup = BeautifulSoup(html or "", "html.parser")
-    blocks = []
-    paragraphs = soup.find_all("p") or [soup]
-    for p in paragraphs:
-        for br in p.find_all("br"):
+    blocks, footnotes = [], []
+    for el in soup.find_all(["h1", "h2", "h3", "h4", "p"]) or [soup]:
+        for br in el.find_all("br"):
             br.replace_with("\n")
-        text = collapse(htmllib.unescape(p.get_text()))
+        text = collapse(htmllib.unescape(el.get_text()))
         if not text or RE_SEPARATOR.match(text):
+            continue
+        if el.name in ("h1", "h2", "h3", "h4"):
+            blocks.append(Rubrik(text=text, level=int(el.name[1])))
+            continue
+        fd = RE_FOOTDEF.match(text)
+        if fd:
+            footnotes.append(_footnote(fd))
             continue
         m = RE_NUMPARA.match(text)
         if m:
@@ -110,11 +133,18 @@ def parse_innehall(html):
             blocks.append(Rubrik(text=text))
         else:
             blocks.append(Stycke(text=text))
-    return blocks
+    return blocks, footnotes
+
+
+def parse_innehall(html):
+    """The body blocks alone (footnotes dropped) -- the contract the structural
+    tests and any prose-only caller rely on."""
+    return parse_body(html)[0]
 
 
 def parse_api_record(d):
     """API record dict -> Avgorande."""
+    body, footnotes = parse_body(d.get("innehall"))
     return Avgorande(
         court=d["domstol"]["domstolKod"],
         court_namn=d["domstol"]["domstolNamn"],
@@ -132,17 +162,41 @@ def parse_api_record(d):
         sammanfattning=(d.get("sammanfattning") or "").strip() or None,
         related=[p for p in d.get("hanvisadePubliceringarLista", [])]
                 + [e for e in d.get("europarattsligaAvgorandenLista", [])],
-        body=parse_innehall(d.get("innehall")),
+        body=body,
+        footnotes=footnotes,
         sources=["domstol"],
     )
 
 
 @functools.cache
 def legal_vocab():
-    """Named-law and abbreviation tables for the citation scanner, loaded
-    once. KORTLAGRUM is enabled (court decisions cite both full law names
-    and abbreviations -- "12 kap. 57 § JB", "10 kap. 10 § RB")."""
-    return load_namedlaws(SFS_NAMEDLAWS), load_abbreviations(SFS_NAMEDLAWS)
+    """Named-law, abbreviation and EU-act tables for the citation scanner, loaded
+    once. KORTLAGRUM is enabled (court decisions cite both full law names and
+    abbreviations -- "12 kap. 57 § JB", "10 kap. 10 § RB"); the EU-act table lets
+    "artikel 6 i dataskyddsförordningen" pinpoint the regulation's article."""
+    return (load_namedlaws(SFS_NAMEDLAWS), load_abbreviations(SFS_NAMEDLAWS),
+            load_namedacts(NAMEDACTS))
+
+
+def extract_footrefs(text):
+    """`(clean, marks)`: `text` with its inline footnote markers removed (and
+    the OOXML duplicated-digit artifact undone, so the citation scanner sees the
+    real case number), plus `[(position, num), …]` for each marker -- the
+    position being where the superscript sits in `clean`."""
+    parts, marks, last, clean_len = [], [], 0, 0
+    for m in RE_FOOTREF.finditer(text):
+        gap = text[last:m.start()]
+        parts.append(gap)
+        clean_len += len(gap)
+        stray, punct, num = m.group(1), m.group(2), m.group(3)
+        if not (stray is not None and stray == num):  # drop only the doubled digit
+            kept = (stray or "") + punct              # stray/punct here is real text
+            parts.append(kept)
+            clean_len += len(kept)
+        marks.append((clean_len, num))
+        last = m.end()
+    parts.append(text[last:])
+    return "".join(parts), marks
 
 
 def scan_body(body):
@@ -153,20 +207,36 @@ def scan_body(body):
     decision has no base law, so the scanner runs with an empty context
     (relative refs without a named law stay unlinked); one parser threads
     the whole body in document order so "samma lag" and in-document
-    law-name learning carry across blocks."""
+    law-name learning carry across blocks. Inline footnote markers are lifted
+    out as zero-width `kind="footnote"` runs."""
     parser = _scanner()
     parser.state = type(parser.state)()   # fresh per-document state
-    return [interleave(b.text, parser.parse_text(b.text, context={}))
-            for b in body]
+    runs = []
+    for b in body:
+        clean, marks = extract_footrefs(b.text)
+        refs = parser.parse_text(clean, context={})
+        refs += [Ref(p, p, num, "dcterms:references", "#fn-%s" % num,
+                     kind="footnote") for p, num in marks]
+        runs.append(interleave(clean, refs))
+    return runs
+
+
+def scan_footnotes(footnotes):
+    """Footnote-body texts as inline-run lists, citation-scanned like the body
+    (HD's footnotes cite CJEU case law and EU regulations)."""
+    parser = _scanner()
+    parser.state = type(parser.state)()
+    return [interleave(fn.text, parser.parse_text(fn.text, context={}))
+            for fn in footnotes]
 
 
 @functools.cache
 def _scanner():
     """The body citation scanner, built once (grammar compilation is the
     expensive part); scan_body resets its per-document state each call."""
-    namedlaws, abbreviations = legal_vocab()
+    namedlaws, abbreviations, named_acts = legal_vocab()
     return LagrumParser(namedlaws, basefile="dom", abbreviations=abbreviations,
-                        parse_types=DV_PARSE_TYPES)
+                        parse_types=DV_PARSE_TYPES, named_acts=named_acts)
 
 
 def body_links(runs_per_block):
@@ -205,7 +275,7 @@ def to_artifact(av, canonical_id=None):
     runs = scan_body(av.body)
     def block(b, text):
         if isinstance(b, Rubrik):
-            return {"type": "rubrik", "text": text}
+            return {"type": "rubrik", "level": b.level, "text": text}
         return {"type": "stycke", "ordinal": b.ordinal, "text": text}
     cid = canonical_id or (av.referat[0] if av.referat
                            else "%s %s" % (av.court, av.malnummer[0])
@@ -231,17 +301,13 @@ def to_artifact(av, canonical_id=None):
         # the content-bearing instance/ruling tree (delmål → instans →
         # betänkande/dom → domskäl/domslut → …) with the prose attached as leaves
         # (the DV structural golden's reducer drops the prose, comparing only the
-        # skeleton); the renderer flattens it back to the linear body
+        # skeleton); the renderer walks it to show the instance structure
         "structure": nest([block(b, text) for b, text in zip(av.body, runs)]),
+        "footnotes": [{"num": fn.num, "text": runs}
+                      for fn, runs in zip(av.footnotes,
+                                          scan_footnotes(av.footnotes))],
         "sources": av.sources,
     }
-
-
-def find_api_record(domstoldir, uuid):
-    hits = list(Path(domstoldir).rglob(uuid + ".json"))
-    if not hits:
-        sys.exit("no API record with uuid %s under %s" % (uuid, domstoldir))
-    return json.loads(hits[0].read_text())
 
 
 def api_member(case):
@@ -249,88 +315,3 @@ def api_member(case):
         if member["store"] == "domstol":
             return member
     return None
-
-
-def cmd_uuid(args):
-    record = find_api_record(args.domstoldir, args.uuid)
-    av = parse_api_record(record)
-    json.dump(to_artifact(av), sys.stdout, ensure_ascii=False, indent=2)
-    print()
-
-
-def curated_sfs(record):
-    """SFS numbers the editors tagged in lagrumLista (the recall oracle)."""
-    return {l["sfsNummer"] for l in record.get("lagrumLista", [])
-            if l.get("sfsNummer")}
-
-
-def found_sfs(refs):
-    return {m.group(1) for r in refs
-            if (m := RE_SFS_URI.match(r["uri"]))}
-
-
-def cmd_index(args):
-    cases = json.loads(Path(args.index).read_text())
-    cases = [c for c in cases if api_member(c)]
-    if args.limit:
-        cases = cases[:args.limit]
-    counts = Counter()
-    blockstats = Counter()
-    refstats = Counter()
-    failures = []
-    for case in cases:
-        member = api_member(case)
-        try:
-            record = json.loads(Path(member["path"]).read_text())
-            av = parse_api_record(record)
-        except Exception as e:
-            failures.append((case["canonical_id"], "%s: %s"
-                             % (type(e).__name__, e)))
-            continue
-        counts["parsed"] += 1
-        blockstats["rubrik"] += sum(isinstance(b, Rubrik) for b in av.body)
-        blockstats["stycke"] += sum(isinstance(b, Stycke) for b in av.body)
-        if not av.body:
-            counts["empty_body"] += 1
-        if args.references:
-            refs = body_links(scan_body(av.body))
-            curated, found = curated_sfs(record), found_sfs(refs)
-            refstats["refs"] += len(refs)
-            refstats["curated"] += len(curated)
-            refstats["curated_found"] += len(curated & found)
-            if curated and not (curated & found):
-                refstats["cases_missing_all"] += 1
-    print("%d API-backed cases: %d parsed, %d empty body, %d failed"
-          % (len(cases), counts["parsed"], counts["empty_body"],
-             len(failures)))
-    print("blocks: %d rubrik, %d stycke" % (blockstats["rubrik"],
-                                            blockstats["stycke"]))
-    if args.references:
-        cur = refstats["curated"] or 1
-        # Recall against lagrumLista: a curated-but-unfound SFS is usually
-        # the editors deriving a lagrum from reasoning rather than citing
-        # it verbatim, not a scanner miss -- a signal, not a pass/fail.
-        print("references: %d found; lagrumLista recall %d/%d (%.1f%%), "
-              "%d cases with no curated SFS found"
-              % (refstats["refs"], refstats["curated_found"],
-                 refstats["curated"], 100 * refstats["curated_found"] / cur,
-                 refstats["cases_missing_all"]))
-    for cid, err in failures[:20]:
-        print("  FAIL %s: %s" % (cid, err))
-
-
-def main():
-    parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
-    parser.add_argument("--domstoldir", default=DOMSTOL_DEFAULT)
-    parser.add_argument("--uuid")
-    parser.add_argument("--index", default=INDEX_DEFAULT)
-    parser.add_argument("--limit", type=int)
-    parser.add_argument("--references", action="store_true",
-                        help="also scan bodies for citations and report "
-                             "lagrumLista recall (slower)")
-    args = parser.parse_args()
-    (cmd_uuid if args.uuid else cmd_index)(args)
-
-
-if __name__ == "__main__":
-    main()

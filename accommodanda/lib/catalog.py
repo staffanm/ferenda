@@ -264,11 +264,16 @@ def sfs_document(art, path):
 
 
 def dv_document(art, path):
+    # the canonical, name-prefixed title ("Meteoriten (NJA 2025 s. 897)") the
+    # listings and every inbound citation read -- computed once by the source at
+    # parse time (dv.naming, stored on the artifact), so the catalog stays a pure
+    # consumer. The generic fallback covers an artifact parsed before the field.
     referat = art.get("referat") or []
     malnr = art.get("malnummer") or []
-    label = (referat[0] if referat
-             else ("%s %s" % (art.get("court", ""), malnr[0])).strip()
-             if malnr else art.get("court") or local(art["uri"]))
+    label = art.get("label") or (
+        referat[0] if referat
+        else ("%s %s" % (art.get("court", ""), malnr[0])).strip()
+        if malnr else art.get("court") or local(art["uri"]))
     return (art["uri"], "dv", "case", label, label, str(path))
 
 

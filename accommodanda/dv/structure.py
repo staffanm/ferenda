@@ -143,6 +143,12 @@ def _norm_court(court):
     return _ABBREV.get(court, court)
 
 
+def _same_court(a, b):
+    """Whether two instance court names denote the same court -- equal after
+    normalization, or either side still unnamed (a coarse anchor to be refined)."""
+    return a is None or b is None or _norm_court(a) == _norm_court(b)
+
+
 def _block_text(block):
     """Plain text of a block, whether an Avgorande Rubrik/Stycke (``.text`` is a
     str) or an artifact dict (``text`` may be an inline-run list)."""
@@ -151,6 +157,12 @@ def _block_text(block):
         return "".join(r if isinstance(r, str) else r.get("text", "")
                        for r in text)
     return text or ""
+
+
+def _block_level(block):
+    """The source HTML heading rank of a block (1 for an `<h1>`), 0 otherwise."""
+    return getattr(block, "level", None) or (
+        block.get("level", 0) if isinstance(block, dict) else 0)
 
 
 def nest(blocks):
@@ -183,6 +195,15 @@ def nest(blocks):
         return node
 
     def open_instans(court):
+        # a prose "överklagade till X" restating the <h1> "X" just opened is the
+        # same instance, not a new one -- reuse the open, still-ruling-less instans
+        cur = top()
+        if (cur and cur[1]["type"] == "instans"
+                and not any(c.get("type") in RANK for c in cur[1]["children"])
+                and _same_court(cur[1].get("court"), court)):
+            if court and not cur[1].get("court"):
+                cur[1]["court"] = court
+            return
         close_to(2)
         if not (top() and top()[1]["type"] == "delmal"):
             close_to(2)               # detach to root if not under a delmal
@@ -195,7 +216,15 @@ def nest(blocks):
         return None
 
     for block in blocks:
-        hit = classify(_block_text(block))
+        text = _block_text(block)
+        # an <h1> naming a court is the explicit instance boundary HD's modern
+        # records carry ("Attunda tingsrätt", "Svea hovrätt", "Högsta
+        # domstolen"); it opens the instans and is consumed as its name rather
+        # than left as a heading leaf
+        if _block_level(block) == 1 and RE_COURT_FULL.match(text.strip()):
+            open_instans(_norm_court(text.strip()))
+            continue
+        hit = classify(text)
         if not hit:
             attach(block)             # plain prose -> the current node (or root)
             continue
