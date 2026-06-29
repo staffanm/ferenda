@@ -443,6 +443,43 @@ below is not optional polish, it's the only way they enter the corpus.
   - Posture: change-detector, not ground truth — the old FSM segmentation is
     heuristic, so diffs are investigated and the new parser may improve on it
     (a few hand-authored HD fixtures would make good oracle-grade anchors).
+  - ✅ **HD's modern (2023+) record format.** Newer API records carry real
+    `<h1>`–`<h3>` headings and footnotes the legacy `<p>`-only path dropped or
+    mis-segmented. `parse_body` now reads the heading tags (an `<h1>` court name
+    drives the instans boundary directly, so the structure no longer depends on
+    the appellant-action prose), lifts the end-of-document **footnote**
+    definitions out of the block stream, and strips the inline `[N]` markers
+    (undoing the OOXML `<sup>[N]</sup>N` doubled-digit artifact — which also
+    repaired CJEU refs like `C-268/213` → `C-268/21`, so they mint the right
+    CELEX and link to the internal copy). The renderer walks the instance/ruling
+    tree (föredragande's betänkande shown muted, the court's own ruling titled)
+    and prints the footnotes as back-linked endnotes. Locked by fixtures in
+    `test/test_dv_parse.py`.
+  - ✅ **EU acts cited by Swedish short name.** The citation engine
+    (`lagrum.load_namedacts`, reading `eurlex/data/namedacts.json` the way it
+    reads `namedlaws.json`) resolves "artikel 6 i dataskyddsförordningen" →
+    `ext/celex/32016R0679#6`, with a leading determiner/adjective (den, EU:s,
+    allmänna) absorbed by the grammar. Once an act is named, a definite generic
+    "artikel N i förordningen" and a *bare* "artikel N" anaphora-pinpoint the same
+    act — but a coordinated or differently-instrumented article ("artikel 7 och
+    8.1 i EU:s rättighetsstadga", "artikel 6.1 europakonventionen") is refused, so
+    a Charter/ECHR/treaty article is never mis-pinned onto the act. The grammar
+    extension is gated on the caller supplying acts (like KORTLAGRUM's
+    LAW_ABBREV), so SFS/förarbete citation parsing — and the golden — are
+    untouched; only the DV scanner opts in. `test/test_lagrum.py`.
+  - ✅ **Canonical case naming + HD's given names** (`dv/naming.py`). One entry
+    point, `case_label`, computes a case's display title so the renderer heading,
+    its eyebrow and the catalog row label (which drives every listing and inbound
+    citation) read identically. A case's *identity* is its **canonical referat** —
+    the one whose minted URI matches the document's (NJA's page form "NJA 2025 s.
+    897", never the löpnummer "NJA 2025:58"; the löpnummer is kept as metadata,
+    out of every identity string); a raw verdict with no referat identifies by
+    målnummer. On top, Högsta domstolen's *named precedents* (the harvested
+    `namedcases` snapshot, `dv/data/namedcases.json`) lead with the nickname —
+    "Meteoriten (NJA 2025 s. 897)", "Umgängesstödet (Ö 3043-25)" — keyed by URI or,
+    for an un-paginated verdict, by målnummer. The label is **stamped onto the
+    artifact at parse time** (`build.dv_parse_run`, the source owns its model) so
+    the catalog stays a pure consumer. `test/test_dv_naming.py`.
 
 ---
 
@@ -613,6 +650,36 @@ to a future per-doc incremental generate.
   unrelated artifact changes (the old pipeline's deps-file rule, as a catalog
   query). `relate` itself still rebuilds per-source whole (seconds); `parse` stays
   an explicit upstream step.
+- ✅ **Bare lagen.nu page URLs — the published URI grammar, restored.** A document
+  is now linked at its *bare* address (`/2018:585`, `/prop/2020/21:22`,
+  `/dom/ad/1993:100`, `/celex/32016R0679`), not the flattened on-disk filename
+  (`/sfs/1962_700.html`). `lib/layout` grew the split: `page_relpath` is the
+  filesystem-safe HTML file, **`page_url`** the public address a link points at,
+  and **`url_to_relpath`** the inverse the static server applies. A statute is a
+  *top-level* page (`2018:585.html`, the SFS colon kept) served at `/2018:585`; EU
+  acts collapse `ext/celex/` to `/celex/`. `render.href`, the API (`SearchResult`/
+  `BrowseDoc.url`) and the browse model all emit `page_url`; `api.app.SiteFiles`
+  rewrites a bare document URL back to its file on a static miss (nginx's
+  `try_files`, in Starlette), so `lagen serve` answers the published URLs directly.
+  `test/test_api.py`, `test/test_facets.py`, `test/test_site.py`.
+- ✅ **Repealed (upphävd) statutes.** A statute whose `rpubl:upphavandedatum` has
+  passed is marked **upphävd** end-to-end: the catalog carries an `expired` column
+  (`catalog.expired_date`/`expired_uris`); the browse listings **omit** it
+  (`facets._rows`, still reachable by direct link and search — the listing shows
+  only law in force); and its page gets a repeal callout (with a link to the
+  repealing act when known), a subdued reading column and a fixed "Upphävd
+  författning" watermark that stays visible at any scroll depth (`render._expired_banner`
+  + the `body.expired` treatment). A *future* repeal date is still in force.
+  `test/test_site.py`.
+- ✅ **Statute browse listing — visual hierarchy + filter.** An SFS entry is split
+  into its dropped designation/number prefix (shown subdued) and the subject it
+  sorts under (emphasised), so the eye lands on the sort key (`facets._sfs_split`);
+  parliamentary primary law (a *lag*, a *balk*, or a grundlag) is shown at full
+  weight while secondary instruments (förordning, kungörelse, …) are dimmed
+  (`_sfs_is_statute`). The listing carries `pre`/`key`/`subdued`/`year` on each
+  `BrowseDoc`, and each statute page gets a client-side name/year filter over the
+  letter's entries (`render.BROWSE_FILTER`). `test/test_facets.py`,
+  `test/test_api.py`.
 - 🚧 **Publishing layer — search, REST/OpenAPI, bulk dumps** (replaces the
   retired Fuseki/RDF publishing). All three are **derived & rebuildable** from
   artifacts + catalog, never a source of truth, and slot in as **corpus-wide
@@ -1100,6 +1167,21 @@ are not yet citation *targets*; the inbound value comes from the edges above.
   `structure` reshaped to the shared statute node convention (`id`/`ordinal`, paragraf body
   in a `stycke` child) so it reuses `render_node` + the catalog fragment/link walkers. Shared
   PDF extraction lives in `lib/pdftext`.
+- ✅ **`parse` stage wired into the build driver.** Föreskrift was the last vertical whose
+  corpus was produced by a one-off batch script outside the driver; it now registers a real
+  `parse` Stage (`build.foreskrift_parse_run`, inputs = the harvested record + its body PDFs,
+  recipe = `FORESKRIFT_CODE`), so `lagen foreskrift parse` / `… rebuild` re-parse incrementally
+  and a parser edit re-stales every doc the recipe-version way — like SFS/eurlex. No
+  per-document `download` stage: the body PDFs arrive only through the bulk `foreskrift_harvest`
+  sweep, so parse depends on no upstream stage and runs over whatever the harvest left on disk.
+  relate/index/dump/generate already acted on the artifacts by source name, so they needed no
+  change.
+- ✅ **The build driver is the single parse entry point.** The standalone
+  `cmd_one`/`cmd_batch`/`main` CLIs that each `{dv,eurlex,forarbete,wiki,foreskrift}/parse.py`
+  carried (a pre-driver debugging path that duplicated artifact-writing and bypassed the
+  manifest) were removed; every source now parses only through its driver `parse` Stage. The
+  parse modules keep their library API (`parse_record`/`to_artifact`/… that `build.py` imports).
+  (The legacy DV Word path, `dv/legacy.py`, keeps its CLI — it has no driver stage yet.)
 - ⬜ **Next:** the OpenSearch `index` pass for föreskrift (paragraf-precise search), and the
   intra-fs `upphäver`/`ändrar` + `genomför` edges (same mechanism as bemyndigande).
 
@@ -1119,12 +1201,12 @@ model + extraction.
 | `site/data/sfs/parsed/` | the golden = old-pipeline parsed XHTML (11,056 docs), normalized per comparison |
 | `accommodanda/lib/` | **shared** horizontal libs: `lagrum` (citation engine), `util`, `errors` (`SkipDocument`) |
 | `accommodanda/sfs/` | **acts vertical**: `{extract,reader,model,tokenizer,assembler,nf}` parser + `register` (SFSR→amendments/förarbeten/metadata) + `__main__` (validate CLI) |
-| `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `word`, `legacy` |
+| `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `structure`, `word`, `legacy`, `naming` (canonical case title + HD given names), `namedcases` (HD named-precedent harvester) |
 | `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, all 8 types), `model`/`parse` (PDF→artifact), `kommentar` (författningskommentar → EU-directive *genomför* edges), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf) |
 | `accommodanda/eurlex/` | **EU vertical (EUR-Lex/CELLAR)**: `download` (SPARQL discovery), `bulk` (dump import), `parse`/`parse_html`/`parse_pdf` (Formex/HTML/PDF → one artifact shape), `definitions` (defined-terms extraction + in-act interlinking), `lang`, `model` |
 | `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (reusable engine — enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct}; `Skip`/`_guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 15 agencies live), `download`, `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors). Corpus: 1218 regs harvested, parsed 0-fail |
 | `accommodanda/lib/pdftext.py` | **shared font-aware PDF extraction** (förarbete + föreskrift): `pdf_pages` (`pdftohtml -xml` → bold/italic-tagged `Line`s) → `page_paragraphs` (reflow, strip running header/page-no/TOC) → the vertical's own `classify` |
-| `accommodanda/config.py`, `lib/layout.py`, `lib/net.py` | runtime config (`config.yml`/`data_root`), centralized document layout, resilient HTTP session + harvest progress reporter |
+| `accommodanda/config.py`, `lib/layout.py`, `lib/net.py` | runtime config (`config.yml`/`data_root`), centralized document layout (`page_relpath` on-disk file ↔ `page_url`/`url_to_relpath` public lagen.nu address), resilient HTTP session + harvest progress reporter |
 | `site/data/eurlex/` | harvested EU corpus (`notice.ttl` + best manifestation per language) + artifacts |
 | `test/test_eurlex_parse.py`, `test/test_eurlex_html.py`, `test/test_eurlex_definitions.py` | EU parser + defined-terms suites |
 | `accommodanda/lib/wikitext.py` | shared MediaWiki-dump parser (wikilinks + citation engine → runs) |
@@ -1225,6 +1307,11 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **§4/§6** — bare lagen.nu page URLs (`page_url`/`SiteFiles` try_files); DV
+  canonical case naming + HD given names; HD modern record format (h1 instances,
+  footnotes) + instance/ruling rendering; repealed-statute treatment; statute
+  browse hierarchy/filter; named-EU-act citations; build driver the single parse
+  entry point.
 - **§6/§7e** — incremental `relate`/`index`/`generate` (content-hash sync,
   per-source watermarks); föreskrift vertical (15 agencies harvested, shared PDF
   parser, the statute→föreskrift `bemyndigande` edge end-to-end).

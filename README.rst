@@ -1,5 +1,14 @@
 .. -*- coding: utf-8 -*-
 
+.. note::
+
+   **This describes the original framework, which is being rebuilt.** Active
+   development now happens in ``accommodanda/`` — vertical source pipelines plus
+   shared libraries, no source base class. See `REWRITE.md <REWRITE.md>`_ for the
+   why and the current status, and `accommodanda/README.md
+   <accommodanda/README.md>`_ for how to run the new pipelines. The text below
+   documents the legacy ``ferenda``/``lagen`` tree, kept as read-only reference.
+
 Ferenda is a python library and framework for transforming
 unstructured document collections into structured Linked Data. It
 helps with downloading documents, parsing them to add explicit

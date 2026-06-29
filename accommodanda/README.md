@@ -69,12 +69,15 @@ uv run python -m pytest \
 **DV vertical (court decisions)**
 | File | What |
 |---|---|
-| `dv.py` | downloader for the rättspraxis API |
-| `dv_identity.py` | entity-resolution index (one canonical case ← many source records) |
-| `dv_model.py` | `Avgorande` model (flat: metadata + ordered Rubrik/Stycke body) |
-| `dv_parse.py` | **API path** — body from `innehall` HTML, metadata from curated fields |
-| `dv_word.py` | **legacy path** — POI (HWPF/XWPF) → flat `(text, bold, in_table)` stream |
-| `dv_legacy.py` | legacy stream → head/body split → `Avgorande` |
+| `download.py` | downloader for the rättspraxis API |
+| `identity.py` | entity-resolution index (one canonical case ← many source records) |
+| `model.py` | `Avgorande` model (metadata + ordered Rubrik/Stycke body + footnotes) |
+| `parse.py` | **API path** — body from `innehall` HTML, metadata from curated fields |
+| `structure.py` | instance/ruling segmenter (delmål → instans → betänkande/dom → domskäl/domslut) |
+| `naming.py` | canonical case title — referat identity + HD's given names (`case_label`) |
+| `namedcases.py` | harvester for HD's named-precedent list (`data/namedcases.json`) |
+| `word.py` | **legacy path** — POI (HWPF/XWPF) → flat `(text, bold, in_table)` stream |
+| `legacy.py` | legacy stream → head/body split → `Avgorande` |
 
 ## Running the pipelines
 
@@ -94,9 +97,8 @@ uv run python -m accommodanda.sfs refs FILE PARSED.xhtml  # citation diff for on
 uv run python -m accommodanda.dv.download site/data/domstol/downloaded   # [--full] [--no-bilagor] [--limit N]
 uv run python -m accommodanda.dv.identity                       # -> site/data/dv/identity-index.json
 
-# parse
-uv run python -m accommodanda.dv.parse  --index site/data/dv/identity-index.json   # API path, batch report
-uv run python -m accommodanda.dv.parse  --uuid UUID                                # one API record -> artifact
+# parse (API path is driver-owned; `[ids…]` parses just those, empty = all stale)
+uv run python -m accommodanda.build dv parse                                       # API path, incremental
 uv run python -m accommodanda.dv.legacy --index site/data/dv/identity-index.json   # legacy POI path, batch report
 uv run python -m accommodanda.dv.legacy site/data/dv/downloaded/ADO/1993-100_1.doc # one Word file -> artifact
 ```
