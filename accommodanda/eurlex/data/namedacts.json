@@ -1,7 +1,8 @@
 {
-  "_comment": "EU acts by name -> CELEX, for the ⌘K resolver (lib/resolve.py). Hand-edited, and deliberately sparse: this holds only what can't be read off the official title -- `abbr`, the acronym(s) people cite by (GDPR, NIS2, …), and `label`, a genuinely-informal nickname NOT present in the title. An act whose established short title sits in the title's trailing parenthesis (GDPR '(allmän dataskyddsförordning)', DSA '(förordningen om digitala tjänster)', Rom I '(Rom I)') carries no label here -- that name is extracted from the title mechanically (a later step), so an entry may be just an abbr, or empty until then. `abbr`/`label` may each be a string or a list; both are matched case-insensitively, and an `art N`/`artikel N`/`article N` tail becomes the `#N` fragment.",
+  "_comment": "EU acts by name -> CELEX, for the ⌘K resolver (lib/resolve.py) AND the citation engine (lib/lagrum.load_namedacts), which links 'artikel N i <name>' in running text the way it links named SFS laws. Hand-edited, and deliberately sparse: `abbr`, the acronym(s) people cite by (GDPR, NIS2, …), and `label`, the established short name(s). An act whose short title sits in the official title's trailing parenthesis (GDPR '(allmän dataskyddsförordning)', DSA '(förordningen om digitala tjänster)', Rom I '(Rom I)') ideally has it extracted from the title mechanically (a later step); until then list the definite/indefinite forms the engine should match under `label`. `abbr`/`label` may each be a string or a list; both are matched case-insensitively, and an `art N`/`artikel N`/`article N` tail becomes the `#N` fragment. Leading determiners/adjectives (den, EU:s, allmänna) are matched by the grammar, so `label` holds only the noun-phrase head ('dataskyddsförordningen', not 'den allmänna dataskyddsförordningen').",
   "32016R0679": {
-    "abbr": "GDPR"
+    "abbr": "GDPR",
+    "label": ["dataskyddsförordningen", "dataskyddsförordning"]
   },
   "32004L0048": {
     "abbr": "IPRED",

@@ -23,15 +23,26 @@ from pathlib import Path
 
 import pytest
 
+from accommodanda.lib.datasets import NAMEDACTS
 from accommodanda.lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
-from accommodanda.lib.lagrum import (ENKLALAGRUM, EULAGSTIFTNING, EURATTSFALL,
-                                FORARBETEN, MYNDIGHETSBESLUT, RATTSFALL,
-                                LagrumParser, load_abbreviations, load_namedlaws)
+from accommodanda.lib.lagrum import (
+    ENKLALAGRUM,
+    EULAGSTIFTNING,
+    EURATTSFALL,
+    FORARBETEN,
+    MYNDIGHETSBESLUT,
+    RATTSFALL,
+    LagrumParser,
+    load_abbreviations,
+    load_namedacts,
+    load_namedlaws,
+)
 from accommodanda.lib.util import normalize_space
 
 TESTROOT = Path(__file__).parent / "files" / "legalref"
 NAMEDLAWS = load_namedlaws(SFS_NAMEDLAWS)
 ABBREVIATIONS = load_abbreviations(SFS_NAMEDLAWS)
+NAMEDACTS_MAP = load_namedacts(NAMEDACTS)
 
 # Tests the old engine also failed (its driver listed them as broken);
 # the expected output in these files is hand-authored desired behavior.
@@ -159,6 +170,43 @@ EULAGSTIFTNING_CASES = [
 def test_eulagstiftning_celex(text, uri):
     parser = LagrumParser(NAMEDLAWS, basefile="x", parse_types=[EULAGSTIFTNING])
     assert [r.uri for r in parser.parse_text(text, context={})] == [uri]
+
+
+# EU acts cited by Swedish short name (load_namedacts), with article anaphora.
+# Each tuple is (text, [expected uris]); a parser threads one document so the
+# anaphora cases see the act named by the line before them.
+GDPR = "https://lagen.nu/ext/celex/32016R0679"
+EU_NAMEDACT_SEQUENCE = [
+    # explicit name -> article pinpoint, the determiner/adjective absorbed
+    ("Enligt artikel 6 i dataskyddsförordningen ska", ["%s#6" % GDPR]),
+    ("artikel 6.3 och 6.4 i den allmänna dataskyddsförordningen är",
+     []),  # a coordinated article list past the name is left alone (no false pin)
+    ("artikel 23.1 i dataskyddsförordningen medger", ["%s#23.1" % GDPR]),
+    # anaphora: a bare standalone article and the definite generic noun both
+    # pinpoint the act just named
+    ("behandlingen är nödvändig enligt artikel 6.1. e). Den", ["%s#6.1" % GDPR]),
+    ("artikel 5.1 c i förordningen, som", ["%s#5.1" % GDPR]),
+    # a different instrument is never mis-pinned onto the act in focus
+    ("artikel 6.1 europakonventionen och", []),
+    ("artikel 267 EUF-fördraget för", []),
+    ("rätten till privatliv enligt artikel 7 och 8.1 i EU:s rättighetsstadga", []),
+]
+
+
+def test_eu_namedact_articles_and_anaphora():
+    parser = LagrumParser(NAMEDLAWS, basefile="dom", parse_types=[EULAGSTIFTNING],
+                          named_acts=NAMEDACTS_MAP)
+    parser.state = type(parser.state)()       # one threaded document
+    for text, want in EU_NAMEDACT_SEQUENCE:
+        assert [r.uri for r in parser.parse_text(text, context={})] == want, text
+
+
+def test_eu_namedact_off_without_acts():
+    # the grammar extension is gated on supplied acts -- a parser with none
+    # behaves exactly as before (a bare nickname does not link)
+    parser = LagrumParser(NAMEDLAWS, basefile="dom", parse_types=[EULAGSTIFTNING])
+    assert parser.parse_text("artikel 6 i dataskyddsförordningen",
+                             context={}) == []
 
 
 @pytest.mark.parametrize("path", make_params("Avg"))

@@ -621,6 +621,7 @@ class DocState:
     lastlaw: str | None = None
     namedlaws: dict = field(default_factory=dict)  # learned in-document
     last_forarbete: str | None = None  # base URI of last prop ("a. prop.")
+    last_eu_act: str | None = None     # CELEX of the last named EU act (anaphora)
 
 
 class NoLink(Exception):
@@ -679,6 +680,24 @@ def load_abbreviations(path):
         abbr = entry.get("abbr")
         for a in ([abbr] if isinstance(abbr, str) else abbr or []):
             out[a] = lawid.replace('_', ' ')
+    return out
+
+
+def load_namedacts(path):
+    """Map each EU-act short name or acronym (lower-cased) to its CELEX, from the
+    hand-edited EU named-act dataset (CELEX -> {label?, abbr?}, each a str or a
+    list). The EULAGSTIFTNING analogue of load_namedlaws/load_abbreviations: it
+    lets the engine resolve "artikel N i dataskyddsförordningen" / "GDPR art 6" to
+    the act's CELEX, the way named SFS laws resolve to an SFS id."""
+    data = json.loads(Path(path).read_text(encoding='utf-8'))
+    out = {}
+    for celex, entry in data.items():
+        if not isinstance(entry, dict):
+            continue                       # the leading "_comment" string
+        for key in ("label", "abbr"):
+            value = entry.get(key)
+            for alias in ([value] if isinstance(value, str) else value or []):
+                out[alias.lower()] = celex
     return out
 
 
@@ -742,20 +761,51 @@ def celex_uri(attrs, base='https://lagen.nu/'):
     return uri
 
 
+# the named-EU-act extension, added only when EULAGSTIFTNING is active AND the
+# caller supplies act aliases (like LAW_ABBREV for KORTLAGRUM): a known act name
+# becomes a valid `rattsakt_part`, so "artikel N i <name>" and "artikel N <name>"
+# resolve to the act's CELEX. A leading determiner/adjective (den, EU:s, allmänna)
+# is grammar, so `label` data carries only the noun-phrase head.
+#
+# It also turns on article *anaphora*: once an EU act is named, a later "artikel
+# N i förordningen" (the definite generic noun) or a bare "artikel N" pinpoints
+# the same act -- but a bare article trailed by a *different* instrument
+# (europakonventionen, stadgan, EUF-fördraget) is captured by `eu_other` and left
+# unlinked, so an ECHR/Charter/treaty article is never mis-pinned onto the act.
+EU_NAMNAKT_RULES = r"""
+%extend rattsakt_part: eu_namnakt_full
+%extend rattsakt_part: eu_generic
+%extend eu_ref: artikel_part _W eu_namnakt_full
+%extend eu_ref: artikel_part _W (IN _W)? eu_other
+eu_namnakt_full: (EU_DET _W)? (EU_ADJ _W)? eu_namnakt
+eu_namnakt: EU_NAMNAKT
+eu_generic: EU_GENERIC
+eu_other: EU_OTHER
+EU_DET: "EU:s" | "den" | "det"
+EU_ADJ: "allmänna" | "allmän"
+EU_GENERIC: "förordningen" | "direktivet" | "rättsakten"
+EU_OTHER: "europakonventionen" | "Europakonventionen" | "EKMR" | "rättighetsstadgan" | "stadgan" | "EU-stadgan" | "EUF-fördraget" | "FEUF" | "EU-fördraget"
+"""
+
+
 @functools.cache
-def parser(requested, expanded, abbrevs=()):
+def parser(requested, expanded, abbrevs=(), eu_acts=()):
     """Earley parser compiled for a set of parse types. Root alternatives
     come only from the explicitly `requested` types; rule fragments and
     terminals from the dependency-`expanded` set -- so a dependency
     (KORTLAGRUM/ENKLALAGRUM both depend on LAGRUM) lends its productions
     without also contributing its own ?ref roots. `abbrevs` (sorted
-    longest-first) supplies the KORTLAGRUM LAW_ABBREV terminal."""
+    longest-first) supplies the KORTLAGRUM LAW_ABBREV terminal; `eu_acts`
+    (likewise) the EULAGSTIFTNING EU_NAMNAKT terminal of known EU-act names."""
     roots = [r for t in TYPE_ORDER if t in requested for r in ROOTS[t]]
     grammar = "start: ref\n?ref: " + "\n    | ".join(roots) + "\n"
     grammar += "".join(RULES.get(t, '') for t in TYPE_ORDER if t in expanded)
     grammar += TERMINALS
     if KORTLAGRUM in expanded:
         grammar += "\nLAW_ABBREV: %s\n" % " | ".join('"%s"' % a for a in abbrevs)
+    if EULAGSTIFTNING in expanded and eu_acts:
+        grammar += EU_NAMNAKT_RULES
+        grammar += "\nEU_NAMNAKT: %s\n" % " | ".join('"%s"i' % a for a in eu_acts)
     return Lark(grammar, parser='earley')
 
 
@@ -846,10 +896,11 @@ class LagrumParser:
     teaches the parser law names used later in the document)."""
 
     def __init__(self, namedlaws, basefile, base='https://lagen.nu/',
-                 abbreviations=None, parse_types=None):
+                 abbreviations=None, parse_types=None, named_acts=None):
         self.namedlaws = namedlaws
         self.basefile = basefile
         self.base = base
+        self.named_acts = named_acts or {}
         # the document's own law URI -- the prefix every self-reference (a
         # relative "5 §" or an ändringshänvisning "#L<act>") is minted under,
         # used to recognise self-links from id-suppressed provisions.
@@ -873,8 +924,10 @@ class LagrumParser:
         # requested SFS grammar, not when full LAGRUM is also requested.
         self.enkla = ENKLALAGRUM in requested and LAGRUM not in requested
         abbrevs = tuple(sorted(self.abbreviations, key=len, reverse=True))
+        eu_acts = tuple(sorted(self.named_acts, key=len, reverse=True))
         self.lark = parser(requested, self.parse_types,
-                           abbrevs if KORTLAGRUM in self.parse_types else ())
+                           abbrevs if KORTLAGRUM in self.parse_types else (),
+                           eu_acts if EULAGSTIFTNING in self.parse_types else ())
         self.trigger = build_trigger(self.parse_types)
 
     # --- scanning ---
@@ -900,6 +953,10 @@ class LagrumParser:
             if tree is not None and self.acceptable(tree, text,
                                                     m.start() + length):
                 base = m.start()
+                # let a formatter peek at the text trailing its match (the
+                # bare-article anaphora guard needs to see a coordination /
+                # other-instrument continuation that the node itself excludes)
+                self._scan_text, self._scan_base = text, base
                 try:
                     attrlist = list(self.format_root(tree, context))
                     for attrs, (s, e) in zip(
@@ -908,6 +965,10 @@ class LagrumParser:
                             uri = attrs['_uri']
                         elif any(k in attrs for k in EU_KEYS):
                             uri = celex_uri(attrs, self.base)
+                            # remember a formally-named act so a later bare
+                            # "artikel N" anaphora can pinpoint it
+                            self.state.last_eu_act = uri.split(
+                                'ext/celex/')[-1].split('#')[0]
                         else:
                             uri = lagrum_uri(attrs, self.base)
                         refs.append(Ref(base + s, base + e,
@@ -1251,13 +1312,58 @@ class LagrumParser:
 
     # --- EU ---
 
+    def _eu_celex_uri(self, celex, attrs, remember=True):
+        """ext/celex/<CELEX> deep-linked to the cited article (and sub-article).
+        Names the act as the document's current EU act (for later anaphora) unless
+        `remember` is false (an anaphoric ref must not refresh what it points at)."""
+        if remember:
+            self.state.last_eu_act = celex
+        uri = self.base + 'ext/celex/' + celex
+        if attrs.get('artikel'):
+            uri += '#' + attrs['artikel']
+            if attrs.get('underartikel'):
+                uri += '.' + attrs['underartikel']
+        return uri
+
     def fmt_eu_ref(self, node, match, out, context):
         attrs = find_refids(node)
+        parts = {sub.data for sub in node.iter_subtrees()}
+        # an article of a *different* instrument (ECHR/Charter/treaty) -- captured
+        # so it is consumed and skipped, never anaphora-pinned onto our act
+        if 'eu_other' in parts:
+            raise NoLink()
+        # a known EU act named by short name ("artikel N i dataskyddsförordningen")
+        if 'eu_namnakt' in parts:
+            celex = self.named_acts.get(
+                token_text(subtree(node, 'eu_namnakt')).lower())
+            if celex is None:
+                raise NoLink()
+            out.append({'_uri': self._eu_celex_uri(celex, attrs),
+                        '_span': node_span(node)})
+            return
+        # the definite generic noun ("artikel N i förordningen") pinpoints the act
+        # in focus -- unambiguous, since it explicitly refers back to it
+        bare = parts <= {'eu_ref', 'artikel_part', 'artikel_ref_id',
+                         'underartikel_ref_id'}
+        if 'eu_generic' in parts or bare:
+            # a bare "artikel N" only anaphora-links when it stands alone: a
+            # coordination ("artikel 7 och 8.1 ...") or a trailing "i <instrument>"
+            # may belong to a *different* act named past the part we matched, so we
+            # refuse rather than risk pinning a Charter/treaty article onto our act
+            if bare:
+                tail = self._scan_text[self._scan_base + node_span(node)[1]:][:14]
+                if re.match(r"\s*(?:,|och|eller|samt)\s*\d|\s+i\s", tail):
+                    raise NoLink()
+            if not self.state.last_eu_act:
+                raise NoLink()
+            out.append({'_uri': self._eu_celex_uri(self.state.last_eu_act, attrs,
+                                                   remember=False),
+                        '_span': node_span(node)})
+            return
         tokens = tree_tokens(node)
         for t in tokens:
             if t.type in ('DIREKTIV', 'FORORDNING'):
                 attrs['akttyp'] = t.value
-        parts = {sub.data for sub in node.iter_subtrees()}
         if 'akttyp' not in attrs:  # bare "95/46/EG" / "(EEG) nr 2092/91"
             if 'direktiv_part' in parts:
                 attrs['akttyp'] = 'direktiv'
