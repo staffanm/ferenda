@@ -44,7 +44,8 @@ CREATE TABLE IF NOT EXISTS documents (
     title        TEXT,             -- full heading
     path         TEXT NOT NULL,    -- artifact json on disk
     source_url   TEXT,             -- authoritative publisher url ("Källa"), if any
-    content_hash TEXT              -- sha256 of the artifact bytes (incremental relate)
+    content_hash TEXT,             -- sha256 of the artifact bytes (incremental relate)
+    expired      TEXT              -- repeal-effective date (SFS upphavandedatum), if any
 );
 CREATE TABLE IF NOT EXISTS links (
     from_uri    TEXT NOT NULL,   -- document making the citation (doc-level uri)
@@ -100,6 +101,8 @@ def connect(path):
         con.execute("ALTER TABLE documents ADD COLUMN source_url TEXT")
     if "content_hash" not in cols:
         con.execute("ALTER TABLE documents ADD COLUMN content_hash TEXT")
+    if "expired" not in cols:
+        con.execute("ALTER TABLE documents ADD COLUMN expired TEXT")
     return con
 
 
@@ -311,6 +314,14 @@ def foreskrift_document(art, path):
             label, title, str(path))
 
 
+def expired_date(art):
+    """The date a document's repeal takes effect, if its metadata declares one (a
+    statute's `rpubl:upphavandedatum`) -- else None. Stored on the documents row so
+    the browse listings can omit a statute once the date has passed (still reachable
+    by direct link and search)."""
+    return art.get("metadata", {}).get("properties", {}).get("rpubl:upphavandedatum")
+
+
 def document_row(art, path, source):
     return {"sfs": sfs_document, "dv": dv_document,
             "forarbete": forarbete_document, "kommentar": kommentar_document,
@@ -343,9 +354,10 @@ def _index_document(con, art, path, source):
     fragment snippets, replacing any prior version keyed by the same uri."""
     uri = art["uri"]
     con.execute("DELETE FROM links WHERE from_uri = ?", (uri,))
-    con.execute("INSERT OR REPLACE INTO documents VALUES (?,?,?,?,?,?,?,?)",
+    con.execute("INSERT OR REPLACE INTO documents VALUES (?,?,?,?,?,?,?,?,?)",
                 (*document_row(art, path, source), art.get("source_url"),
-                 None))   # content_hash filled by the caller (it holds the bytes)
+                 None,                 # content_hash filled by the caller (holds bytes)
+                 expired_date(art)))
     rows = [(uri, anchor, run.get("predicate", "dcterms:references"),
              run["uri"], strip_fragment(run["uri"]), run.get("text"))
             for anchor, run in (artifact_links(art) + subject_links(art)
@@ -528,9 +540,9 @@ def synthesize_concepts(con):
     # a stable content_hash off the name -- the index then skips it on a re-run
     # (a None hash would force it to re-index every time) instead of file bytes.
     con.executemany(
-        "INSERT OR IGNORE INTO documents VALUES (?,?,?,?,?,?,?,?)",
+        "INSERT OR IGNORE INTO documents VALUES (?,?,?,?,?,?,?,?,?)",
         [(uri, "begrepp", "begrepp", name, name, "", None,
-          content_hash(("begrepp-stub\x1f" + name).encode()))
+          content_hash(("begrepp-stub\x1f" + name).encode()), None)
          for uri in new
          for name in [uri[len(prefix):].replace("_", " ")]])
     # backfill the stable hash on any stub minted before this column existed
@@ -685,6 +697,15 @@ def snippet(con, uri):
 def counts(con):
     return dict(con.execute(
         "SELECT source, COUNT(*) FROM documents GROUP BY source").fetchall())
+
+
+def expired_uris(con, today):
+    """The uris whose declared repeal date (`expired`) is on or before `today` (an
+    ISO date string) -- repealed statutes to drop from the browse listings. A
+    future repeal date (not yet in force) is kept."""
+    return {r[0] for r in con.execute(
+        "SELECT uri FROM documents WHERE expired IS NOT NULL AND expired <= ?",
+        (today,))}
 
 
 def concept_aliases(con):

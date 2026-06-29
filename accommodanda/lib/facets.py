@@ -17,6 +17,7 @@ in one pass (what the static generate consumes). The two share one catalog scan.
 
 import re
 from collections import namedtuple
+from datetime import date
 
 from ..eurlex.model import short_label as _eu_short_label
 from . import catalog, layout
@@ -68,11 +69,42 @@ _SFS_DESIGNATION = re.compile(
 _SFS_CONNECTOR = re.compile(r"^(om|med|angående|för|till|av)\s+", re.I)
 
 
+def _sfs_split(title):
+    """Split a (whitespace-normalised, editorial-stripped) SFS title into the
+    leading designation/number/connector that is *dropped* for sorting and the
+    subject it sorts under: 'Lag (2008:1302) om avtal …' -> ('Lag (2008:1302) om ',
+    'avtal …'). The prefix is shown subdued, the subject emphasised, so a reader
+    sees where the sort key begins."""
+    full = re.sub(r"\s+", " ", _SFS_EDITORIAL.sub("", title)).strip()
+    rest = _SFS_DESIGNATION.sub("", full).strip()
+    rest = re.sub(r"^\(\d{4}:\d+\)\s*", "", rest)    # the SFS number that follows it
+    rest = _SFS_CONNECTOR.sub("", rest).strip()
+    prefix = full[:len(full) - len(rest)] if rest and full.endswith(rest) else ""
+    return prefix, rest
+
+
 def _sfs_sortname(title):
-    t = re.sub(r"\s+", " ", _SFS_EDITORIAL.sub("", title)).strip()
-    t = _SFS_DESIGNATION.sub("", t).strip()
-    t = re.sub(r"^\(\d{4}:\d+\)\s*", "", t)      # the SFS number that follows it
-    return _SFS_CONNECTOR.sub("", t).strip()
+    return _sfs_split(title)[1]
+
+
+# parliamentary primary law -- a lag, a balk (Brottsbalk, Jordabalk, …), or one of
+# the grundlagar -- shown at full weight; secondary instruments (förordning,
+# kungörelse, tillkännagivande, …) are subdued in the listing. The grundlagar open
+# with their own designation, not "Lag"/"Balk", so they're pinned by SFS id.
+_GRUNDLAGAR = {"1974:152", "1949:105", "1991:1469", "1810:0926", "2014:801"}
+_SFS_STATUTE_END = ("lag", "lagen", "balk", "balken")
+
+
+def _sfs_is_statute(title, local):
+    """Whether an SFS is parliamentary primary law -- a lag, a balk, or one of the
+    grundlagar -- as opposed to a förordning/kungörelse/etc. The designation is the
+    phrase before the SFS number; a lag/balk ends in just that, however compound
+    ('Lag', 'Förvaltningslag', 'Radio- och tv-lag', 'Plan- och bygglag',
+    'Brottsbalk'). The grundlagar open with their own designation, so they're
+    pinned by SFS id. Drives the listing's visual hierarchy."""
+    head = re.sub(r"\s+", " ", _SFS_EDITORIAL.sub("", title)).strip()
+    designation = head.split("(", 1)[0].strip().lower()
+    return local in _GRUNDLAGAR or designation.endswith(_SFS_STATUTE_END)
 
 
 def _initial(s):
@@ -293,11 +325,29 @@ def browse_label(source, row):
     return row.label or row.title or row.local
 
 
+def browse_doc(source, row):
+    """A leaf-bucket document entry for the browse model. Every source carries
+    `uri`/`url`/`display`; a statute additionally carries the split title
+    (`pre` subdued + `key` emphasised), whether it is primary law (`subdued`
+    when not), and its `year` -- what the listing renders and filters on."""
+    doc = {"uri": row.uri, "url": layout.page_url(row.uri),
+           "display": browse_label(source, row)}
+    if source == "sfs":
+        pre, key = _sfs_split(row.title or "")
+        doc.update(pre=pre, key=key or doc["display"],
+                   subdued=not _sfs_is_statute(row.title or "", row.local),
+                   year=row.local.split(":", 1)[0])
+    return doc
+
+
 def _rows(con, source):
-    """The catalog rows of `source` that belong in the browse, as `Row`s."""
+    """The catalog rows of `source` that belong in the browse, as `Row`s. A
+    repealed statute whose repeal date has passed is omitted (still reachable by
+    direct link and search) -- the listing shows only law in force."""
+    expired = catalog.expired_uris(con, date.today().isoformat())
     for uri, _src, kind, label, title, _url, _path in catalog.documents(con, source):
         local = catalog.local(uri)
-        if is_browsable(source, local):
+        if uri not in expired and is_browsable(source, local):
             yield Row(uri, local, kind, label, title)
 
 
@@ -393,10 +443,8 @@ def browse_view(con, source):
             if n["children"] is not None:
                 attach(n["children"], keypath)
             else:
-                n["documents"] = [
-                    {"uri": r.uri, "url": "/" + layout.page_relpath(r.uri),
-                     "display": browse_label(source, r)}
-                    for r in grouped.get(keypath, [])]
+                n["documents"] = [browse_doc(source, r)
+                                  for r in grouped.get(keypath, [])]
 
     attach(view["buckets"], ())
     return view

@@ -28,6 +28,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+# StaticFiles.get_response raises Starlette's HTTPException (FastAPI's is a
+# subclass, so it would not catch the parent) -- the SiteFiles rewrite catches this
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
 from .. import config
 from ..lib import catalog, facets, layout, resolve, search
 
@@ -95,7 +99,7 @@ class Fragment(BaseModel):
 
 class SearchResult(BaseModel):
     uri: str
-    url: str | None = None          # the hosted page path (/sfs/1962_700.html)
+    url: str | None = None          # the public page path (/1962:700, /dom/nja/…)
     identifier: str | None = None
     title: str | None = None
     source: str | None = None
@@ -156,8 +160,15 @@ class Document(DocumentMeta):
 
 class BrowseDoc(BaseModel):
     uri: str
-    url: str                        # the hosted page path (/sfs/1962_700.html)
+    url: str                        # the hosted page path (/2018:585, /dom/nja/…)
     display: str                    # the listing handle (law name / short label / id)
+    # statute-only listing extras: the title split into a subdued designation/number
+    # prefix + the emphasised sort subject, whether it is primary law (else subdued),
+    # and its year -- what the SFS listing renders and filters on (None elsewhere)
+    pre: str | None = None
+    key: str | None = None
+    subdued: bool | None = None
+    year: str | None = None
 
 
 class FacetBucket(BaseModel):
@@ -212,7 +223,7 @@ def _resolved_results(con, q, source, kind):
         if kind and kind_ != kind:
             continue
         out.append({
-            "uri": root, "url": "/" + layout.page_relpath(root),
+            "uri": root, "url": layout.page_url(root),
             "identifier": label, "title": title, "source": src, "kind": kind_,
             "score": None, "inbound_count": catalog.document_inbound_count(con, root),
             "highlight": [],
@@ -238,7 +249,7 @@ def search_endpoint(
     full-text ranking (relevance combined with citation count) with the matching
     §/article fragments and highlights."""
     res = _index.search(q, source=source, kind=kind, limit=limit, offset=offset)
-    results = [{**r, "url": "/" + layout.page_relpath(r["uri"])}
+    results = [{**r, "url": layout.page_url(r["uri"])}
                for r in res["results"]]
     total = res["total"]
     # the resolved target is the answer to a citation-shaped query, so it leads;
@@ -369,14 +380,34 @@ def dumps_endpoint():
             for p in sorted(DUMPS.glob("*.ndjson.gz"))]
 
 
+class SiteFiles(StaticFiles):
+    """StaticFiles serving the site at lagen.nu's URI grammar: a request for a
+    document's bare public URL (/2018:585, /prop/2020/21:22, /dom/ad/1993:100,
+    /celex/61954CJ0001) is, on a static miss, rewritten to its flattened on-disk
+    file via layout.url_to_relpath -- nginx's try_files rules, in Starlette.
+    Directories (the /sfs/ etc. browse indexes) and existing files hit first, so
+    only an extensionless document URL takes the rewrite."""
+
+    async def get_response(self, path, scope):
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code == 404 and path and not path.endswith(".html"):
+                rel = layout.url_to_relpath(path)
+                if rel and rel != path:
+                    return await super().get_response(rel, scope)
+            raise
+
+
 def serve(directory, host="127.0.0.1", port=8000):
     """Serve the generated static site *and* the API from one uvicorn process --
     the only server (`lagen serve`). The REST routes (/api/v1/*, /docs,
     /openapi.json) answer first; everything else is served from `directory` as
-    static files (html=True maps each dir to its index.html). Because the site and
-    API share an origin, the ⌘K palette calls the API with relative URLs -- there
-    is no separate API server and no configurable API base to go stale. The static
-    mount is added here -- not at import -- so the in-process API client used
-    during `generate` (which only calls /api/v1) never needs a built site."""
-    app.mount("/", StaticFiles(directory=directory, html=True), name="site")
+    static files (html=True maps each dir to its index.html, and SiteFiles maps a
+    bare /<sfsid> to its <sfsid>.html). Because the site and API share an origin,
+    the ⌘K palette calls the API with relative URLs -- there is no separate API
+    server and no configurable API base to go stale. The static mount is added
+    here -- not at import -- so the in-process API client used during `generate`
+    (which only calls /api/v1) never needs a built site."""
+    app.mount("/", SiteFiles(directory=directory, html=True), name="site")
     uvicorn.run(app, host=host, port=port)

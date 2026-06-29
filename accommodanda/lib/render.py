@@ -28,13 +28,14 @@ import re
 import sqlite3
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
+from datetime import date
 from html import escape
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from ..api import app as api_service
-from ..dv.structure import flatten as dv_flatten
+from ..dv import naming as dv_naming
 from ..eurlex.structure import flatten as eurlex_flatten
 from . import catalog, layout
 from .catalog import BASE
@@ -131,7 +132,7 @@ def href(uri):
     if not uri.startswith(BASE):
         return uri  # already-absolute external
     _, frag = split_uri(uri)
-    return "/" + doc_relpath(uri) + ("#" + frag if frag else "")
+    return layout.page_url(uri) + ("#" + frag if frag else "")
 
 
 def external_href(uri):
@@ -238,6 +239,13 @@ def render_runs(runs, site):
     for run in runs:
         if isinstance(run, str):
             out.append(escape(run))
+            continue
+        if run.get("kind") == "footnote":
+            # an inline footnote marker -> superscript link to the endnote, with
+            # a matching id the endnote's ↩ links back to
+            n = escape(run["text"])
+            out.append('<sup class="fnref" id="fnref-%s">'
+                       '<a href="#fn-%s">%s</a></sup>' % (n, n, n))
             continue
         uri = site.resolve(run["uri"])     # fold a begrepp variant onto its canon
         if site.has(uri):
@@ -600,7 +608,7 @@ PAGE = """<!doctype html>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
 <link rel="stylesheet" href="/style.css">
-</head><body class="gr-root">
+</head><body class="gr-root%(body_class)s">
 %(masthead)s
 %(grid)s
 %(island)s<script src="/scrollspy.js" defer></script>
@@ -649,10 +657,12 @@ def _frontmatter(eyebrow, title, subtitle, meta, source_url=None):
 
 
 def page(title, kind, meta, body, toc="", eyebrow=None, subtitle=None,
-         island="", solo=False, source_url=None):
+         island="", solo=False, source_url=None, body_class=""):
     """Assemble a page. Document pages use the 3-column grid (TOC · reading
     column · context rail); `solo` pages (frontpage, browse indexes) drop the
-    side columns for a single centered column."""
+    side columns for a single centered column. `body_class` adds a modifier to
+    the <body> (e.g. " expired" for a repealed statute -- subdued reading column
+    + a fixed watermark)."""
     front = _frontmatter(eyebrow, title, subtitle, meta, source_url)
     if solo:
         grid = ('<div class="gr-body solo"><main class="gr-main">%s%s</main></div>'
@@ -663,36 +673,152 @@ def page(title, kind, meta, body, toc="", eyebrow=None, subtitle=None,
                 '<aside class="rail" id="rail" aria-live="polite"></aside></div>'
                 % (toc, front, body))
     return PAGE % {"title": escape(title), "masthead": _masthead(kind),
-                   "grid": grid, "island": island}
+                   "grid": grid, "island": island, "body_class": body_class}
+
+
+def _expired_banner(props):
+    """The repeal callout for a statute whose repeal has taken effect: the repeal
+    date and, when known, a link to the repealing act. Paired with the
+    `body.expired` treatment (subdued reading column + a fixed 'Upphävd
+    författning' watermark) so the status stays visible even when an anchor link
+    jumps deep past the heading."""
+    when = props.get("rpubl:upphavandedatum")
+    av = props.get("rinfoex:upphavdAv")
+    detail = ("Upphörde att gälla %s" % escape(when)) if when else "Upphävd"
+    if av:
+        detail += ' genom <a href="%s">SFS %s</a>' % (
+            escape(layout.page_url(av)), escape(catalog.local(av)))
+    return ('<div class="expired-banner"><strong>Upphävd författning</strong>'
+            '<span>%s.</span></div>' % detail)
 
 
 def render_sfs(art, site):
     props = art.get("metadata", {}).get("properties", {})
-    title = props.get("dcterms:title") or ("SFS " + catalog.local(art["uri"]))
+    local_id = catalog.local(art["uri"])
+    title = props.get("dcterms:title") or ("SFS " + local_id)
+    # a repeal that has taken effect (a future repeal date is still in force):
+    # mark the whole page as upphävd
+    upphavd = props.get("rpubl:upphavandedatum")
+    expired = bool(upphavd) and upphavd <= date.today().isoformat()
     meta = _meta_dl([
         ("Utfärdad", props.get("rpubl:utfardandedatum")),
         ("Ikraftträder", props.get("rpubl:ikrafttradandedatum")),
+        ("Upphävd", upphavd),
         ("Källa", props.get("dcterms:identifier")),
     ])
     toc = Toc()
     rail = Rail(site, art["uri"])
-    body = document_inbound(site, art["uri"]) + "".join(
-        render_node(n, site, art["uri"], toc, rail)
-        for n in art.get("structure", []))
+    body = (_expired_banner(props) if expired else "") \
+        + document_inbound(site, art["uri"]) + "".join(
+            render_node(n, site, art["uri"], toc, rail)
+            for n in art.get("structure", []))
     rail.add_document()        # law-level commentary as the rail's default panel
     return page(title, "Författning", meta, body, render_toc(toc),
-                eyebrow="SFS " + catalog.local(art["uri"]), island=rail.island(),
-                source_url=art.get("source_url"))
+                eyebrow="SFS " + local_id, island=rail.island(),
+                source_url=art.get("source_url"),
+                body_class=" expired" if expired else "")
+
+
+# the structural wrapper kinds in a DV decision tree (RANK in dv.structure); the
+# renderer shows them as nested sections rather than flattening them away
+DV_STRUCTURAL = {"delmal", "instans", "betankande", "dom",
+                 "skiljaktig", "tillagg", "domskal", "domslut"}
+DV_SHORT_COURT = {"Högsta domstolen": "HD",
+                  "Högsta förvaltningsdomstolen": "HFD"}
+DV_RULING_HEADING = {"betankande": "Föredragandens förslag till beslut",
+                     "skiljaktig": "Skiljaktig mening", "tillagg": "Tillägg"}
+
+
+def _dv_genitive(court):
+    short = DV_SHORT_COURT.get(court)
+    if short:
+        return short + ":s"                       # HD:s, HFD:s
+    return court + ("" if court.endswith("s") else "s")
+
+
+def _dv_ruling_word(art):
+    """The operative ruling's noun, from the målnummer prefix the court assigns:
+    Ö-mål are beslut, B/T-mål are dom; otherwise the neutral "avgörande"."""
+    mals = art.get("malnummer") or []
+    pre = (mals[0][:1].upper() if mals else "")
+    return {"Ö": "beslut", "B": "dom", "T": "dom"}.get(pre, "avgörande")
+
+
+def _dv_walk(nodes, site, doc_uri, toc, rail, court=None, ruling="avgörande"):
+    """Render a DV structure level: court instances and the betänkande/dom split
+    become titled sections (the föredragande's proposal muted), domskäl/domslut
+    are transparent wrappers whose own `<h2>` leaves carry the section titles,
+    and prose leaves render as ordinary paragraphs."""
+    sib = {n.get("type") for n in nodes}
+    out = []
+    for n in nodes:
+        t = n.get("type")
+        if t == "instans":
+            c = n.get("court") or "Instans"
+            anchor = toc.add(None, c, 1)
+            inner = _dv_walk(n.get("children", []), site, doc_uri, toc, rail,
+                             court=n.get("court"), ruling=ruling)
+            out.append('<section class="instans"><h2 id="%s" class="instans-rubrik">'
+                       '%s</h2>%s</section>' % (escape(anchor), escape(c), inner))
+        elif t == "delmal":
+            inner = _dv_walk(n.get("children", []), site, doc_uri, toc, rail,
+                             court=court, ruling=ruling)
+            head = ('<h2 class="delmal-rubrik">%s</h2>' % escape(n["ordinal"])
+                    if n.get("ordinal") else "")
+            out.append('<section class="delmal">%s%s</section>' % (head, inner))
+        elif t in ("betankande", "skiljaktig", "tillagg"):
+            label = DV_RULING_HEADING[t]
+            anchor = toc.add(None, label, 2)
+            inner = _dv_walk(n.get("children", []), site, doc_uri, toc, rail,
+                             court=court, ruling=ruling)
+            out.append('<section class="%s"><h3 id="%s" class="instans-rubrik">%s'
+                       '</h3>%s</section>' % (t, escape(anchor), escape(label), inner))
+        elif t == "dom":
+            inner = _dv_walk(n.get("children", []), site, doc_uri, toc, rail,
+                             court=court, ruling=ruling)
+            # title the court's own ruling only where a betänkande precedes it in
+            # the same instance; otherwise the instans heading already names it
+            head = ""
+            if "betankande" in sib and court:
+                label = "%s %s" % (_dv_genitive(court), ruling)
+                anchor = toc.add(None, label, 2)
+                head = ('<h3 id="%s" class="instans-rubrik">%s</h3>'
+                        % (escape(anchor), escape(label)))
+            out.append('<section class="dom">%s%s</section>' % (head, inner))
+        elif t in ("domskal", "domslut"):                # transparent wrappers
+            out.append(_dv_walk(n.get("children", []), site, doc_uri, toc, rail,
+                                court=court, ruling=ruling))
+        else:
+            out.append(render_node(n, site, doc_uri, toc, rail))
+    return "".join(out)
+
+
+def _dv_footnotes(footnotes, site):
+    """The end-of-document footnotes as an endnote list, each with a ↩ link back
+    to its inline marker (#fnref-N)."""
+    if not footnotes:
+        return ""
+    items = []
+    for fn in footnotes:
+        n = escape(str(fn["num"]))
+        items.append('<li id="fn-%s">%s <a class="fn-back" href="#fnref-%s" '
+                     'aria-label="Tillbaka till texten">↩</a></li>'
+                     % (n, render_runs(fn["text"], site), n))
+    return ('<section class="fotnoter"><h2>Fotnoter</h2><ol>%s</ol></section>'
+            % "".join(items))
 
 
 def render_dv(art, site):
     md = art.get("metadata", {})
-    referat = art.get("referat") or []
-    title = referat[0] if referat else art["uri"]
+    # heading by canonical identity + HD's given name (the stamped artifact label;
+    # computed live for an artifact parsed before the field). The löpnummer
+    # ("NJA 2025:58") stays metadata, never part of the identity string.
+    title = art.get("label") or dv_naming.case_label(art)
     meta = _meta_dl([
         ("Domstol", art.get("court_namn")),
         ("Avgörandedatum", art.get("avgorandedatum")),
         ("Målnummer", ", ".join(art.get("malnummer") or [])),
+        ("Löpnummer", ", ".join(dv_naming.lopnummer(art))),
         ("Rättsområde", ", ".join(md.get("rattsomrade") or [])),
     ])
     summary = ('<p class="sammanfattning">%s</p>' % escape(md["sammanfattning"])
@@ -700,9 +826,13 @@ def render_dv(art, site):
     sokord = _keywords(md.get("nyckelord") or [], site)
     toc = Toc()
     rail = Rail(site, art["uri"])
-    body = document_inbound(site, art["uri"]) + sokord + summary + "".join(
-        render_node(b, site, art["uri"], toc, rail)
-        for b in dv_flatten(art.get("structure", [])))
+    # a record with explicit instance structure (HD's modern <h1>-tagged form) is
+    # walked as nested sections; a flat legacy record has no structural wrappers,
+    # so the same walk renders it as a plain paragraph sequence
+    body = (document_inbound(site, art["uri"]) + sokord + summary
+            + _dv_walk(art.get("structure", []), site, art["uri"], toc, rail,
+                       ruling=_dv_ruling_word(art))
+            + _dv_footnotes(art.get("footnotes", []), site))
     return page(title, "Rättsfall", meta, body, render_toc(toc),
                 eyebrow=art.get("court_namn"), island=rail.island(),
                 source_url=art.get("source_url"))
@@ -1209,6 +1339,18 @@ def _browse_url(source, slugs):
 
 
 def _browse_item(doc):
+    # a statute carries a split title: the designation/number prefix is shown
+    # subdued, the sort subject emphasised, so the eye lands on where it files.
+    # data-name/data-year drive the client-side filter. A non-statute (förordning,
+    # kungörelse, …) dims the whole entry.
+    if doc.get("key") is not None:
+        cls = ' class="subdued"' if doc.get("subdued") else ""
+        name = (doc.get("pre") or "") + doc["key"]
+        label = ('<span class="pre">%s</span>%s'
+                 % (escape(doc.get("pre") or ""), escape(doc["key"])))
+        return ('<li%s data-name="%s" data-year="%s"><a href="%s">%s</a></li>'
+                % (cls, escape(name.lower()), escape(doc.get("year") or ""),
+                   escape(doc["url"]), label))
     return ('<li><a href="%s">%s</a></li>'
             % (escape(doc["url"]), escape(doc["display"])))
 
@@ -1247,17 +1389,50 @@ def _bucket_heading(source, levels, nodes):
     return "%s %s" % (nodes[0]["label"], nodes[1]["key"])
 
 
+# client-side filter for a statute listing: narrows this letter's entries by name
+# substring, or -- when the query is all digits -- by year prefix. data-name/
+# data-year live on each <li>; the running match count updates .browse-shown.
+BROWSE_FILTER = ('<input type="search" class="browse-filter" '
+                 'placeholder="Filtrera på namn eller år…" '
+                 'aria-label="Filtrera författningar">')
+
+BROWSE_FILTER_JS = """<script>
+(function(){
+  var box=document.querySelector('.browse-filter'),
+      list=document.querySelector('.browse-list');
+  if(!box||!list)return;
+  var items=Array.prototype.slice.call(list.children),
+      shown=document.querySelector('.browse-shown');
+  box.addEventListener('input',function(){
+    var q=box.value.trim().toLowerCase(), byYear=/^[0-9]+$/.test(q), n=0;
+    items.forEach(function(li){
+      var ok=!q||(byYear
+        ?(li.getAttribute('data-year')||'').indexOf(q)===0
+        :(li.getAttribute('data-name')||'').indexOf(q)!==-1);
+      li.hidden=!ok; if(ok)n++;
+    });
+    if(shown)shown.textContent=n;
+  });
+})();
+</script>"""
+
+
 def render_facet_page(source, view, nodes):
     """A single browse bucket page: the navigator + this leaf bucket's document
     list. `nodes` is the bucket-node path (one per level); the leaf carries its
-    `documents` (from the API, already ordered and labelled)."""
+    `documents` (from the API, already ordered and labelled). A statute listing
+    also gets a client-side name/year filter over the letter's entries."""
     heading = _bucket_heading(source, view["levels"], nodes)
     docs = nodes[-1].get("documents") or []
     listing = ('<ul class="browse-list">%s</ul>' % "".join(_browse_item(d) for d in docs)
                if docs else '<p class="empty">Inga dokument.</p>')
-    body = ('%s<section class="browse-group"><h1>%s <span class="c">%d</span></h1>'
-            '%s</section>' % (_facet_nav(source, view, [n["key"] for n in nodes]),
-                              escape(heading), len(docs), listing))
+    filtered = source == "sfs" and bool(docs)
+    body = ('%s<section class="browse-group"><h1>%s '
+            '<span class="c"><span class="browse-shown">%d</span></span></h1>%s%s%s</section>'
+            % (_facet_nav(source, view, [n["key"] for n in nodes]),
+               escape(heading), len(docs),
+               BROWSE_FILTER if filtered else "", listing,
+               BROWSE_FILTER_JS if filtered else ""))
     return page(heading, "Bläddra", "", body, solo=True)
 
 
@@ -1504,6 +1679,25 @@ dl.meta dt { font-weight: 500; font-style: normal; }
 dl.meta dd { margin: 0; }
 dl.meta a { color: var(--accent); }
 
+/* -- Upphävd (repealed) författning -- a clear repeal callout, a subdued reading
+   column, and a fixed watermark that stays in view at any scroll depth (so an
+   anchor link deep into the text still reads as repealed). -- */
+.expired-banner { display: flex; flex-wrap: wrap; align-items: baseline; gap: .55rem;
+                  margin: 0 0 2.25rem; padding: .7rem 1rem; border: 1px solid var(--rule);
+                  border-left: 3px solid var(--accent); border-radius: 5px;
+                  background: var(--surf-2); font-size: .92rem; color: var(--ink-2); }
+.expired-banner strong { font-family: var(--serif); font-weight: 600; color: var(--accent);
+                         text-transform: uppercase; letter-spacing: .04em; font-size: .82rem; }
+.expired-banner a { color: var(--accent); }
+body.expired .gr-main { color: var(--ink-3); }
+body.expired .gr-main h1, body.expired .kaprubrik, body.expired .rubrik,
+body.expired .artikel { color: var(--ink-2); }
+body.expired::before { content: "Upphävd författning"; position: fixed;
+                       top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-24deg);
+                       font-family: var(--serif); font-weight: 600; white-space: nowrap;
+                       font-size: min(11vw, 8rem); color: var(--accent); opacity: .08;
+                       pointer-events: none; user-select: none; z-index: 1; }
+
 /* -- Headings -- */
 .kaprubrik { font-family: var(--serif); font-weight: 500; font-size: 1.7rem;
              letter-spacing: -.022em; line-height: 1.12; margin: 3rem 0 .25rem;
@@ -1542,6 +1736,31 @@ section.paragraf.rail-active { background:
 .sokord { font-size: .85rem; color: var(--ink-3); }
 .sokord span { text-transform: uppercase; letter-spacing: .05em; font-size: .68rem;
                margin-right: .4rem; }
+/* DV instance/ruling structure */
+.instans { margin: 1.75rem 0 0; }
+.instans-rubrik { font-family: var(--serif); font-weight: 600; font-size: 1.45rem;
+                  margin: 0 0 .6rem; padding-bottom: .2rem;
+                  border-bottom: 1px solid var(--rule); }
+.betankande > .instans-rubrik, .dom > .instans-rubrik,
+.skiljaktig > .instans-rubrik, .tillagg > .instans-rubrik {
+    font-size: 1.1rem; border-bottom: 0; color: var(--ink-2); }
+.delmal-rubrik { font-family: var(--serif); font-weight: 600; font-size: 1.6rem;
+                 margin: 1.5rem 0 .6rem; }
+/* the föredragande's proposal HD decides on -- subdued, set apart from the ruling */
+.betankande { border-left: 2px solid var(--rule); padding-left: 1rem;
+              margin: 1rem 0; color: var(--ink-3); }
+.betankande .instans-rubrik { color: var(--ink-3); font-style: italic; }
+/* footnotes (HD 2023+): inline superscript markers + the endnote list */
+sup.fnref { font-size: .7em; line-height: 0; }
+sup.fnref a { text-decoration: none; padding: 0 .1em; }
+.fotnoter { margin-top: 2.5rem; border-top: 1px solid var(--rule);
+            padding-top: 1rem; font-size: .9rem; color: var(--ink-2); }
+.fotnoter h2 { font-family: var(--serif); font-size: 1rem; font-weight: 600;
+               border: 0; margin: 0 0 .5rem; }
+.fotnoter ol { margin: 0; padding-left: 1.5rem; }
+.fotnoter li { margin: .2rem 0; }
+.fn-back { text-decoration: none; color: var(--ink-4); margin-left: .25rem; }
+.fn-back:hover { color: var(--accent); }
 .kommentar-law { font-family: var(--serif); font-style: italic; font-size: 1rem;
                  color: var(--ink-2); border-left: 2px solid var(--kommentar);
                  padding: .4rem 0 .4rem 1rem; margin-bottom: 1rem; }
@@ -1666,6 +1885,17 @@ ol.ranked { padding-left: 1.4rem; } ol.ranked .c { color: var(--ink-3); font-siz
 .browse-list, .browse-group ul { list-style: none; padding: 0; margin: .75rem 0 0;
                    columns: 18rem; column-gap: 2rem; font-size: .92rem; }
 .browse-list li, .browse-group li { margin: .18rem 0; break-inside: avoid; }
+/* statute listing: the dropped designation/number prefix is subdued so the eye
+   lands on the sort subject; secondary instruments (förordning, …) dim wholesale */
+.browse-list .pre { color: var(--ink-4); }
+.browse-list li.subdued a { color: var(--ink-3); }
+.browse-list li.subdued .pre { color: var(--ink-4); }
+.browse-filter { width: 100%; max-width: 24rem; margin: .1rem 0 .9rem;
+                 padding: .45rem .7rem; font-family: var(--sans); font-size: .9rem;
+                 color: var(--ink); background: var(--surf-2);
+                 border: 1px solid var(--rule); border-radius: 6px; }
+.browse-filter:focus { outline: none; border-color: var(--accent);
+                       background: var(--surf); }
 .empty { color: var(--ink-3); font-style: italic; }
 
 /* -- faceted browse navigator -- */

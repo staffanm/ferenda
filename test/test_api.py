@@ -65,8 +65,9 @@ def test_search(client):
     hit = body["results"][0]
     assert hit["identifier"] == "SFS 1962:700"
     assert hit["fragments"][0]["pinpoint"] == "K3P1"
-    # the API resolves each hit's hosted page path (layout.page_relpath)
-    assert hit["url"] == "/sfs/1962_700.html"
+    # the API resolves each hit's public page path (layout.page_url): a statute
+    # at lagen.nu's bare /<sfsid> address, colon kept
+    assert hit["url"] == "/1962:700"
 
 
 def test_documents_lists_ids_and_metadata(client):
@@ -155,8 +156,10 @@ def test_browse_returns_navigator_with_leaf_documents(client):
     f = next(b for b in view["buckets"] if b["slug"] == "f")
     assert f["count"] == 1 and f["children"] is None
     assert f["documents"] == [{"uri": "https://lagen.nu/2018:585",
-                               "url": "/sfs/2018_585.html",
-                               "display": "Förvaltningslag (2018:585)"}]
+                               "url": "/2018:585",
+                               "display": "Förvaltningslag (2018:585)",
+                               "pre": "", "key": "Förvaltningslag (2018:585)",
+                               "subdued": False, "year": "2018"}]
 
 
 def test_sources(client):

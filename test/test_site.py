@@ -181,8 +181,9 @@ def test_rebuild_is_idempotent(tmp_path):
 # --- renderer -------------------------------------------------------------
 
 def test_href_and_relpath():
-    assert render.doc_relpath("https://lagen.nu/1975:635") == "sfs/1975_635.html"
-    assert render.href("https://lagen.nu/1975:635#P6") == "/sfs/1975_635.html#P6"
+    # a statute is a top-level page at lagen.nu's bare /<sfsid> address (colon kept)
+    assert render.doc_relpath("https://lagen.nu/1975:635") == "1975:635.html"
+    assert render.href("https://lagen.nu/1975:635#P6") == "/1975:635#P6"
     assert render.doc_relpath("https://lagen.nu/dom/NJA_1994_s_1") \
         == "dom/dom_NJA_1994_s_1.html"
     # external (non-lagen.nu) uris are left absolute
@@ -193,7 +194,7 @@ def test_render_runs_outbound_link(tmp_path):
     site = render.Site.from_catalog(build_catalog(tmp_path))
     html = render.render_runs(
         ["se ", {"uri": "https://lagen.nu/1975:635#P5", "text": "5 §"}, "."], site)
-    assert html == 'se <a href="/sfs/1975_635.html#P5">5 §</a>.'
+    assert html == 'se <a href="/1975:635#P5">5 §</a>.'
 
 
 def test_celex_renders_as_external_eurlex_link(tmp_path):
@@ -228,14 +229,36 @@ def test_law_page_has_inbound_annotation(tmp_path):
     # the citing case is in §6's context-rail panel, linking back to the case
     panel = _island(html)["P6"]
     assert "Hänvisat till av" in panel
-    assert 'href="/dom/dom_NJA_1994_s_1.html"' in panel
+    assert 'href="/dom/NJA_1994_s_1"' in panel
     assert "NJA 1994 s. 1" in panel
+
+
+def test_expired_statute_is_marked(tmp_path):
+    site = render.Site.from_catalog(build_catalog(tmp_path))
+    repealed = {
+        "uri": "https://lagen.nu/1975:1385",
+        "metadata": {"properties": {
+            "dcterms:title": "Aktiebolagslag (1975:1385)",
+            "rpubl:upphavandedatum": "2006-01-01",
+            "rinfoex:upphavdAv": "https://lagen.nu/2005:552"}},
+        "structure": [],
+    }
+    html = render.render_sfs(repealed, site)
+    assert 'class="gr-root expired"' in html       # drives the subdue + watermark
+    assert "Upphävd författning" in html
+    assert 'href="/2005:552"' in html              # link to the repealing act
+    assert "<dt>Upphävd</dt><dd>2006-01-01</dd>" in html
+    # a *future* repeal date is still in force -> not marked
+    upcoming = json.loads(json.dumps(repealed))
+    upcoming["metadata"]["properties"]["rpubl:upphavandedatum"] = "2099-01-01"
+    out = render.render_sfs(upcoming, site)
+    assert 'class="gr-root expired"' not in out and "expired-banner" not in out
 
 
 def test_case_page_links_into_law(tmp_path):
     site = render.Site.from_catalog(build_catalog(tmp_path))
     html = render.render_dv(CASE, site)
-    assert 'href="/sfs/1975_635.html#P6"' in html
+    assert 'href="/1975:635#P6"' in html
     assert "Om dröjsmålsränta." in html  # sammanfattning rendered
 
 
@@ -403,11 +426,11 @@ def test_generate_browse_writes_faceted_pages(tmp_path):
     # the law files under its subject initial 'R' (Räntelag); the source root and
     # the bucket page both list it (root == default bucket, no redirect)
     bucket = (out / "sfs" / "r" / "index.html").read_text()
-    assert 'href="/sfs/1975_635.html"' in bucket
+    assert 'href="/1975:635"' in bucket          # the bare /<sfsid> page address
     assert "som börjar på R" in bucket
-    assert 'href="/sfs/1975_635.html"' in (out / "sfs" / "index.html").read_text()
+    assert 'href="/1975:635"' in (out / "sfs" / "index.html").read_text()
     # every case is listed under its court; the source root resolves directly
-    assert 'href="/dom/dom_NJA_1994_s_1.html"' in (out / "dom" / "index.html").read_text()
+    assert 'href="/dom/NJA_1994_s_1"' in (out / "dom" / "index.html").read_text()
 
 
 def test_document_level_inbound_for_bare_citation(tmp_path):
@@ -495,7 +518,7 @@ def test_prop_page_renders_genomforande_panel(tmp_path):
     assert "Genomför EU-direktiv" in html
     assert "2 kap. 1 § genomför artikel 21.1, 21.2" in html
     # links to the directive's article on our EU page (we host it)
-    assert 'href="/eurlex/32022L2555.html#21"' in html
+    assert 'href="/celex/32022L2555#21"' in html
 
 
 def test_directive_article_shows_implementing_forarbete(tmp_path):
@@ -504,7 +527,7 @@ def test_directive_article_shows_implementing_forarbete(tmp_path):
     # article 21's rail panel shows the implementing förarbete
     panel = _island(html)["21"]
     assert "Hänvisat till av" in panel
-    assert 'href="/prop/2023_24_1.html#sid100"' in panel
+    assert 'href="/prop/2023/24:1#sid100"' in panel
     assert "Prop. 2023/24:1 s. 100" in panel
 
 
@@ -612,7 +635,7 @@ def test_statute_page_shows_genomfor_margin(tmp_path):
     # the genomför-direktiv block rides in the transposing paragraf's rail panel
     rail = "".join(_island(html).values())
     assert "Genomför EU-rätt" in rail
-    assert 'href="/eurlex/32022L2555.html#21"' in rail
+    assert 'href="/celex/32022L2555#21"' in rail
     assert "genomför delvis artikel 21.2" in rail
     assert "Prop. 2021/22:9" in rail              # provenance
 

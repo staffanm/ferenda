@@ -162,7 +162,7 @@ def test_browse_view_attaches_leaf_documents(tmp_path):
     assert leaf["key"] == "2016" and leaf["children"] is None
     doc = leaf["documents"][0]
     assert doc["uri"] == U + "ext/celex/32016R0679"
-    assert doc["url"] == "/eurlex/32016R0679.html"
+    assert doc["url"] == "/celex/32016R0679"     # eurlex's public /celex/ grammar
     # the listing handle is the source-aware browse label (eurlex short label),
     # not the bare CELEX
     assert doc["display"] == facets.browse_label("eurlex", Row(

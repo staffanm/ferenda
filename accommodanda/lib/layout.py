@@ -4,28 +4,27 @@ mappings derive from it:
 
   * ``downloaded`` -- the raw fetched bytes
   * ``artifact``   -- the parsed JSON
-  * ``page_relpath`` -- the generated HTML file and its public lagen.nu address
+  * ``page_relpath`` -- the generated HTML file on disk
+  * ``page_url`` -- the public lagen.nu address a link points at
 
-They are deliberately *not* identical: a filesystem-safe artifact path versus
-lagen.nu's URL grammar (e.g. a case lives at ``dv/artifact/dom_nja_2011s357.json``
-but is served at ``/dom/nja/2011s357``). Centralising the rules here -- instead
-of the ~10 scattered helpers in build.py and render.py -- keeps the layout
-conventions in one reviewable place.
-
-Step 1 of the consolidation: these rules reproduce the *existing* on-disk layout
-exactly; no files move. The per-source storage rules below are the seam where a
-future uniform ``<source>/{downloaded,artifact}/<relpath>`` convention (and the
-``url``/``from_url`` round-trip that retires the catalog's denormalised path)
-will be introduced.
+The last two are deliberately *not* identical: a filesystem-safe, flattened file
+name versus lagen.nu's URI grammar. A statute's page is the file ``2018:585.html``
+but its public URL is the bare ``/2018:585``; a case lives at
+``dom/dom_nja_2011s357.html`` but is served at ``/dom/nja/2011s357``; an EU act is
+``eurlex/32016R0679.html`` but addressed ``/celex/32016R0679``. ``url_to_relpath``
+is the inverse the static server applies (``api.app.SiteFiles``) to resolve a
+public URL back to its file -- nginx's ``try_files`` rewrites, in Starlette.
+Centralising these rules here -- instead of the ~10 scattered helpers in build.py
+and render.py -- keeps the layout conventions in one reviewable place.
 """
 
 import re
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 from .. import config
 from ..dv.parse import slug as _dv_slug
-from .catalog import local, strip_fragment
+from .catalog import BASE, local, strip_fragment
 
 DATA = config.DATA
 GENERATED = DATA / "generated"
@@ -191,10 +190,11 @@ def source_url(source, basefile, metadata=None):
 
 
 def page_relpath(uri):
-    """The generated HTML file (== public route) for a document uri, by uri
-    shape -- lagen.nu's URL grammar: dv at dom/, förarbeten under their type
-    segment (prop/, sou/, …), EU acts under eurlex/ (the CELEX kept intact),
-    statutes under sfs/."""
+    """The generated HTML file for a document uri, by uri shape -- lagen.nu's URL
+    grammar: dv at dom/, förarbeten under their type segment (prop/, sou/, …), EU
+    acts under eurlex/ (the CELEX kept intact). A statute is a *top-level* page
+    named by its bare SFS id with the colon kept (2018:585 -> 2018:585.html), so
+    it is served at lagen.nu's /2018:585 address (see `page_url`)."""
     loc = local(strip_fragment(uri))
     if loc.startswith("dom/"):
         prefix = "dom"
@@ -215,8 +215,32 @@ def page_relpath(uri):
         fs, _, rest = loc.partition("/")
         return "%s/%s.html" % (fs, _alnum_slug(rest))
     else:
-        prefix = "sfs"
+        # SFS: a top-level page, the SFS id kept verbatim (colon and all). The id
+        # is already filesystem-safe (digits, ':', '_', '.'): 1827:60_s.1007.
+        return "%s.html" % loc
     return "%s/%s.html" % (prefix, _alnum_slug(loc))
+
+
+def page_url(uri):
+    """The public URL a link points at -- lagen.nu's URI grammar: the document's
+    host-stripped local path, served bare (no .html). A statute is /2018:585, a
+    proposition /prop/2020/21:22, a case /dom/ad/1993:100. An EU act lives under
+    /celex/<celexid> (its ext/celex/ namespace collapsed). The static server maps
+    these back to the flattened on-disk files (see url_to_relpath, api.app.SiteFiles)."""
+    loc = local(strip_fragment(uri))
+    if loc.startswith("ext/celex/"):
+        return "/celex/" + loc[len("ext/celex/"):]
+    return "/" + loc
+
+
+def url_to_relpath(path):
+    """Inverse of page_url: the on-disk static file for a public lagen.nu URL path.
+    The path is a document's URI local form, so reattach the host and reuse the
+    page_relpath rule; /celex/<id> is the public address of ext/celex/<id>."""
+    loc = unquote(path).lstrip("/")
+    if loc.startswith("celex/"):
+        loc = "ext/celex/" + loc[len("celex/"):]
+    return page_relpath(BASE + loc)
 
 
 # a föreskrift loc is "<fs>/<år>:<nr>"; every författningssamling code ends in FS
