@@ -24,20 +24,12 @@ Two layers over the shared font-aware extraction (``lib.pdftext``):
     ``bemyndigande`` (the empowering SFS paragrafer, via the citation engine --
     the edge that lets a statute list the regulations issued under it), the EU
     directives a footnote says it ``genomför``, and the regulations it replaces.
-
-    python -m accommodanda.foreskrift.parse RECORD.json     # one record -> stdout
-    python -m accommodanda.foreskrift.parse [--root DIR] [--fs fffs] [--limit N]
 """
 
-import argparse
 import functools
-import glob
-import json
 import re
-import sys
 from pathlib import Path
 
-from ..lib import layout
 from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from ..lib.lagrum import (
     EULAGSTIFTNING,
@@ -49,7 +41,7 @@ from ..lib.lagrum import (
 )
 from ..lib.pdftext import RE_KAP_MARK, RE_PARA_MARK, page_paragraphs, pdf_pages
 from .model import Consolidation, Regulation, regulation_uri
-from .structure import flatten, nest
+from .structure import nest
 
 # a föreskrift cites SFS (the empowering law) and EU directives (what it
 # implements); it does not cite case law or förarbeten in its operative text.
@@ -310,62 +302,3 @@ def parse_record(record, root):
             identifier=am.get("identifier", am.get("text", "")),
             uri=am.get("uri", ""), beslutsdatum=None))
     return reg
-
-
-# --------------------------------------------------------------------------
-# CLI
-# --------------------------------------------------------------------------
-
-def cmd_one(path):
-    record = json.loads(Path(path).read_text())
-    root = Path(path).parents[1]
-    art = parse_record(record, root).to_artifact()
-    json.dump(art, sys.stdout, ensure_ascii=False, indent=2)
-    print()
-
-
-def cmd_batch(root, fs, limit):
-    records = sorted(glob.glob("%s/%s/*.json" % (root, fs or "*")))
-    records = [r for r in records if not r.endswith("/.complete")]
-    if limit:
-        records = records[:limit]
-    paras = links = empty = fail = 0
-    for path in records:
-        record = json.loads(Path(path).read_text())
-        if "fs" not in record:
-            continue
-        try:
-            reg = parse_record(record, root)
-        except Exception as exc:
-            fail += 1
-            print("  FAIL %s: %s: %s" % (record.get("basefile"),
-                                         type(exc).__name__, exc))
-            continue
-        art = reg.to_artifact()
-        flat = flatten(art["structure"])
-        paras += sum(b.get("type") == "paragraf" for b in flat)
-        links += sum(1 for b in flat for r in (b.get("text") or [])
-                     if isinstance(r, dict))
-        empty += not art["structure"]
-        out = layout.artifact("foreskrift", record["basefile"])
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(json.dumps(art, ensure_ascii=False, indent=2))
-    print("%d records: %d paragrafer, %d links, %d empty-body, %d failed"
-          % (len(records), paras, links, empty, fail))
-
-
-def main():
-    ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
-    ap.add_argument("record", nargs="?", help="a single record JSON -> stdout")
-    ap.add_argument("--root", default="site/data/foreskrift/downloaded")
-    ap.add_argument("--fs", help="restrict batch to one författningssamling")
-    ap.add_argument("--limit", type=int)
-    args = ap.parse_args()
-    if args.record:
-        cmd_one(args.record)
-    else:
-        cmd_batch(args.root, args.fs, args.limit)
-
-
-if __name__ == "__main__":
-    main()

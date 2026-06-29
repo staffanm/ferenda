@@ -14,17 +14,10 @@ the annexes (parsing them is a later step).
 Body text is scanned for citations to EU legislation and CJEU case law with the
 shared citation engine, the same way SFS/DV/forarbete are, so EU references link
 into the rest of the corpus.
-
-    python -m accommodanda.eurlex.parse FILE.fmx4 --celex 32022L2555   # -> stdout
-    python -m accommodanda.eurlex.parse --root site/data/eurlex [--limit N]
 """
 
-import argparse
 import functools
-import json
-import sys
 import zipfile
-from collections import Counter
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -34,7 +27,6 @@ from .definitions import build_matcher, extract_definitions, term_refs
 from .model import BASE, Block, EurlexDoc, doctype, short_label
 from .parse_html import parse_html
 from .parse_pdf import parse_pdf
-from .structure import flatten as flatten_structure
 from .structure import nest
 
 LANG_PREFERENCE = ("swe", "eng")
@@ -474,60 +466,3 @@ def parse_content(path, route, celex, lang):
     if route == "pdf":
         return parse_pdf(path, celex, lang)
     raise ValueError("no parser for route %r" % route)
-
-
-def cmd_one(path, celex):
-    path = Path(path)
-    celex = celex or _celex_from_path(path)
-    lang = next((l for l in LANG_PREFERENCE if path.name.startswith(l)),
-                LANG_PREFERENCE[0])
-    route = (_route(path) or (0, "fmx4"))[1]
-    json.dump(to_artifact(parse_content(path, route, celex, lang)),
-              sys.stdout, ensure_ascii=False, indent=2)
-    print()
-
-
-def cmd_batch(root, limit):
-    dirs = sorted(p.parent for p in Path(root).glob("*/*/notice.ttl"))
-    if limit:
-        dirs = dirs[:limit]
-    blocks = links = empty = fail = 0
-    by_route = Counter()
-    for doc_dir in dirs:
-        celex = doc_dir.name.replace("_", "/")
-        path, lang, route = content_file(doc_dir)
-        if path is None:
-            continue
-        by_route[route] += 1
-        try:
-            art = to_artifact(parse_content(path, route, celex, lang))
-        except Exception as exc:
-            fail += 1
-            print("  FAIL %s [%s]: %s: %s" % (celex, route, type(exc).__name__, exc))
-            continue
-        flat = flatten_structure(art["structure"])
-        blocks += len(flat)
-        links += sum(1 for b in flat for r in b.get("text", [])
-                     if isinstance(r, dict))
-        empty += not art["structure"]
-        (doc_dir / "artifact.json").write_text(
-            json.dumps(art, ensure_ascii=False, indent=2))
-    print("%d docs (%s): %d blocks, %d links, %d empty, %d failed"
-          % (len(dirs), dict(by_route), blocks, links, empty, fail))
-
-
-def main():
-    ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
-    ap.add_argument("file", nargs="?", help="a single Formex file -> stdout")
-    ap.add_argument("--celex", help="CELEX id (else recovered from the path)")
-    ap.add_argument("--root", default="site/data/eurlex")
-    ap.add_argument("--limit", type=int)
-    args = ap.parse_args()
-    if args.file:
-        cmd_one(args.file, args.celex)
-    else:
-        cmd_batch(args.root, args.limit)
-
-
-if __name__ == "__main__":
-    main()

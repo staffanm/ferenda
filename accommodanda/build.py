@@ -60,6 +60,8 @@ from .forarbete import genomforande as fa_genomforande
 from .forarbete import kommentar as fa_kommentar
 from .forarbete import parse as fa_parse
 from .foreskrift import download as foreskrift_download
+from .foreskrift import harvest as foreskrift_harvest_mod
+from .foreskrift import parse as foreskrift_parse
 from .foreskrift.agencies import REGISTRY as FORESKRIFT_AGENCIES
 from .lib import catalog, dump, layout, render, search, util
 from .lib.datasets import NAMEDCASES as NAMEDCASES_JSON
@@ -938,7 +940,59 @@ def foreskrift_harvest(scopes):
         print("foreskrift %s: %d seen, %d new" % (fs, seen, new))
 
 
-SOURCES["foreskrift"] = Source("foreskrift", foreskrift_list, {},
+# the parser is one shared engine over every fs (its own model/structure plus the
+# shared PDF extraction + citation engine), so a change to any of these re-stales
+# every föreskrift the recipe-version way -- just like SFS/eurlex parse.
+FORESKRIFT_CODE = (PKG / "foreskrift" / "parse.py",
+                   PKG / "foreskrift" / "model.py",
+                   PKG / "foreskrift" / "structure.py",
+                   PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py")
+
+
+def foreskrift_record(basefile):
+    """The harvested record JSON (``<fs>/<slug>.json``) for one base regulation."""
+    fs = basefile.split("/", 1)[0]
+    return foreskrift_harvest_mod.record_path(
+        layout.FORESKRIFT_DOWNLOADED, fs, basefile)
+
+
+def foreskrift_artifact(basefile):
+    return layout.artifact("foreskrift", basefile)
+
+
+def foreskrift_inputs(basefile):
+    """The record JSON plus every body PDF it references (the regulation and any
+    konsoliderad versions); re-downloading any of them re-stales the parse."""
+    rec = foreskrift_record(basefile)
+    paths = [rec]
+    if rec.exists():
+        record = json.loads(rec.read_text())
+        fsdir = layout.FORESKRIFT_DOWNLOADED / record["fs"]
+        files = record.get("files", {})
+        reg = files.get("regulation")
+        if reg and reg.get("name"):
+            paths.append(fsdir / reg["name"])
+        paths += [fsdir / c["name"] for c in files.get("consolidation", [])
+                  if c.get("name")]
+    return paths
+
+
+def foreskrift_parse_run(basefile):
+    """One harvested record -> its JSON artifact: the body structure, the masthead
+    metadata, and the bemyndigande/genomför citation edges the model carries."""
+    record = json.loads(foreskrift_record(basefile).read_text())
+    reg = foreskrift_parse.parse_record(record, str(layout.FORESKRIFT_DOWNLOADED))
+    write_artifact("foreskrift", basefile, reg.to_artifact())
+
+
+# No per-document download stage: the body PDFs arrive only through the bulk
+# `foreskrift_harvest` sweep, so parse depends on no upstream stage -- it runs over
+# whatever the harvest has put on disk (relate/index/dump/generate then act on the
+# artifacts by source name, like every other source).
+SOURCES["foreskrift"] = Source("foreskrift", foreskrift_list, {
+    "parse": Stage("parse", foreskrift_parse_run, foreskrift_artifact,
+                   inputs=foreskrift_inputs, code=FORESKRIFT_CODE),
+},
     harvest=foreskrift_harvest,
     origin="https://www.lagrummet.se/rattskalla/?filter=foreskrifter",
     scopes=frozenset(FORESKRIFT_AGENCIES),

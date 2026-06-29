@@ -11,17 +11,11 @@ A **begrepp** page ("Ne bis in idem") is a concept definition published at
 `begrepp/Ne_bis_in_idem`; its `[[wikilinks]]` resolve to other concepts and its
 prose citations to laws/cases, so the concept becomes a hub the rest of the
 corpus links into.
-
-    python -m accommodanda.wiki.parse kommentar FILE.xml   # one page -> stdout
-    python -m accommodanda.wiki.parse begrepp   FILE.xml
 """
 
-import argparse
 import functools
 import glob
-import json
 import re
-import sys
 from pathlib import Path
 
 from ..lib import wikitext
@@ -150,20 +144,3 @@ def begrepp_index(root):
                 and not title.startswith(SKIP_TITLE):
             out[title] = path
     return out
-
-
-def main():
-    ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
-    ap.add_argument("kind", choices=("kommentar", "begrepp"))
-    ap.add_argument("file")
-    args = ap.parse_args()
-    build = kommentar_artifact if args.kind == "kommentar" else begrepp_artifact
-    art = build(args.file)
-    if art is None:
-        sys.exit("not a %s page (redirect/namespace)" % args.kind)
-    json.dump(art, sys.stdout, ensure_ascii=False, indent=2)
-    print()
-
-
-if __name__ == "__main__":
-    main()

@@ -1,7 +1,7 @@
 """Tests for the förarbete PDF parser's font-aware blocks logic (PDF-free)."""
 
-from accommodanda.forarbete.parse import (classify, mint_uri, page_paragraphs,
-                                          Line, Para)
+from accommodanda.forarbete.parse import classify, mint_uri
+from accommodanda.lib.pdftext import Line, Para, page_paragraphs
 
 
 def test_mint_uri_matches_citation_form():

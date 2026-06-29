@@ -13,17 +13,10 @@ produces (`prop/{riksmöte}:{no}`, `sou/{year}:{no}`, …), so a citation to thi
 document and the document itself agree by construction -- the lesson from the DV
 case-URI work. Body blocks are scanned for citations (SFS / other förarbeten /
 case law) and carry inline links, like SFS and DV.
-
-    python -m accommodanda.forarbete.parse RECORD.json   # one record -> artifact
-    python -m accommodanda.forarbete.parse --root DIR [--limit N] [--type prop]
 """
 
-import argparse
 import functools
-import glob
-import json
 import re
-import sys
 from pathlib import Path
 
 from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
@@ -49,9 +42,8 @@ from ..lib.pdftext import (
     page_paragraphs,
     pdf_pages,
 )
-from .download import basefile_slug
 from .model import Block, Forarbete
-from .structure import flatten, nest
+from .structure import nest
 
 # förarbeten cite across the whole spectrum, like court decisions
 PARSE_TYPES = [LAGRUM, KORTLAGRUM, EULAGSTIFTNING, RATTSFALL, FORARBETEN,
@@ -145,65 +137,3 @@ def to_artifact(fa):
     return {"uri": fa.uri, "type": fa.type, "identifier": fa.identifier,
             "basefile": fa.basefile, "title": fa.title, "date": fa.date,
             "structure": nest(blocks)}
-
-
-# --------------------------------------------------------------------------
-# CLI
-# --------------------------------------------------------------------------
-
-def cmd_one(path):
-    record = json.loads(Path(path).read_text())
-    json.dump(to_artifact(parse_record(record, Path(path).parents[1])),
-              sys.stdout, ensure_ascii=False, indent=2)
-    print()
-
-
-def cmd_batch(root, typ, limit):
-    pattern = "%s/%s/*.json" % (root, typ or "*")
-    records = sorted(glob.glob(pattern))
-    if limit:
-        records = records[:limit]
-    blocks = links = empty = fail = 0
-    for path in records:
-        record = json.loads(Path(path).read_text())
-        if record.get("files") is None:
-            continue
-        try:
-            art = to_artifact(parse_record(record, root))
-        except Exception as exc:
-            fail += 1
-            print("  FAIL %s: %s: %s" % (record["basefile"],
-                                         type(exc).__name__, exc))
-            continue
-        flat = flatten(art["structure"])
-        blocks += len(flat)
-        links += sum(1 for b in flat for r in b.get("text", [])
-                     if isinstance(r, dict))
-        empty += not art["structure"]
-        art_path(root, record).write_text(
-            json.dumps(art, ensure_ascii=False, indent=2))
-    print("%d records: %d blocks, %d links, %d empty-body, %d failed"
-          % (len(records), blocks, links, empty, fail))
-
-
-def art_path(root, record):
-    out = Path(root) / record["type"] / "artifact"
-    out.mkdir(parents=True, exist_ok=True)
-    return out / (basefile_slug(record["basefile"]) + ".json")
-
-
-def main():
-    ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
-    ap.add_argument("record", nargs="?", help="a single record JSON -> stdout")
-    ap.add_argument("--root", default="site/data/forarbete")
-    ap.add_argument("--type", help="restrict batch to one type")
-    ap.add_argument("--limit", type=int)
-    args = ap.parse_args()
-    if args.record:
-        cmd_one(args.record)
-    else:
-        cmd_batch(args.root, args.type, args.limit)
-
-
-if __name__ == "__main__":
-    main()
