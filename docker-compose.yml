@@ -1,9 +1,104 @@
-version: '3.4'
+# lagen.nu — one compose project, two sites, selected by Compose profiles.
+#
+#   DEV  (only the search backend the rebuilt pipeline needs):
+#       docker compose up -d
+#     -> starts *just* opensearch (it carries no profile). Run accommodanda
+#        itself straight from the working tree -- `lagen all serve` -- because
+#        it is continuously re-edited and restarted; there is no point
+#        containerising it in dev.
+#
+#   PROD (the full host: the legacy lagen.nu stack + the rebuilt site):
+#       docker compose --profile prod up -d
+#     -> everything below. The legacy nginx fronts both vhosts:
+#          lagen.nu          -> legacy ferenda (uwsgi/gunicorn)
+#          ferenda.lagen.nu  -> accommodanda (uvicorn), the rebuilt site+API
+#        See docker/nginx/ferenda.lagen.nu.conf.
+#
+# Rule of thumb: a service with NO `profiles:` key starts in every invocation
+# (that's opensearch, shared by dev and prod); everything tagged
+# `profiles: [prod]` starts only under `--profile prod`.
+
 services:
+  # --- shared: the rebuilt full-text index (dev + prod) --------------------
+  # A single-node, security-disabled OpenSearch 2.x at the code's default
+  # endpoint (config.DEFAULT_OPENSEARCH_URL = http://localhost:9200). Security
+  # is OFF on purpose: a local index over public data, plain HTTP, no auth.
+  # Do NOT expose port 9200 to the internet -- the prod host firewall must keep
+  # 9200/9600 closed; only the accommodanda container talks to it (over the
+  # compose network as http://opensearch:9200). On WSL2, if it won't boot,
+  # raise vm.max_map_count: `sudo sysctl -w vm.max_map_count=262144`.
+  opensearch:
+    image: opensearchproject/opensearch:2.18.0   # ':2' tracks the latest 2.x
+    container_name: lagen-opensearch
+    environment:
+      - discovery.type=single-node           # one node; relaxes the bootstrap checks
+      - DISABLE_SECURITY_PLUGIN=true          # -> plain http://localhost:9200, no auth
+      - DISABLE_INSTALL_DEMO_CONFIG=true      # skip the demo TLS certs/users
+      - bootstrap.memory_lock=true            # keep the JVM heap out of swap
+      - OPENSEARCH_JAVA_OPTS=-Xms3g -Xmx3g    # headroom for a ~1M+ doc parent-child
+                                              # index; the join field's global ordinals
+                                              # are the main heap consumer (now lazy)
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "9200:9200"        # REST API -- the endpoint the code connects to
+      - "9600:9600"        # performance analyzer (optional)
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data   # persist the index across restarts
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 18          # first boot can take a couple of minutes
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "10"
+
+  # --- prod: the rebuilt site (ferenda.lagen.nu) ---------------------------
+  # The code is baked into the image (which also carries the full pipeline
+  # toolchain); the corpus and the wiki content repo are read-write bind-mounts.
+  # One uvicorn process serves the static site + REST API (`lagen all serve`,
+  # the image CMD), and the same container runs maintenance in place:
+  #     docker compose exec accommodanda lagen all rebuild
+  #     docker compose exec accommodanda lagen all index
+  accommodanda:
+    build:
+      context: ../accommodanda
+      dockerfile: docker/accommodanda/Dockerfile
+    profiles: [prod]
+    environment:
+      - OPENSEARCH_URL=http://opensearch:9200
+      - WIKI_ROOT=/wiki
+    volumes:
+      - /mnt/data/ferenda:/app/site/data   # corpus (data_root): download + rebuild write here
+      - /mnt/data/lagen-wiki:/wiki         # begrepp/kommentar markdown repo (git clone on the host)
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    restart: always
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "10"
+
+  # --- prod: legacy lagen.nu stack (reproduced from master) ----------------
   nginx:
     build:
       context: docker/nginx
-      # The Dockerfile builds on the base Nginx image but adds configuration, letsencrypt integration etc
+      # Base image + config (default.conf = lagen.nu, ferenda.lagen.nu.conf =
+      # the rebuilt site) and letsencrypt integration. To get a cert that also
+      # covers ferenda.lagen.nu, add it to this service's DOMAIN below so the
+      # ACME client reissues one SAN cert for both names (both vhosts reference
+      # the same fullchain.pem); until then nginx still boots and only warns for
+      # the new name.
+    profiles: [prod]
     ports:
       - "80:80"
       - "443:443"
@@ -11,22 +106,31 @@ services:
       - /mnt/data/lagen/data:/usr/share/nginx/html:ro
       - /mnt/data/lagen/certificates:/usr/share/nginx/certificates/
       - /home/staffan/wds/ferenda/docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
- 
+      - /home/staffan/wds/ferenda/docker/nginx/ferenda.lagen.nu.conf:/etc/nginx/conf.d/ferenda.lagen.nu.conf:ro
     environment:
-      - "DOMAIN=lagen.nu"
+      - "DOMAIN=lagen.nu"           # add ` ferenda.lagen.nu` here for a SAN cert
       - "EMAIL=staffan.malmgren@gmail.com"
     depends_on:
       - ferenda
       - mediawiki
       - matomo
+      - accommodanda
     restart: always
     logging:
       options:
         max-size: "10m"
         max-file: "10"
   ferenda:
-    build:
-      context: .
+    # The legacy app image. It CANNOT be built from this branch: the
+    # modernization branch deleted requirements.txt (the legacy root Dockerfile
+    # does `COPY requirements.txt .`), replacing it with pyproject/uv.lock for
+    # accommodanda. So reference the already-built legacy image rather than
+    # rebuilding it. Tag your existing/prod legacy image as `lagen-ferenda:legacy`
+    # (e.g. `docker tag <old-ferenda-image> lagen-ferenda:legacy`) or adjust here.
+    # (On master, where requirements.txt still exists, this can go back to
+    # `build: {context: .}` if you cherry-pick this file over there.)
+    image: lagen-ferenda:legacy
+    profiles: [prod]
     volumes:
       - /mnt/data/lagen:/usr/share/site
       - .:/usr/share/ferenda
@@ -42,6 +146,7 @@ services:
         max-file: "10"
   elasticsearch:
     image: elasticsearch:7.7.1
+    profiles: [prod]
     volumes:
       - /mnt/data/elasticsearch:/usr/share/elasticsearch/data
     environment:
@@ -53,9 +158,9 @@ services:
         max-size: "10m"
         max-file: "10"
   fuseki:
-    # image: stain/jena-fuseki
     build:
       context: docker/fuseki
+    profiles: [prod]
     volumes:
       - fuseki:/fuseki
     environment:
@@ -67,8 +172,9 @@ services:
         max-size: "10m"
         max-file: "10"
   mediawiki:
-    build: 
+    build:
       context: docker/mediawiki
+    profiles: [prod]
     volumes:
       - /mnt/data/mediawiki/db:/var/www/data
       - /mnt/data/mediawiki/images:/var/www/html/w/images
@@ -80,6 +186,7 @@ services:
   db:
     image: mariadb
     command: --max-allowed-packet=64MB
+    profiles: [prod]
     volumes:
       - db:/var/lib/mysql
     environment:
@@ -91,22 +198,20 @@ services:
         max-file: "10"
   matomo:
     image: matomo:5
-    #volumes:
-    #  - matomo:/var/www/html
+    profiles: [prod]
     environment:
       - MATOMO_DATABASE_HOST=db
       - MYSQL_PASSWORD=ncfeGpSR63xmnyTa
       - MYSQL_DATABASE=matomo
       - MYSQL_USER=root
-    #ports:
-    #  - 8123:8123
     restart: always
     logging:
       options:
         max-size: "10m"
         max-file: "10"
+
 volumes:
   db:
-  #matomo:
   fuseki:
   elasticsearch:
+  opensearch-data:
