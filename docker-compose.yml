@@ -10,6 +10,8 @@ services:
     volumes:
       - /mnt/data/lagen/data:/usr/share/nginx/html:ro
       - /mnt/data/lagen/certificates:/usr/share/nginx/certificates/
+      - /home/staffan/wds/ferenda/docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+ 
     environment:
       - "DOMAIN=lagen.nu"
       - "EMAIL=staffan.malmgren@gmail.com"
