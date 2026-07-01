@@ -30,6 +30,11 @@ __pycache__/
 /.env
 /mediawiki-db-backup-230502/
 /mediawiki-html-backup-230502/
+# Local MediaWiki SQLite source for the one-time markdown migration (not tracked;
+# tools/mediawiki_to_markdown.py reads it to replay history into ../lagen-wiki)
+/mediawiki-db/
+# Stray local package downloads
+*.deb
 /site/data/
 .playwright-mcp/
 opencode.json
