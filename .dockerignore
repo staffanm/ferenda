@@ -1,3 +1,14 @@
 .git
 doc
 tng.lagen.nu
+
+# Trim the accommodanda build context (docker/accommodanda/Dockerfile, whose
+# context is the repo root). The generated corpus is bind-mounted at runtime,
+# not baked; the venv and dev config must not leak into the image.
+.venv
+site
+config.yml
+mediawiki-db
+__pycache__
+.pytest_cache
+.ruff_cache

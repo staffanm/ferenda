@@ -227,3 +227,56 @@ site/data/domstol/downloaded/                 # DV new-API harvest (per court)
 site/data/dv/{downloaded,intermediate}/       # DV legacy feed (.doc/.docx + old XML)
 site/data/dv/identity-index.json              # canonical case -> source records
 ```
+
+## Production deployment (Docker)
+
+The prod host runs one compose project that serves **both** sites behind the
+legacy nginx: `lagen.nu` (the legacy stack) and `ferenda.lagen.nu` (this
+rebuilt site). Which services start is chosen by a Compose **profile**:
+
+| invocation | services | use |
+|---|---|---|
+| `docker compose up -d` | `opensearch` only | dev — run `lagen all serve` from the working tree |
+| `docker compose --profile prod up -d` | full stack | prod — legacy stack + `accommodanda` + `opensearch` |
+
+`opensearch` carries no profile, so it starts in both; everything else is
+`profiles: [prod]`. On the prod host, set `COMPOSE_PROFILES=prod` in `.env` so
+every command (`ps`, `logs`, `restart`, …) sees the whole stack without the flag.
+
+**One-time host setup**
+
+1. Tag the existing legacy app image so the `ferenda` service can reference it —
+   it can't build from this branch (which deleted `requirements.txt`):
+   `docker tag <old-ferenda-image> lagen-ferenda:legacy`.
+2. Create the read-write data dirs the `accommodanda` service mounts:
+   `/mnt/data/ferenda` (the corpus / `data_root`) and `/mnt/data/lagen-wiki`
+   (a clone of the `lagen-wiki` markdown repo — `WIKI_ROOT`).
+3. Point `ferenda.lagen.nu` DNS at the host and append ` ferenda.lagen.nu` to the
+   nginx service's `DOMAIN` env so the ACME client reissues one SAN cert for both
+   names (nginx boots either way; TLS just warns for the new name until then).
+
+**Bring-up**
+
+```sh
+docker compose --profile prod up -d      # opensearch must report healthy first
+```
+
+`accommodanda` is a frozen image: the code is baked in, but it also carries the
+full pipeline toolchain (poppler-utils, tesseract+swe, ocrmypdf, raptor2-utils,
+a JRE + the POI jars), so **download + rebuild run in the container** against the
+read-write corpus mount:
+
+```sh
+docker compose exec accommodanda lagen all download
+docker compose exec accommodanda lagen all rebuild   # parse→relate→index→dump→generate
+docker compose exec accommodanda lagen all index
+# or, without the serving process running:
+docker compose run --rm accommodanda lagen all rebuild
+```
+
+One uvicorn process serves the static site + REST API (`lagen all serve`, the
+image `CMD`); the nginx `ferenda.lagen.nu` vhost reverse-proxies to it on `:8000`
+(the app resolves lagen.nu's bare-URL grammar itself, so nginx needs no
+`try_files` rules). The corpus mount is read-write and shared with serving; a
+rebuild writes essentially per-file, but for strict isolation restart the
+service afterwards (`docker compose restart accommodanda`).
