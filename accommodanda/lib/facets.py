@@ -19,12 +19,11 @@ import re
 from collections import namedtuple
 from datetime import date
 
-from ..eurlex.model import short_label as _eu_short_label
 from . import catalog, layout
 
 # a catalog row reduced to what facet-key extraction needs (its host-stripped
 # local id is precomputed once, since most extractors slice it)
-Row = namedtuple("Row", "uri local kind label title")
+Row = namedtuple("Row", "uri local kind label title display")
 
 
 # --------------------------------------------------------------------------
@@ -316,13 +315,13 @@ def is_browsable(source, local):
 
 
 def browse_label(source, row):
-    """The handle shown for a document in a listing: a law/concept by name, an EU
-    act by its short title-derived label, everything else by its identifier."""
-    if source == "eurlex":
-        return _eu_short_label(row.title) or row.label or row.local
-    if source in ("sfs", "begrepp"):
-        return row.title or row.label or row.local
-    return row.label or row.title or row.local
+    """The handle shown for a document in a listing -- the same reader-facing
+    heading the page and search hits use (catalog.display_title, stamped onto the
+    `display` column at relate): an act's short name + acronym where it has them,
+    else its title; a law/concept by name; everything else by its identifier.
+    Falls back to label/local for a row predating the column (display still
+    NULL until its source is re-related)."""
+    return row.display or row.label or row.local
 
 
 def browse_doc(source, row):
@@ -345,10 +344,11 @@ def _rows(con, source):
     repealed statute whose repeal date has passed is omitted (still reachable by
     direct link and search) -- the listing shows only law in force."""
     expired = catalog.expired_uris(con, date.today().isoformat())
-    for uri, _src, kind, label, title, _url, _path in catalog.documents(con, source):
+    for uri, _src, kind, label, title, _url, _path, display in \
+            catalog.documents(con, source):
         local = catalog.local(uri)
         if uri not in expired and is_browsable(source, local):
-            yield Row(uri, local, kind, label, title)
+            yield Row(uri, local, kind, label, title, display)
 
 
 def _path(levels, row):

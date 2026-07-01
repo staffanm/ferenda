@@ -33,7 +33,8 @@ GENERATED = DATA / "generated"
 # (parsed) trees. Two deliberate exceptions, matching lagen.nu's grammar:
 #  * case law's canonical dir is dom/ (the /dom/ URL); the api records and ALL
 #    parsed case-law artifacts live there. dv/ keeps only the legacy raw feed.
-#  * kommentar + begrepp share one mediawiki/ dump (one raw source, two derived).
+#  * kommentar + begrepp are authored as markdown in a separate content repo
+#    (WIKI_ROOT, a sibling checkout), not under data_root; two derived sources.
 SFS_ROOT = DATA / "sfs"
 DOM_ROOT = DATA / "dom"          # case law (source key "dv"): api raw + artifacts
 DV_ROOT = DATA / "dv"            # legacy case-law raw feed only
@@ -42,7 +43,7 @@ EURLEX_ROOT = DATA / "eurlex"
 FORESKRIFT_ROOT = DATA / "foreskrift"     # agency regulations (per-fs subtrees)
 KOMMENTAR_ROOT = DATA / "kommentar"
 BEGREPP_ROOT = DATA / "begrepp"
-WIKI_ROOT = DATA / "mediawiki" / "downloaded"       # shared by kommentar+begrepp
+WIKI_ROOT = config.WIKI_ROOT        # git-backed markdown content repo (begrepp/ + kommentar/)
 
 ARTIFACT_ROOT = {"sfs": SFS_ROOT, "dv": DOM_ROOT, "forarbete": FA_ROOT,
                  "eurlex": EURLEX_ROOT, "foreskrift": FORESKRIFT_ROOT,
@@ -68,6 +69,21 @@ def _alnum_slug(s):
     return "".join(c if c.isalnum() else "_" for c in s).strip("_")
 
 
+def kommentar_host(basefile):
+    """The host source a kommentar/begrepp basefile annotates. A kommentar borrows
+    its host's identity (`annotates:` is an SFS number, a CELEX, an FS id or a
+    förarbete id), so its artifact is filed *under that host source* -- mirroring
+    the content repo's `commentary/<source>/…` layout and, crucially, reusing the
+    host's own path transform so two sources can never collide on one flat name.
+    The split is the same one `wiki.host_uri` makes: an FS id / förarbete id first
+    (they carry a `/`), then a colon means SFS, else a bare CELEX (eurlex)."""
+    if _FORESKRIFT_LOC.match(basefile):
+        return "foreskrift"
+    if basefile.startswith(FORARBETE):
+        return "forarbete"
+    return "sfs" if ":" in basefile else "eurlex"
+
+
 # --------------------------------------------------------------------------
 # storage relpath -> artifact / downloaded
 # --------------------------------------------------------------------------
@@ -88,7 +104,14 @@ def relpath(source, basefile):
     if source == "foreskrift":
         fs, rest = basefile.split("/", 1)        # "fffs/2013:10"
         return Path(fs) / rest.replace(":", "-").replace(" ", "_")
-    if source in ("kommentar", "begrepp"):
+    if source == "kommentar":
+        # file the annotation under its host source, reusing that source's
+        # transform: sfs/2009/400, eurlex/2023/32023R2854 -- so a commentary on
+        # SFS 2009:400 and one on a same-slug act in another source never collide
+        host = kommentar_host(basefile)
+        return Path(host) / relpath(host, basefile)
+    if source == "begrepp":
+        # concept names are their own namespace (no host); keep the flat slug
         return Path(_alnum_slug(basefile))
     raise ValueError("unknown source %r" % source)
 

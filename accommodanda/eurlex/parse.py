@@ -17,14 +17,16 @@ into the rest of the corpus.
 """
 
 import functools
+import json
 import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
+from ..lib.datasets import NAMEDACTS
 from ..lib.lagrum import EULAGSTIFTNING, EURATTSFALL, LagrumParser, interleave
 from ..lib.util import from_roman
 from .definitions import build_matcher, extract_definitions, term_refs
-from .model import BASE, Block, EurlexDoc, doctype, short_label
+from .model import BASE, Block, EurlexDoc, doctype, official_short_title, short_label
 from .parse_html import parse_html
 from .parse_pdf import parse_pdf
 from .structure import nest
@@ -373,6 +375,20 @@ def _refparser():
                         parse_types=[EULAGSTIFTNING, EURATTSFALL])
 
 
+@functools.cache
+def _namedacts():
+    """The hand-edited EU named-act dataset, CELEX -> {label?, abbr?} (each a str
+    or a list). Source of the established short name and the citing acronym we
+    stamp onto the artifact for the document page heading."""
+    return json.loads(NAMEDACTS.read_text(encoding="utf-8"))
+
+
+def _first(value):
+    """The dataset stores `label`/`abbr` as a str or a list (the namedacts
+    convention); the page heading wants a single value -- the first when a list."""
+    return value[0] if isinstance(value, list) else value
+
+
 def to_artifact(doc):
     """Project to the artifact JSON: metadata + body blocks whose text is an
     inline-run list (plain runs + {predicate,uri,text} citation links). Defined
@@ -408,9 +424,22 @@ def to_artifact(doc):
     # a short, distinctive human handle derived from the official title (the
     # browse index / search shows it instead of the bare CELEX). Acts (legislation
     # /treaties) only -- a judgment's "title" is the case name, already short.
-    label = short_label(doc.title) if doc.doctype != "judgment" else None
-    if label:
-        art["label"] = label
+    if doc.doctype != "judgment":
+        label = short_label(doc.title)
+        if label:
+            art["label"] = label
+        # the document page heading: the established short name + citing acronym.
+        # The short name is the curated `label` from the named-act dataset (rare),
+        # else the act's own trailing-parenthesis short title; the acronym (`abbr`)
+        # is only shown when the dataset carries one. Both absent -> the page falls
+        # back to the full official title (which always sits in the metadata list).
+        entry = _namedacts().get(doc.celex) or {}
+        shortname = _first(entry.get("label")) or official_short_title(doc.title)
+        if shortname:
+            art["shortname"] = shortname
+        abbr = _first(entry.get("abbr"))
+        if abbr:
+            art["abbr"] = abbr
     if doc.ecli:
         art["ecli"] = doc.ecli
     if doc.oj:

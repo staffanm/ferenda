@@ -64,6 +64,28 @@ _LABEL_TAIL = re.compile(
 _LABEL_LEAD = re.compile(r"^[\s,;:.]*(?:om|on)\b\s*", re.IGNORECASE)
 
 
+def official_short_title(title):
+    """The established short title an act carries in a trailing parenthesis --
+    "… (allmän dataskyddsförordning)" -> "Allmän dataskyddsförordning",
+    "… (cyberresiliensförordningen) (Text av betydelse för EES)" ->
+    "Cyberresiliensförordningen" -- capitalised, or None when the title carries no
+    such naming parenthetical.
+
+    The EEA-relevance / recast boilerplate parenthetical (and the trailing OJ note
+    after it) is stripped first; what then sits in a trailing "(…)" is a real short
+    title when it contains a lowercase letter -- so an all-caps marker like "(SUB)"
+    is rejected -- and is not itself an act-number designation. A single-word short
+    title ("cyberresiliensförordningen") is accepted: Swedish compounds the whole
+    name into one word, so a space must not be required."""
+    title = _LABEL_BOILERPLATE.sub("", re.sub(r"\s+", " ", title or "").strip()).strip()
+    m = re.search(r"\(([^()]{3,})\)\s*$", title)
+    if (m and re.search(r"[a-zåäöéèüæø]", m.group(1))
+            and not _LABEL_DESIGNATION.search(m.group(0))):
+        name = m.group(1).strip()
+        return name[:1].upper() + name[1:]
+    return None
+
+
 def short_label(title):
     """A short, distinctive label for an EU act, derived from its official title --
     what a browse index or a search result shows instead of the bare CELEX.
@@ -81,15 +103,12 @@ def short_label(title):
     title = re.sub(r"\s+", " ", title or "").strip()
     if not title:
         return None
+    short = official_short_title(title)
     title = _LABEL_BOILERPLATE.sub("", title).strip()
     d = _LABEL_DESIGNATION.search(title)
     designation = d.group(0) if d else None
-    # a real naming short title is multi-word and has a lowercase letter -- so an
-    # abbreviation marker like "(SUB)"/"(SMP)" or a leftover act number is not taken
-    m = re.search(r"\(([^()]{3,})\)\s*$", title)
-    if (m and " " in m.group(1) and re.search(r"[a-zåäöéèüæø]", m.group(1))
-            and not _LABEL_DESIGNATION.search(m.group(0))):
-        name = m.group(1).strip()
+    if short:
+        name = short
     elif d:
         name = _LABEL_LEAD.sub("", _LABEL_TAIL.sub(
             "", _LABEL_DATE.sub("", title[d.end():]))).strip().rstrip(".")

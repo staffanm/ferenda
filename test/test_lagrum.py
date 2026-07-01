@@ -163,6 +163,21 @@ EULAGSTIFTNING_CASES = [
     # pre-2015 regulation: "(coop) nr <number>/<year>", number-first
     ("rådets förordning (EEG) nr 1234/85",
      "https://lagen.nu/ext/celex/31985R1234"),
+    # a *bare* act-type word (no "rådets"/"kommissionens" institution) before a
+    # parenthesised designation still sets the sector letter -- "direktiv" -> L,
+    # "förordning" -> R. Regression for the CRA recital-125 bug, where a bare
+    # "direktiv (EU) 2022/2555" minted a regulation (32022R2555) because only the
+    # institution-prefixed alternative captured the act type.
+    ("ändras genom direktiv (EU) 2022/2555 och",
+     "https://lagen.nu/ext/celex/32022L2555"),
+    ("som avses i direktiv (EU) 2018/1808",
+     "https://lagen.nu/ext/celex/32018L1808"),
+    ("enligt förordning (EU) 2022/2554 ska",
+     "https://lagen.nu/ext/celex/32022R2554"),
+    # absent any act-type word, a parenthesised "(EU) <year>/<number>" still
+    # defaults to a regulation -- the correct pre-2015 behaviour (only regulations
+    # used the parenthesised form), and the safe default post-2015
+    ("i (EU) 2019/1020 anges", "https://lagen.nu/ext/celex/32019R1020"),
 ]
 
 

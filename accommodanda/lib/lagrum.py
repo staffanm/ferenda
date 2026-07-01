@@ -205,6 +205,7 @@ artikel_ref_id: NUMBER
 underartikel_ref_id: NUMBER
 
 rattsakt_part: institution _W akttyp _W (direktiv_part | forordning_part) (_W av_datum)?
+             | akttyp _W (direktiv_part | forordning_part) (_W av_datum)?
              | direktiv_part
              | forordning_part
 institution: RADETS | EP_RADETS | KOMMISSIONENS
@@ -490,6 +491,7 @@ EU_TRIGGER_SRC = r"""
     \bartikel\ \d                             # EU article
   | \b(?:rådets|kommissionens|Europaparlamentets\ och\ rådets)\b
   | \b\d+/\d+/E(?:EG|G|U)\b                   # 95/46/EG
+  | \bdirektiv\ (?=\(E(?:EG|G|U)\))           # bare "direktiv (EU) 2022/2555"
   | \(E(?:EG|G|U)\)\ (?:nr\ )?\d+/\d+         # (EEG) nr 2092/91
 """
 

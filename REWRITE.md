@@ -67,13 +67,13 @@ Current code layout (this three-layer split is now realized in the package):
 
 ```
 accommodanda/
-  lib/      shared horizontal libs — lagrum (citation engine), catalog, render, layout, net, wikitext, util, errors
-  config.py runtime config (config.yml / data_root)
+  lib/      shared horizontal libs — lagrum (citation engine), catalog, render, layout, net, markdown, util, errors
+  config.py runtime config (config.yml / data_root / wiki_root)
   sfs/      acts vertical — extract·reader·model·tokenizer·assembler·nf·register (+ __main__)
   dv/       court-decisions vertical — download·identity·model·parse·structure·word·legacy
   forarbete/ preparatory-works vertical — download·model·parse·structure·kommentar
   eurlex/   EU vertical (EUR-Lex/CELLAR) — download·bulk·parse·parse_html·parse_pdf·structure·lang·model
-  wiki/     kommentar + begrepp sources — parse
+  wiki/     kommentar + begrepp sources — parse (markdown content repo, WIKI_ROOT)
   build.py  orchestrator — the `lagen` build driver, composes the verticals
 ```
 

@@ -78,3 +78,50 @@ def flatten(structure):
         else:
             out.append(node)
     return out
+
+
+def subarticle_key(t, num, cur_article, cur_parag):
+    """The citation anchor for a sub-article block -- the **dotted** `4.5` / `6.2.a`
+    grammar, from the block's running article/paragraph context. A paragraph is
+    `article.paragraph`, a point `article.paragraph.point` (or `article.point` for a
+    point sitting directly under the article, like a definitions-article entry).
+    None when the block cannot anchor (no article context or no number). The one
+    canonical sub-article id grammar -- shared by the renderer (the node id it
+    mints), the wiki commentary headings (`## Artikel 5.2 a` -> "5.2.a") and the
+    guidance linker's `.ann` keys -- so every layer lands on the same node."""
+    if not (cur_article and num):
+        return None
+    if t == _PARAGRAPH:
+        return "%s.%s" % (cur_article, num)
+    if t == _POINT:
+        return ("%s.%s.%s" % (cur_article, cur_parag, num) if cur_parag
+                else "%s.%s" % (cur_article, num))
+    return None
+
+
+def anchored_blocks(structure):
+    """Walk the act in document order yielding `(anchor, block)` for every block
+    a citation (or a guidance link) can target: an article (anchor = its id or
+    number), a sub-article paragraph/point (the `subarticle_key` paren form), and
+    a numbered recital (`recital-N`). Blocks that cannot anchor are skipped. The
+    running article/paragraph context is tracked exactly as `render_eurlex` does,
+    so these anchors are the ones the renderer actually mints."""
+    cur_article = cur_parag = None
+    for b in flatten(structure):
+        t = b.get("type")
+        num = b.get("num")
+        if t == _ARTICLE:
+            cur_article, cur_parag = b.get("id") or num, None
+            if cur_article:
+                yield cur_article, b
+        elif t == _PARAGRAPH:
+            cur_parag = num
+            key = subarticle_key(t, num, cur_article, cur_parag)
+            if key:
+                yield key, b
+        elif t == _POINT:
+            key = subarticle_key(t, num, cur_article, cur_parag)
+            if key:
+                yield key, b
+        elif t == "recital" and (num or "").isdigit():
+            yield "recital-%s" % num, b

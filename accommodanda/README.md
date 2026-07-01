@@ -107,6 +107,115 @@ The DV parsers are driven by the identity index: each canonical case is
 parsed from its single best source — the API record when present, the
 legacy Word original otherwise (no cross-source merge; see REWRITE.md §4).
 
+### Wiki content repo (begrepp + kommentar)
+
+The hand-authored commentary (`kommentar`) and concept glossary (`begrepp`)
+are **git-backed markdown** in a separate content repo (`lagen-wiki`),
+checked out alongside this one and pointed at by `WIKI_ROOT`:
+
+```sh
+git clone <lagen-wiki remote> ../lagen-wiki    # or: git submodule update --init
+uv run python -m accommodanda.build begrepp parse
+uv run python -m accommodanda.build kommentar parse
+```
+
+`WIKI_ROOT` defaults to `../lagen-wiki` (a sibling of the repo); override it
+with the `wiki_root` key in `config.yml` or the `WIKI_ROOT` env var. The
+content layout is `concept/<Name>.md` (frontmatter `title:`) and
+`commentary/<source>/<relpath>.md` (frontmatter `annotates:`) — the commentary
+is filed under the source it annotates and that source's basefile→path rule, so
+`SFS/1915:218` lives at `commentary/sfs/1915/218.md`. The parsed artifact mirrors
+this — `kommentar/artifact/<host_source>/<host_relpath>.json` (e.g.
+`kommentar/artifact/eurlex/2023/32023R2854.json`), reusing the host source's own
+path transform (`layout.kommentar_host`) so commentaries on different sources can
+never collide on one flat name. Concept links are
+`[label](begrepp:Concept)`, external links are ordinary markdown
+`[label](https://…)`, legal citations stay plain text (the citation engine links
+them), and `aliases:` carries old names from MediaWiki redirects. The parser is
+`lib/markdown.py`.
+
+Each `## …` heading anchors the section to the host node it annotates, per host:
+
+| heading | anchor | host |
+|---|---|---|
+| `## N §` | `#P{N}` | continuously-numbered SFS |
+| `## N kap M §` | `#K{N}P{M}` | per-chapter SFS |
+| `## Artikel N` | `#{N}` | EU act article |
+| `## Artikel N.M` / `## Artikel N.M a` | `#{N}.{M}` / `#{N}.{M}.{a}` | EU sub-article (definition/list point) |
+| `## Skäl N` or `## (N)` | `#recital-{N}` | EU recital |
+
+`annotates:` is an SFS number (`2009:400`) or a CELEX (`32024R2847`); the host act
+is resolved accordingly (`wiki.host_uri`). A section may carry prose **and** a
+curated external-links list: a `## Externa länkar` bullet block attaches to the
+section heading it sits under (per-article guidance, shown in that node's rail),
+or to the act as a whole when it precedes any section heading (document-level,
+shown in the "Om dokumentet" rail). Bullets are `- [label](https://…) — note`.
+
+`lagen kommentar validate [basefiles…]` reports section anchors that match no node
+in the annotated act (a mistyped `## Artikel 99` / amended-away `## 24 kap 2 §`);
+the same check warns during `relate`.
+
+`lagen kommentar ai-annotate <basefile>` (opt-in, LLM) is the AI guidance linker
+(PRD Step 4). An annotation declares its external guidance documents by hand in a
+`guidance:` frontmatter block — a list of `{title, url, pdf}` mappings, the `pdf:`
+being the direct download link (a guidance doc is short-lived; the URL is not
+derivable from the act):
+
+```markdown
+---
+annotates: 32023R2854
+guidance:
+  - title: Frågor och svar om dataakten
+    url: https://digital-strategy.ec.europa.eu/en/library/…-data-act
+    pdf: https://ec.europa.eu/newsroom/dae/redirection/document/108144
+---
+## Externa länkar
+- [Frågor och svar om dataakten (FAQ)](https://…) — Europeiska kommissionen
+```
+
+The action downloads + caches each PDF (under `kommentar/guidance/`), flattens it
+to page-marked text, and asks the configured Berget model to map guidance sections
+(FAQ questions) to the act's **fine-grained targets** — not just whole articles but
+the sub-articles and recitals the act divides into: a single definition `2.21`, a
+numbered paragraph `6.2`, a recital `recital-15` (the dotted sub-article / `recital-N`
+anchor grammar `eurlex.structure` mints, shared with the renderer and the wiki
+commentary headings, so a link lands on the exact node). A FAQ answer about two definitions links to exactly those two, not to
+article 2 as a whole. The result is written as a **`.ann` sidecar** next to the
+kommentar artifact — `{"guidanceLinks": {anchor: [{label, href, desc, section}]}}` —
+the AI-created (then human-corrected) layer, kept separate from the hand-edited
+markdown, mirroring eurlex's `.ann` editorial layer. `label` names the source and
+its own section reference ("Frågor och svar om dataakten, question 8"), `desc` is
+that section's title (the FAQ question), so the rail renders `link: question`. The
+guidance document's own `section` (a FAQ question number) is the durable,
+human-dereferenceable locator; the `#page=N` deep link is a convenience, located by
+matching the section title back into the PDF (the model miscounts pages). Like every
+`ai-*` action the LLM is called only here, never from a corpus-wide
+parse/relate/generate. The `.ann` is woven into the annotated act's rail by
+`render._kommentar_indexes` (it merges each kommentar `.ann`'s `guidanceLinks`
+alongside the curated per-article guidance); a sub-article gets its citation anchor
++ rail only when something targets it, so a forced/full `generate` surfaces the AI
+links on the right nodes.
+
+A kommentar is a **separate source**: editing a `commentary/…md` file shows up on
+the annotated act's page only after re-running the wiki pipeline and the catalog —
+`lagen kommentar parse && lagen kommentar relate && lagen <host> generate
+<basefile>` (e.g. `lagen eurlex generate 32024R2847`; the host's own
+`parse`/`generate` stages never read the wiki).
+
+The repo was seeded from the live MediaWiki SQLite DB, replaying the full
+per-revision history as one git commit per revision:
+
+```sh
+uv run python tools/mediawiki_to_markdown.py path/to/lagen.sqlite ../lagen-wiki
+uv run python tools/wiki_artifact_diff.py path/to/lagen.sqlite   # losslessness check
+```
+
+`wiki_artifact_diff.py` asserts the migration's safety property: for every
+page, `markdown → artifact` is byte-identical to the old `wikitext →
+artifact` (modulo two adjudicated, content-free normalisations — see the
+script). `lib/wikitext.py` is retired from the pipeline and kept only as the
+converter's/diff's reference.
+
 ## Data layout
 
 The pipelines read large data trees that live under `site/data/` (not all

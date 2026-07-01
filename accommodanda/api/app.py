@@ -102,6 +102,7 @@ class SearchResult(BaseModel):
     url: str | None = None          # the public page path (/1962:700, /dom/nja/…)
     identifier: str | None = None
     title: str | None = None
+    display: str | None = None      # reader-facing heading (short name + acronym, else title)
     source: str | None = None
     kind: str | None = None
     score: float | None = None
@@ -219,12 +220,18 @@ def _resolved_results(con, q, source, kind):
         row = catalog.document(con, root)
         if not row:
             continue
-        _uri, src, kind_, label, title, _path = row
+        _uri, src, kind_, label, title, path = row
         if kind and kind_ != kind:
             continue
+        # the same reader-facing heading the page and full-text hits show (short
+        # name + acronym where the artifact has them, else the title); the artifact
+        # carries the fields, so a pinned hit is labelled like any other
+        display = (catalog.display_title(json.loads(Path(path).read_bytes()), title)
+                   if path else title)
         out.append({
             "uri": root, "url": layout.page_url(root),
-            "identifier": label, "title": title, "source": src, "kind": kind_,
+            "identifier": label, "title": title, "display": display,
+            "source": src, "kind": kind_,
             "score": None, "inbound_count": catalog.document_inbound_count(con, root),
             "highlight": [],
             "fragments": ([{"uri": hit["uri"], "pinpoint": frag, "highlight": []}]
@@ -316,7 +323,7 @@ def documents_endpoint(
     artifact's last-build time."""
     total = catalog.document_count(con, source, kind)
     docs = []
-    for uri, src, kind_, label, title, source_url, path in \
+    for uri, src, kind_, label, title, source_url, path, _display in \
             catalog.documents(con, source, kind, limit, offset):
         p = Path(path)
         updated = (datetime.fromtimestamp(p.stat().st_mtime, timezone.utc).isoformat()

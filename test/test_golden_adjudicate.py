@@ -343,6 +343,28 @@ def test_celex_correction_requires_same_source():
     assert sorted(unexplained) == sorted([new, old]) and accepted == []
 
 
+def test_celex_old_scrambles_adds_directive_letter_flip():
+    # a directive also has the old engine's "defaulted to R" scramble as a variant
+    assert golden_sfs.celex_old_scrambles(
+        "https://lagen.nu/ext/celex/32018L1808") == {
+            "https://lagen.nu/ext/celex/31808L2018",   # plain year/number swap
+            "https://lagen.nu/ext/celex/31808R2018"}   # swap + directive->regulation
+    # a regulation has only the plain swap (no spurious L variant)
+    assert golden_sfs.celex_old_scrambles(
+        "https://lagen.nu/ext/celex/32017R0625") == {
+            "https://lagen.nu/ext/celex/3625R2017"}
+
+
+def test_celex_correction_forgives_directive_letter_flip():
+    # new mints the correct directive 32018L1808; the old pipeline rendered the
+    # bare "direktiv (EU) 2018/1808" as a scrambled *regulation* 31808R2018
+    new = _ref("extra", "K2P4S1", "https://lagen.nu/ext/celex/32018L1808")
+    old = _ref("missing", "K2P4S1", "https://lagen.nu/ext/celex/31808R2018")
+    unexplained, accepted = golden_sfs.adjudicate([new, old], CELEX_GOLDEN)
+    assert unexplained == []
+    assert sorted(r for r, _ in accepted) == ["celex-correction", "celex-correction"]
+
+
 # --- golden-chapter-collapse (TOC mis-read as chapter openings) ----------
 #
 # The old pipeline mis-read a chapter list ("N kap. - Title" lines) as chapter

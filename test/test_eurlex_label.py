@@ -2,7 +2,16 @@
 from an EU act's official title (shown in the browse index instead of the bare
 CELEX, and stored on the artifact)."""
 
-from accommodanda.eurlex.model import short_label
+from accommodanda.eurlex.model import official_short_title, short_label
+
+# the cyberresilience regulation (CRA): its short title is a single compound
+# word in the trailing parenthesis, ahead of the EEA-relevance boilerplate
+CRA_TITLE = (
+    "Europaparlamentets och rådets förordning (EU) 2024/2847 av den 23 oktober "
+    "2024 om övergripande cybersäkerhetskrav för produkter med digitala element "
+    "och om ändring av förordningarna (EU) nr 168/2013 och (EU) 2019/1020 och "
+    "direktiv (EU) 2020/1828 (cyberresiliensförordningen) (Text av betydelse "
+    "för EES)")
 
 
 def test_no_official_label_trims_to_designation_and_subject():
@@ -55,6 +64,31 @@ def test_trailing_abbreviation_marker_is_not_taken_as_a_name():
         "upptagandet av en beteckning (Tørrfisk fra Lofoten) (SUB)")
     assert out.startswith("(EG) nr 885/2005 Komplettering av bilagan")
     assert out != "SUB"
+
+
+def test_single_word_official_short_title_is_taken():
+    # regression: the short title sits in the trailing parenthesis even when it is
+    # a single Swedish compound word (no space) -- the extractor must not require a
+    # multi-word name, or it falls back to the subject ("Övergripande cyber...")
+    assert short_label(CRA_TITLE) == "(EU) 2024/2847 Cyberresiliensförordningen"
+
+
+def test_official_short_title_extracts_bare_capitalised_name():
+    assert official_short_title(CRA_TITLE) == "Cyberresiliensförordningen"
+    assert official_short_title(
+        "... om upphävande av direktiv 95/46/EG (allmän dataskyddsförordning) "
+        "(Text av betydelse för EES)") == "Allmän dataskyddsförordning"
+
+
+def test_official_short_title_none_without_naming_parenthesis():
+    # a subject-only title, an all-caps quality marker, and an empty title all
+    # carry no naming short title
+    assert official_short_title(
+        "Rådets direktiv (EU) 2022/2523 av den 14 december 2022 om "
+        "säkerställande av en global minimiskattenivå") is None
+    assert official_short_title("Något (EU) 2020/1 om något (SUB)") is None
+    assert official_short_title("") is None
+    assert official_short_title(None) is None
 
 
 def test_empty_title_is_none():

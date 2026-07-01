@@ -1,10 +1,12 @@
 """Parse MediaWiki dump pages (the hand-authored lagen.nu commentary + concept
 wiki) into the same inline-run shape every other source uses.
 
-The wiki's value-add links three ways, and this turns all three into the
+The wiki's value-add links four ways, and this turns them all into the
 artifact's `{predicate,uri,text}` link runs:
 
   * `[[Concept]]` / `[[Concept|label]]`  -> a `begrepp/<Concept>` link;
+  * `[https://… label]` (single-bracket external links) -> an external link
+    run (the markdown twin writes these as `[label](https://…)`);
   * natural-language law/case citations in the prose ("2 kap 2 §
     tryckfrihetsförordningen", "RB 17 kap. 11 §", "NJA 1990 s. 510") -> run
     through the **same citation engine** the statutes and cases use;
@@ -19,11 +21,17 @@ import re
 import xml.etree.ElementTree as ET
 
 from .lagrum import Ref, interleave
+from .markdown import begrepp_uri  # one shared begrepp_uri (PRD §3.5)
 
 MW = "{http://www.mediawiki.org/xml/export-0.10/}"
-BEGREPP = "https://lagen.nu/begrepp/"
 
 RE_WIKILINK = re.compile(r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]")
+# an inline link, either form: `[[wikilink]]`/`[[wikilink|label]]` (concept) or
+# single-bracket `[url label]` (external). One regex so they are consumed in a
+# single left-to-right pass (a `[url]` inside `[[ ]]` can't be mismatched).
+RE_INLINE_LINK = re.compile(
+    r"\[\[(?P<wt>[^\]|]+)(?:\|(?P<wl>[^\]]+))?\]\]"
+    r"|\[(?P<url>(?:https?:)?//[^\s\]]+)(?:\s+(?P<el>[^\]]*))?\]")
 RE_CATEGORY = re.compile(r"\[\[Kategori:([^\]]+)\]\]")
 RE_HEADING = re.compile(r"^(=+)\s*(.*?)\s*=+\s*$")
 RE_BYLINE = re.compile(r"^''+\s*Huvudförfattare:?\s*(.+?)\s*''+$")
@@ -50,16 +58,6 @@ def is_redirect(wikitext):
     return bool(RE_REDIRECT.match(wikitext.lstrip()))
 
 
-def begrepp_uri(name):
-    """A concept name -> its begrepp URI. MediaWiki upper-cases the first
-    letter of a page title, so `[[allmän handling]]` and the page "Allmän
-    handling" resolve to the same URI."""
-    name = name.strip()
-    if name:
-        name = name[0].upper() + name[1:]
-    return BEGREPP + name.replace(" ", "_")
-
-
 def _strip(text):
     text = RE_TEMPLATE.sub("", text)
     text = RE_TAG.sub("", text)
@@ -80,22 +78,28 @@ def author(wikitext):
 
 
 def _wikilinks(text):
-    """Replace `[[target|label]]` with its label, returning (plaintext, [Ref])
-    for the concept links, with spans in plaintext coordinates. Category links
-    are dropped (handled separately)."""
+    """Replace each inline link (`[[concept|label]]` or `[url label]`) with its
+    label, returning (plaintext, [Ref]) with spans in plaintext coordinates.
+    Concept links resolve through `begrepp_uri`, external links carry the url
+    verbatim. Category links (`[[Kategori:…]]`) are dropped (handled separately)."""
     out, refs, last, length = [], [], 0, 0
-    for m in RE_WIKILINK.finditer(text):
+    for m in RE_INLINE_LINK.finditer(text):
         before = _strip_inline(text[last:m.start()])
         out.append(before)
         length += len(before)
-        target = m.group(1).strip()
-        label = _strip_inline((m.group(2) or m.group(1)).strip())
         last = m.end()
-        if target.lower().startswith("kategori:"):
-            continue
+        if m.group("wt") is not None:                  # [[concept]] / [[c|label]]
+            target = m.group("wt").strip()
+            if target.lower().startswith("kategori:"):
+                continue
+            label = _strip_inline((m.group("wl") or m.group("wt")).strip())
+            uri = begrepp_uri(target)
+        else:                                          # [url label] external link
+            uri = m.group("url").strip()
+            label = _strip_inline((m.group("el") or uri).strip())
         out.append(label)
         refs.append(Ref(length, length + len(label), label,
-                        "dcterms:references", begrepp_uri(target)))
+                        "dcterms:references", uri))
         length += len(label)
     out.append(_strip_inline(text[last:]))
     return "".join(out), refs

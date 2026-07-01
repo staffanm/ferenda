@@ -80,7 +80,9 @@ def _read_hwpf(path):
 def _read_xwpf(path):
     # POI/jpype classes resolve only after startJVM (see _read_hwpf).
     from java.io import FileInputStream  # ty: ignore[unresolved-import]
-    from org.apache.poi.xwpf.usermodel import XWPFDocument  # ty: ignore[unresolved-import]
+    from org.apache.poi.xwpf.usermodel import (
+        XWPFDocument,  # ty: ignore[unresolved-import]
+    )
 
     doc = XWPFDocument(FileInputStream(str(path)))
     try:

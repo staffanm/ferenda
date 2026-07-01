@@ -20,13 +20,16 @@ from .structure import flatten
 
 PROMPT = Path(__file__).with_name("preamble_analyzer_prompt.txt")
 PLACEHOLDER = "[PASTE FULL LEGAL ACT TEXT HERE]"
+# the hard cap the prompt states -- enforced here so a model that ignores it is
+# rejected (and retried) rather than producing an over-sectioned preamble
+MAX_RECITAL_GROUPS = 16
 
 
 def act_markdown(art):
     """The parsed artifact flattened to a plain-text/markdown rendering of the
     act -- the analyzer's input. Keeps exactly the structure the prompt keys on:
     numbered recitals, article headings, numbered paragraphs and lettered points,
-    so the model can mint the "4(5)" / "6(2)(a)" provision keys it is asked for."""
+    so the model can mint the dotted "4.5" / "6.2.a" provision keys it is asked for."""
     lines = ["# %s" % art.get("title", art["celex"]), ""]
     for b in flatten(art["structure"]):
         text = catalog.runs_text(b["text"]).strip()
@@ -52,15 +55,35 @@ def act_markdown(art):
 
 def _validate(content):
     """Parse and shape-check the model's reply: a JSON object with exactly the
-    two expected keys. Raises on anything else (rather than write a bad layer)."""
-    layer = json.loads(content)
+    two expected keys and no more recital groups than the prompt's hard cap.
+    Raises (ValueError/AssertionError) on anything else rather than write a bad
+    layer -- the message is fed back to the model on the retry."""
+    layer = json.loads(llm.strip_fence(content))
     assert isinstance(layer, dict), "response is not a JSON object"
-    assert isinstance(layer.get("recitalGroups"), list), \
-        "response lacks a recitalGroups list"
+    groups = layer.get("recitalGroups")
+    assert isinstance(groups, list), "response lacks a recitalGroups list"
+    assert len(groups) <= MAX_RECITAL_GROUPS, \
+        "too many recital groups: %d (max %d)" % (len(groups), MAX_RECITAL_GROUPS)
     assert isinstance(layer.get("articleToRecitals"), dict), \
         "response lacks an articleToRecitals object"
-    return {"recitalGroups": layer["recitalGroups"],
+    return {"recitalGroups": groups,
             "articleToRecitals": layer["articleToRecitals"]}
+
+
+def _author(prompt):
+    """Call the model and validate; on a malformed or over-sectioned reply, retry
+    once with the failure fed back as a corrective instruction. A plain re-prompt
+    would be pointless -- the call is temperature 0 and deterministic -- so the
+    retry must carry the reason the first answer was rejected. Raises if the
+    second answer is bad too."""
+    for attempt in range(2):
+        try:
+            return _validate(llm.complete(prompt))
+        except (ValueError, AssertionError) as exc:
+            if attempt:
+                raise
+            prompt += ("\n\nDITT FÖREGÅENDE SVAR UNDERKÄNDES: %s\n"
+                       "Rätta detta och följ alla regler ovan exakt." % exc)
 
 
 def annotate(celex):
@@ -75,7 +98,7 @@ def annotate(celex):
         % (celex, art_path, celex)
     art = json.loads(art_path.read_text())
     prompt = PROMPT.read_text().replace(PLACEHOLDER, act_markdown(art))
-    layer = _validate(llm.complete(prompt))
+    layer = _author(prompt)
     out = art_path.with_suffix(".ann")
     out.write_text(json.dumps({"editorialLayer": layer},
                               ensure_ascii=False, indent=2))

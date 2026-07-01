@@ -22,8 +22,8 @@ import sqlite3
 from pathlib import Path
 
 from . import concepts
+from .markdown import begrepp_uri
 from .text import runs_text
-from .wikitext import begrepp_uri
 
 BASE = "https://lagen.nu/"
 
@@ -62,6 +62,10 @@ CREATE TABLE IF NOT EXISTS fragments (
 CREATE TABLE IF NOT EXISTS concept_alias (
     variant   TEXT PRIMARY KEY,     -- an inflected/variant begrepp uri
     canonical TEXT NOT NULL         -- the concept it folds onto (lib.concepts)
+);
+CREATE TABLE IF NOT EXISTS concept_redirect (
+    variant TEXT PRIMARY KEY,       -- an old begrepp name (a MediaWiki redirect)
+    concept TEXT NOT NULL           -- the begrepp it now resolves to (its `aliases`)
 );
 CREATE TABLE IF NOT EXISTS genomforande (
     sfs_uri    TEXT NOT NULL,       -- the statute paragraf transposing the article
@@ -103,6 +107,8 @@ def connect(path):
         con.execute("ALTER TABLE documents ADD COLUMN content_hash TEXT")
     if "expired" not in cols:
         con.execute("ALTER TABLE documents ADD COLUMN expired TEXT")
+    if "display" not in cols:
+        con.execute("ALTER TABLE documents ADD COLUMN display TEXT")
     return con
 
 
@@ -322,6 +328,19 @@ def expired_date(art):
     return art.get("metadata", {}).get("properties", {}).get("rpubl:upphavandedatum")
 
 
+def display_title(art, title):
+    """The human title a document shows wherever it is named to a reader -- the
+    page heading, a search hit, a listing entry: the act's established short name
+    plus its citing acronym when the artifact carries them
+    ("Cyberresiliensförordningen (CRA)"), else the given `title` (the full
+    heading). Field-driven, not source-keyed -- any source that stamps
+    `shortname`/`abbr` gets the same treatment; the rest fall back to their title,
+    which for every other source already is the page heading."""
+    name = art.get("shortname") or title
+    abbr = art.get("abbr")
+    return "%s (%s)" % (name, abbr) if abbr else name
+
+
 def document_row(art, path, source):
     return {"sfs": sfs_document, "dv": dv_document,
             "forarbete": forarbete_document, "kommentar": kommentar_document,
@@ -347,6 +366,7 @@ def _drop_document(con, uri):
     con.execute("DELETE FROM documents WHERE uri = ?", (uri,))
     con.execute("DELETE FROM fragments WHERE uri = ? OR uri LIKE ?",
                 (uri, uri + "#%"))
+    con.execute("DELETE FROM concept_redirect WHERE concept = ?", (uri,))
 
 
 def _index_document(con, art, path, source):
@@ -354,10 +374,15 @@ def _index_document(con, art, path, source):
     fragment snippets, replacing any prior version keyed by the same uri."""
     uri = art["uri"]
     con.execute("DELETE FROM links WHERE from_uri = ?", (uri,))
-    con.execute("INSERT OR REPLACE INTO documents VALUES (?,?,?,?,?,?,?,?,?)",
-                (*document_row(art, path, source), art.get("source_url"),
-                 None,                 # content_hash filled by the caller (holds bytes)
-                 expired_date(art)))
+    row = document_row(art, path, source)        # (uri, source, kind, label, title, path)
+    con.execute(
+        "INSERT OR REPLACE INTO documents "
+        "(uri, source, kind, label, title, path, source_url, content_hash, "
+        " expired, display) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (*row, art.get("source_url"),
+         None,                 # content_hash filled by the caller (holds bytes)
+         expired_date(art),
+         display_title(art, row[4])))             # the reader-facing heading (row[4]=title)
     rows = [(uri, anchor, run.get("predicate", "dcterms:references"),
              run["uri"], strip_fragment(run["uri"]), run.get("text"))
             for anchor, run in (artifact_links(art) + subject_links(art)
@@ -366,6 +391,10 @@ def _index_document(con, art, path, source):
     con.executemany("INSERT INTO links VALUES (?,?,?,?,?,?)", rows)
     con.executemany("INSERT OR REPLACE INTO fragments VALUES (?,?)",
                     artifact_fragments(art))
+    # a begrepp's `aliases` (old names from MediaWiki redirects) -> resolve to it
+    con.execute("DELETE FROM concept_redirect WHERE concept = ?", (uri,))
+    con.executemany("INSERT OR REPLACE INTO concept_redirect VALUES (?, ?)",
+                    [(v, uri) for v in art.get("aliases", [])])
     return len(rows)
 
 
@@ -417,6 +446,7 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False):
         "SELECT path, uri, content_hash FROM documents WHERE source = ?",
         (source,)) if row[0]}
     seen = set()
+    written = set()          # uris (re)indexed this run, keyed independently of path
     changed = 0
     total = len(artifact_paths)
     for i, path in enumerate(map(Path, artifact_paths)):
@@ -433,6 +463,7 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False):
             digest = content_hash(raw)
             if not force and prev and prev[1] == digest:
                 current = local(prev[0])             # unchanged -- skip the parse
+                written.add(prev[0])
             else:
                 art = json.loads(raw)
                 if prev and prev[0] != art["uri"]:   # uri moved under this path
@@ -441,11 +472,16 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False):
                 con.execute("UPDATE documents SET content_hash = ? WHERE uri = ?",
                             (digest, art["uri"]))
                 changed += 1
+                written.add(art["uri"])
                 current = local(art["uri"])
         if progress:
             progress(i + 1, total, changed, current)
-    for path, (uri, _) in have.items():              # artifacts gone from disk
-        if path not in seen:
+    # drop rows whose artifact vanished -- but a document's identity is its uri, not
+    # its path: when an artifact moves to a new path (e.g. a storage-layout change)
+    # its uri is re-indexed above under the new path, so it must NOT be dropped here
+    # just because the old path is gone (that would delete the row we just wrote).
+    for path, (uri, _) in have.items():
+        if path not in seen and uri not in written:
             _drop_document(con, uri)
     docs = con.execute("SELECT COUNT(*) FROM documents WHERE source = ?",
                        (source,)).fetchone()[0]
@@ -498,16 +534,29 @@ def canonicalize_concepts(con):
     concepts.register_wiki(wiki)
     con.execute("DELETE FROM concept_alias")
     folded = 0
+    resolved = {}                            # uri -> its canonical, for redirect folding
     for canonical, variants in concepts.cluster(forms).items():
         canon_uri = _concept_uri(canonical)
         for variant in variants:
             v_uri = _concept_uri(variant)
+            resolved[v_uri] = canon_uri
             if v_uri != canon_uri:
                 con.execute("UPDATE links SET to_uri = ?, to_root = ? "
                             "WHERE to_root = ?", (canon_uri, canon_uri, v_uri))
                 con.execute("INSERT OR REPLACE INTO concept_alias VALUES (?, ?)",
                             (v_uri, canon_uri))
                 folded += 1
+    # fold the explicit redirect aliases too (old MediaWiki names -> their
+    # concept, itself possibly folded onto a canonical form). Author-declared, so
+    # they win; same remap as an inflected variant, so links to the old name live.
+    for variant, concept in con.execute("SELECT variant, concept FROM concept_redirect"):
+        canon_uri = resolved.get(concept, concept)
+        if variant != canon_uri:
+            con.execute("UPDATE links SET to_uri = ?, to_root = ? "
+                        "WHERE to_root = ?", (canon_uri, canon_uri, variant))
+            con.execute("INSERT OR REPLACE INTO concept_alias VALUES (?, ?)",
+                        (variant, canon_uri))
+            folded += 1
     con.commit()
     return folded
 
@@ -540,9 +589,11 @@ def synthesize_concepts(con):
     # a stable content_hash off the name -- the index then skips it on a re-run
     # (a None hash would force it to re-index every time) instead of file bytes.
     con.executemany(
-        "INSERT OR IGNORE INTO documents VALUES (?,?,?,?,?,?,?,?,?)",
+        "INSERT OR IGNORE INTO documents "
+        "(uri, source, kind, label, title, path, source_url, content_hash, "
+        " expired, display) VALUES (?,?,?,?,?,?,?,?,?,?)",
         [(uri, "begrepp", "begrepp", name, name, "", None,
-          content_hash(("begrepp-stub\x1f" + name).encode()), None)
+          content_hash(("begrepp-stub\x1f" + name).encode()), None, name)
          for uri in new
          for name in [uri[len(prefix):].replace("_", " ")]])
     # backfill the stable hash on any stub minted before this column existed
@@ -736,11 +787,12 @@ def _doc_filter(source, kind):
 
 def documents(con, source=None, kind=None, limit=None, offset=0):
     """A filtered, paginated document listing as (uri, source, kind, label,
-    title, source_url, path) rows, ordered by uri -- the id/metadata index that
-    drives /document lookups (not full-text search). `source`/`kind` filter;
-    `limit`/`offset` page."""
+    title, source_url, path, display) rows, ordered by uri -- the id/metadata
+    index that drives /document lookups and the browse listings (not full-text
+    search). `display` is the reader-facing heading (catalog.display_title).
+    `source`/`kind` filter; `limit`/`offset` page."""
     where, params = _doc_filter(source, kind)
-    sql = ("SELECT uri, source, kind, label, title, source_url, path "
+    sql = ("SELECT uri, source, kind, label, title, source_url, path, display "
            "FROM documents" + where + " ORDER BY uri")
     if limit is not None:
         sql += " LIMIT ? OFFSET ?"

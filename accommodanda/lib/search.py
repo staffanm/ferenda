@@ -106,12 +106,18 @@ MAPPING = {
             "pinpoint":      {"type": "keyword"},
             "inbound_count": {"type": "long"},
             "is_doc":        {"type": "boolean"},    # whole-document unit vs fragment
+            # the human heading shown for a hit (catalog.display_title: short name
+            # + acronym where the artifact has them, else the full title). Display
+            # only -- the full `title` stays the searchable field, so changing the
+            # shown label never costs findability.
+            "display":       {"type": "keyword", "index": False},
             # display-only copies of the document's identity on a fragment unit
             # (index:false so a title/identifier query matches the WHOLE-DOC unit,
             # not every one of its fragments -- otherwise a title hit would collapse
             # to a random paragraph). Returned in _source for the result label.
             "doc_title":     {"type": "keyword", "index": False},
             "doc_label":     {"type": "keyword", "index": False},
+            "doc_display":   {"type": "keyword", "index": False},
             "all":           {"type": "text"},
         }
     }
@@ -149,19 +155,23 @@ def doc_actions(row, inbound_count, version=None):
         # no artifact on disk -- only its identity is searchable: one whole-doc
         # unit carrying its name, no body, no fragments
         yield {"_id": uri, "_source": {**shared, "uri": uri, "is_doc": True,
-               "identifier": label, "title": title, "label": label}}
+               "identifier": label, "title": title, "label": label,
+               "display": title}}
         return
     raw = Path(path).read_bytes()
     if not raw.strip():
         return
     art = json.loads(raw)
+    # the reader-facing heading, shared with the page and listings: short name +
+    # acronym where the artifact carries them, else the full title (catalog)
+    display = catalog.display_title(art, title)
     frags = [(fu, ft) for fu, ft in text.fragment_texts(art) if ft]
     # the whole-document unit carries the searchable identity; it carries the body
     # `text` ONLY when there are no fragments to hold it (DV/forarbete/eurlex
     # today). When fragments exist they own the body text, so a body-term query
     # matches a fragment (which collapses with a pinpoint), not the document.
     doc = {**shared, "uri": uri, "is_doc": True,
-           "identifier": label, "title": title, "label": label}
+           "identifier": label, "title": title, "label": label, "display": display}
     if not frags:
         doc["text"] = text.document_text(art)
     yield {"_id": uri, "_source": doc}
@@ -170,7 +180,8 @@ def doc_actions(row, inbound_count, version=None):
                "_source": {**shared, "uri": frag_uri, "is_doc": False,
                            "text": frag_text,
                            "pinpoint": frag_uri.split("#", 1)[1],
-                           "doc_title": title, "doc_label": label}}
+                           "doc_title": title, "doc_label": label,
+                           "doc_display": display}}
 
 
 # --------------------------------------------------------------------------
@@ -220,6 +231,7 @@ def parse_hit(h):
         "uri": src["doc_uri"],
         "identifier": src.get("identifier") or src.get("doc_label"),
         "title": src.get("title") or src.get("doc_title"),
+        "display": src.get("display") or src.get("doc_display"),
         "source": src.get("source"), "kind": src.get("kind"),
         "score": h.get("_score"), "inbound_count": src.get("inbound_count", 0),
         "highlight": hl.get("text", []) or hl.get("title", []),
@@ -268,16 +280,20 @@ class SearchIndex:
                 "    curl -X DELETE %s/%s\n    lagen all index"
                 % (self.index, props.get("doc_uri", {}).get("type", "missing"),
                    config.OPENSEARCH_URL, self.index))
-        # additive migration: an index built before incremental indexing has no
-        # `version` field, and the strict mapping would reject units carrying one.
-        # Adding a new field by explicit put_mapping is allowed under strict (only
-        # *dynamic* introduction is refused). Its units read back version=None, so
-        # the first incremental run reindexes the whole source once -- as intended.
-        if "version" not in props:
+        # additive migration: an index built under an older schema may lack fields
+        # the current code emits (e.g. `version` before incremental indexing,
+        # `display`/`doc_display` for the reader-facing heading). The strict mapping
+        # would reject any unit carrying an unmapped field, so add the missing ones
+        # by explicit put_mapping -- allowed under strict (only *dynamic* field
+        # introduction is refused). Old units read the new fields back as null, so
+        # the next run reindexes the source once, as intended. (A type *change*
+        # still can't be migrated -- that is what the doc_uri guard above catches.)
+        want = MAPPING["mappings"]["properties"]
+        missing = {name: spec for name, spec in want.items()  # ty: ignore[unresolved-attribute]
+                   if name not in props}
+        if missing:
             self.client.indices.put_mapping(
-                index=self.index,
-                body={"properties": {"version": MAPPING["mappings"]  # ty: ignore[invalid-argument-type, not-subscriptable]
-                                     ["properties"]["version"]}})
+                index=self.index, body={"properties": missing})
 
     def exists(self):
         """Whether the index is present in the cluster -- the caller's gate for a

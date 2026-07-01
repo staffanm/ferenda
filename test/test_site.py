@@ -98,6 +98,28 @@ def test_relate_is_incremental(tmp_path):
                        (LAW["uri"],)).fetchone()[0] == 0
 
 
+def test_relate_survives_artifact_path_move(tmp_path):
+    # a document's identity is its uri, not its on-disk path: when an artifact
+    # moves to a new path (a storage-layout change) but keeps its uri, relate must
+    # re-index it under the new path and NOT prune it as a "vanished" old path --
+    # else the just-written row is deleted and the document silently disappears.
+    db = str(tmp_path / "catalog.sqlite")
+    old = tmp_path / "flat.json"
+    old.write_text(json.dumps(LAW))
+    docs, _, _ = catalog.rebuild(db, "sfs", [old])
+    assert docs == 1
+
+    new = tmp_path / "nested" / "law.json"       # same uri, different path
+    new.parent.mkdir()
+    new.write_text(json.dumps(LAW))
+    old.unlink()
+    docs, _, changed = catalog.rebuild(db, "sfs", [new])
+    assert (docs, changed) == (1, 1)             # survived the move, re-indexed once
+    con = catalog.connect(db)
+    assert con.execute("SELECT path FROM documents WHERE uri = ?",
+                       (LAW["uri"],)).fetchone()[0] == str(new)
+
+
 def test_source_content_signature_tracks_catalog(tmp_path):
     # the index watermark: stable while the catalog is unchanged, moves when a
     # document's content changes (so a no-op index can be skipped wholesale)
@@ -669,6 +691,8 @@ LAYER = {
     "recitalGroups": [
         {"id": "rg", "label": "Bakgrund och syfte", "range": [1, 2],
          "articleRefs": ["4"]}],
+    # deliberately the legacy parenthesised sub-article form, to prove the loader
+    # normalises it to the canonical dotted grammar ("4(1)(a)" -> "4.1.a")
     "articleToRecitals": {"4": [1, 2], "4(1)": [1], "4(1)(a)": [2]},
 }
 
@@ -687,16 +711,17 @@ def test_editorial_indexes_both_directions():
     ed = render.Editorial(LAYER)
     assert ed.group_start[1]["label"] == "Bakgrund och syfte"
     assert ed.group_of[2]["id"] == "rg"
-    # recital 2 is cited by article 4 (whole) and sub-point 4(1)(a) -> article {4}
+    # recital 2 is cited by article 4 (whole) and sub-point 4.1.a -> article {4}
     assert ed.recital_articles[2] == ["4"]
-    assert ed.recitals_for("4(1)(a)") == [2]
+    assert ed.recitals_for("4.1.a") == [2]      # legacy "4(1)(a)" normalised on load
 
 
 def test_subarticle_key_grammar():
-    assert render._subarticle_key("paragraph", "1", "4", None) == "4(1)"
-    assert render._subarticle_key("point", "a", "4", "1") == "4(1)(a)"
-    assert render._subarticle_key("point", "a", "4", None) == "4(a)"
-    assert render._subarticle_key("paragraph", "1", None, None) is None
+    from accommodanda.eurlex.structure import subarticle_key
+    assert subarticle_key("paragraph", "1", "4", None) == "4.1"
+    assert subarticle_key("point", "a", "4", "1") == "4.1.a"
+    assert subarticle_key("point", "a", "4", None) == "4.a"
+    assert subarticle_key("paragraph", "1", None, None) is None
 
 
 def test_act_page_renders_recital_group_heading(monkeypatch, tmp_path):
@@ -715,8 +740,9 @@ def test_act_rail_links_articles_and_subarticles_to_recitals(monkeypatch, tmp_pa
     # article -> its recitals (forward)
     assert 'href="#recital-1"' in island["4"] and 'href="#recital-2"' in island["4"]
     # the sub-article paragraph and point each link to their own recitals
-    assert island["4(1)"] and 'href="#recital-1"' in island["4(1)"]
-    assert island["4(1)(a)"] and 'href="#recital-2"' in island["4(1)(a)"]
+    # (dotted node ids -- the "4.1"/"4.1.a" grammar the renderer mints)
+    assert island["4.1"] and 'href="#recital-1"' in island["4.1"]
+    assert island["4.1.a"] and 'href="#recital-2"' in island["4.1.a"]
     # recital -> back to the articles it underpins, plus its thematic group
     assert 'href="#4"' in island["recital-1"]
     assert "Bakgrund och syfte" in island["recital-1"]
@@ -741,8 +767,13 @@ def test_act_without_annotation_has_no_recital_groups(tmp_path):
     act.write_text(json.dumps(ACT))
     catalog.rebuild(db, "eurlex", [act])
     html = render.render_eurlex(ACT, render.Site.from_catalog(catalog.connect(db)))
+    # the editorial grouping (group headings + the article<->recital back-links) is
+    # absent without a .ann
     assert "recital-group" not in html
-    assert 'id="recital-1"' not in html
+    assert "Tematisk grupp" not in html and "Relevanta skäl" not in html
+    # but a numbered recital still gets its stable `#recital-N` citation anchor, so
+    # it can be cited and commented on even with no editorial layer
+    assert 'id="recital-1"' in html
 
 
 def test_genomfor_pinpoints_split_per_article(tmp_path):
@@ -840,5 +871,5 @@ def test_law_level_commentary_is_the_rail_default_panel(tmp_path):
 
     island = _island(render.render_sfs(json.loads(law.read_text()), site))
     assert "Lagen reglerar avtalsslutande." in island[""]   # law-level default panel
-    assert "Kommentar till lagen" in island[""]
+    assert "Om dokumentet" in island[""]
     assert "Om anbud och accept." in island["P1"]            # per-paragraph still works

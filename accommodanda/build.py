@@ -73,6 +73,7 @@ from .sfs import correspond as sfs_correspond
 from .sfs import download as sfs_download
 from .sfs import load_inputs
 from .sfs.nf import to_normalform
+from .wiki import annotate as wiki_annotate
 from .wiki import parse as wiki_parse
 
 POLITENESS = 0.3   # seconds between per-document network fetches
@@ -1013,7 +1014,7 @@ SOURCES["foreskrift"] = Source("foreskrift", foreskrift_list, {
 # --------------------------------------------------------------------------
 
 WIKI_ROOT = layout.WIKI_ROOT
-WIKI_CODE = (PKG / "wiki" / "parse.py", PKG / "lib" / "wikitext.py",
+WIKI_CODE = (PKG / "wiki" / "parse.py", PKG / "lib" / "markdown.py",
              PKG / "lib" / "lagrum.py")
 
 
@@ -1043,11 +1044,74 @@ def begrepp_parse_run(basefile):
     write_artifact("begrepp", basefile, art)
 
 
+def kommentar_anchor_warnings(con, basefiles=()):
+    """Section anchors in kommentar artifacts that resolve to no node in the act
+    they annotate -- a mistyped `## Artikel N` / `## N kap M §` whose commentary
+    and guidance would silently never surface in any rail (PRD Step 3). Returns
+    `[(basefile, host_uri, [dangling anchors])]`; a host act absent from the
+    corpus is skipped (its anchors can't be checked against a missing artifact).
+    `basefiles` restricts the scan to those ids."""
+    want = set(basefiles)
+    out = []
+    for (path,) in con.execute(
+            "SELECT path FROM documents WHERE source = 'kommentar' AND path <> ''"):
+        komm = json.loads(Path(path).read_bytes())
+        if want and komm.get("basefile") not in want:
+            continue
+        row = con.execute("SELECT path FROM documents WHERE uri = ? AND path <> ''",
+                          (komm.get("annotates"),)).fetchone()
+        if not row:
+            continue
+        bad = wiki_parse.dangling_anchors(komm, json.loads(Path(row[0]).read_bytes()))
+        if bad:
+            out.append((komm.get("basefile"), komm.get("annotates"), bad))
+    return out
+
+
+def kommentar_validate(basefiles=()):
+    """`lagen kommentar validate [basefiles…]` -- report commentary section anchors
+    that don't resolve to a node in the annotated act (PRD Step 3 validation), so a
+    mistyped heading is caught instead of silently dropping its rail content. Reads
+    the catalog; run `lagen kommentar relate` first if it is stale."""
+    assert CATALOG.exists(), (
+        "no catalog at %s -- run `lagen kommentar relate` first" % CATALOG)
+    con = catalog.connect(CATALOG)
+    warnings = kommentar_anchor_warnings(con, basefiles)
+    con.close()
+    for bf, host, anchors in warnings:
+        print("kommentar %s -> %s: no matching node for %s"
+              % (bf, host, ", ".join(anchors)))
+    print("kommentar validate: %d file(s) with dangling anchors" % len(warnings))
+
+
+def kommentar_ai_annotate(basefiles):
+    """`lagen kommentar ai-annotate <basefile> ...` -- the Step-4 AI guidance
+    linker: read the external guidance PDFs a commentary file declares in its
+    `guidance:` frontmatter and LLM-derive, per article, which guidance section
+    explains it. Writes a `.ann` sidecar next to the kommentar artifact (the
+    AI-created layer, kept separate from the hand-edited markdown). One-shot per
+    id: the LLM is never called from parse/relate/generate."""
+    if not basefiles:
+        sys.exit("usage: lagen kommentar ai-annotate <basefile> [<basefile> ...]")
+    for basefile in basefiles:
+        if RUN.dry_run:
+            print("kommentar ai-annotate: would annotate %s -> %s"
+                  % (basefile, kommentar_artifact(basefile).with_suffix(".ann")))
+            continue
+        out = wiki_annotate.annotate(basefile, WIKI_ROOT)
+        print("kommentar ai-annotate %s: wrote %s" % (basefile, out))
+
+
 SOURCES["kommentar"] = Source(
     "kommentar",
     lambda: sorted(wiki_parse.kommentar_index(str(WIKI_ROOT))),
     {"parse": Stage("parse", kommentar_parse_run, kommentar_artifact,
-                    inputs=lambda bf: [kommentar_record(bf)], code=WIKI_CODE)})
+                    inputs=lambda bf: [kommentar_record(bf)], code=WIKI_CODE)},
+    actions={"validate": kommentar_validate, "ai-annotate": kommentar_ai_annotate},
+    notes="validate: report commentary section anchors with no matching node in "
+          "the annotated act (also warned during relate)\n"
+          "ai-annotate <basefile>: LLM-link the declared guidance PDFs to the "
+          "act's articles, written as a .ann sidecar")
 
 SOURCES["begrepp"] = Source(
     "begrepp",
@@ -1071,7 +1135,7 @@ ARTIFACTS = {
     "sfs": lambda: sorted((SFS_ROOT / "artifact").glob("*/*.json")),
     "dv": lambda: sorted((layout.DOM_ROOT / "artifact").glob("*.json")),
     "forarbete": lambda: sorted((FA_ROOT / "artifact").glob("*/*.json")),
-    "kommentar": lambda: sorted((layout.KOMMENTAR_ROOT / "artifact").glob("*.json")),
+    "kommentar": lambda: sorted((layout.KOMMENTAR_ROOT / "artifact").rglob("*.json")),
     "begrepp": lambda: sorted((layout.BEGREPP_ROOT / "artifact").glob("*.json")),
     "eurlex": lambda: sorted((EURLEX_ROOT / "artifact").glob("*/*.json")),
     "foreskrift": lambda: sorted(
@@ -1139,6 +1203,7 @@ def cmd_relate(names):
         catalog.set_correspondence(con, corr)
         folded = catalog.canonicalize_concepts(con)
         concepts = catalog.synthesize_concepts(con)
+        anchor_warnings = kommentar_anchor_warnings(con)
         con.close()
         record_watermark(store, "relate", "__corr__", corr_wm)
         dirty = True
@@ -1150,6 +1215,10 @@ def cmd_relate(names):
               % folded)
         print("relate: %d concept stubs minted from defined terms + nyckelord"
               % concepts)
+        for bf, host, anchors in anchor_warnings:
+            print("relate: WARNING kommentar %s annotates %s but has no matching "
+                  "node for %s -- check the heading numbering"
+                  % (bf, host, ", ".join(anchors)))
     else:
         print("relate: nothing changed -- cross-document passes skipped")
     if dirty:
@@ -1315,7 +1384,7 @@ def stale_sources():
 # a page's rendered HTML is a function of the render/query code plus the
 # artifacts in its prerequisite set (computed per page from the catalog)
 GENERATE_CODE = (PKG / "lib" / "render.py", PKG / "lib" / "catalog.py",
-                 PKG / "lib" / "wikitext.py", PKG / "lib" / "layout.py",
+                 PKG / "lib" / "markdown.py", PKG / "lib" / "layout.py",
                  PKG / "dv" / "naming.py")
 
 
@@ -1329,7 +1398,11 @@ def generate_watermark():
     con.close()
     sides = file_watermark(sorted(
         list((SFS_ROOT / "artifact").glob("*/*.corr"))
-        + list((EURLEX_ROOT / "artifact").glob("*/*.ann"))))
+        + list((EURLEX_ROOT / "artifact").glob("*/*.ann"))
+        # the kommentar ai-annotate guidance layer rides a *different* document's
+        # rail (the host act's), so -- like the cross-document .corr case -- a full
+        # or forced generate is what propagates an edit to the host page
+        + list((layout.KOMMENTAR_ROOT / "artifact").rglob("*.ann"))))
     return hashlib.sha256((sig + "\x1f" + sides).encode()).hexdigest()
 
 
@@ -1443,15 +1516,17 @@ def cmd_generate(only=None, source=None, jobs=1):
         print("serve with: lagen all serve   (then open http://localhost:8000/)")
 
 
-def cmd_serve(port=8000):
+def cmd_serve(host="127.0.0.1", port=8000):
     # one process serves the whole thing: the static site and the REST API it
     # consumes (the API answers under /api/v1/, the site is everything else).
     # Same origin, so the ⌘K palette needs no second port.
     if not GENERATED.exists():
         raise SystemExit("nothing generated yet -- run `lagen all generate` first")
-    print("serving site + API at http://localhost:%d/  "
-          "(API under /api/v1/, docs at /docs, Ctrl-C to stop)" % port)
-    api_app.serve(str(GENERATED), port=port)
+    # show the LAN-reachable host when bound to a wildcard, else localhost
+    shown = "localhost" if host in ("127.0.0.1", "localhost") else host
+    print("serving site + API at http://%s:%d/  "
+          "(API under /api/v1/, docs at /docs, Ctrl-C to stop)" % (shown, port))
+    api_app.serve(str(GENERATED), host=host, port=port)
 
 
 # --------------------------------------------------------------------------
@@ -1550,6 +1625,9 @@ def main(argv=None):
                    help="print the plan, do nothing")
     p.add_argument("--port", type=int, default=8000,
                    help="port for `serve` -- site + API in one process (default 8000)")
+    p.add_argument("--host", default="127.0.0.1", metavar="ADDR",
+                   help="interface for `serve` to bind (default 127.0.0.1, "
+                        "localhost only; use 0.0.0.0 to expose on the LAN)")
     p.add_argument("--since", type=date.fromisoformat, metavar="YYYY-MM-DD",
                    help="eurlex download: only discover documents dated on/after "
                         "this (overrides the per-sector watermark for this run)")
@@ -1593,7 +1671,7 @@ def main(argv=None):
             cmd_generate(source=args.source, jobs=jobs)
         return
     if args.action == "serve":
-        cmd_serve(args.port)
+        cmd_serve(args.host, args.port)
         return
 
     names = list(SOURCES) if args.source == "all" else [args.source]

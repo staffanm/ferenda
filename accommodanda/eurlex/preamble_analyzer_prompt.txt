@@ -41,8 +41,8 @@ Regler för recitalGroups:
 1. Varje skäl ska normalt ingå i exakt en grupp.
 2. Grupperna ska följa rättsaktens ordning.
 3. Grupperna ska vara tematiska, inte mekaniska tiotal.
-4. Använd helst 6–16 grupper för en normal EU-förordning eller ett direktiv med många skäl.
-5. Om rättsakten har mycket få skäl, använd färre grupper.
+4. Använd 6–16 grupper. Detta är ett hårt tak: även en mycket lång rättsakt med många skäl får ALDRIG delas in i fler än 16 grupper. Slå hellre ihop närliggande teman till en bredare grupp än att skapa fler grupper.
+5. Sikta på breda tematiska block. För en rättsakt med många skäl betyder det att en grupp normalt täcker ett tiotal skäl eller fler; för en rättsakt med få skäl, använd färre grupper.
 6. Fältet range ska vara ett intervall med två heltal: första och sista skäl i gruppen.
 7. Om en tematisk grupp inte är helt sammanhängande, dela hellre upp den i två grupper än att använda flera intervall.
 8. articleRefs ska innehålla de artiklar som gruppen huvudsakligen förklarar eller anknyter till.
@@ -58,18 +58,18 @@ Strukturen ska vara en platt mappning:
 {
   "articleToRecitals": {
     "1": [1, 2, 3],
-    "1(1)": [2],
-    "1(2)": [3, 4],
+    "1.1": [2],
+    "1.2": [3, 4],
     "5": [10, 11],
-    "5(12)(b)": [18, 19]
+    "5.12.b": [18, 19]
   }
 }
 
 Regler för articleToRecitals:
 1. Varje nyckel ska vara en artikel, artikelpunkt eller underpunkt som sträng.
 2. Artikelnycklar ska anges som artikelnummer, t.ex. "1", "2", "43".
-3. Artikelpunkter ska anges i formatet "4(5)".
-4. Underpunkter ska anges i formatet "6(2)(b)" eller "5(12)(b)".
+3. Artikelpunkter ska anges med punktnotation i formatet "4.5".
+4. Underpunkter ska anges med punktnotation i formatet "6.2.b" eller "5.12.b".
 5. Använd samma nyckelformat för både svenska och engelska rättsakter.
 6. Värdet ska alltid vara en lista av heltal.
 7. Heltalen ska vara skälnummer.
@@ -126,13 +126,14 @@ Kontrollera att:
 2. Det finns exakt två toppnivånycklar:
    - "recitalGroups"
    - "articleToRecitals"
-3. Alla skäl i range är heltal.
-4. Alla skäl i articleToRecitals är heltal.
-5. Alla articleRefs är strängar.
-6. Inga skälnummer förekommer som inte finns i rättsakten.
-7. Inga artikelnummer förekommer som inte finns i rättsakten.
-8. Finkorniga articleToRecitals-nycklar innehåller endast verkliga eller tydligt identifierbara artikelpunkter.
-9. Inga kommentarer, fotnoter eller förklaringar finns utanför JSON.
+3. recitalGroups innehåller högst 16 grupper.
+4. Alla skäl i range är heltal.
+5. Alla skäl i articleToRecitals är heltal.
+6. Alla articleRefs är strängar.
+7. Inga skälnummer förekommer som inte finns i rättsakten.
+8. Inga artikelnummer förekommer som inte finns i rättsakten.
+9. Finkorniga articleToRecitals-nycklar innehåller endast verkliga eller tydligt identifierbara artikelpunkter.
+10. Inga kommentarer, fotnoter eller förklaringar finns utanför JSON.
 
 OSÄKERHET:
 Du får inte använda kommentarer i JSON. Om en koppling är osäker, utelämna den.

@@ -22,7 +22,9 @@ from ruamel.yaml.comments import CommentedMap
 REPO = Path(__file__).parent.parent          # the ferenda repo root
 CONFIG_PATH = REPO / "config.yml"
 DEFAULT_DATA = REPO / "site" / "data"
+DEFAULT_WIKI_ROOT = REPO.parent / "lagen-wiki"   # git-backed markdown content repo
 DEFAULT_OPENSEARCH_URL = "http://localhost:9200"
+DEFAULT_LLM_MODEL = "openai/gpt-oss-120b"
 
 _yaml = YAML()                               # round-trip mode by default
 
@@ -57,6 +59,24 @@ def resolve_data_root(doc):
     return Path(value).expanduser()
 
 
+def resolve_wiki_root(doc):
+    """The git-backed markdown content repo (begrepp + kommentar) the wiki source
+    reads. Precedence: the ``WIKI_ROOT`` environment variable, then the
+    ``wiki_root`` key in config.yml, then ``<repo>/../lagen-wiki`` (the sibling
+    checkout). Authored separately in its own git repo (a sibling checkout, not a
+    submodule), so it is not under ``data_root``."""
+    env = os.environ.get("WIKI_ROOT")
+    if env:
+        return Path(env).expanduser()
+    if "wiki_root" not in doc:
+        return DEFAULT_WIKI_ROOT
+    value = doc["wiki_root"]
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError("wiki_root set to invalid value %r at %s"
+                          % (value, _at(doc, "wiki_root")))
+    return Path(value).expanduser()
+
+
 def resolve_opensearch_url(doc):
     """The OpenSearch endpoint for the search index. Precedence: the
     ``OPENSEARCH_URL`` environment variable (for ad-hoc overrides), then the
@@ -73,6 +93,26 @@ def resolve_opensearch_url(doc):
     return value
 
 
+def resolve_llm_model(doc):
+    """The chat model for the opt-in LLM passes (eurlex ai-annotate, sfs
+    ai-correspond). Precedence: the ``BERGET_MODEL`` environment variable (ad-hoc
+    overrides), then the ``llm_model`` key in config.yml, then the built-in
+    default. Picking a faster/smaller model here is the lever for the latency of
+    those passes."""
+    env = os.environ.get("BERGET_MODEL")
+    if env:
+        return env
+    if "llm_model" not in doc:
+        return DEFAULT_LLM_MODEL
+    value = doc["llm_model"]
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError("llm_model set to invalid value %r at %s"
+                          % (value, _at(doc, "llm_model")))
+    return value
+
+
 _doc = load()                                # parse config.yml once
 DATA = resolve_data_root(_doc)
+WIKI_ROOT = resolve_wiki_root(_doc)
 OPENSEARCH_URL = resolve_opensearch_url(_doc)
+LLM_MODEL = resolve_llm_model(_doc)

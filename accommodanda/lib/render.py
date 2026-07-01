@@ -37,9 +37,10 @@ from fastapi.testclient import TestClient
 from ..api import app as api_service
 from ..dv import naming as dv_naming
 from ..eurlex.structure import flatten as eurlex_flatten
+from ..eurlex.structure import subarticle_key
 from . import catalog, layout
 from .catalog import BASE
-from .wikitext import begrepp_uri
+from .markdown import begrepp_uri
 
 
 @dataclass
@@ -49,11 +50,15 @@ class Site:
     snippets: dict = field(default_factory=dict)               # fragment uri -> tooltip text (lazy cache)
     aliases: dict = field(default_factory=dict)                # variant begrepp uri -> canonical concept
     commentary: dict = field(default_factory=dict)             # (law_uri, anchor) -> [(author, prose)]
+    guidance: dict = field(default_factory=dict)               # act uri -> [{label, href, note?}]
+    article_guidance: dict = field(default_factory=dict)       # (law_uri, anchor) -> [{label, href, note?}]
 
     @classmethod
     def from_catalog(cls, con):
+        commentary, guidance, article_guidance = _kommentar_indexes(con)
         return cls(con, {u for (u,) in con.execute("SELECT uri FROM documents")},
-                   {}, catalog.concept_aliases(con), _commentary_index(con))
+                   {}, catalog.concept_aliases(con),
+                   commentary, guidance, article_guidance)
 
     def resolve(self, uri):
         """Fold a begrepp link baked into an artifact onto its canonical concept
@@ -73,34 +78,59 @@ class Site:
         return self.snippets[uri]
 
 
-def _commentary_index(con):
-    """Wiki SFS commentary indexed by the statute fragment it annotates:
-    {(law_uri, anchor): [(author, [prose blocks])]} -- the content the rail shows
-    side-by-side with the paragraph. Commentary is an annotation layer (no page of
-    its own); each `== N kap M § ==` section maps onto the statute paragraph's
-    anchor (`K{N}P{M}`), matching the id-bearing node the reader focuses."""
-    index = {}
+def _kommentar_indexes(con):
+    """Build the three rail indexes the wiki value-add feeds in **one pass** over
+    the kommentar artifacts (each is read + parsed once, not three times):
+
+      * ``commentary`` -- {(law_uri, anchor): [(author, [prose blocks])]}, the
+        content the rail shows side-by-side with the paragraph. Commentary is an
+        annotation layer (no page of its own); each `== N kap M § ==` section maps
+        onto the host node's anchor (`K{N}P{M}`, an EU `5.2`, …). Leading blocks
+        before the first section are commentary on the act as a whole, keyed
+        (law, None) and shown in the rail by default.
+      * ``guidance`` -- {act_uri: [{label, href, note?}]}, the document-level
+        `## Externa länkar` block shown at the top of the act (PRD Step 2).
+      * ``article_guidance`` -- {(law_uri, anchor): [{label, href, note?}]}, the
+        external links attached to a single node's rail (PRD Steps 3-4), from two
+        render-only sources keyed identically: the hand-curated per-section
+        `## Externa länkar` block in the artifact body, and the AI guidance
+        linker's `.ann` sidecar (`lagen kommentar ai-annotate`), kept separate from
+        the hand-edited markdown but surfaced in the same rail.
+
+    All three are render-only: external resources live outside the corpus, so they
+    carry no inbound edge."""
+    commentary, guidance, article_guidance = {}, {}, {}
     for (path,) in con.execute(
             "SELECT path FROM documents WHERE source = 'kommentar' AND path <> ''"):
         art = json.loads(Path(path).read_bytes())
         law = art.get("annotates")
         if not law:
             continue
-        body = art.get("body", [])
+        author, body = art.get("author"), art.get("body", [])
         # leading blocks before the first section heading are commentary on the
-        # statute as a whole -- keyed (law, None), shown in the rail by default
+        # act as a whole -- keyed (law, None), shown in the rail by default
         preamble = []
         for b in body:
             if b.get("type") == "sektion":
                 break
             preamble.append(b)
         if preamble:
-            index.setdefault((law, None), []).append((art.get("author"), preamble))
+            commentary.setdefault((law, None), []).append((author, preamble))
         for b in body:
-            if b.get("type") == "sektion" and b.get("children"):
-                index.setdefault((law, b["id"]), []).append(
-                    (art.get("author"), b["children"]))
-    return index
+            if b.get("type") != "sektion":
+                continue
+            if b.get("children"):
+                commentary.setdefault((law, b["id"]), []).append((author, b["children"]))
+            if b.get("guidance"):        # per-section `## Externa länkar` (Step 3)
+                article_guidance.setdefault((law, b["id"]), []).extend(b["guidance"])
+        if art.get("guidance"):          # document-level `## Externa länkar` (Step 2)
+            guidance.setdefault(law, []).extend(art["guidance"])
+        ann = Path(path).with_suffix(".ann")       # AI linker sidecar (Step 4)
+        if ann.exists():
+            links = json.loads(ann.read_bytes()).get("guidanceLinks", {})
+            for anchor, items in links.items():
+                article_guidance.setdefault((law, anchor), []).extend(items)
+    return commentary, guidance, article_guidance
 
 
 # --------------------------------------------------------------------------
@@ -451,28 +481,58 @@ class Rail:
             return
         uri = self.doc_uri + "#" + nid
         commentary = self._commentary(nid)
+        guidance = self._guidance_html(
+            (self.site.article_guidance or {}).get((self.doc_uri, nid)))
         groups = _inbound_groups(self.site, uri)
         genomfor = genomfor_margin(self.site, self.doc_uri, nid)
         bemyndigande = bemyndigande_margin(self.site, uri)        # föreskrifter under it
         corr_cases = corresponding_cases_margin(self.site, uri)   # new-law side
         corresponds = corresponds_margin(self.site, uri)          # old-law side
-        if not (commentary or groups or genomfor or bemyndigande or extra
-                or corr_cases or corresponds):
+        if not (commentary or guidance or groups or genomfor or bemyndigande
+                or extra or corr_cases or corresponds):
             return
         head = ('<div class="rail-h">Kontext%s</div>'
                 % (' för <b>%s</b>' % escape(pinpoint) if pinpoint else ""))
         body = ('<div class="rail-sec"><div class="rail-sec-h">Hänvisat till av</div>'
                 '%s</div>' % groups) if groups else ""
-        self.data[nid] = (head + commentary + body + corr_cases + extra
+        self.data[nid] = (head + commentary + guidance + body + corr_cases + extra
                           + genomfor + bemyndigande + corresponds)
 
     def add_document(self):
-        """The law-level commentary (the kommentar preamble, before any section) as
-        the rail's default panel (key ''), shown when no single paragraph is in
-        focus -- commentary on the statute as a whole."""
-        panel = self._commentary(None)
+        """The document-level rail panel (key ''), shown when no single paragraph
+        is in focus (at the top of the document): the act's curated external links
+        (Externa länkar) plus any commentary on the document as a whole. Replaces
+        the client's empty-rail placeholder."""
+        panel = (self._guidance_html((self.site.guidance or {}).get(self.doc_uri))
+                 + self._commentary(None))
         if panel:
-            self.data[""] = '<div class="rail-h">Kommentar till lagen</div>' + panel
+            self.data[""] = '<div class="rail-h">Om dokumentet</div>' + panel
+
+    def _guidance_html(self, items):
+        """A list of curated external links -- the wiki annotation's `## Externa
+        länkar` block (Commission FAQs, guidance PDFs, call-for-evidence pages, …) --
+        as a rail section, used both for the act's document-level panel (Step 2) and
+        for a single article's context panel (Step 3); '' for no items. Render-only:
+        these resources live outside the corpus, so they carry no inbound edge. A
+        lagen.nu-absolute href renders internal, any other an external link."""
+        if not items:
+            return ""
+        out = []
+        for g in items:
+            ext = "" if g["href"].startswith(BASE) else ' rel="external"'
+            # a guidance link carries either a `desc` (the guidance section's own
+            # text, e.g. the FAQ question -- shown after the link as ": ...") or a
+            # `note` (provenance for a hand-curated link -- shown as "— ...")
+            if g.get("desc"):
+                tail = ': <span class="q">%s</span>' % escape(g["desc"])
+            elif g.get("note"):
+                tail = ' <span class="prov">— %s</span>' % escape(g["note"])
+            else:
+                tail = ""
+            out.append('<li><a href="%s"%s>%s</a>%s</li>'
+                       % (escape(href(g["href"])), ext, escape(g["label"]), tail))
+        return ('<div class="rail-sec vagledning"><div class="rail-sec-h">Externa '
+                'länkar</div><ul>%s</ul></div>' % "".join(out))
 
     def _commentary(self, nid):
         """The wiki commentary for the paragraph `nid` (or `None` for the law as a
@@ -612,6 +672,7 @@ PAGE = """<!doctype html>
 %(masthead)s
 %(grid)s
 %(island)s<script src="/scrollspy.js" defer></script>
+<script src="/search.js" defer></script>
 </body></html>
 """
 
@@ -712,7 +773,7 @@ def render_sfs(art, site):
         + document_inbound(site, art["uri"]) + "".join(
             render_node(n, site, art["uri"], toc, rail)
             for n in art.get("structure", []))
-    rail.add_document()        # law-level commentary as the rail's default panel
+    rail.add_document()        # external links + law-level commentary, default panel
     return page(title, "Författning", meta, body, render_toc(toc),
                 eyebrow="SFS " + local_id, island=rail.island(),
                 source_url=art.get("source_url"),
@@ -974,14 +1035,24 @@ EURLEX_CLASS = {"recital": "recital", "citation": "visa", "preamble": "preamble"
 # offline by `lagen eurlex ai-annotate`; absent for an unannotated act.
 # --------------------------------------------------------------------------
 
+def _sub_to_dot(key):
+    """Normalise a sub-article ref to the canonical dotted id grammar --
+    "6(2)(a)" -> "6.2.a" -- tolerating the legacy parenthesised form an older
+    `.ann` may still carry (new ones are authored dotted)."""
+    return re.sub(r"\(([^)]+)\)", r".\1", key)
+
+
 class Editorial:
     """The `.ann` editorial layer for one EU act, mapping both directions of the
-    preamble<->enacting-terms relation: an article (or sub-article like "4(5)")
+    preamble<->enacting-terms relation: an article (or sub-article like "4.5")
     to the recitals that explain it, and a recital back to the articles it
     underpins plus the thematic group it belongs to."""
 
     def __init__(self, layer):
-        self.a2r = layer.get("articleToRecitals", {})       # "4(5)" -> [recital n]
+        # keys are normalised to the dotted sub-article grammar the renderer mints,
+        # so recitals_for(subarticle_key(...)) matches regardless of the on-disk form
+        self.a2r = {_sub_to_dot(k): v
+                    for k, v in layer.get("articleToRecitals", {}).items()}
         self.groups = layer.get("recitalGroups", [])
         self.group_start = {}        # first recital n of a group -> group (heading)
         self.group_of = {}           # recital n -> its group
@@ -992,7 +1063,7 @@ class Editorial:
                 self.group_of[n] = g
         articles = {}                # recital n -> set of article numbers citing it
         for key, recitals in self.a2r.items():
-            art = key.split("(", 1)[0]                       # "6(2)(a)" -> "6"
+            art = key.split(".", 1)[0]                       # "6.2.a" -> "6"
             for n in recitals:
                 articles.setdefault(n, set()).add(art)
         self.recital_articles = {n: sorted(a, key=_art_sort_key)
@@ -1005,19 +1076,6 @@ class Editorial:
 def _art_sort_key(art):
     """Sort article numbers numerically where possible ('2' before '10')."""
     return (0, int(art)) if art.isdigit() else (1, art)
-
-
-def _subarticle_key(t, num, cur_article, cur_parag):
-    """The `.ann` key for a sub-article block, matching the LLM's "4(5)" /
-    "6(2)(a)" grammar, from the block's running article/paragraph context."""
-    if not (cur_article and num):
-        return None
-    if t == "paragraph":
-        return "%s(%s)" % (cur_article, num)
-    if t == "point":
-        return ("%s(%s)(%s)" % (cur_article, cur_parag, num) if cur_parag
-                else "%s(%s)" % (cur_article, num))
-    return None
 
 
 def _load_editorial(celex):
@@ -1088,7 +1146,7 @@ def _eurlex_pin(t, num, bid):
         return "Skäl %s" % num
     if t == "article":
         return "Artikel %s" % (num or bid or "")
-    if bid and "(" in bid:
+    if bid and "." in bid:            # a dotted sub-article id ("5.2", "6.2.a")
         return "Artikel %s" % bid
     return human_fragment(bid)
 
@@ -1107,22 +1165,33 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, editorial=None,
                                                          runs, lvl)
     if t == "keyword":
         return '<span class="sokord">%s</span>' % runs
+    # a numbered recital is a citation target in its own right (`#recital-N`), so
+    # it can be cited, commented on and ride the rail even with no editorial layer.
+    if t == "recital" and num and num.isdigit():
+        bid = "recital-%s" % num
     # editorial layer (.ann): wire this block into the article<->recital graph.
-    # A recital gets a recital-N id and a back-link panel (its articles + group);
-    # an article/sub-article (paragraph/point, keyed like the .ann's "4(5)") gets
-    # a forward panel of its relevant recitals. Both ride the scroll-driven rail.
+    # A recital gets a back-link panel (its articles + group); an article/
+    # sub-article (paragraph/point, keyed like the .ann's "4.5") gets a forward
+    # panel of its relevant recitals. Both ride the scroll-driven rail.
     extra = ""
-    if editorial:
-        if t == "recital" and num and num.isdigit():
-            bid = "recital-%s" % num
+    if t == "recital" and num and num.isdigit():
+        if editorial:
             extra = _recital_context_html(editorial, int(num))
-        else:
-            key = (cur_article if t == "article"
-                   else _subarticle_key(t, num, cur_article, cur_parag))
-            recitals = editorial.recitals_for(key) if key else None
+    else:
+        # an article's key is its own id; a sub-article's is the dotted form. The
+        # editorial layer gives a block a forward panel of its relevant recitals.
+        # A sub-article (paragraph/point) carries no structural id of its own, so
+        # it becomes a citation target -- gets an anchor + rides the rail -- only
+        # when something targets it: the editorial recital links, or a per-node
+        # guidance/commentary link (the linker's fine-grained "2.21" keys).
+        key = (cur_article if t == "article"
+               else subarticle_key(t, num, cur_article, cur_parag))
+        if key:
+            recitals = editorial.recitals_for(key) if editorial else None
+            if t != "article" and (
+                    recitals or (site.article_guidance or {}).get((doc_uri, key))):
+                bid = key              # synthesise the sub-article citation id
             if recitals:
-                if t != "article":
-                    bid = key          # synthesise the sub-article citation id
                 extra = _recital_links_html(recitals)
     # the article is a citation target (id == its number); its inbound (incl.
     # implementing förarbeten) drives the rail, like an SFS paragraph
@@ -1155,8 +1224,14 @@ def _emphasize_term(runs_html, term):
 
 
 def render_eurlex(art, site):
-    title = art.get("title") or catalog.local(art["uri"])
+    # the heading is the act's short name (curated or extracted, stamped onto the
+    # artifact at parse) plus its citing acronym -- "Cyberresiliensförordningen
+    # (CRA)"; the full official title moves into the metadata list. With no short
+    # name the heading is the full title, so it is not repeated in the metadata.
+    # display_title is the single definition of this, shared with search/listings.
+    title = catalog.display_title(art, art.get("title") or catalog.local(art["uri"]))
     meta = _meta_dl([
+        ("Titel", art.get("title") if art.get("shortname") else None),
         ("CELEX", art.get("celex")),
         ("Typ", EURLEX_KIND.get(art.get("doctype"), art.get("doctype"))),
         ("Datum", art.get("date")),
@@ -1189,6 +1264,7 @@ def render_eurlex(art, site):
             cur_parag = b.get("num")
         parts.append(_render_eurlex_block(b, site, art["uri"], toc, rail,
                                           editorial, cur_article, cur_parag))
+    rail.add_document()        # external links + commentary, the rail's default panel
     body = "".join(parts)
     kind = EURLEX_KIND.get(art.get("doctype"), "EU-rättsakt")
     return page(title, kind, meta, body, render_toc(toc),
@@ -1584,6 +1660,7 @@ def render_aggregates(con, out_root, catalog_path):
     out_root.mkdir(parents=True, exist_ok=True)
     (out_root / "style.css").write_text(CSS)
     (out_root / "scrollspy.js").write_text(SCROLLSPY)
+    (out_root / "search.js").write_text(SEARCH)
     (out_root / "index.html").write_text(render_index(con))
     client = _browse_client(catalog_path)
     try:
@@ -1660,6 +1737,9 @@ nav.toc a.lvl2 { padding-left: 2.5rem; color: var(--ink-3); }
 nav.toc a.lvl3 { padding-left: 3.4rem; color: var(--ink-4); font-size: .78rem; }
 nav.toc a.active { color: var(--accent); border-left-color: var(--accent);
                    background: var(--surf-2); font-weight: 500; }
+/* scrollspy collapses every branch but the active section's ancestor path, so
+   only top-level entries (plus the open branch) show; no-JS keeps all visible */
+nav.toc a.toc-collapsed { display: none; }
 
 /* -- Frontmatter -- */
 .frontmatter { margin-bottom: 3rem; padding-bottom: 1.75rem;
@@ -1845,6 +1925,11 @@ p.definition dfn { font-style: normal; font-weight: 600; color: var(--accent); }
 p.recital { scroll-margin-top: 5rem; }
 .rail-sec.skal .skal-links { display: flex; flex-wrap: wrap; gap: .2rem .6rem; }
 .rail-sec.skal a { font-variant-numeric: oldstyle-nums; }
+/* curated external links (the act's "Externa länkar" rail section) */
+.rail-sec.vagledning { margin-bottom: 1rem; }
+.rail-sec.vagledning ul { list-style: none; margin: 0; padding: 0; font-size: .85rem; }
+.rail-sec.vagledning li { margin: .3rem 0; line-height: 1.4; }
+.rail-sec.vagledning .prov { color: var(--ink-3); font-style: italic; }
 
 /* -- Context markers: every addressable unit that carries rail context wears a
    clickable 💬 in the right gutter (toward the rail), so context-bearing
@@ -1965,8 +2050,8 @@ ol.ranked { padding-left: 1.4rem; } ol.ranked .c { color: var(--ink-3); font-siz
 
 # Client layer: a throttled scroll handler that (1) highlights the TOC entry for
 # the section at the top of the viewport, and (2) swaps the context rail to the
-# active paragraph's panel, read from the JSON island the renderer emitted. Plus
-# a ⌘K palette stub (the search backend is deferred). Plain DOM, no deps.
+# active paragraph's panel, read from the JSON island the renderer emitted. The
+# ⌘K search palette is a separate script (SEARCH, below). Plain DOM, no deps.
 SCROLLSPY = """
 (function () {
   var island = {};
@@ -1978,6 +2063,39 @@ SCROLLSPY = """
   var targets = links.map(function (a) {
     return document.getElementById(decodeURIComponent(a.getAttribute('href').slice(1)));
   });
+
+  // The TOC is a flat list whose nesting lives only in the lvlN class. Recover
+  // each entry's parent (the nearest preceding entry at a shallower level, -1 for
+  // a top-level entry) so the scrollspy can collapse the outline to just the
+  // active section's ancestor path.
+  var levels = links.map(function (a) {
+    var m = a.className.match(/lvl(\\d)/);
+    return m ? +m[1] : 1;
+  });
+  var parents = (function () {
+    var par = [], stack = [];      // stack[level] = last index seen at that level
+    for (var i = 0; i < levels.length; i++) {
+      var lv = levels[i];
+      par[i] = -1;
+      for (var p = lv - 1; p >= 1; p--) {
+        if (stack[p] != null) { par[i] = stack[p]; break; }
+      }
+      stack[lv] = i;
+      for (var d = lv + 1; d < stack.length; d++) stack[d] = null;  // deeper resets
+    }
+    return par;
+  })();
+
+  // Show top-level entries always, plus the active entry, its ancestors, and the
+  // direct children of any node on that path -- every other branch is hidden.
+  function collapse(active) {
+    var expanded = {};             // nodes whose children should stay visible
+    for (var i = active; i >= 0; i = parents[i]) expanded[i] = true;
+    for (var j = 0; j < links.length; j++) {
+      var show = parents[j] < 0 || expanded[parents[j]];
+      links[j].classList.toggle('toc-collapsed', !show);
+    }
+  }
   var rail = document.getElementById('rail');
   var marks = Array.prototype.slice.call(document.querySelectorAll('[data-rail]'));
   var EMPTY = '<div class="rail-empty">Ingen rättspraxis, förarbeten eller annan ' +
@@ -2040,6 +2158,7 @@ SCROLLSPY = """
         var a = links[idx];
         if (a) {
           a.classList.add('active');
+          collapse(idx);          // open only this section's branch (offsets after)
           if (a.offsetTop < toc.scrollTop ||
               a.offsetTop > toc.scrollTop + toc.clientHeight - 30) {
             toc.scrollTop = a.offsetTop - toc.clientHeight / 2;
@@ -2059,12 +2178,19 @@ SCROLLSPY = """
     if (!ticking) { ticking = true; requestAnimationFrame(update); }
   }, { passive: true });
   update();
+})();
+"""
 
-  // ⌘K palette -- live full-text search against the REST API. The API is always
-  // same-origin (the site and the API are served by one process, lagen serve),
-  // so requests are relative ('/api/v1/...') -- never a baked absolute base, which
-  // can only ever go stale and point a cached page at the wrong/dead port.
-  // Debounced; renders the top hits as links to each document's matching paragraph.
+
+# The ⌘K command palette -- live full-text search against the REST API. Its own
+# script (search.js): the search UI is unrelated to the TOC scrollspy and is
+# global to every page, so it does not ride along in scrollspy.js. The API is
+# always same-origin (the site and the API are served by one process, lagen
+# serve), so requests are relative ('/api/v1/...') -- never a baked absolute base,
+# which can only go stale and point a cached page at the wrong/dead port.
+# Debounced; renders the top hits as links to each document's matching paragraph.
+SEARCH = """
+(function () {
   var overlay = null, results = null, timer = null, seq = 0, sel = 0;
 
   function hits() {
@@ -2091,9 +2217,15 @@ SCROLLSPY = """
       var frag = r.fragments && r.fragments[0];
       var hl = (frag && frag.highlight[0]) || (r.highlight && r.highlight[0]) || '';
       var target = (r.url || '#') + (frag && frag.pinpoint ? '#' + frag.pinpoint : '');
+      // lead with the page title (display: short name + acronym where the act
+      // has them, else the full title -- the same heading the document page
+      // shows), and carry the citation id (CELEX / "SFS 2018:218") as the sub,
+      // shown only when it differs from the title (DV's label == its title)
+      var primary = r.display || r.title || r.identifier || r.uri;
       return '<a class="search-hit" href="' + target + '">' +
-        '<span class="hit-title">' + (r.identifier || r.title || r.uri) + '</span>' +
-        (r.title && r.identifier ? '<span class="hit-sub">' + r.title + '</span>' : '') +
+        '<span class="hit-title">' + primary + '</span>' +
+        (r.identifier && r.identifier !== primary ?
+          '<span class="hit-sub">' + r.identifier + '</span>' : '') +
         (hl ? '<span class="hit-snip">' + hl + '</span>' : '') + '</a>';
     }).join('');
     // the first hit is the resolved target for a citation-shaped query

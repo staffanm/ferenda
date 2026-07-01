@@ -51,6 +51,8 @@ def test_doc_actions_document_and_fragment_units(tmp_path):
     assert doc["_source"]["uri"] == "https://lagen.nu/1962:700"
     assert doc["_source"]["title"] == "Brottsbalk (1962:700)"
     assert doc["_source"]["identifier"] == "SFS 1962:700"
+    # no shortname/abbr on the artifact -> the shown heading is just the title
+    assert doc["_source"]["display"] == "Brottsbalk (1962:700)"
     assert "text" not in doc["_source"]                  # fragments hold the text
     assert doc["_source"]["inbound_count"] == 1          # 2018:585 cites K3P1
     assert "_routing" not in doc and "relation" not in doc["_source"]
@@ -65,15 +67,40 @@ def test_doc_actions_document_and_fragment_units(tmp_path):
     assert frag["_source"]["text"] == "Den som dödar annan döms för mord."
     assert frag["_source"]["doc_title"] == "Brottsbalk (1962:700)"
     assert frag["_source"]["doc_label"] == "SFS 1962:700"
+    assert frag["_source"]["doc_display"] == "Brottsbalk (1962:700)"
     assert frag["_source"]["inbound_count"] == 1          # denormalised for ranking
     assert "title" not in frag["_source"]                 # not searchable on a frag
     assert "_routing" not in frag
 
 
+def test_doc_actions_display_uses_shortname_and_abbr(tmp_path):
+    # an eurlex act carrying shortname/abbr (the CRA): the hit heading is the
+    # short name + acronym, while the searchable `title` stays the full official
+    # title -- so the readable label costs no findability
+    art_dir = tmp_path / "artifact"
+    art_dir.mkdir()
+    cra = art_dir / "cra.json"
+    cra.write_text(json.dumps({
+        "uri": "https://lagen.nu/ext/celex/32024R2847", "celex": "32024R2847",
+        "doctype": "regulation", "shortname": "Cyberresiliensförordningen",
+        "abbr": "CRA",
+        "title": "Europaparlamentets och rådets förordning (EU) 2024/2847 ... "
+                 "(cyberresiliensförordningen) (Text av betydelse för EES)",
+        "structure": [{"type": "article", "id": "1", "text": ["Syfte och mål."]}]}))
+    cat = tmp_path / "catalog.sqlite"
+    catalog.rebuild(cat, "eurlex", [cra])
+    con = catalog.connect(cat)
+    uri = "https://lagen.nu/ext/celex/32024R2847"
+    doc, frag = list(search.doc_actions(row := catalog.document(con, uri), 0))
+    assert doc["_source"]["display"] == "Cyberresiliensförordningen (CRA)"
+    assert doc["_source"]["title"].startswith("Europaparlamentets")   # full, searchable
+    assert doc["_source"]["identifier"] == "32024R2847"               # CELEX, the sub
+    assert frag["_source"]["doc_display"] == "Cyberresiliensförordningen (CRA)"
+
+
 def test_doc_actions_no_fragments_carries_full_text(tmp_path):
     # a flat artifact (no id-bearing nodes) -> the single document unit holds the
     # whole body text, since there is no fragment to own it
-    con = _build_catalog(tmp_path)
     art = tmp_path / "flat.json"
     art.write_text(json.dumps({
         "uri": "https://lagen.nu/dom/x", "metadata": {"properties": {}},
@@ -85,7 +112,6 @@ def test_doc_actions_no_fragments_carries_full_text(tmp_path):
 
 
 def test_doc_actions_skips_empty_artifact(tmp_path):
-    con = _build_catalog(tmp_path)
     # a row whose artifact file is empty yields nothing
     empty = tmp_path / "empty.json"
     empty.write_bytes(b"")
@@ -133,13 +159,14 @@ def test_parse_hit_fragment_representative():
         "_source": {"doc_uri": "https://lagen.nu/1962:700",
                     "uri": "https://lagen.nu/1962:700#K3P1", "is_doc": False,
                     "pinpoint": "K3P1", "doc_label": "SFS 1962:700",
-                    "doc_title": "Brottsbalk", "source": "sfs", "kind": "law",
-                    "inbound_count": 42},
+                    "doc_title": "Brottsbalk", "doc_display": "Brottsbalk",
+                    "source": "sfs", "kind": "law", "inbound_count": 42},
         "_score": 7.5,
         "highlight": {"text": ["döms för <em>mord</em>"]},
     })
     assert hit["uri"] == "https://lagen.nu/1962:700"       # the document, not the frag
     assert hit["identifier"] == "SFS 1962:700" and hit["title"] == "Brottsbalk"
+    assert hit["display"] == "Brottsbalk"                  # the heading, from doc_display
     assert hit["inbound_count"] == 42 and hit["score"] == 7.5
     assert hit["fragments"] == [{"uri": "https://lagen.nu/1962:700#K3P1",
                                  "pinpoint": "K3P1",

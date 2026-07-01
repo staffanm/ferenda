@@ -695,6 +695,28 @@ def celex_descramble(uri):
     return "%s3%d%s%s%s" % (base, int(number), descriptor, year, frag or "")
 
 
+def celex_old_scrambles(uri):
+    """Every string the old pipeline could have rendered for the well-formed
+    sector-3 CELEX `uri` (empty for a non sector-3 URI):
+
+    * the year/number field-swap it always applied (`celex_descramble`); plus
+    * when `uri` is a *directive* (type ``L``), the same swap with the type letter
+      forced to ``R``. The old engine -- like the pre-fix grammar -- defaulted a
+      parenthesised designation cited bare as "direktiv (EU) YYYY/NNNN" to a
+      regulation, so its scramble for such a directive is ``3<number>R<year>``.
+      Pairing that against the new pipeline's corrected ``3<year>L<number>`` lets
+      the directive-letter correction be forgiven as a mirror, the way the plain
+      year/number scramble already is (lagrum.rattsakt_part fix)."""
+    primary = celex_descramble(uri)
+    if primary is None:
+        return set()
+    base, year, descriptor, number, frag = re_celex_uri.match(uri).groups()
+    out = {primary}
+    if descriptor == "L":
+        out.add("%s3%dR%s%s" % (base, int(number), year, frag or ""))
+    return out
+
+
 # document-level metadata that is the *consolidation envelope* -- it moves as
 # new amending acts fold in: the konsolidering cutoff URI, the "i lydelse
 # enligt SFS …" identifier, the underlag list, the responsible department.
@@ -850,8 +872,8 @@ def _celex_correction(problem, ctx):
         return False
     kind, source, uri = parsed
     if kind == "extra":
-        scrambled = celex_descramble(uri)
-        return scrambled is not None and (source, scrambled) in ctx["celex_missing"]
+        return any((source, s) in ctx["celex_missing"]
+                   for s in celex_old_scrambles(uri))
     return (source, uri) in ctx["celex_extra_scrambled"]
 
 
@@ -967,7 +989,7 @@ def adjudicate(problems, golden):
     ctx["celex_extra_scrambled"] = {
         (src, scrambled)
         for kind, src, uri in filter(None, map(reference_diff, problems))
-        if kind == "extra" and (scrambled := celex_descramble(uri)) is not None}
+        if kind == "extra" for scrambled in celex_old_scrambles(uri)}
     # golden TOC-collapse: when the golden dumped the whole body into one chapter,
     # pair the new pipeline's distributed link with the collapsed golden one by
     # their chapter-stripped (source, uri) -- a mirror, so unpaired diffs survive.

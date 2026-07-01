@@ -5,8 +5,8 @@ from accommodanda.lib import catalog, facets
 from accommodanda.lib.facets import Row
 
 
-def row(uri, kind="", label="", title=""):
-    return Row(uri, catalog.local(uri), kind, label, title)
+def row(uri, kind="", label="", title="", display=""):
+    return Row(uri, catalog.local(uri), kind, label, title, display)
 
 
 U = "https://lagen.nu/"
@@ -93,10 +93,15 @@ def test_slug_keeps_swedish_letters():
 # --------------------------------------------------------------------------
 
 def _catalog(tmp_path, rows):
+    """rows are (uri, source, kind, label, title[, display]); `display` (the
+    reader-facing heading the browse listing shows) defaults to the title -- the
+    display_title result for an artifact with no short name/acronym."""
     con = catalog.connect(tmp_path / "cat.sqlite")
     con.executemany(
-        "INSERT INTO documents (uri, source, kind, label, title, path) "
-        "VALUES (?,?,?,?,?,'')", rows)
+        "INSERT INTO documents (uri, source, kind, label, title, path, display) "
+        "VALUES (?,?,?,?,?,'',?)",
+        [(uri, src, kind, label, title, rest[0] if rest else title)
+         for (uri, src, kind, label, title, *rest) in rows])
     con.commit()
     return con
 
@@ -153,7 +158,8 @@ def test_documents_naturally_ordered_within_bucket(tmp_path):
 def test_browse_view_attaches_leaf_documents(tmp_path):
     title = "Förordning (EU) 2016/679 om skydd (allmän dataskyddsförordning)"
     con = _catalog(tmp_path, [
-        (U + "ext/celex/32016R0679", "eurlex", "regulation", "32016R0679", title),
+        (U + "ext/celex/32016R0679", "eurlex", "regulation", "32016R0679", title,
+         "Dataskyddsförordningen (GDPR)"),      # stored display = short name + acronym
         (U + "ext/celex/32016L0680", "eurlex", "directive", "32016L0680", "LED"),
     ])
     view = facets.browse_view(con, "eurlex")
@@ -163,10 +169,9 @@ def test_browse_view_attaches_leaf_documents(tmp_path):
     doc = leaf["documents"][0]
     assert doc["uri"] == U + "ext/celex/32016R0679"
     assert doc["url"] == "/celex/32016R0679"     # eurlex's public /celex/ grammar
-    # the listing handle is the source-aware browse label (eurlex short label),
-    # not the bare CELEX
-    assert doc["display"] == facets.browse_label("eurlex", Row(
-        doc["uri"], catalog.local(doc["uri"]), "regulation", "32016R0679", title))
+    # the listing handle is the stored reader-facing heading -- the same display
+    # the page and search show (catalog.display_title), not the bare CELEX
+    assert doc["display"] == "Dataskyddsförordningen (GDPR)"
     assert doc["display"] != "32016R0679"
     # non-leaf (primary) nodes carry no documents
     assert reg.get("documents") is None
