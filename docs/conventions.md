@@ -87,6 +87,9 @@ must not kill a corpus run:
 - the build driver's per-document boundary (`build.py`)
 - the golden-validation harness (`sfs/_validate.py`)
 - the legacy-stats CLI (`dv/legacy.py`)
+- the versions stage's per-version boundary (`sfs/versions.py`) — one
+  corrupt decades-old archive file becomes a recorded skip in the
+  sidecar, not a permanently stale stage
 
 Each site carries `# noqa: BLE001 — <what it survives, and where the
 failure is recorded>`. Adding a *new* resilience point means adding it to

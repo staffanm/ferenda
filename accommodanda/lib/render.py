@@ -38,7 +38,7 @@ from ..api import app as api_service
 from ..dv import naming as dv_naming
 from ..eurlex.structure import flatten as eurlex_flatten
 from ..eurlex.structure import subarticle_key
-from . import catalog, layout
+from . import catalog, history, layout
 from .catalog import BASE
 from .markdown import begrepp_uri
 
@@ -673,6 +673,7 @@ PAGE = """<!doctype html>
 %(grid)s
 %(island)s<script src="/scrollspy.js" defer></script>
 <script src="/search.js" defer></script>
+<script src="/versions.js" defer></script>
 </body></html>
 """
 
@@ -753,14 +754,186 @@ def _expired_banner(props):
             '<span>%s.</span></div>' % detail)
 
 
+def _version_banner(base_id, version):
+    """The callout on a historical-consolidation ("lydelse") page: which
+    cutoff it shows, and the way back to the law as it reads today."""
+    return ('<div class="version-banner"><strong>Äldre lydelse</strong>'
+            '<span>Författningen i dess lydelse t.o.m. ändringar genom '
+            'SFS %s. <a href="%s">Visa gällande lydelse</a>.</span></div>'
+            % (escape(version), escape(layout.page_url(BASE + base_id))))
+
+
+def _version_notes(art):
+    """version id -> "i kraft <date> · Prop. …" annotation for the compare
+    panel, from the amendment register (lib.history's join, reduced to the
+    display string)."""
+    return {v: " · ".join(
+                n for n in ((("i kraft %s" % ikraft) if ikraft else None),
+                            next((f for f in forarbeten
+                                  if f.startswith("Prop")), None)) if n)
+            for v, (ikraft, forarbeten) in history.amendment_info(art).items()}
+
+
+def _versions_panel(art, base_id, own_version, versions):
+    """The compare panel (the old pipeline's docversions dropdown): the
+    <select> that versions.js turns into the on-demand diff view
+    (?diff=<version>, served by /api/v1/document/diff), annotated with each
+    consolidation's ikraft date + proposition where the register knows them.
+    Point-in-time links live in the andringar view (see _andringar); here is
+    only the comparison affordance. Empty when this very consolidation is the
+    only one known."""
+    versions = [(v, u) for v, u in versions if v != own_version]
+    if not versions:
+        return ""
+    notes = _version_notes(art)
+    options = []
+    for v, _vuri in reversed(versions):               # newest first
+        note = notes.get(v, "")
+        options.append('<option value="%s">SFS %s%s</option>'
+                       % (escape(v), escape(v),
+                          escape(" (%s)" % note) if note else ""))
+    return ('<details class="lydelser">'
+            '<summary>Jämför lydelser <span class="count">%d</span></summary>'
+            '<label>Jämför %s lydelse med <select data-diff data-uri="%s" '
+            'data-to="%s"><option value="">– välj lydelse –</option>%s'
+            '</select></label></details>'
+            % (len(options), "denna" if own_version else "aktuell",
+               escape(BASE + base_id), escape(own_version or ""),
+               "".join(options)))
+
+
+def _act_source_links(nr):
+    """The change act's own authoritative publication, by era (the old
+    registerpost rules): print PDFs at rkrattsdb.gov.se for SFS 1998:306 --
+    2018:159, the official svenskforfattningssamling.se version from 2018:160
+    on, nothing digitized before that."""
+    year, _, lop = nr.partition(":")
+    if not (year.isdigit() and lop.isdigit()):
+        return ""
+    y, n = int(year), int(lop)
+    if (y, n) >= (2018, 160):
+        return ('<li><a class="ext" rel="external" href="https://'
+                'svenskforfattningssamling.se/doc/%d%d.html">'
+                'Officiell autentisk version</a></li>' % (y, n))
+    if (y, n) >= (1998, 306):
+        return ('<li><a class="ext" rel="external" href="https://'
+                'rkrattsdb.gov.se/SFSdoc/%02d/%02d%04d.PDF">'
+                'Tryckt format (PDF)</a></li>' % (y % 100, y % 100, n))
+    return ""
+
+
+def _prop_link(site, ident):
+    """A förarbete identifier from the register, linked when it is a
+    proposition we host (the old registerpost linked only propositioner)."""
+    m = re.match(r"Prop\. (\d{4}/\d{2,4}):(\S+)$", ident)
+    if m:
+        uri = BASE + "prop/%s:%s" % (m.group(1), m.group(2))
+        if site.has(uri):
+            return '<a href="%s">%s</a>' % (escape(layout.page_url(uri)),
+                                            escape(ident))
+    return escape(ident)
+
+
+def _andringar(art, base_id, own_version, versions, site, toc, rail):
+    """The bottom-of-page register view (the old pipeline's div.andringar):
+    one section per register post -- the base act first, then every change
+    act -- with the act's own publication links, the point-in-time
+    "Konsoliderad version med ändringar införda till och med SFS X" link where
+    that consolidation is parsed, a diff link against the previous available
+    consolidation (the amendment as a single change), its
+    övergångsbestämmelser, and the register details (förarbeten, omfattning,
+    CELEX, ikraftträdande)."""
+    amendments = art.get("amendments") or []
+    if not amendments:
+        return ""
+    have = dict(versions)                       # version id -> lydelse uri
+    order = [v for v, _ in versions]            # oldest first
+    # the current consolidation's own cutoff: its amendment's diff target is
+    # the *current* page (that snapshot is not archived -- it is the document)
+    m = re.search(r" i lydelse enligt SFS (.+)$",
+                  art.get("metadata", {}).get("properties", {})
+                     .get("dcterms:identifier", ""))
+    cutoff = m.group(1) if m else None
+    doc_uri = art["uri"]
+    posts = []
+    for i, am in enumerate(amendments):
+        p = am.get("properties", {})
+        ident = p.get("dcterms:identifier", "")
+        nr = ident[4:] if ident.startswith("SFS ") else None
+        heading = ("Ändring, %s" % ident) if i and ident else (ident or "Ändring")
+        links = []
+        prev = view_url = None
+        if nr:
+            links.append(_act_source_links(nr))
+            if nr in have:
+                view_url = layout.page_url(have[nr])
+                if nr != own_version:
+                    links.append('<li><a href="%s">Konsoliderad version med '
+                                 'ändringar införda till och med SFS %s</a></li>'
+                                 % (escape(view_url), escape(nr)))
+                idx = order.index(nr)
+                prev = order[idx - 1] if idx else None
+            elif nr == cutoff and order:
+                # the newest amendment: its consolidation is the current text
+                view_url = layout.page_url(BASE + base_id)
+                prev = order[-1]
+        if prev and view_url:
+            links.append('<li><a href="%s?diff=%s">Visa ändringarna (jämfört '
+                         'med lydelsen enligt SFS %s)</a></li>'
+                         % (escape(view_url), escape(prev), escape(prev)))
+        content = "".join(render_node(c, site, doc_uri, toc, rail)
+                          for c in am.get("content", []))
+        if content:
+            content = "<h3>Övergångsbestämmelse</h3>" + content
+        celex = p.get("rpubl:celexNummer", [])
+        rows = [
+            ("Förarbeten", ", ".join(_prop_link(site, f)
+                                     for f in am.get("forarbeten", []))),
+            ("Omfattning", escape(p["rpubl:andrar"])
+             if p.get("rpubl:andrar") else ""),
+            ("CELEX-nr", " ".join(
+                '<a class="ext" rel="external" href="https://eur-lex.europa.eu/'
+                'legal-content/SV/TXT/?uri=CELEX:%s">%s</a>'
+                % (escape(c), escape(c))
+                for c in ([celex] if isinstance(celex, str) else celex))),
+            ("Ikraftträder", escape(p["rpubl:ikrafttradandedatum"])
+             if p.get("rpubl:ikrafttradandedatum") else ""),
+        ]
+        # values above are already escaped/markup, so not _meta_dl (which
+        # escapes wholesale)
+        details = "".join("<dt>%s</dt><dd>%s</dd>" % (k, v)
+                          for k, v in rows if v)
+        details = '<dl class="meta">%s</dl>' % details if details else ""
+        # the anchor: the övergångsbestämmelse node already mints L{nr}; the
+        # wrapper carries it only when no child does (no duplicate DOM ids)
+        child_ids = {c.get("id") for c in am.get("content", [])}
+        wrapper_id = ("L" + nr.replace(" ", "_")) if nr else None
+        ida = (' id="%s"' % escape(wrapper_id)
+               if wrapper_id and wrapper_id not in child_ids else "")
+        posts.append('<div class="andring"%s><h2>%s</h2>%s%s%s</div>'
+                     % (ida, escape(heading),
+                        "<ul>%s</ul>" % "".join(links) if any(links) else "",
+                        content, details))
+    anchor = toc.add("L", "Ändringar och övergångsbestämmelser", 1)
+    return ('<section class="andringar" id="%s"><h2 class="kaprubrik">'
+            'Ändringar och övergångsbestämmelser</h2>%s</section>'
+            % (escape(anchor), "".join(posts)))
+
+
 def render_sfs(art, site):
     props = art.get("metadata", {}).get("properties", {})
     local_id = catalog.local(art["uri"])
-    title = props.get("dcterms:title") or ("SFS " + local_id)
+    # a historical consolidation ("lydelse") carries its cutoff in `version`
+    # and a /konsolidering/ uri; its page gets a way-back banner instead of
+    # the inbound panel (citations always target the current consolidation)
+    base_id, _, _ = local_id.partition("/konsolidering/")
+    version = art.get("version")
+    title = props.get("dcterms:title") or ("SFS " + base_id)
     # a repeal that has taken effect (a future repeal date is still in force):
     # mark the whole page as upphävd
     upphavd = props.get("rpubl:upphavandedatum")
-    expired = bool(upphavd) and upphavd <= date.today().isoformat()
+    expired = (bool(upphavd) and upphavd <= date.today().isoformat()
+               and not version)
     meta = _meta_dl([
         ("Utfärdad", props.get("rpubl:utfardandedatum")),
         ("Ikraftträder", props.get("rpubl:ikrafttradandedatum")),
@@ -769,15 +942,26 @@ def render_sfs(art, site):
     ])
     toc = Toc()
     rail = Rail(site, art["uri"])
-    body = (_expired_banner(props) if expired else "") \
-        + document_inbound(site, art["uri"]) + "".join(
-            render_node(n, site, art["uri"], toc, rail)
-            for n in art.get("structure", []))
+    versions = history.versions(base_id)
+    structure = '<div id="dokument">' + "".join(
+        render_node(n, site, art["uri"], toc, rail)
+        for n in art.get("structure", [])) + "</div>"
+    # the register view renders after the structure so its TOC entry and
+    # rail hooks come last, but the OB anchors (#L{nr}) sit inside it
+    andringar = _andringar(art, base_id, version, versions, site, toc, rail)
+    body = (_version_banner(base_id, version) if version
+            else (_expired_banner(props) if expired else "")) \
+        + _versions_panel(art, base_id, version, versions) \
+        + ("" if version else document_inbound(site, art["uri"])) \
+        + structure + andringar
     rail.add_document()        # external links + law-level commentary, default panel
     return page(title, "Författning", meta, body, render_toc(toc),
-                eyebrow="SFS " + local_id, island=rail.island(),
+                eyebrow=("SFS %s · äldre lydelse" % base_id if version
+                         else "SFS " + base_id),
+                island=rail.island(),
                 source_url=art.get("source_url"),
-                body_class=" expired" if expired else "")
+                body_class=(" inaktuell" if version
+                            else " expired" if expired else ""))
 
 
 # the structural wrapper kinds in a DV decision tree (RANK in dv.structure); the
@@ -1605,7 +1789,7 @@ def _render_one(job):
 
 
 def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None,
-                  only=None, source=None, jobs=1):
+                  only=None, source=None, jobs=1, extra=None):
     """Render every catalogued document to static HTML. `fresh(uri, out_path,
     art_path, dep_digest) -> bool` lets the caller skip a page whose inputs are
     unchanged (incremental generate); `record(uri, art_path, dep_digest)` is
@@ -1614,9 +1798,11 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
     caller); `dep_digest` captures its citation relationships (set-based).
     `only`, a set of artifact path strings, restricts the run to those documents
     (a targeted `lagen <source> generate <id>`) -- the corpus-wide aggregate
-    pages are then left untouched. `jobs>1` renders the stale pages across a
-    process pool. Returns (total_pages, rendered) -- rendered < total when pages
-    were skipped."""
+    pages are then left untouched. `extra` appends pre-scoped (uri, source,
+    path, title) page rows that have no catalog row (the sfs historical
+    consolidations). `jobs>1` renders the stale pages across a process pool.
+    Returns (total_pages, rendered) -- rendered < total when pages were
+    skipped."""
     out_root = Path(out_root)
     con = catalog.connect(catalog_path)
     site = Site.from_catalog(con)
@@ -1629,6 +1815,7 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
         rows = [r for r in rows if r[2] in only]
     # commentary is an annotation rendered into statute rails, not a page of its own
     rows = [r for r in rows if r[1] != "kommentar"]
+    rows += list(extra or ())          # uncatalogued pages, already run-scoped
 
     # Freshness planning is single-threaded: it reads the catalog + manifest and
     # hashes inputs (the manifest lives here in the parent). Fresh pages advance
@@ -1688,6 +1875,7 @@ def render_aggregates(con, out_root, catalog_path):
     (out_root / "style.css").write_text(CSS)
     (out_root / "scrollspy.js").write_text(SCROLLSPY)
     (out_root / "search.js").write_text(SEARCH)
+    (out_root / "versions.js").write_text(VERSIONS)
     (out_root / "robots.txt").write_text(ROBOTS)
     (out_root / "index.html").write_text(render_index(con))
     client = _browse_client(catalog_path)
@@ -1814,6 +2002,53 @@ body.expired::before { content: "Upphävd författning"; position: fixed;
                        font-family: var(--serif); font-weight: 600; white-space: nowrap;
                        font-size: min(11vw, 8rem); color: var(--accent); opacity: .08;
                        pointer-events: none; user-select: none; z-index: 1; }
+
+/* -- Historical consolidations (lydelser) + version diff -- */
+body.inaktuell .gr-main { color: var(--ink-3); }
+body.inaktuell .gr-main h1, body.inaktuell .kaprubrik, body.inaktuell .rubrik {
+  color: var(--ink-2); }
+body.inaktuell::before { content: "Inaktuell författning"; position: fixed;
+                         top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-24deg);
+                         font-family: var(--serif); font-weight: 600; white-space: nowrap;
+                         font-size: min(11vw, 8rem); color: var(--accent); opacity: .08;
+                         pointer-events: none; user-select: none; z-index: 1; }
+.version-banner { display: flex; flex-wrap: wrap; align-items: baseline; gap: .55rem;
+                  margin: 0 0 2.25rem; padding: .7rem 1rem; border: 1px solid var(--rule);
+                  border-left: 3px solid var(--accent); border-radius: 5px;
+                  background: var(--surf-2); font-size: .92rem; color: var(--ink-2); }
+.version-banner strong { font-family: var(--serif); font-weight: 600; color: var(--accent);
+                         text-transform: uppercase; letter-spacing: .04em; font-size: .82rem; }
+.version-banner a { color: var(--accent); }
+details.lydelser { margin: 0 0 2rem; padding: .55rem 1rem; border: 1px solid var(--rule);
+                   border-radius: 5px; background: var(--surf); font-size: .92rem; }
+details.lydelser summary { cursor: pointer; font-weight: 500; color: var(--ink-2); }
+details.lydelser summary .count { color: var(--ink-4); font-weight: 400; }
+details.lydelser label { display: block; margin: .8rem 0 .3rem; color: var(--ink-3); }
+details.lydelser select { max-width: 100%; font: inherit; margin-left: .4rem; }
+details.lydelser ol { margin: .5rem 0 .3rem; padding-left: 1.4rem; }
+details.lydelser li { margin: .2rem 0; }
+details.lydelser .note { color: var(--ink-4); font-size: .85rem; }
+.version-diff ins, .diff-note ins { background: #e3efd9; color: var(--ink);
+                    text-decoration: none; padding: 0 .1em; border-radius: 2px; }
+.version-diff del, .diff-note del { background: #f2ddd6; color: var(--ink-3);
+                    text-decoration: line-through; padding: 0 .1em; border-radius: 2px; }
+.version-diff [id] { scroll-margin-top: 5rem; }
+.diff-note { margin: 0 0 1.5rem; padding: .55rem 1rem; border: 1px solid var(--rule);
+             border-radius: 5px; background: var(--surf-2); font-size: .9rem;
+             color: var(--ink-2); }
+
+/* -- Ändringar och övergångsbestämmelser (the register view) -- */
+section.andringar { margin-top: 4rem; }
+.andring { margin: 2.25rem 0; padding: 1rem 1.25rem; border: 1px solid var(--rule-soft);
+           border-radius: 5px; background: var(--surf); scroll-margin-top: 5rem; }
+.andring h2 { font-family: var(--serif); font-weight: 600; font-size: 1.15rem;
+              margin: 0 0 .5rem; }
+.andring h3 { font-family: var(--serif); font-weight: 600; font-size: 1rem;
+              margin: 1.25rem 0 .25rem; }
+.andring ul { margin: .3rem 0 .6rem; padding-left: 1.3rem; font-size: .92rem; }
+.andring li { margin: .15rem 0; }
+.andring dl.meta { margin: .75rem 0 0; font-size: .9rem; }
+.andring section.paragraf { margin: .75rem 0; }
 
 /* -- Headings -- */
 .kaprubrik { font-family: var(--serif); font-weight: 500; font-size: 1.7rem;
@@ -2334,5 +2569,57 @@ SEARCH = """
   document.addEventListener('click', function (e) {
     if (e.target.closest('[data-search]')) { e.preventDefault(); open(); }
   });
+})();
+"""
+
+
+# Client layer for the version history: the "jämför med tidigare lydelse"
+# <select> (in the details.lydelser panel on statute + lydelse pages) fetches
+# the marked-up diff from /api/v1/document/diff and swaps it into #dokument --
+# the old pipeline's ?diff=true&from=… view, now an API round-trip on the
+# static page. The choice is mirrored into the ?diff= query param so a diff
+# view is deep-linkable; clearing the select restores the original text
+# without a reload. Plain DOM, no deps.
+VERSIONS = """
+(function () {
+  var sel = document.querySelector('select[data-diff]');
+  var doc = document.getElementById('dokument');
+  if (!sel || !doc) return;
+  var original = null;
+
+  function show(version) {
+    var url = new URL(location.href);
+    if (!version) {
+      if (original !== null) doc.innerHTML = original;
+      url.searchParams.delete('diff');
+      history.replaceState(null, '', url);
+      return;
+    }
+    if (original === null) original = doc.innerHTML;
+    doc.innerHTML = '<div class="diff-note">Hämtar skillnader …</div>';
+    var q = '/api/v1/document/diff?uri=' + encodeURIComponent(sel.dataset.uri) +
+            '&from=' + encodeURIComponent(version) +
+            (sel.dataset.to ? '&to=' + encodeURIComponent(sel.dataset.to) : '');
+    fetch(q).then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.text();
+    }).then(function (html) {
+      doc.innerHTML = html;          // explanatory note + marked-up text, API-composed
+      url.searchParams.set('diff', version);
+      history.replaceState(null, '', url);
+    }).catch(function () {
+      doc.innerHTML = '<div class="diff-note">Kunde inte hämta jämförelsen. ' +
+                      'Prova att ladda om sidan.</div>';
+    });
+  }
+
+  sel.addEventListener('change', function () { show(sel.value); });
+  var wanted = new URL(location.href).searchParams.get('diff');
+  if (wanted && Array.prototype.some.call(sel.options, function (o) {
+        return o.value === wanted; })) {
+    sel.value = wanted;
+    sel.closest('details').open = true;
+    show(wanted);
+  }
 })();
 """

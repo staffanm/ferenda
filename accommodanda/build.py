@@ -74,6 +74,7 @@ from .lib.lagrum import LagrumParser, load_namedlaws
 from .sfs import correspond as sfs_correspond
 from .sfs import download as sfs_download
 from .sfs import load_inputs
+from .sfs import versions as sfs_versions_mod
 from .sfs.nf import to_normalform
 from .wiki import annotate as wiki_annotate
 from .wiki import guidance_discover
@@ -219,13 +220,14 @@ def file_watermark(paths):
     return h.hexdigest()
 
 
-def parse_watermark(source):
-    """A cheap fingerprint of a source's parse inputs: each basefile plus its
-    downloaded input files' size+mtime (no content read). Unchanged ⟹ no document
-    needs re-parsing and none appeared, so the whole per-document freshness scan
-    (which content-hashes every input) can be skipped. Basefiles are folded in so
-    a newly-downloaded doc whose input doesn't exist yet still moves the mark."""
-    stage = source.stages["parse"]
+def stage_watermark(source, stage_name):
+    """A cheap fingerprint of a per-document stage's inputs (parse, versions):
+    each basefile plus its input files' size+mtime (no content read). Unchanged
+    ⟹ no document needs re-running and none appeared, so the whole per-document
+    freshness scan (which content-hashes every input) can be skipped. Basefiles
+    are folded in so a newly-downloaded doc whose input doesn't exist yet still
+    moves the mark."""
+    stage = source.stages[stage_name]
     h = hashlib.sha256()
     for bf in source.list_basefiles():
         h.update(bf.encode())
@@ -542,6 +544,28 @@ def sfs_parse_run(basefile):
     write_artifact("sfs", basefile, nf)
 
 
+SFS_VERSIONS_CODE = SFS_CODE + (PKG / "sfs" / "versions.py",)
+
+
+def sfs_versions_inputs(basefile):
+    """Freshness inputs of the versions stage: every archived consolidation.
+    Archive files are immutable once written, so this set changes only when
+    the downloader supersedes a consolidation (or history is imported)."""
+    return [path for _, path in layout.sfs_version_downloads(basefile)]
+
+
+def sfs_versions_sidecar(basefile):
+    return layout.sfs_versions_sidecar(basefile)
+
+
+def sfs_versions_run(basefile):
+    """Parse every archived consolidation of one statute into per-version
+    artifacts + the sidecar index (see sfs.versions). The sidecar is written
+    even when the statute has no archive, marking the stage built."""
+    sfs_versions_mod.build(basefile,
+                           refparser=LagrumParser(_namedlaws(), basefile))
+
+
 def sfs_list():
     """Every *regular* SFS basefile with a source: the new beta JSON
     (downloaded/{y}/{n}.json) or the legacy SFST HTML (downloaded/sfst/).
@@ -593,6 +617,11 @@ SOURCES["sfs"] = Source("sfs", sfs_list, {
     "download": Stage("download", sfs_download_run, sfs_source),
     "parse": Stage("parse", sfs_parse_run, sfs_artifact,
                    inputs=sfs_inputs, code=SFS_CODE),
+    # historical consolidations: parse the download archive (superseded
+    # versions, incl. two decades of legacy HTML snapshots) into per-version
+    # artifacts + a sidecar index, feeding the lydelse pages and the diff view
+    "versions": Stage("versions", sfs_versions_run, sfs_versions_sidecar,
+                      inputs=sfs_versions_inputs, code=SFS_VERSIONS_CODE),
 }, harvest=sfs_harvest, origin=_origin(sfs_download.ENDPOINT),
    actions={"ai-correspond": sfs_ai_correspond},
    notes="ai-correspond <new-sfs> <prop> [<old-sfs>]: LLM-derive the old->new "
@@ -1286,7 +1315,10 @@ SOURCES["begrepp"] = Source(
 # --------------------------------------------------------------------------
 
 ARTIFACTS = {
-    "sfs": lambda: sorted((SFS_ROOT / "artifact").glob("*/*.json")),
+    # the versions-stage sidecars live next to the main artifacts but describe
+    # historical consolidations -- not corpus documents, so not related/dumped
+    "sfs": lambda: sorted(p for p in (SFS_ROOT / "artifact").glob("*/*.json")
+                          if not p.name.endswith(".versions.json")),
     "dv": lambda: sorted((layout.DOM_ROOT / "artifact").glob("*.json")),
     "forarbete": lambda: sorted((FA_ROOT / "artifact").glob("*/*.json")),
     "kommentar": lambda: sorted((layout.KOMMENTAR_ROOT / "artifact").rglob("*.json")),
@@ -1490,29 +1522,31 @@ def cmd_all(names, jobs, whole_corpus, download=False):
         cmd_download_all(names, jobs)
     store = load_watermarks()
     parse_dirty = False
-    for name in names:
-        source = SOURCES[name]
-        if "parse" not in source.stages:
-            continue
-        pcode = source.stages["parse"].code
-        wm = parse_watermark(source)
-        # a coarse gate over the source's inputs: if nothing downloaded changed
-        # and the parser is unchanged, skip the per-document freshness scan (which
-        # would content-hash every input) wholesale. A changed source falls through
-        # to run_action, whose per-doc manifest still re-parses only what moved.
-        if up_to_date(store, "parse", name, wm, pcode):
-            print("parse %s: up to date -- skipped" % name)
-            continue
-        basefiles = source.list_basefiles()
-        result = run_action(source, "parse", basefiles, jobs)
-        report(source, "parse", result, len(basefiles))
-        # only watermark a clean sweep: if any document failed to parse, leave the
-        # source un-marked so the next run retries it (and re-surfaces the error)
-        # instead of skipping wholesale on an unchanged input.
-        if result.errors:
-            continue
-        record_step(store, "parse", name, wm, pcode)
-        parse_dirty = True
+    for step in ("parse", "versions"):
+        for name in names:
+            source = SOURCES[name]
+            if step not in source.stages:
+                continue
+            pcode = source.stages[step].code
+            wm = stage_watermark(source, step)
+            # a coarse gate over the stage's inputs: if no input file changed
+            # and the recipe is unchanged, skip the per-document freshness scan
+            # (which would content-hash every input) wholesale. A changed source
+            # falls through to run_action, whose per-doc manifest still re-runs
+            # only what moved.
+            if up_to_date(store, step, name, wm, pcode):
+                print("%s %s: up to date -- skipped" % (step, name))
+                continue
+            basefiles = source.list_basefiles()
+            result = run_action(source, step, basefiles, jobs)
+            report(source, step, result, len(basefiles))
+            # only watermark a clean sweep: if any document failed, leave the
+            # source un-marked so the next run retries it (and re-surfaces the
+            # error) instead of skipping wholesale on an unchanged input.
+            if result.errors:
+                continue
+            record_step(store, step, name, wm, pcode)
+            parse_dirty = True
     if parse_dirty:
         save_watermarks(store)
     cmd_relate(names)
@@ -1540,25 +1574,47 @@ def stale_sources():
 # artifacts in its prerequisite set (computed per page from the catalog)
 GENERATE_CODE = (PKG / "lib" / "render.py", PKG / "lib" / "catalog.py",
                  PKG / "lib" / "markdown.py", PKG / "lib" / "layout.py",
-                 PKG / "dv" / "naming.py")
+                 PKG / "lib" / "history.py", PKG / "dv" / "naming.py")
 
 
 def generate_watermark():
     """The coarse gate for a full-corpus generate: the whole-catalog content
-    signature plus the .corr/.ann sibling layers that relate doesn't fold into
-    content_hash. Unchanged (with the render code) ⟹ every page is fresh, so the
-    ~100k-page freshness scan can be skipped wholesale."""
+    signature plus the .corr/.ann/.versions.json sibling layers that relate
+    doesn't fold into content_hash. Unchanged (with the render code) ⟹ every
+    page is fresh, so the ~100k-page freshness scan can be skipped wholesale."""
     con = catalog.connect(CATALOG)
     sig = catalog.catalog_signature(con)
     con.close()
     sides = file_watermark(sorted(
         list((SFS_ROOT / "artifact").glob("*/*.corr"))
+        # the versions-stage sidecars: a new historical consolidation must
+        # re-render its statute's page (version panel) + the version pages
+        + list((SFS_ROOT / "artifact").glob("*/*.versions.json"))
         + list((EURLEX_ROOT / "artifact").glob("*/*.ann"))
         # the kommentar ai-annotate guidance layer rides a *different* document's
         # rail (the host act's), so -- like the cross-document .corr case -- a full
         # or forced generate is what propagates an edit to the host page
         + list((layout.KOMMENTAR_ROOT / "artifact").rglob("*.ann"))))
     return hashlib.sha256((sig + "\x1f" + sides).encode()).hexdigest()
+
+
+def sfs_version_pages(sidecars):
+    """The historical-consolidation ("lydelse") pages to render, one (uri,
+    source, path, title) row per parsed version, read from the given
+    versions-stage sidecars. They are not catalog rows -- versions carry no
+    citations or search entries -- so generate appends them to the plan as
+    extra pages."""
+    rows = []
+    for sc in sidecars:
+        if not sc.exists():
+            continue
+        basefile = layout.sfs_sidecar_basefile(sc)
+        for entry in json.loads(sc.read_text())["versions"]:
+            version = entry["version"]
+            rows.append((entry["uri"], "sfs",
+                         str(layout.sfs_version_artifact(basefile, version)),
+                         "SFS %s i lydelse enligt SFS %s" % (basefile, version)))
+    return rows
 
 
 def cmd_generate(only=None, source=None, jobs=1):
@@ -1629,7 +1685,11 @@ def cmd_generate(only=None, source=None, jobs=1):
             # so no sibling layers -- its signature is just its dep_digest (its
             # aggregated inbound, which is the stub's whole content)
             fp = Path(p) if p else None
-            sides = ((fp, fp.with_suffix(".ann"), fp.with_suffix(".corr"))
+            # .versions.json is the sfs versions-stage sidecar: an archived
+            # consolidation appearing re-renders the statute's page (its
+            # version panel lists the new lydelse)
+            sides = ((fp, fp.with_suffix(".ann"), fp.with_suffix(".corr"),
+                      fp.with_suffix(".versions.json"))
                      if fp else ())
             own_hash[p] = hashlib.sha256(b"".join(
                 s.read_bytes() if s.exists() else b"" for s in sides)).hexdigest()
@@ -1650,9 +1710,22 @@ def cmd_generate(only=None, source=None, jobs=1):
     def progress(done, total, current="", rendered=0):
         util.status(done, total, "generate  %d rendered  %s" % (rendered, current))
 
+    # the sfs historical-consolidation pages ride along whenever the run covers
+    # sfs: the whole corpus, the sfs source, or specific sfs documents (whose
+    # sidecars sit next to the artifacts named in `only`)
+    if only is not None:
+        extra = sfs_version_pages([Path(p).with_suffix(".versions.json")
+                                   for p in only
+                                   if Path(p).is_relative_to(SFS_ROOT / "artifact")])
+    elif source in (None, "sfs"):
+        extra = sfs_version_pages(
+            sorted((SFS_ROOT / "artifact").glob("*/*.versions.json")))
+    else:
+        extra = []
+
     total, rendered = render.generate_site(CATALOG, GENERATED, progress=progress,
                                            fresh=fresh, record=record, only=only,
-                                           source=source, jobs=jobs)
+                                           source=source, jobs=jobs, extra=extra)
     sys.stderr.write("\n")
     if updates:
         manifest.update(updates)

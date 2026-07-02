@@ -17,14 +17,17 @@ artifact's `uri` is also its API key, its dump id and its OpenSearch `_id`.
 """
 
 import json
+import re
 import sqlite3
 import threading
 from datetime import datetime, timezone
+from html import escape
 from pathlib import Path
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -33,7 +36,7 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .. import config
-from ..lib import catalog, facets, layout, resolve, search
+from ..lib import catalog, diff, facets, history, layout, resolve, search
 
 CATALOG = config.DATA / "catalog.sqlite"
 DUMPS = config.DATA / "dumps"
@@ -350,6 +353,97 @@ def document_endpoint(uri: str = Query(..., description="full lagen.nu document 
     return Document(uri=uri, source=source, kind=kind, label=label, title=title,
                     source_url=art.get("source_url"), artifact=art,
                     inbound_count=catalog.document_inbound_count(con, uri))
+
+
+# an SFS basefile / version id as it may appear in a query param: "1998:204",
+# "1827:60 s.1007", "2003:466" -- one colon, no path-shaped characters, so it
+# can safely become the filesystem segments the layout rules mint
+_RE_SFS_ID = re.compile(r"^[^/\\:]+:[^/\\:]+$")
+
+
+def _sfs_basefile(uri):
+    """The statute basefile behind a document uri, for the version endpoints
+    (only statutes have archived consolidations)."""
+    basefile = catalog.local(catalog.strip_fragment(uri))
+    if not _RE_SFS_ID.match(basefile) or ".." in basefile:
+        raise HTTPException(404, "%r is not a statute uri -- only SFS "
+                                 "documents carry versions" % uri)
+    return basefile
+
+
+def _version_artifact(basefile, version):
+    """A consolidation's parsed artifact: a named historical version from the
+    archive, or the current one (version None)."""
+    if version is None:
+        path = layout.artifact("sfs", basefile)
+    else:
+        if not _RE_SFS_ID.match(version) and not version.isdigit():
+            raise HTTPException(400, "bad version id %r" % version)
+        path = layout.sfs_version_artifact(basefile, version)
+    if not path.exists():
+        raise HTTPException(404, "no %s consolidation of %s -- see "
+                                 "/api/v1/document/versions"
+                                 % (version or "current", basefile))
+    return json.loads(path.read_bytes())
+
+
+class VersionInfo(BaseModel):
+    version: str                    # the consolidation cutoff ("2003:466")
+    uri: str
+    url: str                        # the hosted lydelse page (/1998:204/konsolidering/2003:466)
+    ikraft: str | None = None       # when the cutoff amendment entered force
+    forarbeten: list[str] = []      # its preparatory works ("Prop. 1997/98:44", …)
+
+
+class VersionList(BaseModel):
+    uri: str
+    versions: list[VersionInfo]     # oldest first; the current consolidation excluded
+
+
+@app.get("/api/v1/document/versions", response_model=VersionList, tags=["document"])
+def versions_endpoint(uri: str = Query(..., description="full lagen.nu statute uri"),
+                      con: sqlite3.Connection = Depends(get_con)):
+    """A statute's archived historical consolidations (lydelser), oldest
+    first -- each one browsable at its own page and diffable via
+    /api/v1/document/diff. Amendment dates and preparatory works are joined
+    in from the statute's register where known."""
+    basefile = _sfs_basefile(uri)
+    row = catalog.document(con, catalog.BASE + basefile)
+    info = (history.amendment_info(json.loads(Path(row[5]).read_bytes()))
+            if row and row[5] else {})
+    return VersionList(uri=catalog.BASE + basefile, versions=[
+        VersionInfo(version=v, uri=vuri, url=layout.page_url(vuri),
+                    ikraft=info.get(v, (None, []))[0],
+                    forarbeten=info.get(v, (None, []))[1])
+        for v, vuri in history.versions(basefile)])
+
+
+@app.get("/api/v1/document/diff", response_class=HTMLResponse, tags=["document"])
+def diff_endpoint(uri: str = Query(..., description="full lagen.nu statute uri"),
+                  from_version: str = Query(..., alias="from",
+                                            description="older version id, e.g. 2003:466"),
+                  to: str | None = Query(None, description="newer version id "
+                                         "(default: the current consolidation)")):
+    """Compare two consolidations of a statute: the newer text in document
+    order with every difference from the older marked up (<ins>/<del>) -- an
+    HTML fragment, ready to swap into the page (the old ?diff=true view).
+    Version ids are consolidation cutoffs from /api/v1/document/versions.
+    Direction is always older -> newer regardless of argument order (the
+    current consolidation is by definition newest); the fragment leads with a
+    note naming both endpoints."""
+    basefile = _sfs_basefile(uri)
+    if to is not None and \
+            layout.sfs_version_key(from_version) > layout.sfs_version_key(to):
+        from_version, to = to, from_version
+    html, _changed = diff.diff_html(_version_artifact(basefile, from_version),
+                                    _version_artifact(basefile, to))
+    note = ('<div class="diff-note">Ändringar från lydelsen enligt '
+            'SFS %s till %s. <ins>Tillagd</ins> och <del>borttagen</del> '
+            'text är markerad.</div>'
+            % (escape(from_version),
+               "lydelsen enligt SFS %s" % escape(to) if to
+               else "den gällande lydelsen"))
+    return HTMLResponse(note + html)
 
 
 @app.get("/api/v1/document/inbound", response_model=list[Citation], tags=["document"])

@@ -157,6 +157,74 @@ def sfs_sfsr(basefile):                 # legacy register HTML
     return SFS_DOWNLOADED / "sfsr" / year / (nr + ".html")
 
 
+# --------------------------------------------------------------------------
+# sfs archive -- superseded consolidations. archive/ mirrors the live
+# categories (downloaded/, artifact/) with the old site's per-document
+# .versions/ layout; a version id is the SFS number of the last amendment
+# folded into that consolidation ("2003:466" -> 2003/466.<ext>), or a bare
+# legacy counter ("11") where the old archiver couldn't recover the cutoff.
+# --------------------------------------------------------------------------
+
+SFS_ARCHIVE = SFS_ROOT / "archive"
+
+
+def _sfs_version_dir(category, basefile):
+    year, nr = _sfs_parts(basefile)
+    return SFS_ARCHIVE / category / year / nr / ".versions"
+
+
+def sfs_version_downloads(basefile):
+    """Every archived consolidation of a statute: sorted (version, path) pairs
+    from the archive's .versions/ tree -- legacy HTML (the two rättsdatabaser
+    generations) and the new downloader's JSON side by side. When one version id
+    exists in both forms the JSON (the richer, register-carrying form) wins."""
+    root = _sfs_version_dir("downloaded", basefile)
+    found = {}
+    for path in sorted(root.glob("*/*")) + sorted(root.glob("*")):
+        if path.is_dir() or path.suffix not in (".html", ".json"):
+            continue   # junk (editor backups) never becomes a version
+        version = ("%s:%s" % (path.parent.name, path.stem.replace("_", " "))
+                   if path.parent != root else path.stem.replace("_", " "))
+        if version not in found or path.suffix == ".json":
+            found[version] = path
+    return sorted(found.items())
+
+
+def sfs_version_key(version):
+    """Chronological sort key for a consolidation version id: the cutoff SFS
+    number ("2003:466"); an unrecovered legacy counter ("11", no year to order
+    by) sorts first, by counter."""
+    if ":" in version:
+        year, nr = version.split(":", 1)
+        return (int(year), int(re.sub(r"\D", "", nr) or 0))
+    return (0, int(version))
+
+
+def sfs_version_artifact(basefile, version):
+    """A parsed archived consolidation: the artifact-tree mirror of its
+    download, keyed by the (possibly recovered) version id."""
+    root = _sfs_version_dir("artifact", basefile)
+    if ":" in version:
+        vyear, vnr = version.split(":", 1)
+        return root / vyear / ("%s.json" % vnr.replace(" ", "_"))
+    return root / ("%s.json" % version)
+
+
+def sfs_versions_sidecar(basefile):
+    """The per-statute version index -- the versions stage's output, a sidecar
+    next to the main artifact (like .corr): which historical consolidations
+    exist, their recovered version ids and their parse status."""
+    rel = relpath("sfs", basefile)
+    return SFS_ROOT / "artifact" / rel.with_name(rel.name + ".versions.json")
+
+
+def sfs_sidecar_basefile(path):
+    """Inverse of sfs_versions_sidecar: the statute basefile a sidecar file
+    describes (the {y}/{n} path segments, slug-decoded)."""
+    return "%s:%s" % (path.parent.name,
+                      path.name[:-len(".versions.json")].replace("_", " "))
+
+
 def fa_record(basefile):
     typ, rest = basefile.split("/", 1)
     return FA_DOWNLOADED / typ / (rest + ".json")

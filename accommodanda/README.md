@@ -59,6 +59,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `model.py` | typed dataclasses (`Forfattning`, `Kapitel`, `Paragraf`, …) |
 | `nf.py` | tree → golden normal form (replicates old URI-minting quirks) |
 | `register.py` | SFSR register page → amendments + change tuples |
+| `versions.py` | archived consolidations (download archive, three raw generations) → per-version artifacts + `.versions.json` sidecar |
 | `__main__.py` | `parse` / `refs` / `validate` CLI |
 
 **Citation engine (shared library)**
@@ -95,6 +96,27 @@ uv run python -m accommodanda.sfs parse site/data/sfs/downloaded/2018/585.json -
 # golden = the old pipeline's parsed XHTML (site/data/sfs/parsed), normalized to NF on the fly
 uv run python -m accommodanda.sfs validate site/data/sfs/parsed site/data/sfs/downloaded --sections structure,references
 uv run python -m accommodanda.sfs refs FILE PARSED.xhtml  # citation diff for one doc
+```
+
+**SFS version history** (historical consolidations / time travel / diff): the
+downloader archives every superseded consolidation under
+`site/data/sfs/archive/downloaded/{y}/{n}/.versions/` (the old site's two HTML
+generations live there too, imported wholesale). The `versions` stage parses
+them into `archive/artifact/…/.versions/{vy}/{vn}.json` plus a per-statute
+`artifact/{y}/{n}.versions.json` sidecar; `generate` then renders one page per
+historical lydelse at `/{sfsnr}/konsolidering/{version}` (watermarked
+"Inaktuell författning"), the statute page grows a "Jämför lydelser" panel and
+the bottom-of-page **Ändringar och övergångsbestämmelser** register view (per
+amendment: publication links, the point-in-time konsolidering link, a diff
+link against the previous lydelse, övergångsbestämmelser, förarbeten). The
+diff view (`?diff=<version>`, `versions.js`) is computed on demand by
+`GET /api/v1/document/diff` — always oldest→newest — (see also
+`/api/v1/document/versions`). A future `history-as-git` export is specced in
+[`docs/prd-sfs-history-as-git.md`](../docs/prd-sfs-history-as-git.md).
+
+```sh
+uv run python -m accommodanda.build sfs versions            # incremental, all statutes
+uv run python -m accommodanda.build sfs versions 1998:204   # one statute
 ```
 
 **DV** (operates on `site/data/domstol/` (API) and `site/data/dv/` (legacy)):

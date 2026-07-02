@@ -2,13 +2,11 @@
 (accommodanda.build), exercised through a synthetic two-stage source over
 temp files -- no real corpus, no JVM, fast."""
 
-import json
 
 import pytest
 
 from accommodanda import build
-from accommodanda.build import (Result, RunOptions, Source, Stage, build_one,
-                               is_fresh)
+from accommodanda.build import RunOptions, Source, Stage, build_one, is_fresh
 
 
 @pytest.fixture(autouse=True)
@@ -147,15 +145,15 @@ def test_file_watermark_detects_add_remove_modify(tmp_path):
     assert build.file_watermark([a, b, c]) != base       # add one
 
 
-def test_parse_watermark_tracks_inputs(tmp_path):
+def test_stage_watermark_tracks_inputs(tmp_path):
     _, src = make_source(tmp_path)
     manifest = {}
     build_one(src, "download", "a", manifest)        # materialise the inputs
     build_one(src, "download", "b", manifest)
-    wm = build.parse_watermark(src)
-    assert build.parse_watermark(src) == wm          # stable while untouched
+    wm = build.stage_watermark(src, "parse")
+    assert build.stage_watermark(src, "parse") == wm   # stable while untouched
     (tmp_path / "dl" / "a.txt").write_text("HELLO AGAIN")   # rewrite one input
-    assert build.parse_watermark(src) != wm
+    assert build.stage_watermark(src, "parse") != wm
 
 
 def test_up_to_date_combines_watermark_code_and_force(tmp_path):

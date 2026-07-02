@@ -204,6 +204,32 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
   same intermediates, so all register/amendment/metadata parsing is reused
   untouched. 2018:585 from JSON vs HTML = **0 field diffs** (only genuine freshness
   deltas).
+- ✅ **Version history / time travel / diff** (`sfs/versions.py`, `lib/diff.py`,
+  the `versions` Stage) — the old archive machinery's user-facing features,
+  rebuilt over artifacts. The `versions` stage parses every archived
+  consolidation (the ~31k legacy HTML snapshots in `archive/downloaded/…/
+  .versions/` — both rättsdatabaser generations — plus the new downloader's
+  JSON) through the same extract→assemble→NF chain into
+  `archive/artifact/…/.versions/{vy}/{vn}.json` + a per-statute
+  `artifact/{y}/{n}.versions.json` sidecar. Version ids are consolidation
+  cutoffs ("t.o.m. SFS 2003:466"); legacy counter-keyed archives ("11.html")
+  get their real cutoff recovered from the header, duplicates skipped, junk
+  recorded in the sidecar rather than retried forever. `generate` renders each
+  lydelse at the old `/{sfsnr}/konsolidering/{version}` grammar (no layout
+  changes needed — the uri rules already round-trip it) with a way-back
+  banner and an "Inaktuell författning" watermark; the statute page gets a
+  "Jämför lydelser" panel (dates + propositions joined from the register) and
+  the old bottom-of-page **andringar view** (one registerpost per change act:
+  tryckt/officiell publication links, "Konsoliderad version … t.o.m. SFS X"
+  point-in-time link, a per-amendment diff link against the previous available
+  lydelse, övergångsbestämmelser, förarbeten/omfattning/CELEX/ikraft). Diff is
+  *computed on demand* by `GET /api/v1/document/diff` (block-align +
+  word-level `<ins>`/`<del>` over the artifact structure — no vendored
+  htmldiff; direction normalized oldest→newest, note composed server-side) and
+  swapped in by `versions.js` (`?diff=<version>`, deep-linkable);
+  `/api/v1/document/versions` lists the history as data.
+  `test/test_sfs_versions.py`, `test/test_diff.py`. A git export of the whole
+  history ("history-as-git") is specced in `docs/prd-sfs-history-as-git.md`.
 - 🚧 **Adjudication overlay** (`golden_sfs.adjudicate`, `test/test_golden_adjudicate.py`)
   — the "change-detector, not oracle" posture (§2) as code: a `PREDICATES` table where
   each rule forgives a whole *family* of diffs in which the new pipeline is right against
