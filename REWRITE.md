@@ -1238,6 +1238,69 @@ now have internal targets.
   `avg/arn/{dnr}`); JO ämbetsberättelse citation (`official_report`) as
   metadata.
 
+### 7g. Frozen legacy corpora — import, don't port ⬜ (plan, 2026-07-01)
+
+The old pipeline downloaded several corpora whose *upstreams are dead or
+historic* (TRIPS retired 2016, KB digitizations, defunct courts) — the corpus
+is complete and will never update, so **the downloaders are not ported;
+only a one-time import is built**. The raw trees live in `ferenda.old/data/`
+(movable). Surveyed 2026-07-01 (data + legacy-module dossier):
+
+| corpus | docs | coverage | raw format | value |
+|---|---|---|---|---|
+| `propkb` | 19,067 | **1867–1970** (two-chamber riksdag, KB) | ABBYY FineReader OCR-XML (full text), some PDF | high — a century of propositions |
+| `propriksdagen` | 7,922 | 1971–2017 (data.riksdagen.se) | dokumentstatus XML + HTML + PDF | **highest value/effort** — born-digital, fills 1971→regeringen.se |
+| `proptrips` | 4,556 | 1993/94–2016 (TRIPS) | plaintext-HTML + doc/docx/wpd/PDF | gap-filler only (era covered by the two above) |
+| `soukb` | 5,807 | 1922–1999 (KB scans) | PDF **with text layer** (verified) + LIBRIS RDF; 371 GB | high — SOU citations resolve |
+| `souregeringen`/`dsregeringen`/`dirregeringen` | 3,046/1,418/2,294 | ~1993–2025 | landing HTML + PDF | overlap with §7a's harvest — import missing basefiles only |
+| `dirtrips`/`dirasp` | 5,096/1,826 | 1987–2016 | plaintext-HTML / PDF | moderate (dir is the least-cited type) |
+| `arn` | 1,027 | 1992–2022 | decision file (pdf/doc/wpd) + `fragment.html` metadata | high, small — the avg vertical's third organ (`fmt_arn_refs` already mints `avg/arn/{dnr}`) |
+| `skvfs`, `sosfs` (+ other myndfs trees) | — | varies | agency PDFs | fills exactly the two harvest-blocked föreskrift agencies (§7e 💤) |
+| `pbr` | ~12,300 | 1977–2016 (court dissolved) | case HTML + PDFs | skip — the old module was download-only, never parsed, no URIs minted |
+| `keyword`/`myndprax`/`forarbeten`/`sitenews`/`mediawiki`/`eurlex*`/`sfs` | — | — | — | skip — facades, derived output, or superseded (wiki migration, CELLAR, golden) |
+
+**Architecture: frozen corpora are alternate *sources* for existing verticals,
+not new verticals.** Twice anticipated: §7a chose *basefile = the document's
+own identifier* precisely so older-period sources reconcile by identity, and
+`eurlex/bulk.py`'s `unpack-bulk` is the working pattern — a one-time import
+verb that materializes a frozen tree into the vertical's own record layout,
+after which the ordinary `parse` stage and the whole derived layer run
+untouched.
+
+- **Import verb per vertical**: `lagen forarbete import-legacy <corpus> <path>`
+  walks the frozen `downloaded/` tree, derives `(type, basefile)` (the mapping
+  quirks are known: PropKB's `1958:b23` b-series/urtima suffixes, SOUKB's 1922
+  "första serien" restart, TRIPS' malformed-year sanitizers), and writes a
+  record **only when no better source already holds that basefile**.
+- **Precedence = the old composite's rule, made static**: live regeringen.se
+  harvest → propriksdagen → proptrips → propkb (the old
+  `get_preferred_instances` effectively said "anyone with a PDF beats an
+  html-only copy"). Single best source per identity, no field merge — the DV
+  lesson, and here identifiers already agree so no union-find is needed. A
+  future harvester (data.riksdagen.se is still live; ARN publishes again) can
+  claim the same basefiles later; the precedence rule absorbs that for free.
+- **URIs agree by construction**: old and new mint the same
+  `/prop/1975/76:100`, `/sou/1922:1`, `/dir/1994:111`, `/avg/arn/1992-1234`.
+- **Point at the bytes, don't copy them** (410 GB soukb): move the frozen
+  trees' `downloaded/` + `entries/` (the per-doc entry JSON carries the
+  original landing URL → `source_url`) to a mount, add a `legacy_root` key in
+  `config.yml`; import records reference body files in place. The old derived
+  trees (`parsed/`, `distilled/`, `generated/`, `deps/`, most `intermediate/`)
+  are replaced by this pipeline — droppable. Keep `soukb/intermediate/*.hocr*`
+  (36 GB) until the PDFs' own text layer is confirmed good corpus-wide.
+- **Format adapters, in effort order**: none for the regeringen-era trees (the
+  förarbete PDF parser applies as-is); TRIPS plaintext-HTML is trivial
+  (`div.body-text` → the text-inferred route); Riksdagen dokumentstatus
+  XML/HTML is small; ABBYY-XML → a `pdftext.Para`-stream loader is one new
+  format route (and buys 19k documents); `.doc`/`.docx` ride the DV POI path;
+  `.wpd` (347 files) is dropped rather than chasing a WordPerfect converter.
+- **Priority**: (1) ARN into `avg` (smallest; the vertical is shaped for it);
+  (2) propriksdagen (biggest citation-resolution payoff — förarbete citations
+  in DV/SFS are dominated by 1971–1990s props that render as dead `.noref`
+  text); (3) soukb + regeringen-era gap-fills; (4) propkb; (5)
+  dirtrips/dirasp; (6) skvfs/sosfs backfill into föreskrift. PBR archived,
+  not imported.
+
 ### 7b. Remaining verticals ⬜
 
 The rest of `/mnt/data/lagen/data/{…}`. Each built the same way; the horizontal
