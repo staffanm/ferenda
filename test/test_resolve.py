@@ -65,19 +65,18 @@ def test_eu_unknown_does_not_resolve():
 
 
 def test_eu_abbr_and_label_resolve_to_same_act():
-    # namedacts.json splits acronym (abbr) from a genuinely-informal name (label)
-    # like namedlaws.json; both must reach the same CELEX
+    # namedacts.json splits acronym (abbr) from the Swedish short names (label)
+    # like namedlaws.json; both must reach the same CELEX. Since d216ecc1 that
+    # includes acts whose short title also lives in the official title's
+    # parenthesis (GDPR) -- the labels are listed explicitly so the citation
+    # engine can link them in running text.
     dora = "https://lagen.nu/ext/celex/32022R2554"
     assert resolve.resolve_eu("DORA") == dora                 # abbr
     assert resolve.resolve_eu("DORA-förordningen") == dora    # label
     assert resolve.resolve_eu("DORA art 5") == dora + "#5"    # abbr + article
-
-
-def test_eu_extractable_label_pruned_abbr_still_resolves():
-    # an act whose Swedish short title lives in the official title's parenthesis
-    # carries only its acronym here (the name is extracted from the title later)
-    assert resolve.resolve_eu("GDPR") == "https://lagen.nu/ext/celex/32016R0679"
-    assert resolve.resolve_eu("dataskyddsförordningen") is None
+    gdpr = "https://lagen.nu/ext/celex/32016R0679"
+    assert resolve.resolve_eu("GDPR") == gdpr                 # abbr
+    assert resolve.resolve_eu("dataskyddsförordningen") == gdpr  # label
 
 
 # --- DV: case nickname ------------------------------------------------------
