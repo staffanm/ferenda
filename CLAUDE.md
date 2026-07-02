@@ -63,6 +63,12 @@ These boundaries are load-bearing rules, not suggestions:
 
 ## Coding conventions
 
+The citable rule catalog is [`docs/conventions.md`](docs/conventions.md) —
+each rule has a slug (`rule:fail-fast`, `rule:second-use-goes-to-lib`, …)
+cited in code where an exception is exercised and enforced by the
+`.claude/hooks/` guardrails (PreToolUse reminders/blocks, git-guard,
+Stop-hook ruff/ty/layer checks). The essentials:
+
 - Avoid fallback code in general — assert how the environment should be.
   Precondition `assert`s with a message are preferred over defensive
   branches that paper over a broken environment.
@@ -81,9 +87,9 @@ These boundaries are load-bearing rules, not suggestions:
 
 ## Testing
 
-- Run the new suites by naming them explicitly; a bare `pytest test/` fails
-  at collection because the legacy `integration*.py` files don't import
-  under modern Python (out of scope). See `accommodanda/README.md`.
+- A bare `pytest` runs exactly the new suites (pyproject scopes collection
+  to `test/test_*.py`, excluding the `test/files/` fixture tree and the
+  legacy unittest files, which stay out of scope).
 - Parser correctness is validated against the golden corpus and small
   regression fixtures; many tests are golden/adjudication checks rather
   than unit assertions.

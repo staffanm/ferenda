@@ -97,11 +97,35 @@ include = ["accommodanda/**/*.py"]
 extend-exclude = ["ferenda", "lagen", "site", "doc", "tools", "test"]
 
 [tool.ruff.lint]
-# F (pyflakes) + I (import grouping, matches CLAUDE.md) are high-signal and
-# enforced by the Stop hook. ANN (annotation coverage) is NOT enabled: the
-# package is mostly unannotated, so it would block every edited function.
-# Measure coverage on demand with `uv run ruff check --select ANN accommodanda`.
-select = ["F", "I"]
+# High-signal sets, enforced by the Stop hook (see docs/conventions.md):
+#   F (pyflakes), I (import grouping) — baseline
+#   B (bugbear) — real bug shapes (zip strict, unused loop vars, ...)
+#   BLE (blind except) — rule:no-catch-log-continue; the sanctioned
+#       resilience points carry cited `# noqa: BLE001 — reason`
+#   PLC0415 (in-function imports) — rule:no-infunction-imports
+#   S110/S112 (try-except-pass/continue) — silent swallowing
+#   RUF100 (unused noqa) — keeps the citations honest
+# NOT enabled: ANN (package is mostly unannotated — measure on demand with
+# `ruff check --select ANN`), ERA (5/5 false positives on prose comments),
+# SIM/RET (would churn the deliberately-faithful tokenizer port).
+select = ["F", "I", "B", "BLE", "PLC0415", "S110", "S112", "RUF100"]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI's `Depends(...)`-in-default idiom.
+"accommodanda/api/app.py" = ["B008"]
+# POI/jpype classes resolve only after startJVM — the one sanctioned
+# in-function-import site (rule:no-infunction-imports).
+"accommodanda/dv/word.py" = ["PLC0415"]
 
 [tool.ty.src]
 include = ["accommodanda"]
+
+[tool.pytest.ini_options]
+# Make a bare `pytest` (or `pytest test/`) collect exactly the new suites.
+# The legacy unittest files (test/integration*.py, test/test[A-Z]*.py,
+# test/functional*.py, examplerepos.py, quiet.py) don't import under modern
+# Python and are out of scope -- never "fix" them (rule:legacy-read-only).
+testpaths = ["test"]
+python_files = ["test_*.py"]
+# test/files/ is fixture data (some of it happens to be named test_*.py)
+addopts = "--ignore=test/files"

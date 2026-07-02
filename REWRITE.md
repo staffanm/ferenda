@@ -1366,16 +1366,19 @@ Target Python 3.10+. Avoid fallback code — assert how the environment
 should be. Don't catch exceptions you can't recover from. Imports at top,
 grouped. DRY, small functions, no "just in case" complexity.
 
-Run the new test suites by naming them explicitly —
-`pytest test/test_lagrum.py test/test_sfs_parse.py test/test_sfs_register.py
-test/test_dv_identity.py test/test_dv_parse.py test/test_dv_legacy.py
-test/test_build.py test/test_sfs_download.py test/test_site.py
-test/test_forarbete_download.py test/test_forarbete_parse.py
-test/test_golden_adjudicate.py test/test_golden_dv_structure.py
-test/test_avg.py`. A bare
-`pytest test/` fails at
-collection: `test/` is a package and the legacy `integration*.py` files
-don't import under modern Python (pre-existing, out of scope).
+A bare `pytest` runs exactly the new suites — pyproject's
+`[tool.pytest.ini_options]` scopes collection to `test/test_*.py` minus
+the `test/files/` fixture tree, so the legacy unittest files
+(`integration*.py`, `test[A-Z]*.py`, …) that don't import under modern
+Python are never touched.
+
+The judgment-level conventions live as a citable rule catalog in
+`docs/conventions.md` (rule slugs like `rule:fail-fast`), enforced by the
+`.claude/` guardrails: PreToolUse hooks (path-keyed conventions reminders,
+legacy-tree edit block, bare-suppression block, git-guard), the Stop hook
+(ruff + ty + `check-layers.py` layer-boundary AST check on edited files),
+review agents (`plan-reviewer`, `conventions-enforcer`, `docs-sync`,
+`commit-planner`) and the `/wrapup` skill.
 
 ---
 
@@ -1425,6 +1428,15 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **guardrails** — docs/conventions.md rule catalog (citable slugs) +
+  mechanical enforcement: PreToolUse hooks (conventions reminders,
+  legacy-tree/bare-suppression blocks, git-guard), layer-boundary AST
+  checker in the Stop hook, hardened ruff (B/BLE/PLC0415/S110/S112 with
+  cited suppressions at the sanctioned resilience points), review agents +
+  /wrapup skill; bare `pytest` now collects exactly the new suites (which
+  surfaced two latent failures: test_eurlex_annotate's stale
+  AssertionError expectations, fixed, and test_resolve's
+  dataskyddsförordningen alias drift, open).
 - **§4/§6** — bare lagen.nu page URLs (`page_url`/`SiteFiles` try_files); DV
   canonical case naming + HD given names; HD modern record format (h1 instances,
   footnotes) + instance/ruling rendering; repealed-statute treatment; statute

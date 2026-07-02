@@ -18,10 +18,38 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+# Same shapes and rationale semantics as conventions-reminder.py (which
+# denies these at edit time); re-checked here in case a suppression arrived
+# via bash/sed (rule:fix-dont-annotate). A suppression is bare when neither
+# its own line nor a comment within the two preceding lines carries a
+# rationale.
+BARE_SUPPRESSIONS = (
+    re.compile(r"#\s*noqa(?::\s*[A-Z]+\d+(?:\s*,\s*[A-Z]+\d+)*)?\s*$"),
+    re.compile(r"#\s*(?:type|ty):\s*ignore(?:\[[^\]]*\])?\s*$"),
+)
+
+
+def _bare_suppressions(files: list[str], project_dir: Path) -> str:
+    """file:line listing of suppression comments lacking a rationale."""
+    hits = []
+    for rel in files:
+        lines = (project_dir / rel).read_text(encoding="utf-8").splitlines()
+        for i, line in enumerate(lines):
+            if not any(rx.search(line) for rx in BARE_SUPPRESSIONS):
+                continue
+            context = lines[max(0, i - 2):i]
+            if any("#" in c
+                   and not any(rx.search(c) for rx in BARE_SUPPRESSIONS)
+                   for c in context):
+                continue
+            hits.append(f"{rel}:{i + 1}: {line.strip()}")
+    return "\n".join(hits)
 
 
 def _edited_paths(transcript_path: Path) -> set[str]:
@@ -112,15 +140,24 @@ def _main() -> int:
         rc, out = _run([ty, "check", *file_args], project_dir)
         if rc != 0 and out:
             findings.append(("ty check", out))
+    layers = project_dir / ".claude" / "hooks" / "check-layers.py"
+    rc, out = _run([sys.executable, str(layers), *file_args], project_dir)
+    if rc != 0 and out:
+        findings.append(("layer boundaries (docs/conventions.md "
+                         "rule:lib-never-imports-vertical)", out))
+    out = _bare_suppressions(file_args, project_dir)
+    if out:
+        findings.append(("bare suppressions (rule:fix-dont-annotate — add "
+                         "a rationale naming the constraint, or fix)", out))
 
     if not findings:
         return 0
 
     parts = [
         "Mechanical checks failed on accommodanda/ files edited this session.",
-        "Fix these before stopping. Prefer a real fix; use a localized "
-        "`# ty: ignore[rule]  # reason` only for irreducible third-party-stub "
-        "or untyped-artifact-dict cases.",
+        "Fix these before stopping. Prefer a real fix; suppressions need a "
+        "same-line rationale naming the constraint (rule:fix-dont-annotate); "
+        "see docs/conventions.md.",
         "",
     ]
     for name, body in findings:

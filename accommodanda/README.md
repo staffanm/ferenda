@@ -38,15 +38,14 @@ this file is just how to get it running.
 ```sh
 uv sync                      # Python deps
 ./tools/fetch_poi.sh         # POI jars (legacy DV only)
-uv run python -m pytest \
-  test/test_lagrum.py test/test_sfs_parse.py test/test_sfs_register.py \
-  test/test_dv_identity.py test/test_dv_parse.py test/test_dv_legacy.py \
-  test/test_avg.py
+uv run python -m pytest      # bare pytest collects exactly the new suites
 ```
 
-> Run the new suites by naming them explicitly. A bare `pytest test/`
-> fails at collection: `test/` is a package and the legacy
-> `integration*.py` files don't import under modern Python (out of scope).
+> `[tool.pytest.ini_options]` in pyproject.toml scopes collection to
+> `test/test_*.py` (minus the `test/files/` fixture tree), so the legacy
+> unittest files (`integration*.py`, `test[A-Z]*.py`, …) that don't import
+> under modern Python are never touched. Name individual suites as usual
+> to run a subset.
 
 ## Module map
 
