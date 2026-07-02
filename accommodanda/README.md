@@ -189,6 +189,38 @@ guidance:
 - [Frågor och svar om dataakten (FAQ)](https://…) — Europeiska kommissionen
 ```
 
+The `guidance:` block is authored by hand because the one thing no machine can
+derive is the binding "*this document is guidance on **this** act*": a Commission
+DG microsite carries no machine-readable link from a guidance PDF to the
+legislation it explains (verified against Cellar / EUR-Lex / data.europa.eu — the
+relation lives only in prose). `lagen kommentar propose-guidance <dg-page-url |
+CELEX> [<CELEX>]` does the drudge around that judgement: given a guidance *page*
+URL (e.g. `…/en/policies/data-act`) it scrapes that page for the act's EUR-Lex
+reference (a cross-check against the optional CELEX) and the guidance/library
+items it links, resolves each to its current
+`newsroom/dae/redirection/document/NNNNN` PDF (that id is version-specific — it
+changes on every FAQ revision, which is why it can't be authored once), and prints
+a **draft `guidance:` block** to review and paste. A human still decides which
+candidates are genuine guidance on the act (not the factsheets / impact
+assessments / general policy the page also lists).
+
+Given a **CELEX** instead of a URL, it looks the page(s) up in an index built by
+`lagen kommentar discover-guidance`, which crawls the configured Commission
+guidance sites' sitemaps (`guidance_discover.GUIDANCE_SITES` — only DG CONNECT's
+`digital-strategy.ec.europa.eu/en/policies/<slug>` hubs follow an enumerable
+per-act shape today; sibling DG sites stay manual) and records, per act CELEX, the
+hub pages that link it (`site/data/kommentar/guidance-index.json`). The DG WAF
+429s a random slice of every run, so the index **merges across runs and
+converges** — re-run to fill the gaps, or `--force` for a clean authoritative
+rebuild when the rate budget is fresh. So the usual flow is `discover-guidance`
+once, then `propose-guidance <CELEX>` per act.
+
+Guidance *published in the OJ* is a different animal — it gets its own sector-5
+`XC`/`DC` CELEX and is machine-linked to the parent act in Cellar
+(`work_cites_work` / `resource_legal_based_on_resource_legal`), so it belongs in
+the corpus as an ordinary eurlex document, not as an external `.ann` link
+(sector-5 harvest is not wired yet).
+
 The action downloads + caches each PDF (under `kommentar/guidance/`), flattens it
 to page-marked text, and asks the configured Berget model to map guidance sections
 (FAQ questions) to the act's **fine-grained targets** — not just whole articles but

@@ -76,6 +76,7 @@ from .sfs import download as sfs_download
 from .sfs import load_inputs
 from .sfs.nf import to_normalform
 from .wiki import annotate as wiki_annotate
+from .wiki import guidance_discover
 from .wiki import parse as wiki_parse
 
 POLITENESS = 0.3   # seconds between per-document network fetches
@@ -1179,16 +1180,91 @@ def kommentar_ai_annotate(basefiles):
         print("kommentar ai-annotate %s: wrote %s" % (basefile, out))
 
 
+def kommentar_discover_guidance(args):
+    """`lagen kommentar discover-guidance [<limit>]` -- crawl the configured
+    Commission guidance sites (their sitemaps) and (re)build the `CELEX ->
+    guidance-page` index, so `propose-guidance <CELEX>` can auto-find an act's
+    page(s) instead of a hand-known URL. The site rate-limits (429s a random slice
+    of every run), so the index *merges across runs* and converges -- re-run to
+    fill the gaps; `--force` starts a clean, authoritative index. `<limit>` caps
+    pages (a quick check). No LLM."""
+    limit = int(args[0]) if args else None
+    if RUN.dry_run:
+        print("kommentar discover-guidance: would crawl %d site(s) -> %s"
+              % (len(guidance_discover.GUIDANCE_SITES),
+                 guidance_discover.INDEX_PATH))
+        return
+
+    def progress(done, total, url):
+        util.status(done, total, "discover-guidance  %s" % url)
+
+    index, stats = guidance_discover.build_index(
+        progress=progress, limit=limit, force=RUN.force)
+    sys.stderr.write("\n")
+    path = guidance_discover.write_index(index)
+    missed = stats["total"] - stats["fetched"]
+    print("kommentar discover-guidance: fetched %d/%d page(s) this run "
+          "(%d rate-limited), index now %d act(s) -> %s"
+          % (stats["fetched"], stats["total"], missed, len(index), path))
+    if missed:
+        print("  re-run `lagen kommentar discover-guidance` to fill the %d "
+              "rate-limited page(s); the index merges across runs" % missed)
+
+
+def kommentar_propose_guidance(args):
+    """`lagen kommentar propose-guidance <dg-page-url | CELEX> [<CELEX>]` -- Track-B
+    guidance proposer (no LLM): scrape a Commission guidance page for the guidance
+    PDFs it links and print a draft `guidance:` frontmatter block to review and
+    paste into the act's kommentar markdown, whence `ai-annotate` links it. Given a
+    URL it scrapes that page (the optional CELEX cross-checks the page's EUR-Lex
+    link); given a CELEX it looks the page(s) up in the `discover-guidance` index. A
+    person still decides which candidates are genuine guidance on the act."""
+    if not args:
+        sys.exit("usage: lagen kommentar propose-guidance "
+                 "<dg-page-url | CELEX> [<CELEX>]")
+    arg = args[0]
+    if arg.lower().startswith("http"):
+        targets, expect = [arg], (args[1] if len(args) > 1 else None)
+    else:
+        targets, expect = guidance_discover.pages_for(arg), arg
+        if not targets:
+            sys.exit("no guidance page indexed for %s -- pass the page URL, or run "
+                     "`lagen kommentar discover-guidance` first" % arg)
+        print("# %s -> %d guidance page(s) from the index"
+              % (arg, len(targets)), file=sys.stderr)
+    for policy_url in targets:
+        celexes, resolved, skipped = guidance_discover.propose(policy_url)
+        print("# %s\n# act on this page (EUR-Lex): %s"
+              % (policy_url, ", ".join(sorted(celexes)) or "none found"),
+              file=sys.stderr)
+        if expect and expect not in celexes:
+            print("# WARNING: expected CELEX %s not among the page's EUR-Lex links"
+                  % expect, file=sys.stderr)
+        for title, url, _ in skipped:
+            print("# no PDF resolved (check by hand): %s -- %s" % (title, url),
+                  file=sys.stderr)
+        print("# --- review before pasting: keep only genuine guidance ON the act, "
+              "drop factsheets / impact assessments / general policy ---")
+        print(guidance_discover.frontmatter_block(resolved))
+
+
 SOURCES["kommentar"] = Source(
     "kommentar",
     lambda: sorted(wiki_parse.kommentar_index(str(WIKI_ROOT))),
     {"parse": Stage("parse", kommentar_parse_run, kommentar_artifact,
                     inputs=lambda bf: [kommentar_record(bf)], code=WIKI_CODE)},
-    actions={"validate": kommentar_validate, "ai-annotate": kommentar_ai_annotate},
+    actions={"validate": kommentar_validate, "ai-annotate": kommentar_ai_annotate,
+             "discover-guidance": kommentar_discover_guidance,
+             "propose-guidance": kommentar_propose_guidance},
     notes="validate: report commentary section anchors with no matching node in "
           "the annotated act (also warned during relate)\n"
           "ai-annotate <basefile>: LLM-link the declared guidance PDFs to the "
-          "act's articles, written as a .ann sidecar")
+          "act's articles, written as a .ann sidecar\n"
+          "discover-guidance: crawl the Commission guidance sites to (re)build the "
+          "CELEX -> guidance-page index\n"
+          "propose-guidance <dg-page-url | CELEX> [<CELEX>]: scrape a Commission "
+          "guidance page (or look it up by CELEX) for a draft `guidance:` block "
+          "(no LLM)")
 
 SOURCES["begrepp"] = Source(
     "begrepp",
