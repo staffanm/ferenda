@@ -128,6 +128,28 @@ def _fs_year(r):
     return m.group(1) if m else "okänt"
 
 
+def _avg_org(r):
+    return r.kind                                # 'jo' | 'jk' (the organ)
+
+
+def _avg_year(r):
+    """Decision year from the diarienummer: JO '2340-2025' carries it last;
+    JK's new form '2024/8082' first; JK's old form '3497-06-40' as a two-digit
+    year (century cutoff >50 -> 19xx, the legacy JKStore rule)."""
+    dnr = r.local.split("/", 2)[-1]              # 'avg/jo/2340-2025' -> dnr
+    m = re.search(r"-(\d{4})$", dnr)
+    if m:
+        return m.group(1)
+    m = re.match(r"(\d{4})/", dnr)
+    if m:
+        return m.group(1)
+    m = re.match(r"\d+-(\d{2})-", dnr)
+    if m:
+        yy = int(m.group(1))
+        return str((1900 if yy > 50 else 2000) + yy)
+    return "okänt"
+
+
 # the case sources (publication series / court), in browse order. The published
 # referat carry a lowercase series segment ('dom/nja/…'); the *raw* avgöranden --
 # the court's own version, harvested months before its editor referat and folded
@@ -276,6 +298,12 @@ SCHEMES = {
     "foreskrift": [
         Level("Serie", _fs_series, _by_alpha),
         Level("År", _fs_year, _by_year_desc),
+    ],
+    "avg": [
+        Level("Organ", _avg_org, _curated(["jo", "jk"]),
+              label=_map_label({"jo": "Justitieombudsmannen (JO)",
+                                "jk": "Justitiekanslern (JK)"})),
+        Level("År", _avg_year, _by_year_desc),
     ],
     "dv": [
         Level("Domstol", _dv_court, _curated(list(DV_COURTS)),

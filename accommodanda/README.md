@@ -40,7 +40,8 @@ uv sync                      # Python deps
 ./tools/fetch_poi.sh         # POI jars (legacy DV only)
 uv run python -m pytest \
   test/test_lagrum.py test/test_sfs_parse.py test/test_sfs_register.py \
-  test/test_dv_identity.py test/test_dv_parse.py test/test_dv_legacy.py
+  test/test_dv_identity.py test/test_dv_parse.py test/test_dv_legacy.py \
+  test/test_avg.py
 ```
 
 > Run the new suites by naming them explicitly. A bare `pytest test/`
@@ -79,6 +80,13 @@ uv run python -m pytest \
 | `word.py` | **legacy path** — POI (HWPF/XWPF) → flat `(text, bold, in_table)` stream |
 | `legacy.py` | legacy stream → head/body split → `Avgorande` |
 
+**avg vertical (JO + JK myndighetsavgöranden)**
+| File | What |
+|---|---|
+| `model.py` | `Beslut` model; URI = `avg/{org}/{dnr}`, byte-identical to what MYNDIGHETSBESLUT citations mint |
+| `download.py` | JO harvester (jo.se WordPress admin-ajax search API + decision PDFs) and JK harvester (jk.se listing → per-decision landing pages); `jk_canonical` dnr normalization |
+| `parse.py` | JO: PDF body via `lib/pdftext` (bold rubriker, "Beslutet i korthet" abstract); JK: landing-page `div.content` (strong→section, em→subsection); both citation-scanned with the DV parse-type set |
+
 ## Running the pipelines
 
 **SFS** (operates on the golden / downloaded trees under `site/data/sfs/`):
@@ -106,6 +114,14 @@ uv run python -m accommodanda.dv.legacy site/data/dv/downloaded/ADO/1993-100_1.d
 The DV parsers are driven by the identity index: each canonical case is
 parsed from its single best source — the API record when present, the
 legacy Word original otherwise (no cross-source merge; see REWRITE.md §4).
+
+**avg — JO + JK decisions** (operates on `site/data/avg/`):
+
+```sh
+uv run python -m accommodanda.build avg download        # both organs; or: … download jo
+uv run python -m accommodanda.build avg parse           # incremental, like every source
+uv run python -m accommodanda.build avg download jo --only jo/2340-2025   # one decision
+```
 
 ### Wiki content repo (begrepp + kommentar)
 
@@ -226,6 +242,7 @@ site/data/sfs/{downloaded,golden,register}/   # SFS source + frozen golden corpu
 site/data/domstol/downloaded/                 # DV new-API harvest (per court)
 site/data/dv/{downloaded,intermediate}/       # DV legacy feed (.doc/.docx + old XML)
 site/data/dv/identity-index.json              # canonical case -> source records
+site/data/avg/downloaded/{jo,jk}/             # JO/JK records (+ jo PDFs, jk landing html)
 ```
 
 ## Production deployment (Docker)

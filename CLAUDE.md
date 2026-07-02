@@ -19,7 +19,8 @@ formatting quirks, the citation grammar) and discards the framework.
   is nothing left to modernize there.)
 - Implemented verticals: **SFS** (statutes), **DV** (court decisions),
   **forarbete** (legislative preparatory works), **eurlex** (EU law),
-  **foreskrift** (agency regulations), **wiki** (begrepp/definitions).
+  **foreskrift** (agency regulations), **avg** (JO/JK decisions),
+  **wiki** (begrepp/definitions).
   We are not at full parity with the old system, but new sources beyond the
   original scope (notably eurlex and foreskrift) are now handled.
 
@@ -32,7 +33,7 @@ architecture and status change.
 
 Three layers, realized in the `accommodanda/` package:
 
-1. **Vertical source pipelines** (`accommodanda/{sfs,dv,eurlex,forarbete,foreskrift,wiki}/`)
+1. **Vertical source pipelines** (`accommodanda/{sfs,dv,eurlex,forarbete,foreskrift,avg,wiki}/`)
    — each owns its full chain (download → parse → typed model → JSON
    artifact) and its *own* document model.
 2. **Horizontal libraries** (`accommodanda/lib/`) — genuinely cross-source
@@ -91,7 +92,7 @@ These boundaries are load-bearing rules, not suggestions:
 
 - Subject is `scope: short lowercase summary`, no trailing period.
 - `scope` is a vertical (`sfs`, `dv`, `eurlex`, `forarbete`, `foreskrift`,
-  `wiki`) or a layer/concern (`lib`, `build`, `render`, `api`, `search`,
+  `avg`, `wiki`) or a layer/concern (`lib`, `build`, `render`, `api`, `search`,
   `catalog`, `structure`, `golden`, `docs`, `chore`).
 - Keep the subject to one line; use `,`/`;`/`—` to separate clauses when a
   commit touches several related things. Add a body explaining the *why*

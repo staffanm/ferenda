@@ -40,13 +40,15 @@ DV_ROOT = DATA / "dv"            # legacy case-law raw feed only
 FA_ROOT = DATA / "forarbete"
 EURLEX_ROOT = DATA / "eurlex"
 FORESKRIFT_ROOT = DATA / "foreskrift"     # agency regulations (per-fs subtrees)
+AVG_ROOT = DATA / "avg"                   # JO/JK decisions (per-org subtrees)
 KOMMENTAR_ROOT = DATA / "kommentar"
 BEGREPP_ROOT = DATA / "begrepp"
 WIKI_ROOT = config.WIKI_ROOT        # git-backed markdown content repo (begrepp/ + kommentar/)
 
 ARTIFACT_ROOT = {"sfs": SFS_ROOT, "dv": DOM_ROOT, "forarbete": FA_ROOT,
                  "eurlex": EURLEX_ROOT, "foreskrift": FORESKRIFT_ROOT,
-                 "kommentar": KOMMENTAR_ROOT, "begrepp": BEGREPP_ROOT}
+                 "avg": AVG_ROOT, "kommentar": KOMMENTAR_ROOT,
+                 "begrepp": BEGREPP_ROOT}
 
 # raw roots -- the download writers put their structure under these
 SFS_DOWNLOADED = SFS_ROOT / "downloaded"
@@ -55,6 +57,7 @@ DV_LEGACY_DOWNLOADED = DV_ROOT / "downloaded"       # dv legacy store
 FA_DOWNLOADED = FA_ROOT / "downloaded"
 EURLEX_DOWNLOADED = EURLEX_ROOT / "downloaded"
 FORESKRIFT_DOWNLOADED = FORESKRIFT_ROOT / "downloaded"   # <fs>/<slug>.{json,pdf}
+AVG_DOWNLOADED = AVG_ROOT / "downloaded"                 # <org>/<slug>.{json,pdf,html}
 
 DOM_INDEX = DOM_ROOT / "identity-index.json"        # case-law identity index
 
@@ -111,6 +114,9 @@ def relpath(source, basefile):
     if source == "foreskrift":
         fs, rest = basefile.split("/", 1)        # "fffs/2013:10"
         return Path(fs) / rest.replace(":", "-").replace(" ", "_")
+    if source == "avg":
+        org, rest = basefile.split("/", 1)       # "jo/2340-2025", "jk/2024/8082"
+        return Path(org) / rest.replace("/", "-")
     if source == "kommentar":
         # file the annotation under its host source, reusing that source's
         # transform: sfs/2009/400, eurlex/2023/32023R2854 -- so a commentary on
@@ -244,6 +250,11 @@ def page_relpath(uri):
         # författningssamling is the top segment: fffs/2013:10 -> fffs/2013-10.html
         fs, _, rest = loc.partition("/")
         return "%s/%s.html" % (fs, _alnum_slug(rest))
+    elif loc.startswith("avg/"):
+        # a JO/JK decision, lagen.nu's /avg/{org}/{dnr} grammar (the URI the
+        # MYNDIGHETSBESLUT citations mint): avg/jo/2340-2025 -> avg/jo_2340-2025.html
+        _, _, rest = loc.partition("/")
+        return "avg/%s.html" % rest.replace("/", "_")
     else:
         # SFS: a top-level page, the SFS id kept verbatim (colon and all). The id
         # is already filesystem-safe (digits, ':', '_', '.'): 1827:60_s.1007.

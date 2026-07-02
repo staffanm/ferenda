@@ -1185,6 +1185,59 @@ are not yet citation *targets*; the inbound value comes from the edges above.
 - ⬜ **Next:** the OpenSearch `index` pass for föreskrift (paragraf-precise search), and the
   intra-fs `upphäver`/`ändrar` + `genomför` edges (same mechanism as bemyndigande).
 
+### 7f. avg vertical — JO + JK myndighetsavgöranden ✅ (first cut)
+
+`accommodanda/avg/` — vägledande avgöranden from Riksdagens ombudsmän (JO) and
+Justitiekanslern (JK), ported from the legacy `jo.py`/`jk.py`. One vertical,
+two per-organ configs (the foreskrift doctrine: sources sharing a model are
+configuration over one engine, not two pipelines). The ~800 MYNDIGHETSBESLUT
+citations the other verticals already scan (`dnr NNNN-YYYY` / `dnr NNNN-YY-TT`)
+now have internal targets.
+
+- **URI = citation-minted, by construction** (the DV lesson, fourth
+  application): `model.beslut_uri` is `avg/{org}/{dnr}` — the exact string
+  `lagrum.fmt_jo_refs`/`fmt_jk_refs` mint — so a decision and any citation to
+  it agree byte-for-byte (locked by `test_uri_matches_citation_grammar`).
+  Identifier forms kept from the old pipeline: "JO dnr 6356-2012" / "JK …".
+- **Both sites were redesigned since the legacy code**, so the download layer
+  is new; the *domain knowledge* carried over (dnr grammar, multi-dnr
+  decisions, the JK dotted-ärendetyp quirk, decision-as-PDF vs -as-page):
+  - **JO** (WordPress): the search UI's `admin-ajax.php` action
+    (`get_jo_search_result`, page-embedded nonce) is a complete records API —
+    dnr, beslutsdatum, title, summary, deciding ombudsman, sakområde/lagrum
+    taxonomies, the decision **PDF url** and the site's own flat text
+    extraction. **3,738 decisions back to 1979.** Newest-first incremental with
+    the dv-style `.complete` backfill marker; the PDF is fetched per decision.
+  - **JK** (Umbraco): the listing still honours the legacy "broken pagination"
+    hack — `POST page=9999` returns the whole corpus in one response
+    (**1,427 decisions, publications 1998–**). The decision *is* its landing
+    page (stored + record JSON). `jk_canonical` normalizes the site's raw dnr
+    forms to the citation form: dotted ärendetyp `6098-19-4.4` → `6098-19-44`,
+    `JK `-prefix dropped, multi-dnr `;`-lists → first names the document; the
+    new-era `YYYY/NNNN` form passes through (not a citation target under the
+    old grammar, but a stable published identity).
+- **Parsers** (`avg/parse.py`): JO reads the PDF through the shared
+  `lib/pdftext` (front matter before the title dropped, the title consumed as
+  a bold-line prefix sequence, bold para → rubrik, `Beslutet i korthet:` → the
+  abstract; the record's `pdf_text` is the no-PDF fallback body); JK classifies
+  the landing `div.content` (all-`<strong>` p → section, all-`<em>` →
+  subsection — the legacy jk.py signals, still valid). Both bodies scanned with
+  the DV parse-type set, so JO/JK practice joins the corpus graph — verified on
+  a live sample: 53 decisions → 1,038 outbound edges (RB, RF, förvaltningslagen
+  top-cited), pages render with live links + rail.
+- **Wired end-to-end**: `lagen avg download [jo|jk] [--only org/dnr]` (harvest)
+  + `parse` Stage (recipe-versioned); `layout` (`avg/{org}/{dnr}` page grammar,
+  storage relpath), `catalog.avg_document`, `render_avg` (JO-beslut/JK-beslut
+  page with sammanfattning + meta), facets (Organ → År browse), frontpage
+  entry. relate/index/dump/generate act on the artifacts generically.
+  `test/test_avg.py` (16 hermetic tests).
+- ⬜ **Remaining:** full harvests + relate at corpus scale; the legacy corpora
+  (old lagen.nu carried JO decisions the redesigned jo.se may have pruned —
+  compare once a full harvest lands; no downloaded JO/JK corpus exists in this
+  checkout); ARN as a third organ config (`fmt_arn_refs` already mints
+  `avg/arn/{dnr}`); JO ämbetsberättelse citation (`official_report`) as
+  metadata.
+
 ### 7b. Remaining verticals ⬜
 
 The rest of `/mnt/data/lagen/data/{…}`. Each built the same way; the horizontal
@@ -1204,6 +1257,7 @@ model + extraction.
 | `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `structure`, `word`, `legacy`, `naming` (canonical case title + HD given names), `namedcases` (HD named-precedent harvester) |
 | `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, all 8 types), `model`/`parse` (PDF→artifact), `kommentar` (författningskommentar → EU-directive *genomför* edges), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf) |
 | `accommodanda/eurlex/` | **EU vertical (EUR-Lex/CELLAR)**: `download` (SPARQL discovery), `bulk` (dump import), `parse`/`parse_html`/`parse_pdf` (Formex/HTML/PDF → one artifact shape), `definitions` (defined-terms extraction + in-act interlinking), `lang`, `model` |
+| `accommodanda/avg/` | **JO/JK-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages; `jk_canonical` dnr normalization), `parse` (JO PDF via `lib/pdftext`, JK landing HTML; DV parse-type citation scan) |
 | `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (reusable engine — enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct}; `Skip`/`_guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 15 agencies live), `download`, `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors). Corpus: 1218 regs harvested, parsed 0-fail |
 | `accommodanda/lib/pdftext.py` | **shared font-aware PDF extraction** (förarbete + föreskrift): `pdf_pages` (`pdftohtml -xml` → bold/italic-tagged `Line`s) → `page_paragraphs` (reflow, strip running header/page-no/TOC) → the vertical's own `classify` |
 | `accommodanda/config.py`, `lib/layout.py`, `lib/net.py` | runtime config (`config.yml`/`data_root`), centralized document layout (`page_relpath` on-disk file ↔ `page_url`/`url_to_relpath` public lagen.nu address), resilient HTTP session + harvest progress reporter |
@@ -1254,7 +1308,8 @@ Run the new test suites by naming them explicitly —
 test/test_dv_identity.py test/test_dv_parse.py test/test_dv_legacy.py
 test/test_build.py test/test_sfs_download.py test/test_site.py
 test/test_forarbete_download.py test/test_forarbete_parse.py
-test/test_golden_adjudicate.py test/test_golden_dv_structure.py`. A bare
+test/test_golden_adjudicate.py test/test_golden_dv_structure.py
+test/test_avg.py`. A bare
 `pytest test/` fails at
 collection: `test/` is a package and the legacy `integration*.py` files
 don't import under modern Python (pre-existing, out of scope).

@@ -325,6 +325,14 @@ def foreskrift_document(art, path):
             label, title, str(path))
 
 
+def avg_document(art, path):
+    # a JO/JK decision; kind is the organ (jo/jk), label the citation form
+    # ("JO dnr 6356-2012" / "JK 2024/8082")
+    label = art.get("identifier") or local(art["uri"])
+    title = art.get("metadata", {}).get("title") or label
+    return (art["uri"], "avg", art.get("org", "avg"), label, title, str(path))
+
+
 def expired_date(art):
     """The date a document's repeal takes effect, if its metadata declares one (a
     statute's `rpubl:upphavandedatum`) -- else None. Stored on the documents row so
@@ -350,7 +358,8 @@ def document_row(art, path, source):
     return {"sfs": sfs_document, "dv": dv_document,
             "forarbete": forarbete_document, "kommentar": kommentar_document,
             "begrepp": begrepp_document, "eurlex": eurlex_document,
-            "foreskrift": foreskrift_document}[source](art, path)
+            "foreskrift": foreskrift_document,
+            "avg": avg_document}[source](art, path)
 
 
 # --------------------------------------------------------------------------

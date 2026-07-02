@@ -1321,12 +1321,38 @@ def render_foreskrift(art, site):
                 source_url=art.get("source_url"))
 
 
+def render_avg(art, site):
+    md = art.get("metadata", {})
+    ident = art.get("identifier") or catalog.local(art["uri"])
+    title = md.get("title") or ident
+    meta = _meta_dl([
+        ("Myndighet", md.get("publisher")),
+        ("Beslutsdatum", md.get("beslutsdatum")),
+        ("Diarienummer", ", ".join(md.get("diarienummer", []))),
+        ("Avgjord av", md.get("avgjordAv")),
+        ("Sakområde", ", ".join(md.get("nyckelord", [])) or None),
+    ])
+    summary = ('<p class="sammanfattning">%s</p>'
+               % escape(art["sammanfattning"])
+               if art.get("sammanfattning") else "")
+    toc = Toc()
+    rail = Rail(site, art["uri"])
+    body = document_inbound(site, art["uri"]) + summary + "".join(
+        render_node(n, site, art["uri"], toc, rail)
+        for n in art.get("structure", []))
+    section = {"jo": "JO-beslut", "jk": "JK-beslut"}.get(art.get("org"),
+                                                         "Myndighetsavgörande")
+    return page(title, section, meta, body, render_toc(toc),
+                eyebrow=ident, island=rail.island(),
+                source_url=art.get("source_url"))
+
+
 def render_document(art, source, site):
     # kommentar is not here -- it is an annotation rendered into statute rails
     # (generate_site skips it), not a page of its own
     return {"sfs": render_sfs, "dv": render_dv, "forarbete": render_forarbete,
             "begrepp": render_begrepp, "eurlex": render_eurlex,
-            "foreskrift": render_foreskrift}[source](art, site)
+            "foreskrift": render_foreskrift, "avg": render_avg}[source](art, site)
 
 
 # --------------------------------------------------------------------------
@@ -1338,10 +1364,11 @@ def render_document(art, source, site):
 # /dom/, lagen.nu's grammar; every other source browses under its own name.
 # kommentar is an annotation layer shown in the rail (no page tree), so it is
 # not a browsable source on the frontpage
-SOURCE_ORDER = ("sfs", "dv", "forarbete", "foreskrift", "eurlex", "begrepp")
+SOURCE_ORDER = ("sfs", "dv", "forarbete", "foreskrift", "avg", "eurlex",
+                "begrepp")
 SOURCE_LABEL = {"sfs": "Författningar", "dv": "Rättsfall",
                 "forarbete": "Förarbeten", "foreskrift": "Myndighetsföreskrifter",
-                "eurlex": "EU-rättsakter",
+                "avg": "JO- och JK-beslut", "eurlex": "EU-rättsakter",
                 "kommentar": "Lagkommentarer", "begrepp": "Begrepp"}
 BROWSE_DIR = {"dv": "dom"}
 

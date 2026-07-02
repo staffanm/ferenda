@@ -47,6 +47,8 @@ import requests
 
 from . import config
 from .api import app as api_app
+from .avg import download as avg_download
+from .avg import parse as avg_parse
 from .dv import download as dv_download
 from .dv import identity as dv_identity
 from .dv import namedcases as dv_namedcases_mod
@@ -1010,6 +1012,80 @@ SOURCES["foreskrift"] = Source("foreskrift", foreskrift_list, {
 
 
 # --------------------------------------------------------------------------
+# avg source (JO + JK vägledande myndighetsavgöranden)
+# --------------------------------------------------------------------------
+
+AVG_CODE = (PKG / "avg" / "parse.py", PKG / "avg" / "model.py",
+            PKG / "avg" / "download.py",
+            PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py")
+
+
+def avg_list():
+    return sorted(bf for org in ("jo", "jk")
+                  for bf in util.list_basefiles(layout.AVG_DOWNLOADED, org))
+
+
+def avg_record(basefile):
+    return util.record_path(layout.AVG_DOWNLOADED, basefile.split("/", 1)[0],
+                            basefile)
+
+
+def avg_inputs(basefile):
+    """The record JSON plus the decision body file (JO: the PDF; JK: the
+    landing page) -- re-downloading either re-stales the parse."""
+    paths = [avg_record(basefile)]
+    if basefile.startswith("jo/"):
+        pdf = avg_download.jo_pdf_path(layout.AVG_DOWNLOADED, basefile)
+        if pdf.exists():
+            paths.append(pdf)
+    else:
+        paths.append(avg_download.jk_html_path(layout.AVG_DOWNLOADED, basefile))
+    return paths
+
+
+def avg_artifact(basefile):
+    return layout.artifact("avg", basefile)
+
+
+def avg_parse_run(basefile):
+    write_artifact("avg", basefile,
+                   avg_parse.parse_record(basefile, layout.AVG_DOWNLOADED))
+
+
+def avg_harvest(scopes):
+    """Bulk harvest of the JO/JK decisions (scopes = organ codes; empty =
+    both). `--force` re-walks the whole corpus (JO) / refetches landings (JK);
+    `--only jo/2340-2025` fetches a single decision (needs its organ scope)."""
+    if RUN.only and len(scopes) != 1:
+        sys.exit("avg --only needs exactly one organ scope, e.g. "
+                 "`lagen avg download jo --only jo/2340-2025`")
+    if RUN.dry_run:
+        print("avg download: would harvest %s into %s"
+              % (RUN.only or ", ".join(scopes) or "jo + jk",
+                 layout.AVG_DOWNLOADED))
+        return
+    totals = avg_download.sync(layout.AVG_DOWNLOADED, scopes=scopes or None,
+                               full=RUN.force, only=RUN.only)
+    for org, (seen, new) in totals.items():
+        print("avg %s: %d seen, %d new" % (org, seen, new))
+
+
+# No per-document download stage (the foreskrift rule): decisions arrive only
+# through the bulk `avg_harvest` sweep, so parse runs over whatever the harvest
+# left on disk; relate/index/dump/generate act on the artifacts by source name.
+SOURCES["avg"] = Source("avg", avg_list, {
+    "parse": Stage("parse", avg_parse_run, avg_artifact,
+                   inputs=avg_inputs, code=AVG_CODE),
+},
+    harvest=avg_harvest,
+    origin="https://www.jo.se/",
+    scopes=frozenset({"jo", "jk"}),
+    notes="download flag: --only org/dnr (fetch one; needs its organ scope)\n"
+          "scopes are the organs: jo (Riksdagens ombudsmän), jk "
+          "(Justitiekanslern); empty = both")
+
+
+# --------------------------------------------------------------------------
 # wiki sources: kommentar (SFS commentary) + begrepp (concept glossary), both
 # parsed from the MediaWiki dump
 # --------------------------------------------------------------------------
@@ -1141,6 +1217,7 @@ ARTIFACTS = {
     "eurlex": lambda: sorted((EURLEX_ROOT / "artifact").glob("*/*.json")),
     "foreskrift": lambda: sorted(
         (layout.FORESKRIFT_ROOT / "artifact").glob("*/*.json")),
+    "avg": lambda: sorted((layout.AVG_ROOT / "artifact").glob("*/*.json")),
 }
 
 
