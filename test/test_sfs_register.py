@@ -18,6 +18,7 @@ from accommodanda.sfs.register import (amendment_properties,
                                   build_metadata, forarbete_identifier,
                                   forfattningstyp, lfragment,
                                   omfattning_predicate, parse_forarbeten,
+                                  register_from_source,
                                   sanitize_departement, sfs_slug)
 
 ROOT = Path(__file__).parent.parent
@@ -118,6 +119,22 @@ def test_omfattning_predicate():
 
 
 # --- register parsing ---------------------------------------------------
+
+def test_register_from_source_sorts_changes_chronologically():
+    # the API's andringsforfattningar carries no reliable order (2017:900
+    # arrives oldest-first, most documents newest-first): the register sorts
+    # by SFS number, the register page's oldest-first publication order
+    reg = register_from_source({
+        "beteckning": "2017:900", "rubrik": "Förvaltningslag (2017:900)",
+        "andringsforfattningar": [
+            {"beteckning": "2019:981", "rubrik": ""},
+            {"beteckning": "2018:1210", "rubrik": ""},
+            {"beteckning": "2025:582", "rubrik": ""},
+            # numeric löpnummer order, not string order (900 < 1001)
+            {"beteckning": "2018:900", "rubrik": ""}]})
+    assert [c.sfsnr for c in reg.changes] == \
+        ["2018:900", "2018:1210", "2019:981", "2025:582"]
+
 
 def test_register_header_and_changes():
     reg = inputs("1951:25")[1]

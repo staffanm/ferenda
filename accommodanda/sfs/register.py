@@ -7,8 +7,8 @@ header; the per-amendment change list (Omfattning, ...) lives only here.
 
 Ported from the old ``extract_metadata_register`` (sfs.py:604-789) minus the
 framework: no rdflib document graph, no COIN minting, no consolidation
-envelope. Per-amendment Förarbeten extraction is deferred until the
-FORARBETEN citation grammar is ported (the ``forarbeten`` field stays []).
+envelope. Per-amendment Förarbeten extraction runs through the ported
+FORARBETEN citation grammar (``parse_forarbeten``).
 
 Each register row becomes one amendment entry, keyed by its own URI:
 the base act first, then every change act. Property values that the old
@@ -27,7 +27,7 @@ from bs4 import BeautifulSoup, Tag
 from rdflib import Graph
 from rdflib.namespace import FOAF, SKOS
 
-from ..lib import util
+from ..lib import layout, util
 from ..lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
 from ..lib.errors import SkipDocument
 
@@ -187,8 +187,10 @@ def register_from_source(source):
     register data pre-split into structured fields, so we map it back onto the
     rkrattsbaser key names and reuse all of amendment_properties unchanged.
 
-    ``andringsforfattningar`` is newest-first in the API; the register page
-    (and so the golden) lists change acts oldest-first."""
+    ``andringsforfattningar`` carries no reliable order in the API (some
+    documents arrive newest-first, others oldest-first), so change acts are
+    sorted by their SFS number -- the register page's (and so the golden's)
+    oldest-first publication order."""
     org = source.get("organisation") or {}
     reg = source.get("register") or {}
     # collapse whitespace on text values, matching the HTML path (parse_register
@@ -213,7 +215,8 @@ def register_from_source(source):
         # takes its first 10 chars).
         header["Upphävd"] = source["upphavdDateTime"]
     changes = []
-    for act in reversed(source.get("andringsforfattningar") or []):
+    for act in sorted(source.get("andringsforfattningar") or [],
+                      key=lambda a: layout.sfs_version_key(a["beteckning"])):
         rows = {"SFS-nummer": act["beteckning"], "Rubrik": norm(act.get("rubrik", ""))}
         for json_key, row_key in (("anteckningar", "Omfattning"),
                                   ("forarbeten", "Förarbeten"),
