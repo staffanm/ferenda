@@ -38,7 +38,7 @@ import subprocess
 from pathlib import Path
 
 import requests
-from lxml import etree  # ty: ignore[unresolved-import]
+from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
 from ..eurlex.structure import anchored_blocks
 from ..lib import layout, llm, markdown

@@ -1600,7 +1600,7 @@ def _write_page(uri, source, path, title, site, out_root):
 def _render_one(job):
     """ProcessPool entry point: render `job` (uri, source, path, title) against
     this worker's prebuilt Site, returning the uri rendered."""
-    _write_page(*job, _RENDER["site"], _RENDER["out_root"])  # ty: ignore[too-many-positional-arguments]
+    _write_page(*job, _RENDER["site"], _RENDER["out_root"])  # ty: ignore[too-many-positional-arguments]  # job is a 4-tuple; ty cannot see arity through *
     return job[0]
 
 

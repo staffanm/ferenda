@@ -164,7 +164,7 @@ def cmd_index(args):
     for case, member in cases:
         try:
             av = parse_legacy_file(member["path"], case)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — stats harness: failure tallied, corpus scan continues (rule:no-catch-log-continue)
             failures.append((case["canonical_id"], "%s: %s" % (type(e).__name__, e)))
             continue
         counts["parsed"] += 1

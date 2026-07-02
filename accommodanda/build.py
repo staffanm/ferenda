@@ -230,6 +230,7 @@ def parse_watermark(source):
     for bf in source.list_basefiles():
         h.update(bf.encode())
         for p in sorted(stage.inputs(bf), key=str):
+            # the per-source stage protocol is untyped; inputs() yields Paths
             if p.exists():  # ty: ignore[unresolved-attribute]
                 st = p.stat()  # ty: ignore[unresolved-attribute]
                 h.update(("\x1f%d\x1f%d" % (st.st_size, st.st_mtime_ns)).encode())
@@ -297,7 +298,7 @@ def ensure(source, stage_name, basefile, manifest, res, force, no_deps):
         # a deliberately empty document (removed/expired): write an empty
         # artifact so it is considered built and not retried every run
         stage.output(basefile).write_bytes(b"")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — per-doc resilience point: recorded in res.errors, run continues (rule:no-catch-log-continue)
         res.errors.append((stage_name, basefile, "%s: %s"
                            % (type(e).__name__, e)))
         return False

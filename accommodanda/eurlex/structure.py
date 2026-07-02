@@ -43,7 +43,7 @@ def nest(blocks):
         t = b.get("type")
         if t == _DIVISION:
             level = b.get("level") or 1
-            while divs and (divs[-1].get("level") or 1) >= level:  # ty: ignore[unsupported-operator]
+            while divs and (divs[-1].get("level") or 1) >= level:  # ty: ignore[unsupported-operator]  # artifact block dicts are untyped; level is int when present
                 divs.pop()
             node = {**b, "children": []}
             parent().append(node)

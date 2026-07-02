@@ -434,7 +434,7 @@ def amendment_properties(act, basefile, omfattning_parser, base):
                     continue
                 for ref in omfattning_parser.parse_text(
                         changecat, predicate=predicate):
-                    props.setdefault(ref.predicate, []).append(ref.uri)  # ty: ignore[unresolved-attribute]
+                    props.setdefault(ref.predicate, []).append(ref.uri)  # ty: ignore[unresolved-attribute]  # props values are str|list; Omfattning keys hold lists
             props["rpubl:andrar"] = val
     if sfsnr in UTFARDANDE:
         props["rpubl:utfardandedatum"] = UTFARDANDE[sfsnr]

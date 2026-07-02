@@ -493,7 +493,7 @@ def _guarded_enumerate(agency, session, log):
             yield next(walk)
         except StopIteration:
             return
-        except Exception as exc:           # the index endpoint itself failed
+        except Exception as exc:  # noqa: BLE001 — index endpoint failed: becomes a Skip record, harvest survives (rule:no-catch-log-continue)
             yield Skip("enumeration aborted: %r" % exc)
             return
 
@@ -538,7 +538,7 @@ def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=prin
         try:
             agency.resolve(session, agency, ref, root, delay)
             new += 1
-        except Exception as exc:       # one bad doc must not abort the walk
+        except Exception as exc:  # noqa: BLE001 — one bad doc must not abort the walk: logged + counted (rule:no-catch-log-continue)
             errors += 1
             log("  %s %s: %s" % (agency.fs, ref.basefile, exc))
         rep.update(seen, None, scope=agency.fs, new=new)

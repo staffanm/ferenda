@@ -80,7 +80,7 @@ def nest(blocks):
                     "ordinal": b.get("num"), "page": b.get("page"),
                     "children": [{"type": "stycke", "text": _strip_marker(b["text"]),
                                   "page": b.get("page")}]}
-            (kap["children"] if kap else root).append(para)  # ty: ignore[unresolved-attribute]
+            (kap["children"] if kap else root).append(para)  # ty: ignore[unresolved-attribute]  # artifact tree nodes are untyped dicts; children is a list
         elif t == "rubrik":
             # a heading ends the current paragraf's reach and labels what follows
             para = None

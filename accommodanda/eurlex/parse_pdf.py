@@ -14,7 +14,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from lxml import etree  # ty: ignore[unresolved-import]
+from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
 from ..lib.util import normalize_space
 from . import lang as L
@@ -101,7 +101,7 @@ def pdf_lines(path, lang="eng"):
 def _paragraphs(lines):
     """Reflow lines into (text, bold) paragraphs: a bold line or a vertical gap
     larger than the body line-height starts a new one."""
-    gaps = sorted(b[0] - a[0] for a, b in zip(lines, lines[1:])
+    gaps = sorted(b[0] - a[0] for a, b in zip(lines, lines[1:], strict=False)
                   if 0 < b[0] - a[0] < 200)
     body = gaps[len(gaps) // 2] if gaps else 12        # median line height
     paras, cur, prev = [], [], None
@@ -141,7 +141,7 @@ def parse_pdf(path, celex, lang):
         doc.oj = "%s %s" % (oj.group(1), oj.group(2))
 
     in_body = False
-    for text, bold in paras:
+    for text, _bold in paras:
         if voc.article.match(text) and len(text) <= 60:
             num = L.article_num(text)
             doc.body.append(Block("article", text, num=num, anchor=num))

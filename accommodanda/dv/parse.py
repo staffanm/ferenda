@@ -293,10 +293,12 @@ def to_artifact(av, canonical_id=None):
         # betänkande/dom → domskäl/domslut → …) with the prose attached as leaves
         # (the DV structural golden's reducer drops the prose, comparing only the
         # skeleton); the renderer walks it to show the instance structure
-        "structure": nest([block(b, text) for b, text in zip(av.body, runs)]),
+        "structure": nest([block(b, text)
+                           for b, text in zip(av.body, runs, strict=True)]),
         "footnotes": [{"num": fn.num, "text": runs}
                       for fn, runs in zip(av.footnotes,
-                                          scan_footnotes(av.footnotes))],
+                                          scan_footnotes(av.footnotes),
+                                          strict=True)],
         "sources": av.sources,
     }
 

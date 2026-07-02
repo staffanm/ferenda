@@ -21,7 +21,7 @@ import json
 import zipfile
 from pathlib import Path
 
-from lxml import etree  # ty: ignore[unresolved-import]
+from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
 from ..lib.datasets import NAMEDACTS
 from ..lib.lagrum import EULAGSTIFTNING, EURATTSFALL, LagrumParser, interleave

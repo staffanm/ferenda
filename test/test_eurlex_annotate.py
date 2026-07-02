@@ -46,9 +46,9 @@ def test_validate_strips_code_fence():
 
 
 def test_validate_rejects_missing_keys():
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         annotate._validate(json.dumps({"recitalGroups": []}))   # no articleToRecitals
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         annotate._validate(json.dumps({"recitalGroups": {}, "articleToRecitals": {}}))
 
 
@@ -61,7 +61,7 @@ def _layer_with_groups(n):
 
 def test_validate_rejects_too_many_recital_groups():
     annotate._validate(_layer_with_groups(annotate.MAX_RECITAL_GROUPS))   # cap: ok
-    with pytest.raises(AssertionError, match="too many recital groups"):
+    with pytest.raises(ValueError, match="too many recital groups"):
         annotate._validate(_layer_with_groups(annotate.MAX_RECITAL_GROUPS + 1))
 
 
@@ -85,7 +85,7 @@ def test_author_retries_once_then_succeeds(monkeypatch):
 def test_author_raises_after_one_failed_retry(monkeypatch):
     monkeypatch.setattr(annotate.llm, "complete",
                         lambda prompt: _layer_with_groups(99))
-    with pytest.raises(AssertionError, match="too many recital groups"):
+    with pytest.raises(ValueError, match="too many recital groups"):
         annotate._author("BASE PROMPT")
 
 

@@ -346,7 +346,7 @@ class SearchIndex:
             indexed, errors = 0, []
             for ok, item in helpers.parallel_bulk(
                     self.client, actions, thread_count=jobs, queue_size=jobs,
-                    raise_on_exception=False, raise_on_error=False, **common):  # ty: ignore[invalid-argument-type]
+                    raise_on_exception=False, raise_on_error=False, **common):  # ty: ignore[invalid-argument-type]  # **common widens kwargs to object
                 if ok:
                     indexed += 1
                 else:
@@ -355,7 +355,7 @@ class SearchIndex:
         # single-threaded path keeps the 429 backoff (parallel_bulk has no retry)
         return helpers.bulk(self.client, actions, raise_on_error=False,
                             max_retries=RETRIES, initial_backoff=2,
-                            max_backoff=BACKOFF_CAP, **common)  # ty: ignore[invalid-argument-type]
+                            max_backoff=BACKOFF_CAP, **common)  # ty: ignore[invalid-argument-type]  # **common widens kwargs to object
 
     def index_source(self, con, source, progress=None, jobs=1, force=False):
         """Sync one source's units to its catalogued documents. Incremental by

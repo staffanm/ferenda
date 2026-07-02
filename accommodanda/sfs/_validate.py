@@ -104,7 +104,7 @@ def validate_one(job):
     # would otherwise crash the whole process pool, not just this document.
     try:
         golden = golden_sfs.normalize(parsedfile)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — golden harness: becomes a per-doc status; an unpicklable lxml error must not kill the pool (rule:no-catch-log-continue)
         empty = not Path(parsedfile).read_text(errors="replace").strip()
         return (basefile, "skipped" if empty else "error",
                 ["normalize: %s" % e], [])
@@ -121,7 +121,7 @@ def validate_one(job):
             json_path, html_path, register_path, basefile)
     except SkipDocument as e:
         return (basefile, "skipped", [str(e)], [])
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — golden harness: per-doc "error" status (rule:no-catch-log-continue)
         return (basefile, "error", ["%s: %s" % (type(e).__name__, e)], [])
 
     # The golden output's id suppression depends on which temporal variants
@@ -149,7 +149,7 @@ def validate_one(job):
                 best, best_now = problems, now
             if not problems:
                 break
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — golden harness: per-doc "error" status (rule:no-catch-log-continue)
         return (basefile, "error",
                 ["structure %s: %s" % (type(e).__name__, e)], [])
 
@@ -159,21 +159,21 @@ def validate_one(job):
         try:
             best = best + compare_refs(golden, doc, basefile, best_now,
                                        golden_sfs)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — golden harness: per-doc "error" status (rule:no-catch-log-continue)
             return (basefile, "error",
                     ["refparse %s: %s" % (type(e).__name__, e)], [])
     if "amendments" in sections:
         try:
             best = best + compare_amendments(golden, doc, basefile, best_now,
                                              register, golden_sfs)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — golden harness: per-doc "error" status (rule:no-catch-log-continue)
             return (basefile, "error",
                     ["amendments %s: %s" % (type(e).__name__, e)], [])
     if "metadata" in sections:
         try:
             best = best + compare_metadata(golden, doc, basefile,
                                            register, sfst_header, golden_sfs)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — golden harness: per-doc "error" status (rule:no-catch-log-continue)
             return (basefile, "error",
                     ["metadata %s: %s" % (type(e).__name__, e)], [])
 

@@ -26,7 +26,7 @@ import re
 import subprocess
 from dataclasses import dataclass
 
-from lxml import etree  # ty: ignore[unresolved-import]
+from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
 from .util import normalize_space
 
@@ -95,8 +95,9 @@ def _lines(spans):
         else:
             lines.append([base, [(left, text, bold, italic)], top])
     out = []
-    for base, runs, top in lines:
+    for _base, runs, top in lines:
         runs.sort()
+        # lines rows are untyped heterogeneous lists, so ty can't see r[1]: str
         out.append(Line(normalize_space(" ".join(r[1] for r in runs)), top,  # ty: ignore[invalid-argument-type]
                         all(r[2] for r in runs), runs[0][2],
                         all(r[3] for r in runs)))
@@ -123,7 +124,8 @@ def page_paragraphs(lines, identifier, pageno):
         text = normalize_space(header_re.sub(" ", l.text))
         if text and text != str(pageno) and not RE_DOTS.search(text):
             kept.append(Line(text, l.top, l.bold, l.lead_bold, l.italic))
-    gaps = sorted(b.top - a.top for a, b in zip(kept, kept[1:]) if b.top > a.top)
+    gaps = sorted(b.top - a.top
+                  for a, b in zip(kept, kept[1:], strict=False) if b.top > a.top)
     body_gap = gaps[len(gaps) // 2] if gaps else 0      # median line-height
     paras, cur, prev = [], None, None
     for l in kept:

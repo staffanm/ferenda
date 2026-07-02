@@ -210,7 +210,7 @@ def nest(blocks):
         push("instans", court=court)
 
     def current_instans():
-        for rank, node in reversed(stack):
+        for _rank, node in reversed(stack):
             if node["type"] == "instans":
                 return node
         return None

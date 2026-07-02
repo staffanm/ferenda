@@ -156,7 +156,8 @@ def _bundle_fmx(zf, members, encode=map):
     for i in range(0, len(tif_parts), _ENCODE_BATCH):
         batch = tif_parts[i:i + _ENCODE_BATCH]
         for name, (data, ext) in zip(batch,
-                                     encode(_recompress, [zf.read(n) for n in batch])):
+                                     encode(_recompress, [zf.read(n) for n in batch]),
+                                     strict=True):
             base = name.rsplit("/", 1)[-1]
             newbase = base[:-4] + ext
             images[newbase] = data

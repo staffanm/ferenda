@@ -650,7 +650,7 @@ def fragment_context(basefile, fragment):
         m = FRAGMENT.match(fragment)
         assert m
         for key, value in zip(('chapter', 'section', 'piece', 'item'),
-                              m.groups()):
+                              m.groups(), strict=True):
             if value:
                 ctx[key] = value
     return ctx
@@ -963,7 +963,8 @@ class LagrumParser:
                 try:
                     attrlist = list(self.format_root(tree, context))
                     for attrs, (s, e) in zip(
-                            attrlist, self.link_spans(attrlist, tree, length)):
+                            attrlist, self.link_spans(attrlist, tree, length),
+                            strict=True):
                         if '_uri' in attrs:    # self-contained (rättsfall)
                             uri = attrs['_uri']
                         elif any(k in attrs for k in EU_KEYS):
@@ -1000,7 +1001,7 @@ class LagrumParser:
             if any(s <= mstart and mend <= e for s, e in spans):
                 continue  # already inside a link's own span
             cand = None
-            for i, (s, e) in enumerate(spans):
+            for i, (_s, e) in enumerate(spans):
                 if e <= mstart and not self._token_between(tokens, e, mstart) \
                         and (cand is None or e > spans[cand][1]):
                     cand = i
