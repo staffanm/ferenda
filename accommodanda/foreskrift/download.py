@@ -4,6 +4,7 @@ named författningssamlingar (default all); ``--full`` re-walks and refreshes
 existing base regulations (new amendments / consolidations), ``--only BASEFILE``
 fetches one (needs a single fs scope)."""
 
+from ..lib.util import list_basefiles as _list_basefiles
 from . import harvest
 from .agencies import REGISTRY
 
@@ -20,4 +21,4 @@ def sync(root, scopes=None, full=False, only=None, delay=0.5, log=print):
 
 
 def list_basefiles(root, fs):
-    return harvest.list_basefiles(root, fs)
+    return _list_basefiles(root, fs)

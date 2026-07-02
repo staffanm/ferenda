@@ -20,7 +20,8 @@ import functools
 import json
 import zipfile
 from pathlib import Path
-from xml.etree import ElementTree as ET
+
+from lxml import etree  # ty: ignore[unresolved-import]
 
 from ..lib.datasets import NAMEDACTS
 from ..lib.lagrum import EULAGSTIFTNING, EURATTSFALL, LagrumParser, interleave
@@ -32,6 +33,14 @@ from .parse_pdf import parse_pdf
 from .structure import nest
 
 LANG_PREFERENCE = ("swe", "eng")
+
+# the manifestation is remote-supplied: no DTD/entity expansion (stdlib
+# ElementTree would expand nested entities unbounded); comments/PIs removed so
+# the element walks see only real elements (ElementTree dropped them, lxml
+# keeps them by default)
+XML_PARSER = etree.XMLParser(resolve_entities=False, load_dtd=False,
+                             no_network=True, remove_comments=True,
+                             remove_pis=True)
 
 # footnote subtrees are dropped from the running text (their content is a note,
 # not body prose)
@@ -58,8 +67,8 @@ def load_formex(path):
             members = sorted(n for n in zf.namelist()
                              if n.endswith(".xml") and not n.endswith(".doc.xml"))
             assert members, "%s: zip has no Formex member" % path
-            return [ET.fromstring(zf.read(m)) for m in members]
-    return [ET.parse(path).getroot()]
+            return [etree.fromstring(zf.read(m), XML_PARSER) for m in members]
+    return [etree.parse(str(path), XML_PARSER).getroot()]
 
 
 # --------------------------------------------------------------------------
@@ -445,15 +454,6 @@ def to_artifact(doc):
     if doc.oj:
         art["oj"] = doc.oj
     return art
-
-
-# --------------------------------------------------------------------------
-# CLI
-# --------------------------------------------------------------------------
-
-def _celex_from_path(path):
-    """Recover the CELEX from a downloaded file's path (.../{celex-slug}/x)."""
-    return Path(path).parent.name.replace("_", "/")
 
 
 # format precedence -> parser route: (filename token, route). fmx4 (richest) >

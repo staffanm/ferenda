@@ -26,7 +26,6 @@ agency that needs one is built -- not speculatively (the rewrite's
 """
 
 import json
-import os
 import re
 import time
 from dataclasses import dataclass, field
@@ -37,13 +36,10 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 
+from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session, request
-from ..lib.util import Reporter
-
-# the documents are public government records; we present a normal browser UA
-# (several agency sites 403 bare clients) and stay polite with delays.
-USER_AGENT = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-              "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+from ..lib.util import Reporter, record_path, write_atomic
+from ..lib.util import basefile_slug as slug
 
 
 @dataclass
@@ -89,31 +85,6 @@ class Agency:
     params: dict = field(default_factory=dict)   # architecture-specific config
     user_agent: str | None = None          # override (a few sites gate on UA)
     headers: dict | None = None            # extra request headers (e.g. Accept-Language)
-
-
-# --------------------------------------------------------------------------
-# shared I/O (same atomic-write contract as the other downloaders)
-# --------------------------------------------------------------------------
-
-def write_atomic(path, data):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    try:
-        tmp.write_bytes(data if isinstance(data, bytes) else data.encode("utf-8"))
-        os.replace(tmp, path)
-    except BaseException:
-        tmp.unlink(missing_ok=True)
-        raise
-
-
-def slug(basefile):
-    """Filesystem-safe form of a basefile; the true identifier lives in the
-    record JSON, so this only has to be unique and stable."""
-    return basefile.replace("/", "-").replace(":", "-").replace(" ", "_")
-
-
-def record_path(root, fs, basefile):
-    return Path(root) / fs / (slug(basefile) + ".json")
 
 
 def absolute(base_url, href):
@@ -580,8 +551,3 @@ def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=prin
         marker.write_text("")          # clean full walk -> later runs incremental
     rep.done()
     return seen, new
-
-
-def list_basefiles(root, fs):
-    return sorted(json.loads(p.read_text())["basefile"]
-                  for p in (Path(root) / fs).glob("*.json"))

@@ -224,10 +224,9 @@ def _resolved_results(con, q, source, kind):
         if kind and kind_ != kind:
             continue
         # the same reader-facing heading the page and full-text hits show (short
-        # name + acronym where the artifact has them, else the title); the artifact
-        # carries the fields, so a pinned hit is labelled like any other
-        display = (catalog.display_title(json.loads(Path(path).read_bytes()), title)
-                   if path else title)
+        # name + acronym where the artifact has them, else the title) -- stored
+        # on the documents row at relate, so no artifact load per resolved hit
+        display = catalog.document_display(con, root) or title
         out.append({
             "uri": root, "url": layout.page_url(root),
             "identifier": label, "title": title, "display": display,

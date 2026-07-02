@@ -40,7 +40,7 @@ from ..lib.lagrum import (
     load_namedlaws,
 )
 from ..lib.pdftext import RE_KAP_MARK, RE_PARA_MARK, page_paragraphs, pdf_pages
-from .model import Consolidation, Regulation, regulation_uri
+from .model import Amendment, Consolidation, Regulation, regulation_uri
 from .structure import nest
 
 # a föreskrift cites SFS (the empowering law) and EU directives (what it
@@ -297,7 +297,6 @@ def parse_record(record, root):
             reg.consolidations.append(Consolidation(
                 of=reg.uri, konsolideradTom=tom, structure=cstruct))
     for am in files.get("amendment", []):
-        from .model import Amendment
         reg.amendments.append(Amendment(
             identifier=am.get("identifier", am.get("text", "")),
             uri=am.get("uri", ""), beslutsdatum=None))

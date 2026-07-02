@@ -32,19 +32,18 @@ changed records.
 
 import argparse
 import json
-import os
 import re
 import time
 from pathlib import Path
 from urllib.parse import quote
 
+from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
-from ..lib.util import Reporter
+from ..lib.util import Reporter, write_atomic
 
 API = "https://rattspraxis.etjanst.domstol.se/api/v1"
 PAGE_SIZE = 100
 COMPLETE = ".complete"   # marker under destdir: corpus walked clean at least once
-USER_AGENT = "lagen.nu harvester (https://lagen.nu/, staffan@tomtebo.org)"
 
 # record path segments come straight from the API response; validate them so a
 # malformed/compromised record can't escape destdir via "..", "/" or an
@@ -74,17 +73,6 @@ def fetch_record(session, record_id):
     return request(session, "GET",
                    API + "/publiceringar/" + quote(record_id, safe=""),
                    parse_json=True)
-
-
-def write_atomic(path, data):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    try:
-        tmp.write_bytes(data)
-        os.replace(tmp, path)
-    except BaseException:
-        tmp.unlink(missing_ok=True)
-        raise
 
 
 def save_record(destdir, record):

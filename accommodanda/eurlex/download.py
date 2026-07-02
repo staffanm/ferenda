@@ -52,15 +52,16 @@ from datetime import date
 from html import escape
 from pathlib import Path
 from urllib.parse import quote
-from xml.etree import ElementTree as ET
 
+from lxml import etree  # ty: ignore[unresolved-import]
+
+from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
-from ..lib.util import Reporter
+from ..lib.util import Reporter, write_atomic
 
 SPARQL = "https://publications.europa.eu/webapi/rdf/sparql"
 CELLAR = "http://publications.europa.eu/resource/celex/%s"
 SOAP_ENDPOINT = "https://eur-lex.europa.eu/EURLexWebService"
-USER_AGENT = "lagen.nu harvester (https://lagen.nu/, staffan@tomtebo.org)"
 
 LANGUAGES = ("swe", "eng")
 # manifestation types we'll take, richest first; any pdf* sub-type (pdf,
@@ -126,17 +127,6 @@ SECTORS = {
                       re.compile(r"6\d{4}(?:%s)\d{4}$" % "|".join(CASELAW_TYPES)),
                       1954),
 }
-
-
-def write_atomic(path, data):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    try:
-        tmp.write_bytes(data)
-        os.replace(tmp, path)
-    except BaseException:
-        tmp.unlink(missing_ok=True)
-        raise
 
 
 def celex_slug(celex):
@@ -223,7 +213,7 @@ def soap_search(session, expert_query, page):
     environment; the service caps a single search at 10,000 results, so callers
     slice the query (e.g. by year) to stay under it."""
     user, password = os.environ["EURLEX_USERNAME"], os.environ["EURLEX_PASSWORD"]
-    envelope = SOAP_ENVELOPE % (user, password,
+    envelope = SOAP_ENVELOPE % (escape(user), escape(password),
                                 escape(expert_query, quote=False),
                                 page, SOAP_PAGESIZE)
     response = request(session, "POST", SOAP_ENDPOINT, timeout=60,
@@ -231,7 +221,11 @@ def soap_search(session, expert_query, page):
                        headers={"Content-Type": 'application/soap+xml; '
                                 'charset=utf-8; action="https://eur-lex.'
                                 'europa.eu/EURLexWebService/doQuery"'})
-    return ET.fromstring(response.content)
+    # remote XML: no DTD/entity expansion (stdlib ElementTree would expand
+    # nested entities unbounded)
+    return etree.fromstring(response.content, etree.XMLParser(
+        resolve_entities=False, load_dtd=False, no_network=True,
+        remove_comments=True, remove_pis=True))
 
 
 def enumerate_celex_soap(session, sector, since=None):
@@ -299,31 +293,12 @@ def _ntriples(rdfxml):
 
 
 class Notice:
-    """The kept triples of a tree notice, indexed for the few lookups selection
-    needs -- a tiny stand-in for the rdflib Graph we used to materialise."""
+    """The kept triples of a tree notice -- all any caller does with one is
+    persist it (`ttl()`); the old per-triple lookup surface is gone with the
+    tree-notice fetch path it served."""
 
     def __init__(self, triples):
         self.lines = [line for line, *_ in triples]
-        self._spo = defaultdict(list)             # (subject, predicate) -> objects
-        self._pos = defaultdict(list)             # (predicate, object) -> subjects
-        self._by_pred = defaultdict(list)         # predicate -> [(subject, object)]
-        for _line, s, p, o in triples:
-            self._spo[(s, p)].append(o)
-            self._pos[(p, o)].append(s)
-            self._by_pred[p].append((s, o))
-
-    def value(self, s, p):
-        objs = self._spo.get((s, p))
-        return objs[0] if objs else None
-
-    def objects(self, s, p):
-        return self._spo.get((s, p), ())
-
-    def subjects(self, p, o):
-        return self._pos.get((p, o), ())
-
-    def subject_objects(self, p):
-        return self._by_pred.get(p, ())
 
     def ttl(self):
         return ("\n".join(self.lines) + "\n").encode()

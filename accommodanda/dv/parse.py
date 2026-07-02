@@ -39,6 +39,7 @@ from ..lib.lagrum import (
     load_namedacts,
     load_namedlaws,
 )
+from ..lib.layout import case_slug as slug
 from .model import Avgorande, Fotnot, Lagrum, Rubrik, Stycke
 from .structure import nest
 
@@ -237,16 +238,6 @@ def _scanner():
     namedlaws, abbreviations, named_acts = legal_vocab()
     return LagrumParser(namedlaws, basefile="dom", abbreviations=abbreviations,
                         parse_types=DV_PARSE_TYPES, named_acts=named_acts)
-
-
-def body_links(runs_per_block):
-    """The link dicts across every block's runs (for the recall stat)."""
-    return [run for runs in runs_per_block for run in runs
-            if isinstance(run, dict)]
-
-
-def slug(case_id):
-    return re.sub(r"[^\w]+", "_", case_id).strip("_")
 
 
 @functools.cache

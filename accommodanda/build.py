@@ -166,7 +166,7 @@ def manifest_key(source, stage, basefile):
     return "%s/%s/%s" % (source, stage, basefile)
 
 
-def is_fresh(manifest, source, stage, basefile):
+def is_fresh(manifest, source, stage, basefile, inputs_hash=None):
     out = stage.output(basefile)
     if not out.exists():
         return False
@@ -176,8 +176,10 @@ def is_fresh(manifest, source, stage, basefile):
         # up to date, whether the driver or the bulk harvester produced it
         return True
     entry = manifest.get(manifest_key(source.name, stage.name, basefile))
+    if inputs_hash is None:
+        inputs_hash = hash_files(stage.inputs(basefile))
     return bool(entry) \
-        and entry["inputs"] == hash_files(stage.inputs(basefile)) \
+        and entry["inputs"] == inputs_hash \
         and (RUN.ignore_code_changes
              or entry["version"] == recipe_version(stage.code))
 
@@ -277,7 +279,10 @@ def ensure(source, stage_name, basefile, manifest, res, force, no_deps):
         if not ensure(source, stage.depends, basefile, manifest, res,
                       False, no_deps):
             return False
-    if not force and is_fresh(manifest, source, stage, basefile):
+    # hash once: the freshness check and the post-run manifest entry use the
+    # same digest (the recipe reads the inputs, never writes them)
+    inputs_hash = hash_files(stage.inputs(basefile))
+    if not force and is_fresh(manifest, source, stage, basefile, inputs_hash):
         return True
     res.planned.append((stage_name, basefile))
     if RUN.dry_run:
@@ -294,7 +299,7 @@ def ensure(source, stage_name, basefile, manifest, res, force, no_deps):
                            % (type(e).__name__, e)))
         return False
     res.updates[manifest_key(source.name, stage_name, basefile)] = {
-        "inputs": hash_files(stage.inputs(basefile)),
+        "inputs": inputs_hash,
         "version": recipe_version(stage.code)}
     res.done.append((stage_name, basefile))
     return True
@@ -424,10 +429,8 @@ def load_manifest():
 def save_manifest(manifest):
     global _MANIFEST_CACHE
     _MANIFEST_CACHE = manifest
-    MANIFEST.parent.mkdir(parents=True, exist_ok=True)
-    tmp = MANIFEST.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(manifest, ensure_ascii=False, sort_keys=True))
-    tmp.replace(MANIFEST)
+    util.write_atomic(MANIFEST, json.dumps(manifest, ensure_ascii=False,
+                                           sort_keys=True))
 
 
 # The coarse per-(step, source) watermarks live in their own tiny file, NOT the
@@ -448,10 +451,8 @@ def load_watermarks():
 def save_watermarks(store):
     global _WATERMARKS_CACHE
     _WATERMARKS_CACHE = store
-    WATERMARKS.parent.mkdir(parents=True, exist_ok=True)
-    tmp = WATERMARKS.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(store, ensure_ascii=False, sort_keys=True, indent=0))
-    tmp.replace(WATERMARKS)
+    util.write_atomic(WATERMARKS, json.dumps(store, ensure_ascii=False,
+                                             sort_keys=True, indent=0))
 
 
 # --------------------------------------------------------------------------
@@ -633,7 +634,7 @@ def dv_download_run(basefile):
     member = api_member(_dv_cases()[basefile])
     record = dv_download.fetch_record(_dv_session(), member["uuid"])
     out = dv_record(basefile)
-    dv_download.write_atomic(out, json.dumps(
+    util.write_atomic(out, json.dumps(
         record, ensure_ascii=False, indent=2).encode())
     dv_download.download_bilagor(_dv_session(), out.parent.parent, record,
                                  POLITENESS)

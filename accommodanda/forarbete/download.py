@@ -41,7 +41,6 @@ already-downloaded doc); `--full` re-walks the whole listing, skipping existing.
 """
 
 import json
-import os
 import re
 import time
 from pathlib import Path
@@ -49,17 +48,14 @@ from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
 
+from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session
-from ..lib.util import Reporter
+from ..lib.util import Reporter, basefile_slug, record_path, write_atomic
 
 BASE = "https://www.regeringen.se"
 FILTER = (BASE + "/Filter/GetFilteredItems?lang=sv&filterType=Taxonomy"
           "&filterByType=FilterablePageBase&rootPageReference=0"
           "&displayLimited=True&preFilteredCategories=%s&page=%d")
-# regeringen.se 403s non-browser User-Agents, so present a normal browser one
-# (the documents are public government records; we stay polite with delays).
-USER_AGENT = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-              "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
 
 # type -> (url segment, taxonomy category id, identifier regex over the listing
 # link text). A None regex marks a type regeringen.se publishes without a
@@ -97,27 +93,6 @@ def document_extension(data):
     if data[:5] == b"{\\rtf":
         return ".rtf"
     return None
-
-
-def write_atomic(path, data):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    try:
-        tmp.write_bytes(data if isinstance(data, bytes) else data.encode("utf-8"))
-        os.replace(tmp, path)
-    except BaseException:
-        tmp.unlink(missing_ok=True)
-        raise
-
-
-def basefile_slug(basefile):
-    """Filesystem-safe form of a basefile; the true identifier lives in the
-    record JSON, so this only has to be unique and stable."""
-    return basefile.replace("/", "-").replace(":", "-").replace(" ", "_")
-
-
-def record_path(root, typ, basefile):
-    return Path(root) / typ / (basefile_slug(basefile) + ".json")
 
 
 def fetch(session, url, timeout=60):
@@ -295,8 +270,3 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
         rep.done()
         totals[typ] = (seen, new)
     return totals
-
-
-def list_basefiles(root, typ):
-    return sorted(json.loads(p.read_text())["basefile"]
-                  for p in (Path(root) / typ).glob("*.json"))

@@ -38,18 +38,17 @@ sfst/, sfsr/ siblings of the download root):
 
 import argparse
 import json
-import os
 import re
 import time
 from pathlib import Path
 
+from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
-from ..lib.util import Reporter
+from ..lib.util import Reporter, write_atomic
 
 ENDPOINT = "https://beta.rkrattsbaser.gov.se/elasticsearch/SearchEsByRawJson"
 PAGE_SIZE = 100
 PAGE_DELAY = 1.0           # seconds between pages -- conservative vs. throttling
-USER_AGENT = "lagen.nu harvester (https://lagen.nu/, staffan@tomtebo.org)"
 WATERMARK = ".watermark"   # file under destdir: max uppdateradDateTime harvested
 
 # fulltext.andringInford looks like "t.o.m. SFS 2026:764"; pull the SFS nr
@@ -80,17 +79,6 @@ def search(session, query, search_after=None):
     if search_after is not None:
         body["search_after"] = search_after
     return _es(session, body)
-
-
-def write_atomic(path, data):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    try:
-        tmp.write_bytes(data)
-        os.replace(tmp, path)
-    except BaseException:
-        tmp.unlink(missing_ok=True)
-        raise
 
 
 def read_watermark(destdir):

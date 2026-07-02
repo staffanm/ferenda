@@ -96,6 +96,11 @@ CREATE INDEX IF NOT EXISTS idx_docs_source   ON documents(source);
 
 def connect(path):
     con = sqlite3.connect(path)
+    # the catalog is derived and rebuildable, so durability is not precious:
+    # WAL (persistent, set once) lets readers proceed during a relate, and
+    # NORMAL skips the per-commit fsync that FULL pays on multi-GB rebuilds
+    con.execute("PRAGMA journal_mode=WAL")
+    con.execute("PRAGMA synchronous=NORMAL")
     con.executescript(SCHEMA)
     # additive migration for catalogs built before a column existed -- CREATE
     # TABLE IF NOT EXISTS never alters an existing table. The new column is NULL
@@ -364,8 +369,12 @@ def _drop_document(con, uri):
     fragment snippets (doc#id and every doc#id child)."""
     con.execute("DELETE FROM links WHERE from_uri = ?", (uri,))
     con.execute("DELETE FROM documents WHERE uri = ?", (uri,))
-    con.execute("DELETE FROM fragments WHERE uri = ? OR uri LIKE ?",
-                (uri, uri + "#%"))
+    # range predicate instead of LIKE 'uri#%': LIKE is case-insensitive by
+    # default so it cannot use the primary-key index and full-scans the
+    # multi-million-row table per dropped document ('$' is '#' + 1)
+    con.execute("DELETE FROM fragments WHERE uri = ? "
+                "OR (uri >= ? || '#' AND uri < ? || '$')",
+                (uri, uri, uri))
     con.execute("DELETE FROM concept_redirect WHERE concept = ?", (uri,))
 
 
@@ -738,6 +747,16 @@ def document_inbound_count(con, root_uri):
         (root_uri,)).fetchone()[0]
 
 
+def document_inbound_counts(con):
+    """`document_inbound_count` for every cited root at once -- {root_uri:
+    count}, same semantics as the per-uri query. One pass over the links table
+    instead of one GROUP-BY subquery per document (the full-reindex path)."""
+    return dict(con.execute(
+        "SELECT to_root, COUNT(*) FROM (SELECT l.to_root, 1 FROM links l "
+        "WHERE 1=1" + _NOT_SELF + " GROUP BY l.to_root, l.from_uri, "
+        "l.from_anchor) GROUP BY to_root"))
+
+
 def snippet(con, uri):
     """The stored text snippet for a fragment uri (link-tooltip text), or None."""
     row = con.execute("SELECT snippet FROM fragments WHERE uri = ?",
@@ -771,6 +790,14 @@ def document(con, uri):
     return con.execute(
         "SELECT uri, source, kind, label, title, path FROM documents "
         "WHERE uri = ?", (uri,)).fetchone()
+
+
+def document_display(con, uri):
+    """The stored reader-facing heading (`documents.display`, written at
+    relate), or None -- so a lookup need not load the artifact to label a hit."""
+    row = con.execute("SELECT display FROM documents WHERE uri = ?",
+                      (uri,)).fetchone()
+    return row[0] if row else None
 
 
 def _doc_filter(source, kind):

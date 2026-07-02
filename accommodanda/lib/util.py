@@ -1,11 +1,44 @@
 """Small shared utilities (ported from ferenda.util)."""
 
+import json
 import os
 import re
 import shutil
 import sys
 import time
+from pathlib import Path
 from typing import Any
+
+
+def write_atomic(path, data):
+    """Write `data` (bytes or str) to `path` via a same-directory temp file +
+    atomic rename, so an interrupted run never leaves a partial file behind."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    try:
+        tmp.write_bytes(data if isinstance(data, bytes) else data.encode("utf-8"))
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
+def basefile_slug(basefile):
+    """Filesystem-safe form of a basefile; the true identifier lives in the
+    record JSON, so this only has to be unique and stable."""
+    return basefile.replace("/", "-").replace(":", "-").replace(" ", "_")
+
+
+def record_path(root, subdir, basefile):
+    """The harvest-record JSON path for `basefile` under `root/subdir`."""
+    return Path(root) / subdir / (basefile_slug(basefile) + ".json")
+
+
+def list_basefiles(root, subdir):
+    """Every harvested basefile under `root/subdir`, read from the records."""
+    return sorted(json.loads(p.read_text())["basefile"]
+                  for p in (Path(root) / subdir).glob("*.json"))
 
 # ETA timing state for `status`, self-tracked so callers need not thread a start
 # time. A current/total run (sfs parse, then dv parse, …) is timed from its first

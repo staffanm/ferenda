@@ -598,12 +598,13 @@ def test_guidance_validate_rejects_hallucinated_target():
         {"title": "Who shares", "section": "question 8",
          "targets": ["2.21", "2.22", "recital-15"]}]
     # a target not in the act is rejected (fed back to the model on retry) so a
-    # hallucinated anchor never reaches the .ann
-    with pytest.raises(AssertionError, match="not in the act"):
+    # hallucinated anchor never reaches the .ann -- ValueError, not assert,
+    # because the retry loop load-bears on the raise (-O strips asserts)
+    with pytest.raises(ValueError, match="not in the act"):
         annotate._validate(
             '{"links": [{"title": "X", "targets": ["2.99"]}]}', anchors)
     # a link with no targets is rejected too
-    with pytest.raises(AssertionError, match="no targets"):
+    with pytest.raises(ValueError, match="no targets"):
         annotate._validate('{"links": [{"title": "X", "targets": []}]}', anchors)
 
 

@@ -39,6 +39,7 @@ from datetime import date
 from pathlib import Path
 
 from lark import Lark, Token, Tree
+from lark.exceptions import UnexpectedInput
 
 # --- parse-type configuration ---------------------------------------
 #
@@ -1023,7 +1024,7 @@ class LagrumParser:
                 return None, 0
             try:
                 return self.lark.parse(window), len(window)
-            except Exception as e:
+            except UnexpectedInput as e:
                 upto = getattr(e, 'pos_in_stream', None)
                 if not upto:
                     return None, 0

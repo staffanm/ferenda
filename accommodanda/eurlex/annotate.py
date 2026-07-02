@@ -56,16 +56,20 @@ def act_markdown(art):
 def _validate(content):
     """Parse and shape-check the model's reply: a JSON object with exactly the
     two expected keys and no more recital groups than the prompt's hard cap.
-    Raises (ValueError/AssertionError) on anything else rather than write a bad
-    layer -- the message is fed back to the model on the retry."""
+    Raises ValueError on anything else rather than write a bad layer -- the
+    message is fed back to the model on the retry. (ValueError, not assert:
+    the retry loop load-bears on the raise, which -O would strip.)"""
     layer = json.loads(llm.strip_fence(content))
-    assert isinstance(layer, dict), "response is not a JSON object"
+    if not isinstance(layer, dict):
+        raise ValueError("response is not a JSON object")
     groups = layer.get("recitalGroups")
-    assert isinstance(groups, list), "response lacks a recitalGroups list"
-    assert len(groups) <= MAX_RECITAL_GROUPS, \
-        "too many recital groups: %d (max %d)" % (len(groups), MAX_RECITAL_GROUPS)
-    assert isinstance(layer.get("articleToRecitals"), dict), \
-        "response lacks an articleToRecitals object"
+    if not isinstance(groups, list):
+        raise ValueError("response lacks a recitalGroups list")
+    if len(groups) > MAX_RECITAL_GROUPS:
+        raise ValueError("too many recital groups: %d (max %d)"
+                         % (len(groups), MAX_RECITAL_GROUPS))
+    if not isinstance(layer.get("articleToRecitals"), dict):
+        raise ValueError("response lacks an articleToRecitals object")
     return {"recitalGroups": groups,
             "articleToRecitals": layer["articleToRecitals"]}
 
@@ -79,7 +83,7 @@ def _author(prompt):
     for attempt in range(2):
         try:
             return _validate(llm.complete(prompt))
-        except (ValueError, AssertionError) as exc:
+        except ValueError as exc:
             if attempt:
                 raise
             prompt += ("\n\nDITT FÖREGÅENDE SVAR UNDERKÄNDES: %s\n"

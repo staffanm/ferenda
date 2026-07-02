@@ -124,6 +124,9 @@ MAPPING = {
 }
 
 HIGHLIGHT = {"fields": {"text": {}, "title": {}},
+             # the client injects the fragment as innerHTML: html-encode the
+             # body (parsed remote content) so only the <em> markers are markup
+             "encoder": "html",
              "fragment_size": 150, "number_of_fragments": 2}
 
 
@@ -392,7 +395,8 @@ class SearchIndex:
 
         # everything the threaded bulk needs, read from the DB up front (the action
         # generator must touch no DB handle -- see doc_actions / _bulk)
-        counts = {r[0]: catalog.document_inbound_count(con, r[0]) for r in todo}
+        all_counts = catalog.document_inbound_counts(con)
+        counts = {r[0]: all_counts.get(r[0], 0) for r in todo}
 
         def actions():
             for i, row in enumerate(todo):

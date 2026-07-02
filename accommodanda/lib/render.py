@@ -2193,6 +2193,14 @@ SEARCH = """
 (function () {
   var overlay = null, results = null, timer = null, seq = 0, sel = 0;
 
+  // the API returns raw field values (correct for an API); the indexed text is
+  // parsed remote content, so everything interpolated into innerHTML is escaped
+  // here. The highlight fragment is the one exception with markup: OpenSearch
+  // html-encodes the body (search.py HIGHLIGHT encoder) and only injects <em>.
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
   function hits() {
     return results ? Array.prototype.slice.call(
       results.querySelectorAll('.search-hit')) : [];
@@ -2208,7 +2216,7 @@ SEARCH = """
     if (!results) return;
     if (!items.length) {
       results.innerHTML = '<div class="search-note">Inga träffar för ' +
-        '\\u201d' + q + '\\u201d.</div>';
+        '\\u201d' + esc(q) + '\\u201d.</div>';
       return;
     }
     results.innerHTML = items.map(function (r) {
@@ -2222,10 +2230,10 @@ SEARCH = """
       // shows), and carry the citation id (CELEX / "SFS 2018:218") as the sub,
       // shown only when it differs from the title (DV's label == its title)
       var primary = r.display || r.title || r.identifier || r.uri;
-      return '<a class="search-hit" href="' + target + '">' +
-        '<span class="hit-title">' + primary + '</span>' +
+      return '<a class="search-hit" href="' + esc(target) + '">' +
+        '<span class="hit-title">' + esc(primary) + '</span>' +
         (r.identifier && r.identifier !== primary ?
-          '<span class="hit-sub">' + r.identifier + '</span>' : '') +
+          '<span class="hit-sub">' + esc(r.identifier) + '</span>' : '') +
         (hl ? '<span class="hit-snip">' + hl + '</span>' : '') + '</a>';
     }).join('');
     // the first hit is the resolved target for a citation-shaped query

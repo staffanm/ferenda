@@ -39,13 +39,12 @@ from pathlib import Path
 
 from PIL import Image, UnidentifiedImageError
 
-from ..lib.util import status
+from ..lib.util import status, write_atomic
 from .download import (
     SECTORS,
     content_filename,
     doc_dir,
     parse_notice,
-    write_atomic,
     write_watermark,
 )
 from .model import doctype

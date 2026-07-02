@@ -147,18 +147,26 @@ def _validate(content, anchors):
     the act. Raises on anything else (the message is fed back on the retry) so a
     hallucinated anchor never reaches the `.ann`."""
     data = json.loads(llm.strip_fence(content))
-    assert isinstance(data, dict), "response is not a JSON object"
+    # ValueError, not assert: the retry loop load-bears on the raise, which
+    # -O would strip
+    if not isinstance(data, dict):
+        raise ValueError("response is not a JSON object")
     links = data.get("links")
-    assert isinstance(links, list), "response lacks a links list"
+    if not isinstance(links, list):
+        raise ValueError("response lacks a links list")
     bad = set()
     for link in links:
-        assert isinstance(link, dict), "a link is not an object"
-        assert link.get("title"), "a link has no title"
+        if not isinstance(link, dict):
+            raise ValueError("a link is not an object")
+        if not link.get("title"):
+            raise ValueError("a link has no title")
         targets = link.get("targets")
-        assert isinstance(targets, list) and targets, \
-            "link %r has no targets list" % link.get("title")
+        if not (isinstance(targets, list) and targets):
+            raise ValueError("link %r has no targets list" % link.get("title"))
         bad |= {a for a in targets if a not in anchors}
-    assert not bad, "links cite anchors not in the act: %s" % ", ".join(sorted(bad))
+    if bad:
+        raise ValueError("links cite anchors not in the act: %s"
+                         % ", ".join(sorted(bad)))
     return links
 
 
@@ -169,7 +177,7 @@ def _author(prompt, anchors):
     for attempt in range(2):
         try:
             return _validate(llm.complete(prompt, max_tokens=MAX_TOKENS), anchors)
-        except (ValueError, AssertionError) as exc:
+        except ValueError as exc:
             if attempt:
                 raise
             prompt += ("\n\nDITT FÖREGÅENDE SVAR UNDERKÄNDES: %s\n"

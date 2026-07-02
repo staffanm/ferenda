@@ -18,12 +18,9 @@ shows up in its margin, a concept's page shows everything that references it.
 """
 
 import re
-import xml.etree.ElementTree as ET
 
 from .lagrum import Ref, interleave
 from .markdown import begrepp_uri  # one shared begrepp_uri (PRD §3.5)
-
-MW = "{http://www.mediawiki.org/xml/export-0.10/}"
 
 RE_WIKILINK = re.compile(r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]")
 # an inline link, either form: `[[wikilink]]`/`[[wikilink|label]]` (concept) or
@@ -35,27 +32,11 @@ RE_INLINE_LINK = re.compile(
 RE_CATEGORY = re.compile(r"\[\[Kategori:([^\]]+)\]\]")
 RE_HEADING = re.compile(r"^(=+)\s*(.*?)\s*=+\s*$")
 RE_BYLINE = re.compile(r"^''+\s*Huvudförfattare:?\s*(.+?)\s*''+$")
-RE_REDIRECT = re.compile(r"^#\s*(?:REDIRECT|OMDIRIGERING)", re.IGNORECASE)
 # wikitext noise stripped to plain text
 RE_FORMAT = re.compile(r"'''''|'''|''")                 # bold/italic markers
 RE_TEMPLATE = re.compile(r"\{\{[^}]*\}\}")              # {{templates}}
 RE_TAG = re.compile(r"<[^>]+>")                         # stray html / <ref>
 RE_WS = re.compile(r"[ \t]+")
-
-
-def load_page(path):
-    """(title, namespace, wikitext) from a MediaWiki XML export file. Takes the
-    last revision (the current text)."""
-    page = ET.parse(path).getroot()
-    title = page.findtext(MW + "title") or ""
-    ns = page.findtext(MW + "ns") or "0"
-    revs = page.findall(MW + "revision")
-    text = (revs[-1].findtext(MW + "text") if revs else "") or ""
-    return title, ns, text
-
-
-def is_redirect(wikitext):
-    return bool(RE_REDIRECT.match(wikitext.lstrip()))
 
 
 def _strip(text):

@@ -23,7 +23,6 @@ from pathlib import Path
 from urllib.parse import quote, unquote
 
 from .. import config
-from ..dv.parse import slug as _dv_slug
 from .catalog import BASE, local, strip_fragment
 
 DATA = config.DATA
@@ -69,6 +68,14 @@ def _alnum_slug(s):
     return "".join(c if c.isalnum() else "_" for c in s).strip("_")
 
 
+def case_slug(case_id):
+    """Filesystem-safe form of a DV case id ("AD 1993 nr 100" ->
+    "AD_1993_nr_100"); runs of non-word characters collapse to one underscore.
+    Not `_alnum_slug` (which underscores each character, "s." -> "s__"). Lives
+    here, not in the dv vertical, because the path grammar is layout's."""
+    return re.sub(r"[^\w]+", "_", case_id).strip("_")
+
+
 def kommentar_host(basefile):
     """The host source a kommentar/begrepp basefile annotates. A kommentar borrows
     its host's identity (`annotates:` is an SFS number, a CELEX, an FS id or a
@@ -95,7 +102,7 @@ def relpath(source, basefile):
         year, nr = _sfs_parts(basefile)
         return Path(year) / nr
     if source == "dv":
-        return Path(_dv_slug(basefile))
+        return Path(case_slug(basefile))
     if source == "forarbete":
         typ, rest = basefile.split("/", 1)
         return Path(typ) / rest
@@ -261,6 +268,11 @@ def url_to_relpath(path):
     The path is a document's URI local form, so reattach the host and reuse the
     page_relpath rule; /celex/<id> is the public address of ext/celex/<id>."""
     loc = unquote(path).lstrip("/")
+    # the path is an attacker-controlled request: refuse traversal-shaped
+    # segments here (no rewrite -> the miss stays a 404) rather than relying
+    # on the static server's containment check alone
+    if ".." in loc.split("/"):
+        return None
     if loc.startswith("celex/"):
         loc = "ext/celex/" + loc[len("celex/"):]
     return page_relpath(BASE + loc)

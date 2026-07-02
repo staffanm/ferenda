@@ -23,7 +23,9 @@ def dump_source(artifact_paths, out_path, progress=None):
     out_path = Path(out_path)
     total = len(artifact_paths)
     written = 0
-    with gzip.open(out_path, "wt", encoding="utf-8") as fh:
+    # level 6 over the default 9: 2-3x faster over the multi-GB corpus for a
+    # few percent larger output; the dumps carry no byte-identity contract
+    with gzip.open(out_path, "wt", encoding="utf-8", compresslevel=6) as fh:
         for i, path in enumerate(map(Path, artifact_paths)):
             raw = path.read_bytes()
             if raw.strip():
