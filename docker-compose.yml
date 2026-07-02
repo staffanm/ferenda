@@ -28,16 +28,25 @@ services:
   # compose network as http://opensearch:9200). On WSL2, if it won't boot,
   # raise vm.max_map_count: `sudo sysctl -w vm.max_map_count=262144`.
   opensearch:
-    image: opensearchproject/opensearch:2.18.0   # ':2' tracks the latest 2.x
+    # Pinned to 2.9.0, NOT "latest 2.x": 2.10.0+ images require the x86-64-v2
+    # CPU baseline (confirmed by bisection -- 2.9.0 boots clean, 2.10.0 fails
+    # with "Fatal glibc error: CPU does not support x86-64-v2") and the prod
+    # host's virtualized CPU doesn't expose it. Revisit once the host's
+    # hypervisor CPU model is fixed (out of our control -- pending host admins).
+    image: opensearchproject/opensearch:2.9.0
     container_name: lagen-opensearch
     environment:
       - discovery.type=single-node           # one node; relaxes the bootstrap checks
       - DISABLE_SECURITY_PLUGIN=true          # -> plain http://localhost:9200, no auth
       - DISABLE_INSTALL_DEMO_CONFIG=true      # skip the demo TLS certs/users
       - bootstrap.memory_lock=true            # keep the JVM heap out of swap
-      - OPENSEARCH_JAVA_OPTS=-Xms3g -Xmx3g    # headroom for a ~1M+ doc parent-child
-                                              # index; the join field's global ordinals
-                                              # are the main heap consumer (now lazy)
+      - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g    # the prod host has 15GB total and the
+                                              # legacy Elasticsearch already reserves
+                                              # 8g; 3g pushed the host into swap
+                                              # thrashing. Revisit upward (comment
+                                              # above still applies re: ~1M+ docs)
+                                              # once host memory or the legacy ES
+                                              # heap frees up headroom.
     ulimits:
       memlock:
         soft: -1
@@ -77,12 +86,44 @@ services:
       - OPENSEARCH_URL=http://opensearch:9200
       - WIKI_ROOT=/wiki
     volumes:
-      - /mnt/data/ferenda:/app/site/data   # corpus (data_root): download + rebuild write here
+      - /mnt/data/accommodanda:/app/site/data   # corpus (data_root): download + rebuild write here
       - /mnt/data/lagen-wiki:/wiki         # begrepp/kommentar markdown repo (git clone on the host)
     depends_on:
-      opensearch:
-        condition: service_healthy
+      - opensearch   # start order only, not a health gate: serving + the CLI don't
+                      # need a live OpenSearch (see api/app.py), only `/search` does
     restart: always
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "10"
+
+  # --- prod: ACME cert issuance/renewal (lagen.nu + ferenda.lagen.nu) ------
+  # Official, actively maintained certbot image -- replaces the certbot 0.30.2
+  # baked into the old andreilhicas/nginx-letsencrypt nginx image, which is
+  # ACME-API-incompatible with current Let's Encrypt (missing Content-Type
+  # header on POST-as-GET; every renewal failed). Certbot only writes files
+  # here -- it does not serve anything -- via two volumes shared with nginx:
+  # the ACME http-01 webroot (challenge files nginx serves back to LE) and the
+  # cert output dir nginx's ssl_certificate directives read from.
+  #
+  # One-time SAN cert covering both vhosts (run once; `renew` below only
+  # renews an existing cert, it doesn't create one):
+  #   docker compose run --rm certbot certonly --webroot -w /var/www/certbot \
+  #     -d lagen.nu -d ferenda.lagen.nu \
+  #     --email staffan.malmgren@gmail.com --agree-tos --non-interactive
+  certbot:
+    image: certbot/certbot:v3.1.0
+    profiles: [prod]
+    volumes:
+      - /mnt/data/lagen/letsencrypt:/etc/letsencrypt        # certbot's own state: account + live/archive certs
+      - certbot-webroot:/var/www/certbot                    # shared ACME http-01 webroot with nginx
+      - /mnt/data/lagen/certificates:/usr/share/nginx/certificates  # nginx's cert dir; deploy-hook copies here
+    entrypoint: >
+      sh -c "trap exit TERM; while :; do
+      certbot renew --webroot -w /var/www/certbot --quiet
+      --deploy-hook 'cp /etc/letsencrypt/live/lagen.nu/fullchain.pem /etc/letsencrypt/live/lagen.nu/privkey.pem /usr/share/nginx/certificates/';
+      sleep 12h & wait $${!}; done"
+    restart: unless-stopped
     logging:
       options:
         max-size: "10m"
@@ -92,12 +133,13 @@ services:
   nginx:
     build:
       context: docker/nginx
-      # Base image + config (default.conf = lagen.nu, ferenda.lagen.nu.conf =
-      # the rebuilt site) and letsencrypt integration. To get a cert that also
-      # covers ferenda.lagen.nu, add it to this service's DOMAIN below so the
-      # ACME client reissues one SAN cert for both names (both vhosts reference
-      # the same fullchain.pem); until then nginx still boots and only warns for
-      # the new name.
+      # Base image + config: default.conf = lagen.nu, ferenda.lagen.nu.conf =
+      # the rebuilt site. Cert issuance lives in the `certbot` service above;
+      # nginx only reads the files it writes -- see /mnt/data/lagen/certificates
+      # below. nginx does NOT auto-reload on renewal (no docker.sock access by
+      # design -- see `certbot` service comment); reload periodically, e.g. a
+      # host cron `docker compose exec nginx nginx -s reload` weekly, harmless
+      # if no cert changed.
     profiles: [prod]
     ports:
       - "80:80"
@@ -105,14 +147,13 @@ services:
     volumes:
       - /mnt/data/lagen/data:/usr/share/nginx/html:ro
       - /mnt/data/lagen/certificates:/usr/share/nginx/certificates/
-    environment:
-      - "DOMAIN=lagen.nu"           # add ` ferenda.lagen.nu` here for a SAN cert
-      - "EMAIL=staffan.malmgren@gmail.com"
+      - certbot-webroot:/var/www/certbot                    # serves ACME http-01 challenges for certbot
     depends_on:
       - ferenda
       - mediawiki
       - matomo
       - accommodanda
+      - certbot
     restart: always
     logging:
       options:
@@ -149,7 +190,12 @@ services:
       - /mnt/data/elasticsearch:/usr/share/elasticsearch/data
     environment:
       - "discovery.type=single-node"
-      - "ES_JAVA_OPTS=-Xms8g -Xmx8g"
+      # was 8g/8g: measured heap_used was ~1.3GB (16%) against the 1.37M-doc
+      # `lagen` index (14GB on disk) -- Xms=Xmx=8g eagerly commits the full 8GB
+      # at JVM startup regardless of actual usage, which combined with
+      # OpenSearch's heap pushed the 15GB prod host into swap thrashing. 3g
+      # leaves >2x headroom over observed usage.
+      - "ES_JAVA_OPTS=-Xms3g -Xmx3g"
     restart: always
     logging:
       options:
@@ -213,3 +259,4 @@ volumes:
   fuseki:
   elasticsearch:
   opensearch-data:
+  certbot-webroot:

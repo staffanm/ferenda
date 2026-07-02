@@ -334,16 +334,29 @@ every command (`ps`, `logs`, `restart`, …) sees the whole stack without the fl
    it can't build from this branch (which deleted `requirements.txt`):
    `docker tag <old-ferenda-image> lagen-ferenda:legacy`.
 2. Create the read-write data dirs the `accommodanda` service mounts:
-   `/mnt/data/ferenda` (the corpus / `data_root`) and `/mnt/data/lagen-wiki`
+   `/mnt/data/accommodanda` (the corpus / `data_root` — NOT `/mnt/data/ferenda`,
+   which is the unrelated legacy `ferenda` checkout) and `/mnt/data/lagen-wiki`
    (a clone of the `lagen-wiki` markdown repo — `WIKI_ROOT`).
-3. Point `ferenda.lagen.nu` DNS at the host and append ` ferenda.lagen.nu` to the
-   nginx service's `DOMAIN` env so the ACME client reissues one SAN cert for both
-   names (nginx boots either way; TLS just warns for the new name until then).
+3. Point `ferenda.lagen.nu` DNS at the host, then issue the SAN cert covering
+   both vhosts (one-time; `certbot renew`, run automatically by the `certbot`
+   service, only renews an existing cert, it doesn't create one):
+   ```sh
+   docker compose --profile prod up -d nginx certbot   # nginx must be up first to answer the ACME challenge
+   docker compose run --rm certbot certonly --webroot -w /var/www/certbot \
+     -d lagen.nu -d ferenda.lagen.nu \
+     --email staffan.malmgren@gmail.com --agree-tos --non-interactive
+   docker compose restart nginx   # pick up the new cert
+   ```
+   Cert issuance/renewal uses the official `certbot/certbot` image (see the
+   `certbot` service in `docker-compose.yml`) — not the nginx image itself.
+   nginx doesn't auto-reload on renewal, so reload it periodically (e.g. a
+   host cron running `docker compose exec nginx nginx -s reload` weekly is
+   harmless whether or not a cert actually changed).
 
 **Bring-up**
 
 ```sh
-docker compose --profile prod up -d      # opensearch must report healthy first
+docker compose --profile prod up -d
 ```
 
 `accommodanda` is a frozen image: the code is baked in, but it also carries the
