@@ -6,6 +6,7 @@ import json
 import sqlite3
 
 import pytest
+from fastapi.staticfiles import StaticFiles
 from fastapi.testclient import TestClient
 
 from accommodanda.api import app as api
@@ -210,7 +211,6 @@ def test_sources(client):
 def test_serve_mounts_static_site_alongside_api(client, tmp_path):
     # `serve()` mounts the generated site at / on the same app: the REST routes
     # still answer first, everything else falls through to the static files
-    from fastapi.staticfiles import StaticFiles
     site = tmp_path / "site"
     site.mkdir()
     (site / "index.html").write_text("<html>frontpage</html>")
