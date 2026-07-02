@@ -53,7 +53,7 @@ from html import escape
 from pathlib import Path
 from urllib.parse import quote
 
-from lxml import etree  # ty: ignore[unresolved-import]
+from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
@@ -499,13 +499,15 @@ def store_document(session, target, celex, wdate, selection, eurovoc):
     scanned TIFF image -- that placeholder is rejected (see _content_ok) and the
     next type (the one carrying the real text) is fetched instead.
 
-    A CELEX with no Swedish/English manifestation (`selection` empty -- a
-    pre-accession act never translated) is *not* stored at all: a notice with no
-    document is dead weight the parser can only skip, and (is_downloaded keys on
-    the notice) it would mask the work from a later run that does find one."""
+    A CELEX with no *stored* content -- `selection` empty (a pre-accession act
+    never translated), or every candidate rejected by _content_ok (a
+    scanned-TIFF placeholder in each language) -- gets *no notice at all*: a
+    notice with no document is dead weight the parser can only skip, and
+    (is_downloaded keys on the notice) it would permanently mask the work from
+    a later run that does find content. The notice is therefore written after
+    the first successful content store, never before."""
     if not selection:
         return []
-    write_atomic(target / "notice.ttl", notice_ttl(celex, wdate, eurovoc))
     stored = []
     for code, candidates in selection:
         for filetype, url in candidates:
@@ -521,6 +523,8 @@ def store_document(session, target, celex, wdate, selection, eurovoc):
                     old.unlink()
             stored.append(code)
             break
+    if stored:
+        write_atomic(target / "notice.ttl", notice_ttl(celex, wdate, eurovoc))
     return stored
 
 

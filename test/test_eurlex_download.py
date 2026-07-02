@@ -57,6 +57,27 @@ def test_store_document_falls_back_when_fmx4_is_a_scanned_image(tmp_path,
     assert fetched == ["u-fmx4", "u-xhtml"]            # tried fmx4, fell back
     assert (target / "swe.xhtml").read_bytes() == bodies["u-xhtml"]
     assert not (target / "swe.fmx4").exists()
+    assert (target / "notice.ttl").exists()            # content stored -> notice
+
+
+def test_store_document_writes_no_notice_when_every_candidate_is_rejected(
+        tmp_path, monkeypatch):
+    # every candidate in every language is a scanned-TIFF placeholder: nothing
+    # is stored and, crucially, no notice.ttl -- is_downloaded keys on the
+    # notice, so an early notice would permanently mask the work from later
+    # runs that do find content
+    class Resp:
+        content = TIFF
+
+    monkeypatch.setattr(D, "request", lambda *a, **kw: Resp())
+    target = tmp_path / "1993" / "61993CC0425"
+    selection = [("swe", [("fmx4", "u1"), ("pdf", "u2")]),
+                 ("eng", [("fmx4", "u3")])]
+    stored = D.store_document(object(), target, "61993CC0425", "1993-01-01",
+                              selection, [])
+    assert stored == []
+    assert not (target / "notice.ttl").exists()
+    assert not D.is_downloaded(tmp_path, "61993CC0425")
 
 
 def test_prune_empty_removes_notice_only_dirs_keeps_documents(tmp_path):
