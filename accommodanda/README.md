@@ -87,6 +87,18 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `download.py` | JO harvester (jo.se WordPress admin-ajax search API + decision PDFs) and JK harvester (jk.se listing → per-decision landing pages); `jk_canonical` dnr normalization |
 | `parse.py` | JO: PDF body via `lib/pdftext` (bold rubriker, "Beslutet i korthet" abstract); JK: landing-page `div.content` (strong→section, em→subsection); both citation-scanned with the DV parse-type set |
 
+**foreskrift vertical (agency regulations)**
+| File | What |
+|---|---|
+| `agencies.py` | the data registry driving one shared harvest engine — 17 författningssamlingar registered so far, no per-agency pipelines (~100 agencies share a few publishing architectures) |
+| `harvest.py` | the shared harvest engine (enumerate → resolve → fetch per architecture) |
+| `download.py` | the `lagen foreskrift download` front over the engine (`--full`, `--only`) |
+| `model.py` / `structure.py` / `parse.py` | as-published `Foreskrift` model, PDF → statute-shaped structure → artifact |
+
+**Service layer**: `api/app.py` is the REST/OpenAPI service (search, documents,
+citation graph, version history + diff) that also serves the static site under
+`lagen serve`.
+
 ## Running the pipelines
 
 **SFS** (operates on the golden / downloaded trees under `site/data/sfs/`):
@@ -291,7 +303,10 @@ The pipelines read large data trees that live under `site/data/` (not all
 committed):
 
 ```
-site/data/sfs/{downloaded,golden,register}/   # SFS source + frozen golden corpus
+site/data/sfs/downloaded/                     # SFS raw (beta JSON + legacy sfst/sfsr HTML)
+site/data/sfs/parsed/                         # old pipeline's frozen golden corpus (XHTML)
+site/data/sfs/artifact/                       # parsed JSON artifacts (+ .versions.json sidecars)
+site/data/sfs/archive/{downloaded,artifact}/  # superseded consolidations, raw + parsed
 site/data/domstol/downloaded/                 # DV new-API harvest (per court)
 site/data/dv/{downloaded,intermediate}/       # DV legacy feed (.doc/.docx + old XML)
 site/data/dv/identity-index.json              # canonical case -> source records
