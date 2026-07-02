@@ -7,7 +7,8 @@ from accommodanda.lib.pdftext import Para
 from accommodanda.foreskrift import structure
 from accommodanda.foreskrift.parse import (classify, extract_metadata, _iso,
                                            _body_start, _dedupe_bemyndigande,
-                                           konsoliderad_tom, _fresh_parser)
+                                           konsoliderad_tom, _fresh_parser,
+                                           amendment_uri, parse_record)
 
 
 # --- classify: text-based markers survive a fontless (scanned) PDF ----------
@@ -154,3 +155,32 @@ def test_extract_metadata_lifts_dates_bemyndigande_and_directive():
     assert "https://lagen.nu/2013:587#P4" in meta["bemyndigande"]
     assert "https://lagen.nu/2013:587#P5" in meta["bemyndigande"]
     assert meta["genomfor"] == ["https://lagen.nu/ext/celex/32011L0061"]
+
+
+# --- amendments: minted uris + preserved source urls (review C3) -------------
+
+def test_amendment_uri_minted_from_the_identifiers_own_fs_code():
+    # folded to the slug form, mixed-prefix graphs (RPSFS base, PMFS
+    # amendments) mint under the amendment's own samling
+    assert amendment_uri("ELSÄK-FS 2026:27") == "https://lagen.nu/elsakfs/2026:27"
+    assert amendment_uri("PMFS 2020:5") == "https://lagen.nu/pmfs/2020:5"
+    assert amendment_uri("FFFS 2014:07") == "https://lagen.nu/fffs/2014:7"
+    assert amendment_uri(None) is None          # unreadable link text
+    assert amendment_uri("Ändringsregister") is None
+
+
+def test_parse_record_mints_amendment_uris_and_keeps_source_urls(tmp_path):
+    # no regulation PDF in the record -> hermetic; amendments must carry a
+    # minted uri (never "") and the agency's own link (previously dropped)
+    record = {"fs": "elsakfs", "basefile": "elsakfs/2013:10",
+              "identifier": "ELSÄK-FS 2013:10",
+              "files": {"amendment": [
+                  {"identifier": "ELSÄK-FS 2026:27", "url": "https://ex/a.pdf"},
+                  {"identifier": None, "url": "https://ex/b.pdf"}]}}
+    reg = parse_record(record, tmp_path)
+    known, unreadable = reg.amendments
+    assert known.identifier == "ELSÄK-FS 2026:27"
+    assert known.uri == "https://lagen.nu/elsakfs/2026:27"
+    assert known.url == "https://ex/a.pdf"
+    assert unreadable.identifier is None and unreadable.uri is None
+    assert unreadable.url == "https://ex/b.pdf"

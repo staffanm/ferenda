@@ -265,6 +265,17 @@ def parse_consolidation(path, identifier, fs, base_ars, base_lop, parser):
     return _structure(blocks[start:], parser), tom
 
 
+def amendment_uri(identifier):
+    """Mint an ändringsförfattning's uri from its printed designation
+    ("ELSÄK-FS 2026:27" -> https://lagen.nu/elsakfs/2026:27), or None when the
+    harvest couldn't read one. Minted from the identifier's *own* FS code --
+    an RPSFS base amended by PMFS acts is a normal mixed-prefix graph."""
+    m = RE_FS_REF.search(identifier or "")
+    if not m:
+        return None
+    return regulation_uri(_fs_key(m.group(1)), m.group(2), str(int(m.group(3))))
+
+
 def parse_record(record, root):
     """A harvested record (``<slug>.json``) -> a parsed :class:`Regulation`.
     The regulation body comes from the downloaded ``regulation`` PDF (or, if the
@@ -297,7 +308,9 @@ def parse_record(record, root):
             reg.consolidations.append(Consolidation(
                 of=reg.uri, konsolideradTom=tom, structure=cstruct))
     for am in files.get("amendment", []):
+        # the harvest record always carries both keys (harvest.py normalizes);
+        # identifier may be None (unreadable link text) -- the url still pins it
         reg.amendments.append(Amendment(
-            identifier=am.get("identifier", am.get("text", "")),
-            uri=am.get("uri", ""), beslutsdatum=None))
+            identifier=am["identifier"], uri=amendment_uri(am["identifier"]),
+            url=am["url"], beslutsdatum=None))
     return reg

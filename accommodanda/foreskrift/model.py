@@ -43,9 +43,12 @@ def regulation_uri(fs, arsutgava, lopnummer):
 class Amendment:
     """An ändringsförfattning: a later regulation that changes the base one.
     Captured as a reference (identity + its own PDF); its body, when we parse
-    it, is just another Regulation in its own right."""
-    identifier: str              # "FFFS 2026:27"
-    uri: str                     # https://lagen.nu/fffs/2026:27
+    it, is just another Regulation in its own right. `identifier`/`uri` are
+    None when the agency's link carried no readable designation (some PMFS
+    entries) -- the `url` still pins the reference to its source."""
+    identifier: str | None       # "FFFS 2026:27"
+    uri: str | None              # https://lagen.nu/fffs/2026:27, minted from identifier
+    url: str | None = None       # the agency's own link for the amendment
     file: str | None = None      # stored amendment PDF, if downloaded
     beslutsdatum: str | None = None
 
@@ -127,7 +130,7 @@ class Regulation:
                 for c in self.consolidations
             ],
             "amendments": [
-                {"identifier": a.identifier, "uri": a.uri,
+                {"identifier": a.identifier, "uri": a.uri, "url": a.url,
                  "beslutsdatum": a.beslutsdatum}
                 for a in self.amendments
             ],
