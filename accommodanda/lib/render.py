@@ -1688,6 +1688,7 @@ def render_aggregates(con, out_root, catalog_path):
     (out_root / "style.css").write_text(CSS)
     (out_root / "scrollspy.js").write_text(SCROLLSPY)
     (out_root / "search.js").write_text(SEARCH)
+    (out_root / "robots.txt").write_text(ROBOTS)
     (out_root / "index.html").write_text(render_index(con))
     client = _browse_client(catalog_path)
     try:
@@ -1697,6 +1698,15 @@ def render_aggregates(con, out_root, catalog_path):
             generate_browse(client, source, out_root)
     finally:
         api_service.app.dependency_overrides.pop(api_service.get_con, None)
+
+
+# ferenda.lagen.nu is the rebuilt site under construction, still a duplicate
+# of the production lagen.nu content -- keep it out of search indexes until
+# it's promoted (see also the X-Robots-Tag defense-in-depth in
+# docker/nginx/ferenda.lagen.nu.conf).
+ROBOTS = """User-agent: *
+Disallow: /
+"""
 
 
 CSS = """
