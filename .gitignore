@@ -22,11 +22,11 @@ __pycache__/
 /doc/_build/
 /data/
 /.direnv/
-# Ignore .claude/ contents, but version-control the shared hook + settings.
-# (settings.local.json, projects/, locks stay ignored as local-only.)
-/.claude/*
-!/.claude/hooks/
-!/.claude/settings.json
+# Version-control .claude/ (hooks, settings, agents, skills) except the
+# genuinely machine-local files: personal permission overrides and the
+# scheduler's runtime lock.
+/.claude/settings.local.json
+/.claude/scheduled_tasks.lock
 /.env
 /mediawiki-db-backup-230502/
 /mediawiki-html-backup-230502/
