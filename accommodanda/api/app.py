@@ -275,7 +275,7 @@ def search_endpoint(
             kept = [r for r in results if r["uri"] not in roots]
             total += sum(p["uri"] not in {r["uri"] for r in results} for p in pinned)
             results = (pinned + kept)[:limit]
-    return SearchResponse(query=q, total=total, results=results)  # ty: ignore[invalid-argument-type]
+    return SearchResponse(query=q, total=total, results=results)  # ty: ignore[invalid-argument-type]  # results are untyped hit dicts; pydantic validates at runtime
 
 
 @app.get("/api/v1/facets", response_model=FacetTree, tags=["catalog"])
@@ -324,9 +324,11 @@ def documents_endpoint(
     docs = []
     for uri, src, kind_, label, title, source_url, path, _display in \
             catalog.documents(con, source, kind, limit, offset):
-        p = Path(path)
+        # synthesized begrepp stubs have no artifact file (path=''); Path('')
+        # aliases to the cwd, so this must be excluded before the exists() check
+        p = Path(path) if path else None
         updated = (datetime.fromtimestamp(p.stat().st_mtime, timezone.utc).isoformat()
-                   if p.exists() else None)
+                   if p and p.exists() else None)
         docs.append(DocumentSummary(uri=uri, source=src, kind=kind_, label=label,
                                     title=title, source_url=source_url,
                                     updated=updated))
@@ -342,7 +344,9 @@ def document_endpoint(uri: str = Query(..., description="full lagen.nu document 
     if not row:
         raise HTTPException(404, "no document %r in the catalog" % uri)
     uri, source, kind, label, title, path = row
-    art = json.loads(Path(path).read_bytes() or b"{}")
+    # synthesized begrepp stubs are real catalog rows with no artifact file
+    # (path='') -- served as an empty artifact, like the rendered shell pages
+    art = json.loads(Path(path).read_bytes()) if path else {}
     return Document(uri=uri, source=source, kind=kind, label=label, title=title,
                     source_url=art.get("source_url"), artifact=art,
                     inbound_count=catalog.document_inbound_count(con, uri))

@@ -53,7 +53,9 @@ def client(tmp_path):
                                "pinpoint": "K3P1", "highlight": ["<em>%s</em>" % q]}]}]}
     api._index = FakeIndex()
 
-    yield TestClient(api.app)
+    client = TestClient(api.app)
+    client.catalog_path = cat            # for tests that add rows directly
+    yield client
     api.app.dependency_overrides.clear()
 
 
@@ -99,6 +101,24 @@ def test_documents_filter_and_paginate(client):
     assert page["documents"][0]["uri"] == "https://lagen.nu/2018:585"
 
 
+def test_documents_begrepp_stub_has_no_updated_timestamp(client):
+    # a synthesized begrepp stub (path='') must not report a plausible-looking
+    # but meaningless `updated` -- Path('') aliases to the server's cwd, so an
+    # unguarded p.exists()/p.stat() reports *something* rather than nothing
+    con = sqlite3.connect(client.catalog_path)
+    with con:
+        con.execute(
+            "INSERT INTO documents (uri, source, kind, label, title, path, "
+            " source_url, content_hash, expired, display) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?)",
+            ("https://lagen.nu/begrepp/Mord", "begrepp", "begrepp",
+             "Mord", "Mord", "", None, "x", None, "Mord"))
+    con.close()
+    body = client.get("/api/v1/documents", params={"source": "begrepp"}).json()
+    assert body["total"] == 1
+    assert body["documents"][0]["updated"] is None
+
+
 def test_document_returns_metadata_and_artifact(client):
     r = client.get("/api/v1/document",
                    params={"uri": "https://lagen.nu/1962:700"})
@@ -108,6 +128,26 @@ def test_document_returns_metadata_and_artifact(client):
     assert body["source_url"] == "https://example/bb"
     assert body["inbound_count"] == 1                  # cited by 2018:585
     assert body["artifact"]["structure"][0]["id"] == "K3P1"
+
+
+def test_document_begrepp_stub_served_with_empty_artifact(client):
+    # a synthesized begrepp stub is a real catalog row with no artifact file
+    # (path='', as minted by catalog.synthesize_concepts) -- /document must
+    # serve it as an empty artifact, not 500 on reading Path('')
+    con = sqlite3.connect(client.catalog_path)
+    with con:
+        con.execute(
+            "INSERT INTO documents (uri, source, kind, label, title, path, "
+            " source_url, content_hash, expired, display) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?)",
+            ("https://lagen.nu/begrepp/Mord", "begrepp", "begrepp",
+             "Mord", "Mord", "", None, "x", None, "Mord"))
+    con.close()
+    r = client.get("/api/v1/document",
+                   params={"uri": "https://lagen.nu/begrepp/Mord"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["label"] == "Mord" and body["artifact"] == {}
 
 
 def test_document_unknown_uri_404(client):
