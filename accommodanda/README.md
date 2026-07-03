@@ -86,11 +86,12 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 **forarbete vertical (preparatory works — prop/sou/ds/dir)**
 | File | What |
 |---|---|
-| `download.py` | regeringen.se harvester (`lagen forarbete download [prop\|sou\|…]`); basefile = the document's own identifier; a `source`-carrying import record is treated as absent so live always wins |
+| `download.py` | regeringen.se harvester (`lagen forarbete download [prop\|sou\|…]`); basefile = the document's own identifier; a `source`-carrying import record is treated as absent so live always wins; `pm` (promemorior outside the Ds series, category 1325 shared with `ds`) keys by diarienummer when the listing shows one, else the landing-page slug |
 | `model.py` / `structure.py` / `parse.py` | `Forarbete` model, PDF (font-aware `pdftohtml`, or `pdftotext` fallback for OCR-layer scans) / html → nested structure → citation-scanned artifact; `_legacy_body` prefers a re-OCR sidecar at `layout.fa_ocr_pdf` |
 | `legacy.py` | one-time import of the nine frozen förarbete corpora (`lagen forarbete import-legacy <corpus>`, §7g) — shared precedence core; regeringen-era + KB corpora entries-driven, the TRIPS family (proptrips/dirtrips/dirasp) walked downloaded-first (path-derived basefile, ~half their entries are null) |
 | `legacy_formats.py` | frozen body adapters — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML (`abbyy_pages`), scanned-PDF OCR text (`scanned_pdf_pages`), TRIPS `div.body-text` (`trips_paras`) |
-| `kommentar.py` / `genomforande.py` | författningskommentar → `implements` (EU directive article) edges |
+| `riksdagen.py` | downloader for utskottsbetänkanden (`bet`, the prop→enacted-law link) off the data.riksdagen.se dokumentlista JSON feed; PDF-only bodies (printed page = citation anchor); basefile `"<rm>:<beteckning>"` matching the FORARBETEN grammar's bet URIs; full backfill walks all 161 riksmöten (the API caps one query's pagination at ~10k docs); no frozen legacy corpus |
+| `kommentar.py` / `genomforande.py` | författningskommentar → `implements` (EU directive article) edges; extracted from `prop` and `fm` (förordningsmotiv) documents — both accompany the final enacted text, unlike a lagrådsremiss/SOU/Ds |
 
 **avg vertical (JO + JK + ARN myndighetsavgöranden)**
 | File | What |
@@ -348,7 +349,8 @@ site/data/domstol/downloaded/                 # DV new-API harvest (per court)
 site/data/dv/{downloaded,intermediate}/       # DV legacy feed (.doc/.docx + old XML)
 site/data/dv/identity-index.json              # canonical case -> source records
 site/data/avg/downloaded/{jo,jk,arn}/         # JO/JK/ARN records (+ jo/arn PDFs, jk landing html)
-site/data/forarbete/downloaded/<type>/        # regeringen.se harvest + frozen-import records
+site/data/forarbete/downloaded/<type>/        # regeringen.se harvest + frozen-import records (prop/sou/ds/pm/dir/fm/skr/so/lr)
+site/data/forarbete/downloaded/bet/           # data.riksdagen.se harvest (utskottsbetänkanden; record json + PDF, no HTML landing page)
 site/data/forarbete/ocr/<type>/               # optional re-OCR sidecar PDFs (win over frozen scans)
 site/data/remisser/cases/                     # regeringen.se remiss case records (Remiss json)
 site/data/remisser/downloaded/<case-slug>/    # per-organisation answer PDFs
