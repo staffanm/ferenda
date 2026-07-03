@@ -2,8 +2,15 @@
 
 import json
 
-from accommodanda.forarbete.download import (_has_live_record, basefile_slug,
-                                             find_content_links, parse_listing)
+import requests
+
+from accommodanda.forarbete import download
+from accommodanda.forarbete.download import (
+    _has_live_record,
+    basefile_slug,
+    find_content_links,
+    parse_listing,
+)
 from accommodanda.lib.util import record_path, write_atomic
 
 # the real regeringen.se listing-item shape: ul.list--block > li >
@@ -151,3 +158,28 @@ def test_has_live_record_treats_import_as_absent(tmp_path):
                  json.dumps({"type": "prop", "source": "proptrips", "legacy_files": []}))
     assert _has_live_record(tmp_path, "prop", "1997/98:45") is False
     assert _has_live_record(tmp_path, "prop", "1867:23") is False   # truly absent
+
+
+def test_incremental_error_drops_the_types_complete_marker(monkeypatch, tmp_path):
+    # marker invariant: a new doc that fails during an incremental walk sits
+    # behind successfully stored newer ones, so the next stop-at-known walk
+    # would never reach it again -- the type's .complete marker must go so the
+    # next run backfills the gap.
+    marker = tmp_path / "prop" / ".complete"
+    marker.parent.mkdir(parents=True)
+    marker.write_text("")
+    item = {"type": "prop", "basefile": "2025/26:999",
+            "identifier": "Prop. 2025/26:999", "title": "En ny lag",
+            "date": "2026-01-01", "url": "https://www.regeringen.se/x/",
+            "slug": "x"}
+    monkeypatch.setattr(download, "make_session", lambda ua: None)
+    monkeypatch.setattr(download, "iter_listing",
+                        lambda session, typ, delay: iter([([item], 1, 1)]))
+
+    def failing_download(session, root, item, delay):
+        raise requests.HTTPError("500 Server Error")
+
+    monkeypatch.setattr(download, "download_document", failing_download)
+    totals = download.sync(tmp_path, types=["prop"], delay=0)
+    assert totals["prop"] == (1, 0)      # the failure was counted, not raised
+    assert not marker.exists()           # marker dropped -> next run backfills

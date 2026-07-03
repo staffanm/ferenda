@@ -64,6 +64,7 @@ from .forarbete import genomforande as fa_genomforande
 from .forarbete import kommentar as fa_kommentar
 from .forarbete import legacy as fa_legacy
 from .forarbete import parse as fa_parse
+from .forarbete import riksdagen as fa_riksdagen
 from .foreskrift import download as foreskrift_download
 from .foreskrift import harvest as foreskrift_harvest_mod
 from .foreskrift import legacy as foreskrift_legacy
@@ -331,6 +332,7 @@ class RunOptions:
     lang: str | None = None      # eurlex: comma-separated languages
     source: str = "sparql"       # eurlex: discovery backend (sparql|soap)
     only: str | None = None      # forarbete: fetch a single document
+    riksmote: str | None = None  # forarbete bet: narrow the harvest to one riksmöte
     limit: int | None = None     # import-legacy (avg/forarbete): cap the run (a slice)
 
 
@@ -807,22 +809,40 @@ def fa_list():
 
 
 def fa_harvest(scopes):
-    """Bulk harvest of regeringen.se (the old download_new). `scopes` narrows it
-    to the named doctypes (prop/sou/ds/...); empty = all. `--only BASEFILE`
-    (with exactly one scope) fetches just that one document, walking the listing
-    until it is found."""
+    """Bulk harvest of preparatory works. Most doctypes come from regeringen.se
+    (the old download_new); `bet` (utskottsbetänkanden) comes from
+    data.riksdagen.se via a separate downloader. `scopes` narrows to the named
+    doctypes (prop/sou/ds/bet/...); empty = all. `--only BASEFILE` (with exactly
+    one regeringen scope) fetches just that one document, walking the listing
+    until it is found (regeringen types only -- bet has no --only).
+    `--riksmote YYYY/YY` (with exactly the bet scope) narrows the bet harvest
+    to one riksmöte -- a dev/manual slice that never marks the corpus complete."""
     if RUN.only and len(scopes) != 1:
         sys.exit("forarbete --only needs exactly one doctype, e.g. "
                  "`lagen forarbete download prop --only 2025/26:28`")
+    do_bet = "bet" in scopes if scopes else True
+    reg_scopes = [s for s in scopes if s != "bet"]
+    do_reg = bool(reg_scopes) or not scopes   # empty scopes = all regeringen types
+    if RUN.only and do_bet:
+        sys.exit("forarbete --only is not supported for bet "
+                 "(data.riksdagen.se); use a full or incremental download")
+    if RUN.riksmote and (do_reg or not do_bet):
+        sys.exit("forarbete --riksmote needs exactly the bet scope, e.g. "
+                 "`lagen forarbete download bet --riksmote 2025/26`")
     if RUN.dry_run:
         print("forarbete download: would harvest %s into %s"
               % (RUN.only or ", ".join(scopes) or "all types",
                  layout.FA_DOWNLOADED))
         return
-    totals = fa_download.sync(str(layout.FA_DOWNLOADED), types=scopes or None,
-                              full=RUN.force, only=RUN.only)
-    for typ, (seen, new) in totals.items():
-        print("forarbete %s: %d seen, %d new" % (typ, seen, new))
+    if do_reg:
+        totals = fa_download.sync(str(layout.FA_DOWNLOADED), types=reg_scopes or None,
+                                  full=RUN.force, only=RUN.only)
+        for typ, (seen, new) in totals.items():
+            print("forarbete %s: %d seen, %d new" % (typ, seen, new))
+    if do_bet:
+        seen, new = fa_riksdagen.sync(str(layout.FA_DOWNLOADED), full=RUN.force,
+                                      riksmote=RUN.riksmote)
+        print("forarbete bet: %d seen, %d new" % (seen, new))
 
 
 def fa_parse_run(basefile):
@@ -869,9 +889,12 @@ SOURCES["forarbete"] = Source("forarbete", fa_list, {
     "parse": Stage("parse", fa_parse_run, fa_artifact,
                    inputs=fa_parse_inputs, code=FA_CODE),
 }, harvest=fa_harvest, origin=_origin(fa_download.BASE),
-   scopes=frozenset(fa_download.TYPES),
+   scopes=frozenset(fa_download.TYPES) | {"bet"},
    actions={"import-legacy": fa_import_legacy},
-   notes="download flag: --only BASEFILE (fetch one document; needs one scope)\n"
+   notes="download flag: --only BASEFILE (fetch one document; needs one "
+         "regeringen scope)\n"
+         "download flag: --riksmote YYYY/YY (narrow the bet harvest to one "
+         "riksmöte; needs the bet scope, never marks the corpus complete)\n"
          "import-legacy {%s} [<path>]: one-time import of a frozen förarbete "
          "corpus (--limit N caps it; --force re-imports)" % FA_LEGACY_CORPORA)
 
@@ -2075,6 +2098,9 @@ def main(argv=None):
     p.add_argument("--only", metavar="BASEFILE",
                    help="forarbete download: fetch just this one document "
                         "(needs exactly one doctype scope)")
+    p.add_argument("--riksmote", metavar="YYYY/YY",
+                   help="forarbete download bet: narrow the harvest to one "
+                        "riksmöte, e.g. 2025/26 (bet scope only)")
     p.add_argument("--limit", type=int, metavar="N",
                    help="import-legacy (avg/forarbete): import at most N "
                         "documents (a test slice)")
@@ -2085,6 +2111,7 @@ def main(argv=None):
     RUN.aggregates_only = args.aggregates_only
     RUN.since, RUN.lang, RUN.source = args.since, args.lang, args.discovery
     RUN.only = args.only
+    RUN.riksmote = args.riksmote
     RUN.limit = args.limit
     # the parallelisable steps default to all cores; -j1 serialises
     jobs = args.jobs if args.jobs is not None else (os.cpu_count() or 1)
