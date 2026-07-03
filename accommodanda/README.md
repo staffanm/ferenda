@@ -1,10 +1,11 @@
 # accommodanda — developer setup
 
-The rebuilt ferenda pipeline: vertical source pipelines (SFS, DV) that go
-from downloaded source files to a typed document model and a JSON artifact,
-with the citation engine as a shared library. For *why* it's shaped this
-way and what's done vs. pending, read [`../REWRITE.md`](../REWRITE.md);
-this file is just how to get it running.
+The rebuilt ferenda pipeline: vertical source pipelines (sfs, dv, eurlex,
+forarbete, foreskrift, avg, wiki) that go from downloaded source files to a
+typed document model and a JSON artifact, with the citation engine as a
+shared library. For *why* it's shaped this way and what's done vs.
+pending, read [`../REWRITE.md`](../REWRITE.md); this file is just how to
+get it running.
 
 ## Prerequisites
 
@@ -66,6 +67,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | File | What |
 |---|---|
 | `lagrum.py` | Lark/Earley engine; `LagrumParser(parse_types=…)` composes a grammar from LAGRUM / KORTLAGRUM / EULAGSTIFTNING / RATTSFALL / FORARBETEN / … |
+| `legacy_import.py` | shared §7g frozen-import core — `should_write` precedence (live-wins / own-import-idempotent-unless-force / optional `better()` tie-break), `rel` (in-place LEGACY_ROOT-relative body references), `iter_entries`/`docdir`/`read_record` walk primitives; used by `forarbete/legacy.py`, `foreskrift/legacy.py`, `avg/legacy.py` |
 
 **DV vertical (court decisions)**
 | File | What |
@@ -80,20 +82,31 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `word.py` | **legacy path** — POI (HWPF/XWPF) → flat `(text, bold, in_table)` stream |
 | `legacy.py` | legacy stream → head/body split → `Avgorande` |
 
-**avg vertical (JO + JK myndighetsavgöranden)**
+**forarbete vertical (preparatory works — prop/sou/ds/dir)**
+| File | What |
+|---|---|
+| `download.py` | regeringen.se harvester (`lagen forarbete download [prop\|sou\|…]`); basefile = the document's own identifier; a `source`-carrying import record is treated as absent so live always wins |
+| `model.py` / `structure.py` / `parse.py` | `Forarbete` model, PDF (font-aware `pdftohtml`, or `pdftotext` fallback for OCR-layer scans) / html → nested structure → citation-scanned artifact; `_legacy_body` prefers a re-OCR sidecar at `layout.fa_ocr_pdf` |
+| `legacy.py` | one-time import of the nine frozen förarbete corpora (`lagen forarbete import-legacy <corpus>`, §7g) — shared precedence core; regeringen-era + KB corpora entries-driven, the TRIPS family (proptrips/dirtrips/dirasp) walked downloaded-first (path-derived basefile, ~half their entries are null) |
+| `legacy_formats.py` | frozen body adapters — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML (`abbyy_pages`), scanned-PDF OCR text (`scanned_pdf_pages`), TRIPS `div.body-text` (`trips_paras`) |
+| `kommentar.py` / `genomforande.py` | författningskommentar → `implements` (EU directive article) edges |
+
+**avg vertical (JO + JK + ARN myndighetsavgöranden)**
 | File | What |
 |---|---|
 | `model.py` | `Beslut` model; URI = `avg/{org}/{dnr}`, byte-identical to what MYNDIGHETSBESLUT citations mint |
-| `download.py` | JO harvester (jo.se WordPress admin-ajax search API + decision PDFs) and JK harvester (jk.se listing → per-decision landing pages); `jk_canonical` dnr normalization |
-| `parse.py` | JO: PDF body via `lib/pdftext` (bold rubriker, "Beslutet i korthet" abstract); JK: landing-page `div.content` (strong→section, em→subsection); both citation-scanned with the DV parse-type set |
+| `download.py` | JO harvester (jo.se WordPress admin-ajax search API + decision PDFs), JK harvester (jk.se listing → per-decision landing pages; `jk_canonical` dnr normalization) and ARN harvester (arn.se one-page vägledande-beslut listing → decision PDFs; a live record overwrites a frozen-import one) |
+| `legacy.py` | one-time import of the frozen ARN corpus 1991–2022 (`lagen avg import-legacy arn <tree>`, §7g) — fragment.html metadata, magic-sniffed bodies converted to PDF via soffice |
+| `parse.py` | JO/ARN: PDF body via `lib/pdftext` (bold rubriker; JO's "Beslutet i korthet" abstract); JK: landing-page `div.content` (strong→section, em→subsection); all citation-scanned with the DV parse-type set |
 
 **foreskrift vertical (agency regulations)**
 | File | What |
 |---|---|
-| `agencies.py` | the data registry driving one shared harvest engine — 17 författningssamlingar registered so far, no per-agency pipelines (~100 agencies share a few publishing architectures) |
+| `agencies.py` | the data registry driving one shared harvest engine — 17 live författningssamlingar + 4 frozen-only (skvfs/rsfs, sosfs/hslffs, §7g), no per-agency pipelines (~100 agencies share a few publishing architectures) |
 | `harvest.py` | the shared harvest engine (enumerate → resolve → fetch per architecture) |
-| `download.py` | the `lagen foreskrift download` front over the engine (`--full`, `--only`) |
-| `model.py` / `structure.py` / `parse.py` | as-published `Foreskrift` model, PDF → statute-shaped structure → artifact |
+| `download.py` | the `lagen foreskrift download` front over the engine (`--full`, `--only`; frozen-only fs are a logged no-op) |
+| `legacy.py` | one-time import of the two harvest-blocked corpora (`lagen foreskrift import-legacy {skvfs\|sosfs}`) — frozen bytes referenced in place (§7g) |
+| `model.py` / `structure.py` / `parse.py` | as-published `Foreskrift` model, PDF → statute-shaped structure → artifact (`parse.body_path` resolves a frozen-import body under LEGACY_ROOT) |
 
 **Service layer**: `api/app.py` is the REST/OpenAPI service (search, documents,
 citation graph, version history + diff) that also serves the static site under
@@ -148,10 +161,10 @@ The DV parsers are driven by the identity index: each canonical case is
 parsed from its single best source — the API record when present, the
 legacy Word original otherwise (no cross-source merge; see REWRITE.md §4).
 
-**avg — JO + JK decisions** (operates on `site/data/avg/`):
+**avg — JO + JK + ARN decisions** (operates on `site/data/avg/`):
 
 ```sh
-uv run python -m accommodanda.build avg download        # both organs; or: … download jo
+uv run python -m accommodanda.build avg download        # all three organs; or: … download jo
 uv run python -m accommodanda.build avg parse           # incremental, like every source
 uv run python -m accommodanda.build avg download jo --only jo/2340-2025   # one decision
 ```
@@ -310,8 +323,15 @@ site/data/sfs/archive/{downloaded,artifact}/  # superseded consolidations, raw +
 site/data/domstol/downloaded/                 # DV new-API harvest (per court)
 site/data/dv/{downloaded,intermediate}/       # DV legacy feed (.doc/.docx + old XML)
 site/data/dv/identity-index.json              # canonical case -> source records
-site/data/avg/downloaded/{jo,jk}/             # JO/JK records (+ jo PDFs, jk landing html)
+site/data/avg/downloaded/{jo,jk,arn}/         # JO/JK/ARN records (+ jo/arn PDFs, jk landing html)
+site/data/forarbete/downloaded/<type>/        # regeringen.se harvest + frozen-import records
+site/data/forarbete/ocr/<type>/               # optional re-OCR sidecar PDFs (win over frozen scans)
 ```
+
+The frozen legacy corpora (REWRITE.md §7g) are NOT under `site/data/`: import
+records reference their body files in place under `legacy_root` (config.yml;
+defaults to the sibling `../ferenda.old/data`) — moving those trees means
+updating that one key, never rewriting records.
 
 ## Production deployment (Docker)
 
