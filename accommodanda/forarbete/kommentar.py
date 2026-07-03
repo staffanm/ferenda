@@ -7,11 +7,20 @@ is a *genomför* (implements) relation, stronger than a bare reference: it ties 
 Swedish provision to the exact EU-law article it transposes, which is the
 machine-readable mapping that otherwise only exists as ad-hoc tables.
 
-Implementation relations are authoritative only in a *proposition*: the bill
-text is the version closest to the enacted law, whereas the structure a
-lagrådsremiss/SOU/Ds proposes is still renumbered and revised (on Lagrådet's and
-the remiss bodies' feedback) before enactment. So `extract` extracts only from
-props; the commentary of other förarbete types is ignored.
+Implementation relations are authoritative when the commentary accompanies the
+*final* text of the enactment. That holds for a *proposition* (the bill text is
+the version closest to the enacted law) and for a *förordningsmotiv* (`fm`) --
+the regeringen publishes förordningsmotiv alongside the förordning it has just
+enacted, so an fm's "Förordningen genomför … direktivet" statement is as
+authoritative as a prop's. It does NOT hold for a lagrådsremiss/SOU/Ds, whose
+proposed structure is still renumbered and revised (on Lagrådet's and the remiss
+bodies' feedback) before enactment. So `extract` extracts from props and
+förordningsmotiv (`{"prop", "fm"}`); the commentary of other förarbete types is
+ignored. A förordningsmotiv writes its författningskommentar at heading level 3
+(prop props it at level 1) and names its förordning in the leading title rubriks
+rather than a "Förslaget till lag om ändring i…" level-2 heading, so the fm
+branch locates the section at any level and reads the law context from the
+title.
 
 This module extracts those statements:
 
@@ -47,10 +56,15 @@ from .structure import flatten
 # "Paragrafen genomför [delvis] artikel(n/na) <refs> i <directive>"; the article
 # block is captured loosely (digits, dots, letters, ranges, "och"/"samt"/commas)
 # up to " i <name>direktivet" -- note article numbers contain dots, so we do not
-# split on '.'
+# split on '.'. "Förordningen" is in the subject set for *all* types (unlike the
+# per-type SUBJECT_RES): a prop commentary sentence "Förordningen genomför
+# artikel …" is vanishingly rare, and when it does occur it is a true implements
+# statement about the förordning under discussion -- and the match only yields a
+# row tied to its own sentence, whereas a stray SUBJECT_RES match would skew the
+# document-wide default-directive vote.
 IMPLEMENTS_RE = re.compile(
     r"(?P<subject>Paragrafen|Paragraferna|Bestämmelsen|Lagförslaget|"
-    r"Ändringen|Punkten)\w*\s+(?:[a-zåäö ]*?\s)?"
+    r"Förordningen|Ändringen|Punkten)\w*\s+(?:[a-zåäö ]*?\s)?"
     r"genomför(?:s|t)?\s+(?P<partial>delvis\s+)?"
     r"(?:artikel|artiklarna)\s+(?P<refs>[0-9][0-9.,‐-―\- a-zåäö]*?)"
     r"\s+i\s+(?P<dir>(?:[A-Za-zÅÄÖåäö0-9./()‐-―\- ]*?)?direktivet)",
@@ -64,14 +78,24 @@ ARTICLE_RE = re.compile(r"(\d+(?:\.\d+)*)\s*([a-z])?", re.IGNORECASE)
 # direktivet)". The alias binds to the subject (first) directive of the sentence.
 ALIAS_RE = re.compile(r"\(([^()]*?direktivet)\)")
 
-# a law-level statement of what the *statute* transposes: "(Genom) lag(en)/
-# lagförslaget genomför(s) [delvis] … direktiv (EU) 2015/2302 …". The first
-# directive cited after it is the proposition's subject directive -- the
-# authoritative fallback for a bare "direktivet" when (as is normal for a single-
-# directive prop) the directive is never given a parenthetical alias. Beats a
-# raw citation count, which a repealed predecessor directive can dominate.
-SUBJECT_RE = re.compile(
-    r"\b(?:lag|lagen|lagförslaget)\b[^.]*?genomför(?:s|t)?\b", re.IGNORECASE)
+# a document-level statement of what the enactment transposes: "(Genom) lag(en)/
+# lagförslaget genomför(s) [delvis] … direktiv (EU) 2015/2302 …" in a prop,
+# "(Genom) förordningen genomförs …" in a förordningsmotiv. The first directive
+# cited after it is the document's subject directive -- the authoritative
+# fallback for a bare "direktivet" when (as is normal for a single-directive
+# document) the directive is never given a parenthetical alias. Beats a raw
+# citation count, which a repealed predecessor directive can dominate. The
+# subject vocabulary is *per document type*: a prop speaks of its lag(förslag),
+# an fm of its förordning -- "förordningen" stays out of the prop pattern
+# because a prop sentence about some other förordning ("… förordningen …
+# genomförs …") would otherwise cast a vote on the prop's document-wide default.
+_GENOMFOR = r"\b[^.]*?genomför(?:s|t)?\b"
+SUBJECT_RES = {
+    "prop": re.compile(r"\b(?:lag|lagen|lagförslaget)" + _GENOMFOR,
+                       re.IGNORECASE),
+    "fm": re.compile(r"\b(?:förordning|förordningen)" + _GENOMFOR,
+                     re.IGNORECASE),
+}
 
 
 def plain(runs):
@@ -98,26 +122,57 @@ def _first_directive(parser, text):
                  if is_directive(r.uri)), None)
 
 
-def resolve_directives(blocks, parser):
-    """Map each directive alias used in the proposition to a CELEX uri, plus a
-    'default' for a bare "direktivet". A defining sentence is one ending in
+# a sentence boundary: '.'/'!'/'?' followed by whitespace and an uppercase
+# sentence start. Legal prose is dense with dotted abbreviations and neither
+# signal suffices alone: the uppercase requirement filters the open-ended
+# citation abbreviations ("jfr prop. 2014/15:128 s. 12", "art. 5"), which are
+# followed by digits -- no lookbehind set could enumerate them all -- while the
+# closed set of prose abbreviations ("bl.a.", "t.ex.", "s.k.", "dvs.", "m.m.",
+# "m.fl.", "resp.", "o.s.v.") routinely precedes proper nouns ("bl.a.
+# Europaparlamentets …") and so needs the explicit negative lookbehinds.
+# Directive numbers ("2009/147/EG") and CELEX cites ("C:2018:255") carry no
+# terminator-space-uppercase run, so they never split.
+SENTENCE_SEP_RE = re.compile(
+    r"(?<!\bbl\.a)(?<!\bt\.ex)(?<!\bs\.k)(?<!\bdvs)(?<!\bm\.m)(?<!\bm\.fl)"
+    r"(?<!\bresp)(?<!o\.s\.v)"
+    r"[.!?]\s+(?=[A-ZÅÄÖ])")
+
+
+def _sentence_start(text, pos):
+    """Index of the start of the sentence that contains `pos` -- the char after
+    the last sentence terminator before `pos`, or 0. Scoping the alias lookback
+    to its defining sentence (rather than a fixed char window) keeps a long
+    "senast ändrat genom <amendment list>" clause from pushing the window past
+    the subject directive it should bind to."""
+    ends = [m.end() for m in SENTENCE_SEP_RE.finditer(text, 0, pos)]
+    return ends[-1] if ends else 0
+
+
+def resolve_directives(blocks, parser, typ="prop"):
+    """Map each directive alias used in the document (a proposition or
+    förordningsmotiv) to a CELEX uri, plus a 'default' for a bare "direktivet".
+    A defining sentence is one ending in
     "(<alias>direktivet)"; the alias binds to its first *directive* citation (the
     subject), not the acts it amends/repeals and not a co-cited regulation
     (which can never be the subject of a "genomför" statement).
 
-    The 'default' is the directive the statute transposes, named in a law-level
-    "lag(en) genomför(s) … direktiv X" statement (SUBJECT_RE) -- the reliable
-    subject signal when, as for a single-directive prop, the directive is never
-    aliased. Failing that it falls back to the dominant aliased directive."""
+    The 'default' is the directive the enactment transposes, named in a
+    document-level "lag(en)/förordningen genomför(s) … direktiv X" statement
+    (SUBJECT_RES[typ], the subject vocabulary of the document type) -- the
+    reliable subject signal when, as for a single-directive document, the
+    directive is never aliased. Failing that it falls back to the dominant
+    aliased directive."""
+    subject_re = SUBJECT_RES[typ]
     aliases = {}
     subjects = []
     for b in blocks:
         text = plain(b["text"])
         for m in ALIAS_RE.finditer(text):
-            uri = _first_directive(parser, text[max(0, m.start() - 400):m.end()])
+            uri = _first_directive(parser,
+                                   text[_sentence_start(text, m.start()):m.end()])
             if uri:
                 aliases[m.group(1).lower()] = uri           # subject directive
-        for m in SUBJECT_RE.finditer(text):
+        for m in subject_re.finditer(text):
             uri = _first_directive(parser, text[m.start():m.end() + 200])
             if uri:
                 subjects.append(uri)
@@ -175,9 +230,26 @@ def directive_uri(name, aliases):
     return aliases.get("default")    # bare "direktivet" / unrecognised alias
 
 
-def find_kommentar(blocks):
-    """The block index range [start, end) of the författningskommentar section
-    (its level-1 heading to the next level-1 heading), or None."""
+def find_kommentar(blocks, any_level=False):
+    """The block index range [start, end) of the författningskommentar section,
+    or None. In a proposition the section is a level-1 chapter, bounded by the
+    next level-1 heading. A förordningsmotiv (`any_level`) writes it at heading
+    level 3 (unnumbered), and its own kapitel/paragraf subheadings share that
+    level, so the section runs from the heading to the next heading of a
+    *shallower* level -- in practice to the end of the document, förordningsmotiv
+    put the commentary last."""
+    if any_level:
+        start = next((i for i, b in enumerate(blocks)
+                      if b["type"] == "rubrik"
+                      and "författningskommentar" in plain(b["text"]).lower()),
+                     None)
+        if start is None:
+            return None
+        level = blocks[start].get("level") or 1
+        end = next((i for i in range(start + 1, len(blocks))
+                    if blocks[i]["type"] == "rubrik"
+                    and (blocks[i].get("level") or 1) < level), len(blocks))
+        return start, end
     start = next((i for i, b in enumerate(blocks)
                   if b["type"] == "rubrik" and (b.get("level") or 1) == 1
                   and "författningskommentar" in plain(b["text"]).lower()), None)
@@ -189,27 +261,67 @@ def find_kommentar(blocks):
     return start, end
 
 
+# the förordning a förordningsmotiv concerns, named in its leading title rubriks
+# (there is no prop-style "Förslaget till lag om ändring i…" level-2 heading):
+# the title wraps over as many rubriks as the layout needs -- "Förordning" +
+# "om ändring i X (NNNN:NN)" (Fm 2022:5), a single "X-förordning" (Fm 2025:1),
+# or a long name split at the line break (Fm 2026:1 "Förordning om omfattning av
+# tiden för lärares och" + "förskollärares undervisningsuppdrag").
+FM_TITLE_RE = re.compile(r"förordning", re.IGNORECASE)
+
+# the document-type label heading the title rubriks: a bare "Förordningsmotiv",
+# or the label fused into the title itself ("Förordningsmotiv om förordning om
+# ändring i X (NNNN:NN)"). Stripped as a *prefix*, not skipped as a whole rubrik:
+# in the fused form the post-label remainder is exactly the förordning name, and
+# dropping the whole rubrik would leave no law at all.
+FM_LABEL_RE = re.compile(r"^förordningsmotiv\b(?:\s+(?:om|för)\b)?\s*",
+                         re.IGNORECASE)
+
+
+def fm_law(blocks):
+    """The förordning a förordningsmotiv comments on, assembled from its leading
+    title rubriks -- only the rubriks *before the first non-rubrik block*, so an
+    in-body heading that mentions "förordning" can never win -- and fed to
+    `sfs_number`/`proposed_name` like a prop's level-2 rubrik. Each leading
+    rubrik has the doc-type label stripped by prefix (a bare "Förordningsmotiv"
+    strips to nothing and drops out); the remainders are joined, rejoining a
+    title the layout wrapped over several rubriks. Returns the joined title, or
+    None when it does not name a förordning."""
+    parts = []
+    for b in blocks:
+        if b["type"] != "rubrik":
+            break
+        t = FM_LABEL_RE.sub("", plain(b["text"]).strip())
+        if t:
+            parts.append(t)
+    law = " ".join(parts)
+    return law if FM_TITLE_RE.search(law) else None
+
+
 def extract(art):
-    """Implements relations stated in a proposition artifact's
+    """Implements relations stated in a proposition's or förordningsmotiv's
     författningskommentar, each tied to the paragraf it comments on. The
     paragraf is tracked from the font-derived `kapitel`/`paragraf` structure
     blocks the parser emits. Records: {predicate, directive, articles,
     pinpoints, uris, partial, law, chapter, paragraf, sentence, page}.
 
-    Only a proposition is authoritative for these relations -- the bill text is
-    closest to the enacted law, while a lagrådsremiss/SOU/Ds still has its
-    provisions renumbered and revised before enactment -- so the commentary of
-    any other förarbete type yields nothing."""
-    if art.get("type") != "prop":
+    Only the commentary that accompanies the final enactment is authoritative --
+    a proposition (bill text closest to the enacted law) or a förordningsmotiv
+    (published alongside the enacted förordning) -- while a lagrådsremiss/SOU/Ds
+    still has its provisions renumbered and revised before enactment, so the
+    commentary of any other förarbete type yields nothing."""
+    typ = art.get("type")
+    if typ not in {"prop", "fm"}:
         return []
     blocks = flatten(art["structure"])      # document-order flat view of the tree
-    span = find_kommentar(blocks)
+    span = find_kommentar(blocks, any_level=typ == "fm")
     if span is None:                      # no författningskommentar (most types)
         return []
     parser = _refparser()
-    aliases = resolve_directives(blocks, parser)
+    aliases = resolve_directives(blocks, parser, typ)
     out = []
-    law = chapter = paragraf = None
+    chapter = paragraf = None
+    law = fm_law(blocks) if typ == "fm" else None   # fm names its förordning up top
     for i in range(*span):
         b = blocks[i]
         text = plain(b["text"])
