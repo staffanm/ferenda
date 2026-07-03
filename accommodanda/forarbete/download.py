@@ -50,7 +50,13 @@ from bs4 import BeautifulSoup
 
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session
-from ..lib.util import Reporter, basefile_slug, record_path, write_atomic
+from ..lib.util import (
+    Reporter,
+    basefile_slug,
+    document_extension,
+    record_path,
+    write_atomic,
+)
 
 BASE = "https://www.regeringen.se"
 FILTER = (BASE + "/Filter/GetFilteredItems?lang=sv&filterType=Taxonomy"
@@ -77,22 +83,6 @@ TYPES = {
 # only in the link text, "… (pdf 2 MB)"), so a suffix filter misses those and the
 # document is read from the served bytes instead -- see document_extension.
 CONTENT_HREF = re.compile(r"/(?:contentassets|globalassets)/", re.IGNORECASE)
-
-
-def document_extension(data):
-    """The file extension for a downloaded document, read from its leading magic
-    bytes (the URL suffix is unreliable; the served bytes are not). None when the
-    bytes are not a document we keep -- so a non-document /contentassets/ asset
-    (an image, an HTML error page) is skipped rather than stored."""
-    if data[:4] == b"%PDF":
-        return ".pdf"
-    if data[:4] == b"PK\x03\x04":          # zip container -> Office Open XML
-        return ".docx"
-    if data[:4] == b"\xd0\xcf\x11\xe0":    # OLE compound document -> legacy .doc
-        return ".doc"
-    if data[:5] == b"{\\rtf":
-        return ".rtf"
-    return None
 
 
 def fetch(session, url, timeout=60):
@@ -213,6 +203,16 @@ def download_document(session, root, item, delay):
 # harvest
 # --------------------------------------------------------------------------
 
+def _has_live_record(root, typ, basefile):
+    """Whether a *live-harvest* record already exists for this document. A frozen
+    import record (§7g -- it carries a `source` key) is treated as absent, for two
+    reasons: live always wins, so the downloader must fetch its better copy and
+    overwrite the import; and a legacy record must not trip the newest-first
+    incremental stop (`done = True`) as if the corpus were already caught up."""
+    recpath = record_path(root, typ, basefile)
+    return recpath.exists() and "source" not in json.loads(recpath.read_text())
+
+
 def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
          only=None):
     """Harvest the named types (default all).
@@ -243,7 +243,7 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
                     download_document(session, root, item, delay)
                     new, done = 1, True
                     break
-                if record_path(root, typ, item["basefile"]).exists():
+                if _has_live_record(root, typ, item["basefile"]):
                     if not backfill:
                         done = True   # newest-first => everything after is older
                         break

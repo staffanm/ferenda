@@ -47,8 +47,9 @@ def nest(blocks):
             m = RE_LEAD_NUM.match(runs_text(b["text"]))
             num = m.group(1) if m else None
             node = {"type": "avsnitt", "id": _section_id(num, counter, seen),
-                    "level": level, "text": b["text"], "page": b.get("page"),
-                    "children": []}
+                    "level": level, "text": b["text"], "children": []}
+            if b.get("page") is not None:   # a page-less (text/tml) body omits page
+                node["page"] = b["page"]
             if num:
                 node["num"] = num
             while stack and stack[-1]["level"] >= level:
@@ -68,7 +69,9 @@ def flatten(structure):
     for node in structure:
         if node.get("type") == "avsnitt":
             head = {"type": "rubrik", "level": node.get("level"),
-                    "text": node["text"], "page": node.get("page")}
+                    "text": node["text"]}
+            if node.get("page") is not None:
+                head["page"] = node["page"]
             if "num" in node:
                 head["num"] = node["num"]
             out.append(head)

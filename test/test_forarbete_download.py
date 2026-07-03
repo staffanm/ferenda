@@ -1,7 +1,10 @@
 """Tests for the förarbete downloader's parsing (network-free)."""
 
-from accommodanda.forarbete.download import (basefile_slug, find_content_links,
-                                             parse_listing)
+import json
+
+from accommodanda.forarbete.download import (_has_live_record, basefile_slug,
+                                             find_content_links, parse_listing)
+from accommodanda.lib.util import record_path, write_atomic
 
 # the real regeringen.se listing-item shape: ul.list--block > li >
 # div.sortcompact > a (link text = "Title, <Identifier>") + a <time>
@@ -79,3 +82,16 @@ def test_find_content_links_dedupes_and_filters():
 def test_basefile_slug():
     assert basefile_slug("2025/26:279") == "2025-26-279"
     assert basefile_slug("2020:1") == "2020-1"
+
+
+def test_has_live_record_treats_import_as_absent(tmp_path):
+    # a genuine live-harvest record (no `source`) blocks re-download / stops the walk
+    write_atomic(record_path(tmp_path, "prop", "2020/21:1"),
+                 json.dumps({"type": "prop", "files": []}))
+    assert _has_live_record(tmp_path, "prop", "2020/21:1") is True
+    # a frozen import record (carries `source`, §7g) is treated as absent, so the
+    # live downloader fetches its better copy AND it never trips the incremental stop
+    write_atomic(record_path(tmp_path, "prop", "1997/98:45"),
+                 json.dumps({"type": "prop", "source": "proptrips", "legacy_files": []}))
+    assert _has_live_record(tmp_path, "prop", "1997/98:45") is False
+    assert _has_live_record(tmp_path, "prop", "1867:23") is False   # truly absent
