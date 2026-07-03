@@ -6,6 +6,7 @@ import re
 import shutil
 import sys
 import time
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -256,3 +257,53 @@ SWEDISH_ORDINAL_MAP = {word: i + 1 for i, word in enumerate(SWEDISH_ORDINALS)}
 def swedish_ordinal(s):
     """'första' -> 1, or None"""
     return SWEDISH_ORDINAL_MAP.get(s.lower())
+
+
+class HarvestWatermark:
+    """The "have we caught up yet" gate for an incremental listing walk over a
+    large, deep archive -- lets a walk stop well short of the full depth
+    without a blanket "stop at the very first already-known item" rule, which
+    a listing that resurfaces an old item (e.g. an "updated" bump) can trip
+    prematurely.
+
+    Two independent signals, either enough to stop:
+      * `lookahead_limit` consecutive already-downloaded items in a row (no
+        date info needed) -- a run of hits this long is not a coincidence.
+      * ONE item already downloaded whose own date is older than the last
+        harvest's date minus `safety_days` -- conclusive on its own, since
+        it is unambiguously past the point anything could still be new. A
+        *missing* item this old is never grounds to stop on its own -- it is
+        a gap to fill, not evidence of having caught up (also resets the
+        consecutive counter, since a gap breaks any run of hits).
+
+    Persisted as `{"last_harvest": "<iso date>"}` at `filepath`; `save` is
+    the caller's job (typically once, at the end of a clean run)."""
+
+    def __init__(self, filepath, lookahead_limit=5, safety_days=14):
+        self.filepath = Path(filepath)
+        self.lookahead_limit = lookahead_limit
+        self.safety_days = safety_days
+        self.last_harvest = (json.loads(self.filepath.read_text())["last_harvest"]
+                             if self.filepath.exists() else None)
+        self._consecutive = 0
+
+    def get_limit_date(self):
+        """The date past which an already-downloaded item is conclusive on its
+        own, or None before any harvest has ever completed."""
+        return (date.fromisoformat(self.last_harvest) - timedelta(days=self.safety_days)
+                if self.last_harvest else None)
+
+    def should_stop(self, is_downloaded, item_date_str=None):
+        limit = self.get_limit_date()
+        if item_date_str is not None and limit is not None:
+            if date.fromisoformat(item_date_str) < limit:
+                if not is_downloaded:
+                    self._consecutive = 0
+                    return False               # a gap, not evidence of catching up
+                return True                    # old and already have it -- conclusive
+        self._consecutive = self._consecutive + 1 if is_downloaded else 0
+        return self._consecutive >= self.lookahead_limit
+
+    def save(self, date_str):
+        self.last_harvest = date_str
+        write_atomic(self.filepath, json.dumps({"last_harvest": date_str}))

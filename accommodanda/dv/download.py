@@ -34,16 +34,33 @@ import argparse
 import json
 import re
 import time
+from datetime import date
 from pathlib import Path
 from urllib.parse import quote
 
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
-from ..lib.util import Reporter, write_atomic
+from ..lib.util import HarvestWatermark, Reporter, write_atomic
 
 API = "https://rattspraxis.etjanst.domstol.se/api/v1"
 PAGE_SIZE = 100
 COMPLETE = ".complete"   # marker under destdir: corpus walked clean at least once
+
+
+def is_dv_downloaded(destdir, record, check_bilagor=True):
+    path = record_dir(destdir, record).with_suffix(".json")
+    if not path.exists():
+        return False
+    if check_bilagor:
+        dirpath = record_dir(destdir, record)
+        for bilaga in record["bilagaLista"]:
+            if not bilaga.get("fillagringId"):
+                continue
+            name = Path(bilaga["filnamn"]).name
+            target = dirpath / name
+            if not (target.exists() and target.stat().st_size > 0):
+                return False
+    return True
 
 # record path segments come straight from the API response; validate them so a
 # malformed/compromised record can't escape destdir via "..", "/" or an
@@ -113,18 +130,28 @@ def sync(destdir, full=False, bilagor=True, limit=None, delay=0.3):
 
     Backfilled -- the whole corpus walked oldest-first, downloading whatever is
     missing -- when `--full` is given or it has never been cleanly walked (no
-    `.complete` marker: a first run, or one interrupted partway). The marker is
+    watermark yet: a first run, or one interrupted partway). The watermark is
     written only on a clean full pass, so an interrupted initial load is
-    resumed, not mistaken for finished. Once complete, later runs go
-    incremental: newest-first, stopping at the first page with nothing new or
-    changed. (Edits to old records still surface only under `--full` -- the API
+    resumed. Once caught up, later runs go incremental: newest-first, stopping
+    at the first document already on disk that falls past the watermark date boundary.
+    (Edits to old records still surface only under `--full` -- the API
     exposes no last-modified field to walk by.)"""
     destdir = Path(destdir)
     session = make_session(USER_AGENT)
     marker = destdir / COMPLETE
-    backfill = full or not marker.exists()
+    watermark_path = destdir / ".watermark.json"
+
+    # Migrate legacy complete marker to watermark
+    if marker.exists() and not watermark_path.exists():
+        initial_watermark = HarvestWatermark(watermark_path)
+        initial_watermark.save(date.today().isoformat())
+
+    watermark = HarvestWatermark(watermark_path, lookahead_limit=20, safety_days=14)
+    backfill = full or not watermark_path.exists()
     seen = changed = index = 0
     completed = False
+    done = False
+    newest_date = None
     rep = Reporter()
     while True:
         page = search_page(session, index, asc=backfill)
@@ -135,11 +162,25 @@ def sync(destdir, full=False, bilagor=True, limit=None, delay=0.3):
         page_changed = 0
         truncated = False
         for record in records:
+            rec_date = record.get("avgorandedatum")
+            if rec_date:
+                if newest_date is None:
+                    newest_date = rec_date
+                else:
+                    newest_date = max(newest_date, rec_date)
+
+            is_downloaded = is_dv_downloaded(destdir, record, check_bilagor=bilagor)
+            if not backfill:
+                if watermark.should_stop(is_downloaded, rec_date):
+                    done = True
+                    break
+            elif is_downloaded:
+                seen += 1
+                continue
+
             if save_record(destdir, record):
                 page_changed += 1
             if bilagor:
-                # checks per-file existence, so a --no-bilagor harvest
-                # can be backfilled by a later run
                 download_bilagor(session, destdir, record, delay)
             seen += 1
             if limit and seen >= limit:
@@ -147,14 +188,16 @@ def sync(destdir, full=False, bilagor=True, limit=None, delay=0.3):
                 break
         changed += page_changed
         rep.update(seen, page["total"], page=index + 1, changed=page_changed)
-        if truncated:
+        if truncated or done:
             break
-        if not backfill and page_changed == 0:
-            break  # incremental: everything older is already harvested
+        if not backfill and page_changed == 0 and not limit:
+            break
         index += 1
         time.sleep(delay)
     rep.done()
-    if completed and backfill:
+
+    if (completed or done) and not limit:
+        watermark.save(newest_date)
         marker.parent.mkdir(parents=True, exist_ok=True)
         marker.write_text("")
     return seen, changed

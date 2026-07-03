@@ -50,6 +50,7 @@ import html as htmllib
 import json
 import re
 import time
+from datetime import date
 from pathlib import Path
 
 from bs4 import BeautifulSoup
@@ -57,6 +58,7 @@ from bs4 import BeautifulSoup
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session, request
 from ..lib.util import (
+    HarvestWatermark,
     Reporter,
     basefile_slug,
     normalize_space,
@@ -159,7 +161,7 @@ def jo_pdf_path(root, basefile):
 def jo_sync(root, full=False, only=None, limit=None, delay=0.5):
     """Harvest JO decisions. Newest-first; incremental runs stop at the first
     page with nothing new once a clean full walk has completed (the
-    ``.complete`` marker, dv's rule). ``only`` = one basefile ("jo/2340-2025"):
+    watermark, dv's rule). ``only`` = one basefile ("jo/2340-2025"):
     a targeted search on the case number."""
     session = make_session(USER_AGENT)
     nonce = jo_nonce(session)
@@ -176,10 +178,21 @@ def jo_sync(root, full=False, only=None, limit=None, delay=0.5):
         hits = [h for h in envelope["search_hits"] if dnr in jo_dnrs(h.get("diary_number"))]
         assert hits, "jo.se search finds no decision with dnr %s" % dnr
         return 1, int(jo_save(root, hits[0], session, delay))
+
     marker = Path(root) / "jo" / COMPLETE
-    backfill = full or not marker.exists()
+    watermark_path = Path(root) / "jo" / ".watermark.json"
+
+    # Migrate legacy complete marker to watermark
+    if marker.exists() and not watermark_path.exists():
+        initial_watermark = HarvestWatermark(watermark_path)
+        initial_watermark.save(date.today().isoformat())
+
+    watermark = HarvestWatermark(watermark_path, lookahead_limit=20, safety_days=14)
+    backfill = full or not watermark_path.exists()
     seen = new = 0
     page, exhausted = 1, False
+    done = False
+    newest_date = None
     rep = Reporter()
     while True:
         envelope = jo_search(session, nonce, page)
@@ -187,21 +200,50 @@ def jo_sync(root, full=False, only=None, limit=None, delay=0.5):
         if not hits:
             exhausted = True
             break
-        page_new = sum(jo_save(root, hit, session, delay) for hit in hits)
-        seen += len(hits)
-        new += page_new
-        rep.update(seen, envelope["total_hits"], page=page, changed=page_new)
+        page_changed = 0
+        for hit in hits:
+            if newest_date is None and hit.get("resolve_date"):
+                newest_date = hit["resolve_date"]
+
+            dnrs = jo_dnrs(hit.get("diary_number"))
+            if not dnrs:
+                continue
+            basefile = "jo/" + dnrs[0]
+
+            path = record_path(root, "jo", basefile)
+            pdf = jo_pdf_path(root, basefile)
+            is_downloaded = path.exists() and (not hit.get("pdf_url") or pdf.exists())
+
+            if not backfill:
+                if watermark.should_stop(is_downloaded, hit.get("resolve_date")):
+                    done = True
+                    break
+            elif is_downloaded:
+                seen += 1
+                continue
+
+            if jo_save(root, hit, session, delay):
+                page_changed += 1
+            seen += 1
+            if limit and seen >= limit:
+                done = True
+                break
+
+        new += page_changed
+        rep.update(seen, envelope["total_hits"], page=page, changed=page_changed)
+        if done:
+            break
         if limit and seen >= limit:
             break
         if page >= envelope["total_pages"]:
             exhausted = True
             break
-        if not backfill and page_new == 0:
-            break     # newest-first: everything older is already harvested
         page += 1
         time.sleep(delay)
     rep.done()
-    if exhausted and not limit:
+
+    if (exhausted or done) and not limit:
+        watermark.save(newest_date)
         marker.parent.mkdir(parents=True, exist_ok=True)
         marker.write_text("")
     return seen, new

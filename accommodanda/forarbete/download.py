@@ -43,6 +43,7 @@ already-downloaded doc); `--full` re-walks the whole listing, skipping existing.
 import json
 import re
 import time
+from datetime import date
 from pathlib import Path
 
 import requests
@@ -51,6 +52,7 @@ from bs4 import BeautifulSoup
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session
 from ..lib.util import (
+    HarvestWatermark,
     Reporter,
     basefile_slug,
     document_extension,
@@ -219,21 +221,30 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
 
     A type is *backfilled* -- the whole listing walked, downloading whatever is
     missing -- when `--full` is given or the type has never been cleanly walked
-    (no `.complete` marker yet: a first run, or one interrupted partway). The
-    marker is written only after a full walk with no download errors, so an
-    interrupted or partially-failed initial load is resumed, not mistaken for a
-    finished one. Once complete, later runs go *incremental*: newest-first,
-    stopping at the first document already on disk. `only` (a basefile)
-    downloads just that one document, walking the listing until it is found
-    (ignoring the on-disk stop). Returns {type: (seen, new)}."""
+    (no watermark yet: a first run, or one interrupted partway). The watermark
+    is written only after a successful walk/sync with no download errors, so
+    an interrupted or failed run is resumed. Once caught up, later runs go
+    *incremental*: newest-first, stopping at the first document already on disk
+    that falls past the watermark date boundary or when look-ahead limit is reached.
+    `only` (a basefile) downloads just that one document, walking the listing until
+    it is found (ignoring the on-disk stop). Returns {type: (seen, new)}."""
     session = make_session(USER_AGENT)
     totals = {}
     rep = Reporter()
     for typ in (types or list(TYPES)):
         marker = Path(root) / typ / ".complete"
-        backfill = full or not marker.exists()
+        watermark_path = Path(root) / typ / ".watermark.json"
+
+        # Migrate legacy complete marker to watermark
+        if marker.exists() and not watermark_path.exists():
+            initial_watermark = HarvestWatermark(watermark_path)
+            initial_watermark.save(date.today().isoformat())
+
+        watermark = HarvestWatermark(watermark_path, lookahead_limit=20, safety_days=14)
+        backfill = full or not watermark_path.exists()
         seen = new = errors = 0
         done = False
+        newest_date = None
         for items, total, page in iter_listing(session, typ, delay):
             for item in items:
                 seen += 1
@@ -243,11 +254,18 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
                     download_document(session, root, item, delay)
                     new, done = 1, True
                     break
-                if _has_live_record(root, typ, item["basefile"]):
-                    if not backfill:
-                        done = True   # newest-first => everything after is older
+
+                if newest_date is None and item.get("date"):
+                    newest_date = item["date"]
+
+                is_downloaded = _has_live_record(root, typ, item["basefile"])
+                if not backfill:
+                    if watermark.should_stop(is_downloaded, item.get("date")):
+                        done = True
                         break
+                elif is_downloaded:
                     continue
+
                 try:
                     download_document(session, root, item, delay)
                     new += 1
@@ -261,12 +279,18 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
             if done:
                 break
         else:
-            # the listing was exhausted with no early stop -> the whole type
-            # was walked. Mark it complete (once clean) so later runs can go
-            # incremental instead of re-walking everything.
+            # Loop completed naturally without early stop
             if not only and errors == 0:
+                watermark.save(newest_date)
                 marker.parent.mkdir(parents=True, exist_ok=True)
                 marker.write_text("")
+
+        # Incremental stop successfully met
+        if done and not only and errors == 0 and not limit:
+            watermark.save(newest_date)
+            marker.parent.mkdir(parents=True, exist_ok=True)
+            marker.write_text("")
+
         rep.done()
         totals[typ] = (seen, new)
     return totals

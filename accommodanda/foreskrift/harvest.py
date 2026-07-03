@@ -29,6 +29,7 @@ import json
 import re
 import time
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urljoin
@@ -38,7 +39,7 @@ from bs4 import BeautifulSoup
 
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session, request
-from ..lib.util import Reporter, record_path, write_atomic
+from ..lib.util import HarvestWatermark, Reporter, record_path, write_atomic
 from ..lib.util import basefile_slug as slug
 
 
@@ -506,17 +507,26 @@ def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=prin
     """Harvest one agency.
 
     Backfill (walk the whole index, download what is missing) on ``--full`` or
-    when the agency has never cleanly completed (no ``.complete`` marker -- a
-    first or interrupted run). Once complete, later runs go incremental:
+    when the agency has never cleanly completed (no watermark yet -- a
+    first or interrupted run). Once caught up, later runs go incremental:
     enumeration is newest-first, so we stop at the first document already on
-    disk. ``only`` (a basefile) fetches just that one. Returns ``(seen, new)``."""
+    disk that falls past the watermark date boundary. ``only`` (a basefile)
+    fetches just that one. Returns ``(seen, new)``."""
     session = make_session(agency.user_agent or USER_AGENT)
     if agency.headers:
         session.headers.update(agency.headers)
     marker = Path(root) / agency.fs / ".complete"
-    backfill = full or not marker.exists()
+    watermark_path = Path(root) / agency.fs / ".watermark.json"
+
+    # Migrate legacy complete marker to watermark
+    if marker.exists() and not watermark_path.exists():
+        initial_watermark = HarvestWatermark(watermark_path)
+        initial_watermark.save(date.today().isoformat())
+
+    watermark = HarvestWatermark(watermark_path, lookahead_limit=20, safety_days=14)
+    backfill = full or not watermark_path.exists()
     seen = new = errors = 0
-    done = False
+    newest_date = None
     rep = Reporter()
     walk = _guarded_enumerate(agency, session, log)
     for ref in walk:
@@ -529,16 +539,30 @@ def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=prin
             if ref.basefile != only:
                 continue
             agency.resolve(session, agency, ref, root, delay)
-            new, done = 1, True
+            new = 1
             break
-        if record_path(root, agency.fs, ref.basefile).exists():
+
+        # basefile is always minted as "<fs>/<year>:<lopnummer>" (agencies.py) --
+        # the year anchors the date watermark
+        year = ref.basefile.split("/", 1)[1].split(":")[0]
+        item_date = f"{year}-12-31" if len(year) == 4 and year.isdigit() else None
+
+        if item_date:
+            if newest_date is None:
+                newest_date = item_date
+            else:
+                newest_date = max(newest_date, item_date)
+
+        is_downloaded = record_path(root, agency.fs, ref.basefile).exists()
+        if not backfill:
+            if watermark.should_stop(is_downloaded, item_date):
+                break
+        elif is_downloaded:
             if full:
                 pass                   # re-resolve: refresh new amendments/consolidations
-            elif backfill:
-                continue               # resume an interrupted first walk; keep what's there
             else:
-                done = True            # incremental: newest-first => the rest is older
-                break
+                continue               # resume an interrupted first walk; keep what's there
+
         try:
             agency.resolve(session, agency, ref, root, delay)
             new += 1
@@ -547,11 +571,12 @@ def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=prin
             log("  %s %s: %s" % (agency.fs, ref.basefile, exc))
         rep.update(seen, None, scope=agency.fs, new=new)
         if limit and new >= limit:
-            done = True
             break
         time.sleep(delay)
-    if not done and not only and errors == 0:
-        marker.parent.mkdir(parents=True, exist_ok=True)
-        marker.write_text("")          # clean full walk -> later runs incremental
     rep.done()
+
+    if not only and errors == 0 and not limit:
+        watermark.save(newest_date)
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text("")
     return seen, new
