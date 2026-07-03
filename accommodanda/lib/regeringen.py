@@ -20,6 +20,7 @@ TYPES = {
     "prop": ("proposition", 1329, r"Prop\. (\d{4}/\d{2,4}:\d+)"),
     "sou": ("statens-offentliga-utredningar", 1331, r"SOU (\d{4}:\d+)"),
     "ds": ("departementsserien-och-promemorior", 1325, r"Ds (\d{4}:\d+)"),
+    "pm": ("departementsserien-och-promemorior", 1325, None),
     "dir": ("kommittedirektiv", 1327, r"Dir\. (\d{4}:\d+)"),
     "fm": ("forordningsmotiv", 1326, r"Fm (\d{4}:\d+)"),
     "skr": ("skrivelse", 1330, r"Skr\. (\d{4}/\d{2,4}:\d+)"),

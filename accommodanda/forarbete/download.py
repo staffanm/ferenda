@@ -15,6 +15,7 @@ The per-type category id (Proposition=1329, …) is the taxonomy id behind the
     prop  proposition                               1329   Prop. 2025/26:279
     sou   statens-offentliga-utredningar            1331   SOU 2026:34
     ds    departementsserien-och-promemorior        1325   Ds 2026:12
+    pm    departementsserien-och-promemorior        1325   Ju2026/01691 (dnr) / title
     dir   kommittedirektiv                          1327   Dir. 2026:45
     fm    forordningsmotiv                           1326   Fm 2025:1
     skr   skrivelse                                 1330   Skr. 2025/26:280
@@ -67,6 +68,20 @@ FILTER = (BASE + "/Filter/GetFilteredItems?lang=sv&filterType=Taxonomy"
           "&filterByType=FilterablePageBase&rootPageReference=0"
           "&displayLimited=True&preFilteredCategories=%s&page=%d")
 
+# Two types share category 1325 ("Departementsserien och promemorior"): `ds`
+# takes the items numbered `Ds YYYY:N`, `pm` takes the rest (the promemorior
+# outside the Ds series). EXCLUDE maps such a sharing type to the sibling whose
+# identifier pattern marks the listing items that are *not* its own. (The
+# split is this harvester's parsing rule, not site knowledge -- it stays here
+# rather than in lib.regeringen.)
+EXCLUDE = {"pm": "ds"}
+
+# A promemoria without a Ds number is keyed by its diarienummer -- department
+# letters + year + slash + running number (Ju2026/01691, KN2026/01475,
+# S2026/01304). Items with neither a Ds number nor a dnr fall back to the slug.
+DNR_RE = re.compile(r"\b([A-ZÅÄÖ][a-zA-Zåäö]{0,3}\d{4}/\d{2,6})\b")
+
+
 # regeringen.se hangs the document download(s) under /contentassets/ or
 # /globalassets/. We match the link by *location*, not by suffix: the redesigned
 # site serves /contentassets/<hash>/<slug> with no extension at all (the type is
@@ -94,18 +109,37 @@ def parse_listing(html, typ):
     first): {type, basefile, identifier, title, date, url, slug}."""
     segment, _, idre = TYPES[typ]
     idpat = re.compile(idre) if idre else None
+    # a type sharing a category with a sibling (pm/ds) takes the complementary
+    # slice: items carrying the sibling's identifier belong to the sibling.
+    sibling = EXCLUDE.get(typ)
+    excludepat = None
+    if sibling:
+        sibre = TYPES[sibling][2]
+        assert sibre, "EXCLUDE sibling %s must be identifier-numbered" % sibling
+        excludepat = re.compile(sibre)
     hrefpat = re.compile(r"/rattsliga-dokument/%s/\d{4}/\d{2}/" % segment)
     out = []
     for li, href, url, text in listing_items(html, hrefpat):
         slug = href.rstrip("/").rsplit("/", 1)[-1]
         time_el = li.find("time")
         date = time_el.get("datetime") if time_el else None
+        if excludepat and excludepat.search(text):
+            continue  # carries the sibling type's number -> not ours
         if idpat:
             m = idpat.search(text)
             if not m:
                 continue  # title without this type's identifier -> not a doc
             basefile, identifier = m.group(1), m.group(0)
             title = text[:m.start()].rstrip(", ").strip() or text
+        elif sibling:
+            # pm: a diarienummer keys the record; a promemoria with only a
+            # title falls back to the landing-page slug (identifier = title).
+            m = DNR_RE.search(text)
+            if m:
+                basefile = identifier = m.group(1)
+                title = text[:m.start()].rstrip(", ").strip() or text
+            else:
+                basefile, identifier, title = slug, text, text
         else:
             basefile = identifier = slug
             title = text

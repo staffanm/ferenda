@@ -35,6 +35,35 @@ LISTING_SLUG = """
 </ul>
 """
 
+# a real category-1325 listing page (trimmed to three items). Category 1325 is
+# "Departementsserien och promemorior": it mixes Ds-numbered items (-> type ds)
+# with promemorior that carry only a diarienummer or only a title (-> type pm).
+LISTING_1325 = """
+<ul class="list--block">
+  <li><div class="sortcompact">
+    <a href="/rattsliga-dokument/departementsserien-och-promemorior/2026/07/skarpt-straffansvar-for-allvarliga-krankningar-av-gravfriden/">
+      Skärpt straffansvar för allvarliga kränkningar av gravfriden, Ju2026/01691</a>
+    <div class="block--timeLinks"><p>Publicerad
+      <time datetime="2026-07-03">03 juli 2026</time> ·
+      <a href="/tx/1325">Departementsserien och promemorior</a></p></div>
+  </div></li>
+  <li><div class="sortcompact">
+    <a href="/rattsliga-dokument/departementsserien-och-promemorior/2026/07/ds-202615/">
+      Gäldenärens avtal i konkurs, Ds 2026:15</a>
+    <div class="block--timeLinks"><p>Publicerad
+      <time datetime="2026-07-02">02 juli 2026</time> ·
+      <a href="/tx/1325">Departementsserien och promemorior</a></p></div>
+  </div></li>
+  <li><div class="sortcompact">
+    <a href="/rattsliga-dokument/departementsserien-och-promemorior/2026/07/andring-av-detaljplaner/">
+      Ändring av detaljplaner</a>
+    <div class="block--timeLinks"><p>Publicerad
+      <time datetime="2026-07-02">02 juli 2026</time> ·
+      <a href="/tx/1325">Departementsserien och promemorior</a></p></div>
+  </div></li>
+</ul>
+"""
+
 DOCPAGE = """
 <div class="content">
   <ul class="list--Block--icons">
@@ -71,6 +100,33 @@ def test_parse_listing_skips_items_without_the_types_identifier():
     # a stray link whose text lacks "Prop. N" must not be taken as a document
     html = LISTING.replace(", Prop. 2025/26:279", "")
     assert len(parse_listing(html, "prop")) == 1  # only the second item survives
+
+
+def test_parse_listing_ds_takes_only_ds_numbered_items():
+    # category 1325 mixes ds and pm; asked for "ds" only the Ds-numbered item
+    # is a document -- the dnr and title-only promemorior are skipped.
+    items = parse_listing(LISTING_1325, "ds")
+    assert len(items) == 1
+    assert items[0]["basefile"] == "2026:15"
+    assert items[0]["identifier"] == "Ds 2026:15"
+    assert items[0]["title"] == "Gäldenärens avtal i konkurs"
+
+
+def test_parse_listing_pm_takes_the_non_ds_promemorior():
+    # asked for "pm" the same page yields the dnr item and the title-only item,
+    # and skips the Ds-numbered one (it belongs to ds).
+    items = parse_listing(LISTING_1325, "pm")
+    assert len(items) == 2
+    dnr, title_only = items
+    # dnr-keyed: basefile == identifier == the diarienummer, title stripped of it
+    assert dnr["basefile"] == "Ju2026/01691"
+    assert dnr["identifier"] == "Ju2026/01691"
+    assert dnr["title"] == "Skärpt straffansvar för allvarliga kränkningar av gravfriden"
+    assert dnr["date"] == "2026-07-03"
+    # title-only: slug basefile, identifier is the title
+    assert title_only["basefile"] == "andring-av-detaljplaner"
+    assert title_only["identifier"] == "Ändring av detaljplaner"
+    assert title_only["title"] == "Ändring av detaljplaner"
 
 
 def test_find_content_links_dedupes_and_filters():
