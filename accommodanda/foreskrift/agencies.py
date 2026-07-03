@@ -395,6 +395,50 @@ RPSFS = Agency(
 )
 
 
+# --------------------------------------------------------------------------
+# Frozen-only författningssamlingar (REWRITE.md §7g priority 6). SKVFS
+# (Skatteverket, behind an F5 bot-defense) and Socialstyrelsen's SOSFS / HSLF-FS
+# (a React SPA) are the plan's two known-hard, *deferred* harvests: no live
+# enumerate/resolve is written for them (both need a bot-evading harvest posture
+# nobody has built yet). Their only source is the frozen legacy tree, materialized
+# once by :mod:`legacy` (`lagen foreskrift import-legacy skvfs|sosfs`). They are
+# registered so the fs codes are first-class scopes / URIs (browse facets,
+# render); a `download` over them is a logged no-op (`download.sync`), and the
+# import stamps each record with a `source` marker so a future live harvester's
+# record is never clobbered by a re-import.
+#
+# Each frozen corpus tree carries *two* fs series: SKVFS + its Riksskatteverket
+# predecessor RSFS (cited "RSFS 1985:20", so its own code + URIs), and SOSFS +
+# the joint HSLF-FS series. So one import writes records for two agencies, keyed
+# by each entry's authoritative (post-sanitization) basefile. HSLF-FS is slugged
+# `hslffs` (hyphen stripped) -- the entries' own basefile field, the ELSÄK-FS ->
+# `elsakfs` precedent, and the `^[a-zåäö]+fs/…` layout locator all agree; the
+# `designation` carries the printed "HSLF-FS" the identifier needs.
+# --------------------------------------------------------------------------
+
+def frozen_agency(fs, name, publisher, designation, site):
+    """A författningssamling whose only source is the frozen legacy tree: a
+    registry entry with no live enumerate/resolve (§7g deferred harvest). ``site``
+    is the agency's home page, kept for provenance though no harvester reads it."""
+    return Agency(fs=fs, name=name, publisher=publisher, base_url=site,
+                  index_url=site, designation=designation)
+
+
+SKVFS = frozen_agency("skvfs", "Skatteverket", "Skatteverket", "SKVFS",
+                      "https://www.skatteverket.se")
+RSFS = frozen_agency("rsfs", "Riksskatteverket", "Skatteverket", "RSFS",
+                     "https://www.skatteverket.se")
+SOSFS = frozen_agency("sosfs", "Socialstyrelsen", "Socialstyrelsen", "SOSFS",
+                      "https://www.socialstyrelsen.se")
+HSLFFS = frozen_agency(
+    "hslffs", "Gemensamma författningssamlingen (hälso- och sjukvård m.m.)",
+    "Socialstyrelsen", "HSLF-FS", "https://www.socialstyrelsen.se")
+
+# corpus (a frozen tree name) -> the fs series it holds. Drives the import verb:
+# the corpus is walked once and each entry routed to its own fs by basefile.
+LEGACY_CORPORA = {"skvfs": ("skvfs", "rsfs"), "sosfs": ("sosfs", "hslffs")}
+
+
 # fs code -> Agency. New agencies append here; a new *site shape* is a new
 # enumerate/classify in harvest.py, not a new pipeline.
 REGISTRY = {a.fs: a for a in (
@@ -402,4 +446,5 @@ REGISTRY = {a.fs: a for a in (
     ELSAKFS, RGKFS, LMFS, KOVFS, PTSFS, MSBFS,         # second wave (10):
     LIVSFS, STEMFS, TFS, SIFS,                         #   ELSÄK-FS … SIFS
     PMFS, RPSFS,                                       # third wave: police FS (2)
+    SKVFS, RSFS, SOSFS, HSLFFS,                        # frozen-only (§7g): SKV/SOS
 )}

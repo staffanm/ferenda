@@ -15,6 +15,11 @@ def sync(root, scopes=None, full=False, only=None, delay=0.5, log=print):
     totals = {}
     for fs in (scopes or list(REGISTRY)):
         agency = REGISTRY[fs]
+        if agency.enumerate is None:       # frozen-only fs (§7g): no live harvester
+            log("foreskrift %s: no live harvester -- import the frozen corpus via "
+                "`lagen foreskrift import-legacy` (§7g)" % fs)
+            totals[fs] = (0, 0)
+            continue
         totals[fs] = harvest.harvest(agency, root, full=full, only=only,
                                      delay=delay, log=log)
     return totals

@@ -30,6 +30,7 @@ import functools
 import re
 from pathlib import Path
 
+from .. import config
 from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from ..lib.lagrum import (
     EULAGSTIFTNING,
@@ -276,11 +277,22 @@ def amendment_uri(identifier):
     return regulation_uri(_fs_key(m.group(1)), m.group(2), str(int(m.group(3))))
 
 
+def body_path(root, fs, entry):
+    """Absolute path of a body PDF a record's ``files`` entry references. A
+    live-harvest file is stored under ``root/fs/<name>``; a frozen-import file
+    (the §7g point-at-the-bytes rule) carries a ``legacy`` relpath resolved under
+    ``config.LEGACY_ROOT`` in place, never copied into the corpus tree."""
+    if "legacy" in entry:
+        return config.LEGACY_ROOT / entry["legacy"]
+    return Path(root) / fs / entry["name"]
+
+
 def parse_record(record, root):
     """A harvested record (``<slug>.json``) -> a parsed :class:`Regulation`.
     The regulation body comes from the downloaded ``regulation`` PDF (or, if the
     agency only offers the konsoliderad version, that); each downloaded
-    consolidation PDF is parsed into its own ``structure``."""
+    consolidation PDF is parsed into its own ``structure``. A frozen-import record
+    (§7g) points the ``regulation`` entry at the frozen PDF via ``body_path``."""
     fs, basefile = record["fs"], record["basefile"]
     arsutgava, lopnummer = basefile.split("/", 1)[1].split(":", 1)
     files = record.get("files", {})
@@ -290,7 +302,7 @@ def parse_record(record, root):
     structure, meta = [], {}
     if reg_file:
         structure, meta = parse_pdf(
-            Path(root) / fs / reg_file["name"], record["identifier"], parser)
+            body_path(root, fs, reg_file), record["identifier"], parser)
 
     reg = Regulation(
         uri=regulation_uri(fs, arsutgava, lopnummer),

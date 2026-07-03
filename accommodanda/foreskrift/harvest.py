@@ -74,17 +74,21 @@ class Skip:
 class Agency:
     """A författningssamling as configuration over the shared engine. ``enumerate``
     and ``resolve`` name the architecture; everything else is per-agency data the
-    architecture reads (URLs, the org behind ``dcterms:publisher``, selectors)."""
+    architecture reads (URLs, the org behind ``dcterms:publisher``, selectors).
+    ``enumerate``/``resolve`` are None for a **frozen-only** författningssamling
+    (SKVFS/SOSFS, §7g): it has no live harvester, only a one-time import from the
+    frozen legacy tree (:mod:`legacy`); :func:`download.sync` skips it as a no-op."""
     fs: str                                # författningssamling code, "fffs"
     name: str                              # "Finansinspektionen"
     publisher: str                         # issuing-org label / uri
     base_url: str                          # scheme://host (for relative hrefs)
     index_url: str                         # the listing entry point
-    enumerate: Callable                    # (session, agency) -> Iterator[DocRef]
-    resolve: Callable                      # (session, agency, ref, root) -> record
+    enumerate: Callable | None = None      # (session, agency) -> Iterator[DocRef]; None = frozen-only
+    resolve: Callable | None = None        # (session, agency, ref, root) -> record; None = frozen-only
     params: dict = field(default_factory=dict)   # architecture-specific config
     user_agent: str | None = None          # override (a few sites gate on UA)
     headers: dict | None = None            # extra request headers (e.g. Accept-Language)
+    designation: str | None = None         # printed FS prefix ("HSLF-FS") when != fs.upper()
 
 
 def absolute(base_url, href):
