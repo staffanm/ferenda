@@ -23,6 +23,7 @@ REPO = Path(__file__).parent.parent          # the ferenda repo root
 CONFIG_PATH = REPO / "config.yml"
 DEFAULT_DATA = REPO / "site" / "data"
 DEFAULT_WIKI_ROOT = REPO.parent / "lagen-wiki"   # git-backed markdown content repo
+DEFAULT_LEGACY_ROOT = REPO.parent / "ferenda.old" / "data"   # frozen legacy corpora
 DEFAULT_OPENSEARCH_URL = "http://localhost:9200"
 DEFAULT_LLM_MODEL = "openai/gpt-oss-120b"
 
@@ -77,6 +78,26 @@ def resolve_wiki_root(doc):
     return Path(value).expanduser()
 
 
+def resolve_legacy_root(doc):
+    """Where the frozen legacy corpora (the old pipeline's ``downloaded/`` +
+    ``entries/`` trees, REWRITE.md §7g) live. Import verbs walk it and the
+    records they write reference body files inside it in place (the 410 GB
+    soukb tree is never copied), so the key must keep pointing at the trees
+    wherever they are mounted. Precedence: the ``LEGACY_ROOT`` environment
+    variable, then the ``legacy_root`` key in config.yml, then
+    ``<repo>/../ferenda.old/data`` (the sibling checkout)."""
+    env = os.environ.get("LEGACY_ROOT")
+    if env:
+        return Path(env).expanduser()
+    if "legacy_root" not in doc:
+        return DEFAULT_LEGACY_ROOT
+    value = doc["legacy_root"]
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError("legacy_root set to invalid value %r at %s"
+                          % (value, _at(doc, "legacy_root")))
+    return Path(value).expanduser()
+
+
 def resolve_opensearch_url(doc):
     """The OpenSearch endpoint for the search index. Precedence: the
     ``OPENSEARCH_URL`` environment variable (for ad-hoc overrides), then the
@@ -114,5 +135,6 @@ def resolve_llm_model(doc):
 _doc = load()                                # parse config.yml once
 DATA = resolve_data_root(_doc)
 WIKI_ROOT = resolve_wiki_root(_doc)
+LEGACY_ROOT = resolve_legacy_root(_doc)
 OPENSEARCH_URL = resolve_opensearch_url(_doc)
 LLM_MODEL = resolve_llm_model(_doc)

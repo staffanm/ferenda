@@ -48,6 +48,7 @@ import requests
 from . import config
 from .api import app as api_app
 from .avg import download as avg_download
+from .avg import legacy as avg_legacy
 from .avg import parse as avg_parse
 from .dv import download as dv_download
 from .dv import identity as dv_identity
@@ -61,9 +62,11 @@ from .eurlex import parse as eurlex_parse
 from .forarbete import download as fa_download
 from .forarbete import genomforande as fa_genomforande
 from .forarbete import kommentar as fa_kommentar
+from .forarbete import legacy as fa_legacy
 from .forarbete import parse as fa_parse
 from .foreskrift import download as foreskrift_download
 from .foreskrift import harvest as foreskrift_harvest_mod
+from .foreskrift import legacy as foreskrift_legacy
 from .foreskrift import parse as foreskrift_parse
 from .foreskrift.agencies import REGISTRY as FORESKRIFT_AGENCIES
 from .lib import catalog, dump, layout, render, search, util
@@ -324,6 +327,7 @@ class RunOptions:
     lang: str | None = None      # eurlex: comma-separated languages
     source: str = "sparql"       # eurlex: discovery backend (sparql|soap)
     only: str | None = None      # forarbete: fetch a single document
+    limit: int | None = None     # import-legacy (avg/forarbete): cap the run (a slice)
 
 
 RUN = RunOptions()
@@ -766,13 +770,25 @@ SOURCES["dv"] = Source("dv", lambda: sorted(_dv_cases()), {
 # --------------------------------------------------------------------------
 
 FA_ROOT = layout.FA_ROOT
+# legacy_formats.py is in FA_CODE because the frozen-import html route reads it at
+# parse time (a text/tml body -> paragraphs), so editing it re-stales those docs.
+# legacy.py (the import verb) is NOT: it only produces records, which are parse's
+# per-doc inputs and already versioned via fa_record's inputs hash.
 FA_CODE = (PKG / "forarbete" / "parse.py", PKG / "forarbete" / "model.py",
            PKG / "forarbete" / "structure.py", PKG / "forarbete" / "kommentar.py",
-           PKG / "lib" / "lagrum.py")
+           PKG / "forarbete" / "legacy_formats.py", PKG / "lib" / "lagrum.py")
 
 
 def fa_record(basefile):
     return layout.fa_record(basefile)
+
+
+def fa_parse_inputs(basefile):
+    """Freshness inputs of the förarbete parse stage: the downloaded record and
+    the re-OCR sidecar slot (§7g). The sidecar is listed even while absent, so
+    dropping a modern-OCR'd PDF there (which `_legacy_body` then parses instead of
+    the frozen scan) re-stales exactly that document's parse."""
+    return [fa_record(basefile), layout.fa_ocr_pdf(*basefile.split("/", 1))]
 
 
 def fa_artifact(basefile):
@@ -819,12 +835,41 @@ def fa_parse_run(basefile):
     write_artifact("forarbete", basefile, art, source_url=record.get("url"))
 
 
+FA_LEGACY_CORPORA = "|".join(fa_legacy.IMPORTERS)
+
+
+def fa_import_legacy(args):
+    """`lagen forarbete import-legacy <corpus> [<path>]` -- one-time import of a
+    frozen förarbete corpus (§7g) into the forarbete record layout, so `parse`
+    then treats each doc like a harvested one (no network). `<corpus>` is one of
+    propriksdagen, souregeringen, dsregeringen, dirregeringen, soukb, dirasp,
+    propkb, proptrips, dirtrips. The records reference the frozen body bytes in
+    place (relative to LEGACY_ROOT), never copying them (the 371 GB soukb tree is
+    pointed at, not duplicated). Path defaults to `LEGACY_ROOT/<corpus>`. `--limit
+    N` caps the run (a test slice); `--force` re-imports the corpus's own records
+    (never overwriting a live or better-format record)."""
+    if not args or args[0] not in fa_legacy.IMPORTERS or len(args) > 2:
+        sys.exit("usage: lagen forarbete import-legacy {%s} [<path>]"
+                 % FA_LEGACY_CORPORA)
+    corpus = args[0]
+    path = args[1] if len(args) == 2 else str(config.LEGACY_ROOT / corpus)
+    if RUN.dry_run:
+        print("forarbete import-legacy: would import %s %s into %s"
+              % (corpus, path, layout.FA_DOWNLOADED))
+        return
+    fa_legacy.import_corpus(corpus, path, layout.FA_DOWNLOADED,
+                            limit=RUN.limit, force=RUN.force)
+
+
 SOURCES["forarbete"] = Source("forarbete", fa_list, {
     "parse": Stage("parse", fa_parse_run, fa_artifact,
-                   inputs=lambda bf: [fa_record(bf)], code=FA_CODE),
+                   inputs=fa_parse_inputs, code=FA_CODE),
 }, harvest=fa_harvest, origin=_origin(fa_download.BASE),
    scopes=frozenset(fa_download.TYPES),
-   notes="download flag: --only BASEFILE (fetch one document; needs one scope)")
+   actions={"import-legacy": fa_import_legacy},
+   notes="download flag: --only BASEFILE (fetch one document; needs one scope)\n"
+         "import-legacy {%s} [<path>]: one-time import of a frozen förarbete "
+         "corpus (--limit N caps it; --force re-imports)" % FA_LEGACY_CORPORA)
 
 
 # --------------------------------------------------------------------------
@@ -1012,8 +1057,11 @@ def foreskrift_inputs(basefile):
         fsdir = layout.FORESKRIFT_DOWNLOADED / record["fs"]
         files = record.get("files", {})
         reg = files.get("regulation")
-        if reg and reg.get("name"):
-            paths.append(fsdir / reg["name"])
+        # a live-harvest file lives under fsdir/<name>; a frozen-import file (§7g)
+        # is resolved in place under LEGACY_ROOT -- body_path handles both.
+        if reg:
+            paths.append(foreskrift_parse.body_path(
+                str(layout.FORESKRIFT_DOWNLOADED), record["fs"], reg))
         paths += [fsdir / c["name"] for c in files.get("consolidation", [])
                   if c.get("name")]
     return paths
@@ -1027,8 +1075,30 @@ def foreskrift_parse_run(basefile):
     write_artifact("foreskrift", basefile, reg.to_artifact())
 
 
+def foreskrift_import_legacy(args):
+    """`lagen foreskrift import-legacy {skvfs|sosfs} [<path>]` -- one-time import of
+    a harvest-blocked författningssamling corpus (§7g pri 6) from the frozen legacy
+    tree into the föreskrift record layout, so `parse` then treats each regulation
+    like a harvested one (no network). Records reference the frozen regulation PDF
+    bytes in place (relative to LEGACY_ROOT), never copying them; each frozen tree
+    holds two fs series (skvfs+rsfs, sosfs+hslffs). Path defaults to
+    `LEGACY_ROOT/<corpus>`. `--limit N` caps the run (a test slice); `--force`
+    re-imports the corpus's own records (never overwriting a live-harvest one)."""
+    if not args or args[0] not in foreskrift_legacy.LEGACY_CORPORA or len(args) > 2:
+        sys.exit("usage: lagen foreskrift import-legacy {skvfs|sosfs} [<path>]")
+    corpus = args[0]
+    path = args[1] if len(args) == 2 else str(config.LEGACY_ROOT / corpus)
+    if RUN.dry_run:
+        print("foreskrift import-legacy: would import %s %s into %s"
+              % (corpus, path, layout.FORESKRIFT_DOWNLOADED))
+        return
+    foreskrift_legacy.import_corpus(corpus, path, str(layout.FORESKRIFT_DOWNLOADED),
+                                    limit=RUN.limit, force=RUN.force)
+
+
 # No per-document download stage: the body PDFs arrive only through the bulk
-# `foreskrift_harvest` sweep, so parse depends on no upstream stage -- it runs over
+# `foreskrift_harvest` sweep (or, for the two harvest-blocked corpora, the
+# `import-legacy` action), so parse depends on no upstream stage -- it runs over
 # whatever the harvest has put on disk (relate/index/dump/generate then act on the
 # artifacts by source name, like every other source).
 SOURCES["foreskrift"] = Source("foreskrift", foreskrift_list, {
@@ -1038,8 +1108,11 @@ SOURCES["foreskrift"] = Source("foreskrift", foreskrift_list, {
     harvest=foreskrift_harvest,
     origin="https://www.lagrummet.se/rattskalla/?filter=foreskrifter",
     scopes=frozenset(FORESKRIFT_AGENCIES),
+    actions={"import-legacy": foreskrift_import_legacy},
     notes="download flag: --only fs/year:num (fetch one; needs one fs scope)\n"
-          "scopes are författningssamling codes (fffs, …); empty = all agencies")
+          "scopes are författningssamling codes (fffs, …); empty = all agencies\n"
+          "import-legacy {skvfs|sosfs} [<path>]: one-time import of the frozen "
+          "harvest-blocked corpus (--limit N caps it; --force re-imports)")
 
 
 # --------------------------------------------------------------------------
@@ -1052,7 +1125,7 @@ AVG_CODE = (PKG / "avg" / "parse.py", PKG / "avg" / "model.py",
 
 
 def avg_list():
-    return sorted(bf for org in ("jo", "jk")
+    return sorted(bf for org in ("jo", "jk", "arn")
                   for bf in util.list_basefiles(layout.AVG_DOWNLOADED, org))
 
 
@@ -1062,13 +1135,15 @@ def avg_record(basefile):
 
 
 def avg_inputs(basefile):
-    """The record JSON plus the decision body file (JO: the PDF; JK: the
-    landing page) -- re-downloading either re-stales the parse."""
+    """The record JSON plus the decision body file (JO/ARN: the PDF; JK: the
+    landing page) -- re-downloading/re-importing either re-stales the parse."""
     paths = [avg_record(basefile)]
     if basefile.startswith("jo/"):
         pdf = avg_download.jo_pdf_path(layout.AVG_DOWNLOADED, basefile)
         if pdf.exists():
             paths.append(pdf)
+    elif basefile.startswith("arn/"):
+        paths.append(avg_legacy.arn_pdf_path(layout.AVG_DOWNLOADED, basefile))
     else:
         paths.append(avg_download.jk_html_path(layout.AVG_DOWNLOADED, basefile))
     return paths
@@ -1084,15 +1159,16 @@ def avg_parse_run(basefile):
 
 
 def avg_harvest(scopes):
-    """Bulk harvest of the JO/JK decisions (scopes = organ codes; empty =
-    both). `--force` re-walks the whole corpus (JO) / refetches landings (JK);
-    `--only jo/2340-2025` fetches a single decision (needs its organ scope)."""
+    """Bulk harvest of the JO/JK/ARN decisions (scopes = organ codes; empty =
+    all three). `--force` re-walks the whole corpus (JO) / refetches landings
+    (JK) / refetches every PDF (ARN); `--only jo/2340-2025` fetches a single
+    decision (needs its organ scope)."""
     if RUN.only and len(scopes) != 1:
         sys.exit("avg --only needs exactly one organ scope, e.g. "
                  "`lagen avg download jo --only jo/2340-2025`")
     if RUN.dry_run:
         print("avg download: would harvest %s into %s"
-              % (RUN.only or ", ".join(scopes) or "jo + jk",
+              % (RUN.only or ", ".join(scopes) or "jo + jk + arn",
                  layout.AVG_DOWNLOADED))
         return
     totals = avg_download.sync(layout.AVG_DOWNLOADED, scopes=scopes or None,
@@ -1101,19 +1177,42 @@ def avg_harvest(scopes):
         print("avg %s: %d seen, %d new" % (org, seen, new))
 
 
+def avg_import_legacy(args):
+    """`lagen avg import-legacy arn <frozen-arn-tree>` -- one-time import of the
+    frozen ARN corpus (a decision file + fragment.html metadata per case) into the
+    avg record layout, so `parse` then treats each referat like a harvested
+    decision (no network). doc/wpd/rtf bodies are converted to PDF via
+    LibreOffice; native PDFs are copied. `--force` re-imports records already on
+    disk; `--limit N` caps the run (a test slice)."""
+    if len(args) != 2 or args[0] != "arn":
+        sys.exit("usage: lagen avg import-legacy arn <frozen-arn-tree>")
+    if RUN.dry_run:
+        print("avg import-legacy: would import ARN corpus %s into %s"
+              % (args[1], layout.AVG_DOWNLOADED))
+        return
+    avg_legacy.import_arn(args[1], layout.AVG_DOWNLOADED, limit=RUN.limit,
+                          force=RUN.force)
+
+
 # No per-document download stage (the foreskrift rule): decisions arrive only
-# through the bulk `avg_harvest` sweep, so parse runs over whatever the harvest
-# left on disk; relate/index/dump/generate act on the artifacts by source name.
+# through the bulk `avg_harvest` sweep (or, for the frozen ARN corpus, the
+# `import-legacy` action), so parse runs over whatever is on disk;
+# relate/index/dump/generate act on the artifacts by source name.
 SOURCES["avg"] = Source("avg", avg_list, {
     "parse": Stage("parse", avg_parse_run, avg_artifact,
                    inputs=avg_inputs, code=AVG_CODE),
 },
     harvest=avg_harvest,
     origin="https://www.jo.se/",
-    scopes=frozenset({"jo", "jk"}),
+    scopes=frozenset({"jo", "jk", "arn"}),
+    actions={"import-legacy": avg_import_legacy},
     notes="download flag: --only org/dnr (fetch one; needs its organ scope)\n"
           "scopes are the organs: jo (Riksdagens ombudsmän), jk "
-          "(Justitiekanslern); empty = both")
+          "(Justitiekanslern), arn (Allmänna reklamationsnämnden); empty = all\n"
+          "arn download harvests the live vägledande-beslut listing (2017-); it "
+          "overwrites any frozen import of the same dnr (live wins)\n"
+          "import-legacy arn <path>: one-time import of the frozen ARN corpus "
+          "(1991-2022; --limit N caps it; --force re-imports)")
 
 
 # --------------------------------------------------------------------------
@@ -1867,6 +1966,9 @@ def main(argv=None):
     p.add_argument("--only", metavar="BASEFILE",
                    help="forarbete download: fetch just this one document "
                         "(needs exactly one doctype scope)")
+    p.add_argument("--limit", type=int, metavar="N",
+                   help="import-legacy (avg/forarbete): import at most N "
+                        "documents (a test slice)")
     args = p.parse_args(argv)
 
     RUN.dry_run, RUN.force, RUN.no_deps = args.dry_run, args.force, args.no_deps
@@ -1874,6 +1976,7 @@ def main(argv=None):
     RUN.aggregates_only = args.aggregates_only
     RUN.since, RUN.lang, RUN.source = args.since, args.lang, args.discovery
     RUN.only = args.only
+    RUN.limit = args.limit
     # the parallelisable steps default to all cores; -j1 serialises
     jobs = args.jobs if args.jobs is not None else (os.cpu_count() or 1)
 
