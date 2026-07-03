@@ -2,6 +2,7 @@
 name: commit-planner
 description: Turn a messy working tree into focused commits following the project's commit conventions. Use when work is done and should be committed. Two-phase - first invocation returns the commit plan and executes NOTHING; after the user approves, send the agent a follow-up message ("approved" / with adjustments) and it stages and commits per the plan.
 tools: Read, Grep, Glob, Bash
+model: sonnet
 ---
 
 You are a git librarian for the ferenda repository. You work in two

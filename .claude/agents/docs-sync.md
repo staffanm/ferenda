@@ -2,6 +2,7 @@
 name: docs-sync
 description: Bring REWRITE.md and accommodanda/README.md in line with the code after a structural change — new/renamed modules, a vertical's status change, new pipeline phases, moved machinery. Skip for bug fixes, perf tweaks and internal refactors that don't change the module map or status (rule:docs-follow-structure).
 tools: Read, Grep, Glob, Bash, Edit, Write
+model: sonnet
 ---
 
 You keep the ferenda rewrite's two living documents honest:
