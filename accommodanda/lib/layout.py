@@ -24,6 +24,7 @@ from urllib.parse import quote, unquote
 
 from .. import config
 from .catalog import BASE, local, strip_fragment
+from .util import basefile_slug
 
 DATA = config.DATA
 GENERATED = DATA / "generated"
@@ -228,6 +229,16 @@ def sfs_sidecar_basefile(path):
 def fa_record(basefile):
     typ, rest = basefile.split("/", 1)
     return FA_DOWNLOADED / typ / (rest + ".json")
+
+
+def fa_ocr_pdf(typ, basefile):
+    """The re-OCR sidecar PDF for a förarbete document (§7g): ``forarbete/ocr/
+    <type>/<slug>.pdf``, slugged exactly like the downloaded record. Dropping a
+    modern-OCR'd PDF here (an ``ocrmypdf`` pass over a frozen scan whose embedded
+    OCR layer is weak) upgrades that document's parse -- parse prefers it over the
+    legacy-root scan -- without touching the one-time import. The path is a parse
+    input, so a new sidecar re-stales that document's parse."""
+    return FA_ROOT / "ocr" / typ / (basefile_slug(basefile) + ".pdf")
 
 
 def eurlex_dir(basefile):

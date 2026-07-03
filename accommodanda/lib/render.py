@@ -711,21 +711,24 @@ def _source_link(source_url):
             '</a></p>' % escape(source_url)) if source_url else ""
 
 
-def _frontmatter(eyebrow, title, subtitle, meta, source_url=None):
+def _frontmatter(eyebrow, title, subtitle, summary, meta, source_url=None):
     eb = '<div class="eyebrow">%s</div>' % escape(eyebrow) if eyebrow else ""
     sub = '<p class="subtitle">%s</p>' % escape(subtitle) if subtitle else ""
-    return ('<header class="frontmatter">%s<h1>%s</h1>%s%s%s</header>'
-            % (eb, escape(title), sub, meta, _source_link(source_url)))
+    return ('<header class="frontmatter">%s<h1>%s</h1>%s%s%s%s</header>'
+            % (eb, escape(title), sub, summary, meta, _source_link(source_url)))
 
 
 def page(title, kind, meta, body, toc="", eyebrow=None, subtitle=None,
-         island="", solo=False, source_url=None, body_class=""):
+         summary="", island="", solo=False, source_url=None, body_class=""):
     """Assemble a page. Document pages use the 3-column grid (TOC · reading
     column · context rail); `solo` pages (frontpage, browse indexes) drop the
     side columns for a single centered column. `body_class` adds a modifier to
     the <body> (e.g. " expired" for a repealed statute -- subdued reading column
-    + a fixed watermark)."""
-    front = _frontmatter(eyebrow, title, subtitle, meta, source_url)
+    + a fixed watermark). `summary` (already-wrapped HTML, e.g. a
+    `<p class="sammanfattning">`) sits in the frontmatter between the title and
+    `meta`, not in the reading column -- pass it instead of prepending to `body`
+    when a source wants its abstract to read before the metadata block."""
+    front = _frontmatter(eyebrow, title, subtitle, summary, meta, source_url)
     if solo:
         grid = ('<div class="gr-body solo"><main class="gr-main">%s%s</main></div>'
                 % (front, body))
@@ -1059,6 +1062,8 @@ def render_dv(art, site):
     # computed live for an artifact parsed before the field). The löpnummer
     # ("NJA 2025:58") stays metadata, never part of the identity string.
     title = art.get("label") or dv_naming.case_label(art)
+    summary = ('<p class="sammanfattning">%s</p>' % escape(md["sammanfattning"])
+               if md.get("sammanfattning") else "")
     meta = _meta_dl([
         ("Domstol", art.get("court_namn")),
         ("Avgörandedatum", art.get("avgorandedatum")),
@@ -1066,21 +1071,19 @@ def render_dv(art, site):
         ("Löpnummer", ", ".join(dv_naming.lopnummer(art))),
         ("Rättsområde", ", ".join(md.get("rattsomrade") or [])),
     ])
-    summary = ('<p class="sammanfattning">%s</p>' % escape(md["sammanfattning"])
-               if md.get("sammanfattning") else "")
     sokord = _keywords(md.get("nyckelord") or [], site)
     toc = Toc()
     rail = Rail(site, art["uri"])
     # a record with explicit instance structure (HD's modern <h1>-tagged form) is
     # walked as nested sections; a flat legacy record has no structural wrappers,
     # so the same walk renders it as a plain paragraph sequence
-    body = (document_inbound(site, art["uri"]) + sokord + summary
+    body = (document_inbound(site, art["uri"]) + sokord
             + _dv_walk(art.get("structure", []), site, art["uri"], toc, rail,
                        ruling=_dv_ruling_word(art))
             + _dv_footnotes(art.get("footnotes", []), site))
     return page(title, "Rättsfall", meta, body, render_toc(toc),
-                eyebrow=art.get("court_namn"), island=rail.island(),
-                source_url=art.get("source_url"))
+                eyebrow=art.get("court_namn"), summary=summary,
+                island=rail.island(), source_url=art.get("source_url"))
 
 
 def _keywords(nyckelord, site):
@@ -1521,13 +1524,13 @@ def render_avg(art, site):
                if art.get("sammanfattning") else "")
     toc = Toc()
     rail = Rail(site, art["uri"])
-    body = document_inbound(site, art["uri"]) + summary + "".join(
+    body = document_inbound(site, art["uri"]) + "".join(
         render_node(n, site, art["uri"], toc, rail)
         for n in art.get("structure", []))
-    section = {"jo": "JO-beslut", "jk": "JK-beslut"}.get(art.get("org"),
-                                                         "Myndighetsavgörande")
+    section = {"jo": "JO-beslut", "jk": "JK-beslut",
+               "arn": "ARN-beslut"}.get(art.get("org"), "Myndighetsavgörande")
     return page(title, section, meta, body, render_toc(toc),
-                eyebrow=ident, island=rail.island(),
+                eyebrow=ident, summary=summary, island=rail.island(),
                 source_url=art.get("source_url"))
 
 
@@ -2083,8 +2086,7 @@ section.paragraf.rail-active { background:
 
 /* -- DV / förarbete extras -- */
 .sammanfattning { font-family: var(--serif); font-style: italic; font-size: 1.05rem;
-                  color: var(--ink-2); border-left: 2px solid var(--rule);
-                  padding-left: 1rem; }
+                  color: var(--ink-2); }
 .sokord { font-size: .85rem; color: var(--ink-3); }
 .sokord span { text-transform: uppercase; letter-spacing: .05em; font-size: .68rem;
                margin-right: .4rem; }

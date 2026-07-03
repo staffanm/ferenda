@@ -40,6 +40,25 @@ def list_basefiles(root, subdir):
     return sorted(json.loads(p.read_text())["basefile"]
                   for p in (Path(root) / subdir).glob("*.json"))
 
+
+def document_extension(data):
+    """The file extension for a document, read from its leading magic bytes (a
+    URL suffix or a served/on-disk extension is unreliable; the bytes are not).
+    None when the bytes are not a document we recognize -- so a mislabelled asset
+    (an image, an HTML error page served or stored as `.pdf`) is rejected rather
+    than trusted."""
+    if data[:4] == b"%PDF":
+        return ".pdf"
+    if data[:4] == b"PK\x03\x04":          # zip container -> Office Open XML
+        return ".docx"
+    if data[:4] == b"\xd0\xcf\x11\xe0":    # OLE compound document -> legacy .doc
+        return ".doc"
+    if data[:5] == b"{\\rtf":
+        return ".rtf"
+    if data[:4] == b"\xffWPC":             # WordPerfect
+        return ".wpd"
+    return None
+
 # ETA timing state for `status`, self-tracked so callers need not thread a start
 # time. A current/total run (sfs parse, then dv parse, …) is timed from its first
 # line; a new run is detected when `done` restarts or `total` changes, which

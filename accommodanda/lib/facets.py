@@ -133,10 +133,14 @@ def _avg_org(r):
 
 
 def _avg_year(r):
-    """Decision year from the diarienummer: JO '2340-2025' carries it last;
-    JK's new form '2024/8082' first; JK's old form '3497-06-40' as a two-digit
-    year (century cutoff >50 -> 19xx, the legacy JKStore rule)."""
+    """Decision year from the diarienummer: ARN 'YYYY-NNNN' carries it first;
+    JO '2340-2025' last; JK's new form '2024/8082' first; JK's old form
+    '3497-06-40' as a two-digit year (century cutoff >50 -> 19xx, the legacy
+    JKStore rule). ARN and JO share the 4-4 shape but order it oppositely, so
+    ARN is keyed on the organ rather than the dnr shape."""
     dnr = r.local.split("/", 2)[-1]              # 'avg/jo/2340-2025' -> dnr
+    if r.kind == "arn":                          # 'avg/arn/1992-3657' -> 1992
+        return dnr[:4]
     m = re.search(r"-(\d{4})$", dnr)
     if m:
         return m.group(1)
@@ -300,9 +304,10 @@ SCHEMES = {
         Level("År", _fs_year, _by_year_desc),
     ],
     "avg": [
-        Level("Organ", _avg_org, _curated(["jo", "jk"]),
+        Level("Organ", _avg_org, _curated(["jo", "jk", "arn"]),
               label=_map_label({"jo": "Justitieombudsmannen (JO)",
-                                "jk": "Justitiekanslern (JK)"})),
+                                "jk": "Justitiekanslern (JK)",
+                                "arn": "Allmänna reklamationsnämnden (ARN)"})),
         Level("År", _avg_year, _by_year_desc),
     ],
     "dv": [
