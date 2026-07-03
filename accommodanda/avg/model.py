@@ -14,8 +14,9 @@ from ..lib.lagrum import interleave
 
 BASE = "https://lagen.nu/"
 
-ORGS = ("jo", "jk")
-ORG_NAME = {"jo": "Justitieombudsmannen", "jk": "Justitiekanslern"}
+ORGS = ("jo", "jk", "arn")
+ORG_NAME = {"jo": "Justitieombudsmannen", "jk": "Justitiekanslern",
+            "arn": "Allmänna reklamationsnämnden"}
 
 
 def beslut_uri(org, dnr):
@@ -26,8 +27,9 @@ def beslut_uri(org, dnr):
 
 def beslut_identifier(org, dnr):
     """The old pipeline's dcterms:identifier forms, kept: "JO dnr 6356-2012"
-    (jo.py infer_identifier) / "JK 3497-06-40" (jk.py)."""
-    return ("JO dnr %s" if org == "jo" else "JK %s") % dnr
+    (jo.py infer_identifier), "JK 3497-06-40" (jk.py), "ARN 1992-3657"
+    (arn.py infer_identifier)."""
+    return {"jo": "JO dnr %s", "jk": "JK %s", "arn": "ARN %s"}[org] % dnr
 
 
 @dataclass
@@ -39,7 +41,7 @@ class Block:
 
 @dataclass
 class Beslut:
-    org: str                            # "jo" | "jk"
+    org: str                            # "jo" | "jk" | "arn"
     diarienummer: list[str]             # first = canonical (names the document)
     titel: str
     beslutsdatum: str | None = None     # ISO date

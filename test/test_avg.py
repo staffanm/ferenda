@@ -5,15 +5,20 @@ Hermetic: synthetic fixtures modelled on the live 2026 sites (jo.se WordPress
 search hits, jk.se Umbraco landing pages); no network, no poppler."""
 
 import json
+from pathlib import Path
 
 import pytest
 
 from accommodanda.avg import download as avg_download
+from accommodanda.avg import legacy as avg_legacy
 from accommodanda.avg import parse as avg_parse
 from accommodanda.avg.model import Beslut, Block, beslut_uri
 from accommodanda.lib import catalog, facets, layout
 from accommodanda.lib.lagrum import MYNDIGHETSBESLUT, LagrumParser
 from accommodanda.lib.pdftext import Para
+from accommodanda.lib.util import document_extension, record_path, write_atomic
+
+ARN_FIXTURES = Path(__file__).parent / "files" / "avg" / "arn"
 
 
 # --------------------------------------------------------------------------
@@ -24,6 +29,8 @@ from accommodanda.lib.pdftext import Para
     ("se JO:s beslut den 30 juni 2026, dnr 2340-2025", "jo", "2340-2025"),
     ("jfr JO 1995/96 s. 92, dnr 3067-1994", "jo", "3067-1994"),
     ("Justitiekanslerns beslut med dnr 3497-06-40", "jk", "3497-06-40"),
+    ("jfr ARN:s änr 1992-3657", "arn", "1992-3657"),
+    ("ARN, avgörande 1992-11-12; 1992-3657", "arn", "1992-3657"),
 ])
 def test_uri_matches_citation_grammar(text, org, dnr):
     parser = LagrumParser({}, basefile="avg", parse_types=[MYNDIGHETSBESLUT])
@@ -235,3 +242,248 @@ def test_record_roundtrip(tmp_path):
     write_atomic(record_path(tmp_path, "jk", record["basefile"]),
                  json.dumps(record))
     assert list_basefiles(tmp_path, "jk") == ["jk/2024/8082"]
+
+
+# --------------------------------------------------------------------------
+# ARN -- the frozen third organ (imported by avg/legacy.py)
+# --------------------------------------------------------------------------
+
+def _fragment(dnr):
+    return (ARN_FIXTURES / (dnr + ".html")).read_text(encoding="utf-8")
+
+
+def test_arn_parse_fragment():
+    # 1992-3657: metadata cells + a title whose trailing self-citation uses the
+    # 4-digit-year date form (with the corpus's stray internal space "11- 12")
+    meta = avg_legacy.parse_fragment(_fragment("1992-3657"))
+    assert meta["dnr"] == "1992-3657"
+    assert meta["beslutsdatum"] == "1992-11-12"
+    assert meta["avdelning"] == "Resor"
+    assert meta["title"].startswith("Då det på grund av lastbilsstrejk")
+    # the "Avgörande 1992-11- 12; 92-3657." self-citation is stripped from the end
+    assert meta["title"].endswith("outnyttjade delen av resan.")
+    assert "Avgörande" not in meta["title"]
+
+
+def test_arn_title_sanitization_two_digit_year():
+    # 1992-1536's self-citation uses the 2-digit-year form "Avgörande 92-09-21;
+    # 92-1536." -- also stripped, anchored to the end
+    meta = avg_legacy.parse_fragment(_fragment("1992-1536"))
+    assert meta["dnr"] == "1992-1536"
+    assert meta["title"].endswith("skadeståndsbeloppets storlek.")
+    assert "92-1536" not in meta["title"]
+
+
+def test_arn_title_sanitization_colon_form():
+    # 1991-4398's self-citation uses the colon, space-separated form the old
+    # regex missed entirely: "Avgörande: 1991-12-05 91-4398" (no semicolon)
+    meta = avg_legacy.parse_fragment(_fragment("1991-4398"))
+    assert meta["dnr"] == "1991-4398"
+    assert meta["title"] == "Fråga om nyttoavdrag vid hävning av bilköp."
+
+
+@pytest.mark.parametrize("summary,expected", [
+    # the dominant "; " form, 4- and 2-digit years
+    ("Text. Avgörande 1992-11-12; 1992-3657.", "Text."),
+    ("Text. Avgörande 92-09-21; 92-1536.", "Text."),
+    # colon after Avgörande, space-separated dnr
+    ("Text. Avgörande: 1991-12-05 91-4398", "Text."),
+    # comma separator, parenthesised dnr, stray internal date space
+    ("Text. Avgörande 2001-08-28, 2001-0438", "Text."),
+    ("Text. Avgörande: 1998-11-02 (98-1207)", "Text."),
+    ("Text. Avgörande 1992-11- 12; 92-3657.", "Text."),
+    # "Änr" word before the dnr, and a multi-dnr "och" list
+    ("Text. Avgörande 1999-05-05; Änr 1999-0677.", "Text."),
+    ("Text. Avgörande 2001-08-28; 2000-4837 och 2001-0438", "Text."),
+    # reversed order: dnr before the date
+    ("Text. Avgörande 1992-3657; 1992-11-12", "Text."),
+    # a citation embedded mid-summary (the fragment's summary div swallowed the
+    # whole decision body, so the citation is followed by a long tail) is left
+    # intact -- stripping it would delete the entire decision text
+    ("Fråga om x. Avgörande 1995-09-28; 95-2094 " + "Bakgrunden var att " * 12,
+     "Fråga om x. Avgörande 1995-09-28; 95-2094 "
+     + ("Bakgrunden var att " * 12).strip()),
+])
+def test_arn_self_citation_regex(summary, expected):
+    assert avg_legacy.RE_SELF_CITE.sub("", summary).strip() == expected
+
+
+def test_arn_empty_summary():
+    # 1993-3084 carries a blank summary paragraph -> an empty title (the parse
+    # importer pairs this with an empty body to detect the excised stub)
+    meta = avg_legacy.parse_fragment(_fragment("1993-3084"))
+    assert meta["dnr"] == "1993-3084"
+    assert meta["beslutsdatum"] == "1993-11-11"
+    assert meta["title"] == ""
+
+
+def test_document_extension_magic():
+    assert document_extension(b"%PDF-1.4") == ".pdf"
+    assert document_extension(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1") == ".doc"
+    assert document_extension(b"\xffWPC\x5e\x00\x00\x00") == ".wpd"    # WordPerfect
+    assert document_extension(b"{\\rtf1") == ".rtf"
+    assert document_extension(b"<!DOCTYPE HTML PUBLIC") is None        # error page
+
+
+def test_arn_pick_body_prefers_valid_doc_over_corrupt_pdf(tmp_path):
+    # the five 2001 cases store a Digiforms HTML error page as index.pdf; the real
+    # decision is the sibling index.doc. Selection sniffs magic bytes, so the
+    # mislabelled .pdf is rejected and the valid .doc chosen.
+    (tmp_path / "index.pdf").write_bytes(b"<!DOCTYPE HTML PUBLIC \"-//W3C//\">")
+    (tmp_path / "index.doc").write_bytes(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1rest")
+    chosen, ext = avg_legacy.pick_body(tmp_path)
+    assert (chosen.name, ext) == ("index.doc", ".doc")
+
+
+def test_arn_year_facet():
+    # ARN 'YYYY-NNNN' orders the year first -- the opposite of JO's 4-4 dnr, so
+    # the year facet must key on the organ, not the dnr shape
+    class R:
+        def __init__(self, local, kind):
+            self.local, self.kind = local, kind
+    assert facets._avg_year(R("avg/arn/1992-3657", "arn")) == "1992"
+    assert facets._avg_org(R("avg/arn/1992-3657", "arn")) == "arn"
+
+
+def test_classify_arn_and_citation_scan():
+    # bold paragraph -> rubrik, else stycke; the body is citation-scanned like
+    # the other organs, so a lagrum reference becomes an inline run
+    paras = [
+        Para(text="Bakgrund", bold=True),
+        Para(text="Konsumenten begärde återbetalning.", bold=False),
+        Para(text="", bold=False),                       # blank Para dropped
+        Para(text="Enligt 2 kap. 6 § regeringsformen gäller skydd.", bold=False),
+    ]
+    blocks = avg_parse.classify_arn(paras)
+    assert [(b.kind, b.level) for b in blocks] == [
+        ("rubrik", 1), ("stycke", 1), ("stycke", 1)]
+    beslut = Beslut(org="arn", diarienummer=["1992-3657"],
+                    titel="Fråga om återbetalning", beslutsdatum="1992-11-12",
+                    nyckelord=["Resor"], body=blocks)
+    art = beslut.to_artifact(avg_parse._fresh_parser())
+    assert art["uri"] == "https://lagen.nu/avg/arn/1992-3657"
+    assert art["identifier"] == "ARN 1992-3657"
+    assert art["org"] == "arn"
+    assert art["metadata"]["publisher"] == "Allmänna reklamationsnämnden"
+    assert art["metadata"]["nyckelord"] == ["Resor"]
+    runs = [r for b in art["structure"] for r in b["text"] if isinstance(r, dict)]
+    assert any(r["uri"] == "https://lagen.nu/1974:152#K2P6" for r in runs)
+
+
+def test_arn_catalog_and_uri():
+    # the generic avg catalog row + layout path handle arn with no special-casing
+    art = {"uri": "https://lagen.nu/avg/arn/1992-3657", "org": "arn",
+           "identifier": "ARN 1992-3657",
+           "metadata": {"title": "Fråga om återbetalning"}}
+    uri, source, kind, label, title, path = catalog.avg_document(art, "p.json")
+    assert (source, kind, label) == ("avg", "arn", "ARN 1992-3657")
+    assert layout.relpath("avg", "arn/1992-3657").as_posix() == "arn/1992-3657"
+
+
+# --------------------------------------------------------------------------
+# ARN -- the live harvester (arn.se vägledande-beslut listing)
+# --------------------------------------------------------------------------
+
+ARN_LISTING = (ARN_FIXTURES / "vagledande-beslut-listing.html").read_text(
+    encoding="utf-8")
+
+
+def test_arn_dnrs():
+    # the anchor text carries the dnr; a multi-dnr referat lists several and the
+    # first names the document. The embedded beslutsdatum ("2018-06-14") is not a
+    # dnr -- \d{4}-\d{4,} needs 4+ trailing digits, so it is skipped.
+    assert avg_download.arn_dnrs("Referat 2026-00382") == ["2026-00382"]
+    assert avg_download.arn_dnrs(
+        "Referat 2018-06-14; 2017-07814 (I) och 2017-13660 (II)") == \
+        ["2017-07814", "2017-13660"]
+    # zero-padding varies and is preserved verbatim (never normalized)
+    assert avg_download.arn_dnrs("Referat 2024-00318") == ["2024-00318"]
+
+
+def test_arn_parse_listing():
+    items = avg_download.arn_parse_listing(ARN_LISTING)
+    assert [i["dnrs"][0] for i in items] == [
+        "2026-00382", "2025-06866", "2025-00318", "2024-25067", "2017-07814"]
+    first = items[0]
+    assert first["beslutsdatum"] == "2026-06-16"
+    assert first["avdelning"] == "Motor"
+    assert first["url"] == ("https://www.arn.se/globalassets/extern/pdfer/"
+                            "referat-2026/arendereferat-2026-00382.pdf")
+    # the summary is the title (ARN referat have no real title); the "Referat
+    # NNNN" link trailer is not part of it
+    assert first["title"].startswith("Frågan gällde om ett bilköp")
+    assert "Referat 2026-00382" not in first["title"]
+    # a summary nested in the site's div wrappers is still collected as the title
+    assert items[2]["title"].startswith("ARN har kommit fram till att ett spelbolag")
+    # the h3 area survives its "vägledande beslut i utökad sammansättning" quirk
+    assert items[4]["avdelning"] == "Bank"
+    assert items[4]["dnrs"] == ["2017-07814", "2017-13660"]
+
+
+def test_parse_arn_source_url_roundtrip(tmp_path, monkeypatch):
+    # one parse path, both provenances. Body extraction (poppler) is stubbed so
+    # the test stays hermetic; the assertion is on metadata + source_url passthrough.
+    monkeypatch.setattr(avg_parse, "pdf_pages", lambda p: [])
+    pdf = avg_legacy.arn_pdf_path(tmp_path, "arn/2026-00382")
+    pdf.parent.mkdir(parents=True, exist_ok=True)
+    pdf.write_bytes(b"%PDF-1.7\n")
+    live = {"basefile": "arn/2026-00382", "org": "arn",
+            "diarienummer": "2026-00382", "beslutsdatum": "2026-06-16",
+            "avdelning": "Motor", "title": "Frågan gällde om ett bilköp.",
+            "source_url": ("https://www.arn.se/globalassets/extern/pdfer/"
+                           "referat-2026/arendereferat-2026-00382.pdf")}
+    art = avg_parse.parse_arn(live, tmp_path).to_artifact(avg_parse._fresh_parser())
+    assert art["uri"] == "https://lagen.nu/avg/arn/2026-00382"
+    assert art["identifier"] == "ARN 2026-00382"
+    assert art["metadata"]["beslutsdatum"] == "2026-06-16"
+    assert art["metadata"]["nyckelord"] == ["Motor"]
+    assert art["source_url"] == live["source_url"]
+    # a frozen-import record (no source_url) parses through the same path and its
+    # artifact carries no Källa link -- the legacy behaviour is unchanged
+    frozen = {k: v for k, v in live.items() if k != "source_url"}
+    frozen["source"] = avg_legacy.SOURCE
+    frozen["imported_from"] = "2026/00382/index.pdf"
+    art2 = avg_parse.parse_arn(frozen, tmp_path).to_artifact(
+        avg_parse._fresh_parser())
+    assert "source_url" not in art2
+
+
+def _arn_stub_request(monkeypatch, calls):
+    class Resp:
+        content = b"%PDF-1.7\nlive referat bytes"
+    monkeypatch.setattr(avg_download, "request",
+                        lambda session, method, url, **kw: calls.append(url) or Resp())
+    return Resp
+
+
+def test_arn_save_live_wins_over_frozen(tmp_path, monkeypatch):
+    # the other half of the §7g precedence rule: legacy.import_arn refuses to
+    # overwrite a live record; here the live harvest overwrites a frozen import.
+    calls = []
+    resp = _arn_stub_request(monkeypatch, calls)
+    root, dnr = str(tmp_path), "2020-08372"
+    basefile = "arn/" + dnr
+    recpath = record_path(root, "arn", basefile)
+    pdfpath = avg_legacy.arn_pdf_path(root, basefile)
+    write_atomic(recpath, json.dumps(
+        {"basefile": basefile, "org": "arn", "diarienummer": dnr,
+         "beslutsdatum": "2020-05-05", "avdelning": "Bank",
+         "title": "frozen title", "source": avg_legacy.SOURCE,
+         "imported_from": "2020/08372/index.doc"}))
+    write_atomic(pdfpath, b"%PDF-1.4 frozen converted body")
+    item = {"dnrs": [dnr], "beslutsdatum": "2020-05-05", "avdelning": "Bank",
+            "title": "live summary title",
+            "url": "https://www.arn.se/globalassets/extern/pdfer/referat-2021/"
+                   "arendereferat-2020-08372.pdf"}
+    # a frozen record never compares equal to a live one -> overwritten (live wins)
+    assert avg_download.arn_save(root, item, None, 0) is True
+    rec = json.loads(recpath.read_text())
+    assert "source" not in rec and "imported_from" not in rec
+    assert rec["source_url"] == item["url"] and rec["title"] == "live summary title"
+    # the converted frozen PDF is replaced by the freshly fetched live one
+    assert pdfpath.read_bytes() == resp.content
+    assert calls == [item["url"]]
+    # a second run over the unchanged live record fetches nothing and reports skip
+    calls.clear()
+    assert avg_download.arn_save(root, item, None, 0) is False
+    assert calls == []

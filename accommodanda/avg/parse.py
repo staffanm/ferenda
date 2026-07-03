@@ -43,7 +43,8 @@ from ..lib.lagrum import (
 from ..lib.pdftext import page_paragraphs, pdf_pages
 from ..lib.util import record_path
 from .download import jk_canonical, jk_html_path, jo_dnrs, jo_pdf_path
-from .model import Beslut, Block
+from .legacy import arn_pdf_path
+from .model import ORG_NAME, Beslut, Block
 
 AVG_PARSE_TYPES = [LAGRUM, KORTLAGRUM, EULAGSTIFTNING, RATTSFALL, FORARBETEN,
                    EURATTSFALL, MYNDIGHETSBESLUT]
@@ -217,16 +218,51 @@ def parse_jk(record, html_text):
 
 
 # --------------------------------------------------------------------------
+# ARN (frozen corpus imported by avg/legacy.py)
+# --------------------------------------------------------------------------
+
+def classify_arn(paras):
+    """`lib.pdftext.Para`s -> body blocks (a bold paragraph is a heading, the
+    rest running text). Pure over the Para stream so the rule is testable without
+    poppler. ARN referat carry no known masthead noise, so nothing is filtered."""
+    return [Block("rubrik", _norm(p.text), 1) if p.bold
+            else Block("stycke", _norm(p.text))
+            for p in paras if _norm(p.text)]
+
+
+def parse_arn(record, root):
+    """An ARN record (+ its decision PDF under `root`) -> Beslut. One path for
+    both provenances: a frozen-corpus import (`avg/legacy.py`, no ``source_url``)
+    and a live arn.se harvest (`avg/download.py`, carrying the referat's live PDF
+    URL as ``source_url``). ARN referat have no real title -- the summary
+    paragraph is the title (a frozen fragment's, sanitized at import time; a live
+    listing's, the ARN-curated summary). The body is the decision PDF read through
+    the shared font-aware extraction; the Avdelning is the one keyword."""
+    dnr = record["diarienummer"]
+    pdf = arn_pdf_path(root, "arn/" + dnr)
+    assert pdf.exists(), "arn %s has no body PDF at %s" % (dnr, pdf)
+    paras = [p for pageno, lines in pdf_pages(str(pdf))
+             for p in page_paragraphs(lines, ORG_NAME["arn"], pageno)]
+    return Beslut(
+        org="arn", diarienummer=[dnr], titel=_norm(record["title"]),
+        beslutsdatum=record.get("beslutsdatum") or None,
+        nyckelord=[record["avdelning"]] if record.get("avdelning") else [],
+        body=classify_arn(paras), source_url=record.get("source_url"))
+
+
+# --------------------------------------------------------------------------
 # entry point (the build driver's recipe)
 # --------------------------------------------------------------------------
 
 def parse_record(basefile, root):
-    """One harvested basefile ("jo/2340-2025" / "jk/2024-8082") -> artifact
-    dict, body citation-scanned."""
+    """One basefile ("jo/2340-2025" / "jk/2024-8082" / "arn/1992-3657") ->
+    artifact dict, body citation-scanned."""
     org = basefile.split("/", 1)[0]
     record = json.loads(record_path(root, org, basefile).read_text())
     if org == "jo":
         beslut = parse_jo(record, root)
-    else:
+    elif org == "jk":
         beslut = parse_jk(record, jk_html_path(root, basefile).read_text())
+    else:
+        beslut = parse_arn(record, root)
     return beslut.to_artifact(_fresh_parser())

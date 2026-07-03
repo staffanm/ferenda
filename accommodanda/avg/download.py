@@ -25,8 +25,25 @@ landing page plus a record JSON. Diarienummer come in several raw shapes
 multi-dnr ``;``-separated); :func:`jk_canonical` reduces them to the citation
 form that names the document.
 
+**ARN** (arn.se, Optimizely/EPiServer): Allmänna reklamationsnämnden publishes
+its vägledande beslut again -- the live source the §7g frozen import (1991-2022)
+could only look back from. The old session-bound Digiforms database
+(``adokweb.arn.se/referatwebb``) is still dead, but the current site carries a
+single static listing page, ``/om-arn/vagledande-beslut/``, whose "De senaste
+vägledande besluten" section links every published referat's decision PDF
+(2017-, ~140 today) with an ``<h3>{avdelning}, beslut {ISO-datum}</h3>`` heading,
+the ARN-curated summary paragraphs, and a link whose text names the diarienummer
+(``\\d{4}-\\d{4,}``, first names a joined referat). One page, no pagination, so
+the JK idiom applies -- every run walks the whole listing and fetches only what
+is new or changed (no ``.complete`` marker). Records are written in the same
+shape :func:`avg.parse.parse_arn` reads for the frozen corpus (dnr, beslutsdatum,
+avdelning, and the summary as the title -- ARN referat have no real title) plus a
+live ``source_url``. A harvested record carries no ``source`` marker key, so it
+wins over -- and its live PDF overwrites -- any frozen import of the same dnr
+(the §7g precedence rule; the other half lives in ``legacy.import_arn``).
+
 Stored per decision under ``site/data/avg/downloaded/{org}/``:
-``<slug>.json`` record (+ for JO the decision PDF, for JK the landing HTML).
+``<slug>.json`` record (+ for JO/ARN the decision PDF, for JK the landing HTML).
 """
 
 import html as htmllib
@@ -39,7 +56,14 @@ from bs4 import BeautifulSoup
 
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session, request
-from ..lib.util import Reporter, basefile_slug, record_path, write_atomic
+from ..lib.util import (
+    Reporter,
+    basefile_slug,
+    normalize_space,
+    record_path,
+    write_atomic,
+)
+from .legacy import RE_ARN_DNR, arn_pdf_path
 
 COMPLETE = ".complete"    # marker under the org dir: corpus walked clean once
 
@@ -54,6 +78,10 @@ JK_BASE = "https://www.jk.se"
 JK_LIST = JK_BASE + "/beslut-och-yttranden/"
 # "Diarienr: 2024/8082 / Beslutsdatum: 20 apr 2026" (the / separator is a span)
 RE_JK_OLD = re.compile(r"^(\d+)-(\d{2})-([\d.]+)$")
+
+ARN_BASE = "https://www.arn.se"
+ARN_LIST = ARN_BASE + "/om-arn/vagledande-beslut/"
+RE_ARN_ISODATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
 # --------------------------------------------------------------------------
@@ -275,14 +303,129 @@ def jk_sync(root, full=False, only=None, limit=None, delay=0.5):
 
 
 # --------------------------------------------------------------------------
+# ARN -- one static listing page + per-decision PDFs
+# --------------------------------------------------------------------------
+
+def arn_dnrs(text):
+    """Every diarienummer a listing link's text names ("Referat 2018-06-14;
+    2017-07814 (I) och 2017-13660 (II)" -> the two dnr, the embedded date skipped
+    -- ``\\d{4}-\\d{4,}`` needs 4+ trailing digits); first names the referat."""
+    return RE_ARN_DNR.findall(text or "")
+
+
+def arn_parse_listing(html_text):
+    """The referat entries of arn.se's vägledande-beslut page, in page order
+    (newest first): per ``<h3>{avdelning}, beslut {ISO-datum}</h3>`` its summary
+    paragraphs and the decision PDF link. Returns {avdelning, beslutsdatum,
+    title, url, dnrs} per entry that carries both a date and a PDF link. Pure
+    over the HTML so it is testable without network."""
+    soup = BeautifulSoup(html_text, "html.parser")
+    heading = next((h for h in soup.find_all("h2")
+                    if "senaste" in h.get_text().lower()), None)
+    assert heading is not None, \
+        "arn.se listing has no 'De senaste ...' section -- site changed?"
+    # collect element refs first, then mutate (extract the link) -- never during
+    # the find_all_next walk
+    entries, cur = [], None
+    for el in heading.find_all_next():
+        if el.name == "h2":
+            break                       # the next top-level section ends the list
+        if el.name == "h3":
+            cur = {"h3": el, "ps": []}
+            entries.append(cur)
+        elif cur is not None and el.name == "p":
+            cur["ps"].append(el)
+    items = []
+    for e in entries:
+        h3 = normalize_space(e["h3"].get_text(" ", strip=True))
+        date = RE_ARN_ISODATE.search(h3)
+        link = None
+        for p in e["ps"]:
+            anchor = p.find("a", href=lambda h: h and "pdfer" in h)
+            if anchor:
+                link = (ARN_BASE + str(anchor["href"]),
+                        normalize_space(anchor.get_text(" ", strip=True)))
+                anchor.extract()        # so the "Referat NNNN" trailer leaves the title
+                break
+        if not (date and link and arn_dnrs(link[1])):
+            continue
+        summary = normalize_space(" ".join(normalize_space(p.get_text(" ", strip=True))
+                                     for p in e["ps"]))
+        items.append({"avdelning": h3.split(",", 1)[0].strip(),
+                      "beslutsdatum": date.group(0), "title": summary,
+                      "url": link[0], "dnrs": arn_dnrs(link[1])})
+    return items
+
+
+def arn_listing(session):
+    """Every referat arn.se currently lists, in one request (the page carries no
+    pagination -- the whole 'vägledande beslut' set is inline)."""
+    return arn_parse_listing(request(session, "GET", ARN_LIST, timeout=120).text)
+
+
+def arn_save(root, item, session, delay, full=False):
+    """Store one referat: its record (parse_arn's shape + a live ``source_url``)
+    and its decision PDF. Returns True when written (new, changed, or a frozen
+    import overwritten -- live always wins), False when already on disk unchanged
+    or when the site served a non-PDF body (rejected and logged, like jo_save --
+    an error page must never be stored as the decision). The record carries no
+    ``source`` marker key, so a frozen-import record of the same dnr never
+    compares equal: it is overwritten and its converted PDF is replaced by the
+    live one (the §7g precedence rule)."""
+    basefile = "arn/" + item["dnrs"][0]
+    record = {"basefile": basefile, "org": "arn",
+              "diarienummer": item["dnrs"][0],
+              "beslutsdatum": item["beslutsdatum"],
+              "avdelning": item["avdelning"], "title": item["title"],
+              "source_url": item["url"]}
+    path = record_path(root, "arn", basefile)
+    pdf = arn_pdf_path(root, basefile)
+    if not full and path.exists() and pdf.exists() \
+            and json.loads(path.read_text()) == record:
+        return False
+    response = request(session, "GET", item["url"], timeout=120)
+    time.sleep(delay)
+    if response.content[:4] != b"%PDF":
+        print("arn: %s: %s served a non-PDF body, skipping"
+              % (basefile, item["url"]), flush=True)
+        return False
+    write_atomic(pdf, response.content)
+    write_atomic(path, json.dumps(record, ensure_ascii=False, indent=2))
+    return True
+
+
+def arn_sync(root, full=False, only=None, limit=None, delay=0.5):
+    """Harvest ARN referat. The listing is one static page, so every run walks
+    all entries and fetches only what is missing or changed (``--full`` refetches
+    every PDF and rewrites every record). ``only`` = one basefile
+    ("arn/2026-00382"): the matching listing entry."""
+    session = make_session(USER_AGENT)
+    items = arn_listing(session)
+    if only:
+        dnr = only.split("/", 1)[1]
+        items = [i for i in items if i["dnrs"][0] == dnr]
+        assert items, "arn.se listing carries no decision with dnr %s" % dnr
+    seen = new = 0
+    rep = Reporter()
+    for item in items:
+        new += arn_save(root, item, session, delay, full=full)
+        seen += 1
+        rep.update(seen, len(items), changed=new)
+        if limit and seen >= limit:
+            break
+    rep.done()
+    return seen, new
+
+
+# --------------------------------------------------------------------------
 # entry point
 # --------------------------------------------------------------------------
 
 def sync(root, scopes=None, full=False, only=None, limit=None, delay=0.5):
-    """Harvest the named organs (default both). Returns {org: (seen, new)}."""
+    """Harvest the named organs (default all three). Returns {org: (seen, new)}."""
     totals = {}
-    for org in (scopes or ("jo", "jk")):
-        run = {"jo": jo_sync, "jk": jk_sync}[org]
+    for org in (scopes or ("jo", "jk", "arn")):
+        run = {"jo": jo_sync, "jk": jk_sync, "arn": arn_sync}[org]
         scoped_only = only if only and only.startswith(org + "/") else None
         totals[org] = run(str(root), full=full, only=scoped_only,
                           limit=limit, delay=delay)
