@@ -886,7 +886,10 @@ them resolve.
   construction. Bodies are **PDF-only** (the printed page is the citation
   anchor; riksdagen's HTML body carries no pages) — a betänkande without an
   attached filbilaga gets a metadata-only record, still a real catalog
-  document. Incremental (newest-first, stop at first on-disk) + `--full`;
+  document. Incremental (newest-first, gated by the shared `HarvestWatermark`;
+  only *final* records feed the gate, and the saved date is the newest
+  *published* entry's datum — a planned betänkande's future datum would erode
+  the safety margin) + `--full`;
   a full backfill iterates all **161 riksmöten** back to 1867, because the
   API caps a single query's pagination at ~10k docs, far below the ~75k-doc
   corpus. Wired into `build.py`'s `fa_harvest` as scope `"bet"` (its own
@@ -1155,7 +1158,7 @@ are not yet citation *targets*; the inbound value comes from the edges above.
   `bemyndigande` → `https://lagen.nu/{sfs}#P{n}`. `structure` is the förarbete-style
   nested §§ tree (filled at parse).
 - ✅ **Reusable harvest engine** (`foreskrift/harvest.py`) — the shared loop
-  (incremental newest-first + `.complete` backfill marker, atomic writes, `Reporter`,
+  (incremental newest-first gated by the shared `HarvestWatermark`, atomic writes, `Reporter`,
   politeness; generalized `forarbete.sync`) is **architecture-agnostic**. An agency is
   config naming two seams over it:
   - **`enumerate`** — *how to list an agency's docs*, the variable axis. Three reusable
@@ -1185,7 +1188,7 @@ are not yet citation *targets*; the inbound value comes from the edges above.
   next agency (one bad source can't abort the 15-agency run); multi-page enumerators
   (`indexed_enumerate` per-year, `paginated`, `sitemap`) yield a `Skip` for one
   unreachable page and keep walking the tail. A `Skip` is *logged* (never swallowed)
-  and *withholds the `.complete` marker* so the page is retried next run; an
+  and *withholds the watermark save* so the page is retried next run; an
   *expected* empty page (a year with no regulations — `optional_pages`) is silently
   skipped, not an error.
 - ✅ **Per-agency parse-coverage fixes** surfaced by the full run: MSBFS 25→96/97
@@ -1297,7 +1300,7 @@ now have internal targets.
     dnr, beslutsdatum, title, summary, deciding ombudsman, sakområde/lagrum
     taxonomies, the decision **PDF url** and the site's own flat text
     extraction. **3,738 decisions back to 1979.** Newest-first incremental with
-    the dv-style `.complete` backfill marker; the PDF is fetched per decision.
+    the dv-style `HarvestWatermark` incremental gate; the PDF is fetched per decision.
   - **JK** (Umbraco): the listing still honours the legacy "broken pagination"
     hack — `POST page=9999` returns the whole corpus in one response
     (**1,427 decisions, publications 1998–**). The decision *is* its landing

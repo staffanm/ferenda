@@ -816,7 +816,7 @@ def fa_harvest(scopes):
     one regeringen scope) fetches just that one document, walking the listing
     until it is found (regeringen types only -- bet has no --only).
     `--riksmote YYYY/YY` (with exactly the bet scope) narrows the bet harvest
-    to one riksmöte -- a dev/manual slice that never marks the corpus complete."""
+    to one riksmöte -- a dev/manual slice that never advances the watermark."""
     if RUN.only and len(scopes) != 1:
         sys.exit("forarbete --only needs exactly one doctype, e.g. "
                  "`lagen forarbete download prop --only 2025/26:28`")
@@ -894,7 +894,7 @@ SOURCES["forarbete"] = Source("forarbete", fa_list, {
    notes="download flag: --only BASEFILE (fetch one document; needs one "
          "regeringen scope)\n"
          "download flag: --riksmote YYYY/YY (narrow the bet harvest to one "
-         "riksmöte; needs the bet scope, never marks the corpus complete)\n"
+         "riksmöte; needs the bet scope, never advances the watermark)\n"
          "import-legacy {%s} [<path>]: one-time import of a frozen förarbete "
          "corpus (--limit N caps it; --force re-imports)" % FA_LEGACY_CORPORA)
 

@@ -25,24 +25,6 @@ def write_atomic(path, data):
         raise
 
 
-def sync_complete_marker(marker, *, exhausted, errors):
-    """Maintain a corpus ``.complete`` marker after a harvest walk. The marker
-    promises "walked clean at least once, no gaps": it is written only when the
-    walk exhausted its listing with zero errors, and dropped whenever any
-    document failed -- a failed document sits *behind* successfully stored
-    newer ones, where the next incremental stop-at-known walk would never reach
-    it again (a permanent silent gap). Dropping the marker makes the next run
-    backfill; backfill skips known docs, so recovery costs only listing pages.
-    An early-stopped clean walk (incremental stop, ``limit``, ``only``, an rm-
-    narrowed run) leaves any existing marker untouched."""
-    marker = Path(marker)
-    if errors:
-        marker.unlink(missing_ok=True)
-    elif exhausted:
-        marker.parent.mkdir(parents=True, exist_ok=True)
-        marker.write_text("")
-
-
 def basefile_slug(basefile):
     """Filesystem-safe form of a basefile; the true identifier lives in the
     record JSON, so this only has to be unique and stable."""

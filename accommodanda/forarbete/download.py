@@ -1,6 +1,6 @@
 """Downloader for Swedish preparatory works (förarbeten) from regeringen.se.
 
-regeringen.se publishes eight document types under /rattsliga-dokument/. The
+regeringen.se publishes nine document types under /rattsliga-dokument/. The
 visible `?p=N` links are decoration -- the listing is paged by an AJAX endpoint
 the page's JS calls, returning a JSON envelope `{"Message": <html>, "TotalCount":
 N}` whose Message is the `<ul class="list--block">` of items:
@@ -218,7 +218,7 @@ def download_document(session, root, item, delay):
 # harvest
 # --------------------------------------------------------------------------
 
-def _has_live_record(root, typ, basefile):
+def has_live_record(root, typ, basefile):
     """Whether a *live-harvest* record already exists for this document. A frozen
     import record (§7g -- it carries a `source` key) is treated as absent, for two
     reasons: live always wins, so the downloader must fetch its better copy and
@@ -271,7 +271,7 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
                 if newest_date is None and item.get("date"):
                     newest_date = item["date"]
 
-                is_downloaded = _has_live_record(root, typ, item["basefile"])
+                is_downloaded = has_live_record(root, typ, item["basefile"])
                 if not backfill:
                     if watermark.should_stop(is_downloaded, item.get("date")):
                         done = True

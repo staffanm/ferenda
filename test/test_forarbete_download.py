@@ -6,7 +6,7 @@ import requests
 
 from accommodanda.forarbete import download
 from accommodanda.forarbete.download import (
-    _has_live_record,
+    has_live_record,
     basefile_slug,
     find_content_links,
     parse_listing,
@@ -151,23 +151,24 @@ def test_has_live_record_treats_import_as_absent(tmp_path):
     # a genuine live-harvest record (no `source`) blocks re-download / stops the walk
     write_atomic(record_path(tmp_path, "prop", "2020/21:1"),
                  json.dumps({"type": "prop", "files": []}))
-    assert _has_live_record(tmp_path, "prop", "2020/21:1") is True
+    assert has_live_record(tmp_path, "prop", "2020/21:1") is True
     # a frozen import record (carries `source`, §7g) is treated as absent, so the
     # live downloader fetches its better copy AND it never trips the incremental stop
     write_atomic(record_path(tmp_path, "prop", "1997/98:45"),
                  json.dumps({"type": "prop", "source": "proptrips", "legacy_files": []}))
-    assert _has_live_record(tmp_path, "prop", "1997/98:45") is False
-    assert _has_live_record(tmp_path, "prop", "1867:23") is False   # truly absent
+    assert has_live_record(tmp_path, "prop", "1997/98:45") is False
+    assert has_live_record(tmp_path, "prop", "1867:23") is False   # truly absent
 
 
-def test_incremental_error_drops_the_types_complete_marker(monkeypatch, tmp_path):
-    # marker invariant: a new doc that fails during an incremental walk sits
-    # behind successfully stored newer ones, so the next stop-at-known walk
-    # would never reach it again -- the type's .complete marker must go so the
-    # next run backfills the gap.
-    marker = tmp_path / "prop" / ".complete"
-    marker.parent.mkdir(parents=True)
-    marker.write_text("")
+def test_incremental_error_keeps_watermark_and_next_run_retries(
+        monkeypatch, tmp_path):
+    # watermark invariant: a doc that fails during an incremental walk is
+    # simply missing on disk -- a gap the watermark gate never stops on -- so
+    # the watermark must not advance on an errored run, and the next
+    # incremental run must reach and heal the gap.
+    watermark = tmp_path / "prop" / ".watermark.json"
+    watermark.parent.mkdir(parents=True)
+    watermark.write_text(json.dumps({"last_harvest": "2025-12-01"}))
     item = {"type": "prop", "basefile": "2025/26:999",
             "identifier": "Prop. 2025/26:999", "title": "En ny lag",
             "date": "2026-01-01", "url": "https://www.regeringen.se/x/",
@@ -182,4 +183,13 @@ def test_incremental_error_drops_the_types_complete_marker(monkeypatch, tmp_path
     monkeypatch.setattr(download, "download_document", failing_download)
     totals = download.sync(tmp_path, types=["prop"], delay=0)
     assert totals["prop"] == (1, 0)      # the failure was counted, not raised
-    assert not marker.exists()           # marker dropped -> next run backfills
+    # the errored run must not advance the watermark past the failed doc
+    assert json.loads(watermark.read_text())["last_harvest"] == "2025-12-01"
+
+    def storing_download(session, root, item, delay):
+        write_atomic(record_path(root, item["type"], item["basefile"]),
+                     json.dumps(item))
+
+    monkeypatch.setattr(download, "download_document", storing_download)
+    totals = download.sync(tmp_path, types=["prop"], delay=0)
+    assert totals["prop"] == (1, 1)      # the gap healed on the next run

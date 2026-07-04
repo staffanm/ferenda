@@ -171,10 +171,23 @@ def test_riksmoten_sequence():
 
 
 # --------------------------------------------------------------------------
-# sync: multi-riksmöte backfill, incremental, and the .complete marker rules
+# sync: multi-riksmöte backfill, incremental, and the watermark rules
 # --------------------------------------------------------------------------
 
 RM_PAGE2_URL = "https://data.riksdagen.se/dokumentlista/rm-2025-26-page2"
+
+
+def _watermark(tmp_path):
+    """The saved last_harvest date, or None when no watermark exists."""
+    path = tmp_path / "bet" / riksdagen.WATERMARK
+    return json.loads(path.read_text())["last_harvest"] if path.exists() else None
+
+
+def _set_watermark(tmp_path, date_str):
+    """Simulate an earlier clean harvest on `date_str` -- gives the gate's
+    safety margin (14 days) room over the fixtures' fixed datums."""
+    write_atomic(tmp_path / "bet" / riksdagen.WATERMARK,
+                 json.dumps({"last_harvest": date_str}))
 
 
 def _page(docs, sida="1", nasta=None):
@@ -201,11 +214,14 @@ def _backfill_net(monkeypatch):
     return net
 
 
-def test_sync_backfill_walks_riksmoten_and_marks_complete(monkeypatch, tmp_path):
+def test_sync_backfill_walks_riksmoten_and_saves_watermark(monkeypatch, tmp_path):
     net = _backfill_net(monkeypatch)
     seen, new = riksdagen.sync(tmp_path, delay=0)
     assert seen == 3 and new == 3          # FiU8 (metadata-only) + KU45 + JuU47
-    assert (tmp_path / "bet" / riksdagen.COMPLETE).exists()
+    # the saved date is the newest *published* entry's datum (KU45, 2026-06-16);
+    # the planned FiU8's later datum (2026-06-30) must not win -- a planned
+    # datum lies in the future and would erode the gate's safety margin
+    assert _watermark(tmp_path) == "2026-06-16"
     assert record_path(tmp_path, "bet", "2026/27:FiU8").exists()
     assert record_path(tmp_path, "bet", "2025/26:JuU47").exists()
     # the newest-riksmöte probe hits the un-narrowed listing once; every listing
@@ -219,13 +235,16 @@ def test_sync_backfill_walks_riksmoten_and_marks_complete(monkeypatch, tmp_path)
 
 def test_sync_incremental_run_is_one_unnarrowed_walk(monkeypatch, tmp_path):
     _backfill_net(monkeypatch)
-    riksdagen.sync(tmp_path, delay=0)                     # backfill, writes marker
+    riksdagen.sync(tmp_path, delay=0)                     # backfill, saves watermark
+    _set_watermark(tmp_path, "2026-07-15")   # a later clean harvest has happened
     net2 = FakeNet()
     _patch(monkeypatch, net2)
     seen2, new2 = riksdagen.sync(tmp_path, delay=0)
     assert new2 == 0
-    # marker present -> single un-narrowed newest-first walk, stopped at the
-    # first known doc on page 1 (page 2 never requested, no rm narrowing)
+    # watermark present -> single un-narrowed newest-first walk. The provisional
+    # FiU8 (datum 2026-06-30 < the 2026-07-01 limit, but not final) reads as a
+    # gap, then the final KU45 (2026-06-16, past the limit) stops the walk
+    # conclusively -- page 2 never requested, no rm narrowing
     assert [u for u in net2.fetched if "dokumentlista" in u] == [riksdagen.LISTING]
 
 
@@ -240,18 +259,10 @@ def test_sync_backfill_skips_known_docs_but_keeps_walking(monkeypatch, tmp_path)
     seen, new = riksdagen.sync(tmp_path, delay=0)
     assert seen == 3 and new == 2                # KU45 skipped, walk continued
     assert record_path(tmp_path, "bet", "2025/26:JuU47").exists()
-    assert (tmp_path / "bet" / riksdagen.COMPLETE).exists()
+    assert _watermark(tmp_path) == "2026-06-16"
 
 
-def test_sync_limit_truncated_backfill_never_marks_complete(monkeypatch, tmp_path):
-    _backfill_net(monkeypatch)
-    seen, new = riksdagen.sync(tmp_path, delay=0, limit=1)
-    assert new == 1
-    # the limit stopped the walk mid-corpus -> not a full walk, no marker
-    assert not (tmp_path / "bet" / riksdagen.COMPLETE).exists()
-
-
-def test_riksmote_narrowed_run_never_writes_complete(monkeypatch, tmp_path):
+def test_riksmote_narrowed_run_never_advances_watermark(monkeypatch, tmp_path):
     net = FakeNet()
     # narrowing appends the API's &rm= parameter; point that url at the fixtures
     narrowed_url = riksdagen.LISTING + "&rm=2025/26"
@@ -260,16 +271,15 @@ def test_riksmote_narrowed_run_never_writes_complete(monkeypatch, tmp_path):
     _patch(monkeypatch, net)
     seen, new = riksdagen.sync(tmp_path, delay=0, riksmote="2025/26")
     assert seen == 4 and new == 4                       # it did download
-    assert not (tmp_path / "bet" / riksdagen.COMPLETE).exists()   # but never marks complete
+    assert _watermark(tmp_path) is None       # a partial view never advances it
 
 
-def test_full_rewalk_with_errors_drops_stale_marker(monkeypatch, tmp_path):
-    # a --full re-walk over an already-complete corpus that hits errors must not
-    # leave the stale marker behind (the backfill branch drops it up front and
-    # rewrites it only on a clean finish)
+def test_full_rewalk_with_errors_does_not_advance_watermark(monkeypatch, tmp_path):
+    # a --full re-walk that hits errors leaves a gap on disk; the watermark
+    # must not advance past it (an errored run never saves)
     _backfill_net(monkeypatch)
-    riksdagen.sync(tmp_path, delay=0)                     # clean backfill, marker on
-    assert (tmp_path / "bet" / riksdagen.COMPLETE).exists()
+    riksdagen.sync(tmp_path, delay=0)                     # clean backfill
+    assert _watermark(tmp_path) == "2026-06-16"
     # the JuU47 copy goes missing and its refetch now yields non-PDF bytes
     juu47 = _entry(PAGE1, "JuU47")
     record_path(tmp_path, "bet", "2025/26:JuU47").unlink()
@@ -277,11 +287,11 @@ def test_full_rewalk_with_errors_drops_stale_marker(monkeypatch, tmp_path):
     net2.bad_fil.add(riksdagen.pdf_fil(juu47)["url"])
     seen, new = riksdagen.sync(tmp_path, delay=0, full=True)
     assert new == 0                                       # the refetch failed
-    assert not (tmp_path / "bet" / riksdagen.COMPLETE).exists()   # no stale marker
+    assert _watermark(tmp_path) == "2026-06-16"           # unchanged
 
 
 # --------------------------------------------------------------------------
-# per-document failure handling: non-PDF bytes and the marker invariant
+# per-document failure handling: non-PDF bytes and the watermark invariant
 # --------------------------------------------------------------------------
 
 def test_download_rejects_non_pdf_bytes(monkeypatch, tmp_path):
@@ -297,15 +307,15 @@ def test_download_rejects_non_pdf_bytes(monkeypatch, tmp_path):
     assert not record_path(tmp_path, "bet", "2025/26:JuU47").exists()
 
 
-def test_incremental_error_drops_marker_and_backfill_recovers(monkeypatch, tmp_path):
+def test_incremental_error_holds_watermark_and_next_run_heals(monkeypatch, tmp_path):
     # 1) clean backfill of the two-riksmöte corpus (JuU45 not in it yet)
     _backfill_net(monkeypatch)
     riksdagen.sync(tmp_path, delay=0)
-    assert (tmp_path / "bet" / riksdagen.COMPLETE).exists()
+    assert _watermark(tmp_path) == "2026-06-16"
     # 2) incremental run: a NEW doc (JuU45) tops the un-narrowed listing ahead
-    #    of the known KU45, but its PDF fetch yields non-PDF bytes. The failed
-    #    doc is behind successfully-stored newer ones, so a later incremental
-    #    run would stop before ever reaching it -- the marker must go.
+    #    of the known KU45, but its PDF fetch yields non-PDF bytes. The errored
+    #    run must not advance the watermark -- the failed doc is simply missing,
+    #    a gap the gate never stops on.
     juu45 = _entry(PAGE2, "JuU45")
     net2 = FakeNet()
     net2.pages[riksdagen.LISTING] = _page([juu45, _entry(PAGE1, "KU45")])
@@ -314,16 +324,17 @@ def test_incremental_error_drops_marker_and_backfill_recovers(monkeypatch, tmp_p
     seen, new = riksdagen.sync(tmp_path, delay=0)
     assert new == 0                                       # the failure was counted, not raised
     assert not record_path(tmp_path, "bet", "2025/26:JuU45").exists()
-    assert not (tmp_path / "bet" / riksdagen.COMPLETE).exists()   # marker invariant
-    # 3) the next run therefore backfills (skipping known docs) and fetches the
-    #    missed document with the transient failure gone
-    net3 = _backfill_net(monkeypatch)
-    net3.pages[RM_PAGE2_URL] = _page([_entry(PAGE1, "JuU47"), juu45], sida="2")
+    assert _watermark(tmp_path) == "2026-06-16"           # not advanced
+    # 3) the next incremental run (still one un-narrowed walk, no rm backfill)
+    #    reaches the gap and heals it with the transient failure gone
+    net3 = FakeNet()
+    net3.pages[riksdagen.LISTING] = _page([juu45, _entry(PAGE1, "KU45")])
+    _patch(monkeypatch, net3)
     seen3, new3 = riksdagen.sync(tmp_path, delay=0)
     assert new3 == 1                                      # exactly the missed doc
     assert record_path(tmp_path, "bet", "2025/26:JuU45").exists()
     assert (tmp_path / "bet" / "2025-26-JuU45.pdf").read_bytes() == PDF_BYTES
-    assert (tmp_path / "bet" / riksdagen.COMPLETE).exists()
+    assert [u for u in net3.fetched if "dokumentlista" in u] == [riksdagen.LISTING]
 
 
 # --------------------------------------------------------------------------
@@ -356,25 +367,29 @@ def test_incremental_upgrades_metadata_only_record_once_pdf_appears(monkeypatch,
     net2.pages[riksdagen.LISTING] = _page([fiu8_pub, _entry(PAGE1, "KU45")])
     _patch(monkeypatch, net2)
     seen, new = riksdagen.sync(tmp_path, delay=0)         # incremental
-    assert new == 1                                       # the upgrade, then stop at KU45
+    assert new == 1                                       # the upgrade
     assert json.loads(fiu8_record.read_text())["files"] == ["2026-27-FiU8.pdf"]
     assert (tmp_path / "bet" / "2026-27-FiU8.pdf").read_bytes() == PDF_BYTES
-    assert (tmp_path / "bet" / riksdagen.COMPLETE).exists()   # no errors, marker stays
+    # the clean run saves the watermark; FiU8 now counts as published, so its
+    # datum (the newest) is the new last_harvest
+    assert _watermark(tmp_path) == "2026-06-30"
 
 
 def test_incremental_stops_only_at_final_records(monkeypatch, tmp_path):
-    # a current provisional (still filbilaga-less) record never anchors the
-    # incremental stop: a planned betänkande's datum can post-date documents
-    # published after the last harvest, so the datum sort puts those new docs
-    # *behind* the placeholder -- stopping at it would skip them silently.
-    # Here the NEW JuU45 sorts below the FiU8 placeholder: the walk must skip
-    # FiU8 (still current, no re-download), fetch JuU45, and stop at the final
-    # KU45 -- without following @nasta_sida past it (that url is not served;
-    # this is also what keeps a wholly provisional old-corpus region like
-    # rm=1990/91 from ever being re-walked: the walk stops at the first final
-    # doc above it).
+    # a current provisional (still filbilaga-less) record never feeds the
+    # gate as "downloaded": a planned betänkande's datum can post-date
+    # documents published after the last harvest, so the datum sort puts those
+    # new docs *behind* the placeholder -- stopping at it would skip them
+    # silently. Here the NEW JuU45 sorts below the FiU8 placeholder: the walk
+    # must skip FiU8 (still current, no re-download, gate reads it as a gap),
+    # fetch JuU45, and stop conclusively at the final KU45 (its datum is past
+    # the safety margin) -- without following @nasta_sida past it (that url is
+    # not served; this is also what keeps a wholly provisional old-corpus
+    # region like rm=1990/91 from ever being re-walked: the walk stops at the
+    # first final doc above it).
     _backfill_net(monkeypatch)
     riksdagen.sync(tmp_path, delay=0)                     # FiU8 stored metadata-only
+    _set_watermark(tmp_path, "2026-07-15")   # a later clean harvest has happened
     net2 = FakeNet()
     net2.pages[riksdagen.LISTING] = _page(
         [_entry(PAGE1, "FiU8"), _entry(PAGE2, "JuU45"), _entry(PAGE1, "KU45")],

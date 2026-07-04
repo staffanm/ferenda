@@ -26,13 +26,17 @@ entry, the record is re-downloaded and upgraded in place (see `_currency`).
 
 Stored under `site/data/forarbete/bet/`: one `<slug>.json` record (type,
 basefile, identifier, title, date, url, files, plus organ and dok_id) and,
-when present, the `<slug>.pdf`. Incremental by default: newest-first, stop at
-the first *final* document already on disk and current -- a provisional
-(planned, filbilaga-less) record never anchors the stop, since its planned
-datum can top docs published after the last harvest (see `_currency`).
-`--full` re-walks.
+when present, the `<slug>.pdf`. Incremental by default: newest-first, gated by
+the shared `HarvestWatermark` (`lib/util.py`) exactly like the regeringen and
+foreskrift harvesters -- the walk stops on a run of consecutive already-current
+*final* documents, or conclusively on one current final document older than the
+last clean harvest minus the safety margin. A provisional (planned,
+filbilaga-less) record never feeds the gate: its planned datum can top docs
+published after the last harvest (see `_currency`), and for the same reason the
+saved watermark date is the newest *published* entry's datum, never a planned
+one. `--full` re-walks.
 `--riksmote` narrows the walk to one riksmöte for dev/manual runs -- a narrowed
-walk is a partial view, so it never writes the `.complete` marker (else a later
+walk is a partial view, so it never advances the watermark (else a later
 full backfill would go incremental and silently skip the corpus).
 
 The API caps any one listing at ~50 pages (10k docs at sz=200), far below the
@@ -57,19 +61,19 @@ import requests
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
 from ..lib.util import (
+    HarvestWatermark,
     Reporter,
     basefile_slug,
     record_path,
-    sync_complete_marker,
     write_atomic,
 )
-from .download import _has_live_record
+from .download import has_live_record
 
 API = "https://data.riksdagen.se"
 LISTING = (API + "/dokumentlista/?doktyp=bet&utformat=json"
            "&sort=datum&sortorder=desc&sz=200")
 TYPE = "bet"
-COMPLETE = ".complete"   # marker under bet/: corpus walked clean at least once
+WATERMARK = ".watermark.json"   # under bet/: HarvestWatermark state
 
 
 def _https(url):
@@ -161,7 +165,7 @@ def download_document(session, root, entry, delay):
 def _currency(root, entry, basefile):
     """How current the on-disk record for this entry is: None when it needs a
     (re)fetch, "final" when it has its PDF stored, "provisional" for a current
-    metadata-only record. Builds on the shared `_has_live_record` (a frozen
+    metadata-only record. Builds on the shared `has_live_record` (a frozen
     import never counts), adding the pre-print upgrade cycle: riksdagen lists a
     betänkande as "planerat" (beslutad=0, filbilaga null -- 19 of the newest 200
     feed entries) before the printed PDF is attached, so a routinely harvested
@@ -173,12 +177,13 @@ def _currency(root, entry, basefile):
     -- so they never re-download.
 
     The final/provisional split exists for the incremental stop: only a final
-    record may anchor it (see `_walk`). A planned entry carries the datum of its
-    *planned* debate, which can post-date documents published after the last
-    harvest -- the feed's datum sort then puts those new docs *behind* the
-    placeholder, and stopping at it would skip them silently (permanently, if
-    the placeholder is withdrawn and never gains a filbilaga)."""
-    if not _has_live_record(root, TYPE, basefile):
+    record may feed the watermark gate (see `_walk`). A planned entry carries
+    the datum of its *planned* debate, which can post-date documents published
+    after the last harvest -- the feed's datum sort then puts those new docs
+    *behind* the placeholder, and stopping at it would skip them silently
+    (permanently, if the placeholder is withdrawn and never gains a
+    filbilaga)."""
+    if not has_live_record(root, TYPE, basefile):
         return None
     record = json.loads(record_path(root, TYPE, basefile).read_text())
     if record["files"]:
@@ -224,99 +229,101 @@ def newest_riksmote_year(session):
     return max(int(entry["rm"][:4]) for entry in docs)
 
 
-def _walk(session, root, url, *, backfill, limit, delay, log, rep, scope):
+def _walk(session, root, url, *, watermark, delay, log, rep, scope):
     """One listing walk (one url, `@nasta_sida`-paged): download every document
     whose record is absent or stale (`_currency` -- a metadata-only record
     whose entry has since gained a filbilaga is re-downloaded and upgraded).
-    Incremental (not backfill) stops at the first current *final* on-disk
-    record (newest-first => everything after is older); a current provisional
-    record is skipped but never anchors the stop -- its planned-debate datum
-    can post-date docs published since the last harvest, which the datum sort
-    puts behind it (see `_currency`). A backfill skips current documents but
-    keeps walking. Returns (seen, new, errors, truncated) -- truncated = the
-    walk ended early (limit hit or incremental stop), so the listing was NOT
-    exhausted."""
+    With a `watermark` (an incremental run) the walk stops when the
+    `HarvestWatermark` gate says the corpus is caught up; only a current
+    *final* record counts as downloaded for the gate -- a current provisional
+    record is skipped but reads as a gap, since its planned-debate datum can
+    post-date docs published since the last harvest, which the datum sort puts
+    behind it (see `_currency`). `watermark=None` (a backfill or an rm-narrowed
+    run) skips current documents but always walks the whole listing. Returns
+    (seen, new, errors, newest_pub) -- newest_pub = the datum of the newest
+    *published* (filbilaga-carrying) entry seen, the only sound watermark date
+    (a planned entry's future datum would erode the safety margin)."""
     seen = new = errors = 0
-    truncated = False
+    newest_pub = None
+    stopped = False
     for page in iter_pages(session, url, delay):
         for entry in _docs(page):
             seen += 1
             basefile = "%s:%s" % (entry["rm"], entry["beteckning"])
             currency = _currency(root, entry, basefile)
+            if watermark is not None and watermark.should_stop(
+                    currency == "final", entry.get("datum")):
+                stopped = True
+                break
+            if newest_pub is None and pdf_fil(entry) is not None:
+                newest_pub = entry["datum"]   # newest-first => first published wins
             if currency:
-                if not backfill and currency == "final":
-                    truncated = True
-                    break
                 continue
             try:
                 download_document(session, root, entry, delay)
                 new += 1
             except (requests.HTTPError, ValueError) as exc:
                 # a counted, logged per-document failure (a 404'd filbilaga or
-                # non-PDF bytes) that gates the `.complete` marker; it must not
+                # non-PDF bytes) that gates the watermark save; it must not
                 # abort the remaining ~161-riksmöte walk
                 errors += 1
                 log("  bet %s: %s" % (basefile, exc))
-            if limit and new >= limit:
-                truncated = True
-                break
         rep.update(seen, int(page["@traffar"]), scope=scope,
                    page=int(page["@sida"]), new=new)
-        if truncated:
+        if stopped:
             break
     rep.done()
-    return seen, new, errors, truncated
+    return seen, new, errors, newest_pub
 
 
-def sync(root, full=False, limit=None, delay=0.5, log=print, riksmote=None):
+def sync(root, full=False, delay=0.5, log=print, riksmote=None):
     """Harvest utskottsbetänkanden (doktyp=bet) into `root/bet/`.
 
     Backfilled -- everything missing downloaded -- when `--full` is given or the
-    corpus has never been cleanly walked (no `.complete` marker: a first run, or
-    one interrupted partway). Because the API caps any one listing at ~10k docs,
-    an un-narrowed backfill walks riksmöte by riksmöte, newest to oldest (see
-    `riksmoten`); the marker is written only after ALL riksmöte walks finish
+    corpus has never been cleanly walked (no watermark yet: a first run, or one
+    interrupted partway). Because the API caps any one listing at ~10k docs, an
+    un-narrowed backfill walks riksmöte by riksmöte, newest to oldest (see
+    `riksmoten`); the watermark is saved only after ALL riksmöte walks finish
     with zero errors, so an interrupted or partially-failed initial load is
-    resumed, not mistaken for finished. Once complete, later runs go
-    incremental: one un-narrowed newest-first walk stopping at the first
-    *final* document already on disk and current (new docs land at the top,
-    well within the cap; a filbilaga attached to a doc already *behind* the
-    stop point surfaces only under `--full`, like edits to old regeringen
-    docs).
+    resumed, not mistaken for finished. Once caught up, later runs go
+    incremental: one un-narrowed newest-first walk gated by the shared
+    `HarvestWatermark` (new docs land at the top, well within the cap; a
+    document that failed mid-run is simply missing -- a gap the gate never
+    stops on -- so the next incremental run reaches and heals it; a filbilaga
+    attached to a doc already *past* the stop point surfaces only under
+    `--full`, like edits to old regeringen docs). The saved watermark date is
+    the newest *published* entry's datum -- a planned entry's future datum
+    would erode the gate's safety margin (see `_walk`).
     `riksmote` narrows the run to one riksmöte (e.g. "2025/26", the API's `rm=`
     parameter) for dev/manual runs; a narrowed run is a partial view of the
-    corpus and therefore NEVER writes `.complete`. Returns (seen, new)."""
+    corpus and therefore NEVER advances the watermark. Returns (seen, new)."""
     root = Path(root)
     session = make_session(USER_AGENT)
-    marker = root / TYPE / COMPLETE
-    backfill = full or not marker.exists()
+    watermark_path = root / TYPE / WATERMARK
+    watermark = HarvestWatermark(watermark_path, lookahead_limit=20,
+                                 safety_days=14)
     rep = Reporter()
-    if backfill and riksmote is None:
-        # marker invariant: entering a backfill invalidates any earlier "cleanly
-        # walked" claim -- the marker is dropped up front and rewritten only on a
-        # clean finish, so an interrupted, limit-truncated or partially-failed
-        # walk (including a --full re-walk over an already-complete corpus)
-        # leaves the next run backfilling instead of hiding the gaps behind the
-        # incremental stop.
-        marker.unlink(missing_ok=True)
-        seen = new = errors = 0
-        exhausted = True
-        for value in riksmoten(newest_riksmote_year(session)):
-            s, n, e, truncated = _walk(
-                session, root, LISTING + "&rm=" + quote(value), backfill=True,
-                limit=(limit - new if limit else None), delay=delay, log=log,
-                rep=rep, scope="%s %s" % (TYPE, value))
-            seen, new, errors = seen + s, new + n, errors + e
-            if truncated:
-                exhausted = False   # limit hit mid-corpus -> not a full walk
-                break
-        sync_complete_marker(marker, exhausted=exhausted, errors=errors)
+    if riksmote is not None:
+        seen, new, _, _ = _walk(session, root, LISTING + "&rm=" + quote(riksmote),
+                                watermark=None, delay=delay, log=log, rep=rep,
+                                scope=TYPE)
         return seen, new
-    url = LISTING + ("&rm=" + quote(riksmote) if riksmote else "")
-    seen, new, errors, _ = _walk(session, root, url, backfill=backfill,
-                                 limit=limit, delay=delay, log=log, rep=rep,
-                                 scope=TYPE)
-    # an incremental or rm-narrowed run never earns the marker; any error
-    # drops it (see sync_complete_marker for the no-gaps invariant)
-    sync_complete_marker(marker, exhausted=False, errors=errors)
+    if full or not watermark_path.exists():
+        seen = new = errors = 0
+        newest_pub = None
+        for value in riksmoten(newest_riksmote_year(session)):
+            s, n, e, pub = _walk(
+                session, root, LISTING + "&rm=" + quote(value), watermark=None,
+                delay=delay, log=log, rep=rep, scope="%s %s" % (TYPE, value))
+            seen, new, errors = seen + s, new + n, errors + e
+            newest_pub = newest_pub or pub   # walks run newest riksmöte first
+    else:
+        seen, new, errors, newest_pub = _walk(
+            session, root, LISTING, watermark=watermark, delay=delay, log=log,
+            rep=rep, scope=TYPE)
+    # an errored run leaves the watermark untouched: the failed doc is a gap
+    # the gate never stops on, so the next run (backfill on a first load,
+    # incremental otherwise) reaches and heals it before advancing the date
+    if errors == 0 and newest_pub:
+        watermark.save(newest_pub)
     return seen, new
