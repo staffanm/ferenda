@@ -13,8 +13,9 @@ same session). One hit is a complete record: ``diary_number``,
 deciding ombudsman (``resolve_maker``), the sakområde/lagstiftning taxonomies,
 the decision PDF url (``pdf_url``) *and* the site's own flat text extraction of
 it (``pdf_text``). ~3,700 decisions back to 1979. Newest-first by default, so
-incremental runs stop at the first page with nothing new; the ``.complete``
-marker gates the initial oldest..newest backfill exactly like dv/forarbete.
+incremental runs stop at the first page with nothing new; the shared
+``HarvestWatermark`` gates the initial oldest..newest backfill exactly like
+dv/forarbete.
 
 **JK** (jk.se, Umbraco): the listing at ``/beslut-och-yttranden/`` still
 honours the legacy "broken pagination" hack -- ``POST page=9999`` returns every
@@ -35,7 +36,7 @@ vägledande besluten" section links every published referat's decision PDF
 the ARN-curated summary paragraphs, and a link whose text names the diarienummer
 (``\\d{4}-\\d{4,}``, first names a joined referat). One page, no pagination, so
 the JK idiom applies -- every run walks the whole listing and fetches only what
-is new or changed (no ``.complete`` marker). Records are written in the same
+is new or changed (no watermark gate). Records are written in the same
 shape :func:`avg.parse.parse_arn` reads for the frozen corpus (dnr, beslutsdatum,
 avdelning, and the summary as the title -- ARN referat have no real title) plus a
 live ``source_url``. A harvested record carries no ``source`` marker key, so it

@@ -2,8 +2,8 @@
 
 ~100 agencies, but only a few *publishing architectures*. An agency is
 :class:`Agency` config naming an :class:`Architecture`; the harvest loop
-(:func:`harvest`) is architecture-agnostic -- incremental newest-first with a
-``.complete`` backfill marker, atomic writes, a politeness delay and a
+(:func:`harvest`) is architecture-agnostic -- incremental newest-first gated
+by the shared ``HarvestWatermark``, atomic writes, a politeness delay and a
 ``Reporter``, all lifted from ``forarbete.download.sync`` and shared.
 
 An architecture is two callables over that shared loop:
@@ -64,8 +64,8 @@ class Skip:
     badly maintained -- a per-year page 500s, one sitemap of several times out,
     a 'show all' list is briefly down -- so a multi-page enumerator yields this
     instead of a :class:`DocRef` when it cannot fetch one page but can keep
-    walking the rest. :func:`harvest` logs it and withholds the ``.complete``
-    marker, so the missed page is retried on the next run rather than silently
+    walking the rest. :func:`harvest` logs it and withholds the watermark
+    save, so the missed page is retried on the next run rather than silently
     lost. (An *expected* empty page -- a year with no regulations -- is not a
     Skip; the enumerator just yields nothing for it.)"""
     reason: str
