@@ -153,14 +153,28 @@ def blocks(body):
     return out
 
 
-def _target_uri(target):
+def target_uri(target):
     """A markdown link target -> the run uri, or None if it is not a recognised
     link (then the `[label](target)` is left as literal prose). Strict grammar:
-    `begrepp:Concept` concept links and `http(s)://` / `//` external links only;
-    bare `[x](y)` in legal prose stays text (the citation engine owns refs)."""
+    `begrepp:Concept` concept links, `sfs:1949:381` statute links,
+    `eurlex:32016R0679` EU-act links, and `http(s)://` / `//` external links
+    only; bare `[x](y)` in legal prose stays text (the citation engine owns
+    refs). The `source:identifier` schemes are deliberately symmetric -- a source
+    is named by its key, never by its on-disk/URL shape."""
     if target.startswith("begrepp:"):
         # `)` in a concept name is %29-escaped to survive the link grammar
         return begrepp_uri(target[len("begrepp:"):].replace("%29", ")"))
+    if target.startswith("sfs:"):
+        # a statute by SFS number -> its top-level lagen.nu document uri (render's
+        # `href` maps it back to the bare /<sfsid> URL). A general link-target
+        # rule, not site-specific: any source can now write `[FB](sfs:1949:381)`.
+        return "https://lagen.nu/" + target[len("sfs:"):]
+    if target.startswith("eurlex:"):
+        # an EU act by CELEX -> its ext/celex document uri (render's `href` maps
+        # it to the public /celex/<CELEX> URL, the same page the eurlex source
+        # builds). Symmetric with `sfs:` -- the content names the source, not the
+        # URL path, so `[GDPR](eurlex:32016R0679)` mirrors `[FB](sfs:1949:381)`.
+        return "https://lagen.nu/ext/celex/" + target[len("eurlex:"):]
     if RE_URL.match(target):
         # `)` in an external url is %29-escaped the same way (the link grammar's
         # `)` terminator can't appear literally in the target)
@@ -190,7 +204,7 @@ def guidance_item(line):
     m = RE_MDLINK.match(rest)
     if not m:
         return None
-    href = _target_uri(m.group(2).strip())
+    href = target_uri(m.group(2).strip())
     if href is None:
         return None
     note = rest[m.end():].strip().lstrip("—–-").strip()
@@ -243,7 +257,7 @@ def to_runs(text, refparser=None, **parse_kw):
         parts.append(before)
         length += len(before)
         last = m.end()
-        label, uri = m.group(1), _target_uri(m.group(2).strip())
+        label, uri = m.group(1), target_uri(m.group(2).strip())
         if uri is None:                      # not a link -- keep the literal text
             parts.append(m.group(0))
             length += len(m.group(0))

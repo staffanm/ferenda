@@ -45,12 +45,14 @@ AVG_ROOT = DATA / "avg"                   # JO/JK decisions (per-org subtrees)
 REMISSER_ROOT = DATA / "remisser"         # remiss responses (per-case subtrees)
 KOMMENTAR_ROOT = DATA / "kommentar"
 BEGREPP_ROOT = DATA / "begrepp"
-WIKI_ROOT = config.WIKI_ROOT        # git-backed markdown content repo (begrepp/ + kommentar/)
+SITE_ROOT = DATA / "site"           # editorial site content (frontpage, /om, sitenews)
+WIKI_ROOT = config.WIKI_ROOT        # git-backed markdown content repo (begrepp/ + kommentar/ + site/)
 
 ARTIFACT_ROOT = {"sfs": SFS_ROOT, "dv": DOM_ROOT, "forarbete": FA_ROOT,
                  "eurlex": EURLEX_ROOT, "foreskrift": FORESKRIFT_ROOT,
                  "avg": AVG_ROOT, "remisser": REMISSER_ROOT,
-                 "kommentar": KOMMENTAR_ROOT, "begrepp": BEGREPP_ROOT}
+                 "kommentar": KOMMENTAR_ROOT, "begrepp": BEGREPP_ROOT,
+                 "site": SITE_ROOT}
 
 # raw roots -- the download writers put their structure under these
 SFS_DOWNLOADED = SFS_ROOT / "downloaded"
@@ -133,6 +135,10 @@ def relpath(source, basefile):
     if source == "begrepp":
         # concept names are their own namespace (no host); keep the flat slug
         return Path(_alnum_slug(basefile))
+    if source == "site":
+        # editorial pages under fixed basefiles (`frontpage`, `sitenews`,
+        # `om/<slug>`); the basefile is already filesystem-safe, used verbatim
+        return Path(basefile)
     raise ValueError("unknown source %r" % source)
 
 
@@ -347,6 +353,11 @@ def page_relpath(uri):
         # MYNDIGHETSBESLUT citations mint): avg/jo/2340-2025 -> avg/jo_2340-2025.html
         _, _, rest = loc.partition("/")
         return "avg/%s.html" % rest.replace("/", "_")
+    elif loc.startswith("om/"):
+        # an editorial about page: /om/english -> om/english.html (the slug is
+        # already filesystem-safe). Explicit rather than leaning on the SFS
+        # else-branch's incidental passthrough.
+        return "%s.html" % loc
     else:
         # SFS: a top-level page, the SFS id kept verbatim (colon and all). The id
         # is already filesystem-safe (digits, ':', '_', '.'): 1827:60_s.1007.

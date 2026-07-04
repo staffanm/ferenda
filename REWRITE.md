@@ -76,6 +76,7 @@ accommodanda/
   foreskrift/ agency-regulations vertical — agencies·harvest·download·model·parse·structure·legacy
   avg/      JO/JK/ARN-decisions vertical — download·model·parse·legacy
   remisser/ remiss (referral-response) vertical — model·download·parse·ai_analyze
+  site/     editorial-chrome vertical (frontpage/om/sitenews) — model·parse·render (markdown content repo, WIKI_ROOT)
   wiki/     kommentar + begrepp sources — parse·annotate·guidance_discover (markdown content repo, WIKI_ROOT)
   api/      HTTP API — app
   build.py  orchestrator — the `lagen` build driver, composes the verticals
@@ -1609,6 +1610,47 @@ context rail, so it has no `relate`/`index`/`dump`/`generate` stage at all.
   `test/test_remisser_render.py`, `test/test_remisser_ai_analyze.py`,
   `test/test_pdftext.py` (32 tests, hermetic).
 
+### 7i. site vertical — lagen.nu's editorial chrome ✅ (first cut)
+
+`accommodanda/site/` carries the parts of lagen.nu that are hand-authored
+prose, not extracted legal-document semantics: the curated frontpage law
+list, the `/om/*` about pages, and the sitenews feed. Content is markdown in
+the same `lagen-wiki` repo as `concept/`/`commentary/`, under a new `site/`
+tree (`site/frontpage.md`, `site/sitenews.md`, `site/om/*.md`), populated
+one-off by `tools/migrate_site_content.py` from the legacy MediaWiki
+`Lagen.nu:Huvudsida` page, `lagen/nu/res/static/*.rst`, and `sitenews.txt` —
+the markdown is the source of truth thereafter.
+
+- **`model.py`**: a small block tree (`Heading`/`Paragraph`/`Bullets`/`Code`,
+  Swedish on-disk discriminators `rubrik`/`stycke`/`lista`/`kod`) plus the
+  three page shapes `Frontpage`, `AboutPage`, `Sitenews`/`NewsItem` — no
+  `Forfattning`/`Avgorande`-style domain model, since there's no citation
+  graph to hang one on.
+- **`parse.py`**: markdown → JSON artifact for three fixed basefiles
+  (`frontpage`, `om/<slug>`, `sitenews`, the last split into dated
+  `NewsItem`s on `## YYYY-MM-DD HH:MM:SS Title` heads); reuses
+  `lib.markdown`'s frontmatter/link/heading grammar and adds only the block
+  layer (bullet lists, fenced code) the legal-prose parser doesn't need. A
+  generic, symmetric `sfs:`/`eurlex:` link scheme (`[FB](sfs:1949:381)`,
+  `[GDPR](eurlex:32016R0679)`) was added to `lib.markdown.target_uri` for the
+  frontpage's law links — the content names the source, never its URL shape.
+- **`render.py`**: artifacts → static HTML + an Atom feed, one entry point
+  `write_site(out_root)`. Registered in `build.py` as `SOURCES["site"]` with
+  a `parse` Stage, but — like `remisser` — it is **absent from `ARTIFACTS`**,
+  so it is never `relate`d/indexed/dumped. It *is* rendered during
+  `generate`: `cmd_generate` calls `write_site` on a full run, on
+  `--aggregates-only`, and on `lagen site generate`. The curated frontpage
+  overwrites the generic corpus-stats `index.html` (`write_index=False`
+  threaded through `render.generate_site`/`render_aggregates` when
+  `has_frontpage()`); site artifacts are folded into `generate_watermark()`
+  so an editorial edit reopens the generate gate.
+- Served at `/` (frontpage), `/om/<slug>` + `/om/` hub, and
+  `/dataset/sitenews/feed` (+ `.atom`) via the app's `SiteFiles` handler —
+  no nginx change. New masthead entries "Om"/"Nyheter" in `lib/render.py`'s
+  `MAST_NAV`.
+- Wired end-to-end: `lagen site parse` (incremental) + `lagen site generate`.
+  `test/test_site_content.py` (parse + render, hermetic).
+
 ### 7b. Remaining verticals ⬜
 
 The rest of `/mnt/data/lagen/data/{…}`. Each built the same way; the horizontal
@@ -1632,6 +1674,7 @@ model + extraction.
 | `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (reusable engine — enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct}; `Skip`/`_guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 17 agencies live + 4 frozen-only), `download`, `legacy` (one-time import of the two harvest-blocked corpora, §7g), `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors). Corpus: 1218 regs harvested, parsed 0-fail |
 | `accommodanda/remisser/` | **remiss (referral-response) vertical**: `model` (`Remiss`/`Remissinstans`/`Remissvar`, `org_slug`), `download` (regeringen.se `/remisser/` two-pass sync + `sync_one`/`--only`, stub records for unreachable case pages), `parse` (answer PDF → `Remissvar` via `lib/pdftext` with no fixed header), `ai_analyze` (the sole LLM pass — sentiment+quote per section, `.ann` sidecar). Never `relate`d/published; its `.ann` layer feeds the referred förarbete's rail via `render._remiss_indexes` |
 | `accommodanda/lib/regeringen.py` | shared regeringen.se harvest knowledge (rule:second-use-goes-to-lib): the doctype table (`TYPES`) and `ul.list--block` listing walk (`listing_items`), used by both `forarbete/download.py` and `remisser/download.py` |
+| `accommodanda/site/` | **editorial-chrome vertical**: `model` (block-tree dataclasses + `Frontpage`/`AboutPage`/`Sitenews`), `parse` (markdown → artifact for `frontpage`/`om/<slug>`/`sitenews`), `render` (artifacts → HTML + Atom, `write_site`). Content is markdown in `lagen-wiki/site/`, migrated once by `tools/migrate_site_content.py`. Never `relate`d/indexed/dumped (absent from `ARTIFACTS`, like remisser); rendered during `generate` |
 | `accommodanda/lib/pdftext.py` | **shared font-aware PDF extraction** (förarbete + föreskrift + avg (JO/ARN) + remisser): `pdf_pages` (`pdftohtml -xml` → bold/italic-tagged `Line`s) → `page_paragraphs` (reflow, strip running header/page-no/TOC — `identifier=None` skips header-stripping for sources with no fixed masthead, e.g. remisser) → the vertical's own `classify` |
 | `accommodanda/config.py`, `lib/layout.py`, `lib/net.py` | runtime config (`config.yml`/`data_root`, also resolves `legacy_root`/`LEGACY_ROOT` for the §7g frozen-corpus imports), centralized document layout (`page_relpath` on-disk file ↔ `page_url`/`url_to_relpath` public lagen.nu address), resilient HTTP session + harvest progress reporter |
 | `accommodanda/lib/legacy_import.py` | shared frozen-import core (§7g): `should_write` (live-wins / own-import-idempotent-unless-force / optional `better()` tie-break), `rel` (in-place LEGACY_ROOT-relative body references), `iter_entries`/`docdir`/`read_record` (frozen-tree walk primitives) — used by `forarbete/legacy.py`, `foreskrift/legacy.py`, `avg/legacy.py` |
@@ -1743,6 +1786,16 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **§7i** (2026-07-04) — site vertical landed: lagen.nu's editorial chrome
+  (curated frontpage, `/om/*` about pages, sitenews feed) moved from
+  hand-maintained legacy templates to markdown in `lagen-wiki/site/`,
+  migrated once by `tools/migrate_site_content.py`. Small block-tree model
+  (`Heading`/`Paragraph`/`Bullets`/`Code`), `parse.py` reusing
+  `lib.markdown`'s grammar (plus new `sfs:`/`eurlex:` link schemes), `render.py`
+  writing static HTML + Atom (`write_site`). Registered in `build.py` with a
+  `parse` Stage but no `relate`/`index`/`dump`, like remisser; wired into
+  `generate` (full run, `--aggregates-only`, and `lagen site generate`) where
+  the curated frontpage overwrites the generic corpus-stats `index.html`.
 - **§6** (2026-07-04) — operations/health dashboard: `lib/runlog.py` owns the
   three `DATA/.build/` state files (run ledger, per-doc error store, rolling
   status snapshot), `build.py` instruments every invocation and extends

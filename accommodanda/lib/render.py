@@ -786,7 +786,9 @@ MAST_NAV = (("Lagar", "/sfs/", ("Författning",)),
              "Sveriges internationella överenskommelser", "Förarbete")),
             ("Föreskrifter", "/foreskrift/", ("Föreskrift",)),
             ("EU-rätt", "/eurlex/", ("EU-förordning", "EU-direktiv", "EU-beslut",
-             "EU-domstolen", "Fördrag", "EU-rättsakt")))
+             "EU-domstolen", "Fördrag", "EU-rättsakt")),
+            ("Om", "/om/", ("Om",)),
+            ("Nyheter", "/dataset/sitenews/feed/", ("Nyheter",)))
 
 
 def _masthead(kind):
@@ -1899,7 +1901,7 @@ def _render_one(job):
 
 
 def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None,
-                  only=None, source=None, jobs=1, extra=None):
+                  only=None, source=None, jobs=1, extra=None, write_index=True):
     """Render every catalogued document to static HTML. `fresh(uri, out_path,
     art_path, dep_digest) -> bool` lets the caller skip a page whose inputs are
     unchanged (incremental generate); `record(uri, art_path, dep_digest)` is
@@ -1966,20 +1968,23 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
             finish(uri, path, dep)
 
     if only is None and source is None:          # corpus-wide pages on a full run
-        render_aggregates(con, out_root, catalog_path)
+        render_aggregates(con, out_root, catalog_path, write_index=write_index)
     if progress:
         progress(total, total, "", rendered)
     con.close()
     return total, rendered
 
 
-def render_aggregates(con, out_root, catalog_path):
+def render_aggregates(con, out_root, catalog_path, write_index=True):
     """Write the corpus-wide pages -- stylesheet, scripts, frontpage and the
     per-source faceted browse -- from the catalog. They depend on the whole
     document set (not on any single artifact), so they are cheap and always
     rebuilt; `lagen all generate --aggregates-only` runs just this, skipping the
     per-document render. The browse pages are written through the REST API (an
-    in-process client over `catalog_path`), the frontpage from the catalog."""
+    in-process client over `catalog_path`), the frontpage from the catalog.
+    `write_index=False` skips the generic corpus-stats frontpage -- the caller
+    (build.cmd_generate) then writes a curated editorial frontpage in its place,
+    so this never write-then-clobbers `index.html`."""
     out_root = Path(out_root)
     out_root.mkdir(parents=True, exist_ok=True)
     (out_root / "style.css").write_text(CSS)
@@ -1987,7 +1992,8 @@ def render_aggregates(con, out_root, catalog_path):
     (out_root / "search.js").write_text(SEARCH)
     (out_root / "versions.js").write_text(VERSIONS)
     (out_root / "robots.txt").write_text(ROBOTS)
-    (out_root / "index.html").write_text(render_index(con))
+    if write_index:
+        (out_root / "index.html").write_text(render_index(con))
     client = _browse_client(catalog_path)
     try:
         for source in catalog.counts(con):
@@ -2058,6 +2064,32 @@ a:hover { text-decoration: underline; }
 .gr-body.solo { display: block; max-width: 56rem; margin: 0 auto; }
 .gr-main { min-width: 0; padding: 2.5rem clamp(1.5rem, 4vw, 4rem) 8rem; max-width: 56rem; }
 .gr-body.solo .gr-main { max-width: none; }
+/* the editorial frontpage is a wide multi-column index -- give it more room */
+body.site .gr-body.solo { max-width: 78rem; }
+
+/* -- Frontpage: curated multi-column law index --
+   cluster headings (h2) and the intro/"vanliga ingångar" paragraphs span every
+   column; the `### category` + its law list flow into columns and never break
+   mid-list, so 20 categories read as 5 scannable bands. */
+.frontpage { columns: 16.5rem 3; column-gap: 2.75rem; }
+.frontpage > h2, .frontpage > p { column-span: all; -webkit-column-span: all; }
+.frontpage > p { max-width: 46rem; color: var(--ink-2); }
+.frontpage > p strong { color: var(--ink); }
+.frontpage h2 { font-family: var(--serif); font-size: .82rem; font-weight: 600;
+                letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3);
+                margin: 2.4rem 0 1rem; padding-bottom: .45rem;
+                border-bottom: 1px solid var(--rule); }
+.frontpage > p + h2 { margin-top: 2.8rem; }
+.frontpage h3 { font-family: var(--serif); font-size: 1.02rem; font-weight: 600;
+                color: var(--ink); margin: 0 0 .35rem; break-after: avoid; }
+.frontpage ul { list-style: none; margin: 0; padding: 0;
+                break-inside: avoid; margin-bottom: 1.6rem; }
+.frontpage li { line-height: 1.5; padding: .04rem 0; font-size: .93rem; }
+.frontpage li a { color: var(--ink-2); }
+.frontpage li a:hover { color: var(--accent); }
+.frontpage li strong { font-weight: 400; }
+.frontpage li strong a { color: var(--ink); font-weight: 600; }
+.frontpage a.ext::after { content: " ↗"; color: var(--ink-4); font-size: .8em; }
 
 /* -- TOC -- */
 .toc-col { position: sticky; top: 4rem; max-height: calc(100vh - 4rem);

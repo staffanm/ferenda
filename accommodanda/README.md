@@ -1,11 +1,11 @@
 # accommodanda — developer setup
 
 The rebuilt ferenda pipeline: vertical source pipelines (sfs, dv, eurlex,
-forarbete, foreskrift, avg, wiki) that go from downloaded source files to a
-typed document model and a JSON artifact, with the citation engine as a
-shared library. For *why* it's shaped this way and what's done vs.
-pending, read [`../REWRITE.md`](../REWRITE.md); this file is just how to
-get it running.
+forarbete, foreskrift, avg, wiki, site) that go from downloaded (or, for
+wiki/site, hand-authored) source files to a typed document model and a JSON
+artifact, with the citation engine as a shared library. For *why* it's
+shaped this way and what's done vs. pending, read
+[`../REWRITE.md`](../REWRITE.md); this file is just how to get it running.
 
 ## Prerequisites
 
@@ -123,6 +123,21 @@ This source is never `relate`d/`generate`d — it publishes no pages of its own;
 (`layout.artifacts("remisser")`) and surfaces them as a "Remissvar" section on
 the *referred förarbete's* context rail.
 
+**site vertical (editorial chrome — frontpage / om / sitenews)**
+| File | What |
+|---|---|
+| `model.py` | small block-tree dataclasses (`Heading`/`Paragraph`/`Bullets`/`Code`; on-disk `type` discriminator `rubrik`/`stycke`/`lista`/`kod`) plus the three page shapes `Frontpage`, `AboutPage`, `Sitenews` (a list of `NewsItem`) — no citation graph, so no `Forfattning`/`Avgorande`-style domain model |
+| `parse.py` | markdown (`lagen-wiki/site/`) → JSON artifact for three fixed basefiles: `frontpage` (curated law list: `## <Category>` + `- [Label](sfs:…)` bullets), `om/<slug>` (about pages), `sitenews` (split into dated `NewsItem`s on `## YYYY-MM-DD HH:MM:SS Title` heads); reuses `lib.markdown`'s frontmatter/link/heading grammar, adds only the block layer (bullets, fenced code) |
+| `render.py` | artifacts → static HTML + Atom, one entry point `write_site(out_root)` called by the build driver during `generate`; the curated frontpage overwrites the generic corpus-stats `index.html` (`has_frontpage()` gates that) |
+
+Like `remisser`, `site` is parsed (and, unlike remisser, rendered during
+`generate`) but is **absent from `ARTIFACTS`**, so it is never
+`relate`d/indexed/dumped — it carries no citation graph. Site artifacts are
+folded into `generate_watermark()` so an editorial edit reopens the generate
+gate. Served at `/` (frontpage), `/om/<slug>` + `/om/` hub, and
+`/dataset/sitenews/feed` (+ `/dataset/sitenews/feed.atom`); masthead entries
+"Om"/"Nyheter" in `lib/render.py`'s `MAST_NAV`.
+
 **Service layer**: `api/app.py` is the REST/OpenAPI service (search, documents,
 citation graph, version history + diff) that also serves the static site under
 `lagen serve`. `api/ops.py` mounts the ops health dashboard on the same app
@@ -193,6 +208,14 @@ uv run python -m accommodanda.build remisser download                    # harve
 uv run python -m accommodanda.build remisser download --only <case-url>  # one case, bypassing the listing walk
 uv run python -m accommodanda.build remisser parse                       # incremental, like every source
 uv run python -m accommodanda.build remisser ai-analyze <case-slug>/<org-slug>  # the sole LLM pass
+```
+
+**site — lagen.nu's editorial chrome** (frontpage / om / sitenews; parsed +
+generated but never `relate`d/indexed/dumped — see the module map above):
+
+```sh
+uv run python -m accommodanda.build site parse       # markdown -> artifacts, incremental
+uv run python -m accommodanda.build site generate     # rewrite just the editorial pages (write_site)
 ```
 
 ### Wiki content repo (begrepp + kommentar)
@@ -335,6 +358,32 @@ page, `markdown → artifact` is byte-identical to the old `wikitext →
 artifact` (modulo two adjudicated, content-free normalisations — see the
 script). `lib/wikitext.py` is retired from the pipeline and kept only as the
 converter's/diff's reference.
+
+### Site content (frontpage + om + sitenews)
+
+lagen.nu's editorial chrome — the curated frontpage law list, the `/om/*`
+about pages, and the sitenews feed — is likewise **git-backed markdown**,
+alongside `concept/` and `commentary/` in the same `lagen-wiki` repo
+(`WIKI_ROOT`):
+
+```
+site/frontpage.md      # ## <Category> headings + - [Label](sfs:…) bullets
+site/om/<slug>.md       # one file per /om/<slug> about page
+site/sitenews.md        # ## YYYY-MM-DD HH:MM:SS Title sections, newest content first
+```
+
+It was populated once by `tools/migrate_site_content.py`, converting three
+legacy sources: the frontpage from the MediaWiki `Lagen.nu:Huvudsida` page (ns
+4, in the sqlite dump), the about pages from `lagen/nu/res/static/*.rst`
+(docutils RST), and the sitenews feed from `lagen/nu/res/static/sitenews.txt`.
+Read-only over those legacy trees, like `tools/mediawiki_to_markdown.py`; the
+markdown is the source of truth thereafter — hand-edit it, don't re-run the
+migration.
+
+```sh
+uv run python -m accommodanda.build site parse    # markdown -> artifacts, incremental
+uv run python -m accommodanda.build site generate # rewrite the editorial pages
+```
 
 ## Data layout
 

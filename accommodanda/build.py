@@ -85,6 +85,8 @@ from .sfs import download as sfs_download
 from .sfs import load_inputs
 from .sfs import versions as sfs_versions_mod
 from .sfs.nf import to_normalform
+from .site import parse as site_parse
+from .site import render as site_render
 from .wiki import annotate as wiki_annotate
 from .wiki import guidance_discover
 from .wiki import parse as wiki_parse
@@ -1588,6 +1590,34 @@ SOURCES["begrepp"] = Source(
                     inputs=lambda bf: [begrepp_record(bf)], code=WIKI_CODE)})
 
 
+# the site vertical: lagen.nu's editorial chrome (curated frontpage, /om about
+# pages, sitenews), authored as markdown in the same lagen-wiki content repo
+# (site/). It is parsed to artifacts and rendered during generate, but -- like
+# remisser -- it carries no citation graph, so it is absent from ARTIFACTS below
+# and is never related/indexed/dumped.
+SITE_CODE = (PKG / "site" / "parse.py", PKG / "site" / "model.py",
+             PKG / "lib" / "markdown.py")
+
+
+def site_record(basefile):
+    return site_parse.record(str(WIKI_ROOT), basefile)
+
+
+def site_artifact(basefile):
+    return layout.artifact("site", basefile)
+
+
+def site_parse_run(basefile):
+    write_artifact("site", basefile, site_parse.artifact(str(WIKI_ROOT), basefile))
+
+
+SOURCES["site"] = Source(
+    "site",
+    lambda: site_parse.list_basefiles(str(WIKI_ROOT)),
+    {"parse": Stage("parse", site_parse_run, site_artifact,
+                    inputs=lambda bf: [site_record(bf)], code=SITE_CODE)})
+
+
 # --------------------------------------------------------------------------
 # derived layer: relate (catalog) + generate (static site). Corpus-wide verbs,
 # not per-document Stages, for two reasons: relate writes shared catalog rows
@@ -1900,7 +1930,8 @@ def stale_sources():
 # artifacts in its prerequisite set (computed per page from the catalog)
 GENERATE_CODE = (PKG / "lib" / "render.py", PKG / "lib" / "catalog.py",
                  PKG / "lib" / "markdown.py", PKG / "lib" / "layout.py",
-                 PKG / "lib" / "history.py", PKG / "dv" / "naming.py")
+                 PKG / "lib" / "history.py", PKG / "dv" / "naming.py",
+                 PKG / "site" / "render.py")
 
 
 def generate_watermark():
@@ -1920,7 +1951,12 @@ def generate_watermark():
         # the kommentar ai-annotate guidance layer rides a *different* document's
         # rail (the host act's), so -- like the cross-document .corr case -- a full
         # or forced generate is what propagates an edit to the host page
-        + list((layout.KOMMENTAR_ROOT / "artifact").rglob("*.ann"))))
+        + list((layout.KOMMENTAR_ROOT / "artifact").rglob("*.ann"))
+        # the site artifacts (frontpage/om/sitenews) aren't catalog rows, so the
+        # catalog signature above never sees them -- fold them in directly so a
+        # re-parsed editorial edit reopens the generate gate (else a full generate
+        # would skip and ship the stale site)
+        + list((layout.SITE_ROOT / "artifact").rglob("*.json"))))
     return hashlib.sha256((sig + "\x1f" + sides).encode()).hexdigest()
 
 
@@ -1966,11 +2002,22 @@ def cmd_generate(only=None, source=None, jobs=1):
     # per-source render (`lagen <src> generate`) under that source's name
     seg_source = source or "__site__"
     t0 = time.perf_counter()
+    if source == "site":
+        # `lagen site generate`: rewrite just the editorial pages from the current
+        # site artifacts (the generic per-document/aggregate paths below have no
+        # site rows to render). Kept here in the driver -- lib/render never learns
+        # the `site` name.
+        site_render.write_site(GENERATED)
+        print("generate: rebuilt site pages (frontpage, /om, sitenews) -> %s" % GENERATED)
+        _emit_segment("generate", "site", time.perf_counter() - t0, status="ok")
+        return
     if RUN.aggregates_only:
         con = catalog.connect(CATALOG)
-        render.render_aggregates(con, GENERATED, CATALOG)
+        render.render_aggregates(con, GENERATED, CATALOG,
+                                 write_index=not site_render.has_frontpage())
         con.close()
-        print("generate: rebuilt frontpage + browse indexes -> %s" % GENERATED)
+        site_render.write_site(GENERATED)
+        print("generate: rebuilt frontpage + browse indexes + site pages -> %s" % GENERATED)
         _emit_segment("generate", "__site__", time.perf_counter() - t0, status="ok")
         return
 
@@ -2057,7 +2104,10 @@ def cmd_generate(only=None, source=None, jobs=1):
 
     total, rendered = render.generate_site(CATALOG, GENERATED, progress=progress,
                                            fresh=fresh, record=record, only=only,
-                                           source=source, jobs=jobs, extra=extra)
+                                           source=source, jobs=jobs, extra=extra,
+                                           write_index=not site_render.has_frontpage())
+    if not scoped:                       # editorial pages ride a full-corpus run
+        site_render.write_site(GENERATED)
     sys.stderr.write("\n")
     if updates:
         manifest.update(updates)
