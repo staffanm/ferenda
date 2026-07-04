@@ -41,6 +41,7 @@ from ..eurlex.structure import subarticle_key
 from . import catalog, history, layout
 from .catalog import BASE
 from .markdown import begrepp_uri
+from .util import basefile_slug
 
 
 @dataclass
@@ -52,13 +53,17 @@ class Site:
     commentary: dict = field(default_factory=dict)             # (law_uri, anchor) -> [(author, prose)]
     guidance: dict = field(default_factory=dict)               # act uri -> [{label, href, note?}]
     article_guidance: dict = field(default_factory=dict)       # (law_uri, anchor) -> [{label, href, note?}]
+    remiss_feedback: dict[tuple[str, str], list[dict[str, str | float]]] = field(default_factory=dict)  # (forarbete_uri, avsnitt_id) -> [{organisation, sentiment, quote, source_url}]
+    remiss_overall: dict[str, list[dict[str, str | float]]] = field(default_factory=dict)               # forarbete_uri -> [{organisation, sentiment, quote, source_url}]
 
     @classmethod
     def from_catalog(cls, con):
         commentary, guidance, article_guidance = _kommentar_indexes(con)
+        remiss_feedback, remiss_overall = _remiss_indexes()
         return cls(con, {u for (u,) in con.execute("SELECT uri FROM documents")},
                    {}, catalog.concept_aliases(con),
-                   commentary, guidance, article_guidance)
+                   commentary, guidance, article_guidance,
+                   remiss_feedback, remiss_overall)
 
     def resolve(self, uri):
         """Fold a begrepp link baked into an artifact onto its canonical concept
@@ -131,6 +136,60 @@ def _kommentar_indexes(con):
             for anchor, items in links.items():
                 article_guidance.setdefault((law, anchor), []).extend(items)
     return commentary, guidance, article_guidance
+
+
+def _remiss_item(svar, scored):
+    """One rail feedback item from an answer artifact `svar` (read as a raw dict,
+    not the vertical's model -- lib stays source-agnostic) and a scored `.ann`
+    object (the `overall` stance or a segment): the answering organisation, its
+    sentiment/quote, and a `source_url` "Källa" link to that organisation's own
+    answer PDF so a reader can open the actual remissvar."""
+    return {"organisation": svar["organisation"], "sentiment": scored["sentiment"],
+            "quote": scored["quote"], "source_url": svar["source_url"]}
+
+
+def _remiss_indexes():
+    """Build the two remiss rail indexes in **one pass** over the remisser artifact
+    tree. Unlike the kommentar indexes this reads the *filesystem*, not the
+    catalog: the remisser corpus is deliberately never `relate`d (no page, no
+    catalog rows, no inbound edge), so its analyzed answers are found by walking
+    the remisser artifact tree (``layout.artifacts``, one `<case-slug>/<org-slug>`
+    artifact per answer) and picking up each
+    answer's ``.ann`` sidecar (the `ai-analyze` sentiment layer). An answer with no
+    ``.ann`` yet is simply unanalyzed -- skipped, no error; a *malformed* ``.ann``
+    is a broken environment invariant and its `json.JSONDecodeError` propagates.
+
+      * ``remiss_feedback`` -- {(forarbete_uri, avsnitt_id): [item, …]}, one entry
+        per analyzed segment, keyed on the *referred förarbete's* own minted uri
+        plus the section id the segment cites, so that förarbete's section rail
+        can show what each answer said about that section.
+      * ``remiss_overall`` -- {forarbete_uri: [item, …]}, one entry per answer's
+        document-level `overall` stance, for the förarbete's document-level panel."""
+    remiss_feedback, remiss_overall = {}, {}
+    host_uri = {}          # (typ, fa_basefile) -> referred förarbete's minted uri
+    for path in layout.artifacts("remisser"):
+        ann = path.with_suffix(".ann")
+        if not ann.exists():
+            continue                       # answer not analyzed yet -- nothing to show
+        svar = json.loads(path.read_text())
+        # v1 maps only the first cross-ref, matching ai_analyze.analyze (a remiss
+        # almost always sends out exactly one SOU/Ds); cache the referred
+        # förarbete's uri so N answers to the same document reopen it once.
+        typ, fa_basefile = svar["remitterat"][0]["typ"], svar["remitterat"][0]["basefile"]
+        key = (typ, fa_basefile)
+        if key not in host_uri:
+            fa_path = layout.artifact(
+                "forarbete", "%s/%s" % (typ, basefile_slug(fa_basefile)))
+            host_uri[key] = json.loads(fa_path.read_text())["uri"]
+        fa_uri = host_uri[key]
+
+        layer = json.loads(ann.read_text())      # malformed .ann -> JSONDecodeError
+        remiss_overall.setdefault(fa_uri, []).append(
+            _remiss_item(svar, layer["overall"]))
+        for seg in layer["segments"]:
+            remiss_feedback.setdefault((fa_uri, seg["forarbete_id"]), []).append(
+                _remiss_item(svar, seg))
+    return remiss_feedback, remiss_overall
 
 
 # --------------------------------------------------------------------------
@@ -458,6 +517,20 @@ def corresponding_cases_margin(site, uri):
     return "".join(out)
 
 
+def _sentiment_span(sentiment):
+    """A compact, self-contained sentiment indicator for the remiss rail: a glyph
+    (+ / − / ±) and a sign/magnitude css class the stylesheet colours. A small band
+    around zero reads neutral. `sentiment` is a validated numeric score from the
+    `.ann` (ai_analyze enforces [-1, 1]), so it is not user-escaped HTML."""
+    if sentiment >= 0.15:
+        cls, glyph = "sentiment-pos", "+"
+    elif sentiment <= -0.15:
+        cls, glyph = "sentiment-neg", "−"
+    else:
+        cls, glyph = "sentiment-neutral", "±"
+    return '<span class="sentiment %s">%s</span>' % (cls, glyph)
+
+
 class Rail:
     """Collects each paragraph's context panel (who cites it, and which EU
     article it transposes) as a document is rendered, keyed by the node's anchor
@@ -483,20 +556,22 @@ class Rail:
         commentary = self._commentary(nid)
         guidance = self._guidance_html(
             (self.site.article_guidance or {}).get((self.doc_uri, nid)))
+        remiss = self._remiss_html(
+            (self.site.remiss_feedback or {}).get((self.doc_uri, nid)))
         groups = _inbound_groups(self.site, uri)
         genomfor = genomfor_margin(self.site, self.doc_uri, nid)
         bemyndigande = bemyndigande_margin(self.site, uri)        # föreskrifter under it
         corr_cases = corresponding_cases_margin(self.site, uri)   # new-law side
         corresponds = corresponds_margin(self.site, uri)          # old-law side
-        if not (commentary or guidance or groups or genomfor or bemyndigande
-                or extra or corr_cases or corresponds):
+        if not (commentary or guidance or remiss or groups or genomfor
+                or bemyndigande or extra or corr_cases or corresponds):
             return
         head = ('<div class="rail-h">Kontext%s</div>'
                 % (' för <b>%s</b>' % escape(pinpoint) if pinpoint else ""))
         body = ('<div class="rail-sec"><div class="rail-sec-h">Hänvisat till av</div>'
                 '%s</div>' % groups) if groups else ""
-        self.data[nid] = (head + commentary + guidance + body + corr_cases + extra
-                          + genomfor + bemyndigande + corresponds)
+        self.data[nid] = (head + commentary + guidance + remiss + body + corr_cases
+                          + extra + genomfor + bemyndigande + corresponds)
 
     def add_document(self):
         """The document-level rail panel (key ''), shown when no single paragraph
@@ -504,9 +579,35 @@ class Rail:
         (Externa länkar) plus any commentary on the document as a whole. Replaces
         the client's empty-rail placeholder."""
         panel = (self._guidance_html((self.site.guidance or {}).get(self.doc_uri))
-                 + self._commentary(None))
+                 + self._commentary(None)
+                 # the "most interesting feedback" for the whole SOU/Ds. v1
+                 # deliberately renders every overall stance as-is; a later pass can
+                 # rank by |sentiment| to surface only the strongest.
+                 + self._remiss_html((self.site.remiss_overall or {}).get(self.doc_uri)))
         if panel:
             self.data[""] = '<div class="rail-h">Om dokumentet</div>' + panel
+
+    def _remiss_html(self, items):
+        """Remiss (referral) feedback on a node -- what each answering organisation
+        said about this section (or, in `add_document`, the SOU/Ds as a whole),
+        from the `.ann` sentiment layer -- as a rail section; '' for no items.
+        Render-only: the remiss corpus has no page of its own, so each item links
+        out to the organisation's own answer PDF (`source_url`, a "Källa" link,
+        always `rel="external"` -- a remiss PDF is never a BASE-prefixed internal
+        url). Everything shown (organisation, quote) is PDF/LLM-derived and
+        `html.escape`d, exactly like `_guidance_html`."""
+        if not items:
+            return ""
+        out = []
+        for it in items:
+            out.append(
+                '<li><span class="remiss-org">%s</span> %s '
+                '<span class="q">”%s”</span> '
+                '<a href="%s" rel="external">Läs remissvaret</a></li>'
+                % (escape(it["organisation"]), _sentiment_span(it["sentiment"]),
+                   escape(it["quote"]), escape(it["source_url"])))
+        return ('<div class="rail-sec remiss"><div class="rail-sec-h">Remissvar'
+                '</div><ul>%s</ul></div>' % "".join(out))
 
     def _guidance_html(self, items):
         """A list of curated external links -- the wiki annotation's `## Externa
@@ -1161,14 +1262,19 @@ def render_forarbete(art, site):
             if n.get("type") == "avsnitt":
                 level = n.get("level") or 1
                 anchor = toc.add(n.get("id"), plain(n["text"]), level)
-                parts.append('<h%d id="%s" class="rubrik">%s</h%d>'
-                             % (min(level + 1, 5), escape(anchor),
+                # wire the section to the scroll-driven rail (remiss feedback on
+                # this avsnitt); a section with no context gets no data-rail
+                rail.add(n.get("id"), plain(n["text"]))
+                ra = _rail_attr(rail, n.get("id"))
+                parts.append('<h%d id="%s"%s class="rubrik">%s</h%d>'
+                             % (min(level + 1, 5), escape(anchor), ra,
                                 render_runs(n["text"], site), min(level + 1, 5)))
                 walk(n.get("children", []))
             else:
                 parts.append("<p>%s</p>" % render_runs(n["text"], site))
 
     walk(art.get("structure", []))
+    rail.add_document()        # document-level remiss "most interesting" overall panel
     return page(title, "Förarbete", meta, "".join(parts), render_toc(toc),
                 eyebrow=FA_TYPE_LABEL.get(art.get("type"), "Förarbete"),
                 island=rail.island(), source_url=art.get("source_url"))

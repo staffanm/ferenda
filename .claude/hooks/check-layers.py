@@ -24,7 +24,8 @@ import os
 import sys
 from pathlib import Path
 
-VERTICALS = {"sfs", "dv", "eurlex", "forarbete", "foreskrift", "avg", "wiki"}
+VERTICALS = {"sfs", "dv", "eurlex", "forarbete", "foreskrift", "avg", "wiki",
+             "remisser"}
 RESTRICTED = VERTICALS | {"api"}
 
 # (module file relative to the package, imported accommodanda-submodule

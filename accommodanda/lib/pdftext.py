@@ -112,16 +112,23 @@ def _dehyphenate(acc, line):
 
 def page_paragraphs(lines, identifier, pageno):
     """Reflow a page's lines into paragraphs, dropping the running header (the
-    identifier), the page-number line and TOC dotted-leader lines. A bold line
-    (heading or a §/chapter marker) always begins its own paragraph; otherwise
-    a vertical gap larger than the body line-height does. A page dominated by
-    dotted leaders is the table of contents -- skipped whole."""
+    identifier, when one is known -- pass ``None``/``""`` where the source has no
+    fixed header to strip, e.g. a letter whose sender's name is prose, not a
+    repeated masthead; the substitution is skipped outright rather than built as
+    an always-matching pattern, since a header is stripped only where it recurs
+    as a header, never as an incidental substring inside body text), the
+    page-number line and TOC dotted-leader lines. A bold line (heading or a
+    §/chapter marker) always begins its own paragraph; otherwise a vertical gap
+    larger than the body line-height does. A page dominated by dotted leaders is
+    the table of contents -- skipped whole."""
     if sum(RE_DOTS.search(l.text) is not None for l in lines) >= 5:
         return []
-    header_re = re.compile(r"\s*".join(re.escape(t) for t in identifier.split()))
+    header_re = (re.compile(r"\s*".join(re.escape(t) for t in identifier.split()))
+                 if identifier else None)
     kept = []
     for l in lines:
-        text = normalize_space(header_re.sub(" ", l.text))
+        raw = header_re.sub(" ", l.text) if header_re else l.text
+        text = normalize_space(raw)
         if text and text != str(pageno) and not RE_DOTS.search(text):
             kept.append(Line(text, l.top, l.bold, l.lead_bold, l.italic))
     gaps = sorted(b.top - a.top

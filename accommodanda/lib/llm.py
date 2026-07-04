@@ -26,17 +26,24 @@ def strip_fence(content):
     return s.strip()
 
 
-def complete(prompt, model=DEFAULT_MODEL, timeout=TIMEOUT, max_tokens=None):
-    """The model's reply to a single user prompt (temperature 0), code-fence
-    stripped. Reads BERGET_API_KEY from the environment/.env. `max_tokens` caps
-    the completion -- raise it for a reasoning model (gpt-oss) on a large input,
+def complete_thread(messages, model=DEFAULT_MODEL, timeout=TIMEOUT, max_tokens=None):
+    """The model's reply (temperature 0) to a full `messages` thread
+    (`[{"role": "user"|"assistant", "content": ...}, ...]`), code-fence stripped.
+    Reads BERGET_API_KEY from the environment/.env. `max_tokens` caps the
+    completion -- raise it for a reasoning model (gpt-oss) on a large input,
     whose chain-of-thought otherwise exhausts the endpoint's small default before
-    it emits the answer (a `length` finish leaves the reply truncated)."""
+    it emits the answer (a `length` finish leaves the reply truncated).
+
+    Use this (over `complete`) for a self-repair retry: replaying the model's own
+    prior reply as a real `assistant` turn, followed by a short `user` turn naming
+    what failed, lets it target the fix directly -- rather than re-deriving the
+    whole answer from a single ever-growing user message with the correction
+    tacked onto the end, which forces it to redo the entire task from scratch and
+    often reproduces the same mistake."""
     load_dotenv()
     api_key = os.environ.get("BERGET_API_KEY")
     assert api_key, "BERGET_API_KEY is not set (add it to .env)"
-    payload = {"model": model, "temperature": 0,
-               "messages": [{"role": "user", "content": prompt}]}
+    payload = {"model": model, "temperature": 0, "messages": messages}
     if max_tokens:
         payload["max_tokens"] = max_tokens
     resp = requests.post(
@@ -47,3 +54,9 @@ def complete(prompt, model=DEFAULT_MODEL, timeout=TIMEOUT, max_tokens=None):
     assert choice.get("finish_reason") != "length", \
         "model reply truncated at max_tokens -- raise max_tokens"
     return strip_fence(choice["message"]["content"])
+
+
+def complete(prompt, model=DEFAULT_MODEL, timeout=TIMEOUT, max_tokens=None):
+    """The model's reply to a single user prompt -- see `complete_thread`."""
+    return complete_thread([{"role": "user", "content": prompt}],
+                           model=model, timeout=timeout, max_tokens=max_tokens)

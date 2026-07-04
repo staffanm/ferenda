@@ -74,6 +74,10 @@ from .lib.datasets import NAMEDCASES as NAMEDCASES_JSON
 from .lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
 from .lib.errors import SkipDocument
 from .lib.lagrum import LagrumParser, load_namedlaws
+from .remisser import ai_analyze as remisser_analyze
+from .remisser import download as remisser_download
+from .remisser import model as remisser_model
+from .remisser import parse as remisser_parse
 from .sfs import correspond as sfs_correspond
 from .sfs import download as sfs_download
 from .sfs import load_inputs
@@ -1213,6 +1217,111 @@ SOURCES["avg"] = Source("avg", avg_list, {
           "overwrites any frozen import of the same dnr (live wins)\n"
           "import-legacy arn <path>: one-time import of the frozen ARN corpus "
           "(1991-2022; --limit N caps it; --force re-imports)")
+
+
+# --------------------------------------------------------------------------
+# remisser source (regeringen.se remiss/referral responses -- never rendered
+# as its own pages; parsed answers feed the sole LLM pass, ai-analyze, whose
+# .ann sidecars a later render pass surfaces on the referred förarbete's rail)
+# --------------------------------------------------------------------------
+
+REMISSER_CODE = (PKG / "remisser" / "parse.py", PKG / "remisser" / "model.py",
+                 PKG / "lib" / "pdftext.py")
+
+
+def remisser_list():
+    """Every downloaded remiss-answer basefile ("<case-slug>/<org-slug>"), one
+    per `Remissinstans` marked downloaded -- the parse stage's targets. Not
+    every `Remiss.svar` entry: an instance not yet fetched has no PDF to parse."""
+    out = []
+    for path in sorted(layout.REMISSER_CASES.glob("*.json")):
+        remiss = remisser_model.Remiss.from_dict(json.loads(path.read_text()))
+        out.extend("%s/%s" % (remiss.basefile, remisser_model.org_slug(inst.source_url))
+                   for inst in remiss.svar if inst.downloaded)
+    return out
+
+
+def remisser_record(basefile):
+    return layout.REMISSER_CASES / (basefile.split("/", 1)[0] + ".json")
+
+
+def remisser_pdf(basefile):
+    case_basefile, org_slug = basefile.split("/", 1)
+    return layout.REMISSER_DOWNLOADED / case_basefile / (org_slug + ".pdf")
+
+
+def remisser_artifact(basefile):
+    return layout.artifact("remisser", basefile)
+
+
+def remisser_inputs(basefile):
+    return [remisser_record(basefile), remisser_pdf(basefile)]
+
+
+def remisser_parse_run(basefile):
+    write_artifact("remisser", basefile,
+                   remisser_parse.parse_record(
+                       basefile, layout.REMISSER_CASES,
+                       layout.REMISSER_DOWNLOADED).to_dict())
+
+
+def remisser_harvest(scopes):
+    """Bulk harvest: discover new remiss cases, re-poll every still-open one for
+    newly-arrived answers, and fetch any answer PDF not yet cached. No sub-scopes
+    (unlike avg's organs / forarbete's doctypes) -- one homogeneous listing.
+    `--only <url>` fetches exactly one case by its regeringen.se URL, bypassing
+    the listing walk entirely (the archive runs to thousands of pages, so this
+    is the escape hatch for "just this one case")."""
+    if RUN.dry_run:
+        print("remisser download: would harvest into %s" % layout.REMISSER_ROOT)
+        return
+    if RUN.only:
+        result = remisser_download.sync_one(layout.REMISSER_ROOT, RUN.only)
+        print("remisser %s: %d svar, %d fetched"
+              % (result["basefile"], result["svar"], result["fetched"]))
+        return
+    summary = remisser_download.sync(layout.REMISSER_ROOT, full=RUN.force)
+    print("remisser: %d new, %d repolled, %d closed, %d fetched"
+          % (summary["new"], summary["repolled"], summary["closed"], summary["fetched"]))
+
+
+def remisser_ai_analyze(basefiles):
+    """`lagen remisser ai-analyze <basefile> ...` -- the sole LLM pass: map one
+    remissvar onto the sections of the SOU/Ds it discusses (sentiment + verbatim
+    quote per section, plus an overall stance), written as a `.ann` sidecar. One
+    basefile is `"<case-slug>/<org-slug>"`; the LLM is never called from
+    parse/relate/generate."""
+    if not basefiles:
+        sys.exit("usage: lagen remisser ai-analyze <basefile> [<basefile> ...]")
+    for basefile in basefiles:
+        if RUN.dry_run:
+            print("remisser ai-analyze: would analyze %s -> %s"
+                  % (basefile, remisser_artifact(basefile).with_suffix(".ann")))
+            continue
+        out = remisser_analyze.analyze(basefile)
+        print("remisser ai-analyze %s: wrote %s" % (basefile, out))
+
+
+# No per-document download stage (the avg/foreskrift rule): answers arrive only
+# through the bulk `remisser_harvest` sweep, so parse runs over whatever is on
+# disk; relate/index/dump/generate never touch this source (it publishes nothing).
+SOURCES["remisser"] = Source("remisser", remisser_list, {
+    "parse": Stage("parse", remisser_parse_run, remisser_artifact,
+                   inputs=remisser_inputs, code=REMISSER_CODE),
+},
+    harvest=remisser_harvest,
+    origin="https://www.regeringen.se/remisser/",
+    actions={"ai-analyze": remisser_ai_analyze},
+    notes="download flag: --only <regeringen.se case url> (fetch one case + its "
+          "answer PDFs, bypassing the listing walk entirely)\n"
+          "download harvests the whole /remisser/ listing (new cases, watermarked "
+          "so a normal run doesn't re-walk the whole archive) then re-polls every "
+          "still-open case for newly-arrived answers; --full ignores the "
+          "watermark and re-walks everything\n"
+          "ai-analyze <basefile>: LLM-map one answer onto the referred SOU/Ds's "
+          "sections (sentiment + quote per section), written as a .ann sidecar\n"
+          "this source is never related/generated -- it feeds the referred "
+          "förarbete's rail, not its own pages")
 
 
 # --------------------------------------------------------------------------

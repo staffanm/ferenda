@@ -42,14 +42,15 @@ FA_ROOT = DATA / "forarbete"
 EURLEX_ROOT = DATA / "eurlex"
 FORESKRIFT_ROOT = DATA / "foreskrift"     # agency regulations (per-fs subtrees)
 AVG_ROOT = DATA / "avg"                   # JO/JK decisions (per-org subtrees)
+REMISSER_ROOT = DATA / "remisser"         # remiss responses (per-case subtrees)
 KOMMENTAR_ROOT = DATA / "kommentar"
 BEGREPP_ROOT = DATA / "begrepp"
 WIKI_ROOT = config.WIKI_ROOT        # git-backed markdown content repo (begrepp/ + kommentar/)
 
 ARTIFACT_ROOT = {"sfs": SFS_ROOT, "dv": DOM_ROOT, "forarbete": FA_ROOT,
                  "eurlex": EURLEX_ROOT, "foreskrift": FORESKRIFT_ROOT,
-                 "avg": AVG_ROOT, "kommentar": KOMMENTAR_ROOT,
-                 "begrepp": BEGREPP_ROOT}
+                 "avg": AVG_ROOT, "remisser": REMISSER_ROOT,
+                 "kommentar": KOMMENTAR_ROOT, "begrepp": BEGREPP_ROOT}
 
 # raw roots -- the download writers put their structure under these
 SFS_DOWNLOADED = SFS_ROOT / "downloaded"
@@ -59,6 +60,8 @@ FA_DOWNLOADED = FA_ROOT / "downloaded"
 EURLEX_DOWNLOADED = EURLEX_ROOT / "downloaded"
 FORESKRIFT_DOWNLOADED = FORESKRIFT_ROOT / "downloaded"   # <fs>/<slug>.{json,pdf}
 AVG_DOWNLOADED = AVG_ROOT / "downloaded"                 # <org>/<slug>.{json,pdf,html}
+REMISSER_CASES = REMISSER_ROOT / "cases"                 # <case-slug>.json
+REMISSER_DOWNLOADED = REMISSER_ROOT / "downloaded"        # <case-slug>/<org-slug>.pdf
 
 DOM_INDEX = DOM_ROOT / "identity-index.json"        # case-law identity index
 
@@ -118,6 +121,9 @@ def relpath(source, basefile):
     if source == "avg":
         org, rest = basefile.split("/", 1)       # "jo/2340-2025", "jk/2024/8082"
         return Path(org) / rest.replace("/", "-")
+    if source == "remisser":
+        case, org = basefile.split("/", 1)        # "<case-slug>/<org-slug>"
+        return Path(case) / org
     if source == "kommentar":
         # file the annotation under its host source, reusing that source's
         # transform: sfs/2009/400, eurlex/2023/32023R2854 -- so a commentary on
@@ -134,6 +140,13 @@ def artifact(source, basefile):
     """The parsed-artifact path: ``<dir>/artifact/<relpath>.json``."""
     rel = relpath(source, basefile)
     return ARTIFACT_ROOT[source] / "artifact" / rel.with_name(rel.name + ".json")
+
+
+def artifacts(source):
+    """Every parse artifact of `source` on disk, sorted -- the iteration
+    companion to `artifact`, so the tree layout has one home and a consumer
+    can't drift out of sync with it by hand-globbing."""
+    return sorted((ARTIFACT_ROOT[source] / "artifact").glob("**/*.json"))
 
 
 # --------------------------------------------------------------------------

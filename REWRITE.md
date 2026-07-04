@@ -73,6 +73,9 @@ accommodanda/
   dv/       court-decisions vertical — download·identity·model·parse·structure·word·legacy
   forarbete/ preparatory-works vertical — download·model·parse·structure·kommentar
   eurlex/   EU vertical (EUR-Lex/CELLAR) — download·bulk·parse·parse_html·parse_pdf·structure·lang·model
+  foreskrift/ agency-regulations vertical — agencies·harvest·download·legacy·model·parse·structure
+  avg/      JO/JK/ARN-decisions vertical — model·download·legacy·parse
+  remisser/ remiss (referral-response) vertical — model·download·parse·ai_analyze
   wiki/     kommentar + begrepp sources — parse (markdown content repo, WIKI_ROOT)
   build.py  orchestrator — the `lagen` build driver, composes the verticals
 ```
@@ -1480,6 +1483,68 @@ extracted to `accommodanda/lib/legacy_import.py`; `forarbete/legacy.py`,
 with förarbete supplying its body-tier/source-rank comparison as the
 `better()` tie-break callback.
 
+### 7h. remisser vertical — regeringen.se referral responses ✅ (first cut)
+
+`accommodanda/remisser/` — remiss (public referral) cases from
+regeringen.se/remisser/: a remiss sends a SOU/Ds out for consultation, and over
+the referral period answers ("remissvar") accumulate from courts, agencies and
+organisations. This corpus is **never published as its own pages** — it only
+feeds an opt-in LLM pass whose output surfaces on the *referred* förarbete's
+context rail, so it has no `relate`/`index`/`dump`/`generate` stage at all.
+
+- **`model.py`**: `Remiss` (the case: title, dnr, deadline, cross-ref to the
+  referred förarbete via `remitterat`, and `svar` — the `Remissinstans` list of
+  organisations that have answered), `Remissvar` (one organisation's parsed
+  answer). `org_slug` derives the filed-under-basename identity that
+  `download.py`/`parse.py`/`build.py` all key on.
+- **`download.py`**: harvests the paginated `/remisser/` listing plus each case
+  page's metadata, "Remissinstanser" PDF and "Remissvar" list; a Genvägar
+  shortcut (or, failing that, the case title) is matched against
+  `lib.regeringen.TYPES` to recover the referred förarbete's canonical
+  basefile. `sync` runs two passes — discover new cases newest-first (stopping
+  at the first already-known slug; `--full` re-walks everything), then
+  re-poll every still-open case (deadline unknown, or within a 21-day grace
+  period of it) for newly-arrived answers and fetch any answer PDF not yet
+  cached. A case page that 404s/500s is written as a *stub* record from the
+  listing facts alone — the on-disk slug is the incremental stop condition, so
+  a silently-skipped failure would otherwise hide that case from every later
+  incremental run; the stub has no deadline, so it stays "open" and gets
+  re-polled until a real fetch succeeds. `sync_one`/`--only <url>` fetches one
+  already-known case directly, bypassing the listing walk.
+- **`parse.py`**: one answer PDF → `Remissvar`, via the shared
+  `lib/pdftext` (`pdf_pages` + `page_paragraphs`) flattened to plain paragraph
+  text — no structural classification, since the only downstream consumer is
+  an LLM reading prose. Unlike JO/ARN/föreskrift there is no fixed running
+  header to strip (each organisation's PDF carries its own letterhead), so
+  `page_paragraphs` now accepts `identifier=None`/`""` and skips
+  header-stripping outright rather than matching on a bad substitute.
+- **`ai_analyze.py`** — `lagen remisser ai-analyze <case-slug>/<org-slug>`, the
+  sole LLM pass over this corpus (never called from parse/relate/generate, the
+  same doctrine as `kommentar ai-annotate`): maps one answer onto the specific
+  sections of the referred SOU/Ds it discusses, with a per-section sentiment
+  score and a verbatim quote plus an overall stance, validated strictly
+  (every cited section id real, every quote a verbatim substring of the
+  answer) and written as a `.ann` sidecar. Retries once as a real
+  assistant/user follow-up turn on a malformed reply (`lib.llm.complete_thread`,
+  extracted from the former single-shot `complete` for this self-repair use).
+- **Wired into `render.py`**: `_remiss_indexes` walks the remisser artifact
+  tree directly (`layout.artifacts("remisser")`, not the catalog — this source
+  is never `relate`d) picking up each answer's `.ann`, and builds
+  `remiss_feedback`/`remiss_overall` on `Site`; `Rail._remiss_html` renders
+  them as a "Remissvar" section — per-section on the cited `avsnitt`, and a
+  document-level "most interesting feedback" panel via `Rail.add_document`,
+  now wired into `render_forarbete`.
+- **`lib/regeringen.py`** (new, rule:second-use-goes-to-lib): the doctype table
+  (`TYPES`) and listing-DOM walk (`listing_items`) both `forarbete/download.py`
+  and `remisser/download.py` need, extracted once remisser became the second
+  regeringen.se harvester (remisser no longer imports from `forarbete`).
+- Wired end-to-end: `lagen remisser download [--only <url>] [--full]`
+  (harvest) + `parse` Stage (recipe includes `lib/pdftext.py`); no
+  `relate`/`index`/`dump`/`generate` — this source publishes nothing of its
+  own. `test/test_remisser.py`, `test/test_remisser_parse.py`,
+  `test/test_remisser_render.py`, `test/test_remisser_ai_analyze.py`,
+  `test/test_pdftext.py` (32 tests, hermetic).
+
 ### 7b. Remaining verticals ⬜
 
 The rest of `/mnt/data/lagen/data/{…}`. Each built the same way; the horizontal
@@ -1501,7 +1566,9 @@ model + extraction.
 | `accommodanda/eurlex/` | **EU vertical (EUR-Lex/CELLAR)**: `download` (SPARQL discovery), `bulk` (dump import), `parse`/`parse_html`/`parse_pdf` (Formex/HTML/PDF → one artifact shape), `definitions` (defined-terms extraction + in-act interlinking), `lang`, `model` |
 | `accommodanda/avg/` | **JO/JK/ARN-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages, `jk_canonical` dnr normalization; ARN one-page vägledande-beslut listing), `legacy` (one-time import of the frozen ARN corpus 1991–2022, §7g), `parse` (JO/ARN PDF via `lib/pdftext`, JK landing HTML; DV parse-type citation scan) |
 | `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (reusable engine — enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct}; `Skip`/`_guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 17 agencies live + 4 frozen-only), `download`, `legacy` (one-time import of the two harvest-blocked corpora, §7g), `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors). Corpus: 1218 regs harvested, parsed 0-fail |
-| `accommodanda/lib/pdftext.py` | **shared font-aware PDF extraction** (förarbete + föreskrift): `pdf_pages` (`pdftohtml -xml` → bold/italic-tagged `Line`s) → `page_paragraphs` (reflow, strip running header/page-no/TOC) → the vertical's own `classify` |
+| `accommodanda/remisser/` | **remiss (referral-response) vertical**: `model` (`Remiss`/`Remissinstans`/`Remissvar`, `org_slug`), `download` (regeringen.se `/remisser/` two-pass sync + `sync_one`/`--only`, stub records for unreachable case pages), `parse` (answer PDF → `Remissvar` via `lib/pdftext` with no fixed header), `ai_analyze` (the sole LLM pass — sentiment+quote per section, `.ann` sidecar). Never `relate`d/published; its `.ann` layer feeds the referred förarbete's rail via `render._remiss_indexes` |
+| `accommodanda/lib/regeringen.py` | shared regeringen.se harvest knowledge (rule:second-use-goes-to-lib): the doctype table (`TYPES`) and `ul.list--block` listing walk (`listing_items`), used by both `forarbete/download.py` and `remisser/download.py` |
+| `accommodanda/lib/pdftext.py` | **shared font-aware PDF extraction** (förarbete + föreskrift + avg (JO/ARN) + remisser): `pdf_pages` (`pdftohtml -xml` → bold/italic-tagged `Line`s) → `page_paragraphs` (reflow, strip running header/page-no/TOC — `identifier=None` skips header-stripping for sources with no fixed masthead, e.g. remisser) → the vertical's own `classify` |
 | `accommodanda/config.py`, `lib/layout.py`, `lib/net.py` | runtime config (`config.yml`/`data_root`, also resolves `legacy_root`/`LEGACY_ROOT` for the §7g frozen-corpus imports), centralized document layout (`page_relpath` on-disk file ↔ `page_url`/`url_to_relpath` public lagen.nu address), resilient HTTP session + harvest progress reporter |
 | `accommodanda/lib/legacy_import.py` | shared frozen-import core (§7g): `should_write` (live-wins / own-import-idempotent-unless-force / optional `better()` tie-break), `rel` (in-place LEGACY_ROOT-relative body references), `iter_entries`/`docdir`/`read_record` (frozen-tree walk primitives) — used by `forarbete/legacy.py`, `foreskrift/legacy.py`, `avg/legacy.py` |
 | `site/data/eurlex/` | harvested EU corpus (`notice.ttl` + best manifestation per language) + artifacts |
@@ -1611,6 +1678,18 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **§7h** (2026-07-04) — remisser vertical landed: regeringen.se remiss/referral
+  harvest (two-pass sync, stub records for unreachable case pages so an
+  incremental watermark can't hide a failure), PDF parse over the shared
+  `lib/pdftext` (now header-optional, `identifier=None`, for sources with no
+  fixed masthead), and the sole LLM pass `ai-analyze` (sentiment + verbatim
+  quote per förarbete section, `.ann` sidecar, retried via the new
+  `lib.llm.complete_thread`). Never `relate`d — its `.ann` layer is picked up
+  straight off the filesystem (`layout.artifacts`, new) and rendered as a
+  "Remissvar" rail section on the referred förarbete's page. `lib/regeringen.py`
+  extracted (TYPES + listing walk) once remisser became the second
+  regeringen.se harvester alongside forarbete; `lib/util.py` gained
+  `swedish_date`/`MONTHS`, shared by foreskrift and remisser.
 - **§7g** — frozen legacy corpora imported, not ported: ~38,200 documents
   across three verticals (ARN → avg incl. a new live arn.se harvester,
   9 förarbete corpora 1867–2023 with format-probed body routing +

@@ -68,6 +68,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 |---|---|
 | `lagrum.py` | Lark/Earley engine; `LagrumParser(parse_types=…)` composes a grammar from LAGRUM / KORTLAGRUM / EULAGSTIFTNING / RATTSFALL / FORARBETEN / … |
 | `legacy_import.py` | shared §7g frozen-import core — `should_write` precedence (live-wins / own-import-idempotent-unless-force / optional `better()` tie-break), `rel` (in-place LEGACY_ROOT-relative body references), `iter_entries`/`docdir`/`read_record` walk primitives; used by `forarbete/legacy.py`, `foreskrift/legacy.py`, `avg/legacy.py` |
+| `regeringen.py` | shared regeringen.se harvest knowledge — the doctype table (`TYPES`: url segment, taxonomy category id, identifier regex) and the `ul.list--block` listing walk (`listing_items`); used by `forarbete/download.py` and `remisser/download.py` |
 
 **DV vertical (court decisions)**
 | File | What |
@@ -107,6 +108,19 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `download.py` | the `lagen foreskrift download` front over the engine (`--full`, `--only`; frozen-only fs are a logged no-op) |
 | `legacy.py` | one-time import of the two harvest-blocked corpora (`lagen foreskrift import-legacy {skvfs\|sosfs}`) — frozen bytes referenced in place (§7g) |
 | `model.py` / `structure.py` / `parse.py` | as-published `Foreskrift` model, PDF → statute-shaped structure → artifact (`parse.body_path` resolves a frozen-import body under LEGACY_ROOT) |
+
+**remisser vertical (regeringen.se referral responses)**
+| File | What |
+|---|---|
+| `model.py` | `Remiss` (case: title, dnr, deadline, `remitterat` cross-ref to the referred förarbete, `svar` list of `Remissinstans`), `Remissvar` (one organisation's parsed answer); `org_slug` derives the shared basename identity `download`/`parse`/`build` all key on |
+| `download.py` | regeringen.se `/remisser/` two-pass sync — discover new cases (`--full` re-walks everything), then re-poll every still-open case for newly-arrived answers and fetch any answer PDF not yet cached; `sync_one`/`--only <url>` fetches one known case directly; a 404/500 case page is written as a *stub* record (from listing facts only) so the incremental watermark can't hide the failure — re-polled until it succeeds |
+| `parse.py` | one answer PDF → `Remissvar` via the shared `lib/pdftext` (`pdf_pages` + `page_paragraphs`), flattened to plain paragraph text; passes `identifier=None` since each organisation's PDF carries its own letterhead, not a fixed running header |
+| `ai_analyze.py` | `lagen remisser ai-analyze <case-slug>/<org-slug>` — the sole LLM pass: maps one answer onto the referred SOU/Ds's sections with a per-section sentiment + verbatim quote plus an overall stance, validated strictly and written as a `.ann` sidecar; retries once via `lib.llm.complete_thread` on a malformed reply |
+
+This source is never `relate`d/`generate`d — it publishes no pages of its own;
+`render._remiss_indexes` reads its `.ann` sidecars straight off the filesystem
+(`layout.artifacts("remisser")`) and surfaces them as a "Remissvar" section on
+the *referred förarbete's* context rail.
 
 **Service layer**: `api/app.py` is the REST/OpenAPI service (search, documents,
 citation graph, version history + diff) that also serves the static site under
@@ -167,6 +181,16 @@ legacy Word original otherwise (no cross-source merge; see REWRITE.md §4).
 uv run python -m accommodanda.build avg download        # all three organs; or: … download jo
 uv run python -m accommodanda.build avg parse           # incremental, like every source
 uv run python -m accommodanda.build avg download jo --only jo/2340-2025   # one decision
+```
+
+**remisser — regeringen.se referral responses** (operates on `site/data/remisser/`;
+never `relate`d/`generate`d — see the module map above):
+
+```sh
+uv run python -m accommodanda.build remisser download                    # harvest new cases + re-poll open ones
+uv run python -m accommodanda.build remisser download --only <case-url>  # one case, bypassing the listing walk
+uv run python -m accommodanda.build remisser parse                       # incremental, like every source
+uv run python -m accommodanda.build remisser ai-analyze <case-slug>/<org-slug>  # the sole LLM pass
 ```
 
 ### Wiki content repo (begrepp + kommentar)
@@ -326,6 +350,8 @@ site/data/dv/identity-index.json              # canonical case -> source records
 site/data/avg/downloaded/{jo,jk,arn}/         # JO/JK/ARN records (+ jo/arn PDFs, jk landing html)
 site/data/forarbete/downloaded/<type>/        # regeringen.se harvest + frozen-import records
 site/data/forarbete/ocr/<type>/               # optional re-OCR sidecar PDFs (win over frozen scans)
+site/data/remisser/cases/                     # regeringen.se remiss case records (Remiss json)
+site/data/remisser/downloaded/<case-slug>/    # per-organisation answer PDFs
 ```
 
 The frozen legacy corpora (REWRITE.md §7g) are NOT under `site/data/`: import
