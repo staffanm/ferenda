@@ -808,7 +808,7 @@ lesser types) annotated onto the statute paragraphs they comment on. ~31,700
 förarbete citations currently render as dead `.noref` text; this vertical makes
 them resolve.
 
-- ✅ **Downloader** `accommodanda/forarbete/download.py` — harvests all eight
+- ✅ **Downloader** `accommodanda/forarbete/download.py` — harvests all nine
   regeringen.se types from `/rattsliga-dokument/`. Built from first principles
   off the live site (the old `Regeringen` downloader targeted the pre-rebuild
   site). **Enumeration** is the page's own AJAX filter endpoint

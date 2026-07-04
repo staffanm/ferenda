@@ -22,12 +22,15 @@ we store the filbilaga PDF and nothing else. A document without a filbilaga
 (a planned or not-yet-printed betänkande) gets a metadata-only record -- still a
 real catalog document at its URI, and still a citation-link target. Such a
 record is provisional, not final: once the feed shows a filbilaga for the
-entry, the record is re-downloaded and upgraded in place (see `_is_current`).
+entry, the record is re-downloaded and upgraded in place (see `_currency`).
 
 Stored under `site/data/forarbete/bet/`: one `<slug>.json` record (type,
 basefile, identifier, title, date, url, files, plus organ and dok_id) and,
-when present, the `<slug>.pdf`. Incremental by default (newest-first, stop at
-the first document already on disk and current); `--full` re-walks.
+when present, the `<slug>.pdf`. Incremental by default: newest-first, stop at
+the first *final* document already on disk and current -- a provisional
+(planned, filbilaga-less) record never anchors the stop, since its planned
+datum can top docs published after the last harvest (see `_currency`).
+`--full` re-walks.
 `--riksmote` narrows the walk to one riksmöte for dev/manual runs -- a narrowed
 walk is a partial view, so it never writes the `.complete` marker (else a later
 full backfill would go incremental and silently skip the corpus).
@@ -53,7 +56,13 @@ import requests
 
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
-from ..lib.util import Reporter, basefile_slug, record_path, write_atomic
+from ..lib.util import (
+    Reporter,
+    basefile_slug,
+    record_path,
+    sync_complete_marker,
+    write_atomic,
+)
 from .download import _has_live_record
 
 API = "https://data.riksdagen.se"
@@ -149,22 +158,32 @@ def download_document(session, root, entry, delay):
     return record
 
 
-def _is_current(root, entry, basefile):
-    """Whether the on-disk record for this entry needs no refetch. Builds on the
-    shared `_has_live_record` (a frozen import never counts), adding the
-    pre-print upgrade cycle: riksdagen lists a betänkande as "planerat"
-    (beslutad=0, filbilaga null -- 19 of the newest 200 feed entries) before the
-    printed PDF is attached, so a routinely harvested fresh doc is often
-    metadata-only at first. Such a record is current only while the feed still
-    shows no filbilaga; once one appears, the record is stale and re-downloading
-    upgrades it in place. Old genuinely PDF-less docs (rm=1990/91: 97 of 100
-    entries have status "saknas" and a null filbilaga) stay current forever --
-    their entries never gain a filbilaga -- so they neither re-download on every
-    run nor stop terminating the incremental walk."""
+def _currency(root, entry, basefile):
+    """How current the on-disk record for this entry is: None when it needs a
+    (re)fetch, "final" when it has its PDF stored, "provisional" for a current
+    metadata-only record. Builds on the shared `_has_live_record` (a frozen
+    import never counts), adding the pre-print upgrade cycle: riksdagen lists a
+    betänkande as "planerat" (beslutad=0, filbilaga null -- 19 of the newest 200
+    feed entries) before the printed PDF is attached, so a routinely harvested
+    fresh doc is often metadata-only at first. Such a record is current only
+    while the feed still shows no filbilaga; once one appears, the record is
+    stale (None) and re-downloading upgrades it in place. Old genuinely PDF-less
+    docs (rm=1990/91: 97 of 100 entries have status "saknas" and a null
+    filbilaga) stay provisional forever -- their entries never gain a filbilaga
+    -- so they never re-download.
+
+    The final/provisional split exists for the incremental stop: only a final
+    record may anchor it (see `_walk`). A planned entry carries the datum of its
+    *planned* debate, which can post-date documents published after the last
+    harvest -- the feed's datum sort then puts those new docs *behind* the
+    placeholder, and stopping at it would skip them silently (permanently, if
+    the placeholder is withdrawn and never gains a filbilaga)."""
     if not _has_live_record(root, TYPE, basefile):
-        return False
+        return None
     record = json.loads(record_path(root, TYPE, basefile).read_text())
-    return bool(record["files"]) or pdf_fil(entry) is None
+    if record["files"]:
+        return "final"
+    return "provisional" if pdf_fil(entry) is None else None
 
 
 # The riksmöte value sequence the API accepts, verified empirically (2026-07)
@@ -207,21 +226,25 @@ def newest_riksmote_year(session):
 
 def _walk(session, root, url, *, backfill, limit, delay, log, rep, scope):
     """One listing walk (one url, `@nasta_sida`-paged): download every document
-    whose record is absent or stale (`_is_current` -- a metadata-only record
+    whose record is absent or stale (`_currency` -- a metadata-only record
     whose entry has since gained a filbilaga is re-downloaded and upgraded).
-    Incremental (not backfill) stops at the first current on-disk record
-    (newest-first => everything after is older); a backfill skips current
-    documents but keeps walking. Returns (seen, new, errors, truncated) --
-    truncated = the walk ended early (limit hit or incremental stop), so the
-    listing was NOT exhausted."""
+    Incremental (not backfill) stops at the first current *final* on-disk
+    record (newest-first => everything after is older); a current provisional
+    record is skipped but never anchors the stop -- its planned-debate datum
+    can post-date docs published since the last harvest, which the datum sort
+    puts behind it (see `_currency`). A backfill skips current documents but
+    keeps walking. Returns (seen, new, errors, truncated) -- truncated = the
+    walk ended early (limit hit or incremental stop), so the listing was NOT
+    exhausted."""
     seen = new = errors = 0
     truncated = False
     for page in iter_pages(session, url, delay):
         for entry in _docs(page):
             seen += 1
             basefile = "%s:%s" % (entry["rm"], entry["beteckning"])
-            if _is_current(root, entry, basefile):
-                if not backfill:
+            currency = _currency(root, entry, basefile)
+            if currency:
+                if not backfill and currency == "final":
                     truncated = True
                     break
                 continue
@@ -256,9 +279,10 @@ def sync(root, full=False, limit=None, delay=0.5, log=print, riksmote=None):
     with zero errors, so an interrupted or partially-failed initial load is
     resumed, not mistaken for finished. Once complete, later runs go
     incremental: one un-narrowed newest-first walk stopping at the first
-    document already on disk and current (new docs land at the top, well within
-    the cap; a filbilaga attached to a doc already *behind* the stop point
-    surfaces only under `--full`, like edits to old regeringen docs).
+    *final* document already on disk and current (new docs land at the top,
+    well within the cap; a filbilaga attached to a doc already *behind* the
+    stop point surfaces only under `--full`, like edits to old regeringen
+    docs).
     `riksmote` narrows the run to one riksmöte (e.g. "2025/26", the API's `rm=`
     parameter) for dev/manual runs; a narrowed run is a partial view of the
     corpus and therefore NEVER writes `.complete`. Returns (seen, new)."""
@@ -286,19 +310,13 @@ def sync(root, full=False, limit=None, delay=0.5, log=print, riksmote=None):
             if truncated:
                 exhausted = False   # limit hit mid-corpus -> not a full walk
                 break
-        if exhausted and errors == 0:
-            marker.parent.mkdir(parents=True, exist_ok=True)
-            marker.write_text("")
+        sync_complete_marker(marker, exhausted=exhausted, errors=errors)
         return seen, new
     url = LISTING + ("&rm=" + quote(riksmote) if riksmote else "")
     seen, new, errors, _ = _walk(session, root, url, backfill=backfill,
                                  limit=limit, delay=delay, log=log, rep=rep,
                                  scope=TYPE)
-    if errors:
-        # marker invariant: `.complete` promises no gaps. A document that failed
-        # here sits *behind* successfully stored newer ones, so the next
-        # incremental stop-at-known walk would never reach it again -- a
-        # permanent silent gap. Dropping the marker makes the next run backfill;
-        # backfill skips known docs, so recovery costs only listing pages.
-        marker.unlink(missing_ok=True)
+    # an incremental or rm-narrowed run never earns the marker; any error
+    # drops it (see sync_complete_marker for the no-gaps invariant)
+    sync_complete_marker(marker, exhausted=False, errors=errors)
     return seen, new

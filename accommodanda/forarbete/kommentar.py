@@ -56,19 +56,23 @@ from .structure import flatten
 # "Paragrafen genomför [delvis] artikel(n/na) <refs> i <directive>"; the article
 # block is captured loosely (digits, dots, letters, ranges, "och"/"samt"/commas)
 # up to " i <name>direktivet" -- note article numbers contain dots, so we do not
-# split on '.'. "Förordningen" is in the subject set for *all* types (unlike the
-# per-type SUBJECT_RES): a prop commentary sentence "Förordningen genomför
-# artikel …" is vanishingly rare, and when it does occur it is a true implements
-# statement about the förordning under discussion -- and the match only yields a
-# row tied to its own sentence, whereas a stray SUBJECT_RES match would skew the
-# document-wide default-directive vote.
-IMPLEMENTS_RE = re.compile(
-    r"(?P<subject>Paragrafen|Paragraferna|Bestämmelsen|Lagförslaget|"
-    r"Förordningen|Ändringen|Punkten)\w*\s+(?:[a-zåäö ]*?\s)?"
+# split on '.'. The subject vocabulary is *per document type*, like SUBJECT_RES:
+# "Förordningen" only in the fm pattern. A prop commentary sentence
+# "Förordningen genomför artikel …" is about some *other* instrument, but the
+# emitted row would still carry the law/chapter/paragraf context of the lag
+# section under comment -- a false implements edge pinned to the wrong
+# instrument's paragraf, later resolved to an SFS anchor by genomforande.py.
+_IMPLEMENTS = (
+    r"(?P<subject>%s)\w*\s+(?:[a-zåäö ]*?\s)?"
     r"genomför(?:s|t)?\s+(?P<partial>delvis\s+)?"
     r"(?:artikel|artiklarna)\s+(?P<refs>[0-9][0-9.,‐-―\- a-zåäö]*?)"
-    r"\s+i\s+(?P<dir>(?:[A-Za-zÅÄÖåäö0-9./()‐-―\- ]*?)?direktivet)",
-    re.IGNORECASE)
+    r"\s+i\s+(?P<dir>(?:[A-Za-zÅÄÖåäö0-9./()‐-―\- ]*?)?direktivet)")
+_SUBJECTS = "Paragrafen|Paragraferna|Bestämmelsen|Lagförslaget|Ändringen|Punkten"
+IMPLEMENTS_RES = {
+    "prop": re.compile(_IMPLEMENTS % _SUBJECTS, re.IGNORECASE),
+    "fm": re.compile(_IMPLEMENTS % (_SUBJECTS + "|Förordningen"),
+                     re.IGNORECASE),
+}
 
 # one article pinpoint inside the refs span: article number, optional dotted
 # subsection(s), optional trailing letter ("23.4 a", "21.1", "28")
@@ -148,7 +152,7 @@ def _sentence_start(text, pos):
     return ends[-1] if ends else 0
 
 
-def resolve_directives(blocks, parser, typ="prop"):
+def resolve_directives(blocks, parser, typ):
     """Map each directive alias used in the document (a proposition or
     förordningsmotiv) to a CELEX uri, plus a 'default' for a bare "direktivet".
     A defining sentence is one ending in
@@ -319,6 +323,7 @@ def extract(art):
         return []
     parser = _refparser()
     aliases = resolve_directives(blocks, parser, typ)
+    implements_re = IMPLEMENTS_RES[typ]
     out = []
     chapter = paragraf = None
     law = fm_law(blocks) if typ == "fm" else None   # fm names its förordning up top
@@ -332,7 +337,7 @@ def extract(art):
             chapter, paragraf = b.get("num"), None
         elif kind == "paragraf":
             paragraf = b.get("num")
-        for m in IMPLEMENTS_RE.finditer(text):
+        for m in implements_re.finditer(text):
             uri = directive_uri(m.group("dir"), aliases)
             if uri is None:
                 continue

@@ -42,7 +42,7 @@ def test_directive_alias_binds_to_subject_not_repealed():
         "Europaparlamentets och rådets direktiv (EU) 2022/2555 av den 14 "
         "december 2022 om ändring av förordning (EU) nr 910/2014 och om "
         "upphävande av direktiv (EU) 2016/1148 (NIS 2-direktivet)."]}]
-    aliases = resolve_directives(blocks, _refparser())
+    aliases = resolve_directives(blocks, _refparser(), "prop")
     assert aliases["nis 2-direktivet"] == CELEX + "32022L2555"
     assert aliases["default"] == CELEX + "32022L2555"
 
@@ -59,7 +59,7 @@ def test_default_directive_from_law_level_subject_statement():
                   "paketresor upphävs. Direktiv 90/314/EEG byggde på en annan "
                   "systematik än direktiv 90/314/EEG."]},
     ]
-    aliases = resolve_directives(blocks, _refparser())
+    aliases = resolve_directives(blocks, _refparser(), "prop")
     assert aliases["default"] == CELEX + "32015L2302"
 
 
@@ -123,6 +123,43 @@ def test_extract_only_from_proposition():
     assert extract({"type": "sou", "structure": body}) == []
 
 
+def test_implements_subject_forordningen_only_in_fm():
+    # "Förordningen genomför artikel …" is an implements statement only in a
+    # förordningsmotiv. In a prop the sentence talks about some *other*
+    # förordning, but the emitted row would inherit the lag section's
+    # law/chapter/paragraf context -- a false edge pinned to the wrong
+    # instrument -- so the prop pattern must not match the subject at all.
+    prop = {"type": "prop", "structure": nest([
+        {"type": "stycke", "text": [
+            "Direktiv (EU) 2022/2555 (NIS 2-direktivet)."]},
+        {"type": "rubrik", "level": 1, "text": ["15 Författningskommentar"]},
+        {"type": "rubrik", "level": 2,
+         "text": ["15.1 Förslaget till cybersäkerhetslag"]},
+        {"type": "paragraf", "num": "3", "text": ["3 §"]},
+        {"type": "stycke", "text": [
+            "Förordningen genomför artikel 5 i NIS 2-direktivet."]},
+    ])}
+    assert extract(prop) == []
+
+    fm = {"type": "fm", "structure": nest([
+        {"type": "rubrik", "level": 3, "text": ["Förordningsmotiv"]},
+        {"type": "rubrik", "level": 3,
+         "text": ["Förordning om ändring i artskyddsförordningen (2007:845)"]},
+        {"type": "stycke", "text": [
+            "Genom förordningen genomförs Europaparlamentets och rådets "
+            "direktiv 2009/147/EG av den 30 november 2009 om bevarande av "
+            "vilda fåglar (fågeldirektivet)."]},
+        {"type": "rubrik", "level": 3, "text": ["Författningskommentar"]},
+        {"type": "paragraf", "num": "4", "text": ["4 §"]},
+        {"type": "stycke", "text": [
+            "Förordningen genomför artikel 5 i fågeldirektivet."]},
+    ])}
+    [rec] = extract(fm)
+    assert rec["directive"] == CELEX + "32009L0147"
+    assert rec["articles"] == ["5"]
+    assert rec["paragraf"] == "4"
+
+
 def test_alias_binds_across_long_amendment_list():
     # a real förordningsmotiv sentence (Fm 2022:5): the subject directive
     # 2009/147/EG is followed by a long "senast ändrat genom …" amendment list
@@ -138,7 +175,7 @@ def test_alias_binds_across_long_amendment_list():
         "Europaparlamentets och rådets direktiv 2002/49/EG, 2004/35/EG, "
         "2007/2/EG, 2009/147/EG och 2010/63/EU samt rådets direktiv 86/278/EEG "
         "(fågeldirektivet)."]}]
-    aliases = resolve_directives(blocks, _refparser())
+    aliases = resolve_directives(blocks, _refparser(), "prop")
     assert aliases["fågeldirektivet"] == CELEX + "32009L0147"
 
 
@@ -152,7 +189,7 @@ def test_alias_lookback_survives_abbreviations():
         "livsmiljöer samt vilda djur och växter gäller bl.a. Natura "
         "2000-områden och skyddar t.ex. Barbastella barbastellus "
         "(art- och habitatdirektivet). En senare mening om annat."]}]
-    aliases = resolve_directives(blocks, _refparser())
+    aliases = resolve_directives(blocks, _refparser(), "prop")
     assert aliases["art- och habitatdirektivet"] == CELEX + "31992L0043"
 
 
@@ -291,5 +328,5 @@ def test_directive_alias_ignores_co_cited_regulation():
     blocks = [{"text": [
         "förordning (EG) nr 1107/2006 av den 5 juli 2006 om rättigheter i "
         "samband med flygresor (jfr artikel 13.8 i direktivet)."]}]
-    aliases = resolve_directives(blocks, _refparser())
+    aliases = resolve_directives(blocks, _refparser(), "prop")
     assert CELEX + "32006R1107" not in aliases.values()

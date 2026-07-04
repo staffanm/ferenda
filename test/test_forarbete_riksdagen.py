@@ -362,21 +362,27 @@ def test_incremental_upgrades_metadata_only_record_once_pdf_appears(monkeypatch,
     assert (tmp_path / "bet" / riksdagen.COMPLETE).exists()   # no errors, marker stays
 
 
-def test_incremental_terminates_on_still_pdf_less_records(monkeypatch, tmp_path):
-    # old genuinely PDF-less docs (rm=1990/91: status "saknas", filbilaga null)
-    # keep their metadata-only records current for as long as the feed shows no
-    # filbilaga: an incremental run stops at the first of them instead of
-    # re-downloading them or re-walking the whole corpus
+def test_incremental_stops_only_at_final_records(monkeypatch, tmp_path):
+    # a current provisional (still filbilaga-less) record never anchors the
+    # incremental stop: a planned betänkande's datum can post-date documents
+    # published after the last harvest, so the datum sort puts those new docs
+    # *behind* the placeholder -- stopping at it would skip them silently.
+    # Here the NEW JuU45 sorts below the FiU8 placeholder: the walk must skip
+    # FiU8 (still current, no re-download), fetch JuU45, and stop at the final
+    # KU45 -- without following @nasta_sida past it (that url is not served;
+    # this is also what keeps a wholly provisional old-corpus region like
+    # rm=1990/91 from ever being re-walked: the walk stops at the first final
+    # doc above it).
     _backfill_net(monkeypatch)
     riksdagen.sync(tmp_path, delay=0)                     # FiU8 stored metadata-only
     net2 = FakeNet()
-    # FiU8 still has no filbilaga; the page links onward to a url the stub does
-    # NOT serve -- following it (i.e. failing to stop) would blow up the test
     net2.pages[riksdagen.LISTING] = _page(
-        [_entry(PAGE1, "FiU8")], nasta="https://data.riksdagen.se/never-served")
+        [_entry(PAGE1, "FiU8"), _entry(PAGE2, "JuU45"), _entry(PAGE1, "KU45")],
+        nasta="https://data.riksdagen.se/never-served")
     _patch(monkeypatch, net2)
     seen, new = riksdagen.sync(tmp_path, delay=0)
-    assert (seen, new) == (1, 0)                          # stopped at the first doc
+    assert (seen, new) == (3, 1)          # FiU8 skipped, JuU45 fetched, stop at KU45
+    assert record_path(tmp_path, "bet", "2025/26:JuU45").exists()
     assert [u for u in net2.fetched if "dokumentlista" in u] == [riksdagen.LISTING]
 
 
