@@ -2,7 +2,7 @@
 
 from xml.etree import ElementTree as ET
 
-from accommodanda.eurlex.structure import flatten as flatten_structure
+from accommodanda.lib.eu_structure import flatten as flatten_structure
 from accommodanda.eurlex.parse import (flatten, doctype, parse_formex,
                                        parse_document, to_artifact,
                                        content_file, _annex_anchor)

@@ -1,8 +1,8 @@
-"""dv.naming -- the canonical, name-prefixed case title shared by the case page
-heading, the listings and every inbound citation."""
+"""lib.casenaming -- the canonical, name-prefixed case title shared by the case
+page heading, the listings and every inbound citation, plus the case-URI minter."""
 
-from accommodanda.dv import naming
-from accommodanda.dv.parse import case_uri
+from accommodanda.lib import casenaming as naming
+from accommodanda.lib.casenaming import case_uri
 
 
 def _art(referat=(), malnummer=(), uri=None, court="HDO"):

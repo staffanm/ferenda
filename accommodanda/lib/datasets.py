@@ -14,6 +14,7 @@ A single source of truth for these paths, so the ~7 parse-time callers and the
 ⌘K resolver agree without each re-deriving the location.
 """
 
+import json
 from pathlib import Path
 
 _PKG = Path(__file__).resolve().parent.parent
@@ -21,3 +22,16 @@ _PKG = Path(__file__).resolve().parent.parent
 NAMEDLAWS = _PKG / "sfs" / "data" / "namedlaws.json"
 NAMEDACTS = _PKG / "eurlex" / "data" / "namedacts.json"
 NAMEDCASES = _PKG / "dv" / "data" / "namedcases.json"
+
+
+def load_namedcases(path=NAMEDCASES):
+    """Map each lower-cased HD-case nickname to its resolvable case URI, from the
+    committed snapshot -- only rows that carry a URI (a determinate referat). The
+    snapshot is produced by `dv.namedcases` (the harvest owns the case-URI minting);
+    reading it back is a pure JSON load with no source dependency, so the ⌘K
+    resolver reads it straight from here. Empty if not harvested yet."""
+    if not path.exists():
+        return {}
+    return {c["namn"].lower(): c["uri"]
+            for c in json.loads(path.read_text(encoding="utf-8"))["cases"]
+            if c.get("uri")}

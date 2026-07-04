@@ -1,7 +1,8 @@
 """EU-act hierarchy: the flat typed-block run grouped into its containment tree
 (accommodanda/eurlex/structure.py)."""
 
-from accommodanda.eurlex.structure import flatten, nest
+from accommodanda.eurlex.structure import nest
+from accommodanda.lib.eu_structure import flatten
 
 
 def _blocks():

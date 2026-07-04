@@ -6,7 +6,7 @@ from accommodanda.eurlex.definitions import (_term_of, build_matcher,
                                              extract_definitions, term_refs)
 from accommodanda.eurlex.model import Block
 from accommodanda.eurlex.parse import parse_formex, to_artifact
-from accommodanda.eurlex.structure import flatten
+from accommodanda.lib.eu_structure import flatten
 
 
 # a directive with a definitions article (art. 5) and a later article (art. 7)

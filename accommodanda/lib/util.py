@@ -212,6 +212,14 @@ def normalize_space(s):
     return " ".join(s.split())
 
 
+def normalize_fold(s):
+    """Whitespace-collapsed, stripped and case-folded -- the matching key for
+    comparing titles/headings/terms case- and spacing-insensitively while the
+    display form is kept elsewhere. None-safe (an absent value folds to ""); the
+    lower-casing is what sets it apart from `normalize_space`."""
+    return " ".join((s or "").split()).lower()
+
+
 def split_numalpha(s):
     """'10 a §' -> ['', 10, ' a §'], so strings with mixed numbers and
     letters sort naturally."""

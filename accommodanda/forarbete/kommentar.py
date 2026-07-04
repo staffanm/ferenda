@@ -49,7 +49,9 @@ import json
 import re
 from pathlib import Path
 
+from ..lib.catalog import norm_title
 from ..lib.lagrum import EULAGSTIFTNING, LagrumParser
+from ..lib.util import normalize_fold
 from .parse import parse_record, to_artifact
 from .structure import flatten
 
@@ -380,6 +382,36 @@ def proposed_name(law):
     '9.1 Förslaget till lag om alternativ tvistlösning …' -> 'lag om alternativ
     tvistlösning …'. The caller matches it against the SFS title index."""
     return RUBRIK_PREFIX_RE.sub("", law or "").strip().rstrip(".")
+
+
+def fk_section(prop_art, new_title):
+    """The författningskommentar prose for the proposed law titled `new_title`, as
+    one text block -- the förarbete half of the SFS correspondence derivation
+    (sfs.correspond consumes this text; the reading of a proposition artifact lives
+    here, in the vertical that owns propositioner). Sliced from the level-2 rubrik
+    whose "Förslaget till X" names this law (under the FK's level-1 heading) up to
+    the next level-2 rubrik -- the next proposed law -- or the document end. Chapter
+    and § markers are kept inline so a consumer can place each statement under its
+    new paragraf. Robust to the chapter-heading-as-level-1 misdetection that
+    truncates `find_kommentar`: it bounds on level-2 (proposed-law) rubriks only."""
+    blocks = flatten(prop_art["structure"])
+    fk = next((i for i, b in enumerate(blocks)
+               if b["type"] == "rubrik" and (b.get("level") or 1) == 1
+               and "författningskommentar" in normalize_fold(plain(b["text"]))),
+              None)
+    if fk is None:
+        return ""
+    want = norm_title(new_title)
+    start = next((i for i in range(fk + 1, len(blocks))
+                  if blocks[i]["type"] == "rubrik" and blocks[i].get("level") == 2
+                  and norm_title(proposed_name(plain(blocks[i]["text"]))) == want),
+                 None)
+    if start is None:
+        return ""
+    end = next((i for i in range(start + 1, len(blocks))
+                if blocks[i]["type"] == "rubrik" and blocks[i].get("level") == 2),
+               len(blocks))
+    return "\n".join(plain(blocks[i]["text"]) for i in range(start, end))
 
 
 def paragraf_fragment(chapter, paragraf):

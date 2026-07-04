@@ -22,6 +22,7 @@ import re
 
 from bs4 import BeautifulSoup
 
+from ..lib.casenaming import case_uri
 from ..lib.datasets import NAMEDACTS
 from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from ..lib.lagrum import (
@@ -39,7 +40,6 @@ from ..lib.lagrum import (
     load_namedacts,
     load_namedlaws,
 )
-from ..lib.layout import case_slug as slug
 from .model import Avgorande, Fotnot, Lagrum, Rubrik, Stycke
 from .structure import nest
 
@@ -238,28 +238,6 @@ def _scanner():
     namedlaws, abbreviations, named_acts = legal_vocab()
     return LagrumParser(namedlaws, basefile="dom", abbreviations=abbreviations,
                         parse_types=DV_PARSE_TYPES, named_acts=named_acts)
-
-
-@functools.cache
-def _rattsfall_parser():
-    return LagrumParser({}, basefile="dom", parse_types=[RATTSFALL])
-
-
-def case_uri(cid):
-    """The published document URI for a court decision.
-
-    A referat case (the vast majority, and the only kind a citation can name)
-    is minted by running its referat through the *same* RATTSFALL citation
-    parser, so the document URI is byte-identical to what any reference to it
-    produces -- the old pipeline's `dom/{serie}/{year}:{nr}` /
-    `dom/nja/{year}s{page}` / `.../not/{n}` scheme. This is the published
-    identifier the old site used; it must not change.
-
-    A non-referat case (~7%, never a citation target) has no such canonical
-    form; it keeps a stable slug URI for now -- restoring the old verdict
-    scheme `dom/{court}/{malnummer}/{date}` for these is tracked separately."""
-    refs = _rattsfall_parser().parse_text(cid, context={})
-    return refs[0].uri if refs else "https://lagen.nu/dom/" + slug(cid)
 
 
 def to_artifact(av, canonical_id=None):

@@ -35,11 +35,10 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from ..api import app as api_service
-from ..dv import naming as dv_naming
-from ..eurlex.structure import flatten as eurlex_flatten
-from ..eurlex.structure import subarticle_key
-from . import catalog, history, layout
+from . import casenaming, catalog, history, layout
 from .catalog import BASE
+from .eu_structure import flatten as eurlex_flatten
+from .eu_structure import subarticle_key
 from .markdown import begrepp_uri
 from .util import basefile_slug
 
@@ -1164,14 +1163,14 @@ def render_dv(art, site):
     # heading by canonical identity + HD's given name (the stamped artifact label;
     # computed live for an artifact parsed before the field). The löpnummer
     # ("NJA 2025:58") stays metadata, never part of the identity string.
-    title = art.get("label") or dv_naming.case_label(art)
+    title = art.get("label") or casenaming.case_label(art)
     summary = ('<p class="sammanfattning">%s</p>' % escape(md["sammanfattning"])
                if md.get("sammanfattning") else "")
     meta = _meta_dl([
         ("Domstol", art.get("court_namn")),
         ("Avgörandedatum", art.get("avgorandedatum")),
         ("Målnummer", ", ".join(art.get("malnummer") or [])),
-        ("Löpnummer", ", ".join(dv_naming.lopnummer(art))),
+        ("Löpnummer", ", ".join(casenaming.lopnummer(art))),
         ("Rättsområde", ", ".join(md.get("rattsomrade") or [])),
     ])
     sokord = _keywords(md.get("nyckelord") or [], site)

@@ -1,6 +1,13 @@
-"""Canonical case naming -- the display title for a court decision.
+"""Court-decision identity: the canonical published URI a case is minted at, and
+the display title a reader sees.
 
-Two domain facts drive it:
+Both are cross-layer contracts, keyed on a case artifact's metadata, not on dv
+internals -- so they live here in lib, read identically by the source that stamps
+them at parse time, the catalog row that labels every listing and inbound citation,
+and the renderer's page heading. They depend only on the shared citation engine
+(`lib.lagrum`) and the URI/path grammar (`lib.layout`), never the reverse.
+
+Two domain facts drive the naming:
 
   * a case's *identity* is the referat whose minted URI matches the document's --
     NJA's page form ("NJA 2025 s. 897"), never the löpnummer ("NJA 2025:58").
@@ -11,16 +18,37 @@ Two domain facts drive it:
     (NJA 2025 s. 897)", "Umgängesstödet (Ö 3043-25)". The nickname appears nowhere
     in the case text, so this is the only place it is attached.
 
-`case_label` is the one entry point, shared by the renderer (the page heading and
-its eyebrow) and the catalog (the row label that drives the listings and every
-inbound citation), so all three read identically.
+`case_label` is the one display entry point; `case_uri` the one identity minter.
 """
 
 import functools
 import json
 
-from ..lib.datasets import NAMEDCASES
-from .parse import case_uri
+from .datasets import NAMEDCASES
+from .lagrum import RATTSFALL, LagrumParser
+from .layout import case_slug as slug
+
+
+@functools.cache
+def _rattsfall_parser():
+    return LagrumParser({}, basefile="dom", parse_types=[RATTSFALL])
+
+
+def case_uri(cid):
+    """The published document URI for a court decision.
+
+    A referat case (the vast majority, and the only kind a citation can name)
+    is minted by running its referat through the *same* RATTSFALL citation
+    parser, so the document URI is byte-identical to what any reference to it
+    produces -- the old pipeline's `dom/{serie}/{year}:{nr}` /
+    `dom/nja/{year}s{page}` / `.../not/{n}` scheme. This is the published
+    identifier the old site used; it must not change.
+
+    A non-referat case (~7%, never a citation target) has no such canonical
+    form; it keeps a stable slug URI for now -- restoring the old verdict
+    scheme `dom/{court}/{malnummer}/{date}` for these is tracked separately."""
+    refs = _rattsfall_parser().parse_text(cid, context={})
+    return refs[0].uri if refs else "https://lagen.nu/dom/" + slug(cid)
 
 
 @functools.cache

@@ -54,7 +54,6 @@ from .avg import parse as avg_parse
 from .dv import download as dv_download
 from .dv import identity as dv_identity
 from .dv import namedcases as dv_namedcases_mod
-from .dv import naming as dv_naming
 from .dv.parse import api_member, parse_api_record, to_artifact
 from .eurlex import annotate as eurlex_annotate
 from .eurlex import bulk as eurlex_bulk
@@ -71,7 +70,7 @@ from .foreskrift import harvest as foreskrift_harvest_mod
 from .foreskrift import legacy as foreskrift_legacy
 from .foreskrift import parse as foreskrift_parse
 from .foreskrift.agencies import REGISTRY as FORESKRIFT_AGENCIES
-from .lib import catalog, dump, layout, render, runlog, search, util
+from .lib import casenaming, catalog, dump, layout, render, runlog, search, util
 from .lib.datasets import NAMEDCASES as NAMEDCASES_JSON
 from .lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
 from .lib.errors import SkipDocument
@@ -663,7 +662,11 @@ def sfs_ai_correspond(basefiles):
         print("sfs ai-correspond: would map %s <- %s via %s -> %s"
               % (new_sfs, old_uri.rsplit("/", 1)[-1], prop, out))
         return
-    sidecar, stats = sfs_correspond.correspond(new_art, prop_art, old_art)
+    # reading the proposition's författningskommentar is förarbete's job; build
+    # composes the two verticals (sfs.correspond no longer imports forarbete)
+    fk = fa_kommentar.fk_section(
+        prop_art, new_art["metadata"]["properties"]["dcterms:title"])
+    sidecar, stats = sfs_correspond.correspond(new_art, prop_art, old_art, fk)
     out.write_text(json.dumps(sidecar, ensure_ascii=False, indent=2))
     print("sfs ai-correspond %s: %d edges from %d (%d rejected), wrote %s"
           % (new_sfs, stats["emitted"], stats["raw"], stats["rejected"], out))
@@ -695,7 +698,7 @@ DOM_DOWNLOADED = layout.DOM_DOWNLOADED            # dv api records (primary)
 DV_LEGACY_DOWNLOADED = layout.DV_LEGACY_DOWNLOADED  # legacy raw feed
 DV_INDEX = layout.DOM_INDEX
 DV_CODE = (PKG / "dv" / "parse.py", PKG / "dv" / "model.py",
-           PKG / "dv" / "structure.py", PKG / "dv" / "naming.py",
+           PKG / "dv" / "structure.py", PKG / "lib" / "casenaming.py",
            PKG / "lib" / "lagrum.py")
 
 
@@ -804,10 +807,10 @@ def dv_parse_run(basefile):
     # gruppKorrelationsnummer (the publication group), not derivable from basefile
     grupp = record.get("gruppKorrelationsnummer")
     art = to_artifact(av, canonical_id=basefile)
-    # stamp the canonical, name-prefixed display title onto the artifact here (the
-    # source owns its model; to_artifact can't -- dv.naming imports dv.parse), so
-    # the pure catalog reads it without importing a source
-    art["label"] = dv_naming.case_label(art)
+    # stamp the canonical, name-prefixed display title onto the artifact here, so
+    # the pure catalog reads it off the artifact without recomputing (the naming
+    # grammar itself lives in lib.casenaming, read identically by page + catalog)
+    art["label"] = casenaming.case_label(art)
     write_artifact("dv", basefile, art,
                    source_url=layout.dv_source_url(grupp) if grupp else None)
 
@@ -1410,7 +1413,7 @@ SOURCES["remisser"] = Source("remisser", remisser_list, {
 
 WIKI_ROOT = layout.WIKI_ROOT
 WIKI_CODE = (PKG / "wiki" / "parse.py", PKG / "lib" / "markdown.py",
-             PKG / "lib" / "lagrum.py")
+             PKG / "lib" / "lagrum.py", PKG / "lib" / "eu_structure.py")
 
 
 def kommentar_record(basefile):
@@ -1930,8 +1933,8 @@ def stale_sources():
 # artifacts in its prerequisite set (computed per page from the catalog)
 GENERATE_CODE = (PKG / "lib" / "render.py", PKG / "lib" / "catalog.py",
                  PKG / "lib" / "markdown.py", PKG / "lib" / "layout.py",
-                 PKG / "lib" / "history.py", PKG / "dv" / "naming.py",
-                 PKG / "site" / "render.py")
+                 PKG / "lib" / "history.py", PKG / "lib" / "casenaming.py",
+                 PKG / "lib" / "eu_structure.py", PKG / "site" / "render.py")
 
 
 def generate_watermark():

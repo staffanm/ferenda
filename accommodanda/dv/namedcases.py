@@ -11,8 +11,8 @@ turn the nickname straight into the published case URI.
 The list is a clean two/three-column PDF table (A: NJA ref, B: namn, C: mål nr),
 which ``pdftotext -layout`` lays out faithfully -- so the parse is a per-line
 regex, not the font-aware reflow the document verticals need. Each determinate
-referat is run through the *same* ``dv.parse.case_uri`` the corpus mints with, so
-the harvested URI is byte-identical to the published document.
+referat is run through the *same* ``lib.casenaming.case_uri`` the corpus mints
+with, so the harvested URI is byte-identical to the published document.
 
 The committed JSON is the shipped snapshot (resolve reads it directly); re-run
 ``lagen dv namedcases`` to refresh it as HD updates the list. The newest entries
@@ -26,9 +26,9 @@ import subprocess
 import tempfile
 
 from ..lib import net
+from ..lib.casenaming import case_uri
 from ..lib.datasets import NAMEDCASES
 from .download import USER_AGENT
-from .parse import case_uri
 
 URL = ("https://www.domstol.se/globalassets/filer/domstol/hogstadomstolen/"
        "namngivna-rattsfall/officiell-lista-over-namngivna-rattsfall.pdf")
@@ -95,17 +95,6 @@ def harvest(out_path=NAMEDCASES, session=None):
                    ensure_ascii=False, indent=1) + "\n",
         encoding="utf-8")
     return cases
-
-
-def load(path=NAMEDCASES):
-    """Map each lower-cased nickname to its resolvable case URI, from the
-    committed snapshot -- only rows that carry a URI (a determinate referat).
-    Empty if the snapshot hasn't been harvested yet."""
-    if not path.exists():
-        return {}
-    data = json.loads(path.read_text(encoding="utf-8"))
-    return {c["namn"].lower(): c["uri"]
-            for c in data["cases"] if c.get("uri")}
 
 
 if __name__ == "__main__":

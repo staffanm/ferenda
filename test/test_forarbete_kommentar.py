@@ -4,6 +4,7 @@ from accommodanda.forarbete.kommentar import (
     _refparser,
     article_of,
     extract,
+    fk_section,
     fm_law,
     parse_articles,
     pinpoints_by_article,
@@ -14,6 +15,24 @@ from accommodanda.forarbete.kommentar import (
 from accommodanda.forarbete.structure import flatten, nest
 
 CELEX = "https://lagen.nu/ext/celex/"
+
+
+def test_fk_section_slices_matching_proposed_law():
+    # FK with two proposed laws; we want only the säkerhetsskyddslag subsection,
+    # and it must survive a chapter heading mis-typed as level-1 (which would
+    # otherwise truncate the section). Consumed by sfs.correspond.
+    prop = {"uri": "https://lagen.nu/prop/2017/18:89", "structure": [
+        {"type": "rubrik", "level": 1, "text": ["16 Författningskommentar"]},
+        {"type": "rubrik", "level": 2, "text": ["16.1 Förslaget till säkerhetsskyddslag"]},
+        {"type": "rubrik", "level": 1, "text": ["1 Kap. Tillämpningsområde"]},
+        {"type": "paragraf", "num": "1", "text": ["1 §"]},
+        {"type": "stycke", "text": ["Paragrafen motsvarar 1 § 1996 års säkerhetsskyddslag."]},
+        {"type": "rubrik", "level": 2, "text": ["16.2 Förslaget till lag om ändring i X"]},
+        {"type": "stycke", "text": ["Detta hör till den andra lagen."]}]}
+    fk = fk_section(prop, "Säkerhetsskyddslag (2018:585)")
+    assert "Paragrafen motsvarar 1 § 1996 års säkerhetsskyddslag." in fk
+    assert "1 Kap. Tillämpningsområde" in fk          # chapter heading kept inline
+    assert "andra lagen" not in fk                    # next proposed law excluded
 
 
 def test_parse_articles_dotted_ranged_listed_lettered():

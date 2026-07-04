@@ -25,8 +25,9 @@ folded so `på Internet` / `på internet` are one concept.
 """
 
 import json
-import re
 from pathlib import Path
+
+from .util import normalize_fold as _norm
 
 RES = (Path(__file__).resolve().parents[2]
        / "lagen" / "nu" / "res" / "extra" / "begrepp_aliases.json")
@@ -64,9 +65,6 @@ def _last_word_bases(form):
     return {" ".join(parts[:-1] + [b]) for b in _bases(parts[-1])} if parts else set()
 
 
-def _norm(form):
-    """Case-fold + collapse whitespace -- the matching key (display form kept)."""
-    return re.sub(r"\s+", " ", form.strip()).lower()
 
 
 def _ucfirst(name):

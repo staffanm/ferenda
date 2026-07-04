@@ -3,6 +3,7 @@ inventory, old-law detection, FK slicing, and edge validation)."""
 
 import json
 
+from accommodanda.forarbete import kommentar
 from accommodanda.sfs import correspond as C
 
 CELEX = "https://lagen.nu/"
@@ -43,24 +44,6 @@ def test_detect_old_law_from_repeal_clause():
 
 def test_detect_old_law_none_when_no_repeal():
     assert C.detect_old_law(_sfs(CELEX + "2020:9", [])) is None
-
-
-def test_fk_section_slices_matching_proposed_law():
-    # FK with two proposed laws; we want only the säkerhetsskyddslag subsection,
-    # and it must survive a chapter heading mis-typed as level-1 (which would
-    # otherwise truncate the section)
-    prop = {"uri": CELEX + "prop/2017/18:89", "structure": [
-        {"type": "rubrik", "level": 1, "text": ["16 Författningskommentar"]},
-        {"type": "rubrik", "level": 2, "text": ["16.1 Förslaget till säkerhetsskyddslag"]},
-        {"type": "rubrik", "level": 1, "text": ["1 Kap. Tillämpningsområde"]},
-        {"type": "paragraf", "num": "1", "text": ["1 §"]},
-        {"type": "stycke", "text": ["Paragrafen motsvarar 1 § 1996 års säkerhetsskyddslag."]},
-        {"type": "rubrik", "level": 2, "text": ["16.2 Förslaget till lag om ändring i X"]},
-        {"type": "stycke", "text": ["Detta hör till den andra lagen."]}]}
-    fk = C.fk_section(prop, "Säkerhetsskyddslag (2018:585)")
-    assert "Paragrafen motsvarar 1 § 1996 års säkerhetsskyddslag." in fk
-    assert "1 Kap. Tillämpningsområde" in fk          # chapter heading kept inline
-    assert "andra lagen" not in fk                    # next proposed law excluded
 
 
 def test_validate_edges_keeps_valid_drops_hallucinations():
@@ -117,7 +100,9 @@ def test_correspond_end_to_end_monkeypatched(monkeypatch):
              "scope": "helt", "quote": "Paragrafen motsvarar 1 §"}]})
 
     monkeypatch.setattr(C.llm, "complete", fake_complete)
-    sidecar, stats = C.correspond(new, prop, old)
+    # build composes the two verticals: förarbete extracts the FK text, sfs derives
+    fk = kommentar.fk_section(prop, "Säkerhetsskyddslag (2018:585)")
+    sidecar, stats = C.correspond(new, prop, old, fk)
     assert stats == {"raw": 2, "emitted": 1, "rejected": 1}
     assert sidecar["correspondence"]["edges"] == [{
         "newParagraf": "K1P1", "oldParagraf": "P1",

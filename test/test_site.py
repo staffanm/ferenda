@@ -822,7 +822,7 @@ def test_editorial_indexes_both_directions():
 
 
 def test_subarticle_key_grammar():
-    from accommodanda.eurlex.structure import subarticle_key
+    from accommodanda.lib.eu_structure import subarticle_key
     assert subarticle_key("paragraph", "1", "4", None) == "4.1"
     assert subarticle_key("point", "a", "4", "1") == "4.1.a"
     assert subarticle_key("point", "a", "4", None) == "4.a"

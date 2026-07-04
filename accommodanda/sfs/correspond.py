@@ -25,18 +25,13 @@ import json
 import re
 from pathlib import Path
 
-from ..forarbete import kommentar
-from ..forarbete.structure import flatten
-from ..lib import catalog, llm
+from ..lib import llm
+from ..lib.util import normalize_fold as _norm
 
 PROMPT = Path(__file__).with_name("correspondence_prompt.txt")
 RELATIONS = {"motsvarar", "overfort"}
 SCOPES = {"helt", "i_sak", "i_huvudsak", "delvis", None}
 QUOTE_KEY = 40         # chars of a quote's normalised prefix that must occur in FK
-
-
-def _norm(s):
-    return re.sub(r"\s+", " ", s or "").strip().lower()
 
 
 def paragraf_index(art):
@@ -90,34 +85,6 @@ def detect_old_law(new_art):
     return found[0] if found else None
 
 
-def fk_section(prop_art, new_title):
-    """The författningskommentar prose for the proposed law titled `new_title`,
-    as one text block. Sliced from the level-2 rubrik whose "Förslaget till X"
-    names this law (under the FK's level-1 heading) up to the next level-2 rubrik
-    -- the next proposed law -- or the document end. Chapter and § markers are
-    kept inline so the model can place each statement under its new paragraf.
-    Robust to the chapter-heading-as-level-1 misdetection that truncates
-    kommentar.find_kommentar: it bounds on level-2 (proposed-law) rubriks only."""
-    blocks = flatten(prop_art["structure"])
-    fk = next((i for i, b in enumerate(blocks)
-               if b["type"] == "rubrik" and (b.get("level") or 1) == 1
-               and "författningskommentar" in _norm(kommentar.plain(b["text"]))),
-              None)
-    if fk is None:
-        return ""
-    want = catalog.norm_title(new_title)
-    start = next((i for i in range(fk + 1, len(blocks))
-                  if blocks[i]["type"] == "rubrik" and blocks[i].get("level") == 2
-                  and catalog.norm_title(kommentar.proposed_name(
-                      kommentar.plain(blocks[i]["text"]))) == want), None)
-    if start is None:
-        return ""
-    end = next((i for i in range(start + 1, len(blocks))
-                if blocks[i]["type"] == "rubrik" and blocks[i].get("level") == 2),
-               len(blocks))
-    return "\n".join(kommentar.plain(blocks[i]["text"]) for i in range(start, end))
-
-
 def validate_edges(raw, new_anchors, old_anchors, old_uri, fk):
     """Keep only the model's edges that check out: both endpoints are real
     paragrafs, relation/scope are in the controlled vocabulary, and the supporting
@@ -154,12 +121,14 @@ def build_prompt(new_idx, old_idx, fk):
             .replace("[[KOMMENTAR]]", fk))
 
 
-def correspond(new_art, prop_art, old_art):
-    """Derive and validate the correspondence edges from the proposition's FK;
-    return (sidecar, stats). The sidecar is `{"correspondence": {...}}`, with the
-    new-law paragraf anchors relative to `new_art` (it is written next to it)."""
+def correspond(new_art, prop_art, old_art, fk):
+    """Derive and validate the correspondence edges from the proposition's
+    författningskommentar text `fk` (extracted by `forarbete.kommentar.fk_section`
+    -- reading the proposition artifact is förarbete's job, so build composes the
+    two verticals rather than sfs importing forarbete); return (sidecar, stats). The
+    sidecar is `{"correspondence": {...}}`, with the new-law paragraf anchors
+    relative to `new_art` (it is written next to it)."""
     new_idx, old_idx = paragraf_index(new_art), paragraf_index(old_art)
-    fk = fk_section(prop_art, new_art["metadata"]["properties"]["dcterms:title"])
     assert fk, ("no författningskommentar subsection for %s in %s"
                 % (new_art["uri"], prop_art.get("identifier")))
     raw = json.loads(llm.complete(build_prompt(new_idx, old_idx, fk)))

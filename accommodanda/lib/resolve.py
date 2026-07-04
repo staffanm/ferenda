@@ -30,7 +30,6 @@ import functools
 import json
 import re
 
-from ..dv import namedcases as dv_namedcases
 from . import datasets
 from .lagrum import LagrumParser, lagrum_uri, load_abbreviations, load_namedlaws
 
@@ -150,7 +149,7 @@ def resolve_eu(q):
 
 @functools.cache
 def _named_cases():
-    return dv_namedcases.load()
+    return datasets.load_namedcases()
 
 
 def resolve_dv(q):

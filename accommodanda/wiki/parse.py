@@ -28,9 +28,9 @@ import glob
 import re
 from pathlib import Path
 
-from ..eurlex.structure import anchored_blocks
 from ..lib import markdown
 from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
+from ..lib.eu_structure import anchored_blocks
 from ..lib.lagrum import (
     EULAGSTIFTNING,
     EURATTSFALL,
