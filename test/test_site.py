@@ -299,6 +299,19 @@ def test_law_page_has_inbound_annotation(tmp_path):
     assert "NJA 1994 s. 1" in panel
 
 
+def test_render_document_injects_edit_meta(tmp_path):
+    # render_document (the dispatcher) grafts the inline-editor <meta> + editor.js
+    # onto every page: a statute is commentary-editable (kind=kommentar, ref=the
+    # SFS number), a case is not (dv hosts no editable content).
+    site = render.Site.from_catalog(build_catalog(tmp_path))
+    law = render.render_document(LAW, "sfs", site)
+    assert '<meta name="lagen-doc" data-kind="kommentar" data-ref="1975:635"' in law
+    assert law.count("</head>") == 1 and '/editor.js' in law
+    case = render.render_document(CASE, "dv", site)
+    assert 'name="lagen-doc"' not in case      # court decisions are read-only
+    assert '/editor.js' in case                # but the script still loads (inert)
+
+
 def test_expired_statute_is_marked(tmp_path):
     site = render.Site.from_catalog(build_catalog(tmp_path))
     repealed = {

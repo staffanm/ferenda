@@ -103,6 +103,39 @@ def heading_fragment(heading):
     return None
 
 
+# `K21P1S2` / `P7` / `K25` / EU `5.2.a` / `recital-13` -> the heading text
+_RE_FRAG_SFS = re.compile(r"^(?:K(\d+))?(?:P(\d+)([a-z])?)?(?:S(\d+))?$")
+_RE_FRAG_EU = re.compile(r"^(\d+)(?:\.(\d+))?(?:\.([a-z]))?$")
+
+
+def fragment_heading(anchor):
+    """The inverse of `heading_fragment`: a host node anchor -> the commentary
+    section heading that annotates it, so the editor can seed a `## …` section
+    when a user comments on a node that has no commentary yet. `heading_fragment`
+    is a left inverse of this (round-trips every anchor it mints). Raises
+    ValueError on an anchor outside the grammar -- a section can't be created for
+    a target the host never mints."""
+    if anchor.startswith("recital-"):
+        return "Skäl %s" % anchor[len("recital-"):]
+    m = _RE_FRAG_SFS.match(anchor)
+    if m and (m.group(1) or m.group(2)):
+        kap, para, letter, stycke = m.groups()
+        parts = []
+        if kap:
+            parts.append("%s kap." % kap)
+        if para:
+            parts.append("%s%s §" % (para, " " + letter if letter else ""))
+        if stycke:
+            parts.append("%s st" % stycke)
+        return " ".join(parts)
+    m = _RE_FRAG_EU.match(anchor)
+    if m:
+        art, para, point = m.groups()
+        frag = art + ("." + para if para else "")
+        return "Artikel %s%s" % (frag, " " + point if point else "")
+    raise ValueError("anchor %r is not an anchorable host node" % anchor)
+
+
 def _read(path):
     return markdown.frontmatter(Path(path).read_text(encoding="utf-8"))
 

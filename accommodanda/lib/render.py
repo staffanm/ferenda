@@ -774,6 +774,7 @@ PAGE = """<!doctype html>
 %(island)s<script src="/scrollspy.js" defer></script>
 <script src="/search.js" defer></script>
 <script src="/versions.js" defer></script>
+<script src="/editor.js" defer></script>
 </body></html>
 """
 
@@ -1642,12 +1643,44 @@ def render_avg(art, site):
                 source_url=art.get("source_url"))
 
 
+# the sources whose pages carry inline-editable content. A logged-in user edits
+# the *commentary* (kommentar rail) on a host act's node -- the official body text
+# stays read-only -- so the editable ref is the host's `annotates` basefile: the
+# uri's local part, bar eurlex's `ext/celex/` prefix (the bare CELEX the
+# commentary frontmatter keys on). A concept page edits its own body.
+KOMMENTAR_HOSTS = ("sfs", "eurlex", "foreskrift", "forarbete")
+
+
+def edit_meta(kind, ref, uri):
+    """The `<meta>` that tells editor.js what a page is and which markdown region
+    an edit maps to. Empty string disables editing on the page. Kept a plain
+    string (not a page-shell param) so it can be injected uniformly into every
+    renderer's output, including the separate editorial-site renderer."""
+    return ('<meta name="lagen-doc" data-kind="%s" data-ref="%s" content="%s">'
+            % (escape(kind), escape(ref), escape(uri)))
+
+
+def _document_edit_meta(source, art):
+    uri = art["uri"]
+    if source in KOMMENTAR_HOSTS:
+        local = catalog.local(uri)
+        ref = local[len("ext/celex/"):] if local.startswith("ext/celex/") else local
+        return edit_meta("kommentar", ref, uri)
+    if source == "begrepp":
+        return edit_meta("begrepp", art["title"], uri)
+    return ""                            # dv / avg pages host no editable content
+
+
 def render_document(art, source, site):
     # kommentar is not here -- it is an annotation rendered into statute rails
     # (generate_site skips it), not a page of its own
-    return {"sfs": render_sfs, "dv": render_dv, "forarbete": render_forarbete,
+    html = {"sfs": render_sfs, "dv": render_dv, "forarbete": render_forarbete,
             "begrepp": render_begrepp, "eurlex": render_eurlex,
             "foreskrift": render_foreskrift, "avg": render_avg}[source](art, site)
+    meta = _document_edit_meta(source, art)
+    # injected right before </head> (PAGE has exactly one) rather than threaded
+    # through every per-source renderer's page() call
+    return html.replace("</head>", meta + "</head>", 1) if meta else html
 
 
 # --------------------------------------------------------------------------
@@ -1994,10 +2027,11 @@ def render_aggregates(con, out_root, catalog_path, write_index=True):
     so this never write-then-clobbers `index.html`."""
     out_root = Path(out_root)
     out_root.mkdir(parents=True, exist_ok=True)
-    (out_root / "style.css").write_text(CSS)
+    (out_root / "style.css").write_text(CSS + EDITOR_CSS)
     (out_root / "scrollspy.js").write_text(SCROLLSPY)
     (out_root / "search.js").write_text(SEARCH)
     (out_root / "versions.js").write_text(VERSIONS)
+    (out_root / "editor.js").write_text(EDITOR)
     (out_root / "robots.txt").write_text(ROBOTS)
     if write_index:
         (out_root / "index.html").write_text(render_index(con))
@@ -2768,6 +2802,316 @@ VERSIONS = """
     sel.value = wanted;
     sel.closest('details').open = true;
     show(wanted);
+  }
+})();
+"""
+
+
+# The inline editor (editor.js). Loaded on every page but inert until a logged-in
+# session is confirmed (GET /auth/me); the static HTML stays identical and
+# cacheable for anonymous readers, the edit affordances are grafted on client-side
+# -- the same approach scrollspy.js uses to inject the rail dots. It reads the
+# page's identity from the <meta name="lagen-doc"> injected by render_document /
+# the site renderer, attaches an ✎ button to each editable node (a §/article for
+# commentary, or the whole body for a concept/editorial page), and drives the
+# cart + checkout against the same-origin /api/v1/edit/* routes. Raw string: the
+# markdown-preview regexes carry backslashes JS must see verbatim.
+EDITOR_CSS = """
+/* inline editor (editor.js) */
+.ed-account { margin-left: 1rem; font-size: .85rem; color: var(--ink-3); }
+.ed-account a { color: var(--accent); }
+.ed-btn { border: 1px solid var(--rule); background: var(--surf); color: var(--accent);
+          border-radius: 5px; cursor: pointer; font-size: .8rem; line-height: 1;
+          padding: .15rem .35rem; }
+.ed-btn:hover { background: var(--surf-2); }
+[id] > .ed-btn { position: absolute; right: -3.4rem; top: .05rem; }
+.paragraf > .ed-btn { right: -3.4rem; top: .05rem; }
+.ed-btn-top { position: static; display: inline-flex; gap: .3rem; margin: 0 0 1rem; }
+.ed-overlay { position: fixed; inset: 0; background: #0007; z-index: 80;
+              display: flex; align-items: flex-start; justify-content: center;
+              padding: 4vh 1rem; overflow: auto; }
+.ed-panel { background: var(--surf); color: var(--ink); width: min(760px, 96vw);
+            border: 1px solid var(--rule); border-radius: 10px; padding: 1rem 1.2rem;
+            box-shadow: 0 16px 48px #0008; }
+.ed-panel h3 { margin: 0 0 .6rem; font-size: 1.05rem; }
+.ed-panel textarea { width: 100%; box-sizing: border-box; min-height: 200px;
+                     font-family: var(--mono, ui-monospace, monospace); font-size: .9rem;
+                     border: 1px solid var(--rule); border-radius: 6px; padding: .5rem; }
+.ed-panel input { box-sizing: border-box; width: 100%; margin: .25rem 0;
+                  border: 1px solid var(--rule); border-radius: 6px; padding: .4rem .5rem; }
+.ed-tools { display: flex; gap: .4rem; flex-wrap: wrap; margin: .5rem 0; }
+.ed-tools button, .ed-row button, .ed-rm { border: 1px solid var(--rule);
+    background: var(--surf-2); color: var(--ink); border-radius: 5px; cursor: pointer;
+    padding: .3rem .6rem; font: inherit; font-size: .85rem; }
+.ed-save, .ed-commit, .ed-do { background: var(--accent) !important; color: #fff !important;
+                               border-color: var(--accent) !important; }
+.ed-preview { border: 1px dashed var(--rule); border-radius: 6px; padding: .5rem .75rem;
+              margin-top: .5rem; background: var(--bg); }
+.ed-preview h4 { margin: .3rem 0; }
+.ed-row { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .7rem; }
+.ed-err { color: #c0392b; font-size: .85rem; margin-top: .4rem; }
+.ed-search-res { list-style: none; margin: .3rem 0 0; padding: 0;
+                 border: 1px solid var(--rule); border-radius: 6px; max-height: 220px;
+                 overflow: auto; }
+.ed-search-res li { padding: .3rem .5rem; cursor: pointer; }
+.ed-search-res li:hover { background: var(--surf-2); }
+.ed-cart-list { list-style: none; margin: 0 0 .6rem; padding: 0; }
+.ed-cart-list li { display: flex; justify-content: space-between; gap: .5rem;
+                   align-items: center; padding: .3rem 0; border-bottom: 1px solid var(--rule); }
+.ed-cart { position: fixed; right: 1rem; bottom: 1rem; z-index: 70; cursor: pointer;
+           border: 1px solid var(--accent); background: var(--surf); color: var(--accent);
+           border-radius: 999px; padding: .55rem .9rem; font: inherit; font-weight: 600;
+           box-shadow: 0 6px 20px #0004; }
+@media (max-width: 64rem) {
+  [id] > .ed-btn, .paragraf > .ed-btn { position: static; margin-left: .4rem; }
+}
+"""
+
+EDITOR = r"""
+(function () {
+  var meta = document.querySelector('meta[name="lagen-doc"]');
+  var API = '/api/v1';
+  var KIND = meta && meta.dataset.kind;
+  var REF = meta && meta.dataset.ref;
+  var me = null, cartEl = null;
+
+  function j(url, opts) {
+    opts = opts || {};
+    opts.credentials = 'same-origin';
+    if (opts.body !== undefined) {
+      opts.headers = { 'Content-Type': 'application/json' };
+      opts.body = JSON.stringify(opts.body);
+    }
+    return fetch(url, opts);
+  }
+  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+  function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+
+  // the login check that decides whether any edit UI appears. A 401/403 (anon or
+  // editing disabled) leaves the page exactly as a reader sees it.
+  j(API + '/auth/me').then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (u) {
+      me = u;
+      account();
+      if (me) { mountCart(); refreshCart(); enableEditing(); }
+    });
+
+  function account() {
+    var mast = document.querySelector('header.masthead');
+    if (!mast) return;
+    var box = el('span', 'ed-account');
+    if (me) {
+      box.innerHTML = esc(me.name) + ' · <a href="#" class="ed-logout">Logga ut</a>';
+      mast.appendChild(box);
+      box.querySelector('.ed-logout').addEventListener('click', function (e) {
+        e.preventDefault();
+        j(API + '/auth/logout', { method: 'POST' }).then(function () { location.reload(); });
+      });
+    } else {
+      box.innerHTML = '<a href="#" class="ed-login">Logga in</a>';
+      mast.appendChild(box);
+      box.querySelector('.ed-login').addEventListener('click', function (e) { e.preventDefault(); loginPanel(); });
+    }
+  }
+
+  // ---- attaching edit buttons -------------------------------------------
+  function topButton(label, anchor) {
+    var main = document.querySelector('main.gr-main') || document.querySelector('main');
+    if (!main) return;
+    var b = el('button', 'ed-btn ed-btn-top'); b.type = 'button'; b.textContent = label;
+    b.addEventListener('click', function (e) { e.preventDefault(); openEditor(anchor); });
+    main.insertBefore(b, main.firstChild);
+  }
+  function enableEditing() {
+    if (!meta) return;                 // page carries no editable content
+    if (KIND === 'kommentar') {
+      // the act as a whole (document-level commentary, the "Om dokumentet" rail)
+      topButton('✎ Kommentera dokumentet', null);
+      // and one per commentable node (a §/article/recital/chapter)
+      var sel = 'main section.paragraf[id], main h3.artikel[id], main p.recital[id], main h2.kaprubrik[id]';
+      document.querySelectorAll(sel).forEach(function (node) {
+        var b = el('button', 'ed-btn'); b.type = 'button'; b.textContent = '✎';
+        b.title = 'Redigera kommentar till denna del';
+        b.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); openEditor(node.id); });
+        node.appendChild(b);
+      });
+    } else {
+      topButton('✎ Redigera sidan', null);   // begrepp / editorial: whole body
+    }
+  }
+
+  // ---- the inline editor ------------------------------------------------
+  function openEditor(anchor) {
+    var q = API + '/edit/region?kind=' + encodeURIComponent(KIND) + '&ref=' + encodeURIComponent(REF) +
+            (anchor ? '&anchor=' + encodeURIComponent(anchor) : '');
+    j(q).then(function (r) { return r.json(); }).then(function (v) { editorPanel(anchor, v.markdown); });
+  }
+
+  function editorPanel(anchor, text) {
+    var ov = overlay(), p = el('div', 'ed-panel'); ov.appendChild(p);
+    p.appendChild(el('h3', null, esc(label(KIND, REF, anchor))));
+    var ta = el('textarea'); ta.value = text; p.appendChild(ta);
+    var tools = el('div', 'ed-tools',
+      '<button data-src="sfs">Länk: lag</button>' +
+      '<button data-src="eurlex">Länk: EU-rätt</button>' +
+      '<button data-src="begrepp">Länk: begrepp</button>');
+    p.appendChild(tools);
+    var picker = el('div'); p.appendChild(picker);
+    var prev = el('div', 'ed-preview'); p.appendChild(prev);
+    function render() { prev.innerHTML = mdPreview(ta.value); }
+    ta.addEventListener('input', render); render();
+    tools.querySelectorAll('button').forEach(function (btn) {
+      btn.addEventListener('click', function (e) { e.preventDefault(); linkPicker(picker, btn.getAttribute('data-src'), ta, render); });
+    });
+    var row = el('div', 'ed-row', '<button class="ed-cancel">Avbryt</button><button class="ed-save">Lägg i korg</button>');
+    p.appendChild(row);
+    row.querySelector('.ed-cancel').addEventListener('click', function () { ov.remove(); });
+    row.querySelector('.ed-save').addEventListener('click', function () {
+      j(API + '/edit/region', { method: 'POST', body: { kind: KIND, ref: REF, anchor: anchor, new_text: ta.value } })
+        .then(function (r) {
+          if (!r.ok) return r.json().then(function (d) { alert('Kunde inte spara: ' + (d.detail || r.status)); });
+          return r.json().then(function (d) { setCart(d.cart); ov.remove(); });
+        });
+    });
+  }
+
+  function linkPicker(box, src, ta, render) {
+    box.innerHTML = '';
+    var inp = el('input'); inp.placeholder = 'Sök att länka till…';
+    var ul = el('ul', 'ed-search-res'); box.appendChild(inp); box.appendChild(ul); inp.focus();
+    var timer;
+    inp.addEventListener('input', function () {
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        var q = inp.value.trim(); if (!q) { ul.innerHTML = ''; return; }
+        j(API + '/search?q=' + encodeURIComponent(q) + '&source=' + src + '&limit=6')
+          .then(function (r) { return r.json(); }).then(function (res) {
+            ul.innerHTML = '';
+            (res.results || []).forEach(function (hit) {
+              var tok = token(src, hit.uri); if (!tok) return;
+              var name = hit.display || hit.identifier || hit.title || q;
+              var li = el('li', null, esc(name) + ' <small>' + esc(tok) + '</small>');
+              li.addEventListener('click', function () {
+                insert(ta, '[' + name + '](' + tok + ')'); render(); box.innerHTML = '';
+              });
+              ul.appendChild(li);
+            });
+          });
+      }, 200);
+    });
+  }
+
+  function token(src, uri) {
+    var m;
+    if (src === 'begrepp') { m = uri.match(/\/begrepp\/(.+)$/); return m ? 'begrepp:' + m[1] : null; }
+    if (src === 'eurlex') { m = uri.match(/\/ext\/celex\/([^#]+)/); return m ? 'eurlex:' + m[1] : null; }
+    m = uri.match(/^https?:\/\/lagen\.nu\/([^#]+)/); return m ? 'sfs:' + m[1] : null;
+  }
+  function insert(ta, s) {
+    var a = ta.selectionStart, b = ta.selectionEnd;
+    ta.value = ta.value.slice(0, a) + s + ta.value.slice(b);
+    ta.selectionStart = ta.selectionEnd = a + s.length; ta.focus();
+  }
+
+  // ---- cart + checkout --------------------------------------------------
+  function mountCart() {
+    cartEl = el('button', 'ed-cart'); cartEl.type = 'button'; cartEl.style.display = 'none';
+    cartEl.addEventListener('click', checkout); document.body.appendChild(cartEl);
+  }
+  function setCart(n) {
+    if (!cartEl) return;
+    cartEl.textContent = '🧺 ' + n + (n === 1 ? ' ändring' : ' ändringar');
+    cartEl.style.display = n > 0 ? 'block' : 'none';
+  }
+  function refreshCart() { j(API + '/edit/cart').then(function (r) { return r.json(); }).then(function (d) { setCart((d.drafts || []).length); }); }
+
+  function checkout() { j(API + '/edit/cart').then(function (r) { return r.json(); }).then(function (d) { checkoutPanel(d.drafts || []); }); }
+
+  function checkoutPanel(drafts) {
+    var ov = overlay(), p = el('div', 'ed-panel'); ov.appendChild(p);
+    p.appendChild(el('h3', null, 'Dina ändringar (' + drafts.length + ')'));
+    var ul = el('ul', 'ed-cart-list'); p.appendChild(ul);
+    drafts.forEach(function (dr) {
+      var li = el('li', null, '<span>' + esc(label(dr.kind, dr.ref, dr.anchor)) + '</span>');
+      var x = el('button', 'ed-rm', 'Ta bort');
+      x.addEventListener('click', function () {
+        j(API + '/edit/discard', { method: 'POST', body: { key: dr.key } })
+          .then(function (r) { return r.json(); })
+          .then(function (res) { setCart(res.cart); ov.remove(); if (res.cart > 0) checkout(); });
+      });
+      li.appendChild(x); ul.appendChild(li);
+    });
+    if (!drafts.length) { p.appendChild(el('p', null, 'Korgen är tom.')); }
+    var ta = el('textarea', 'ed-msg'); ta.placeholder = 'Beskriv ändringen (blir commit-meddelandet)';
+    p.appendChild(ta);
+    var row = el('div', 'ed-row', '<button class="ed-cancel">Stäng</button><button class="ed-commit">Spara allt</button>');
+    p.appendChild(row);
+    var err = el('div', 'ed-err'); p.appendChild(err);
+    row.querySelector('.ed-cancel').addEventListener('click', function () { ov.remove(); });
+    var commitBtn = row.querySelector('.ed-commit');
+    if (!drafts.length) commitBtn.disabled = true;
+    commitBtn.addEventListener('click', function () {
+      var msg = ta.value.trim(); if (!msg) { ta.focus(); return; }
+      commitBtn.disabled = true; commitBtn.textContent = 'Sparar…';
+      j(API + '/edit/commit', { method: 'POST', body: { message: msg } }).then(function (r) {
+        if (r.ok) return r.json().then(function () { setCart(0); location.reload(); });
+        return r.json().then(function (d) {
+          var detail = d.detail;
+          if (r.status === 409 && detail && detail.conflicts) {
+            err.textContent = 'Någon annan hann ändra: ' + detail.conflicts.join(', ') + '. Ladda om och försök igen.';
+          } else { err.textContent = 'Fel: ' + (typeof detail === 'string' ? detail : r.status); }
+          commitBtn.disabled = false; commitBtn.textContent = 'Spara allt';
+        });
+      });
+    });
+  }
+
+  // ---- login ------------------------------------------------------------
+  function loginPanel() {
+    var ov = overlay(), p = el('div', 'ed-panel'); ov.appendChild(p);
+    p.appendChild(el('h3', null, 'Logga in'));
+    var u = el('input'); u.placeholder = 'Användarnamn';
+    var pw = el('input'); pw.type = 'password'; pw.placeholder = 'Lösenord';
+    p.appendChild(u); p.appendChild(pw);
+    var err = el('div', 'ed-err');
+    var row = el('div', 'ed-row', '<button class="ed-cancel">Avbryt</button><button class="ed-do">Logga in</button>');
+    p.appendChild(row); p.appendChild(err);
+    row.querySelector('.ed-cancel').addEventListener('click', function () { ov.remove(); });
+    function submit() {
+      j(API + '/auth/login', { method: 'POST', body: { username: u.value, password: pw.value } })
+        .then(function (r) { if (r.ok) location.reload(); else err.textContent = 'Fel användarnamn eller lösenord.'; });
+    }
+    row.querySelector('.ed-do').addEventListener('click', submit);
+    pw.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+    u.focus();
+  }
+
+  // ---- helpers ----------------------------------------------------------
+  function overlay() {
+    var ov = el('div', 'ed-overlay');
+    ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
+    document.body.appendChild(ov); return ov;
+  }
+  function label(kind, ref, anchor) {
+    if (kind === 'kommentar') return 'Kommentar · ' + ref + (anchor ? ' · ' + anchor : ' · hela dokumentet');
+    if (kind === 'begrepp') return 'Begrepp · ' + ref;
+    return 'Sida · ' + ref;
+  }
+  // a deliberately small preview: headings, paragraphs and [text](target) links.
+  // Not the full citation-linked render (that is the server's job on publish) --
+  // just enough to see structure and links before carting.
+  function mdPreview(src) {
+    return src.split(/\n{2,}/).map(function (block) {
+      block = block.trim(); if (!block) return '';
+      var h = block.match(/^(#{1,6})\s+(.*)$/);
+      if (h) { var n = Math.min(h[1].length + 2, 6); return '<h' + n + '>' + inline(h[2]) + '</h' + n + '>'; }
+      return '<p>' + inline(block) + '</p>';
+    }).join('');
+  }
+  function inline(t) {
+    return esc(t).replace(/\[([^\]]+)\]\(([^)]+)\)/g, function (_, txt, tgt) {
+      return '<a href="#" title="' + esc(tgt) + '">' + esc(txt) + '</a>';
+    });
   }
 })();
 """

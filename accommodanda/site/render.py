@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 
 from ..lib import layout
-from ..lib.render import escape, href, page
+from ..lib.render import edit_meta, escape, href, page
 
 FEED_URL = "https://lagen.nu/dataset/sitenews/feed"
 
@@ -161,6 +161,14 @@ def has_frontpage():
     return layout.artifact("site", "frontpage").exists()
 
 
+def _editable(html, basefile):
+    """Graft the inline-editor `<meta>` onto an editorial page so a logged-in
+    user can edit its whole markdown body (`site/<basefile>.md`). Whole-body, not
+    per-block, because editorial blocks carry no stable per-node anchors."""
+    return html.replace("</head>",
+                        edit_meta("site", basefile, "/" + basefile) + "</head>", 1)
+
+
 def write_site(out_root):
     """Write every parsed site artifact to its page(s) under `out_root`: the
     frontpage to ``index.html``, each about page to ``om/<slug>.html``, and the
@@ -170,15 +178,15 @@ def write_site(out_root):
     for path in layout.artifacts("site"):
         art = json.loads(path.read_text(encoding="utf-8"))
         if art["type"] == "frontpage":
-            (out / "index.html").write_text(render_frontpage(art))
+            (out / "index.html").write_text(_editable(render_frontpage(art), "frontpage"))
         elif art["type"] == "om":
             dest = out / "om" / (art["slug"] + ".html")
             dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_text(render_about(art))
+            dest.write_text(_editable(render_about(art), "om/" + art["slug"]))
         elif art["type"] == "sitenews":
             feed = out / "dataset" / "sitenews" / "feed"
             feed.mkdir(parents=True, exist_ok=True)
-            (feed / "index.html").write_text(render_sitenews(art))
+            (feed / "index.html").write_text(_editable(render_sitenews(art), "sitenews"))
             (feed.parent / "feed.atom").write_text(render_atom(art))
         else:
             raise ValueError("unknown site artifact type %r at %s" % (art["type"], path))

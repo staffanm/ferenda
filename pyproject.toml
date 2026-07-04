@@ -116,6 +116,8 @@ select = ["F", "I", "B", "BLE", "PLC0415", "S110", "S112", "RUF100"]
 # FastAPI's `Depends(...)`-in-default idiom.
 "accommodanda/api/app.py" = ["B008"]
 "accommodanda/api/ops.py" = ["B008"]
+"accommodanda/api/auth.py" = ["B008"]
+"accommodanda/api/edit.py" = ["B008"]
 # POI/jpype classes resolve only after startJVM — the one sanctioned
 # in-function-import site (rule:no-infunction-imports).
 "accommodanda/dv/word.py" = ["PLC0415"]

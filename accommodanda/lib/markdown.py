@@ -153,6 +153,38 @@ def blocks(body):
     return out
 
 
+def split_frontmatter(text):
+    """`(fm_text, body_text)` splitting a markdown file into its frontmatter block
+    (fences included, `''` if none) and the verbatim body. Unlike `frontmatter`,
+    which reparses and rejoins, both halves come back as the original text so a
+    single-region rewrite (the inline editor) can preserve everything it does not
+    touch byte-for-byte."""
+    lines = text.splitlines(keepends=True)
+    if not (lines and RE_FM_FENCE.match(lines[0].rstrip("\n"))):
+        return "", text
+    end = next(i for i in range(1, len(lines))
+               if RE_FM_FENCE.match(lines[i].rstrip("\n")))
+    return "".join(lines[:end + 1]), "".join(lines[end + 1:])
+
+
+def iter_headings(body):
+    """Yield `(line_index, level, text)` for each ATX heading line in `body`
+    (indices into `body.splitlines()`), skipping any `#` inside a ```` ``` ````
+    fenced code block. The line-addressable form of `blocks`' heading events, so a
+    caller can locate and rewrite one section in place."""
+    fence = False
+    for i, raw in enumerate(body.splitlines()):
+        s = raw.strip()
+        if s.startswith("```"):
+            fence = not fence
+            continue
+        if fence:
+            continue
+        h = RE_HEADING.match(s)
+        if h:
+            yield i, len(h.group(1)), h.group(2).strip()
+
+
 def target_uri(target):
     """A markdown link target -> the run uri, or None if it is not a recognised
     link (then the `[label](target)` is left as literal prose). Strict grammar:

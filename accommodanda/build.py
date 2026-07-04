@@ -48,6 +48,7 @@ import requests
 
 from . import config
 from .api import app as api_app
+from .api import edit as api_edit
 from .avg import download as avg_download
 from .avg import legacy as avg_legacy
 from .avg import parse as avg_parse
@@ -70,7 +71,17 @@ from .foreskrift import harvest as foreskrift_harvest_mod
 from .foreskrift import legacy as foreskrift_legacy
 from .foreskrift import parse as foreskrift_parse
 from .foreskrift.agencies import REGISTRY as FORESKRIFT_AGENCIES
-from .lib import casenaming, catalog, dump, layout, render, runlog, search, util
+from .lib import (
+    casenaming,
+    catalog,
+    dump,
+    layout,
+    markdown,
+    render,
+    runlog,
+    search,
+    util,
+)
 from .lib.datasets import NAMEDCASES as NAMEDCASES_JSON
 from .lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
 from .lib.errors import SkipDocument
@@ -1619,6 +1630,51 @@ SOURCES["site"] = Source(
     lambda: site_parse.list_basefiles(str(WIKI_ROOT)),
     {"parse": Stage("parse", site_parse_run, site_artifact,
                     inputs=lambda bf: [site_record(bf)], code=SITE_CODE)})
+
+
+def rebuild_after_commit(changes):
+    """Regenerate the static pages an inline-editor commit touched, in dependency
+    order: re-parse the changed markdown -> relate the affected wiki source(s) so
+    the catalog picks up new/edited commentary edges -> regenerate just the
+    touched host/concept pages (and, for editorial edits, the site pages). Reuses
+    the exact stage functions the `lagen` CLI runs; a web request mints no run id,
+    so the ledger emissions inside them no-op (see `RUN_ID`). `changes` is the
+    list `editcart.commit` returns -- `{"kind": kommentar|begrepp|site,
+    "basefile": …}`. Returns the public URLs of the rebuilt pages.
+
+    Called from `api/edit.py` (the write side of the service). build already
+    imports `api.app`; this is the one call back the other way, used only at
+    request time, never at import time -- so the mutual reference stays sound."""
+    kommentar = [c["basefile"] for c in changes if c["kind"] == "kommentar"]
+    begrepp = [c["basefile"] for c in changes if c["kind"] == "begrepp"]
+    site = [c["basefile"] for c in changes if c["kind"] == "site"]
+    for bf in kommentar:
+        kommentar_parse_run(bf)
+    for bf in begrepp:
+        begrepp_parse_run(bf)
+    for bf in site:
+        site_parse_run(bf)
+    relate = [n for n, present in (("kommentar", kommentar), ("begrepp", begrepp))
+              if present]
+    if relate:
+        cmd_relate(relate)
+    urls = []
+    for bf in kommentar:                 # a commentary rides its host act's page
+        host = layout.kommentar_host(bf)
+        cmd_generate(only={str(layout.artifact(host, bf))}, source=host)
+        urls.append(layout.page_url(wiki_parse.host_uri(bf)))
+    for bf in begrepp:
+        cmd_generate(only={str(layout.artifact("begrepp", bf))}, source="begrepp")
+        urls.append(layout.page_url(markdown.begrepp_uri(bf)))
+    if site:
+        cmd_generate(source="site")      # write_site rewrites all editorial pages
+        urls += ["/" if bf == "frontpage" else "/" + bf for bf in site]
+    return urls
+
+
+# wire the editor's commit endpoint to the rebuild above (build imports the api
+# package, so this is the sound direction to close the loop -- see api/edit.py)
+api_edit.set_rebuild(rebuild_after_commit)
 
 
 # --------------------------------------------------------------------------

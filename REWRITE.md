@@ -814,6 +814,26 @@ to a future per-doc incremental generate.
     `ops`, password = the new `ops_token` config knob / `OPS_TOKEN` env —
     unset disables it, 403) with `/ops/runs`, `/ops/runs/{id}` and
     `/ops/failures` drill-downs. `test/test_runlog.py`, `test/test_ops.py`.
+  - ✅ **Inline content editor** (`api/auth.py` + `api/edit.py` + `api/editcontent.py`
+    + `api/editcart.py`; the write side of the service, first cut 2026-07-05) — a
+    logged-in user edits the git-backed markdown (kommentar / begrepp / editorial
+    site) *inline on the live site*: an ✎ on any §/article opens the commentary for
+    that node (created from `fragment_heading` if none exists), a concept/editorial
+    page edits its whole body, with a link toolbar that turns a search hit into an
+    `sfs:`/`eurlex:`/`begrepp:` link. Edits accumulate in a per-user "cart"
+    (`DATA/.build/edits/<user>.json`, isolated from the working tree); checkout is
+    **one git commit authored as that user** (`name`/`email` from a new `editors`
+    config registry — so history attributes each editor exactly as a clone+commit
+    would), conflict-checked against on-disk `base_sha`, followed by a synchronous
+    scoped rebuild (`build.rebuild_after_commit`: parse → relate → regenerate just
+    the touched pages) so the edit is live when the call returns. Auth is a signed
+    session cookie (stdlib HMAC over the `editor_secret` knob — unset disables
+    editing, 403, like `ops_token`); passwords are `pbkdf2$…` strings minted by
+    `python -m accommodanda.api.auth hash`. The static site stays byte-identical for
+    anonymous readers — the affordances are grafted client-side (`render.EDITOR`,
+    `editor.js`) after a `/auth/me` check, keyed off a `<meta name="lagen-doc">`
+    render injects. The mutating routes are same-origin only (CORS stays GET-open).
+    `test/test_editcontent.py`, `test/test_editcart.py`, `test/test_edit_api.py`.
 - ✅ **Full corpus now catalogued.** `relate` runs over the whole set —
   `documents`: sfs 11,184 · dv 17,103 · forarbete 15,237 · eurlex 61,146
   (+ kommentar/begrepp) — so the cited law-roots that were dead targets in the
@@ -1802,6 +1822,20 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **§6** (2026-07-05) — inline content editor: the write side of the service.
+  A new `editors` config registry + `editor_secret` back a signed-cookie login
+  (`api/auth.py`); `api/edit.py` exposes `/api/v1/{auth,edit}/*` (all gated,
+  same-origin only). `api/editcontent.py` locates and rewrites one markdown
+  region (a kommentar `## §`-section, or a concept/editorial body) in `WIKI_ROOT`
+  in place, byte-preserving everything around it; `api/editcart.py` holds each
+  user's pending hunks and, on checkout, makes one git commit authored as that
+  user + conflict-checks against `base_sha`. `build.rebuild_after_commit` does the
+  synchronous scoped parse→relate→generate (wired into `edit.py` by injection to
+  avoid an import cycle). Client: `render.EDITOR`/`editor.js` grafts ✎ buttons +
+  a cart/checkout UI (with an `sfs:`/`eurlex:`/`begrepp:` link picker) onto the
+  otherwise-static pages after `/auth/me`, keyed off a `<meta name="lagen-doc">`.
+  Added `markdown.split_frontmatter`/`iter_headings` and `wiki.fragment_heading`
+  (inverse of `heading_fragment`). `test/test_edit{content,cart,_api}.py`.
 - **§7i** (2026-07-04) — site vertical landed: lagen.nu's editorial chrome
   (curated frontpage, `/om/*` about pages, sitenews feed) moved from
   hand-maintained legacy templates to markdown in `lagen-wiki/site/`,

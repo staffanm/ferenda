@@ -37,7 +37,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .. import config
 from ..lib import catalog, diff, facets, history, layout, resolve, search
-from . import ops
+from . import auth, edit, ops
 
 CATALOG = config.DATA / "catalog.sqlite"
 DUMPS = config.DATA / "dumps"
@@ -57,6 +57,13 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"],
 # the ops dashboard (/ops*), registered like /api/v1 -- before the SiteFiles
 # mount added in serve(), so its explicit routes win over the static catch-all
 app.include_router(ops.router)
+
+# the inline editor's auth + write routes. The mutating side of the service: it
+# stays GET-open/CORS-* for the public read API above and same-origin only for
+# these (the editor JS is served from this same origin; the session cookie is
+# SameSite=Lax), so CORS deliberately keeps blocking cross-origin writes.
+app.include_router(auth.router)
+app.include_router(edit.router)
 
 # one search client for the process; constructing it does not open a connection,
 # so importing/serving the API never requires a running OpenSearch -- only an
@@ -519,4 +526,8 @@ def serve(directory, host="127.0.0.1", port=8000):
     here -- not at import -- so the in-process API client used during `generate`
     (which only calls /api/v1) never needs a built site."""
     app.mount("/", SiteFiles(directory=directory, html=True), name="site")
-    uvicorn.run(app, host=host, port=port)
+    # proxy_headers so the app sees the real scheme/host behind the prod TLS proxy
+    # (nginx must send X-Forwarded-Proto) -- the editor's session cookie sets its
+    # Secure flag from request.url.scheme, which is otherwise `http` behind nginx.
+    # forwarded_allow_ips defaults to 127.0.0.1, the proxy on the same host.
+    uvicorn.run(app, host=host, port=port, proxy_headers=True)

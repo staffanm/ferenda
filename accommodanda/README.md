@@ -111,6 +111,26 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `legacy.py` | one-time import of the two harvest-blocked corpora (`lagen foreskrift import-legacy {skvfs\|sosfs}`) — frozen bytes referenced in place (§7g) |
 | `model.py` / `structure.py` / `parse.py` | as-published `Foreskrift` model, PDF → statute-shaped structure → artifact (`parse.body_path` resolves a frozen-import body under LEGACY_ROOT) |
 
+**eurlex vertical (EU law — EUR-Lex / CELLAR)**
+| File | What |
+|---|---|
+| `download.py` | harvester for the Publications Office CELLAR repository, keyed by CELEX (SPARQL discovery + SOAP/REST fetch; Formex/HTML/PDF manifestations) |
+| `bulk.py` | unpack a CELLAR bulk "legislation" dump into the per-CELEX layout the incremental harvester produces, so the whole corpus can be imported from official dumps |
+| `model.py` | typed `EurlexDoc` model parsed from Formex (legislation/treaties + judgments) |
+| `parse.py` | orchestrator: Formex (the structured XML manifestation) → `EurlexDoc` → JSON artifact |
+| `parse_html.py` / `parse_pdf.py` | fallback body parsers for the (many older) acts with no Formex — OJ HTML/XHTML, then PDF via `pdftohtml -xml` as last resort |
+| `structure.py` | group an act's flat block sequence into its containment hierarchy (`nest`, the parse-time tree builder; the anchor grammar itself lives in `lib/eu_structure.py`) |
+| `definitions.py` | extract an act's defined terms and interlink their in-act uses |
+| `lang.py` | localized structural vocabulary for the non-Formex (html/pdf) parsers (Formex is tag-marked, so its parser needs no language knowledge) |
+| `annotate.py` | `lagen eurlex ai-annotate <CELEX>` — author the editorial `.ann` layer for a sector-3 act with an LLM |
+
+**wiki vertical (git-backed markdown — begrepp + kommentar)**
+| File | What |
+|---|---|
+| `parse.py` | project the markdown wiki into kommentar / begrepp artifacts; the `## heading → host node anchor` grammar (`heading_fragment`, `fragment_heading`), `host_uri`, and the frontmatter-keyed `kommentar_index`/`begrepp_index` |
+| `annotate.py` | `lagen kommentar ai-annotate <basefile>` — the Step-4 AI guidance linker: read an annotation's declared guidance PDFs and propose, per article, the guidance links (`.ann` sidecar) |
+| `guidance_discover.py` | `lagen kommentar {discover,propose}-guidance` — crawl Commission guidance sitemaps into a per-CELEX index + draft a `guidance:` block to review (no LLM) |
+
 **remisser vertical (regeringen.se referral responses)**
 | File | What |
 |---|---|
@@ -143,6 +163,9 @@ gate. Served at `/` (frontpage), `/om/<slug>` + `/om/` hub, and
 citation graph, version history + diff) that also serves the static site under
 `lagen serve`. `api/ops.py` mounts the ops health dashboard on the same app
 (see "Operations" below); `lib/runlog.py` owns the state files behind it.
+`api/auth.py` + `api/edit.py` + `api/editcontent.py` + `api/editcart.py` are the
+inline content editor — the one authenticated, mutating surface (see "Inline
+editing" below).
 
 ## Running the pipelines
 
@@ -442,6 +465,61 @@ segments + errors) and `/ops/failures` (drill-down with tracebacks) alongside
 it. It's gated by HTTP Basic auth (user `ops`, password = the `ops_token` key
 in `config.yml` or the `OPS_TOKEN` env var); leaving it unset disables the
 dashboard (every route answers 403).
+
+## Inline editing (web UI)
+
+The git-backed markdown — legal-source **commentary** (`commentary/…md`),
+**concept** pages (`concept/…md`) and the **editorial** site pages
+(`site/…md`) — can be edited **inline on the live site** by a logged-in user,
+instead of cloning `lagen-wiki` and committing by hand. It is the only
+authenticated, mutating part of the service; the public read API stays GET-only.
+
+**Who can edit** is a hand-curated registry in `config.yml` (there is no
+self-signup). Each entry maps a login to the git identity its commits are
+attributed to and a password hash:
+
+```yaml
+editor_secret: <random hex>          # signs the session cookie; unset ⇒ editing off (403)
+editors:
+  staffan:
+    name: Staffan Malmgren           # -> GIT_AUTHOR_NAME / GIT_COMMITTER_NAME
+    email: staffan@example.org        # -> GIT_AUTHOR_EMAIL / GIT_COMMITTER_EMAIL
+    pwhash: "pbkdf2$260000$…$…"        # never a plaintext password
+```
+
+Mint a `pwhash` (nothing is stored in the clear):
+
+```sh
+uv run python -m accommodanda.api.auth hash '<the password>'   # prints the pbkdf2$… line
+```
+
+`editor_secret`/`editors` follow the same env→config.yml precedence as the other
+knobs (`EDITOR_SECRET` env; `editors` is config-only). Leaving `editor_secret`
+unset disables editing wholesale — every `/api/v1/{auth,edit}/*` route answers
+403 — exactly as an unset `ops_token` disables `/ops`.
+
+**How it works.** The static pages are byte-identical for anonymous readers;
+`editor.js` (served with the site) grafts the edit UI on client-side after a
+`GET /api/v1/auth/me` check, keyed off a `<meta name="lagen-doc">` the renderer
+injects. On a statute / EU-act page an ✎ button on a `§`/article edits the
+**commentary** for that node (the official text stays read-only) — the `##`
+section is created from its heading if none exists, and the file with an
+`annotates:` frontmatter if the host has no commentary at all. Concept and
+editorial pages edit their whole markdown body. The editor has a link toolbar
+that turns a search hit into an `sfs:`/`eurlex:`/`begrepp:` link.
+
+Edits accumulate in a per-user **cart** (`DATA/.build/edits/<user>.json`, kept
+out of the working tree so users don't collide). "Checkout" opens a
+commit-message box and turns the whole cart into **one git commit authored as
+that user** — byte-for-byte the history a `git clone` + commit would produce — 
+then synchronously re-parses / re-relates / regenerates just the touched pages
+(`build.rebuild_after_commit`) so the edit is live when the request returns. A
+hunk that changed on disk since it was carted fails the checkout (409) rather
+than clobbering.
+
+The routes are same-origin only (the session cookie is `SameSite=Lax`; CORS
+stays GET-open for the public read API). No new dependencies — cookie signing
+and password hashing are stdlib `hmac`/`hashlib`.
 
 ## Production deployment (Docker)
 

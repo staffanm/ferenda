@@ -33,12 +33,12 @@ import argparse
 import os
 import re
 import sqlite3
-import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from accommodanda.lib import (
+    git,  # noqa: E402  (shared git-CLI wrapper)
     layout,  # noqa: E402  (basefile -> storage relpath)
     wikitext,  # noqa: E402  (reused for faithful conversion)
 )
@@ -243,11 +243,6 @@ def mw_timestamp(ts):
             % (ts[0:4], ts[4:6], ts[6:8], ts[8:10], ts[10:12], ts[12:14]))
 
 
-def _git(repo, *args, env=None):
-    subprocess.run(["git", "-C", str(repo), *args], check=True,
-                   env=env, stdout=subprocess.DEVNULL)
-
-
 def page_path(repo, title):
     """The content-repo path for one page: commentary is filed under its source
     and that source's basefile->path rule (`commentary/sfs/1915/218.md`);
@@ -262,7 +257,7 @@ def replay(con, repo, limit=None):
     repo = Path(repo)
     if not (repo / ".git").exists():
         repo.mkdir(parents=True, exist_ok=True)
-        _git(repo, "init", "-q")
+        git.run(repo, "init", "-q")
 
     aliases = redirect_aliases(con)
     revisions = all_revisions(con)
@@ -291,9 +286,9 @@ def replay(con, repo, limit=None):
                "GIT_COMMITTER_NAME": name, "GIT_COMMITTER_EMAIL": email,
                "GIT_AUTHOR_DATE": mw_timestamp(rev["ts"]),
                "GIT_COMMITTER_DATE": mw_timestamp(rev["ts"])}
-        _git(repo, "add", "--", str(path.relative_to(repo)), env=env)
+        git.run(repo, "add", "--", str(path.relative_to(repo)), env=env)
         msg = rev["comment"] or ("%s (rev %d)" % (rev["title"], rev["rev_id"]))
-        _git(repo, "commit", "-q", "--allow-empty", "--allow-empty-message",
+        git.run(repo, "commit", "-q", "--allow-empty", "--allow-empty-message",
              "-m", msg, env=env)
         state.write_text(str(i))
         if i % 200 == 0 or i == total:

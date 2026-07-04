@@ -14,10 +14,16 @@ anchored to the package source tree by their own callers, not here.
 """
 
 import os
+import re
 from pathlib import Path
 
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
+
+# an editor `pwhash` as `api.auth.hash_password` mints it: pbkdf2$rounds$salt$hash
+# (salt/hash are unpadded urlsafe-base64). Validated at config load so a mangled
+# hash fails at boot, not as a 500 on that editor's first login.
+_RE_PWHASH = re.compile(r"^pbkdf2\$\d+\$[A-Za-z0-9_-]+\$[A-Za-z0-9_-]+$")
 
 REPO = Path(__file__).parent.parent          # the ferenda repo root
 CONFIG_PATH = REPO / "config.yml"
@@ -152,6 +158,60 @@ def resolve_ops_token(doc):
     return value
 
 
+def resolve_editor_secret(doc):
+    """The HMAC key that signs the inline editor's session cookie (api/auth.py).
+    Unset (``None``) disables editing entirely -- every mutating route answers
+    403, exactly like an unset ``ops_token`` disables the dashboard. Precedence:
+    the ``EDITOR_SECRET`` environment variable, then the ``editor_secret`` key in
+    config.yml, else ``None``. A present-but-invalid value raises ``ConfigError``
+    rather than silently disabling auth."""
+    env = os.environ.get("EDITOR_SECRET")
+    if env:
+        return env
+    if "editor_secret" not in doc:
+        return None
+    value = doc["editor_secret"]
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError("editor_secret set to invalid value %r at %s"
+                          % (value, _at(doc, "editor_secret")))
+    return value
+
+
+def resolve_editors(doc):
+    """The registry of people allowed to edit content inline, keyed by login
+    name. Each entry maps a username to a ``name``/``email`` (the git identity
+    stamped on that user's commits, so history attributes each editor exactly as
+    a `git clone` + commit would) and a ``pwhash`` (a ``pbkdf2$…`` string minted
+    by ``python -m accommodanda.api.auth hash``; no plaintext password is ever
+    stored). Absent -> ``{}`` (no one can log in). A malformed entry raises
+    ``ConfigError`` -- a typo must not silently drop an editor or their identity.
+    Read from config.yml only; there is no env-var form (identities are not a
+    single scalar)."""
+    if "editors" not in doc:
+        return {}
+    raw = doc["editors"]
+    if not isinstance(raw, dict) or not raw:
+        raise ConfigError("editors set to invalid value %r at %s"
+                          % (raw, _at(doc, "editors")))
+    editors = {}
+    for user, entry in raw.items():
+        loc = _at(doc, "editors")
+        if not isinstance(entry, dict):
+            raise ConfigError("editor %r is not a mapping at %s" % (user, loc))
+        missing = [k for k in ("name", "email", "pwhash")
+                   if not (isinstance(entry.get(k), str) and entry[k].strip())]
+        if missing:
+            raise ConfigError("editor %r missing %s at %s"
+                              % (user, "/".join(missing), loc))
+        if not _RE_PWHASH.match(entry["pwhash"]):
+            raise ConfigError("editor %r has a malformed pwhash at %s -- mint one "
+                              "with `python -m accommodanda.api.auth hash`"
+                              % (user, loc))
+        editors[str(user)] = {"name": entry["name"], "email": entry["email"],
+                              "pwhash": entry["pwhash"]}
+    return editors
+
+
 _doc = load()                                # parse config.yml once
 DATA = resolve_data_root(_doc)
 WIKI_ROOT = resolve_wiki_root(_doc)
@@ -159,3 +219,5 @@ LEGACY_ROOT = resolve_legacy_root(_doc)
 OPENSEARCH_URL = resolve_opensearch_url(_doc)
 LLM_MODEL = resolve_llm_model(_doc)
 OPS_TOKEN = resolve_ops_token(_doc)
+EDITOR_SECRET = resolve_editor_secret(_doc)
+EDITORS = resolve_editors(_doc)
