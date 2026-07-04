@@ -166,8 +166,8 @@ def test_riksmoten_sequence():
     assert seq[50] == "1976/77"
     assert seq[51] == "1975/76"                   # first split-year riksmöte
     assert seq[52] == "1975"                      # last single-year session
-    assert seq[-1] == "1867"                      # oldest riksmöte with bet docs
-    assert len(seq) == 52 + 109                   # 2026/27..1975/76 + 1975..1867
+    assert seq[-1] == "1971"                       # first unicameral riksmöte
+    assert len(seq) == 52 + 5                      # 2026/27..1975/76 + 1975..1971
 
 
 # --------------------------------------------------------------------------

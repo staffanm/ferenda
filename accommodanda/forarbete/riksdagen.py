@@ -39,16 +39,25 @@ one. `--full` re-walks.
 walk is a partial view, so it never advances the watermark (else a later
 full backfill would go incremental and silently skip the corpus).
 
-The API caps any one listing at ~50 pages (10k docs at sz=200), far below the
-~75k-document corpus, so a single un-narrowed walk can never reach the older
+The API caps any one listing at ~50 pages (10k docs at sz=200), below the
+~25k-document corpus, so a single un-narrowed walk can never reach the older
 betänkanden. A backfill therefore iterates riksmöte by riksmöte, newest to
 oldest -- each riksmöte is ~300-900 docs, well under the cap; see `riksmoten`
 for the empirically verified value sequence. The plain incremental run (new
 docs land at the top of the un-narrowed listing) keeps the single walk.
 
-The corpus reaches back to 1867, so the older filbilagor are scans; those PDFs
-currently parse best-effort through the ordinary live-PDF branch with no OCR
-fallback -- an accepted limitation, revisited with the full-crawl decision.
+We harvest from riksmöte 1971 -- the first unicameral riksdag -- onward, where
+`doktyp=bet` is exactly the committee reports (100% subtyp=bet). Before 1971 the
+same doktyp is dominated by utskotts-*utlåtanden* and *memorial* (a bicameral-era
+document species with its own identifiers and citation forms, none modelled
+here yet); genuine "betänkande"-subtype documents in that era are almost only
+Bevillningsutskottet's, so harvesting the old doktyp would mislabel utlåtanden as
+"Bet. …" and add link targets nothing resolves. The pre-1971 corpus is therefore
+a deliberate non-goal, revisited as its own project (see `FIRST_RIKSMOTE`).
+
+The oldest filbilagor (early-1970s) are scans; those PDFs currently parse
+best-effort through the ordinary live-PDF branch with no OCR fallback -- an
+accepted limitation, revisited with the full-crawl decision.
 """
 
 import json
@@ -196,20 +205,20 @@ def _currency(root, entry, basefile):
 #   - split-year "YYYY/YY" works from "1975/76" (708 hits) onward; "1971/72"
 #     and "1976" give 0 -- the split form starts exactly at 1975/76.
 #   - before that, plain calendar years: "1975" (364, the last spring-only
-#     session) back to "1867" (335). "1866"/"1865" give 0 -- the corpus starts
-#     with the first bicameral riksdag.
-#   - extra sessions fold into the plain year: "1914B"/"1958B"/"1919A" give 0
-#     while "1914" (639) and "1958" (543) cover them.
-# Summing @traffar over the full sequence (161 riksmöten) gives 74772 against
-# the un-narrowed total of 74773 -- coverage is complete except at most one
-# stray document with an rm value outside any riksmöte filter.
+#     session) back to "1971" (681), the first unicameral riksmöte.
+# Summing @traffar over this sequence (57 riksmöten, 1971..2026/27) gives 24850,
+# every one a genuine subtyp=bet betänkande. The un-narrowed total is 74773 --
+# the ~50k difference is the pre-1971 utlåtanden/memorial deliberately excluded
+# (see the module docstring and FIRST_RIKSMOTE), not a coverage gap.
 SPLIT_FROM = 1975      # "1975/76" is the first split-year riksmöte
-FIRST_RIKSMOTE = 1867  # the oldest riksmöte with bet documents
+FIRST_RIKSMOTE = 1971  # first unicameral riksmöte; doktyp=bet is 100% subtyp=bet
+                       # from here on. Pre-1971 doktyp=bet is mostly utlåtanden/
+                       # memorial (see module docstring) -- a deliberate non-goal.
 
 
 def riksmoten(newest_year):
     """Every riksmöte value from the riksmöte starting in `newest_year` down to
-    1867, newest first: "2026/27" … "1975/76", then "1975" … "1867"."""
+    1971, newest first: "2026/27" … "1975/76", then "1975" … "1971"."""
     for year in range(newest_year, SPLIT_FROM - 1, -1):
         yield "%d/%02d" % (year, (year + 1) % 100)
     for year in range(SPLIT_FROM, FIRST_RIKSMOTE - 1, -1):
