@@ -67,6 +67,8 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | File | What |
 |---|---|
 | `lagrum.py` | Lark/Earley engine; `LagrumParser(parse_types=…)` composes a grammar from LAGRUM / KORTLAGRUM / EULAGSTIFTNING / RATTSFALL / FORARBETEN / … |
+| `casenaming.py` | court-decision identity — `case_uri` (mint a case's canonical URI via the RATTSFALL parser) + `case_label`/`lopnummer` (referat identity + HD's given names); read identically by dv's parse-time label stamp, the catalog row and the page heading |
+| `eu_structure.py` | the one EU-act sub-article anchor grammar (`anchored_blocks`/`subarticle_key`/`flatten`), shared by the eurlex parser, the renderer and the wiki guidance layer (`nest`, the parse-time tree builder, stays in `eurlex/structure.py`) |
 | `legacy_import.py` | shared §7g frozen-import core — `should_write` precedence (live-wins / own-import-idempotent-unless-force / optional `better()` tie-break), `rel` (in-place LEGACY_ROOT-relative body references), `iter_entries`/`docdir`/`read_record` walk primitives; used by `forarbete/legacy.py`, `foreskrift/legacy.py`, `avg/legacy.py` |
 | `regeringen.py` | shared regeringen.se harvest knowledge — the doctype table (`TYPES`: url segment, taxonomy category id, identifier regex) and the `ul.list--block` listing walk (`listing_items`); used by `forarbete/download.py` and `remisser/download.py` |
 
@@ -78,7 +80,6 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `model.py` | `Avgorande` model (metadata + ordered Rubrik/Stycke body + footnotes) |
 | `parse.py` | **API path** — body from `innehall` HTML, metadata from curated fields |
 | `structure.py` | instance/ruling segmenter (delmål → instans → betänkande/dom → domskäl/domslut) |
-| `naming.py` | canonical case title — referat identity + HD's given names (`case_label`) |
 | `namedcases.py` | harvester for HD's named-precedent list (`data/namedcases.json`) |
 | `word.py` | **legacy path** — POI (HWPF/XWPF) → flat `(text, bold, in_table)` stream |
 | `legacy.py` | legacy stream → head/body split → `Avgorande` |
@@ -91,7 +92,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `legacy.py` | one-time import of the nine frozen förarbete corpora (`lagen forarbete import-legacy <corpus>`, §7g) — shared precedence core; regeringen-era + KB corpora entries-driven, the TRIPS family (proptrips/dirtrips/dirasp) walked downloaded-first (path-derived basefile, ~half their entries are null) |
 | `legacy_formats.py` | frozen body adapters — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML (`abbyy_pages`), scanned-PDF OCR text (`scanned_pdf_pages`), TRIPS `div.body-text` (`trips_paras`) |
 | `riksdagen.py` | downloader for utskottsbetänkanden (`bet`, the prop→enacted-law link) off the data.riksdagen.se dokumentlista JSON feed; PDF-only bodies (printed page = citation anchor); basefile `"<rm>:<beteckning>"` matching the FORARBETEN grammar's bet URIs; full backfill walks all 161 riksmöten (the API caps one query's pagination at ~10k docs); no frozen legacy corpus |
-| `kommentar.py` / `genomforande.py` | författningskommentar → `implements` (EU directive article) edges; extracted from `prop` and `fm` (förordningsmotiv) documents — both accompany the final enacted text, unlike a lagrådsremiss/SOU/Ds |
+| `kommentar.py` / `genomforande.py` | författningskommentar → `implements` (EU directive article) edges; extracted from `prop` and `fm` (förordningsmotiv) documents — both accompany the final enacted text, unlike a lagrådsremiss/SOU/Ds; `fk_section` also slices out the per-law FK prose consumed by `sfs/correspond.py` (reading a proposition artifact stays förarbete's job) |
 
 **avg vertical (JO + JK + ARN myndighetsavgöranden)**
 | File | What |
@@ -321,7 +322,7 @@ to page-marked text, and asks the configured Berget model to map guidance sectio
 (FAQ questions) to the act's **fine-grained targets** — not just whole articles but
 the sub-articles and recitals the act divides into: a single definition `2.21`, a
 numbered paragraph `6.2`, a recital `recital-15` (the dotted sub-article / `recital-N`
-anchor grammar `eurlex.structure` mints, shared with the renderer and the wiki
+anchor grammar `lib.eu_structure` mints, shared with the renderer and the wiki
 commentary headings, so a link lands on the exact node). A FAQ answer about two definitions links to exactly those two, not to
 article 2 as a whole. The result is written as a **`.ann` sidecar** next to the
 kommentar artifact — `{"guidanceLinks": {anchor: [{label, href, desc, section}]}}` —
