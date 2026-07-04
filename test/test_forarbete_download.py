@@ -2,6 +2,9 @@
 
 import json
 
+import requests
+
+from accommodanda.forarbete import download
 from accommodanda.forarbete.download import (_has_live_record, basefile_slug,
                                              find_content_links, parse_listing)
 from accommodanda.lib.util import record_path, write_atomic
@@ -95,3 +98,61 @@ def test_has_live_record_treats_import_as_absent(tmp_path):
                  json.dumps({"type": "prop", "source": "proptrips", "legacy_files": []}))
     assert _has_live_record(tmp_path, "prop", "1997/98:45") is False
     assert _has_live_record(tmp_path, "prop", "1867:23") is False   # truly absent
+
+
+def test_sync_incremental_skips_downloaded(tmp_path, monkeypatch):
+    # 1. Setup mock functions
+    items = [
+        {"type": "prop", "basefile": "2025/26:279", "identifier": "Prop. 2025/26:279", "date": "2026-06-09", "url": "http://example.com/1"},
+        {"type": "prop", "basefile": "2025/26:276", "identifier": "Prop. 2025/26:276", "date": "2026-05-20", "url": "http://example.com/2"},
+    ]
+
+    # Mock iter_listing
+    monkeypatch.setattr(download, "iter_listing", lambda session, typ, delay: [(items, 2, 1)])
+
+    # Mock download_document
+    downloads = []
+    def mock_download_document(session, root, item, delay):
+        downloads.append(item["basefile"])
+        # Create the live record so _has_live_record is True next time
+        write_atomic(record_path(root, "prop", item["basefile"]),
+                     json.dumps({"type": "prop", "files": []}))
+        return {"basefile": item["basefile"]}
+    monkeypatch.setattr(download, "download_document", mock_download_document)
+
+    # 2. First run (backfill / no watermark)
+    totals = download.sync(tmp_path, types=["prop"], delay=0)
+    assert totals == {"prop": (2, 2)}
+    assert downloads == ["2025/26:279", "2025/26:276"]
+
+    # Verify watermark file was written
+    watermark_path = tmp_path / "prop" / ".watermark.json"
+    assert watermark_path.exists()
+
+    # 3. Second run (incremental)
+    downloads.clear()
+    totals2 = download.sync(tmp_path, types=["prop"], delay=0)
+    # Both seen, but 0 new downloads since both already downloaded
+    assert totals2 == {"prop": (2, 0)}
+    assert downloads == []
+
+
+def test_sync_saves_watermark_with_errors(tmp_path, monkeypatch):
+    items = [
+        {"type": "prop", "basefile": "2025/26:279", "identifier": "Prop. 2025/26:279", "date": "2026-06-09", "url": "http://example.com/1"},
+    ]
+
+    monkeypatch.setattr(download, "iter_listing", lambda session, typ, delay: [(items, 1, 1)])
+
+    def mock_download_document_error(session, root, item, delay):
+        raise requests.HTTPError("500 Server Error")
+
+    monkeypatch.setattr(download, "download_document", mock_download_document_error)
+
+    # Run sync, it should encounter error but still write watermark
+    totals = download.sync(tmp_path, types=["prop"], delay=0, log=lambda msg: None)
+    assert totals == {"prop": (1, 0)}
+
+    watermark_path = tmp_path / "prop" / ".watermark.json"
+    assert watermark_path.exists()
+    assert json.loads(watermark_path.read_text())["last_harvest"] == "2026-06-09"

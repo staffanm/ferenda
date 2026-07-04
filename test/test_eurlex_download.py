@@ -4,6 +4,8 @@ must not be left on disk as a bare notice, and prune_empty cleans up any such
 dirs earlier runs created -- and its content-format fallback (a scanned TIFF
 served under an fmx4 manifestation is rejected for the next text type)."""
 
+from datetime import date
+
 from accommodanda.eurlex import download as D
 
 TIFF = b"II*\x00\x12p\x00\x00"          # little-endian TIFF magic + noise
@@ -96,3 +98,41 @@ def test_prune_empty_removes_notice_only_dirs_keeps_documents(tmp_path):
     assert D.prune_empty(tmp_path) == 1                   # removes the notice-only dir
     assert not notice_only.exists()
     assert (with_doc / "swe.html").exists()               # the real document is kept
+
+
+def test_watermark_round_trip_and_legacy_format(tmp_path):
+    # legacy plain-date file (pre run-recency): high only, no run date
+    (tmp_path / ".watermark-treaties").write_text("2022-05-05")
+    assert D.read_watermark(tmp_path, "treaties") == (date(2022, 5, 5), None)
+
+    # new format round-trips both dates
+    D.write_watermark(tmp_path, "treaties", "2022-05-05", run=date(2026, 7, 4))
+    assert D.read_watermark(tmp_path, "treaties") == (date(2022, 5, 5),
+                                                      date(2026, 7, 4))
+
+    # the resume write (interrupted walk) carries no run date -- an unfinished
+    # walk must not claim recency
+    D.write_watermark(tmp_path, "treaties", "2023-01-01")
+    assert D.read_watermark(tmp_path, "treaties") == (date(2023, 1, 1), None)
+
+    # no file at all
+    assert D.read_watermark(tmp_path, "acts") == (None, None)
+
+
+def test_incremental_floor_advances_with_run_recency():
+    # a quiet sector (treaties: nothing since 2022) must not pin the window to
+    # its last document -- a recent run advances the floor to run - 183 days
+    assert D.incremental_floor(date(2022, 5, 5), date(2026, 7, 4)) \
+        == date(2026, 7, 4) - D.RECENCY_WINDOW
+
+    # an active sector's own high wins when it is more recent than the window
+    assert D.incremental_floor(date(2026, 7, 1), date(2026, 7, 4)) \
+        == date(2026, 7, 1)
+
+    # a dormant *harvester* (old run) must not skip the years it never saw
+    assert D.incremental_floor(date(2022, 5, 5), date(2024, 1, 1)) \
+        == date(2024, 1, 1) - D.RECENCY_WINDOW
+
+    # legacy watermark (run unknown): behave exactly as before
+    assert D.incremental_floor(date(2022, 5, 5), None) == date(2022, 5, 5)
+    assert D.incremental_floor(None, None) is None

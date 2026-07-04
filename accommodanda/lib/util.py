@@ -39,7 +39,8 @@ def record_path(root, subdir, basefile):
 def list_basefiles(root, subdir):
     """Every harvested basefile under `root/subdir`, read from the records."""
     return sorted(json.loads(p.read_text())["basefile"]
-                  for p in (Path(root) / subdir).glob("*.json"))
+                  for p in (Path(root) / subdir).glob("*.json")
+                  if not p.name.startswith("."))
 
 
 def document_extension(data):

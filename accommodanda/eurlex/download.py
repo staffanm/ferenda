@@ -41,6 +41,7 @@ Harvested via `lagen eurlex download [treaties|acts|caselaw]
 three. CELEX-specific refetch is `lagen eurlex download <CELEX>`.
 """
 
+import json
 import os
 import re
 import subprocess
@@ -48,7 +49,7 @@ import sys
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from html import escape
 from pathlib import Path
 from urllib.parse import quote
@@ -567,15 +568,51 @@ def prune_empty(root, remove=True):
     return n
 
 
+# CELLAR indexes a document within months of its work date, so a work date
+# older than the last completed run minus this lag can no longer gain new
+# documents. That lets the incremental window advance with *run* recency
+# instead of staying pinned to a quiet sector's last document (treaties: none
+# published since 2022, which used to mean re-querying 2022..today every run).
+RECENCY_WINDOW = timedelta(days=183)
+
+
 def read_watermark(root, sector_name):
-    """The max work date harvested for this sector in a previous clean run, or
-    None (no prior run -> enumerate from the sector's first year)."""
+    """The sector's discovery watermark from the last clean run, as a
+    (high, run) pair: `high` the max work date harvested, `run` the date that
+    run happened. `run` is None on a legacy plain-date file or after an
+    interrupted walk's resume write (recency must not be claimed by a walk
+    that did not finish); (None, None) with no prior run at all -> enumerate
+    from the sector's first year."""
     path = Path(root) / (".watermark-" + sector_name)
-    return date.fromisoformat(path.read_text().strip()) if path.exists() else None
+    if not path.exists():
+        return None, None
+    text = path.read_text().strip()
+    if text.startswith("{"):
+        data = json.loads(text)
+        return (date.fromisoformat(data["high"]),
+                date.fromisoformat(data["run"]) if "run" in data else None)
+    return date.fromisoformat(text), None      # legacy plain-date format
 
 
-def write_watermark(root, sector_name, value):
-    write_atomic(Path(root) / (".watermark-" + sector_name), str(value).encode())
+def write_watermark(root, sector_name, high, run=None):
+    payload = {"high": str(high)}
+    if run:
+        payload["run"] = run.isoformat()
+    write_atomic(Path(root) / (".watermark-" + sector_name),
+                 json.dumps(payload).encode())
+
+
+def incremental_floor(high, run, window=RECENCY_WINDOW):
+    """The discovery floor for an incremental run. Everything with a work date
+    below `high` was seen by the last clean run, but a quiet sector must not
+    pin the window to its last document forever: once the last run is more
+    recent than `high` + `window`, anything older than `run - window` can no
+    longer appear (RECENCY_WINDOW), so the floor advances with run recency."""
+    if high is None:
+        return None
+    if run is None:
+        return high            # legacy watermark: only the document date known
+    return max(high, run - window)
 
 
 def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
@@ -583,9 +620,9 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
     """Harvest a sector into root, returning (seen, stored, skipped).
 
     Incremental by default: re-fetches only CELEX not already on disk, and
-    bounds discovery by a per-sector watermark (the max work date harvested in
-    the last clean run) -- so an incremental run enumerates only from the
-    watermark's year onward, never re-querying the decades below it. `--full`
+    bounds discovery by a per-sector watermark -- the max work date harvested
+    in the last clean run, advanced by run recency (`incremental_floor`) so a
+    quiet sector stops re-querying the years since its last document. `--full`
     re-fetches every document and re-walks from the sector's first year; an
     explicit `--since` is a manual one-off window that overrides, but does not
     move, the watermark. A clean (un-truncated) run advances it.
@@ -598,12 +635,13 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
     enumerate_fn = enumerate_celex_soap if source == "soap" else enumerate_celex
 
     manual = since is not None        # explicit --since: don't move the watermark
-    watermark = None if (full or manual) else read_watermark(root, sector_name)
+    wm_high, wm_run = ((None, None) if (full or manual)
+                       else read_watermark(root, sector_name))
     if since is None and not full:
-        since = watermark             # incremental discovery floor
+        since = incremental_floor(wm_high, wm_run)   # incremental discovery floor
 
     seen = stored = skipped = 0
-    high = watermark.isoformat() if watermark else None
+    high = wm_high.isoformat() if wm_high else None
     truncated = False
     rep = Reporter()
 
@@ -665,7 +703,9 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
         if not manual and year < date.today().year:
             write_watermark(root, sector_name, date(year + 1, 1, 1).isoformat())
     if not manual and not truncated and high:
-        write_watermark(root, sector_name, high)   # precise floor for incrementals
+        # precise floor for incrementals, plus the run date whose recency lets
+        # the next run's floor advance past a quiet sector's last document
+        write_watermark(root, sector_name, high, run=date.today())
     return seen, stored, skipped
 
 

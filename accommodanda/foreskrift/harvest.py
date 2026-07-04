@@ -2,8 +2,8 @@
 
 ~100 agencies, but only a few *publishing architectures*. An agency is
 :class:`Agency` config naming an :class:`Architecture`; the harvest loop
-(:func:`harvest`) is architecture-agnostic -- incremental newest-first with a
-``.complete`` backfill marker, atomic writes, a politeness delay and a
+(:func:`harvest`) is architecture-agnostic -- incremental newest-first behind
+a ``HarvestWatermark`` gate, atomic writes, a politeness delay and a
 ``Reporter``, all lifted from ``forarbete.download.sync`` and shared.
 
 An architecture is two callables over that shared loop:
@@ -64,8 +64,8 @@ class Skip:
     badly maintained -- a per-year page 500s, one sitemap of several times out,
     a 'show all' list is briefly down -- so a multi-page enumerator yields this
     instead of a :class:`DocRef` when it cannot fetch one page but can keep
-    walking the rest. :func:`harvest` logs it and withholds the ``.complete``
-    marker, so the missed page is retried on the next run rather than silently
+    walking the rest. :func:`harvest` logs it and withholds the watermark, so
+    the missed page is retried on the next run rather than silently
     lost. (An *expected* empty page -- a year with no regulations -- is not a
     Skip; the enumerator just yields nothing for it.)"""
     reason: str
@@ -525,13 +525,13 @@ def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=prin
 
     watermark = HarvestWatermark(watermark_path, lookahead_limit=20, safety_days=14)
     backfill = full or not watermark_path.exists()
-    seen = new = errors = 0
+    seen = new = errors = skips = 0
     newest_date = None
     rep = Reporter()
     walk = _guarded_enumerate(agency, session, log)
     for ref in walk:
         if isinstance(ref, Skip):          # a page we could not fetch; logged below
-            errors += 1
+            skips += 1
             log("  %s enumerate: %s" % (agency.fs, ref.reason))
             continue
         seen += 1
@@ -554,14 +554,10 @@ def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=prin
                 newest_date = max(newest_date, item_date)
 
         is_downloaded = record_path(root, agency.fs, ref.basefile).exists()
-        if not backfill:
-            if watermark.should_stop(is_downloaded, item_date):
-                break
-        elif is_downloaded:
-            if full:
-                pass                   # re-resolve: refresh new amendments/consolidations
-            else:
-                continue               # resume an interrupted first walk; keep what's there
+        if not backfill and watermark.should_stop(is_downloaded, item_date):
+            break
+        if is_downloaded and not full:
+            continue    # on disk already; --full re-resolves to refresh amendments
 
         try:
             agency.resolve(session, agency, ref, root, delay)
@@ -575,8 +571,13 @@ def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=prin
         time.sleep(delay)
     rep.done()
 
-    if not only and errors == 0 and not limit:
+    # per-document resolve failures are named and retryable (--only), so they
+    # advance the watermark anyway; a Skip is an enumeration hole -- unknown
+    # documents were missed -- so the watermark is withheld and the walk redone
+    if not only and not limit and skips == 0:
         watermark.save(newest_date)
-        marker.parent.mkdir(parents=True, exist_ok=True)
-        marker.write_text("")
+    if errors:
+        log("  %s: %d download error(s) -- retry via --only <basefile> "
+            "(or --full once they fall behind the watermark)"
+            % (agency.fs, errors))
     return seen, new

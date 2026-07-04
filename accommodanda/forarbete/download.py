@@ -201,8 +201,10 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
     A type is *backfilled* -- the whole listing walked, downloading whatever is
     missing -- when `--full` is given or the type has never been cleanly walked
     (no watermark yet: a first run, or one interrupted partway). The watermark
-    is written only after a successful walk/sync with no download errors, so
-    an interrupted or failed run is resumed. Once caught up, later runs go
+    is written after a completed walk/sync even if some documents failed to
+    download (one persistently-broken document must not force a full re-walk
+    forever); failures are logged for --only/--full retry. An *interrupted*
+    run leaves no watermark and is resumed. Once caught up, later runs go
     *incremental*: newest-first, stopping at the first document already on disk
     that falls past the watermark date boundary or when look-ahead limit is reached.
     `only` (a basefile) downloads just that one document, walking the listing until
@@ -242,7 +244,7 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
                     if watermark.should_stop(is_downloaded, item.get("date")):
                         done = True
                         break
-                elif is_downloaded:
+                if is_downloaded:
                     continue
 
                 try:
@@ -259,17 +261,21 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
                 break
         else:
             # Loop completed naturally without early stop
-            if not only and errors == 0:
+            if not only:
                 watermark.save(newest_date)
-                marker.parent.mkdir(parents=True, exist_ok=True)
-                marker.write_text("")
 
         # Incremental stop successfully met
-        if done and not only and errors == 0 and not limit:
+        if done and not only and not limit:
             watermark.save(newest_date)
-            marker.parent.mkdir(parents=True, exist_ok=True)
-            marker.write_text("")
 
         rep.done()
+        if errors:
+            # the watermark advances despite failures (one persistently-broken
+            # document must not force a full re-walk forever), so surface them:
+            # a failed document is retried while it stays above the incremental
+            # stop point, but slips behind it after safety_days
+            log("  %s: %d download error(s) -- retry via --only <basefile> "
+                "(or --full once they fall behind the watermark)"
+                % (typ, errors))
         totals[typ] = (seen, new)
     return totals

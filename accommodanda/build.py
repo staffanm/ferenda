@@ -584,9 +584,10 @@ def sfs_list():
     and will be picked up by the myndfskr (myndighetsföreskrifter) port."""
     return sorted({"%s:%s" % (p.parent.name, p.stem.replace("_", " "))
                    for p in layout.SFS_DOWNLOADED.glob("*/*.json")
-                   if p.parent.name.isdigit()}
+                   if p.parent.name.isdigit() and not p.name.startswith(".")}
                   | {"%s:%s" % (p.parent.name, p.stem.replace("_", " "))
-                     for p in (layout.SFS_DOWNLOADED / "sfst").glob("*/*.html")})
+                     for p in (layout.SFS_DOWNLOADED / "sfst").glob("*/*.html")
+                     if not p.name.startswith(".")})
 
 
 def sfs_ai_correspond(basefiles):
@@ -803,7 +804,8 @@ def fa_list():
     """Every harvested record as 'type/slug' (the artifact subdir excluded by
     the single-level glob)."""
     return sorted("%s/%s" % (p.parent.name, p.stem)
-                  for p in layout.FA_DOWNLOADED.glob("*/*.json"))
+                  for p in layout.FA_DOWNLOADED.glob("*/*.json")
+                  if not p.name.startswith("."))
 
 
 def fa_harvest(scopes):
@@ -1009,7 +1011,8 @@ def foreskrift_list():
     """Every harvested base regulation as 'fs/year:num' (the artifact subdir
     excluded by the single-level glob)."""
     return sorted(json.loads(p.read_text())["basefile"]
-                  for p in layout.FORESKRIFT_DOWNLOADED.glob("*/*.json"))
+                  for p in layout.FORESKRIFT_DOWNLOADED.glob("*/*.json")
+                  if not p.name.startswith("."))
 
 
 def foreskrift_harvest(scopes):
@@ -1110,7 +1113,10 @@ SOURCES["foreskrift"] = Source("foreskrift", foreskrift_list, {
                    inputs=foreskrift_inputs, code=FORESKRIFT_CODE),
 },
     harvest=foreskrift_harvest,
-    origin="https://www.lagrummet.se/rattskalla/?filter=foreskrifter",
+    # display label only, nothing is ever fetched from a central index: the
+    # harvest engine drives each agency's own site from foreskrift/agencies.py
+    origin="the %d agency sites in foreskrift/agencies.py"
+           % len(FORESKRIFT_AGENCIES),
     scopes=frozenset(FORESKRIFT_AGENCIES),
     actions={"import-legacy": foreskrift_import_legacy},
     notes="download flag: --only fs/year:num (fetch one; needs one fs scope)\n"
@@ -1235,6 +1241,8 @@ def remisser_list():
     every `Remiss.svar` entry: an instance not yet fetched has no PDF to parse."""
     out = []
     for path in sorted(layout.REMISSER_CASES.glob("*.json")):
+        if path.name.startswith("."):
+            continue
         remiss = remisser_model.Remiss.from_dict(json.loads(path.read_text()))
         out.extend("%s/%s" % (remiss.basefile, remisser_model.org_slug(inst.source_url))
                    for inst in remiss.svar if inst.downloaded)
