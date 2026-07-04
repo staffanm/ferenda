@@ -53,6 +53,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "coverage",
+    "pip-audit",
     "psutil",
     "pytest",
     "ruff",
@@ -64,6 +65,7 @@ dev = [
 [dependency-groups]
 dev = [
     "coverage",
+    "pip-audit",
     "psutil",
     "pytest",
     "ruff",
