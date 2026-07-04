@@ -32,14 +32,10 @@ RESTRICTED = VERTICALS | {"api"}
 # truncated to two components). Review §3.1 OPEN items; delete entries as
 # the fixes land.
 ALLOWLIST = {
-    ("lib/render.py", "dv.naming"),
-    ("lib/render.py", "eurlex.structure"),
+    # render builds the browse pages by calling the API in-process (TestClient),
+    # so it imports api.app -- the one remaining cross-layer exception. The other
+    # entries were retired when the artifact/eu-structure helpers moved into lib/.
     ("lib/render.py", "api.app"),
-    ("lib/resolve.py", "dv.namedcases"),
-    ("wiki/parse.py", "eurlex.structure"),
-    ("wiki/annotate.py", "eurlex.structure"),
-    ("sfs/correspond.py", "forarbete.kommentar"),
-    ("sfs/correspond.py", "forarbete.structure"),
 }
 
 
