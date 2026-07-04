@@ -259,6 +259,20 @@ def swedish_ordinal(s):
     return SWEDISH_ORDINAL_MAP.get(s.lower())
 
 
+MONTHS: dict[str, int] = {m: i for i, m in enumerate(
+    "januari februari mars april maj juni juli augusti september oktober "
+    "november december".split(), 1)}
+SV_DATE = re.compile(r"(\d{1,2})\s+(%s)\s+(\d{4})" % "|".join(MONTHS),
+                     re.IGNORECASE)
+
+
+def swedish_date(text):
+    """'den 30 juni 2026' / '09 april 2026' -> ISO '2026-06-30', or None."""
+    m = SV_DATE.search(text or "")
+    return ("%s-%02d-%02d" % (m.group(3), MONTHS[m.group(2).lower()], int(m.group(1)))
+            if m else None)
+
+
 class HarvestWatermark:
     """The "have we caught up yet" gate for an incremental listing walk over a
     large, deep archive -- lets a walk stop well short of the full depth

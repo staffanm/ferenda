@@ -41,6 +41,7 @@ from ..lib.lagrum import (
     load_namedlaws,
 )
 from ..lib.pdftext import RE_KAP_MARK, RE_PARA_MARK, page_paragraphs, pdf_pages
+from ..lib.util import MONTHS
 from .model import Amendment, Consolidation, Regulation, regulation_uri
 from .structure import nest
 
@@ -52,9 +53,6 @@ RE_RUBRIK_NUM = re.compile(r"^(\d+(?:\.\d+)*)\s+\S")     # "2.1 Heading"
 RE_LIST_ITEM = re.compile(r"^(?:\d+[.)]|[-–—•])\s")       # "1." / "– " list rows
 
 # masthead facts (best-effort; the layout that carries them is often mangled)
-MONTHS = {m: i for i, m in enumerate(
-    "januari februari mars april maj juni juli augusti september oktober "
-    "november december".split(), 1)}
 RE_DATE = re.compile(r"den\s+(\d{1,2})\s+(%s)(?:\s+(\d{4}))?" % "|".join(MONTHS),
                      re.IGNORECASE)
 RE_BESLUTAD = re.compile(r"beslutad[e]?\s+den\s+(\d{1,2})\s+(\w+)\s+(\d{4})", re.I)

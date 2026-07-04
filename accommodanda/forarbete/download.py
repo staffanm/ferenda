@@ -51,6 +51,7 @@ from bs4 import BeautifulSoup
 
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session
+from ..lib.regeringen import BASE, TYPES, listing_items
 from ..lib.util import (
     HarvestWatermark,
     Reporter,
@@ -60,24 +61,11 @@ from ..lib.util import (
     write_atomic,
 )
 
-BASE = "https://www.regeringen.se"
+# BASE and the doctype table (TYPES: url segment, taxonomy category id,
+# identifier regex) live in lib.regeringen -- shared with the remisser vertical.
 FILTER = (BASE + "/Filter/GetFilteredItems?lang=sv&filterType=Taxonomy"
           "&filterByType=FilterablePageBase&rootPageReference=0"
           "&displayLimited=True&preFilteredCategories=%s&page=%d")
-
-# type -> (url segment, taxonomy category id, identifier regex over the listing
-# link text). A None regex marks a type regeringen.se publishes without a
-# number; its basefile falls back to the landing-page slug.
-TYPES = {
-    "prop": ("proposition", 1329, r"Prop\. (\d{4}/\d{2,4}:\d+)"),
-    "sou": ("statens-offentliga-utredningar", 1331, r"SOU (\d{4}:\d+)"),
-    "ds": ("departementsserien-och-promemorior", 1325, r"Ds (\d{4}:\d+)"),
-    "dir": ("kommittedirektiv", 1327, r"Dir\. (\d{4}:\d+)"),
-    "fm": ("forordningsmotiv", 1326, r"Fm (\d{4}:\d+)"),
-    "skr": ("skrivelse", 1330, r"Skr\. (\d{4}/\d{2,4}:\d+)"),
-    "so": ("sveriges-internationella-overenskommelser", 1332, None),
-    "lr": ("lagradsremiss", 2085, None),
-}
 
 # regeringen.se hangs the document download(s) under /contentassets/ or
 # /globalassets/. We match the link by *location*, not by suffix: the redesigned
@@ -107,15 +95,8 @@ def parse_listing(html, typ):
     segment, _, idre = TYPES[typ]
     idpat = re.compile(idre) if idre else None
     hrefpat = re.compile(r"/rattsliga-dokument/%s/\d{4}/\d{2}/" % segment)
-    soup = BeautifulSoup(html, "html.parser")
     out = []
-    for li in soup.select("ul.list--block > li"):
-        a = li.find("a", href=hrefpat)
-        if not a:
-            continue
-        href = a["href"]
-        assert isinstance(href, str)
-        text = a.get_text(" ", strip=True)
+    for li, href, url, text in listing_items(html, hrefpat):
         slug = href.rstrip("/").rsplit("/", 1)[-1]
         time_el = li.find("time")
         date = time_el.get("datetime") if time_el else None
@@ -128,10 +109,8 @@ def parse_listing(html, typ):
         else:
             basefile = identifier = slug
             title = text
-        url = (BASE + href) if href.startswith("/") else href
         out.append({"type": typ, "basefile": basefile, "identifier": identifier,
-                    "title": title, "date": date,
-                    "url": url if url.endswith("/") else url + "/", "slug": slug})
+                    "title": title, "date": date, "url": url, "slug": slug})
     return out
 
 
