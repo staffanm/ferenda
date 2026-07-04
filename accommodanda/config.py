@@ -132,9 +132,30 @@ def resolve_llm_model(doc):
     return value
 
 
+def resolve_ops_token(doc):
+    """The shared secret guarding the ops dashboard (`/ops`, api/ops.py). It is
+    the HTTP-Basic password for user ``ops``; unset (``None``) leaves the
+    dashboard disabled (its routes answer 403 with a hint). Precedence: the
+    ``OPS_TOKEN`` environment variable, then the ``ops_token`` key in
+    config.yml, else ``None``. Like its siblings, a present-but-invalid value
+    (non-string or empty) raises ``ConfigError`` rather than silently falling
+    back to ``None`` -- a typo must not disable auth quietly."""
+    env = os.environ.get("OPS_TOKEN")
+    if env:
+        return env
+    if "ops_token" not in doc:
+        return None
+    value = doc["ops_token"]
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError("ops_token set to invalid value %r at %s"
+                          % (value, _at(doc, "ops_token")))
+    return value
+
+
 _doc = load()                                # parse config.yml once
 DATA = resolve_data_root(_doc)
 WIKI_ROOT = resolve_wiki_root(_doc)
 LEGACY_ROOT = resolve_legacy_root(_doc)
 OPENSEARCH_URL = resolve_opensearch_url(_doc)
 LLM_MODEL = resolve_llm_model(_doc)
+OPS_TOKEN = resolve_ops_token(_doc)

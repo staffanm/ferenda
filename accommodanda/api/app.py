@@ -37,6 +37,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .. import config
 from ..lib import catalog, diff, facets, history, layout, resolve, search
+from . import ops
 
 CATALOG = config.DATA / "catalog.sqlite"
 DUMPS = config.DATA / "dumps"
@@ -52,6 +53,10 @@ app = FastAPI(
 # data, so any origin may read it.
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
                    allow_methods=["GET"], allow_headers=["*"])
+
+# the ops dashboard (/ops*), registered like /api/v1 -- before the SiteFiles
+# mount added in serve(), so its explicit routes win over the static catch-all
+app.include_router(ops.router)
 
 # one search client for the process; constructing it does not open a connection,
 # so importing/serving the API never requires a running OpenSearch -- only an

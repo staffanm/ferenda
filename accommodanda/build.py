@@ -36,6 +36,7 @@ import json
 import os
 import sys
 import time
+import traceback
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import date
@@ -69,7 +70,7 @@ from .foreskrift import harvest as foreskrift_harvest_mod
 from .foreskrift import legacy as foreskrift_legacy
 from .foreskrift import parse as foreskrift_parse
 from .foreskrift.agencies import REGISTRY as FORESKRIFT_AGENCIES
-from .lib import catalog, dump, layout, render, search, util
+from .lib import catalog, dump, layout, render, runlog, search, util
 from .lib.datasets import NAMEDCASES as NAMEDCASES_JSON
 from .lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
 from .lib.errors import SkipDocument
@@ -91,6 +92,9 @@ POLITENESS = 0.3   # seconds between per-document network fetches
 DATA = config.DATA                            # corpus location (config.yml: data_root)
 MANIFEST = DATA / ".build" / "manifest.json"
 WATERMARKS = DATA / ".build" / "watermarks.json"   # small per-(step,source) gates
+RUNS = DATA / ".build" / "runs.ndjson"             # append-only run ledger
+ERRORS = DATA / ".build" / "errors.json"           # per-doc latest-outcome store
+STATUS = DATA / ".build" / "status.json"           # rolling health snapshot
 CATALOG = DATA / "catalog.sqlite"
 GENERATED = layout.GENERATED
 DUMPS = DATA / "dumps"                         # NDJSON bulk exports
@@ -279,8 +283,10 @@ def record_step(store, kind, source, wm, code):
 class Result:
     planned: list = field(default_factory=list)   # (stage, basefile)
     done: list = field(default_factory=list)
-    errors: list = field(default_factory=list)     # (stage, basefile, msg)
+    errors: list = field(default_factory=list)     # (stage, basefile, msg, tb)
     updates: dict = field(default_factory=dict)    # manifest key -> entry
+    skips: list = field(default_factory=list)      # (stage, basefile) SkipDocument
+    timings: list = field(default_factory=list)    # (stage, basefile, secs)
 
 
 def ensure(source, stage_name, basefile, manifest, res, force, no_deps):
@@ -300,6 +306,7 @@ def ensure(source, stage_name, basefile, manifest, res, force, no_deps):
     res.planned.append((stage_name, basefile))
     if RUN.dry_run:
         return True
+    t0 = time.perf_counter()
     try:
         stage.output(basefile).parent.mkdir(parents=True, exist_ok=True)
         stage.run(basefile)
@@ -307,10 +314,12 @@ def ensure(source, stage_name, basefile, manifest, res, force, no_deps):
         # a deliberately empty document (removed/expired): write an empty
         # artifact so it is considered built and not retried every run
         stage.output(basefile).write_bytes(b"")
+        res.skips.append((stage_name, basefile))
     except Exception as e:  # noqa: BLE001 — per-doc resilience point: recorded in res.errors, run continues (rule:no-catch-log-continue)
         res.errors.append((stage_name, basefile, "%s: %s"
-                           % (type(e).__name__, e)))
+                           % (type(e).__name__, e), traceback.format_exc()))
         return False
+    res.timings.append((stage_name, basefile, time.perf_counter() - t0))
     res.updates[manifest_key(source.name, stage_name, basefile)] = {
         "inputs": inputs_hash,
         "version": recipe_version(stage.code)}
@@ -335,6 +344,41 @@ class RunOptions:
 
 
 RUN = RunOptions()
+
+# The current invocation's run id, minted once in main() for a pipeline action
+# (workers never need it, so it stays off RunOptions). INVARIANT: no run id ⇒
+# every ledger/errors emission is a no-op -- the single rule that covers
+# --dry-run, serve and runs, so no guard has to be scattered around the choke
+# points. The ledger/errors emissions go through the three helpers below;
+# `status` is the deliberate exception -- it carries no run id yet writes
+# status.json's authoritative snapshot cell directly (see cmd_status), so it
+# does not route through them. RUN_ERRORS accumulates THIS run's segment error
+# total (not the corpus-wide currently-failing count) for the run-end verdict.
+RUN_ID = None
+RUN_ERRORS = 0
+
+
+def _emit_segment(step, source, secs, *, total=None, ran=None, errors=0,
+                  skipped_fresh=0, skipdoc=0, status, slowest=()):
+    global RUN_ERRORS
+    if RUN_ID is None:
+        return
+    RUN_ERRORS += errors
+    runlog.emit_segment(RUNS, RUN_ID, step, source, secs, total=total, ran=ran,
+                        errors=errors, skipped_fresh=skipped_fresh,
+                        skipdoc=skipdoc, status=status, slowest=slowest)
+
+
+def _apply_outcomes(source, errors, done):
+    if RUN_ID is None:
+        return
+    runlog.apply_outcomes(ERRORS, source, errors, done, RUN_ID)
+
+
+def _update_status_cell(source, stage, cell):
+    if RUN_ID is None:
+        return
+    runlog.update_status_cell(STATUS, source, stage, cell)
 
 
 def build_one(source, action, basefile, manifest):
@@ -418,6 +462,8 @@ def _absorb(into, res):
     into.done += res.done
     into.errors += res.errors
     into.updates.update(res.updates)
+    into.skips += res.skips
+    into.timings += res.timings
 
 
 # --------------------------------------------------------------------------
@@ -1567,12 +1613,16 @@ def cmd_relate(names):
     catalog_missing = not CATALOG.exists()
     dirty = False
     for name in names:
+        if name not in ARTIFACTS:
+            continue
         paths = ARTIFACTS[name]()
         wm = file_watermark(paths)
         if not catalog_missing and up_to_date(store, "relate", name, wm,
                                               RELATE_CODE):
             print("relate %s: up to date (%d artifacts unchanged) -- skipped"
                   % (name, len(paths)))
+            _emit_segment("relate", name, 0.0, total=len(paths), ran=0,
+                          skipped_fresh=len(paths), status="skipped")
             continue
 
         def progress(seen, total, changed, current, name=name):
@@ -1582,8 +1632,11 @@ def cmd_relate(names):
         recode = code_changed(store, "relate", name, RELATE_CODE)
         if recode and not RUN.force:
             print("relate %s: extraction code changed -- re-extracting all" % name)
+        t0 = time.perf_counter()
         docs, edges, changed = catalog.rebuild(
             CATALOG, name, paths, progress=progress, force=RUN.force or recode)
+        _emit_segment("relate", name, time.perf_counter() - t0, total=docs,
+                      ran=changed, status="ok")
         record_step(store, "relate", name, wm, RELATE_CODE)
         dirty = True
         sys.stderr.write("\n")
@@ -1599,6 +1652,7 @@ def cmd_relate(names):
     corr_wm = file_watermark(sorted((SFS_ROOT / "artifact").glob("*/*.corr")))
     if dirty or RUN.force or not watermark_fresh(store, "relate", "__corr__",
                                                  corr_wm):
+        t0 = time.perf_counter()
         con = catalog.connect(CATALOG)
         pinned = fa_genomforande.resolve(con)
         corr = [row for p in (SFS_ROOT / "artifact").glob("*/*.corr")
@@ -1608,6 +1662,7 @@ def cmd_relate(names):
         concepts = catalog.synthesize_concepts(con)
         anchor_warnings = kommentar_anchor_warnings(con)
         con.close()
+        _emit_segment("relate", "__corr__", time.perf_counter() - t0, status="ok")
         record_watermark(store, "relate", "__corr__", corr_wm)
         dirty = True
         print("relate: %d genomför-direktiv relations pinned to SFS paragrafs"
@@ -1624,6 +1679,7 @@ def cmd_relate(names):
                   % (bf, host, ", ".join(anchors)))
     else:
         print("relate: nothing changed -- cross-document passes skipped")
+        _emit_segment("relate", "__corr__", 0.0, status="skipped")
     if dirty:
         save_watermarks(store)
     print("catalog: %s" % CATALOG)
@@ -1647,9 +1703,12 @@ def cmd_index(names, jobs=1):
     # source's docs unindexed, so nothing may be skipped until it's rebuilt
     index_present = index.exists()
     for name in names:
+        if name not in ARTIFACTS:
+            continue
         wm = catalog.source_content_signature(con, name)
         if index_present and up_to_date(store, "index", name, wm, INDEX_CODE):
             print("index %s: up to date (catalog unchanged) -- skipped" % name)
+            _emit_segment("index", name, 0.0, ran=0, status="skipped")
             continue
 
         def progress(seen, total, current="", name=name):
@@ -1657,8 +1716,12 @@ def cmd_index(names, jobs=1):
         recode = code_changed(store, "index", name, INDEX_CODE)
         if recode and not RUN.force:
             print("index %s: index code changed -- reindexing all" % name)
+        t0 = time.perf_counter()
         docs, indexed, errors, missing, skipped, deleted = index.index_source(
             con, name, progress=progress, jobs=jobs, force=RUN.force or recode)
+        _emit_segment("index", name, time.perf_counter() - t0, total=docs,
+                      ran=indexed, errors=len(errors), skipped_fresh=skipped,
+                      status="errors" if errors else "ok")
         record_step(store, "index", name, wm, INDEX_CODE)
         dirty = True
         sys.stderr.write("\n")
@@ -1685,17 +1748,24 @@ def cmd_dump(names):
     store = load_watermarks()
     dirty = False
     for name in names:
+        if name not in ARTIFACTS:
+            continue
         out = DUMPS / ("%s.ndjson.gz" % name)
         paths = ARTIFACTS[name]()
         wm = file_watermark(paths)
         if out.exists() and up_to_date(store, "dump", name, wm, DUMP_CODE):
             print("dump %s: up to date (%d artifacts unchanged) -- skipped"
                   % (name, len(paths)))
+            _emit_segment("dump", name, 0.0, total=len(paths), ran=0,
+                          skipped_fresh=len(paths), status="skipped")
             continue
 
         def progress(seen, total, name=name):
             util.status(seen, total, "dump %s" % name)
+        t0 = time.perf_counter()
         lines = dump.dump_source(paths, out, progress=progress)
+        _emit_segment("dump", name, time.perf_counter() - t0, total=lines,
+                      ran=lines, status="ok")
         record_step(store, "dump", name, wm, DUMP_CODE)
         dirty = True
         sys.stderr.write("\n")
@@ -1711,16 +1781,27 @@ def cmd_download_all(names, jobs):
     the pipeline -- kept separate from `rebuild` so the offline rebuild stays fast.
     A source derived from another's dump (kommentar/begrepp) has nothing to fetch
     and is skipped."""
+    had_errors = False
     for name in names:
         source = SOURCES[name]
         if source.harvest is not None:
             if source.origin:
                 print("Downloading %s from %s" % (name, source.origin), flush=True)
-            source.harvest([])                       # [] = full discovery
+            t0 = time.perf_counter()
+            try:
+                source.harvest([])                       # [] = full discovery
+                _emit_segment("download", name, time.perf_counter() - t0, status="ok")
+            except Exception:  # noqa: BLE001 — per-source resilience point: one source's harvest failure must not abort the remaining sources; printed + nonzero exit at end (rule:no-catch-log-continue)
+                traceback.print_exc()
+                _emit_segment("download", name, time.perf_counter() - t0,
+                              status="errors", errors=1)
+                had_errors = True
         elif "download" in source.stages:
             basefiles = source.list_basefiles()
-            report(source, "download",
-                   run_action(source, "download", basefiles, jobs), len(basefiles))
+            result = run_action(source, "download", basefiles, jobs)
+            report(source, "download", result, len(basefiles), full_source=True)
+            had_errors |= bool(result.errors)
+    return had_errors
 
 
 def cmd_all(names, jobs, whole_corpus, download=False):
@@ -1734,8 +1815,9 @@ def cmd_all(names, jobs, whole_corpus, download=False):
     new, so it makes no network calls). relate/index/dump act on the named
     sources; generate rebuilds the whole corpus when the run targets `all`
     sources, else just the named sources' pages."""
+    had_errors = False
     if download:
-        cmd_download_all(names, jobs)
+        had_errors = cmd_download_all(names, jobs)
     store = load_watermarks()
     parse_dirty = False
     for step in ("parse", "versions"):
@@ -1752,14 +1834,18 @@ def cmd_all(names, jobs, whole_corpus, download=False):
             # only what moved.
             if up_to_date(store, step, name, wm, pcode):
                 print("%s %s: up to date -- skipped" % (step, name))
+                # bypasses report(); emit the skipped segment here so the run
+                # detail still shows the whole pipeline (§2)
+                _emit_segment(step, name, 0.0, ran=0, status="skipped")
                 continue
             basefiles = source.list_basefiles()
             result = run_action(source, step, basefiles, jobs)
-            report(source, step, result, len(basefiles))
+            report(source, step, result, len(basefiles), full_source=True)
             # only watermark a clean sweep: if any document failed, leave the
             # source un-marked so the next run retries it (and re-surfaces the
             # error) instead of skipping wholesale on an unchanged input.
             if result.errors:
+                had_errors = True
                 continue
             record_step(store, step, name, wm, pcode)
             parse_dirty = True
@@ -1773,6 +1859,7 @@ def cmd_all(names, jobs, whole_corpus, download=False):
     else:
         for name in names:
             cmd_generate(source=name, jobs=jobs)
+    return had_errors
 
 
 def stale_sources():
@@ -1852,11 +1939,16 @@ def cmd_generate(only=None, source=None, jobs=1):
     `--aggregates-only` rewrites just the corpus-wide pages (frontpage + browse
     indexes) from the current catalog, skipping the per-document render -- a
     seconds-long refresh after a frontpage/browse change, not a full rebuild."""
+    # segment source: the whole-site run reports under __site__, a scoped
+    # per-source render (`lagen <src> generate`) under that source's name
+    seg_source = source or "__site__"
+    t0 = time.perf_counter()
     if RUN.aggregates_only:
         con = catalog.connect(CATALOG)
         render.render_aggregates(con, GENERATED, CATALOG)
         con.close()
         print("generate: rebuilt frontpage + browse indexes -> %s" % GENERATED)
+        _emit_segment("generate", "__site__", time.perf_counter() - t0, status="ok")
         return
 
     # a full generate auto-relates any stale source first (relate is its upstream
@@ -1878,6 +1970,7 @@ def cmd_generate(only=None, source=None, jobs=1):
         site_wm = generate_watermark()
         if up_to_date(store, "generate", "__site__", site_wm, GENERATE_CODE):
             print("generate: up to date -- skipped (%s)" % GENERATED)
+            _emit_segment("generate", "__site__", 0.0, ran=0, status="skipped")
             return
 
     manifest = load_manifest()
@@ -1949,6 +2042,8 @@ def cmd_generate(only=None, source=None, jobs=1):
     if not scoped:                       # record the site watermark for next time
         record_step(store, "generate", "__site__", site_wm, GENERATE_CODE)
         save_watermarks(store)
+    _emit_segment("generate", seg_source, time.perf_counter() - t0, total=total,
+                  ran=rendered, status="ok")
     if only is not None and not total:
         print("generate: no catalogued document matched %d requested id(s) -- "
               "parse/relate them first" % len(only))
@@ -1977,32 +2072,85 @@ def cmd_serve(host="127.0.0.1", port=8000):
 # CLI
 # --------------------------------------------------------------------------
 
-def cmd_status(source):
-    manifest = load_manifest()
+def status_scan(source, manifest, errors):
+    """Structured per-stage status for one source: {total, fresh, stale, missing,
+    empty, failed} per stage, `failed` a list of the basefiles with a live
+    errors.json entry (so "failed" ≠ "never tried"). `empty` counts zero-byte
+    outputs -- the SkipDocument marker (a deliberately empty document), the stat
+    already paid by the exists-check. `errors` is the errors.json store keyed
+    "<source>/<stage>/<basefile>". Lives here (not lib) because it needs
+    is_fresh/Stage, which can't move to lib (build.py imports the API app)."""
     basefiles = source.list_basefiles()
-    print("%s: %d basefiles" % (source.name, len(basefiles)))
+    out = {}
     for name, stage in source.stages.items():
-        fresh = stale = missing = 0
+        fresh = stale = missing = empty = 0
+        failed = []
         for bf in basefiles:
-            if not stage.output(bf).exists():
+            if errors.get("%s/%s/%s" % (source.name, name, bf)):
+                failed.append(bf)
+            output = stage.output(bf)
+            if not output.exists():
                 missing += 1
+            elif output.stat().st_size == 0:
+                empty += 1
             elif is_fresh(manifest, source, stage, bf):
                 fresh += 1
             else:
                 stale += 1
-        print("  %-10s %6d fresh  %6d stale  %6d missing"
-              % (name, fresh, stale, missing))
+        out[name] = {"total": len(basefiles), "fresh": fresh, "stale": stale,
+                     "missing": missing, "empty": empty, "failed": failed}
+    return out
 
 
-def report(source, action, result, requested):
+def cmd_status(source):
+    """Full, authoritative recompute of `source`'s per-stage health, printed and
+    written to status.json as the exact snapshot cells (the CLI-only exact writer;
+    the cheap per-segment writer in report() covers full-source pipeline runs)."""
+    manifest = load_manifest()
+    scan = status_scan(source, manifest, runlog.read_errors(ERRORS))
+    total = next(iter(scan.values()))["total"] if scan else 0
+    print("%s: %d basefiles" % (source.name, total))
+    for name, st in scan.items():
+        print("  %-10s %6d fresh  %6d stale  %6d missing  %6d failed  %6d empty"
+              % (name, st["fresh"], st["stale"], st["missing"],
+                 len(st["failed"]), st["empty"]))
+        runlog.update_status_cell(STATUS, source.name, name, {
+            "total": st["total"], "fresh": st["fresh"], "stale": st["stale"],
+            "missing": st["missing"], "failed": len(st["failed"]),
+            "empty": st["empty"], "run": RUN_ID})
+
+
+def report(source, action, result, requested, full_source):
+    """Print one action's outcome and fold it into the run instrumentation:
+    emit the (action, source) segment, apply the per-doc outcomes to errors.json
+    and -- only when the run covered the whole source (`full_source`, no explicit
+    basefile args) -- write the cheap status.json cell. All emissions are no-ops
+    without a run id (--dry-run, non-pipeline verbs)."""
     verb = "would run" if RUN.dry_run else "ran"
     skipped = requested - len({bf for _, bf in result.planned}) \
-        - len({bf for _, bf, _ in result.errors})
+        - len({bf for _, bf, _, _ in result.errors})
     print("%s %s (%d basefiles): %s %d, skipped (fresh) %d, errors %d" % (
         source.name, action, requested, verb, len(result.planned),
         skipped, len(result.errors)))
-    for stage, bf, msg in result.errors[:20]:
+    for stage, bf, msg, _tb in result.errors[:20]:
         print("  ERROR %s %s: %s" % (stage, bf, msg))
+    secs = sum(s for _, _, s in result.timings)
+    slowest = sorted(((bf, s) for _, bf, s in result.timings),
+                     key=lambda x: x[1], reverse=True)
+    _emit_segment(action, source.name, secs, total=requested,
+                  ran=len(result.done), errors=len(result.errors),
+                  skipped_fresh=skipped, skipdoc=len(result.skips),
+                  status="errors" if result.errors else "ok", slowest=slowest)
+    _apply_outcomes(source.name, result.errors, result.done)
+    if RUN_ID is not None:
+        print("%d docs failing overall" % len(runlog.read_errors(ERRORS)))
+    # cheap cell: a full-source run proves the source -- everything planned+done
+    # is now fresh, nothing missing (§1c). A targeted run must NOT touch the cell.
+    if full_source:
+        _update_status_cell(source.name, action, {
+            "total": requested, "fresh": requested - len(result.errors),
+            "stale": 0, "missing": 0, "failed": len(result.errors),
+            "empty": len(result.skips), "run": RUN_ID})
 
 
 def _help(name):
@@ -2097,6 +2245,56 @@ def main(argv=None):
     # the parallelisable steps default to all cores; -j1 serialises
     jobs = args.jobs if args.jobs is not None else (os.cpu_count() or 1)
 
+    # A pipeline invocation is wrapped in the run ledger: mint a run id, prune old
+    # runs, emit run-start, and (try/finally, so a crash or Ctrl-C still lands it)
+    # run-end. serve/status/runs read or serve; --dry-run writes nothing -- none get
+    # a run id, and the no-run-id invariant makes every runlog emission below a
+    # no-op for them.
+    global RUN_ID, RUN_ERRORS
+    # reset unconditionally so a second in-process main() (e.g. a --dry-run or a
+    # non-pipeline verb after a pipeline run) never inherits the prior run's id
+    # or error tally
+    RUN_ID = None
+    RUN_ERRORS = 0
+    if args.action not in ("serve", "status", "runs") and not RUN.dry_run:
+        RUN_ID = runlog.make_run_id(os.getpid())
+        runlog.prune(RUNS)
+        runlog.emit_run_start(RUNS, RUN_ID, ["lagen", *argv], os.getpid())
+    t0 = time.perf_counter()
+    ok = False
+    try:
+        _dispatch(args, p, jobs)
+        ok = True          # only a clean return counts; any exception or a
+                           # SystemExit(nonzero) from _dispatch leaves ok False
+    finally:
+        if RUN_ID is not None:
+            # ok from the success flag, folded with THIS run's error total
+            # (RUN_ERRORS) -- not the corpus-wide currently-failing count, which
+            # lives in errors.json and the /ops overview
+            runlog.emit_run_end(RUNS, RUN_ID, time.perf_counter() - t0,
+                                ok and RUN_ERRORS == 0, RUN_ERRORS)
+
+
+def _cmd_runs(limit):
+    """`lagen all runs [N]`: print the newest N run summaries from the ledger
+    (neither a stage nor a source action, so intercepted before the dispatch loop
+    and excluded from run-ledger wrapping)."""
+    runs = runlog.read_runs(RUNS)
+    if limit:
+        runs = runs[:limit]
+    if not runs:
+        print("no runs recorded yet (%s)" % RUNS)
+        return
+    for r in runs:
+        secs = "%.1fs" % r["secs"] if r["secs"] is not None else "-"
+        print("%s  %-8s %9s  %2d seg  %d err  %s"
+              % (r["run"], r["status"], secs, r["segments"], r["errors"],
+                 " ".join(r["argv"])))
+
+
+def _dispatch(args, p, jobs):
+    """Route one parsed invocation to its command. Split out of main() so main
+    can wrap the whole dispatch in a single run-start/run-end try/finally."""
     # generate is corpus-wide by default, but `lagen <source> generate <id> ...`
     # targets just those documents (and leaves the aggregate pages alone)
     if args.action == "generate":
@@ -2121,14 +2319,19 @@ def main(argv=None):
     if args.action == "serve":
         cmd_serve(args.host, args.port)
         return
+    if args.action == "runs":
+        _cmd_runs(int(args.basefiles[0]) if args.basefiles else None)
+        return
 
     names = list(SOURCES) if args.source == "all" else [args.source]
     if any(n not in SOURCES for n in names):
         p.error("unknown source %r (have: %s)" % (args.source, ", ".join(SOURCES)))
 
     if args.action in ("rebuild", "all"):
-        cmd_all(names, jobs, whole_corpus=args.source == "all",
-                download=args.action == "all")
+        had_errors = cmd_all(names, jobs, whole_corpus=args.source == "all",
+                             download=args.action == "all")
+        if had_errors:
+            sys.exit(1)
         return
     if args.action == "relate":
         cmd_relate(names)
@@ -2158,17 +2361,30 @@ def main(argv=None):
                     label = "%s %s" % (name, "/".join(scopes)) if scopes else name
                     print("Downloading %s from %s" % (label, source.origin),
                           flush=True)
-                source.harvest(scopes)
+                t0 = time.perf_counter()
+                try:
+                    source.harvest(scopes)
+                    _emit_segment("download", name, time.perf_counter() - t0,
+                                  status="ok")
+                except Exception:  # noqa: BLE001 — per-source resilience point: one source's harvest failure must not abort the remaining sources; printed + nonzero exit at end (rule:no-catch-log-continue)
+                    traceback.print_exc()
+                    _emit_segment("download", name, time.perf_counter() - t0,
+                                  status="errors", errors=1)
+                    had_errors = True
                 continue
             if scopes and source.scopes and "download" not in source.stages:
                 bad = [s for s in scopes if s not in source.scopes]
                 p.error("unknown %s scope(s): %s (have: %s)"
                         % (name, ", ".join(bad), ", ".join(sorted(source.scopes))))
             if not scopes and source.harvest is None:
+                if args.source == "all" and "download" not in source.stages:
+                    continue
                 p.error("source %r has no bulk harvest" % name)
             # scopes are document ids -> fall through to the per-doc download stage
         if args.action in source.actions:
+            t0 = time.perf_counter()
             source.actions[args.action](args.basefiles)
+            _emit_segment(args.action, name, time.perf_counter() - t0, status="ok")
             continue
         if args.action not in source.stages:
             p.error("source %r has no action %r (have: %s)"
@@ -2176,7 +2392,8 @@ def main(argv=None):
                        ", ".join([*source.stages, *source.actions])))
         basefiles = args.basefiles or source.list_basefiles()
         result = run_action(source, args.action, basefiles, jobs)
-        report(source, args.action, result, len(basefiles))
+        report(source, args.action, result, len(basefiles),
+               full_source=not args.basefiles)
         had_errors |= bool(result.errors)
     if had_errors:                 # report every source first, then signal failure
         sys.exit(1)

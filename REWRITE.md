@@ -774,6 +774,18 @@ to a future per-doc incremental generate.
     index` run at corpus scale** against a provisioned OpenSearch — works.
     ✅ **Incremental relate + index** (content-hash diff, see 2026-06-26 log);
     ⬜ Remaining: MCP.
+  - ✅ **Operations/health dashboard** (`lib/runlog.py`, `api/ops.py`) — every
+    `build.py` invocation now records a run in an append-only ledger
+    (`DATA/.build/runs.ndjson`: run-start / per-(step,source) segment /
+    run-end), folds per-doc failures into a keyed latest-outcome store
+    (`errors.json`, so "failed" is distinguishable from "never tried") and,
+    on full-source runs, updates a rolling per-source × per-stage snapshot
+    (`status.json`). `lagen <source> status` writes the authoritative
+    snapshot cell; `lagen all runs [N]` lists recent runs from the CLI. The
+    dashboard itself is `/ops` on the FastAPI app (HTML, HTTP Basic user
+    `ops`, password = the new `ops_token` config knob / `OPS_TOKEN` env —
+    unset disables it, 403) with `/ops/runs`, `/ops/runs/{id}` and
+    `/ops/failures` drill-downs. `test/test_runlog.py`, `test/test_ops.py`.
 - ✅ **Full corpus now catalogued.** `relate` runs over the whole set —
   `documents`: sfs 11,184 · dv 17,103 · forarbete 15,237 · eurlex 61,146
   (+ kommentar/begrepp) — so the cited law-roots that were dead targets in the
@@ -1678,6 +1690,12 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **§6** (2026-07-04) — operations/health dashboard: `lib/runlog.py` owns the
+  three `DATA/.build/` state files (run ledger, per-doc error store, rolling
+  status snapshot), `build.py` instruments every invocation and extends
+  `status` + adds `lagen all runs`, and `api/ops.py` serves `/ops` (Basic-auth,
+  new `ops_token` config knob) as a self-contained health matrix + run/failure
+  drill-down, independent of the site render.
 - **§7h** (2026-07-04) — remisser vertical landed: regeringen.se remiss/referral
   harvest (two-pass sync, stub records for unreachable case pages so an
   incremental watermark can't hide a failure), PDF parse over the shared

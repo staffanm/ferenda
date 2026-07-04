@@ -124,7 +124,8 @@ the *referred förarbete's* context rail.
 
 **Service layer**: `api/app.py` is the REST/OpenAPI service (search, documents,
 citation graph, version history + diff) that also serves the static site under
-`lagen serve`.
+`lagen serve`. `api/ops.py` mounts the ops health dashboard on the same app
+(see "Operations" below); `lib/runlog.py` owns the state files behind it.
 
 ## Running the pipelines
 
@@ -358,6 +359,37 @@ The frozen legacy corpora (REWRITE.md §7g) are NOT under `site/data/`: import
 records reference their body files in place under `legacy_root` (config.yml;
 defaults to the sibling `../ferenda.old/data`) — moving those trees means
 updating that one key, never rewriting records.
+
+## Operations
+
+`lib/runlog.py` owns three state files under `DATA/.build/`. The run ledger and
+error store are written by `build.py` on every *pipeline* `lagen` invocation (a
+no-op under `--dry-run`, and for the non-pipeline verbs `serve`/`runs`, which
+carry no run id). `status` is the deliberate exception: it too carries no run id
+and never touches the ledger, but it writes the authoritative `status.json`
+snapshot cell directly (see below).
+
+- `runs.ndjson` — append-only run ledger: one block of events per invocation
+  (run-start, one segment per (step, source) executed, run-end).
+- `errors.json` — per-document latest-outcome store keyed
+  `<source>/<stage>/<basefile>`, set on failure and cleared on success, so a
+  "failed" doc is distinguishable from one that was simply never touched.
+- `status.json` — rolling per-source × per-stage health snapshot
+  (`{total, fresh, stale, missing, failed, empty}` per cell).
+
+```sh
+uv run python -m accommodanda.build <source> status   # extended: also shows failed/empty, writes the authoritative snapshot cell
+uv run python -m accommodanda.build all runs [N]       # recent runs from the ledger
+```
+
+`/ops` is an HTML health dashboard mounted on the same FastAPI app as the REST
+API (`api/ops.py`) — the per-source × per-stage matrix, a stale-snapshot
+banner, failing-doc totals, the last runs, duration-regression flags, and the
+catalog delta — with `/ops/runs`, `/ops/runs/{id}` (per-source timing bars +
+segments + errors) and `/ops/failures` (drill-down with tracebacks) alongside
+it. It's gated by HTTP Basic auth (user `ops`, password = the `ops_token` key
+in `config.yml` or the `OPS_TOKEN` env var); leaving it unset disables the
+dashboard (every route answers 403).
 
 ## Production deployment (Docker)
 
