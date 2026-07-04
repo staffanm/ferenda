@@ -23,7 +23,8 @@ class Block:
 
 @dataclass
 class Forarbete:
-    type: str                 # prop | sou | ds | dir | fm | skr | so | lr
+    type: str                 # prop | sou | ds | pm | dir | fm | skr | so |
+                              # lr | bet
     basefile: str             # the document's own id, e.g. "2025/26:161"
     identifier: str           # display form, e.g. "Prop. 2025/26:161"
     uri: str                  # https://lagen.nu/prop/2025/26:161

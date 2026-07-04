@@ -69,14 +69,15 @@ Current code layout (this three-layer split is now realized in the package):
 accommodanda/
   lib/      shared horizontal libs — lagrum (citation engine), catalog, render, layout, net, markdown, util, errors
   config.py runtime config (config.yml / data_root / wiki_root)
-  sfs/      acts vertical — extract·reader·model·tokenizer·assembler·nf·register (+ __main__)
-  dv/       court-decisions vertical — download·identity·model·parse·structure·word·legacy
-  forarbete/ preparatory-works vertical — download·model·parse·structure·kommentar
-  eurlex/   EU vertical (EUR-Lex/CELLAR) — download·bulk·parse·parse_html·parse_pdf·structure·lang·model
-  foreskrift/ agency-regulations vertical — agencies·harvest·download·legacy·model·parse·structure
-  avg/      JO/JK/ARN-decisions vertical — model·download·legacy·parse
+  sfs/      acts vertical — download·extract·reader·model·tokenizer·assembler·nf·register·versions·correspond·begrepp (+ __main__)
+  dv/       court-decisions vertical — download·identity·naming·namedcases·model·parse·structure·word·legacy
+  forarbete/ preparatory-works vertical — download·riksdagen·model·parse·structure·kommentar·genomforande·legacy·legacy_formats
+  eurlex/   EU vertical (EUR-Lex/CELLAR) — download·bulk·annotate·definitions·parse·parse_html·parse_pdf·structure·lang·model
+  foreskrift/ agency-regulations vertical — agencies·harvest·download·model·parse·structure·legacy
+  avg/      JO/JK/ARN-decisions vertical — download·model·parse·legacy
   remisser/ remiss (referral-response) vertical — model·download·parse·ai_analyze
-  wiki/     kommentar + begrepp sources — parse (markdown content repo, WIKI_ROOT)
+  wiki/     kommentar + begrepp sources — parse·annotate·guidance_discover (markdown content repo, WIKI_ROOT)
+  api/      HTTP API — app
   build.py  orchestrator — the `lagen` build driver, composes the verticals
 ```
 
@@ -583,6 +584,16 @@ below is not optional polish, it's the only way they enter the corpus.
     prerequisite set is data-dependent (the inbound set), not a static
     per-basefile input list.
 - ⬜ Generic golden-corpus comparator (factor out of `golden_sfs.py`).
+- ⬜ **Shared harvest core, not yet extracted.** The incremental-harvest loop
+  (newest-first page walk, stop-at-first-on-disk, `--full`/backfill mode,
+  atomic writes, politeness delay, `Reporter` progress) now exists in three
+  independent implementations: `forarbete/download.py` (regeringen.se AJAX
+  listing), `foreskrift/harvest.py` (the per-agency enumerate/resolve engine)
+  and `forarbete/riksdagen.py` (data.riksdagen.se dokumentlista JSON, plus its
+  own riksmöte-partitioned backfill for the API's pagination cap). Flagged as
+  a future `lib/` consolidation — not done yet since each grew its own
+  paging/backfill quirks and a premature abstraction would be guessing at the
+  shared shape from three data points.
 
 ## 6. Derived layer + publishing 🚧
 
@@ -809,7 +820,7 @@ lesser types) annotated onto the statute paragraphs they comment on. ~31,700
 förarbete citations currently render as dead `.noref` text; this vertical makes
 them resolve.
 
-- ✅ **Downloader** `accommodanda/forarbete/download.py` — harvests all eight
+- ✅ **Downloader** `accommodanda/forarbete/download.py` — harvests all nine
   regeringen.se types from `/rattsliga-dokument/`. Built from first principles
   off the live site (the old `Regeringen` downloader targeted the pre-rebuild
   site). **Enumeration** is the page's own AJAX filter endpoint
@@ -825,6 +836,12 @@ them resolve.
     (riksdagen/KB) for older periods reconciles by identity. The two types
     regeringen.se publishes untitled-by-number (SÖ, lagrådsremiss) fall back to
     the landing-page slug.
+  - **`pm` (promemorior outside the Ds series)** shares category 1325
+    ("Departementsserien och promemorior") with `ds`; `parse_listing`'s
+    `EXCLUDE` map gives `ds` the items numbered `Ds YYYY:N` and `pm` the rest.
+    A pm without a Ds number is keyed by its **diarienummer** (`Ju2026/01691`,
+    `KN2026/01475`, …); one with neither Ds number nor dnr falls back to the
+    landing-page slug like SÖ/lr. Same downloader, same parse pipeline.
   - Incremental (newest-first, stop at first on-disk) + `--full`; atomic writes;
     browser UA (regeringen.se 403s bots); politeness delay. Stores per doc:
     `<slug>.json` record + landing `<slug>.html` + content PDF(s) under
@@ -871,6 +888,26 @@ them resolve.
   resolve and each förarbete shows what cites it (and at which page).
 - ⬜ Older-period sources (riksdagen/KB), lr/SÖ content, page-number offset for
   docs whose front matter shifts the printed sequence.
+- ✅ **`bet` (utskottsbetänkanden) — a fourth harvest source**,
+  `accommodanda/forarbete/riksdagen.py`. Committee reports are the missing
+  prop→enacted-law link ("bet. 2025/26:JuU47 s. 12", already minted by the
+  FORARBETEN grammar as `bet/<rm>:<beteckning>`); this downloader fills that
+  citation target. Off `data.riksdagen.se`'s `dokumentlista` JSON feed
+  (`doktyp=bet`), not regeringen.se. **basefile = `"<rm>:<beteckning>"`**
+  (e.g. "2025/26:JuU47"), matching the citation grammar's URIs by
+  construction. Bodies are **PDF-only** (the printed page is the citation
+  anchor; riksdagen's HTML body carries no pages) — a betänkande without an
+  attached filbilaga gets a metadata-only record, still a real catalog
+  document. Incremental (newest-first, gated by the shared `HarvestWatermark`;
+  only *final* records feed the gate, and the saved date is the newest
+  *published* entry's datum — a planned betänkande's future datum would erode
+  the safety margin) + `--full`;
+  a full backfill iterates all **161 riksmöten** back to 1867, because the
+  API caps a single query's pagination at ~10k docs, far below the ~75k-doc
+  corpus. Wired into `build.py`'s `fa_harvest` as scope `"bet"` (its own
+  sync call, alongside the regeringen.se scopes; `--only` is not supported
+  for `bet`). No frozen legacy corpus (§7g) covers it.
+  `test/test_forarbete_riksdagen.py`.
 
 ### 7c. Wiki value-add — kommentar + begrepp ✅ (first cut)
 
@@ -1065,6 +1102,21 @@ law, keyed by **CELEX** (the basefile throughout).
   page renders a **"Genomför EU-direktiv"** panel linking each statement to the
   directive article. Verified end-to-end on the real corpus (prop 2014/15:128 → 7
   statements → directive articles light up). `test/test_site.py`.
+  - ✅ **Extended to `fm` (förordningsmotiv).** The extraction guard was
+    prop-only ("only the bill text is closest to the enacted law"); widened to
+    `{"prop", "fm"}` because an fm is published *alongside* the förordning it
+    enacts, so its "Förordningen genomför … direktivet" statement is just as
+    authoritative. An fm writes its författningskommentar at heading level 3
+    (unnumbered, prop props it at level 1) and names its förordning in the
+    leading title rubriks rather than a prop-style "Förslaget till lag om
+    ändring i…" level-2 heading, so `find_kommentar`/`fm_law` needed fm-aware
+    section-location and law-context logic. Same pass fixed the alias-binding
+    lookback: a directive alias used to resolve against a fixed 400-char
+    window before the `(…direktivet)` parenthetical, which a long "senast
+    ändrat genom <amendment list>" clause could push past the real subject
+    directive; now scoped to the **defining sentence** (`_sentence_start`),
+    which also corrected a real prop misparse, not just an fm-only edge case.
+    `test/test_forarbete_kommentar.py`.
 - ✅ **Genomför statements pinned to the SFS paragraf** — the cross-document join
   the parser couldn't make, resolved at *relate* time (`forarbete/genomforande.py`,
   a vertical module that reads the statute corpus through the shared catalog,
@@ -1118,7 +1170,7 @@ are not yet citation *targets*; the inbound value comes from the edges above.
   `bemyndigande` → `https://lagen.nu/{sfs}#P{n}`. `structure` is the förarbete-style
   nested §§ tree (filled at parse).
 - ✅ **Reusable harvest engine** (`foreskrift/harvest.py`) — the shared loop
-  (incremental newest-first + `.complete` backfill marker, atomic writes, `Reporter`,
+  (incremental newest-first gated by the shared `HarvestWatermark`, atomic writes, `Reporter`,
   politeness; generalized `forarbete.sync`) is **architecture-agnostic**. An agency is
   config naming two seams over it:
   - **`enumerate`** — *how to list an agency's docs*, the variable axis. Three reusable
@@ -1148,7 +1200,7 @@ are not yet citation *targets*; the inbound value comes from the edges above.
   next agency (one bad source can't abort the 15-agency run); multi-page enumerators
   (`indexed_enumerate` per-year, `paginated`, `sitemap`) yield a `Skip` for one
   unreachable page and keep walking the tail. A `Skip` is *logged* (never swallowed)
-  and *withholds the `.complete` marker* so the page is retried next run; an
+  and *withholds the watermark save* so the page is retried next run; an
   *expected* empty page (a year with no regulations — `optional_pages`) is silently
   skipped, not an error.
 - ✅ **Per-agency parse-coverage fixes** surfaced by the full run: MSBFS 25→96/97
@@ -1260,7 +1312,7 @@ now have internal targets.
     dnr, beslutsdatum, title, summary, deciding ombudsman, sakområde/lagrum
     taxonomies, the decision **PDF url** and the site's own flat text
     extraction. **3,738 decisions back to 1979.** Newest-first incremental with
-    the dv-style `.complete` backfill marker; the PDF is fetched per decision.
+    the dv-style `HarvestWatermark` incremental gate; the PDF is fetched per decision.
   - **JK** (Umbraco): the listing still honours the legacy "broken pagination"
     hack — `POST page=9999` returns the whole corpus in one response
     (**1,427 decisions, publications 1998–**). The decision *is* its landing
@@ -1574,7 +1626,7 @@ model + extraction.
 | `accommodanda/lib/` | **shared** horizontal libs: `lagrum` (citation engine), `util`, `errors` (`SkipDocument`) |
 | `accommodanda/sfs/` | **acts vertical**: `{extract,reader,model,tokenizer,assembler,nf}` parser + `register` (SFSR→amendments/förarbeten/metadata) + `__main__` (validate CLI) |
 | `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `structure`, `word`, `legacy`, `naming` (canonical case title + HD given names), `namedcases` (HD named-precedent harvester) |
-| `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, all 8 types), `model`/`structure`/`parse` (PDF/html→nested structure→artifact), `legacy` (one-time import of the nine frozen förarbete corpora, §7g), `legacy_formats` (frozen body adapters — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML, scanned-PDF OCR text, TRIPS `div.body-text`), `kommentar` (författningskommentar → EU-directive *genomför* edges), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf) |
+| `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, 8 types + `pm`, promemorior outside the Ds series), `model`/`structure`/`parse` (PDF/html→nested structure→artifact), `legacy` (one-time import of the nine frozen förarbete corpora, §7g), `legacy_formats` (frozen body adapters — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML, scanned-PDF OCR text, TRIPS `div.body-text`), `riksdagen` (`bet`/utskottsbetänkanden downloader off data.riksdagen.se, no frozen corpus), `kommentar` (författningskommentar → EU-directive *genomför* edges, prop + fm), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf) |
 | `accommodanda/eurlex/` | **EU vertical (EUR-Lex/CELLAR)**: `download` (SPARQL discovery), `bulk` (dump import), `parse`/`parse_html`/`parse_pdf` (Formex/HTML/PDF → one artifact shape), `definitions` (defined-terms extraction + in-act interlinking), `lang`, `model` |
 | `accommodanda/avg/` | **JO/JK/ARN-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages, `jk_canonical` dnr normalization; ARN one-page vägledande-beslut listing), `legacy` (one-time import of the frozen ARN corpus 1991–2022, §7g), `parse` (JO/ARN PDF via `lib/pdftext`, JK landing HTML; DV parse-type citation scan) |
 | `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (reusable engine — enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct}; `Skip`/`_guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 17 agencies live + 4 frozen-only), `download`, `legacy` (one-time import of the two harvest-blocked corpora, §7g), `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors). Corpus: 1218 regs harvested, parsed 0-fail |
@@ -1590,7 +1642,8 @@ model + extraction.
 | `site/data/mediawiki/downloaded/` | MediaWiki dump (SFS commentary + concept pages) |
 | `test/test_wiki.py` | wiki parsing suite |
 | `site/data/forarbete/downloaded/<type>/` | harvested förarbeten (record json + landing html + content pdf) + frozen-import records |
-| `test/test_forarbete_download.py` | förarbete downloader parsing suite |
+| `test/test_forarbete_download.py` | förarbete downloader parsing suite (incl. `pm`) |
+| `test/test_forarbete_riksdagen.py` | `bet`/utskottsbetänkanden downloader suite (data.riksdagen.se) |
 | `test/test_forarbete_legacy.py`, `test/test_forarbete_legacy_formats.py` | förarbete frozen-corpus import + body-adapter suites |
 | `test/test_foreskrift_legacy.py` | föreskrift frozen-corpus import suite |
 | `test/test_avg.py` | avg (JO/JK/ARN) parser + citation-grammar suite |
@@ -1708,6 +1761,16 @@ in `git log`. This document is the forest-level status; section markers
   extracted (TYPES + listing walk) once remisser became the second
   regeringen.se harvester alongside forarbete; `lib/util.py` gained
   `swedish_date`/`MONTHS`, shared by foreskrift and remisser.
+- **2026-07-03, §7a** — three förarbete extensions: `pm` (promemorior outside
+  the Ds series, keyed by diarienummer or landing-page slug) added to the
+  regeringen.se downloader's shared category-1325 listing; `bet`
+  (utskottsbetänkanden, the prop→enacted-law link) added as a fourth harvest
+  source off data.riksdagen.se (`forarbete/riksdagen.py`), backfilling all 161
+  riksmöten to work around the API's ~10k-doc pagination cap; `kommentar.py`'s
+  genomför-direktiv extraction widened from prop-only to `{prop, fm}`
+  (förordningsmotiv), with the alias-binding lookback rescoped from a fixed
+  400-char window to the defining sentence — which also fixed a real prop
+  misparse, not just an fm edge case.
 - **§7g** — frozen legacy corpora imported, not ported: ~38,200 documents
   across three verticals (ARN → avg incl. a new live arn.se harvester,
   9 förarbete corpora 1867–2023 with format-probed body routing +

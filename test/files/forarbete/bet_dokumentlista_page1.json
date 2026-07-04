@@ -1,0 +1,90 @@
+{
+ "dokumentlista": {
+  "@ms": "339.0",
+  "@version": "3.8.5.21679",
+  "@q": "sz=200&utformat=json&doktyp=bet&sort=datum&sortorder=desc",
+  "@datum": "2026-07-03 21:52:28",
+  "@sidor": "374",
+  "@traffar": "74773",
+  "@dR": "211",
+  "@sida": "1",
+  "@nasta_sida": "http://data.riksdagen.se/dokumentlista/?doktyp=bet&utformat=json&sort=datum&sortorder=desc&sz=200&p=2",
+  "dokument": [
+   {
+    "id": "he01fiu8",
+    "datum": "2026-06-30",
+    "dok_id": "HE01FiU8",
+    "dokument_url_html": "//data.riksdagen.se/dokument/HE01FiU8.html",
+    "dokument_url_text": "//data.riksdagen.se/dokument/HE01FiU8.text",
+    "dokumentstatus_url_xml": "//data.riksdagen.se/dokumentstatus/HE01FiU8.xml",
+    "titel": "Skattetransparenta värdepappersfonder för institutionella investerare",
+    "rm": "2026/27",
+    "organ": "FiU",
+    "doktyp": "bet",
+    "typ": "bet",
+    "subtyp": "bet",
+    "beteckning": "FiU8",
+    "nummer": "8",
+    "status": "planerat",
+    "filbilaga": null,
+    "dokumentnamn": "Betänkande"
+   },
+   {
+    "id": "hd01ku45",
+    "datum": "2026-06-16",
+    "dok_id": "HD01KU45",
+    "dokument_url_html": "//data.riksdagen.se/dokument/HD01KU45.html",
+    "dokument_url_text": "//data.riksdagen.se/dokument/HD01KU45.text",
+    "dokumentstatus_url_xml": "//data.riksdagen.se/dokumentstatus/HD01KU45.xml",
+    "titel": "Prövning av fråga om tillämpligheten av 2 kap. 22 § regeringsformen i visst fall (bet. 2025/26:SfU31)",
+    "rm": "2025/26",
+    "organ": "KU",
+    "doktyp": "bet",
+    "typ": "bet",
+    "subtyp": "bet",
+    "beteckning": "KU45",
+    "nummer": "45",
+    "status": "Webbpublicering",
+    "filbilaga": {
+     "fil": [
+      {
+       "typ": "pdf",
+       "namn": "2025_26_KU45_20260616180940_Publicering.pdf",
+       "storlek": "215108",
+       "url": "https://data.riksdagen.se/fil/C889726E-ED62-4E29-9FBB-C25B8458C08E"
+      }
+     ]
+    },
+    "dokumentnamn": "Betänkande"
+   },
+   {
+    "id": "hd01juu47",
+    "datum": "2026-06-16",
+    "dok_id": "HD01JuU47",
+    "dokument_url_html": "//data.riksdagen.se/dokument/HD01JuU47.html",
+    "dokument_url_text": "//data.riksdagen.se/dokument/HD01JuU47.text",
+    "dokumentstatus_url_xml": "//data.riksdagen.se/dokumentstatus/HD01JuU47.xml",
+    "titel": "Nya möjligheter att bekämpa onlinerekrytering",
+    "rm": "2025/26",
+    "organ": "JuU",
+    "doktyp": "bet",
+    "typ": "bet",
+    "subtyp": "bet",
+    "beteckning": "JuU47",
+    "nummer": "47",
+    "status": "Webbpublicering",
+    "filbilaga": {
+     "fil": [
+      {
+       "typ": "pdf",
+       "namn": "2025_26_JuU47_20260616111109_Publicering.pdf",
+       "storlek": "834764",
+       "url": "https://data.riksdagen.se/fil/52E8F89D-D3E8-4562-8746-6A6C6F14D765"
+      }
+     ]
+    },
+    "dokumentnamn": "Betänkande"
+   }
+  ]
+ }
+}

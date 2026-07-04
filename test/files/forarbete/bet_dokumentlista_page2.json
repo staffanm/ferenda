@@ -1,0 +1,42 @@
+{
+ "dokumentlista": {
+  "@ms": "339.0",
+  "@version": "3.8.5.21679",
+  "@q": "sz=200&utformat=json&doktyp=bet&sort=datum&sortorder=desc",
+  "@datum": "2026-07-03 21:52:28",
+  "@sidor": "374",
+  "@traffar": "74773",
+  "@dR": "211",
+  "@sida": "2",
+  "dokument": [
+   {
+    "id": "hd01juu45",
+    "datum": "2026-06-16",
+    "dok_id": "HD01JuU45",
+    "dokument_url_html": "//data.riksdagen.se/dokument/HD01JuU45.html",
+    "dokument_url_text": "//data.riksdagen.se/dokument/HD01JuU45.text",
+    "dokumentstatus_url_xml": "//data.riksdagen.se/dokumentstatus/HD01JuU45.xml",
+    "titel": "Stärkt skydd mot utlänningar som utgör kvalificerade säkerhetshot",
+    "rm": "2025/26",
+    "organ": "JuU",
+    "doktyp": "bet",
+    "typ": "bet",
+    "subtyp": "bet",
+    "beteckning": "JuU45",
+    "nummer": "45",
+    "status": "Webbpublicering",
+    "filbilaga": {
+     "fil": [
+      {
+       "typ": "pdf",
+       "namn": "2025_26_JuU45_20260616105925_Publicering.pdf",
+       "storlek": "888279",
+       "url": "https://data.riksdagen.se/fil/C3DADDC7-B6A1-4E0D-98FA-191AB8BB78B7"
+      }
+     ]
+    },
+    "dokumentnamn": "Betänkande"
+   }
+  ]
+ }
+}
