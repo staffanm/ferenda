@@ -1919,7 +1919,7 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
     con = catalog.connect(catalog_path)
     site = Site.from_catalog(con)
     rows = con.execute(
-        "SELECT uri, source, path, title FROM documents "
+        "SELECT uri, source, path, title, content_hash FROM documents "
         "ORDER BY source, uri").fetchall()
     if source is not None:                       # whole-source scope (incl. stubs)
         rows = [r for r in rows if r[1] == source]
@@ -1927,30 +1927,38 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
         rows = [r for r in rows if r[2] in only]
     # commentary is an annotation rendered into statute rails, not a page of its own
     rows = [r for r in rows if r[1] != "kommentar"]
-    rows += list(extra or ())          # uncatalogued pages, already run-scoped
+    # uncatalogued pages (sfs historical consolidations) carry no catalog row, so
+    # no stored content_hash -- the caller re-hashes their artifact from disk (few)
+    rows += [(uri, src, path, title, None) for (uri, src, path, title)
+             in (extra or ())]
+
+    # the whole-corpus dependency digests in one batched pass (not one pair of
+    # subqueries per document -- the 124k-page planning loop); a link-less uri is
+    # absent and takes the empty default
+    deps = catalog.page_dependency_digests(con)
 
     # Freshness planning is single-threaded: it reads the catalog + manifest and
     # hashes inputs (the manifest lives here in the parent). Fresh pages advance
     # the counter at once; stale ones go to `plan` to be rendered (in parallel).
     total = len(rows)
     done = rendered = 0
-    plan = []                       # (uri, source, path, title, dep) needing render
-    for (uri, src, path, title) in rows:
+    plan = []                # (uri, source, path, title, dep, chash) needing render
+    for (uri, src, path, title, chash) in rows:
         out = out_root / doc_relpath(uri)
-        dep = catalog.page_dependency_digest(con, uri)
-        if fresh and fresh(uri, out, path, dep):
+        dep = deps.get(uri, catalog.EMPTY_DEP_DIGEST)
+        if fresh and fresh(uri, out, path, dep, chash):
             done += 1
             if progress and done % 500 == 0:
                 progress(done, total, catalog.local(uri), rendered)
         else:
-            plan.append((uri, src, path, title, dep))
+            plan.append((uri, src, path, title, dep, chash))
 
-    def finish(uri, path, dep):
+    def finish(uri, path, dep, chash):
         nonlocal done, rendered
         done += 1
         rendered += 1
         if record:
-            record(uri, path, dep)
+            record(uri, path, dep, chash)
         if progress:
             progress(done, total, catalog.local(uri), rendered)
 
@@ -1960,12 +1968,12 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
             futures = {pool.submit(_render_one, job[:4]): job for job in plan}
             for fut in as_completed(futures):
                 fut.result()                 # propagate a render error (abort)
-                uri, src, path, title, dep = futures[fut]
-                finish(uri, path, dep)
+                uri, src, path, title, dep, chash = futures[fut]
+                finish(uri, path, dep, chash)
     else:
-        for (uri, src, path, title, dep) in plan:
+        for (uri, src, path, title, dep, chash) in plan:
             _write_page(uri, src, path, title, site, out_root)
-            finish(uri, path, dep)
+            finish(uri, path, dep, chash)
 
     if only is None and source is None:          # corpus-wide pages on a full run
         render_aggregates(con, out_root, catalog_path, write_index=write_index)

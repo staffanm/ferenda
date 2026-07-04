@@ -2048,43 +2048,48 @@ def cmd_generate(only=None, source=None, jobs=1):
     updates = {}
     own_hash = {}                # artifact path -> content hash, memoized per run
 
-    def page_signature(art_path, dep_digest):
-        # only the page's OWN artifact is content-hashed (it changes when the doc
+    def page_signature(art_path, dep_digest, content_hash):
+        # only the page's OWN artifact enters the signature (it changes when the doc
         # is re-parsed); its neighbours enter via dep_digest as a set of
         # relationships, not their contents -- an immutable case re-appearing
-        # unchanged must not invalidate every law it cites. The page's sibling LLM
-        # layers are hashed in too, so authoring or editing one re-renders just
-        # that page: `.ann` (eurlex ai-annotate) and `.corr` (sfs ai-correspond,
-        # the new statute's corresponding-cases margin). The *old* statute's margin
-        # reads a `.corr` next to a different document, so a `.corr` edit reaches it
-        # only via relate + a full/forced generate.
+        # unchanged must not invalidate every law it cites. The artifact's bytes are
+        # NOT re-read here: relate already stored their sha256 as the catalog's
+        # `content_hash`, so generate reuses it instead of re-hashing all ~6.3 GB in
+        # the single-threaded planning loop (§2.1). Only the page's sibling LLM
+        # layers are read from disk (they aren't catalogued), so authoring or editing
+        # one re-renders just that page: `.ann` (eurlex ai-annotate) and `.corr` (sfs
+        # ai-correspond, the new statute's corresponding-cases margin). The *old*
+        # statute's margin reads a `.corr` next to a different document, so a `.corr`
+        # edit reaches it only via relate + a full/forced generate.
         p = str(art_path)
         if p not in own_hash:
-            # a synthesized concept stub has no artifact on disk (empty path) and
-            # so no sibling layers -- its signature is just its dep_digest (its
-            # aggregated inbound, which is the stub's whole content)
+            # a synthesized concept stub has no artifact on disk (empty path) and so
+            # no sibling layers; an uncatalogued page (sfs historical consolidation)
+            # has an artifact but no catalog content_hash, so its bytes are hashed
+            # directly. .versions.json is the sfs versions-stage sidecar: an archived
+            # consolidation appearing re-renders the statute's page (its version
+            # panel lists the new lydelse).
             fp = Path(p) if p else None
-            # .versions.json is the sfs versions-stage sidecar: an archived
-            # consolidation appearing re-renders the statute's page (its
-            # version panel lists the new lydelse)
-            sides = ((fp, fp.with_suffix(".ann"), fp.with_suffix(".corr"),
-                      fp.with_suffix(".versions.json"))
-                     if fp else ())
-            own_hash[p] = hashlib.sha256(b"".join(
+            sides = ((fp.with_suffix(".ann"), fp.with_suffix(".corr"),
+                      fp.with_suffix(".versions.json")) if fp else ())
+            base = content_hash if content_hash is not None else (
+                catalog.content_hash(fp.read_bytes()) if fp and fp.exists() else "")
+            own_hash[p] = hashlib.sha256(base.encode() + b"".join(
                 s.read_bytes() if s.exists() else b"" for s in sides)).hexdigest()
         return hashlib.sha256((own_hash[p] + dep_digest).encode()).hexdigest()
 
-    def fresh(uri, out_path, art_path, dep_digest):
+    def fresh(uri, out_path, art_path, dep_digest, content_hash):
         if RUN.force or not out_path.exists():
             return False
         entry = manifest.get(manifest_key("generate", "page", uri))
         return bool(entry) \
-            and entry["inputs"] == page_signature(art_path, dep_digest) \
+            and entry["inputs"] == page_signature(art_path, dep_digest, content_hash) \
             and (RUN.ignore_code_changes or entry["version"] == code_version)
 
-    def record(uri, art_path, dep_digest):
+    def record(uri, art_path, dep_digest, content_hash):
         updates[manifest_key("generate", "page", uri)] = {
-            "inputs": page_signature(art_path, dep_digest), "version": code_version}
+            "inputs": page_signature(art_path, dep_digest, content_hash),
+            "version": code_version}
 
     def progress(done, total, current="", rendered=0):
         util.status(done, total, "generate  %d rendered  %s" % (rendered, current))

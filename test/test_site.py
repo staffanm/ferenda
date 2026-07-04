@@ -1,8 +1,12 @@
 """Tests for the derived layer: the SQLite catalog (relate) and the static
 HTML renderer (generate) -- REWRITE.md §6."""
 
+import hashlib
 import json
 import re
+from pathlib import Path
+
+import pytest
 
 from accommodanda.lib import catalog, render
 
@@ -153,6 +157,46 @@ def test_catalog_signature_tracks_whole_catalog(tmp_path):
     catalog.rebuild(db, "dv", [case])                # another source's doc appears
     con = catalog.connect(db)
     assert catalog.catalog_signature(con) != sig
+
+
+def test_relate_skips_read_on_stat_match(tmp_path, monkeypatch):
+    # §2.2: an artifact whose (size, mtime) are unchanged since the last relate is
+    # not read at all -- the fast path decides "unchanged" from the stat alone.
+    db = str(tmp_path / "catalog.sqlite")
+    law = tmp_path / "law.json"
+    law.write_text(json.dumps(LAW))
+    catalog.rebuild(db, "sfs", [law])
+
+    reads = []
+    orig = Path.read_bytes
+    monkeypatch.setattr(Path, "read_bytes",
+                        lambda self: reads.append(self) or orig(self))
+    _, _, changed = catalog.rebuild(db, "sfs", [law])
+    assert changed == 0 and reads == []              # decided by stat, never read
+
+
+def test_relate_identical_rewrite_reads_once_then_stats(tmp_path):
+    # §2.2: rewriting an artifact with byte-identical content bumps its mtime, so
+    # the stat differs and it is read once; the content hash still matches, so it
+    # is not re-extracted, and the refreshed stat lets the *next* relate skip it.
+    db = str(tmp_path / "catalog.sqlite")
+    law = tmp_path / "law.json"
+    law.write_text(json.dumps(LAW))
+    catalog.rebuild(db, "sfs", [law])
+
+    st_before = law.stat().st_mtime_ns
+    while law.stat().st_mtime_ns == st_before:       # force a distinct mtime
+        law.write_text(json.dumps(LAW))
+    _, _, changed = catalog.rebuild(db, "sfs", [law])
+    assert changed == 0                              # bytes unchanged -> not re-extracted
+
+    reads = []
+    orig = Path.read_bytes
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(Path, "read_bytes",
+                   lambda self: reads.append(self) or orig(self))
+        _, _, changed = catalog.rebuild(db, "sfs", [law])
+    assert changed == 0 and reads == []              # stat refreshed -> fast path again
 
 
 def test_force_relate_reextracts_all(tmp_path):
@@ -453,6 +497,67 @@ def test_generate_browse_writes_faceted_pages(tmp_path):
     assert 'href="/1975:635"' in (out / "sfs" / "index.html").read_text()
     # every case is listed under its court; the source root resolves directly
     assert 'href="/dom/NJA_1994_s_1"' in (out / "dom" / "index.html").read_text()
+
+
+def test_generate_site_incremental_reuses_content_hash(tmp_path):
+    # §2.1/§2.3: generate skips a page whose stored content_hash and batched
+    # dependency digest are both unchanged; a content edit (new content_hash)
+    # re-renders exactly that page. The fresh/record protocol mirrors build.py's,
+    # reusing the catalog content_hash instead of re-reading the artifact.
+    db = str(tmp_path / "catalog.sqlite")
+    law = tmp_path / "law.json"
+    law.write_text(json.dumps(LAW))
+    case = tmp_path / "case.json"
+    case.write_text(json.dumps(CASE))
+    catalog.rebuild(db, "sfs", [law])
+    catalog.rebuild(db, "dv", [case])
+    out = tmp_path / "site"
+
+    manifest = {}
+    rendered_uris = []
+
+    def signature(chash, dep):
+        return hashlib.sha256(((chash or "") + dep).encode()).hexdigest()
+
+    def fresh(uri, out_path, art_path, dep, chash):
+        return (uri in manifest and out_path.exists()
+                and manifest[uri] == signature(chash, dep))
+
+    def record(uri, art_path, dep, chash):
+        manifest[uri] = signature(chash, dep)
+        rendered_uris.append(uri)
+
+    total, rendered = render.generate_site(db, out, fresh=fresh, record=record)
+    assert total >= 2 and rendered == total          # first run renders every page
+    assert LAW["uri"] in rendered_uris and CASE["uri"] in rendered_uris
+
+    rendered_uris.clear()
+    _, rendered = render.generate_site(db, out, fresh=fresh, record=record)
+    assert rendered == 0 and rendered_uris == []     # nothing changed -> all skipped
+
+    # edit the law's title (new bytes -> new content_hash), re-relate, regenerate:
+    # only the law's own page re-renders (its dependency set is unchanged)
+    law.write_text(json.dumps({**LAW, "metadata": {"properties":
+                   {"dcterms:title": "Räntelag (1975:635), ändrad"}}}))
+    catalog.rebuild(db, "sfs", [law])
+    rendered_uris.clear()
+    _, rendered = render.generate_site(db, out, fresh=fresh, record=record)
+    assert rendered_uris == [LAW["uri"]]             # only the edited page
+
+    # a new case citing the law changes the law's inbound set -> its dependency
+    # digest moves, so the law's page re-renders though its own bytes are unchanged
+    newcase = tmp_path / "newcase.json"
+    newcase.write_text(json.dumps({
+        "uri": "https://lagen.nu/dom/NJA_2001_s_1", "court": "HDO",
+        "referat": ["NJA 2001 s. 1"], "metadata": {},
+        "structure": [{"type": "stycke", "text": [
+            "se ", {"predicate": "dcterms:references", "text": "6 §",
+                    "uri": "https://lagen.nu/1975:635#P6"}, "."]}]}))
+    catalog.rebuild(db, "dv", [case, newcase])
+    rendered_uris.clear()
+    _, rendered = render.generate_site(db, out, fresh=fresh, record=record)
+    assert LAW["uri"] in rendered_uris               # cited page re-rendered
+    assert "https://lagen.nu/dom/NJA_2001_s_1" in rendered_uris   # the new page
 
 
 def test_document_level_inbound_for_bare_citation(tmp_path):

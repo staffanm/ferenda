@@ -114,6 +114,13 @@ def connect(path):
         con.execute("ALTER TABLE documents ADD COLUMN expired TEXT")
     if "display" not in cols:
         con.execute("ALTER TABLE documents ADD COLUMN display TEXT")
+    # (size, mtime_ns) of the artifact bytes, stored so incremental relate can
+    # skip an untouched artifact by stat alone -- never reading + hashing it just
+    # to confirm it is unchanged (rebuild). NULL until that source is re-related.
+    if "art_size" not in cols:
+        con.execute("ALTER TABLE documents ADD COLUMN art_size INTEGER")
+    if "art_mtime_ns" not in cols:
+        con.execute("ALTER TABLE documents ADD COLUMN art_mtime_ns INTEGER")
     return con
 
 
@@ -279,9 +286,10 @@ def sfs_document(art, path):
 
 def dv_document(art, path):
     # the canonical, name-prefixed title ("Meteoriten (NJA 2025 s. 897)") the
-    # listings and every inbound citation read -- computed once by the source at
-    # parse time (dv.naming, stored on the artifact), so the catalog stays a pure
-    # consumer. The generic fallback covers an artifact parsed before the field.
+    # listings and every inbound citation read -- stamped onto the artifact at
+    # parse time (build.dv_parse_run, via lib.casenaming.case_label), so the catalog
+    # stays a pure consumer. The generic fallback covers an artifact parsed before
+    # the field.
     referat = art.get("referat") or []
     malnr = art.get("malnummer") or []
     label = art.get("label") or (
@@ -457,12 +465,12 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False):
     sync, and how many documents were (re)written this run."""
     con = connect(catalog_path)
     # current catalog state for this source, keyed by artifact path (1:1 with a
-    # document): path -> (uri, content_hash). Path-less rows (synthesized begrepp
-    # stubs) aren't artifact-backed, so they're owned by synthesize_concepts, not
-    # this path-keyed sync.
-    have = {row[0]: (row[1], row[2]) for row in con.execute(
-        "SELECT path, uri, content_hash FROM documents WHERE source = ?",
-        (source,)) if row[0]}
+    # document): path -> (uri, content_hash, art_size, art_mtime_ns). Path-less
+    # rows (synthesized begrepp stubs) aren't artifact-backed, so they're owned by
+    # synthesize_concepts, not this path-keyed sync.
+    have = {row[0]: (row[1], row[2], row[3], row[4]) for row in con.execute(
+        "SELECT path, uri, content_hash, art_size, art_mtime_ns "
+        "FROM documents WHERE source = ?", (source,)) if row[0]}
     seen = set()
     written = set()          # uris (re)indexed this run, keyed independently of path
     changed = 0
@@ -470,8 +478,21 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False):
     for i, path in enumerate(map(Path, artifact_paths)):
         key = str(path)
         seen.add(key)
-        raw = path.read_bytes()
+        st = path.stat()
         prev = have.get(key)
+        # stat fast path: an artifact whose (size, mtime) match the ones recorded
+        # at the last relate is untouched (parse rewrites bump the mtime), so trust
+        # them like file_watermark does and skip the read + hash entirely. size 0
+        # is an artifact-backed doc's row that never happens (a SkipDocument
+        # placeholder carries no row, so prev is None), so it always falls through.
+        if (not force and prev and prev[2] == st.st_size
+                and prev[3] == st.st_mtime_ns):
+            current = local(prev[0])
+            written.add(prev[0])
+            if progress:
+                progress(i + 1, total, changed, current)
+            continue
+        raw = path.read_bytes()
         if not raw.strip():
             # a SkipDocument placeholder: ensure no stale row survives at this path
             if prev:
@@ -480,15 +501,22 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False):
         else:
             digest = content_hash(raw)
             if not force and prev and prev[1] == digest:
-                current = local(prev[0])             # unchanged -- skip the parse
+                # bytes unchanged but the file was rewritten (mtime moved) -- skip
+                # the parse, but refresh the stored stat so the next run hits the
+                # fast path above instead of re-hashing this artifact again
+                con.execute("UPDATE documents SET art_size = ?, art_mtime_ns = ? "
+                            "WHERE uri = ?",
+                            (st.st_size, st.st_mtime_ns, prev[0]))
+                current = local(prev[0])
                 written.add(prev[0])
             else:
                 art = json.loads(raw)
                 if prev and prev[0] != art["uri"]:   # uri moved under this path
                     _drop_document(con, prev[0])
                 _index_document(con, art, path, source)
-                con.execute("UPDATE documents SET content_hash = ? WHERE uri = ?",
-                            (digest, art["uri"]))
+                con.execute("UPDATE documents SET content_hash = ?, art_size = ?, "
+                            "art_mtime_ns = ? WHERE uri = ?",
+                            (digest, st.st_size, st.st_mtime_ns, art["uri"]))
                 changed += 1
                 written.add(art["uri"])
                 current = local(art["uri"])
@@ -498,7 +526,7 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False):
     # its path: when an artifact moves to a new path (e.g. a storage-layout change)
     # its uri is re-indexed above under the new path, so it must NOT be dropped here
     # just because the old path is gone (that would delete the row we just wrote).
-    for path, (uri, _) in have.items():
+    for path, (uri, *_) in have.items():
         if path not in seen and uri not in written:
             _drop_document(con, uri)
     docs = con.execute("SELECT COUNT(*) FROM documents WHERE source = ?",
@@ -855,34 +883,70 @@ def outbound(con, uri):
         "WHERE l.from_uri = ? ORDER BY l.from_anchor, l.to_uri", (uri,)).fetchall()
 
 
-def page_dependency_digest(con, uri):
-    """A digest of everything *besides uri's own artifact* that its rendered page
-    depends on, for incremental generate. Identity/set-based, not content-based:
-    cited and citing documents are effectively immutable (a case or förarbete
-    never changes once published), so a page goes stale when the *set* of its
-    relationships changes -- a new case starts citing it, an old one drops out,
-    or a document it links to appears/disappears -- not when an unchanged
-    neighbour's bytes change. Two parts:
+_EMPTY_SIDE = hashlib.sha256().hexdigest()   # digest of zero inbound/outbound rows
+
+
+def _combine_dep(inbound_hex, outbound_hex):
+    return hashlib.sha256(
+        ((inbound_hex or _EMPTY_SIDE) + "\x00"
+         + (outbound_hex or _EMPTY_SIDE)).encode()).hexdigest()
+
+
+# The dependency digest a page with no inbound *and* no outbound edges gets --
+# the default for a uri absent from `page_dependency_digests` (generate looks up
+# every catalogued uri, including the link-less ones).
+EMPTY_DEP_DIGEST = _combine_dep(None, None)
+
+
+def page_dependency_digests(con):
+    """`{uri: digest}` for every document with a citation relationship -- a digest
+    of everything *besides its own artifact* that its rendered page depends on, for
+    incremental generate. Identity/set-based, not content-based: cited and citing
+    documents are effectively immutable (a case or förarbete never changes once
+    published), so a page goes stale when the *set* of its relationships changes --
+    a new case starts citing it, an old one drops out, or a document it links to
+    appears/disappears -- not when an unchanged neighbour's bytes change. Two parts,
+    combined into the per-uri digest:
 
       * inbound -- the (citing doc, pinpoint, label) rows it renders in its
         margins and panel: a new or removed citer changes this;
       * outbound -- the set of hosted documents it links to, so a link goes live
         the moment its target is parsed (and dims if the target disappears).
 
+    One streamed pass over the whole `links` table per part instead of two
+    subqueries per document (the 124k-document generate-planning loop); a uri with
+    neither part is absent from the result and takes `EMPTY_DEP_DIGEST`.
     Self-citations excluded; external targets we don't host drop out of the join."""
-    h = hashlib.sha256()
-    for row in con.execute(
-            "SELECT l.from_uri, l.from_anchor, d.label, d.title, d.source "
+    # inbound: ordered by target so one pass groups each cited root's citation rows
+    inbound = {}
+    cur, h = None, hashlib.sha256()
+    for root, *fields in con.execute(
+            "SELECT l.to_root, l.from_uri, l.from_anchor, d.label, d.title, d.source "
             "FROM links l JOIN documents d ON d.uri = l.from_uri "
-            "WHERE l.to_root = ?1 AND l.from_uri <> l.to_root "
-            "ORDER BY 1, 2", (uri,)):
-        h.update(("\x1f".join("" if c is None else c for c in row)).encode())
+            "WHERE l.from_uri <> l.to_root "
+            "ORDER BY l.to_root, l.from_uri, l.from_anchor"):
+        if root != cur:
+            if cur is not None:
+                inbound[cur] = h.hexdigest()
+            cur, h = root, hashlib.sha256()
+        h.update(("\x1f".join("" if c is None else c for c in fields)).encode())
         h.update(b"\x1e")
-    h.update(b"\x00")
-    for (target,) in con.execute(
-            "SELECT DISTINCT l.to_root FROM links l "
+    if cur is not None:
+        inbound[cur] = h.hexdigest()
+    # outbound: ordered by citing doc so one pass groups the hosted targets it links
+    outbound = {}
+    cur, h = None, hashlib.sha256()
+    for from_uri, target in con.execute(
+            "SELECT DISTINCT l.from_uri, l.to_root FROM links l "
             "JOIN documents d ON d.uri = l.to_root "
-            "WHERE l.from_uri = ?1 AND l.to_root <> l.from_uri ORDER BY 1", (uri,)):
+            "WHERE l.to_root <> l.from_uri ORDER BY l.from_uri, l.to_root"):
+        if from_uri != cur:
+            if cur is not None:
+                outbound[cur] = h.hexdigest()
+            cur, h = from_uri, hashlib.sha256()
         h.update(target.encode())
         h.update(b"\x1e")
-    return h.hexdigest()
+    if cur is not None:
+        outbound[cur] = h.hexdigest()
+    return {uri: _combine_dep(inbound.get(uri), outbound.get(uri))
+            for uri in inbound.keys() | outbound.keys()}
