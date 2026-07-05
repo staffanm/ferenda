@@ -29,9 +29,10 @@ def _index(con):
     """norm-title -> [sfs uri] (for new-law title matching) and sfs uri ->
     artifact path (for the ikraftträdande tie-break)."""
     title, path = {}, {}
+    root = catalog.data_root(con)              # stored paths are data_root-relative
     for uri, t, p in con.execute(
             "SELECT uri, title, path FROM documents WHERE source = 'sfs'"):
-        path[uri] = p
+        path[uri] = str(root / p) if p else p
         if t:
             title.setdefault(catalog.norm_title(t), []).append(uri)
     return title, path
@@ -65,6 +66,7 @@ def resolve(con):
     from the förarbete artifacts' `implements` sections (only the props that
     carry such edges are read). Returns the number of relations pinned."""
     title_idx, path_idx = _index(con)
+    root = catalog.data_root(con)              # stored paths are data_root-relative
     props = con.execute(
         "SELECT DISTINCT d.uri, d.path FROM links l "
         "JOIN documents d ON d.uri = l.from_uri "
@@ -72,7 +74,7 @@ def resolve(con):
     ).fetchall()
     rows = []
     for prop_uri, prop_path in props:
-        art = json.loads(Path(prop_path).read_text())
+        art = json.loads((root / prop_path).read_text())
         prop_date, prop_label = art.get("date"), art.get("identifier")
         for rec in art.get("implements", []):
             sfs_uri = _resolve_law(rec.get("law"), prop_date, title_idx, path_idx)

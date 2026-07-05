@@ -21,11 +21,11 @@ FILES = Path(__file__).parent / "files" / "sfs" / "versions"
 
 def test_version_artifact_paths():
     assert layout.sfs_version_artifact("1998:204", "2003:466") == (
-        layout.SFS_ARCHIVE / "artifact" / "1998" / "204" / ".versions"
+        layout.SFS_ARTIFACT / "archive" / "1998" / "204" / ".versions"
         / "2003" / "466.json")
     # a legacy counter id stays a flat file under .versions/
     assert layout.sfs_version_artifact("1998:204", "11") == (
-        layout.SFS_ARCHIVE / "artifact" / "1998" / "204" / ".versions"
+        layout.SFS_ARTIFACT / "archive" / "1998" / "204" / ".versions"
         / "11.json")
 
 
@@ -45,8 +45,8 @@ def test_konsolidering_url_roundtrip():
 
 def test_version_downloads_enumeration_and_json_preference(tmp_path,
                                                            monkeypatch):
-    monkeypatch.setattr(layout, "SFS_ARCHIVE", tmp_path / "archive")
-    root = tmp_path / "archive" / "downloaded" / "1998" / "204" / ".versions"
+    monkeypatch.setattr(layout, "SFS_DOWNLOADED", tmp_path / "downloaded")
+    root = tmp_path / "downloaded" / "archive" / "1998" / "204" / ".versions"
     (root / "2003").mkdir(parents=True)
     (root / "2003" / "466.html").write_text("older html")
     (root / "2003" / "466.json").write_text("{}")      # same version, json wins
@@ -58,7 +58,7 @@ def test_version_downloads_enumeration_and_json_preference(tmp_path,
 
 
 def test_version_downloads_empty_without_archive(tmp_path, monkeypatch):
-    monkeypatch.setattr(layout, "SFS_ARCHIVE", tmp_path / "archive")
+    monkeypatch.setattr(layout, "SFS_DOWNLOADED", tmp_path / "downloaded")
     assert layout.sfs_version_downloads("1998:204") == []
 
 
@@ -138,9 +138,9 @@ def archive(tmp_path, monkeypatch):
     """A temporary sfs data root with an archive holding one statute's
     versions: an explicit SFS-keyed file and a counter-keyed duplicate of a
     different cutoff, plus a corrupt file."""
-    monkeypatch.setattr(layout, "SFS_ROOT", tmp_path)
-    monkeypatch.setattr(layout, "SFS_ARCHIVE", tmp_path / "archive")
-    root = tmp_path / "archive" / "downloaded" / "1998" / "204" / ".versions"
+    monkeypatch.setattr(layout, "SFS_DOWNLOADED", tmp_path / "downloaded")
+    monkeypatch.setattr(layout, "SFS_ARTIFACT", tmp_path / "artifact")
+    root = tmp_path / "downloaded" / "archive" / "1998" / "204" / ".versions"
     (root / "2003").mkdir(parents=True)
     (root / "2003" / "466.html").write_bytes(
         (FILES / "sfst-archival.html").read_bytes())
@@ -167,8 +167,8 @@ def test_build_writes_artifacts_and_sidecar(archive):
 
 
 def test_build_empty_archive_writes_empty_sidecar(tmp_path, monkeypatch):
-    monkeypatch.setattr(layout, "SFS_ROOT", tmp_path)
-    monkeypatch.setattr(layout, "SFS_ARCHIVE", tmp_path / "archive")
+    monkeypatch.setattr(layout, "SFS_DOWNLOADED", tmp_path / "downloaded")
+    monkeypatch.setattr(layout, "SFS_ARTIFACT", tmp_path / "artifact")
     sidecar = versions.build("1998:204")
     assert sidecar == {"versions": [], "skipped": []}
     assert layout.sfs_versions_sidecar("1998:204").exists()
@@ -183,7 +183,7 @@ def test_diff_endpoint_normalizes_direction(archive):
     # cutoff rewritten), so from/to can be passed both ways
     later = (FILES / "sfst-archival.html").read_bytes().replace(
         b"2003:466", b"2005:999")
-    p = (layout.SFS_ARCHIVE / "downloaded" / "1998" / "204" / ".versions"
+    p = (layout.SFS_DOWNLOADED / "archive" / "1998" / "204" / ".versions"
          / "2005" / "999.html")
     p.parent.mkdir(parents=True)
     p.write_bytes(later)

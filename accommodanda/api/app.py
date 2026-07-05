@@ -22,7 +22,6 @@ import sqlite3
 import threading
 from datetime import datetime, timezone
 from html import escape
-from pathlib import Path
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Query
@@ -337,11 +336,12 @@ def documents_endpoint(
     artifact's last-build time."""
     total = catalog.document_count(con, source, kind)
     docs = []
+    root = catalog.data_root(con)              # stored paths are data_root-relative
     for uri, src, kind_, label, title, source_url, path, _display in \
             catalog.documents(con, source, kind, limit, offset):
         # synthesized begrepp stubs have no artifact file (path=''); Path('')
         # aliases to the cwd, so this must be excluded before the exists() check
-        p = Path(path) if path else None
+        p = catalog.artifact_path(root, path)
         updated = (datetime.fromtimestamp(p.stat().st_mtime, timezone.utc).isoformat()
                    if p and p.exists() else None)
         docs.append(DocumentSummary(uri=uri, source=src, kind=kind_, label=label,
@@ -361,7 +361,8 @@ def document_endpoint(uri: str = Query(..., description="full lagen.nu document 
     uri, source, kind, label, title, path = row
     # synthesized begrepp stubs are real catalog rows with no artifact file
     # (path='') -- served as an empty artifact, like the rendered shell pages
-    art = json.loads(Path(path).read_bytes()) if path else {}
+    p = catalog.artifact_path(catalog.data_root(con), path)   # stored path is relative
+    art = json.loads(p.read_bytes()) if p else {}
     return Document(uri=uri, source=source, kind=kind, label=label, title=title,
                     source_url=art.get("source_url"), artifact=art,
                     inbound_count=catalog.document_inbound_count(con, uri))
@@ -421,7 +422,8 @@ def versions_endpoint(uri: str = Query(..., description="full lagen.nu statute u
     in from the statute's register where known."""
     basefile = _sfs_basefile(uri)
     row = catalog.document(con, catalog.BASE + basefile)
-    info = (history.amendment_info(json.loads(Path(row[5]).read_bytes()))
+    info = (history.amendment_info(json.loads(
+                (catalog.data_root(con) / row[5]).read_bytes()))
             if row and row[5] else {})
     return VersionList(uri=catalog.BASE + basefile, versions=[
         VersionInfo(version=v, uri=vuri, url=layout.page_url(vuri),

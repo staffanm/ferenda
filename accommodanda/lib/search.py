@@ -370,6 +370,11 @@ class SearchIndex:
         rows = con.execute(
             "SELECT uri, source, kind, label, title, path, content_hash "
             "FROM documents WHERE source = ? ORDER BY uri", (source,)).fetchall()
+        # stored paths are data_root-relative (portable catalog); resolve to
+        # absolute so the missing-artifact check and doc_actions (which reads the
+        # artifact bytes) work in absolute paths. A stub's empty path stays empty.
+        root = catalog.data_root(con)
+        rows = [(*r[:5], str(root / r[5]) if r[5] else r[5], r[6]) for r in rows]
         have = self.indexed_versions(source)
         present = {row[0] for row in rows}
 

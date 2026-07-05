@@ -34,12 +34,14 @@ def golden_module():
 
 def json_path(basefile):
     year, rest = basefile.split(":")
-    return ROOT / "site/data/sfs/downloaded" / year / (rest.replace(" ", "_") + ".json")
+    return ROOT / "site/data/downloaded/sfs" / year / (rest.replace(" ", "_") + ".json")
 
 
 def parsed_path(basefile):
     year, rest = basefile.split(":")
-    return ROOT / "site/data/sfs/parsed" / year / (rest.replace(" ", "_") + ".xhtml")
+    # old-pipeline parsed XHTML oracle -- temporary scaffolding in the old checkout
+    return (ROOT.parent / "ferenda.old/data/sfs/parsed"
+            / year / (rest.replace(" ", "_") + ".xhtml"))
 
 
 def inputs(basefile):

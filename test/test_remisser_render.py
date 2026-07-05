@@ -16,9 +16,7 @@ from accommodanda.lib import catalog, layout, render
 def _scenario(tmp_path, monkeypatch):
     """A one-answer synthetic corpus: a host SOU with a matching avsnitt id, and a
     remissvar artifact + `.ann` referring to it. Returns the förarbete uri."""
-    monkeypatch.setattr(layout, "REMISSER_ROOT", tmp_path / "remisser")
-    monkeypatch.setitem(layout.ARTIFACT_ROOT, "remisser", tmp_path / "remisser")
-    monkeypatch.setitem(layout.ARTIFACT_ROOT, "forarbete", tmp_path / "forarbete")
+    monkeypatch.setattr(layout, "ARTIFACT", tmp_path)
 
     fa_uri = "https://lagen.nu/sou/2020:1"
     fa_path = layout.artifact("forarbete", "sou/2020-1")

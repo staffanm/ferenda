@@ -25,6 +25,21 @@ def write_atomic(path, data):
         raise
 
 
+def store_relpath(path, root):
+    """Render an absolute `path` as a `root`-relative string, so an on-disk index
+    (the catalog, the dv identity index, …) stays portable across data_root
+    moves: an index rsync'd to a host with a different data_root still resolves
+    via `load_relpath`. Raises if `path` is not under `root` -- a stray path from
+    another root must surface, not be silently stored broken."""
+    return str(Path(path).relative_to(root))
+
+
+def load_relpath(root, stored):
+    """Inverse of `store_relpath`: the absolute Path for a `root`-relative stored
+    path, or None for an empty (stub) path."""
+    return root / stored if stored else None
+
+
 def basefile_slug(basefile):
     """Filesystem-safe form of a basefile; the true identifier lives in the
     record JSON, so this only has to be unique and stable."""

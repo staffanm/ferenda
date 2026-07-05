@@ -24,7 +24,7 @@ real catalog document at its URI, and still a citation-link target. Such a
 record is provisional, not final: once the feed shows a filbilaga for the
 entry, the record is re-downloaded and upgraded in place (see `_currency`).
 
-Stored under `site/data/forarbete/bet/`: one `<slug>.json` record (type,
+Stored under `site/data/downloaded/forarbete/bet/`: one `<slug>.json` record (type,
 basefile, identifier, title, date, url, files, plus organ and dok_id) and,
 when present, the `<slug>.pdf`. Incremental by default: newest-first, gated by
 the shared `HarvestWatermark` (`lib/util.py`) exactly like the regeringen and

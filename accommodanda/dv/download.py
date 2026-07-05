@@ -206,7 +206,7 @@ def sync(destdir, full=False, bilagor=True, limit=None, delay=0.3):
 def main():
     parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     parser.add_argument("destdir",
-                        help="target directory, e.g. site/data/dv/downloaded")
+                        help="target directory, e.g. site/data/downloaded/dom")
     parser.add_argument("--full", action="store_true",
                         help="walk the entire corpus oldest-first instead "
                              "of stopping at already-harvested records")

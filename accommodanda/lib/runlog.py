@@ -263,6 +263,26 @@ def apply_outcomes(path, source, errors, done, run, t=None, *,
     return data
 
 
+def reconcile_orphans(path, source, valid):
+    """Drop `source` error entries whose basefile is no longer in `valid` -- the
+    source's current basefile set. These are orphans: a document that left the
+    corpus, or one an enumerator-bug once emitted (e.g. a `.watermark` mistaken
+    for a basefile) and no longer does, so it is never re-run and its stale error
+    can never self-heal. Only safe after a full-source run, which proves `valid`
+    is complete. Keys are ``source/stage/basefile`` (basefile may contain '/'),
+    so strip the ``source/stage/`` prefix to recover the basefile. Returns the
+    updated store (also written atomically)."""
+    data = read_errors(path)
+    prefix = source + "/"
+    dropped = [k for k in data if k.startswith(prefix)
+               and "/" in k[len(prefix):]
+               and k[len(prefix):].split("/", 1)[1] not in valid]
+    for k in dropped:
+        del data[k]
+    write_atomic(path, json.dumps(data, ensure_ascii=False))
+    return data
+
+
 # --------------------------------------------------------------------------
 # status.json -- rolling health snapshot
 # --------------------------------------------------------------------------

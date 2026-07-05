@@ -61,7 +61,7 @@ GUIDANCE_PLACEHOLDER = "[GUIDANCE TEXT]"
 MAX_TOKENS = 32000
 RE_PAGE = re.compile(r"\[Sida (\d+)\]\n")
 USER_AGENT = "ferenda/lagen.nu guidance linker"
-CACHE = layout.KOMMENTAR_ROOT / "guidance"
+CACHE = layout.DOWNLOADED / "kommentar" / "guidance"
 
 
 def fetch_pdf(url):

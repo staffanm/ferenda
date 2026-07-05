@@ -4,7 +4,7 @@ Reconciles the two raw DV stores into one canonical identity per real
 legal case, so the downstream parser can merge representations instead of
 emitting the same case twice under two unlinked ids:
 
-  site/data/dv/downloaded/{COURT}/*.doc(x)   legacy feed (Word originals)
+  site/data/downloaded/dv/{COURT}/*.doc(x)   legacy feed (Word originals)
   site/data/domstol/downloaded/{COURT}/*.json  new courts' API (JSON)
 
 This is entity resolution, not a winner-takes-all fallback: every source
@@ -37,6 +37,8 @@ import json
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
+
+from ..lib import layout, util
 
 # legacy court dir code -> code used by the new API (others are identical)
 COURT_CANON = {"REG": "REGR", "MÖD": "MOD", "MMD": "MMOD",
@@ -82,10 +84,13 @@ def keys(court, malnummer, referat):
 def scan_api(domstoldir):
     records = []
     for path in sorted(Path(domstoldir).rglob("*.json")):
+        if path.name.startswith("."):
+            continue   # not a record: the .watermark.json harvest marker, junk
         d = json.loads(path.read_text())
         court = canonical_court(d["domstol"]["domstolKod"])
         records.append({
-            "store": "domstol", "court": court, "path": str(path),
+            "store": "domstol", "court": court,
+            "path": util.store_relpath(path, layout.DATA),
             "uuid": d["id"],
             "malnummer": [m.strip() for m in d.get("malNummerLista", [])],
             "referat": [r.strip() for r in d.get("referatNummerLista", [])],
@@ -106,7 +111,8 @@ def scan_legacy(dvdir):
         if malnummer is None:
             unrecognized.append(str(path))
             continue
-        records.append({"store": "dv", "court": court, "path": str(path),
+        records.append({"store": "dv", "court": court,
+                        "path": util.store_relpath(path, layout.DATA),
                         "malnummer": malnummer, "referat": referat})
     return records, unrecognized
 

@@ -67,6 +67,101 @@ def test_build_then_skip(tmp_path):
     assert res2.planned == []  # everything fresh -> nothing to do
 
 
+def test_fresh_skip_heals_stale_error(tmp_path, monkeypatch):
+    """A doc skipped as fresh has a valid, up-to-date artifact, so a stale error
+    from an earlier transient failure (e.g. an input momentarily missing) must be
+    healed on the next incremental run -- without a --force re-parse."""
+    _, src = make_source(tmp_path)
+    manifest = {}
+    apply(manifest, build_one(src, "parse", "a", manifest))   # now fresh on disk
+
+    monkeypatch.setattr(build, "ERRORS", tmp_path / "errors.json")
+    monkeypatch.setattr(build, "RUNS", tmp_path / "runs.ndjson")
+    monkeypatch.setattr(build, "STATUS", tmp_path / "status.json")
+    monkeypatch.setattr(build, "RUN_ID", "run-2")
+    # an earlier transient run recorded a failure for this (now-fresh) doc
+    runlog.apply_outcomes(build.ERRORS, "syn",
+                          [("parse", "a", "OSError: gone", "tb")], [], "run-1")
+    assert "syn/parse/a" in runlog.read_errors(build.ERRORS)
+
+    res2 = build_one(src, "parse", "a", manifest)
+    assert res2.planned == [] and ("parse", "a") in res2.fresh   # skipped as fresh
+    build.report(src, "parse", res2, 1, True)                   # folds fresh -> clear
+    assert "syn/parse/a" not in runlog.read_errors(build.ERRORS)
+
+
+def test_stage_gate_skips_when_watermark_unchanged(tmp_path, monkeypatch, capsys):
+    """The coarse watermark gate (shared by cmd_all and single-source `lagen sfs
+    parse`): once the source is watermarked, a re-run with unchanged inputs skips
+    the per-doc scan wholesale ("up to date -- skipped"); an input change re-runs."""
+    _, src = make_source(tmp_path)
+    monkeypatch.setattr(build, "MANIFEST", tmp_path / "manifest.json")
+    monkeypatch.setattr(build, "_MANIFEST_CACHE", None)
+    # settle downloads first (as `download` before `parse` does in real use), so a
+    # later parse touches no inputs and the recorded watermark stays valid
+    build.run_action(src, "parse", src.list_basefiles(), 1)
+    capsys.readouterr()
+    store = {}
+
+    errs, recorded = build._run_stage_gated(src, "parse", 1, store)
+    assert (errs, recorded) == (False, True)                 # ran + watermarked
+    assert "up to date -- skipped" not in capsys.readouterr().out
+
+    errs, recorded = build._run_stage_gated(src, "parse", 1, store)
+    assert (errs, recorded) == (False, False)                # skipped wholesale
+    assert "parse syn: up to date -- skipped" in capsys.readouterr().out
+
+    # an input change re-stales the gate -> it runs again
+    (tmp_path / "dl" / "a.txt").write_text("CHANGED")
+    errs, recorded = build._run_stage_gated(src, "parse", 1, store)
+    assert (errs, recorded) == (False, True)
+
+
+def test_orphan_errors_reconciled_only_on_full_source(tmp_path, monkeypatch):
+    """A full-source run drops error entries for basefiles the source no longer
+    lists (orphans that fresh-skip healing can never reach); a targeted run must
+    NOT -- else parsing one doc would nuke every other doc's recorded error."""
+    _, src = make_source(tmp_path)                       # lists "a", "b"
+    monkeypatch.setattr(build, "ERRORS", tmp_path / "errors.json")
+    monkeypatch.setattr(build, "RUNS", tmp_path / "runs.ndjson")
+    monkeypatch.setattr(build, "STATUS", tmp_path / "status.json")
+    monkeypatch.setattr(build, "RUN_ID", "run-2")
+    # an orphan (basefile with '/', no longer listed) + a different source's entry
+    runlog.apply_outcomes(build.ERRORS, "syn",
+                          [("parse", "gone/x", "KeyError: 'type'", "tb")], [], "r1")
+    runlog.apply_outcomes(build.ERRORS, "other",
+                          [("parse", "z", "KeyError", "tb")], [], "r1")
+
+    # targeted run (full_source=False): reconcile must NOT fire
+    build.report(src, "parse", build.Result(), 1, False)
+    assert "syn/parse/gone/x" in runlog.read_errors(build.ERRORS)
+
+    # full-source run: the orphan is dropped, other sources untouched
+    build.report(src, "parse", build.Result(), 2, True)
+    errs = runlog.read_errors(build.ERRORS)
+    assert "syn/parse/gone/x" not in errs
+    assert "other/parse/z" in errs                       # never touches another source
+
+
+def test_report_failing_count_is_source_scoped(tmp_path, monkeypatch, capsys):
+    """The `docs failing` line counts only the reported source -- `lagen dv parse`
+    must not surface another source's errors."""
+    _, src = make_source(tmp_path)                       # source "syn"
+    monkeypatch.setattr(build, "ERRORS", tmp_path / "errors.json")
+    monkeypatch.setattr(build, "RUNS", tmp_path / "runs.ndjson")
+    monkeypatch.setattr(build, "STATUS", tmp_path / "status.json")
+    monkeypatch.setattr(build, "RUN_ID", "r1")
+    runlog.apply_outcomes(build.ERRORS, "syn",
+                          [("parse", "a", "E", "tb")], [], "r0")
+    runlog.apply_outcomes(build.ERRORS, "other",     # a different source, 3 errors
+                          [("parse", x, "E", "tb") for x in ("x", "y", "z")], [], "r0")
+
+    build.report(src, "parse", build.Result(), 1, False)   # targeted: no reconcile
+    out = capsys.readouterr().out
+    assert "1 docs failing in syn" in out                  # only syn's error counted
+    assert "overall" not in out                            # no misleading global count
+
+
 def test_content_change_rebuilds_not_mtime(tmp_path):
     remote, src = make_source(tmp_path)
     manifest = {}
@@ -147,6 +242,32 @@ def test_file_watermark_detects_add_remove_modify(tmp_path):
     assert build.file_watermark([a]) != base             # remove one
     c = tmp_path / "c.json"; c.write_text("3")
     assert build.file_watermark([a, b, c]) != base       # add one
+
+
+def test_artifacts_excludes_index_sidecars(tmp_path, monkeypatch):
+    # layout.artifacts() is the single home for a source's artifact list, and
+    # build.ARTIFACTS["dv"]/["kommentar"] delegate to it. The non-document json
+    # that shares a source's artifact dir -- the case-law identity index, the
+    # AI-guidance index, the sfs .versions.json layers -- must never surface as a
+    # document, else relate tries to index a JSON list (art["uri"] on a list).
+    monkeypatch.setattr(layout, "ARTIFACT", tmp_path)
+
+    dom = tmp_path / "dom"; dom.mkdir()
+    case = dom / "NJA_2020_s_1.json"; case.write_text("{}")
+    (dom / layout.DOM_INDEX.name).write_text("[]")               # not a document
+    assert layout.artifacts("dv") == [case]
+    assert build.ARTIFACTS["dv"]() == [case]                     # build delegates
+
+    komm = tmp_path / "kommentar" / "sfs"; komm.mkdir(parents=True)
+    note = komm / "2009_400.json"; note.write_text("{}")
+    (tmp_path / "kommentar" / layout.GUIDANCE_INDEX.name).write_text("{}")
+    assert layout.artifacts("kommentar") == [note]
+    assert build.ARTIFACTS["kommentar"]() == [note]
+
+    sfs = tmp_path / "sfs" / "2020"; sfs.mkdir(parents=True)
+    law = sfs / "1.json"; law.write_text("{}")
+    (sfs / "1.versions.json").write_text("[]")                   # not a document
+    assert layout.artifacts("sfs") == [law]
 
 
 def test_stage_watermark_tracks_inputs(tmp_path):

@@ -104,9 +104,11 @@ def _kommentar_indexes(con):
     All three are render-only: external resources live outside the corpus, so they
     carry no inbound edge."""
     commentary, guidance, article_guidance = {}, {}, {}
+    root = catalog.data_root(con)
     for (path,) in con.execute(
             "SELECT path FROM documents WHERE source = 'kommentar' AND path <> ''"):
-        art = json.loads(Path(path).read_bytes())
+        path = root / path
+        art = json.loads(path.read_bytes())
         law = art.get("annotates")
         if not law:
             continue
@@ -1953,6 +1955,12 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
     rows = con.execute(
         "SELECT uri, source, path, title, content_hash FROM documents "
         "ORDER BY source, uri").fetchall()
+    # stored paths are data_root-relative (portable catalog); resolve to absolute
+    # here so `only`, the fresh/record callbacks and _write_page all work in
+    # absolute paths, exactly as before. A stub's empty path stays empty.
+    root = catalog.data_root(con)
+    rows = [(uri, src, str(root / path) if path else path, title, chash)
+            for (uri, src, path, title, chash) in rows]
     if source is not None:                       # whole-source scope (incl. stubs)
         rows = [r for r in rows if r[1] == source]
     elif only is not None:                       # specific-document scope

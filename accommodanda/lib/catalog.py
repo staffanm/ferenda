@@ -21,7 +21,7 @@ import re
 import sqlite3
 from pathlib import Path
 
-from . import concepts
+from . import concepts, util
 from .markdown import begrepp_uri
 from .text import runs_text
 
@@ -130,6 +130,25 @@ def local(uri):
 
 def strip_fragment(uri):
     return uri.split("#", 1)[0]
+
+
+def data_root(con):
+    """The corpus root a catalog's stored artifact paths are relative to: the
+    directory the catalog file itself lives in (`CATALOG = DATA/catalog.sqlite`).
+    Paths are stored data_root-relative rather than absolute so the catalog is
+    portable -- rsync a dev catalog to a deploy host with a different data_root and
+    every artifact still resolves (see `rebuild`)."""
+    main = [file for _seq, name, file in con.execute("PRAGMA database_list")
+            if name == "main"]
+    assert main and main[0], "catalog connection is not backed by a file"
+    return Path(main[0]).parent
+
+
+def artifact_path(root, stored):
+    """Resolve a stored (data_root-relative) artifact path to an absolute Path, or
+    None for a synthesized stub (empty `path`). `root` is `data_root(con)`. Thin
+    domain-named wrapper over the shared `util.load_relpath`."""
+    return util.load_relpath(root, stored)
 
 
 # --------------------------------------------------------------------------
@@ -452,6 +471,22 @@ def catalog_signature(con):
     return h.hexdigest()
 
 
+def _relativize_paths(con, source, root):
+    """In-place migration of a pre-relative catalog: paths used to be stored
+    absolute, which pinned the catalog to the host that built it. Rewrite this
+    source's still-absolute rows to data_root-relative, so an rsync'd catalog
+    resolves on a deploy host with a different data_root. A no-op once migrated
+    (relative paths don't start with '/'). Runs on the host that built the rows,
+    where the absolute path is genuinely under `root` -- `relative_to` raises if
+    it is not (a catalog carried over unmigrated), surfacing the mistake rather
+    than silently storing a broken path."""
+    stale = con.execute("SELECT uri, path FROM documents "
+                        "WHERE source = ? AND path LIKE '/%'", (source,)).fetchall()
+    for uri, path in stale:
+        con.execute("UPDATE documents SET path = ? WHERE uri = ?",
+                    (util.store_relpath(path, root), uri))
+
+
 def rebuild(catalog_path, source, artifact_paths, progress=None, force=False):
     """Sync one source's rows in the catalog to its artifacts on disk.
     Incremental by content hash: an artifact whose bytes are unchanged since the
@@ -464,6 +499,10 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False):
     Returns (documents, links, changed): the source's row + link totals after the
     sync, and how many documents were (re)written this run."""
     con = connect(catalog_path)
+    # artifact paths are stored data_root-relative (portable catalog), relative to
+    # the directory the catalog file lives in (CATALOG = DATA/catalog.sqlite).
+    root = Path(catalog_path).parent
+    _relativize_paths(con, source, root)
     # current catalog state for this source, keyed by artifact path (1:1 with a
     # document): path -> (uri, content_hash, art_size, art_mtime_ns). Path-less
     # rows (synthesized begrepp stubs) aren't artifact-backed, so they're owned by
@@ -476,7 +515,10 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False):
     changed = 0
     total = len(artifact_paths)
     for i, path in enumerate(map(Path, artifact_paths)):
-        key = str(path)
+        # `path` (absolute) is stat'd and read on disk; `key` (data_root-relative)
+        # is what the row stores and `have` is keyed by -- so the incremental match
+        # and the stored path both stay host-independent.
+        key = util.store_relpath(path, root)
         seen.add(key)
         st = path.stat()
         prev = have.get(key)
@@ -513,7 +555,7 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False):
                 art = json.loads(raw)
                 if prev and prev[0] != art["uri"]:   # uri moved under this path
                     _drop_document(con, prev[0])
-                _index_document(con, art, path, source)
+                _index_document(con, art, key, source)
                 con.execute("UPDATE documents SET content_hash = ?, art_size = ?, "
                             "art_mtime_ns = ? WHERE uri = ?",
                             (digest, st.st_size, st.st_mtime_ns, art["uri"]))

@@ -120,8 +120,61 @@ def test_relate_survives_artifact_path_move(tmp_path):
     docs, _, changed = catalog.rebuild(db, "sfs", [new])
     assert (docs, changed) == (1, 1)             # survived the move, re-indexed once
     con = catalog.connect(db)
+    # the stored path is data_root-relative (the catalog's own directory), so it
+    # survives the move as the new relative path -- not the absolute one
     assert con.execute("SELECT path FROM documents WHERE uri = ?",
-                       (LAW["uri"],)).fetchone()[0] == str(new)
+                       (LAW["uri"],)).fetchone()[0] == str(new.relative_to(tmp_path))
+
+
+def test_catalog_paths_are_data_root_relative_and_portable(tmp_path):
+    # the deploy guarantee: a catalog stores artifact paths relative to its own
+    # directory (data_root), never absolute, so it can be rsync'd to a host with a
+    # different data_root and still resolve every artifact. Build under one root,
+    # then "relocate" the whole tree to another dir and confirm the render layer
+    # (which resolves stored paths against catalog.data_root) opens the artifacts.
+    src = tmp_path / "dev"
+    src.mkdir()
+    (src / "artifact").mkdir()
+    law = src / "artifact" / "law.json"
+    law.write_text(json.dumps(LAW))
+    db = str(src / "catalog.sqlite")
+    catalog.rebuild(db, "sfs", [law])
+
+    con = catalog.connect(db)
+    stored = con.execute("SELECT path FROM documents WHERE uri = ?",
+                         (LAW["uri"],)).fetchone()[0]
+    assert stored == "artifact/law.json"                 # relative, host-independent
+    assert catalog.data_root(con) == src                 # derived from the db file
+
+    # relocate the corpus to a different absolute path (simulating the deploy host)
+    dst = tmp_path / "prod"
+    (src).rename(dst)
+    con = catalog.connect(str(dst / "catalog.sqlite"))
+    # the render layer resolves the relative path against the new root and renders
+    out = dst / "generated"
+    total, rendered = render.generate_site(str(dst / "catalog.sqlite"), str(out))
+    assert rendered >= 1
+    assert (out / render.doc_relpath(LAW["uri"])).exists()
+
+
+def test_relate_migrates_legacy_absolute_paths(tmp_path):
+    # a catalog built before relative paths stored absolute ones; the next relate
+    # rewrites them in place to data_root-relative (so an old catalog becomes
+    # portable without a full --force rebuild)
+    db = str(tmp_path / "catalog.sqlite")
+    law = tmp_path / "law.json"
+    law.write_text(json.dumps(LAW))
+    catalog.rebuild(db, "sfs", [law])
+    con = catalog.connect(db)
+    con.execute("UPDATE documents SET path = ? WHERE uri = ?",
+                (str(law), LAW["uri"]))                  # force a legacy absolute row
+    con.commit()
+    con.close()
+
+    catalog.rebuild(db, "sfs", [law])                    # a plain incremental relate
+    con = catalog.connect(db)
+    assert con.execute("SELECT path FROM documents WHERE uri = ?",
+                       (LAW["uri"],)).fetchone()[0] == "law.json"
 
 
 def test_source_content_signature_tracks_catalog(tmp_path):
@@ -377,8 +430,7 @@ def test_dv_source_url_uses_publication_group():
 
 def test_write_artifact_stamps_source_url(tmp_path, monkeypatch):
     from accommodanda.lib import layout
-    monkeypatch.setitem(layout.ARTIFACT_ROOT, "eurlex", tmp_path / "eurlex")
-    monkeypatch.setitem(layout.ARTIFACT_ROOT, "forarbete", tmp_path / "forarbete")
+    monkeypatch.setattr(layout, "ARTIFACT", tmp_path)
     from accommodanda import build
 
     # derived: eurlex gets its ELI even with nothing recorded

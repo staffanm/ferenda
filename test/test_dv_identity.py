@@ -1,9 +1,17 @@
 """Tests for the DV identity indexer (entity resolution across the legacy
 Word feed and the new courts' API)."""
 
+import json
+
 from accommodanda.dv.identity import (
-    canonical_court, legacy_identity, norm_malnr, norm_referat,
-    build_index)
+    build_index,
+    canonical_court,
+    legacy_identity,
+    norm_malnr,
+    norm_referat,
+    scan_api,
+)
+from accommodanda.lib import layout
 
 
 def test_court_canonicalization():
@@ -49,6 +57,23 @@ def api(uuid, court, mal, ref=()):
 def legacy(path, court, mal, ref=()):
     return {"store": "dv", "court": court, "path": path,
             "malnummer": list(mal), "referat": list(ref)}
+
+
+def test_scan_api_skips_watermark_and_stores_relative_path(tmp_path, monkeypatch):
+    # the harvest marker (.watermark.json) shares the downloaded/ tree with the
+    # records but is not one; scan_api must skip it, not KeyError on d["domstol"]
+    monkeypatch.setattr(layout, "DATA", tmp_path)
+    dom = tmp_path / "downloaded" / "dom"
+    (dom / "ADO").mkdir(parents=True)
+    (dom / "ADO" / "u1.json").write_text(json.dumps({
+        "domstol": {"domstolKod": "ADO"}, "id": "u1",
+        "malNummerLista": ["A 1-99"], "referatNummerLista": ["AD 1999 nr 1"],
+        "avgorandedatum": "1999-01-01", "innehall": "x", "bilagaLista": []}))
+    (dom / ".watermark.json").write_text(json.dumps({"last_harvest": "2020-01-01"}))
+    records = scan_api(dom)
+    assert [r["uuid"] for r in records] == ["u1"]           # watermark skipped
+    # paths are stored data_root-relative (portable index), not absolute
+    assert records[0]["path"] == "downloaded/dom/ADO/u1.json"
 
 
 def test_links_on_shared_malnummer():

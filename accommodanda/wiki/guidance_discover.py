@@ -64,8 +64,9 @@ GUIDANCE_SITES = [
      re.compile(r"^https?://[^/]+/[a-z]{2}/policies/[a-z0-9\-]+$")),
 ]
 # the built CELEX -> [guidance-page url] index; refreshed by `discover-guidance`,
-# read by `propose-guidance <CELEX>` to auto-find the page(s) for an act
-INDEX_PATH = layout.KOMMENTAR_ROOT / "guidance-index.json"
+# read by `propose-guidance <CELEX>` to auto-find the page(s) for an act. The path
+# is owned by layout (which excludes it from `artifacts()` as a non-document).
+INDEX_PATH = layout.GUIDANCE_INDEX
 # a full crawl is a few hundred page fetches; fan out modestly. Concurrency does
 # NOT change the DG site's 429 rate (measured: same ~half-fail at 1/3/6 workers),
 # so parallelism only finishes the pages that *do* succeed sooner

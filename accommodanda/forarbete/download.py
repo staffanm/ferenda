@@ -35,7 +35,7 @@ lagrådsremiss) fall back to the landing-page slug as basefile.
 Harvested via `lagen forarbete download [prop|sou|ds|...]`; no doctype = all.
 A single document: `lagen forarbete download <doctype> --only <basefile>`.
 
-Stored under `site/data/forarbete/<type>/`: one `<slug>.json` record (identifier,
+Stored under `site/data/downloaded/forarbete/<type>/`: one `<slug>.json` record (identifier,
 title, date, landing url, downloaded files) + the landing `<slug>.html` + the
 content file(s). Incremental by default (newest-first, stop at the first
 already-downloaded doc); `--full` re-walks the whole listing, skipping existing.

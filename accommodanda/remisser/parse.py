@@ -24,14 +24,15 @@ from ..lib.pdftext import page_paragraphs, pdf_pages
 from .model import Remiss, Remissvar, org_slug
 
 
-def parse_record(basefile, cases_root, downloaded_root):
+def parse_record(basefile, root):
     """A remiss-answer basefile ("<case-slug>/<org-slug>") -> Remissvar. Reads
     the case record for its metadata + cross-refs and the org's answer PDF for
-    the body text; asserts the pipeline invariant that a parse never runs ahead
-    of the download (the matching instance exists and is marked downloaded)."""
+    the body text (both under one download `root`: ``<case>.json`` beside the
+    ``<case>/`` PDF dir); asserts the pipeline invariant that a parse never runs
+    ahead of the download (the matching instance exists and is marked downloaded)."""
     case_basefile, slug = basefile.split("/", 1)
     remiss = Remiss.from_dict(json.loads(
-        (Path(cases_root) / (case_basefile + ".json")).read_text()))
+        (Path(root) / (case_basefile + ".json")).read_text()))
     inst = next((i for i in remiss.svar if org_slug(i.source_url) == slug),
                None)
     assert inst is not None, (
@@ -40,7 +41,7 @@ def parse_record(basefile, cases_root, downloaded_root):
     assert inst.downloaded, (
         "remiss %s answer %r has not been downloaded yet" % (case_basefile, slug))
 
-    pdf_path = Path(downloaded_root) / case_basefile / (slug + ".pdf")
+    pdf_path = Path(root) / case_basefile / (slug + ".pdf")
     assert pdf_path.exists(), "no answer PDF at %s" % pdf_path
 
     paras = [p for pageno, lines in pdf_pages(str(pdf_path))

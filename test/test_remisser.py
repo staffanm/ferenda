@@ -10,8 +10,14 @@ from pathlib import Path
 import pytest
 import requests
 
+from accommodanda.lib import layout
 from accommodanda.remisser import download
 from accommodanda.remisser.model import Remiss, Remissinstans
+
+
+def _redirect(tmp_path, monkeypatch):
+    """Point remisser's download tree (records + answer PDFs) at tmp_path."""
+    monkeypatch.setattr(layout, "REMISSER_DOWNLOADED", tmp_path / "downloaded")
 
 FILES = Path(__file__).parent / "files" / "remisser"
 CLOSED_URL = ("https://www.regeringen.se/remisser/2026/04/remiss-av-"
@@ -118,17 +124,18 @@ def test_sync_two_passes(tmp_path, monkeypatch):
     monkeypatch.setattr(download, "request", fake_request)
     monkeypatch.setattr(download, "make_session", lambda ua: object())
     monkeypatch.setattr(download.time, "sleep", lambda s: None)
+    _redirect(tmp_path, monkeypatch)
 
-    summary = download.sync(tmp_path, delay=0)
+    summary = download.sync(delay=0)
     assert summary["new"] == 2
     assert summary["fetched"] == 17
-    assert download.list_basefiles(tmp_path) == ["closed-case", "open-case"]
+    assert download.list_basefiles() == ["closed-case", "open-case"]
     assert len(list((tmp_path / "downloaded" / "closed-case").glob("*.pdf"))) == 17
-    record = json.loads((tmp_path / "cases" / "closed-case.json").read_text())
+    record = json.loads((tmp_path / "downloaded" / "closed-case.json").read_text())
     assert all(s["downloaded"] for s in record["svar"])
 
     # a second run is incremental (no new cases) and re-fetches no PDF
-    again = download.sync(tmp_path, delay=0)
+    again = download.sync(delay=0)
     assert again["new"] == 0
     assert again["fetched"] == 0
 
@@ -171,20 +178,21 @@ def test_sync_stubs_unreachable_case_and_recovers(tmp_path, monkeypatch):
     monkeypatch.setattr(download, "request", fake_request)
     monkeypatch.setattr(download, "make_session", lambda ua: object())
     monkeypatch.setattr(download.time, "sleep", lambda s: None)
+    _redirect(tmp_path, monkeypatch)
 
-    summary = download.sync(tmp_path, delay=0)
+    summary = download.sync(delay=0)
     assert summary["new"] == 1 and summary["failed"] == 1
     # the failed case exists as a stub carrying the listing facts, so the
     # incremental walk still stops at it next run
-    stub = json.loads((tmp_path / "cases" / "closed-case.json").read_text())
+    stub = json.loads((tmp_path / "downloaded" / "closed-case.json").read_text())
     assert stub["titel"] == "Broken case title"
     assert stub["svar"] == [] and stub["sista_svarsdag"] is None
 
     # once the page is reachable, the normal repoll pass completes the record
     broken.clear()
-    again = download.sync(tmp_path, delay=0)
+    again = download.sync(delay=0)
     assert again["new"] == 0 and again["failed"] == 0
-    record = json.loads((tmp_path / "cases" / "closed-case.json").read_text())
+    record = json.loads((tmp_path / "downloaded" / "closed-case.json").read_text())
     assert record["dnr"] == "KN2026/00741"
     assert len(record["svar"]) == 17 and again["fetched"] == 17
 
@@ -200,4 +208,4 @@ def test_fetch_pending_rejects_duplicate_org_slugs(tmp_path):
               Remissinstans(organisation="Kammarkollegiet",
                             source_url="https://x/contentassets/bb/remissvar.pdf")])
     with pytest.raises(AssertionError, match="duplicate org slugs"):
-        download._fetch_pending(object(), tmp_path, remiss, 0)
+        download._fetch_pending(object(), remiss, 0)

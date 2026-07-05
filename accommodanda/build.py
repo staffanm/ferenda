@@ -299,6 +299,7 @@ class Result:
     errors: list = field(default_factory=list)     # (stage, basefile, msg, tb)
     updates: dict = field(default_factory=dict)    # manifest key -> entry
     skips: list = field(default_factory=list)      # (stage, basefile) SkipDocument
+    fresh: list = field(default_factory=list)      # (stage, basefile) skipped as fresh
     timings: list = field(default_factory=list)    # (stage, basefile, secs)
 
 
@@ -315,6 +316,11 @@ def ensure(source, stage_name, basefile, manifest, res, force, no_deps):
     # same digest (the recipe reads the inputs, never writes them)
     inputs_hash = hash_files(stage.inputs(basefile))
     if not force and is_fresh(manifest, source, stage, basefile, inputs_hash):
+        # fresh ⟹ a valid, up-to-date artifact exists (is_fresh checks output
+        # existence), so the doc is not failing -- heal any stale error left by an
+        # earlier transient failure (e.g. an input momentarily missing) without a
+        # --force re-parse. report() folds res.fresh into the error-clear set.
+        res.fresh.append((stage_name, basefile))
         return True
     res.planned.append((stage_name, basefile))
     if RUN.dry_run:
@@ -367,7 +373,8 @@ RUN = RunOptions()
 # `status` is the deliberate exception -- it carries no run id yet writes
 # status.json's authoritative snapshot cell directly (see cmd_status), so it
 # does not route through them. RUN_ERRORS accumulates THIS run's segment error
-# total (not the corpus-wide currently-failing count) for the run-end verdict.
+# total (not the per-source currently-failing count report() prints) for the
+# run-end verdict.
 RUN_ID = None
 RUN_ERRORS = 0
 
@@ -387,6 +394,12 @@ def _apply_outcomes(source, errors, done):
     if RUN_ID is None:
         return
     runlog.apply_outcomes(ERRORS, source, errors, done, RUN_ID)
+
+
+def _reconcile_orphans(source, valid):
+    if RUN_ID is None:
+        return
+    runlog.reconcile_orphans(ERRORS, source, set(valid))
 
 
 def _update_status_cell(source, stage, cell):
@@ -477,6 +490,7 @@ def _absorb(into, res):
     into.errors += res.errors
     into.updates.update(res.updates)
     into.skips += res.skips
+    into.fresh += res.fresh
     into.timings += res.timings
 
 
@@ -533,7 +547,6 @@ def save_watermarks(store):
 # SFS source
 # --------------------------------------------------------------------------
 
-SFS_ROOT = layout.SFS_ROOT
 PKG = Path(__file__).parent
 SFS_CODE = tuple(PKG / "sfs" / ("%s.py" % m) for m in (
     "__init__", "extract", "reader", "tokenizer", "assembler", "model", "nf",
@@ -729,7 +742,8 @@ def dv_artifact(basefile):
 
 
 def dv_record(basefile):
-    return Path(api_member(_dv_cases()[basefile])["path"])
+    # the identity index stores paths data_root-relative (portable); resolve here
+    return util.load_relpath(layout.DATA, api_member(_dv_cases()[basefile])["path"])
 
 
 def dv_download_run(basefile):
@@ -838,7 +852,6 @@ SOURCES["dv"] = Source("dv", lambda: sorted(_dv_cases()), {
 # förarbete source (preparatory works from regeringen.se)
 # --------------------------------------------------------------------------
 
-FA_ROOT = layout.FA_ROOT
 # legacy_formats.py is in FA_CODE because the frozen-import html route reads it at
 # parse time (a text/tml body -> paragraphs), so editing it re-stales those docs.
 # legacy.py (the import verb) is NOT: it only produces records, which are parse's
@@ -967,7 +980,6 @@ SOURCES["forarbete"] = Source("forarbete", fa_list, {
 # EUR-Lex source (EU treaties, legislation, case law from CELLAR; CELEX ids)
 # --------------------------------------------------------------------------
 
-EURLEX_ROOT = layout.EURLEX_ROOT
 EURLEX_CODE = (PKG / "eurlex" / "parse.py", PKG / "eurlex" / "parse_html.py",
                PKG / "eurlex" / "parse_pdf.py", PKG / "eurlex" / "lang.py",
                PKG / "eurlex" / "model.py", PKG / "eurlex" / "structure.py",
@@ -1325,7 +1337,7 @@ def remisser_list():
     per `Remissinstans` marked downloaded -- the parse stage's targets. Not
     every `Remiss.svar` entry: an instance not yet fetched has no PDF to parse."""
     out = []
-    for path in sorted(layout.REMISSER_CASES.glob("*.json")):
+    for path in sorted(layout.REMISSER_DOWNLOADED.glob("*.json")):
         if path.name.startswith("."):
             continue
         remiss = remisser_model.Remiss.from_dict(json.loads(path.read_text()))
@@ -1335,12 +1347,12 @@ def remisser_list():
 
 
 def remisser_record(basefile):
-    return layout.REMISSER_CASES / (basefile.split("/", 1)[0] + ".json")
+    return layout.remisser_case(basefile.split("/", 1)[0])
 
 
 def remisser_pdf(basefile):
     case_basefile, org_slug = basefile.split("/", 1)
-    return layout.REMISSER_DOWNLOADED / case_basefile / (org_slug + ".pdf")
+    return layout.remisser_answer(case_basefile, org_slug)
 
 
 def remisser_artifact(basefile):
@@ -1354,8 +1366,7 @@ def remisser_inputs(basefile):
 def remisser_parse_run(basefile):
     write_artifact("remisser", basefile,
                    remisser_parse.parse_record(
-                       basefile, layout.REMISSER_CASES,
-                       layout.REMISSER_DOWNLOADED).to_dict())
+                       basefile, layout.REMISSER_DOWNLOADED).to_dict())
 
 
 def remisser_harvest(scopes):
@@ -1366,14 +1377,15 @@ def remisser_harvest(scopes):
     the listing walk entirely (the archive runs to thousands of pages, so this
     is the escape hatch for "just this one case")."""
     if RUN.dry_run:
-        print("remisser download: would harvest into %s" % layout.REMISSER_ROOT)
+        print("remisser download: would harvest into %s"
+              % layout.REMISSER_DOWNLOADED)
         return
     if RUN.only:
-        result = remisser_download.sync_one(layout.REMISSER_ROOT, RUN.only)
+        result = remisser_download.sync_one(RUN.only)
         print("remisser %s: %d svar, %d fetched"
               % (result["basefile"], result["svar"], result["fetched"]))
         return
-    summary = remisser_download.sync(layout.REMISSER_ROOT, full=RUN.force)
+    summary = remisser_download.sync(full=RUN.force)
     print("remisser: %d new, %d repolled, %d closed, %d fetched"
           % (summary["new"], summary["repolled"], summary["closed"], summary["fetched"]))
 
@@ -1462,16 +1474,17 @@ def kommentar_anchor_warnings(con, basefiles=()):
     `basefiles` restricts the scan to those ids."""
     want = set(basefiles)
     out = []
+    root = catalog.data_root(con)              # stored paths are data_root-relative
     for (path,) in con.execute(
             "SELECT path FROM documents WHERE source = 'kommentar' AND path <> ''"):
-        komm = json.loads(Path(path).read_bytes())
+        komm = json.loads((root / path).read_bytes())
         if want and komm.get("basefile") not in want:
             continue
         row = con.execute("SELECT path FROM documents WHERE uri = ? AND path <> ''",
                           (komm.get("annotates"),)).fetchone()
         if not row:
             continue
-        bad = wiki_parse.dangling_anchors(komm, json.loads(Path(row[0]).read_bytes()))
+        bad = wiki_parse.dangling_anchors(komm, json.loads((root / row[0]).read_bytes()))
         if bad:
             out.append((komm.get("basefile"), komm.get("annotates"), bad))
     return out
@@ -1691,16 +1704,19 @@ api_edit.set_rebuild(rebuild_after_commit)
 ARTIFACTS = {
     # the versions-stage sidecars live next to the main artifacts but describe
     # historical consolidations -- not corpus documents, so not related/dumped
-    "sfs": lambda: sorted(p for p in (SFS_ROOT / "artifact").glob("*/*.json")
+    "sfs": lambda: sorted(p for p in layout.SFS_ARTIFACT.glob("*/*.json")
                           if not p.name.endswith(".versions.json")),
-    "dv": lambda: sorted((layout.DOM_ROOT / "artifact").glob("*.json")),
-    "forarbete": lambda: sorted((FA_ROOT / "artifact").glob("*/*.json")),
-    "kommentar": lambda: sorted((layout.KOMMENTAR_ROOT / "artifact").rglob("*.json")),
-    "begrepp": lambda: sorted((layout.BEGREPP_ROOT / "artifact").glob("*.json")),
-    "eurlex": lambda: sorted((EURLEX_ROOT / "artifact").glob("*/*.json")),
+    # dv + kommentar go through layout.artifacts(), the single home that already
+    # excludes the non-document index sidecars (DOM_INDEX / guidance-index.json)
+    # -- no hand-globbed carve-out here (else the exclusion drifts across surfaces)
+    "dv": lambda: layout.artifacts("dv"),
+    "forarbete": lambda: sorted(layout.artifact_dir("forarbete").glob("*/*.json")),
+    "kommentar": lambda: layout.artifacts("kommentar"),
+    "begrepp": lambda: sorted(layout.artifact_dir("begrepp").glob("*.json")),
+    "eurlex": lambda: sorted(layout.artifact_dir("eurlex").glob("*/*.json")),
     "foreskrift": lambda: sorted(
-        (layout.FORESKRIFT_ROOT / "artifact").glob("*/*.json")),
-    "avg": lambda: sorted((layout.AVG_ROOT / "artifact").glob("*/*.json")),
+        layout.artifact_dir("foreskrift").glob("*/*.json")),
+    "avg": lambda: sorted(layout.artifact_dir("avg").glob("*/*.json")),
 }
 
 
@@ -1761,13 +1777,13 @@ def cmd_relate(names):
     # every defined term / nyckelord the corpus references. Their inputs are the
     # catalog (changed only if a source was re-related above) and the .corr files,
     # so a no-op run skips them too -- gated on a .corr watermark.
-    corr_wm = file_watermark(sorted((SFS_ROOT / "artifact").glob("*/*.corr")))
+    corr_wm = file_watermark(sorted(layout.SFS_ARTIFACT.glob("*/*.corr")))
     if dirty or RUN.force or not watermark_fresh(store, "relate", "__corr__",
                                                  corr_wm):
         t0 = time.perf_counter()
         con = catalog.connect(CATALOG)
         pinned = fa_genomforande.resolve(con)
-        corr = [row for p in (SFS_ROOT / "artifact").glob("*/*.corr")
+        corr = [row for p in layout.SFS_ARTIFACT.glob("*/*.corr")
                 for row in sfs_correspond.corr_rows(json.loads(p.read_text()))]
         catalog.set_correspondence(con, corr)
         folded = catalog.canonicalize_concepts(con)
@@ -1916,6 +1932,33 @@ def cmd_download_all(names, jobs):
     return had_errors
 
 
+def _run_stage_gated(source, step, jobs, store):
+    """Run a watermark-gated per-document stage (parse/versions) over a whole
+    source. Coarse gate: if the stage's inputs + recipe are unchanged, skip the
+    per-doc freshness scan (which content-hashes every input) wholesale -- "up to
+    date -- skipped"; else run it and, on a clean sweep, record the watermark in
+    `store` so the next run can skip. Shared by `cmd_all` and the single-source
+    dispatch so a direct `lagen <src> parse` gets the same shortcut. Returns
+    (had_errors, recorded) -- `recorded` tells the caller to save `store`."""
+    pcode = source.stages[step].code
+    wm = stage_watermark(source, step)
+    if up_to_date(store, step, source.name, wm, pcode):
+        print("%s %s: up to date -- skipped" % (step, source.name))
+        # bypasses report(); emit the skipped segment so the run detail still
+        # shows the whole pipeline (§2)
+        _emit_segment(step, source.name, 0.0, ran=0, status="skipped")
+        return False, False
+    basefiles = source.list_basefiles()
+    result = run_action(source, step, basefiles, jobs)
+    report(source, step, result, len(basefiles), full_source=True)
+    # only watermark a clean sweep: a failed doc leaves the source un-marked so
+    # the next run retries it (and re-surfaces the error) rather than skipping
+    if result.errors:
+        return True, False
+    record_step(store, step, source.name, wm, pcode)
+    return False, True
+
+
 def cmd_all(names, jobs, whole_corpus, download=False):
     """Run the build pipeline for the named sources. The offline core (action
     `rebuild`) is parse -> relate -> index -> dump -> generate; action `all`
@@ -1937,30 +1980,9 @@ def cmd_all(names, jobs, whole_corpus, download=False):
             source = SOURCES[name]
             if step not in source.stages:
                 continue
-            pcode = source.stages[step].code
-            wm = stage_watermark(source, step)
-            # a coarse gate over the stage's inputs: if no input file changed
-            # and the recipe is unchanged, skip the per-document freshness scan
-            # (which would content-hash every input) wholesale. A changed source
-            # falls through to run_action, whose per-doc manifest still re-runs
-            # only what moved.
-            if up_to_date(store, step, name, wm, pcode):
-                print("%s %s: up to date -- skipped" % (step, name))
-                # bypasses report(); emit the skipped segment here so the run
-                # detail still shows the whole pipeline (§2)
-                _emit_segment(step, name, 0.0, ran=0, status="skipped")
-                continue
-            basefiles = source.list_basefiles()
-            result = run_action(source, step, basefiles, jobs)
-            report(source, step, result, len(basefiles), full_source=True)
-            # only watermark a clean sweep: if any document failed, leave the
-            # source un-marked so the next run retries it (and re-surfaces the
-            # error) instead of skipping wholesale on an unchanged input.
-            if result.errors:
-                had_errors = True
-                continue
-            record_step(store, step, name, wm, pcode)
-            parse_dirty = True
+            errs, recorded = _run_stage_gated(source, step, jobs, store)
+            had_errors |= errs
+            parse_dirty |= recorded
     if parse_dirty:
         save_watermarks(store)
     cmd_relate(names)
@@ -2002,20 +2024,20 @@ def generate_watermark():
     sig = catalog.catalog_signature(con)
     con.close()
     sides = file_watermark(sorted(
-        list((SFS_ROOT / "artifact").glob("*/*.corr"))
+        list(layout.SFS_ARTIFACT.glob("*/*.corr"))
         # the versions-stage sidecars: a new historical consolidation must
         # re-render its statute's page (version panel) + the version pages
-        + list((SFS_ROOT / "artifact").glob("*/*.versions.json"))
-        + list((EURLEX_ROOT / "artifact").glob("*/*.ann"))
+        + list(layout.SFS_ARTIFACT.glob("*/*.versions.json"))
+        + list(layout.artifact_dir("eurlex").glob("*/*.ann"))
         # the kommentar ai-annotate guidance layer rides a *different* document's
         # rail (the host act's), so -- like the cross-document .corr case -- a full
         # or forced generate is what propagates an edit to the host page
-        + list((layout.KOMMENTAR_ROOT / "artifact").rglob("*.ann"))
+        + list(layout.artifact_dir("kommentar").rglob("*.ann"))
         # the site artifacts (frontpage/om/sitenews) aren't catalog rows, so the
         # catalog signature above never sees them -- fold them in directly so a
         # re-parsed editorial edit reopens the generate gate (else a full generate
         # would skip and ship the stale site)
-        + list((layout.SITE_ROOT / "artifact").rglob("*.json"))))
+        + list(layout.artifact_dir("site").rglob("*.json"))))
     return hashlib.sha256((sig + "\x1f" + sides).encode()).hexdigest()
 
 
@@ -2159,10 +2181,10 @@ def cmd_generate(only=None, source=None, jobs=1):
     if only is not None:
         extra = sfs_version_pages([Path(p).with_suffix(".versions.json")
                                    for p in only
-                                   if Path(p).is_relative_to(SFS_ROOT / "artifact")])
+                                   if Path(p).is_relative_to(layout.SFS_ARTIFACT)])
     elif source in (None, "sfs"):
         extra = sfs_version_pages(
-            sorted((SFS_ROOT / "artifact").glob("*/*.versions.json")))
+            sorted(layout.SFS_ARTIFACT.glob("*/*.versions.json")))
     else:
         extra = []
 
@@ -2278,9 +2300,22 @@ def report(source, action, result, requested, full_source):
                   ran=len(result.done), errors=len(result.errors),
                   skipped_fresh=skipped, skipdoc=len(result.skips),
                   status="errors" if result.errors else "ok", slowest=slowest)
-    _apply_outcomes(source.name, result.errors, result.done)
+    # clear stale errors for docs (re)built this run AND for docs skipped as
+    # fresh -- both mean the doc now has a valid artifact and is not failing
+    _apply_outcomes(source.name, result.errors, result.done + result.fresh)
+    # a full-source run proves the current basefile set is complete, so error
+    # entries for basefiles it no longer lists are orphans (a doc left the corpus,
+    # or an enumerator bug once emitted it) -- drop them, since they are never
+    # re-run and fresh-skip healing can't reach them
+    if full_source:
+        _reconcile_orphans(source.name, source.list_basefiles())
     if RUN_ID is not None:
-        print("%d docs failing overall" % len(runlog.read_errors(ERRORS)))
+        # scope the failing count to THIS source -- a `lagen dv parse` must not
+        # report another source's errors (the store holds every source's)
+        prefix = source.name + "/"
+        failing = sum(1 for k in runlog.read_errors(ERRORS)
+                      if k.startswith(prefix))
+        print("%d docs failing in %s" % (failing, source.name))
     # cheap cell: a full-source run proves the source -- everything planned+done
     # is now fresh, nothing missing (§1c). A targeted run must NOT touch the cell.
     if full_source:
@@ -2531,6 +2566,16 @@ def _dispatch(args, p, jobs):
             p.error("source %r has no action %r (have: %s)"
                     % (name, args.action,
                        ", ".join([*source.stages, *source.actions])))
+        # a full-source run of a watermark-gated per-doc stage gets the same
+        # coarse "up to date -- skipped" shortcut cmd_all uses, so a direct
+        # `lagen sfs parse` with nothing changed skips the per-doc scan too
+        if not args.basefiles and args.action in ("parse", "versions"):
+            store = load_watermarks()
+            errs, recorded = _run_stage_gated(source, args.action, jobs, store)
+            if recorded:
+                save_watermarks(store)
+            had_errors |= errs
+            continue
         basefiles = args.basefiles or source.list_basefiles()
         result = run_action(source, args.action, basefiles, jobs)
         report(source, args.action, result, len(basefiles),

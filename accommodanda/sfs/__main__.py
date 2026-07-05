@@ -156,7 +156,7 @@ def cmd_refs(args):
 
 
 def cmd_validate(args):
-    # the "golden" is the old pipeline's parsed XHTML+RDFa (site/data/sfs/parsed);
+    # the "golden" is the old pipeline's parsed XHTML+RDFa (scaffolding in the old checkout);
     # validate_one normalizes each to NF on the fly -- no frozen golden tree.
     parseddir, downloaddir = Path(args.parseddir), Path(args.downloaddir)
     jobs = []
@@ -245,7 +245,8 @@ def main():
     r.set_defaults(func=cmd_refs)
     v = sub.add_parser("validate")
     v.add_argument("parseddir", help="old-pipeline parsed XHTML tree "
-                   "(site/data/sfs/parsed); normalized to NF on the fly")
+                   "(scaffolding, e.g. ../ferenda.old/data/sfs/parsed); "
+                   "normalized to NF on the fly")
     v.add_argument("downloaddir")
     v.add_argument("--sections", default="structure",
                    help="comma-separated: structure,references,amendments,metadata")

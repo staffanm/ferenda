@@ -38,6 +38,7 @@ def test_doc_actions_document_and_fragment_units(tmp_path):
     con = _build_catalog(tmp_path)
     uri = "https://lagen.nu/1962:700"
     row = catalog.document(con, uri)
+    row = (*row[:5], str(catalog.data_root(con) / row[5]))   # stored path is relative
     actions = list(search.doc_actions(
         row, catalog.document_inbound_count(con, uri), version="h1"))
     assert actions[0]["_source"]["version"] == "h1"     # carried for the diff
@@ -91,7 +92,9 @@ def test_doc_actions_display_uses_shortname_and_abbr(tmp_path):
     catalog.rebuild(cat, "eurlex", [cra])
     con = catalog.connect(cat)
     uri = "https://lagen.nu/ext/celex/32024R2847"
-    doc, frag = list(search.doc_actions(row := catalog.document(con, uri), 0))
+    row = catalog.document(con, uri)
+    row = (*row[:5], str(catalog.data_root(con) / row[5]))   # stored path is relative
+    doc, frag = list(search.doc_actions(row, 0))
     assert doc["_source"]["display"] == "Cyberresiliensförordningen (CRA)"
     assert doc["_source"]["title"].startswith("Europaparlamentets")   # full, searchable
     assert doc["_source"]["identifier"] == "32024R2847"               # CELEX, the sub

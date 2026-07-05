@@ -750,7 +750,7 @@ def test_ocr_sidecar_wins_over_legacy_pdf(frozen, monkeypatch):
     # a modern-OCR'd PDF at the sidecar path is parsed instead of the frozen scan
     make, out = frozen
     src, entries, downloaded = make("soukb")
-    monkeypatch.setattr(layout, "FA_ROOT", out.parent / "faroot")
+    monkeypatch.setattr(layout, "OCR", out.parent / "ocr")
     (downloaded / "1935" / "14").mkdir(parents=True)
     (downloaded / "1935" / "14" / "index.pdf").write_bytes(PDF_MAGIC)  # weak scan
     sidecar = layout.fa_ocr_pdf("sou", "1935:14")

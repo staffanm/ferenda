@@ -42,6 +42,7 @@ import re
 import time
 from pathlib import Path
 
+from ..lib import layout
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
 from ..lib.util import Reporter, write_atomic
@@ -120,24 +121,22 @@ def source_path(destdir, beteckning):
 
 
 def archive_path(destdir, beteckning, version):
-    """A superseded consolidation's path. Archived versions live under a
-    top-level archive/ tree mirroring the live categories, in the old site's
-    per-document .versions/ layout -- keyed by the SFS cutoff that identifies
-    the consolidation (year/nr subdirs), .json instead of .html:
-        <root>/downloaded/{y}/{n}.json
-        -> <root>/archive/downloaded/{y}/{n}/.versions/{vy}/{vn}.json
-    """
-    year, nr = _split_beteckning(beteckning)
-    archive_root = destdir.parent / "archive" / destdir.name / year / nr / ".versions"
-    if ":" in version:
-        vyear, vnr = version.split(":", 1)
-        return archive_root / vyear / ("%s.json" % vnr)
-    return archive_root / ("%s.json" % version.replace(" ", "_"))
+    """A superseded consolidation's write path. The archive/.versions grammar is
+    owned by layout; here we only validate the beteckning first -- a corrupt id
+    must not escape the tree -- before layout derives the path from the injected
+    download root's sibling archive tree."""
+    _split_beteckning(beteckning)
+    return layout.sfs_archive_version_download(destdir, beteckning, version)
 
 
 def version_id(source):
     """The consolidation's identity: the last amending act folded in. An
-    un-amended base act has no andringInford and is its own version."""
+    un-amended base act has no andringInford and is its own version.
+
+    Version ids are space-free by construction (the `.replace(" ", "")` below);
+    `layout.sfs_version_file` relies on this -- its single .versions/ path
+    grammar slugs both the colon and legacy-counter branches identically, so a
+    spaceful id can never split the writer and reader trees."""
     andring = (source.get("fulltext") or {}).get("andringInford")
     if andring:
         match = RE_VERSION.search(andring)

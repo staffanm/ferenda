@@ -43,7 +43,7 @@ live ``source_url``. A harvested record carries no ``source`` marker key, so it
 wins over -- and its live PDF overwrites -- any frozen import of the same dnr
 (the §7g precedence rule; the other half lives in ``legacy.import_arn``).
 
-Stored per decision under ``site/data/avg/downloaded/{org}/``:
+Stored per decision under ``site/data/downloaded/avg/{org}/``:
 ``<slug>.json`` record (+ for JO/ARN the decision PDF, for JK the landing HTML).
 """
 

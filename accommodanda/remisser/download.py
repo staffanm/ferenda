@@ -14,9 +14,9 @@ document, kept as a url. A "Genvägar" shortcut links the referred SOU/Ds's own
 regeringen.se landing page -- matched against `lib.regeringen.TYPES` to
 recover the canonical förarbete basefile, the load-bearing join to that vertical.
 
-Two output trees under REMISSER_ROOT (mirroring layout.REMISSER_CASES /
-REMISSER_DOWNLOADED): ``cases/<slug>.json`` (the Remiss record, source of truth)
-and ``downloaded/<slug>/<org-slug>.pdf`` (each answer PDF, immutable once posted).
+One download tree, layout.REMISSER_DOWNLOADED: ``downloaded/remisser/<slug>.json``
+(the Remiss record, source of truth) beside its ``downloaded/remisser/<slug>/
+<org-slug>.pdf`` answer PDFs (each immutable once posted).
 
 `sync` runs two passes: discover new cases newest-first, stopping at the first
 already-known slug (`--full` re-walks the whole listing, downloading only what
@@ -36,11 +36,11 @@ import json
 import re
 import time
 from datetime import date, timedelta
-from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
 
+from ..lib import layout
 from ..lib.net import BROWSER_UA, make_session, request
 from ..lib.regeringen import BASE, TYPES, listing_items
 from ..lib.util import Reporter, swedish_date, write_atomic
@@ -196,8 +196,8 @@ def parse_case(html, url):
 # harvest
 # --------------------------------------------------------------------------
 
-def _write_case(root, remiss):
-    write_atomic(Path(root) / "cases" / (remiss.basefile + ".json"),
+def _write_case(remiss):
+    write_atomic(layout.remisser_case(remiss.basefile),
                  json.dumps(remiss.to_dict(), ensure_ascii=False, indent=2))
 
 
@@ -233,7 +233,7 @@ def _merge(remiss, fresh):
     return changed
 
 
-def _fetch_pending(session, root, remiss, delay):
+def _fetch_pending(session, remiss, delay):
     """Fetch each answer PDF not yet cached (immutable once posted), flipping its
     `downloaded` flag. Returns the number newly fetched."""
     slugs = [org_slug(inst.source_url) for inst in remiss.svar]
@@ -246,39 +246,37 @@ def _fetch_pending(session, root, remiss, delay):
         if inst.downloaded:
             continue
         data = request(session, "GET", inst.source_url).content
-        write_atomic(Path(root) / "downloaded" / remiss.basefile
-                     / (org_slug(inst.source_url) + ".pdf"), data)
+        write_atomic(layout.remisser_answer(remiss.basefile,
+                                            org_slug(inst.source_url)), data)
         inst.downloaded = True
         fetched += 1
         time.sleep(delay)
     return fetched
 
 
-def sync_one(root, url, delay=0.5):
+def sync_one(url, delay=0.5):
     """Fetch exactly one case by its regeringen.se URL, bypassing the listing walk
     entirely -- the `--only` escape hatch, so grabbing one already-known case's
     remissvar never requires an incremental (let alone full) sweep of the
     archive. Merges onto any existing record for that case (like `sync`'s second
     pass) and fetches every answer PDF not yet cached. Returns
     {"basefile", "svar", "fetched"}."""
-    root = Path(root)
     session = make_session(BROWSER_UA)
     url = url if url.endswith("/") else url + "/"
     remiss = parse_case(request(session, "GET", url).text, url)
-    existing = root / "cases" / (remiss.basefile + ".json")
+    existing = layout.remisser_case(remiss.basefile)
     if existing.exists():
         stored = Remiss.from_dict(json.loads(existing.read_text()))
         _merge(stored, remiss)
         remiss = stored
-    fetched = _fetch_pending(session, root, remiss, delay)
-    _write_case(root, remiss)
+    fetched = _fetch_pending(session, remiss, delay)
+    _write_case(remiss)
     return {"basefile": remiss.basefile, "svar": len(remiss.svar), "fetched": fetched}
 
 
-def sync(root, full=False, delay=0.5, log=print):
-    """Harvest remiss cases into ``<root>/cases`` + ``<root>/downloaded`` (root is
-    layout.REMISSER_ROOT; the two trees mirror layout.REMISSER_CASES /
-    REMISSER_DOWNLOADED).
+def sync(full=False, delay=0.5, log=print):
+    """Harvest remiss cases into layout.REMISSER_DOWNLOADED (downloaded/remisser):
+    each case's ``<slug>.json`` record beside its ``<slug>/`` answer-PDF dir.
 
     Pass 1 discovers new cases newest-first, stopping at the first slug already on
     disk (`full` re-walks the whole listing, downloading only what is missing).
@@ -292,8 +290,7 @@ def sync(root, full=False, delay=0.5, log=print):
     yet cached (across all cases, so a case that was already closed when first
     seen still gets its PDFs). Returns {"new", "failed", "repolled", "closed",
     "fetched"}."""
-    root = Path(root)
-    cases = root / "cases"
+    cases = layout.REMISSER_DOWNLOADED
     session = make_session(BROWSER_UA)
     rep = Reporter()
     summary = {"new": 0, "failed": 0, "repolled": 0, "closed": 0, "fetched": 0}
@@ -305,7 +302,7 @@ def sync(root, full=False, delay=0.5, log=print):
             break
         for item in items:
             seen += 1
-            if (cases / (item["basefile"] + ".json")).exists():
+            if layout.remisser_case(item["basefile"]).exists():
                 if not full:
                     stop = True
                     break
@@ -321,7 +318,7 @@ def sync(root, full=False, delay=0.5, log=print):
                 summary["failed"] += 1
             else:
                 summary["new"] += 1
-            _write_case(root, remiss)
+            _write_case(remiss)
             time.sleep(delay)
         rep.update(seen, None, scope="remisser", page=page, new=summary["new"])
         page += 1
@@ -343,14 +340,14 @@ def sync(root, full=False, delay=0.5, log=print):
             changed = _merge(remiss, fresh)
         else:
             summary["closed"] += 1
-        fetched = _fetch_pending(session, root, remiss, delay)
+        fetched = _fetch_pending(session, remiss, delay)
         summary["fetched"] += fetched
         if changed or fetched:
-            _write_case(root, remiss)
+            _write_case(remiss)
     return summary
 
 
-def list_basefiles(root):
+def list_basefiles():
     """Every case basefile (slug) on disk, sorted -- not instance basefiles."""
     return sorted(json.loads(p.read_text())["basefile"]
-                  for p in (Path(root) / "cases").glob("*.json"))
+                  for p in layout.REMISSER_DOWNLOADED.glob("*.json"))

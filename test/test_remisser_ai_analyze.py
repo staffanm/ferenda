@@ -124,8 +124,7 @@ def test_validate_rejects_boolean_sentiment():
 def corpus(tmp_path, monkeypatch):
     """A synthetic remissvar artifact + its referred förarbete artifact on disk,
     with the artifact roots pointed at tmp_path."""
-    monkeypatch.setitem(layout.ARTIFACT_ROOT, "remisser", tmp_path / "remisser")
-    monkeypatch.setitem(layout.ARTIFACT_ROOT, "forarbete", tmp_path / "forarbete")
+    monkeypatch.setattr(layout, "ARTIFACT", tmp_path)
 
     fa_path = layout.artifact("forarbete", "sou/2026-14")   # slugged (colon -> dash)
     fa_path.parent.mkdir(parents=True, exist_ok=True)

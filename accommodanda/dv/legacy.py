@@ -17,12 +17,12 @@ Rättsfall, Sökord) -- is recovered here from the document itself.
 
 import argparse
 import json
-import os
 import re
 import sys
 from collections import Counter
 from pathlib import Path
 
+from ..lib import layout, util
 from . import word
 from .model import Avgorande, Lagrum, Rubrik, Stycke
 from .parse import RE_NUMPARA, is_heading, to_artifact
@@ -146,8 +146,10 @@ def legacy_original(case):
     Notisfall members have a zero-byte original (the body lives only in the
     frozen intermediate) and are excluded here."""
     for member in case["members"]:
-        path = member["path"]
-        if member["store"] == "dv" and os.path.exists(path) and os.path.getsize(path):
+        if member["store"] != "dv":
+            continue
+        path = util.load_relpath(layout.DATA, member["path"])
+        if path.exists() and path.stat().st_size:
             return member
     return None
 
@@ -163,7 +165,7 @@ def cmd_index(args):
     failures = []
     for case, member in cases:
         try:
-            av = parse_legacy_file(member["path"], case)
+            av = parse_legacy_file(util.load_relpath(layout.DATA, member["path"]), case)
         except Exception as e:  # noqa: BLE001 — stats harness: failure tallied, corpus scan continues (rule:no-catch-log-continue)
             failures.append((case["canonical_id"], "%s: %s" % (type(e).__name__, e)))
             continue

@@ -29,43 +29,60 @@ from .util import basefile_slug
 DATA = config.DATA
 GENERATED = DATA / "generated"
 
-# One dir per source, each with the uniform downloaded/ (raw) + artifact/
-# (parsed) trees. Two deliberate exceptions, matching lagen.nu's grammar:
-#  * case law's canonical dir is dom/ (the /dom/ URL); the api records and ALL
-#    parsed case-law artifacts live there. dv/ keeps only the legacy raw feed.
+# --------------------------------------------------------------------------
+# Stage-first layout: <stage>/<source>/…  (e.g. downloaded/sfs, artifact/dom).
+# Grouping by pipeline stage first, source second, keeps each stage a single
+# directory -- the bulky downloaded/ can live on its own volume, be snapshotted
+# or synced, without dragging the derived trees along. Two source-name
+# exceptions match lagen.nu's grammar:
+#  * case law (source key "dv") files its api raw *and* every parsed artifact
+#    under the name "dom" (the /dom/ URL); "dv" names only its legacy raw feed.
 #  * kommentar + begrepp are authored as markdown in a separate content repo
-#    (WIKI_ROOT, a sibling checkout), not under data_root; two derived sources.
-SFS_ROOT = DATA / "sfs"
-DOM_ROOT = DATA / "dom"          # case law (source key "dv"): api raw + artifacts
-DV_ROOT = DATA / "dv"            # legacy case-law raw feed only
-FA_ROOT = DATA / "forarbete"
-EURLEX_ROOT = DATA / "eurlex"
-FORESKRIFT_ROOT = DATA / "foreskrift"     # agency regulations (per-fs subtrees)
-AVG_ROOT = DATA / "avg"                   # JO/JK decisions (per-org subtrees)
-REMISSER_ROOT = DATA / "remisser"         # remiss responses (per-case subtrees)
-KOMMENTAR_ROOT = DATA / "kommentar"
-BEGREPP_ROOT = DATA / "begrepp"
-SITE_ROOT = DATA / "site"           # editorial site content (frontpage, /om, sitenews)
+#    (WIKI_ROOT, a sibling checkout); only their derived artifacts live here.
+# --------------------------------------------------------------------------
 WIKI_ROOT = config.WIKI_ROOT        # git-backed markdown content repo (begrepp/ + kommentar/ + site/)
 
-ARTIFACT_ROOT = {"sfs": SFS_ROOT, "dv": DOM_ROOT, "forarbete": FA_ROOT,
-                 "eurlex": EURLEX_ROOT, "foreskrift": FORESKRIFT_ROOT,
-                 "avg": AVG_ROOT, "remisser": REMISSER_ROOT,
-                 "kommentar": KOMMENTAR_ROOT, "begrepp": BEGREPP_ROOT,
-                 "site": SITE_ROOT}
+# stage roots
+DOWNLOADED = DATA / "downloaded"    # raw fetched bytes -- the bulk; volume candidate
+ARTIFACT = DATA / "artifact"        # parsed JSON -- the source of truth
+OCR = DATA / "ocr"                  # re-OCR sidecar PDFs (forarbete parse input)
+# NB: the old-pipeline parsed/distilled "golden" oracles are temporary
+# scaffolding, deliberately NOT a data_root stage -- they live in the old
+# checkout (see tools/golden_dv*.py, which take an oracle path arg).
+
+# the on-disk source-dir name under each stage; "dv" -> "dom" (see above)
+SOURCE_DIR = {"sfs": "sfs", "dv": "dom", "forarbete": "forarbete",
+              "eurlex": "eurlex", "foreskrift": "foreskrift", "avg": "avg",
+              "remisser": "remisser", "kommentar": "kommentar",
+              "begrepp": "begrepp", "site": "site"}
+
+
+def artifact_dir(source):
+    """The parsed-artifact directory of a source: ``artifact/<source>``."""
+    return ARTIFACT / SOURCE_DIR[source]
+
 
 # raw roots -- the download writers put their structure under these
-SFS_DOWNLOADED = SFS_ROOT / "downloaded"
-DOM_DOWNLOADED = DOM_ROOT / "downloaded"            # dv api records
-DV_LEGACY_DOWNLOADED = DV_ROOT / "downloaded"       # dv legacy store
-FA_DOWNLOADED = FA_ROOT / "downloaded"
-EURLEX_DOWNLOADED = EURLEX_ROOT / "downloaded"
-FORESKRIFT_DOWNLOADED = FORESKRIFT_ROOT / "downloaded"   # <fs>/<slug>.{json,pdf}
-AVG_DOWNLOADED = AVG_ROOT / "downloaded"                 # <org>/<slug>.{json,pdf,html}
-REMISSER_CASES = REMISSER_ROOT / "cases"                 # <case-slug>.json
-REMISSER_DOWNLOADED = REMISSER_ROOT / "downloaded"        # <case-slug>/<org-slug>.pdf
+SFS_DOWNLOADED = DOWNLOADED / "sfs"
+SFS_ARTIFACT = ARTIFACT / "sfs"                     # sfs artifacts + sidecars + archive/
+DOM_DOWNLOADED = DOWNLOADED / "dom"                 # dv api records
+DV_LEGACY_DOWNLOADED = DOWNLOADED / "dv"            # dv legacy store
+FA_DOWNLOADED = DOWNLOADED / "forarbete"
+EURLEX_DOWNLOADED = DOWNLOADED / "eurlex"
+FORESKRIFT_DOWNLOADED = DOWNLOADED / "foreskrift"   # <fs>/<slug>.{json,pdf}
+AVG_DOWNLOADED = DOWNLOADED / "avg"                 # <org>/<slug>.{json,pdf,html}
 
-DOM_INDEX = DOM_ROOT / "identity-index.json"        # case-law identity index
+# remisser's case records + answer PDFs share one download tree (see remisser_case)
+REMISSER_DOWNLOADED = DOWNLOADED / "remisser"
+
+# index sidecars that live inside a source's artifact dir but are NOT corpus
+# documents -- the case-law identity index and the AI-guidance discovery index.
+# `artifacts()` filters them out so no consumer treats them as a document (they
+# are JSON lists / index maps, not artifacts). Owned here because the artifact
+# tree is layout's; guidance_discover imports GUIDANCE_INDEX rather than the
+# reverse (lib must not import a vertical).
+DOM_INDEX = ARTIFACT / "dom" / "identity-index.json"        # case-law identity index
+GUIDANCE_INDEX = ARTIFACT / "kommentar" / "guidance-index.json"  # AI-guidance index
 
 
 def _sfs_parts(basefile):
@@ -143,16 +160,30 @@ def relpath(source, basefile):
 
 
 def artifact(source, basefile):
-    """The parsed-artifact path: ``<dir>/artifact/<relpath>.json``."""
+    """The parsed-artifact path: ``artifact/<source>/<relpath>.json``."""
     rel = relpath(source, basefile)
-    return ARTIFACT_ROOT[source] / "artifact" / rel.with_name(rel.name + ".json")
+    return artifact_dir(source) / rel.with_name(rel.name + ".json")
+
+
+# non-document json files that share a source's artifact dir: the index sidecars
+# (by basename, so the filter is independent of where ARTIFACT is rooted) and the
+# sfs `.versions.json` historical-consolidation sidecars.
+_NON_ARTIFACT_NAMES = frozenset({DOM_INDEX.name, GUIDANCE_INDEX.name})
+
+
+def _is_document_artifact(path):
+    return (path.name not in _NON_ARTIFACT_NAMES
+            and not path.name.endswith(".versions.json"))
 
 
 def artifacts(source):
     """Every parse artifact of `source` on disk, sorted -- the iteration
     companion to `artifact`, so the tree layout has one home and a consumer
-    can't drift out of sync with it by hand-globbing."""
-    return sorted((ARTIFACT_ROOT[source] / "artifact").glob("**/*.json"))
+    can't drift out of sync with it by hand-globbing. Non-document json that
+    happens to live in the artifact dir (the identity/guidance index sidecars,
+    the sfs `.versions.json` layers) is excluded -- it is not a corpus document."""
+    return sorted(p for p in artifact_dir(source).glob("**/*.json")
+                  if _is_document_artifact(p))
 
 
 # --------------------------------------------------------------------------
@@ -178,19 +209,43 @@ def sfs_sfsr(basefile):                 # legacy register HTML
 
 
 # --------------------------------------------------------------------------
-# sfs archive -- superseded consolidations. archive/ mirrors the live
-# categories (downloaded/, artifact/) with the old site's per-document
-# .versions/ layout; a version id is the SFS number of the last amendment
-# folded into that consolidation ("2003:466" -> 2003/466.<ext>), or a bare
-# legacy counter ("11") where the old archiver couldn't recover the cutoff.
+# sfs archive -- superseded consolidations. Each stage keeps its own archive/
+# subtree (downloaded/sfs/archive for raw, artifact/sfs/archive for parsed), in
+# the old site's per-document .versions/ layout; a version id is the SFS number
+# of the last amendment folded into that consolidation ("2003:466" ->
+# 2003/466.<ext>), or a bare legacy counter ("11") where the old archiver
+# couldn't recover the cutoff.
 # --------------------------------------------------------------------------
 
-SFS_ARCHIVE = SFS_ROOT / "archive"
-
-
-def _sfs_version_dir(category, basefile):
+def _sfs_version_dir(stage_dir, basefile):
+    """The .versions/ tree of one statute under a stage dir's archive/ subtree
+    (`stage_dir` is SFS_DOWNLOADED for raw, SFS_ARTIFACT for parsed)."""
     year, nr = _sfs_parts(basefile)
-    return SFS_ARCHIVE / category / year / nr / ".versions"
+    return stage_dir / "archive" / year / nr / ".versions"
+
+
+def sfs_version_file(stage_dir, basefile, version):
+    """Physical path of one archived consolidation under a stage dir's archive
+    subtree: ``<stage_dir>/archive/{y}/{n}/.versions/{vy}/{vn}.json`` -- a flat
+    ``.versions/<version>.json`` for an unrecovered legacy counter with no year
+    to nest under. The single owner of the .versions grammar, shared by the raw
+    writer (`sfs_archive_version_download`, stage_dir=SFS_DOWNLOADED) and the
+    parsed reader (`sfs_version_artifact`, stage_dir=SFS_ARTIFACT) so the two
+    archives can never drift (version ids are space-free -- `sfs.download.
+    version_id` strips them -- but slug them for parity with `relpath`)."""
+    root = _sfs_version_dir(stage_dir, basefile)
+    if ":" in version:
+        vyear, vnr = version.split(":", 1)
+        return root / vyear / ("%s.json" % vnr.replace(" ", "_"))
+    return root / ("%s.json" % version.replace(" ", "_"))
+
+
+def sfs_archive_version_download(destdir, basefile, version):
+    """Write path for a superseded consolidation's raw JSON: the ``archive/``
+    subtree of the live download dir. `destdir` is the injected download dir
+    (SFS_DOWNLOADED in prod, a tmp/CLI dir under test), so the harvester stays
+    root-relative while the slug grammar lives here."""
+    return sfs_version_file(destdir, basefile, version)
 
 
 def sfs_version_downloads(basefile):
@@ -198,7 +253,7 @@ def sfs_version_downloads(basefile):
     from the archive's .versions/ tree -- legacy HTML (the two rättsdatabaser
     generations) and the new downloader's JSON side by side. When one version id
     exists in both forms the JSON (the richer, register-carrying form) wins."""
-    root = _sfs_version_dir("downloaded", basefile)
+    root = _sfs_version_dir(SFS_DOWNLOADED, basefile)
     found = {}
     for path in sorted(root.glob("*/*")) + sorted(root.glob("*")):
         if path.is_dir() or path.suffix not in (".html", ".json"):
@@ -223,11 +278,7 @@ def sfs_version_key(version):
 def sfs_version_artifact(basefile, version):
     """A parsed archived consolidation: the artifact-tree mirror of its
     download, keyed by the (possibly recovered) version id."""
-    root = _sfs_version_dir("artifact", basefile)
-    if ":" in version:
-        vyear, vnr = version.split(":", 1)
-        return root / vyear / ("%s.json" % vnr.replace(" ", "_"))
-    return root / ("%s.json" % version)
+    return sfs_version_file(SFS_ARTIFACT, basefile, version)
 
 
 def sfs_versions_sidecar(basefile):
@@ -235,7 +286,7 @@ def sfs_versions_sidecar(basefile):
     next to the main artifact (like .corr): which historical consolidations
     exist, their recovered version ids and their parse status."""
     rel = relpath("sfs", basefile)
-    return SFS_ROOT / "artifact" / rel.with_name(rel.name + ".versions.json")
+    return SFS_ARTIFACT / rel.with_name(rel.name + ".versions.json")
 
 
 def sfs_sidecar_basefile(path):
@@ -251,19 +302,37 @@ def fa_record(basefile):
 
 
 def fa_ocr_pdf(typ, basefile):
-    """The re-OCR sidecar PDF for a förarbete document (§7g): ``forarbete/ocr/
+    """The re-OCR sidecar PDF for a förarbete document (§7g): ``ocr/forarbete/
     <type>/<slug>.pdf``, slugged exactly like the downloaded record. Dropping a
     modern-OCR'd PDF here (an ``ocrmypdf`` pass over a frozen scan whose embedded
     OCR layer is weak) upgrades that document's parse -- parse prefers it over the
     legacy-root scan -- without touching the one-time import. The path is a parse
     input, so a new sidecar re-stales that document's parse."""
-    return FA_ROOT / "ocr" / typ / (basefile_slug(basefile) + ".pdf")
+    return OCR / "forarbete" / typ / (basefile_slug(basefile) + ".pdf")
 
 
 def eurlex_dir(basefile):
     """The per-CELEX directory holding eurlex's raw files (notice.ttl + the
     per-language manifestations)."""
     return EURLEX_DOWNLOADED / relpath("eurlex", basefile)
+
+
+# --------------------------------------------------------------------------
+# remisser -- case records and answer PDFs share one download tree (a case's
+# open/closed state is downloader-only, so the record is plain download-stage
+# data, not a stage of its own). The filename grammar lives here so both the
+# harvester (writer) and build.py (reader) derive the same paths.
+# --------------------------------------------------------------------------
+
+def remisser_case(basefile):
+    """One stored case record: ``downloaded/remisser/<case-slug>.json`` -- the
+    Remiss source of truth, beside its answer PDFs (the sibling <case-slug>/ dir)."""
+    return REMISSER_DOWNLOADED / (basefile + ".json")
+
+
+def remisser_answer(case_basefile, org_slug):
+    """One downloaded answer PDF: ``downloaded/remisser/<case-slug>/<org-slug>.pdf``."""
+    return REMISSER_DOWNLOADED / case_basefile / (org_slug + ".pdf")
 
 
 # --------------------------------------------------------------------------
