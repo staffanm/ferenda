@@ -38,6 +38,15 @@ COPY --from=ghcr.io/astral-sh/uv:0.9.0 /uv /uvx /bin/
 ENV UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1
 
+# Run as an unprivileged user, not root: the pipeline shells out to a lot of
+# tools and serves the public internet, so drop root for the runtime process.
+# UID/GID are build args so they can be pinned to the host `ferenda` user that
+# owns the bind-mounted corpus/wiki (default 1000, matching the VPS user); the
+# uids must line up or the mounted trees are unwritable to the download/rebuild.
+ARG UID=1000
+ARG GID=1000
+RUN groupadd -g "$GID" app && useradd -m -u "$UID" -g "$GID" -s /bin/bash app
+
 WORKDIR /app
 
 # 1) dependencies only -- cached until pyproject.toml/uv.lock change.
@@ -56,6 +65,16 @@ RUN uv sync --frozen --no-dev \
 ENV PATH="/app/.venv/bin:$PATH" \
     OPENSEARCH_URL="http://opensearch:9200" \
     WIKI_ROOT="/wiki"
+
+# Everything built above ran as root; hand the whole app tree (code + venv +
+# vendored POI jars) to the unprivileged user it now runs as. The corpus and
+# wiki are bind-mounted at runtime and chowned to this uid on the host.
+RUN chown -R app:app /app
+# The editor commits to the bind-mounted /wiki repo as `app`; git refuses to
+# operate in a repo owned by a different uid unless it is marked safe.
+RUN git config --system --add safe.directory /wiki \
+    && git config --system --add safe.directory /app
+USER app
 
 EXPOSE 8000
 # Bind all interfaces so the nginx ferenda.lagen.nu vhost can proxy in.

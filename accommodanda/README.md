@@ -526,69 +526,45 @@ and password hashing are stdlib `hmac`/`hashlib`.
 
 ## Production deployment (Docker)
 
-The prod host runs one compose project that serves **both** sites behind the
-legacy nginx: `lagen.nu` (the legacy stack) and `ferenda.lagen.nu` (this
-rebuilt site). Which services start is chosen by a Compose **profile**:
+Deployed to **ferenda-vps** as a standalone accommodanda-only stack — the legacy
+lagen.nu stack is not on this box. The authoritative runbook (host bootstrap,
+disk layout, secrets, CI, cron) is **[`../docs/deploy-vps.md`](../docs/deploy-vps.md)**;
+this section is just the shape of it.
+
+The repo-root `docker-compose.yml` defines four services, selected by a Compose
+**profile**:
 
 | invocation | services | use |
 |---|---|---|
 | `docker compose up -d` | `opensearch` only | dev — run `lagen all serve` from the working tree |
-| `docker compose --profile prod up -d` | full stack | prod — legacy stack + `accommodanda` + `opensearch` |
+| `docker compose --profile prod up -d` | full stack | prod — `opensearch` + `accommodanda` + `nginx` + `certbot` |
 
 `opensearch` carries no profile, so it starts in both; everything else is
-`profiles: [prod]`. On the prod host, set `COMPOSE_PROFILES=prod` in `.env` so
-every command (`ps`, `logs`, `restart`, …) sees the whole stack without the flag.
+`profiles: [prod]`. Everything runs unprivileged (`accommodanda` as uid 1000
+matching the host `ferenda` user that owns the bind mounts, `nginx` as uid 101)
+except the `certbot` sidecar, which is root inside its own container.
 
-**One-time host setup**
-
-1. Tag the existing legacy app image so the `ferenda` service can reference it —
-   it can't build from this branch (which deleted `requirements.txt`):
-   `docker tag <old-ferenda-image> lagen-ferenda:legacy`.
-2. Create the read-write data dirs the `accommodanda` service mounts:
-   `/mnt/data/accommodanda` (the corpus / `data_root` — NOT `/mnt/data/ferenda`,
-   which is the unrelated legacy `ferenda` checkout) and `/mnt/data/lagen-wiki`
-   (a clone of the `lagen-wiki` markdown repo — `WIKI_ROOT`).
-3. Point `ferenda.lagen.nu` DNS at the host, then issue the SAN cert covering
-   both vhosts (one-time; `certbot renew`, run automatically by the `certbot`
-   service, only renews an existing cert, it doesn't create one):
-   ```sh
-   docker compose --profile prod up -d nginx certbot   # nginx must be up first to answer the ACME challenge
-   docker compose run --rm certbot certonly --webroot -w /var/www/certbot \
-     -d lagen.nu -d ferenda.lagen.nu \
-     --email staffan.malmgren@gmail.com --agree-tos --non-interactive
-   docker compose restart nginx   # pick up the new cert
-   ```
-   Cert issuance/renewal uses the official `certbot/certbot` image (see the
-   `certbot` service in `docker-compose.yml`) — not the nginx image itself.
-   nginx doesn't auto-reload on renewal, so reload it periodically (e.g. a
-   host cron running `docker compose exec nginx nginx -s reload` weekly is
-   harmless whether or not a cert actually changed).
-
-**Bring-up**
+`accommodanda` is built on the box from this checkout (`docker/accommodanda/Dockerfile`):
+the code is baked in, and it carries the full pipeline toolchain (poppler-utils,
+tesseract+swe, ocrmypdf, raptor2-utils, a JRE + the POI jars), so **download +
+rebuild run in the container** against the read-write corpus mount:
 
 ```sh
-docker compose --profile prod up -d
-```
-
-`accommodanda` is a frozen image: the code is baked in, but it also carries the
-full pipeline toolchain (poppler-utils, tesseract+swe, ocrmypdf, raptor2-utils,
-a JRE + the POI jars), so **download + rebuild run in the container** against the
-read-write corpus mount:
-
-```sh
-docker compose exec accommodanda lagen all download
 docker compose exec accommodanda lagen all rebuild   # parse→relate→index→dump→generate
-docker compose exec accommodanda lagen all index
-# or, without the serving process running:
-docker compose run --rm accommodanda lagen all rebuild
+docker compose exec accommodanda lagen all all       # download too, then rebuild
 ```
 
 One uvicorn process serves the static site + REST API (`lagen all serve`, the
-image `CMD`); the nginx `ferenda.lagen.nu` vhost reverse-proxies to it on `:8000`
-(the app resolves lagen.nu's bare-URL grammar itself, so nginx needs no
-`try_files` rules). The corpus mount is read-write and shared with serving; a
-rebuild writes essentially per-file, but for strict isolation restart the
-service afterwards (`docker compose restart accommodanda`).
+image `CMD`); the `nginx` vhost reverse-proxies to it on `:8000` (the app
+resolves lagen.nu's bare-URL grammar itself, so nginx needs no `try_files`
+rules). TLS for `ferenda.lagen.nu` is issued once with `tools/vps/issue-cert.sh`
+(certbot `--standalone`, before nginx exists) and renewed by the `certbot`
+sidecar thereafter.
+
+**Continuous deploy + nightly sync.** Pushes to `modernization` trigger
+`.github/workflows/deploy.yml` on a self-hosted runner on the VPS (update the
+on-box checkout → build → `up -d` → `lagen all rebuild`); a `ferenda` crontab
+runs `tools/vps/nightly.sh` (`lagen all all`) nightly. See the runbook.
 
 **Bootstrap by rsync (skip the from-scratch rebuild)**
 

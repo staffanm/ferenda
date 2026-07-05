@@ -8,6 +8,8 @@ tng.lagen.nu
 .venv
 site
 config.yml
+.env
+.env~
 mediawiki-db
 __pycache__
 .pytest_cache

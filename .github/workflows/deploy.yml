@@ -1,0 +1,55 @@
+# Continuous deploy to ferenda-vps.
+#
+# Runs on a SELF-HOSTED runner installed on the VPS (as the `ferenda` user, in
+# the docker group) -- see docs/deploy-vps.md for registration. On every push to
+# the deployed branch it fast-forwards the on-box checkout, rebuilds the
+# accommodanda image, brings the stack up, and kicks off an incremental rebuild
+# of the corpus so the new code's parser/render changes take effect.
+#
+# No secrets travel through GitHub: the runner already sits on the box with the
+# checkout, the mounted corpus and docker access. The nightly `lagen all all`
+# (download + rebuild) is a separate host cron, not this workflow.
+
+name: deploy
+
+on:
+  push:
+    branches: [modernization]
+  workflow_dispatch: {}   # allow a manual redeploy from the Actions tab
+
+# Never let two deploys run at once (a rebuild can take a while); queue instead
+# of cancelling a rebuild already in flight.
+concurrency:
+  group: ferenda-vps-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, ferenda-vps]
+    # No actions/checkout: we deploy the persistent on-box checkout, not the
+    # runner's throwaway workspace.
+    steps:
+      - name: Update the on-box checkout to the pushed commit
+        run: |
+          set -euo pipefail
+          cd /srv/ferenda/ferenda
+          git fetch --prune origin
+          git reset --hard "${GITHUB_SHA}"
+
+      - name: Build the accommodanda image
+        run: |
+          set -euo pipefail
+          cd /srv/ferenda/ferenda
+          docker compose build accommodanda
+
+      - name: Bring the stack up (opensearch + app + nginx + certbot)
+        run: |
+          set -euo pipefail
+          cd /srv/ferenda/ferenda
+          docker compose --profile prod up -d
+
+      - name: Incremental rebuild of the corpus with the new code
+        run: |
+          set -euo pipefail
+          cd /srv/ferenda/ferenda
+          docker compose exec -T accommodanda lagen all rebuild
