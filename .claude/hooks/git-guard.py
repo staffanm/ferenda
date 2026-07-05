@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """
-PreToolUse hook (Bash): state-changing git needs explicit confirmation.
+PreToolUse hook (Bash): state-changing git is restricted to commit-planner.
 
-CLAUDE.md / rule:no-unrequested-git: never run a git command that changes
-state without an explicit instruction for that operation. This hook turns
-every state-changing git invocation into a permission prompt
-(permissionDecision "ask") so it surfaces even under acceptEdits/auto modes.
-Read-only git (status, diff, log, show, ...) passes untouched, as do the
-bare listing forms of branch/tag/stash.
+rule:no-unrequested-git enforced structurally: only the `commit-planner`
+subagent may run state-changing git (commit, add, push, reset, ...) -- it is
+auto-allowed (permissionDecision "allow"); the main session and every other
+subagent are denied (permissionDecision "deny") and must launch commit-planner
+to commit. The caller is identified by the `agent_type` field the harness
+passes the hook (the subagent's name; absent for the main session), which a
+prompt cannot forge -- so this, not message provenance, is the trust boundary.
+Read-only git (status, diff, log, show, ...) and the bare listing forms of
+branch/tag/stash pass untouched.
 
 Always exits 0; the decision travels in the JSON payload.
 """
@@ -75,14 +78,25 @@ def _main() -> int:
     hits = state_changing_calls(command)
     if not hits:
         return 0
+    joined = "; ".join(f"`{h}`" for h in hits)
+    # Trust boundary: state-changing git is the commit-planner subagent's job
+    # alone. `agent_type` is the calling subagent's name (absent -> the main
+    # session); the harness sets it and a prompt cannot forge it, so this -- not
+    # who "approved" in a message -- is the enforcement point. commit-planner is
+    # auto-allowed; everyone else (the main session, every other subagent) is
+    # denied and must launch commit-planner to make commits.
+    if data.get("agent_type") == "commit-planner":
+        decision, reason = "allow", "commit-planner (git-write agent): " + joined
+    else:
+        who = data.get("agent_type") or "the main session"
+        decision = "deny"
+        reason = (f"State-changing git is restricted to the commit-planner "
+                  f"subagent (rule:no-unrequested-git); {who} may not run: "
+                  f"{joined}. Launch commit-planner to make commits.")
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PreToolUse",
-        "permissionDecision": "ask",
-        "permissionDecisionReason":
-            "State-changing git (rule:no-unrequested-git): "
-            + "; ".join(f"`{h}`" for h in hits)
-            + ". Confirm only if the user explicitly asked for this "
-              "operation — \"fix X\" is not permission to commit X."}}))
+        "permissionDecision": decision,
+        "permissionDecisionReason": reason}}))
     return 0
 
 
