@@ -28,10 +28,15 @@ from rdflib.namespace import DCTERMS, RDF
 RPUBL = "http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from accommodanda.lib import catalog  # noqa: E402
+from accommodanda.lib import (
+    catalog,
+    layout,
+)
 
-DISTILLED = "site/data/dv/distilled"
-ARTIFACTS = "site/data/dv/artifact"
+# The distilled RDF oracle is temporary scaffolding, not a long-lived artifact,
+# so it is NOT under data_root -- it lives in the old checkout (source-first
+# layout). This is only the default; override with --distilled.
+DISTILLED_DEFAULT = "../ferenda.old/data/dv/distilled"
 BASE = "https://lagen.nu/"
 
 
@@ -76,7 +81,9 @@ def new_refs(art):
 def index_new():
     """doc-uri -> new artifact path, over all DV artifacts."""
     out = {}
-    for p in glob.glob(ARTIFACTS + "/*.json"):
+    # layout.artifacts filters out index sidecars (identity-index.json), which a
+    # raw glob of the dv artifact dir would choke on (it's a JSON list, not a doc)
+    for p in layout.artifacts("dv"):
         raw = Path(p).read_bytes()
         if raw.strip():
             out[json.loads(raw)["uri"]] = p
@@ -87,12 +94,19 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--limit", type=int)
     ap.add_argument("--show", type=int, default=10, help="example diffs")
+    ap.add_argument("--distilled", default=DISTILLED_DEFAULT,
+                    help="old-pipeline distilled RDF oracle tree (scaffolding; "
+                         "default %(default)s)")
     args = ap.parse_args()
 
     new_by_uri = index_new()
     print("indexed %d new DV artifacts by uri" % len(new_by_uri))
 
-    rdfs = sorted(glob.glob(DISTILLED + "/*/*.rdf"))
+    rdfs = sorted(glob.glob(args.distilled + "/*/*.rdf"))
+    if not rdfs:   # raise, not assert: a missing/mistyped --distilled must fail
+                   # loudly (even under `python -O`), not report a false-clean golden
+        raise SystemExit("no distilled oracle .rdf files under %s -- the DV golden "
+                         "is temporary scaffolding (see --distilled)" % args.distilled)
     if args.limit:
         rdfs = rdfs[:args.limit]
 

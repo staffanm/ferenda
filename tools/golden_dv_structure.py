@@ -1,6 +1,6 @@
 """DV structural golden -- the instance/ruling skeleton oracle (REWRITE.md §4).
 
-The old pipeline's parsed XHTML+RDFa (``site/data/dv/parsed/{COURT}/{id}.xhtml``)
+The old pipeline's parsed XHTML+RDFa (``site/data/parsed/dv/{COURT}/{id}.xhtml``)
 segmented each referat into its decision structure, which the distilled-RDF
 oracle (``golden_dv.py``) does not capture:
 
@@ -51,11 +51,15 @@ from pathlib import Path
 from lxml import etree
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from accommodanda import config  # noqa: E402
+from accommodanda.lib import (
+    layout,
+)
 
 XHTML = "http://www.w3.org/1999/xhtml"
-PARSED = str(config.DATA / "dv" / "parsed")
-ARTIFACTS = str(config.DATA / "dv" / "artifact")
+# The parsed-XHTML oracle is temporary scaffolding, not a long-lived artifact,
+# so it is NOT under data_root -- it lives in the old checkout (source-first
+# layout). This is only the default; override with --parsed.
+PARSED_DEFAULT = "../ferenda.old/data/dv/parsed"
 
 # the decision-structure block kinds, in document order of nesting. bodymeta
 # (the referat headnote/keywords) and endmeta (sökord/litteratur trailer) are
@@ -176,7 +180,9 @@ def load_golden_sfs():
 def index_new():
     """doc-uri -> new artifact path, over all DV artifacts."""
     out = {}
-    for p in glob.glob(ARTIFACTS + "/*.json"):
+    # layout.artifacts filters out index sidecars (identity-index.json), which a
+    # raw glob of the dv artifact dir would choke on (it's a JSON list, not a doc)
+    for p in layout.artifacts("dv"):
         raw = Path(p).read_bytes()
         if raw.strip():
             out[json.loads(raw)["uri"]] = p
@@ -192,7 +198,11 @@ def signature(problem):
 def cmd_validate(args, golden_sfs):
     new_by_uri = index_new()
     print("indexed %d new DV artifacts by uri" % len(new_by_uri))
-    files = sorted(glob.glob(PARSED + "/*/*.xhtml"))
+    files = sorted(glob.glob(args.parsed + "/*/*.xhtml"))
+    if not files:   # raise, not assert: a missing/mistyped --parsed must fail
+                    # loudly (even under `python -O`), not report a false-clean golden
+        raise SystemExit("no parsed oracle .xhtml files under %s -- the DV structure "
+                         "golden is temporary scaffolding (see --parsed)" % args.parsed)
     if args.limit:
         files = files[:args.limit]
 
@@ -244,6 +254,9 @@ def main():
     v = sub.add_parser("validate", help="corpus structure cross-check")
     v.add_argument("--limit", type=int)
     v.add_argument("--top", type=int, default=20)
+    v.add_argument("--parsed", default=PARSED_DEFAULT,
+                   help="old-pipeline parsed XHTML oracle tree (scaffolding; "
+                        "default %(default)s)")
     args = ap.parse_args()
 
     if args.command == "normalize":
