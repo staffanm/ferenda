@@ -109,7 +109,8 @@ the new one can be checked against it. The old pipeline can no longer run
 (it depends on `pkg_resources`, dropped by modern setuptools), so its
 final output *is* the spec.
 
-- ✅ **The golden corpus *is* `site/data/sfs/parsed/`** — the old pipeline's
+- ✅ **The golden corpus *is* `../ferenda.old/data/sfs/parsed/`** (the old
+  checkout, not `site/data/`) — the old pipeline's
   parsed XHTML+RDFa output (11,056 SFS documents; the 174 zero-byte files are
   old-pipeline dummies for removed/expired docs). There is **no separate frozen
   golden tree and no `freeze` step**: `tools/golden_sfs.py normalize` transforms a
@@ -215,9 +216,9 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
   passthrough; one JSON `_source` per consolidated act (body + register +
   amendments) replaces the old two-page SFST+SFSR scrape. `search_after`
   enumeration (past ES's 10k window), incremental/`--full`, atomic writes.
-  **13,789 acts.** New JSON lives flat at `downloaded/{y}/{n}.json`; legacy HTML
-  in `downloaded/sfst|sfsr/`; superseded consolidations archived to
-  `archive/downloaded/{y}/{n}/.versions/{vy}/{vn}.json` (keyed on the
+  **13,789 acts.** New JSON lives flat at `downloaded/sfs/{y}/{n}.json`; legacy
+  HTML in `downloaded/sfs/sfst|sfsr/`; superseded consolidations archived to
+  `downloaded/sfs/archive/{y}/{n}/.versions/{vy}/{vn}.json` (keyed on the
   `andringInford` legal version, not checksum). `test/test_sfs_download.py`.
 - ✅ **JSON-or-HTML parse selection** — `load_inputs` prefers the new JSON over the
   legacy HTML; `register_from_source`/`sfst_header_from_source` map it onto the
@@ -227,11 +228,11 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
 - ✅ **Version history / time travel / diff** (`sfs/versions.py`, `lib/diff.py`,
   the `versions` Stage) — the old archive machinery's user-facing features,
   rebuilt over artifacts. The `versions` stage parses every archived
-  consolidation (the ~31k legacy HTML snapshots in `archive/downloaded/…/
+  consolidation (the ~31k legacy HTML snapshots in `downloaded/sfs/archive/…/
   .versions/` — both rättsdatabaser generations — plus the new downloader's
   JSON) through the same extract→assemble→NF chain into
-  `archive/artifact/…/.versions/{vy}/{vn}.json` + a per-statute
-  `artifact/{y}/{n}.versions.json` sidecar. Version ids are consolidation
+  `artifact/sfs/archive/…/.versions/{vy}/{vn}.json` + a per-statute
+  `artifact/sfs/{y}/{n}.versions.json` sidecar. Version ids are consolidation
   cutoffs ("t.o.m. SFS 2003:466"); legacy counter-keyed archives ("11.html")
   get their real cutoff recovered from the header, duplicates skipped, junk
   recorded in the sidecar rather than retried forever. `generate` renders each
@@ -331,7 +332,7 @@ horizontal pieces: KORTLAGRUM citations and the cross-source link graph.
   publication service at `rattspraxis.etjanst.domstol.se` (open JSON API
   behind an Angular SPA): `POST /api/v1/sok` paginates the whole corpus,
   `GET /api/v1/bilagor/{id}` for PDFs. Records stored verbatim as
-  `site/data/domstol/downloaded/{domstolKod}/{uuid}.json` + attachments.
+  `site/data/downloaded/dom/{domstolKod}/{uuid}.json` + attachments.
   Incremental (newest-first, stops at first seen page) and `--full`
   (oldest-first) modes; idempotent, atomic writes, politeness delay.
 - ✅ **Full harvest done:** 17,254 records across 22 courts (1981–today),
@@ -361,7 +362,7 @@ horizontal pieces: KORTLAGRUM citations and the cross-source link graph.
   - **Result on the real corpus: 18,728 canonical cases — 14,838 linked
     across both sources, 2,252 API-only (post-feed + 6 new courts), 1,638
     legacy-only** (825 NJA notisfall the API doesn't carry, 514 older AD
-    referat, 231 HSV, …). Index at `site/data/dv/identity-index.json`.
+    referat, 231 HSV, …). Index at `site/data/artifact/dom/identity-index.json`.
   - `test/test_dv_identity.py` (linkage, reconstruction,
     court-scoping/no-over-link, attachment grouping).
 
@@ -447,7 +448,7 @@ below is not optional polish, it's the only way they enter the corpus.
   - Summary-only nämnd records (no `innehall`) get the sammanfattning as
     body downstream.
 - ✅ **DV golden corpus (reference graph)** — `tools/golden_dv.py`. The old
-  pipeline's distilled RDF (`site/data/dv/distilled/{COURT}/{id}.rdf`, 15,858
+  pipeline's distilled RDF (`../ferenda.old/data/dv/distilled/{COURT}/{id}.rdf`, 15,858
   files) is the frozen oracle: per case a document URI + its
   `dcterms:references` set. Cases match by URI (which now agree — the RDF shows
   `dom/rh/2009:37`, **independently confirming the case-URI re-minting**).
@@ -461,7 +462,7 @@ below is not optional polish, it's the only way they enter the corpus.
   gaps. ⬜ Metadata-field comparison (referatrubrik, dates) still to add.
 - 🚧 **DV structural golden (instance/ruling skeleton)** — `tools/golden_dv_structure.py`,
   a *second* DV oracle, complementing the reference-graph one above. The old
-  pipeline's parsed XHTML+RDFa (`site/data/dv/parsed/{COURT}/{id}.xhtml`, which
+  pipeline's parsed XHTML+RDFa (`../ferenda.old/data/dv/parsed/{COURT}/{id}.xhtml`, which
   the distilled RDF does not capture) segmented each referat into its decision
   structure — instance stages (`div.instans`, `dcterms:creator` = court), the
   föredragande/revisionssekreterare **betänkande** as a sibling of the court's
@@ -570,7 +571,7 @@ below is not optional polish, it's the only way they enter the corpus.
   action builds stale upstream first; `--no-deps` scopes). `--force`, `-j`
   (process pool), `-n`/`--dry-run`, `status`. `test/test_build.py`.
   - ✅ **`parse` stage wired for SFS + DV** — finally *persists* artifacts:
-    `site/data/sfs/artifact/<y>/<n>.json` and `site/data/dv/artifact/<slug>.json`
+    `site/data/artifact/sfs/<y>/<n>.json` and `site/data/artifact/dom/<slug>.json`
     (DV driven by the identity index). This is Stage B (artifact corpus on
     disk) from §6.
   - ✅ **`download` wired for SFS + DV**, two modes split on whether a basefile
@@ -591,7 +592,7 @@ below is not optional polish, it's the only way they enter the corpus.
     so new cases are immediately parse-visible — one whole-corpus pass at the
     end (the index is a global union-find, not incrementally updatable; needs
     no parsing, keys come from raw fields + legacy filenames). Index lives at
-    `site/data/dv/identity-index.json`.
+    `site/data/artifact/dom/identity-index.json`.
   - ✅ **Driver progress logging** — `run_action` prints a throttled
     single-line `\r` counter to stderr (`parse 5400/11228  ran … err …`) every
     50 docs; the per-document loop was otherwise silent until the final report.
@@ -636,6 +637,12 @@ to a future per-doc incremental generate.
   `rebuild()` is per-source (drop + re-insert that source's rows),
   single-process and transactional (sidesteps multi-writer SQLite
   contention). `lagen all relate` → **catalog at `site/data/catalog.sqlite`**.
+  `documents.path` is stored **`data_root`-relative** (relative to the catalog
+  file's own directory), never absolute — so the catalog is *portable*: rsync a
+  dev catalog to a deploy host with a different `data_root` and every artifact
+  still resolves. Read sites resolve through `catalog.data_root(con)` /
+  `catalog.artifact_path(root, stored)`; `rebuild()` migrates any pre-relative
+  absolute rows in place (`_relativize_paths`) on the host that built them.
 - ✅ **Cross-source inbound-link graph** — the killer feature, working
   end-to-end. `catalog.inbound(con, uri)` = the distinct docs citing exactly
   that fragment uri. Verified on the partial corpus: **2,037 cases cite
@@ -793,7 +800,7 @@ to a future per-doc incremental generate.
     FastAPI `TestClient` over a fixture catalog + faked search — no live cluster.
     `test/test_api.py`.
   - ✅ **NDJSON bulk dumps** (`lib/dump.py`, `lagen <src> dump`) — every
-    `<source>/artifact/**.json` re-serialised one-per-line, gzipped, to
+    `artifact/<source>/**.json` re-serialised one-per-line, gzipped, to
     `site/data/dumps/<source>.ndjson.gz`. Each line round-trips to its on-disk
     artifact; the citation graph is already inline, so a line is self-contained
     (no catalog read, no transform). Listed at `/api/v1/dumps`. Verified on the
@@ -882,7 +889,7 @@ them resolve.
   - Incremental (newest-first, stop at first on-disk) + `--full`; atomic writes;
     browser UA (regeringen.se 403s bots); politeness delay. Stores per doc:
     `<slug>.json` record + landing `<slug>.html` + content PDF(s) under
-    `site/data/forarbete/downloaded/<type>/`. `test/test_forarbete_download.py`.
+    `site/data/downloaded/forarbete/<type>/`. `test/test_forarbete_download.py`.
   - ⬜ **Older-period sources** (riksdagen data API, KB scans) — regeringen.se
     only reaches back ~1990s; the same-identifier basefile means these slot in
     as alternate sources later (the old pipeline's CompositeRepository idea).
@@ -949,7 +956,7 @@ them resolve.
 ### 7c. Wiki value-add — kommentar + begrepp ✅ (first cut)
 
 The hand-authored MediaWiki content (the dump in
-`site/data/mediawiki/downloaded/`) imported as **two ordinary sources**, proving
+`site/data/downloaded/mediawiki/`) imported as **two ordinary sources**, proving
 the manually-written value-add flows through the identical artifact → catalog →
 inbound → render pipeline as the machine-extracted sources.
 
@@ -1107,7 +1114,7 @@ law, keyed by **CELEX** (the basefile throughout).
   `is_external`); only *un-parsed* EU acts still fall back to the external EUR-Lex
   href — exactly the §6 "becomes live once parsed" promise, now for EU law.
 - ✅ **Corpus on disk:** ~102k EU documents parsed to artifacts
-  (`site/data/eurlex/artifact/`); manifestation mix ~73k Formex / ~11k HTML / 122
+  (`site/data/artifact/eurlex/`); manifestation mix ~73k Formex / ~11k HTML / 122
   PDF. `test/test_eurlex_parse.py` (Formex, 11 tests), `test/test_eurlex_html.py`
   (HTML/PDF fallback, 5).
 - ✅ **Defined-terms extraction + in-act interlinking** (`eurlex/definitions.py`).
@@ -1700,7 +1707,7 @@ model + extraction.
 | Path | What |
 |---|---|
 | `tools/golden_sfs.py` | golden-corpus comparator (`normalize` parsed XHTML → NF on the fly) |
-| `site/data/sfs/parsed/` | the golden = old-pipeline parsed XHTML (11,056 docs), normalized per comparison |
+| `../ferenda.old/data/sfs/parsed/` | the golden = old-pipeline parsed XHTML (11,056 docs), normalized per comparison — sibling checkout, not `site/data/` |
 | `accommodanda/lib/` | **shared** horizontal libs: `lagrum` (citation engine), `util`, `errors` (`SkipDocument`) |
 | `accommodanda/sfs/` | **acts vertical**: `{extract,reader,model,tokenizer,assembler,nf}` parser + `register` (SFSR→amendments/förarbeten/metadata) + `__main__` (validate CLI) |
 | `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `structure`, `word`, `legacy`, `namedcases` (HD named-precedent harvester); canonical case title + HD given names live in `lib/casenaming.py` (shared with the catalog + renderer) |
@@ -1714,13 +1721,13 @@ model + extraction.
 | `accommodanda/lib/pdftext.py` | **shared font-aware PDF extraction** (förarbete + föreskrift + avg (JO/ARN) + remisser): `pdf_pages` (`pdftohtml -xml` → bold/italic-tagged `Line`s) → `page_paragraphs` (reflow, strip running header/page-no/TOC — `identifier=None` skips header-stripping for sources with no fixed masthead, e.g. remisser) → the vertical's own `classify` |
 | `accommodanda/config.py`, `lib/layout.py`, `lib/net.py` | runtime config (`config.yml`/`data_root`, also resolves `legacy_root`/`LEGACY_ROOT` for the §7g frozen-corpus imports), centralized document layout (`page_relpath` on-disk file ↔ `page_url`/`url_to_relpath` public lagen.nu address), resilient HTTP session + harvest progress reporter |
 | `accommodanda/lib/legacy_import.py` | shared frozen-import core (§7g): `should_write` (live-wins / own-import-idempotent-unless-force / optional `better()` tie-break), `rel` (in-place LEGACY_ROOT-relative body references), `iter_entries`/`docdir`/`read_record` (frozen-tree walk primitives) — used by `forarbete/legacy.py`, `foreskrift/legacy.py`, `avg/legacy.py` |
-| `site/data/eurlex/` | harvested EU corpus (`notice.ttl` + best manifestation per language) + artifacts |
+| `site/data/{downloaded,artifact}/eurlex/` | harvested EU corpus (`notice.ttl` + best manifestation per language) + artifacts |
 | `test/test_eurlex_parse.py`, `test/test_eurlex_html.py`, `test/test_eurlex_definitions.py` | EU parser + defined-terms suites |
 | `accommodanda/lib/wikitext.py` | shared MediaWiki-dump parser (wikilinks + citation engine → runs) |
 | `accommodanda/wiki/` | **kommentar + begrepp sources**: `parse` (commentary anchored to §§, concept glossary) |
-| `site/data/mediawiki/downloaded/` | MediaWiki dump (SFS commentary + concept pages) |
+| `site/data/downloaded/mediawiki/` | MediaWiki dump (SFS commentary + concept pages) |
 | `test/test_wiki.py` | wiki parsing suite |
-| `site/data/forarbete/downloaded/<type>/` | harvested förarbeten (record json + landing html + content pdf) + frozen-import records |
+| `site/data/downloaded/forarbete/<type>/` | harvested förarbeten (record json + landing html + content pdf) + frozen-import records |
 | `test/test_forarbete_download.py` | förarbete downloader parsing suite (incl. `pm`) |
 | `test/test_forarbete_riksdagen.py` | `bet`/utskottsbetänkanden downloader suite (data.riksdagen.se) |
 | `test/test_forarbete_legacy.py`, `test/test_forarbete_legacy_formats.py` | förarbete frozen-corpus import + body-adapter suites |
@@ -1738,11 +1745,11 @@ model + extraction.
 | `site/data/catalog.sqlite` | derived catalog (documents + links) |
 | `site/data/generated/` | generated static site (`index.html`, `sfs/`, `dom/`) |
 | `test/test_site.py` | derived-layer suite |
-| `site/data/sfs/register/` | downloaded SFSR register pages (11,231) |
+| `site/data/downloaded/sfs/sfsr/` | downloaded SFSR register pages (11,231) |
 | `site/data/.build/manifest.json` | build freshness state (input + recipe hashes) |
-| `site/data/{sfs,dv}/artifact/` | persisted parse artifacts (the source of truth) |
+| `site/data/artifact/{sfs,dom}/` | persisted parse artifacts (the source of truth) |
 | `python -m accommodanda.sfs` | `parse` / `validate` / `refs` diagnostic CLI |
-| `site/data/dv/identity-index.json` | canonical case → source records |
+| `site/data/artifact/dom/identity-index.json` | canonical case → source records |
 | `test/test_dv_identity.py`, `test_dv_parse.py` | DV suites |
 | `test/test_lagrum.py` | citation test suite |
 | `test/test_sfs_parse.py` | SFS structure + inline-link oracle suite |
@@ -1751,8 +1758,8 @@ model + extraction.
 | `test/test_sfs_download.py` | SFS downloader version/archiving suite |
 | `test/files/` | hand-authored fixture corpora (oracle) |
 | `lagen/nu/res/extra/sfs.ttl` | named-law dataset (live site data) |
-| `site/data/dv/` | legacy DV feed (Word docs) |
-| `site/data/domstol/` | new DV API harvest |
+| `site/data/downloaded/dv/` | legacy DV feed (Word docs) |
+| `site/data/downloaded/dom/` | new DV API harvest |
 
 ## Conventions (from CLAUDE.md)
 

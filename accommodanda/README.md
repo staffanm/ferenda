@@ -169,21 +169,22 @@ editing" below).
 
 ## Running the pipelines
 
-**SFS** (operates on the golden / downloaded trees under `site/data/sfs/`):
+**SFS** (operates on `site/data/{downloaded,artifact}/sfs/`, validated against
+the golden corpus in the old checkout, `../ferenda.old/data/sfs/parsed/`):
 
 ```sh
-uv run python -m accommodanda.sfs parse site/data/sfs/downloaded/2018/585.json --basefile 2018:585
-# golden = the old pipeline's parsed XHTML (site/data/sfs/parsed), normalized to NF on the fly
-uv run python -m accommodanda.sfs validate site/data/sfs/parsed site/data/sfs/downloaded --sections structure,references
+uv run python -m accommodanda.sfs parse site/data/downloaded/sfs/2018/585.json --basefile 2018:585
+# golden = the old pipeline's parsed XHTML (scaffolding in the old checkout), normalized to NF on the fly
+uv run python -m accommodanda.sfs validate ../ferenda.old/data/sfs/parsed site/data/downloaded/sfs --sections structure,references
 uv run python -m accommodanda.sfs refs FILE PARSED.xhtml  # citation diff for one doc
 ```
 
 **SFS version history** (historical consolidations / time travel / diff): the
 downloader archives every superseded consolidation under
-`site/data/sfs/archive/downloaded/{y}/{n}/.versions/` (the old site's two HTML
+`site/data/downloaded/sfs/archive/{y}/{n}/.versions/` (the old site's two HTML
 generations live there too, imported wholesale). The `versions` stage parses
-them into `archive/artifact/…/.versions/{vy}/{vn}.json` plus a per-statute
-`artifact/{y}/{n}.versions.json` sidecar; `generate` then renders one page per
+them into `artifact/sfs/archive/…/.versions/{vy}/{vn}.json` plus a per-statute
+`artifact/sfs/{y}/{n}.versions.json` sidecar; `generate` then renders one page per
 historical lydelse at `/{sfsnr}/konsolidering/{version}` (watermarked
 "Inaktuell författning"), the statute page grows a "Jämför lydelser" panel and
 the bottom-of-page **Ändringar och övergångsbestämmelser** register view (per
@@ -199,24 +200,24 @@ uv run python -m accommodanda.build sfs versions            # incremental, all s
 uv run python -m accommodanda.build sfs versions 1998:204   # one statute
 ```
 
-**DV** (operates on `site/data/domstol/` (API) and `site/data/dv/` (legacy)):
+**DV** (operates on `site/data/downloaded/dom/` (API) and `site/data/downloaded/dv/` (legacy)):
 
 ```sh
 # download + build the identity index
-uv run python -m accommodanda.dv.download site/data/domstol/downloaded   # [--full] [--no-bilagor] [--limit N]
-uv run python -m accommodanda.dv.identity                       # -> site/data/dv/identity-index.json
+uv run python -m accommodanda.dv.download site/data/downloaded/dom   # [--full] [--no-bilagor] [--limit N]
+uv run python -m accommodanda.dv.identity                       # -> site/data/artifact/dom/identity-index.json
 
 # parse (API path is driver-owned; `[ids…]` parses just those, empty = all stale)
 uv run python -m accommodanda.build dv parse                                       # API path, incremental
-uv run python -m accommodanda.dv.legacy --index site/data/dv/identity-index.json   # legacy POI path, batch report
-uv run python -m accommodanda.dv.legacy site/data/dv/downloaded/ADO/1993-100_1.doc # one Word file -> artifact
+uv run python -m accommodanda.dv.legacy --index site/data/artifact/dom/identity-index.json   # legacy POI path, batch report
+uv run python -m accommodanda.dv.legacy site/data/downloaded/dv/ADO/1993-100_1.doc # one Word file -> artifact
 ```
 
 The DV parsers are driven by the identity index: each canonical case is
 parsed from its single best source — the API record when present, the
 legacy Word original otherwise (no cross-source merge; see REWRITE.md §4).
 
-**avg — JO + JK + ARN decisions** (operates on `site/data/avg/`):
+**avg — JO + JK + ARN decisions** (operates on `site/data/{downloaded,artifact}/avg/`):
 
 ```sh
 uv run python -m accommodanda.build avg download        # all three organs; or: … download jo
@@ -224,8 +225,11 @@ uv run python -m accommodanda.build avg parse           # incremental, like ever
 uv run python -m accommodanda.build avg download jo --only jo/2340-2025   # one decision
 ```
 
-**remisser — regeringen.se referral responses** (operates on `site/data/remisser/`;
-never `relate`d/`generate`d — see the module map above):
+**remisser — regeringen.se referral responses** (operates on
+`site/data/{downloaded,artifact}/remisser/` — case records and answer PDFs
+share one download tree, `site/data/downloaded/remisser/<case>.json` beside
+`site/data/downloaded/remisser/<case>/<org>.pdf`; never `relate`d/`generate`d
+— see the module map above):
 
 ```sh
 uv run python -m accommodanda.build remisser download                    # harvest new cases + re-poll open ones
@@ -260,8 +264,8 @@ content layout is `concept/<Name>.md` (frontmatter `title:`) and
 `commentary/<source>/<relpath>.md` (frontmatter `annotates:`) — the commentary
 is filed under the source it annotates and that source's basefile→path rule, so
 `SFS/1915:218` lives at `commentary/sfs/1915/218.md`. The parsed artifact mirrors
-this — `kommentar/artifact/<host_source>/<host_relpath>.json` (e.g.
-`kommentar/artifact/eurlex/2023/32023R2854.json`), reusing the host source's own
+this — `site/data/artifact/kommentar/<host_source>/<host_relpath>.json` (e.g.
+`site/data/artifact/kommentar/eurlex/2023/32023R2854.json`), reusing the host source's own
 path transform (`layout.kommentar_host`) so commentaries on different sources can
 never collide on one flat name. Concept links are
 `[label](begrepp:Concept)`, external links are ordinary markdown
@@ -328,7 +332,7 @@ Given a **CELEX** instead of a URL, it looks the page(s) up in an index built by
 guidance sites' sitemaps (`guidance_discover.GUIDANCE_SITES` — only DG CONNECT's
 `digital-strategy.ec.europa.eu/en/policies/<slug>` hubs follow an enumerable
 per-act shape today; sibling DG sites stay manual) and records, per act CELEX, the
-hub pages that link it (`site/data/kommentar/guidance-index.json`). The DG WAF
+hub pages that link it (`site/data/artifact/kommentar/guidance-index.json`). The DG WAF
 429s a random slice of every run, so the index **merges across runs and
 converges** — re-run to fill the gaps, or `--force` for a clean authoritative
 rebuild when the rate budget is fresh. So the usual flow is `discover-guidance`
@@ -340,7 +344,7 @@ Guidance *published in the OJ* is a different animal — it gets its own sector-
 the corpus as an ordinary eurlex document, not as an external `.ann` link
 (sector-5 harvest is not wired yet).
 
-The action downloads + caches each PDF (under `kommentar/guidance/`), flattens it
+The action downloads + caches each PDF (under `site/data/downloaded/kommentar/guidance/`), flattens it
 to page-marked text, and asks the configured Berget model to map guidance sections
 (FAQ questions) to the act's **fine-grained targets** — not just whole articles but
 the sub-articles and recitals the act divides into: a single definition `2.21`, a
@@ -415,19 +419,18 @@ The pipelines read large data trees that live under `site/data/` (not all
 committed):
 
 ```
-site/data/sfs/downloaded/                     # SFS raw (beta JSON + legacy sfst/sfsr HTML)
-site/data/sfs/parsed/                         # old pipeline's frozen golden corpus (XHTML)
-site/data/sfs/artifact/                       # parsed JSON artifacts (+ .versions.json sidecars)
-site/data/sfs/archive/{downloaded,artifact}/  # superseded consolidations, raw + parsed
-site/data/domstol/downloaded/                 # DV new-API harvest (per court)
-site/data/dv/{downloaded,intermediate}/       # DV legacy feed (.doc/.docx + old XML)
-site/data/dv/identity-index.json              # canonical case -> source records
-site/data/avg/downloaded/{jo,jk,arn}/         # JO/JK/ARN records (+ jo/arn PDFs, jk landing html)
-site/data/forarbete/downloaded/<type>/        # regeringen.se harvest + frozen-import records (prop/sou/ds/pm/dir/fm/skr/so/lr)
-site/data/forarbete/downloaded/bet/           # data.riksdagen.se harvest (utskottsbetänkanden; record json + PDF, no HTML landing page)
-site/data/forarbete/ocr/<type>/               # optional re-OCR sidecar PDFs (win over frozen scans)
-site/data/remisser/cases/                     # regeringen.se remiss case records (Remiss json)
-site/data/remisser/downloaded/<case-slug>/    # per-organisation answer PDFs
+site/data/downloaded/sfs/                     # SFS raw (beta JSON + legacy sfst/sfsr HTML)
+site/data/artifact/sfs/                       # parsed JSON artifacts (+ .versions.json sidecars)
+site/data/{downloaded,artifact}/sfs/archive/  # superseded consolidations, raw + parsed
+site/data/downloaded/dom/                     # DV new-API harvest (per court)
+site/data/downloaded/dv/                      # DV legacy feed (.doc/.docx)
+site/data/artifact/dom/identity-index.json    # canonical case -> source records
+site/data/downloaded/avg/{jo,jk,arn}/         # JO/JK/ARN records (+ jo/arn PDFs, jk landing html)
+site/data/downloaded/forarbete/<type>/        # regeringen.se harvest + frozen-import records (prop/sou/ds/pm/dir/fm/skr/so/lr)
+site/data/downloaded/forarbete/bet/           # data.riksdagen.se harvest (utskottsbetänkanden; record json + PDF, no HTML landing page)
+site/data/ocr/forarbete/<type>/               # optional re-OCR sidecar PDFs (win over frozen scans)
+site/data/downloaded/remisser/<case-slug>.json  # regeringen.se remiss case record (Remiss json)
+site/data/downloaded/remisser/<case-slug>/      # its per-organisation answer PDFs (beside the record)
 ```
 
 The frozen legacy corpora (REWRITE.md §7g) are NOT under `site/data/`: import
@@ -586,3 +589,19 @@ image `CMD`); the nginx `ferenda.lagen.nu` vhost reverse-proxies to it on `:8000
 `try_files` rules). The corpus mount is read-write and shared with serving; a
 rebuild writes essentially per-file, but for strict isolation restart the
 service afterwards (`docker compose restart accommodanda`).
+
+**Bootstrap by rsync (skip the from-scratch rebuild)**
+
+A full first `relate`/`generate` over the ~200K-document corpus is slow. Since
+the catalog stores `data_root`-relative paths (see REWRITE.md §6 — the catalog is
+*portable*), you can seed a new host from an already-built dev corpus instead:
+rsync the artifact tree, `catalog.sqlite`, and `generated/` into the host's
+`data_root`, then let the host update incrementally (`lagen all rebuild` only
+re-does what changed). The paths resolve against the host's own `data_root`, not
+the dev machine's.
+
+One caveat: migrate the dev catalog **before** rsyncing. An older catalog holds
+absolute paths; `rebuild()` rewrites them to relative in place, but only on the
+host where those absolute paths are valid (it fails loud otherwise). Run
+`lagen all relate` on dev once — it re-relates every source and relativises the
+whole catalog — then rsync.
