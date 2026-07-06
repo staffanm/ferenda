@@ -14,6 +14,8 @@ import gzip
 import json
 from pathlib import Path
 
+from . import compress
+
 
 def dump_source(artifact_paths, out_path, progress=None):
     """Write every artifact in `artifact_paths` as one NDJSON line to the
@@ -27,7 +29,7 @@ def dump_source(artifact_paths, out_path, progress=None):
     # few percent larger output; the dumps carry no byte-identity contract
     with gzip.open(out_path, "wt", encoding="utf-8", compresslevel=6) as fh:
         for i, path in enumerate(map(Path, artifact_paths)):
-            raw = path.read_bytes()
+            raw = compress.read_bytes(path)      # decompressed artifact bytes
             if raw.strip():
                 json.dump(json.loads(raw), fh, ensure_ascii=False,
                           separators=(",", ":"))

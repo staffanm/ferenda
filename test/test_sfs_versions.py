@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from accommodanda.api.app import app
-from accommodanda.lib import layout
+from accommodanda.lib import compress, layout
 from accommodanda.sfs import versions
 
 FILES = Path(__file__).parent / "files" / "sfs" / "versions"
@@ -160,8 +160,8 @@ def test_build_writes_artifacts_and_sidecar(archive):
     assert skipped["12"]["duplicate_of"] == "2003:466"
     assert "error" in skipped["13"]
     art_path = layout.sfs_version_artifact("1998:204", "2003:466")
-    assert art_path.exists()
-    assert json.loads(art_path.read_text())["version"] == "2003:466"
+    assert compress.exists(art_path)        # stored precompressed (.json.br)
+    assert json.loads(compress.read_bytes(art_path))["version"] == "2003:466"
     on_disk = json.loads(layout.sfs_versions_sidecar("1998:204").read_text())
     assert on_disk == sidecar
 

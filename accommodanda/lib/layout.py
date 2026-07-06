@@ -23,6 +23,7 @@ from pathlib import Path
 from urllib.parse import quote, unquote
 
 from .. import config
+from . import compress
 from .catalog import BASE, local, strip_fragment
 from .util import basefile_slug
 
@@ -181,9 +182,17 @@ def artifacts(source):
     companion to `artifact`, so the tree layout has one home and a consumer
     can't drift out of sync with it by hand-globbing. Non-document json that
     happens to live in the artifact dir (the identity/guidance index sidecars,
-    the sfs `.versions.json` layers) is excluded -- it is not a corpus document."""
-    return sorted(p for p in artifact_dir(source).glob("**/*.json")
-                  if _is_document_artifact(p))
+    the sfs `.versions.json` layers) is excluded -- it is not a corpus document.
+
+    Artifacts are stored precompressed (lib/compress), so a document may be on
+    disk as `.json`, `.json.br` or `.json.gz`; each is mapped back to its logical
+    `.json` path (deduplicated). The transparent read/stat helpers resolve that
+    logical path to whatever variant is present, so every consumer keeps working
+    on logical paths regardless of the on-disk storage format."""
+    root = artifact_dir(source)
+    logical = {compress.logical(p) for suffix in ("", *compress.SUFFIXES)
+               for p in root.glob("**/*.json" + suffix)}
+    return sorted(p for p in logical if _is_document_artifact(p))
 
 
 # --------------------------------------------------------------------------

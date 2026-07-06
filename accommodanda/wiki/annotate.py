@@ -40,7 +40,7 @@ from pathlib import Path
 import requests
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
-from ..lib import layout, llm, markdown
+from ..lib import compress, layout, llm, markdown
 from ..lib.eu_structure import anchored_blocks
 from ..lib.text import runs_text
 from ..lib.util import normalize_space
@@ -222,10 +222,10 @@ def annotate(basefile, wiki_root):
     assert sources, \
         "%s declares no `guidance:` sources in frontmatter -- nothing to link" % src
     host_path = layout.artifact("eurlex", celex)
-    assert host_path.exists(), \
+    assert compress.exists(host_path), \
         ("%s: no parsed host artifact at %s -- run `lagen eurlex parse %s` first"
          % (basefile, host_path, celex))
-    host_art = json.loads(host_path.read_text())
+    host_art = json.loads(compress.read_bytes(host_path))
     act, anchors = act_map(host_art)
     assert anchors, "%s host act %s has no anchors to link against" % (basefile, celex)
 

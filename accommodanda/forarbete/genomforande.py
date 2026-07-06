@@ -19,9 +19,8 @@ catalog (never the SFS vertical -- the statute corpus is read through the catalo
 """
 
 import json
-from pathlib import Path
 
-from ..lib import catalog
+from ..lib import catalog, compress
 from . import kommentar
 
 
@@ -39,7 +38,7 @@ def _index(con):
 
 
 def _ikraft(path):
-    props = json.loads(Path(path).read_text()).get("metadata", {}).get(
+    props = json.loads(compress.read_bytes(path)).get("metadata", {}).get(
         "properties", {})
     return props.get("rpubl:ikrafttradandedatum")
 
@@ -74,7 +73,7 @@ def resolve(con):
     ).fetchall()
     rows = []
     for prop_uri, prop_path in props:
-        art = json.loads((root / prop_path).read_text())
+        art = json.loads(compress.read_bytes(root / prop_path))
         prop_date, prop_label = art.get("date"), art.get("identifier")
         for rec in art.get("implements", []):
             sfs_uri = _resolve_law(rec.get("law"), prop_date, title_idx, path_idx)

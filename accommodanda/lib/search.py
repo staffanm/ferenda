@@ -29,14 +29,13 @@ needs a running OpenSearch (``OPENSEARCH_URL``, default localhost:9200).
 import json
 import sys
 import time
-from pathlib import Path
 
 from opensearchpy import OpenSearch, helpers
 from opensearchpy.exceptions import ConnectionError as OpenSearchConnectionError
 from opensearchpy.exceptions import ConnectionTimeout
 
 from .. import config
-from . import catalog, text
+from . import catalog, compress, text
 
 INDEX = "lagen"
 
@@ -161,7 +160,7 @@ def doc_actions(row, inbound_count, version=None):
                "identifier": label, "title": title, "label": label,
                "display": title}}
         return
-    raw = Path(path).read_bytes()
+    raw = compress.read_bytes(path)          # decompressed artifact bytes
     if not raw.strip():
         return
     art = json.loads(raw)
@@ -381,7 +380,7 @@ class SearchIndex:
         todo, missing, skipped = [], [], 0
         for row in rows:
             uri, path, chash = row[0], row[5], row[6]
-            if path and not Path(path).exists():
+            if path and not compress.exists(path):   # artifact stored precompressed
                 # the catalog points at an artifact removed since the last relate;
                 # skip it (re-run relate to prune the stale row for good). A
                 # path-less row is a synthesized stub (no artifact) -- not missing.

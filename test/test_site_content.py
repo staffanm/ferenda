@@ -6,7 +6,7 @@ import json
 import xml.dom.minidom as minidom
 from pathlib import Path
 
-from accommodanda.lib import markdown
+from accommodanda.lib import compress, markdown
 from accommodanda.site import parse, render
 
 FIX = str(Path(__file__).resolve().parent / "files" / "sitecontent")
@@ -105,7 +105,9 @@ def test_write_site_emits_expected_paths(tmp_path, monkeypatch):
     out = tmp_path / "out"
     out.mkdir()
     render.write_site(out)
-    assert (out / "index.html").exists()
-    assert (out / "om" / "index.html").exists()
-    assert (out / "dataset" / "sitenews" / "feed" / "index.html").exists()
-    assert (out / "dataset" / "sitenews" / "feed.atom").exists()
+    # pages are written precompressed (.html.br + .gz); compress.exists resolves
+    # the logical path to whichever variant is on disk
+    assert compress.exists(out / "index.html")
+    assert compress.exists(out / "om" / "index.html")
+    assert compress.exists(out / "dataset" / "sitenews" / "feed" / "index.html")
+    assert compress.exists(out / "dataset" / "sitenews" / "feed.atom")

@@ -1,0 +1,96 @@
+# ferenda.lagen.nu -- OPTIONAL variant of ferenda.conf that serves the generated
+# static site's precompressed bytes DIRECTLY from nginx, without proxying every
+# content request to the accommodanda container.
+#
+# Why this is possible: `lagen generate` writes every page and asset precompressed
+# (accommodanda/lib/compress) as a single Brotli variant -- `2018:585.html.br`,
+# no plain file and no gzip companion (disk is the constraint; br is the smallest
+# and every current browser accepts `Content-Encoding: br`). That `.br` is exactly
+# what nginx's `brotli_static` hands out as-is, doing no compression of its own.
+#
+# REQUIRES ngx_brotli. The stock nginx image (incl. nginx-unprivileged) does NOT
+# bundle the Brotli module, and with only `.br` on disk `gzip_static` has nothing
+# to serve -- so nginx-direct static serving needs an image rebuilt with ngx_brotli
+# (https://github.com/google/ngx_brotli). Without it, leave ferenda.conf in place:
+# the app already serves the same `.br` bytes as-is (and decompresses for the rare
+# client that can't take brotli), so nginx-direct is a pure offload, not required.
+#
+# NB: with only the `.br` on disk, `brotli_static` -- NOT `try_files` -- is what
+# finds it: `try_files $uri` tests the uncompressed path, misses, and defeats the
+# point. brotli_static serves `<file>.br` for a request to `<file>`.
+#
+# To use this instead of ferenda.conf:
+#   1. Rebuild the nginx image with ngx_brotli (adds the brotli_static module).
+#   2. Mount the generated tree into the nginx container, read-only. In
+#      docker-compose.yml under the `nginx` service `volumes:` add:
+#         - /srv/ferenda/site/data/generated:/srv/generated:ro
+#   3. COPY this file to /etc/nginx/conf.d/default.conf in the Dockerfile
+#      (replacing ferenda.conf).
+#
+# The app remains the fallback for everything nginx cannot resolve to a `.br` on
+# disk -- the REST API + editor (matched explicitly, so POSTs never hit the static
+# handler), the /sfs/ browse directory indexes, the bare-document-URL grammar
+# (/2018:585, /dom/nja/2011s357, /celex/32016R0679; the app mints the flattened
+# on-disk name via layout.url_to_relpath and serves the `.br` itself), and any
+# client that does not accept brotli (the app decompresses for it). A missing file
+# or an unmounted volume therefore degrades gracefully to ferenda.conf's
+# proxy-everything behaviour -- nothing 404s that the app could have served.
+
+server {
+    listen 8080;
+    server_name ferenda.lagen.nu;
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 8443 ssl;
+    server_name ferenda.lagen.nu;
+
+    ssl_certificate /etc/letsencrypt/live/ferenda.lagen.nu/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/ferenda.lagen.nu/privkey.pem;
+    include /etc/ssl-options/options-nginx-ssl.conf;
+    ssl_dhparam /etc/ssl-options/ssl-dhparams.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    charset utf-8;
+    client_max_body_size 4m;
+    add_header X-Robots-Tag "noindex, nofollow" always;
+
+    # the precompressed generated/ tree, mounted read-only (see step 2 above)
+    root /srv/generated;
+
+    # serve the precompressed .br as-is (ngx_brotli, step 1). brotli_static serves
+    # <file>.br for a request to <file>; a client that doesn't accept br 404s here
+    # and is handed to the app, which decompresses and serves identity bytes.
+    brotli_static on;
+
+    # the dynamic + mutating surface always goes to the app. It must be matched
+    # here (not left to the content fallback) because the editor's writes are
+    # POSTs, which the static file handler would reject before any fallback.
+    location /api/           { proxy_pass http://accommodanda:8000; proxy_set_header Host $host; proxy_set_header X-Real-IP $remote_addr; proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; proxy_set_header X-Forwarded-Proto $scheme; proxy_http_version 1.1; }
+    location = /openapi.json { proxy_pass http://accommodanda:8000; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto $scheme; }
+    location /docs           { proxy_pass http://accommodanda:8000; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto $scheme; }
+    location /ops            { proxy_pass http://accommodanda:8000; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto $scheme; }
+
+    # site content: brotli_static serves the .br for the flattened path (an asset,
+    # or a page whose URL equals its on-disk name, e.g. /2018:585.html). Anything
+    # with no .br on disk -- the bare document URLs, the /sfs/ browse indexes, the
+    # API, a non-brotli client -- 404s here and is handed to the app.
+    location / {
+        error_page 404 = @app;
+    }
+
+    location @app {
+        proxy_pass http://accommodanda:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+    }
+}

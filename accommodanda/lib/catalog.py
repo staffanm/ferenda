@@ -21,7 +21,7 @@ import re
 import sqlite3
 from pathlib import Path
 
-from . import concepts, util
+from . import compress, concepts, util
 from .markdown import begrepp_uri
 from .text import runs_text
 
@@ -520,7 +520,7 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False):
         # and the stored path both stay host-independent.
         key = util.store_relpath(path, root)
         seen.add(key)
-        st = path.stat()
+        st = compress.stat(path)             # the on-disk (possibly .br) variant
         prev = have.get(key)
         # stat fast path: an artifact whose (size, mtime) match the ones recorded
         # at the last relate is untouched (parse rewrites bump the mtime), so trust
@@ -534,7 +534,7 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False):
             if progress:
                 progress(i + 1, total, changed, current)
             continue
-        raw = path.read_bytes()
+        raw = compress.read_bytes(path)      # decompressed artifact bytes
         if not raw.strip():
             # a SkipDocument placeholder: ensure no stale row survives at this path
             if prev:

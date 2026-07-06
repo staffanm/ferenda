@@ -22,11 +22,12 @@ import sqlite3
 import threading
 from datetime import datetime, timezone
 from html import escape
+from pathlib import Path
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -35,7 +36,7 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .. import config
-from ..lib import catalog, diff, facets, history, layout, resolve, search
+from ..lib import catalog, compress, diff, facets, history, layout, resolve, search
 from . import auth, edit, ops
 
 CATALOG = config.DATA / "catalog.sqlite"
@@ -342,8 +343,8 @@ def documents_endpoint(
         # synthesized begrepp stubs have no artifact file (path=''); Path('')
         # aliases to the cwd, so this must be excluded before the exists() check
         p = catalog.artifact_path(root, path)
-        updated = (datetime.fromtimestamp(p.stat().st_mtime, timezone.utc).isoformat()
-                   if p and p.exists() else None)
+        updated = (datetime.fromtimestamp(compress.stat(p).st_mtime, timezone.utc).isoformat()
+                   if p and compress.exists(p) else None)
         docs.append(DocumentSummary(uri=uri, source=src, kind=kind_, label=label,
                                     title=title, source_url=source_url,
                                     updated=updated))
@@ -362,7 +363,7 @@ def document_endpoint(uri: str = Query(..., description="full lagen.nu document 
     # synthesized begrepp stubs are real catalog rows with no artifact file
     # (path='') -- served as an empty artifact, like the rendered shell pages
     p = catalog.artifact_path(catalog.data_root(con), path)   # stored path is relative
-    art = json.loads(p.read_bytes()) if p else {}
+    art = json.loads(compress.read_bytes(p)) if p else {}
     return Document(uri=uri, source=source, kind=kind, label=label, title=title,
                     source_url=art.get("source_url"), artifact=art,
                     inbound_count=catalog.document_inbound_count(con, uri))
@@ -393,11 +394,11 @@ def _version_artifact(basefile, version):
         if not _RE_SFS_ID.match(version) and not version.isdigit():
             raise HTTPException(400, "bad version id %r" % version)
         path = layout.sfs_version_artifact(basefile, version)
-    if not path.exists():
+    if not compress.exists(path):
         raise HTTPException(404, "no %s consolidation of %s -- see "
                                  "/api/v1/document/versions"
                                  % (version or "current", basefile))
-    return json.loads(path.read_bytes())
+    return json.loads(compress.read_bytes(path))
 
 
 class VersionInfo(BaseModel):
@@ -423,7 +424,7 @@ def versions_endpoint(uri: str = Query(..., description="full lagen.nu statute u
     basefile = _sfs_basefile(uri)
     row = catalog.document(con, catalog.BASE + basefile)
     info = (history.amendment_info(json.loads(
-                (catalog.data_root(con) / row[5]).read_bytes()))
+                compress.read_bytes(catalog.data_root(con) / row[5])))
             if row and row[5] else {})
     return VersionList(uri=catalog.BASE + basefile, versions=[
         VersionInfo(version=v, uri=vuri, url=layout.page_url(vuri),
@@ -498,22 +499,96 @@ def dumps_endpoint():
             for p in sorted(DUMPS.glob("*.ndjson.gz"))]
 
 
+def _accept_encoding(scope):
+    """The `Content-Encoding` tokens the client will take, from the request's
+    Accept-Encoding header. `*` matches any (so a wildcard accepts br/gzip)."""
+    for key, value in scope.get("headers", ()):
+        if key == b"accept-encoding":
+            tokens = {tok.split(b";", 1)[0].strip().decode("latin-1")
+                      for tok in value.split(b",")}
+            if "*" in tokens:
+                tokens |= {enc for enc, _ in compress.ENCODINGS}
+            return tokens
+    return set()
+
+
 class SiteFiles(StaticFiles):
-    """StaticFiles serving the site at lagen.nu's URI grammar: a request for a
-    document's bare public URL (/2018:585, /prop/2020/21:22, /dom/ad/1993:100,
-    /celex/61954CJ0001) is, on a static miss, rewritten to its flattened on-disk
-    file via layout.url_to_relpath -- nginx's try_files rules, in Starlette.
-    Directories (the /sfs/ etc. browse indexes) and existing files hit first, so
-    only an extensionless document URL takes the rewrite."""
+    """StaticFiles serving the site at lagen.nu's URI grammar, over the
+    precompressed generated/ tree (lib/compress).
+
+    Two things layered on plain StaticFiles:
+
+    * **Precompression.** Pages/assets are stored as `.br` (+ `.gz`), not plain
+      (see compress). For each request the best variant the client accepts is
+      served *as-is* with `Content-Encoding` + `Vary` -- exactly what nginx's
+      `brotli_static`/`gzip_static` would do, so the app and a future nginx-direct
+      config behave identically. A client that accepts neither is handed the
+      decompressed bytes (nginx would need the plain file; the app just decodes).
+      Tiny files kept plain (the size floor) are served by StaticFiles directly.
+    * **URI grammar.** A document's bare public URL (/2018:585, /prop/2020/21:22,
+      /dom/ad/1993:100, /celex/61954CJ0001) is, on a static miss, rewritten to its
+      flattened on-disk file via layout.url_to_relpath, and a directory maps to
+      its index.html -- nginx's try_files rules, in Starlette."""
 
     async def get_response(self, path, scope):
+        # a plain file / directory index that StaticFiles serves outright (tiny
+        # assets kept uncompressed) wins first; a path never has both a plain and
+        # a compressed representation, so a 200 here is authoritative.
         try:
-            return await super().get_response(path, scope)
+            resp = await super().get_response(path, scope)
+            if resp.status_code != 404:
+                return resp
         except StarletteHTTPException as exc:
-            if exc.status_code == 404 and path and not path.endswith(".html"):
-                rel = layout.url_to_relpath(path)
-                if rel and rel != path:
-                    return await super().get_response(rel, scope)
+            if exc.status_code != 404:
+                raise
+        accepts = _accept_encoding(scope)
+        for rel in self._candidates(path):
+            served = await self._serve(rel, accepts, scope)
+            if served is not None:
+                return served
+        raise StarletteHTTPException(404)
+
+    def _candidates(self, path):
+        """The logical relpaths a request may resolve to, in order: the path
+        itself, its directory index, and the bare-document-URL rewrite."""
+        seen = []
+        def add(rel):
+            if rel and rel not in seen:
+                seen.append(rel)
+        base = path.rstrip("/")
+        if base:
+            add(base)
+            add(base + "/index.html")           # a browse directory's index
+        else:
+            add("index.html")                   # the site root
+        if path and not path.endswith(".html"):
+            add(layout.url_to_relpath(path))     # /2018:585 -> 2018:585.html
+        return seen
+
+    async def _serve(self, rel, accepts, scope):
+        """A response for logical `rel` -- its best precompressed variant, else a
+        plain file StaticFiles serves, else None (nothing on disk)."""
+        variants = compress.variants_on_disk(self.directory, rel)
+        if variants:
+            media_type = compress.media_type(rel)
+            for enc, _suffix in compress.ENCODINGS:      # br preferred, then gzip
+                if enc in accepts and enc in variants:
+                    full, st = variants[enc]
+                    resp = FileResponse(full, stat_result=st, media_type=media_type)
+                    resp.headers["Content-Encoding"] = enc
+                    resp.headers["Vary"] = "Accept-Encoding"
+                    return resp
+            # client accepts no stored encoding: decode one and serve identity
+            enc, (full, _st) = next(iter(variants.items()))
+            data = compress.decompress_bytes(Path(full).read_bytes(), enc)
+            return Response(data, media_type=media_type,
+                            headers={"Vary": "Accept-Encoding"})
+        try:
+            resp = await super().get_response(rel, scope)
+            return resp if resp.status_code != 404 else None
+        except StarletteHTTPException as exc:
+            if exc.status_code == 404:
+                return None
             raise
 
 
