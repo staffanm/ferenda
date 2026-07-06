@@ -105,6 +105,13 @@ class Sector:
     prefixes: tuple            # CELEX descriptor prefixes to query per year
     celex_re: re.Pattern       # the accepted CELEX shape within the sector
     first_year: int
+    # Does the CELEX year track the work date? For legislation and treaties the
+    # CELEX year is the adoption/consolidation year, which equals the work date
+    # year, so with a date floor the walk may start at the floor's year. For
+    # caselaw it does NOT: the CELEX year is the CASE year while the work date is
+    # the DECISION date, which can fall years later -- so caselaw must walk every
+    # year regardless of the floor (see enum_years).
+    wdate_follows_celex_year: bool
 
 # The CELEX descriptor (the 2-letter code after the year) names the court and
 # document kind: first letter C/T/F = Court of Justice / General Court / Civil
@@ -121,12 +128,12 @@ CASELAW_TYPES = ("CJ", "CC", "TJ", "TC", "FJ")
 # the consolidated treaty texts .../TXT, not the ~9800 other sector-1 docs).
 SECTORS = {
     "treaties": Sector("treaties", "1", ("",),
-                       re.compile(r"1\d{4}[A-Z]{1,2}/TXT"), 1951),
+                       re.compile(r"1\d{4}[A-Z]{1,2}/TXT"), 1951, True),
     "acts": Sector("acts", "3", ("R", "L"),
-                   re.compile(r"3\d{4}[RL]\d{4}(\(\d+\))?$"), 1952),
+                   re.compile(r"3\d{4}[RL]\d{4}(\(\d+\))?$"), 1952, True),
     "caselaw": Sector("caselaw", "6", CASELAW_TYPES,
                       re.compile(r"6\d{4}(?:%s)\d{4}$" % "|".join(CASELAW_TYPES)),
-                      1954),
+                      1954, False),
 }
 
 
@@ -156,8 +163,12 @@ def sparql_select(session, query):
 def _enum_query(celex_prefix, since):
     """A DISTINCT (CELEX, work-date) listing for one sector-year-descriptor
     prefix; the date feeds the watermark. `since` (a date) restricts to
-    documents whose work date is on/after it."""
-    datefilter = (' FILTER(?d >= "%s"^^xsd:date)' % since.isoformat()
+    documents whose work date is on/after it -- but a document with no
+    work_date_document (a modelled state: enumerate_celex stores None,
+    notice_ttl handles it) must survive the filter, hence the !BOUND clause. A
+    plain `?d >= ...` evaluates error->false for an unbound ?d and would drop
+    every wdate-less work from every incremental run."""
+    datefilter = (' FILTER(!BOUND(?d) || ?d >= "%s"^^xsd:date)' % since.isoformat()
                   if since else "")
     return ("PREFIX cdm: <http://publications.europa.eu/ontology/cdm#> "
             "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> "
@@ -168,13 +179,34 @@ def _enum_query(celex_prefix, since):
             % (celex_prefix, datefilter))
 
 
+def enum_years(sector, since):
+    """The CELEX years to walk for `sector` given a work-date floor `since`.
+
+    The enumeration start is decoupled from the date floor because a sector's
+    CELEX year does not always track its work date. Legislation (sector 3) and
+    treaties (sector 1) carry `wdate_follows_celex_year`: the CELEX year is the
+    adoption/consolidation year, equal to the work date year, so with a floor
+    the walk may start at `since.year` and never re-query the decades below it.
+
+    Caselaw (sector 6) does not: a judgment's CELEX year is the CASE year while
+    work_date_document is the DECISION date, which can fall years later (a case
+    filed 2020, decided 2025 -- the same lag the resume watermark documents).
+    Starting at `since.year` there would make every `62020CJ...` slice
+    permanently invisible to a 2025 floor, so caselaw walks from first_year every
+    run and lets the per-slice wdate FILTER prune the years that hold nothing new
+    (an empty year-slice is one cheap query)."""
+    start = (max(sector.first_year, since.year)
+             if since and sector.wdate_follows_celex_year else sector.first_year)
+    return range(start, date.today().year + 1)
+
+
 def enumerate_celex(session, sector, since=None):
     """Yield (year, [(CELEX, work_date), ...]) per year, oldest first. Each
     year's slice is fetched whole (one SPARQL query, or two for acts' R/L
     prefixes), so the caller knows the year's exact size up front. With `since`
-    set, the walk starts at that year, never re-querying the decades below it."""
-    start = max(sector.first_year, since.year) if since else sector.first_year
-    for year in range(start, date.today().year + 1):
+    set, the walk is bounded by enum_years (which years) and the per-slice wdate
+    FILTER (which documents within a year)."""
+    for year in enum_years(sector, since):
         print("  querying %s %d ..." % (sector.name, year),
               file=sys.stderr, flush=True)
         items, seen = [], set()
@@ -233,9 +265,8 @@ def enumerate_celex_soap(session, sector, since=None):
     """Same contract as enumerate_celex, over the SOAP service (which exposes no
     per-hit work date, so it pairs each CELEX with None -- a soap run does not
     advance the watermark). Slices the DN (CELEX) wildcard query by year to stay
-    under the per-search cap, starting at the `since` year."""
-    start = max(sector.first_year, since.year) if since else sector.first_year
-    for year in range(start, date.today().year + 1):
+    under the per-search cap, walking the years enum_years selects."""
+    for year in enum_years(sector, since):
         items, seen = [], set()
         for prefix in sector.prefixes:
             query = "DN = %s%d%s*" % (sector.digit, year, prefix)
@@ -506,7 +537,15 @@ def store_document(session, target, celex, wdate, selection, eurovoc):
     notice with no document is dead weight the parser can only skip, and
     (is_downloaded keys on the notice) it would permanently mask the work from
     a later run that does find content. The notice is therefore written after
-    the first successful content store, never before."""
+    the first successful content store, never before.
+
+    No-notice alone is not enough to actually retry, though: once the work's
+    date falls below the incremental floor the walk stops enumerating it. So
+    sync records recent no-content CELEX on a retry sidecar (read_pending /
+    write_pending) and re-attempts them at the start of every incremental run --
+    that, not the missing notice, is what lets a work that only later gains
+    content (a TIFF replaced by real Formex, an act translated after
+    publication) be picked up."""
     if not selection:
         return []
     stored = []
@@ -578,11 +617,15 @@ RECENCY_WINDOW = timedelta(days=183)
 
 def read_watermark(root, sector_name):
     """The sector's discovery watermark from the last clean run, as a
-    (high, run) pair: `high` the max work date harvested, `run` the date that
-    run happened. `run` is None on a legacy plain-date file or after an
-    interrupted walk's resume write (recency must not be claimed by a walk
-    that did not finish); (None, None) with no prior run at all -> enumerate
-    from the sector's first year."""
+    (high, run) pair: `high` the max work date downloaded, `run` the date that
+    run happened. `high` is NOT a clean "everything below was seen" boundary:
+    CELLAR indexes documents out of work-date order by up to RECENCY_WINDOW, so
+    a work dated below `high` can still surface after the run that set `high` --
+    which is why the incremental floor reaches below `high` (see
+    incremental_floor), not up to it. `run` is None on a legacy plain-date file
+    or after an interrupted walk's resume write (recency must not be claimed by
+    a walk that did not finish); (None, None) with no prior run at all ->
+    enumerate from the sector's first year."""
     path = Path(root) / (".watermark-" + sector_name)
     if not path.exists():
         return None, None
@@ -603,29 +646,83 @@ def write_watermark(root, sector_name, high, run=None):
 
 
 def incremental_floor(high, run, window=RECENCY_WINDOW):
-    """The discovery floor for an incremental run. Everything with a work date
-    below `high` was seen by the last clean run, but a quiet sector must not
-    pin the window to its last document forever: once the last run is more
-    recent than `high` + `window`, anything older than `run - window` can no
-    longer appear (RECENCY_WINDOW), so the floor advances with run recency."""
+    """The discovery floor (a work-date `since`) for an incremental run.
+
+    The floor is `run - window`, NOT `high` and not `max(high, run - window)`.
+    CELLAR indexes a document within `window` of its work date, so the last
+    clean run (which saw everything indexed by its date `run`) is guaranteed to
+    have seen only works whose work date is <= `run - window`; anything dated
+    after that might still be un-indexed, or indexed later out of order, at the
+    time that run finished. So the floor must reach down to `run - window`:
+
+    - active sector (`high` recent, ~`run`): this reaches BELOW `high` by the
+      lag allowance, catching a work dated under `high` but indexed later --
+      which `max(high, run - window)` pinned at `high` and lost forever.
+    - quiet sector (`high` old, e.g. treaties last published 2022): the floor
+      still advances with run recency to `run - window` instead of pinning to
+      the sector's last document, so a steadily-running quiet sector stops
+      re-querying the years since it went quiet.
+    - dormant harvester (an old `run`): the floor sits at that old run's
+      `run - window`, so the years published while the harvester slept are
+      re-walked, not skipped.
+
+    `high` only decides the degenerate cases: no prior high -> None (enumerate
+    from first_year); a legacy watermark with the run date unknown -> `high`,
+    the one date we have."""
     if high is None:
         return None
     if run is None:
         return high            # legacy watermark: only the document date known
-    return max(high, run - window)
+    return run - window
+
+
+def read_pending(root, sector_name):
+    """The no-content CELEX recorded by earlier runs, awaiting retry (see
+    write_pending / store_document). A JSON list of CELEX strings; [] if none."""
+    path = Path(root) / (".pending-" + sector_name)
+    if not path.exists():
+        return []
+    return json.loads(path.read_text())
+
+
+def write_pending(root, sector_name, celexes):
+    write_atomic(Path(root) / (".pending-" + sector_name),
+                 json.dumps(sorted(celexes)).encode())
+
+
+def worth_retrying(wdate, today=None, window=RECENCY_WINDOW):
+    """Whether a CELEX that stored no content belongs on the retry sidecar.
+
+    Only recent no-content works: a just-published act still awaiting its
+    Swedish/English translation, or a scanned old judgment (a TIFF placeholder)
+    still awaiting its real Formex, can plausibly gain content -- and its work
+    date is recent (within `window` of now, since content lands within the
+    indexing lag). An old contentless work is a permanent never-translated act;
+    retrying it every run is pure waste and would bloat the sidecar during a
+    --full or first (unwatermarked) walk over the pre-accession decades. A
+    wdate-less work is kept: we cannot date it, and dropping it would lose it."""
+    if wdate is None:
+        return True
+    return wdate >= ((today or date.today()) - window).isoformat()
 
 
 def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
          languages=LANGUAGES, source="sparql"):
-    """Harvest a sector into root, returning (seen, stored, skipped).
+    """Download a sector into root, returning (seen, stored, skipped).
 
     Incremental by default: re-fetches only CELEX not already on disk, and
-    bounds discovery by a per-sector watermark -- the max work date harvested
-    in the last clean run, advanced by run recency (`incremental_floor`) so a
-    quiet sector stops re-querying the years since its last document. `--full`
+    bounds discovery by a per-sector watermark -- the max work date downloaded
+    in the last clean run, with the floor reaching a lag allowance BELOW it
+    (`incremental_floor`) so a work indexed out of order is still caught, while
+    a quiet sector stops re-querying the years since its last document. `--full`
     re-fetches every document and re-walks from the sector's first year; an
     explicit `--since` is a manual one-off window that overrides, but does not
     move, the watermark. A clean (un-truncated) run advances it.
+
+    Recent works that stored no content (an untranslated act, a scanned-TIFF
+    judgment) are recorded on a per-sector retry sidecar (read_pending /
+    write_pending) and re-attempted at the start of every incremental run, since
+    the floor would otherwise bury them once their date ages past the window.
 
     Edits to already-stored documents surface only under `--full`: discovery
     keys on work date, so a re-dated/corrected old document is not re-seen."""
@@ -644,6 +741,25 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
     high = wm_high.isoformat() if wm_high else None
     truncated = False
     rep = Reporter()
+
+    # Retry the no-content works earlier runs recorded before walking the years:
+    # the walk's floor no longer enumerates the older ones, so this is their only
+    # second chance (a TIFF that gained a real Formex, an act since translated).
+    retry = set() if full else set(read_pending(root, sector_name))
+    for celex in sorted(retry):
+        if is_downloaded(root, celex):
+            retry.discard(celex)                 # gained content some other way
+            continue
+        sel = fetch_selection(session, [celex], languages)
+        meta_wdate, meta_eurovoc = fetch_metadata(session, [celex])
+        if store_document(session, doc_dir(root, celex), celex,
+                          meta_wdate.get(celex), sel.get(celex, []),
+                          meta_eurovoc.get(celex, [])):
+            stored += 1
+            retry.discard(celex)
+        elif not worth_retrying(meta_wdate.get(celex)):
+            retry.discard(celex)                 # aged out, still empty: give up
+        time.sleep(delay)
 
     for year, items in enumerate_fn(session, sector, since):
         scope = "%s %d" % (sector_name, year)
@@ -675,9 +791,12 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
                                   eurovoc.get(celex, [])):
                     stored += 1
                     y_stored += 1
+                    retry.discard(celex)
                 else:
                     print("%s: no manifestation in %s"
                           % (celex, "/".join(languages)), flush=True)
+                    if worth_retrying(wdate):
+                        retry.add(celex)   # a recent work may gain content later
                 time.sleep(delay)       # politeness applies only to real fetches
                 fetched = True
             if wdate and (high is None or wdate > high):
@@ -706,6 +825,11 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
         # precise floor for incrementals, plus the run date whose recency lets
         # the next run's floor advance past a quiet sector's last document
         write_watermark(root, sector_name, high, run=date.today())
+    if not full:
+        # persist the retry sidecar: successes and aged-out entries were dropped
+        # above, recent no-content works added; worth_retrying bounds it by work
+        # date, so even a --since sweep over old years cannot bloat it.
+        write_pending(root, sector_name, retry)
     return seen, stored, skipped
 
 
