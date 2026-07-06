@@ -766,6 +766,7 @@ PAGE = """<!doctype html>
 <html lang="sv"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>%(title)s</title>
+<script>(function(){try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
@@ -777,6 +778,7 @@ PAGE = """<!doctype html>
 <script src="/search.js" defer></script>
 <script src="/versions.js" defer></script>
 <script src="/editor.js" defer></script>
+<script>(function(){var b=document.querySelector('[data-theme-toggle]');if(!b)return;b.addEventListener('click',function(){var cur=document.documentElement.getAttribute('data-theme');if(cur!=='light'&&cur!=='dark')cur=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';var next=cur==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',next);try{localStorage.setItem('theme',next);}catch(e){}});})();</script>
 </body></html>
 """
 
@@ -805,7 +807,21 @@ def _masthead(kind):
             '<circle cx="7" cy="7" r="5"></circle><path d="M11 11l4 4"></path></svg>'
             '<span>Sök lag, paragraf, rättsfall…</span>'
             '<span class="k">⌘K</span></button>'
-            '<nav class="mast-nav">%s</nav></header>' % links)
+            '<nav class="mast-nav">%s</nav>'
+            '<button class="theme-toggle" type="button" data-theme-toggle '
+            'aria-label="Växla mellan ljust och mörkt tema" '
+            'title="Växla ljust / mörkt tema">'
+            '<svg class="icon-moon" width="17" height="17" viewBox="0 0 24 24" '
+            'fill="none" stroke="currentColor" stroke-width="1.8" '
+            'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+            '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg>'
+            '<svg class="icon-sun" width="17" height="17" viewBox="0 0 24 24" '
+            'fill="none" stroke="currentColor" stroke-width="1.8" '
+            'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+            '<circle cx="12" cy="12" r="4"></circle>'
+            '<path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4'
+            'M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>'
+            '</button></header>' % links)
 
 
 def _source_link(source_url):
@@ -2062,24 +2078,75 @@ Disallow: /
 """
 
 
-CSS = """
-/* lagen 2026 -- Library / Gravitas. Sans body (Inter), serif headings &
-   numerals (Source Serif 4) on warm paper, a single umber accent. A 3-column
-   grid (TOC | reading column | context rail) that collapses under 64rem. */
+CSS = r"""
+/* lagen 2026 -- Marginalia, recoloured.
+   ==========================================================================
+   An evolution of the implemented stylesheet. Layout, class names, geometry
+   and typography are UNCHANGED -- only the colour layer is rebuilt as tokens.
+
+   Two coordinated schemes, driven by a single [data-theme] switch with a
+   prefers-color-scheme fallback:
+
+     * Light  -- cool porcelain paper, cool near-black ink, one warm
+                 oxblood accent. Warm-on-cool editorial tension.
+     * Dark   -- deep cool slate, terracotta accent, the three source
+                 category hues (case / forarbete / kommentar) lightened.
+
+   Drop-in: set  <html data-theme="light">  or  "dark", or leave it off to
+   follow the OS. Everything below the token block is the original CSS with
+   its scattered colour literals promoted to tokens so both schemes hold.
+   ========================================================================== */
+
+/* ── Light (default) ─────────────────────────────────────────── */
 :root {
-  --bg:#f4f1ea; --surf:#faf8f3; --surf-2:#ede9df; --surf-3:#ddd8c8;
-  --ink:#14181e; --ink-2:#3c4149; --ink-3:#6b6f76; --ink-4:#9da0a6;
-  --rule:#d6d1c2; --rule-soft:#e6e2d4;
-  --accent:#7a4a23; --case:#9a5a2a; --forarbete:#5b4a86; --kommentar:#9a3b5e;
+  --bg:#e9ecf0; --surf:#f4f6f8; --surf-2:#dde2e8; --surf-3:#c9d0d9;
+  --ink:#171b21; --ink-2:#3b434d; --ink-3:#697079; --ink-4:#9aa1aa;
+  --rule:#cfd4dc; --rule-soft:#dee2e9;
+  --accent:#8f3524; --case:#9a5a2a; --forarbete:#544a80; --kommentar:#933659;
+
+  /* promoted literals */
+  --diff-ins-bg:#d9e8dc; --diff-del-bg:#efdad6;
+  --overlay:rgba(18,22,28,.34); --shadow-modal:rgba(18,22,28,.30);
+  --mark:#f0e4a6; --danger:#b5402c; --on-accent:#ffffff;
+
   --serif:"Source Serif 4","Charter",Georgia,serif;
   --sans:"Inter","Helvetica Neue",system-ui,sans-serif;
   --col-toc:18rem; --col-rail:20rem;
+  color-scheme: light;
 }
+
+/* ── Dark ────────────────────────────────────────────────────── */
+:root[data-theme="dark"] {
+  --bg:#12161b; --surf:#1a1f26; --surf-2:#232a33; --surf-3:#2f3843;
+  --ink:#e7e9ec; --ink-2:#b6bcc4; --ink-3:#868d97; --ink-4:#5c636d;
+  --rule:#2b323b; --rule-soft:#222831;
+  --accent:#cd6f56; --case:#c9884f; --forarbete:#9b90d2; --kommentar:#cf7295;
+
+  --diff-ins-bg:#25352a; --diff-del-bg:#3a2723;
+  --overlay:rgba(6,8,11,.55); --shadow-modal:rgba(0,0,0,.6);
+  --mark:#4a4326; --danger:#e0755e; --on-accent:#1a0f0c;
+  color-scheme: dark;
+}
+/* follow the OS when no explicit theme is set */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg:#12161b; --surf:#1a1f26; --surf-2:#232a33; --surf-3:#2f3843;
+    --ink:#e7e9ec; --ink-2:#b6bcc4; --ink-3:#868d97; --ink-4:#5c636d;
+    --rule:#2b323b; --rule-soft:#222831;
+    --accent:#cd6f56; --case:#c9884f; --forarbete:#9b90d2; --kommentar:#cf7295;
+    --diff-ins-bg:#25352a; --diff-del-bg:#3a2723;
+    --overlay:rgba(6,8,11,.55); --shadow-modal:rgba(0,0,0,.6);
+    --mark:#4a4326; --danger:#e0755e; --on-accent:#1a0f0c;
+    color-scheme: dark;
+  }
+}
+
 * { box-sizing: border-box; }
 html, body { margin: 0; }
 body { font-family: var(--sans); font-size: 15px; line-height: 1.6;
        letter-spacing: -.005em; color: var(--ink); background: var(--bg);
-       font-feature-settings: "kern"; }
+       font-feature-settings: "kern";
+       transition: background-color .25s ease, color .25s ease; }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
@@ -2106,6 +2173,23 @@ a:hover { text-decoration: underline; }
 .mast-nav a:hover { color: var(--ink); text-decoration: none;
                     border-bottom-color: var(--ink-3); }
 .mast-nav a.on { color: var(--ink); font-weight: 500; border-bottom-color: var(--accent); }
+/* -- Theme toggle: a single sun/moon control; the icon reflects the scheme the
+   click would switch AWAY from -- moon while light, sun while dark. -- */
+.theme-toggle { display: inline-flex; align-items: center; justify-content: center;
+                width: 2rem; height: 2rem; padding: 0; color: var(--ink-2);
+                background: var(--surf-2); border: 1px solid var(--rule);
+                border-radius: 999px; cursor: pointer;
+                transition: background-color .15s, color .15s; }
+.theme-toggle:hover { background: var(--surf-3); color: var(--ink); }
+.theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.theme-toggle .icon-sun { display: none; }
+.theme-toggle .icon-moon { display: inline-flex; }
+:root[data-theme="dark"] .theme-toggle .icon-sun { display: inline-flex; }
+:root[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .theme-toggle .icon-sun { display: inline-flex; }
+  :root:not([data-theme]) .theme-toggle .icon-moon { display: none; }
+}
 
 /* -- Body grid -- */
 .gr-body { display: grid; align-items: start;
@@ -2219,9 +2303,9 @@ details.lydelser select { max-width: 100%; font: inherit; margin-left: .4rem; }
 details.lydelser ol { margin: .5rem 0 .3rem; padding-left: 1.4rem; }
 details.lydelser li { margin: .2rem 0; }
 details.lydelser .note { color: var(--ink-4); font-size: .85rem; }
-.version-diff ins, .diff-note ins { background: #e3efd9; color: var(--ink);
+.version-diff ins, .diff-note ins { background: var(--diff-ins-bg); color: var(--ink);
                     text-decoration: none; padding: 0 .1em; border-radius: 2px; }
-.version-diff del, .diff-note del { background: #f2ddd6; color: var(--ink-3);
+.version-diff del, .diff-note del { background: var(--diff-del-bg); color: var(--ink-3);
                     text-decoration: line-through; padding: 0 .1em; border-radius: 2px; }
 .version-diff [id] { scroll-margin-top: 5rem; }
 .diff-note { margin: 0 0 1.5rem; padding: .55rem 1rem; border: 1px solid var(--rule);
@@ -2409,7 +2493,7 @@ p.recital { scroll-margin-top: 5rem; }
             transform: scale(1.2); outline: none; }
 [data-rail].rail-active > .rail-dot { opacity: 1; filter: none; }
 a.ext { color: var(--accent); }
-a.ext::after { content: " \\2197"; font-size: .8em; color: var(--ink-4); }
+a.ext::after { content: " \2197"; font-size: .8em; color: var(--ink-4); }
 table { border-collapse: collapse; margin: 1rem 0; width: 100%; font-size: .92rem; }
 td { border-top: 1px solid var(--rule); padding: .35rem .7rem; vertical-align: top; }
 
@@ -2456,17 +2540,17 @@ ol.ranked { padding-left: 1.4rem; } ol.ranked .c { color: var(--ink-3); font-siz
                 background: var(--surf-2); color: var(--ink-2); font-size: .92rem;
                 text-decoration: none; }
 .facet-list a:hover { background: var(--surf-3); }
-.facet-list a[aria-current] { background: var(--accent); color: #fff; }
+.facet-list a[aria-current] { background: var(--accent); color: var(--on-accent); }
 .facet-list .c { color: var(--ink-4); font-size: .72rem; margin-left: .25rem; }
-.facet-list a[aria-current] .c { color: rgba(255,255,255,.75); }
+.facet-list a[aria-current] .c { color: color-mix(in oklab, var(--on-accent) 72%, transparent); }
 
 /* -- search palette (live full-text search via the REST API) -- */
 .search-overlay { position: fixed; inset: 0; z-index: 100; display: flex;
                   justify-content: center; align-items: flex-start; padding-top: 8rem;
-                  background: rgba(20,16,10,.32); }
+                  background: var(--overlay); }
 .search-box { width: 37rem; max-width: 92vw; background: var(--surf);
               border: 1px solid var(--rule); border-radius: 8px;
-              box-shadow: 0 30px 80px rgba(20,16,10,.3); overflow: hidden; }
+              box-shadow: 0 30px 80px var(--shadow-modal); overflow: hidden; }
 .search-box input { width: 100%; border: 0; outline: 0; padding: 1.1rem 1.25rem;
                     background: transparent; font-family: var(--serif); font-size: 1.2rem;
                     color: var(--ink); }
@@ -2486,7 +2570,7 @@ ol.ranked { padding-left: 1.4rem; } ol.ranked .c { color: var(--ink-3); font-siz
                        font-size: .9rem; }
 .search-hit .hit-snip { display: block; font-family: var(--serif); color: var(--ink-3);
                         font-size: .82rem; margin-top: .15rem; }
-.search-hit .hit-snip em { font-style: normal; background: var(--mark, #fdf2b8);
+.search-hit .hit-snip em { font-style: normal; background: var(--mark);
                            border-radius: 2px; padding: 0 1px; }
 
 /* -- Responsive: drop the side columns -- */
@@ -2824,7 +2908,7 @@ VERSIONS = """
 # commentary, or the whole body for a concept/editorial page), and drives the
 # cart + checkout against the same-origin /api/v1/edit/* routes. Raw string: the
 # markdown-preview regexes carry backslashes JS must see verbatim.
-EDITOR_CSS = """
+EDITOR_CSS = r"""
 /* inline editor (editor.js) */
 .ed-account { margin-left: 1rem; font-size: .85rem; color: var(--ink-3); }
 .ed-account a { color: var(--accent); }
@@ -2835,12 +2919,12 @@ EDITOR_CSS = """
 [id] > .ed-btn { position: absolute; right: -3.4rem; top: .05rem; }
 .paragraf > .ed-btn { right: -3.4rem; top: .05rem; }
 .ed-btn-top { position: static; display: inline-flex; gap: .3rem; margin: 0 0 1rem; }
-.ed-overlay { position: fixed; inset: 0; background: #0007; z-index: 80;
+.ed-overlay { position: fixed; inset: 0; background: var(--overlay); z-index: 80;
               display: flex; align-items: flex-start; justify-content: center;
               padding: 4vh 1rem; overflow: auto; }
 .ed-panel { background: var(--surf); color: var(--ink); width: min(760px, 96vw);
             border: 1px solid var(--rule); border-radius: 10px; padding: 1rem 1.2rem;
-            box-shadow: 0 16px 48px #0008; }
+            box-shadow: 0 16px 48px var(--shadow-modal); }
 .ed-panel h3 { margin: 0 0 .6rem; font-size: 1.05rem; }
 .ed-panel textarea { width: 100%; box-sizing: border-box; min-height: 200px;
                      font-family: var(--mono, ui-monospace, monospace); font-size: .9rem;
@@ -2851,13 +2935,13 @@ EDITOR_CSS = """
 .ed-tools button, .ed-row button, .ed-rm { border: 1px solid var(--rule);
     background: var(--surf-2); color: var(--ink); border-radius: 5px; cursor: pointer;
     padding: .3rem .6rem; font: inherit; font-size: .85rem; }
-.ed-save, .ed-commit, .ed-do { background: var(--accent) !important; color: #fff !important;
+.ed-save, .ed-commit, .ed-do { background: var(--accent) !important; color: var(--on-accent) !important;
                                border-color: var(--accent) !important; }
 .ed-preview { border: 1px dashed var(--rule); border-radius: 6px; padding: .5rem .75rem;
               margin-top: .5rem; background: var(--bg); }
 .ed-preview h4 { margin: .3rem 0; }
 .ed-row { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .7rem; }
-.ed-err { color: #c0392b; font-size: .85rem; margin-top: .4rem; }
+.ed-err { color: var(--danger); font-size: .85rem; margin-top: .4rem; }
 .ed-search-res { list-style: none; margin: .3rem 0 0; padding: 0;
                  border: 1px solid var(--rule); border-radius: 6px; max-height: 220px;
                  overflow: auto; }
@@ -2869,7 +2953,7 @@ EDITOR_CSS = """
 .ed-cart { position: fixed; right: 1rem; bottom: 1rem; z-index: 70; cursor: pointer;
            border: 1px solid var(--accent); background: var(--surf); color: var(--accent);
            border-radius: 999px; padding: .55rem .9rem; font: inherit; font-weight: 600;
-           box-shadow: 0 6px 20px #0004; }
+           box-shadow: 0 6px 20px var(--shadow-modal); }
 @media (max-width: 64rem) {
   [id] > .ed-btn, .paragraf > .ed-btn { position: static; margin-left: .4rem; }
 }
