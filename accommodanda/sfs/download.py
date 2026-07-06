@@ -202,7 +202,7 @@ def sync(destdir, full=False, limit=None, delay=PAGE_DELAY):
                      {"range": {"uppdateradDateTime": {"gte": watermark}}}]}},
                  "sort": [{"uppdateradDateTime": "asc"},
                           {"grundforfattningId": "asc"}]}
-    print("sfs harvest: %s (since %s)"
+    print("sfs download: %s (since %s)"
           % ("full backfill" if backfill else "incremental",
              watermark or "scratch"), flush=True)
 
@@ -264,7 +264,7 @@ def main():
     parser.add_argument("destdir", help="target dir, e.g. site/data/sfs")
     parser.add_argument("--full", action="store_true",
                         help="walk the entire corpus oldest-first instead of "
-                             "stopping at the first already-harvested page")
+                             "stopping at the first already-downloaded page")
     parser.add_argument("--limit", type=int, help="stop after N documents")
     parser.add_argument("--delay", type=float, default=0.3,
                         help="seconds between pages (default 0.3)")

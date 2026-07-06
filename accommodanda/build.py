@@ -606,7 +606,7 @@ def sfs_harvest(scopes):
     by default (stops at the first page with nothing new); `--force` walks the
     entire corpus oldest-first. Throttled and self-logging (per page)."""
     if RUN.dry_run:
-        print("sfs download: would harvest the corpus into %s"
+        print("sfs download: would download the corpus into %s"
               % layout.SFS_DOWNLOADED)
         return
     seen, new, updated, skipped = sfs_download.sync(layout.SFS_DOWNLOADED,
@@ -772,7 +772,7 @@ def dv_harvest(scopes):
     (keys come from raw record fields + legacy filenames), so it runs once at
     the end rather than per page."""
     if RUN.dry_run:
-        print("dv download: would harvest into %s, then rebuild %s"
+        print("dv download: would download into %s, then rebuild %s"
               % (DOM_DOWNLOADED, DV_INDEX))
         print("dv download: would refresh named-rättsfall snapshot %s"
               % NAMEDCASES_JSON)
@@ -816,7 +816,7 @@ def dv_namedcases(args=()):
     published case URI. Independent of the per-document download/parse chain --
     it's a single small curated dataset, not corpus artifacts."""
     if RUN.dry_run:
-        print("dv namedcases: would harvest %s -> %s"
+        print("dv namedcases: would download %s -> %s"
               % (dv_namedcases_mod.URL, NAMEDCASES_JSON))
         return
     cases = dv_namedcases_mod.harvest()
@@ -907,7 +907,7 @@ def fa_harvest(scopes):
         sys.exit("forarbete --riksmote needs exactly the bet scope, e.g. "
                  "`lagen forarbete download bet --riksmote 2025/26`")
     if RUN.dry_run:
-        print("forarbete download: would harvest %s into %s"
+        print("forarbete download: would download %s into %s"
               % (RUN.only or ", ".join(scopes) or "all types",
                  layout.FA_DOWNLOADED))
         return
@@ -970,7 +970,7 @@ SOURCES["forarbete"] = Source("forarbete", fa_list, {
    actions={"import-legacy": fa_import_legacy},
    notes="download flag: --only BASEFILE (fetch one document; needs one "
          "regeringen scope)\n"
-         "download flag: --riksmote YYYY/YY (narrow the bet harvest to one "
+         "download flag: --riksmote YYYY/YY (narrow the bet download to one "
          "riksmöte; needs the bet scope, never advances the watermark)\n"
          "import-legacy {%s} [<path>]: one-time import of a frozen förarbete "
          "corpus (--limit N caps it; --force re-imports)" % FA_LEGACY_CORPORA)
@@ -1033,7 +1033,7 @@ def eurlex_harvest(scopes):
     default (watermark-bounded, skips CELEX already on disk); --force re-fetches
     everything. --since/--lang/--source tune discovery (see RunOptions)."""
     if RUN.dry_run:
-        print("eurlex download: would harvest %s into %s"
+        print("eurlex download: would download %s into %s"
               % (", ".join(scopes) or "treaties/acts/caselaw",
                  layout.EURLEX_DOWNLOADED))
         return
@@ -1096,7 +1096,7 @@ SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
             "prune-empty": eurlex_prune},
    notes="download flags: --since YYYY-MM-DD, --lang swe,eng, --source sparql|soap\n"
          "unpack-bulk <dir|zip>: import a CELLAR bulk legislation dump\n"
-         "prune-empty: remove harvest dirs with only a notice.ttl (no swe/eng doc)\n"
+         "prune-empty: remove download dirs with only a notice.ttl (no swe/eng doc)\n"
          "ai-annotate <CELEX>: LLM-author the editorial .ann layer (sector-3 acts)")
 
 
@@ -1120,7 +1120,7 @@ def foreskrift_harvest(scopes):
         sys.exit("foreskrift --only needs exactly one fs scope, e.g. "
                  "`lagen foreskrift download fffs --only fffs/2013:10`")
     if RUN.dry_run:
-        print("foreskrift download: would harvest %s into %s"
+        print("foreskrift download: would download %s into %s"
               % (RUN.only or ", ".join(scopes) or "all agencies",
                  layout.FORESKRIFT_DOWNLOADED))
         return
@@ -1274,7 +1274,7 @@ def avg_harvest(scopes):
         sys.exit("avg --only needs exactly one organ scope, e.g. "
                  "`lagen avg download jo --only jo/2340-2025`")
     if RUN.dry_run:
-        print("avg download: would harvest %s into %s"
+        print("avg download: would download %s into %s"
               % (RUN.only or ", ".join(scopes) or "jo + jk + arn",
                  layout.AVG_DOWNLOADED))
         return
@@ -1316,7 +1316,7 @@ SOURCES["avg"] = Source("avg", avg_list, {
     notes="download flag: --only org/dnr (fetch one; needs its organ scope)\n"
           "scopes are the organs: jo (Riksdagens ombudsmän), jk "
           "(Justitiekanslern), arn (Allmänna reklamationsnämnden); empty = all\n"
-          "arn download harvests the live vägledande-beslut listing (2017-); it "
+          "the arn scope downloads the live vägledande-beslut listing (2017-); it "
           "overwrites any frozen import of the same dnr (live wins)\n"
           "import-legacy arn <path>: one-time import of the frozen ARN corpus "
           "(1991-2022; --limit N caps it; --force re-imports)")
@@ -1377,7 +1377,7 @@ def remisser_harvest(scopes):
     the listing walk entirely (the archive runs to thousands of pages, so this
     is the escape hatch for "just this one case")."""
     if RUN.dry_run:
-        print("remisser download: would harvest into %s"
+        print("remisser download: would download into %s"
               % layout.REMISSER_DOWNLOADED)
         return
     if RUN.only:
@@ -1419,7 +1419,7 @@ SOURCES["remisser"] = Source("remisser", remisser_list, {
     actions={"ai-analyze": remisser_ai_analyze},
     notes="download flag: --only <regeringen.se case url> (fetch one case + its "
           "answer PDFs, bypassing the listing walk entirely)\n"
-          "download harvests the whole /remisser/ listing (new cases, watermarked "
+          "download sweeps the whole /remisser/ listing (new cases, watermarked "
           "so a normal run doesn't re-walk the whole archive) then re-polls every "
           "still-open case for newly-arrived answers; --full ignores the "
           "watermark and re-walks everything\n"
@@ -2336,7 +2336,7 @@ def _help(name):
         print("\nsource:  %s" % src.origin)
     print("actions: %s" % ", ".join(verbs))
     if src.scopes:
-        print("\ndownload scopes (narrow the harvest to sub-corpora):")
+        print("\ndownload scopes (narrow the download to sub-corpora):")
         print("  %s" % ", ".join(sorted(src.scopes)))
         print("  e.g. `lagen %s download %s`   (no scope = the whole corpus)"
               % (name, sorted(src.scopes)[0]))
@@ -2368,7 +2368,7 @@ def main(argv=None):
                         "so a no-change re-run is cheap")
     p.add_argument("basefiles", nargs="*",
                    help="ids to act on (empty = all stale); for download, names "
-                        "harvest sub-scopes, e.g. 'prop' or 'acts'")
+                        "download sub-scopes, e.g. 'prop' or 'acts'")
     p.add_argument("-f", "--force", action="store_true",
                    help="rebuild the named stage even if fresh")
     p.add_argument("--no-deps", action="store_true",
@@ -2404,7 +2404,7 @@ def main(argv=None):
                    help="forarbete download: fetch just this one document "
                         "(needs exactly one doctype scope)")
     p.add_argument("--riksmote", metavar="YYYY/YY",
-                   help="forarbete download bet: narrow the harvest to one "
+                   help="forarbete download bet: narrow the download to one "
                         "riksmöte, e.g. 2025/26 (bet scope only)")
     p.add_argument("--limit", type=int, metavar="N",
                    help="import-legacy (avg/forarbete): import at most N "

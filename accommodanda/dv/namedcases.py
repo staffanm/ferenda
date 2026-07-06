@@ -100,5 +100,5 @@ def harvest(out_path=NAMEDCASES, session=None):
 if __name__ == "__main__":
     cases = harvest()
     resolvable = sum(1 for c in cases if c["uri"])
-    print("harvested %d named cases (%d resolvable) -> %s"
+    print("downloaded %d named cases (%d resolvable) -> %s"
           % (len(cases), resolvable, NAMEDCASES))

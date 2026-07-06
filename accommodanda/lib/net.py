@@ -54,10 +54,10 @@ def _log_failure(exc, response):
     block (a 403/429 with Retry-After or an HTML body) can be told apart from a
     genuine error or a one-off empty body."""
     if response is None:
-        print("harvest request failed: %s: %s" % (type(exc).__name__, exc),
+        print("download request failed: %s: %s" % (type(exc).__name__, exc),
               file=sys.stderr, flush=True)
         return
-    lines = ["harvest request failed: HTTP %d for %s"
+    lines = ["download request failed: HTTP %d for %s"
              % (response.status_code, response.url)]
     for header in ("Retry-After", "RateLimit-Reset", "X-RateLimit-Remaining",
                    "X-RateLimit-Limit", "Server", "Via", "CF-Ray", "X-Cache",
