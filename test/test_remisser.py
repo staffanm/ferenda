@@ -197,6 +197,64 @@ def test_sync_stubs_unreachable_case_and_recovers(tmp_path, monkeypatch):
     assert len(record["svar"]) == 17 and again["fetched"] == 17
 
 
+def test_sync_stubs_malformed_case_and_recovers(tmp_path, monkeypatch):
+    """A case page that returns 200 but with a DOM parse_case can't read (a
+    bot-challenge interstitial, a truncated response -- no ``<h1 id='h1id'>``)
+    must be stubbed exactly like an HTTP error: the run continues to later
+    cases instead of aborting after newer slugs were already written, and the
+    stub is re-polled until the page becomes well-formed."""
+    listing = """
+    <ul class="list--block">
+      <li><div class="sortcompact"><a href="/remisser/2026/07/open-case/">Open</a>
+        </div></li>
+      <li><div class="sortcompact"><a href="/remisser/2026/04/closed-case/">Broken case title</a></div></li>
+    </ul>"""
+    open_html = (FILES / "case-open.html").read_text()
+    closed_html = (FILES / "case-closed.html").read_text()
+    garbled = {"https://www.regeringen.se/remisser/2026/04/closed-case/"}
+
+    class Resp:
+        def __init__(self, text=None, content=None):
+            self.text, self.content = text, content
+
+    def fake_request(session, method, url, **kw):
+        if "/remisser/?p=1" in url:
+            return Resp(text=listing)
+        if "/remisser/?p=" in url:
+            return Resp(text="<html></html>")
+        if url.endswith("/open-case/"):
+            return Resp(text=open_html)
+        if url.endswith("/closed-case/"):
+            return Resp(text=closed_html if url not in garbled
+                        else "<html><body>bot challenge</body></html>")
+        if url.endswith(".pdf"):
+            return Resp(content=b"%PDF-1.4 fake")
+        raise AssertionError("unexpected url %s" % url)
+
+    monkeypatch.setattr(download, "request", fake_request)
+    monkeypatch.setattr(download, "make_session", lambda ua: object())
+    monkeypatch.setattr(download.time, "sleep", lambda s: None)
+    _redirect(tmp_path, monkeypatch)
+
+    summary = download.sync(delay=0)
+    assert summary["new"] == 1 and summary["failed"] == 1
+    # the failed case exists as a stub carrying the listing facts, so the
+    # incremental walk still stops at it next run -- and pass 1 kept going to
+    # write the newer "open-case" slug instead of aborting
+    stub = json.loads((tmp_path / "downloaded" / "closed-case.json").read_text())
+    assert stub["titel"] == "Broken case title"
+    assert stub["svar"] == [] and stub["sista_svarsdag"] is None
+    assert download.list_basefiles() == ["closed-case", "open-case"]
+
+    # once the page is well-formed, the normal repoll pass completes the record
+    garbled.clear()
+    again = download.sync(delay=0)
+    assert again["new"] == 0 and again["failed"] == 0
+    record = json.loads((tmp_path / "downloaded" / "closed-case.json").read_text())
+    assert record["dnr"] == "KN2026/00741"
+    assert len(record["svar"]) == 17 and again["fetched"] == 17
+
+
 def test_fetch_pending_rejects_duplicate_org_slugs(tmp_path):
     """Two answer PDFs sharing a basename would silently overwrite each other
     under downloaded/<case>/<slug>.pdf and mis-join both basefiles to the

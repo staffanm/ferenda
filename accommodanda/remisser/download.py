@@ -22,10 +22,11 @@ One download tree, layout.REMISSER_DOWNLOADED: ``downloaded/remisser/<slug>.json
 already-known slug (`--full` re-walks the whole listing, downloading only what
 is missing), then re-poll every still-open case (deadline unknown, or within
 GRACE_PERIOD of it) to pick up newly-arrived answers, and fetch any answer PDF
-not yet cached. An unreachable case page (HTTP error) is recorded as a stub
-from the listing facts, so the slug still exists on disk (the incremental stop
-condition) and pass 2 / later runs keep re-polling it until it succeeds; a
-*malformed* page fails the run (`AssertionError` from `parse_case`).
+not yet cached. Any per-case fetch/parse failure -- an HTTP error, or a 200
+response whose DOM doesn't match what `parse_case` expects (bot-challenge
+interstitial, truncation) -- is recorded as a stub from the listing facts, so
+the slug still exists on disk (the incremental stop condition) and pass 2 /
+later runs keep re-polling it until it succeeds.
 `sync_one` fetches
 exactly one already-known case URL, bypassing the listing walk entirely -- the
 `--only` escape hatch for grabbing one case's remissvar without touching the
@@ -165,7 +166,8 @@ def parse_case(html, url):
     """A case detail page -> a Remiss (svar empty until answers exist)."""
     soup = BeautifulSoup(html, "html.parser")
     h1 = soup.find("h1", id="h1id")
-    assert h1 is not None, "no <h1 id='h1id'> on remiss page %s" % url
+    if h1 is None:
+        raise ValueError("no <h1 id='h1id'> on remiss page %s" % url)
     dnr = None
     vignette = h1.find("span", class_="h1-vignette")
     if vignette:
@@ -280,11 +282,13 @@ def sync(full=False, delay=0.5, log=print):
 
     Pass 1 discovers new cases newest-first, stopping at the first slug already on
     disk (`full` re-walks the whole listing, downloading only what is missing).
-    A case page that 404s/500s is written as a *stub* record from the listing
-    facts: the on-disk slug is the incremental stop condition, so newer slugs
-    written in the same walk would otherwise hide the failed case from every
-    later incremental run; as a stub (no deadline) it stays "open" and pass 2 /
-    later runs re-poll it until a fetch succeeds.
+    A case page that fails to fetch (404/500/connection error) or fails to parse
+    (unexpected DOM -- a bot-challenge interstitial, a truncated response) is
+    written as a *stub* record from the listing facts: the on-disk slug is the
+    incremental stop condition, so newer slugs written in the same walk would
+    otherwise hide the failed case from every later incremental run; as a stub
+    (no deadline) it stays "open" and pass 2 / later runs re-poll it until a
+    fetch succeeds.
     Pass 2 re-polls every still-open case (deadline unknown or within
     GRACE_PERIOD) to merge newly-arrived answers, and fetches any answer PDF not
     yet cached (across all cases, so a case that was already closed when first
@@ -307,10 +311,15 @@ def sync(full=False, delay=0.5, log=print):
                     stop = True
                     break
                 continue
+            # a bad response (HTTP error) or a malformed page (parse_case's
+            # ValueError on unexpected DOM) must not abort the walk -- one
+            # failed case would otherwise silently swallow every case behind
+            # it once newer slugs land on disk (rule:no-catch-log-continue:
+            # recorded as a stub below, re-polled every later run)
             try:
                 remiss = parse_case(
                     request(session, "GET", item["url"]).text, item["url"])
-            except requests.HTTPError as exc:
+            except (requests.RequestException, ValueError) as exc:
                 log("  remiss %s: %s (stub written, re-polled next run)"
                     % (item["basefile"], exc))
                 remiss = Remiss(basefile=item["basefile"], titel=item["title"],
@@ -333,7 +342,7 @@ def sync(full=False, delay=0.5, log=print):
             try:
                 fresh = parse_case(
                     request(session, "GET", remiss.url).text, remiss.url)
-            except requests.HTTPError as exc:
+            except (requests.RequestException, ValueError) as exc:
                 log("  repoll %s: %s" % (remiss.basefile, exc))
                 continue
             summary["repolled"] += 1
