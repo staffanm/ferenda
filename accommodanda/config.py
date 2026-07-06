@@ -158,6 +158,60 @@ def resolve_ops_token(doc):
     return value
 
 
+def resolve_compress(doc):
+    """Whether the artifact/ and generated/ trees are stored precompressed
+    (lib/compress). On (the default) => a parsed artifact lands as ``.json.br``
+    and a rendered page as ``.html.br`` (Brotli, no plain sibling) so nginx can
+    serve the bytes as-is (`brotli_static`) with no app in the path -- and the
+    tree stays small on disk; off => plain files, for a dev checkout that would
+    rather diff them.
+    Precedence: the ``FERENDA_COMPRESS`` environment variable (``0``/``1``,
+    ``false``/``true``), then the ``compress`` key in config.yml, else on. A
+    present-but-uninterpretable value raises rather than guessing."""
+    env = os.environ.get("FERENDA_COMPRESS")
+    if env is not None:
+        low = env.strip().lower()
+        if low in ("1", "true", "yes", "on"):
+            return True
+        if low in ("0", "false", "no", "off"):
+            return False
+        raise ConfigError("FERENDA_COMPRESS set to invalid value %r "
+                          "(expected a boolean)" % env)
+    if "compress" not in doc:
+        return True
+    value = doc["compress"]
+    if not isinstance(value, bool):
+        raise ConfigError("compress set to invalid value %r at %s "
+                          "(expected true/false)" % (value, _at(doc, "compress")))
+    return value
+
+
+def resolve_compress_quality(doc):
+    """The Brotli quality (0--11) the two text trees are compressed at. The
+    payload is JSON/HTML compressed once per build and served/read forever, so
+    the default is the maximum (11): on representative text it lands well under a
+    third the size of gzip and decompresses faster, and the extra CPU is paid
+    only at build time. Lower it (e.g. 9, ~13x faster for ~10% larger output)
+    when build latency matters more than bytes. Precedence:
+    ``FERENDA_COMPRESS_QUALITY`` env var, then the ``compress_quality`` config
+    key, else 11."""
+    env = os.environ.get("FERENDA_COMPRESS_QUALITY")
+    raw = env if env is not None else doc.get("compress_quality")
+    if raw is None:
+        return 11
+    where = ("FERENDA_COMPRESS_QUALITY" if env is not None
+             else "compress_quality at %s" % _at(doc, "compress_quality"))
+    try:
+        quality = int(raw)
+    except (TypeError, ValueError):
+        raise ConfigError("%s set to invalid value %r (expected an integer 0-11)"
+                          % (where, raw)) from None
+    if not 0 <= quality <= 11:
+        raise ConfigError("%s set to %d (out of the valid Brotli range 0-11)"
+                          % (where, quality))
+    return quality
+
+
 def resolve_editor_secret(doc):
     """The HMAC key that signs the inline editor's session cookie (api/auth.py).
     Unset (``None``) disables editing entirely -- every mutating route answers
@@ -221,3 +275,5 @@ LLM_MODEL = resolve_llm_model(_doc)
 OPS_TOKEN = resolve_ops_token(_doc)
 EDITOR_SECRET = resolve_editor_secret(_doc)
 EDITORS = resolve_editors(_doc)
+COMPRESS = resolve_compress(_doc)
+COMPRESS_QUALITY = resolve_compress_quality(_doc)

@@ -35,7 +35,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from ..api import app as api_service
-from . import casenaming, catalog, history, layout
+from . import casenaming, catalog, compress, history, layout
 from .catalog import BASE
 from .eu_structure import flatten as eurlex_flatten
 from .eu_structure import subarticle_key
@@ -108,7 +108,7 @@ def _kommentar_indexes(con):
     for (path,) in con.execute(
             "SELECT path FROM documents WHERE source = 'kommentar' AND path <> ''"):
         path = root / path
-        art = json.loads(path.read_bytes())
+        art = json.loads(compress.read_bytes(path))
         law = art.get("annotates")
         if not law:
             continue
@@ -172,7 +172,7 @@ def _remiss_indexes():
         ann = path.with_suffix(".ann")
         if not ann.exists():
             continue                       # answer not analyzed yet -- nothing to show
-        svar = json.loads(path.read_text())
+        svar = json.loads(compress.read_bytes(path))
         # v1 maps only the first cross-ref, matching ai_analyze.analyze (a remiss
         # almost always sends out exactly one SOU/Ds); cache the referred
         # förarbete's uri so N answers to the same document reopen it once.
@@ -181,7 +181,7 @@ def _remiss_indexes():
         if key not in host_uri:
             fa_path = layout.artifact(
                 "forarbete", "%s/%s" % (typ, basefile_slug(fa_basefile)))
-            host_uri[key] = json.loads(fa_path.read_text())["uri"]
+            host_uri[key] = json.loads(compress.read_bytes(fa_path))["uri"]
         fa_uri = host_uri[key]
 
         layer = json.loads(ann.read_text())      # malformed .ann -> JSONDecodeError
@@ -1888,7 +1888,8 @@ def render_facet_page(source, view, nodes):
 def _write_browse(out_root, source, slugs, html):
     target = Path(out_root).joinpath(_browse_dir(source), *slugs)
     target.mkdir(parents=True, exist_ok=True)
-    (target / "index.html").write_text(html)
+    compress.write_text(target / "index.html", html,
+                        encodings=compress.PAGE_ENCODINGS)
 
 
 def generate_browse(client, source, out_root):
@@ -1936,11 +1937,12 @@ def _write_page(uri, source, path, title, site, out_root):
     artifact on disk (empty path) and renders a shell whose content is its
     aggregated inbound (what defines/tags the concept); everything else loads its
     artifact."""
-    art = (json.loads(Path(path).read_bytes()) if path
+    art = (json.loads(compress.read_bytes(path)) if path
            else {"uri": uri, "type": source, "title": title})
     out = Path(out_root) / doc_relpath(uri)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(render_document(art, source, site))
+    compress.write_text(out, render_document(art, source, site),
+                        encodings=compress.PAGE_ENCODINGS)
 
 
 def _render_one(job):
@@ -2051,14 +2053,16 @@ def render_aggregates(con, out_root, catalog_path, write_index=True):
     so this never write-then-clobbers `index.html`."""
     out_root = Path(out_root)
     out_root.mkdir(parents=True, exist_ok=True)
-    (out_root / "style.css").write_text(CSS + EDITOR_CSS)
-    (out_root / "scrollspy.js").write_text(SCROLLSPY)
-    (out_root / "search.js").write_text(SEARCH)
-    (out_root / "versions.js").write_text(VERSIONS)
-    (out_root / "editor.js").write_text(EDITOR)
-    (out_root / "robots.txt").write_text(ROBOTS)
+    # the static chrome is browser-facing too, so it rides the same precompression
+    # as the pages (nginx serves .br/.gz as-is); tiny files stay plain via the
+    # size floor in compress.write.
+    for name, body in (("style.css", CSS + EDITOR_CSS), ("scrollspy.js", SCROLLSPY),
+                       ("search.js", SEARCH), ("versions.js", VERSIONS),
+                       ("editor.js", EDITOR), ("robots.txt", ROBOTS)):
+        compress.write_text(out_root / name, body, encodings=compress.PAGE_ENCODINGS)
     if write_index:
-        (out_root / "index.html").write_text(render_index(con))
+        compress.write_text(out_root / "index.html", render_index(con),
+                            encodings=compress.PAGE_ENCODINGS)
     client = _browse_client(catalog_path)
     try:
         for source in catalog.counts(con):

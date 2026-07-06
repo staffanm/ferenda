@@ -15,7 +15,7 @@ never as part of a corpus-wide parse/relate/generate.
 import json
 from pathlib import Path
 
-from ..lib import catalog, layout, llm
+from ..lib import catalog, compress, layout, llm
 from ..lib.eu_structure import flatten
 
 PROMPT = Path(__file__).with_name("preamble_analyzer_prompt.txt")
@@ -97,10 +97,10 @@ def annotate(celex):
         ("%s: ai-annotate handles only sector-3 acts "
          "(regulation/directive/decision)" % celex)
     art_path = layout.artifact("eurlex", celex)
-    assert art_path.exists(), \
+    assert compress.exists(art_path), \
         "%s: no parsed artifact at %s -- run `lagen eurlex parse %s` first" \
         % (celex, art_path, celex)
-    art = json.loads(art_path.read_text())
+    art = json.loads(compress.read_bytes(art_path))
     prompt = PROMPT.read_text().replace(PLACEHOLDER, act_markdown(art))
     layer = _author(prompt)
     out = art_path.with_suffix(".ann")

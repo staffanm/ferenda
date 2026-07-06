@@ -74,6 +74,7 @@ from .foreskrift.agencies import REGISTRY as FORESKRIFT_AGENCIES
 from .lib import (
     casenaming,
     catalog,
+    compress,
     dump,
     layout,
     markdown,
@@ -166,8 +167,10 @@ def write_artifact(source, basefile, art, source_url=None):
            or layout.source_url(source, basefile, art.get("metadata")))
     if url:
         art["source_url"] = url
-    layout.artifact(source, basefile).write_text(
-        json.dumps(art, ensure_ascii=False, indent=2, sort_keys=True))
+    compress.write_text(
+        layout.artifact(source, basefile),
+        json.dumps(art, ensure_ascii=False, indent=2, sort_keys=True),
+        encodings=compress.ARTIFACT_ENCODINGS)
 
 
 # --------------------------------------------------------------------------
@@ -176,12 +179,15 @@ def write_artifact(source, basefile, art, source_url=None):
 
 def hash_files(paths):
     """Content hash over the existing files in `paths` (order-independent
-    in declaration but name-tagged so a rename counts)."""
+    in declaration but name-tagged so a rename counts). Compress-aware: a path
+    stored as a `.br`/`.gz` variant is hashed over its *decompressed* content and
+    logical name, so an artifact's fingerprint is stable across compression
+    settings (and identical to when it was stored plain)."""
     h = hashlib.sha256()
     for p in sorted(map(Path, paths), key=str):
-        if p.exists():
+        if compress.exists(p):
             h.update(p.name.encode())
-            h.update(p.read_bytes())
+            h.update(compress.read_bytes(p))
     return h.hexdigest()
 
 
@@ -196,7 +202,7 @@ def manifest_key(source, stage, basefile):
 
 def is_fresh(manifest, source, stage, basefile, inputs_hash=None):
     out = stage.output(basefile)
-    if not out.exists():
+    if not compress.exists(out):        # the output may be stored precompressed
         return False
     if not stage.inputs(basefile) and not stage.code:
         # nothing to version the output against (e.g. download: the "input" is
@@ -239,7 +245,7 @@ def file_watermark(paths):
     re-hashing every file. --force or a code-version change overrides it."""
     h = hashlib.sha256()
     for p in paths:                          # ARTIFACTS yields them already sorted
-        st = p.stat()
+        st = compress.stat(p)                # the real (possibly .br) file's size+mtime
         h.update(("%s\x1f%d\x1f%d\x1e" % (p, st.st_size, st.st_mtime_ns)).encode())
     return h.hexdigest()
 
@@ -257,8 +263,8 @@ def stage_watermark(source, stage_name):
         h.update(bf.encode())
         for p in sorted(stage.inputs(bf), key=str):
             # the per-source stage protocol is untyped; inputs() yields Paths
-            if p.exists():  # ty: ignore[unresolved-attribute]
-                st = p.stat()  # ty: ignore[unresolved-attribute]
+            if compress.exists(p):
+                st = compress.stat(p)
                 h.update(("\x1f%d\x1f%d" % (st.st_size, st.st_mtime_ns)).encode())
         h.update(b"\x1e")
     return h.hexdigest()
@@ -331,8 +337,11 @@ def ensure(source, stage_name, basefile, manifest, res, force, no_deps):
         stage.run(basefile)
     except SkipDocument:
         # a deliberately empty document (removed/expired): write an empty
-        # artifact so it is considered built and not retried every run
-        stage.output(basefile).write_bytes(b"")
+        # artifact so it is considered built and not retried every run. Via
+        # compress so any prior compressed variant at this path is cleared (the
+        # empty placeholder itself stays plain -- below the size floor).
+        compress.write_bytes(stage.output(basefile), b"",
+                             encodings=compress.ARTIFACT_ENCODINGS)
         res.skips.append((stage_name, basefile))
     except Exception as e:  # noqa: BLE001 — per-doc resilience point: recorded in res.errors, run continues (rule:no-catch-log-continue)
         res.errors.append((stage_name, basefile, "%s: %s"
@@ -674,13 +683,13 @@ def sfs_ai_correspond(basefiles):
         sys.exit("usage: lagen sfs ai-correspond <new-sfs> <prop-basefile> "
                  "[<old-sfs>]  (e.g. 2018:585 prop/2017-18-89)")
     new_sfs, prop = basefiles[0], basefiles[1]
-    new_art = json.loads(sfs_artifact(new_sfs).read_text())
-    prop_art = json.loads(fa_artifact(prop).read_text())
+    new_art = json.loads(compress.read_bytes(sfs_artifact(new_sfs)))
+    prop_art = json.loads(compress.read_bytes(fa_artifact(prop)))
     old_uri = ("https://lagen.nu/" + basefiles[2] if len(basefiles) == 3
                else sfs_correspond.detect_old_law(new_art))
     assert old_uri, ("%s: could not detect the repealed law from its transition "
                      "clause; pass it as the third argument" % new_sfs)
-    old_art = json.loads(sfs_artifact(old_uri.rsplit("/", 1)[-1]).read_text())
+    old_art = json.loads(compress.read_bytes(sfs_artifact(old_uri.rsplit("/", 1)[-1])))
     out = sfs_artifact(new_sfs).with_suffix(".corr")
     if RUN.dry_run:
         print("sfs ai-correspond: would map %s <- %s via %s -> %s"
@@ -1477,14 +1486,14 @@ def kommentar_anchor_warnings(con, basefiles=()):
     root = catalog.data_root(con)              # stored paths are data_root-relative
     for (path,) in con.execute(
             "SELECT path FROM documents WHERE source = 'kommentar' AND path <> ''"):
-        komm = json.loads((root / path).read_bytes())
+        komm = json.loads(compress.read_bytes(root / path))
         if want and komm.get("basefile") not in want:
             continue
         row = con.execute("SELECT path FROM documents WHERE uri = ? AND path <> ''",
                           (komm.get("annotates"),)).fetchone()
         if not row:
             continue
-        bad = wiki_parse.dangling_anchors(komm, json.loads((root / row[0]).read_bytes()))
+        bad = wiki_parse.dangling_anchors(komm, json.loads(compress.read_bytes(root / row[0])))
         if bad:
             out.append((komm.get("basefile"), komm.get("annotates"), bad))
     return out
@@ -1701,22 +1710,27 @@ api_edit.set_rebuild(rebuild_after_commit)
 # incremental generate would key off that inbound set.
 # --------------------------------------------------------------------------
 
+# each source's artifacts are stored precompressed (.json.br); compress.glob
+# matches a pattern across plain + compressed variants and yields logical .json
+# paths, so these keep their exact glob shape (notably sfs's one-nesting-level
+# `*/*.json`, which must not recurse into the archive/.versions/ consolidation
+# subtree) while transparently seeing the compressed files.
 ARTIFACTS = {
     # the versions-stage sidecars live next to the main artifacts but describe
     # historical consolidations -- not corpus documents, so not related/dumped
-    "sfs": lambda: sorted(p for p in layout.SFS_ARTIFACT.glob("*/*.json")
+    "sfs": lambda: sorted(p for p in compress.glob(layout.SFS_ARTIFACT, "*/*.json")
                           if not p.name.endswith(".versions.json")),
     # dv + kommentar go through layout.artifacts(), the single home that already
     # excludes the non-document index sidecars (DOM_INDEX / guidance-index.json)
     # -- no hand-globbed carve-out here (else the exclusion drifts across surfaces)
     "dv": lambda: layout.artifacts("dv"),
-    "forarbete": lambda: sorted(layout.artifact_dir("forarbete").glob("*/*.json")),
+    "forarbete": lambda: sorted(compress.glob(layout.artifact_dir("forarbete"), "*/*.json")),
     "kommentar": lambda: layout.artifacts("kommentar"),
-    "begrepp": lambda: sorted(layout.artifact_dir("begrepp").glob("*.json")),
-    "eurlex": lambda: sorted(layout.artifact_dir("eurlex").glob("*/*.json")),
+    "begrepp": lambda: sorted(compress.glob(layout.artifact_dir("begrepp"), "*.json")),
+    "eurlex": lambda: sorted(compress.glob(layout.artifact_dir("eurlex"), "*/*.json")),
     "foreskrift": lambda: sorted(
-        layout.artifact_dir("foreskrift").glob("*/*.json")),
-    "avg": lambda: sorted(layout.artifact_dir("avg").glob("*/*.json")),
+        compress.glob(layout.artifact_dir("foreskrift"), "*/*.json")),
+    "avg": lambda: sorted(compress.glob(layout.artifact_dir("avg"), "*/*.json")),
 }
 
 
@@ -2036,8 +2050,9 @@ def generate_watermark():
         # the site artifacts (frontpage/om/sitenews) aren't catalog rows, so the
         # catalog signature above never sees them -- fold them in directly so a
         # re-parsed editorial edit reopens the generate gate (else a full generate
-        # would skip and ship the stale site)
-        + list(layout.artifact_dir("site").rglob("*.json"))))
+        # would skip and ship the stale site). layout.artifacts() yields logical
+        # paths across plain/compressed storage; file_watermark stats the variant.
+        + list(layout.artifacts("site"))))
     return hashlib.sha256((sig + "\x1f" + sides).encode()).hexdigest()
 
 
@@ -2154,13 +2169,14 @@ def cmd_generate(only=None, source=None, jobs=1):
             sides = ((fp.with_suffix(".ann"), fp.with_suffix(".corr"),
                       fp.with_suffix(".versions.json")) if fp else ())
             base = content_hash if content_hash is not None else (
-                catalog.content_hash(fp.read_bytes()) if fp and fp.exists() else "")
+                catalog.content_hash(compress.read_bytes(fp))
+                if fp and compress.exists(fp) else "")
             own_hash[p] = hashlib.sha256(base.encode() + b"".join(
                 s.read_bytes() if s.exists() else b"" for s in sides)).hexdigest()
         return hashlib.sha256((own_hash[p] + dep_digest).encode()).hexdigest()
 
     def fresh(uri, out_path, art_path, dep_digest, content_hash):
-        if RUN.force or not out_path.exists():
+        if RUN.force or not compress.exists(out_path):   # page stored precompressed
             return False
         entry = manifest.get(manifest_key("generate", "page", uri))
         return bool(entry) \

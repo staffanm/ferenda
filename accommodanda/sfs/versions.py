@@ -25,7 +25,7 @@ import html
 import json
 import re
 
-from ..lib import layout, util
+from ..lib import compress, layout, util
 from ..lib.errors import SkipDocument
 from . import parse_sfs, parse_sfs_source
 from . import register as register_mod
@@ -154,8 +154,9 @@ def build(basefile, refparser=None):
         seen.add(recovered)
         out = layout.sfs_version_artifact(basefile, recovered)
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(json.dumps(art, ensure_ascii=False, indent=2,
-                                  sort_keys=True))
+        compress.write_text(out, json.dumps(art, ensure_ascii=False, indent=2,
+                                            sort_keys=True),
+                            encodings=compress.ARTIFACT_ENCODINGS)
         entry = {"version": recovered, "uri": art["uri"]}
         if recovered != version:
             entry["archived_as"] = version

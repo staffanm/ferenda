@@ -161,6 +161,34 @@ docker compose --profile prod logs -f accommodanda   # tail the app
 docker compose --profile prod restart accommodanda   # restart serve
 ```
 
+## Compression (artifact/ + generated/)
+
+The `artifact/` and `generated/` trees are stored **precompressed with Brotli**
+(`accommodanda/lib/compress`): a parsed artifact is written as `2018:585.json.br`
+and a rendered page as `2018:585.html.br` — a single `.br` variant, no plain file
+and no gzip companion (disk is the constraint on this box). On the text-heavy
+JSON/HTML payload Brotli q11 lands around a third the size of gzip and
+*decompresses faster*; the slow max-quality encode is paid once per build. The
+whole scheme is transparent — every reader/writer goes through `lib/compress`,
+which resolves a logical path (`…json`/`…html`) to whatever variant is on disk —
+so nothing downstream (relate, index, dump, the API) knows or cares. Tiny files
+(< 512 B: `robots.txt`, empty skip placeholders) stay plain. Toggle with the
+`compress` config key / `FERENDA_COMPRESS` env var; tune the effort with
+`compress_quality` (default 11).
+
+The `.br` bytes are what a browser wants (`Content-Encoding: br`), so they can be
+served **as-is, with no recompression**:
+
+- **Default (this deploy):** nginx proxies to `accommodanda:8000`, and the app
+  (`api.app.SiteFiles`) serves the `.br` verbatim to any client that accepts
+  brotli, decompressing on the fly for the rare one that doesn't.
+- **nginx-direct (offload the app):** mount `…/generated` into the nginx
+  container read-only and use `docker/vps/nginx/ferenda-static.conf.example`,
+  which serves the tree with `brotli_static` and falls back to the app for the
+  bare-document-URL grammar and the API. Needs an nginx image built with
+  `ngx_brotli` (stock nginx can't read `.br`); until then the default already
+  serves the same bytes.
+
 ## Notes / caveats
 
 - **LEGACY_ROOT is not mounted.** The frozen legacy corpora (the 410 GB soukb

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from accommodanda.lib import catalog, render
+from accommodanda.lib import catalog, compress, render
 
 
 # a minimal SFS-shaped artifact: one paragraph whose stycke cites another law,
@@ -154,7 +154,7 @@ def test_catalog_paths_are_data_root_relative_and_portable(tmp_path):
     out = dst / "generated"
     total, rendered = render.generate_site(str(dst / "catalog.sqlite"), str(out))
     assert rendered >= 1
-    assert (out / render.doc_relpath(LAW["uri"])).exists()
+    assert compress.exists(out / render.doc_relpath(LAW["uri"]))   # page stored precompressed
 
 
 def test_relate_migrates_legacy_absolute_paths(tmp_path):
@@ -556,12 +556,12 @@ def test_generate_browse_writes_faceted_pages(tmp_path):
     render.render_aggregates(con, out, str(tmp_path / "catalog.sqlite"))
     # the law files under its subject initial 'R' (Räntelag); the source root and
     # the bucket page both list it (root == default bucket, no redirect)
-    bucket = (out / "sfs" / "r" / "index.html").read_text()
+    bucket = compress.read_text(out / "sfs" / "r" / "index.html")   # pages precompressed
     assert 'href="/1975:635"' in bucket          # the bare /<sfsid> page address
     assert "som börjar på R" in bucket
-    assert 'href="/1975:635"' in (out / "sfs" / "index.html").read_text()
+    assert 'href="/1975:635"' in compress.read_text(out / "sfs" / "index.html")
     # every case is listed under its court; the source root resolves directly
-    assert 'href="/dom/NJA_1994_s_1"' in (out / "dom" / "index.html").read_text()
+    assert 'href="/dom/NJA_1994_s_1"' in compress.read_text(out / "dom" / "index.html")
 
 
 def test_generate_site_incremental_reuses_content_hash(tmp_path):
@@ -585,7 +585,7 @@ def test_generate_site_incremental_reuses_content_hash(tmp_path):
         return hashlib.sha256(((chash or "") + dep).encode()).hexdigest()
 
     def fresh(uri, out_path, art_path, dep, chash):
-        return (uri in manifest and out_path.exists()
+        return (uri in manifest and compress.exists(out_path)   # page precompressed
                 and manifest[uri] == signature(chash, dep))
 
     def record(uri, art_path, dep, chash):

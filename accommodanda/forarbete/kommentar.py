@@ -47,8 +47,8 @@ and leaves those joins to the caller. See REWRITE.md.
 import argparse
 import json
 import re
-from pathlib import Path
 
+from ..lib import compress
 from ..lib.catalog import norm_title
 from ..lib.lagrum import EULAGSTIFTNING, LagrumParser
 from ..lib.util import normalize_fold
@@ -431,7 +431,7 @@ def main():
     ap.add_argument("record", help="a förarbete record JSON (or its artifact)")
     ap.add_argument("--root", default="site/data/forarbete")
     args = ap.parse_args()
-    data = json.loads(Path(args.record).read_text())
+    data = json.loads(compress.read_bytes(args.record))
     art = data if "structure" in data else to_artifact(parse_record(data, args.root))
     records = extract(art)
     print("%d implements-statements in författningskommentar" % len(records))

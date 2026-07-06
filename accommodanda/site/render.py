@@ -14,7 +14,7 @@ write-then-clobber). The sitenews listing lives at ``/dataset/sitenews/feed``
 import json
 from pathlib import Path
 
-from ..lib import layout
+from ..lib import compress, layout
 from ..lib.render import edit_meta, escape, href, page
 
 FEED_URL = "https://lagen.nu/dataset/sitenews/feed"
@@ -158,7 +158,7 @@ def render_atom(art):
 def has_frontpage():
     """Whether a curated frontpage artifact exists -- the driver uses this to
     decide whether to suppress the generic corpus-stats ``index.html``."""
-    return layout.artifact("site", "frontpage").exists()
+    return compress.exists(layout.artifact("site", "frontpage"))
 
 
 def _editable(html, basefile):
@@ -175,18 +175,22 @@ def write_site(out_root):
     sitenews listing + Atom feed under ``dataset/sitenews/feed``. Driven purely
     by which artifacts exist (an empty site source writes nothing)."""
     out = Path(out_root)
+    page_fmt = compress.PAGE_ENCODINGS
     for path in layout.artifacts("site"):
-        art = json.loads(path.read_text(encoding="utf-8"))
+        art = json.loads(compress.read_bytes(path))
         if art["type"] == "frontpage":
-            (out / "index.html").write_text(_editable(render_frontpage(art), "frontpage"))
+            compress.write_text(out / "index.html",
+                                _editable(render_frontpage(art), "frontpage"), page_fmt)
         elif art["type"] == "om":
             dest = out / "om" / (art["slug"] + ".html")
             dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_text(_editable(render_about(art), "om/" + art["slug"]))
+            compress.write_text(dest, _editable(render_about(art), "om/" + art["slug"]),
+                                page_fmt)
         elif art["type"] == "sitenews":
             feed = out / "dataset" / "sitenews" / "feed"
             feed.mkdir(parents=True, exist_ok=True)
-            (feed / "index.html").write_text(_editable(render_sitenews(art), "sitenews"))
-            (feed.parent / "feed.atom").write_text(render_atom(art))
+            compress.write_text(feed / "index.html",
+                                _editable(render_sitenews(art), "sitenews"), page_fmt)
+            compress.write_text(feed.parent / "feed.atom", render_atom(art), page_fmt)
         else:
             raise ValueError("unknown site artifact type %r at %s" % (art["type"], path))

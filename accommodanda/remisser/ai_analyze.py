@@ -20,7 +20,7 @@ named basefile -- never from a corpus-wide parse/relate/generate.
 import json
 from pathlib import Path
 
-from ..lib import layout, llm
+from ..lib import compress, layout, llm
 from ..lib.text import runs_text
 from ..lib.util import basefile_slug, normalize_space
 from .model import Remissvar
@@ -146,7 +146,7 @@ def analyze(basefile):
     """Author and write the `.ann` sentiment layer for one remissvar basefile
     ("<case-slug>/<org-slug>"); returns the written path."""
     art_path = layout.artifact("remisser", basefile)
-    svar = Remissvar.from_dict(json.loads(art_path.read_text()))
+    svar = Remissvar.from_dict(json.loads(compress.read_bytes(art_path)))
     assert svar.remitterat, (
         "%s references no förarbete document (remitterat is empty) -- nothing to "
         "map onto; the caller should have scoped it out" % basefile)
@@ -157,11 +157,12 @@ def analyze(basefile):
     # remitterat carries the colon identifier ("2019:61"); the förarbete artifact
     # tree is keyed by the filesystem slug ("2019-61"), so slug it for the join
     host_path = layout.artifact("forarbete", "%s/%s" % (typ, basefile_slug(fa_basefile)))
-    assert host_path.exists(), (
+    assert compress.exists(host_path), (
         "%s: no parsed förarbete artifact at %s -- run "
         "`lagen forarbete parse %s/%s` first"
         % (basefile, host_path, typ, fa_basefile))
-    outline, valid_ids = section_outline(json.loads(host_path.read_text())["structure"])
+    outline, valid_ids = section_outline(
+        json.loads(compress.read_bytes(host_path))["structure"])
     assert valid_ids, ("%s host förarbete %s/%s has no sections to map onto"
                        % (basefile, typ, fa_basefile))
 
