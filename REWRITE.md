@@ -333,8 +333,13 @@ horizontal pieces: KORTLAGRUM citations and the cross-source link graph.
   behind an Angular SPA): `POST /api/v1/sok` paginates the whole corpus,
   `GET /api/v1/bilagor/{id}` for PDFs. Records stored verbatim as
   `site/data/downloaded/dom/{domstolKod}/{uuid}.json` + attachments.
-  Incremental (newest-first, stops at first seen page) and `--full`
-  (oldest-first) modes; idempotent, atomic writes, politeness delay.
+  Incremental (newest-first, through the shared `lib/harvest.walk`/
+  `HarvestWatermark` loop — stops on a run of consecutive already-downloaded
+  pages or one conclusively past the 365-day safety window) and `--full`
+  (oldest-first) modes; idempotent, atomic writes, politeness delay. A crashed
+  or `--limit`-truncated run leaves the watermark dirty, so the next run
+  re-walks the backlog instead of trusting it; a periodic cron'd `--full`
+  sweep is the backstop for record edits/late publication past the window.
 - ✅ **Full harvest done:** 17,254 records across 22 courts (1981–today),
   656/657 PDFs (1 upstream glitch — registered attachment never
   uploaded). Mostly HTML `innehall`, not PDF — good for parsing. Keep
@@ -602,16 +607,25 @@ below is not optional polish, it's the only way they enter the corpus.
     prerequisite set is data-dependent (the inbound set), not a static
     per-basefile input list.
 - ⬜ Generic golden-corpus comparator (factor out of `golden_sfs.py`).
-- ⬜ **Shared harvest core, not yet extracted.** The incremental-harvest loop
-  (newest-first page walk, stop-at-first-on-disk, `--full`/backfill mode,
-  atomic writes, politeness delay, `Reporter` progress) now exists in three
-  independent implementations: `forarbete/download.py` (regeringen.se AJAX
-  listing), `foreskrift/harvest.py` (the per-agency enumerate/resolve engine)
-  and `forarbete/riksdagen.py` (data.riksdagen.se dokumentlista JSON, plus its
-  own riksmöte-partitioned backfill for the API's pagination cap). Flagged as
-  a future `lib/` consolidation — not done yet since each grew its own
-  paging/backfill quirks and a premature abstraction would be guessing at the
-  shared shape from three data points.
+- ✅ **Shared harvest core extracted** (`accommodanda/lib/harvest.py`, 2026-07-06).
+  The incremental-harvest loop independently reimplemented in four verticals
+  (dv, forarbete, `forarbete/riksdagen.py`, `foreskrift/harvest.py`, avg/jo) —
+  newest-first page walk, stop-at-first-on-disk, `--full`/backfill mode,
+  atomic writes, politeness delay, `Reporter` progress — is now one shared
+  mechanism: `HarvestWatermark` (the stop-decision gate) and `walk`/`Skip`/
+  `ItemKey`/`guarded_enumerate` (the download loop itself), promoted out of
+  `foreskrift/harvest.py`'s original engine. Also hardened in the promotion:
+  a `begin()`/`complete()` lifecycle persists a `dirty` flag alongside the
+  watermark date, so a crashed, `--limit`-truncated, or per-doc-error run
+  leaves the store dirty — the next run disables the consecutive-hit stop
+  (but keeps the date-conclusive one) and self-heals by walking back down to
+  the safety boundary, rather than trusting fresh records that may sit above
+  stranded backlog. `dv/download.py` and `foreskrift/harvest.py`/`avg/download.py`
+  (jo) now run through `walk`; `forarbete/download.py` and
+  `forarbete/riksdagen.py` adopt the `begin`/`complete` lifecycle directly.
+  Each source states its own window (`lookahead_limit`/`safety_days`) at its
+  call site — dv: 365-day safety window (annual cadence, coarse dates);
+  forarbete/riksdagen/foreskrift/avg-jo: 14 days / 20 items.
 
 ## 6. Derived layer + publishing 🚧
 
@@ -886,8 +900,16 @@ them resolve.
     A pm without a Ds number is keyed by its **diarienummer** (`Ju2026/01691`,
     `KN2026/01475`, …); one with neither Ds number nor dnr falls back to the
     landing-page slug like SÖ/lr. Same downloader, same parse pipeline.
-  - Incremental (newest-first, stop at first on-disk) + `--full`; atomic writes;
-    browser UA (regeringen.se 403s bots); politeness delay. Stores per doc:
+  - Incremental (newest-first, through the shared `lib/harvest.walk`/
+    `HarvestWatermark` begin/complete lifecycle — dv, §4) + `--full`; atomic
+    writes; browser UA (regeringen.se 403s bots); politeness delay. Fixed
+    (2026-07-06): `iter_listing` was terminating on the *type-filtered*
+    descriptor count, so a raw page whose items all belonged to the sibling
+    type (pm/ds share category 1325) read as "exhausted" and permanently
+    truncated the listing below it; it now keys exhaustion on the raw
+    per-page item count, cross-checked against the envelope's `TotalCount`
+    (a truncated/broken listing now raises rather than silently stopping).
+    Stores per doc:
     `<slug>.json` record + landing `<slug>.html` + content PDF(s) under
     `site/data/downloaded/forarbete/<type>/`. `test/test_forarbete_download.py`.
   - ⬜ **Older-period sources** (riksdagen data API, KB scans) — regeringen.se
@@ -1213,10 +1235,12 @@ are not yet citation *targets*; the inbound value comes from the edges above.
   just when the file was regenerated). URI `https://lagen.nu/{fs}/{year}:{lopnummer}`;
   `bemyndigande` → `https://lagen.nu/{sfs}#P{n}`. `structure` is the förarbete-style
   nested §§ tree (filled at parse).
-- ✅ **Reusable harvest engine** (`foreskrift/harvest.py`) — the shared loop
-  (incremental newest-first gated by the shared `HarvestWatermark`, atomic writes, `Reporter`,
-  politeness; generalized `forarbete.sync`) is **architecture-agnostic**. An agency is
-  config naming two seams over it:
+- ✅ **Reusable harvest engine** (`foreskrift/harvest.py`) — the incremental
+  newest-first loop itself (gated by `HarvestWatermark`, atomic writes,
+  `Reporter`, politeness) was promoted out of here into `lib/harvest.py`
+  (`walk`, shared with dv/forarbete/riksdagen/avg — see §5); `foreskrift/harvest.py`
+  now just wires each agency's enumerate/resolve seam onto that shared loop,
+  **architecture-agnostic**. An agency is config naming two seams over it:
   - **`enumerate`** — *how to list an agency's docs*, the variable axis. Three reusable
     enumerators cover the wild: `indexed_enumerate` (one static HTML page),
     `paginated_enumerate` (`?page=N`), `json_enumerate` (a search/REST API in one call);
@@ -1613,7 +1637,9 @@ context rail, so it has no `relate`/`index`/`dump`/`generate` stage at all.
   at the first already-known slug; `--full` re-walks everything), then
   re-poll every still-open case (deadline unknown, or within a 21-day grace
   period of it) for newly-arrived answers and fetch any answer PDF not yet
-  cached. A case page that 404s/500s is written as a *stub* record from the
+  cached. Any per-case fetch or parse failure — an HTTP error, or a 200
+  response whose DOM doesn't match what `parse_case` expects (a bot-challenge
+  interstitial, a truncated response) — is written as a *stub* record from the
   listing facts alone — the on-disk slug is the incremental stop condition, so
   a silently-skipped failure would otherwise hide that case from every later
   incremental run; the stub has no deadline, so it stays "open" and gets
@@ -1708,14 +1734,14 @@ model + extraction.
 |---|---|
 | `tools/golden_sfs.py` | golden-corpus comparator (`normalize` parsed XHTML → NF on the fly) |
 | `../ferenda.old/data/sfs/parsed/` | the golden = old-pipeline parsed XHTML (11,056 docs), normalized per comparison — sibling checkout, not `site/data/` |
-| `accommodanda/lib/` | **shared** horizontal libs: `lagrum` (citation engine), `util`, `errors` (`SkipDocument`) |
+| `accommodanda/lib/` | **shared** horizontal libs: `lagrum` (citation engine), `util`, `errors` (`SkipDocument`), `harvest` (shared incremental-download core — `HarvestWatermark`, `walk`) |
 | `accommodanda/sfs/` | **acts vertical**: `{extract,reader,model,tokenizer,assembler,nf}` parser + `register` (SFSR→amendments/förarbeten/metadata) + `__main__` (validate CLI) |
 | `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `structure`, `word`, `legacy`, `namedcases` (HD named-precedent harvester); canonical case title + HD given names live in `lib/casenaming.py` (shared with the catalog + renderer) |
 | `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, 8 types + `pm`, promemorior outside the Ds series), `model`/`structure`/`parse` (PDF/html→nested structure→artifact), `legacy` (one-time import of the nine frozen förarbete corpora, §7g), `legacy_formats` (frozen body adapters — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML, scanned-PDF OCR text, TRIPS `div.body-text`), `riksdagen` (`bet`/utskottsbetänkanden downloader off data.riksdagen.se, no frozen corpus), `kommentar` (författningskommentar → EU-directive *genomför* edges, prop + fm), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf) |
 | `accommodanda/eurlex/` | **EU vertical (EUR-Lex/CELLAR)**: `download` (SPARQL discovery), `bulk` (dump import), `parse`/`parse_html`/`parse_pdf` (Formex/HTML/PDF → one artifact shape), `definitions` (defined-terms extraction + in-act interlinking), `lang`, `model` |
 | `accommodanda/avg/` | **JO/JK/ARN-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages, `jk_canonical` dnr normalization; ARN one-page vägledande-beslut listing), `legacy` (one-time import of the frozen ARN corpus 1991–2022, §7g), `parse` (JO/ARN PDF via `lib/pdftext`, JK landing HTML; DV parse-type citation scan) |
-| `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (reusable engine — enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct}; `Skip`/`_guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 17 agencies live + 4 frozen-only), `download`, `legacy` (one-time import of the two harvest-blocked corpora, §7g), `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors). Corpus: 1218 regs harvested, parsed 0-fail |
-| `accommodanda/remisser/` | **remiss (referral-response) vertical**: `model` (`Remiss`/`Remissinstans`/`Remissvar`, `org_slug`), `download` (regeringen.se `/remisser/` two-pass sync + `sync_one`/`--only`, stub records for unreachable case pages), `parse` (answer PDF → `Remissvar` via `lib/pdftext` with no fixed header), `ai_analyze` (the sole LLM pass — sentiment+quote per section, `.ann` sidecar). Never `relate`d/published; its `.ann` layer feeds the referred förarbete's rail via `render._remiss_indexes` |
+| `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (per-agency enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct} wired onto `lib/harvest.walk`; `Skip`/`guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 17 agencies live + 4 frozen-only), `download`, `legacy` (one-time import of the two harvest-blocked corpora, §7g), `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors). Corpus: 1218 regs harvested, parsed 0-fail |
+| `accommodanda/remisser/` | **remiss (referral-response) vertical**: `model` (`Remiss`/`Remissinstans`/`Remissvar`, `org_slug`), `download` (regeringen.se `/remisser/` two-pass sync + `sync_one`/`--only`, stub records for any per-case fetch/parse failure), `parse` (answer PDF → `Remissvar` via `lib/pdftext` with no fixed header), `ai_analyze` (the sole LLM pass — sentiment+quote per section, `.ann` sidecar). Never `relate`d/published; its `.ann` layer feeds the referred förarbete's rail via `render._remiss_indexes` |
 | `accommodanda/lib/regeringen.py` | shared regeringen.se harvest knowledge (rule:second-use-goes-to-lib): the doctype table (`TYPES`) and `ul.list--block` listing walk (`listing_items`), used by both `forarbete/download.py` and `remisser/download.py` |
 | `accommodanda/site/` | **editorial-chrome vertical**: `model` (block-tree dataclasses + `Frontpage`/`AboutPage`/`Sitenews`), `parse` (markdown → artifact for `frontpage`/`om/<slug>`/`sitenews`), `render` (artifacts → HTML + Atom, `write_site`). Content is markdown in `lagen-wiki/site/`, migrated once by `tools/migrate_site_content.py`. Never `relate`d/indexed/dumped (absent from `ARTIFACTS`, like remisser); rendered during `generate` |
 | `accommodanda/lib/pdftext.py` | **shared font-aware PDF extraction** (förarbete + föreskrift + avg (JO/ARN) + remisser): `pdf_pages` (`pdftohtml -xml` → bold/italic-tagged `Line`s) → `page_paragraphs` (reflow, strip running header/page-no/TOC — `identifier=None` skips header-stripping for sources with no fixed masthead, e.g. remisser) → the vertical's own `classify` |
@@ -1829,6 +1855,26 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **§5/§4/§7a/§7e** (2026-07-06) — shared harvest core extracted to
+  `lib/harvest.py` (`HarvestWatermark` begin/complete lifecycle + `walk`/
+  `Skip`/`ItemKey`/`guarded_enumerate`), closing the §5 "not yet extracted"
+  gap; dv, `foreskrift/harvest.py` and avg (jo) now run on `walk`,
+  forarbete/riksdagen adopt the begin/complete lifecycle directly. Alongside
+  the extraction, a round of incremental-download correctness fixes:
+  `forarbete/download.py`'s `iter_listing` was fixed to key listing-exhaustion
+  on the raw per-page item count (not the type-filtered one), which had been
+  permanently truncating
+  pm/ds harvests past a page dominated by the sibling type; `eurlex/download.py`
+  now walks caselaw's CELEX-year enumeration from `first_year` regardless of
+  the date floor (a judgment's CELEX year is its case year, not its decision
+  year), corrected its recency floor to `run - window` (reaching below the max
+  seen work date, not pinned to it), keeps wdate-less works past the SPARQL
+  filter, and gained a per-sector pending-retry sidecar for no-content works;
+  `remisser/download.py` now writes a stub record for any per-case fetch/parse
+  failure (previously HTTP errors only); avg's `jo_sync --full` re-resolves
+  on-disk docs (via `walk`) and `jk_sync --full` no longer pre-deletes the
+  stored landing before refetching; foreskrift's non-PDF response bodies are
+  now logged and counted rejections rather than silently dropped.
 - **§6** (2026-07-05) — inline content editor: the write side of the service.
   A new `editors` config registry + `editor_secret` back a signed-cookie login
   (`api/auth.py`); `api/edit.py` exposes `/api/v1/{auth,edit}/*` (all gated,

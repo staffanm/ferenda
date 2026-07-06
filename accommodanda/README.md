@@ -71,6 +71,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `eu_structure.py` | the one EU-act sub-article anchor grammar (`anchored_blocks`/`subarticle_key`/`flatten`), shared by the eurlex parser, the renderer and the wiki guidance layer (`nest`, the parse-time tree builder, stays in `eurlex/structure.py`) |
 | `legacy_import.py` | shared §7g frozen-import core — `should_write` precedence (live-wins / own-import-idempotent-unless-force / optional `better()` tie-break), `rel` (in-place LEGACY_ROOT-relative body references), `iter_entries`/`docdir`/`read_record` walk primitives; used by `forarbete/legacy.py`, `foreskrift/legacy.py`, `avg/legacy.py` |
 | `regeringen.py` | shared regeringen.se harvest knowledge — the doctype table (`TYPES`: url segment, taxonomy category id, identifier regex) and the `ul.list--block` listing walk (`listing_items`); used by `forarbete/download.py` and `remisser/download.py` |
+| `harvest.py` | shared incremental-download core — `HarvestWatermark` (begin/complete lifecycle, never-regress date save, crash-safe `dirty` flag that disables the consecutive-hit stop but not the date-conclusive one) + `walk`/`Skip`/`ItemKey`/`guarded_enumerate` (the newest-first download loop over an enumerate/resolve pair); each source states its own `lookahead_limit`/`safety_days` window (dv: 365-day safety window, ~5000-item lookahead; forarbete/riksdagen/foreskrift/avg-jo: 14 days/20 items); used by `dv/download.py`, `foreskrift/harvest.py`, `avg/download.py` (jo), and directly by `forarbete/download.py` + `forarbete/riksdagen.py` |
 
 **DV vertical (court decisions)**
 | File | What |
@@ -106,7 +107,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | File | What |
 |---|---|
 | `agencies.py` | the data registry driving one shared harvest engine — 17 live författningssamlingar + 4 frozen-only (skvfs/rsfs, sosfs/hslffs, §7g), no per-agency pipelines (~100 agencies share a few publishing architectures) |
-| `harvest.py` | the shared harvest engine (enumerate → resolve → fetch per architecture) |
+| `harvest.py` | per-agency enumerate/resolve architectures (indexed/paginated/json/sitemap enumerators; landing/direct resolvers + file classifiers) wired onto `lib/harvest.py`'s shared `walk`/`HarvestWatermark` loop |
 | `download.py` | the `lagen foreskrift download` front over the engine (`--full`, `--only`; frozen-only fs are a logged no-op) |
 | `legacy.py` | one-time import of the two harvest-blocked corpora (`lagen foreskrift import-legacy {skvfs\|sosfs}`) — frozen bytes referenced in place (§7g) |
 | `model.py` / `structure.py` / `parse.py` | as-published `Foreskrift` model, PDF → statute-shaped structure → artifact (`parse.body_path` resolves a frozen-import body under LEGACY_ROOT) |
@@ -135,7 +136,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | File | What |
 |---|---|
 | `model.py` | `Remiss` (case: title, dnr, deadline, `remitterat` cross-ref to the referred förarbete, `svar` list of `Remissinstans`), `Remissvar` (one organisation's parsed answer); `org_slug` derives the shared basename identity `download`/`parse`/`build` all key on |
-| `download.py` | regeringen.se `/remisser/` two-pass sync — discover new cases (`--full` re-walks everything), then re-poll every still-open case for newly-arrived answers and fetch any answer PDF not yet cached; `sync_one`/`--only <url>` fetches one known case directly; a 404/500 case page is written as a *stub* record (from listing facts only) so the incremental watermark can't hide the failure — re-polled until it succeeds |
+| `download.py` | regeringen.se `/remisser/` two-pass sync — discover new cases (`--full` re-walks everything), then re-poll every still-open case for newly-arrived answers and fetch any answer PDF not yet cached; `sync_one`/`--only <url>` fetches one known case directly; any per-case fetch or parse failure (HTTP error, or a 200 whose DOM doesn't match — a bot-challenge interstitial, a truncation) is written as a *stub* record (from listing facts only) so the incremental watermark can't hide the failure — re-polled until it succeeds |
 | `parse.py` | one answer PDF → `Remissvar` via the shared `lib/pdftext` (`pdf_pages` + `page_paragraphs`), flattened to plain paragraph text; passes `identifier=None` since each organisation's PDF carries its own letterhead, not a fixed running header |
 | `ai_analyze.py` | `lagen remisser ai-analyze <case-slug>/<org-slug>` — the sole LLM pass: maps one answer onto the referred SOU/Ds's sections with a per-section sentiment + verbatim quote plus an overall stance, validated strictly and written as a `.ann` sidecar; retries once via `lib.llm.complete_thread` on a malformed reply |
 
@@ -216,6 +217,10 @@ uv run python -m accommodanda.dv.legacy site/data/downloaded/dv/ADO/1993-100_1.d
 The DV parsers are driven by the identity index: each canonical case is
 parsed from its single best source — the API record when present, the
 legacy Word original otherwise (no cross-source merge; see REWRITE.md §4).
+The incremental download only covers late publication within its 365-day
+safety window below the watermark; a record edit or a referat published
+later than that surfaces only under `--full`, so a periodic cron'd `--full`
+sweep remains the backstop.
 
 **avg — JO + JK + ARN decisions** (operates on `site/data/{downloaded,artifact}/avg/`):
 
