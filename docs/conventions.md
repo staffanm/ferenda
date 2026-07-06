@@ -83,7 +83,7 @@ crash into silent data corruption. Broad `except Exception` is allowed
 only at the sanctioned per-item resilience points, where one bad document
 must not kill a corpus run:
 
-- the harvest walk (`foreskrift/harvest.py`)
+- the shared download walk (`lib/harvest.py`)
 - the build driver's per-document boundary (`build.py`)
 - the golden-validation harness (`sfs/_validate.py`)
 - the legacy-stats CLI (`dv/legacy.py`)

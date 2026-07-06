@@ -56,12 +56,13 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
+from ..lib.harvest import HarvestWatermark, ItemKey, walk
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session, request
 from ..lib.util import (
-    HarvestWatermark,
     Reporter,
     basefile_slug,
+    document_extension,
     normalize_space,
     record_path,
     write_atomic,
@@ -146,7 +147,7 @@ def jo_save(root, hit, session, delay):
     pdf = jo_pdf_path(root, basefile)
     if pdf_url and not pdf.exists():
         response = request(session, "GET", pdf_url, timeout=120)
-        if response.content[:4] == b"%PDF":
+        if document_extension(response.content) == ".pdf":
             write_atomic(pdf, response.content)
         else:
             print("jo: %s pdf_url served non-PDF, skipping body file"
@@ -159,11 +160,11 @@ def jo_pdf_path(root, basefile):
     return Path(root) / "jo" / (basefile_slug(basefile) + ".pdf")
 
 
-def jo_sync(root, full=False, only=None, limit=None, delay=0.5):
-    """Harvest JO decisions. Newest-first; incremental runs stop at the first
-    page with nothing new once a clean full walk has completed (the
-    watermark, dv's rule). ``only`` = one basefile ("jo/2340-2025"):
-    a targeted search on the case number."""
+def jo_sync(root, full=False, only=None, limit=None, delay=0.5, log=print):
+    """Download JO decisions onto :func:`lib.harvest.walk`. Newest-first;
+    incremental runs stop once a run of already-downloaded decisions (or one
+    older than the watermark boundary) shows the corpus is caught up. ``only`` =
+    one basefile ("jo/2340-2025"): a targeted search on the case number."""
     session = make_session(USER_AGENT)
     nonce = jo_nonce(session)
     if only:
@@ -185,69 +186,42 @@ def jo_sync(root, full=False, only=None, limit=None, delay=0.5):
 
     # Migrate legacy complete marker to watermark
     if marker.exists() and not watermark_path.exists():
-        initial_watermark = HarvestWatermark(watermark_path)
-        initial_watermark.save(date.today().isoformat())
+        HarvestWatermark(watermark_path).save(date.today().isoformat())
 
+    # JO decisions are dated to the day; a 14-day safety window past the newest
+    # resolve_date plus a 20-hit lookahead comfortably covers a bump/reorder.
     watermark = HarvestWatermark(watermark_path, lookahead_limit=20, safety_days=14)
-    backfill = full or not watermark_path.exists()
-    seen = new = 0
-    page, exhausted = 1, False
-    done = False
-    newest_date = None
-    rep = Reporter()
-    while True:
-        envelope = jo_search(session, nonce, page)
-        hits = envelope["search_hits"]
-        if not hits:
-            exhausted = True
-            break
-        page_changed = 0
-        for hit in hits:
-            if newest_date is None and hit.get("resolve_date"):
-                newest_date = hit["resolve_date"]
 
-            dnrs = jo_dnrs(hit.get("diary_number"))
-            if not dnrs:
-                continue
-            basefile = "jo/" + dnrs[0]
+    # a lazy newest-first hit stream over the paged search; the first page also
+    # yields total_hits for the progress line
+    first = jo_search(session, nonce, 1)
 
-            path = record_path(root, "jo", basefile)
-            pdf = jo_pdf_path(root, basefile)
-            is_downloaded = path.exists() and (not hit.get("pdf_url") or pdf.exists())
+    def hits():
+        envelope, page = first, 1
+        while True:
+            yield from envelope["search_hits"]
+            if page >= envelope["total_pages"]:
+                return
+            page += 1
+            time.sleep(delay)
+            envelope = jo_search(session, nonce, page)
 
-            if not backfill:
-                if watermark.should_stop(is_downloaded, hit.get("resolve_date")):
-                    done = True
-                    break
-            elif is_downloaded:
-                seen += 1
-                continue
+    def item_key(hit):
+        dnrs = jo_dnrs(hit.get("diary_number"))
+        if not dnrs:
+            return None                       # unparsable diary_number -- not a doc
+        basefile = "jo/" + dnrs[0]
+        pdf = jo_pdf_path(root, basefile)
+        is_downloaded = record_path(root, "jo", basefile).exists() \
+            and (not hit.get("pdf_url") or pdf.exists())
+        return ItemKey(basefile=basefile, is_downloaded=is_downloaded,
+                       date=hit.get("resolve_date"))
 
-            if jo_save(root, hit, session, delay):
-                page_changed += 1
-            seen += 1
-            if limit and seen >= limit:
-                done = True
-                break
-
-        new += page_changed
-        rep.update(seen, envelope["total_hits"], page=page, changed=page_changed)
-        if done:
-            break
-        if limit and seen >= limit:
-            break
-        if page >= envelope["total_pages"]:
-            exhausted = True
-            break
-        page += 1
-        time.sleep(delay)
-    rep.done()
-
-    if (exhausted or done) and not limit:
-        watermark.save(newest_date)
-        marker.parent.mkdir(parents=True, exist_ok=True)
-        marker.write_text("")
-    return seen, new
+    result = walk(hits(), resolve=lambda hit: jo_save(root, hit, session, delay),
+                  item_key=item_key, watermark=watermark, full=full, limit=limit,
+                  scope="jo", count_label="changed", total=first["total_hits"],
+                  log=log)
+    return result.seen, result.new
 
 
 # --------------------------------------------------------------------------
@@ -300,9 +274,12 @@ def jk_html_path(root, basefile):
     return Path(root) / "jk" / (basefile_slug(basefile) + ".html")
 
 
-def jk_save(root, item, session, delay):
+def jk_save(root, item, session, delay, full=False):
     """Store one decision: its landing page (the document itself) + record.
-    Returns True when fetched (new), False when already on disk."""
+    Returns True when fetched (new/refreshed), False when already on disk
+    unchanged. ``full`` bypasses the equality check to refetch. The new landing
+    is fetched *before* the old is overwritten, so a failed fetch leaves the
+    existing good record in place rather than a stub that later crashes parse."""
     basefile = "jk/" + jk_canonical(item["dnr_raw"])
     record = {"basefile": basefile, "org": "jk",
               "diarienummer_raw": item["dnr_raw"],
@@ -310,7 +287,7 @@ def jk_save(root, item, session, delay):
               "title": item["title"], "url": item["url"]}
     path = record_path(root, "jk", basefile)
     landing = jk_html_path(root, basefile)
-    if path.exists() and landing.exists() \
+    if not full and path.exists() and landing.exists() \
             and json.loads(path.read_text()) == record:
         return False
     response = request(session, "GET", item["url"], timeout=60)
@@ -321,9 +298,9 @@ def jk_save(root, item, session, delay):
 
 
 def jk_sync(root, full=False, only=None, limit=None, delay=0.5):
-    """Harvest JK decisions. The listing is one request, so every run walks all
+    """Download JK decisions. The listing is one request, so every run walks all
     entries and fetches only what is missing or changed (``--full`` refetches
-    landings too, by clearing the record match via the raw fields)."""
+    landings too, by bypassing the record equality check in :func:`jk_save`)."""
     session = make_session(USER_AGENT)
     items = jk_listing(session)
     if only:
@@ -333,10 +310,7 @@ def jk_sync(root, full=False, only=None, limit=None, delay=0.5):
     seen = new = 0
     rep = Reporter()
     for item in items:
-        if full:
-            jk_html_path(root, "jk/" + jk_canonical(item["dnr_raw"])) \
-                .unlink(missing_ok=True)
-        new += jk_save(root, item, session, delay)
+        new += jk_save(root, item, session, delay, full=full)
         seen += 1
         rep.update(seen, len(items), changed=new)
         if limit and seen >= limit:
@@ -428,7 +402,7 @@ def arn_save(root, item, session, delay, full=False):
         return False
     response = request(session, "GET", item["url"], timeout=120)
     time.sleep(delay)
-    if response.content[:4] != b"%PDF":
+    if document_extension(response.content) != ".pdf":
         print("arn: %s: %s served a non-PDF body, skipping"
               % (basefile, item["url"]), flush=True)
         return False
@@ -438,7 +412,7 @@ def arn_save(root, item, session, delay, full=False):
 
 
 def arn_sync(root, full=False, only=None, limit=None, delay=0.5):
-    """Harvest ARN referat. The listing is one static page, so every run walks
+    """Download ARN referat. The listing is one static page, so every run walks
     all entries and fetches only what is missing or changed (``--full`` refetches
     every PDF and rewrites every record). ``only`` = one basefile
     ("arn/2026-00382"): the matching listing entry."""
@@ -465,7 +439,7 @@ def arn_sync(root, full=False, only=None, limit=None, delay=0.5):
 # --------------------------------------------------------------------------
 
 def sync(root, scopes=None, full=False, only=None, limit=None, delay=0.5):
-    """Harvest the named organs (default all three). Returns {org: (seen, new)}."""
+    """Download the named organs (default all three). Returns {org: (seen, new)}."""
     totals = {}
     for org in (scopes or ("jo", "jk", "arn")):
         run = {"jo": jo_sync, "jk": jk_sync, "arn": arn_sync}[org]

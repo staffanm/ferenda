@@ -487,3 +487,58 @@ def test_arn_save_live_wins_over_frozen(tmp_path, monkeypatch):
     calls.clear()
     assert avg_download.arn_save(root, item, None, 0) is False
     assert calls == []
+
+
+def test_arn_save_rejects_non_pdf(tmp_path, monkeypatch):
+    # the magic-sniff now goes through lib.util.document_extension; a WAF/HTML
+    # error page is rejected and nothing is written for the referat
+    class Resp:
+        content = b"<html>error</html>"
+    monkeypatch.setattr(avg_download, "request", lambda *a, **kw: Resp())
+    item = {"dnrs": ["2020-08372"], "beslutsdatum": "2020-05-05",
+            "avdelning": "Bank", "title": "t", "url": "https://www.arn.se/x.pdf"}
+    assert avg_download.arn_save(str(tmp_path), item, None, 0) is False
+    assert not record_path(tmp_path, "arn", "arn/2020-08372").exists()
+
+
+# --------------------------------------------------------------------------
+# JO / JK -- the --full refresh fixes, ported onto lib.harvest.walk
+# --------------------------------------------------------------------------
+
+def test_jo_full_falls_through_to_jo_save(tmp_path, monkeypatch):
+    # --full must re-visit an already-downloaded decision so jo_save's change
+    # detection runs (the backfill branch used to `continue` before it)
+    hit = {"id": 1, "diary_number": "2340-2025", "resolve_date": "2026-06-30",
+           "pdf_url": None}
+    write_atomic(record_path(tmp_path, "jo", "jo/2340-2025"),
+                 json.dumps(avg_download.jo_record(hit, "jo/2340-2025")))
+    monkeypatch.setattr(avg_download, "make_session", lambda ua: None)
+    monkeypatch.setattr(avg_download, "jo_nonce", lambda session: "nonce")
+    monkeypatch.setattr(avg_download, "jo_search",
+                        lambda session, nonce, page, **kw: {
+                            "search_hits": [hit], "total_hits": 1, "total_pages": 1})
+    saved = []
+    monkeypatch.setattr(avg_download, "jo_save",
+                        lambda root, h, session, delay: saved.append(h["diary_number"]) or False)
+    seen, new = avg_download.jo_sync(str(tmp_path), full=True)
+    assert saved == ["2340-2025"]         # the downloaded doc was re-visited
+
+
+def test_jk_full_keeps_old_landing_when_refetch_fails(tmp_path, monkeypatch):
+    # --full must not pre-delete the stored landing before fetching its
+    # replacement: a failed refetch has to leave the existing good record intact
+    root = str(tmp_path)
+    item = {"dnr_raw": "2024/8082", "beslutsdatum_raw": "20 apr 2026",
+            "title": "t", "url": "https://www.jk.se/x/"}
+    landing = avg_download.jk_html_path(root, "jk/2024/8082")
+    write_atomic(landing, "OLD GOOD HTML")
+
+    def boom(*a, **kw):
+        raise RuntimeError("refetch failed")
+
+    monkeypatch.setattr(avg_download, "make_session", lambda ua: None)
+    monkeypatch.setattr(avg_download, "jk_listing", lambda session: [item])
+    monkeypatch.setattr(avg_download, "request", boom)
+    with pytest.raises(RuntimeError):
+        avg_download.jk_sync(root, full=True)
+    assert landing.read_text() == "OLD GOOD HTML"   # not pre-deleted

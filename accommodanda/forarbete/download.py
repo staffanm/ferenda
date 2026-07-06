@@ -32,7 +32,7 @@ source (riksdagen, KB) for older periods reconciles by identity, exactly as the
 user requires. The two types regeringen.se publishes without a number (SÖ,
 lagrådsremiss) fall back to the landing-page slug as basefile.
 
-Harvested via `lagen forarbete download [prop|sou|ds|...]`; no doctype = all.
+Downloaded via `lagen forarbete download [prop|sou|ds|...]`; no doctype = all.
 A single document: `lagen forarbete download <doctype> --only <basefile>`.
 
 Stored under `site/data/downloaded/forarbete/<type>/`: one `<slug>.json` record (identifier,
@@ -50,11 +50,11 @@ from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
 
+from ..lib.harvest import HarvestWatermark
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session
 from ..lib.regeringen import BASE, TYPES, listing_items
 from ..lib.util import (
-    HarvestWatermark,
     Reporter,
     basefile_slug,
     document_extension,
@@ -105,8 +105,11 @@ def fetch(session, url, timeout=60):
 # --------------------------------------------------------------------------
 
 def parse_listing(html, typ):
-    """One listing page -> a descriptor per document, in page order (newest
-    first): {type, basefile, identifier, title, date, url, slug}."""
+    """One listing page -> (descriptors, raw_count): a descriptor per document
+    of type `typ`, in page order (newest first) -- {type, basefile, identifier,
+    title, date, url, slug} -- plus the RAW number of listing items on the page
+    *before* type filtering. The raw count is what tells "listing exhausted"
+    apart from "page full of the sibling type's documents" (see iter_listing)."""
     segment, _, idre = TYPES[typ]
     idpat = re.compile(idre) if idre else None
     # a type sharing a category with a sibling (pm/ds) takes the complementary
@@ -119,7 +122,9 @@ def parse_listing(html, typ):
         excludepat = re.compile(sibre)
     hrefpat = re.compile(r"/rattsliga-dokument/%s/\d{4}/\d{2}/" % segment)
     out = []
+    raw = 0
     for li, href, url, text in listing_items(html, hrefpat):
+        raw += 1
         slug = href.rstrip("/").rsplit("/", 1)[-1]
         time_el = li.find("time")
         date = time_el.get("datetime") if time_el else None
@@ -145,26 +150,45 @@ def parse_listing(html, typ):
             title = text
         out.append({"type": typ, "basefile": basefile, "identifier": identifier,
                     "title": title, "date": date, "url": url, "slug": slug})
-    return out
+    return out, raw
 
 
 def listing_page(session, typ, page):
     """One listing page via the AJAX filter endpoint: returns (items,
-    total_count). The endpoint wraps the `ul.list--block` HTML in a JSON
-    envelope {"Message": <html>, "TotalCount": N}."""
+    raw_count, total_count). The endpoint wraps the `ul.list--block` HTML in a
+    JSON envelope {"Message": <html>, "TotalCount": N}."""
     category = TYPES[typ][1]
     envelope = fetch(session, FILTER % (category, page)).json()
-    return parse_listing(envelope.get("Message", ""), typ), envelope.get("TotalCount")
+    items, raw = parse_listing(envelope.get("Message", ""), typ)
+    return items, raw, envelope.get("TotalCount")
 
 
 def iter_listing(session, typ, delay):
-    """Yield (descriptors, total_count, page_number) per listing page until one
-    is empty."""
+    """Yield (descriptors, total_count, page_number) per listing page until the
+    listing is exhausted.
+
+    Exhaustion keys on the RAW per-page item count, never the type-filtered
+    descriptor count: two types share category 1325 (pm/ds), so a page whose
+    items all belong to the sibling type filters to zero descriptors while the
+    listing continues below it -- reading that as "exhausted" would permanently
+    skip everything deeper, --full included. (Same for any page whose items all
+    lack the type's identifier in the link text.) A raw-empty page normally IS
+    the end; but when the envelope's TotalCount says more items should exist,
+    the listing is truncated or broken, and that is an error, not clean
+    exhaustion (rule:fail-fast) -- the raise lands inside sync's walk, after
+    begin(), so the watermark store stays dirty and the next run re-walks."""
     page = 1
+    raw_seen = 0
     while True:
-        items, total = listing_page(session, typ, page)
-        if not items:
+        items, raw, total = listing_page(session, typ, page)
+        if raw == 0:
+            if total and raw_seen < total:
+                raise ValueError(
+                    "%s: listing page %d is empty but TotalCount=%d and only "
+                    "%d items seen -- truncated or broken listing" %
+                    (typ, page, total, raw_seen))
             return
+        raw_seen += raw
         yield items, total, page
         page += 1
         time.sleep(delay)
@@ -215,7 +239,7 @@ def download_document(session, root, item, delay):
 
 
 # --------------------------------------------------------------------------
-# harvest
+# download loop
 # --------------------------------------------------------------------------
 
 def has_live_record(root, typ, basefile):
@@ -230,19 +254,24 @@ def has_live_record(root, typ, basefile):
 
 def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
          only=None):
-    """Harvest the named types (default all).
+    """Download the named types (default all).
 
     A type is *backfilled* -- the whole listing walked, downloading whatever is
     missing -- when `--full` is given or the type has never been cleanly walked
-    (no watermark yet: a first run, or one interrupted partway). The watermark
-    is written after a completed walk/sync even if some documents failed to
-    download (one persistently-broken document must not force a full re-walk
-    forever); failures are logged for --only/--full retry. An *interrupted*
-    run leaves no watermark and is resumed. Once caught up, later runs go
-    *incremental*: newest-first, stopping at the first document already on disk
-    that falls past the watermark date boundary or when look-ahead limit is reached.
+    (no watermark date yet: a first run, or one crashed partway). The walk
+    drives the shared begin/complete watermark lifecycle (lib.harvest): the
+    watermark date advances even when some documents failed to download (one
+    persistently-broken document must not force ever-deeper re-walks -- the
+    date-conclusive stop bounds the depth), but errors leave the store *dirty*,
+    so the next run disables the consecutive-hit stop, walks down to the
+    date-conclusive boundary, and naturally retries the failures. A crashed or
+    `--limit`-truncated run likewise stays dirty and is re-walked. Once caught
+    up, later runs go *incremental*: newest-first, stopping at the first
+    document already on disk that falls past the watermark date boundary or
+    when the look-ahead limit is reached.
     `only` (a basefile) downloads just that one document, walking the listing until
-    it is found (ignoring the on-disk stop). Returns {type: (seen, new)}."""
+    it is found (ignoring the on-disk stop and the watermark). Returns
+    {type: (seen, new)}."""
     session = make_session(USER_AGENT)
     totals = {}
     rep = Reporter()
@@ -255,11 +284,19 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
             initial_watermark = HarvestWatermark(watermark_path)
             initial_watermark.save(date.today().isoformat())
 
+        # per-source window (project convention): regeringen.se listings are
+        # strictly newest-first by publication date but occasionally resurface
+        # an edited item near the top; 20 consecutive hits / 14 days of slack
+        # absorb those bumps without deep re-walks.
         watermark = HarvestWatermark(watermark_path, lookahead_limit=20, safety_days=14)
-        backfill = full or not watermark_path.exists()
+        # a crashed run leaves {"last_harvest": null, "dirty": true}: still a
+        # backfill, so key on the date, not on the file existing
+        backfill = full or watermark.last_harvest is None
         seen = new = errors = 0
         done = False
         newest_date = None
+        if only is None:
+            watermark.begin()
         for items, total, page in iter_listing(session, typ, delay):
             for item in items:
                 seen += 1
@@ -293,23 +330,27 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
             rep.update(seen, total, scope=typ, page=page, new=new)
             if done:
                 break
-        else:
-            # Loop completed naturally without early stop
-            if not only:
-                watermark.save(newest_date)
 
-        # Incremental stop successfully met
-        if done and not only and not limit:
-            watermark.save(newest_date)
+        if only is None:
+            truncated = bool(limit) and new >= limit
+            if not truncated:
+                # complete() advances the date even with errors (the
+                # date-conclusive stop bounds how deep future runs walk, so a
+                # permanently-broken document never forces ever-deeper
+                # re-walks), but a per-doc failure or a zero-item walk
+                # (indistinguishable from selector rot) leaves the store
+                # dirty: the next run walks past the consecutive-hit stop
+                # down to the date boundary and retries what was stranded.
+                watermark.complete(newest_date,
+                                   errors=errors if errors else int(seen == 0),
+                                   log=log)
+            # a --limit-truncated run just leaves the dirty flag begin() set --
+            # the un-fetched backlog below the cap is re-walked next run
 
         rep.done()
         if errors:
-            # the watermark advances despite failures (one persistently-broken
-            # document must not force a full re-walk forever), so surface them:
-            # a failed document is retried while it stays above the incremental
-            # stop point, but slips behind it after safety_days
-            log("  %s: %d download error(s) -- retry via --only <basefile> "
-                "(or --full once they fall behind the watermark)"
-                % (typ, errors))
+            log("  %s: %d download error(s) -- the store stays dirty, so the "
+                "next run re-walks down to the watermark boundary and retries "
+                "them (--only <basefile> forces one now)" % (typ, errors))
         totals[typ] = (seen, new)
     return totals

@@ -10,7 +10,8 @@ from bs4 import BeautifulSoup
 from accommodanda.foreskrift import harvest
 from accommodanda.foreskrift.harvest import (classify_file, classify_section,
                                              classify_href, classify_single, _ref,
-                                             Skip, DocRef, Agency)
+                                             Skip, DocRef)
+from accommodanda.lib.harvest import guarded_enumerate
 
 
 def anchor(html):
@@ -104,27 +105,61 @@ def test_ref_direct_puts_pdf_in_extra():
 
 # --- enumeration resilience: a flaky index must not abort the run -----------
 
-def _agency(enum):
-    return Agency(fs="x", name="n", publisher="p", base_url="http://e",
-                  index_url="http://e", enumerate=enum, resolve=lambda *a: None)
-
-
 def test_guarded_enumerate_turns_a_blowup_into_a_skip():
     """A single-call enumerator (an API/index that dies outright) must end the
     walk with one Skip, not propagate and abort the whole 15-agency run."""
-    def boom(session, agency):
+    def boom():
         raise ValueError("index endpoint down")
         yield  # pragma: no cover -- makes boom a generator
-    out = list(harvest._guarded_enumerate(_agency(boom), None, lambda *a: None))
+    out = list(guarded_enumerate(boom(), lambda *a: None))
     assert len(out) == 1 and isinstance(out[0], Skip)
 
 
 def test_guarded_enumerate_passes_skips_and_docs_through():
     """A multi-page enumerator that yields a Skip for one bad page keeps
     yielding the documents it can still reach (the tail is preserved)."""
-    def mixed(session, agency):
+    def mixed():
         yield DocRef("x/2024:1", "X 2024:1", "u1")
         yield Skip("page 2 down")
         yield DocRef("x/2022:3", "X 2022:3", "u2")
-    out = list(harvest._guarded_enumerate(_agency(mixed), None, lambda *a: None))
+    out = list(guarded_enumerate(mixed(), lambda *a: None))
     assert [type(o).__name__ for o in out] == ["DocRef", "Skip", "DocRef"]
+
+
+# --- magic-sniff: a non-PDF body is logged + counted, never silently dropped -
+
+def _agency_fffs():
+    return harvest.Agency(fs="fffs", name="FI", publisher="Finansinspektionen",
+                          base_url="https://e", index_url="https://e/list")
+
+
+def test_resolve_landing_rejects_and_counts_non_pdf(tmp_path, monkeypatch):
+    # a WAF/error page served 200 for a link the classifier kept must be rejected
+    # by a magic-byte sniff, logged and counted -- not stored while the record is
+    # still written (which used to mask the doc with zero trace).
+    class Resp:
+        text = '<a href="/x/fffs-2013-10.pdf">FFFS 2013:10</a>'
+        content = b"<html>WAF challenge -- not a PDF</html>"
+    monkeypatch.setattr(harvest, "request", lambda *a, **kw: Resp())
+    ref = DocRef(basefile="fffs/2013:10", identifier="FFFS 2013:10",
+                 url="https://e/landing")
+    logs, rejects = [], []
+    record = harvest.resolve_landing(None, _agency_fffs(), ref, str(tmp_path),
+                                     delay=0, log=logs.append, rejects=rejects)
+    assert record["files"]["regulation"] is None      # nothing stored as the PDF
+    assert len(rejects) == 1
+    assert any("non-PDF" in m for m in logs)
+    assert not (tmp_path / "fffs" / "fffs-2013-10-regulation.pdf").exists()
+
+
+def test_resolve_direct_rejects_and_counts_non_pdf(tmp_path, monkeypatch):
+    class Resp:
+        content = b"<html>error page</html>"
+    monkeypatch.setattr(harvest, "request", lambda *a, **kw: Resp())
+    ref = DocRef(basefile="bfs/2026:1", identifier="BFS 2026:1", url="https://e/x",
+                 extra={"regulation_url": "https://e/x.pdf", "title": "t"})
+    logs, rejects = [], []
+    record = harvest.resolve_direct(None, _agency_fffs(), ref, str(tmp_path),
+                                    delay=0, log=logs.append, rejects=rejects)
+    assert record["files"]["regulation"] is None
+    assert len(rejects) == 1 and any("non-PDF" in m for m in logs)

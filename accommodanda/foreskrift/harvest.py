@@ -1,10 +1,10 @@
-"""Reusable harvest engine for agency författningssamlingar.
+"""Per-agency download architectures for the författningssamlingar.
 
 ~100 agencies, but only a few *publishing architectures*. An agency is
-:class:`Agency` config naming an :class:`Architecture`; the harvest loop
-(:func:`harvest`) is architecture-agnostic -- incremental newest-first behind
-a ``HarvestWatermark`` gate, atomic writes, a politeness delay and a
-``Reporter``, all lifted from ``forarbete.download.sync`` and shared.
+:class:`Agency` config naming an architecture; the actual download loop lives in
+:func:`lib.harvest.walk` (architecture-agnostic -- incremental newest-first
+behind a ``HarvestWatermark`` gate, atomic writes and a progress ``Reporter``).
+:func:`harvest` here just wires one agency's callables onto that shared engine.
 
 An architecture is two callables over that shared loop:
 
@@ -37,10 +37,11 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 
+from ..lib.harvest import HarvestWatermark, ItemKey, Skip, walk
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session, request
-from ..lib.util import HarvestWatermark, Reporter, record_path, write_atomic
 from ..lib.util import basefile_slug as slug
+from ..lib.util import document_extension, record_path, write_atomic
 
 
 @dataclass
@@ -56,19 +57,6 @@ class DocRef:
     url: str
     title: str | None = None
     extra: dict = field(default_factory=dict)
-
-
-@dataclass
-class Skip:
-    """A non-fatal hole in an enumeration. These agency indexes are flaky and
-    badly maintained -- a per-year page 500s, one sitemap of several times out,
-    a 'show all' list is briefly down -- so a multi-page enumerator yields this
-    instead of a :class:`DocRef` when it cannot fetch one page but can keep
-    walking the rest. :func:`harvest` logs it and withholds the watermark, so
-    the missed page is retried on the next run rather than silently
-    lost. (An *expected* empty page -- a year with no regulations -- is not a
-    Skip; the enumerator just yields nothing for it.)"""
-    reason: str
 
 
 @dataclass
@@ -224,12 +212,17 @@ def classify_default_regulation(a, fs, base_ars, base_lop):
 DOWNLOAD_ROLES = frozenset({"regulation", "consolidation"})
 
 
-def resolve_landing(session, agency, ref, root, delay=0.5):
+def resolve_landing(session, agency, ref, root, delay=0.5, *, log=print, rejects=None):
     """Fetch ``ref``'s landing page, classify the files it hangs, download the
     in-force text (regulation + consolidation) and record the rest as
     references, then write the record JSON + landing HTML. Architecture-generic:
     the only per-agency knobs are the PDF-link selector (``params['pdf_select']``),
     the classification (``params['classify']``) and ``params['download_roles']``.
+
+    A link the classifier kept but whose bytes are not a PDF (a WAF challenge or
+    error page served 200) is rejected by a magic-byte sniff, logged, and (when
+    ``rejects`` is given) counted -- never silently dropped while the record is
+    still written, which used to mask the document with zero trace.
 
     Returns the stored record (also written to disk)."""
     fs = agency.fs
@@ -264,7 +257,12 @@ def resolve_landing(session, agency, ref, root, delay=0.5):
                 files[role].append(ref_entry)       # dedup repeated links by identifier
             continue
         data = request(session, "GET", ref_entry["url"]).content
-        if data[:4] != b"%PDF":                    # the link wasn't a PDF after all
+        if document_extension(data) != ".pdf":     # the link wasn't a PDF after all
+            msg = "%s %s: %s link served a non-PDF body, skipped (%s)" % (
+                fs, ref.basefile, role, ref_entry["url"])
+            log("  " + msg)
+            if rejects is not None:
+                rejects.append(msg)
             continue
         name = "%s-%s.pdf" % (slug(ref.basefile), role) if role == "regulation" \
             else "%s-%s-%s_%s.pdf" % (slug(ref.basefile), role,
@@ -288,13 +286,15 @@ def resolve_landing(session, agency, ref, root, delay=0.5):
     return record
 
 
-def resolve_direct(session, agency, ref, root, delay=0.5):
+def resolve_direct(session, agency, ref, root, delay=0.5, *, log=print, rejects=None):
     """Resolve an agency that publishes the document URLs *in the listing* (an
     API-direct source, e.g. Boverket -- no landing page to scrape). Reads
     ``ref.extra`` (the agency-neutral payload an API enumerator fills),
     downloads the in-force text (regulation + consolidation) and records
     amendments as references. The shared resolve for any source whose
-    enumeration already carries the file URLs."""
+    enumeration already carries the file URLs. A URL whose bytes are not a PDF
+    (a WAF/error page) is rejected by a magic-byte sniff, logged and counted
+    (via ``rejects``), never silently dropped."""
     fs = agency.fs
     extra = ref.extra
     files: dict[str, Any] = {"regulation": None, "consolidation": [], "amendment": [],
@@ -302,7 +302,12 @@ def resolve_direct(session, agency, ref, root, delay=0.5):
 
     def fetch_pdf(url, name):
         data = request(session, "GET", url).content
-        if data[:4] != b"%PDF":
+        if document_extension(data) != ".pdf":
+            msg = "%s %s: %s served a non-PDF body, skipped (%s)" % (
+                fs, ref.basefile, name, url)
+            log("  " + msg)
+            if rejects is not None:
+                rejects.append(msg)
             return None
         write_atomic(Path(root) / fs / name, data)
         time.sleep(delay)
@@ -482,36 +487,19 @@ def sitemap_enumerate(session, agency):
 
 
 # --------------------------------------------------------------------------
-# the harvest loop (architecture-agnostic; generalized forarbete.sync)
+# per-agency wiring onto the shared download engine (lib.harvest.walk)
 # --------------------------------------------------------------------------
 
-def _guarded_enumerate(agency, session, log):
-    """Iterate an agency's enumerator so that an exception escaping it (a
-    single-call API or index page that died outright -- the listing endpoint is
-    down, returns malformed JSON, 403s) ends the walk with a :class:`Skip`
-    instead of aborting the whole run. Multi-page enumerators yield their own
-    :class:`Skip` for individual bad pages and keep going; this catches whatever
-    they let through. Either way the agency is left incomplete and retried."""
-    walk = iter(agency.enumerate(session, agency))
-    while True:
-        try:
-            yield next(walk)
-        except StopIteration:
-            return
-        except Exception as exc:  # noqa: BLE001 — index endpoint failed: becomes a Skip record, harvest survives (rule:no-catch-log-continue)
-            yield Skip("enumeration aborted: %r" % exc)
-            return
-
-
 def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=print):
-    """Harvest one agency.
+    """Download one agency onto :func:`lib.harvest.walk`.
 
     Backfill (walk the whole index, download what is missing) on ``--full`` or
-    when the agency has never cleanly completed (no watermark yet -- a
-    first or interrupted run). Once caught up, later runs go incremental:
-    enumeration is newest-first, so we stop at the first document already on
-    disk that falls past the watermark date boundary. ``only`` (a basefile)
-    fetches just that one. Returns ``(seen, new)``."""
+    when the agency has never cleanly completed (no watermark yet -- a first or
+    interrupted run). Once caught up, later runs go incremental: enumeration is
+    newest-first, so the walk stops at the first document already on disk that
+    falls past the watermark's date boundary (or after a run of consecutive
+    already-downloaded items). ``only`` (a basefile) fetches just that one.
+    Returns ``(seen, new)``."""
     session = make_session(agency.user_agent or USER_AGENT)
     if agency.headers:
         session.headers.update(agency.headers)
@@ -520,64 +508,36 @@ def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=prin
 
     # Migrate legacy complete marker to watermark
     if marker.exists() and not watermark_path.exists():
-        initial_watermark = HarvestWatermark(watermark_path)
-        initial_watermark.save(date.today().isoformat())
+        HarvestWatermark(watermark_path).save(date.today().isoformat())
 
+    # föreskrifter carry only a year (no day), so the item date is the year end;
+    # a 14-day safety window past the newest FS plus a 20-item lookahead is
+    # ample -- an agency issues at most a few dozen numbers a year.
     watermark = HarvestWatermark(watermark_path, lookahead_limit=20, safety_days=14)
-    backfill = full or not watermark_path.exists()
-    seen = new = errors = skips = 0
-    newest_date = None
-    rep = Reporter()
-    walk = _guarded_enumerate(agency, session, log)
-    for ref in walk:
-        if isinstance(ref, Skip):          # a page we could not fetch; logged below
-            skips += 1
-            log("  %s enumerate: %s" % (agency.fs, ref.reason))
-            continue
-        seen += 1
-        if only is not None:
-            if ref.basefile != only:
-                continue
-            agency.resolve(session, agency, ref, root, delay)
-            new = 1
-            break
+    rejects: list[str] = []
 
-        # basefile is always minted as "<fs>/<year>:<lopnummer>" (agencies.py) --
-        # the year anchors the date watermark
+    def item_key(ref):
+        # basefile is always "<fs>/<year>:<lopnummer>" (agencies.py) -- the year
+        # anchors the date watermark; a non-year prefix leaves the item undated
         year = ref.basefile.split("/", 1)[1].split(":")[0]
-        item_date = f"{year}-12-31" if len(year) == 4 and year.isdigit() else None
+        return ItemKey(
+            basefile=ref.basefile,
+            is_downloaded=record_path(root, agency.fs, ref.basefile).exists(),
+            date=f"{year}-12-31" if len(year) == 4 and year.isdigit() else None)
 
-        if item_date:
-            if newest_date is None:
-                newest_date = item_date
-            else:
-                newest_date = max(newest_date, item_date)
+    def resolve(ref):
+        return agency.resolve(session, agency, ref, root, delay,
+                              log=log, rejects=rejects)
 
-        is_downloaded = record_path(root, agency.fs, ref.basefile).exists()
-        if not backfill and watermark.should_stop(is_downloaded, item_date):
-            break
-        if is_downloaded and not full:
-            continue    # on disk already; --full re-resolves to refresh amendments
+    result = walk(agency.enumerate(session, agency), resolve=resolve,
+                  item_key=item_key, watermark=watermark, full=full, only=only,
+                  limit=limit, scope=agency.fs, log=log)
 
-        try:
-            agency.resolve(session, agency, ref, root, delay)
-            new += 1
-        except Exception as exc:  # noqa: BLE001 — one bad doc must not abort the walk: logged + counted (rule:no-catch-log-continue)
-            errors += 1
-            log("  %s %s: %s" % (agency.fs, ref.basefile, exc))
-        rep.update(seen, None, scope=agency.fs, new=new)
-        if limit and new >= limit:
-            break
-        time.sleep(delay)
-    rep.done()
-
-    # per-document resolve failures are named and retryable (--only), so they
-    # advance the watermark anyway; a Skip is an enumeration hole -- unknown
-    # documents were missed -- so the watermark is withheld and the walk redone
-    if not only and not limit and skips == 0:
-        watermark.save(newest_date)
-    if errors:
-        log("  %s: %d download error(s) -- retry via --only <basefile> "
-            "(or --full once they fall behind the watermark)"
-            % (agency.fs, errors))
-    return seen, new
+    if rejects:
+        log("  %s: %d file(s) served a non-PDF body and were skipped"
+            % (agency.fs, len(rejects)))
+    if result.errors:
+        log("  %s: %d download error(s) -- the store stays dirty, so the next "
+            "run walks past the already-downloaded backlog and retries them"
+            % (agency.fs, result.errors))
+    return result.seen, result.new

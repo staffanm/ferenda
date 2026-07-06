@@ -183,6 +183,12 @@ def _watermark(tmp_path):
     return json.loads(path.read_text())["last_harvest"] if path.exists() else None
 
 
+def _dirty(tmp_path):
+    """The persisted dirty flag of the watermark store."""
+    path = tmp_path / "bet" / riksdagen.WATERMARK
+    return json.loads(path.read_text()).get("dirty", False)
+
+
 def _set_watermark(tmp_path, date_str):
     """Simulate an earlier clean harvest on `date_str` -- gives the gate's
     safety margin (14 days) room over the fixtures' fixed datums."""
@@ -222,6 +228,7 @@ def test_sync_backfill_walks_riksmoten_and_saves_watermark(monkeypatch, tmp_path
     # the planned FiU8's later datum (2026-06-30) must not win -- a planned
     # datum lies in the future and would erode the gate's safety margin
     assert _watermark(tmp_path) == "2026-06-16"
+    assert _dirty(tmp_path) is False               # a clean run completes clean
     assert record_path(tmp_path, "bet", "2026/27:FiU8").exists()
     assert record_path(tmp_path, "bet", "2025/26:JuU47").exists()
     # the newest-riksmöte probe hits the un-narrowed listing once; every listing
@@ -274,9 +281,10 @@ def test_riksmote_narrowed_run_never_advances_watermark(monkeypatch, tmp_path):
     assert _watermark(tmp_path) is None       # a partial view never advances it
 
 
-def test_full_rewalk_with_errors_does_not_advance_watermark(monkeypatch, tmp_path):
-    # a --full re-walk that hits errors leaves a gap on disk; the watermark
-    # must not advance past it (an errored run never saves)
+def test_full_rewalk_with_errors_leaves_store_dirty_and_next_run_heals(monkeypatch, tmp_path):
+    # a --full re-walk that hits errors leaves a gap on disk; complete() still
+    # advances the date (the date-conclusive stop bounds future walk depth) but
+    # leaves the store dirty, so the next plain run re-walks and heals the gap
     _backfill_net(monkeypatch)
     riksdagen.sync(tmp_path, delay=0)                     # clean backfill
     assert _watermark(tmp_path) == "2026-06-16"
@@ -287,7 +295,18 @@ def test_full_rewalk_with_errors_does_not_advance_watermark(monkeypatch, tmp_pat
     net2.bad_fil.add(riksdagen.pdf_fil(juu47)["url"])
     seen, new = riksdagen.sync(tmp_path, delay=0, full=True)
     assert new == 0                                       # the refetch failed
-    assert _watermark(tmp_path) == "2026-06-16"           # unchanged
+    assert _watermark(tmp_path) == "2026-06-16"           # newest published datum
+    assert _dirty(tmp_path) is True                       # ... but not a clean run
+    # the next plain (incremental) run reaches the gap -- the gate never stops
+    # on a missing doc -- and, the transient failure gone, refetches it
+    net3 = FakeNet()
+    net3.pages[riksdagen.LISTING] = _page(
+        [_entry(PAGE1, "FiU8"), _entry(PAGE1, "KU45"), juu47])
+    _patch(monkeypatch, net3)
+    seen3, new3 = riksdagen.sync(tmp_path, delay=0)
+    assert new3 == 1                                      # exactly the stranded doc
+    assert record_path(tmp_path, "bet", "2025/26:JuU47").exists()
+    assert _dirty(tmp_path) is False                      # healed run completes clean
 
 
 # --------------------------------------------------------------------------
@@ -307,15 +326,17 @@ def test_download_rejects_non_pdf_bytes(monkeypatch, tmp_path):
     assert not record_path(tmp_path, "bet", "2025/26:JuU47").exists()
 
 
-def test_incremental_error_holds_watermark_and_next_run_heals(monkeypatch, tmp_path):
+def test_incremental_error_leaves_store_dirty_and_next_run_heals(monkeypatch, tmp_path):
     # 1) clean backfill of the two-riksmöte corpus (JuU45 not in it yet)
     _backfill_net(monkeypatch)
     riksdagen.sync(tmp_path, delay=0)
     assert _watermark(tmp_path) == "2026-06-16"
     # 2) incremental run: a NEW doc (JuU45) tops the un-narrowed listing ahead
-    #    of the known KU45, but its PDF fetch yields non-PDF bytes. The errored
-    #    run must not advance the watermark -- the failed doc is simply missing,
-    #    a gap the gate never stops on.
+    #    of the known KU45, but its PDF fetch yields non-PDF bytes. complete()
+    #    still advances the date, but the errored run leaves the store dirty --
+    #    the failed doc is simply missing, a gap the gate never stops on, and
+    #    the dirty flag makes the next run walk down to it regardless of any
+    #    run of consecutive hits above.
     juu45 = _entry(PAGE2, "JuU45")
     net2 = FakeNet()
     net2.pages[riksdagen.LISTING] = _page([juu45, _entry(PAGE1, "KU45")])
@@ -324,7 +345,8 @@ def test_incremental_error_holds_watermark_and_next_run_heals(monkeypatch, tmp_p
     seen, new = riksdagen.sync(tmp_path, delay=0)
     assert new == 0                                       # the failure was counted, not raised
     assert not record_path(tmp_path, "bet", "2025/26:JuU45").exists()
-    assert _watermark(tmp_path) == "2026-06-16"           # not advanced
+    assert _watermark(tmp_path) == "2026-06-16"           # newest published datum
+    assert _dirty(tmp_path) is True                       # errors withhold the clean save
     # 3) the next incremental run (still one un-narrowed walk, no rm backfill)
     #    reaches the gap and heals it with the transient failure gone
     net3 = FakeNet()
@@ -335,6 +357,31 @@ def test_incremental_error_holds_watermark_and_next_run_heals(monkeypatch, tmp_p
     assert record_path(tmp_path, "bet", "2025/26:JuU45").exists()
     assert (tmp_path / "bet" / "2025-26-JuU45.pdf").read_bytes() == PDF_BYTES
     assert [u for u in net3.fetched if "dokumentlista" in u] == [riksdagen.LISTING]
+    assert _dirty(tmp_path) is False                      # the healing run was clean
+
+
+def test_malformed_feed_entries_are_recorded_and_skipped(monkeypatch, tmp_path):
+    # one entry missing rm, one with a broken filbilaga (fil without typ/url),
+    # one missing dokument_url_html: each becomes a recorded ValueError, never
+    # a KeyError escaping the per-document catch -- one malformed entry must
+    # not kill an hours-long backfill. The good document after them still
+    # downloads, and the errors leave the store dirty.
+    _set_watermark(tmp_path, "2026-07-15")
+    no_rm = {k: v for k, v in _entry(PAGE2, "JuU45").items() if k != "rm"}
+    bad_fil = dict(_entry(PAGE1, "JuU47"))
+    bad_fil["filbilaga"] = {"fil": [{"namn": "x.pdf"}]}   # no typ, no url
+    no_url = {k: v for k, v in _entry(PAGE2, "JuU45").items()
+              if k != "dokument_url_html"}
+    net = FakeNet()
+    net.pages[riksdagen.LISTING] = _page(
+        [no_rm, bad_fil, no_url, _entry(PAGE1, "KU45")])
+    _patch(monkeypatch, net)
+    messages = []
+    seen, new = riksdagen.sync(tmp_path, delay=0, log=messages.append)
+    assert (seen, new) == (4, 1)                   # only the good doc downloaded
+    assert record_path(tmp_path, "bet", "2025/26:KU45").exists()
+    assert sum("malformed" in m for m in messages) == 3
+    assert _dirty(tmp_path) is True                # recorded errors keep it dirty
 
 
 # --------------------------------------------------------------------------

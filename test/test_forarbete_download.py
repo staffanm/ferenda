@@ -1,7 +1,9 @@
 """Tests for the förarbete downloader's parsing (network-free)."""
 
 import json
+from types import SimpleNamespace
 
+import pytest
 import requests
 
 from accommodanda.forarbete import download
@@ -9,6 +11,7 @@ from accommodanda.forarbete.download import (
     basefile_slug,
     find_content_links,
     has_live_record,
+    iter_listing,
     parse_listing,
 )
 from accommodanda.lib.util import record_path, write_atomic
@@ -84,7 +87,8 @@ DOCPAGE = """
 
 
 def test_parse_listing_numbered_type():
-    items = parse_listing(LISTING, "prop")
+    items, raw = parse_listing(LISTING, "prop")
+    assert raw == 2
     assert len(items) == 2
     a = items[0]
     assert a["basefile"] == "2025/26:279"           # the document's own id
@@ -96,7 +100,8 @@ def test_parse_listing_numbered_type():
 
 
 def test_parse_listing_slug_type_falls_back_to_slug():
-    items = parse_listing(LISTING_SLUG, "lr")
+    items, raw = parse_listing(LISTING_SLUG, "lr")
+    assert raw == 1
     assert len(items) == 1
     # lagrådsremiss has no number on regeringen.se -> basefile is the slug
     assert items[0]["basefile"] == "andrade-regler-om-avdrag"
@@ -106,13 +111,16 @@ def test_parse_listing_slug_type_falls_back_to_slug():
 def test_parse_listing_skips_items_without_the_types_identifier():
     # a stray link whose text lacks "Prop. N" must not be taken as a document
     html = LISTING.replace(", Prop. 2025/26:279", "")
-    assert len(parse_listing(html, "prop")) == 1  # only the second item survives
+    items, raw = parse_listing(html, "prop")
+    assert len(items) == 1        # only the second item survives the filter...
+    assert raw == 2               # ...but the page was NOT raw-empty
 
 
 def test_parse_listing_ds_takes_only_ds_numbered_items():
     # category 1325 mixes ds and pm; asked for "ds" only the Ds-numbered item
     # is a document -- the dnr and title-only promemorior are skipped.
-    items = parse_listing(LISTING_1325, "ds")
+    items, raw = parse_listing(LISTING_1325, "ds")
+    assert raw == 3
     assert len(items) == 1
     assert items[0]["basefile"] == "2026:15"
     assert items[0]["identifier"] == "Ds 2026:15"
@@ -122,7 +130,8 @@ def test_parse_listing_ds_takes_only_ds_numbered_items():
 def test_parse_listing_pm_takes_the_non_ds_promemorior():
     # asked for "pm" the same page yields the dnr item and the title-only item,
     # and skips the Ds-numbered one (it belongs to ds).
-    items = parse_listing(LISTING_1325, "pm")
+    items, raw = parse_listing(LISTING_1325, "pm")
+    assert raw == 3
     assert len(items) == 2
     dnr, title_only = items
     # dnr-keyed: basefile == identifier == the diarienummer, title stripped of it
@@ -197,7 +206,10 @@ def test_sync_incremental_skips_downloaded(tmp_path, monkeypatch):
     assert downloads == []
 
 
-def test_sync_saves_watermark_with_errors(tmp_path, monkeypatch):
+def test_sync_error_advances_date_but_leaves_store_dirty_and_retries(tmp_path, monkeypatch):
+    # begin/complete lifecycle: a failed download still advances the watermark
+    # date (bounded walk depth) but leaves the store dirty; the next run then
+    # reaches down past the consecutive-hit stop and retries the failure.
     items = [
         {"type": "prop", "basefile": "2025/26:279", "identifier": "Prop. 2025/26:279", "date": "2026-06-09", "url": "http://example.com/1"},
     ]
@@ -209,10 +221,145 @@ def test_sync_saves_watermark_with_errors(tmp_path, monkeypatch):
 
     monkeypatch.setattr(download, "download_document", mock_download_document_error)
 
-    # Run sync, it should encounter error but still write watermark
     totals = download.sync(tmp_path, types=["prop"], delay=0, log=lambda msg: None)
     assert totals == {"prop": (1, 0)}
 
     watermark_path = tmp_path / "prop" / ".watermark.json"
-    assert watermark_path.exists()
-    assert json.loads(watermark_path.read_text())["last_harvest"] == "2026-06-09"
+    state = json.loads(watermark_path.read_text())
+    assert state["last_harvest"] == "2026-06-09"     # the date still advances
+    assert state["dirty"] is True                    # ... but the run was not clean
+
+    # the next run (transient failure gone) retries the stranded doc and heals
+    downloads = []
+    def mock_download_document(session, root, item, delay):
+        downloads.append(item["basefile"])
+        write_atomic(record_path(root, "prop", item["basefile"]),
+                     json.dumps({"type": "prop", "files": []}))
+        return {"basefile": item["basefile"]}
+    monkeypatch.setattr(download, "download_document", mock_download_document)
+    totals2 = download.sync(tmp_path, types=["prop"], delay=0, log=lambda msg: None)
+    assert totals2 == {"prop": (1, 1)}
+    assert downloads == ["2025/26:279"]
+    state2 = json.loads(watermark_path.read_text())
+    assert state2["dirty"] is False                  # a clean run clears the flag
+
+
+def test_sync_limit_truncation_leaves_store_dirty(tmp_path, monkeypatch):
+    items = [
+        {"type": "prop", "basefile": "2025/26:279", "identifier": "Prop. 2025/26:279", "date": "2026-06-09", "url": "http://example.com/1"},
+        {"type": "prop", "basefile": "2025/26:276", "identifier": "Prop. 2025/26:276", "date": "2026-05-20", "url": "http://example.com/2"},
+    ]
+    monkeypatch.setattr(download, "iter_listing", lambda session, typ, delay: [(items, 2, 1)])
+
+    def mock_download_document(session, root, item, delay):
+        write_atomic(record_path(root, "prop", item["basefile"]),
+                     json.dumps({"type": "prop", "files": []}))
+        return {"basefile": item["basefile"]}
+    monkeypatch.setattr(download, "download_document", mock_download_document)
+
+    totals = download.sync(tmp_path, types=["prop"], delay=0, limit=1)
+    assert totals["prop"][1] == 1                    # truncated at the cap
+    state = json.loads((tmp_path / "prop" / ".watermark.json").read_text())
+    assert state["dirty"] is True                    # backlog below the cap remains
+
+
+# --------------------------------------------------------------------------
+# walk termination keys on the RAW item count, not the type-filtered one:
+# category 1325 mixes ds and pm, so a page consisting entirely of the sibling
+# type's documents must NOT read as "listing exhausted" (that would permanently
+# skip everything deeper, --full included).
+# --------------------------------------------------------------------------
+
+# one page of only Ds-numbered items, one page of only non-Ds promemorior,
+# built from the real 1325 fixture markup above
+DS_ONLY_PAGE = LISTING_1325.replace(
+    """  <li><div class="sortcompact">
+    <a href="/rattsliga-dokument/departementsserien-och-promemorior/2026/07/skarpt-straffansvar-for-allvarliga-krankningar-av-gravfriden/">
+      Skärpt straffansvar för allvarliga kränkningar av gravfriden, Ju2026/01691</a>
+    <div class="block--timeLinks"><p>Publicerad
+      <time datetime="2026-07-03">03 juli 2026</time> ·
+      <a href="/tx/1325">Departementsserien och promemorior</a></p></div>
+  </div></li>
+""", "").replace(
+    """  <li><div class="sortcompact">
+    <a href="/rattsliga-dokument/departementsserien-och-promemorior/2026/07/andring-av-detaljplaner/">
+      Ändring av detaljplaner</a>
+    <div class="block--timeLinks"><p>Publicerad
+      <time datetime="2026-07-02">02 juli 2026</time> ·
+      <a href="/tx/1325">Departementsserien och promemorior</a></p></div>
+  </div></li>
+""", "")
+PM_ONLY_PAGE = LISTING_1325.replace(
+    """  <li><div class="sortcompact">
+    <a href="/rattsliga-dokument/departementsserien-och-promemorior/2026/07/ds-202615/">
+      Gäldenärens avtal i konkurs, Ds 2026:15</a>
+    <div class="block--timeLinks"><p>Publicerad
+      <time datetime="2026-07-02">02 juli 2026</time> ·
+      <a href="/tx/1325">Departementsserien och promemorior</a></p></div>
+  </div></li>
+""", "")
+EMPTY_PAGE = '<ul class="list--block"></ul>'
+
+
+def _fake_fetch(pages, total):
+    """A download.fetch stub serving `pages[N]` (1-based listing pages) wrapped
+    in the AJAX JSON envelope; pages past the dict are raw-empty."""
+    def fetch(session, url, timeout=60):
+        page = int(url.rsplit("page=", 1)[1])
+        html = pages.get(page, EMPTY_PAGE)
+        return SimpleNamespace(json=lambda: {"Message": html, "TotalCount": total})
+    return fetch
+
+
+def test_iter_listing_sibling_only_page_does_not_terminate_pm_walk(monkeypatch):
+    # page 1 holds only Ds items; the pm walk must keep going to page 2
+    monkeypatch.setattr(download, "fetch",
+                        _fake_fetch({1: DS_ONLY_PAGE, 2: PM_ONLY_PAGE}, 3))
+    pages = list(iter_listing(None, "pm", delay=0))
+    assert [p for _, _, p in pages] == [1, 2]
+    assert [i["basefile"] for items, _, _ in pages for i in items] == [
+        "Ju2026/01691", "andring-av-detaljplaner"]
+
+
+def test_iter_listing_sibling_only_page_does_not_terminate_ds_walk(monkeypatch):
+    # the mirror image: page 1 holds only non-Ds promemorior; the ds walk must
+    # keep going to page 2 where the Ds document sits
+    monkeypatch.setattr(download, "fetch",
+                        _fake_fetch({1: PM_ONLY_PAGE, 2: DS_ONLY_PAGE}, 3))
+    pages = list(iter_listing(None, "ds", delay=0))
+    assert [p for _, _, p in pages] == [1, 2]
+    assert [i["basefile"] for items, _, _ in pages for i in items] == ["2026:15"]
+
+
+def test_iter_listing_genuinely_exhausted_listing_terminates(monkeypatch):
+    # a raw-empty page with all TotalCount items already seen is the clean end
+    monkeypatch.setattr(download, "fetch", _fake_fetch({1: LISTING_1325}, 3))
+    pages = list(iter_listing(None, "ds", delay=0))
+    assert [p for _, _, p in pages] == [1]
+
+
+def test_iter_listing_raw_empty_page_below_totalcount_is_an_error(monkeypatch):
+    # a raw-empty page while TotalCount says more should exist is a truncated
+    # or broken listing -- an error, never clean exhaustion
+    monkeypatch.setattr(download, "fetch", _fake_fetch({1: LISTING_1325}, 40))
+    with pytest.raises(ValueError, match="TotalCount"):
+        list(iter_listing(None, "ds", delay=0))
+
+
+def test_sync_downloads_pm_doc_below_a_ds_only_page(tmp_path, monkeypatch):
+    # end-to-end: a full pm sync whose first listing page is all-Ds still
+    # reaches and downloads the promemoria on page 2
+    monkeypatch.setattr(download, "fetch",
+                        _fake_fetch({1: DS_ONLY_PAGE, 2: PM_ONLY_PAGE}, 3))
+    downloads = []
+    def mock_download_document(session, root, item, delay):
+        downloads.append(item["basefile"])
+        write_atomic(record_path(root, "pm", item["basefile"]),
+                     json.dumps({"type": "pm", "files": []}))
+        return {"basefile": item["basefile"]}
+    monkeypatch.setattr(download, "download_document", mock_download_document)
+    totals = download.sync(tmp_path, types=["pm"], delay=0)
+    assert totals == {"pm": (2, 2)}
+    assert downloads == ["Ju2026/01691", "andring-av-detaljplaner"]
+    state = json.loads((tmp_path / "pm" / ".watermark.json").read_text())
+    assert state["dirty"] is False and state["last_harvest"] == "2026-07-03"

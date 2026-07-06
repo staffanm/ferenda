@@ -1,4 +1,4 @@
-"""Harvester for vägledande avgöranden from the courts' publication
+"""Downloader for vägledande avgöranden from the courts' publication
 service at rattspraxis.etjanst.domstol.se (the successor to the old
 lagrummet.se/vagledande-avgoranden zip feed).
 
@@ -9,7 +9,7 @@ The service is an Angular SPA over a JSON API:
                                         (~17k publications, 1981-).
                                         Page size capped at 100.
   GET  /api/v1/publiceringar/{id}       single record -- same fields as a
-                                        search hit, so the harvester never
+                                        search hit, so the downloader never
                                         needs it
   GET  /api/v1/bilagor/{fillagringId}   attachment (PDF); the id contains
                                         slashes and must be %-encoded
@@ -22,10 +22,20 @@ UUID and stored verbatim:
   DESTDIR/{domstolKod}/{id}.json
   DESTDIR/{domstolKod}/{id}/{filnamn}     attachments
 
-Initial harvest pages the corpus in ascending avgörandedatum order (new
-publications append at the end, so the iteration is stable). Incremental
-runs page in descending order and stop at the first page with no new or
-changed records.
+The initial download pages the corpus in ascending avgörandedatum order
+(new publications append at the end, so the iteration is stable).
+Incremental runs page in descending order through the shared download loop
+(lib.harvest.walk), whose begin/complete watermark lifecycle makes a
+crashed or `--limit`-truncated run leave the store dirty so the next run
+re-walks the backlog instead of trusting the truncated run's fresh records.
+
+The walk is ordered by avgörandedatum and the API record carries no
+publication or last-modified date, so an incremental run can only cover
+late publication through the safety window below the watermark
+(see the call site in :func:`sync`). A referat published later than that
+window after its decision date, and any upstream edit to an old record,
+surfaces only under `--full`: keep a periodic `--full` sweep cron'd as the
+backstop for both.
 
   python -m accommodanda.dv DESTDIR [--full] [--no-bilagor] [--limit N]
 """
@@ -38,13 +48,14 @@ from datetime import date
 from pathlib import Path
 from urllib.parse import quote
 
+from ..lib.harvest import HarvestWatermark, ItemKey, walk
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
-from ..lib.util import HarvestWatermark, Reporter, write_atomic
+from ..lib.util import write_atomic
 
 API = "https://rattspraxis.etjanst.domstol.se/api/v1"
 PAGE_SIZE = 100
-COMPLETE = ".complete"   # marker under destdir: corpus walked clean at least once
+COMPLETE = ".complete"   # legacy marker, superseded by (migrated into) the watermark
 
 
 def is_dv_downloaded(destdir, record, check_bilagor=True):
@@ -126,81 +137,68 @@ def download_bilagor(session, destdir, record, delay):
 
 
 def sync(destdir, full=False, bilagor=True, limit=None, delay=0.3):
-    """Harvest publications into destdir, returning (seen, changed).
+    """Download publications into destdir, returning (seen, changed).
 
-    Backfilled -- the whole corpus walked oldest-first, downloading whatever is
-    missing -- when `--full` is given or it has never been cleanly walked (no
-    watermark yet: a first run, or one interrupted partway). The watermark is
-    written only on a clean full pass, so an interrupted initial load is
-    resumed. Once caught up, later runs go incremental: newest-first, stopping
-    at the first document already on disk that falls past the watermark date boundary.
-    (Edits to old records still surface only under `--full` -- the API
-    exposes no last-modified field to walk by.)"""
+    Backfilled -- the whole corpus walked oldest-first, downloading whatever
+    is missing -- when `--full` is given or no run has ever completed (an
+    interrupted initial load is resumed; `--full` additionally re-resolves
+    records already on disk, picking up upstream edits). Once caught up,
+    later runs go incremental: newest-first through lib.harvest.walk, which
+    marks the store dirty up front and completes (advancing the watermark)
+    only on a clean, untruncated run -- a crash or `--limit` truncation
+    leaves the store dirty so the next run re-walks down to the date boundary
+    instead of stopping above the truncated run's un-fetched backlog."""
     destdir = Path(destdir)
     session = make_session(USER_AGENT)
-    marker = destdir / COMPLETE
     watermark_path = destdir / ".watermark.json"
 
     # Migrate legacy complete marker to watermark
+    marker = destdir / COMPLETE
     if marker.exists() and not watermark_path.exists():
-        initial_watermark = HarvestWatermark(watermark_path)
-        initial_watermark.save(date.today().isoformat())
+        HarvestWatermark(watermark_path).save(date.today().isoformat())
 
-    watermark = HarvestWatermark(watermark_path, lookahead_limit=20, safety_days=14)
-    backfill = full or not watermark_path.exists()
-    seen = changed = index = 0
-    completed = False
-    done = False
-    newest_date = None
-    rep = Reporter()
-    while True:
-        page = search_page(session, index, asc=backfill)
-        records = page["publiceringLista"]
-        if not records:
-            completed = True   # exhausted the corpus, not an early stop
-            break
-        page_changed = 0
-        truncated = False
-        for record in records:
-            rec_date = record.get("avgorandedatum")
-            if rec_date:
-                if newest_date is None:
-                    newest_date = rec_date
-                else:
-                    newest_date = max(newest_date, rec_date)
+    # Referat are published on the curator's schedule, not the court's: the
+    # yearly series lag their avgörandedatum by months and pick up stragglers
+    # from the previous year. The walk is ordered by avgörandedatum (the API
+    # record carries no publication date), so only this window below the
+    # watermark can catch a late publication -- sized to that cadence: one
+    # year. The consecutive-hit stop would preempt any date window (a few
+    # weeks of already-downloaded decisions suffice to trip it), so its limit
+    # is raised well past a year's record volume (~700) to a pure fuse; the
+    # date-conclusive stop is what ends an incremental run. Publications
+    # later than a year after their decision date, and edits to old records,
+    # are covered by the periodic `--full` sweep (see module docstring).
+    watermark = HarvestWatermark(watermark_path, lookahead_limit=5000,
+                                 safety_days=365)
+    backfill = full or watermark.last_harvest is None
 
-            is_downloaded = is_dv_downloaded(destdir, record, check_bilagor=bilagor)
-            if not backfill:
-                if watermark.should_stop(is_downloaded, rec_date):
-                    done = True
-                    break
-            elif is_downloaded:
-                seen += 1
-                continue
+    def records():
+        index = 0
+        while True:
+            page = search_page(session, index, asc=backfill)
+            if not page["publiceringLista"]:
+                return           # exhausted the corpus, not an early stop
+            yield from page["publiceringLista"]
+            index += 1
+            time.sleep(delay)
 
-            if save_record(destdir, record):
-                page_changed += 1
-            if bilagor:
-                download_bilagor(session, destdir, record, delay)
-            seen += 1
-            if limit and seen >= limit:
-                truncated = True
-                break
-        changed += page_changed
-        rep.update(seen, page["total"], page=index + 1, changed=page_changed)
-        if truncated or done:
-            break
-        if not backfill and page_changed == 0 and not limit:
-            break
-        index += 1
-        time.sleep(delay)
-    rep.done()
+    def item_key(record):
+        return ItemKey(
+            basefile=record["id"],
+            is_downloaded=is_dv_downloaded(destdir, record,
+                                           check_bilagor=bilagor),
+            date=record.get("avgorandedatum"))
 
-    if (completed or done) and not limit:
-        watermark.save(newest_date)
-        marker.parent.mkdir(parents=True, exist_ok=True)
-        marker.write_text("")
-    return seen, changed
+    def resolve(record):
+        changed = save_record(destdir, record)
+        if bilagor:
+            download_bilagor(session, destdir, record, delay)
+        return changed
+
+    result = walk(records(), resolve=resolve, item_key=item_key,
+                  watermark=watermark, full=full, limit=limit, scope="dv",
+                  count_label="changed")
+    return result.seen, result.new
 
 
 def main():
@@ -208,11 +206,15 @@ def main():
     parser.add_argument("destdir",
                         help="target directory, e.g. site/data/downloaded/dom")
     parser.add_argument("--full", action="store_true",
-                        help="walk the entire corpus oldest-first instead "
-                             "of stopping at already-harvested records")
+                        help="walk the entire corpus oldest-first, "
+                             "re-checking already-downloaded records "
+                             "(picks up late publications and upstream edits)")
     parser.add_argument("--no-bilagor", dest="bilagor", action="store_false",
                         help="skip PDF attachments")
-    parser.add_argument("--limit", type=int, help="stop after N records")
+    parser.add_argument("--limit", type=int,
+                        help="stop after downloading N new/changed records "
+                             "(leaves the run incomplete; the next run "
+                             "re-walks the backlog)")
     parser.add_argument("--delay", type=float, default=0.3,
                         help="seconds between requests (default 0.3)")
     args = parser.parse_args()

@@ -1,6 +1,6 @@
-"""Harvest entry point for the föreskrift vertical -- wires the agency registry
-to the shared harvest engine. ``lagen foreskrift download [fs...]`` harvests the
-named författningssamlingar (default all); ``--full`` re-walks and refreshes
+"""Download entry point for the föreskrift vertical -- wires the agency registry
+to the shared download engine. ``lagen foreskrift download [fs...]`` downloads
+the named författningssamlingar (default all); ``--full`` re-walks and refreshes
 existing base regulations (new amendments / consolidations), ``--only BASEFILE``
 fetches one (needs a single fs scope)."""
 
@@ -10,13 +10,13 @@ from .agencies import REGISTRY
 
 
 def sync(root, scopes=None, full=False, only=None, delay=0.5, log=print):
-    """Harvest the named författningssamlingar (default all in the registry).
+    """Download the named författningssamlingar (default all in the registry).
     Returns {fs: (seen, new)}."""
     totals = {}
     for fs in (scopes or list(REGISTRY)):
         agency = REGISTRY[fs]
-        if agency.enumerate is None:       # frozen-only fs (§7g): no live harvester
-            log("foreskrift %s: no live harvester -- import the frozen corpus via "
+        if agency.enumerate is None:       # frozen-only fs (§7g): no live downloader
+            log("foreskrift %s: no live downloader -- import the frozen corpus via "
                 "`lagen foreskrift import-legacy` (§7g)" % fs)
             totals[fs] = (0, 0)
             continue
