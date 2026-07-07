@@ -19,10 +19,13 @@ An architecture is two callables over that shared loop:
     agencies) and downloads them. A direct-PDF agency would use a thinner
     resolve.
 
-Only the architecture FFFS needs is implemented (``indexed`` enumerate +
-``resolve_landing``); the others are named extension points, added when an
-agency that needs one is built -- not speculatively (the rewrite's
-"don't design the horizontal layer from one source" rule).
+Four ``enumerate`` shapes are implemented (``indexed``/``paginated``/``json``/
+``sitemap``, plus a couple of bespoke per-agency enumerators such as PMFS's
+in-force listing) and two ``resolve`` shapes (``resolve_landing``,
+``resolve_direct`` -- the listing anchor already *is* the PDF), driving the
+17 live agencies configured in :mod:`agencies` -- new shapes are added when an
+agency that needs one is built, not speculatively (the rewrite's "don't design
+the horizontal layer from one source" rule).
 """
 
 import json
@@ -517,13 +520,17 @@ def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=prin
     rejects: list[str] = []
 
     def item_key(ref):
-        # basefile is always "<fs>/<year>:<lopnummer>" (agencies.py) -- the year
-        # anchors the date watermark; a non-year prefix leaves the item undated
+        # basefile is always "<fs>/<year>:<lopnummer>" (built by _ref, above, off
+        # a regex that only ever captures a 4-digit year) -- the year anchors the
+        # date watermark; a shape that violates this is this module's own bug,
+        # not a data quirk to route around
         year = ref.basefile.split("/", 1)[1].split(":")[0]
+        assert len(year) == 4 and year.isdigit(), \
+            "%s: basefile year %r is not a 4-digit year" % (ref.basefile, year)
         return ItemKey(
             basefile=ref.basefile,
             is_downloaded=record_path(root, agency.fs, ref.basefile).exists(),
-            date=f"{year}-12-31" if len(year) == 4 and year.isdigit() else None)
+            date=f"{year}-12-31")
 
     def resolve(ref):
         return agency.resolve(session, agency, ref, root, delay,

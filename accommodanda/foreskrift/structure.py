@@ -84,7 +84,7 @@ def nest(blocks):
         elif t == "rubrik":
             # a heading ends the current paragraf's reach and labels what follows
             para = None
-            (kap["children"] if kap else root).append(b)  # ty: ignore[unresolved-attribute]
+            (kap["children"] if kap else root).append(b)  # ty: ignore[unresolved-attribute]  # same as above: kap's dict-literal value union hides that children is a list
         else:
             sink().append(b)
     return root

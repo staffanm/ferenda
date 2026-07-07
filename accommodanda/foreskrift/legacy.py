@@ -43,7 +43,7 @@ import json
 from pathlib import Path
 
 from ..lib import legacy_import
-from ..lib.util import document_extension, record_path, write_atomic
+from ..lib.util import record_path, sniff_extension, write_atomic
 from .agencies import LEGACY_CORPORA, REGISTRY
 
 
@@ -113,7 +113,7 @@ def import_corpus(corpus, source_path, root, limit=None, force=False, log=print)
         # only reference a real PDF (magic-sniffed): some index.pdf files are in
         # fact HTML/.doc (a mislabelled asset), which the PDF parser cannot read --
         # those become metadata-only, like the html-only documents.
-        if pdf.exists() and document_extension(pdf.read_bytes()[:8]) == ".pdf":
+        if pdf.exists() and sniff_extension(pdf) == ".pdf":
             reg = {"legacy": legacy_import.rel(pdf), "url": entry.get("orig_url")}
             counts["pdf"] += 1
         else:

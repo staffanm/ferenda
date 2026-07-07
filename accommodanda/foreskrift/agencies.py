@@ -26,7 +26,7 @@ import time
 
 from bs4 import BeautifulSoup
 
-from ..lib.net import request
+from ..lib.net import BROWSER_UA, request
 from . import harvest
 from .harvest import (
     Agency,
@@ -42,11 +42,6 @@ from .harvest import (
     resolve_direct,
     resolve_landing,
 )
-
-# A full desktop-browser UA, for the few agency sites that gate plain clients.
-BROWSER_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-              "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-
 
 # --------------------------------------------------------------------------
 # FFFS (Finansinspektionen) -- bespoke enumerate: the förteckning row links the

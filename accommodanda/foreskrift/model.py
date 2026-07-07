@@ -12,9 +12,6 @@ amendments it folds in. The structure layer is grounded in förarbete:
   * förarbete -- the nested ``structure`` tree (``nest``/``flatten``) with §§
     as anchor-bearing leaves, so the body renders with real headings and each
     paragraf is a citation target / inbound-annotation site.
-  * förarbete -- the nested ``structure`` tree (``nest``/``flatten``) with §§
-    as anchor-bearing leaves, so the body renders with real headings and each
-    paragraf is a citation target / inbound-annotation site.
 
 These are kept in the vertical for now; once a second författningssamling is
 built the genuinely shared shape can be promoted to ``lib`` (the rewrite's
