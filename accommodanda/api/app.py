@@ -74,6 +74,33 @@ _index = search.SearchIndex()
 _schema_lock = threading.Lock()
 _schema_ready = False
 
+# a bounded LRU of rendered diffs, keyed on the (basefile, from_version, to)
+# triple: two archived consolidations are immutable, so the same triple always
+# renders the same HTML and is safe to cache indefinitely. The "current"
+# consolidation (to=None) is excluded -- it changes on the next build, so
+# caching it would serve a stale diff -- and every miss still does the same
+# bounded diff.diff_html work, so the cache is purely an anonymous-traffic
+# resource cap, not a correctness dependency.
+_diff_lock = threading.Lock()
+_diff_cache = {}
+_DIFF_CACHE_MAX = 512
+
+
+def _cached_diff_html(basefile, from_version, to):
+    key = (basefile, from_version, to)
+    with _diff_lock:
+        cached = _diff_cache.get(key)
+    if cached is not None:
+        return cached
+    html, _changed = diff.diff_html(_version_artifact(basefile, from_version),
+                                    _version_artifact(basefile, to))
+    if to is not None:
+        with _diff_lock:
+            if len(_diff_cache) >= _DIFF_CACHE_MAX:
+                _diff_cache.pop(next(iter(_diff_cache)))
+            _diff_cache[key] = html
+    return html
+
 
 def _ensure_schema():
     """Apply the catalog's additive migrations once per process: a catalog built
@@ -258,7 +285,7 @@ def _resolved_results(con, q, source, kind):
 def search_endpoint(
         q: str = Query(..., description="free-text query"),
         source: str | None = Query(None, description="restrict to a source "
-                                   "(sfs, dv, forarbete, foreskrift, eurlex, kommentar, begrepp)"),
+                                   "(sfs, dv, forarbete, foreskrift, eurlex, avg, kommentar, begrepp)"),
         kind: str | None = Query(None, description="restrict to a document kind"),
         limit: int = Query(10, ge=1, le=100),
         offset: int = Query(0, ge=0)):
@@ -296,7 +323,7 @@ def search_endpoint(
 @app.get("/api/v1/facets", response_model=FacetTree, tags=["catalog"])
 def facets_endpoint(
         source: str = Query(..., description="a faceted source "
-                            "(sfs, dv, forarbete, foreskrift, eurlex, begrepp)"),
+                            "(sfs, dv, forarbete, foreskrift, eurlex, avg, begrepp)"),
         con: sqlite3.Connection = Depends(get_con)):
     """The navigation facets for a source: the ordered buckets (one or two levels
     -- a law's subject initial, a case's court + year) with document counts, plus
@@ -310,7 +337,7 @@ def facets_endpoint(
 @app.get("/api/v1/browse", response_model=FacetTree, tags=["catalog"])
 def browse_endpoint(
         source: str = Query(..., description="a faceted source "
-                            "(sfs, dv, forarbete, foreskrift, eurlex, begrepp)"),
+                            "(sfs, dv, forarbete, foreskrift, eurlex, avg, begrepp)"),
         con: sqlite3.Connection = Depends(get_con)):
     """The complete browse model for a source: the facet navigator *plus* each
     leaf bucket's ordered, display-labelled documents. The single payload the
@@ -324,7 +351,7 @@ def browse_endpoint(
 @app.get("/api/v1/documents", response_model=DocumentList, tags=["document"])
 def documents_endpoint(
         source: str | None = Query(None, description="restrict to a source "
-                                   "(sfs, dv, forarbete, foreskrift, eurlex, kommentar, begrepp)"),
+                                   "(sfs, dv, forarbete, foreskrift, eurlex, avg, kommentar, begrepp)"),
         kind: str | None = Query(None, description="restrict to a document kind "
                                  "(law, case, prop, directive, …)"),
         limit: int = Query(100, ge=1, le=1000),
@@ -385,14 +412,23 @@ def _sfs_basefile(uri):
     return basefile
 
 
+def _validate_version_id(version):
+    """Raise 400 unless `version` is a well-formed consolidation cutoff -- as
+    strictly checked as `_sfs_basefile`'s uri (no ``..`` segment) so a version
+    id can't smuggle a path-traversal-shaped value past the one place both
+    become filesystem segments (`layout.sfs_version_artifact`)."""
+    if (not _RE_SFS_ID.match(version) or ".." in version) \
+            and not version.isdigit():
+        raise HTTPException(400, "bad version id %r" % version)
+
+
 def _version_artifact(basefile, version):
     """A consolidation's parsed artifact: a named historical version from the
     archive, or the current one (version None)."""
     if version is None:
         path = layout.artifact("sfs", basefile)
     else:
-        if not _RE_SFS_ID.match(version) and not version.isdigit():
-            raise HTTPException(400, "bad version id %r" % version)
+        _validate_version_id(version)
         path = layout.sfs_version_artifact(basefile, version)
     if not compress.exists(path):
         raise HTTPException(404, "no %s consolidation of %s -- see "
@@ -447,11 +483,13 @@ def diff_endpoint(uri: str = Query(..., description="full lagen.nu statute uri")
     current consolidation is by definition newest); the fragment leads with a
     note naming both endpoints."""
     basefile = _sfs_basefile(uri)
+    _validate_version_id(from_version)
+    if to is not None:
+        _validate_version_id(to)
     if to is not None and \
             layout.sfs_version_key(from_version) > layout.sfs_version_key(to):
         from_version, to = to, from_version
-    html, _changed = diff.diff_html(_version_artifact(basefile, from_version),
-                                    _version_artifact(basefile, to))
+    html = _cached_diff_html(basefile, from_version, to)
     note = ('<div class="diff-note">Ändringar från lydelsen enligt '
             'SFS %s till %s. <ins>Tillagd</ins> och <del>borttagen</del> '
             'text är markerad.</div>'
@@ -603,8 +641,11 @@ def serve(directory, host="127.0.0.1", port=8000):
     here -- not at import -- so the in-process API client used during `generate`
     (which only calls /api/v1) never needs a built site."""
     app.mount("/", SiteFiles(directory=directory, html=True), name="site")
-    # proxy_headers so the app sees the real scheme/host behind the prod TLS proxy
-    # (nginx must send X-Forwarded-Proto) -- the editor's session cookie sets its
-    # Secure flag from request.url.scheme, which is otherwise `http` behind nginx.
+    # proxy_headers so the app sees the real client IP/scheme/host behind the
+    # prod TLS proxy (nginx must send X-Forwarded-For/-Proto) -- notably,
+    # api/auth.py's per-IP login rate limit keys on `request.client.host`,
+    # which would otherwise be nginx's own address for every request. The
+    # session cookie's Secure flag is an explicit config switch
+    # (config.COOKIE_SECURE), not derived from this header.
     # forwarded_allow_ips defaults to 127.0.0.1, the proxy on the same host.
     uvicorn.run(app, host=host, port=port, proxy_headers=True)

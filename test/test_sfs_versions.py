@@ -8,8 +8,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from accommodanda.api import app as app_module
 from accommodanda.api.app import app
-from accommodanda.lib import compress, layout
+from accommodanda.lib import compress, diff, layout
 from accommodanda.sfs import versions
 
 FILES = Path(__file__).parent / "files" / "sfs" / "versions"
@@ -202,3 +203,68 @@ def test_diff_endpoint_normalizes_direction(archive):
         "uri": "https://lagen.nu/1998:204", "from": "2003:466",
         "to": "2005:999"})
     assert forward.text == reversed_args.text
+
+
+def test_diff_endpoint_rejects_dotdot_version(archive):
+    # a version id must be as strictly validated as basefile: no ".." segment,
+    # even though it otherwise shapes like a valid "one colon, no slash" id
+    client = TestClient(app)
+    resp = client.get("/api/v1/document/diff", params={
+        "uri": "https://lagen.nu/1998:204", "from": "..:..", "to": "2003:466"})
+    assert resp.status_code == 400
+
+
+def test_diff_endpoint_caches_computed_diff(archive, monkeypatch):
+    # two archived consolidations are immutable, so a repeat request for the
+    # same (basefile, from, to) triple must not recompute the diff
+    later = (FILES / "sfst-archival.html").read_bytes().replace(
+        b"2003:466", b"2005:999")
+    p = (layout.SFS_DOWNLOADED / "archive" / "1998" / "204" / ".versions"
+         / "2005" / "999.html")
+    p.parent.mkdir(parents=True)
+    p.write_bytes(later)
+    versions.build("1998:204")
+
+    app_module._diff_cache.clear()
+    calls = []
+    real_diff_html = diff.diff_html
+    def counting_diff_html(*args, **kwargs):
+        calls.append(1)
+        return real_diff_html(*args, **kwargs)
+    monkeypatch.setattr(diff, "diff_html", counting_diff_html)
+
+    client = TestClient(app)
+    params = {"uri": "https://lagen.nu/1998:204", "from": "2003:466",
+             "to": "2005:999"}
+    first = client.get("/api/v1/document/diff", params=params)
+    second = client.get("/api/v1/document/diff", params=params)
+    assert first.status_code == second.status_code == 200
+    assert first.text == second.text
+    assert len(calls) == 1
+
+
+def test_diff_endpoint_does_not_cache_current_consolidation(archive, monkeypatch):
+    # `to` defaults to the current (mutable) consolidation -- that pair must
+    # never be served from the cache. Seed a "current" artifact (a copy of the
+    # archived one is fine -- diff.diff_html only cares about its shape).
+    versions.build("1998:204")
+    current_path = layout.artifact("sfs", "1998:204")
+    current_path.parent.mkdir(parents=True, exist_ok=True)
+    compress.write_bytes(
+        current_path,
+        compress.read_bytes(layout.sfs_version_artifact("1998:204", "2003:466")))
+
+    app_module._diff_cache.clear()
+    calls = []
+    real_diff_html = diff.diff_html
+    def counting_diff_html(*args, **kwargs):
+        calls.append(1)
+        return real_diff_html(*args, **kwargs)
+    monkeypatch.setattr(diff, "diff_html", counting_diff_html)
+
+    client = TestClient(app)
+    params = {"uri": "https://lagen.nu/1998:204", "from": "2003:466"}
+    client.get("/api/v1/document/diff", params=params)
+    client.get("/api/v1/document/diff", params=params)
+    assert len(calls) == 2
+    assert ("1998:204", "2003:466", None) not in app_module._diff_cache

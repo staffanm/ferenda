@@ -231,6 +231,33 @@ def resolve_editor_secret(doc):
     return value
 
 
+def resolve_cookie_secure(doc):
+    """Whether the editor session cookie (api/auth.py) carries the ``Secure``
+    flag. Default on: the prod deploy is https-only, so the cookie should never
+    be sent in the clear. A per-request ``X-Forwarded-Proto`` check is
+    spoofable by anyone who can reach the app directly (or a misconfigured
+    proxy), so this is an explicit, config-driven switch instead -- flip it off
+    only for a plain-http dev serve. Precedence: the ``EDITOR_COOKIE_SECURE``
+    environment variable (``0``/``1``, ``false``/``true``), then the
+    ``cookie_secure`` key in config.yml, else on."""
+    env = os.environ.get("EDITOR_COOKIE_SECURE")
+    if env is not None:
+        low = env.strip().lower()
+        if low in ("1", "true", "yes", "on"):
+            return True
+        if low in ("0", "false", "no", "off"):
+            return False
+        raise ConfigError("EDITOR_COOKIE_SECURE set to invalid value %r "
+                          "(expected a boolean)" % env)
+    if "cookie_secure" not in doc:
+        return True
+    value = doc["cookie_secure"]
+    if not isinstance(value, bool):
+        raise ConfigError("cookie_secure set to invalid value %r at %s "
+                          "(expected true/false)" % (value, _at(doc, "cookie_secure")))
+    return value
+
+
 def resolve_editors(doc):
     """The registry of people allowed to edit content inline, keyed by login
     name. Each entry maps a username to a ``name``/``email`` (the git identity
@@ -249,7 +276,7 @@ def resolve_editors(doc):
                           % (raw, _at(doc, "editors")))
     editors = {}
     for user, entry in raw.items():
-        loc = _at(doc, "editors")
+        loc = _at(raw, user)          # the entry's own line, not `editors:`'s
         if not isinstance(entry, dict):
             raise ConfigError("editor %r is not a mapping at %s" % (user, loc))
         missing = [k for k in ("name", "email", "pwhash")
@@ -277,3 +304,4 @@ EDITOR_SECRET = resolve_editor_secret(_doc)
 EDITORS = resolve_editors(_doc)
 COMPRESS = resolve_compress(_doc)
 COMPRESS_QUALITY = resolve_compress_quality(_doc)
+COOKIE_SECURE = resolve_cookie_secure(_doc)

@@ -1,8 +1,8 @@
 # lagen.nu API — utvecklarguide
 
 Ett läsbart REST/OpenAPI-gränssnitt över hela det parsade rättskällекorpuset
-(författningar, rättsfall, förarbeten, myndighetsföreskrifter, EU-rätt,
-kommentarer och begrepp). Det
+(författningar, rättsfall, förarbeten, myndighetsföreskrifter, JO/JK/ARN-avgöranden,
+EU-rätt, kommentarer och begrepp). Det
 ersätter den gamla pipelinens RDF-/Fuseki-publicering.
 
 API:t exponerar tre saker:
@@ -113,7 +113,7 @@ curl -G http://127.0.0.1:8001/api/v1/document \
 | Parameter | Typ | Förklaring |
 |---|---|---|
 | `q` | sträng (obligatorisk) | sökfrågan |
-| `source` | sträng | begränsa till en källa: `sfs`, `dv`, `forarbete`, `foreskrift`, `eurlex`, `kommentar`, `begrepp` |
+| `source` | sträng | begränsa till en källa: `sfs`, `dv`, `forarbete`, `foreskrift`, `eurlex`, `avg`, `kommentar`, `begrepp` |
 | `kind` | sträng | begränsa till en dokumenttyp (`law`, `case`, `prop`, `directive`, …) |
 | `limit` | heltal 1–100 (standard 10) | antal träffar |
 | `offset` | heltal (standard 0) | paginering |
@@ -170,7 +170,7 @@ id + lättviktig metadata, **inte** det fullständiga innehållet.
 
 | Parameter | Typ | Förklaring |
 |---|---|---|
-| `source` | sträng | filtrera på källa (`sfs`, `dv`, `forarbete`, `foreskrift`, `eurlex`, `kommentar`, `begrepp`) |
+| `source` | sträng | filtrera på källa (`sfs`, `dv`, `forarbete`, `foreskrift`, `eurlex`, `avg`, `kommentar`, `begrepp`) |
 | `kind` | sträng | filtrera på dokumenttyp (`law`, `case`, `prop`, `directive`, …) |
 | `limit` | heltal 1–1000 (standard 100) | sidstorlek |
 | `offset` | heltal (standard 0) | paginering |
@@ -298,6 +298,7 @@ curl http://127.0.0.1:8001/api/v1/sources
 
 ```json
 [
+  {"source": "avg", "documents": 6256},
   {"source": "begrepp", "documents": 564},
   {"source": "dv", "documents": 17103},
   {"source": "eurlex", "documents": 69290},

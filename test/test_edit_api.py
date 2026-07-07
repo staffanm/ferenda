@@ -5,6 +5,7 @@ with the page rebuild stubbed (the real relate/generate is build's concern)."""
 import subprocess
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from accommodanda import config
@@ -33,6 +34,13 @@ def env(tmp_path, monkeypatch):
     _git(root, "commit", "-qm", "seed")
 
     monkeypatch.setattr(config, "EDITOR_SECRET", "test-signing-key")
+    # TestClient talks plain http; a Secure cookie would never be replayed by
+    # its cookie jar, so tests run as the plain-http dev case does.
+    monkeypatch.setattr(config, "COOKIE_SECURE", False)
+    # a fresh rate limiter per test -- the real one is a module-level
+    # singleton so attempts would otherwise bleed across tests (every
+    # TestClient request looks like it comes from the same fake IP)
+    monkeypatch.setattr(auth, "_login_limiter", auth._RateLimiter())
     monkeypatch.setattr(config, "EDITORS", {"anna": {
         "name": "Anna Ek", "email": "anna@example.org",
         "pwhash": auth.hash_password("hunter2", rounds=1000)}})
@@ -123,3 +131,83 @@ def test_disabled_when_no_secret(env, monkeypatch):
     assert c.get("/api/v1/auth/me").status_code == 403
     assert c.post("/api/v1/auth/login",
                   json={"username": "anna", "password": "hunter2"}).status_code == 403
+
+
+# --------------------------------------------------------------------------
+# login rate limiting (_RateLimiter + the concurrency semaphore)
+# --------------------------------------------------------------------------
+
+def test_login_rate_limited_after_repeated_failures(env):
+    c = TestClient(api.app)
+    for _ in range(auth._LOGIN_FREE_ATTEMPTS):
+        r = c.post("/api/v1/auth/login",
+                   json={"username": "anna", "password": "wrong"})
+        assert r.status_code == 401
+    # the free quota is spent -- the next attempt is throttled, not even
+    # given the chance to fail on the password
+    limited = c.post("/api/v1/auth/login",
+                     json={"username": "anna", "password": "wrong"})
+    assert limited.status_code == 429
+    assert "Retry-After" in limited.headers
+
+
+def test_rate_limiter_tracks_keys_independently():
+    # a direct unit test of _RateLimiter itself -- exercised over HTTP, a
+    # single TestClient always presents the same fake IP, so the (ip, ...)
+    # key would confound a from-scratch (user, ...) key in the same request
+    # stream. The limiter's job is to keep unrelated keys independent, which
+    # is easiest to prove directly.
+    limiter = auth._RateLimiter()
+    for _ in range(auth._LOGIN_FREE_ATTEMPTS):
+        limiter.check(("user", "alice"))       # within quota -- no raise
+    with pytest.raises(HTTPException) as exc:
+        limiter.check(("user", "alice"))
+    assert exc.value.status_code == 429
+    # bob's key is untouched by alice's history
+    limiter.check(("user", "bob"))
+    limiter.check(("ip", "10.0.0.1"))
+
+
+def test_login_success_resets_the_rate_limit(env):
+    c = TestClient(api.app)
+    for _ in range(auth._LOGIN_FREE_ATTEMPTS - 1):
+        c.post("/api/v1/auth/login", json={"username": "anna", "password": "wrong"})
+    assert _login(c).status_code == 200
+    c.post("/api/v1/auth/logout")
+    # the successful login reset anna's counter -- back to a fresh quota
+    assert c.post("/api/v1/auth/login",
+                  json={"username": "anna", "password": "wrong"}).status_code == 401
+
+
+def test_login_concurrency_cap_rejects_beyond_the_semaphore(env, monkeypatch):
+    # simulate the semaphore already being fully checked out by concurrent
+    # requests: the next login must be rejected before any pbkdf2 work runs,
+    # rather than queueing indefinitely in the sync threadpool
+    for _ in range(auth._LOGIN_MAX_CONCURRENT):
+        assert auth._LOGIN_SEM.acquire(blocking=False)
+    try:
+        c = TestClient(api.app)
+        r = c.post("/api/v1/auth/login",
+                   json={"username": "anna", "password": "hunter2"})
+        assert r.status_code == 429
+    finally:
+        for _ in range(auth._LOGIN_MAX_CONCURRENT):
+            auth._LOGIN_SEM.release()
+
+
+# --------------------------------------------------------------------------
+# session revocation: a password change invalidates outstanding sessions
+# --------------------------------------------------------------------------
+
+def test_password_change_revokes_outstanding_sessions(env, monkeypatch):
+    c = TestClient(api.app)
+    _login(c)
+    assert c.get("/api/v1/auth/me").status_code == 200
+    # anna's password (and so her pwhash) changes -- e.g. after a suspected
+    # compromise -- with no server-side session table to also update
+    monkeypatch.setitem(config.EDITORS, "anna",
+                        {**config.EDITORS["anna"],
+                         "pwhash": auth.hash_password("newpassword", rounds=1000)})
+    # the old cookie's embedded pwhash fingerprint no longer matches -> 401,
+    # even though the signature and expiry are still perfectly valid
+    assert c.get("/api/v1/auth/me").status_code == 401
