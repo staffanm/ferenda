@@ -24,16 +24,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from bs4 import BeautifulSoup, Tag
-from rdflib import Graph
-from rdflib.namespace import FOAF, SKOS
 
 from ..lib import layout, util
+from ..lib.catalog import BASE
 from ..lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
 from ..lib.errors import SkipDocument
 
-BASE = "https://lagen.nu/"
-RESOURCE_TTL = (Path(__file__).parent.parent.parent
-                / "lagen/nu/res/extra/swedishlegalsource.ttl")
+# label -> URI for orgs (foaf:name) and series (skos:altLabel), extracted
+# once from the frozen lagen/nu/res/extra/swedishlegalsource.ttl the same
+# way namedlaws.json was ported (rule:legacy-read-only): a FOAF.name pass
+# then a SKOS.altLabel pass over the graph, first subject per label winning
+RESOURCES_JSON = Path(__file__).parent / "data" / "resources.json"
 RINFO_PUBL = "http://rinfo.lagrummet.se/publ/sfs/"
 CELEX_BASE = "https://lagen.nu/ext/celex/"
 KONSOLIDERAD_TYPE = ("http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#"
@@ -80,21 +81,19 @@ TITLE_WITHOUT_BASEFILE = {
 
 @functools.cache
 def resource_map():
-    """label -> URI for orgs (foaf:name) and series (skos:altLabel), loaded
-    from the live swedishlegalsource dataset."""
-    graph = Graph().parse(RESOURCE_TTL, format="turtle")
-    out = {}
-    for _, prop in ((FOAF.name, FOAF.name), (SKOS.altLabel, SKOS.altLabel)):
-        for subject, _, label in graph.triples((None, prop, None)):
-            out.setdefault(str(label), str(subject))
-    return out
+    """label -> URI for orgs and series, from the ported dataset."""
+    return json.loads(RESOURCES_JSON.read_text(encoding="utf-8"))
 
 
 def lookup_resource(label):
-    """Resolve a label to its URI, or return the label unchanged when the
-    dataset doesn't know it (surfaces as a diff rather than crashing the
-    corpus run)."""
-    return resource_map().get(label, label)
+    """Resolve a label to its URI. An unknown label is bad input data, not
+    something to pass through as if it were a URI -- raise so the failure
+    lands at the per-document boundary instead of minting a non-URI value
+    into the artifact (rule:fail-fast)."""
+    uri = resource_map().get(label)
+    if uri is None:
+        raise ValueError("unknown org/series label: %r" % label)
+    return uri
 
 
 def sanitize_departement(val):

@@ -16,12 +16,23 @@ from accommodanda.lib.lagrum import FORARBETEN, LagrumParser, load_namedlaws
 from accommodanda.sfs.nf import to_normalform
 from accommodanda.sfs.register import (amendment_properties,
                                   build_metadata, forarbete_identifier,
-                                  forfattningstyp, lfragment,
+                                  forfattningstyp, lfragment, lookup_resource,
                                   omfattning_predicate, parse_forarbeten,
-                                  register_from_source,
+                                  register_from_source, resource_map,
                                   sanitize_departement, sfs_slug)
 
 ROOT = Path(__file__).parent.parent
+
+# the golden-diff tests read two data trees that only exist on a full dev
+# checkout: the downloaded SFS JSON corpus and the old pipeline's parsed XHTML
+# oracle in a sibling ferenda.old checkout. Skip (not fail) where either is
+# absent; the pure-helper tests below run everywhere.
+needs_json_corpus = pytest.mark.skipif(
+    not (ROOT / "site/data/downloaded/sfs").is_dir(),
+    reason="downloaded SFS JSON corpus (site/data/downloaded/sfs) not present")
+needs_golden_corpus = pytest.mark.skipif(
+    not (ROOT.parent / "ferenda.old/data/sfs/parsed").is_dir(),
+    reason="golden corpus (../ferenda.old/data/sfs/parsed) not present")
 
 
 def golden_module():
@@ -87,6 +98,25 @@ def test_sanitize_departement_drops_suborg():
         "Justitiedepartementet DOM, L5 och Å") == "Justitiedepartementet"
 
 
+def test_lookup_resource_known_labels_and_unknown_raise():
+    # the labels the register builder itself hardcodes, plus a sanitized
+    # departement (current and historical), must all be in the ported
+    # resources.json -- and resolve to URIs, never echo the label back
+    for label in ("Regeringskansliet", "SFS", "Justitiedepartementet",
+                  "Klimat- och näringslivsdepartementet"):
+        assert lookup_resource(label).startswith("http")
+    # an unknown label is bad input data: raise at the per-document boundary,
+    # never mint a non-URI value into the artifact
+    with pytest.raises(ValueError, match="unknown org/series label"):
+        lookup_resource("Fantasidepartementet")
+
+
+def test_resource_map_values_are_uris():
+    # the TTL->JSON port must yield only URIs; a label that slipped into a
+    # value position would silently corrupt every artifact referencing it
+    assert all(uri.startswith("http") for uri in resource_map().values())
+
+
 def test_forfattningstyp():
     assert forfattningstyp("Lag (1902:71 s.1) om foo") == "rpubl:Lag"
     assert forfattningstyp("Miljöbalk (1998:808)") == "rpubl:Lag"
@@ -138,6 +168,7 @@ def test_register_from_source_sorts_changes_chronologically():
         ["2018:900", "2018:1210", "2019:981", "2025:582"]
 
 
+@needs_json_corpus
 def test_register_header_and_changes():
     reg = inputs("1951:25")[1]
     assert reg.sfsnr == "1951:25"
@@ -150,6 +181,7 @@ def test_register_header_and_changes():
     assert [a.sfsnr for a in reg.acts] == ["1951:25", "1994:14"]
 
 
+@needs_json_corpus
 def test_amendment_properties_base_act():
     reg = inputs("1951:25")[1]
     parser = LagrumParser(load_namedlaws(NAMEDLAWS), "1951:25")
@@ -165,6 +197,7 @@ def test_amendment_properties_base_act():
     assert "rdf:type" not in props
 
 
+@needs_json_corpus
 def test_omfattning_resolves_to_paragraph_uris():
     reg = inputs("1998:808")[1]
     parser = LagrumParser(load_namedlaws(NAMEDLAWS), "1998:808")
@@ -176,6 +209,7 @@ def test_omfattning_resolves_to_paragraph_uris():
     assert props["rpubl:inforsI"] == ["https://lagen.nu/1998:808#K9P6i"]
 
 
+@needs_json_corpus
 def test_omfattning_whitespace_normalized():
     # the JSON Omfattning ("anteckningar") carries hard \r\n line breaks; the
     # register parser must collapse them so the raw rpubl:andrar matches the
@@ -192,6 +226,8 @@ def test_omfattning_whitespace_normalized():
 # --- golden-diff integration -------------------------------------------
 
 @pytest.mark.parametrize("basefile", ["1990:100", "1951:25"])
+@needs_json_corpus
+@needs_golden_corpus
 def test_amendments_match_golden(basefile):
     gold, module = golden(basefile)
     problems = []
@@ -200,6 +236,7 @@ def test_amendments_match_golden(basefile):
     assert problems == []
 
 
+@needs_json_corpus
 def test_sfst_header_parses_cutoff():
     header = inputs("1998:808")[2]
     # the cutoff drifts as the source is re-downloaded; assert the shape, not the
@@ -208,6 +245,7 @@ def test_sfst_header_parses_cutoff():
     assert header["Utfärdad"].startswith("1998-06-11")
 
 
+@needs_json_corpus
 def test_build_metadata_consolidation_envelope():
     _, reg, header = inputs("1998:808")
     cutoff = header["Ändring införd"].replace("t.o.m. SFS ", "")
@@ -228,6 +266,8 @@ def test_build_metadata_consolidation_envelope():
 # the golden -- new-is-right drift, covered by the corpus run's adjudicator, not
 # assertable against a frozen golden here.
 @pytest.mark.parametrize("basefile", ["1990:100", "1951:25"])
+@needs_json_corpus
+@needs_golden_corpus
 def test_metadata_match_golden(basefile):
     # dcterms:title diverges on purpose: the JSON carries the modernised title
     # ("Kungörelse..."), the golden the historical one ("Kungl. Maj:ts
@@ -241,6 +281,7 @@ def test_metadata_match_golden(basefile):
     assert problems == []
 
 
+@needs_json_corpus
 def test_overgangsbestammelse_content_joined():
     """The base act's övergångsbestämmelse joins onto its amendment entry as
     content with the L-prefixed fragment ids."""
