@@ -42,6 +42,34 @@ def test_sfs_unknown_term_does_not_resolve():
     assert resolve.resolve_sfs("skadestånd") is None
 
 
+def test_sfs_relative_citation_without_base_does_not_mint_sentinel():
+    # "3 § skadestånd" carries a relative pinpoint but no resolvable base
+    # law -- it must return None, never a garbage URI under the "query"
+    # placeholder basefile (regression: it used to return .../query#P3).
+    assert resolve.resolve_sfs("3 § skadestånd") is None
+    assert resolve.resolve_sfs("5 §") is None
+
+
+# --- SFS: each query is independent -- no state leaks between queries -------
+
+def test_sfs_samma_lag_does_not_leak_from_earlier_query():
+    # resolving a citation must not leave a "current law" that a *later*,
+    # unrelated query's "samma lag" picks up. Two sequential queries are
+    # independent; the second must not inherit brottsbalken from the first.
+    assert (resolve.resolve_sfs("12 kap. 1 § brottsbalken")
+            == "https://lagen.nu/1962:700#K12P1")
+    assert resolve.resolve_sfs("5 § samma lag") is None
+
+
+def test_sfs_learned_alias_does_not_leak_from_earlier_query():
+    # "7 § hittepålagen (1999:123)" teaches the parser that "hittepålagen"
+    # means 1999:123 -- but only for that query. A later bare "9 § hittepålagen"
+    # must not resolve off the leaked alias (it names no known law).
+    assert (resolve.resolve_sfs("7 § hittepålagen (1999:123)")
+            == "https://lagen.nu/1999:123#P7")
+    assert resolve.resolve_sfs("9 § hittepålagen") is None
+
+
 # --- EU: short name + optional article -------------------------------------
 
 def test_eu_shortname_plus_article():

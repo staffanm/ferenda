@@ -27,11 +27,16 @@ simply doesn't surface.
 """
 
 import functools
-import json
 import re
 
 from . import datasets
-from .lagrum import LagrumParser, lagrum_uri, load_abbreviations, load_namedlaws
+from .lagrum import (
+    LagrumParser,
+    lagrum_uri,
+    load_abbreviations,
+    load_namedacts,
+    load_namedlaws,
+)
 
 CELEX_BASE = "https://lagen.nu/ext/celex/"
 
@@ -42,8 +47,23 @@ CELEX_BASE = "https://lagen.nu/ext/celex/"
 
 @functools.cache
 def _sfs_parser():
+    """The cached citation parser. Construction (grammar + dataset loading) is
+    the expensive part, so it is cached; its *state* is stateful and leaks
+    across parse_text calls ("samma lag", learned aliases), so every query must
+    reset it first via `_fresh_sfs_parser` -- never call this directly."""
     return LagrumParser(load_namedlaws(datasets.NAMEDLAWS), basefile="query",
                         abbreviations=load_abbreviations(datasets.NAMEDLAWS))
+
+
+def _fresh_sfs_parser():
+    """The cached parser with a clean per-query state. The resolver treats each
+    ⌘K query as an independent one-shot citation, so state accumulated by an
+    earlier query (a named law for a later "samma lag", an alias taught by
+    "lagen (1999:123) om ...") must not leak into the next -- the same
+    reset-per-document pattern the verticals use before parsing a new document."""
+    parser = _sfs_parser()
+    parser.reset()
+    return parser
 
 
 @functools.cache
@@ -88,17 +108,22 @@ def resolve_sfs(q):
     None. Handles the law-first order ⌘K users type ("avtalslagen 36", "BrB
     12:1") by peeling the leading law and resolving the pinpoint in its context;
     falls back to parsing the query as a plain citation ("12 kap. 1 § brottsbalken")."""
+    parser = _fresh_sfs_parser()
     split = _split_leading_law(q)
     if split:
         lawid, rem = split
         if rem:
-            refs = _sfs_parser().parse_text(_normalize_pinpoint(rem),
-                                            context={"law": lawid})
+            refs = parser.parse_text(_normalize_pinpoint(rem),
+                                     context={"law": lawid})
             frag = next((r.uri for r in refs if "#" in r.uri), None)
             if frag:
                 return frag
         return lagrum_uri({"law": lawid})       # law named, no usable pinpoint
-    refs = _sfs_parser().parse_text(q)
+    # nobaseuri mode (context={}): the query has no resolvable base law, so a
+    # relative citation ("3 § skadestånd") stays unlinked rather than minting a
+    # sentinel URI under the "query" placeholder basefile. A citation that names
+    # its law inline ("12 kap. 1 § brottsbalken") still resolves.
+    refs = parser.parse_text(q, context={})
     frags = [r.uri for r in refs if "#" in r.uri]
     return frags[0] if frags else (refs[0].uri if refs else None)
 
@@ -112,19 +137,14 @@ _ART = re.compile(r"^art(?:ikel|icle)?\.?\s*(\d+)(?:[.\s]+(\d+))?", re.IGNORECAS
 
 @functools.cache
 def _named_acts():
-    """(alias, celex) pairs for every EU act, longest alias first -- the union of
-    each act's descriptive name(s) (`label`) and acronym(s) (`abbr`), either of
-    which may be a string or a list (the namedlaws.json convention)."""
-    data = json.loads(datasets.NAMEDACTS.read_text(encoding="utf-8"))
-    pairs = []
-    for celex, e in data.items():
-        if not isinstance(e, dict):
-            continue                          # the leading "_comment" string
-        for key in ("label", "abbr"):
-            value = e.get(key)
-            for alias in ([value] if isinstance(value, str) else value or []):
-                pairs.append((alias, celex))
-    return sorted(pairs, key=lambda p: len(p[0]), reverse=True)
+    """(alias, celex) pairs for every EU act, longest alias first, so a leading
+    act name in a query is matched greedily. Reuses the citation engine's own
+    loader (lagrum.load_namedacts) rather than re-reading namedacts.json here --
+    one loader, one contract (the union of each act's `label` and `abbr`,
+    lower-cased), no drift channel. resolve_eu lower-cases the query before
+    matching, so the lower-cased aliases match directly."""
+    return sorted(load_namedacts(datasets.NAMEDACTS).items(),
+                  key=lambda p: len(p[0]), reverse=True)
 
 
 def resolve_eu(q):
