@@ -56,9 +56,10 @@ def _names():
     """(by_uri, by_malnr): the nickname maps from HD's named-rättsfall snapshot. A
     case with an assigned NJA page is keyed by its URI; one still at "NJA YYYY s.
     xxx" (page unassigned) is keyed by målnummer -- so a raw verdict is named before
-    its referat exists. Empty if the snapshot hasn't been harvested."""
-    if not NAMEDCASES.exists():
-        return {}, {}
+    its referat exists."""
+    assert NAMEDCASES.exists(), (
+        "%s missing -- a broken checkout, not an unharvested snapshot; run "
+        "`lagen dv namedcases` or restore the committed file" % NAMEDCASES)
     data = json.loads(NAMEDCASES.read_text(encoding="utf-8"))
     by_uri, by_malnr = {}, {}
     for c in data["cases"]:

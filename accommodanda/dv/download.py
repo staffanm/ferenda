@@ -37,7 +37,7 @@ window after its decision date, and any upstream edit to an old record,
 surfaces only under `--full`: keep a periodic `--full` sweep cron'd as the
 backstop for both.
 
-  python -m accommodanda.dv DESTDIR [--full] [--no-bilagor] [--limit N]
+  python -m accommodanda.dv.download DESTDIR [--full] [--no-bilagor] [--limit N]
 """
 
 import argparse

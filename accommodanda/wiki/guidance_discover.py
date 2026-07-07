@@ -38,11 +38,12 @@ from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 
 from ..lib import layout
+from ..lib.net import BROWSER_UA as UA
+from ..lib.util import write_atomic
 
 # the op.europa.eu WAF and the DG sites 403 non-browser clients; a plain browser
-# UA is enough (no cookies needed for the public policy/library pages)
-UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-      "(KHTML, like Gecko) Chrome/120 Safari/537.36")
+# UA is enough (no cookies needed for the public policy/library pages) -- see
+# lib/net.BROWSER_UA for the shared identity.
 # the Commission newsroom redirector serves the raw PDF bytes at this path; the
 # numeric id is per-file/per-version (it changes when the FAQ is revised), which
 # is exactly why this has to be re-resolved rather than authored once by hand
@@ -279,8 +280,7 @@ def load_index():
 
 
 def write_index(index):
-    INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
-    INDEX_PATH.write_text(json.dumps(index, ensure_ascii=False, indent=2))
+    write_atomic(INDEX_PATH, json.dumps(index, ensure_ascii=False, indent=2))
     return INDEX_PATH
 
 

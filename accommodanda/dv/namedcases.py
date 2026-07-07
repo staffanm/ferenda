@@ -25,7 +25,7 @@ import re
 import subprocess
 import tempfile
 
-from ..lib import net
+from ..lib import net, util
 from ..lib.casenaming import case_uri
 from ..lib.datasets import NAMEDCASES
 from .download import USER_AGENT
@@ -87,13 +87,13 @@ def harvest(out_path=NAMEDCASES, session=None):
     session = session or net.make_session(USER_AGENT)
     pdf_bytes = net.request(session, "GET", URL).content
     cases = parse(pdf_bytes)
-    out_path.write_text(
+    util.write_atomic(
+        out_path,
         json.dumps({"_comment": "Named HD cases (nickname -> NJA referat -> "
                     "case URI), harvested from HD's official list. Refresh with "
                     "`lagen dv namedcases`. See dv/namedcases.py.",
                     "_source_url": URL, "cases": cases},
-                   ensure_ascii=False, indent=1) + "\n",
-        encoding="utf-8")
+                   ensure_ascii=False, indent=1) + "\n")
     return cases
 
 

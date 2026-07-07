@@ -7,6 +7,8 @@ with paragraphs in document order); grouping into sections, if wanted, is
 a downstream projection rather than part of the model.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 
 
@@ -49,8 +51,8 @@ class Avgorande:
     forarbeten: list[str] = field(default_factory=list)
     sammanfattning: str | None = None
     related: list[str] = field(default_factory=list)
-    body: list = field(default_factory=list)        # list[Rubrik | Stycke]
-    footnotes: list = field(default_factory=list)   # list[Fotnot], document end
+    body: list[Rubrik | Stycke] = field(default_factory=list)
+    footnotes: list[Fotnot] = field(default_factory=list)  # document end
     sources: list[str] = field(default_factory=list)  # provenance paths
 
 

@@ -11,8 +11,8 @@ everything the index lacks for legacy-only cases -- avgörandedatum,
 målnummer, and the curated fields (Rubrik→sammanfattning, Lagrum,
 Rättsfall, Sökord) -- is recovered here from the document itself.
 
-  python -m accommodanda.dv_legacy FILE                 # one Word file -> artifact
-  python -m accommodanda.dv_legacy --index INDEX [--limit N]  # batch + report
+  python -m accommodanda.dv.legacy FILE                 # one Word file -> artifact
+  python -m accommodanda.dv.legacy --index INDEX [--limit N]  # batch + report
 """
 
 import argparse
@@ -91,9 +91,25 @@ def _classify(p):
 _MALNR_SPLIT = re.compile(r"\s+och\s+|[,;]|\s+")
 
 
+_MALNR_PREFIXES = ("Ö", "B", "T")
+
+
 def _split_malnummer(value):
     if value[:2] in ("Ö ", "B ", "T "):
-        return [value.replace(" ", "")]
+        # A single "Ö 2475-12" is one identifier (the space is internal), but
+        # the same prefix also bundles several målnummer, e.g. "Ö 2475-12 och
+        # Ö 2477-12" -- split on the usual separators first, then re-glue
+        # each stray prefix letter to the number that follows it.
+        parts = [x.strip() for x in _MALNR_SPLIT.split(value) if x.strip()]
+        merged, i = [], 0
+        while i < len(parts):
+            if parts[i] in _MALNR_PREFIXES and i + 1 < len(parts):
+                merged.append(parts[i] + parts[i + 1])
+                i += 2
+            else:
+                merged.append(parts[i])
+                i += 1
+        return merged
     return [x.strip() for x in _MALNR_SPLIT.split(value) if x.strip()]
 
 

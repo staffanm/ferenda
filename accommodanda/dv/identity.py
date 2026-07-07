@@ -229,8 +229,7 @@ def reindex(dvdir, domstoldir, out):
           % (len(api_records), len(legacy_records), len(unrecognized)))
     cases = build_index(api_records, legacy_records)
     cases.sort(key=lambda c: (c["avgorandedatum"] or "", c["canonical_id"]))
-    Path(out).parent.mkdir(parents=True, exist_ok=True)
-    Path(out).write_text(json.dumps(cases, ensure_ascii=False, indent=2))
+    util.write_atomic(out, json.dumps(cases, ensure_ascii=False, indent=2))
     report(cases, unrecognized)
     print("index written to %s" % out)
     return cases

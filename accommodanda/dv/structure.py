@@ -204,9 +204,7 @@ def nest(blocks):
             if court and not cur[1].get("court"):
                 cur[1]["court"] = court
             return
-        close_to(2)
-        if not (top() and top()[1]["type"] == "delmal"):
-            close_to(2)               # detach to root if not under a delmal
+        close_to(2)   # leaves an open delmal (rank 1) if any, else the root
         push("instans", court=court)
 
     def current_instans():

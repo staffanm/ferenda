@@ -40,6 +40,7 @@ from pathlib import Path
 import brotli
 
 from .. import config
+from .util import write_atomic
 
 # encoding token (the HTTP `Content-Encoding` / `Accept-Encoding` name) -> the
 # on-disk suffix, in *preference order* (best ratio first). nginx's
@@ -171,19 +172,25 @@ def _selected(encodings):
 def write_bytes(path, data, encodings=PAGE_ENCODINGS):
     """Write `data` (bytes) for a logical `path`, storing the configured
     compressed variant(s) and clearing any stale sibling. Small files (and, with
-    compression disabled, all files) are stored plain. The parent directory must
-    already exist (callers ``mkdir`` it), matching the plain ``Path.write_bytes``
-    it replaces."""
+    compression disabled, all files) are stored plain.
+
+    Every variant is written atomically (util.write_atomic: same-directory temp
+    file + rename): this is the single write funnel for the artifact tree -- the
+    source of truth -- and the served page tree, where an interrupted run must
+    not leave a truncated file. A zero-byte artifact is *meaningful* (a
+    SkipDocument placeholder the catalog deliberately drops), so a partial write
+    surviving here would silently corrupt the corpus, not just a page
+    (rule:artifact-is-truth)."""
     p = logical(path)
     encs = _selected(encodings)
     if not encs or len(data) < MIN_SIZE:
-        p.write_bytes(data)
+        write_atomic(p, data)
         _clear_variants(p, keep=("",))
         return
     kept = []
     for enc in encs:
         suffix = SUFFIX_FOR[enc]
-        p.with_name(p.name + suffix).write_bytes(compress_bytes(data, enc))
+        write_atomic(p.with_name(p.name + suffix), compress_bytes(data, enc))
         kept.append(suffix)
     _clear_variants(p, keep=tuple(kept))
 

@@ -84,6 +84,13 @@ def test_split_malnummer_single_spaced():
     assert _split_malnummer("Ö 2475-12") == ["Ö2475-12"]
 
 
+def test_split_malnummer_multiple_with_court_prefix():
+    # a court-prefix letter also bundles several målnummer, each of which
+    # must keep its own prefix rather than collapsing into one garbage entry
+    assert (_split_malnummer("Ö 2475-12 och Ö 2477-12")
+            == ["Ö2475-12", "Ö2477-12"])
+
+
 def test_classify_numbered_paragraph():
     block = _classify(P("1. Den ordinarie veckoarbetstiden är 40 timmar."))
     assert block == Stycke("Den ordinarie veckoarbetstiden är 40 timmar.", ordinal="1")
