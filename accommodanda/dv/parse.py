@@ -26,13 +26,7 @@ from ..lib.casenaming import case_uri
 from ..lib.datasets import NAMEDACTS
 from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from ..lib.lagrum import (
-    EULAGSTIFTNING,
-    EURATTSFALL,
-    FORARBETEN,
-    KORTLAGRUM,
-    LAGRUM,
-    MYNDIGHETSBESLUT,
-    RATTSFALL,
+    ALL_PARSE_TYPES,
     LagrumParser,
     Ref,
     interleave,
@@ -45,8 +39,7 @@ from .structure import nest
 
 # Court decisions cite across the whole spectrum of legal sources, so the
 # DV citation scanner enables every ported grammar.
-DV_PARSE_TYPES = [LAGRUM, KORTLAGRUM, EULAGSTIFTNING, RATTSFALL, FORARBETEN,
-                  EURATTSFALL, MYNDIGHETSBESLUT]
+DV_PARSE_TYPES = ALL_PARSE_TYPES
 
 # section labels that are headings even when not all-caps
 KNOWN_HEADINGS = {
@@ -211,7 +204,7 @@ def scan_body(body):
     law-name learning carry across blocks. Inline footnote markers are lifted
     out as zero-width `kind="footnote"` runs."""
     parser = _scanner()
-    parser.state = type(parser.state)()   # fresh per-document state
+    parser.reset()                        # fresh per-document state
     runs = []
     for b in body:
         clean, marks = extract_footrefs(b.text)
@@ -226,7 +219,7 @@ def scan_footnotes(footnotes):
     """Footnote-body texts as inline-run lists, citation-scanned like the body
     (HD's footnotes cite CJEU case law and EU regulations)."""
     parser = _scanner()
-    parser.state = type(parser.state)()
+    parser.reset()
     return [interleave(fn.text, parser.parse_text(fn.text, context={}))
             for fn in footnotes]
 

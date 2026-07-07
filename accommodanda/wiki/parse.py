@@ -32,20 +32,13 @@ from ..lib import markdown
 from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from ..lib.eu_structure import anchored_blocks
 from ..lib.lagrum import (
-    EULAGSTIFTNING,
-    EURATTSFALL,
-    FORARBETEN,
-    KORTLAGRUM,
-    LAGRUM,
-    MYNDIGHETSBESLUT,
-    RATTSFALL,
+    ALL_PARSE_TYPES,
     LagrumParser,
     load_abbreviations,
     load_namedlaws,
 )
 
-PARSE_TYPES = [LAGRUM, KORTLAGRUM, EULAGSTIFTNING, RATTSFALL, FORARBETEN,
-               EURATTSFALL, MYNDIGHETSBESLUT]
+PARSE_TYPES = ALL_PARSE_TYPES
 
 # a commentary heading -> the statute fragment it annotates. The chapter is
 # optional: a continuously-numbered law (avtalslagen, where § runs 1..40 across

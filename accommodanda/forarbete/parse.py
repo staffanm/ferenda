@@ -24,13 +24,7 @@ from .. import config
 from ..lib import layout
 from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from ..lib.lagrum import (
-    EULAGSTIFTNING,
-    EURATTSFALL,
-    FORARBETEN,
-    KORTLAGRUM,
-    LAGRUM,
-    MYNDIGHETSBESLUT,
-    RATTSFALL,
+    ALL_PARSE_TYPES,
     LagrumParser,
     interleave,
     load_abbreviations,
@@ -50,11 +44,9 @@ from .model import Block, Forarbete
 from .structure import nest
 
 # förarbeten cite across the whole spectrum, like court decisions
-PARSE_TYPES = [LAGRUM, KORTLAGRUM, EULAGSTIFTNING, RATTSFALL, FORARBETEN,
-               EURATTSFALL, MYNDIGHETSBESLUT]
+PARSE_TYPES = ALL_PARSE_TYPES
 
 RE_HEADING_NUM = re.compile(r"^\d+(?:\.\d+)*$")       # "4" / "4.3.2" (own line)
-RE_HEADING_INLINE = re.compile(r"^(\d+(?:\.\d+)+)\s+\S")   # "4.3.2 Title"
 RE_NUM_TITLE = re.compile(r"^(\d+(?:\.\d+)*)\s+\S")        # "15 Title" / "4.3 T"
 
 
@@ -79,7 +71,11 @@ def classify(paras, page):
         elif p.lead_bold and mp:
             blocks.append(Block("paragraf", p.text, page,
                                 num=re.sub(r"\s+", "", mp.group(1))))
-        elif (p.bold or mt) and mt and len(p.text) < 120:
+        elif mt and len(p.text) < 120:
+            # `(p.bold or mt) and mt` reduces to `mt` -- the `p.bold or` was a
+            # dead subexpression (its only effect on the AND is when mt is
+            # already truthy, in which case it changes nothing); a numbered
+            # "N Title"/"N.N Title" line is a rubrik whether or not it is bold
             blocks.append(Block("rubrik", p.text, page,
                                 mt.group(1).count(".") + 1))
         elif p.bold and len(p.text) < 120:
@@ -199,7 +195,7 @@ def to_artifact(fa):
     document so 'a. prop.'/'samma lag' state carries; the flat block run is then
     grouped into the nested `structure` tree by heading level (see structure.py)."""
     parser = _refparser()
-    parser.state = type(parser.state)()      # fresh per-document state
+    parser.reset()                          # fresh per-document state
     blocks = [{"type": b.kind,
                "text": interleave(b.text, parser.parse_text(b.text, context={}))}
               | ({"page": b.page} if b.page is not None else {})

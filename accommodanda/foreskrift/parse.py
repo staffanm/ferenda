@@ -200,7 +200,7 @@ def _fresh_parser():
     """The shared parser with document-lifetime state reset (so one document's
     'samma lag' / learned law names do not bleed into the next)."""
     parser = _refparser()
-    parser.state = type(parser.state)()
+    parser.reset()
     return parser
 
 
@@ -287,10 +287,14 @@ def body_path(root, fs, entry):
 
 def parse_record(record, root):
     """A harvested record (``<slug>.json``) -> a parsed :class:`Regulation`.
-    The regulation body comes from the downloaded ``regulation`` PDF (or, if the
-    agency only offers the konsoliderad version, that); each downloaded
-    consolidation PDF is parsed into its own ``structure``. A frozen-import record
-    (§7g) points the ``regulation`` entry at the frozen PDF via ``body_path``."""
+    The regulation body comes from the downloaded ``regulation`` PDF -- when a
+    record has none (`files["regulation"]` is `None`; every classifier still
+    hangs a landing page's PDFs onto a `regulation`/`consolidation`/`amendment`
+    role, but not every entry has to fill each role), the base `Regulation`
+    keeps an empty `structure` and only its `consolidations` carry a parsed
+    body. Each downloaded consolidation PDF is parsed into its own
+    ``structure``. A frozen-import record (§7g) points the ``regulation``
+    entry at the frozen PDF via ``body_path``."""
     fs, basefile = record["fs"], record["basefile"]
     arsutgava, lopnummer = basefile.split("/", 1)[1].split(":", 1)
     files = record.get("files", {})

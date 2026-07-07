@@ -29,13 +29,7 @@ from bs4 import BeautifulSoup
 
 from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from ..lib.lagrum import (
-    EULAGSTIFTNING,
-    EURATTSFALL,
-    FORARBETEN,
-    KORTLAGRUM,
-    LAGRUM,
-    MYNDIGHETSBESLUT,
-    RATTSFALL,
+    ALL_PARSE_TYPES,
     LagrumParser,
     load_abbreviations,
     load_namedlaws,
@@ -46,8 +40,7 @@ from .download import jk_canonical, jk_html_path, jo_dnrs, jo_pdf_path
 from .legacy import arn_pdf_path
 from .model import ORG_NAME, Beslut, Block
 
-AVG_PARSE_TYPES = [LAGRUM, KORTLAGRUM, EULAGSTIFTNING, RATTSFALL, FORARBETEN,
-                   EURATTSFALL, MYNDIGHETSBESLUT]
+AVG_PARSE_TYPES = ALL_PARSE_TYPES
 
 ABSTRACT_PREFIX = "Beslutet i korthet:"
 
@@ -74,7 +67,7 @@ def _fresh_parser():
     """The shared parser with document-lifetime state reset (so one decision's
     'samma lag' / learned law names do not bleed into the next)."""
     parser = _refparser()
-    parser.state = type(parser.state)()
+    parser.reset()
     return parser
 
 

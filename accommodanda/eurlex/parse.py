@@ -404,7 +404,7 @@ def to_artifact(doc):
     terms are extracted first (anchoring the definition points), then every block
     is scanned both for citations and for in-act uses of those terms."""
     parser = _refparser()
-    parser.state = type(parser.state)()       # fresh per-document state
+    parser.reset()                          # fresh per-document state
     matcher, index = build_matcher(extract_definitions(doc.body, doc.lang),
                                    doc.lang)
     body = []
