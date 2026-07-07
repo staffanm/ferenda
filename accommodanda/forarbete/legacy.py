@@ -58,8 +58,8 @@ from pathlib import Path
 
 from ..lib import legacy_import
 from ..lib.util import (
-    document_extension,
     record_path,
+    sniff_extension,
     split_numalpha,
     write_atomic,
 )
@@ -71,8 +71,12 @@ SOURCE = "propriksdagen"
 # a frozen record's body-format tier: any of these extensions among its
 # legacy_files is a tier-2 (real document) body; an html-only body is tier 1; no
 # body is tier 0. The tier is what handles the PDF-gap window -- a later corpus's
-# pdf/doc copy outranks propriksdagen's html-only record regardless of source rank.
-BODY_FORMATS = frozenset({".pdf", ".doc", ".docx", ".wpd", ".rtf"})
+# pdf copy outranks propriksdagen's html-only record regardless of source rank.
+# Only .pdf is listed: no walker ever emits a .doc/.docx/.wpd/.rtf legacy_files
+# entry (those bodies have no parse route, so they are left out of legacy_files
+# entirely -- see _pick_proptrips), so a wider set here would be speculative
+# (rule:no-speculative-code).
+BODY_FORMATS = frozenset({".pdf"})
 
 # static source rank breaking an equal-tier tie (lower number wins). Ranks are
 # only ever compared *within* one basefile's type (a `record_path` collision), so
@@ -278,8 +282,7 @@ def _pick_body(nrdir, meta, log):
       catalog document at its URI.
     """
     pdf = nrdir / "index.pdf"
-    if (pdf.exists() and document_extension(pdf.read_bytes()[:8]) == ".pdf"
-            and _pdf_has_text(pdf)):
+    if pdf.exists() and sniff_extension(pdf) == ".pdf" and _pdf_has_text(pdf):
         return "pdf_route", [legacy_import.rel(pdf)], None
     html = nrdir / "index.html"
     fmt = meta["htmlformat"]
@@ -359,8 +362,7 @@ def _text_pdf(path):
     OCR lives elsewhere or nowhere) or a mislabelled asset is rejected, so it can
     neither shadow a real body at parse time nor inflate the record's tier against
     a later corpus's real pdf/doc copy."""
-    return (path.exists() and document_extension(path.read_bytes()[:8]) == ".pdf"
-            and _pdf_has_text(path))
+    return path.exists() and sniff_extension(path) == ".pdf" and _pdf_has_text(path)
 
 
 def _record(corpus, basefile, entry, legacy_files, body_format=None):
@@ -541,17 +543,20 @@ def _pick_proptrips(docdir):
     """Body pick for a proptrips doc dir: a text-probed `index.pdf` (pdf route,
     tier 2 -- the 1995/96+ born-digital copies that beat propriksdagen's html-only
     records in the upstream-PDF gap), else the `index.html` TRIPS plaintext (trips
-    route, tier 1), else metadata-only. `.doc`/`.docx`/`.wpd` have no parse route so
-    are not listed. An empty dir (a legacy sanitizer stray) is a no-doc skip."""
+    route, tier 1) when it actually carries a `div.body-text` (some frozen pages
+    are search-result shells the crawl saved instead of the document, like
+    dirtrips' 5 known shells -- no recoverable body), else metadata-only.
+    `.doc`/`.docx`/`.wpd` have no parse route so are not listed. An empty dir (a
+    legacy sanitizer stray) is a no-doc skip."""
     if not any(docdir.iterdir()):
         return None
     pdf = docdir / "index.pdf"
     if _text_pdf(pdf):
         return [legacy_import.rel(pdf)], None, "pdf_route"
     html = docdir / "index.html"
-    if html.exists():
+    if html.exists() and "body-text" in html.read_text("utf-8"):
         return [legacy_import.rel(html)], "trips", "trips_route"
-    return [], None, "metadata_only"                      # only a doc/docx/wpd body
+    return [], None, "metadata_only"      # only a doc/docx/wpd body, or a shell page
 
 
 def _pick_dirasp(docdir):

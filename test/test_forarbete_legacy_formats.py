@@ -62,7 +62,7 @@ def test_dokumentstatus_meta_placeholder_date_is_none():
 
 def test_dokumentstatus_meta_missing_beteckning_fails_fast():
     xml = b'<dokumentstatus><dokument><rm>1971</rm></dokument></dokumentstatus>'
-    with pytest.raises(AssertionError, match="rm/beteckning"):
+    with pytest.raises(ValueError, match="rm/beteckning"):
         dokumentstatus_meta(xml)
 
 

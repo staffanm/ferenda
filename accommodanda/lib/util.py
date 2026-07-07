@@ -75,6 +75,14 @@ def document_extension(data):
         return ".wpd"
     return None
 
+
+def sniff_extension(path):
+    """`document_extension` for an on-disk file, streamed -- only the leading
+    8 bytes are read, so a large network-mounted asset isn't read whole just
+    to inspect its header."""
+    with open(path, "rb") as f:
+        return document_extension(f.read(8))
+
 # ETA timing state for `status`, self-tracked so callers need not thread a start
 # time. A current/total run (sfs parse, then dv parse, …) is timed from its first
 # line; a new run is detected when `done` restarts or `total` changes, which

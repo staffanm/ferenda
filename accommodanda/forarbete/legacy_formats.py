@@ -65,6 +65,13 @@ SOFT_HYPHEN = "\xad"
 _BR = re.compile(r"<br\s*/?>", re.IGNORECASE)
 _ISODATE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})")
 
+# the dokumentstatus XML is remote-supplied (data.riksdagen.se): no DTD/entity
+# expansion, matching the hardened parser eurlex/parse.py uses for its own
+# remote XML (rule:second-use-goes-to-lib candidate once a third source needs it)
+_XML_PARSER = etree.XMLParser(resolve_entities=False, load_dtd=False,
+                              no_network=True, remove_comments=True,
+                              remove_pis=True)
+
 
 # --- Adapter 1: Riksdagen dokumentstatus XML -----------------------------
 
@@ -95,11 +102,15 @@ def dokumentstatus_meta(xml_bytes):
     ``source_url`` keeps the still-live data.riksdagen.se html endpoint;
     ``htmlformat`` + ``bilagor`` are what the precedence rule reads (a pdf bilaga
     is what lets a scanned/html-ec doc beat this html-only body)."""
-    root = etree.fromstring(xml_bytes)
+    root = etree.fromstring(xml_bytes, parser=_XML_PARSER)
     dok = root.find("dokument")
     rm, beteckning = _text(dok, "rm"), _text(dok, "beteckning")
-    assert rm and beteckning, (
-        "dokumentstatus missing rm/beteckning (dok_id=%s)" % _text(dok, "dok_id"))
+    if not (rm and beteckning):
+        # untrusted remote XML -- a raise, never an assert: under `python -O`
+        # an assert is stripped and a None:None basefile would be minted and
+        # written to disk as a junk catalog document (rule:errors-drive-retry-use-raise)
+        raise ValueError("dokumentstatus missing rm/beteckning (dok_id=%s)"
+                         % _text(dok, "dok_id"))
     basefile = "%s:%s" % (rm, beteckning)
     return {
         "basefile": basefile,
@@ -249,5 +260,11 @@ def trips_paras(html_text):
     the text/tml body. ``html.parser`` tolerates the unescaped ``<``/``>`` the
     legacy pages are known to contain."""
     body = BeautifulSoup(html_text, "html.parser").find("div", class_="body-text")
-    assert body is not None, "TRIPS html has no div.body-text"
+    if body is None:
+        # untrusted legacy html -- a raise, never an assert (a stripped assert
+        # under `python -O` would fall through with body=None and crash on
+        # .get_text() instead of failing this one document cleanly); the
+        # import-time div.body-text guard (_pick_proptrips/import_dirtrips)
+        # keeps this from firing in the ordinary case (rule:errors-drive-retry-use-raise)
+        raise ValueError("TRIPS html has no div.body-text")
     return _reflow_plaintext(body.get_text())

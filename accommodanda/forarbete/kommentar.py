@@ -48,7 +48,7 @@ import argparse
 import json
 import re
 
-from ..lib import compress
+from ..lib import compress, layout
 from ..lib.catalog import norm_title
 from ..lib.lagrum import EULAGSTIFTNING, LagrumParser
 from ..lib.util import normalize_fold
@@ -429,7 +429,7 @@ def paragraf_fragment(chapter, paragraf):
 def main():
     ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     ap.add_argument("record", help="a förarbete record JSON (or its artifact)")
-    ap.add_argument("--root", default="site/data/forarbete")
+    ap.add_argument("--root", default=str(layout.FA_DOWNLOADED))
     args = ap.parse_args()
     data = json.loads(compress.read_bytes(args.record))
     art = data if "structure" in data else to_artifact(parse_record(data, args.root))

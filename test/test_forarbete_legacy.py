@@ -112,7 +112,10 @@ def legacy_root(tmp_path, monkeypatch):
 
 def test_body_tier():
     assert body_tier(["propriksdagen/downloaded/1971/40/index.pdf"]) == 2
-    assert body_tier(["x/a.doc"]) == 2 and body_tier(["x/a.wpd"]) == 2
+    # .doc/.docx/.wpd/.rtf are never emitted in legacy_files (no parse route --
+    # see _pick_proptrips), so BODY_FORMATS only lists .pdf; a stray .doc/.wpd
+    # would fall to the html-only tier like any other non-pdf body
+    assert body_tier(["x/a.doc"]) == 1 and body_tier(["x/a.wpd"]) == 1
     assert body_tier(["x/a.html"]) == 1
     assert body_tier([]) == 0
 
@@ -545,6 +548,26 @@ def test_proptrips_pdf_html_doc_and_empty_dir(frozen):
     assert trec["legacy_files"] == ["proptrips/downloaded/1993-94/1/index.html"]
     assert _read_rec(out, "prop", "1995-96-100")["legacy_files"] == []   # .wpd not listed
     assert not (out / "prop" / "2071-72-1.json").exists()           # empty dir skipped
+
+
+def test_proptrips_search_shell_page_imports_metadata_only(frozen):
+    # regression: like dirtrips, a proptrips index.html can be a search-result
+    # shell the crawl saved instead of the document -- no div.body-text, no
+    # recoverable body. It must import metadata-only, not a trips-route record
+    # whose parse would later fail on the missing div.body-text.
+    make, out = frozen
+    src, entries, downloaded = make("proptrips")
+    _entry(entries, "1994-95/1", "1994/95:1",
+           orig_url="http://193.188.157.111/prop?dok=P")
+    (downloaded / "1994-95" / "1").mkdir(parents=True)
+    (downloaded / "1994-95" / "1" / "index.html").write_text(
+        "<!DOCTYPE html><html><body><div class='container'>"
+        "Totalt 2 träffar</div></body></html>", encoding="utf-8")
+    counts = legacy.import_proptrips(src, out, log=lambda *_: None)
+    assert counts["imported"] == 1 and counts["metadata_only"] == 1
+    assert counts["trips_route"] == 0
+    rec = _read_rec(out, "prop", "1994-95-1")
+    assert rec["legacy_files"] == [] and "body_format" not in rec
 
 
 # --- dirtrips (flat downloaded/<year>/<n>.html) ---------------------------

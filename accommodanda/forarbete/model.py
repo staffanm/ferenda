@@ -30,4 +30,4 @@ class Forarbete:
     uri: str                  # https://lagen.nu/prop/2025/26:161
     title: str
     date: str | None = None
-    body: list = field(default_factory=list)   # [Block], document order
+    body: list[Block] = field(default_factory=list)   # document order
