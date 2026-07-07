@@ -639,6 +639,22 @@ def test_guidance_validate_rejects_hallucinated_target():
         annotate._validate('{"links": [{"title": "X", "targets": []}]}', anchors)
 
 
+def test_guidance_validate_rejects_non_integer_page():
+    # a `page:` the model volunteers renders through "#page=%d" in the expensive
+    # post-call `_source_link`; a string there crashes *after* the LLM call, so it
+    # must be rejected at validation time (fed back on retry), not written or
+    # crashed on -- ValueError, not assert (the retry loop load-bears on the raise)
+    anchors = {"2"}
+    with pytest.raises(ValueError, match="non-integer page"):
+        annotate._validate(
+            '{"links": [{"title": "X", "targets": ["2"], "page": "twelve"}]}',
+            anchors)
+    # an integer page (or none at all) is accepted
+    assert annotate._validate(
+        '{"links": [{"title": "X", "targets": ["2"], "page": 12}]}', anchors) == [
+        {"title": "X", "targets": ["2"], "page": 12}]
+
+
 def test_guidance_page_located_by_title_not_model_count():
     # the page is found by matching the (alnum-normalised) title in the page text,
     # so a straight quote matches the PDF's curly one and the model's own page

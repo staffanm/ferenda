@@ -15,7 +15,7 @@ never as part of a corpus-wide parse/relate/generate.
 import json
 from pathlib import Path
 
-from ..lib import catalog, compress, layout, llm
+from ..lib import catalog, compress, layout, llm, util
 from ..lib.eu_structure import flatten
 
 PROMPT = Path(__file__).with_name("preamble_analyzer_prompt.txt")
@@ -30,7 +30,9 @@ def act_markdown(art):
     act -- the analyzer's input. Keeps exactly the structure the prompt keys on:
     numbered recitals, article headings, numbered paragraphs and lettered points,
     so the model can mint the dotted "4.5" / "6.2.a" provision keys it is asked for."""
-    lines = ["# %s" % art.get("title", art["celex"]), ""]
+    # the parsed artifact always carries a `title` key; it can be None for an act
+    # whose title never got extracted, in which case the CELEX is the heading
+    lines = ["# %s" % (art["title"] or art["celex"]), ""]
     for b in flatten(art["structure"]):
         text = catalog.runs_text(b["text"]).strip()
         t, num = b["type"], b.get("num")
@@ -53,12 +55,30 @@ def act_markdown(art):
     return "\n".join(lines)
 
 
+def _int_list(value, where):
+    """`value` shape-checked as a non-empty list of ints (a JSON `true` must not
+    pass -- bool is an int subclass), returned as ints. Raises `ValueError`
+    naming `where` on anything else. These are recital numbers the renderer
+    iterates and ranges over (lib.render.Editorial), so a string or a nested
+    object here crashes every later generate; reject it at write time instead."""
+    if not isinstance(value, list) or not value:
+        raise ValueError("%s is not a non-empty list" % where)
+    for n in value:
+        if isinstance(n, bool) or not isinstance(n, int):
+            raise ValueError("%s contains a non-integer recital: %r" % (where, n))
+    return value
+
+
 def _validate(content):
-    """Parse and shape-check the model's reply: a JSON object with exactly the
-    two expected keys and no more recital groups than the prompt's hard cap.
-    Raises ValueError on anything else rather than write a bad layer -- the
-    message is fed back to the model on the retry. (ValueError, not assert:
-    the retry loop load-bears on the raise, which -O would strip.)"""
+    """Parse and shape-check the model's reply into the editorial layer: a JSON
+    object with a `recitalGroups` list (each group a dict with a two-integer
+    `range` lo<=hi, within the prompt's hard cap) and an `articleToRecitals` map
+    of article ref -> non-empty list of integer recital numbers. Every shape the
+    renderer (lib.render.Editorial) later indexes is checked *here*, so a
+    malformed-but-JSON reply is fed back to the model on the retry rather than
+    written to the `.ann` and crashing every subsequent generate. Raises
+    `ValueError` on anything else -- not assert: the retry loop load-bears on the
+    raise, which -O would strip."""
     layer = json.loads(llm.strip_fence(content))
     if not isinstance(layer, dict):
         raise ValueError("response is not a JSON object")
@@ -68,26 +88,24 @@ def _validate(content):
     if len(groups) > MAX_RECITAL_GROUPS:
         raise ValueError("too many recital groups: %d (max %d)"
                          % (len(groups), MAX_RECITAL_GROUPS))
-    if not isinstance(layer.get("articleToRecitals"), dict):
+    for i, g in enumerate(groups):
+        if not isinstance(g, dict):
+            raise ValueError("recital group %d is not an object" % i)
+        rng = g.get("range")
+        if not (isinstance(rng, list) and len(rng) == 2):
+            raise ValueError("recital group %d has no two-integer range" % i)
+        lo, hi = rng
+        if (isinstance(lo, bool) or isinstance(hi, bool)
+                or not isinstance(lo, int) or not isinstance(hi, int)):
+            raise ValueError("recital group %d has no two-integer range" % i)
+        if lo > hi:
+            raise ValueError("recital group %d range is inverted: %r" % (i, rng))
+    a2r = layer.get("articleToRecitals")
+    if not isinstance(a2r, dict):
         raise ValueError("response lacks an articleToRecitals object")
-    return {"recitalGroups": groups,
-            "articleToRecitals": layer["articleToRecitals"]}
-
-
-def _author(prompt):
-    """Call the model and validate; on a malformed or over-sectioned reply, retry
-    once with the failure fed back as a corrective instruction. A plain re-prompt
-    would be pointless -- the call is temperature 0 and deterministic -- so the
-    retry must carry the reason the first answer was rejected. Raises if the
-    second answer is bad too."""
-    for attempt in range(2):
-        try:
-            return _validate(llm.complete(prompt))
-        except ValueError as exc:
-            if attempt:
-                raise
-            prompt += ("\n\nDITT FÖREGÅENDE SVAR UNDERKÄNDES: %s\n"
-                       "Rätta detta och följ alla regler ovan exakt." % exc)
+    for key, recitals in a2r.items():
+        _int_list(recitals, "articleToRecitals[%r]" % key)
+    return {"recitalGroups": groups, "articleToRecitals": a2r}
 
 
 def annotate(celex):
@@ -102,8 +120,8 @@ def annotate(celex):
         % (celex, art_path, celex)
     art = json.loads(compress.read_bytes(art_path))
     prompt = PROMPT.read_text().replace(PLACEHOLDER, act_markdown(art))
-    layer = _author(prompt)
+    layer = llm.author(prompt, _validate)
     out = art_path.with_suffix(".ann")
-    out.write_text(json.dumps({"editorialLayer": layer},
-                              ensure_ascii=False, indent=2))
+    util.write_atomic(out, json.dumps({"editorialLayer": layer},
+                                      ensure_ascii=False, indent=2))
     return out

@@ -20,7 +20,7 @@ named basefile -- never from a corpus-wide parse/relate/generate.
 import json
 from pathlib import Path
 
-from ..lib import compress, layout, llm
+from ..lib import compress, layout, llm, util
 from ..lib.text import runs_text
 from ..lib.util import basefile_slug, normalize_space
 from .model import Remissvar
@@ -116,32 +116,6 @@ def _validate(content, valid_ids, haystack):
     }
 
 
-def _author(prompt, valid_ids, haystack):
-    """Call the model and validate; on a malformed reply, retry once as a real
-    follow-up turn -- the model's own prior reply replayed as an `assistant`
-    message, then a short `user` message naming exactly what failed and asking
-    for a fix. This lets it correct the one broken part directly, rather than
-    re-deriving the whole answer from an ever-longer single user message with the
-    correction tacked onto the end (which forces it to redo the entire task from
-    scratch, over the same outline and answer text, and often reproduces the same
-    mistake since nothing points it at what specifically to change). Raises if
-    the second answer is bad too."""
-    messages = [{"role": "user", "content": prompt}]
-    for attempt in range(2):
-        reply = llm.complete_thread(messages, max_tokens=MAX_TOKENS)
-        try:
-            return _validate(reply, valid_ids, haystack)
-        except ValueError as exc:
-            if attempt:
-                raise
-            messages.append({"role": "assistant", "content": reply})
-            messages.append({"role": "user", "content":
-                             "DITT SVAR UNDERKÄNDES: %s\n"
-                             "Rätta ENDAST detta i ditt svar och följ alla regler "
-                             "i den ursprungliga instruktionen exakt. Svara med "
-                             "hela den korrigerade JSON-strukturen igen." % exc})
-
-
 def analyze(basefile):
     """Author and write the `.ann` sentiment layer for one remissvar basefile
     ("<case-slug>/<org-slug>"); returns the written path."""
@@ -169,9 +143,10 @@ def analyze(basefile):
     text = "\n\n".join(svar.full_text)
     prompt = (PROMPT.read_text().replace(OUTLINE_PLACEHOLDER, outline)
               .replace(TEXT_PLACEHOLDER, text))
-    result = _author(prompt, valid_ids, normalize_space(text))
+    haystack = normalize_space(text)
+    result = llm.author(prompt, lambda reply: _validate(reply, valid_ids, haystack),
+                        max_tokens=MAX_TOKENS)
 
     path = art_path.with_suffix(".ann")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(result, ensure_ascii=False, indent=2))
+    util.write_atomic(path, json.dumps(result, ensure_ascii=False, indent=2))
     return path

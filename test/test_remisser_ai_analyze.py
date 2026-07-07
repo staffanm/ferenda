@@ -149,7 +149,7 @@ def corpus(tmp_path, monkeypatch):
 
 def test_analyze_writes_ann_sidecar(corpus, monkeypatch):
     monkeypatch.setattr(ai_analyze.llm, "complete_thread",
-                        lambda messages, max_tokens=None: VALID_REPLY)
+                        lambda messages, **kw: VALID_REPLY)
     path = ai_analyze.analyze(corpus)
     assert path.suffix == ".ann"
     data = json.loads(path.read_text())
@@ -160,7 +160,7 @@ def test_analyze_writes_ann_sidecar(corpus, monkeypatch):
 def test_analyze_passes_outline_and_text_to_model(corpus, monkeypatch):
     seen = []
 
-    def fake_complete_thread(messages, max_tokens=None):
+    def fake_complete_thread(messages, **kw):
         seen.append(list(messages))
         return VALID_REPLY
 
@@ -181,7 +181,7 @@ def test_analyze_retries_once_then_succeeds(corpus, monkeypatch):
     replies = iter([bad_reply, VALID_REPLY])
     seen = []
 
-    def fake_complete_thread(messages, max_tokens=None):
+    def fake_complete_thread(messages, **kw):
         seen.append(list(messages))
         return next(replies)
 
@@ -201,7 +201,7 @@ def test_analyze_retries_once_then_succeeds(corpus, monkeypatch):
 
 def test_analyze_raises_after_one_failed_retry(corpus, monkeypatch):
     monkeypatch.setattr(ai_analyze.llm, "complete_thread",
-                        lambda messages, max_tokens=None: "not json at all")
+                        lambda messages, **kw: "not json at all")
     with pytest.raises(ValueError):
         ai_analyze.analyze(corpus)
 

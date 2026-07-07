@@ -40,7 +40,7 @@ from pathlib import Path
 import requests
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
-from ..lib import compress, layout, llm, markdown
+from ..lib import compress, layout, llm, markdown, util
 from ..lib.eu_structure import anchored_blocks
 from ..lib.text import runs_text
 from ..lib.util import normalize_space
@@ -74,10 +74,14 @@ def fetch_pdf(url):
         return cached
     resp = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=120)
     resp.raise_for_status()
-    assert resp.content[:4] == b"%PDF", \
-        "%s did not return a PDF (got %r)" % (url, resp.content[:8])
-    cached.parent.mkdir(parents=True, exist_ok=True)
-    cached.write_bytes(resp.content)
+    # untrusted remote content: a WAF challenge / error page comes back 200 with
+    # HTML, not a PDF. raise (not assert, which -O strips) so a non-PDF is rejected
+    # loudly, and write atomically only after the check passes -- a poisoned body
+    # must never be cached under the .pdf name where `cached.exists()` would serve
+    # it forever (rule:fail-fast, rule:errors-drive-retry-use-raise).
+    if resp.content[:4] != b"%PDF":
+        raise ValueError("%s did not return a PDF (got %r)" % (url, resp.content[:8]))
+    util.write_atomic(cached, resp.content)
     return cached
 
 
@@ -163,25 +167,19 @@ def _validate(content, anchors):
         targets = link.get("targets")
         if not (isinstance(targets, list) and targets):
             raise ValueError("link %r has no targets list" % link.get("title"))
+        # a `page:` the model volunteers is a fallback deep-link target when the
+        # title isn't found in the PDF; it renders through `"#page=%d"`, so a
+        # non-integer here would crash the expensive post-call `_source_link`
+        # rather than being fed back on the retry -- reject it at validation time
+        page = link.get("page")
+        if page is not None and (isinstance(page, bool) or not isinstance(page, int)):
+            raise ValueError("link %r has a non-integer page: %r"
+                             % (link.get("title"), page))
         bad |= {a for a in targets if a not in anchors}
     if bad:
         raise ValueError("links cite anchors not in the act: %s"
                          % ", ".join(sorted(bad)))
     return links
-
-
-def _author(prompt, anchors):
-    """Call the model and validate; on a malformed or hallucinated reply, retry
-    once with the failure fed back (the call is temperature 0, so a bare re-prompt
-    would repeat the answer). Raises if the second answer is bad too."""
-    for attempt in range(2):
-        try:
-            return _validate(llm.complete(prompt, max_tokens=MAX_TOKENS), anchors)
-        except ValueError as exc:
-            if attempt:
-                raise
-            prompt += ("\n\nDITT FÖREGÅENDE SVAR UNDERKÄNDES: %s\n"
-                       "Rätta detta och följ alla regler ovan exakt." % exc)
 
 
 def _source_link(source, link, page):
@@ -236,13 +234,14 @@ def annotate(basefile, wiki_root):
         pages = _pages(text)
         prompt = (PROMPT.read_text().replace(ACT_PLACEHOLDER, act)
                   .replace(GUIDANCE_PLACEHOLDER, text))
-        for link in _author(prompt, anchors):
+        for link in llm.author(prompt, lambda reply: _validate(reply, anchors),
+                               max_tokens=MAX_TOKENS):
             page = _page_of(pages, link["title"]) or link.get("page")
             item = _source_link(source, link, page)
             for anchor in link["targets"]:
                 out.setdefault(anchor, []).append(item)
 
     path = layout.artifact("kommentar", basefile).with_suffix(".ann")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"guidanceLinks": out}, ensure_ascii=False, indent=2))
+    util.write_atomic(path, json.dumps({"guidanceLinks": out},
+                                       ensure_ascii=False, indent=2))
     return path
