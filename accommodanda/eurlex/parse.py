@@ -66,7 +66,8 @@ def load_formex(path):
         with zipfile.ZipFile(path) as zf:
             members = sorted(n for n in zf.namelist()
                              if n.endswith(".xml") and not n.endswith(".doc.xml"))
-            assert members, "%s: zip has no Formex member" % path
+            if not members:
+                raise ValueError("%s: zip has no Formex member" % path)
             return [etree.fromstring(zf.read(m), XML_PARSER) for m in members]
     return [etree.parse(str(path), XML_PARSER).getroot()]
 
@@ -464,9 +465,14 @@ _TIERS = (("fmx4.zip", "fmx4"), ("fmx4", "fmx4"), ("xhtml", "html"),
 
 
 def _route(path):
-    """(rank, parser-route) for a content file by format precedence, or None."""
+    """(rank, parser-route) for a content file by format precedence, or None.
+
+    Matches the exact trailing suffix (e.g. ".fmx4", ".fmx4.zip"), not a bare
+    substring: a stale `swe.fmx4.tmp` left behind by a hard-killed download
+    (write_atomic's temp file, orphaned when the process dies before the
+    rename) must not be mistaken for a real `.fmx4` content file."""
     for rank, (token, route) in enumerate(_TIERS):
-        if token in path.name:
+        if path.name.endswith("." + token):
             return rank, route
     return None
 

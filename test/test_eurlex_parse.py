@@ -1,11 +1,14 @@
 """Tests for the EUR-Lex Formex parser."""
 
+import zipfile
 from xml.etree import ElementTree as ET
+
+import pytest
 
 from accommodanda.lib.eu_structure import flatten as flatten_structure
 from accommodanda.eurlex.parse import (flatten, doctype, parse_formex,
                                        parse_document, to_artifact,
-                                       content_file, _annex_anchor)
+                                       content_file, load_formex, _annex_anchor)
 
 
 def _flat(xml):
@@ -193,3 +196,24 @@ def test_content_file_prefers_swe_zip(tmp_path):
     (tmp_path / "swe.fmx4").write_bytes(b"x")
     path, lang, route = content_file(tmp_path)
     assert lang == "swe" and path.name == "swe.fmx4.zip" and route == "fmx4"
+
+
+def test_content_file_ignores_orphaned_tmp_partial(tmp_path):
+    # a hard-killed write_atomic orphans its temp file; "swe.fmx4.tmp" contains
+    # the token "fmx4" but is not content -- suffix matching must reject it
+    (tmp_path / "swe.fmx4.tmp").write_bytes(b"x")
+    (tmp_path / "swe.html").write_bytes(b"x")
+    path, lang, route = content_file(tmp_path)
+    assert path.name == "swe.html" and route == "html"
+    (tmp_path / "swe.html").unlink()
+    assert content_file(tmp_path) == (None, None, None)
+
+
+def test_load_formex_rejects_zip_without_formex_member(tmp_path):
+    # a bundle holding only the .doc.xml manifest wrapper has no act content;
+    # that is remote-data validation, so it raises (not asserts)
+    bundle = tmp_path / "swe.fmx4.zip"
+    with zipfile.ZipFile(bundle, "w") as zf:
+        zf.writestr("L_2016001SV.doc.xml", "<wrapper/>")
+    with pytest.raises(ValueError, match="no Formex member"):
+        load_formex(bundle)

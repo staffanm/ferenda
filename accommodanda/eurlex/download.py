@@ -417,14 +417,19 @@ def _content_ok(filetype, content):
     """Whether a fetched item's bytes match the format its manifestation type
     promises. CELLAR sometimes serves a scanned image (TIFF: II*\\0 / MM\\0*)
     under an `fmx4`/`xhtml`/`html` manifestation; such a placeholder fails here so
-    the caller falls back to the next type (which carries the real text)."""
+    the caller falls back to the next type (which carries the real text).
+
+    `filetype` always comes from `_ranked_types`, so it is one of
+    TEXT_PREFERENCE or a `pdf*` type -- an unrecognised type here means that
+    set changed without teaching this function the new type's signature, so
+    it must raise rather than wave the content through unchecked."""
     if filetype == "fmx4":
         return content.lstrip()[:1] == b"<" or content.startswith(ZIP_MAGIC)
     if filetype in ("xhtml", "html"):
         return content.lstrip()[:1] == b"<"
     if filetype.startswith("pdf"):
         return content.startswith(b"%PDF")
-    return True
+    raise ValueError("no content check for manifestation type %r" % filetype)
 
 
 def _is_wrapper(streams):
@@ -434,8 +439,9 @@ def _is_wrapper(streams):
 
 
 def _resolve_streams(session, items):
-    """item URL -> its owl:sameAs stream URIs, for the few items that need
-    wrapper disambiguation (a manifestation carrying more than one item)."""
+    """item URL -> its owl:sameAs stream URIs, for the items that need wrapper
+    disambiguation (every fmx4 item, plus any other manifestation carrying
+    more than one item)."""
     streams = defaultdict(list)
     for row in _chunked(session, _stream_query, sorted(items), STREAM_CHUNK):
         streams[row["item"]["value"]].append(row["stream"]["value"])
@@ -457,10 +463,14 @@ def fetch_selection(session, celexes, languages):
             (tree[row["celex"]["value"]][code]
                  [row["mtype"]["value"]].append(row["item"]["value"]))
 
-    # any manifestation carrying more than one item needs wrapper disambiguation
-    # (the real .xml content item vs its .doc.xml wrapper)
+    # wrapper disambiguation (the real .xml content item vs its .doc.xml
+    # wrapper): every fmx4 item needs its streams resolved -- a wrapper-only
+    # work's Formex manifestation carries the .doc.xml wrapper as its *single*
+    # item, so multi-item is not a sufficient trigger there -- plus any other
+    # type's manifestation carrying more than one item.
     ambiguous = {i for by_lang in tree.values() for by_type in by_lang.values()
-                 for items in by_type.values() if len(items) > 1 for i in items}
+                 for mtype, items in by_type.items()
+                 if mtype == "fmx4" or len(items) > 1 for i in items}
     streams = _resolve_streams(session, ambiguous) if ambiguous else {}
 
     out = defaultdict(list)
@@ -468,9 +478,14 @@ def fetch_selection(session, celexes, languages):
         for code, by_type in by_lang.items():
             candidates = []
             for filetype in _ranked_types(by_type):
-                items = by_type[filetype]
-                real = [i for i in items if not _is_wrapper(streams.get(i, ()))]
-                candidates.append((filetype, (real or items)[0]))
+                real = [i for i in by_type[filetype]
+                        if not _is_wrapper(streams.get(i, ()))]
+                # all items wrappers (a wrapper-only Formex work): skip the
+                # type so the document degrades to the next one -- shipping
+                # the .doc.xml manifest as content is worse than falling back
+                # to html/pdf (bulk.py's _select_content degrades the same way)
+                if real:
+                    candidates.append((filetype, real[0]))
             if candidates:
                 out[celex].append((code, candidates))
     return out
@@ -717,7 +732,13 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
     a quiet sector stops re-querying the years since its last document. `--full`
     re-fetches every document and re-walks from the sector's first year; an
     explicit `--since` is a manual one-off window that overrides, but does not
-    move, the watermark. A clean (un-truncated) run advances it.
+    move, the watermark. A clean (un-truncated) run advances it -- except
+    `--source soap`, which never writes the watermark: it carries no per-hit
+    work date (enumerate_celex_soap pairs every CELEX with None, so `high`
+    could never advance anyway) and, unlike SPARQL, cannot be trusted to have
+    seen everything up to today (the expert search service silently caps a
+    single query at 10,000 hits with no signal we truncated), so it must not
+    even advance the resume-safety `run` date either.
 
     Recent works that stored no content (an untranslated act, a scanned-TIFF
     judgment) are recorded on a per-sector retry sidecar (read_pending /
@@ -819,9 +840,9 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
         # (a case filed in 2000, decided 2005), so a max-date floor would skip
         # the years between on resume; a work date is always >= its CELEX year,
         # so a year-start floor never hides a document.
-        if not manual and year < date.today().year:
+        if not manual and source == "sparql" and year < date.today().year:
             write_watermark(root, sector_name, date(year + 1, 1, 1).isoformat())
-    if not manual and not truncated and high:
+    if not manual and not truncated and high and source == "sparql":
         # precise floor for incrementals, plus the run date whose recency lets
         # the next run's floor advance past a quiet sector's last document
         write_watermark(root, sector_name, high, run=date.today())

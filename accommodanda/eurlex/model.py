@@ -172,4 +172,4 @@ class EurlexDoc:
     date: str | None = None    # ISO date of the document
     ecli: str | None = None    # case law
     oj: str | None = None      # Official Journal reference (e.g. "L 333")
-    body: list = field(default_factory=list)   # [Block], document order
+    body: list[Block] = field(default_factory=list)   # document order

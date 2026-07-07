@@ -35,6 +35,47 @@ def test_ranked_types_orders_fmx4_xhtml_html_then_pdf():
     assert D._ranked_types(by_type) == ["fmx4", "xhtml", "html", "pdf", "pdfa1a"]
 
 
+def _fake_sparql(selection_rows, stream_rows):
+    """A sparql_select stand-in routing by query shape: the item-scoped stream
+    query mentions owl:sameAs, the selection query does not."""
+    return lambda session, query: (stream_rows if "owl:sameAs" in query
+                                   else selection_rows)
+
+
+def _row(celex, lang, mtype, item):
+    return {"celex": {"value": celex}, "lang": {"value": lang},
+            "mtype": {"value": mtype}, "item": {"value": item}}
+
+
+def test_fetch_selection_degrades_a_wrapper_only_fmx4_to_html(monkeypatch):
+    # a wrapper-only work: its Formex manifestation's single item is the
+    # .doc.xml manifest, not content. fetch_selection must drop the fmx4 type
+    # entirely and degrade to the next type (as bulk._select_content does),
+    # never ship the wrapper -- and single-item manifestations must enter
+    # wrapper disambiguation for this to be seen at all
+    monkeypatch.setattr(D, "sparql_select", _fake_sparql(
+        [_row("32000L0001", "SWE", "fmx4", "u-doc"),
+         _row("32000L0001", "SWE", "html", "u-html")],
+        [{"item": {"value": "u-doc"},
+          "stream": {"value": "http://x/L_2000001SV.doc.xml"}}]))
+    out = D.fetch_selection(object(), ["32000L0001"], ["swe"])
+    assert out["32000L0001"] == [("swe", [("html", "u-html")])]
+
+
+def test_fetch_selection_keeps_the_real_item_beside_its_wrapper(monkeypatch):
+    # the common case: a Formex manifestation carrying both the real .xml item
+    # and its .doc.xml wrapper -- the real item wins, the wrapper is dropped
+    monkeypatch.setattr(D, "sparql_select", _fake_sparql(
+        [_row("32000L0001", "SWE", "fmx4", "u-doc"),
+         _row("32000L0001", "SWE", "fmx4", "u-xml")],
+        [{"item": {"value": "u-doc"},
+          "stream": {"value": "http://x/L_2000001SV.doc.xml"}},
+         {"item": {"value": "u-xml"},
+          "stream": {"value": "http://x/L_2000001SV.01.xml"}}]))
+    out = D.fetch_selection(object(), ["32000L0001"], ["swe"])
+    assert out["32000L0001"] == [("swe", [("fmx4", "u-xml")])]
+
+
 def test_store_document_falls_back_when_fmx4_is_a_scanned_image(tmp_path,
                                                                 monkeypatch):
     # CELLAR serves a TIFF under the fmx4-typed manifestation of some scanned old
