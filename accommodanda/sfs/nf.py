@@ -36,6 +36,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from ..lib import lagrum, util
+from ..lib.catalog import BASE
 from . import begrepp
 from . import register as register_mod
 from .model import (
@@ -54,8 +55,6 @@ from .model import (
     UpphavdParagraf,
     UpphavtKapitel,
 )
-
-BASE = "https://lagen.nu/"
 
 
 def to_normalform(doc, basefile, now=None, refparser=None,

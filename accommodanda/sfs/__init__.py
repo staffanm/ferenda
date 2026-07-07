@@ -47,6 +47,19 @@ def parse_sfs_source(source, basefile):
     return _assemble(text.replace("\r", ""), basefile)
 
 
+def input_paths(path):
+    """Dispatch a downloaded-document path to ``load_inputs``' three path
+    arguments: the new JSON ``_source`` when ``path`` already is one, else the
+    legacy SFST HTML with its SFSR register sibling found alongside (by the
+    ``/downloaded/`` -> ``/register/`` substitution the old tree layout
+    used)."""
+    json_path = path if path.suffix == ".json" else None
+    html_path = path if path.suffix != ".json" else None
+    register_path = (Path(str(path).replace("/downloaded/", "/register/"))
+                     if html_path else None)
+    return json_path, html_path, register_path
+
+
 def load_inputs(json_path, html_path, register_path, basefile):
     """Return ``(doc, register, sfst_header)`` for a basefile, preferring the
     new JSON ``_source`` over the legacy SFST+SFSR HTML pages — the DV

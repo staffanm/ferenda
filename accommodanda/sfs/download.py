@@ -251,20 +251,14 @@ def sync(destdir, full=False, limit=None, delay=PAGE_DELAY):
     return seen, new, updated, skipped
 
 
-def list_basefiles(destdir):
-    """SFS basefiles ("year:nr") harvested into destdir, for the build driver.
-    The deeper archive/<year>/<nr>/ subtree of superseded versions is naturally
-    excluded by the one-level-deep year/nr.json glob."""
-    return sorted("%s:%s" % (p.parent.name, p.stem.replace("_", " "))
-                  for p in Path(destdir).glob("*/*.json"))
-
-
 def main():
     parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     parser.add_argument("destdir", help="target dir, e.g. site/data/sfs")
     parser.add_argument("--full", action="store_true",
-                        help="walk the entire corpus oldest-first instead of "
-                             "stopping at the first already-downloaded page")
+                        help="force a full corpus backfill (oldest-first by "
+                             "base-act id) even when a watermark exists, "
+                             "instead of the incremental changed-since-"
+                             "watermark sync")
     parser.add_argument("--limit", type=int, help="stop after N documents")
     parser.add_argument("--delay", type=float, default=0.3,
                         help="seconds between pages (default 0.3)")

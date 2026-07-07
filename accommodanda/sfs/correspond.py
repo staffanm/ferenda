@@ -46,7 +46,10 @@ def paragraf_index(art):
             if n.get("type") == "kapitel":
                 walk(n.get("children", []), n.get("ordinal"))
                 continue
-            if n.get("type") == "paragraf":
+            if n.get("type") == "paragraf" and n["id"] is not None:
+                # id-suppressed paragrafs (temporal/dedup, nf.IdMinter) have
+                # no anchor to link to -- offering them to the model would
+                # only invite edges that validate_edges must then drop
                 ordn = n.get("ordinal")
                 out.append((n["id"], "%s kap. %s §" % (kap, ordn) if kap
                             else "%s §" % ordn))
@@ -129,8 +132,12 @@ def correspond(new_art, prop_art, old_art, fk):
     sidecar is `{"correspondence": {...}}`, with the new-law paragraf anchors
     relative to `new_art` (it is written next to it)."""
     new_idx, old_idx = paragraf_index(new_art), paragraf_index(old_art)
-    assert fk, ("no författningskommentar subsection for %s in %s"
-                % (new_art["uri"], prop_art.get("identifier")))
+    if not fk:
+        # validated (not asserted) before the LLM spend: a missing FK
+        # subsection is bad input data, not a programming bug
+        # (rule:errors-drive-retry-use-raise)
+        raise ValueError("no författningskommentar subsection for %s in %s"
+                         % (new_art["uri"], prop_art.get("identifier")))
     raw = json.loads(llm.complete(build_prompt(new_idx, old_idx, fk)))
     edges, rejected = validate_edges(
         raw.get("correspondences", []), {a for a, _ in new_idx},

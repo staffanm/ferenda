@@ -27,6 +27,15 @@ def test_paragraf_index_chaptered_and_flat():
     assert C.paragraf_index(flat) == [("P32a", "32 a §")]
 
 
+def test_paragraf_index_excludes_id_suppressed():
+    # an id-suppressed paragraf (temporal/dedup, "id": None) has no anchor;
+    # it must not enter the LLM inventory as a mappable target
+    art = _sfs(CELEX + "2018:585", [
+        {"type": "paragraf", "id": "P1", "ordinal": "1"},
+        {"type": "paragraf", "id": None, "ordinal": "2"}])
+    assert C.paragraf_index(art) == [("P1", "1 §")]
+
+
 def test_detect_old_law_from_repeal_clause():
     new = _sfs(CELEX + "2018:585", [], amendments=[{"content": [{"children": [
         {"type": "punkt", "text": [

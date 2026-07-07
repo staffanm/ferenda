@@ -1,7 +1,6 @@
 """Extract statute body text from downloaded rkrattsbaser HTML."""
 
 import re
-from datetime import datetime
 
 from bs4 import BeautifulSoup, Tag
 
@@ -13,26 +12,14 @@ def sniff_encoding(raw):
     return "utf-8" if b"<!DOCTYPE html>" in raw[:256] else "latin-1"
 
 
-def extract_body(path, keep_expired=True):
+def extract_body(path):
     """Return the statute body text (the part below the header) as a
-    string with LF line separators."""
+    string with LF line separators. Expired statutes are extracted like any
+    other -- lagen.nu keeps them (they stay reachable as historical law)."""
     with open(path, "rb") as fp:
         raw = fp.read()
     encoding = sniff_encoding(raw)
     rawtext = raw.decode(encoding)
-
-    # expired statutes are published with an expiry note in the header;
-    # lagen.nu keeps them (they remain reachable as historical law)
-    if not keep_expired:
-        for needle in ('<span class="bold">Upphävd:</span> ',
-                       '<span class="bold">Övrigt:</span> Utgår genom SFS'):
-            idx = rawtext.find(needle, 0, 10000)
-            if idx != -1:
-                datestr = rawtext[idx + len(needle):idx + len(needle) + 10]
-                if (not re.match(r"\d+-\d+-\d+$", datestr) or
-                        datetime.strptime(datestr, "%Y-%m-%d") <
-                        datetime.today()):
-                    raise SkipDocument("expired (%s)" % needle.strip())
 
     soup = BeautifulSoup(rawtext, "lxml")
     if encoding == "utf-8":

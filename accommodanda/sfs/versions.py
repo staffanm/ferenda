@@ -101,8 +101,8 @@ def parse_version(basefile, version, path, refparser=None):
     ``(recovered_version, artifact)`` -- `recovered_version` is the cutoff the
     file itself names, which for legacy counter-keyed archives ("11") replaces
     the meaningless counter."""
-    html = path.suffix != ".json"
-    if html:
+    is_html = path.suffix != ".json"
+    if is_html:
         header = (archival_header(path)
                   if sniff_encoding(path.read_bytes()) == "latin-1"
                   else register_mod.parse_sfst_header(path))
@@ -116,7 +116,7 @@ def parse_version(basefile, version, path, refparser=None):
                             register=register_mod.register_from_source(source),
                             sfst_header=header)
     recovered = header_cutoff(header) or version
-    if html:
+    if is_html:
         # no register to drive build_metadata on the HTML path -- construct
         # the konsolidering identity from the header instead
         art["metadata"] = version_metadata(basefile, recovered, header)

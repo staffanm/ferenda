@@ -38,10 +38,11 @@ def test_paths():
 
 
 def test_beteckning_with_space_in_number(tmp_path):
+    # the space maps to "_" on disk; build.sfs_list maps it back when
+    # enumerating basefiles for the driver
     dl = tmp_path / "downloaded"
     d.save_document(dl, src("1976:725 s.1", None, "x"))
     assert (dl / "1976/725_s.1.json").exists()
-    assert d.list_basefiles(dl) == ["1976:725 s.1"]
 
 
 def test_first_download_is_new(tmp_path):

@@ -97,8 +97,10 @@ class OpenUnderavdelning:
 class OpenKapitel:
     ordinal: str
     rubrik: str
-    upphor: object = None
-    ikrafttrader: object = None
+    # datetime for a dated /Upphör att gälla U:.../ or /Träder i kraft
+    # I:.../ directive, str for the "den dag regeringen bestämmer" form
+    upphor: datetime | str | None = None
+    ikrafttrader: datetime | str | None = None
 
 
 @dataclass
@@ -106,8 +108,10 @@ class OpenParagraf:
     ordinal: str
     first_stycke: str
     moment: str | None = None
-    upphor: object = None
-    ikrafttrader: object = None
+    # datetime for a dated /Upphör att gälla U:.../ or /Träder i kraft
+    # I:.../ directive, str for the "den dag regeringen bestämmer" form
+    upphor: datetime | str | None = None
+    ikrafttrader: datetime | str | None = None
 
 
 @dataclass
@@ -123,8 +127,10 @@ class OpenOB:
 @dataclass
 class OpenBilaga:
     rubrik: str
-    upphor: object = None
-    ikrafttrader: object = None
+    # datetime for a dated /Upphör att gälla U:.../ or /Träder i kraft
+    # I:.../ directive, str for the "den dag regeringen bestämmer" form
+    upphor: datetime | str | None = None
+    ikrafttrader: datetime | str | None = None
 
 
 @dataclass
@@ -143,8 +149,10 @@ class UpphavdParagrafEv:
 class RubrikEv:
     text: str
     underrubrik: bool = False
-    upphor: object = None
-    ikrafttrader: object = None
+    # datetime for a dated /Upphör att gälla U:.../ or /Träder i kraft
+    # I:.../ directive, str for the "den dag regeringen bestämmer" form
+    upphor: datetime | str | None = None
+    ikrafttrader: datetime | str | None = None
 
 
 @dataclass
@@ -213,42 +221,48 @@ class Tokenizer:
                 return None
             break
 
-        try:
-            # inside a numbered list, list continuation takes priority over
-            # everything (some items would otherwise classify as tables)
-            if in_numrerad and self.is_numrerad_lista():
-                return self.tok_listitem("numrerad")
-            if self.is_avdelning():
-                return self.tok_avdelning()
-            if self.is_underavdelning():
-                return self.tok_underavdelning()
-            if self.is_upphavt_kapitel():
-                return self.tok_upphavt_kapitel()
-            if self.is_upphavd_paragraf():
-                return self.tok_upphavd_paragraf()
-            if self.is_kapitel():
-                return self.tok_kapitel()
-            if self.is_paragraf():
-                return self.tok_paragraf()
-            if self.is_tabell():
-                return self.tok_tabell()
-            if self.is_overgangsbestammelser():
-                return OpenOBSection(rubrik=self.reader.readparagraph())
-            if self.is_overgangsbestammelse():
-                return OpenOB(sfsnr=self.reader.readline())
-            if self.is_bilaga():
-                return self.tok_bilaga()
-            if self.is_numrerad_lista():
-                return self.tok_listitem("numrerad")
-            if self.is_strecksatslista():
-                return self.tok_listitem("strecksats")
-            if self.is_bokstavslista():
-                return self.tok_listitem("bokstav")
-            if self.is_rubrik():
-                return self.tok_rubrik()
-            return StyckeEv(text=util.normalize_space(r.readparagraph()))
-        except IOError:
-            return None
+        # Each is_*/tok_* pair below that looks further ahead than the
+        # current line/paragraph (is_rubrik, is_tabell,
+        # is_overgangsbestammelser, tok_avdelning) catches its own IOError
+        # from peeking past the end of data internally, so a lookahead
+        # failure there falls back to "no more context" rather than
+        # aborting the whole event. Nothing here is expected to raise
+        # IOError; if it does, that's a bug to fail fast on, not to paper
+        # over (rule:narrow-what-you-catch, rule:fail-fast).
+        #
+        # inside a numbered list, list continuation takes priority over
+        # everything (some items would otherwise classify as tables)
+        if in_numrerad and self.is_numrerad_lista():
+            return self.tok_listitem("numrerad")
+        if self.is_avdelning():
+            return self.tok_avdelning()
+        if self.is_underavdelning():
+            return self.tok_underavdelning()
+        if self.is_upphavt_kapitel():
+            return self.tok_upphavt_kapitel()
+        if self.is_upphavd_paragraf():
+            return self.tok_upphavd_paragraf()
+        if self.is_kapitel():
+            return self.tok_kapitel()
+        if self.is_paragraf():
+            return self.tok_paragraf()
+        if self.is_tabell():
+            return self.tok_tabell()
+        if self.is_overgangsbestammelser():
+            return OpenOBSection(rubrik=self.reader.readparagraph())
+        if self.is_overgangsbestammelse():
+            return OpenOB(sfsnr=self.reader.readline())
+        if self.is_bilaga():
+            return self.tok_bilaga()
+        if self.is_numrerad_lista():
+            return self.tok_listitem("numrerad")
+        if self.is_strecksatslista():
+            return self.tok_listitem("strecksats")
+        if self.is_bokstavslista():
+            return self.tok_listitem("bokstav")
+        if self.is_rubrik():
+            return self.tok_rubrik()
+        return StyckeEv(text=util.normalize_space(r.readparagraph()))
 
     # --- recognizers ----------------------------------------------------
 
@@ -300,10 +314,19 @@ class Tokenizer:
         self.current_avdelning = ordinal
         rubrik = self.reader.readline()
         underrubrik = None
-        if (self.reader.peekline(1) == "" and
+        try:
+            has_underrubrik = (
+                self.reader.peekline(1) == "" and
                 self.reader.peekline(3) == "" and
                 not (self.is_kapitel(self.reader.peekline(2)) or
-                     self.is_underavdelning(self.reader.peekline(2)))):
+                     self.is_underavdelning(self.reader.peekline(2))))
+        except IOError:
+            # a trailing avdelning heading with nothing after it: there is
+            # no room for an underrubrik, so the heading itself is the last
+            # event -- don't let the lookahead failure drop it (rule:
+            # narrow-what-you-catch)
+            has_underrubrik = False
+        if has_underrubrik:
             self.reader.readline()
             underrubrik = self.reader.readline()
         return OpenAvdelning(ordinal=ordinal, rubrik=rubrik,

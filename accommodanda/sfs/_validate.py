@@ -13,7 +13,7 @@ from pathlib import Path
 from ..lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
 from ..lib.errors import SkipDocument
 from ..lib.lagrum import LagrumParser, load_namedlaws
-from . import load_inputs
+from . import input_paths, load_inputs
 from .nf import inline_references, temporal_dates, to_normalform
 
 
@@ -112,10 +112,7 @@ def validate_one(job):
     # load_inputs prefers the new JSON _source over the legacy SFST+SFSR HTML
     # pair, dispatching on path suffix. The register sibling for an HTML file
     # is looked up alongside (the legacy layout); for JSON it's inside the doc.
-    json_path = downloadedfile if downloadedfile.suffix == ".json" else None
-    html_path = downloadedfile if downloadedfile.suffix != ".json" else None
-    register_path = (Path(str(downloadedfile).replace("/downloaded/", "/register/"))
-                     if html_path else None)
+    json_path, html_path, register_path = input_paths(downloadedfile)
     try:
         doc, register, sfst_header = load_inputs(
             json_path, html_path, register_path, basefile)

@@ -15,7 +15,7 @@ from pathlib import Path
 
 from ..lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
 from ..lib.lagrum import LagrumParser, load_namedlaws
-from . import load_inputs
+from . import input_paths, load_inputs
 from ._validate import load_golden_module, validate_one
 from .nf import inline_references, to_normalform
 
@@ -107,10 +107,7 @@ def cmd_parse(args):
     path = Path(args.file).resolve()
     basefile = args.basefile or "%s:%s" % (path.parent.name,
                                            path.stem.replace("_", " "))
-    json_path = path if path.suffix == ".json" else None
-    html_path = path if path.suffix != ".json" else None
-    register_path = (Path(str(path).replace("/downloaded/", "/register/"))
-                     if html_path else None)
+    json_path, html_path, register_path = input_paths(path)
     doc, register, sfst_header = load_inputs(
         json_path, html_path, register_path, basefile)
     nf = to_normalform(doc, basefile,
@@ -129,10 +126,7 @@ def cmd_refs(args):
     path = Path(args.file).resolve()
     basefile = args.basefile or "%s:%s" % (path.parent.name,
                                            path.stem.replace("_", " "))
-    json_path = path if path.suffix == ".json" else None
-    html_path = path if path.suffix != ".json" else None
-    register_path = (Path(str(path).replace("/downloaded/", "/register/"))
-                     if html_path else None)
+    json_path, html_path, register_path = input_paths(path)
     doc, _register, _sfst_header = load_inputs(
         json_path, html_path, register_path, basefile)
     refparser = LagrumParser(load_namedlaws(NAMEDLAWS_JSON), basefile)
