@@ -24,7 +24,7 @@ its own paragraph) and the classifiers reuse them.
 
 import re
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
@@ -36,6 +36,9 @@ RE_PARA_MARK = re.compile(r"^(\d+\s*[a-z]?)\s*§(?:\s|$)")  # "3 §" / "3 a §"
 
 LINE_TOL = 4          # spans within this many y-units are the same visual line
 PARA_GAP = 1.5        # a vertical gap > PARA_GAP x line-height starts a paragraph
+PAGE_STRIDE = 100000  # per-page `top` offset used by flat_lines: far larger than
+                      # any within-page gap, so a whole-document reflow never
+                      # merges the foot of one page into the head of the next
 
 
 @dataclass
@@ -56,13 +59,15 @@ class Para:
     italic: bool = False
 
 
-def pdf_pages(pdf_path):
+def pdf_pages(pdf_path, hidden=False):
     """(pageno, [Line]) per page via `pdftohtml -xml`. Each <text> fragment is
     one font run carrying <b>/<i>; fragments on the same baseline are one visual
-    line, bold/italic when all their runs are."""
-    xml = subprocess.run(
-        ["pdftohtml", "-xml", "-i", "-nodrm", "-stdout", str(pdf_path)],
-        capture_output=True, check=True).stdout
+    line, bold/italic when all their runs are. ``hidden=True`` adds ``-hidden``
+    so invisible text is included -- the OCR layer ocrmypdf renders behind the
+    page image is invisible, and pdftohtml drops it otherwise."""
+    args = ["pdftohtml", "-xml", "-i", *(["-hidden"] if hidden else []),
+            "-nodrm", "-stdout", str(pdf_path)]
+    xml = subprocess.run(args, capture_output=True, check=True).stdout
     # pdftohtml emits occasionally malformed XML (overlapping <b>/<i>, stray &),
     # so parse leniently rather than abort the document
     root = etree.fromstring(xml, etree.XMLParser(recover=True, load_dtd=False,
@@ -104,7 +109,19 @@ def _lines(spans):
     return out
 
 
-def _dehyphenate(acc, line):
+def flat_lines(pdf_path, hidden=False):
+    """Every visual line across every page as one top-ordered [Line], page breaks
+    flattened into large vertical gaps via a per-page `top` offset (PAGE_STRIDE),
+    so a reflow over the whole document -- rather than page by page -- never
+    merges the foot of one page into the head of the next. For sources whose
+    structure ignores page boundaries (an EU act's articles run continuously),
+    where per-page `page_paragraphs` would fragment a run across the break."""
+    return [replace(line, top=line.top + page * PAGE_STRIDE)
+            for page, (_pageno, lines) in enumerate(pdf_pages(pdf_path, hidden=hidden))
+            for line in lines]
+
+
+def dehyphenate(acc, line):
     if acc.endswith("-") and line[:1].islower():
         return acc[:-1] + line          # soft hyphen: "för-\nfogar" -> "förfogar"
     return (acc + " " + line) if acc else line
@@ -146,7 +163,7 @@ def page_paragraphs(lines, identifier, pageno):
         if cur is None:
             cur = Para(l.text, l.bold, bool(marker), l.italic)
         else:
-            cur.text = _dehyphenate(cur.text, l.text)
+            cur.text = dehyphenate(cur.text, l.text)
             cur.italic = cur.italic and l.italic
         prev = l
     if cur is not None:

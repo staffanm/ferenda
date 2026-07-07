@@ -56,9 +56,14 @@ def _heading_level(role):
     return int(match.group(1)) if match else 1
 
 
-def _eu_date(text):
-    """'9.4.1968' -> '1968-04-09'."""
-    match = re.match(r"(\d{1,2})\.(\d{1,2})\.(\d{4})", text)
+RE_EU_DATE = re.compile(r"\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b")
+
+
+def eu_date(text):
+    """The EU 'D.M.YYYY' date anywhere in `text` -> ISO ('9.4.1968' ->
+    '1968-04-09'), or None. The single definition of the EU date shape for the
+    eurlex vertical; parse_pdf searches the OJ header blob with it too."""
+    match = RE_EU_DATE.search(text)
     if match:
         day, month, year = match.groups()
         return "%s-%02d-%02d" % (year, int(month), int(day))
@@ -130,7 +135,7 @@ def parse_html(markup, celex, lang):
                 break
     hd_date = body.find(class_=re.compile(r"^(oj-)?hd-date$"))
     if hd_date is not None:
-        doc.date = _eu_date(_flat(hd_date))
+        doc.date = eu_date(_flat(hd_date))
     hd_oj = body.find(class_=re.compile(r"^(oj-)?hd-oj$"))
     if hd_oj is not None:
         doc.oj = _oj(_flat(hd_oj))

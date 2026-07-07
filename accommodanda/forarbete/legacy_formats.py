@@ -44,7 +44,7 @@ from lxml import html as lxml_html
 
 # de-hyphenation is the same soft-hyphen rule the PDF verticals already use; the
 # ABBYY loader reuses it rather than replicating it (rule:second-use-goes-to-lib)
-from ..lib.pdftext import Para, _dehyphenate
+from ..lib.pdftext import Para, dehyphenate
 from ..lib.util import normalize_space
 
 # the ABBYY export namespaces every element; Clark-notation prefix for lookups
@@ -55,7 +55,7 @@ ABBYY_NS = "{http://www.abbyy.com/FineReader_xml/FineReader10-schema-v1.xml}"
 EJ_UTGIVEN = "Propositionen ej utgiven"
 
 # the ABBYY OCR renders the line-break soft hyphen as U+00AC (NOT SIGN) as often
-# as a plain '-'; normalizing it lets the shared `_dehyphenate` rule apply
+# as a plain '-'; normalizing it lets the shared `dehyphenate` rule apply
 OCR_HYPHEN = "¬"
 
 # the skanning2007 Word export renders the OCR line-break hyphen as a real
@@ -190,7 +190,7 @@ def _join_ocr_lines(lines):
             continue
         if line.endswith(OCR_HYPHEN):
             line = line[:-1] + "-"
-        acc = _dehyphenate(acc, line)
+        acc = dehyphenate(acc, line)
     return acc
 
 

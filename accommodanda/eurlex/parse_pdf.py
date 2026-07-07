@@ -11,113 +11,71 @@ and far lossier than Formex, but citation-scannable and article-anchored.
 
 import re
 import subprocess
-import sys
 from pathlib import Path
 
-from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
-
+from ..lib.pdftext import dehyphenate, flat_lines
 from ..lib.util import normalize_space
 from . import lang as L
 from .model import BASE, Block, EurlexDoc, doctype
+from .parse_html import eu_date
 
-LINE_TOL = 3         # px: spans within this vertical distance are one visual line
 PARA_GAP = 1.6       # a vertical gap > this * body-line-height starts a paragraph
 RE_OJ = re.compile(r"\b([LC])\s*(\d+)\s*/\s*\d+")
-RE_DATE = re.compile(r"\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b")
-
-
-def _dehyphenate(acc, line):
-    if acc.endswith("-") and line[:1].islower():
-        return acc[:-1] + line
-    return (acc + " " + line) if acc else line
 
 
 def _ocr(path, lang):
     """OCR a scanned PDF (no recoverable text layer) into a cached hidden
-    sidecar, returning its path -- or None if OCR is unavailable or fails (a
-    missing tesseract language pack, say). Cached so a re-parse is free."""
+    sidecar, returning its path. Cached so a re-parse is free. A missing
+    ocrmypdf binary is a broken environment and propagates (rule:fail-fast); a
+    per-document OCR failure (a corrupt scan, a missing language pack) raises
+    CalledProcessError, caught at the build driver's per-document boundary and
+    recorded there -- never swallowed into an empty artifact."""
     cached = path.with_name("." + path.stem + ".ocr.pdf")
     if cached.exists():
         return cached
-    try:
-        # --force-ocr: rasterize and OCR every page, replacing the unrecoverable
-        # (Identity-H, no ToUnicode) text layer these scans carry -- --skip-text
-        # would see that broken layer as "already text" and skip the page.
-        subprocess.run(["ocrmypdf", "--quiet", "--force-ocr", "-l", lang,
-                        str(path), str(cached)], check=True, capture_output=True)
-    except (FileNotFoundError, subprocess.CalledProcessError) as exc:
-        print("  OCR unavailable for %s: %s" % (path.name, exc),
-              file=sys.stderr, flush=True)
-        return None
+    # --force-ocr: rasterize and OCR every page, replacing the unrecoverable
+    # (Identity-H, no ToUnicode) text layer these scans carry -- --skip-text
+    # would see that broken layer as "already text" and skip the page.
+    subprocess.run(["ocrmypdf", "--quiet", "--force-ocr", "-l", lang,
+                    str(path), str(cached)], check=True, capture_output=True)
     return cached
 
 
-def _extract_lines(path):
-    """Ordered (top, text, bold) visual lines across all pages (page breaks are
-    just larger vertical gaps via a per-page offset)."""
-    # -hidden: include invisible text -- the OCR layer ocrmypdf adds is rendered
-    # invisibly behind the page image, and pdftohtml drops it without this.
-    xml = subprocess.run(
-        ["pdftohtml", "-xml", "-i", "-hidden", "-nodrm", "-stdout", str(path)],
-        capture_output=True, check=True).stdout
-    # pdftohtml emits occasionally malformed XML (overlapping <b>/<i>, stray &)
-    root = etree.fromstring(xml, etree.XMLParser(recover=True, load_dtd=False,
-                                                 no_network=True))
-    out, offset = [], 0
-    for page in root.findall("page"):
-        spans = []
-        for t in page.findall("text"):
-            text = normalize_space("".join(t.itertext()))
-            if text:
-                spans.append((int(t.get("top")), int(t.get("left")), text,
-                              t.find(".//b") is not None))
-        lines = []
-        for top, left, text, bold in sorted(spans):
-            if lines and abs(top - lines[-1][0]) <= LINE_TOL:
-                lines[-1][1].append((left, text, bold))
-            else:
-                lines.append((top, [(left, text, bold)]))
-        for top, runs in lines:
-            runs.sort()
-            out.append((offset + top,
-                        normalize_space(" ".join(r[1] for r in runs)),
-                        all(r[2] for r in runs)))
-        offset += int(page.get("height", "1200")) + 100
-    return out
-
-
 def pdf_lines(path, lang="eng"):
-    """Visual lines from a PDF; if it has no recoverable text layer (a scanned
-    document), OCR it first with ocrmypdf and extract from that."""
+    """Visual lines from a PDF via the shared font-aware extractor, flattened
+    across pages; if it has no recoverable text layer (a scanned document), OCR
+    it first with ocrmypdf and extract from that. `hidden=True` throughout: the
+    OCR layer ocrmypdf adds is rendered invisibly behind the page image."""
     path = Path(path)
-    lines = _extract_lines(path)
+    lines = flat_lines(path, hidden=True)
     if not lines:
-        ocr = _ocr(path, lang)
-        if ocr is not None:
-            lines = _extract_lines(ocr)
+        lines = flat_lines(_ocr(path, lang), hidden=True)
     return lines
 
 
 def _paragraphs(lines):
-    """Reflow lines into (text, bold) paragraphs: a bold line or a vertical gap
-    larger than the body line-height starts a new one."""
-    gaps = sorted(b[0] - a[0] for a, b in zip(lines, lines[1:], strict=False)
-                  if 0 < b[0] - a[0] < 200)
+    """Reflow [Line] into (text, bold) paragraphs: a bold line or a vertical gap
+    larger than the body line-height starts a new one. (EU acts run continuously
+    across pages, so this reflows the whole document rather than page by page and
+    keeps every line, unlike the header/TOC/page-number stripping page_paragraphs
+    the Swedish sources use.)"""
+    gaps = sorted(b.top - a.top for a, b in zip(lines, lines[1:], strict=False)
+                  if 0 < b.top - a.top < 200)
     body = gaps[len(gaps) // 2] if gaps else 12        # median line height
     paras, cur, prev = [], [], None
-    for top, text, bold in lines:
-        if cur and (bold or prev is None or top - prev > body * PARA_GAP):
+    for line in lines:
+        if cur and (line.bold or prev is None or line.top - prev > body * PARA_GAP):
             paras.append(cur)
             cur = []
-        cur.append((text, bold))
-        prev = top
+        cur.append((line.text, line.bold))
+        prev = line.top
     if cur:
         paras.append(cur)
     out = []
     for para in paras:
         text = ""
         for line, _ in para:
-            text = _dehyphenate(text, line)
+            text = dehyphenate(text, line)
         text = normalize_space(text)
         if text:
             out.append((text, all(b for _, b in para)))
@@ -132,10 +90,7 @@ def parse_pdf(path, celex, lang):
 
     # metadata: the OJ header line(s) near the top
     head = " ".join(t for t, _ in paras[:6])
-    date = RE_DATE.search(head)
-    if date:
-        doc.date = "%s-%02d-%02d" % (date.group(3), int(date.group(2)),
-                                     int(date.group(1)))
+    doc.date = eu_date(head)
     oj = RE_OJ.search(head)
     if oj:
         doc.oj = "%s %s" % (oj.group(1), oj.group(2))
