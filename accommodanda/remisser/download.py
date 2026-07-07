@@ -213,15 +213,18 @@ def _is_open(remiss, today):
 
 def _merge(remiss, fresh):
     """Fold a re-fetch into the stored case: a recorded answer stays recorded
-    even if the fresh HTML momentarily omits it; new answers (by organisation)
+    even if the fresh HTML momentarily omits it; new answers (by org_slug --
+    the same identity `_fetch_pending`/`parse.py`/`build.py` key answers on, so
+    two answers from the same organisation are both kept, not deduped away)
     are appended; changed scalar fields are updated. Returns whether anything
     changed."""
     changed = False
-    known = {inst.organisation for inst in remiss.svar}
+    known = {org_slug(inst.source_url) for inst in remiss.svar}
     for inst in fresh.svar:
-        if inst.organisation not in known:
+        slug = org_slug(inst.source_url)
+        if slug not in known:
             remiss.svar.append(inst)
-            known.add(inst.organisation)
+            known.add(slug)
             changed = True
     for f in ("titel", "dnr", "departement", "publicerad", "uppdaterad",
               "sista_svarsdag", "remissinstanser_pdf"):
@@ -235,14 +238,26 @@ def _merge(remiss, fresh):
     return changed
 
 
+def _check_slugs(remiss):
+    """Raise ValueError if two answers share an org_slug: writing both under
+    ``downloaded/<case>/<slug>.pdf`` would silently overwrite one organisation's
+    answer with another's and mis-join both basefiles to whichever was written
+    last. This must be a `raise`, not an `assert` -- an `assert` here would
+    vanish under `python -O`, turning a caught, visible failure back into the
+    silent data loss it exists to prevent (rule:errors-drive-retry-use-raise)."""
+    slugs = [org_slug(inst.source_url) for inst in remiss.svar]
+    if len(slugs) != len(set(slugs)):
+        raise ValueError(
+            "remiss %s: duplicate org slugs %s -- two answer PDFs would silently "
+            "overwrite each other" % (remiss.basefile,
+                                      sorted({s for s in slugs if slugs.count(s) > 1})))
+
+
 def _fetch_pending(session, remiss, delay):
     """Fetch each answer PDF not yet cached (immutable once posted), flipping its
-    `downloaded` flag. Returns the number newly fetched."""
-    slugs = [org_slug(inst.source_url) for inst in remiss.svar]
-    assert len(slugs) == len(set(slugs)), (
-        "remiss %s: duplicate org slugs %s -- two answer PDFs would silently "
-        "overwrite each other" % (remiss.basefile,
-                                  sorted({s for s in slugs if slugs.count(s) > 1})))
+    `downloaded` flag. Returns the number newly fetched. Raises ValueError on an
+    org_slug collision (see `_check_slugs`)."""
+    _check_slugs(remiss)
     fetched = 0
     for inst in remiss.svar:
         if inst.downloaded:
@@ -292,8 +307,11 @@ def sync(full=False, delay=0.5, log=print):
     Pass 2 re-polls every still-open case (deadline unknown or within
     GRACE_PERIOD) to merge newly-arrived answers, and fetches any answer PDF not
     yet cached (across all cases, so a case that was already closed when first
-    seen still gets its PDFs). Returns {"new", "failed", "repolled", "closed",
-    "fetched"}."""
+    seen still gets its PDFs). A case whose answers collide on org_slug logs
+    the collision and skips its PDF fetch this run (any merged scalar/svar
+    updates are still written) -- an anomaly in that one case's data, not
+    grounds to abort the sweep over every other case. Returns {"new", "failed",
+    "repolled", "closed", "fetched"}."""
     cases = layout.REMISSER_DOWNLOADED
     session = make_session(BROWSER_UA)
     rep = Reporter()
@@ -349,7 +367,18 @@ def sync(full=False, delay=0.5, log=print):
             changed = _merge(remiss, fresh)
         else:
             summary["closed"] += 1
-        fetched = _fetch_pending(session, remiss, delay)
+        # a duplicate org_slug is this case's own data anomaly -- it must not
+        # abort the whole sweep over every other case still to be repolled
+        # (rule:no-catch-log-continue: recorded via the log, retried next run).
+        # Pre-checked here so the catch is exactly as wide as that one failure;
+        # any other error out of the fetch loop still aborts loudly.
+        try:
+            _check_slugs(remiss)
+        except ValueError as exc:
+            log("  fetch %s: %s (retried next run)" % (remiss.basefile, exc))
+            fetched = 0
+        else:
+            fetched = _fetch_pending(session, remiss, delay)
         summary["fetched"] += fetched
         if changed or fetched:
             _write_case(remiss)

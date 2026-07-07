@@ -258,12 +258,90 @@ def test_sync_stubs_malformed_case_and_recovers(tmp_path, monkeypatch):
 def test_fetch_pending_rejects_duplicate_org_slugs(tmp_path):
     """Two answer PDFs sharing a basename would silently overwrite each other
     under downloaded/<case>/<slug>.pdf and mis-join both basefiles to the
-    first organisation -- _fetch_pending fails fast instead."""
+    first organisation -- _fetch_pending fails fast instead.
+
+    This must be a ValueError, not an AssertionError: an `assert` here would
+    be stripped out under `python -O`, silently letting the collision through
+    to the overwrite it exists to prevent (rule:errors-drive-retry-use-raise)."""
     remiss = Remiss(
         basefile="case", titel="t", url="https://example.org/case/",
         svar=[Remissinstans(organisation="Ale kommun",
                             source_url="https://x/contentassets/aa/remissvar.pdf"),
               Remissinstans(organisation="Kammarkollegiet",
                             source_url="https://x/contentassets/bb/remissvar.pdf")])
-    with pytest.raises(AssertionError, match="duplicate org slugs"):
+    with pytest.raises(ValueError, match="duplicate org slugs"):
         download._fetch_pending(object(), remiss, 0)
+
+
+def test_sync_skips_collision_case_without_aborting_sweep(tmp_path, monkeypatch):
+    """A single case whose answers collide on org_slug must not blow up the
+    whole repoll sweep -- it is that one case's own data anomaly, so `sync`
+    logs it, leaves that case's PDFs unfetched this run (retried next run),
+    and still repolls/fetches every other case."""
+    logged = []
+    _redirect(tmp_path, monkeypatch)
+    layout.remisser_case("collider").parent.mkdir(parents=True, exist_ok=True)
+
+    collider = Remiss(
+        basefile="collider", titel="t", url="https://example.org/collider/",
+        sista_svarsdag="2000-01-01",  # long closed -- no repoll, straight to fetch
+        svar=[Remissinstans(organisation="Ale kommun",
+                            source_url="https://x/contentassets/aa/remissvar.pdf"),
+              Remissinstans(organisation="Kammarkollegiet",
+                            source_url="https://x/contentassets/bb/remissvar.pdf")])
+    layout.remisser_case("collider").write_text(
+        json.dumps(collider.to_dict(), ensure_ascii=False))
+
+    healthy = Remiss(
+        basefile="healthy", titel="t", url="https://example.org/healthy/",
+        sista_svarsdag="2000-01-01",
+        svar=[Remissinstans(organisation="Statskontoret",
+                            source_url="https://x/statskontoret.pdf")])
+    layout.remisser_case("healthy").write_text(
+        json.dumps(healthy.to_dict(), ensure_ascii=False))
+
+    class Resp:
+        def __init__(self, text=None, content=None):
+            self.text, self.content = text, content
+
+    def fake_request(session, method, url, **kw):
+        if url.endswith(".pdf"):
+            return Resp(content=b"%PDF-1.4 fake")
+        return Resp(text="<html></html>")   # the listing page (pass 1)
+
+    monkeypatch.setattr(download, "request", fake_request)
+    monkeypatch.setattr(download, "make_session", lambda ua: object())
+    monkeypatch.setattr(download.time, "sleep", lambda s: None)
+    monkeypatch.setattr(download, "parse_listing", lambda html: [])
+
+    summary = download.sync(delay=0, log=logged.append)
+
+    assert any("collider" in msg and "duplicate org slugs" in msg for msg in logged)
+    assert summary["fetched"] == 1   # healthy's one PDF, despite collider's failure
+    collider_after = Remiss.from_dict(
+        json.loads(layout.remisser_case("collider").read_text()))
+    assert not any(inst.downloaded for inst in collider_after.svar)
+    healthy_after = Remiss.from_dict(
+        json.loads(layout.remisser_case("healthy").read_text()))
+    assert all(inst.downloaded for inst in healthy_after.svar)
+
+
+def test_merge_keeps_both_answers_from_same_org(tmp_path):
+    """Two distinct answers filed by the same organisation (different PDFs,
+    different org_slugs -- e.g. a follow-up submission) must both survive a
+    re-poll merge, exactly as the fresh-parse path keeps them both; deduping
+    on the organisation's display name would silently drop the second one."""
+    stored = Remiss(
+        basefile="case", titel="t", url="https://example.org/case/",
+        svar=[Remissinstans(organisation="Kammarkollegiet",
+                            source_url="https://x/kammarkollegiet.pdf")])
+    fresh = Remiss(
+        basefile="case", titel="t", url="https://example.org/case/",
+        svar=[Remissinstans(organisation="Kammarkollegiet",
+                            source_url="https://x/kammarkollegiet.pdf"),
+              Remissinstans(organisation="Kammarkollegiet",
+                            source_url="https://x/kammarkollegiet-2.pdf")])
+    changed = download._merge(stored, fresh)
+    assert changed
+    assert [inst.source_url for inst in stored.svar] == [
+        "https://x/kammarkollegiet.pdf", "https://x/kammarkollegiet-2.pdf"]
