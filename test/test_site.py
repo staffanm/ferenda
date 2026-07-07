@@ -4,6 +4,7 @@ HTML renderer (generate) -- REWRITE.md §6."""
 import hashlib
 import json
 import re
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -623,6 +624,182 @@ def test_generate_site_incremental_reuses_content_hash(tmp_path):
     _, rendered = render.generate_site(db, out, fresh=fresh, record=record)
     assert LAW["uri"] in rendered_uris               # cited page re-rendered
     assert "https://lagen.nu/dom/NJA_2001_s_1" in rendered_uris   # the new page
+
+
+# the fresh/record protocol the incremental tests share: signature = own
+# content_hash + the dependency digest generate_site hands over (which folds in
+# the cross-document layers and the repeal status)
+def _incremental_harness(manifest, rendered_uris):
+    def signature(chash, dep):
+        return hashlib.sha256(((chash or "") + dep).encode()).hexdigest()
+
+    def fresh(uri, out_path, art_path, dep, chash):
+        return (uri in manifest and compress.exists(out_path)
+                and manifest[uri] == signature(chash, dep))
+
+    def record(uri, art_path, dep, chash):
+        manifest[uri] = signature(chash, dep)
+        rendered_uris.append(uri)
+    return fresh, record
+
+
+KOMMENTAR = {
+    "uri": "https://lagen.nu/wiki/1975:635",
+    "annotates": "https://lagen.nu/1975:635",
+    "author": "testförfattare",
+    "body": [{"type": "sektion", "id": "P6", "children": [
+        {"type": "stycke", "text": ["Kommentar till 6 §."]}]}],
+}
+
+
+def test_kommentar_edit_rerenders_host_page(tmp_path):
+    # kommentar prose renders onto the HOST act's page (the rail), not a page of
+    # its own -- so editing it must invalidate the host page's freshness even
+    # though the host's own artifact bytes and link sets are unchanged. This is
+    # the site_cross_digests fold into the dependency digest; before it, only
+    # --force shipped a commentary edit.
+    db = str(tmp_path / "catalog.sqlite")
+    law = tmp_path / "law.json"
+    law.write_text(json.dumps(LAW))
+    komm = tmp_path / "komm.json"
+    komm.write_text(json.dumps(KOMMENTAR))
+    catalog.rebuild(db, "sfs", [law])
+    catalog.rebuild(db, "kommentar", [komm])
+    out = tmp_path / "site"
+    manifest, rendered_uris = {}, []
+    fresh, record = _incremental_harness(manifest, rendered_uris)
+
+    render.generate_site(db, out, fresh=fresh, record=record)
+    assert LAW["uri"] in rendered_uris
+    page = compress.read_text(out / render.doc_relpath(LAW["uri"]))
+    assert "Kommentar till 6 §." in page             # prose reached the rail
+
+    rendered_uris.clear()
+    _, rendered = render.generate_site(db, out, fresh=fresh, record=record)
+    assert rendered == 0                             # unchanged -> all fresh
+
+    # edit the commentary prose, re-relate the kommentar source, regenerate:
+    # the host act's page must re-render and carry the new prose
+    komm.write_text(json.dumps({**KOMMENTAR, "body": [
+        {"type": "sektion", "id": "P6", "children": [
+            {"type": "stycke", "text": ["Omskriven kommentar."]}]}]}))
+    catalog.rebuild(db, "kommentar", [komm])
+    rendered_uris.clear()
+    render.generate_site(db, out, fresh=fresh, record=record)
+    assert rendered_uris == [LAW["uri"]]
+    page = compress.read_text(out / render.doc_relpath(LAW["uri"]))
+    assert "Omskriven kommentar." in page
+
+
+def test_generate_site_only_composes_with_source(tmp_path):
+    # the editor's post-commit rebuild passes BOTH source= and only= (one host
+    # page within a source). They must compose to exactly that page -- source
+    # overriding only made every editor checkout scan (and potentially render)
+    # the whole source inside the web request.
+    db = str(tmp_path / "catalog.sqlite")
+    law = tmp_path / "law.json"
+    law.write_text(json.dumps(LAW))
+    law2 = tmp_path / "law2.json"
+    law2.write_text(json.dumps({
+        "uri": "https://lagen.nu/1976:100",
+        "metadata": {"properties": {"dcterms:title": "Annan lag (1976:100)"}},
+        "structure": [{"type": "paragraf", "id": "P1", "ordinal": "1",
+                       "children": [{"type": "stycke", "id": "P1S1",
+                                     "text": ["Text."]}]}]}))
+    catalog.rebuild(db, "sfs", [law, law2])
+    out = tmp_path / "site"
+
+    total, rendered = render.generate_site(
+        db, out, only={str(law)}, source="sfs")
+    assert (total, rendered) == (1, 1)               # exactly the named page
+
+    # a scope naming a document outside the source renders nothing
+    total, rendered = render.generate_site(
+        db, out, only={str(law)}, source="dv")
+    assert total == 0
+
+
+def test_repeal_date_passing_rerenders_page(tmp_path, monkeypatch):
+    # a statute's repeal status is evaluated against *today* -- when its
+    # upphavandedatum passes, the page must go stale by itself (no artifact
+    # changed), or the site keeps presenting a repealed statute as in force
+    db = str(tmp_path / "catalog.sqlite")
+    law = tmp_path / "law.json"
+    law.write_text(json.dumps({
+        **LAW, "metadata": {"properties": {
+            "dcterms:title": "Räntelag (1975:635)",
+            "rpubl:upphavandedatum": "2099-01-01"}}}))
+    catalog.rebuild(db, "sfs", [law])
+    out = tmp_path / "site"
+    manifest, rendered_uris = {}, []
+    fresh, record = _incremental_harness(manifest, rendered_uris)
+
+    render.generate_site(db, out, fresh=fresh, record=record)
+    assert LAW["uri"] in rendered_uris
+    rendered_uris.clear()
+    _, rendered = render.generate_site(db, out, fresh=fresh, record=record)
+    assert rendered == 0                             # repeal not yet in force
+
+    class _after_repeal(date):
+        @classmethod
+        def today(cls):
+            return date(2099, 1, 2)
+
+    monkeypatch.setattr(render, "date", _after_repeal)
+    rendered_uris.clear()
+    render.generate_site(db, out, fresh=fresh, record=record)
+    assert LAW["uri"] in rendered_uris               # status flipped -> re-rendered
+    page = compress.read_text(out / render.doc_relpath(LAW["uri"]))
+    assert "pphävd" in page                          # page now marked upphävd
+
+
+def test_relate_drops_stale_fragments_on_id_change(tmp_path):
+    # re-relating an artifact whose node ids changed must not leave ghost
+    # fragment rows behind: INSERT OR REPLACE only overwrites ids that still
+    # exist, so without the pre-delete a renamed/shed node's snippet lived on
+    # forever (a dead link tooltip)
+    db = str(tmp_path / "catalog.sqlite")
+    law = tmp_path / "law.json"
+    law.write_text(json.dumps(LAW))
+    catalog.rebuild(db, "sfs", [law])
+    con = catalog.connect(db)
+    assert catalog.snippet(con, "https://lagen.nu/1975:635#P6S1")
+    con.close()
+
+    renamed = json.loads(json.dumps(LAW))
+    renamed["structure"][0]["id"] = "P7"
+    renamed["structure"][0]["children"][0]["id"] = "P7S1"
+    law.write_text(json.dumps(renamed))
+    catalog.rebuild(db, "sfs", [law])
+    con = catalog.connect(db)
+    assert catalog.snippet(con, "https://lagen.nu/1975:635#P7S1")
+    assert catalog.snippet(con, "https://lagen.nu/1975:635#P6S1") is None
+    assert catalog.snippet(con, "https://lagen.nu/1975:635#P6") is None
+
+
+def test_inbound_count_matches_inbound_filter(tmp_path):
+    # the "+N fler" overflow figure subtracts INBOUND_CAP from inbound_count, so
+    # the count must use the same filtered set as the listed rows -- a kommentar
+    # citing the paragraf is excluded from both (it is a rail annotation, not a
+    # citing page), else the figure is inflated
+    db = str(tmp_path / "catalog.sqlite")
+    law = tmp_path / "law.json"
+    law.write_text(json.dumps(LAW))
+    case = tmp_path / "case.json"
+    case.write_text(json.dumps(CASE))
+    komm = tmp_path / "komm.json"
+    komm.write_text(json.dumps({
+        **KOMMENTAR, "body": [{"type": "sektion", "id": "P6", "children": [
+            {"type": "stycke", "text": [
+                "se ", {"predicate": "dcterms:references", "text": "6 §",
+                        "uri": "https://lagen.nu/1975:635#P6"}, "."]}]}]}))
+    catalog.rebuild(db, "sfs", [law])
+    catalog.rebuild(db, "dv", [case])
+    catalog.rebuild(db, "kommentar", [komm])
+    con = catalog.connect(db)
+    rows = catalog.inbound(con, "https://lagen.nu/1975:635#P6")
+    assert [r[4] for r in rows] == ["dv"]            # the case, not the kommentar
+    assert catalog.inbound_count(con, "https://lagen.nu/1975:635#P6") == len(rows)
 
 
 def test_document_level_inbound_for_bare_citation(tmp_path):

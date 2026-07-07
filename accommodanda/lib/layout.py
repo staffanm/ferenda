@@ -390,7 +390,7 @@ def eurlex_source_url(celex):
     return EURLEX_CELEX % celex
 
 
-def source_url(source, basefile, metadata=None):
+def source_url(source, basefile):
     """The authoritative publisher url for a document, derived by rule from its
     identity where possible, else None -- in which case the downloader-recorded
     url is used instead (see build.write_artifact)."""

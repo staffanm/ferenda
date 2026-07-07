@@ -23,6 +23,7 @@ so a citation to a document we don't have (yet) renders as plain text rather
 than a broken link.
 """
 
+import hashlib
 import json
 import re
 import sqlite3
@@ -45,13 +46,14 @@ from .util import basefile_slug
 
 @dataclass
 class Site:
-    con: object
-    known: set                          # document root uris present
-    snippets: dict = field(default_factory=dict)               # fragment uri -> tooltip text (lazy cache)
-    aliases: dict = field(default_factory=dict)                # variant begrepp uri -> canonical concept
-    commentary: dict = field(default_factory=dict)             # (law_uri, anchor) -> [(author, prose)]
-    guidance: dict = field(default_factory=dict)               # act uri -> [{label, href, note?}]
-    article_guidance: dict = field(default_factory=dict)       # (law_uri, anchor) -> [{label, href, note?}]
+    con: sqlite3.Connection
+    known: set[str]                     # document root uris present
+    snippets: dict[str, str] = field(default_factory=dict)      # fragment uri -> tooltip text (lazy cache)
+    aliases: dict[str, str] = field(default_factory=dict)       # variant begrepp uri -> canonical concept
+    # (law_uri, anchor) -> [(author, prose)]; anchor is None for the act-level preamble
+    commentary: dict[tuple[str, str | None], list[tuple[str | None, list[dict]]]] = field(default_factory=dict)
+    guidance: dict[str, list[dict]] = field(default_factory=dict)              # act uri -> [{label, href, note?}]
+    article_guidance: dict[tuple[str, str], list[dict]] = field(default_factory=dict)  # (law_uri, anchor) -> [{label, href, note?}]
     remiss_feedback: dict[tuple[str, str], list[dict[str, str | float]]] = field(default_factory=dict)  # (forarbete_uri, avsnitt_id) -> [{organisation, sentiment, quote, source_url}]
     remiss_overall: dict[str, list[dict[str, str | float]]] = field(default_factory=dict)               # forarbete_uri -> [{organisation, sentiment, quote, source_url}]
 
@@ -69,7 +71,7 @@ class Site:
         uri (inflected/variant forms merged at relate time); other uris (and a
         non-begrepp uri) pass through unchanged."""
         base, sep, frag = uri.partition("#")
-        return (self.aliases or {}).get(base, base) + sep + frag
+        return self.aliases.get(base, base) + sep + frag
 
     def has(self, uri):
         return catalog.strip_fragment(uri) in self.known
@@ -109,9 +111,11 @@ def _kommentar_indexes(con):
             "SELECT path FROM documents WHERE source = 'kommentar' AND path <> ''"):
         path = root / path
         art = json.loads(compress.read_bytes(path))
-        law = art.get("annotates")
-        if not law:
-            continue
+        # wiki/parse stamps `annotates` (the host act uri) on every kommentar
+        # artifact, so a missing key is a corrupt artifact, not an opt-out: fail
+        # fast rather than silently drop the whole commentary from every statute
+        # rail (rule:fail-fast).
+        law = art["annotates"]
         author, body = art.get("author"), art.get("body", [])
         # leading blocks before the first section heading are commentary on the
         # act as a whole -- keyed (law, None), shown in the rail by default
@@ -191,6 +195,46 @@ def _remiss_indexes():
             remiss_feedback.setdefault((fa_uri, seg["forarbete_id"]), []).append(
                 _remiss_item(svar, seg))
     return remiss_feedback, remiss_overall
+
+
+def site_cross_digests(site):
+    """{host_uri: digest} of every piece of CROSS-document content the Site
+    renders onto a host's page: kommentar prose + its `.ann` guidance layer
+    (``commentary``/``guidance``/``article_guidance``), remiss `.ann` analyses
+    (``remiss_feedback``/``remiss_overall``) and the `.corr` correspondence rows
+    (both the old-law "motsvaras numera av" margin and the new-law
+    corresponding-cases margin). A page's own freshness signature covers only
+    its own artifact + sidecars, and the dependency digest only its link *sets*
+    -- so without this fold, editing any of these layers never re-renders the
+    host page they appear on (rule:artifact-is-truth: the artifact edit must
+    reach every page it renders on, not wait for --force). The caller folds the
+    digest into each page's dependency digest; a host absent here contributes
+    nothing (and a layer's *removal* changes the fold, invalidating the page)."""
+    acc = {}
+
+    def feed(host, index, key, value):
+        # one canonical line per index entry; sorted at digest time so dict
+        # iteration order never enters the fingerprint
+        acc.setdefault(host, []).append(
+            json.dumps([index, key, value], ensure_ascii=False, sort_keys=True))
+
+    for (law, anchor), v in site.commentary.items():
+        feed(law, "commentary", anchor, v)
+    for law, v in site.guidance.items():
+        feed(law, "guidance", None, v)
+    for (law, anchor), v in site.article_guidance.items():
+        feed(law, "article_guidance", anchor, v)
+    for (fa_uri, avsnitt), v in site.remiss_feedback.items():
+        feed(fa_uri, "remiss_feedback", avsnitt, v)
+    for fa_uri, v in site.remiss_overall.items():
+        feed(fa_uri, "remiss_overall", None, v)
+    for row in site.con.execute(
+            "SELECT new_uri, old_uri, relation, scope, prop_uri "
+            "FROM correspondence"):
+        feed(catalog.strip_fragment(row[1]), "corr", row[1], list(row))
+        feed(catalog.strip_fragment(row[0]), "corr", row[0], list(row))
+    return {host: hashlib.sha256("\x1e".join(sorted(lines)).encode()).hexdigest()
+            for host, lines in acc.items()}
 
 
 # --------------------------------------------------------------------------
@@ -399,6 +443,28 @@ def document_inbound(site, uri):
             % groups) if groups else ""
 
 
+def _ext_link(url, label):
+    """The `.ext` external-reference anchor markup, shared by every
+    out-of-corpus link (EUR-Lex CELEX pages, guidance links, …)."""
+    return '<a class="ext" href="%s" rel="external">%s</a>' % (escape(url), escape(label))
+
+
+def _directive_link(site, directive, target=None):
+    """Link to an EU act referenced by `directive`: our own hosted page (at
+    `target`, defaulting to the act itself) when we've parsed it, else out to
+    EUR-Lex via its CELEX. Shared by the genomför-EU margin (statute paragraf
+    -> directive article) and the genomförande section (proposition ->
+    directive article) -- both name the directive the same way (its catalogued
+    title, falling back to the bare CELEX) and fall back to EUR-Lex
+    identically."""
+    target = target or directive
+    celex = catalog.local(directive).rsplit("/", 1)[-1]
+    label = _doc_title(site, directive) or celex
+    if site.has(directive):
+        return '<a href="%s">%s</a>' % (escape(href(target)), escape(label))
+    return _ext_link(external_href(directive), label)
+
+
 def genomfor_margin(site, sfs_uri, anchor):
     """Statute-paragraf margin: the EU directive article(s) this paragraf
     transposes (genomför), with the proposition as provenance (§7d). The mirror
@@ -408,13 +474,7 @@ def genomfor_margin(site, sfs_uri, anchor):
         return ""
     items = []
     for directive, article, prop_uri, prop_label, pinpoint, partial in rows:
-        celex = catalog.local(directive).rsplit("/", 1)[-1]
-        dlabel = _doc_title(site, directive) or celex
-        dlink = ('<a href="%s">%s</a>' % (escape(href(directive + "#" + article)),
-                                          escape(dlabel))
-                 if site.has(directive) else
-                 '<a class="ext" href="%s" rel="external">%s</a>'
-                 % (escape(external_href(directive)), escape(dlabel)))
+        dlink = _directive_link(site, directive, directive + "#" + article)
         prov = ('<a href="%s">%s</a>' % (escape(href(prop_uri)), escape(prop_label))
                 if prop_label and site.has(prop_uri) else escape(prop_label or ""))
         items.append('<li>genomför%s artikel %s i %s%s</li>'
@@ -556,9 +616,9 @@ class Rail:
         uri = self.doc_uri + "#" + nid
         commentary = self._commentary(nid)
         guidance = self._guidance_html(
-            (self.site.article_guidance or {}).get((self.doc_uri, nid)))
+            self.site.article_guidance.get((self.doc_uri, nid)))
         remiss = self._remiss_html(
-            (self.site.remiss_feedback or {}).get((self.doc_uri, nid)))
+            self.site.remiss_feedback.get((self.doc_uri, nid)))
         groups = _inbound_groups(self.site, uri)
         genomfor = genomfor_margin(self.site, self.doc_uri, nid)
         bemyndigande = bemyndigande_margin(self.site, uri)        # föreskrifter under it
@@ -579,12 +639,12 @@ class Rail:
         is in focus (at the top of the document): the act's curated external links
         (Externa länkar) plus any commentary on the document as a whole. Replaces
         the client's empty-rail placeholder."""
-        panel = (self._guidance_html((self.site.guidance or {}).get(self.doc_uri))
+        panel = (self._guidance_html(self.site.guidance.get(self.doc_uri))
                  + self._commentary(None)
                  # the "most interesting feedback" for the whole SOU/Ds. v1
                  # deliberately renders every overall stance as-is; a later pass can
                  # rank by |sentiment| to surface only the strongest.
-                 + self._remiss_html((self.site.remiss_overall or {}).get(self.doc_uri)))
+                 + self._remiss_html(self.site.remiss_overall.get(self.doc_uri)))
         if panel:
             self.data[""] = '<div class="rail-h">Om dokumentet</div>' + panel
 
@@ -641,7 +701,7 @@ class Rail:
         whole), rendered as a rail section (its prose + author byline) -- shown
         side-by-side with what it comments on, in place of a separate kommentar
         page."""
-        entries = (self.site.commentary or {}).get((self.doc_uri, nid))
+        entries = self.site.commentary.get((self.doc_uri, nid))
         if not entries:
             return ""
         out = []
@@ -1016,9 +1076,7 @@ def _andringar(art, base_id, own_version, versions, site, toc, rail):
             ("Omfattning", escape(p["rpubl:andrar"])
              if p.get("rpubl:andrar") else ""),
             ("CELEX-nr", " ".join(
-                '<a class="ext" rel="external" href="https://eur-lex.europa.eu/'
-                'legal-content/SV/TXT/?uri=CELEX:%s">%s</a>'
-                % (escape(c), escape(c))
+                _ext_link(EURLEX % c, c)
                 for c in ([celex] if isinstance(celex, str) else celex))),
             ("Ikraftträder", escape(p["rpubl:ikrafttradandedatum"])
              if p.get("rpubl:ikrafttradandedatum") else ""),
@@ -1088,10 +1146,6 @@ def render_sfs(art, site):
                             else " expired" if expired else ""))
 
 
-# the structural wrapper kinds in a DV decision tree (RANK in dv.structure); the
-# renderer shows them as nested sections rather than flattening them away
-DV_STRUCTURAL = {"delmal", "instans", "betankande", "dom",
-                 "skiljaktig", "tillagg", "domskal", "domslut"}
 DV_SHORT_COURT = {"Högsta domstolen": "HD",
                   "Högsta förvaltningsdomstolen": "HFD"}
 DV_RULING_HEADING = {"betankande": "Föredragandens förslag till beslut",
@@ -1238,13 +1292,8 @@ def render_implements(art, site):
     items = []
     for r in recs:
         directive = r["directive"]
-        celex = catalog.local(directive).rsplit("/", 1)[-1]
-        label = _doc_title(site, directive) or celex
         target = r["uris"][0] if r.get("uris") else directive
-        link = ('<a href="%s">%s</a>' % (escape(href(target)), escape(label))
-                if site.has(directive) else
-                '<a class="ext" href="%s" rel="external">%s</a>'
-                % (escape(external_href(directive)), escape(label)))
+        link = _directive_link(site, directive, target)
         where = (("%s kap. %s § " % (r["chapter"], r["paragraf"]))
                  if r.get("chapter") and r.get("paragraf")
                  else ("%s § " % r["paragraf"]) if r.get("paragraf") else "")
@@ -1503,7 +1552,7 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, editorial=None,
         if key:
             recitals = editorial.recitals_for(key) if editorial else None
             if t != "article" and (
-                    recitals or (site.article_guidance or {}).get((doc_uri, key))):
+                    recitals or site.article_guidance.get((doc_uri, key))):
                 bid = key              # synthesise the sub-article citation id
             if recitals:
                 extra = _recital_links_html(recitals)
@@ -1897,10 +1946,9 @@ def generate_browse(client, source, out_root):
     plus the landing copies: a primary bucket's directory shows its first
     (default) child, and the source root shows the overall default bucket -- so
     /dom/, /dom/nja/ and /dom/nja/2025/ all resolve without a redirect or JS.
-    A source the API does not facet (kommentar) is skipped."""
+    The caller (render_aggregates) already skips the one source the API does
+    not facet (kommentar), so every `source` here is faceted."""
     resp = client.get("/api/v1/browse", params={"source": source})
-    if resp.status_code == 404:
-        return
     view = resp.json()
     root_html = None
     for prim in view["buckets"]:
@@ -1959,7 +2007,9 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
     unchanged (incremental generate); `record(uri, art_path, dep_digest)` is
     called after a page is (re)rendered so the caller can store its new
     signature. `art_path` is the page's own artifact (content-hashed by the
-    caller); `dep_digest` captures its citation relationships (set-based).
+    caller); `dep_digest` captures its citation relationships (set-based) plus,
+    where present, the content of cross-document layers rendered onto the page
+    (site_cross_digests) and its current repeal status.
     `only`, a set of artifact path strings, restricts the run to those documents
     (a targeted `lagen <source> generate <id>`) -- the corpus-wide aggregate
     pages are then left untouched. `extra` appends pre-scoped (uri, source,
@@ -1979,9 +2029,14 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
     root = catalog.data_root(con)
     rows = [(uri, src, str(root / path) if path else path, title, chash)
             for (uri, src, path, title, chash) in rows]
+    # the two scopes COMPOSE: `source` narrows to one source (incl. stubs),
+    # `only` to specific artifacts. The editor's post-commit rebuild passes both
+    # (one host page within a source); treating `source` as overriding `only`
+    # made every editor checkout scan the whole source instead of rendering the
+    # one dirty page.
     if source is not None:                       # whole-source scope (incl. stubs)
         rows = [r for r in rows if r[1] == source]
-    elif only is not None:                       # specific-document scope
+    if only is not None:                         # specific-document scope
         rows = [r for r in rows if r[2] in only]
     # commentary is an annotation rendered into statute rails, not a page of its own
     rows = [r for r in rows if r[1] != "kommentar"]
@@ -1994,6 +2049,15 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
     # subqueries per document -- the 124k-page planning loop); a link-less uri is
     # absent and takes the empty default
     deps = catalog.page_dependency_digests(con)
+    # cross-document content (kommentar prose/.ann, remiss .ann, .corr rows)
+    # renders onto OTHER documents' pages -- fold a per-host content digest into
+    # the dependency digest so editing it re-renders the host page
+    cross = site_cross_digests(site)
+    # a repeal is presented against today's date (render_sfs marks the page
+    # upphävd, facets drop it from browse), so a page's freshness must carry its
+    # current in-force status: the day the date passes, the fold flips and the
+    # page re-renders (rule:respect-source-temporality)
+    expired = catalog.expired_uris(con, date.today().isoformat())
 
     # Freshness planning is single-threaded: it reads the catalog + manifest and
     # hashes inputs (the manifest lives here in the parent). Fresh pages advance
@@ -2004,6 +2068,11 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
     for (uri, src, path, title, chash) in rows:
         out = out_root / doc_relpath(uri)
         dep = deps.get(uri, catalog.EMPTY_DEP_DIGEST)
+        if uri in cross or uri in expired:
+            dep = hashlib.sha256(
+                ("%s\x1f%s\x1f%s" % (dep, cross.get(uri, ""),
+                                     "expired" if uri in expired else "")
+                 ).encode()).hexdigest()
         if fresh and fresh(uri, out, path, dep, chash):
             done += 1
             if progress and done % 500 == 0:

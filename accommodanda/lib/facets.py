@@ -347,7 +347,7 @@ def is_browsable(source, local):
     return not (source == "eurlex" and _EU_CORRIGENDUM.search(local))
 
 
-def browse_label(source, row):
+def browse_label(row):
     """The handle shown for a document in a listing -- the same reader-facing
     heading the page and search hits use (catalog.display_title, stamped onto the
     `display` column at relate): an act's short name + acronym where it has them,
@@ -363,7 +363,7 @@ def browse_doc(source, row):
     (`pre` subdued + `key` emphasised), whether it is primary law (`subdued`
     when not), and its `year` -- what the listing renders and filters on."""
     doc = {"uri": row.uri, "url": layout.page_url(row.uri),
-           "display": browse_label(source, row)}
+           "display": browse_label(row)}
     if source == "sfs":
         pre, key = _sfs_split(row.title or "")
         doc.update(pre=pre, key=key or doc["display"],

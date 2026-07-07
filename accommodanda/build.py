@@ -164,7 +164,7 @@ def write_artifact(source, basefile, art, source_url=None):
     A document with none simply carries no source_url and its page omits the
     link."""
     url = (art.get("source_url") or source_url
-           or layout.source_url(source, basefile, art.get("metadata")))
+           or layout.source_url(source, basefile))
     if url:
         art["source_url"] = url
     compress.write_text(
@@ -700,7 +700,9 @@ def sfs_ai_correspond(basefiles):
     fk = fa_kommentar.fk_section(
         prop_art, new_art["metadata"]["properties"]["dcterms:title"])
     sidecar, stats = sfs_correspond.correspond(new_art, prop_art, old_art, fk)
-    out.write_text(json.dumps(sidecar, ensure_ascii=False, indent=2))
+    # atomic: the .corr layer is a costly one-shot LLM output feeding relate +
+    # the freshness watermark -- a truncated file must never survive a crash
+    util.write_atomic(out, json.dumps(sidecar, ensure_ascii=False, indent=2))
     print("sfs ai-correspond %s: %d edges from %d (%d rejected), wrote %s"
           % (new_sfs, stats["emitted"], stats["raw"], stats["rejected"], out))
 
@@ -1681,12 +1683,18 @@ def rebuild_after_commit(changes):
     if relate:
         cmd_relate(relate)
     urls = []
+    # force=True: these pages are dirty by construction (the request just
+    # committed an edit that renders onto them), so the freshness signature --
+    # which does not see a kommentar edit to a *host* page -- must not be
+    # consulted; the committed edit has to be live when the response returns.
     for bf in kommentar:                 # a commentary rides its host act's page
         host = layout.kommentar_host(bf)
-        cmd_generate(only={str(layout.artifact(host, bf))}, source=host)
+        cmd_generate(only={str(layout.artifact(host, bf))}, source=host,
+                     force=True)
         urls.append(layout.page_url(wiki_parse.host_uri(bf)))
     for bf in begrepp:
-        cmd_generate(only={str(layout.artifact("begrepp", bf))}, source="begrepp")
+        cmd_generate(only={str(layout.artifact("begrepp", bf))},
+                     source="begrepp", force=True)
         urls.append(layout.page_url(markdown.begrepp_uri(bf)))
     if site:
         cmd_generate(source="site")      # write_site rewrites all editorial pages
@@ -1738,8 +1746,18 @@ ARTIFACTS = {
 # lives wholly in catalog.py; index's unit shape + body extraction in
 # search.py + text.py. A change to these re-stales the corresponding step the same
 # way a parser edit re-stales parse (recipe-version rule).
-RELATE_CODE = (PKG / "lib" / "catalog.py",)
-INDEX_CODE = (PKG / "lib" / "search.py", PKG / "lib" / "text.py")
+# A recipe-version tuple must cover every first-party module whose edit can
+# change the stage's output, not just the head module -- else editing an
+# imported helper leaves the step "up to date -- skipped" and ships stale
+# output until --force. catalog.py's per-artifact extraction imports concepts
+# (alias synthesis), text (run flattening) and markdown (begrepp uris); a
+# change to any re-stales relate.
+RELATE_CODE = (PKG / "lib" / "catalog.py", PKG / "lib" / "concepts.py",
+               PKG / "lib" / "text.py", PKG / "lib" / "markdown.py")
+# index reads the catalog rows (source signature, inbound-count ranking) it
+# denormalises onto the search units, so a change to catalog.py re-stales it too.
+INDEX_CODE = (PKG / "lib" / "search.py", PKG / "lib" / "text.py",
+              PKG / "lib" / "catalog.py")
 DUMP_CODE = (PKG / "lib" / "dump.py",)
 
 
@@ -2023,19 +2041,32 @@ def stale_sources():
 
 # a page's rendered HTML is a function of the render/query code plus the
 # artifacts in its prerequisite set (computed per page from the catalog)
+# generate renders the per-document pages (render.py + the modules it walks the
+# artifact with) AND, via the sanctioned in-process API inversion, the faceted
+# browse pages -- so facets.py (the bucket rules) and api/app.py (the /browse
+# projection) are part of generate's recipe: a facet-rule edit must re-stale the
+# browse pages, not leave them "up to date -- skipped".
 GENERATE_CODE = (PKG / "lib" / "render.py", PKG / "lib" / "catalog.py",
                  PKG / "lib" / "markdown.py", PKG / "lib" / "layout.py",
                  PKG / "lib" / "history.py", PKG / "lib" / "casenaming.py",
-                 PKG / "lib" / "eu_structure.py", PKG / "site" / "render.py")
+                 PKG / "lib" / "eu_structure.py", PKG / "lib" / "facets.py",
+                 PKG / "api" / "app.py", PKG / "site" / "render.py")
 
 
 def generate_watermark():
     """The coarse gate for a full-corpus generate: the whole-catalog content
     signature plus the .corr/.ann/.versions.json sibling layers that relate
-    doesn't fold into content_hash. Unchanged (with the render code) ⟹ every
-    page is fresh, so the ~100k-page freshness scan can be skipped wholesale."""
+    doesn't fold into content_hash, plus the set of currently-effective repeal
+    dates. Unchanged (with the render code) ⟹ every page is fresh, so the
+    ~100k-page freshness scan can be skipped wholesale."""
     con = catalog.connect(CATALOG)
     sig = catalog.catalog_signature(con)
+    # a statute's repeal is presented against *today* (page watermark, browse
+    # listings), so the day an upphavandedatum passes the gate must reopen even
+    # though no file changed -- fold the currently-expired uri set in
+    # (rule:respect-source-temporality)
+    expired = "\x1f".join(sorted(
+        catalog.expired_uris(con, date.today().isoformat())))
     con.close()
     sides = file_watermark(sorted(
         list(layout.SFS_ARTIFACT.glob("*/*.corr"))
@@ -2044,16 +2075,22 @@ def generate_watermark():
         + list(layout.SFS_ARTIFACT.glob("*/*.versions.json"))
         + list(layout.artifact_dir("eurlex").glob("*/*.ann"))
         # the kommentar ai-annotate guidance layer rides a *different* document's
-        # rail (the host act's), so -- like the cross-document .corr case -- a full
-        # or forced generate is what propagates an edit to the host page
+        # rail (the host act's) -- per page it enters the host's dependency
+        # digest (render.site_cross_digests); here it reopens the coarse gate
         + list(layout.artifact_dir("kommentar").rglob("*.ann"))
+        # the remiss answers + their ai-analyze .ann layers render onto the
+        # referred förarbete's page (never related, so the catalog signature
+        # can't see them) -- fold them in so an analysis run reopens the gate
+        + list(layout.artifacts("remisser"))
+        + list(layout.artifact_dir("remisser").rglob("*.ann"))
         # the site artifacts (frontpage/om/sitenews) aren't catalog rows, so the
         # catalog signature above never sees them -- fold them in directly so a
         # re-parsed editorial edit reopens the generate gate (else a full generate
         # would skip and ship the stale site). layout.artifacts() yields logical
         # paths across plain/compressed storage; file_watermark stats the variant.
         + list(layout.artifacts("site"))))
-    return hashlib.sha256((sig + "\x1f" + sides).encode()).hexdigest()
+    return hashlib.sha256(
+        (sig + "\x1f" + sides + "\x1f" + expired).encode()).hexdigest()
 
 
 def sfs_version_pages(sidecars):
@@ -2075,7 +2112,7 @@ def sfs_version_pages(sidecars):
     return rows
 
 
-def cmd_generate(only=None, source=None, jobs=1):
+def cmd_generate(only=None, source=None, jobs=1, force=False):
     """Render every catalogued document to static HTML, with live outbound
     links and inbound annotations queried from the catalog, plus a frontpage.
     Auto-runs `relate` first for any source whose artifacts are newer than the
@@ -2093,7 +2130,11 @@ def cmd_generate(only=None, source=None, jobs=1):
 
     `--aggregates-only` rewrites just the corpus-wide pages (frontpage + browse
     indexes) from the current catalog, skipping the per-document render -- a
-    seconds-long refresh after a frontpage/browse change, not a full rebuild."""
+    seconds-long refresh after a frontpage/browse change, not a full rebuild.
+
+    `force=True` (the editor's post-commit rebuild) renders the scoped pages
+    unconditionally: they are dirty by construction (the request just committed
+    an edit onto them), so the freshness check is skipped rather than trusted."""
     # segment source: the whole-site run reports under __site__, a scoped
     # per-source render (`lagen <src> generate`) under that source's name
     seg_source = source or "__site__"
@@ -2154,9 +2195,10 @@ def cmd_generate(only=None, source=None, jobs=1):
         # the single-threaded planning loop (§2.1). Only the page's sibling LLM
         # layers are read from disk (they aren't catalogued), so authoring or editing
         # one re-renders just that page: `.ann` (eurlex ai-annotate) and `.corr` (sfs
-        # ai-correspond, the new statute's corresponding-cases margin). The *old*
-        # statute's margin reads a `.corr` next to a different document, so a `.corr`
-        # edit reaches it only via relate + a full/forced generate.
+        # ai-correspond, the new statute's corresponding-cases margin). Content that
+        # renders onto OTHER documents' pages (kommentar prose/.ann, remiss .ann,
+        # the old-law side of `.corr`) enters via `dep_digest`, which generate_site
+        # folds render.site_cross_digests into per host uri.
         p = str(art_path)
         if p not in own_hash:
             # a synthesized concept stub has no artifact on disk (empty path) and so
@@ -2176,7 +2218,9 @@ def cmd_generate(only=None, source=None, jobs=1):
         return hashlib.sha256((own_hash[p] + dep_digest).encode()).hexdigest()
 
     def fresh(uri, out_path, art_path, dep_digest, content_hash):
-        if RUN.force or not compress.exists(out_path):   # page stored precompressed
+        # `force` (the editor's dirty-by-construction pages) and --force both
+        # bypass the signature check entirely
+        if force or RUN.force or not compress.exists(out_path):  # page stored precompressed
             return False
         entry = manifest.get(manifest_key("generate", "page", uri))
         return bool(entry) \
@@ -2302,8 +2346,11 @@ def report(source, action, result, requested, full_source):
     basefile args) -- write the cheap status.json cell. All emissions are no-ops
     without a run id (--dry-run, non-pipeline verbs)."""
     verb = "would run" if RUN.dry_run else "ran"
-    skipped = requested - len({bf for _, bf in result.planned}) \
-        - len({bf for _, bf, _, _ in result.errors})
+    # planned already contains every errored basefile (ensure() plans before it
+    # runs), so subtract the *union* -- subtracting both sets double-counted
+    # errored docs and undercounted "skipped (fresh)" (negative on error-heavy runs)
+    skipped = requested - len({bf for _, bf in result.planned}
+                              | {bf for _, bf, _, _ in result.errors})
     print("%s %s (%d basefiles): %s %d, skipped (fresh) %d, errors %d" % (
         source.name, action, requested, verb, len(result.planned),
         skipped, len(result.errors)))
@@ -2417,8 +2464,10 @@ def main(argv=None):
                    default="sparql",
                    help="eurlex download: discovery backend (default sparql)")
     p.add_argument("--only", metavar="BASEFILE",
-                   help="forarbete download: fetch just this one document "
-                        "(needs exactly one doctype scope)")
+                   help="fetch just this one document, bypassing the listing "
+                        "walk (forarbete/foreskrift/avg download: needs exactly "
+                        "one doctype/fs/organ scope; remisser download: one "
+                        "case URL)")
     p.add_argument("--riksmote", metavar="YYYY/YY",
                    help="forarbete download bet: narrow the download to one "
                         "riksmöte, e.g. 2025/26 (bet scope only)")

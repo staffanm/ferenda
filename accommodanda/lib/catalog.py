@@ -434,6 +434,14 @@ def _index_document(con, art, path, source):
                                 + definition_links(art)
                                 + bemyndigande_links(art))]
     con.executemany("INSERT INTO links VALUES (?,?,?,?,?,?)", rows)
+    # pre-delete this document's fragment rows before re-inserting: INSERT OR
+    # REPLACE only overwrites ids that still exist, so a shed or renamed node id
+    # would otherwise leave a ghost snippet row (a dead link tooltip) forever.
+    # Same range predicate as _drop_document (a case-insensitive LIKE would
+    # bypass the primary-key index; '$' is '#' + 1).
+    con.execute("DELETE FROM fragments WHERE uri = ? "
+                "OR (uri >= ? || '#' AND uri < ? || '$')",
+                (uri, uri, uri))
     con.executemany("INSERT OR REPLACE INTO fragments VALUES (?,?)",
                     artifact_fragments(art))
     # a begrepp's `aliases` (old names from MediaWiki redirects) -> resolve to it
@@ -808,11 +816,16 @@ def bemyndigande_inbound(con, uri):
 
 
 def inbound_count(con, uri):
-    """How many (citing document, pinpoint) entries cite exactly `uri`."""
+    """How many (citing document, pinpoint) entries cite exactly `uri` -- over the
+    same filtered set `inbound` lists (kommentar excluded: it is a rail annotation
+    shown side-by-side, not a citing page of its own), so the renderer's "+N fler"
+    overflow figure counts exactly the rows it would have shown."""
     return con.execute(
-        "SELECT COUNT(*) FROM (SELECT 1 FROM links l WHERE l.to_uri = ?"
-        + _NOT_SELF + _NOT_BEMYNDIGANDE
-        + " GROUP BY l.from_uri, l.from_anchor)", (uri,)).fetchone()[0]
+        "SELECT COUNT(*) FROM (SELECT 1 FROM links l "
+        "JOIN documents d ON d.uri = l.from_uri "
+        "WHERE l.to_uri = ?" + _NOT_SELF + _NOT_BEMYNDIGANDE
+        + " AND d.source <> 'kommentar' "
+        "GROUP BY l.from_uri, l.from_anchor)", (uri,)).fetchone()[0]
 
 
 def document_inbound_count(con, root_uri):
