@@ -49,9 +49,9 @@ from ..lib import legacy_import
 from ..lib.pdftext import pdf_pages
 from ..lib.util import (
     basefile_slug,
-    document_extension,
     normalize_space,
     record_path,
+    sniff_extension,
     write_atomic,
 )
 
@@ -125,8 +125,7 @@ def pick_body(casedir):
     case holds no recognizable document."""
     candidates = {}
     for f in sorted(casedir.glob("index.*")):
-        ext = document_extension(f.read_bytes()[:8])
-        if ext:
+        if ext := sniff_extension(f):
             candidates[ext] = f
     for ext in BODY_PREFERENCE:
         if ext in candidates:
@@ -146,12 +145,17 @@ def _iter_cases(downloaded):
 def _convert_to_pdf(src, outdir, profile):
     """Convert a doc/wpd/rtf decision file to PDF with headless LibreOffice into
     ``outdir``. An isolated ``UserInstallation`` profile keeps parallel/nested
-    soffice instances from fighting over the shared profile lock."""
+    soffice instances from fighting over the shared profile lock. The target is
+    removed before the run: soffice sometimes exits 0 without producing output,
+    and ``outdir`` is shared across every case in the import, so a stale PDF left
+    over from a same-stemmed earlier case would otherwise pass the existence
+    check below and be imported as the current case's body."""
+    out = outdir / (src.stem + ".pdf")
+    out.unlink(missing_ok=True)
     subprocess.run(
         ["soffice", "--headless", "-env:UserInstallation=file://%s" % profile,
          "--convert-to", "pdf", "--outdir", str(outdir), str(src)],
         check=True, capture_output=True, timeout=120)
-    out = outdir / (src.stem + ".pdf")
     assert out.exists(), "soffice produced no PDF for %s" % src
     return out
 
@@ -188,68 +192,76 @@ def import_arn(source, root, limit=None, force=False, log=print):
         "%s is not a frozen ARN tree (no downloaded/)" % source
     imported = skipped = empty = 0
     profile = tempfile.mkdtemp(prefix="arn-soffice-")
-    with tempfile.TemporaryDirectory(prefix="arn-convert-") as tmp:
-        tmpdir = Path(tmp)
-        for casedir in _iter_cases(downloaded):
-            if limit is not None and imported >= limit:
-                break
-            dnr = "%s-%s" % (casedir.parent.name, casedir.name)
-            assert RE_ARN_DNR.fullmatch(dnr), "case %s is not an ARN dnr" % casedir
-            basefile = "arn/" + dnr
-            recpath = record_path(root, "arn", basefile)
-            pdfpath = arn_pdf_path(root, basefile)
-            # the shared §7g precedence rule via the `source` marker: a live
-            # arn.se record (no marker) always wins, even under --force; the
-            # import's own record is rewritten under --force or when its
-            # materialized PDF is missing
-            existing = legacy_import.read_record(recpath)
-            if not legacy_import.should_write(existing, SOURCE,
-                                              force or not pdfpath.exists()):
-                skipped += 1
-                continue
+    try:
+        with tempfile.TemporaryDirectory(prefix="arn-convert-") as tmp:
+            tmpdir = Path(tmp)
+            for casedir in _iter_cases(downloaded):
+                if limit is not None and imported >= limit:
+                    break
+                dnr = "%s-%s" % (casedir.parent.name, casedir.name)
+                assert RE_ARN_DNR.fullmatch(dnr), "case %s is not an ARN dnr" % casedir
+                basefile = "arn/" + dnr
+                recpath = record_path(root, "arn", basefile)
+                pdfpath = arn_pdf_path(root, basefile)
+                # the shared §7g precedence rule via the `source` marker: a live
+                # arn.se record (no marker) always wins, even under --force; the
+                # import's own record is rewritten under --force or when its
+                # materialized PDF is missing
+                existing = legacy_import.read_record(recpath)
+                if not legacy_import.should_write(existing, SOURCE,
+                                                  force or not pdfpath.exists()):
+                    skipped += 1
+                    continue
 
-            meta = parse_fragment((casedir / "fragment.html").read_text("utf-8"))
-            assert meta["dnr"] == dnr, \
-                "fragment Änr %s != dir-derived dnr %s" % (meta["dnr"], dnr)
-            assert RE_ISO.match(meta["beslutsdatum"]), \
-                "arn %s beslutsdatum %r is not ISO" % (dnr, meta["beslutsdatum"])
+                meta = parse_fragment((casedir / "fragment.html").read_text("utf-8"))
+                if meta["dnr"] != dnr:
+                    raise ValueError(
+                        "fragment Änr %s != dir-derived dnr %s" % (meta["dnr"], dnr))
+                if not RE_ISO.match(meta["beslutsdatum"]):
+                    raise ValueError(
+                        "arn %s beslutsdatum %r is not ISO" % (dnr, meta["beslutsdatum"]))
 
-            chosen, ext = pick_body(casedir)
-            if chosen is None:
-                log("arn %s: no recognizable decision file -- skipping" % dnr)
-                empty += 1
-                continue
-            # the materialized PDF is content-stable (frozen source), so an
-            # existing one is reused even under --force -- a record-only rerun
-            # (e.g. adding a provenance field) must not redo ~830 conversions
-            if pdfpath.exists():
-                pdf = pdfpath
-            elif ext == ".pdf":
-                pdf = chosen
-            else:
-                pdf = _convert_to_pdf(chosen, tmpdir, profile)
+                chosen, ext = pick_body(casedir)
+                if chosen is None:
+                    log("arn %s: no recognizable decision file -- skipping" % dnr)
+                    empty += 1
+                    continue
+                # the materialized PDF is content-stable (frozen source), so an
+                # existing one is reused even under --force -- a record-only rerun
+                # (e.g. adding a provenance field) must not redo ~830 conversions
+                if pdfpath.exists():
+                    pdf = pdfpath
+                elif ext == ".pdf":
+                    pdf = chosen
+                else:
+                    pdf = _convert_to_pdf(chosen, tmpdir, profile)
 
-            # a case with neither a title nor any body text is an empty stub (the
-            # legacy DocumentRemovedError case) -- detected generically, not by id.
-            if not meta["title"] and not _pdf_has_any_text(pdf):
-                log("arn %s: blank summary and empty body -- skipping (%s)"
-                    % (dnr, chosen.name))
-                empty += 1
-                continue
+                # a case with neither a title nor any body text is an empty stub
+                # (the legacy DocumentRemovedError case) -- detected generically,
+                # not by id.
+                if not meta["title"] and not _pdf_has_any_text(pdf):
+                    log("arn %s: blank summary and empty body -- skipping (%s)"
+                        % (dnr, chosen.name))
+                    empty += 1
+                    continue
 
-            imported_from = "%s/%s/%s" % (casedir.parent.name, casedir.name,
-                                          chosen.name)
-            record = {"basefile": basefile, "org": "arn", "diarienummer": dnr,
-                      "beslutsdatum": meta["beslutsdatum"],
-                      "avdelning": meta["avdelning"], "title": meta["title"],
-                      "source": SOURCE, "imported_from": imported_from}
-            orig_url = _orig_url(source, casedir)
-            if orig_url:
-                record["orig_url"] = orig_url
-            if pdf != pdfpath:
-                write_atomic(pdfpath, pdf.read_bytes())
-            write_atomic(recpath, json.dumps(record, ensure_ascii=False, indent=2))
-            imported += 1
-    shutil.rmtree(profile, ignore_errors=True)
+                imported_from = "%s/%s/%s" % (casedir.parent.name, casedir.name,
+                                              chosen.name)
+                record = {"basefile": basefile, "org": "arn", "diarienummer": dnr,
+                          "beslutsdatum": meta["beslutsdatum"],
+                          "avdelning": meta["avdelning"], "title": meta["title"],
+                          "source": SOURCE, "imported_from": imported_from}
+                orig_url = _orig_url(source, casedir)
+                if orig_url:
+                    record["orig_url"] = orig_url
+                if pdf != pdfpath:
+                    write_atomic(pdfpath, pdf.read_bytes())
+                write_atomic(recpath, json.dumps(record, ensure_ascii=False, indent=2))
+                imported += 1
+    finally:
+        # ignore_errors: soffice may still hold the profile dir open briefly
+        # after being killed by the `timeout=` in `_convert_to_pdf`; the
+        # profile is scratch space, never worth failing the import over.
+        shutil.rmtree(profile, ignore_errors=True)
     log("arn import: %d imported, %d skipped, %d empty" % (imported, skipped, empty))
     return imported, skipped, empty

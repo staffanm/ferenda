@@ -519,9 +519,28 @@ def test_jo_full_falls_through_to_jo_save(tmp_path, monkeypatch):
                             "search_hits": [hit], "total_hits": 1, "total_pages": 1})
     saved = []
     monkeypatch.setattr(avg_download, "jo_save",
-                        lambda root, h, session, delay: saved.append(h["diary_number"]) or False)
+                        lambda root, h, session, delay, full=False:
+                        saved.append(h["diary_number"]) or False)
     seen, new = avg_download.jo_sync(str(tmp_path), full=True)
     assert saved == ["2340-2025"]         # the downloaded doc was re-visited
+
+
+def test_jo_full_refetches_existing_pdf(tmp_path, monkeypatch):
+    # --full must refresh an already-downloaded decision PDF (jk/arn/foreskrift
+    # semantics), not just records of new decisions
+    root = str(tmp_path)
+    hit = {"id": 1, "diary_number": "2340-2025", "resolve_date": "2026-06-30",
+           "pdf_url": "https://www.jo.se/x.pdf"}
+    pdf = avg_download.jo_pdf_path(root, "jo/2340-2025")
+    write_atomic(pdf, b"%PDF-1.4 old")
+
+    class Resp:
+        content = b"%PDF-1.4 fresh"
+    monkeypatch.setattr(avg_download, "request", lambda *a, **kw: Resp())
+    assert avg_download.jo_save(root, hit, None, 0) is True
+    assert pdf.read_bytes() == b"%PDF-1.4 old"      # incremental: kept
+    avg_download.jo_save(root, hit, None, 0, full=True)
+    assert pdf.read_bytes() == b"%PDF-1.4 fresh"    # --full: refetched
 
 
 def test_jk_full_keeps_old_landing_when_refetch_fails(tmp_path, monkeypatch):

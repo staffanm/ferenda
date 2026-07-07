@@ -10,9 +10,8 @@ one beslut) stay in the metadata.
 
 from dataclasses import dataclass, field
 
+from ..lib.catalog import BASE
 from ..lib.lagrum import interleave
-
-BASE = "https://lagen.nu/"
 
 ORGS = ("jo", "jk", "arn")
 ORG_NAME = {"jo": "Justitieombudsmannen", "jk": "Justitiekanslern",

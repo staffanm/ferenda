@@ -13,9 +13,9 @@ same session). One hit is a complete record: ``diary_number``,
 deciding ombudsman (``resolve_maker``), the sakområde/lagstiftning taxonomies,
 the decision PDF url (``pdf_url``) *and* the site's own flat text extraction of
 it (``pdf_text``). ~3,700 decisions back to 1979. Newest-first by default, so
-incremental runs stop at the first page with nothing new; the shared
-``HarvestWatermark`` gates the initial oldest..newest backfill exactly like
-dv/forarbete.
+incremental runs stop at the first page with nothing new; the initial backfill
+walks the same newest-first listing all the way down, gated by the shared
+``HarvestWatermark`` exactly like dv/forarbete.
 
 **JK** (jk.se, Umbraco): the listing at ``/beslut-och-yttranden/`` still
 honours the legacy "broken pagination" hack -- ``POST page=9999`` returns every
@@ -129,9 +129,11 @@ def jo_record(hit, basefile):
     return record
 
 
-def jo_save(root, hit, session, delay):
-    """Store one hit's record (+ its decision PDF when missing on disk).
-    Returns True if the record is new or changed."""
+def jo_save(root, hit, session, delay, full=False):
+    """Store one hit's record (+ its decision PDF when missing on disk, or
+    always under ``full`` -- consistent with jk_save/arn_save's ``--full``
+    semantics of refetching an already-downloaded document, not just new
+    ones). Returns True if the record is new or changed."""
     dnrs = jo_dnrs(hit.get("diary_number"))
     if not dnrs:
         print("jo: hit %s has no parsable diary_number %r, skipping"
@@ -145,7 +147,7 @@ def jo_save(root, hit, session, delay):
         write_atomic(path, json.dumps(record, ensure_ascii=False, indent=2))
     pdf_url = record.get("pdf_url")
     pdf = jo_pdf_path(root, basefile)
-    if pdf_url and not pdf.exists():
+    if pdf_url and (full or not pdf.exists()):
         response = request(session, "GET", pdf_url, timeout=120)
         if document_extension(response.content) == ".pdf":
             write_atomic(pdf, response.content)
@@ -179,7 +181,7 @@ def jo_sync(root, full=False, only=None, limit=None, delay=0.5, log=print):
                                  "language": "sv", "advanced_search": "0"})
         hits = [h for h in envelope["search_hits"] if dnr in jo_dnrs(h.get("diary_number"))]
         assert hits, "jo.se search finds no decision with dnr %s" % dnr
-        return 1, int(jo_save(root, hits[0], session, delay))
+        return 1, int(jo_save(root, hits[0], session, delay, full=full))
 
     marker = Path(root) / "jo" / COMPLETE
     watermark_path = Path(root) / "jo" / ".watermark.json"
@@ -217,7 +219,7 @@ def jo_sync(root, full=False, only=None, limit=None, delay=0.5, log=print):
         return ItemKey(basefile=basefile, is_downloaded=is_downloaded,
                        date=hit.get("resolve_date"))
 
-    result = walk(hits(), resolve=lambda hit: jo_save(root, hit, session, delay),
+    result = walk(hits(), resolve=lambda hit: jo_save(root, hit, session, delay, full=full),
                   item_key=item_key, watermark=watermark, full=full, limit=limit,
                   scope="jo", count_label="changed", total=first["total_hits"],
                   log=log)
