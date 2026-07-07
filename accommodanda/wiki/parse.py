@@ -130,7 +130,7 @@ def fragment_heading(anchor):
 
 
 def _read(path):
-    return markdown.frontmatter(Path(path).read_text(encoding="utf-8"))
+    return markdown.frontmatter(Path(path).read_text(encoding="utf-8"), path=path)
 
 
 def host_uri(annotates):
@@ -272,7 +272,13 @@ def kommentar_index(root):
     out = {}
     for path in _wiki_dir(root, "commentary").rglob("*.md"):
         meta, _ = _read(str(path))
-        out[str(meta["annotates"])] = str(path)
+        basefile = str(meta["annotates"])
+        if basefile in out:
+            raise ValueError(
+                "duplicate `annotates: %s` -- %s and %s both claim it; each "
+                "commentary file must annotate a distinct basefile"
+                % (basefile, out[basefile], path))
+        out[basefile] = str(path)
     return out
 
 
@@ -282,5 +288,11 @@ def begrepp_index(root):
     out = {}
     for path in glob.glob(str(_wiki_dir(root, "concept") / "*.md")):
         meta, _ = _read(path)
-        out[meta["title"]] = path
+        title = meta["title"]
+        if title in out:
+            raise ValueError(
+                "duplicate concept `title: %s` -- %s and %s both claim it; "
+                "each concept file must have a distinct title"
+                % (title, out[title], path))
+        out[title] = path
     return out

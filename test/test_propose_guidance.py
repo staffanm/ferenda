@@ -6,6 +6,7 @@ YAML-scalar quoting, and the link collection that shape the draft frontmatter.""
 
 import lxml.html
 
+from accommodanda.lib import markdown
 from accommodanda.wiki import guidance_discover as pg
 
 
@@ -36,6 +37,17 @@ def test_scalar_quotes_only_when_needed():
     assert pg.yaml_scalar("Data Act — Factsheet") == "Data Act — Factsheet"
     # a colon would break `title: value`, so it must be quoted
     assert pg.yaml_scalar("FAQ: the Data Act") == '"FAQ: the Data Act"'
+
+
+def test_scalar_escaping_round_trips_through_frontmatter():
+    # yaml_scalar's `\\` / `\"` escaping must be undone by markdown._scalar --
+    # the emitted `guidance:` block is pasted into commentary frontmatter and
+    # reparsed, so producer and consumer share one quoting grammar
+    title = 'Guidance on the "Data Act": C:\\path edition'
+    meta, _ = markdown.frontmatter(
+        "---\nguidance:\n  - title: %s\n    url: https://x\n---\n"
+        % pg.yaml_scalar(title))
+    assert meta["guidance"][0]["title"] == title
 
 
 def test_library_items_are_absolute_deduped_and_ordered():

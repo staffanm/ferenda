@@ -98,6 +98,37 @@ def test_frontmatter_block_list_of_mappings():
     assert body == "Body."
 
 
+def test_unterminated_frontmatter_names_file_and_fault():
+    # an opened-but-never-closed fence must raise a clear error naming the
+    # file, not a bare StopIteration from the fence scan
+    with pytest.raises(ValueError, match="never closed"):
+        markdown.frontmatter("---\ntitle: Foo\nBrödtext.")
+    with pytest.raises(ValueError, match=r"broken\.md.*never closed"):
+        markdown.frontmatter("---\ntitle: Foo\n", path="broken.md")
+    with pytest.raises(ValueError, match=r"broken\.md.*never closed"):
+        markdown.split_frontmatter("---\ntitle: Foo\n", path="broken.md")
+
+
+def test_duplicate_index_keys_are_rejected(tmp_path):
+    # two commentary files claiming the same `annotates:` (or two concept files
+    # the same `title:`) must fail loudly, not silently drop one of them
+    commentary = tmp_path / "commentary" / "sfs" / "2009"
+    commentary.mkdir(parents=True)
+    for name in ("400.md", "400-copy.md"):
+        (commentary / name).write_text("---\nannotates: 2009:400\n---\nText.",
+                                       encoding="utf-8")
+    with pytest.raises(ValueError, match="duplicate `annotates: 2009:400`"):
+        wiki.kommentar_index(str(tmp_path))
+    concept = tmp_path / "concept"
+    concept.mkdir()
+    for name in ("Negotiorum gestio.md", "Negotiorum gestio 2.md"):
+        (concept / name).write_text("---\ntitle: Negotiorum gestio\n---\nText.",
+                                    encoding="utf-8")
+    with pytest.raises(ValueError,
+                       match="duplicate concept `title: Negotiorum gestio`"):
+        wiki.begrepp_index(str(tmp_path))
+
+
 def test_blocks_split_headings_and_paragraphs():
     assert markdown.blocks("## 1 kap 2 §\n\nFörsta.\nrad två\n\nAndra.") == [
         ("rubrik", 2, "1 kap 2 §"),

@@ -35,7 +35,6 @@ BEGREPP = "https://lagen.nu/begrepp/"
 # than being swallowed into the label.
 RE_MDLINK = re.compile(r"\[([^][]+)\]\(([^)]+)\)")
 RE_HEADING = re.compile(r"^(#+)\s+(.*?)\s*#*\s*$")
-RE_WS = re.compile(r"[ \t]+")
 # a recognised external link target -- everything else in (...) is left literal
 RE_URL = re.compile(r"^(?:https?:)?//", re.IGNORECASE)
 
@@ -64,12 +63,21 @@ RE_FM_FENCE = re.compile(r"^---\s*$")
 # `field:`), so a scalar list item that is itself a URL (`- https://…`, whose
 # `https:` has no following space) is not mistaken for a mapping.
 RE_FM_FIELD = re.compile(r"^([\w-]+):(?:\s+(.*))?$")
+# a backslash-escaped character inside a double-quoted scalar (`\"` or `\\`)
+RE_ESCAPE = re.compile(r"\\(.)")
 
 
 def _scalar(value):
     value = value.strip()
     if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-        return value[1:-1]
+        inner = value[1:-1]
+        if value[0] == '"':
+            # undo guidance_discover.yaml_scalar's `\\` / `\"` escaping (the only
+            # producer of backslash escapes in this subset) -- a backslash always
+            # starts a two-character escape unit, so a left-to-right \X -> X pass
+            # reverses it exactly.
+            inner = RE_ESCAPE.sub(r"\1", inner)
+        return inner
     return value
 
 
@@ -77,21 +85,30 @@ def _inline_list(value):
     return [_scalar(item) for item in value[1:-1].split(",") if item.strip()]
 
 
-def frontmatter(text):
+def frontmatter(text, path=None):
     """`(meta, body)` from a markdown file. `meta` is the parsed YAML-subset
     frontmatter (``{}`` if the file has none); `body` is everything after the
-    closing fence."""
+    closing fence. `path` (if given) names the source file in the error raised
+    for a malformed (unterminated) frontmatter fence."""
     lines = text.splitlines()
     if not (lines and RE_FM_FENCE.match(lines[0])):
         return {}, text
-    end = next(i for i in range(1, len(lines)) if RE_FM_FENCE.match(lines[i]))
+    end = next((i for i in range(1, len(lines)) if RE_FM_FENCE.match(lines[i])),
+               None)
+    if end is None:
+        raise ValueError(
+            "%s: frontmatter opened with `---` but never closed with a "
+            "matching `---` fence" % (path or "<string>"))
     meta, key, mapping = {}, None, None
     for line in lines[1:end]:
         if not line.strip():
             continue
         stripped = line.lstrip()
         if line[:1] in (" ", "\t") and stripped.startswith("- "):
-            assert key is not None, "list item before any key in frontmatter"
+            if key is None:
+                raise ValueError(
+                    "%s: frontmatter list item %r appears before any key"
+                    % (path or "<string>", line))
             item = stripped[2:].strip()
             m = RE_FM_FIELD.match(item)
             if m:                                # `- field: value` -> a new mapping
@@ -103,7 +120,10 @@ def frontmatter(text):
             continue
         if line[:1] in (" ", "\t") and mapping is not None:   # mapping continuation
             m = RE_FM_FIELD.match(stripped)
-            assert m, "bad frontmatter mapping field: %r" % line
+            if not m:
+                raise ValueError(
+                    "%s: bad frontmatter mapping field: %r"
+                    % (path or "<string>", line))
             mapping[m.group(1)] = _scalar(m.group(2) or "")
             continue
         key, _, value = line.partition(":")
@@ -153,17 +173,22 @@ def blocks(body):
     return out
 
 
-def split_frontmatter(text):
+def split_frontmatter(text, path=None):
     """`(fm_text, body_text)` splitting a markdown file into its frontmatter block
     (fences included, `''` if none) and the verbatim body. Unlike `frontmatter`,
     which reparses and rejoins, both halves come back as the original text so a
     single-region rewrite (the inline editor) can preserve everything it does not
-    touch byte-for-byte."""
+    touch byte-for-byte. `path` (if given) names the source file in the error
+    raised for a malformed (unterminated) frontmatter fence."""
     lines = text.splitlines(keepends=True)
     if not (lines and RE_FM_FENCE.match(lines[0].rstrip("\n"))):
         return "", text
-    end = next(i for i in range(1, len(lines))
-               if RE_FM_FENCE.match(lines[i].rstrip("\n")))
+    end = next((i for i in range(1, len(lines))
+                if RE_FM_FENCE.match(lines[i].rstrip("\n"))), None)
+    if end is None:
+        raise ValueError(
+            "%s: frontmatter opened with `---` but never closed with a "
+            "matching `---` fence" % (path or "<string>"))
     return "".join(lines[:end + 1]), "".join(lines[end + 1:])
 
 
