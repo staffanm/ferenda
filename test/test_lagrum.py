@@ -19,6 +19,7 @@ of the rewrite.
 
 import ast
 import re
+import time
 from pathlib import Path
 
 import pytest
@@ -26,13 +27,18 @@ import pytest
 from accommodanda.lib.datasets import NAMEDACTS
 from accommodanda.lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from accommodanda.lib.lagrum import (
+    ALL_PARSE_TYPES,
     ENKLALAGRUM,
     EULAGSTIFTNING,
     EURATTSFALL,
     FORARBETEN,
+    LAGRUM,
     MYNDIGHETSBESLUT,
     RATTSFALL,
     LagrumParser,
+    Ref,
+    build_trigger,
+    interleave,
     load_abbreviations,
     load_namedacts,
     load_namedlaws,
@@ -234,3 +240,58 @@ def test_myndighetsbeslut(path):
 def test_enklalagrum(path):
     got, want = run_testfile(path, parse_types=[ENKLALAGRUM])
     assert got == want
+
+
+def test_lagrum_trigger_bounded_on_pathological_enumeration():
+    # A long flattened digit/comma enumeration with no closing " §" used to
+    # make the LAGRUM trigger's unbounded list-continuation quantifier
+    # backtrack quadratically (O(n^2)+): ~6s at 24KB of "12, " repeats.
+    # The quantifier is now bounded ({0,50}), so this stays linear and fast
+    # even though the input never matches.
+    trigger = build_trigger([LAGRUM])
+    pathological = "12, " * 6000  # 24 KB, previously ~6s
+    start = time.time()
+    trigger.search(pathological)
+    assert time.time() - start < 1.0
+
+
+def test_interleave_disjoint_refs():
+    text = "se 3 § och 5 § nedan"
+    refs = [Ref(3, 6, "3 §", "dcterms:references", "https://x/#P3"),
+            Ref(11, 14, "5 §", "dcterms:references", "https://x/#P5")]
+    assert interleave(text, refs) == [
+        "se ",
+        {"predicate": "dcterms:references", "uri": "https://x/#P3",
+         "text": "3 §"},
+        " och ",
+        {"predicate": "dcterms:references", "uri": "https://x/#P5",
+         "text": "5 §"},
+        " nedan",
+    ]
+
+
+def test_interleave_rejects_overlapping_refs():
+    # Every producer guarantees disjoint spans (parse_text consumes matched
+    # spans; call sites merging two ref lists filter overlaps first), so an
+    # overlap reaching interleave is an upstream bug. It used to be silently
+    # dropped, losing a link; now it fails fast.
+    text = "3 kap. 5 §"
+    refs = [Ref(0, 10, "3 kap. 5 §", "dcterms:references", "https://x/#K3P5"),
+            Ref(7, 10, "5 §", "dcterms:references", "https://x/#P5")]
+    with pytest.raises(AssertionError, match="overlapping ref spans"):
+        interleave(text, refs)
+
+
+def test_parser_reset_clears_document_state():
+    # reset() gives the per-document state a clean slate without paying for
+    # parser reconstruction (grammar compilation is the expensive part).
+    parser = LagrumParser(NAMEDLAWS, basefile="9999:999",
+                          parse_types=ALL_PARSE_TYPES,
+                          abbreviations=ABBREVIATIONS)
+    # give the parser a "samma lag" focus and a learned in-document alias
+    parser.parse_text("enligt 5 § lagen (1994:953) om åligganden",
+                      context={})
+    assert parser.state.lastlaw == "1994:953"
+    parser.state.namedlaws["testlagen"] = "1999:175"
+    parser.reset()
+    assert not parser.state.namedlaws and parser.state.lastlaw is None

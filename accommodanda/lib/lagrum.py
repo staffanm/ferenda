@@ -67,6 +67,13 @@ ENKLALAGRUM = 'ENKLALAGRUM'        # absolute-only SFS refs (förarbete-safe)
 TYPE_ORDER = [KORTLAGRUM, ENKLALAGRUM, LAGRUM, EULAGSTIFTNING, RATTSFALL,
               FORARBETEN, EURATTSFALL, MYNDIGHETSBESLUT]
 
+# The "everything" configuration for verticals that link every reference
+# flavour (dv, forarbete, avg, wiki): all parse types except ENKLALAGRUM,
+# which is the deliberately restricted *alternative* to LAGRUM, never
+# combined with it. Import this instead of copying the list.
+ALL_PARSE_TYPES = [LAGRUM, KORTLAGRUM, EULAGSTIFTNING, RATTSFALL,
+                   FORARBETEN, EURATTSFALL, MYNDIGHETSBESLUT]
+
 # types each requested type pulls in (kortlagrum/enklalagrum reuse the
 # generic_ref / external_law / piece_ref productions defined by lagrum)
 DEPENDS = {KORTLAGRUM: [LAGRUM], ENKLALAGRUM: [LAGRUM]}
@@ -473,7 +480,7 @@ SLUG_TRANS = str.maketrans('åäö', 'aao')
 LAGRUM_TRIGGER_SRC = r"""
     \b\d+(?:\ ?[a-n]\b)?
         (?:(?:\ ?,\ ?|\ och\ |\ eller\ |\ samt\ |\ ?[-–—]{1,2}\ ?)
-           \d+(?:\ ?[a-n]\b)?)*\ §            # section (lists/intervals)
+           \d+(?:\ ?[a-n]\b)?){0,50}\ §       # section (lists/intervals)
   | \b\d+\ (?:[a-zåäö]\ )?[Kk]ap\b            # chapter
   | \b(?:\d+|första|andra|tredje|fjärde|femte|sjätte|sjunde|åttonde|nionde)
         (?:\ (?:första|andra|tredje|fjärde|femte|sjätte|sjunde|åttonde|nionde))?
@@ -601,11 +608,17 @@ def interleave(text, refs):
     `text`, returning the inline-run list the artifact stores: plain `str`
     runs interleaved with {"predicate", "uri", "text"} link dicts, in
     document order. Text with no refs is a single-element list `[text]`;
-    empty text is `[]`."""
+    empty text is `[]`.
+
+    Spans must be disjoint -- parse_text consumes matched spans, and the
+    one caller merging two ref lists (eurlex cites + term uses) filters
+    overlaps first -- so an overlap is an upstream bug, not a case to
+    resolve silently by dropping a link (rule:fail-fast)."""
     out, pos = [], 0
     for ref in sorted(refs, key=lambda r: r.start):
-        if ref.start < pos:
-            continue  # disjoint spans expected; ignore any stray overlap
+        assert ref.start >= pos, (
+            "overlapping ref spans: %r [%d:%d] overlaps text already "
+            "consumed up to %d" % (ref.text, ref.start, ref.end, pos))
         if ref.start > pos:
             out.append(text[pos:ref.start])
         run = {"predicate": ref.predicate, "uri": ref.uri, "text": ref.text}
@@ -622,7 +635,8 @@ def interleave(text, refs):
 class DocState:
     """Reference-parser state with document lifetime."""
     lastlaw: str | None = None
-    namedlaws: dict = field(default_factory=dict)  # learned in-document
+    # law names learned in-document: normalized lawname -> SFS id
+    namedlaws: dict[str, str] = field(default_factory=dict)
     last_forarbete: str | None = None  # base URI of last prop ("a. prop.")
     last_eu_act: str | None = None     # CELEX of the last named EU act (anaphora)
 
@@ -932,6 +946,13 @@ class LagrumParser:
                            abbrevs if KORTLAGRUM in self.parse_types else (),
                            eu_acts if EULAGSTIFTNING in self.parse_types else ())
         self.trigger = build_trigger(self.parse_types)
+
+    def reset(self):
+        """Discard per-document state (learned law names, the "samma lag"
+        focus, förarbete/EU-act anaphora) before parsing a new document.
+        Call this instead of rebuilding the parser -- construction (grammar
+        compilation, dataset loading) is the expensive part."""
+        self.state = DocState()
 
     # --- scanning ---
 
