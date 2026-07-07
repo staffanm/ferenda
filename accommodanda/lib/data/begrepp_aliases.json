@@ -1,0 +1,7 @@
+{
+  "_comment": "Hand-edited concept normalization overrides (see lib/concepts.py).",
+  "alias": {
+  },
+  "keep_distinct": [
+  ]
+}

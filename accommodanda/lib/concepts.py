@@ -17,7 +17,7 @@ The vocabulary is bounded (defined legal terms), so this is a hand-rolled,
     The canonical display/URI form of a group is a wiki-authored form if present
     (the wiki uses base form by convention), else the most base-like member.
 
-A hand-edited override file (`begrepp_aliases.json`) maps stubborn variants and
+A hand-edited override file (`data/begrepp_aliases.json`) maps stubborn variants and
 true synonyms onto a canonical, and lists forms to KEEP DISTINCT (blocking a
 wrong auto-merge). De-inflection only touches a term's last word (the head in
 this corpus's compounds and `X av/för Y` phrases); casing and whitespace are
@@ -29,8 +29,7 @@ from pathlib import Path
 
 from .util import normalize_fold as _norm
 
-RES = (Path(__file__).resolve().parents[2]
-       / "lagen" / "nu" / "res" / "extra" / "begrepp_aliases.json")
+RES = Path(__file__).resolve().parent / "data" / "begrepp_aliases.json"
 
 # generic inflectional endings reversed to a base (definite singular, plural and
 # definite plural). NOT -are (an agent base) and NOT derivational (-ning/-het/
@@ -96,7 +95,7 @@ _WIKI = None
 def _load():
     global _OVERRIDES
     if _OVERRIDES is None:
-        data = json.loads(RES.read_text()) if RES.exists() else {}
+        data = json.loads(RES.read_text())
         _OVERRIDES = {"alias": {_norm(k): v for k, v in data.get("alias", {}).items()},
                       "distinct": [{_norm(x) for x in p}
                                    for p in data.get("keep_distinct", [])]}
