@@ -291,6 +291,9 @@ class SearchIndex:
         # the next run reindexes the source once, as intended. (A type *change*
         # still can't be migrated -- that is what the doc_uri guard above catches.)
         want = MAPPING["mappings"]["properties"]
+        # ty infers the heterogeneous MAPPING dict literal's values as a union
+        # (str | dict | ...), so `want` includes str, on which .items() is
+        # unresolved; at runtime it is always the properties dict.
         missing = {name: spec for name, spec in want.items()  # ty: ignore[unresolved-attribute]
                    if name not in props}
         if missing:

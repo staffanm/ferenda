@@ -1659,8 +1659,9 @@ context rail, so it has no `relate`/`index`/`dump`/`generate` stage at all.
   score and a verbatim quote plus an overall stance, validated strictly
   (every cited section id real, every quote a verbatim substring of the
   answer) and written as a `.ann` sidecar. Retries once as a real
-  assistant/user follow-up turn on a malformed reply (`lib.llm.complete_thread`,
-  extracted from the former single-shot `complete` for this self-repair use).
+  assistant/user follow-up turn on a malformed reply — since generalized
+  into `lib.llm.author` (§5/§6/api, 2026-07-06), the shared validate/
+  self-repair-retry loop eurlex/wiki annotate now use too.
 - **Wired into `render.py`**: `_remiss_indexes` walks the remisser artifact
   tree directly (`layout.artifacts("remisser")`, not the catalog — this source
   is never `relate`d) picking up each answer's `.ann`, and builds
@@ -1855,6 +1856,26 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **§5/§6/api** (2026-07-06) — review-fix pass across the corpus: `lib/llm.py`
+  gained the shared `author` validate/self-repair-retry loop (factored out of
+  the near-identical retry code in eurlex/wiki annotate + remisser
+  ai-analyze); `lib/pdftext.py` gained a `hidden=True` mode (recovers an
+  OCR text layer `pdftohtml` otherwise drops) and `flat_lines` (page-break-
+  flattened line stream), with `eurlex/parse_pdf.py` cut over to consume it
+  instead of its own extraction; `lib/compress.py` now writes through
+  `util.write_atomic`. `generate_watermark()` widened its coarse gate: the
+  remiss answers + their `ai-analyze` `.ann` layer (rendered onto the
+  referred förarbete's page, never `relate`d, so invisible to the catalog
+  signature) now fold in alongside the existing `.corr`/`.versions.json`/
+  eurlex-`.ann`/kommentar-`.ann` layers, and the currently-expired-statute
+  URI set is folded in too, so an upphävd date passing reopens the gate on
+  its own (no file change needed). `api/auth.py` gained in-process login
+  rate limiting (per-(IP, username) sliding window + exponential backoff,
+  plus a concurrency cap on pbkdf2 work) so a login flood can't pin CPU
+  behind the password check. Two ported-from-`lagen/` data files landed:
+  `lib/data/begrepp_aliases.json` (concept-normalization overrides) and
+  `sfs/data/resources.json` (org/series label → URI lookups feeding
+  `sfs/register.py`).
 - **§5/§4/§7a/§7e** (2026-07-06) — shared harvest core extracted to
   `lib/harvest.py` (`HarvestWatermark` begin/complete lifecycle + `walk`/
   `Skip`/`ItemKey`/`guarded_enumerate`), closing the §5 "not yet extracted"

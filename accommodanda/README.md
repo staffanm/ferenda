@@ -53,17 +53,21 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 **SFS vertical**
 | File | What |
 |---|---|
+| `download.py` | harvester for consolidated SFS off the beta rkrattsbaser ES passthrough (one request per document; the register + amendment list come in the same `_source`) |
 | `extract.py` | body extraction from rkrattsbaser HTML (+ archival `<pre>`) |
 | `reader.py` | `TextReader` — faithful port incl. autostrip blank-line semantics |
 | `tokenizer.py` | recognizers → flat event stream |
 | `assembler.py` | RANK-driven stack machine → document tree |
 | `model.py` | typed dataclasses (`Forfattning`, `Kapitel`, `Paragraf`, …) |
 | `nf.py` | tree → golden normal form (replicates old URI-minting quirks) |
-| `register.py` | SFSR register page → amendments + change tuples |
+| `register.py` | SFSR register page → amendments + change tuples; `resource_map`/`lookup_resource` resolve org/series labels via the ported `data/resources.json` dataset |
 | `versions.py` | archived consolidations (download archive, three raw generations) → per-version artifacts + `.versions.json` sidecar |
+| `begrepp.py` | `find_definitions` — begreppsdefinition heuristics (paragraf mode + defined-term cases) → `dcterms:subject` links |
+| `correspond.py` | LLM pass deriving the old-law → new-law paragraf correspondence map for a restructured statute, from the proposition's författningskommentar |
+| `_validate.py` | worker functions for `lagen sfs validate`, in an importable module so `ProcessPoolExecutor` workers can resolve them under `python -m` |
 | `__main__.py` | `parse` / `refs` / `validate` CLI |
 
-**Citation engine (shared library)**
+**Shared library (`lib/`)** — a source may import from here; `lib` never imports from, or branches on, a source.
 | File | What |
 |---|---|
 | `lagrum.py` | Lark/Earley engine; `LagrumParser(parse_types=…)` composes a grammar from LAGRUM / KORTLAGRUM / EULAGSTIFTNING / RATTSFALL / FORARBETEN / … |
@@ -72,6 +76,28 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `legacy_import.py` | shared §7g frozen-import core — `should_write` precedence (live-wins / own-import-idempotent-unless-force / optional `better()` tie-break), `rel` (in-place LEGACY_ROOT-relative body references), `iter_entries`/`docdir`/`read_record` walk primitives; used by `forarbete/legacy.py`, `foreskrift/legacy.py`, `avg/legacy.py` |
 | `regeringen.py` | shared regeringen.se harvest knowledge — the doctype table (`TYPES`: url segment, taxonomy category id, identifier regex) and the `ul.list--block` listing walk (`listing_items`); used by `forarbete/download.py` and `remisser/download.py` |
 | `harvest.py` | shared incremental-download core — `HarvestWatermark` (begin/complete lifecycle, never-regress date save, crash-safe `dirty` flag that disables the consecutive-hit stop but not the date-conclusive one) + `walk`/`Skip`/`ItemKey`/`guarded_enumerate` (the newest-first download loop over an enumerate/resolve pair); each source states its own `lookahead_limit`/`safety_days` window (dv: 365-day safety window, ~5000-item lookahead; forarbete/riksdagen/foreskrift/avg-jo: 14 days/20 items); used by `dv/download.py`, `foreskrift/harvest.py`, `avg/download.py` (jo), and directly by `forarbete/download.py` + `forarbete/riksdagen.py` |
+| `catalog.py` | the SQLite catalog (`documents`/`links`/`fragments`/`genomforande` tables) built by `relate`, derived and rebuildable; `documents.path` is stored `data_root`-relative so the catalog is portable across hosts |
+| `render.py` | the `generate` phase — a single generic node walk renders every source's artifact to static, interlinked HTML (live outbound links, an inbound-context rail collected from the catalog) |
+| `dump.py` | NDJSON bulk corpus export (REWRITE.md §6) — one gzipped, self-contained JSON line per artifact, no transformation |
+| `search.py` | full-text search over the parsed corpus on OpenSearch 2.x — standalone per-unit documents collapsed by `doc_uri`, no parent-child join |
+| `facets.py` | faceted navigation over the catalog — `tree`/`group`, the single source shared by the REST API (`/facets`) and the static browse pages |
+| `resolve.py` | turns a ⌘K query into a precise, fragment-deep resource target — three resolvers (SFS/EU-act/case nicknames + citation-engine pinpoints) over `lib.datasets` |
+| `layout.py` | single source of truth for where a `(source, basefile)` document lives, on disk and on the web (`downloaded`/`artifact`/`page_relpath`/`page_url`) |
+| `datasets.py` | canonical filesystem paths of the curated named-resource datasets (`NAMEDLAWS`/`NAMEDACTS`/`NAMEDCASES`) that ship in the package tree |
+| `concepts.py` | begrepp (concept) normalization — a hand-rolled, corpus-aware Swedish de-inflector collapsing inflected term forms onto one canonical `begrepp/<Name>`, plus the hand-edited override file `data/begrepp_aliases.json` |
+| `diff.py` | the "jämför lydelser" version-diff view — block-align + word-level `<ins>`/`<del>` over two parsed artifact versions, computed on demand |
+| `history.py` | read layer over the SFS version-history sidecar + amendment-register join, shared by the renderer's compare panel and `/api/v1/document/versions` |
+| `text.py` | one definition of "the plain text behind an artifact's inline-run structure", shared by the catalog (tooltip snippets), search indexing and the bulk dumps |
+| `compress.py` | transparent Brotli-only compression for the `artifact/`/`generated/` trees, written atomically via `util.write_atomic` |
+| `pdftext.py` | shared font-aware PDF text extraction pipeline for the PDF-bodied verticals — `pdf_pages`/`flat_lines` (poppler `pdftohtml -xml`, `hidden=True` recovers an OCR text layer pdftohtml otherwise drops) → `page_paragraphs` → a vertical's own `classify` |
+| `llm.py` | shared client for the Berget chat-completions endpoint used by the opt-in `ai-*` passes (eurlex/wiki annotate, remisser ai-analyze) — `complete`/`complete_thread` plus `author`, the source-agnostic validate/self-repair-retry loop |
+| `markdown.py` | parse the git-backed wiki markdown (commentary/concept/site) into the shared inline-run artifact shape — the markdown counterpart of `wikitext.py` |
+| `wikitext.py` | parse MediaWiki dump pages into the same inline-run shape; retired from the live pipeline, kept only as the migration/diff tools' reference |
+| `runlog.py` | run instrumentation behind the ops dashboard — `runs.ndjson`/`errors.json`/`status.json` under `DATA/.build/` |
+| `net.py` | shared HTTP session setup + a resilient `request()` helper for the source downloaders (transport-level retry, Retry-After, throttle logging) |
+| `git.py` | the one place that shells out to the git CLI — the inline editor's commit engine and the one-time MediaWiki history importer |
+| `errors.py` | `SkipDocument` — the shared control-flow signal a source's extractor raises for an expired/removed/empty document |
+| `util.py` | small shared utilities ported from `ferenda.util`, incl. `write_atomic` (same-directory temp file + rename) |
 
 **DV vertical (court decisions)**
 | File | What |
@@ -138,7 +164,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `model.py` | `Remiss` (case: title, dnr, deadline, `remitterat` cross-ref to the referred förarbete, `svar` list of `Remissinstans`), `Remissvar` (one organisation's parsed answer); `org_slug` derives the shared basename identity `download`/`parse`/`build` all key on |
 | `download.py` | regeringen.se `/remisser/` two-pass sync — discover new cases (`--full` re-walks everything), then re-poll every still-open case for newly-arrived answers and fetch any answer PDF not yet cached; `sync_one`/`--only <url>` fetches one known case directly; any per-case fetch or parse failure (HTTP error, or a 200 whose DOM doesn't match — a bot-challenge interstitial, a truncation) is written as a *stub* record (from listing facts only) so the incremental watermark can't hide the failure — re-polled until it succeeds |
 | `parse.py` | one answer PDF → `Remissvar` via the shared `lib/pdftext` (`pdf_pages` + `page_paragraphs`), flattened to plain paragraph text; passes `identifier=None` since each organisation's PDF carries its own letterhead, not a fixed running header |
-| `ai_analyze.py` | `lagen remisser ai-analyze <case-slug>/<org-slug>` — the sole LLM pass: maps one answer onto the referred SOU/Ds's sections with a per-section sentiment + verbatim quote plus an overall stance, validated strictly and written as a `.ann` sidecar; retries once via `lib.llm.complete_thread` on a malformed reply |
+| `ai_analyze.py` | `lagen remisser ai-analyze <case-slug>/<org-slug>` — the sole LLM pass: maps one answer onto the referred SOU/Ds's sections with a per-section sentiment + verbatim quote plus an overall stance, validated strictly and written as a `.ann` sidecar; retries once via `lib.llm.author`'s validate/self-repair loop on a malformed reply |
 
 This source is never `relate`d/`generate`d — it publishes no pages of its own;
 `render._remiss_indexes` reads its `.ann` sidecars straight off the filesystem
@@ -167,6 +193,13 @@ citation graph, version history + diff) that also serves the static site under
 `api/auth.py` + `api/edit.py` + `api/editcontent.py` + `api/editcart.py` are the
 inline content editor — the one authenticated, mutating surface (see "Inline
 editing" below).
+
+**Top-level**: `config.py` locates the corpus — the `data_root` (and
+`legacy_root`/`wiki_root`) keys in the optional `config.yml`, read with
+ruamel.yaml round-trip mode so a bad value's line number is reported. It
+deliberately locates nothing else — curated source resources shipped in the
+tree (`lib/datasets.py`'s `NAMEDLAWS`/`NAMEDACTS`/`NAMEDCASES`, `sfs/data/
+resources.json`, …) are anchored by their own callers, not here.
 
 ## Running the pipelines
 
@@ -505,6 +538,20 @@ uv run python -m accommodanda.api.auth hash '<the password>'   # prints the pbkd
 knobs (`EDITOR_SECRET` env; `editors` is config-only). Leaving `editor_secret`
 unset disables editing wholesale — every `/api/v1/{auth,edit}/*` route answers
 403 — exactly as an unset `ops_token` disables `/ops`.
+
+The session cookie's `Secure` flag is `cookie_secure` (`EDITOR_COOKIE_SECURE`
+env), on by default; flip it off in `config.yml` only for a plain-http dev
+serve. A password change (a new `pwhash`, plus a restart) invalidates every
+outstanding session for that editor — the cookie embeds a fingerprint of the
+current `pwhash`, which is the revocation mechanism (there is no server-side
+session table to keep a separate blocklist in).
+
+Login is rate-limited in-process (`api/auth.py`): a per-(IP, username) sliding
+window allows 5 free attempts per minute, then backs off exponentially up to
+5 minutes (`429` + `Retry-After`), and a hard concurrency cap bounds how many
+pbkdf2 hashes run at once — so a flood can't pin CPU behind the password check
+and starve the rest of the (small, single-process) server. State is in-memory
+only; a restart forgets past attempts.
 
 **How it works.** The static pages are byte-identical for anonymous readers;
 `editor.js` (served with the site) grafts the edit UI on client-side after a
