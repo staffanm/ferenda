@@ -72,6 +72,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 |---|---|
 | `lagrum.py` | Lark/Earley engine; `LagrumParser(parse_types=…)` composes a grammar from LAGRUM / KORTLAGRUM / EULAGSTIFTNING / RATTSFALL / FORARBETEN / … |
 | `casenaming.py` | court-decision identity — `case_uri` (mint a case's canonical URI via the RATTSFALL parser) + `case_label`/`lopnummer` (referat identity + HD's given names); read identically by dv's parse-time label stamp, the catalog row and the page heading |
+| `eucasenaming.py` | the EU mirror of `casenaming.py` — `case_number` (CELEX → court case number, "62018CJ0311" → "C-311/18", also T-/F- courts), `given_name`/`case_name`/`case_citation` (curated usual name, page heading, "C-311/18 (Schrems II)" inbound-citation label) from the shipped `eurlex/data/casenames.json` snapshot; read identically by eurlex's parse-time label stamp, the catalog row and the page heading |
 | `eu_structure.py` | the one EU-act sub-article anchor grammar (`anchored_blocks`/`subarticle_key`/`flatten`), shared by the eurlex parser, the renderer and the wiki guidance layer (`nest`, the parse-time tree builder, stays in `eurlex/structure.py`) |
 | `legacy_import.py` | shared §7g frozen-import core — `should_write` precedence (live-wins / own-import-idempotent-unless-force / optional `better()` tie-break), `rel` (in-place LEGACY_ROOT-relative body references), `iter_entries`/`docdir`/`read_record` walk primitives; used by `forarbete/legacy.py`, `foreskrift/legacy.py`, `avg/legacy.py` |
 | `regeringen.py` | shared regeringen.se harvest knowledge — the doctype table (`TYPES`: url segment, taxonomy category id, identifier regex) and the `ul.list--block` listing walk (`listing_items`); used by `forarbete/download.py` and `remisser/download.py` |
@@ -83,7 +84,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `facets.py` | faceted navigation over the catalog — `tree`/`group`, the single source shared by the REST API (`/facets`) and the static browse pages |
 | `resolve.py` | turns a ⌘K query into a precise, fragment-deep resource target — three resolvers (SFS/EU-act/case nicknames + citation-engine pinpoints) over `lib.datasets` |
 | `layout.py` | single source of truth for where a `(source, basefile)` document lives, on disk and on the web (`downloaded`/`artifact`/`page_relpath`/`page_url`) |
-| `datasets.py` | canonical filesystem paths of the curated named-resource datasets (`NAMEDLAWS`/`NAMEDACTS`/`NAMEDCASES`) that ship in the package tree |
+| `datasets.py` | canonical filesystem paths of the curated named-resource datasets (`NAMEDLAWS`/`NAMEDACTS`/`NAMEDCASES`/`NAMEDEUCASES`) that ship in the package tree |
 | `concepts.py` | begrepp (concept) normalization — a hand-rolled, corpus-aware Swedish de-inflector collapsing inflected term forms onto one canonical `begrepp/<Name>`, plus the hand-edited override file `data/begrepp_aliases.json` |
 | `diff.py` | the "jämför lydelser" version-diff view — block-align + word-level `<ins>`/`<del>` over two parsed artifact versions, computed on demand |
 | `history.py` | read layer over the SFS version-history sidecar + amendment-register join, shared by the renderer's compare panel and `/api/v1/document/versions` |
@@ -150,6 +151,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `definitions.py` | extract an act's defined terms and interlink their in-act uses |
 | `lang.py` | localized structural vocabulary for the non-Formex (html/pdf) parsers (Formex is tag-marked, so its parser needs no language knowledge) |
 | `annotate.py` | `lagen eurlex ai-annotate <CELEX>` — author the editorial `.ann` layer for a sector-3 act with an LLM |
+| `casenames.py` | `lagen eurlex casenames` — harvest CELEX → usual name for named EU cases ("Schrems II") from Wikidata (property P476) into `data/casenames.json`, read by `lib/eucasenaming.py` |
 
 **wiki vertical (git-backed markdown — begrepp + kommentar)**
 | File | What |
@@ -198,7 +200,7 @@ editing" below).
 `legacy_root`/`wiki_root`) keys in the optional `config.yml`, read with
 ruamel.yaml round-trip mode so a bad value's line number is reported. It
 deliberately locates nothing else — curated source resources shipped in the
-tree (`lib/datasets.py`'s `NAMEDLAWS`/`NAMEDACTS`/`NAMEDCASES`, `sfs/data/
+tree (`lib/datasets.py`'s `NAMEDLAWS`/`NAMEDACTS`/`NAMEDCASES`/`NAMEDEUCASES`, `sfs/data/
 resources.json`, …) are anchored by their own callers, not here.
 
 ## Running the pipelines

@@ -58,6 +58,7 @@ from .dv import namedcases as dv_namedcases_mod
 from .dv.parse import api_member, parse_api_record, to_artifact
 from .eurlex import annotate as eurlex_annotate
 from .eurlex import bulk as eurlex_bulk
+from .eurlex import casenames as eurlex_casenames_mod
 from .eurlex import download as eurlex_download
 from .eurlex import parse as eurlex_parse
 from .forarbete import download as fa_download
@@ -84,6 +85,7 @@ from .lib import (
     util,
 )
 from .lib.datasets import NAMEDCASES as NAMEDCASES_JSON
+from .lib.datasets import NAMEDEUCASES as NAMEDEUCASES_JSON
 from .lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
 from .lib.errors import SkipDocument
 from .lib.lagrum import LagrumParser, load_namedlaws
@@ -1096,6 +1098,22 @@ def eurlex_ai_annotate(basefiles):
         print("eurlex ai-annotate %s: wrote %s" % (celex, out))
 
 
+def eurlex_casenames(args=()):
+    """Refresh the named-EU-cases snapshot (`lagen eurlex casenames`): query
+    Wikidata for EU cases carrying a CELEX number and rewrite
+    eurlex/data/casenames.json, which lib.eucasenaming reads to label a case by
+    its usual name ("Schrems II"). Independent of the per-document download/parse
+    chain -- one small curated dataset, not corpus artifacts. A parse restamps
+    the name onto the artifact, so re-parse the caselaw sector after a refresh."""
+    if RUN.dry_run:
+        print("eurlex casenames: would query %s -> %s"
+              % (eurlex_casenames_mod.WDQS, NAMEDEUCASES_JSON))
+        return
+    cases = eurlex_casenames_mod.harvest()
+    print("eurlex casenames: %d named EU cases -> %s"
+          % (len(cases), NAMEDEUCASES_JSON))
+
+
 SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
     layout.EURLEX_DOWNLOADED), {
     "download": Stage("download", eurlex_download_run, eurlex_notice),
@@ -1104,11 +1122,12 @@ SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
 }, harvest=eurlex_harvest, origin=_origin(eurlex_download.SOAP_ENDPOINT),
    scopes=frozenset(eurlex_download.SECTORS),
    actions={"unpack-bulk": eurlex_unpack, "ai-annotate": eurlex_ai_annotate,
-            "prune-empty": eurlex_prune},
+            "prune-empty": eurlex_prune, "casenames": eurlex_casenames},
    notes="download flags: --since YYYY-MM-DD, --lang swe,eng, --source sparql|soap\n"
          "unpack-bulk <dir|zip>: import a CELLAR bulk legislation dump\n"
          "prune-empty: remove download dirs with only a notice.ttl (no swe/eng doc)\n"
-         "ai-annotate <CELEX>: LLM-author the editorial .ann layer (sector-3 acts)")
+         "ai-annotate <CELEX>: LLM-author the editorial .ann layer (sector-3 acts)\n"
+         "casenames: refresh the named-EU-cases snapshot from Wikidata")
 
 
 # --------------------------------------------------------------------------

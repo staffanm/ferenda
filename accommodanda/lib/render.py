@@ -37,7 +37,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from ..api import app as api_service
-from . import casenaming, catalog, compress, history, lagrum, layout
+from . import casenaming, catalog, compress, eucasenaming, history, lagrum, layout
 from .catalog import BASE
 from .eu_structure import flatten as eurlex_flatten
 from .eu_structure import subarticle_key
@@ -317,7 +317,8 @@ def describe_citer(from_uri, anchor, label, title, source):
 # reading aid to a paragraph), then the machine-extracted sources, then concepts
 INBOUND_GROUPS = [("sfs", "Författningar"), ("forarbete", "Förarbeten"),
                   ("foreskrift", "Myndighetsföreskrifter"),
-                  ("dv", "Rättsfall"), ("begrepp", "Begrepp")]
+                  ("dv", "Rättsfall"), ("eurlex", "EU-rätt"),
+                  ("begrepp", "Begrepp")]
 
 # förarbete precedence in the inbound panel and the "Förarbeten" section:
 # propositions first, then SOU, Ds/PM, lagrådsremiss, betänkanden -- each block
@@ -1654,10 +1655,8 @@ def _load_editorial(celex):
 def _artlist(refs):
     """Article refs as links joined the Swedish way: "2", "2 och 6",
     "2, 6 och 28"."""
-    links = ['<a href="#%s">%s</a>' % (escape(a), escape(a)) for a in refs]
-    if len(links) <= 1:
-        return "".join(links)
-    return ", ".join(links[:-1]) + " och " + links[-1]
+    return _swedish_join(['<a href="#%s">%s</a>' % (escape(a), escape(a))
+                          for a in refs])
 
 
 def _group_anchor(g):
@@ -1795,8 +1794,18 @@ def render_eurlex(art, site):
     # name the heading is the full title, so it is not repeated in the metadata.
     # display_title is the single definition of this, shared with search/listings.
     title = catalog.display_title(art, art.get("title") or catalog.local(art["uri"]))
+    # a named case shows its case number ("C-311/18") as its own row: the heading
+    # is the usual name, so the number would otherwise appear nowhere but the
+    # CELEX. An unnamed case's heading already is the case number -- don't repeat
+    # it. Read the stamped `shortname` (the artifact is the source of truth) to
+    # decide "named", rather than re-deriving the name live, so this row can never
+    # disagree with the heading if the name snapshot is refreshed before re-parse.
+    number = (eucasenaming.case_number(art["celex"])
+              if art.get("doctype") == "judgment" else None)
+    named_case = number is not None and art.get("shortname") not in (None, number)
     meta = _meta_dl([
         ("Titel", art.get("title") if art.get("shortname") else None),
+        ("Mål", number if named_case else None),
         ("CELEX", art.get("celex")),
         ("Typ", EURLEX_KIND.get(art.get("doctype"), art.get("doctype"))),
         ("Datum", art.get("date")),

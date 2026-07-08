@@ -9,6 +9,9 @@ these). Each dataset is co-located with the vertical that owns and curates it:
   * ``NAMEDCASES`` -- HD cases by nickname ("Instagrambilden" -> NJA referat).
     Auto-harvested from Högsta domstolen's official list (dv.namedcases), with
     the harvested JSON committed as the shipped snapshot.
+  * ``NAMEDEUCASES`` -- EU cases by usual name ("Schrems II" -> CELEX). The Court
+    assigns no such name as data, so it is auto-harvested from Wikidata
+    (eurlex.casenames), with the harvested JSON committed as the shipped snapshot.
 
 A single source of truth for these paths, so the ~7 parse-time callers and the
 ⌘K resolver agree without each re-deriving the location.
@@ -22,6 +25,7 @@ _PKG = Path(__file__).resolve().parent.parent
 NAMEDLAWS = _PKG / "sfs" / "data" / "namedlaws.json"
 NAMEDACTS = _PKG / "eurlex" / "data" / "namedacts.json"
 NAMEDCASES = _PKG / "dv" / "data" / "namedcases.json"
+NAMEDEUCASES = _PKG / "eurlex" / "data" / "casenames.json"
 
 
 def load_namedcases(path=NAMEDCASES):

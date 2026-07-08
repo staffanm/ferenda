@@ -340,10 +340,14 @@ def begrepp_document(art, path):
 
 def eurlex_document(art, path):
     # kind is the doctype (regulation/directive/judgment/treaty); label is the
-    # CELEX (the short id citations use)
+    # CELEX (the short id citations use). A judgment's inbound-citation name is
+    # the case citation stamped at parse ("C-311/18 (Schrems II)"), not its
+    # "Domstolens dom (...)" Formex title; an act keeps its full title.
     label = art.get("celex") or local(art["uri"])
+    title = (art.get("label") if art.get("doctype") == "judgment"
+             else art.get("title")) or label
     return (art["uri"], "eurlex", art.get("doctype", "eurlex"),
-            label, art.get("title") or label, str(path))
+            label, title, str(path))
 
 
 def foreskrift_document(art, path):

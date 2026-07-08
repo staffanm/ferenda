@@ -1,0 +1,986 @@
+{
+ "_comment": "Named EU cases (CELEX -> usual name), harvested from Wikidata (P476 CELEX number -> item label). Refresh with `lagen eurlex casenames`. See eurlex/casenames.py.",
+ "_source_url": "https://query.wikidata.org/sparql",
+ "cases": [
+  {
+   "celex": "61962CJ0025",
+   "name": "Plaumann & Co v Commission"
+  },
+  {
+   "celex": "61962CJ0026",
+   "name": "Van Gend & Loos mot Nederländerna"
+  },
+  {
+   "celex": "61964CJ0006",
+   "name": "Costa mot Enel"
+  },
+  {
+   "celex": "61964CJ0056",
+   "name": "Consten SaRL and Grundig GmbH v Commission"
+  },
+  {
+   "celex": "61965CJ0061",
+   "name": "Vaassen v Beambtenfonds Mijnbedrijf"
+  },
+  {
+   "celex": "61966CJ0008",
+   "name": "Société anonyme Cimenteries CBR Cementsbedrijven NV v Commission"
+  },
+  {
+   "celex": "61968CJ0007",
+   "name": "Commission v Italy"
+  },
+  {
+   "celex": "61969CJ0029",
+   "name": "Stauder v City of Ulm"
+  },
+  {
+   "celex": "61970CJ0011",
+   "name": "Solange I"
+  },
+  {
+   "celex": "61970CJ0022",
+   "name": "Commission v Council"
+  },
+  {
+   "celex": "61972CJ0039",
+   "name": "Commission v Italy"
+  },
+  {
+   "celex": "61973CJ0004",
+   "name": "arrêt Nold"
+  },
+  {
+   "celex": "61973CJ0006",
+   "name": "Commercial Solvents Corporation v Commission"
+  },
+  {
+   "celex": "61974CJ0002",
+   "name": "Reyners v Belgium"
+  },
+  {
+   "celex": "61974CJ0008",
+   "name": "Procureur du Roi v Dassonville"
+  },
+  {
+   "celex": "61974CJ0009",
+   "name": "Casagrande case"
+  },
+  {
+   "celex": "61974CJ0033",
+   "name": "Van Binsbergen v Bestuur van de Bedrijfvereniging voor de Metaalnijverheid"
+  },
+  {
+   "celex": "61974CJ0041",
+   "name": "Van Duyn v Home Office"
+  },
+  {
+   "celex": "61975CJ0043",
+   "name": "Defrenne v Sabena"
+  },
+  {
+   "celex": "61976CJ0027",
+   "name": "United Brands Company v Commission of the European Communities"
+  },
+  {
+   "celex": "61977CJ0106",
+   "name": "Amministrazione delle Finanze dello Stato v Simmenthal SpA"
+  },
+  {
+   "celex": "61978CJ0120",
+   "name": "Cassis de Dijon (dom)"
+  },
+  {
+   "celex": "61978CJ0148",
+   "name": "Pubblico Ministero v Ratti"
+  },
+  {
+   "celex": "61979CJ0044",
+   "name": "Liselotte Hauer v Land Rheinland-Pfalz"
+  },
+  {
+   "celex": "61979CJ0129",
+   "name": "Macarthys v Smith"
+  },
+  {
+   "celex": "61979CJ0138",
+   "name": "SA Roquette Frères v Council"
+  },
+  {
+   "celex": "61980CJ0179",
+   "name": "Roquette Frères v Council"
+  },
+  {
+   "celex": "61980CJ0244",
+   "name": "Foglia vs. Novello"
+  },
+  {
+   "celex": "61981CJ0060",
+   "name": "International Business Machines Corporation v Commission"
+  },
+  {
+   "celex": "61981CJ0102",
+   "name": "Nordsee Deutsche Hochseefischerei GmbH v Reederei Mond Hochseefischerei Nordstern AG & Co KG"
+  },
+  {
+   "celex": "61981CJ0249",
+   "name": "Commission v Ireland"
+  },
+  {
+   "celex": "61981CJ0261",
+   "name": "Walter Rau Lebensmittelwerke v De Smedt PVBA"
+  },
+  {
+   "celex": "61981CJ0283",
+   "name": "CILFIT"
+  },
+  {
+   "celex": "61982CJ0011",
+   "name": "Piraiki-Patraiki v Commission"
+  },
+  {
+   "celex": "61983CJ0014",
+   "name": "Von Colson v Land Nordrhein-Westfalen"
+  },
+  {
+   "celex": "61983CJ0222",
+   "name": "Municipality of Differdange v Commission"
+  },
+  {
+   "celex": "61983CJ0293",
+   "name": "Gravier v City of Liege"
+  },
+  {
+   "celex": "61983CJ0294",
+   "name": "Parti écologiste \"Les Verts\" v Parliament"
+  },
+  {
+   "celex": "61984CJ0152",
+   "name": "Marshall v Southampton Health Authority"
+  },
+  {
+   "celex": "61984CJ0170",
+   "name": "Bilka-Kaufhaus GmbH v Weber von Hartz"
+  },
+  {
+   "celex": "61984CJ0178",
+   "name": "Commission v Germany"
+  },
+  {
+   "celex": "61984CJ0222",
+   "name": "Johnston v Chief Constable of the Royal Ulster Constabulary"
+  },
+  {
+   "celex": "61985CJ0024",
+   "name": "Spijkers v Gebroeders Benedik Abattoir CV"
+  },
+  {
+   "celex": "61985CJ0066",
+   "name": "Lawrie-Blum v Land Baden-Württemberg"
+  },
+  {
+   "celex": "61985CJ0314",
+   "name": "Foto-Frost case"
+  },
+  {
+   "celex": "61986CJ0062",
+   "name": "AKZO Chemie BV v Commission"
+  },
+  {
+   "celex": "61987CJ0081",
+   "name": "R (Daily Mail and General Trust plc) v HM Treasury"
+  },
+  {
+   "celex": "61987CJ0196",
+   "name": "Steymann v Staatssecretaris van Justitie"
+  },
+  {
+   "celex": "61987CJ0379",
+   "name": "Groener v Minister for Education"
+  },
+  {
+   "celex": "61988CJ0109",
+   "name": "Handels-og Kontorfunktionaerernes Forbund I Danmark v Dansk Arbejdsgiverforening, acting on behalf of Danfoss"
+  },
+  {
+   "celex": "61988CJ0171",
+   "name": "Rinner-Kühn v FWW Spezial-Gebäudereinigung GmbH & Co KG"
+  },
+  {
+   "celex": "61988CJ0262",
+   "name": "Barber v Guardian Royal Exchange Assurance Group"
+  },
+  {
+   "celex": "61988CJ0297",
+   "name": "Dzodzi-Entscheidung"
+  },
+  {
+   "celex": "61989CJ0106",
+   "name": "Marleasing SA v La Comercial Internacional de Alimentacion SA"
+  },
+  {
+   "celex": "61989CJ0184",
+   "name": "Nimz v Freie und Hansestadt Hamburg"
+  },
+  {
+   "celex": "61989CJ0188",
+   "name": "Foster v British Gas plc"
+  },
+  {
+   "celex": "61989CJ0260",
+   "name": "ERT AE v Pliroforissis and Kouvelas"
+  },
+  {
+   "celex": "61990CJ0006",
+   "name": "Francovich mot Italien"
+  },
+  {
+   "celex": "61990CJ0041",
+   "name": "Höfner and Elser v Macrotron GmbH"
+  },
+  {
+   "celex": "61990CJ0054",
+   "name": "Weddel & Co BV v Commission"
+  },
+  {
+   "celex": "61990CJ0370",
+   "name": "R (Secretary of State for the Home Department) v Immigration Appeal Tribunal and Surinder Singh"
+  },
+  {
+   "celex": "61991CJ0237",
+   "name": "Kazım-Kuş-Entscheidung"
+  },
+  {
+   "celex": "61991CJ0267",
+   "name": "Keck and Mithouard"
+  },
+  {
+   "celex": "61992CJ0049",
+   "name": "Commission v Anic Partecipazioni SpA"
+  },
+  {
+   "celex": "61992CJ0091",
+   "name": "Faccini Dori v Recreb Srl"
+  },
+  {
+   "celex": "61992CJ0127",
+   "name": "Enderby v Frenchay Health Authority"
+  },
+  {
+   "celex": "61992CJ0392",
+   "name": "Christel-Schmidt-Entscheidung"
+  },
+  {
+   "celex": "61993CJ0032",
+   "name": "Webb v EMO Air Cargo (UK) Ltd"
+  },
+  {
+   "celex": "61993CJ0046",
+   "name": "Brasserie du Pêcheur v Germany"
+  },
+  {
+   "celex": "61993CJ0279",
+   "name": "Finanzamt Köln Altstadt v Schumacker"
+  },
+  {
+   "celex": "61993CJ0384",
+   "name": "Alpine Investments BV v Minister van Financiën"
+  },
+  {
+   "celex": "61993CJ0415",
+   "name": "Bosmandomen"
+  },
+  {
+   "celex": "61993CJ0450",
+   "name": "Kalanke v Freie Hansestadt Bremen"
+  },
+  {
+   "celex": "61994CJ0013",
+   "name": "P v S and Cornwall County Council"
+  },
+  {
+   "celex": "61994CJ0055",
+   "name": "Gebhard v Consiglio dell'Ordine degli Avvocati e Procuratori di Milano"
+  },
+  {
+   "celex": "61994CJ0194",
+   "name": "CIA Security International SA v Signalson SA and Securitel SPRL"
+  },
+  {
+   "celex": "61995CJ0013",
+   "name": "Süzen v Zehnacker Gebaeudereingung GmbH"
+  },
+  {
+   "celex": "61995CJ0034",
+   "name": "Konsumentombudsmannen v De Agostini"
+  },
+  {
+   "celex": "61995CJ0251",
+   "name": "Sabel v Puma"
+  },
+  {
+   "celex": "61995CJ0265",
+   "name": "Commission v France"
+  },
+  {
+   "celex": "61995CJ0409",
+   "name": "Marschall v Land Nordrhein Westfalen"
+  },
+  {
+   "celex": "61996CJ0067",
+   "name": "Albany International BV v Stichting Bedrijfspensioenfonds Textielindustrie"
+  },
+  {
+   "celex": "61996CJ0085",
+   "name": "Sala v Freistaat Bayern"
+  },
+  {
+   "celex": "61997CJ0108",
+   "name": "Windsurfing Chiemsee Produktions v Boots"
+  },
+  {
+   "celex": "61997CJ0125",
+   "name": "Regeling v Bestuur van de Bedrijfsvereniging voor de Metaalnijverheid"
+  },
+  {
+   "celex": "61997CJ0158",
+   "name": "Re Badeck's application"
+  },
+  {
+   "celex": "61997CJ0167",
+   "name": "R (Seymour-Smith) v Secretary of State for Employment"
+  },
+  {
+   "celex": "61997CJ0212",
+   "name": "Centros Ltd v Erhversus-og Selkabssyrelsen"
+  },
+  {
+   "celex": "61997CJ0273",
+   "name": "Sirdar v The Army Board"
+  },
+  {
+   "celex": "61997CJ0294",
+   "name": "Eurowings-Entscheidung"
+  },
+  {
+   "celex": "61998CJ0107",
+   "name": "Teckal-undantaget"
+  },
+  {
+   "celex": "61998CJ0281",
+   "name": "Angonese v Cassa di Risparmio di Bolzano SpA"
+  },
+  {
+   "celex": "61998CJ0285",
+   "name": "Kreil-Entscheidung"
+  },
+  {
+   "celex": "61998CJ0303",
+   "name": "Sindicato de Médicos de Asistencia Pública v Conselleria de Sanidad y Consumo de la Generalidad Valenciana"
+  },
+  {
+   "celex": "61998CJ0379",
+   "name": "PreussenElektra AG v Schleswag AG"
+  },
+  {
+   "celex": "61998CJ0405",
+   "name": "Konsumentombudsmannen v Gourmet AB"
+  },
+  {
+   "celex": "61998CJ0407",
+   "name": "Abrahamsson and Anderson v Fogelqvist"
+  },
+  {
+   "celex": "61998CJ0443",
+   "name": "Unilever Italia SpA v Central Food SpA"
+  },
+  {
+   "celex": "61999CJ0157",
+   "name": "Geraets-Smits v Stichting Ziekenfonds"
+  },
+  {
+   "celex": "61999CJ0172",
+   "name": "Oy Liikenne Ab v Pekka Liskojärvi and Pentti Juntunen"
+  },
+  {
+   "celex": "61999CJ0173",
+   "name": "R (BECTU) v Department of Trade and Industry"
+  },
+  {
+   "celex": "61999CJ0184",
+   "name": "Grzelczyk v Centre Public d’Aide Sociale d’Ottignes-Louvain-la-Neuve"
+  },
+  {
+   "celex": "61999CJ0268",
+   "name": "Jany-Entscheidung"
+  },
+  {
+   "celex": "61999CJ0309",
+   "name": "Wouters v Algemene Raad van de Nederlandse Orde van Advocaten"
+  },
+  {
+   "celex": "61999CJ0383",
+   "name": "Procter & Gamble Co. v OHIM"
+  },
+  {
+   "celex": "61999CJ0413",
+   "name": "Baumbast and R v Secretary of State for the Home Department"
+  },
+  {
+   "celex": "61999CJ0453",
+   "name": "Courage Ltd v Crehan"
+  },
+  {
+   "celex": "61999TJ0222",
+   "name": "arrêt Martinez e.a. contre Parlement"
+  },
+  {
+   "celex": "62000CJ0014",
+   "name": "Commission v Italy"
+  },
+  {
+   "celex": "62000CJ0050",
+   "name": "Unión de Pequeños Agricultores v Council of the European Union"
+  },
+  {
+   "celex": "62000CJ0099",
+   "name": "Criminal proceedings against Kenny Roland Lyckeskog"
+  },
+  {
+   "celex": "62000CJ0112",
+   "name": "Schmidberger v Austria"
+  },
+  {
+   "celex": "62000CJ0187",
+   "name": "Kutz-Bauer v Freie und Hansestadt Hamburg"
+  },
+  {
+   "celex": "62000CJ0208",
+   "name": "Überseering BV v Nordic Construction Company Baumanagement GmbH"
+  },
+  {
+   "celex": "62000CJ0273",
+   "name": "Ralf Sieckmann v Deutsches Patent und Markenamt"
+  },
+  {
+   "celex": "62000CJ0280",
+   "name": "arrêt Altmark"
+  },
+  {
+   "celex": "62000CJ0438",
+   "name": "Kolpak ruling"
+  },
+  {
+   "celex": "62001CJ0002",
+   "name": "Bundesverband der Arzneimittel-Importeure eV and Commission v Bayer"
+  },
+  {
+   "celex": "62001CJ0101",
+   "name": "Bodil Lindqvist v Åklagarkammaren i Jönköping"
+  },
+  {
+   "celex": "62001CJ0167",
+   "name": "Kamer van Koophandel en Fabrieken voor Amsterdam v Inspire Art Ltd"
+  },
+  {
+   "celex": "62001CJ0224",
+   "name": "Köbler v Republik Österreich"
+  },
+  {
+   "celex": "62001CJ0234",
+   "name": "Arrest Arnoud Gerritse"
+  },
+  {
+   "celex": "62001CJ0256",
+   "name": "Allonby v Accrington and Rossendale College"
+  },
+  {
+   "celex": "62001CJ0283",
+   "name": "Shield Mark BV vs Joost Kist"
+  },
+  {
+   "celex": "62001CJ0322",
+   "name": "Deutscher Apothekerverband v 0800 DocMorris NV"
+  },
+  {
+   "celex": "62001CJ0387",
+   "name": "Weigel v Finanzlandesdirektion für Vorarlberg"
+  },
+  {
+   "celex": "62001CJ0397",
+   "name": "Pfeiffer v Deutsches Rotes Kreuz"
+  },
+  {
+   "celex": "62002CJ0009",
+   "name": "Lasteyrie-du-Saillant-Entscheidung"
+  },
+  {
+   "celex": "62002CJ0036",
+   "name": "Omega Spielhallen und Automatenaufstellungs-GmbH v Oberbürgermeisterin der Bundesstadt Bonn"
+  },
+  {
+   "celex": "62002CJ0116",
+   "name": "Gasser v MISAT"
+  },
+  {
+   "celex": "62002CJ0151",
+   "name": "Landeshauptstadt Kiel v Jaeger"
+  },
+  {
+   "celex": "62002CJ0200",
+   "name": "Chen v Home Secretary"
+  },
+  {
+   "celex": "62002CJ0222",
+   "name": "Peter Paul and Others v Bundesrepublik Deutschland"
+  },
+  {
+   "celex": "62002CJ0304",
+   "name": "arrêt merluchon"
+  },
+  {
+   "celex": "62002CJ0319",
+   "name": "Manninen-Entscheidung"
+  },
+  {
+   "celex": "62002CJ0453",
+   "name": "Linneweber/Akritidis-Entscheidung"
+  },
+  {
+   "celex": "62002CJ0456",
+   "name": "Trojani v Centre public d'aide sociale de Bruxelles"
+  },
+  {
+   "celex": "62003CC0321",
+   "name": "Dyson v Registrar of Trade Marks"
+  },
+  {
+   "celex": "62003CJ0147",
+   "name": "Commission v Austria"
+  },
+  {
+   "celex": "62003CJ0209",
+   "name": "R (Bidar) v London Borough of Ealing"
+  },
+  {
+   "celex": "62003CJ0446",
+   "name": "Marks-&-Spencer-Entscheidung"
+  },
+  {
+   "celex": "62003TJ0328",
+   "name": "O2 (Germany) GmbH & Co OHG v Commission"
+  },
+  {
+   "celex": "62004CJ0131",
+   "name": "Robinson-Steele v RD Retail Services Ltd"
+  },
+  {
+   "celex": "62004CJ0144",
+   "name": "Mangold v Helm"
+  },
+  {
+   "celex": "62004CJ0170",
+   "name": "Rosengrendomen"
+  },
+  {
+   "celex": "62004CJ0196",
+   "name": "Cadbury-Schweppes-Entscheidung"
+  },
+  {
+   "celex": "62004CJ0432",
+   "name": "Commission v Edith Cresson"
+  },
+  {
+   "celex": "62004CJ0484",
+   "name": "Commission v United Kingdom"
+  },
+  {
+   "celex": "62004CJ0499",
+   "name": "Werhof v Freeway Traffic Systems GmbH & Co KG"
+  },
+  {
+   "celex": "62004CJ0519",
+   "name": "Meca Medina and Majcen v Commission"
+  },
+  {
+   "celex": "62004TJ0201",
+   "name": "Microsoft Corp. v European Commission"
+  },
+  {
+   "celex": "62005CJ0013",
+   "name": "Chacón Navas v Eurest Colectividades SA"
+  },
+  {
+   "celex": "62005CJ0110",
+   "name": "Commission v Italy"
+  },
+  {
+   "celex": "62005CJ0112",
+   "name": "Commission v Germany"
+  },
+  {
+   "celex": "62005CJ0213",
+   "name": "Geven v Land Nordrhein-Westfalen"
+  },
+  {
+   "celex": "62005CJ0278",
+   "name": "Robins v Secretary of State for Work and Pensions"
+  },
+  {
+   "celex": "62005CJ0287",
+   "name": "Hendrix v Employee Insurance Institute"
+  },
+  {
+   "celex": "62005CJ0341",
+   "name": "Vaxholmskonflikten"
+  },
+  {
+   "celex": "62005CJ0402",
+   "name": "Kadi v Council and Commission"
+  },
+  {
+   "celex": "62005CJ0411",
+   "name": "Palacios de la Villa v Cortefiel Servicios SA"
+  },
+  {
+   "celex": "62005CJ0438",
+   "name": "International Transport Workers Federation v Viking Line ABP"
+  },
+  {
+   "celex": "62006CJ0210",
+   "name": "Cartesio Oktató és Szolgáltató bt"
+  },
+  {
+   "celex": "62006CJ0228",
+   "name": "Soysal-Urteil"
+  },
+  {
+   "celex": "62006CJ0303",
+   "name": "Coleman v Attridge Law"
+  },
+  {
+   "celex": "62006CJ0350",
+   "name": "Her Majesty's Revenue and Customs v Stringer"
+  },
+  {
+   "celex": "62006CJ0501",
+   "name": "GlaxoSmithKline Services Unlimited v Commission"
+  },
+  {
+   "celex": "62007CJ0042",
+   "name": "Liga Portuguesa de Futebol v Santa Casa da Misericórdia de Lisboa"
+  },
+  {
+   "celex": "62007CJ0054",
+   "name": "Centrum voor Gelijkheid van Kansen en voor Racismebestrijding v Firma Feryn NV"
+  },
+  {
+   "celex": "62007CJ0185",
+   "name": "Allianz SpA v West Tankers"
+  },
+  {
+   "celex": "62007CJ0202",
+   "name": "France Telecom SA v Commission"
+  },
+  {
+   "celex": "62007CJ0252",
+   "name": "Intel Corporation Inc. v CPM United Kingdom Ltd"
+  },
+  {
+   "celex": "62007CJ0420",
+   "name": "Apostolides v Orams"
+  },
+  {
+   "celex": "62007CJ0553",
+   "name": "College van burgemeester en wethouders van Rotterdam v M.E.E. Rijkeboer"
+  },
+  {
+   "celex": "62007CJ0555",
+   "name": "Kücükdeveci v Swedex GmbH & Co KG"
+  },
+  {
+   "celex": "62008CJ0005",
+   "name": "Infopaq International A/S v Danske Dagblades Forening"
+  },
+  {
+   "celex": "62008CJ0008",
+   "name": "T-Mobile Netherlands BV v Raad van bestuur van de Nederlandse Mededingingsautoriteit"
+  },
+  {
+   "celex": "62008CJ0022",
+   "name": "Vatsouras and Koupatantze v ARGE"
+  },
+  {
+   "celex": "62008CJ0044",
+   "name": "Akavan Erityisalojen Keskusliitto AEK ry v Fujitsu Siemens Computers Oy"
+  },
+  {
+   "celex": "62008CJ0058",
+   "name": "R (Vodafone Ltd) v Secretary of State for Business, Enterprise and Regulatory Reform"
+  },
+  {
+   "celex": "62008CJ0127",
+   "name": "Metock v Minister for Justice, Equality and Law Reform"
+  },
+  {
+   "celex": "62008CJ0171",
+   "name": "Commission v Portugal"
+  },
+  {
+   "celex": "62008CJ0229",
+   "name": "Wolf v Stadt Frankfurt am Main"
+  },
+  {
+   "celex": "62008CJ0236",
+   "name": "Google v Louis Vuitton"
+  },
+  {
+   "celex": "62008CJ0280",
+   "name": "Deutsche Telekom AG v Commission"
+  },
+  {
+   "celex": "62008CJ0403",
+   "name": "Murphy v Media Protection Services Limited"
+  },
+  {
+   "celex": "62008CJ0428",
+   "name": "Monsanto Technology LLC v Cefetra BV and Others"
+  },
+  {
+   "celex": "62008CJ0486",
+   "name": "Zentralbetriebsrat der Landeskrankenhäuser Tirols"
+  },
+  {
+   "celex": "62008CJ0565",
+   "name": "Commission v Italy"
+  },
+  {
+   "celex": "62008CJ0585",
+   "name": "Pammer and Alpenhof cases"
+  },
+  {
+   "celex": "62009CJ0108",
+   "name": "Ker-Optika bt v ÀNTSZ Dél- dunántúli Regionális Intézete"
+  },
+  {
+   "celex": "62009CJ0137",
+   "name": "Josemans v Burgemeester van Maastricht"
+  },
+  {
+   "celex": "62009CJ0196",
+   "name": "Miles v European Schools"
+  },
+  {
+   "celex": "62009CJ0236",
+   "name": "Test-Achats vs Council of Ministers"
+  },
+  {
+   "celex": "62010CJ0406",
+   "name": "SAS Institute Inc. v World Programming Ltd"
+  },
+  {
+   "celex": "62010CJ0457",
+   "name": "AstraZeneca plc v Commission"
+  },
+  {
+   "celex": "62010CJ0463",
+   "name": "Deutsche Post v Commission"
+  },
+  {
+   "celex": "62010CJ0544",
+   "name": "Deutsches Weintor eG v Land Rheinland-Pfalz"
+  },
+  {
+   "celex": "62010CJ0584",
+   "name": "Commission and Others v Kadi"
+  },
+  {
+   "celex": "62010CJ0617",
+   "name": "Åklagaren v Fransson"
+  },
+  {
+   "celex": "62010CJ0618",
+   "name": "Banco Español de Crédito SA v Camino"
+  },
+  {
+   "celex": "62011CJ0092",
+   "name": "RWE Vertrieb AG v Verbraucherzentrale Nordrhein-Westfalen eV"
+  },
+  {
+   "celex": "62011CJ0399",
+   "name": "arrêt Melloni contre Espagne"
+  },
+  {
+   "celex": "62011CJ0415",
+   "name": "Aziz v Caixa d´Estalvis de Catalunya"
+  },
+  {
+   "celex": "62011CJ0488",
+   "name": "Brusse v Jahani BV"
+  },
+  {
+   "celex": "62011CJ0583",
+   "name": "Inuit Tapiriit Kanatami v Parliament and Council"
+  },
+  {
+   "celex": "62011CJ0639",
+   "name": "Grzegorz Dorobek case"
+  },
+  {
+   "celex": "62012CJ0131",
+   "name": "Google Spain v AEPD and Mario Costeja González"
+  },
+  {
+   "celex": "62012CJ0141",
+   "name": "YS and M v Minister voor Immigratie"
+  },
+  {
+   "celex": "62012CJ0176",
+   "name": "Association de médiation sociale v Union locale des syndicats CGT"
+  },
+  {
+   "celex": "62012CJ0295",
+   "name": "Telefónica SA v Commission"
+  },
+  {
+   "celex": "62012CJ0370",
+   "name": "Pringle v Government of Ireland"
+  },
+  {
+   "celex": "62012CJ0486",
+   "name": "C-486/12"
+  },
+  {
+   "celex": "62013CJ0034",
+   "name": "Kušionová v SMART Capital a.s."
+  },
+  {
+   "celex": "62013CJ0146",
+   "name": "Case C-146/13"
+  },
+  {
+   "celex": "62013CJ0147",
+   "name": "Case C-147/13"
+  },
+  {
+   "celex": "62013CJ0182",
+   "name": "Lyttle v Bluebird UK Bidco 2 Ltd"
+  },
+  {
+   "celex": "62013CJ0201",
+   "name": "Deckmyn vs Vandersteen"
+  },
+  {
+   "celex": "62013CJ0268",
+   "name": "Elena Petru v Casa Județeană de Asigurări de Sănătate Sibiu and Casa Națională de Asigurări de Sănătate"
+  },
+  {
+   "celex": "62013CJ0333",
+   "name": "Dano v Jobcenter Leipzig"
+  },
+  {
+   "celex": "62013CJ0413",
+   "name": "FNV Kunsten Informatie en Media v Staat der Nederlanden"
+  },
+  {
+   "celex": "62013CV0002",
+   "name": "Opinion 2/13"
+  },
+  {
+   "celex": "62014CJ0062",
+   "name": "Gauweiler v Deutsche Bundestag"
+  },
+  {
+   "celex": "62014CJ0362",
+   "name": "Schrems I"
+  },
+  {
+   "celex": "62014CJ0484",
+   "name": "Tobias Mc Fadden v. Sony Music Entertainment Germany GmbH"
+  },
+  {
+   "celex": "62014CJ0613",
+   "name": "James-Elliott-Entscheidung"
+  },
+  {
+   "celex": "62015CJ0133",
+   "name": "H.C. Chavez-Vilchez and Others v Raad van bestuur van de Sociale verzekeringsbank and Others"
+  },
+  {
+   "celex": "62015CJ0160",
+   "name": "GS Media v. Sanoma"
+  },
+  {
+   "celex": "62015CJ0566",
+   "name": "Erzberger v TUI AG"
+  },
+  {
+   "celex": "62015CJ0671",
+   "name": "Président de l’Autorité de la concurrence v APVE and Others"
+  },
+  {
+   "celex": "62015TJ0117",
+   "name": "Commission v Estonia"
+  },
+  {
+   "celex": "62016CJ0434",
+   "name": "Nowak v Data Protection Commissioner"
+  },
+  {
+   "celex": "62016CJ0673",
+   "name": "Coman and Others v Inspectoratul General pentru Imigrări and Ministerul Afacerilor Interne"
+  },
+  {
+   "celex": "62017CJ0673",
+   "name": "German Federation of Consumer Organisations v Planet49 GmbH"
+  },
+  {
+   "celex": "62018CJ0311",
+   "name": "Schrems II"
+  },
+  {
+   "celex": "62018CJ0507",
+   "name": "NH v Associazione Avvocatura per i diritti LGBTI – Rete Lenford"
+  },
+  {
+   "celex": "62018CJ0619",
+   "name": "Commission v Poland"
+  },
+  {
+   "celex": "62018TJ0604",
+   "name": "Google LLC v Commission"
+  },
+  {
+   "celex": "62019CJ0821",
+   "name": "Commission v Hungary"
+  },
+  {
+   "celex": "62021TJ0726",
+   "name": "Rolex v EUIPO"
+  },
+  {
+   "celex": "62022CC0633",
+   "name": "Real Madrid Club de Fútbol v Le Monde"
+  },
+  {
+   "celex": "62022CJ0769",
+   "name": "Commission v Hungary"
+  },
+  {
+   "celex": "62023CJ0386",
+   "name": "Novel Nutriology GmbH v Verband Sozialer Wettbewerb eV"
+  },
+  {
+   "celex": "62023CJ0394",
+   "name": "Arrêt Mousse contre SNCF Connect et CNIL"
+  },
+  {
+   "celex": "62023CJ0662",
+   "name": "Zimir (C‑662/23)"
+  },
+  {
+   "celex": "62023CJ0713",
+   "name": "Cupriak-Trojan and Trojan v Wojewoda Mazowiecki"
+  }
+ ]
+}

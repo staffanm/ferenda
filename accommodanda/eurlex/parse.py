@@ -23,6 +23,7 @@ from pathlib import Path
 
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
+from ..lib import eucasenaming
 from ..lib.datasets import NAMEDACTS
 from ..lib.lagrum import EULAGSTIFTNING, EURATTSFALL, LagrumParser, interleave
 from ..lib.util import from_roman
@@ -431,10 +432,18 @@ def to_artifact(doc):
     art = {"uri": doc.uri, "celex": doc.celex, "doctype": doc.doctype,
            "lang": doc.lang, "title": doc.title, "date": doc.date,
            "structure": nest(body)}
-    # a short, distinctive human handle derived from the official title (the
-    # browse index / search shows it instead of the bare CELEX). Acts (legislation
-    # /treaties) only -- a judgment's "title" is the case name, already short.
-    if doc.doctype != "judgment":
+    # a short, distinctive human handle shown instead of the bare CELEX (the page
+    # heading, the browse index / search, an inbound-citation label). The two
+    # document families derive it differently:
+    if doc.doctype == "judgment":
+        # a case: its Formex "title" is "Domstolens dom (...) den ..." -- no use
+        # as a name. The heading is the case's usual name / case number
+        # ("Schrems II", "C-176/09"); an inbound citation adds the case number
+        # ("C-311/18 (Schrems II)"). Stamped from lib.eucasenaming so the pure
+        # catalog + renderer read them off the artifact without recomputing.
+        art["shortname"] = eucasenaming.case_name(doc.celex)
+        art["label"] = eucasenaming.case_citation(doc.celex)
+    else:
         label = short_label(doc.title)
         if label:
             art["label"] = label

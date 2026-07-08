@@ -67,7 +67,7 @@ Current code layout (this three-layer split is now realized in the package):
 
 ```
 accommodanda/
-  lib/      shared horizontal libs — lagrum (citation engine), catalog, render, layout, net, markdown, util, errors, casenaming, eu_structure, datasets
+  lib/      shared horizontal libs — lagrum (citation engine), catalog, render, layout, net, markdown, util, errors, casenaming, eucasenaming, eu_structure, datasets
   config.py runtime config (config.yml / data_root / wiki_root)
   sfs/      acts vertical — download·extract·reader·model·tokenizer·assembler·nf·register·versions·correspond·begrepp (+ __main__)
   dv/       court-decisions vertical — download·identity·namedcases·model·parse·structure·word·legacy
@@ -87,7 +87,10 @@ A vertical imports from `lib`; `lib` never imports a vertical; only `build`
 once owned but the derived layer also reads live in `lib` keyed on artifact
 metadata, not source code: `lib.casenaming` (a court decision's canonical URI +
 display title, read identically by dv's parse-time stamp, the catalog row and the
-page heading), `lib.eu_structure` (the one EU-act sub-article anchor grammar shared
+page heading), `lib.eucasenaming` (its EU mirror — a CJEU case's court case
+number, curated usual name and inbound-citation label, keyed on CELEX, read
+identically by eurlex's parse-time stamp, the catalog row and the page heading),
+`lib.eu_structure` (the one EU-act sub-article anchor grammar shared
 by the eurlex parser, the renderer and the wiki guidance layer), and
 `lib.datasets` (the named-resource snapshot loaders).
 
@@ -1155,6 +1158,23 @@ law, keyed by **CELEX** (the basefile throughout).
   definitions-article pattern (covers NIS2 + the bulk of modern acts); inline "'X'
   means …" definitions in running prose not yet detected.
   `test/test_eurlex_definitions.py`.
+- ✅ **EU case naming** (`lib/eucasenaming.py`, the EU mirror of DV's
+  `lib/casenaming.py`). `case_number` derives the court's own case number from a
+  caselaw CELEX (`62018CJ0311` → "C-311/18", also T-/F- courts, an AG opinion
+  sharing its judgment's number); on top, a curated **usual name** (`given_name`,
+  e.g. "Schrems II") sourced from a shipped snapshot, since neither EUR-Lex nor
+  CELLAR carry one as data (only the full parties string) — the Court publishes
+  no such name, so it is harvested from **Wikidata** (`eurlex/casenames.py`,
+  property P476 CELEX → item label) into `eurlex/data/casenames.json`
+  (`NAMEDEUCASES` in `lib/datasets.py`), analogous to `dv/data/namedcases.json`.
+  Coverage is famous cases only (~245); every other case falls back to the bare
+  case number. `case_name` (usual name or case number) is stamped onto a
+  judgment artifact at parse time as its page heading — replacing the useless
+  Formex "Domstolens dom (…) den …" title, which moves to a "Titel" metadata row
+  — and `case_citation` ("C-311/18 (Schrems II)") labels it wherever it is cited
+  from elsewhere, feeding a new "EU-rätt" inbound-panel group
+  (`render.INBOUND_GROUPS`). Refreshed via `lagen eurlex casenames`.
+  `test/test_eucasenaming.py`, `test/test_eurlex_casenames.py`.
 - ✅ **Genomför-direktiv edges wired** — `forarbete/kommentar.py`'s *implements*
   relations (a proposition's författningskommentar stating which EU directive
   article a provision transposes — "Paragrafen genomför artikel 21.1–21.3 i NIS
@@ -1735,11 +1755,11 @@ model + extraction.
 |---|---|
 | `tools/golden_sfs.py` | golden-corpus comparator (`normalize` parsed XHTML → NF on the fly) |
 | `../ferenda.old/data/sfs/parsed/` | the golden = old-pipeline parsed XHTML (11,056 docs), normalized per comparison — sibling checkout, not `site/data/` |
-| `accommodanda/lib/` | **shared** horizontal libs: `lagrum` (citation engine), `util`, `errors` (`SkipDocument`), `harvest` (shared incremental-download core — `HarvestWatermark`, `walk`) |
+| `accommodanda/lib/` | **shared** horizontal libs: `lagrum` (citation engine), `util`, `errors` (`SkipDocument`), `harvest` (shared incremental-download core — `HarvestWatermark`, `walk`), `casenaming`/`eucasenaming` (DV/EU case identity + display naming) |
 | `accommodanda/sfs/` | **acts vertical**: `{extract,reader,model,tokenizer,assembler,nf}` parser + `register` (SFSR→amendments/förarbeten/metadata) + `__main__` (validate CLI) |
 | `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `structure`, `word`, `legacy`, `namedcases` (HD named-precedent harvester); canonical case title + HD given names live in `lib/casenaming.py` (shared with the catalog + renderer) |
 | `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, 8 types + `pm`, promemorior outside the Ds series), `model`/`structure`/`parse` (PDF/html→nested structure→artifact), `legacy` (one-time import of the nine frozen förarbete corpora, §7g), `legacy_formats` (frozen body adapters — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML, scanned-PDF OCR text, TRIPS `div.body-text`), `riksdagen` (`bet`/utskottsbetänkanden downloader off data.riksdagen.se, no frozen corpus), `kommentar` (författningskommentar → EU-directive *genomför* edges, prop + fm), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf) |
-| `accommodanda/eurlex/` | **EU vertical (EUR-Lex/CELLAR)**: `download` (SPARQL discovery), `bulk` (dump import), `parse`/`parse_html`/`parse_pdf` (Formex/HTML/PDF → one artifact shape), `definitions` (defined-terms extraction + in-act interlinking), `lang`, `model` |
+| `accommodanda/eurlex/` | **EU vertical (EUR-Lex/CELLAR)**: `download` (SPARQL discovery), `bulk` (dump import), `parse`/`parse_html`/`parse_pdf` (Formex/HTML/PDF → one artifact shape), `definitions` (defined-terms extraction + in-act interlinking), `lang`, `model`, `casenames` (harvest CELEX → usual name for named EU cases from Wikidata into `data/casenames.json`, read by `lib/eucasenaming.py`) |
 | `accommodanda/avg/` | **JO/JK/ARN-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages, `jk_canonical` dnr normalization; ARN one-page vägledande-beslut listing), `legacy` (one-time import of the frozen ARN corpus 1991–2022, §7g), `parse` (JO/ARN PDF via `lib/pdftext`, JK landing HTML; DV parse-type citation scan) |
 | `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (per-agency enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct} wired onto `lib/harvest.walk`; `Skip`/`guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 17 agencies live + 4 frozen-only), `download`, `legacy` (one-time import of the two harvest-blocked corpora, §7g), `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors). Corpus: 1218 regs harvested, parsed 0-fail |
 | `accommodanda/remisser/` | **remiss (referral-response) vertical**: `model` (`Remiss`/`Remissinstans`/`Remissvar`, `org_slug`), `download` (regeringen.se `/remisser/` two-pass sync + `sync_one`/`--only`, stub records for any per-case fetch/parse failure), `parse` (answer PDF → `Remissvar` via `lib/pdftext` with no fixed header), `ai_analyze` (the sole LLM pass — sentiment+quote per section, `.ann` sidecar). Never `relate`d/published; its `.ann` layer feeds the referred förarbete's rail via `render._remiss_indexes` |
@@ -1749,7 +1769,7 @@ model + extraction.
 | `accommodanda/config.py`, `lib/layout.py`, `lib/net.py` | runtime config (`config.yml`/`data_root`, also resolves `legacy_root`/`LEGACY_ROOT` for the §7g frozen-corpus imports), centralized document layout (`page_relpath` on-disk file ↔ `page_url`/`url_to_relpath` public lagen.nu address), resilient HTTP session + harvest progress reporter |
 | `accommodanda/lib/legacy_import.py` | shared frozen-import core (§7g): `should_write` (live-wins / own-import-idempotent-unless-force / optional `better()` tie-break), `rel` (in-place LEGACY_ROOT-relative body references), `iter_entries`/`docdir`/`read_record` (frozen-tree walk primitives) — used by `forarbete/legacy.py`, `foreskrift/legacy.py`, `avg/legacy.py` |
 | `site/data/{downloaded,artifact}/eurlex/` | harvested EU corpus (`notice.ttl` + best manifestation per language) + artifacts |
-| `test/test_eurlex_parse.py`, `test/test_eurlex_html.py`, `test/test_eurlex_definitions.py` | EU parser + defined-terms suites |
+| `test/test_eurlex_parse.py`, `test/test_eurlex_html.py`, `test/test_eurlex_definitions.py`, `test/test_eucasenaming.py`, `test/test_eurlex_casenames.py` | EU parser, defined-terms and case-naming suites |
 | `accommodanda/lib/wikitext.py` | shared MediaWiki-dump parser (wikilinks + citation engine → runs) |
 | `accommodanda/wiki/` | **kommentar + begrepp sources**: `parse` (commentary anchored to §§, concept glossary) |
 | `site/data/downloaded/mediawiki/` | MediaWiki dump (SFS commentary + concept pages) |
@@ -1856,6 +1876,16 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **§7d** (2026-07-08) — EU case naming: `lib/eucasenaming.py` (the EU mirror
+  of `lib/casenaming.py`) derives a CJEU case's court case number from its
+  CELEX and pairs it with a curated usual name harvested from Wikidata
+  (`eurlex/casenames.py`, property P476, shipped as `eurlex/data/casenames.json`
+  / `NAMEDEUCASES`, ~245 named cases). A judgment's page heading is now its
+  usual name / case number (the old Formex "Domstolens dom (…) den …" title
+  moves to a "Titel" metadata row), and an inbound citation now reads
+  "C-311/18 (Schrems II)" — feeding a new "EU-rätt" group in the inbound panel
+  (`render.INBOUND_GROUPS`). New CLI action `lagen eurlex casenames` refreshes
+  the snapshot.
 - **§5/§6/api** (2026-07-06) — review-fix pass across the corpus: `lib/llm.py`
   gained the shared `author` validate/self-repair-retry loop (factored out of
   the near-identical retry code in eurlex/wiki annotate + remisser
