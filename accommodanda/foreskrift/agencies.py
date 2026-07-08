@@ -230,19 +230,26 @@ PTSFS = Agency(
     user_agent=BROWSER_UA, headers={"Accept-Language": "sv-SE,sv;q=0.9"},
 )
 
-# paginated + landing + filename-classify (MSB -> mcf.se; msbfs/mcffs co-prefix)
-MSBFS = Agency(
-    fs="msbfs", name="Myndigheten för civilt försvar (f.d. MSB)",
-    publisher="Myndigheten för samhällsskydd och beredskap",
+# paginated + landing + filename-classify. MCF (Myndigheten för civilt försvar)
+# took over MSB's författningssamling; its "gällande regler" listing mixes the
+# new MCFFS series with still-in-force MSBFS and older SÄIFS/IFS regulations, so
+# `fs_from_designation` keeps each document under its own samling code rather
+# than collapsing them onto one -- an MSBFS föreskrift keeps its MSBFS identity.
+# The FS designation is read off each row's own text.
+MCFFS = Agency(
+    fs="mcffs", name="Myndigheten för civilt försvar (f.d. MSB)",
+    publisher="Myndigheten för civilt försvar",
     base_url="https://www.mcf.se",
-    index_url="https://www.mcf.se/sv/regler/gallande-regler/",
+    index_url="https://www.mcf.se/sv/regler/gallande-regler/?sortOrder=DescendingYear",
     enumerate=paginated_enumerate, resolve=resolve_landing,
-    params={"page_url": "https://www.mcf.se/sv/regler/gallande-regler/?selectedpage={page}",
+    params={"page_url": "https://www.mcf.se/sv/regler/gallande-regler/"
+                        "?sortOrder=DescendingYear&selectedpage={page}",
             "row_select": "a.constitution-list-card-link",
             # new texts live under /contentassets/, the old SÄI/SÄIFS ones under
             # /siteassets/ with UUID filenames -- match both asset roots.
             "pdf_select": 'a[href*="assets/"][href$=".pdf"]',
-            "classify": classify_default_regulation},
+            "classify": classify_default_regulation,
+            "fs_from_designation": True},
 )
 
 # indexed over per-year pages + DIRECT (col-1 PDF link per row)
@@ -438,7 +445,7 @@ LEGACY_CORPORA = {"skvfs": ("skvfs", "rsfs"), "sosfs": ("sosfs", "hslffs")}
 # enumerate/classify in harvest.py, not a new pipeline.
 REGISTRY = {a.fs: a for a in (
     FFFS, SSMFS, NFS, KIFS, BFS,                       # first wave (5)
-    ELSAKFS, RGKFS, LMFS, KOVFS, PTSFS, MSBFS,         # second wave (10):
+    ELSAKFS, RGKFS, LMFS, KOVFS, PTSFS, MCFFS,         # second wave (10):
     LIVSFS, STEMFS, TFS, SIFS,                         #   ELSÄK-FS … SIFS
     PMFS, RPSFS,                                       # third wave: police FS (2)
     SKVFS, RSFS, SOSFS, HSLFFS,                        # frozen-only (§7g): SKV/SOS

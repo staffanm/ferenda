@@ -3,14 +3,21 @@ classification and number-extraction logic that decides what each landing-page
 file is and which regulation it belongs to. The live enumerate/resolve paths are
 exercised against the real sites during a harvest, not here."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from bs4 import BeautifulSoup
 
 from accommodanda.foreskrift import harvest
-from accommodanda.foreskrift.harvest import (classify_file, classify_section,
-                                             classify_href, classify_single, _ref,
-                                             Skip, DocRef)
+from accommodanda.foreskrift.harvest import (
+    DocRef,
+    Skip,
+    _ref,
+    classify_file,
+    classify_href,
+    classify_section,
+    classify_single,
+)
+from accommodanda.foreskrift.parse import extract_publisher
 from accommodanda.lib.harvest import guarded_enumerate
 
 
@@ -25,6 +32,7 @@ class _Agency:
     fs: str = "fffs"
     base_url: str = "https://example.se"
     index_url: str = "https://example.se/list"
+    params: dict = field(default_factory=dict)
 
 
 # --- classify_file: role + number from link text ---------------------------
@@ -103,6 +111,31 @@ def test_ref_direct_puts_pdf_in_extra():
     assert ref.extra["regulation_url"] == "https://example.se/gl/lmfs-2026-3.pdf"
 
 
+def test_ref_fs_from_designation_keeps_inherited_samling_identity():
+    # An agency that took over a renamed/disbanded agency's samling (MCF, whose
+    # listing mixes new MCFFS with still-in-force MSBFS/SÄIFS) files each document
+    # under its own fs, read from the row's printed designation -- not agency.fs.
+    seen = set()
+    agency = _Agency(fs="mcffs", params={"fs_from_designation": True})
+    own = _ref(agency, "MCFFS 2026:13", "/gallande-regler/mcffs-202613/", seen)
+    assert own.basefile == "mcffs/2026:13" and own.fs == "mcffs" \
+        and own.identifier == "MCFFS 2026:13"
+    inherited = _ref(agency, "MSBFS 2020:1", "/gallande-regler/msbfs-20201/", seen)
+    assert inherited.basefile == "msbfs/2020:1" and inherited.fs == "msbfs" \
+        and inherited.identifier == "MSBFS 2020:1"
+    # the hyphenated HSLF-FS designation collapses to a separator-free fs code
+    hslf = _ref(agency, "HSLF-FS 2019:4", "/gallande-regler/hslf-fs-20194/", seen)
+    assert hslf.basefile == "hslffs/2019:4" and hslf.identifier == "HSLF-FS 2019:4"
+
+
+def test_ref_without_fs_from_designation_normalises_to_agency_fs():
+    # the default (no opt-in): a stray designation is still normalised onto the
+    # agency's own fs, so ordinary agencies are unaffected by the new capability
+    seen = set()
+    ref = _ref(_Agency(fs="kifs"), "KIFS 2017:7", "/kifs-20177", seen)
+    assert ref.basefile == "kifs/2017:7" and ref.fs is None
+
+
 # --- enumeration resilience: a flaky index must not abort the run -----------
 
 def test_guarded_enumerate_turns_a_blowup_into_a_skip():
@@ -163,3 +196,62 @@ def test_resolve_direct_rejects_and_counts_non_pdf(tmp_path, monkeypatch):
                                     delay=0, log=logs.append, rejects=rejects)
     assert record["files"]["regulation"] is None
     assert len(rejects) == 1 and any("non-PDF" in m for m in logs)
+
+
+# --- extract_publisher: the issuing agency from the PDF masthead --------------
+# Inputs are real (whitespace-collapsed) masthead openings; the extractor is what
+# lets an inherited SÄIFS/SRVFS number keep its own defunct issuer rather than the
+# current custodian. Applies to every myndighetsföreskrift source (one parser).
+
+def test_publisher_from_utgivare_drops_the_named_individual():
+    # 'Utgivare: <person>, <agency>' -> the agency, never the person
+    mast = ("Statens räddningsverks författningssamling Utgivare: Key Hedström, "
+            "Statens räddningsverk ISSN 0283-6165 SRVFS 2004:3")
+    assert extract_publisher(mast) == "Statens räddningsverk"
+
+
+def test_publisher_utgivare_without_agency_falls_back_to_series_title():
+    # extraction often drops the agency after the person ('Anna Asp ISSN … MCFFS
+    # 2026:2'); the '<agency>s författningssamling' title then supplies it
+    mast = ("Myndigheten för civilt försvars författningssamling Utgivare: Anna Asp "
+            "ISSN 2000-1886 MCFFS 2026:2 Utkom från trycket den 19 januari 2026")
+    assert extract_publisher(mast) == "Myndigheten för civilt försvar"
+
+
+def test_publisher_series_title_optional_genitive_and_capital_f():
+    # an older masthead prints 'Krisberedskapsmyndigheten Författningssamling'
+    # (no genitive -s, capital F) -- still the agency
+    mast = ("Krisberedskapsmyndigheten Författningssamling Utgivare: Maria Broms "
+            "Hagelin SN 165 587 ISSN 1651-5587 KBMFS Krisberedskapsmyndighetens "
+            "föreskrifter 2008:1")
+    assert extract_publisher(mast) == "Krisberedskapsmyndigheten"
+
+
+def test_publisher_does_not_bleed_into_preceding_heading_words():
+    # a cover-page heading of Capitalised words before the title must not be
+    # swept into the agency (the continuation is lowercase-only)
+    mast = ("Skyltning Överlåtelse Transport Sprängämnesinspektionens "
+            "författningssamling Sprängämnesinspektionens föreskrifter om")
+    assert extract_publisher(mast) == "Sprängämnesinspektionen"
+
+
+def test_publisher_does_not_run_past_the_agency_into_the_next_words():
+    # the Utgivare agency stops at the next Capitalised token ('Allmänna'), not
+    # swallowing it
+    mast = ("Utgivare: Key Hedström, Myndigheten för samhällsskydd och beredskap "
+            "Allmänna råd ISSN 2000-1886")
+    assert extract_publisher(mast) == "Myndigheten för samhällsskydd och beredskap"
+
+
+def test_publisher_falls_back_to_foreskrift_name_when_no_series_line():
+    # no 'Utgivare:' and no 'författningssamling' -> the possessive prefix of the
+    # föreskrift's own name
+    mast = "Naturvårdsverkets föreskrifter (NFS 2020:5) om buller"
+    assert extract_publisher(mast) == "Naturvårdsverket"
+
+
+def test_publisher_prose_allmanna_rad_is_not_a_possessive_agency():
+    # a lowercase prose 'följande allmänna råd' is not a title; nothing is claimed
+    mast = ("Räddningsverket meddelar härmed följande allmänna råd för "
+            "tillämpningen av ovannämnda föreskrifter.")
+    assert extract_publisher(mast) is None

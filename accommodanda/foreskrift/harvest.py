@@ -54,12 +54,20 @@ class DocRef:
     API-direct agency the file itself). ``extra`` carries an agency-neutral
     payload for :func:`resolve_direct` (an enumeration that already knows the
     file URLs): ``{regulation_url, consolidations:[{url}],
-    amendments:[{identifier,url}], title, source_url}``."""
+    amendments:[{identifier,url}], title, source_url}``.
+
+    ``fs`` is the författningssamling this one document belongs to, which is
+    normally ``agency.fs`` but need not be: an agency that has taken over a
+    renamed/disbanded agency's samling lists several författningssamlingar on one
+    page (see ``fs_from_designation`` in :func:`_ref`), and each document is
+    stored and identified under *its own* fs, read from here by the resolvers and
+    the downloaded-check. ``None`` means "use ``agency.fs``"."""
     basefile: str
     identifier: str
     url: str
     title: str | None = None
     extra: dict = field(default_factory=dict)
+    fs: str | None = None
 
 
 @dataclass
@@ -228,7 +236,7 @@ def resolve_landing(session, agency, ref, root, delay=0.5, *, log=print, rejects
     still written, which used to mask the document with zero trace.
 
     Returns the stored record (also written to disk)."""
-    fs = agency.fs
+    fs = ref.fs or agency.fs     # the document's own samling (see DocRef.fs)
     arsutgava, lopnummer = ref.basefile.split("/", 1)[1].split(":")
     landing = request(session, "GET", ref.url).text
     soup = BeautifulSoup(landing, "html.parser")
@@ -298,7 +306,7 @@ def resolve_direct(session, agency, ref, root, delay=0.5, *, log=print, rejects=
     enumeration already carries the file URLs. A URL whose bytes are not a PDF
     (a WAF/error page) is rejected by a magic-byte sniff, logged and counted
     (via ``rejects``), never silently dropped."""
-    fs = agency.fs
+    fs = ref.fs or agency.fs     # the document's own samling (see DocRef.fs)
     extra = ref.extra
     files: dict[str, Any] = {"regulation": None, "consolidation": [], "amendment": [],
              "memo": [], "attachment": []}
@@ -371,15 +379,29 @@ def _ref(agency, ident_text, href, seen, title=None, direct=False):
         if not bare:
             return None
         arsutgava, lopnummer = bare.group(1), str(int(bare.group(2)))
-    basefile = "%s/%s:%s" % (agency.fs, arsutgava, lopnummer)
+    # Normally every document lands under agency.fs. But when an agency has taken
+    # over a renamed/disbanded agency's samling, its listing mixes författnings-
+    # samlingar (MCF's "gällande regler" carries new MCFFS *and* still-in-force
+    # MSBFS + older SÄIFS). ``fs_from_designation`` keeps each document under its
+    # own fs, taken from the printed designation, rather than collapsing the lot
+    # onto agency.fs -- so an MSBFS regulation keeps its MSBFS identity. The fs
+    # code is the lowercased designation stripped of separators ("HSLF-FS" ->
+    # "hslffs"); it only applies when the row actually names a designation.
+    fs = agency.fs
+    doc_fs = None      # DocRef.fs override; None == agency.fs (the common case)
+    identifier = "%s %s:%s" % (agency.fs.upper(), arsutgava, lopnummer)
+    if agency.params.get("fs_from_designation") and fsm:
+        designation = fsm.group(1).upper()
+        fs = doc_fs = re.sub(r"[^0-9a-zåäö]", "", designation.lower())
+        identifier = "%s %s:%s" % (designation, arsutgava, lopnummer)
+    basefile = "%s/%s:%s" % (fs, arsutgava, lopnummer)
     if basefile in seen:
         return None
     seen.add(basefile)
     url = absolute(agency.base_url, href)
     extra = {"regulation_url": url, "title": title, "source_url": agency.index_url} \
         if direct else {}
-    return DocRef(basefile=basefile,
-                  identifier="%s %s:%s" % (agency.fs.upper(), arsutgava, lopnummer),
+    return DocRef(basefile=basefile, fs=doc_fs, identifier=identifier,
                   url=url, title=title, extra=extra)
 
 
@@ -529,7 +551,9 @@ def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=prin
             "%s: basefile year %r is not a 4-digit year" % (ref.basefile, year)
         return ItemKey(
             basefile=ref.basefile,
-            is_downloaded=record_path(root, agency.fs, ref.basefile).exists(),
+            # the record lives under the document's own fs, which is agency.fs
+            # unless the row named a different samling (see DocRef.fs)
+            is_downloaded=record_path(root, ref.fs or agency.fs, ref.basefile).exists(),
             date=f"{year}-12-31")
 
     def resolve(ref):

@@ -63,6 +63,35 @@ RE_STODAV = re.compile(r"[Mm]ed\s+stöd\s+av\b(.*?)(?:föreskriver|kungör|beslu
                        r"meddelar|följande|\.)", re.DOTALL)
 RE_ERSATTER = re.compile(r"\b(?:ersätter|upphäver)\b(.*?)(?:\.|$)", re.DOTALL | re.I)
 RE_FS_REF = re.compile(r"\b([A-ZÅÄÖ]+-?FS)\s*(\d{4}):(\d+)")   # NFS/TFS … ELSÄK-FS
+# the issuing agency, read from the masthead (searched over a whitespace-collapsed
+# copy, since two-column extraction breaks the lines apart). Three signals, tried
+# in order:
+#   1. the "Utgivare:" line as "<person>, <agency>" -- keep the agency (the segment
+#      after the first comma), up to the ISSN / Utkom / FS-number the masthead runs
+#      on into. A line with no comma is just a name (extraction often drops the
+#      agency), so it yields nothing and the name signals take over.
+# (case is significant throughout -- the captured agency must begin at a real
+# uppercase letter, so these patterns carry no IGNORECASE; the anchor words spell
+# both cases where a masthead varies them.)
+RE_UTGIVARE = re.compile(
+    r"Utgivare:[^,]{1,60},\s*([A-ZÅÄÖ][a-zåäö0-9 .-]{2,55}?)"
+    r"\s*(?:ISSN|[A-ZÅÄÖ]|\d{4}:\d+|$)")
+#   2. the publication title "<agency>s författningssamling" -- the agency is the
+#      possessive prefix (the genitive -s optional: an older masthead prints
+#      "Krisberedskapsmyndigheten Författningssamling" without it). Prose-safe --
+#      "författningssamling" never occurs in the operative text.
+# An agency name is one Capitalised word followed by lowercase continuation words
+# ("Myndigheten för samhällsskydd och beredskap"); the continuation class excludes
+# uppercase, so the capture cannot bleed left into a preceding heading word
+# ("Skyltning Överlåtelse Transport Sprängämnesinspektionen"), and the optional
+# trailing -s absorbs the genitive.
+RE_FS_SERIES = re.compile(
+    r"([A-ZÅÄÖ][a-zåäö0-9 .-]{2,55}?)s?\s+[Ff]örfattningssamling\b")
+#   3. failing that, the föreskrift's own name "<agency>s föreskrifter/allmänna råd"
+#      -- the genitive -s is mandatory here so a prose "följande allmänna råd" can
+#      never be mistaken for a possessive agency prefix.
+RE_FS_TITLE = re.compile(
+    r"([A-ZÅÄÖ][a-zåäö0-9 .-]{2,55}?)s\s+(?:[Ff]öreskrift(?:er)?|[Aa]llmänna\s+råd)\b")
 RE_DIREKTIV_CELEX = re.compile(r"/ext/celex/\d+L\d")    # a directive (…L…), not a reg (…R…)
 # the "Jfr … direktiv …" implementation footnote; the directive right after "Jfr"
 # is the one the föreskrift genomför (any further directives in the clause are ones
@@ -153,6 +182,24 @@ def _first_date(rx, text):
     return _iso(*m.groups()) if m else None
 
 
+def extract_publisher(masthead):
+    """The issuing agency, read from the PDF masthead -- the one place the *real*
+    issuer is knowable (the harvest label is only the current custodian, so an
+    older MSBFS number may in truth name Statens räddningsverk, not MSB, and an
+    inherited SÄIFS/SRVFS number its own defunct agency).
+
+    Tries, in order: the ``Utgivare:`` line's agency, the "<agency>s
+    författningssamling" masthead title, then the föreskrift's own
+    "<agency>s föreskrifter" name (see the ``RE_*`` patterns above). ``None`` when
+    the masthead yields none of them, so the caller keeps the harvest-time label."""
+    flat = re.sub(r"\s+", " ", masthead)       # two-column extraction breaks lines
+    for rx in (RE_UTGIVARE, RE_FS_SERIES, RE_FS_TITLE):
+        m = rx.search(flat)
+        if m:
+            return m.group(1).strip(" .,-")
+    return None
+
+
 def extract_metadata(text, parser):
     """Best-effort masthead facts from the regulation's plain text. ``text`` is
     the whole document (ikraftträdande sits at the end, the rest up front)."""
@@ -226,8 +273,12 @@ def parse_pdf(path, identifier, parser):
     from the whole text (the masthead up front, ikraftträdande at the end); the
     structure is built from the operative body only, the masthead dropped."""
     blocks = parse_body(pdf_pages(path), identifier)
+    start = _body_start(blocks)
     meta = extract_metadata(_full_text(blocks), parser)
-    return _structure(blocks[_body_start(blocks):], parser), meta
+    # the publisher is a masthead fact only (a body citation to another agency's
+    # föreskrifter must not be mistaken for it), so read it from the masthead blocks
+    meta["publisher"] = extract_publisher(_full_text(blocks[:start]) or _full_text(blocks))
+    return _structure(blocks[start:], parser), meta
 
 
 def _fs_key(designation):
@@ -306,11 +357,14 @@ def parse_record(record, root):
         structure, meta = parse_pdf(
             body_path(root, fs, reg_file), record["identifier"], parser)
 
+    # the PDF masthead is the authoritative issuer; the harvest label (the current
+    # custodian agency) is only the fallback when the PDF names none
+    publisher = meta.pop("publisher", None) or record.get("publisher")
     reg = Regulation(
         uri=regulation_uri(fs, arsutgava, lopnummer),
         identifier=record["identifier"], fs=fs,
         arsutgava=arsutgava, lopnummer=lopnummer,
-        title=record.get("title"), publisher=record.get("publisher"),
+        title=record.get("title"), publisher=publisher,
         source_url=record.get("url"),
         structure=structure, **meta)
 
