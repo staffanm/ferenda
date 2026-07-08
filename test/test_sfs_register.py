@@ -58,8 +58,16 @@ def parsed_path(basefile):
 def inputs(basefile):
     """``(doc, register, sfst_header)`` from the new JSON ``_source`` -- the
     legacy SFSR/SFST HTML pages the old layout split this across are gone, so
-    the register/metadata parsing now runs off the JSON throughout."""
-    return load_inputs(json_path(basefile), None, None, basefile)
+    the register/metadata parsing now runs off the JSON throughout.
+
+    The `needs_json_corpus` guard only checks the corpus *directory* exists; a
+    partial checkout can have the dir but not this basefile's JSON. Skip per
+    basefile so a partial corpus produces skips, not a None-path failure deep in
+    extract_body."""
+    path = json_path(basefile)
+    if not path.exists():
+        pytest.skip("SFS JSON %s not in this (partial) corpus" % path)
+    return load_inputs(path, None, None, basefile)
 
 
 def normalform(basefile):

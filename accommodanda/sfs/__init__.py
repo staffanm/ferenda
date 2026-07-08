@@ -65,11 +65,18 @@ def load_inputs(json_path, html_path, register_path, basefile):
     new JSON ``_source`` over the legacy SFST+SFSR HTML pages — the DV
     single-best-source-per-document pattern. ``register``/``sfst_header`` are
     None when the legacy register page is absent or empty."""
-    if Path(json_path).exists():
+    if json_path and Path(json_path).exists():
         source = json.loads(Path(json_path).read_text())
         return (parse_sfs_source(source, basefile),
                 register_from_source(source),
                 sfst_header_from_source(source))
+    # the JSON source is the input throughout (the legacy HTML fallback is gone);
+    # fail loud at the boundary if it is missing rather than passing a None path
+    # down to parse_sfs -> extract_body, where it surfaces as an opaque TypeError
+    if html_path is None:
+        raise FileNotFoundError(
+            "no input for %s: JSON source %s absent and no legacy HTML page"
+            % (basefile, json_path))
     doc = parse_sfs(html_path, basefile)
     if not Path(register_path).exists():
         return doc, None, None
