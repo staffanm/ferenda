@@ -1436,16 +1436,29 @@ class LagrumParser:
         out.append({'_uri': self.forarb_doc_uri(node.children[0])})
 
     def fmt_forarb_refs(self, node, match, out, context):
-        base = self.forarb_doc_uri(node.children[0].children[0])
-        for page in self.sidor_pages(node):
-            out.append({'_uri': '%s#sid%s' % (base, page)})
+        doc = node.children[0]
+        base = self.forarb_doc_uri(doc.children[0])
+        self.emit_pages(node, base, out, node_span(doc)[0])
 
     def fmt_anon_prop_refs(self, node, match, out, context):
         if self.state.last_forarbete is None:
             raise NoLink()
-        for page in self.sidor_pages(node):
-            out.append({'_uri': '%s#sid%s'
-                        % (self.state.last_forarbete, page)})
+        # the A_PROP token ("a. prop.") anchors the first page link's span
+        self.emit_pages(node, self.state.last_forarbete, out,
+                        node.children[0].start_pos)
+
+    def emit_pages(self, node, base, out, doc_start):
+        """One `#sid{n}` link per page, each spanning its own page-number
+        token so a multi-page list ("s. 445 och 454", "s. 162-165") does
+        not collapse to one overlapping span. The first link folds in the
+        leading document text ("prop. … s. 445"); later pages link the
+        bare number, the way the golden corpus draws the boundaries."""
+        pages = [s for s in node.iter_subtrees_topdown() if s.data == 'sida_num']
+        for i, page in enumerate(pages):
+            pstart, pend = node_span(page)
+            span = (doc_start if i == 0 else pstart, pend)
+            out.append({'_uri': '%s#sid%s' % (base, token_text(page)),
+                        '_span': span})
 
     def fmt_avsnitt_external(self, node, match, out, context):
         komm = context.get('kommittensbetankande')
@@ -1501,10 +1514,6 @@ class LagrumParser:
         prefix = 'prop' if 'Proposition' in context['type'] else 'sou'
         return '%s%s/%s:%s' % (self.base, prefix, context['year'],
                                context['no'])
-
-    def sidor_pages(self, node):
-        return [token_text(s) for s in node.iter_subtrees_topdown()
-                if s.data == 'sida_num']
 
     def avsnitt_frags(self, node):
         return ['S' + token_text(s).replace('.', '-')

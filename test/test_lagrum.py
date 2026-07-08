@@ -129,6 +129,47 @@ def test_forarbeten(path):
     assert got == want
 
 
+# Multi-page förarbete refs ("s. 445 och 454", "s. 162-165", "s. 400, 505,
+# 509 och 511", "a. prop. s. 48, 50") emit one #sid{n} link per page. The
+# URI-only test above never exercised their *spans*, so every page link
+# defaulted to the whole match window and the links overlapped -- which
+# blew up interleave() in the real parse pipeline. These cases assert the
+# per-page link boundaries: the first page folds in the leading document
+# text, later pages link the bare number (as the golden corpus draws them).
+FORARB_PAGE_CASES = [
+    ("(jfr prop. 2017/18:232 s. 445 och 454)", None, [
+        ("prop. 2017/18:232 s. 445", "https://lagen.nu/prop/2017/18:232#sid445"),
+        ("454", "https://lagen.nu/prop/2017/18:232#sid454")]),
+    ("prop. 2017/18:105 s. 162-165", None, [
+        ("prop. 2017/18:105 s. 162", "https://lagen.nu/prop/2017/18:105#sid162"),
+        ("165", "https://lagen.nu/prop/2017/18:105#sid165")]),
+    ("prop. 2021/22:136 s. 400, 505, 509 och 511", None, [
+        ("prop. 2021/22:136 s. 400", "https://lagen.nu/prop/2021/22:136#sid400"),
+        ("505", "https://lagen.nu/prop/2021/22:136#sid505"),
+        ("509", "https://lagen.nu/prop/2021/22:136#sid509"),
+        ("511", "https://lagen.nu/prop/2021/22:136#sid511")]),
+    # "a. prop." (anförd proposition) resolves against the last prop seen
+    ("a. prop. s. 48, 50", "https://lagen.nu/prop/2017/18:105", [
+        ("a. prop. s. 48", "https://lagen.nu/prop/2017/18:105#sid48"),
+        ("50", "https://lagen.nu/prop/2017/18:105#sid50")]),
+]
+
+
+@pytest.mark.parametrize("text,last_prop,links", FORARB_PAGE_CASES,
+                         ids=[c[0] for c in FORARB_PAGE_CASES])
+def test_forarb_page_spans(text, last_prop, links):
+    parser = LagrumParser(NAMEDLAWS, basefile="9999:999",
+                          parse_types=[FORARBETEN])
+    if last_prop:
+        parser.state.last_forarbete = last_prop
+    refs = parser.parse_text(text, context={"law": "9999:999"})
+    # interleave asserts the spans are disjoint; the link runs it produces
+    # pin down each page's exact text boundary
+    runs = [(run["text"], run["uri"])
+            for run in interleave(text, refs) if isinstance(run, dict)]
+    assert runs == links
+
+
 # The repo's ECJ fixtures (test/files/legalref/ECJ) are unusable as an
 # oracle: the old driver flagged both as broken, they carry no expected
 # output, and the files are UTF-8 (U+2011) while the harness reads
