@@ -2035,8 +2035,12 @@ def stale_sources():
     if RUN.force or not CATALOG.exists():
         return list(ARTIFACTS)
     cutoff = CATALOG.stat().st_mtime
+    # artifacts are stored precompressed (.json.br); the listers yield logical
+    # .json names, so stat the real backing file (compress.stat) -- a plain
+    # p.stat() would raise FileNotFoundError on every compressed tree, exactly
+    # as file_watermark() already does when fingerprinting these same paths
     return [name for name, lister in ARTIFACTS.items()
-            if any(p.stat().st_mtime > cutoff for p in lister())]
+            if any(compress.stat(p).st_mtime > cutoff for p in lister())]
 
 
 # a page's rendered HTML is a function of the render/query code plus the
