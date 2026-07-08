@@ -290,7 +290,7 @@ def search_endpoint(
             kept = [r for r in results if r["uri"] not in roots]
             total += sum(p["uri"] not in {r["uri"] for r in results} for p in pinned)
             results = (pinned + kept)[:limit]
-    return SearchResponse(query=q, total=total, results=results)  # ty: ignore[invalid-argument-type]  # results are untyped hit dicts; pydantic validates at runtime
+    return SearchResponse(query=q, total=total, results=results)  # results are untyped hit dicts; pydantic validates at runtime
 
 
 @app.get("/api/v1/facets", response_model=FacetTree, tags=["catalog"])
