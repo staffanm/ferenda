@@ -737,6 +737,20 @@ def _id_attr(nid):
     return ' id="%s"' % escape(nid) if nid else ""
 
 
+def _strip_self_ref(runs, nid):
+    """A container's title ("1 kap. Lagens tillämpningsområde") carries its own
+    designator as a leading reference run that the citation engine linked back
+    to this very container (`#K1`) -- a pointless self-link. Flatten any run
+    targeting the container's own id to plain text; leave real cross-references
+    alone."""
+    if not isinstance(runs, list):
+        return runs
+    return [run["text"] if isinstance(run, dict)
+            and run.get("uri", "").rpartition("#")[2] == nid
+            else run
+            for run in runs]
+
+
 def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
     t = node.get("type")
     nid = node.get("id")
@@ -789,14 +803,33 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
     if t in ("kapitel", "avdelning", "underavdelning"):
         label = {"kapitel": "kap.", "avdelning": "Avd.",
                  "underavdelning": "Avd."}[t]
-        # the chapter number; its title is a rubrik child that already reads
-        # "1 kap. Statsskickets grunder", so the chapter goes in the TOC via
-        # that rubrik, not as a redundant bare-number entry here
-        head_text = ("%s %s" % (node.get("ordinal", ""), label)).strip()
-        children = "".join(render_node(c, site, doc_uri, toc, rail)
-                           for c in node.get("children", []))
-        head = '<h2%s class="kaprubrik">%s</h2>' % (_id_attr(nid),
-                                                    escape(head_text))
+        # the container's own title is its first child: a level-1 rubrik reading
+        # "1 kap. Lagens tillämpningsområde" whose leading "1 kap." designator the
+        # citation engine self-links back here. Adopt that rubrik AS the single
+        # chapter heading -- under the container's id (the #K1 anchor target and
+        # TOC entry), self-link flattened -- rather than emitting a bare-number
+        # "1 kap." kaprubrik plus the redundant rubrik that repeats it.
+        kids = node.get("children", [])
+        title = (kids[0] if kids and kids[0].get("type") == "rubrik"
+                 and (kids[0].get("level") or 1) == 1 else None)
+        if title is not None and plain(title.get("text", [])):
+            # anchor the heading at the container's id (or a minted secN when the
+            # container is id-less) and point the TOC there; capturing toc.add's
+            # return keeps the heading id and the TOC anchor in lockstep, as the
+            # rubrik branch does -- _id_attr(nid) alone would emit no id for an
+            # id-less container while the TOC still linked its minted secN anchor
+            anchor = toc.add(nid, plain(title.get("text", [])), 1)
+            head = '<h2 id="%s" class="kaprubrik">%s</h2>' % (
+                escape(anchor),
+                render_runs(_strip_self_ref(title.get("text", []), nid), site))
+            body = kids[1:]
+        else:
+            # no usable title (empty rubrik) -- keep the bare designator heading
+            head = '<h2%s class="kaprubrik">%s</h2>' % (
+                _id_attr(nid),
+                escape(("%s %s" % (node.get("ordinal", ""), label)).strip()))
+            body = kids[1:] if title is not None else kids
+        children = "".join(render_node(c, site, doc_uri, toc, rail) for c in body)
         return '<section class="%s"%s>%s%s</section>' % (t, ra, head, children)
 
     if t == "paragraf":
