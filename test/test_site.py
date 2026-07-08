@@ -359,6 +359,9 @@ def test_render_document_injects_edit_meta(tmp_path):
     site = render.Site.from_catalog(build_catalog(tmp_path))
     law = render.render_document(LAW, "sfs", site)
     assert '<meta name="lagen-doc" data-kind="kommentar" data-ref="1975:635"' in law
+    # a statute is patchable, so its identity rides on the meta for the
+    # "patch source" button beside the commentary one
+    assert 'data-source="sfs" data-basefile="1975:635"' in law
     assert law.count("</head>") == 1 and '/editor.js' in law
     case = render.render_document(CASE, "dv", site)
     assert 'name="lagen-doc"' not in case      # court decisions are read-only

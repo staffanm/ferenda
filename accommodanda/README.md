@@ -562,7 +562,10 @@ The web surface (`api/patch.py`, gated by the same editor auth as the commentary
 editor) serves `GET /api/v1/patch/edit?source=…&basefile=…` — a textarea seeded
 with the intermediate text; saving writes the *minimal* diff, commits it attributed
 to the editor, and force-reparses the document so the fix is live. Editing the text
-back to the pristine source removes the patch. See
+back to the pristine source removes the patch. A logged-in editor reaches it from a
+**🩹 Patcha källtext** button that `editor.js` grafts next to the *✎ Kommentera
+dokumentet* button on any patchable document page (the page's `<meta name="lagen-doc">`
+carries the `data-source`/`data-basefile` identity). See
 [`patches/README.md`](patches/README.md).
 
 ## Production deployment (Docker)
