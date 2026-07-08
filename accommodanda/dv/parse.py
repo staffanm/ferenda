@@ -22,6 +22,7 @@ import re
 
 from bs4 import BeautifulSoup
 
+from ..lib import patch
 from ..lib.casenaming import case_uri
 from ..lib.datasets import NAMEDACTS
 from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
@@ -143,9 +144,14 @@ def parse_innehall(html):
     return parse_body(html)[0]
 
 
-def parse_api_record(d):
-    """API record dict -> Avgorande."""
-    body, footnotes = parse_body(d.get("innehall"))
+def parse_api_record(d, basefile=None):
+    """API record dict -> Avgorande. The innehåll HTML is DV's intermediate
+    format: when `basefile` is given, apply any curated patch to it (a
+    correction, or a rot13 redaction anonymising a party) before it is parsed."""
+    innehall = d.get("innehall")
+    if basefile is not None and innehall is not None:
+        innehall = patch.apply("dv", basefile, innehall)
+    body, footnotes = parse_body(innehall)
     return Avgorande(
         court=d["domstol"]["domstolKod"],
         court_namn=d["domstol"]["domstolNamn"],

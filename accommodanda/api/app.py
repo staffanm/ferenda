@@ -36,7 +36,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .. import config
 from ..lib import catalog, diff, facets, history, layout, resolve, search
-from . import auth, edit, ops
+from . import auth, edit, ops, patch
 
 CATALOG = config.DATA / "catalog.sqlite"
 DUMPS = config.DATA / "dumps"
@@ -63,6 +63,7 @@ app.include_router(ops.router)
 # SameSite=Lax), so CORS deliberately keeps blocking cross-origin writes.
 app.include_router(auth.router)
 app.include_router(edit.router)
+app.include_router(patch.router)   # the patch-file (source-fix) editor
 
 # one search client for the process; constructing it does not open a connection,
 # so importing/serving the API never requires a running OpenSearch -- only an

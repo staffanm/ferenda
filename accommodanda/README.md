@@ -165,7 +165,9 @@ citation graph, version history + diff) that also serves the static site under
 (see "Operations" below); `lib/runlog.py` owns the state files behind it.
 `api/auth.py` + `api/edit.py` + `api/editcontent.py` + `api/editcart.py` are the
 inline content editor — the one authenticated, mutating surface (see "Inline
-editing" below).
+editing" below); `api/patch.py` is its sibling for authoring source-fix **patch
+files** (`lib/patch.py`, `lib/patchit.py`, `patchsource.py`; see "Patch files"
+below).
 
 ## Running the pipelines
 
@@ -523,6 +525,42 @@ than clobbering.
 The routes are same-origin only (the session cookie is `SameSite=Lax`; CORS
 stays GET-open for the public read API). No new dependencies — cookie signing
 and password hashing are stdlib `hmac`/`hashlib`.
+
+## Patch files (source corrections + redactions)
+
+Controlled, version-controlled fixes to a document's **source material**, applied
+at parse time before the text is tokenised — the old pipeline's `patch_if_needed`,
+re-done. A **correction** fixes a real error in a downloaded source (an OCR slip, a
+broken table); a **redaction** removes personal data (a named party, a
+personnummer) and is stored **rot13-obfuscated** so the removed text is not
+plain-text googleable in the committed tree.
+
+A patch is an ordinary unified diff against a document's **best intermediate
+format** — the representation its parser actually reads and a human can edit: plain
+text for `sfs`, the `innehåll` HTML for `dv`, the Formex XML for `eurlex` (the
+PDF-bodied sources are not text-patchable at source level). Each vertical's parser
+calls `lib.patch.patch_if_needed(source, basefile, text)` at that choke point; a
+patch that no longer applies is a **fatal** parse error (the source drifted — it
+must be regenerated, never silently skipped). Patches live committed in the repo at
+`patches/<source>/<relpath>.patch` (or `.rot13.patch`), keyed by the same rule as
+the artifact tree (`layout.patch`); they are folded into the parse freshness inputs
+so editing one re-stales its document.
+
+Author them from the CLI or the inline web editor:
+
+```sh
+lagen sfs patch-show 2018:585 > /tmp/585.txt   # the intermediate text (patch applied)
+$EDITOR /tmp/585.txt                            # edit to the desired final text
+lagen sfs mkpatch 2018:585 /tmp/585.txt "Rättad OCR-felaktighet"
+lagen dv mkpatch "NJA 2015 s 1" /tmp/case.html "Avidentifierad part" --rot13
+```
+
+The web surface (`api/patch.py`, gated by the same editor auth as the commentary
+editor) serves `GET /api/v1/patch/edit?source=…&basefile=…` — a textarea seeded
+with the intermediate text; saving writes the *minimal* diff, commits it attributed
+to the editor, and force-reparses the document so the fix is live. Editing the text
+back to the pristine source removes the patch. See
+[`patches/README.md`](patches/README.md).
 
 ## Production deployment (Docker)
 
