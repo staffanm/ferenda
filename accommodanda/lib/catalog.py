@@ -45,7 +45,8 @@ CREATE TABLE IF NOT EXISTS documents (
     path         TEXT NOT NULL,    -- artifact json on disk
     source_url   TEXT,             -- authoritative publisher url ("Källa"), if any
     content_hash TEXT,             -- sha256 of the artifact bytes (incremental relate)
-    expired      TEXT              -- repeal-effective date (SFS upphavandedatum), if any
+    expired      TEXT,             -- repeal-effective date (SFS upphavandedatum), if any
+    date         TEXT              -- the document's own date (förarbete/statute/decision), ISO
 );
 CREATE TABLE IF NOT EXISTS links (
     from_uri    TEXT NOT NULL,   -- document making the citation (doc-level uri)
@@ -121,6 +122,8 @@ def connect(path):
         con.execute("ALTER TABLE documents ADD COLUMN art_size INTEGER")
     if "art_mtime_ns" not in cols:
         con.execute("ALTER TABLE documents ADD COLUMN art_mtime_ns INTEGER")
+    if "date" not in cols:
+        con.execute("ALTER TABLE documents ADD COLUMN date TEXT")
     return con
 
 
@@ -368,6 +371,18 @@ def expired_date(art):
     return art.get("metadata", {}).get("properties", {}).get("rpubl:upphavandedatum")
 
 
+def document_date(art):
+    """The document's own date (ISO yyyy-mm-dd), for chronological ordering of
+    inbound references -- a förarbete's publication date, a statute's
+    utfärdandedatum, a decision's date. Field-driven across sources; None when
+    the artifact carries no date (the renderer sorts undated entries last)."""
+    props = art.get("metadata", {}).get("properties", {})
+    return (art.get("date")
+            or props.get("rpubl:utfardandedatum")
+            or props.get("rpubl:avgorandedatum")
+            or props.get("rpubl:beslutsdatum"))
+
+
 def display_title(art, title):
     """The human title a document shows wherever it is named to a reader -- the
     page heading, a search hit, a listing entry: the act's established short name
@@ -423,11 +438,12 @@ def _index_document(con, art, path, source):
     con.execute(
         "INSERT OR REPLACE INTO documents "
         "(uri, source, kind, label, title, path, source_url, content_hash, "
-        " expired, display) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        " expired, display, date) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
         (*row, art.get("source_url"),
          None,                 # content_hash filled by the caller (holds bytes)
          expired_date(art),
-         display_title(art, row[4])))             # the reader-facing heading (row[4]=title)
+         display_title(art, row[4]),              # the reader-facing heading (row[4]=title)
+         document_date(art)))
     rows = [(uri, anchor, run.get("predicate", "dcterms:references"),
              run["uri"], strip_fragment(run["uri"]), run.get("text"))
             for anchor, run in (artifact_links(art) + subject_links(art)
@@ -803,6 +819,29 @@ def inbound(con, uri, limit=None):
     return con.execute(sql, (uri,)).fetchall()
 
 
+def inbound_collapsed(con, uri, exclude_from=()):
+    """Documents citing exactly `uri`, one row per citing *document* (not per
+    pinpoint) as (from_uri, label, title, source, kind, date, anchors) -- the
+    grain the "Hänvisat till av" panel renders, so a förarbete citing from a
+    dozen avsnitt is one line whose `anchors` (comma-joined, NULL pinpoints
+    dropped) the renderer turns into a pinpoint list. Self-citations, kommentar
+    and bemyndigande excluded, plus any `exclude_from` uris (a statute's own
+    förarbeten, shown once in their preparatory-works role instead)."""
+    excl = ""
+    params = [uri]
+    if exclude_from:
+        excl = " AND l.from_uri NOT IN (%s)" % ",".join("?" * len(exclude_from))
+        params.extend(exclude_from)
+    sql = ("SELECT l.from_uri, d.label, d.title, d.source, d.kind, d.date, "
+           "GROUP_CONCAT(DISTINCT l.from_anchor) "
+           "FROM links l JOIN documents d ON d.uri = l.from_uri "
+           "WHERE l.to_uri = ?" + _NOT_SELF + _NOT_BEMYNDIGANDE
+           + " AND d.source <> 'kommentar'" + excl
+           + " GROUP BY l.from_uri "
+           "ORDER BY d.source, d.date, d.label")
+    return con.execute(sql, params).fetchall()
+
+
 def bemyndigande_inbound(con, uri):
     """The föreskrifter issued (meddelade) under a statute paragraf -- the inbound
     side of the bemyndigande edge: (foreskrift_uri, label, title), one per
@@ -813,19 +852,6 @@ def bemyndigande_inbound(con, uri):
         "FROM links l JOIN documents d ON d.uri = l.from_uri "
         "WHERE l.to_uri = ? AND l.predicate = 'rpubl:bemyndigande' "
         "ORDER BY d.label", (uri,)).fetchall()
-
-
-def inbound_count(con, uri):
-    """How many (citing document, pinpoint) entries cite exactly `uri` -- over the
-    same filtered set `inbound` lists (kommentar excluded: it is a rail annotation
-    shown side-by-side, not a citing page of its own), so the renderer's "+N fler"
-    overflow figure counts exactly the rows it would have shown."""
-    return con.execute(
-        "SELECT COUNT(*) FROM (SELECT 1 FROM links l "
-        "JOIN documents d ON d.uri = l.from_uri "
-        "WHERE l.to_uri = ?" + _NOT_SELF + _NOT_BEMYNDIGANDE
-        + " AND d.source <> 'kommentar' "
-        "GROUP BY l.from_uri, l.from_anchor)", (uri,)).fetchone()[0]
 
 
 def document_inbound_count(con, root_uri):
@@ -882,6 +908,14 @@ def document(con, uri):
     return con.execute(
         "SELECT uri, source, kind, label, title, path FROM documents "
         "WHERE uri = ?", (uri,)).fetchone()
+
+
+def document_meta(con, uri):
+    """(kind, label, title, date) for a uri, or None -- the columns the inbound
+    labels and the preparatory-works section need without loading the artifact."""
+    return con.execute(
+        "SELECT kind, label, title, date FROM documents WHERE uri = ?",
+        (uri,)).fetchone()
 
 
 def document_display(con, uri):

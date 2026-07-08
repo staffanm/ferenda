@@ -285,7 +285,8 @@ def test_inbound_excludes_self_citation(tmp_path):
     con = build_catalog(tmp_path)
     rows = catalog.inbound(con, "https://lagen.nu/1975:635#P5")
     assert rows == []
-    assert catalog.inbound_count(con, "https://lagen.nu/1975:635#P5") == 0
+    # the collapsed query the "Hänvisat till av" panel reads likewise excludes it
+    assert catalog.inbound_collapsed(con, "https://lagen.nu/1975:635#P5") == []
 
 
 def test_rebuild_is_idempotent(tmp_path):
@@ -812,11 +813,10 @@ def test_relate_drops_stale_fragments_on_id_change(tmp_path):
     assert catalog.snippet(con, "https://lagen.nu/1975:635#P6") is None
 
 
-def test_inbound_count_matches_inbound_filter(tmp_path):
-    # the "+N fler" overflow figure subtracts INBOUND_CAP from inbound_count, so
-    # the count must use the same filtered set as the listed rows -- a kommentar
-    # citing the paragraf is excluded from both (it is a rail annotation, not a
-    # citing page), else the figure is inflated
+def test_inbound_excludes_kommentar_annotation(tmp_path):
+    # a kommentar citing the paragraf is a rail annotation, not a citing page, so
+    # it is excluded from the inbound panel set -- both the per-pinpoint `inbound`
+    # and the collapsed `inbound_collapsed` the "Hänvisat till av" panel renders
     db = str(tmp_path / "catalog.sqlite")
     law = tmp_path / "law.json"
     law.write_text(json.dumps(LAW))
@@ -834,7 +834,8 @@ def test_inbound_count_matches_inbound_filter(tmp_path):
     con = catalog.connect(db)
     rows = catalog.inbound(con, "https://lagen.nu/1975:635#P6")
     assert [r[4] for r in rows] == ["dv"]            # the case, not the kommentar
-    assert catalog.inbound_count(con, "https://lagen.nu/1975:635#P6") == len(rows)
+    collapsed = catalog.inbound_collapsed(con, "https://lagen.nu/1975:635#P6")
+    assert [r[3] for r in collapsed] == ["dv"]       # one doc line, kommentar excluded
 
 
 def test_document_level_inbound_for_bare_citation(tmp_path):
@@ -856,6 +857,139 @@ def test_document_level_inbound_for_bare_citation(tmp_path):
     html = render.render_sfs(LAW, site)
     assert '<section class="inbound-doc">' in html
     assert "NJA 2000 s. 1" in html
+
+
+# --- collapsed inbound panel + own-förarbeten section --------------------
+
+def test_forarbete_pinpoint_maps_anchor_to_human_form():
+    assert render.forarbete_pinpoint("a14.3") == "avsnitt 14.3"
+    assert render.forarbete_pinpoint("a1-17") == "avsnitt 1"   # clash suffix dropped
+    assert render.forarbete_pinpoint("sid39") == "s. 39"
+    assert render.forarbete_pinpoint("sec7") == ""             # generated, no number
+
+
+def test_citer_name_prefers_full_title_by_kind():
+    # a förarbete carries its full title on its number; a lagrådsremiss by title
+    # alone; an sfs/dv citer already stores a human title
+    assert render.citer_name("forarbete", "prop", "Prop. 2025/26:116",
+                             "En ny funktion") == "Prop. 2025/26:116: En ny funktion"
+    assert render.citer_name("forarbete", "lr", "Lr 1", "En ny lag") \
+        == "Lagrådsremiss: En ny lag"
+    assert render.citer_name("sfs", "law", "SFS 2010:800",
+                             "Skollag (2010:800)") == "Skollag (2010:800)"
+
+
+def test_citer_line_collapses_pinpoints_and_caps_at_five():
+    # one line per document: full-title name + up to five avsnitt (shared category
+    # word written once, each number its own link), then " m.fl." beyond five
+    row = ("https://lagen.nu/prop/2025/26:123", "Prop. 2025/26:123",
+           "Explosiva varor", "forarbete", "prop", "2025-01-01",
+           "a18.4.1,a15.2,a16.7,a2,a9,a11")     # six avsnitt, out of order
+    li = render._citer_line(row)
+    assert 'href="/prop/2025/26:123">Prop. 2025/26:123: Explosiva varor</a>' in li
+    assert "avsnitt <a" in li                             # category word once
+    assert li.index("2</a>") < li.index("9</a>") < li.index("15.2</a>")  # natural sort
+    assert li.endswith(" m.fl.</li>")                     # >5 -> m.fl.
+    assert 'href="/prop/2025/26:123#a15.2">15.2</a>' in li
+
+
+FORARB_LAW = {
+    "uri": "https://lagen.nu/2020:100",
+    "metadata": {"properties": {"dcterms:title": "Testlag (2020:100)"}},
+    "amendments": [
+        {"forarbeten": ["Prop. 2019/20:5", "SOU 2018:9", "Bet. 2019/20:XX1"]},
+        {"forarbeten": ["Prop. 2021/22:7"]},
+    ],
+    "structure": [{"type": "paragraf", "id": "P1", "ordinal": "1", "children": [
+        {"type": "stycke", "id": "P1S1", "text": ["Text."]}]}],
+}
+
+
+def _citer(uri, ident, title, dt, anchors):
+    """A förarbete artifact citing the whole Testlag from each of `anchors`."""
+    return {"uri": uri, "type": "prop" if "prop" in uri else "sou",
+            "identifier": ident, "title": title, "date": dt,
+            "structure": [{"type": "avsnitt", "id": a, "children": [
+                {"type": "stycke", "text": [
+                    "se ", {"predicate": "dcterms:references", "text": "lagen",
+                            "uri": "https://lagen.nu/2020:100"}, "."]}]}
+                for a in anchors]}
+
+
+def build_forarb_catalog(tmp_path):
+    db = str(tmp_path / "catalog.sqlite")
+    files = {
+        "law": FORARB_LAW,
+        # own preparatory works (in the register): a prop + a SOU, both citing the law
+        "propown": _citer("https://lagen.nu/prop/2019/20:5", "Prop. 2019/20:5",
+                          "Ursprungspropositionen", "2020-02-01", ["a5.2", "a5.3"]),
+        "souown": _citer("https://lagen.nu/sou/2018:9", "SOU 2018:9",
+                         "Utredningen", "2018-06-01", ["a3.1"]),
+        # a later, unrelated prop citing the law -- stays in the panel
+        "propother": _citer("https://lagen.nu/prop/2023/24:9", "Prop. 2023/24:9",
+                            "Senare proposition", "2024-03-01", ["a1.1"]),
+    }
+    for name, art in files.items():
+        (tmp_path / (name + ".json")).write_text(json.dumps(art))
+    catalog.rebuild(db, "sfs", [tmp_path / "law.json"])
+    catalog.rebuild(db, "forarbete", [tmp_path / f for f in
+                                      ("propown.json", "souown.json", "propother.json")])
+    return catalog.connect(db)
+
+
+def test_inbound_collapsed_aggregates_pinpoints_and_excludes(tmp_path):
+    con = build_forarb_catalog(tmp_path)
+    uri = "https://lagen.nu/2020:100"
+    rows = catalog.inbound_collapsed(con, uri)
+    # one row per citing document (the two-avsnitt prop is a single row)
+    by_uri = {r[0]: r for r in rows}
+    assert set(anchor for anchor in by_uri
+               ["https://lagen.nu/prop/2019/20:5"][6].split(",")) == {"a5.2", "a5.3"}
+    # excluding the law's own förarbeten drops them, keeps the unrelated prop
+    kept = catalog.inbound_collapsed(con, uri, exclude_from={
+        "https://lagen.nu/prop/2019/20:5", "https://lagen.nu/sou/2018:9"})
+    assert [r[0] for r in kept] == ["https://lagen.nu/prop/2023/24:9"]
+
+
+def test_forarbeten_section_lists_own_works_and_excludes_from_panel(tmp_path):
+    site = render.Site.from_catalog(build_forarb_catalog(tmp_path))
+    section, own = render.forarbeten_section(site, FORARB_LAW)
+    # hosted own works link under their full-title label; the unhosted Bet. shows bare
+    assert "Prop. 2019/20:5: Ursprungspropositionen" in section
+    assert "SOU 2018:9: Utredningen" in section
+    assert "Bet. 2019/20:XX1" in section
+    assert own == {"https://lagen.nu/prop/2019/20:5", "https://lagen.nu/sou/2018:9"}
+    # the citation panel below excludes them; only the unrelated prop remains
+    panel = render.document_inbound(site, "https://lagen.nu/2020:100", own)
+    assert "Prop. 2023/24:9: Senare proposition" in panel
+    assert "Prop. 2019/20:5" not in panel and "SOU 2018:9" not in panel
+
+
+def test_forarbeten_section_top_billed_above_citation_panel(tmp_path):
+    site = render.Site.from_catalog(build_forarb_catalog(tmp_path))
+    html = render.render_sfs(FORARB_LAW, site)
+    assert html.index('<section class="forarbeten">') \
+        < html.index('<section class="inbound-doc">')
+
+
+def test_inbound_panel_overflow_is_expandable(tmp_path, monkeypatch):
+    # citers past PANEL_CAP go behind a <details> "+N fler" disclosure (no JS)
+    monkeypatch.setattr(render, "PANEL_CAP", 1)
+    site = render.Site.from_catalog(build_forarb_catalog(tmp_path))
+    panel = render.document_inbound(site, "https://lagen.nu/2020:100")
+    # three förarbete citers, one shown, the other two disclosed
+    assert '<details class="more"><summary>+2 fler</summary>' in panel
+
+
+def test_forarbete_inbound_sorted_by_kind_then_date(tmp_path):
+    # in the citation panel förarbeten order prop→sou, each block oldest-first:
+    # the document_date column (populated at relate) drives the chronology
+    site = render.Site.from_catalog(build_forarb_catalog(tmp_path))
+    panel = render.document_inbound(site, "https://lagen.nu/2020:100")
+    order = [panel.index("Prop. 2019/20:5"),   # prop, 2020-02
+             panel.index("Prop. 2023/24:9"),   # prop, 2024-03 (later)
+             panel.index("SOU 2018:9")]         # sou after every prop, despite 2018
+    assert order == sorted(order)
 
 
 # --- förarbete genomför-direktiv edges (REWRITE.md §7d) -------------------
@@ -931,8 +1065,10 @@ def test_directive_article_shows_implementing_forarbete(tmp_path):
     # article 21's rail panel shows the implementing förarbete
     panel = _island(html)["21"]
     assert "Hänvisat till av" in panel
-    assert 'href="/prop/2023/24:1#sid100"' in panel
-    assert "Prop. 2023/24:1 s. 100" in panel
+    # the collapsed citer line carries the förarbete's full-title label and links
+    # the page pinpoint ("s. 100") to its own anchor
+    assert "Prop. 2023/24:1: Cybersäkerhetslag" in panel
+    assert 'href="/prop/2023/24:1#sid100">100</a>' in panel
 
 
 def test_genomforande_panel_absent_without_implements(tmp_path):

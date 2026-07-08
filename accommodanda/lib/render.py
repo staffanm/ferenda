@@ -23,6 +23,7 @@ so a citation to a document we don't have (yet) renders as plain text rather
 than a broken link.
 """
 
+import functools
 import hashlib
 import json
 import re
@@ -36,12 +37,12 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from ..api import app as api_service
-from . import casenaming, catalog, compress, history, layout
+from . import casenaming, catalog, compress, history, lagrum, layout
 from .catalog import BASE
 from .eu_structure import flatten as eurlex_flatten
 from .eu_structure import subarticle_key
 from .markdown import begrepp_uri
-from .util import basefile_slug
+from .util import basefile_slug, split_numalpha
 
 
 @dataclass
@@ -318,6 +319,98 @@ INBOUND_GROUPS = [("sfs", "Författningar"), ("forarbete", "Förarbeten"),
                   ("foreskrift", "Myndighetsföreskrifter"),
                   ("dv", "Rättsfall"), ("begrepp", "Begrepp")]
 
+# förarbete precedence in the inbound panel and the "Förarbeten" section:
+# propositions first, then SOU, Ds/PM, lagrådsremiss, betänkanden -- each block
+# then ordered oldest-first (older preparatory work is the more foundational).
+FORARB_KIND_PRIORITY = {"prop": 0, "sou": 1, "ds": 2, "pm": 2, "lr": 3, "bet": 4}
+
+PINPOINT_CAP = 5   # source pinpoints listed on a collapsed citer line before "m.fl."
+PANEL_CAP = 20     # citing docs shown per group before the "+N fler" disclosure
+
+
+def forarb_sort_key(kind, date, label):
+    """Ordering of a förarbete in the panel and the preparatory-works section:
+    by kind precedence, then oldest-first (an undated entry sorts last), then
+    label. One key so the two listings never disagree."""
+    return (FORARB_KIND_PRIORITY.get(kind, 9), date or "9999-99-99", label)
+
+
+def forarbete_pinpoint(anchor):
+    """A förarbete node id -> a human pinpoint: "a14.3" -> "avsnitt 14.3",
+    "sid39" -> "s. 39". A generated "sec7" (a heading carrying no section
+    number) has no pinpoint; a "-N" clash suffix on the avsnitt id is dropped."""
+    if anchor.startswith("sid"):
+        return "s. " + anchor[3:]
+    if re.match(r"a\d", anchor):
+        return "avsnitt " + re.sub(r"-\d+$", "", anchor[1:])
+    return ""
+
+
+def citer_pinpoint(source, anchor):
+    """The human pinpoint for a citing document's source anchor: an avsnitt/page
+    for a förarbete, a chapter/§ for a statute; other sources cite whole-doc."""
+    if not anchor:
+        return ""
+    if source == "forarbete":
+        return forarbete_pinpoint(anchor)
+    if source == "sfs":
+        return human_fragment(anchor)
+    return ""
+
+
+def citer_name(source, kind, label, title):
+    """The preferred display name for a citing/preparatory document. A förarbete
+    carries its full title on its number ("Prop. 2025/26:116: En ny funktion …")
+    -- a lagrådsremiss by title alone ("Lagrådsremiss: …"), it having no number;
+    every other source already stores a human title (the law name, the referat)."""
+    if source == "forarbete":
+        if kind == "lr":
+            return "Lagrådsremiss: %s" % title if title and title != label \
+                else "Lagrådsremiss"
+        return "%s: %s" % (label, title) if title and title != label else label
+    return title or label
+
+
+def _swedish_join(parts):
+    """["a","b","c"] -> "a, b och c" (the last item joined with "och")."""
+    if len(parts) <= 1:
+        return "".join(parts)
+    return ", ".join(parts[:-1]) + " och " + parts[-1]
+
+
+def _citer_line(row):
+    """One collapsed "<li>" for a citing document: its full-title name (linking
+    to the document) followed by up to PINPOINT_CAP distinct source pinpoints,
+    then " m.fl." if more. Förarbete pinpoints share a category word ("avsnitt
+    3, 5 och 7" -- written once, each number linking its own anchor); other
+    sources' pinpoints are each rendered whole as a single link."""
+    from_uri, label, title, source, kind, _date, anchors = row
+    name = '<a href="%s">%s</a>' % (escape(href(from_uri)),
+                                    escape(citer_name(source, kind, label, title)))
+    pins, seen = [], set()
+    for anchor in (anchors.split(",") if anchors else []):
+        pin = citer_pinpoint(source, anchor)
+        if pin and pin not in seen:        # dedupe on the human pinpoint
+            seen.add(pin)
+            pins.append((pin, anchor))
+    if not pins:
+        return "<li>%s</li>" % name
+    pins.sort(key=lambda p: split_numalpha(p[0]))
+    shown, overflow = pins[:PINPOINT_CAP], len(pins) > PINPOINT_CAP
+
+    def link(anchor, text):
+        return '<a href="%s">%s</a>' % (
+            escape(href(from_uri + "#" + anchor)), escape(text))
+
+    words = {pin.split(" ")[0] for pin, _ in shown}
+    if source == "forarbete" and len(words) == 1 and " " in shown[0][0]:
+        word = escape(shown[0][0].split(" ", 1)[0])       # "avsnitt" / "s."
+        body = word + " " + _swedish_join(
+            [link(a, pin.split(" ", 1)[1]) for pin, a in shown])
+    else:
+        body = _swedish_join([link(a, pin) for pin, a in shown])
+    return "<li>%s, %s%s</li>" % (name, body, " m.fl." if overflow else "")
+
 
 # --------------------------------------------------------------------------
 # table of contents (a sticky, scrollspy-driven outline of a document)
@@ -409,38 +502,109 @@ def render_runs(runs, site):
     return "".join(out)
 
 
-def _inbound_groups(site, uri):
+def _inbound_groups(site, uri, exclude_from=()):
     """Inbound entries grouped into per-source sections (Författningar /
-    Förarbeten / Rättsfall), each a list of human-readable, pinpointed links.
-    Returns the inner HTML, or None when nothing cites `uri`."""
-    rows = catalog.inbound(site.con, uri, limit=INBOUND_CAP + 1)
+    Förarbeten / Rättsfall), one collapsed line per citing document (its
+    pinpoints listed inline). Förarbeten are ordered prop→sou→ds→lagrådsremiss→
+    bet, oldest-first; each group shows PANEL_CAP docs, the rest behind a "+N
+    fler" disclosure. `exclude_from` drops citers already shown elsewhere (a
+    statute's own preparatory works). Returns the inner HTML, or None when
+    nothing (left) cites `uri`."""
+    rows = catalog.inbound_collapsed(site.con, uri, exclude_from)
     if not rows:
         return None
-    shown, overflow = rows[:INBOUND_CAP], len(rows) > INBOUND_CAP
     bucket = {}
-    for from_uri, anchor, label, title, source in shown:
-        target = from_uri + ("#" + anchor if anchor else "")   # link to the pinpoint
-        bucket.setdefault(source, []).append(
-            '<li><a href="%s">%s</a></li>'
-            % (escape(href(target)),
-               escape(describe_citer(from_uri, anchor, label, title, source))))
+    for row in rows:
+        bucket.setdefault(row[3], []).append(row)   # row[3] = source
+    for source, items in bucket.items():
+        if source == "forarbete":
+            items.sort(key=lambda r: forarb_sort_key(r[4], r[5], r[1]))
+        else:
+            items.sort(key=lambda r: (r[2] or r[1] or "").lower())
     groups = [(src, heading) for src, heading in INBOUND_GROUPS if src in bucket]
     groups += [(s, s) for s in bucket if s not in dict(INBOUND_GROUPS)]
-    html = "".join(
-        '<div class="ingroup %s"><div class="ingroup-h">%s</div><ul>%s</ul></div>'
-        % (src, escape(heading), "".join(bucket[src])) for src, heading in groups)
-    if overflow:
-        html += ('<div class="more">+%d fler</div>'
-                 % (catalog.inbound_count(site.con, uri) - INBOUND_CAP))
+    html = ""
+    for src, heading in groups:
+        lines = [_citer_line(row) for row in bucket[src]]
+        inner = "<ul>%s</ul>" % "".join(lines[:PANEL_CAP])
+        if len(lines) > PANEL_CAP:
+            inner += ('<details class="more"><summary>+%d fler</summary>'
+                      '<ul>%s</ul></details>'
+                      % (len(lines) - PANEL_CAP, "".join(lines[PANEL_CAP:])))
+        html += ('<div class="ingroup %s"><div class="ingroup-h">%s</div>%s</div>'
+                 % (src, escape(heading), inner))
     return html
 
 
-def document_inbound(site, uri):
+def document_inbound(site, uri, exclude_from=()):
     """Document-level inbound: who cites the law/case/förarbete as a whole
-    (the bare uri). Surfaces the citations no paragraph annotation shows."""
-    groups = _inbound_groups(site, uri)
+    (the bare uri). Surfaces the citations no paragraph annotation shows.
+    `exclude_from` omits citers listed elsewhere (a statute's own förarbeten,
+    which get their own preparatory-works section above)."""
+    groups = _inbound_groups(site, uri, exclude_from)
     return ('<section class="inbound-doc"><h2>Hänvisat till av</h2>%s</section>'
             % groups) if groups else ""
+
+
+# a shared FORARBETEN recognizer, built lazily per process, to turn a förarbete
+# identifier ("Prop. 2017/18:89") into its document uri -- reusing the citation
+# engine's minting instead of a second, drifting parser. namedlaws is irrelevant
+# to förarbete numbers, so an empty map suffices.
+_FORARB_PARSER = None
+
+
+@functools.lru_cache(maxsize=None)
+def forarbete_identifier_uri(identifier):
+    """The document uri a förarbete identifier mints to (prop/sou/ds), or None
+    for a form the engine does not host (betänkanden, riksdagsskrivelser).
+    The lru_cache is what bounds the reuse: the lazily-built parser is reset and
+    run at most once per distinct identifier, never on every call."""
+    global _FORARB_PARSER
+    if _FORARB_PARSER is None:
+        _FORARB_PARSER = lagrum.LagrumParser(
+            {}, basefile="0000:000", parse_types=[lagrum.FORARBETEN])
+    _FORARB_PARSER.reset()
+    refs = _FORARB_PARSER.parse_text(identifier, context={})
+    return refs[0].uri if refs else None
+
+
+def forarbeten_section(site, art):
+    """The statute's own preparatory works, top-billed above the citation panel.
+    Every förarbete of the grundförfattning and every ändringsförfattning is
+    listed once (prop→sou→ds→lagrådsremiss→bet, oldest-first): the ones we host
+    link to their page under the preferred full-title label, the rest (a
+    betänkande/riksdagsskrivelse we do not host) show as their bare identifier.
+
+    Returns `(html, own_uris)` -- `own_uris` are the hosted förarbete uris,
+    excluded from the citation panel so a creating proposition reads as a
+    preparatory work here, not as a generic inbound reference below."""
+    idents, seen = [], set()
+    for amendment in art.get("amendments", []):
+        for ident in amendment.get("forarbeten", []):
+            if ident not in seen:
+                seen.add(ident)
+                idents.append(ident)
+    entries, own_uris = [], set()
+    for ident in idents:
+        uri = forarbete_identifier_uri(ident)
+        meta = catalog.document_meta(site.con, uri) if uri else None
+        if meta and site.has(uri):
+            kind, label, title, dt = meta
+            own_uris.add(uri)
+            html = '<a href="%s">%s</a>' % (
+                escape(href(uri)), escape(citer_name("forarbete", kind, label, title)))
+        else:                       # unhosted (bet./rskr.) -> bare identifier
+            # kind from the identifier prefix ("Bet. …" -> bet) so it still sorts
+            # into its precedence block; date unknown, so it trails its dated peers
+            kind, label, dt, html = (ident.split(" ")[0].rstrip(".").lower(),
+                                     ident, None, escape(ident))
+        entries.append((forarb_sort_key(kind, dt, label), html))
+    if not entries:
+        return "", own_uris
+    entries.sort(key=lambda e: e[0])
+    lis = "".join("<li>%s</li>" % html for _, html in entries)
+    return ('<section class="forarbeten"><h2>Förarbeten</h2><ul>%s</ul></section>'
+            % lis), own_uris
 
 
 def _ext_link(url, label):
@@ -1164,10 +1328,15 @@ def render_sfs(art, site):
     # the register view renders after the structure so its TOC entry and
     # rail hooks come last, but the OB anchors (#L{nr}) sit inside it
     andringar = _andringar(art, base_id, version, versions, site, toc, rail)
+    # the statute's own preparatory works get top billing; their hosted uris are
+    # then excluded from the generic citation panel below
+    forarbeten, own_forarbeten = ("", set()) if version \
+        else forarbeten_section(site, art)
     body = (_version_banner(base_id, version) if version
             else (_expired_banner(props) if expired else "")) \
         + _versions_panel(art, base_id, version, versions) \
-        + ("" if version else document_inbound(site, art["uri"])) \
+        + forarbeten \
+        + ("" if version else document_inbound(site, art["uri"], own_forarbeten)) \
         + structure + andringar
     rail.add_document()        # external links + law-level commentary, default panel
     return page(title, "Författning", meta, body, render_toc(toc),
@@ -2535,12 +2704,26 @@ sup.fnref a { text-decoration: none; padding: 0 .1em; }
 .ingroup.kommentar a { color: var(--kommentar); font-weight: 500; }
 .ingroup.begrepp a { color: var(--accent); }
 .more { color: var(--ink-3); font-style: italic; font-size: .78rem; margin-top: .25rem; }
+details.more { margin-top: .3rem; }
+details.more > summary { color: var(--ink-3); font-style: italic; font-size: .78rem;
+                         cursor: pointer; list-style: none; }
+details.more > summary::-webkit-details-marker { display: none; }
+details.more[open] > summary { margin-bottom: .25rem; }
+details.more > ul { list-style: none; margin: 0; padding: 0; }
 aside.genomfor, aside.motsvarighet { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--rule); }
 aside.genomfor ul, aside.motsvarighet ul { list-style: none; margin: 0; padding: 0; font-size: .8rem; }
 aside.genomfor li, aside.motsvarighet li { margin: .2rem 0; line-height: 1.4; }
 aside.genomfor .prov { color: var(--ink-3); }
 .inbound-h { font-family: var(--serif); font-style: italic; font-size: .8rem;
              color: var(--accent); font-weight: 500; margin-bottom: .35rem; }
+
+/* -- Preparatory works ("Förarbeten"), top-billed above the citation panel -- */
+section.forarbeten { margin: 1.25rem 0; font-size: .85rem; }
+section.forarbeten h2 { font-family: var(--serif); font-style: italic; font-size: .85rem;
+                        color: var(--ink-3); font-weight: 400; margin: 0 0 .4rem; border: 0; }
+section.forarbeten ul { list-style: none; margin: 0; padding: 0; }
+section.forarbeten li { margin: .15rem 0; line-height: 1.4; }
+section.forarbeten a { color: var(--forarbete); }
 
 /* -- Document-level inbound panel (whole-doc citations) -- */
 .inbound-doc { background: var(--surf); border: 1px solid var(--rule); border-radius: 6px;
