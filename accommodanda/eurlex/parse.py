@@ -23,7 +23,7 @@ from pathlib import Path
 
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
-from ..lib import eucasenaming
+from ..lib import eucasenaming, patch
 from ..lib.datasets import NAMEDACTS
 from ..lib.lagrum import EULAGSTIFTNING, EURATTSFALL, LagrumParser, interleave
 from ..lib.util import from_roman
@@ -57,11 +57,12 @@ INLINE = {"HT", "IE", "FT", "DATE", "QUOT.START", "QUOT.END", "QUOT.S",
 # loading the Formex source (single file or the main act of a zip bundle)
 # --------------------------------------------------------------------------
 
-def load_formex(path):
-    """The Formex roots of a downloaded manifestation, in document order: the
-    main act/judgment first, then any annexes. A single `.fmx4` yields one
-    root; a `.fmx4.zip` bundle yields the main act (lowest-sequence member)
-    followed by its annexes (the `.doc.xml` wrappers are skipped)."""
+def formex_members(path):
+    """The raw Formex members of a downloaded manifestation as ``(name, bytes)``
+    in document order (main act/judgment first, then annexes) -- a single
+    ``.fmx4`` yields one member, a ``.fmx4.zip`` its sorted ``.xml`` members (the
+    ``.doc.xml`` wrappers skipped). The byte-level split that `load_formex`
+    parses and the patch/editor path reads the main act's source XML from."""
     path = Path(path)
     if zipfile.is_zipfile(path):
         with zipfile.ZipFile(path) as zf:
@@ -69,8 +70,29 @@ def load_formex(path):
                              if n.endswith(".xml") and not n.endswith(".doc.xml"))
             if not members:
                 raise ValueError("%s: zip has no Formex member" % path)
-            return [etree.fromstring(zf.read(m), XML_PARSER) for m in members]
-    return [etree.parse(str(path), XML_PARSER).getroot()]
+            return [(m, zf.read(m)) for m in members]
+    return [(path.name, path.read_bytes())]
+
+
+def load_formex(path):
+    """The Formex roots of a downloaded manifestation, in document order: the
+    main act/judgment first, then any annexes."""
+    return [etree.fromstring(data, XML_PARSER) for _, data in formex_members(path)]
+
+
+def _formex_roots(path, celex):
+    """`load_formex` with the act's patch applied to the *main act's* Formex XML
+    (the eurlex intermediate format) before it is parsed. Annexes are not
+    separately patchable; the no-patch path stays byte-identical to load_formex."""
+    members = formex_members(path)
+    if not patch.has_patch("eurlex", celex):
+        return [etree.fromstring(data, XML_PARSER) for _, data in members]
+    roots = []
+    for i, (_name, data) in enumerate(members):
+        if i == 0:   # the main act
+            data = patch.apply("eurlex", celex, data.decode("utf-8")).encode("utf-8")
+        roots.append(etree.fromstring(data, XML_PARSER))
+    return roots
 
 
 # --------------------------------------------------------------------------
@@ -504,9 +526,13 @@ def content_file(doc_dir, languages=LANG_PREFERENCE):
 def parse_content(path, route, celex, lang):
     """Dispatch a content file to its format's parser -> EurlexDoc."""
     if route == "fmx4":
-        return parse_document(load_formex(path), celex, lang)
+        return parse_document(_formex_roots(path, celex), celex, lang)
     if route == "html":
-        return parse_html(path.read_bytes(), celex, lang)
+        data = path.read_bytes()
+        if patch.has_patch("eurlex", celex):
+            data = patch.apply("eurlex", celex,
+                               data.decode("utf-8", "replace")).encode("utf-8")
+        return parse_html(data, celex, lang)
     if route == "pdf":
         return parse_pdf(path, celex, lang)
     raise ValueError("no parser for route %r" % route)

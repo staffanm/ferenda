@@ -44,7 +44,7 @@ def parse_record(basefile, root):
     pdf_path = Path(root) / case_basefile / (slug + ".pdf")
     assert pdf_path.exists(), "no answer PDF at %s" % pdf_path
 
-    paras = [p for pageno, lines in pdf_pages(str(pdf_path))
+    paras = [p for pageno, lines in pdf_pages(str(pdf_path), ("remisser", basefile))
              for p in page_paragraphs(lines, None, pageno)]
     full_text = [p.text for p in paras if p.text]
 

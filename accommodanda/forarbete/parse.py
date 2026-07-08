@@ -93,10 +93,11 @@ def classify(paras, page):
     return blocks
 
 
-def parse_pdf(pdf_path, identifier):
-    """All body blocks of a förarbete PDF, page by page (page = pdf index)."""
+def parse_pdf(pdf_path, identifier, patch_key=None):
+    """All body blocks of a förarbete PDF, page by page (page = pdf index).
+    `patch_key=(source, basefile)` patches the pdftohtml XML before extraction."""
     blocks = []
-    for pageno, lines in pdf_pages(pdf_path):
+    for pageno, lines in pdf_pages(pdf_path, patch_key):
         blocks += classify(page_paragraphs(lines, identifier, pageno), pageno)
     return blocks
 
@@ -174,7 +175,8 @@ def parse_record(record, root):
         body = _legacy_body(record)
     else:
         pdfs = [f for f in record.get("files", []) if f.lower().endswith(".pdf")]
-        body = (parse_pdf(Path(root) / typ / pdfs[0], record["identifier"])
+        body = (parse_pdf(Path(root) / typ / pdfs[0], record["identifier"],
+                          ("forarbete", basefile))
                 if pdfs else [])
     return Forarbete(type=typ, basefile=basefile,
                      identifier=record["identifier"], uri=mint_uri(typ, basefile),

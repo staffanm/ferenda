@@ -46,9 +46,10 @@ from urllib.parse import urlsplit
 
 import requests
 
-from . import config
+from . import config, patchsource
 from .api import app as api_app
 from .api import edit as api_edit
+from .api import patch as api_patch
 from .avg import download as avg_download
 from .avg import legacy as avg_legacy
 from .avg import parse as avg_parse
@@ -79,6 +80,7 @@ from .lib import (
     dump,
     layout,
     markdown,
+    patch,
     render,
     runlog,
     search,
@@ -149,6 +151,14 @@ def _origin(url):
     """The scheme://host/ base of an endpoint, for the harvest banner."""
     parts = urlsplit(url)
     return "%s://%s/" % (parts.scheme, parts.netloc)
+
+
+def _patch_input(source, basefile):
+    """The document's patch file as a 0/1-element list, to fold into a source's
+    freshness inputs -- so editing a patch re-stales that document's parse (the
+    patch is a genuine parse input). Text-patchable sources add this to `inputs`."""
+    patchfile = patch.find_patch(source, basefile)[0]
+    return [patchfile] if patchfile else []
 
 
 def write_artifact(source, basefile, art, source_url=None):
@@ -372,6 +382,7 @@ class RunOptions:
     only: str | None = None      # forarbete: fetch a single document
     riksmote: str | None = None  # forarbete bet: narrow the harvest to one riksmöte
     limit: int | None = None     # import-legacy (avg/forarbete): cap the run (a slice)
+    rot13: bool = False          # mkpatch: obfuscate the patch (PII redactions)
 
 
 RUN = RunOptions()
@@ -589,11 +600,14 @@ def sfs_register(basefile):
 
 
 def sfs_inputs(basefile):
-    """Freshness inputs: the JSON _source when present (the new beta API),
-    else the legacy SFST + SFSR HTML pair."""
+    """Freshness inputs: the JSON _source when present (the new beta API), else
+    the legacy SFST + SFSR HTML pair -- plus the document's patch file if one
+    exists (`_patch_input`), so editing a patch re-stales the parse."""
     if sfs_source(basefile).exists():
-        return [sfs_source(basefile)]
-    return [sfs_downloaded(basefile), sfs_register(basefile)]
+        inputs = [sfs_source(basefile)]
+    else:
+        inputs = [sfs_downloaded(basefile), sfs_register(basefile)]
+    return inputs + _patch_input("sfs", basefile)
 
 
 def sfs_artifact(basefile):
@@ -840,7 +854,7 @@ def dv_namedcases(args=()):
 
 def dv_parse_run(basefile):
     record = json.loads(dv_record(basefile).read_text())
-    av = parse_api_record(record)
+    av = parse_api_record(record, basefile)
     # the case's public publication-search page is keyed by the record's
     # gruppKorrelationsnummer (the publication group), not derivable from basefile
     grupp = record.get("gruppKorrelationsnummer")
@@ -856,7 +870,8 @@ def dv_parse_run(basefile):
 SOURCES["dv"] = Source("dv", lambda: sorted(_dv_cases()), {
     "download": Stage("download", dv_download_run, dv_record),
     "parse": Stage("parse", dv_parse_run, dv_artifact,
-                   inputs=lambda bf: [dv_record(bf)], code=DV_CODE),
+                   inputs=lambda bf: [dv_record(bf)] + _patch_input("dv", bf),
+                   code=DV_CODE),
 }, harvest=dv_harvest, origin=_origin(dv_download.API),
    actions={"reindex": dv_reindex, "namedcases": dv_namedcases})
 
@@ -883,7 +898,8 @@ def fa_parse_inputs(basefile):
     the re-OCR sidecar slot (§7g). The sidecar is listed even while absent, so
     dropping a modern-OCR'd PDF there (which `_legacy_body` then parses instead of
     the frozen scan) re-stales exactly that document's parse."""
-    return [fa_record(basefile), layout.fa_ocr_pdf(*basefile.split("/", 1))]
+    return ([fa_record(basefile), layout.fa_ocr_pdf(*basefile.split("/", 1))]
+            + _patch_input("forarbete", basefile))
 
 
 def fa_artifact(basefile):
@@ -1118,7 +1134,8 @@ SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
     layout.EURLEX_DOWNLOADED), {
     "download": Stage("download", eurlex_download_run, eurlex_notice),
     "parse": Stage("parse", eurlex_parse_run, eurlex_artifact,
-                   inputs=eurlex_content, depends="download", code=EURLEX_CODE),
+                   inputs=lambda bf: eurlex_content(bf) + _patch_input("eurlex", bf),
+                   depends="download", code=EURLEX_CODE),
 }, harvest=eurlex_harvest, origin=_origin(eurlex_download.SOAP_ENDPOINT),
    scopes=frozenset(eurlex_download.SECTORS),
    actions={"unpack-bulk": eurlex_unpack, "ai-annotate": eurlex_ai_annotate,
@@ -1198,7 +1215,7 @@ def foreskrift_inputs(basefile):
                 str(layout.FORESKRIFT_DOWNLOADED), record["fs"], reg))
         paths += [fsdir / c["name"] for c in files.get("consolidation", [])
                   if c.get("name")]
-    return paths
+    return paths + _patch_input("foreskrift", basefile)
 
 
 def foreskrift_parse_run(basefile):
@@ -1283,7 +1300,7 @@ def avg_inputs(basefile):
         paths.append(avg_legacy.arn_pdf_path(layout.AVG_DOWNLOADED, basefile))
     else:
         paths.append(avg_download.jk_html_path(layout.AVG_DOWNLOADED, basefile))
-    return paths
+    return paths + _patch_input("avg", basefile)
 
 
 def avg_artifact(basefile):
@@ -1390,7 +1407,8 @@ def remisser_artifact(basefile):
 
 
 def remisser_inputs(basefile):
-    return [remisser_record(basefile), remisser_pdf(basefile)]
+    return [remisser_record(basefile), remisser_pdf(basefile)] + _patch_input(
+        "remisser", basefile)
 
 
 def remisser_parse_run(basefile):
@@ -1724,6 +1742,21 @@ def rebuild_after_commit(changes):
 # wire the editor's commit endpoint to the rebuild above (build imports the api
 # package, so this is the sound direction to close the loop -- see api/edit.py)
 api_edit.set_rebuild(rebuild_after_commit)
+
+
+def reparse_one(source, basefile):
+    """Force-reparse one document, writing its artifact JSON in place -- the
+    patch editor's post-save hook, so a just-saved patch is immediately effective
+    in the corpus (the artifact is what the API and the next `generate` read).
+    Reuses the source's own parse recipe, like `rebuild_after_commit` does for
+    the markdown editor."""
+    stage = SOURCES[source].stages.get("parse")
+    if stage is None:
+        raise ValueError("source %r has no parse stage" % source)
+    stage.run(basefile)
+
+
+api_patch.set_reparse(reparse_one)
 
 
 # --------------------------------------------------------------------------
@@ -2446,7 +2479,7 @@ def main(argv=None):
                    % ", ".join(SOURCES))
     p.add_argument("action",
                    help="download | parse | relate | generate | index | dump "
-                        "| rebuild | all | serve | status "
+                        "| rebuild | all | serve | status | patch-show | mkpatch "
                         "| a source action (e.g. dv reindex). `rebuild` runs the "
                         "offline pipeline (parse -> relate -> index -> dump -> "
                         "generate) over already-downloaded data; `all` is "
@@ -2497,6 +2530,10 @@ def main(argv=None):
     p.add_argument("--limit", type=int, metavar="N",
                    help="import-legacy (avg/forarbete): import at most N "
                         "documents (a test slice)")
+    p.add_argument("--rot13", action="store_true",
+                   help="mkpatch: store the patch rot13-obfuscated, so a "
+                        "redaction of personal data is not plain-text googleable "
+                        "in the committed patch")
     args = p.parse_args(argv)
 
     RUN.dry_run, RUN.force, RUN.no_deps = args.dry_run, args.force, args.no_deps
@@ -2506,6 +2543,7 @@ def main(argv=None):
     RUN.only = args.only
     RUN.riksmote = args.riksmote
     RUN.limit = args.limit
+    RUN.rot13 = args.rot13
     # the parallelisable steps default to all cores; -j1 serialises
     jobs = args.jobs if args.jobs is not None else (os.cpu_count() or 1)
 
@@ -2556,9 +2594,66 @@ def _cmd_runs(limit):
                  " ".join(r["argv"])))
 
 
+def cmd_patch_show(args, p):
+    """`lagen <source> patch-show <basefile>` -- print a document's intermediate
+    source text (the format its patch targets: plain text for sfs, innehåll HTML
+    for dv, Formex XML for eurlex), with any existing patch already applied, to
+    stdout. Redirect it to a file, hand-edit that file, then feed it back to
+    `mkpatch` to author a minimal patch."""
+    if args.source not in patchsource._INTERMEDIATE:
+        p.error("source %r has no patchable intermediate (patchable: %s)"
+                % (args.source, ", ".join(patchsource.patchable_sources())))
+    if len(args.basefiles) != 1:
+        p.error("patch-show needs exactly one basefile")
+    basefile = args.basefiles[0]
+    text, label = patchsource.current(args.source, basefile)
+    sys.stderr.write("# %s %s -- intermediate format: %s%s\n"
+                     % (args.source, basefile, label,
+                        " (patch applied)" if patch.has_patch(args.source, basefile)
+                        else ""))
+    sys.stdout.write(text if text.endswith("\n") else text + "\n")
+
+
+def cmd_mkpatch(args, p):
+    """`lagen <source> mkpatch <basefile> <edited-file> [description]` -- author a
+    patch from a hand-edited copy of the intermediate text. Diffs the pristine
+    intermediate against `<edited-file>` and writes the minimal unified diff to
+    the document's patch location (`patches/<source>/…`). `--rot13` stores it
+    obfuscated (redactions of personal data). An edited file identical to the
+    pristine text removes any existing patch."""
+    if args.source not in patchsource._INTERMEDIATE:
+        p.error("source %r has no patchable intermediate (patchable: %s)"
+                % (args.source, ", ".join(patchsource.patchable_sources())))
+    if not 2 <= len(args.basefiles) <= 3:
+        p.error("mkpatch needs: <basefile> <edited-file> [description]")
+    basefile, edited_path = args.basefiles[0], args.basefiles[1]
+    description = args.basefiles[2] if len(args.basefiles) == 3 else ""
+    pristine, label = patchsource.intermediate(args.source, basefile)
+    edited = Path(edited_path).read_text(encoding="utf-8")
+    if RUN.dry_run:
+        print(patch.make_patch_text(pristine, edited, description)
+              or "mkpatch: no differences; nothing to write")
+        return
+    path = patch.create_patch(args.source, basefile, pristine, edited,
+                              description=description, rot13=RUN.rot13)
+    if path is None:
+        print("mkpatch %s %s: no differences; removed any existing patch"
+              % (args.source, basefile))
+    else:
+        print("mkpatch %s %s: wrote %s patch %s (%s intermediate)"
+              % (args.source, basefile, "rot13" if RUN.rot13 else "plain",
+                 path, label))
+
+
 def _dispatch(args, p, jobs):
     """Route one parsed invocation to its command. Split out of main() so main
     can wrap the whole dispatch in a single run-start/run-end try/finally."""
+    if args.action == "patch-show":
+        cmd_patch_show(args, p)
+        return
+    if args.action == "mkpatch":
+        cmd_mkpatch(args, p)
+        return
     # generate is corpus-wide by default, but `lagen <source> generate <id> ...`
     # targets just those documents (and leaves the aggregate pages alone)
     if args.action == "generate":

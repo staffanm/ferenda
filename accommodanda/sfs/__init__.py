@@ -10,6 +10,7 @@ SFS formatting quirks; the architecture is new.
 import json
 from pathlib import Path
 
+from ..lib import patch
 from ..lib.errors import SkipDocument
 from .assembler import assemble
 from .extract import extract_body
@@ -24,6 +25,10 @@ from .tokenizer import Tokenizer
 
 
 def _assemble(text, basefile):
+    # the plain statute text is SFS's intermediate format: apply any curated
+    # patch (a correction, or a rot13 redaction of personal data) here, before
+    # the reader tokenises it, so the fix flows into every downstream artifact.
+    text = patch.apply("sfs", basefile, text)
     reader = TextReader(text)
     reader.autostrip = True
     return assemble(Tokenizer(reader, basefile))

@@ -27,6 +27,7 @@ import re
 
 from bs4 import BeautifulSoup
 
+from ..lib import patch
 from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from ..lib.lagrum import (
     ALL_PARSE_TYPES,
@@ -111,13 +112,13 @@ def classify_jo(paras, titel):
     return blocks, abstract
 
 
-def jo_body(pdf_path, titel):
-    paras = [p for pageno, lines in pdf_pages(str(pdf_path))
+def jo_body(pdf_path, titel, patch_key=None):
+    paras = [p for pageno, lines in pdf_pages(str(pdf_path), patch_key)
              for p in page_paragraphs(lines, "Riksdagens ombudsmän", pageno)]
     return classify_jo(paras, titel)
 
 
-def parse_jo(record, root):
+def parse_jo(record, root, patch_key=None):
     """A harvested JO search record (+ its PDF under `root`) -> Beslut."""
     dnrs = jo_dnrs(record.get("diary_number"))
     assert dnrs, "jo record %s carries no diarienummer" % record.get("id")
@@ -125,7 +126,7 @@ def parse_jo(record, root):
                                 "html.parser").get_text(" ", strip=True))
     pdf = jo_pdf_path(root, "jo/" + dnrs[0])
     if pdf.exists():
-        body, abstract = jo_body(pdf, titel)
+        body, abstract = jo_body(pdf, titel, patch_key)
     else:
         # no PDF on disk: the record's own flat extraction, one preformatted
         # block (paragraph structure is not recoverable from it)
@@ -223,7 +224,7 @@ def classify_arn(paras):
             for p in paras if _norm(p.text)]
 
 
-def parse_arn(record, root):
+def parse_arn(record, root, patch_key=None):
     """An ARN record (+ its decision PDF under `root`) -> Beslut. One path for
     both provenances: a frozen-corpus import (`avg/legacy.py`, no ``source_url``)
     and a live arn.se harvest (`avg/download.py`, carrying the referat's live PDF
@@ -234,7 +235,7 @@ def parse_arn(record, root):
     dnr = record["diarienummer"]
     pdf = arn_pdf_path(root, "arn/" + dnr)
     assert pdf.exists(), "arn %s has no body PDF at %s" % (dnr, pdf)
-    paras = [p for pageno, lines in pdf_pages(str(pdf))
+    paras = [p for pageno, lines in pdf_pages(str(pdf), patch_key)
              for p in page_paragraphs(lines, ORG_NAME["arn"], pageno)]
     return Beslut(
         org="arn", diarienummer=[dnr], titel=_norm(record["title"]),
@@ -252,10 +253,13 @@ def parse_record(basefile, root):
     artifact dict, body citation-scanned."""
     org = basefile.split("/", 1)[0]
     record = json.loads(record_path(root, org, basefile).read_text())
+    patch_key = ("avg", basefile)
     if org == "jo":
-        beslut = parse_jo(record, root)
+        beslut = parse_jo(record, root, patch_key)
     elif org == "jk":
-        beslut = parse_jk(record, jk_html_path(root, basefile).read_text())
+        # jk's intermediate is its landing-page HTML, not a PDF; patch it here
+        html = jk_html_path(root, basefile).read_text()
+        beslut = parse_jk(record, patch.apply(*patch_key, html))
     else:
-        beslut = parse_arn(record, root)
+        beslut = parse_arn(record, root, patch_key)
     return beslut.to_artifact(_fresh_parser())

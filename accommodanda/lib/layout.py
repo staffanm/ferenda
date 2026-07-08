@@ -166,6 +166,28 @@ def artifact(source, basefile):
     return artifact_dir(source) / rel.with_name(rel.name + ".json")
 
 
+# --------------------------------------------------------------------------
+# patch files -- curated, version-controlled fixes to a document's raw/
+# intermediate source, applied at parse time (see lib/patch.py). Unlike the
+# downloaded/artifact trees these are hand-authored knowledge that must be
+# reviewable and must ship with the pipeline, so they live *in the repo*, not
+# under DATA -- anchored to the package tree like the other curated in-repo
+# resources (sfs/data/*.json). Keyed by the same (source, basefile) -> relpath
+# rule as artifact(), so a document's patch sits at a predictable location.
+# --------------------------------------------------------------------------
+PATCHES = Path(__file__).resolve().parent.parent / "patches"   # accommodanda/patches
+
+
+def patch(source, basefile, suffix=".patch"):
+    """The patch-file path for a document: ``patches/<source>/<relpath><suffix>``.
+    `suffix` selects the variant -- ``.patch`` (plain), ``.rot13.patch`` (a
+    rot13-obfuscated redaction, so removed personal data is not itself plain-text
+    googleable in the committed patch) or ``.desc`` (a multi-line description
+    sidecar)."""
+    rel = relpath(source, basefile)
+    return PATCHES / source / rel.with_name(rel.name + suffix)
+
+
 # non-document json files that share a source's artifact dir: the index sidecars
 # (by basename, so the filter is independent of where ARTIFACT is rooted) and the
 # sfs `.versions.json` historical-consolidation sidecars.

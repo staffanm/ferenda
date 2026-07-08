@@ -1929,13 +1929,17 @@ def render_avg(art, site):
 KOMMENTAR_HOSTS = ("sfs", "eurlex", "foreskrift", "forarbete")
 
 
-def edit_meta(kind, ref, uri):
+def edit_meta(kind, ref, uri, source="", basefile=""):
     """The `<meta>` that tells editor.js what a page is and which markdown region
-    an edit maps to. Empty string disables editing on the page. Kept a plain
-    string (not a page-shell param) so it can be injected uniformly into every
-    renderer's output, including the separate editorial-site renderer."""
-    return ('<meta name="lagen-doc" data-kind="%s" data-ref="%s" content="%s">'
-            % (escape(kind), escape(ref), escape(uri)))
+    an edit maps to. `source`/`basefile` additionally name the document's own
+    identity when it is patchable (see lib.patch), so the editor can offer a
+    "patch source" button beside the commentary one. Empty string disables editing
+    on the page. Kept a plain string (not a page-shell param) so it can be injected
+    uniformly into every renderer's output, including the editorial-site renderer."""
+    return ('<meta name="lagen-doc" data-kind="%s" data-ref="%s" '
+            'data-source="%s" data-basefile="%s" content="%s">'
+            % (escape(kind), escape(ref), escape(source), escape(basefile),
+               escape(uri)))
 
 
 def _document_edit_meta(source, art):
@@ -1943,7 +1947,9 @@ def _document_edit_meta(source, art):
     if source in KOMMENTAR_HOSTS:
         local = catalog.local(uri)
         ref = local[len("ext/celex/"):] if local.startswith("ext/celex/") else local
-        return edit_meta("kommentar", ref, uri)
+        # the host act's own basefile is `ref`; every KOMMENTAR_HOSTS source is
+        # patchable, so pass its identity through for the patch-source button
+        return edit_meta("kommentar", ref, uri, source=source, basefile=ref)
     if source == "begrepp":
         return edit_meta("begrepp", art["title"], uri)
     return ""                            # dv / avg pages host no editable content
@@ -3214,6 +3220,7 @@ EDITOR_CSS = r"""
           border-radius: 5px; cursor: pointer; font-size: .8rem; line-height: 1;
           padding: .15rem .35rem; }
 .ed-btn:hover { background: var(--surf-2); }
+.ed-btn-patch { margin-left: .5rem; }
 [id] > .ed-btn { position: absolute; right: -3.4rem; top: .05rem; }
 .paragraf > .ed-btn { right: -3.4rem; top: .05rem; }
 .ed-btn-top { position: static; display: inline-flex; gap: .3rem; margin: 0 0 1rem; }
@@ -3263,6 +3270,8 @@ EDITOR = r"""
   var API = '/api/v1';
   var KIND = meta && meta.dataset.kind;
   var REF = meta && meta.dataset.ref;
+  var SOURCE = meta && meta.dataset.source;      // patch identity (if patchable)
+  var BASEFILE = meta && meta.dataset.basefile;
   var me = null, cartEl = null;
 
   function j(url, opts) {
@@ -3307,16 +3316,32 @@ EDITOR = r"""
   // ---- attaching edit buttons -------------------------------------------
   function topButton(label, anchor) {
     var main = document.querySelector('main.gr-main') || document.querySelector('main');
-    if (!main) return;
+    if (!main) return null;
     var b = el('button', 'ed-btn ed-btn-top'); b.type = 'button'; b.textContent = label;
     b.addEventListener('click', function (e) { e.preventDefault(); openEditor(anchor); });
     main.insertBefore(b, main.firstChild);
+    return b;
+  }
+  // a "patch source" button beside the commentary one -- opens the source-fix
+  // editor for this document (correct a scanning error, or redact personal data).
+  // Only for a patchable document (SOURCE is set on the page meta).
+  function patchButton(after) {
+    if (!SOURCE || !BASEFILE || !after) return;
+    var b = el('button', 'ed-btn ed-btn-top ed-btn-patch'); b.type = 'button';
+    b.textContent = '🩹 Patcha källtext';
+    b.title = 'Rätta eller avidentifiera källtexten för detta dokument';
+    b.addEventListener('click', function (e) {
+      e.preventDefault();
+      window.open(API + '/patch/edit?source=' + encodeURIComponent(SOURCE) +
+                  '&basefile=' + encodeURIComponent(BASEFILE), '_blank');
+    });
+    after.after(b);
   }
   function enableEditing() {
     if (!meta) return;                 // page carries no editable content
     if (KIND === 'kommentar') {
       // the act as a whole (document-level commentary, the "Om dokumentet" rail)
-      topButton('✎ Kommentera dokumentet', null);
+      patchButton(topButton('✎ Kommentera dokumentet', null));
       // and one per commentable node (a §/article/recital/chapter)
       var sel = 'main section.paragraf[id], main h3.artikel[id], main p.recital[id], main h2.kaprubrik[id]';
       document.querySelectorAll(sel).forEach(function (node) {

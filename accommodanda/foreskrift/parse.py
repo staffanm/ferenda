@@ -268,11 +268,12 @@ def _full_text(blocks):
     return "\n".join(text for _, text, _, _ in blocks)
 
 
-def parse_pdf(path, identifier, parser):
+def parse_pdf(path, identifier, parser, patch_key=None):
     """One föreskrift PDF -> (structure tree, its metadata dict). Metadata is read
     from the whole text (the masthead up front, ikraftträdande at the end); the
-    structure is built from the operative body only, the masthead dropped."""
-    blocks = parse_body(pdf_pages(path), identifier)
+    structure is built from the operative body only, the masthead dropped.
+    `patch_key=(source, basefile)` patches the pdftohtml XML before extraction."""
+    blocks = parse_body(pdf_pages(path, patch_key), identifier)
     start = _body_start(blocks)
     meta = extract_metadata(_full_text(blocks), parser)
     # the publisher is a masthead fact only (a body citation to another agency's
@@ -355,7 +356,8 @@ def parse_record(record, root):
     structure, meta = [], {}
     if reg_file:
         structure, meta = parse_pdf(
-            body_path(root, fs, reg_file), record["identifier"], parser)
+            body_path(root, fs, reg_file), record["identifier"], parser,
+            ("foreskrift", basefile))
 
     # the PDF masthead is the authoritative issuer; the harvest label (the current
     # custodian agency) is only the fallback when the PDF names none
