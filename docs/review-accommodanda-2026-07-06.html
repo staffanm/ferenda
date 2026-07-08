@@ -1,0 +1,335 @@
+<title>accommodanda code review — 2026-07-06</title>
+<style>
+:root {
+  --bg: #faf8f4; --surface: #ffffff; --ink: #22262b; --muted: #6f675a;
+  --accent: #234a70; --line: #e6dfd2; --code-bg: #f1ede4;
+  --high: #b3382c; --high-bg: #f9ece9;
+  --med: #8f6400; --med-bg: #f7f0dd;
+  --low: #55677a; --low-bg: #ecf0f4;
+  --ok: #2e7d4f; --ok-bg: #e9f3ec;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16181d; --surface: #1e2128; --ink: #e6e2d9; --muted: #968f81;
+    --accent: #85aed3; --line: #2d313a; --code-bg: #262a33;
+    --high: #e0705f; --high-bg: #33211f;
+    --med: #d5a63f; --med-bg: #2f2a1c;
+    --low: #93a5b6; --low-bg: #222831;
+    --ok: #6cb98d; --ok-bg: #1d2c23;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #faf8f4; --surface: #ffffff; --ink: #22262b; --muted: #6f675a;
+  --accent: #234a70; --line: #e6dfd2; --code-bg: #f1ede4;
+  --high: #b3382c; --high-bg: #f9ece9;
+  --med: #8f6400; --med-bg: #f7f0dd;
+  --low: #55677a; --low-bg: #ecf0f4;
+  --ok: #2e7d4f; --ok-bg: #e9f3ec;
+}
+:root[data-theme="dark"] {
+  --bg: #16181d; --surface: #1e2128; --ink: #e6e2d9; --muted: #968f81;
+  --accent: #85aed3; --line: #2d313a; --code-bg: #262a33;
+  --high: #e0705f; --high-bg: #33211f;
+  --med: #d5a63f; --med-bg: #2f2a1c;
+  --low: #93a5b6; --low-bg: #222831;
+  --ok: #6cb98d; --ok-bg: #1d2c23;
+}
+html { background: var(--bg); }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+  margin: 0; padding: 2.5rem 1.25rem 5rem;
+}
+main { max-width: 46rem; margin: 0 auto; }
+h1, h2, h3 { font-family: Charter, Georgia, "Times New Roman", serif; line-height: 1.25; text-wrap: balance; }
+h1 { font-size: 2rem; font-weight: 700; margin: 0 0 .3rem; }
+h2 { font-size: 1.45rem; margin: 3rem 0 .8rem; padding-top: 1.4rem; border-top: 1px solid var(--line); }
+h3 { font-size: 1.1rem; margin: 1.8rem 0 .5rem; }
+p { margin: .7rem 0; }
+a { color: var(--accent); }
+.eyebrow { text-transform: uppercase; letter-spacing: .09em; font-size: .72rem; color: var(--muted); font-weight: 600; }
+.sub { color: var(--muted); font-size: .95rem; margin-top: .2rem; }
+code, .loc {
+  font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, monospace;
+  font-size: .84em; background: var(--code-bg); border-radius: 3px; padding: .08em .35em;
+}
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: .7rem; margin: 1.6rem 0; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: .8rem .95rem; }
+.tile .n { font-size: 1.7rem; font-weight: 700; font-variant-numeric: tabular-nums; font-family: Charter, Georgia, serif; }
+.tile .l { font-size: .78rem; color: var(--muted); line-height: 1.35; margin-top: .1rem; }
+.tile.high .n { color: var(--high); } .tile.med .n { color: var(--med); }
+.tile.low .n { color: var(--low); } .tile.ok .n { color: var(--ok); }
+.chip {
+  display: inline-block; font-size: .68rem; font-weight: 700; letter-spacing: .06em;
+  border-radius: 999px; padding: .1rem .55rem; vertical-align: middle; text-transform: uppercase;
+}
+.chip.high { color: var(--high); background: var(--high-bg); }
+.chip.med  { color: var(--med);  background: var(--med-bg); }
+.chip.low  { color: var(--low);  background: var(--low-bg); }
+.chip.ok   { color: var(--ok);   background: var(--ok-bg); }
+.chip.area { color: var(--muted); background: var(--code-bg); text-transform: none; letter-spacing: .02em; font-weight: 600; }
+.finding {
+  background: var(--surface); border: 1px solid var(--line); border-left-width: 4px;
+  border-radius: 6px; padding: .85rem 1.05rem .9rem; margin: .8rem 0;
+}
+.finding.high { border-left-color: var(--high); }
+.finding.med  { border-left-color: var(--med); }
+.finding.low  { border-left-color: var(--low); }
+.finding .head { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: .35rem; }
+.finding .title { font-weight: 650; }
+.finding p { margin: .45rem 0; font-size: .93rem; }
+.finding .fix { font-size: .88rem; color: var(--muted); }
+.finding .fix strong { color: var(--ink); }
+.rule { font-size: .74rem; color: var(--muted); font-family: ui-monospace, Menlo, monospace; }
+table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+.tablewrap { overflow-x: auto; margin: 1rem 0; }
+th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: .74rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+td .loc { white-space: nowrap; }
+ul { padding-left: 1.3rem; } li { margin: .3rem 0; }
+.lowlist li { font-size: .9rem; margin: .45rem 0; }
+details { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: .6rem 1rem; margin: .7rem 0; }
+summary { cursor: pointer; font-weight: 600; font-size: .95rem; }
+summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.verdict {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+  padding: 1rem 1.2rem; margin: 1.4rem 0; font-size: 1.02rem;
+}
+.flag { border-left: 4px solid var(--med); }
+blockquote { margin: .8rem 0; padding: .1rem 1rem; border-left: 3px solid var(--line); color: var(--muted); font-size: .92rem; }
+.ordered li { margin: .55rem 0; }
+footer { margin-top: 4rem; color: var(--muted); font-size: .8rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+</style>
+<main>
+<div class="eyebrow">Code review · accommodanda/ · 2026-07-06</div>
+<h1>Whole-package review: correctness, security, conventions</h1>
+<p class="sub">~28,900 lines across 9 verticals + lib/ + api/, reviewed against <code>REWRITE.md</code>, <code>docs/conventions.md</code> and the two prior reviews (2026-07-01, 2026-07-02). Nine parallel review slices, each verified against full code paths; several findings reproduced by execution.</p>
+
+<div class="tiles">
+  <div class="tile high"><div class="n">7</div><div class="l">new HIGH findings</div></div>
+  <div class="tile med"><div class="n">~21</div><div class="l">new MEDIUM findings</div></div>
+  <div class="tile low"><div class="n">~26</div><div class="l">new LOW findings</div></div>
+  <div class="tile"><div class="n">44<span style="font-size:1rem;color:var(--muted)">/45</span></div><div class="l">07-02 punch-list items still open</div></div>
+  <div class="tile ok"><div class="n">✓</div><div class="l">ruff · ty · layer checker all green</div></div>
+</div>
+
+<div class="verdict">
+<strong>Verdict.</strong> The architecture is holding: layer boundaries are clean (verified by checker <em>and</em> by hand in every slice), the mechanical layer is green, SQL is parameterized throughout, and the authenticated edit surface is genuinely well built. The problems cluster in two places instead: <strong>incremental correctness</strong> — seven independent ways the harvest/freshness machinery silently and permanently loses data (one per vertical, plus the render layer) — and <strong>the untouched 07-02 punch list</strong>, whose recurring patterns (load-bearing asserts on untrusted data, non-atomic writes, per-vertical harvest copies) kept re-accreting in exactly the new code this review examined.
+</div>
+
+<h2 id="theme-watermarks">Theme 1 — Silent, permanent document loss in incremental pipelines</h2>
+<p>The dominant result of this review. Every vertical grew its own watermark/stop logic (the <code>lib/harvest.py</code> promotion has been flagged since 07-01 and re-flagged 07-02 as HIGH #11), and each copy has a distinct hole. All of these share one failure shape: <em>the run reports success, the watermark advances, and a document is never fetched again without a manual <code>--full</code></em>.</p>
+
+<div class="finding high">
+<div class="head"><span class="chip high">High</span><span class="chip area">eurlex</span><span class="title">Late-indexed case law permanently invisible to incremental runs</span></div>
+<p><span class="loc">eurlex/download.py:176,237</span> — <code>enumerate_celex</code> starts the CELEX year walk at <code>max(first_year, since.year)</code>, but a CJEU judgment's CELEX year is the <em>case</em> year; its work date lands at decision time, years later. With a 2025 watermark, <code>62020CJ…</code> slices are never queried again, so a 2020-case judgment decided in 2025 never enters the corpus. The code documents this exact lag at :698–702 for the resume value — but not for enumeration.</p>
+<p class="fix"><strong>Fix:</strong> decouple enumeration start-year from the date floor for caselaw (walk from <code>first_year</code> or a bounded lag; the SPARQL wdate FILTER prunes cheaply).</p>
+</div>
+
+<div class="finding high">
+<div class="head"><span class="chip high">High</span><span class="chip area">eurlex</span><span class="title">Incremental floor gives zero tolerance for CELLAR's out-of-order indexing</span></div>
+<p><span class="loc">eurlex/download.py:605–615</span> — <code>floor = max(high, run − window)</code> can only move <em>up</em> from the highest work date seen, yet RECENCY_WINDOW exists precisely because CELLAR indexes documents months after their work date. An act dated below <code>high</code> but indexed later is permanently skipped. This also defeats the deliberate no-notice retry design at :503–509 (double-confirmed by two independent reviewers): a doc that once yielded no content (e.g. a placeholder TIFF) is never re-enumerated once <code>high</code> passes its date.</p>
+<p class="fix"><strong>Fix:</strong> let the active-sector floor reach <code>min(high, run) − window</code>; the on-disk skip makes the re-enumerated window cheap. Related MEDIUM: the <code>FILTER(?d &gt;= …)</code> silently drops wdate-less documents every incremental run — use <code>FILTER(!BOUND(?d) || …)</code>.</p>
+</div>
+
+<div class="finding high">
+<div class="head"><span class="chip high">High</span><span class="chip area">dv</span><span class="title">Interrupted or --limit run poisons the next run's lookahead stop</span></div>
+<p><span class="loc">dv/download.py:172–201</span> + <span class="loc">lib/util.py:334–343</span> — a crashed or truncated incremental run correctly withholds the watermark but leaves its ~N freshly written records on disk. The next run's stop rule ("20 consecutive already-downloaded ⇒ done") trusts disk state, stops above the un-fetched backlog, and <em>then saves the watermark past it</em>. Everything below the crash point is permanently skipped.</p>
+<p class="fix"><strong>Fix:</strong> a dirty-marker set at the start of any mutating run, cleared only on clean completion; dirty at startup forces the backfill path. Related MEDIUM: the walk orders by <em>decision</em> date, not publication date — a referat published &gt;14 days after decision sorts below downloaded records and is never harvested (the AD 2006–2017 gap in REWRITE §4 is this exact pattern); a periodic cron'd <code>--full</code> should be a documented part of the contract.</p>
+</div>
+
+<div class="finding high">
+<div class="head"><span class="chip high">High</span><span class="chip area">forarbete</span><span class="title">Listing walk stops on a type-filtered-empty page, truncating pm/ds harvests — including --full</span></div>
+<p><span class="loc">forarbete/download.py:160–170</span> — <code>iter_listing</code> terminates when a page yields no items <em>after</em> type filtering. For the two types sharing regeringen.se category 1325, a page consisting entirely of the sibling type's documents (an all-Ds page is very plausible in the Ds-dominated older range) reads as "listing exhausted": the walk ends, the watermark is written, totals look plausible, and everything deeper in the listing is permanently skipped — for backfills too.</p>
+<p class="fix"><strong>Fix:</strong> terminate on the <em>raw</em> item count (or on <code>page &gt; ceil(TotalCount/pagesize)</code> — TotalCount is already fetched).</p>
+</div>
+
+<div class="finding med">
+<div class="head"><span class="chip med">Medium</span><span class="chip area">foreskrift · avg</span><span class="title">Empty enumeration "succeeds" and clobbers a good watermark with null</span></div>
+<p><span class="loc">foreskrift/harvest.py:577–578</span>, <span class="loc">avg/download.py:246–247</span> — selector rot or an API change yielding zero items produces zero Skips, so <code>watermark.save(None)</code> overwrites a previously earned date. The run reports clean while the corpus silently stops updating.</p>
+<p class="fix"><strong>Fix:</strong> treat 0-items-enumerated as a Skip; make <code>HarvestWatermark.save</code> reject <code>None</code> (never regress a watermark).</p>
+</div>
+
+<div class="finding med">
+<div class="head"><span class="chip med">Medium</span><span class="chip area">foreskrift</span><span class="title">One transient resolve failure + the 20-hit lookahead = a permanently stranded document</span></div>
+<p><span class="loc">foreskrift/harvest.py:565–578</span> — a failed per-doc resolve is logged as "retryable", but the watermark still advances; on the next newest-first run, the 20 documents downloaded <em>above</em> it trip the lookahead stop before the walk reaches it. One 500 from an agency page = a permanent hole unless an operator reads one log line. Sibling LOW: a non-PDF body (WAF page served 200) is dropped with no log <em>and</em> a record is still written, so the doc is permanently metadata-only with zero trace (<span class="loc">harvest.py:267,305</span>).</p>
+<p class="fix"><strong>Fix:</strong> a retry sidecar consumed at run start (the <code>sfs/versions.py</code> skip-sidecar pattern), or withhold the watermark when <code>errors &gt; 0</code> — which is exactly what <span class="loc">forarbete/riksdagen.py:336</span> already does; the two policies in one vertical answering the same question oppositely is itself flagged (LOW).</p>
+</div>
+
+<div class="finding med">
+<div class="head"><span class="chip med">Medium</span><span class="chip area">remisser</span><span class="title">Stub-record protection covers only HTTPError; a DOM-shaped failure permanently hides the case</span></div>
+<p><span class="loc">remisser/download.py:310–321</span> — the stub design exists precisely to keep failures visible, but a 200-with-unexpected-DOM (bot interstitial) raises past the <code>HTTPError</code> catch <em>after</em> newer slugs were written; the next incremental run stops at the first on-disk slug and the failed case is never fetched again.</p>
+<p class="fix"><strong>Fix:</strong> write the stub for any per-case fetch/parse failure (catch <code>RequestException</code> + a typed parse error), log, count as failed.</p>
+</div>
+
+<div class="finding med">
+<div class="head"><span class="chip med">Medium</span><span class="chip area">eurlex bulk</span><span class="title">A stray sector-1/6 work in a legislation dump claims full-sector watermark coverage</span></div>
+<p><span class="loc">eurlex/bulk.py:277–305</span> — <code>marks</code> is keyed by CELEX sector digit with no sector-3 restriction, so one treaty/judgment in a LEG dump writes the treaties/caselaw watermark from a one-document baseline; a later incremental then skips that sector's entire un-harvested history. Sibling MEDIUM: dump-supplied CELEX strings reach filesystem path construction with no shape validation (<span class="loc">bulk.py:255–259</span> — a <code>/</code> or <code>..</code> escapes root; a literal <code>_</code> breaks slug reversibility), while the live download path regex-validates every CELEX.</p>
+<p class="fix"><strong>Fix:</strong> write watermarks only for the sector the dump covers; validate CELEX against the sector regexes and count rejects under <code>skipped</code>.</p>
+</div>
+
+<h2 id="theme-freshness">Theme 2 — The render freshness model can't see cross-document edits</h2>
+
+<div class="finding high">
+<div class="head"><span class="chip high">High</span><span class="chip area">lib · build</span><span class="title">Kommentar, guidance, remisser and correspondence layers never reach the pages that render them</span></div>
+<p><span class="loc">lib/render.py:85–193</span> · <span class="loc">build.py:2026–2160</span> · <span class="loc">lib/catalog.py:943–994</span> — the per-page freshness key covers a page's own artifact + its own sidecars; the dependency digest is identity-based (link <em>sets</em>). But kommentar prose, kommentar <code>.ann</code> guidance, remisser <code>.ann</code> analyses and <code>.corr</code> correspondence render onto <em>other documents'</em> pages. Verified end-to-end: editing kommentar prose never re-renders the host page; <code>ai-annotate</code> opens the generate gate but every page is then judged fresh (0 rendered — the in-code comment claiming a full generate propagates it is wrong for the unforced case); remisser artifacts appear in <em>neither</em> the watermark nor any signature. Only <code>--force</code> or an unrelated change ships these edits.</p>
+<p class="fix"><strong>Fix:</strong> per-host-uri content digests for <code>Site</code>'s cross-document indexes, folded into page signatures; add remisser globs to <code>generate_watermark</code>. <span class="rule">rule:artifact-is-truth</span></p>
+</div>
+
+<div class="finding high">
+<div class="head"><span class="chip high">High</span><span class="chip area">build · api</span><span class="title">The inline editor's post-commit rebuild doesn't actually make the edit live</span></div>
+<p><span class="loc">lib/render.py:1964–1967</span> vs <span class="loc">build.py:1677–1680</span> — <code>generate_site</code> ignores <code>only</code> whenever <code>source</code> is also passed, and <code>rebuild_after_commit</code> passes both. Every editor checkout therefore runs a whole-source freshness scan synchronously inside the web request — and, combined with the finding above, then judges the host page fresh, so the committed edit <strong>does not appear on the live page</strong>, contradicting REWRITE §6. The pinned test mocks <code>cmd_generate</code> and only asserts argument shapes, so nothing catches either half.</p>
+<p class="fix"><strong>Fix:</strong> make <code>only</code> compose with <code>source</code>; have the editor path bypass <code>fresh()</code> for pages that are dirty by construction. Bonus: routing <code>write_artifact</code> through <code>write_atomic</code> (Theme 3) also fixes the editor path 500-ing on a first-ever commentary (missing parent dir, <em>after</em> the git commit landed).</p>
+</div>
+
+<div class="finding med">
+<div class="head"><span class="chip med">Medium</span><span class="chip area">lib</span><span class="title">Repeal status evaluated against today's date, but no freshness key contains a date</span></div>
+<p><span class="loc">lib/render.py:1043</span>, <span class="loc">lib/facets.py:379</span> — when a statute's <code>upphavandedatum</code> passes, nothing invalidates: the site keeps presenting a now-repealed statute as in force until an unrelated change or <code>--force</code>. <span class="rule">rule:respect-source-temporality</span></p>
+<p class="fix"><strong>Fix:</strong> fold repeal dates falling in <code>(last_run, today]</code> into <code>generate_watermark</code> and the affected pages' signatures.</p>
+</div>
+
+<div class="finding med">
+<div class="head"><span class="chip med">Medium</span><span class="chip area">build</span><span class="title">Recipe-version tuples miss transitive imports — editing shared code doesn't re-stale its stages</span></div>
+<p><span class="loc">build.py:1727–1729, 2012–2015</span> — <code>RELATE_CODE</code> omits <code>concepts.py</code>/<code>text.py</code>/<code>markdown.py</code> that catalog.py imports; <code>GENERATE_CODE</code> omits <code>facets.py</code> and <code>api/app.py</code> (which produce the browse pages, via the sanctioned inversion); <code>INDEX_CODE</code> omits <code>catalog.py</code>. Change a facet bucket rule → "up to date — skipped" → stale browse pages until <code>--force</code>.</p>
+<p class="fix"><strong>Fix:</strong> extend the tuples to the real import closure, or derive them from the import graph in one place.</p>
+</div>
+
+<h2 id="theme-atomicity">Theme 3 — Atomicity: the consolidation missed the most important writer</h2>
+
+<div class="finding med">
+<div class="head"><span class="chip med">Medium</span><span class="chip area">build · lib</span><span class="title">write_artifact is plain write_text; a zero-byte artifact silently drops the document from the catalog</span></div>
+<p><span class="loc">build.py:169</span> — the one writer the 07-01 <code>write_atomic</code> consolidation missed is the central artifact writer. <code>write_text</code> truncates first: an OOM-killed worker or ENOSPC leaves a zero-byte artifact, which <code>catalog.rebuild</code> (<span class="loc">lib/catalog.py:538–541</span>) interprets as a deliberate SkipDocument placeholder and <strong>silently drops from the catalog</strong>. Same non-atomic in-place writes on the <em>served</em> tree (<span class="loc">render.py:1875,1927,2038</span>, <span class="loc">dump.py:28</span>) — a reader mid-regenerate can receive a truncated page.</p>
+<p class="fix"><strong>Fix:</strong> route all through <code>util.write_atomic</code>. Batch with the other new non-atomic sites found this pass: <span class="loc">sfs/versions.py:157</span> (version artifacts — the sidecar 3 lines below is already atomic), <span class="loc">dv/identity.py:233</span> (the identity index that drives the whole dv parse phase), <span class="loc">dv/namedcases.py:90</span>, <span class="loc">eurlex/annotate.py:107</span> and <span class="loc">remisser/ai_analyze.py:175</span> (truncated <code>.ann</code> breaks every later generate), plus the two wiki sites already on the 07-02 list. <span class="rule">rule:second-use-goes-to-lib</span></p>
+</div>
+
+<h2 id="theme-hostile">Theme 4 — Robustness against hostile or pathological input</h2>
+
+<div class="finding med">
+<div class="head"><span class="chip med">Medium</span><span class="chip area">lib/lagrum</span><span class="title">Quadratic blowup in the LAGRUM trigger regex — reproduced: 6.2 s on 24 KB</span></div>
+<p><span class="loc">lib/lagrum.py:473–476</span> — the unbounded list-continuation quantifier makes the trigger scan O(n²)+ in the length of a digit/separator run (measured 0.09→0.45→1.4→6.2 s per input doubling). Any remote-supplied DV/förarbete text containing a long flattened enumeration (one <code>§</code> anywhere defeats FILTER_LAW) stalls the parse for minutes-to-hours — a hang the per-document exception boundary cannot catch.</p>
+<p class="fix"><strong>Fix:</strong> bound the repetition (e.g. <code>{0,50}</code>; <code>WINDOW=220</code> already caps what the parser can consume). Measured 1.1 s over 300 KB with the bound; no golden-visible behavior change.</p>
+</div>
+
+<div class="finding med">
+<div class="head"><span class="chip med">Medium</span><span class="chip area">api</span><span class="title">No rate limiting on login; every attempt costs a full pbkdf2</span></div>
+<p><span class="loc">api/auth.py:174–194</span> — no throttle, backoff or lockout on password guesses, and every POST — including unknown usernames, deliberately checked against a dummy hash — burns 260k pbkdf2 rounds in Starlette's bounded sync threadpool. A login flood pins CPU and starves the whole (otherwise cheap) site. The only MEDIUM from the security slice; everything else on the auth/edit/git surface checked out sound (timing-safe compares, <code>--</code> git argument hygiene, <code>_contained</code> path confinement, CSRF posture, prior XSS/XXE fixes present).</p>
+<p class="fix"><strong>Fix:</strong> per-IP + per-account rate limiting with backoff; cap concurrent login work. Security LOWs: <code>version</code> param allows one <code>..</code> segment where <code>basefile</code> forbids it (<span class="loc">app.py:387</span>); anonymous <code>/document/diff</code> has no resource cap (cache it — versions are immutable); sessions unrevocable for 14 days; cookie <code>Secure</code> inferred from a proxy header.</p>
+</div>
+
+<div class="finding med">
+<div class="head"><span class="chip med">Medium</span><span class="chip area">avg</span><span class="title">LibreOffice conversion can import the previous case's decision under the current dnr</span></div>
+<p><span class="loc">avg/legacy.py:146–230</span> — every conversion targets <code>tmpdir/index.pdf</code> in one shared temp dir; soffice sometimes exits 0 without producing output, in which case the <em>previous</em> case's stale PDF passes the existence assert and is imported as the current case's body — silent wrong data.</p>
+<p class="fix"><strong>Fix:</strong> <code>out.unlink(missing_ok=True)</code> before the run, or per-case subdirectories.</p>
+</div>
+
+<div class="finding med">
+<div class="head"><span class="chip med">Medium</span><span class="chip area">eurlex · wiki · remisser</span><span class="title">LLM-response validation gaps defer failures past the retry loop</span></div>
+<p><span class="loc">eurlex/annotate.py:56–74</span> — <code>recitalGroups</code>/<code>articleToRecitals</code> shapes never checked, so a malformed-but-JSON reply is written to the <code>.ann</code> and crashes <em>every subsequent generate</em> (<span class="loc">render.py:1355–1368</span>) instead of being fed back to the model. Sibling LOW: <span class="loc">wiki/annotate.py:240</span> uses unvalidated <code>link["page"]</code> in <code>"#page=%d"</code>, crashing after the expensive call. And the two-attempt validate/retry loop now exists in <strong>three</strong> near-identical copies (eurlex, wiki, remisser — remisser's, with real assistant-turn replay, is the best one); promote to <code>lib/llm</code>. <span class="rule">rule:errors-drive-retry-use-raise · rule:second-use-goes-to-lib</span></p>
+</div>
+
+<div class="finding med">
+<div class="head"><span class="chip med">Medium</span><span class="chip area">forarbete · avg · remisser</span><span class="title">The load-bearing-assert pattern keeps re-accreting in new code</span></div>
+<p>The exact defect class fixed in 07-01 (§3.3) and listed 5× in the 07-02 punch list has new instances in each newer vertical: <span class="loc">forarbete/legacy_formats.py:101,252</span> (under <code>-O</code>, mints <code>"None:None"</code> basefiles written to disk as junk catalog documents), <span class="loc">avg/legacy.py:212–215</span> (mismatched dnr/date flows into the record), <span class="loc">remisser/download.py:240–243</span> (org-slug collision silently overwrites one org's answer PDF with another's — and the assert is <em>test-pinned</em>, so the fix must adjudicate <span class="loc">test_remisser.py:200</span>). <span class="rule">rule:errors-drive-retry-use-raise</span></p>
+<p class="fix"><strong>Fix:</strong> convert to <code>raise ValueError</code> (record-and-continue where per-item resilience applies). Consider a ruff ban (<code>S101</code>-scoped) outside tests, since judgment alone isn't holding the line.</p>
+</div>
+
+<div class="finding med">
+<div class="head"><span class="chip med">Medium</span><span class="chip area">forarbete</span><span class="title">Legacy-import robustness: full-file magic sniffs and a missing shell-page guard</span></div>
+<p><span class="loc">forarbete/legacy.py:281,362</span> — <code>pdf.read_bytes()[:8]</code> reads entire PDFs (over soukb: the full 371 GB tree, hours of pure I/O) to inspect 8 bytes. <span class="loc">legacy.py:551–553</span> — <code>_pick_proptrips</code> lacks the <code>div.body-text</code> shell-page guard its dirtrips sibling has (5 known shells in the same crawl), turning a saved search-result shell into a permanent per-doc parse failure instead of a metadata-only record.</p>
+<p class="fix"><strong>Fix:</strong> stream the 8-byte sniff; apply the dirtrips guard. Same full-read sniff pattern also at <span class="loc">foreskrift/legacy.py:116</span>, <span class="loc">avg/legacy.py:128</span>.</p>
+</div>
+
+<h2 id="theme-sfs">Theme 5 — SFS validation-harness integrity</h2>
+
+<div class="finding high">
+<div class="head"><span class="chip high">High</span><span class="chip area">sfs</span><span class="title">load_inputs crashes on every legacy-HTML call — and validate silently misclassifies those docs</span></div>
+<p><span class="loc">sfs/__init__.py:55</span> — <code>Path(json_path).exists()</code> raises <code>TypeError</code> when <code>json_path</code> is <code>None</code>, which is what every legacy-HTML caller passes (reproduced). The documented CLI mode crashes; worse, in corpus <code>validate</code> the TypeError is swallowed by the per-doc boundary, so every HTML-fallback document is misclassified as <code>error: TypeError</code> instead of golden-compared — <strong>those docs silently drop out of the correctness net</strong>. Production <code>build.py</code> always passes real Paths, so only the CLI/harness is affected — but the harness is the regression net. Related MEDIUM: the legacy register path is derived by a fossil <code>/downloaded/→/register/</code> transform matching no current layout (<span class="loc">sfs/__main__.py:112,134</span>, <span class="loc">_validate.py:117</span>), so HTML-path parses silently lose all register-derived amendments/metadata; derive via <code>layout.sfs_sfsr</code>.</p>
+</div>
+
+<div class="finding med">
+<div class="head"><span class="chip med">Medium</span><span class="chip area">sfs</span><span class="title">versions stage: a transient environment failure becomes a permanent sidecar skip</span></div>
+<p><span class="loc">sfs/versions.py:147</span> — the sanctioned per-version boundary catches <em>all</em> Exception, so an OSError from a flaky mount is recorded exactly like a corrupt archive; since the inputs are immutable, the stage is watermark-fresh forever and that historical lydelse silently vanishes from the version panel until the recipe hash changes. The noqa rationale covers data corruption, not environment. <span class="rule">rule:narrow-what-you-catch</span></p>
+<p class="fix"><strong>Fix:</strong> re-raise <code>OSError</code>/<code>MemoryError</code>; keep the recorded skip for data-shaped failures.</p>
+</div>
+
+<h2 id="punchlist">The 2026-07-02 punch list: 44 of 45 still open</h2>
+<p>Every item verified against current code. Only the <code>.gitignore</code> fix landed (the review agents/skills are now tracked). All 12 HIGHs — the shared stateful ⌘K parser, the sentinel <code>query#P3</code> URIs, the six load-bearing asserts, the ghost fragment rows, the wrapper-Formex shipping, the pdftext fork, the harvest-engine promotion, the vanishing-kommentar fallback — are unchanged, with line drift only. Several got <em>worse</em>: the all-grammars parse-type list is now 5 copies (was 4), the browser-UA constant 4 (was 3), and this review found ~6 new non-atomic write sites and 5 new load-bearing asserts of exactly the shapes that list flags.</p>
+
+<div class="finding flag" style="border-left-color: var(--med)">
+<div class="head"><span class="chip med">Needs your judgment</span><span class="title">The overlappande-tabellrader test was resolved on the fixture side, not the parser side</span></div>
+<p>The 07-02 review prescribed a fix + fixture for <code>sfs/nf.py:tabell_nf</code> ignoring per-row <code>upphor</code>/<code>ikrafttrader</code> (the fields exist on <code>Tabellrad</code> and the tokenizer populates them). The test now passes — but the on-disk fixture contains <strong>no temporal markers at all</strong>, and <code>tabell_nf</code> is unchanged. If the fixture was edited to sidestep the diagnosed gap, that's <span class="rule">rule:never-weaken-tests</span>; the squashed history makes it undatable. The companion decision item (EU label pruning) was resolved cleanly the other way: the old test was replaced with one pinning the opposite, adopted contract — but its bundled sub-finding (resolve.py re-implementing <code>load_namedacts</code>, the drift channel) is still open.</p>
+</div>
+
+<h2 id="lows">Remaining findings by area (LOW unless noted)</h2>
+
+<details><summary>eurlex (5)</summary><ul class="lowlist">
+<li><span class="loc">parse.py:69</span> — load-bearing assert on remote zip content; raise ValueError. <span class="rule">rule:errors-drive-retry-use-raise</span></li>
+<li><span class="loc">download.py:234,703</span> — SOAP runs advance the watermark despite the docstring's contrary contract; guard on <code>source == "sparql"</code> or fix the doc.</li>
+<li><span class="loc">download.py:396</span> — unreachable accept-anything fallback in <code>_content_ok</code>; a future ranked type would be silently accepted unchecked.</li>
+<li><span class="loc">parse.py:474</span> — <code>swe.*</code> glob + substring routing can pick up a stale <code>.tmp</code> partial after a hard kill; exact-suffix match.</li>
+<li><span class="loc">model.py:175</span> — <code>body: list  # [Block]</code>, the literal anti-pattern. <span class="rule">rule:own-typed-model</span> (also <span class="loc">forarbete/model.py:33</span>)</li>
+</ul></details>
+
+<details><summary>dv + casenaming (3)</summary><ul class="lowlist">
+<li><span class="loc">dv/legacy.py:94–97</span> — multi-målnummer values with a court-prefix letter (<code>"Ö 2475-12 och Ö 2477-12"</code>) collapse to one garbage entry; reached for referat-keyed legacy-only cases.</li>
+<li><span class="loc">lib/casenaming.py:60–61</span> — <code>if not NAMEDCASES.exists(): return {}, {}</code> on a committed file: a broken checkout silently drops every HD nickname site-wide. <span class="rule">rule:fail-fast</span></li>
+<li><span class="loc">dv/download.py</span> — publication-lag contract (see Theme 1 dv MEDIUM).</li>
+</ul></details>
+
+<details><summary>sfs parse chain + citation data (4)</summary><ul class="lowlist">
+<li><span class="loc">sfs/tokenizer.py:250</span> — blanket <code>except IOError</code> in <code>next_event</code> silently drops a final event whose recognizer looks ahead after consuming (reproduced: trailing avdelning heading vanishes). <span class="rule">rule:narrow-what-you-catch</span></li>
+<li><span class="loc">sfs/data/namedlaws.json:17,192</span> — "Upplåtelser" and "Tillhandahållande" are title fragments, not abbreviations; DV prose like "Tillhandahållande 2 §" mints a false link to 2003:234. Fix the two data entries.</li>
+<li><span class="loc">sfs/correspond.py:51</span> — id-suppressed paragrafs enter the LLM prompt inventory as anchor <code>None</code>; any edge mapped to them is silently rejected by <code>validate_edges</code>.</li>
+<li><span class="loc">sfs/versions.py:104</span> — local <code>html</code> bool shadows the <code>html</code> module import; <span class="loc">register.py:35</span> — org/series resolution depends on a ttl inside the frozen <code>lagen/</code> tree (<span class="rule">rule:legacy-read-only</span>; port the data as namedlaws was); <span class="loc">download.py:266</span> — <code>--full</code> help text describes dv's semantics, not sfs's.</li>
+</ul></details>
+
+<details><summary>avg + foreskrift (4)</summary><ul class="lowlist">
+<li><span class="loc">avg/download.py:222</span> — <code>jo_sync --full</code> never refreshes already-downloaded docs (inconsistent with jk/arn/foreskrift's <code>--full</code>).</li>
+<li><span class="loc">avg/download.py:336</span> — <code>jk_sync --full</code> deletes the stored landing <em>before</em> fetching its replacement; a failed fetch leaves a record whose parse crashes until re-harvest.</li>
+<li><span class="loc">foreskrift/harvest.py:267,305</span> + <span class="loc">avg/download.py:149,431</span> — four hand-rolled <code>%PDF</code> sniffs beside the existing <code>lib/util.document_extension</code> helper. <span class="rule">rule:second-use-goes-to-lib</span></li>
+<li><span class="loc">foreskrift/harvest.py:547</span> — dead defensive branch on the year format quietly disables the date signal if it ever fired; <span class="loc">avg/legacy.py:190</span> — soffice profile dir leaks on exception, cleanup is an unannotated <code>ignore_errors</code>.</li>
+</ul></details>
+
+<details><summary>forarbete (4)</summary><ul class="lowlist">
+<li><span class="loc">riksdagen.py:106,119</span> — bare dict access on remote feed fields; one malformed entry kills an hours-long backfill (resumable, but hours lost).</li>
+<li><span class="loc">parse.py:83</span> — <code>(p.bold or mt) and mt</code> is just <code>mt</code>; either a dead subexpression or a latent heading-classification bug — confirm intent. <span class="loc">parse.py:57</span> — <code>RE_HEADING_INLINE</code> unused.</li>
+<li><span class="loc">legacy.py:75</span> — <code>.doc/.docx/.wpd/.rtf</code> body tiers are unreachable surface (no walker emits them). <span class="rule">rule:no-speculative-code</span></li>
+<li><span class="loc">legacy_formats.py:47</span> — second consumer imports private <code>_dehyphenate</code>; make it public. <span class="loc">legacy_formats.py:98</span> — the one non-hardened <code>etree.fromstring</code> left in the tree (frozen-tree input; harden for uniformity). <span class="loc">kommentar.py:432</span> — debug CLI's <code>--root</code> default wrong for live records.</li>
+</ul></details>
+
+<details><summary>remisser + wiki + markdown (4)</summary><ul class="lowlist">
+<li><span class="loc">remisser/download.py:212</span> — re-poll merge dedups by organisation display name, silently dropping a second answer from the same org (the fresh-parse path keeps both); key on <code>org_slug</code>.</li>
+<li><span class="loc">lib/markdown.py:87,165</span> — unterminated frontmatter fence raises a bare <code>StopIteration</code> naming neither file nor fault.</li>
+<li><span class="loc">wiki/guidance_discover.py:158</span> — <code>yaml_scalar</code> emits real-YAML escaping that <code>markdown._scalar</code> never unescapes; producer/consumer quoting grammars disagree.</li>
+<li><span class="loc">lib/render.py:388</span> — the "+N fler" inbound overflow count uses different semantics (no kommentar exclusion) than the listed rows; inflated figure. (MEDIUM-ish, display-only.)</li>
+</ul></details>
+
+<details><summary>api + config (already summarized in Theme 4)</summary><ul class="lowlist">
+<li><span class="loc">app.py:387</span> — <code>version</code> param permits one <code>..</code> segment (asymmetric with <code>basefile</code>); <span class="loc">app.py:435</span> — no diff resource cap; sessions unrevocable 14d; <code>Secure</code> flag inferred from proxy scheme.</li>
+<li><span class="loc">config.py:198</span> — bad-editor error reports the <code>editors:</code> key's line, not the offending entry's.</li>
+</ul></details>
+
+<h2 id="mechanical">Mechanical health &amp; docs</h2>
+<div class="tablewrap"><table>
+<tr><th>Check</th><th>Result</th></tr>
+<tr><td>ruff (F/I/B/BLE/PLC0415/S110/S112/RUF100)</td><td><span class="chip ok">pass</span></td></tr>
+<tr><td>ty type check</td><td><span class="chip ok">pass</span> 0 errors</td></tr>
+<tr><td>layer checker (lib→vertical, vertical→vertical)</td><td><span class="chip ok">pass</span> — one sanctioned allowlist entry (render→api). Gap: <code>site</code> missing from the checker's VERTICALS list, so its boundary isn't enforced</td></tr>
+<tr><td>pytest (1113 tests, ~12 s)</td><td><span class="chip med">12 failed</span> 1089 passed — all 12 failures are <code>test_sfs_register.py</code> golden tests hard-failing because <code>../ferenda.old</code> doesn't exist on this machine; should <code>skipif</code> on the corpus dir</td></tr>
+<tr><td>Debug artifacts / TODOs / bare suppressions</td><td><span class="chip ok">none</span> (the two weak-rationale suppressions are the known 07-02 items)</td></tr>
+<tr><td>Doc drift (new)</td><td>README's module map covers only 6 of 26 <code>lib/</code> modules and omits <code>sfs/{download,begrepp,correspond,_validate}.py</code> + <code>config.py</code>; <code>__init__.py</code> docstring still names 2 verticals of 9</td></tr>
+</table></div>
+
+<h2 id="order">Suggested order of work</h2>
+<ol class="ordered">
+<li><strong>The freshness pair</strong> (Theme 2 H1+H2) — user-visible today: inline edits and AI annotations don't go live, and the editor path does a whole-source scan per checkout.</li>
+<li><strong>The watermark family as one design fix</strong> — the four HIGHs + four MEDIUMs of Theme 1 are eight instances of one missing abstraction. The long-planned <code>lib/harvest.py</code> promotion (07-02 HIGH #11) is where the fix belongs: dirty-markers, never-regress watermarks, error-gated saves and retry sidecars once, not eight times. Until then, cron periodic <code>--full</code> sweeps as a stopgap and fix the two eurlex floor bugs (cheap, isolated).</li>
+<li><strong>Atomic writes in one batch</strong> — <code>write_artifact</code> + the ~8 sites listed in Theme 3.</li>
+<li><strong>The lagrum trigger bound</strong> — one-line fix for a reproducible multi-minute hang.</li>
+<li><strong>SFS harness integrity</strong> — <code>load_inputs</code> + the register-path fossil, so <code>validate</code> actually covers the HTML-fallback docs; then decide the overlappande-fixture question.</li>
+<li><strong>The 07-02 punch list</strong> — still the highest-density list of known defects; the 12 HIGHs have now survived two review cycles, and this review shows their patterns actively re-accreting (consider mechanical enforcement: assert-ban outside tests, a write_text lint).</li>
+<li><strong>Login rate limiting</strong> before the editor registry grows beyond a handful of users.</li>
+</ol>
+
+<footer>Review conducted 2026-07-06 against the single squashed commit <code>6e2f87e</code> on <code>modernization</code>. Nine review slices (open-findings verification, API security, lib/build core, sfs download/versions/register, lagrum + sfs parse chain, dv + casenaming, eurlex, forarbete, foreskrift/avg, remisser/site/wiki); every finding verified against the full code path by its reviewer, several reproduced by execution; each slice also reported what it checked and found sound.</footer>
+</main>
