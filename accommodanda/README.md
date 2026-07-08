@@ -537,14 +537,17 @@ plain-text googleable in the committed tree.
 
 A patch is an ordinary unified diff against a document's **best intermediate
 format** — the representation its parser actually reads and a human can edit: plain
-text for `sfs`, the `innehåll` HTML for `dv`, the Formex XML for `eurlex` (the
-PDF-bodied sources are not text-patchable at source level). Each vertical's parser
-calls `lib.patch.patch_if_needed(source, basefile, text)` at that choke point; a
-patch that no longer applies is a **fatal** parse error (the source drifted — it
-must be regenerated, never silently skipped). Patches live committed in the repo at
+text for `sfs`, the `innehåll` HTML for `dv`, the Formex XML for `eurlex`, and the
+`pdftohtml -xml` output (verbose but editable) for the PDF-bodied sources
+(`forarbete`, `foreskrift`, `remisser`, and JO/ARN under `avg`; JK is landing-page
+HTML). Each vertical's parser applies the patch at that choke point —
+`lib.patch.patch_if_needed(...)` for the text/HTML/XML sources, a `patch_key`
+threaded into `lib.pdftext.pdf_pages` for the PDF ones; a patch that no longer
+applies is a **fatal** parse error (the source drifted — it must be regenerated,
+never silently skipped). Patches live committed in the repo at
 `patches/<source>/<relpath>.patch` (or `.rot13.patch`), keyed by the same rule as
-the artifact tree (`layout.patch`); they are folded into the parse freshness inputs
-so editing one re-stales its document.
+the artifact tree (`layout.patch`); they are folded into every patchable source's
+parse freshness inputs so editing one re-stales its document.
 
 Author them from the CLI or the inline web editor:
 

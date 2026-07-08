@@ -187,10 +187,40 @@ def test_patchsource_intermediate_sfs(monkeypatch, tmp_path):
     assert text == "1 §\ntext" and label == "plain text"
 
 
-def test_patchsource_rejects_pdf_source():
+def test_patchsource_lists_all_wired_sources():
+    # sfs/dv/eurlex (text) + the pdftohtml-XML PDF sources + avg (mixed)
+    assert patchsource.patchable_sources() == [
+        "avg", "dv", "eurlex", "forarbete", "foreskrift", "remisser", "sfs"]
+
+
+def test_patchsource_rejects_non_patchable_source():
+    # a source with no parse-time patch hook (editorial markdown) is not patchable
     with pytest.raises(ValueError):
-        patchsource.intermediate("remisser", "x/y")
-    assert patchsource.patchable_sources() == ["dv", "eurlex", "sfs"]
+        patchsource.intermediate("site", "frontpage")
+
+
+def test_patchsource_pdf_dispatch(monkeypatch):
+    monkeypatch.setattr(patchsource, "_pdf_xml", lambda p: "<pdf>%s</pdf>" % p)
+    monkeypatch.setattr(patchsource.layout, "remisser_answer",
+                        lambda case, org: "/x/%s/%s.pdf" % (case, org))
+    text, label = patchsource.intermediate("remisser", "case/org")
+    assert text == "<pdf>/x/case/org.pdf</pdf>" and label == "pdftohtml XML"
+
+
+def test_pdf_pages_applies_patch(patches, monkeypatch):
+    from accommodanda.lib import pdftext
+    xml = ('<?xml version="1.0" encoding="UTF-8"?>\n<pdf2xml>\n'
+           '<page number="1">\n<text top="1" left="1" height="10">Namn SECRET</text>\n'
+           "</page>\n</pdf2xml>\n")
+    monkeypatch.setattr(pdftext.subprocess, "run",
+                        lambda *a, **k: SimpleNamespace(stdout=xml.encode("utf-8")))
+    # no patch -> the pdftohtml XML is parsed as-is
+    assert list(pdftext.pdf_pages("x.pdf", ("remisser", "c/o")))[0][1][0].text \
+        == "Namn SECRET"
+    # a patch on the XML redacts the extracted text at the pdf_pages choke-point
+    patch.create_patch("remisser", "c/o", xml, xml.replace("SECRET", "[X]"))
+    assert list(pdftext.pdf_pages("x.pdf", ("remisser", "c/o")))[0][1][0].text \
+        == "Namn [X]"
 
 
 # --------------------------------------------------------------------------
@@ -233,8 +263,8 @@ def test_cli_mkpatch_rot13_flag(patches, monkeypatch, tmp_path):
 
 
 def test_cli_mkpatch_rejects_unpatchable_source(patches):
-    with pytest.raises(SystemExit):
-        build.cmd_mkpatch(SimpleNamespace(source="remisser", basefiles=["a/b", "f"]),
+    with pytest.raises(SystemExit):   # 'site' is editorial markdown, no parse hook
+        build.cmd_mkpatch(SimpleNamespace(source="site", basefiles=["frontpage", "f"]),
                           _Parser())
 
 

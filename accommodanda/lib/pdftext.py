@@ -28,6 +28,7 @@ from dataclasses import dataclass
 
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
+from . import patch
 from .util import normalize_space
 
 RE_DOTS = re.compile(r"\.{4,}")                       # TOC dotted leaders
@@ -56,13 +57,27 @@ class Para:
     italic: bool = False
 
 
-def pdf_pages(pdf_path):
-    """(pageno, [Line]) per page via `pdftohtml -xml`. Each <text> fragment is
-    one font run carrying <b>/<i>; fragments on the same baseline are one visual
-    line, bold/italic when all their runs are."""
-    xml = subprocess.run(
+def pdftohtml_xml(pdf_path):
+    """The raw ``pdftohtml -xml`` output for a PDF, as bytes. Verbose, but the
+    one editable text representation of a PDF body -- so it is the patchable
+    *intermediate format* of the PDF-bodied sources (förarbeten, föreskrifter,
+    JO/ARN, remissvar). `pdf_pages` parses it; `patchsource` shows it for editing."""
+    return subprocess.run(
         ["pdftohtml", "-xml", "-i", "-nodrm", "-stdout", str(pdf_path)],
         capture_output=True, check=True).stdout
+
+
+def pdf_pages(pdf_path, patch_key=None):
+    """(pageno, [Line]) per page via `pdftohtml -xml`. Each <text> fragment is
+    one font run carrying <b>/<i>; fragments on the same baseline are one visual
+    line, bold/italic when all their runs are. `patch_key=(source, basefile)`
+    applies that document's patch to the pdftohtml XML before parsing -- the
+    PDF-bodied sources' patch hook (a correction, or a rot13 redaction)."""
+    xml = pdftohtml_xml(pdf_path)
+    if patch_key is not None and patch.has_patch(*patch_key):
+        source, basefile = patch_key
+        xml = patch.apply(source, basefile,
+                          xml.decode("utf-8", "replace")).encode("utf-8")
     # pdftohtml emits occasionally malformed XML (overlapping <b>/<i>, stray &),
     # so parse leniently rather than abort the document
     root = etree.fromstring(xml, etree.XMLParser(recover=True, load_dtd=False,

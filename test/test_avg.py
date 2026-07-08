@@ -423,7 +423,7 @@ def test_arn_parse_listing():
 def test_parse_arn_source_url_roundtrip(tmp_path, monkeypatch):
     # one parse path, both provenances. Body extraction (poppler) is stubbed so
     # the test stays hermetic; the assertion is on metadata + source_url passthrough.
-    monkeypatch.setattr(avg_parse, "pdf_pages", lambda p: [])
+    monkeypatch.setattr(avg_parse, "pdf_pages", lambda p, patch_key=None: [])
     pdf = avg_legacy.arn_pdf_path(tmp_path, "arn/2026-00382")
     pdf.parent.mkdir(parents=True, exist_ok=True)
     pdf.write_bytes(b"%PDF-1.7\n")

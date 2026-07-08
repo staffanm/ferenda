@@ -885,7 +885,8 @@ def fa_parse_inputs(basefile):
     the re-OCR sidecar slot (§7g). The sidecar is listed even while absent, so
     dropping a modern-OCR'd PDF there (which `_legacy_body` then parses instead of
     the frozen scan) re-stales exactly that document's parse."""
-    return [fa_record(basefile), layout.fa_ocr_pdf(*basefile.split("/", 1))]
+    return ([fa_record(basefile), layout.fa_ocr_pdf(*basefile.split("/", 1))]
+            + _patch_input("forarbete", basefile))
 
 
 def fa_artifact(basefile):
@@ -1184,7 +1185,7 @@ def foreskrift_inputs(basefile):
                 str(layout.FORESKRIFT_DOWNLOADED), record["fs"], reg))
         paths += [fsdir / c["name"] for c in files.get("consolidation", [])
                   if c.get("name")]
-    return paths
+    return paths + _patch_input("foreskrift", basefile)
 
 
 def foreskrift_parse_run(basefile):
@@ -1269,7 +1270,7 @@ def avg_inputs(basefile):
         paths.append(avg_legacy.arn_pdf_path(layout.AVG_DOWNLOADED, basefile))
     else:
         paths.append(avg_download.jk_html_path(layout.AVG_DOWNLOADED, basefile))
-    return paths
+    return paths + _patch_input("avg", basefile)
 
 
 def avg_artifact(basefile):
@@ -1376,7 +1377,8 @@ def remisser_artifact(basefile):
 
 
 def remisser_inputs(basefile):
-    return [remisser_record(basefile), remisser_pdf(basefile)]
+    return [remisser_record(basefile), remisser_pdf(basefile)] + _patch_input(
+        "remisser", basefile)
 
 
 def remisser_parse_run(basefile):

@@ -17,10 +17,15 @@ any existing patch already applied (what the editor seeds its textarea with, so
 successive edits compound rather than fight an applied patch)."""
 
 import json
+from pathlib import Path
 
+from .avg.download import jk_html_path, jo_dnrs, jo_pdf_path
+from .avg.legacy import arn_pdf_path
 from .eurlex.parse import content_file, formex_members
-from .lib import layout, patch
+from .foreskrift.parse import body_path as fs_body_path
+from .lib import layout, patch, pdftext
 from .lib.errors import SkipDocument
+from .lib.util import record_path
 from .sfs.extract import extract_body
 
 
@@ -61,13 +66,72 @@ def _eurlex_intermediate(basefile):
                      "(PDF-only act)" % (basefile, route))
 
 
+def _pdf_xml(pdf_path):
+    """A PDF's ``pdftohtml -xml`` output as text -- the intermediate the
+    PDF-bodied sources patch (`lib.pdftext.pdf_pages` reads the same XML)."""
+    if not Path(pdf_path).exists():
+        raise SkipDocument("no body PDF at %s" % pdf_path)
+    return pdftext.pdftohtml_xml(pdf_path).decode("utf-8", "replace")
+
+
+def _forarbete_intermediate(basefile):
+    """A förarbete's live-harvest body PDF as pdftohtml XML (the same first PDF
+    parse reads). Frozen legacy-import bodies carry non-XML formats and are not
+    patched at source level."""
+    record = json.loads(layout.fa_record(basefile).read_text())
+    if "legacy_files" in record:
+        raise ValueError("%s: frozen legacy-import body is not text-patchable "
+                         "at source level" % basefile)
+    pdfs = [f for f in record.get("files", []) if f.lower().endswith(".pdf")]
+    if not pdfs:
+        raise SkipDocument("%s: no body PDF" % basefile)
+    return _pdf_xml(layout.FA_DOWNLOADED / record["type"] / pdfs[0])
+
+
+def _foreskrift_intermediate(basefile):
+    """A föreskrift's base-regulation PDF as pdftohtml XML (konsoliderade versions
+    are separate documents, not patched through this key)."""
+    fs = basefile.split("/", 1)[0]
+    record = json.loads(
+        record_path(layout.FORESKRIFT_DOWNLOADED, fs, basefile).read_text())
+    reg_file = (record.get("files") or {}).get("regulation")
+    if not reg_file:
+        raise SkipDocument("%s: no base-regulation PDF" % basefile)
+    return _pdf_xml(fs_body_path(layout.FORESKRIFT_DOWNLOADED, fs, reg_file))
+
+
+def _avg_intermediate(basefile):
+    """A JO/ARN decision's PDF as pdftohtml XML; a JK decision's landing-page
+    HTML (its own intermediate) -- dispatched on the org, like the parser."""
+    org = basefile.split("/", 1)[0]
+    record = json.loads(record_path(layout.AVG_DOWNLOADED, org, basefile).read_text())
+    if org == "jk":
+        return jk_html_path(layout.AVG_DOWNLOADED, basefile).read_text()
+    if org == "jo":
+        dnrs = jo_dnrs(record.get("diary_number"))
+        if not dnrs:
+            raise SkipDocument("%s: jo record carries no diarienummer" % basefile)
+        return _pdf_xml(jo_pdf_path(layout.AVG_DOWNLOADED, "jo/" + dnrs[0]))
+    return _pdf_xml(arn_pdf_path(layout.AVG_DOWNLOADED, "arn/" + record["diarienummer"]))
+
+
+def _remisser_intermediate(basefile):
+    """A remissvar's answer PDF as pdftohtml XML."""
+    case, org = basefile.split("/", 1)
+    return _pdf_xml(layout.remisser_answer(case, org))
+
+
 # source -> (pristine-text provider, human label of the format being patched).
-# Adding a source here (its parser must call patch.apply at its intermediate
-# choke point) makes it patchable from the CLI and the web editor.
+# Adding a source here (its parser must call patch.apply / pass a patch_key at
+# its intermediate choke point) makes it patchable from the CLI and web editor.
 _INTERMEDIATE = {
     "sfs": (_sfs_intermediate, "plain text"),
     "dv": (_dv_intermediate, "innehåll HTML"),
     "eurlex": (_eurlex_intermediate, "Formex XML"),
+    "forarbete": (_forarbete_intermediate, "pdftohtml XML"),
+    "foreskrift": (_foreskrift_intermediate, "pdftohtml XML"),
+    "avg": (_avg_intermediate, "pdftohtml XML (jk: landing HTML)"),
+    "remisser": (_remisser_intermediate, "pdftohtml XML"),
 }
 
 

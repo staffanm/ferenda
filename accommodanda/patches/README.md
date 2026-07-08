@@ -31,6 +31,12 @@ The patch is an ordinary `diff -u` / `difflib` unified diff against the document
 | `sfs` | plain consolidated statute text |
 | `dv` | the `innehåll` HTML |
 | `eurlex` | the main act's Formex XML |
+| `forarbete`, `foreskrift`, `remisser` | the body PDF's `pdftohtml -xml` output |
+| `avg` | JO/ARN: the decision PDF's `pdftohtml -xml`; JK: the landing-page HTML |
+
+The `pdftohtml -xml` intermediate is verbose but editable and deterministic for a
+given PDF + poppler version, so a diff cut against it re-applies on re-parse (the
+fuzzy context matcher absorbs small drift).
 
 A single-line description rides on the first hunk's `@@` header; a multi-line one
 goes in the `.desc` sidecar. Exactly one variant (plain **or** rot13) is kept per

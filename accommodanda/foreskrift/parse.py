@@ -221,11 +221,12 @@ def _full_text(blocks):
     return "\n".join(text for _, text, _, _ in blocks)
 
 
-def parse_pdf(path, identifier, parser):
+def parse_pdf(path, identifier, parser, patch_key=None):
     """One föreskrift PDF -> (structure tree, its metadata dict). Metadata is read
     from the whole text (the masthead up front, ikraftträdande at the end); the
-    structure is built from the operative body only, the masthead dropped."""
-    blocks = parse_body(pdf_pages(path), identifier)
+    structure is built from the operative body only, the masthead dropped.
+    `patch_key=(source, basefile)` patches the pdftohtml XML before extraction."""
+    blocks = parse_body(pdf_pages(path, patch_key), identifier)
     meta = extract_metadata(_full_text(blocks), parser)
     return _structure(blocks[_body_start(blocks):], parser), meta
 
@@ -300,7 +301,8 @@ def parse_record(record, root):
     structure, meta = [], {}
     if reg_file:
         structure, meta = parse_pdf(
-            body_path(root, fs, reg_file), record["identifier"], parser)
+            body_path(root, fs, reg_file), record["identifier"], parser,
+            ("foreskrift", basefile))
 
     reg = Regulation(
         uri=regulation_uri(fs, arsutgava, lopnummer),
