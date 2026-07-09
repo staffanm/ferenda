@@ -22,6 +22,9 @@ import re
 from ..lib.text import runs_text
 
 RE_LEAD_NUM = re.compile(r"^(\d+(?:\.\d+)*)\b")        # "14" / "14.3.4" leading a heading
+# a signer line's departement parenthetical: "Mikael Damberg
+# (Justitiedepartementet)" -- shared with parse._is_signer_name
+RE_TRAILING_PAREN = re.compile(r"\s*\([^)]*\)$")
 
 
 def _section_id(num, counter, seen):
@@ -59,6 +62,30 @@ def nest(blocks):
         else:
             (stack[-1]["children"] if stack else root).append(b)
     return root
+
+
+def signers(structure):
+    """The signer names of a parsed artifact, in document order: the `signatur`
+    blocks parse.tag_frontmatter (prop/skr) or parse.rskr_body (rskr) tagged,
+    with any departement parenthetical stripped ("Mikael Damberg
+    (Justitiedepartementet)" -> "Mikael Damberg"). Empty when the document's
+    front matter defeated the tagging (OCR noise, reflowed lines)."""
+    return [RE_TRAILING_PAREN.sub("", runs_text(b["text"])).strip()
+            for b in flatten(structure) if b.get("type") == "signatur"]
+
+
+def ingress(structure):
+    """The first paragraph under a proposition's "huvudsakliga innehåll"
+    heading (the avsnitt parse.tag_frontmatter promoted), or None. This is the
+    government's own one-paragraph summary of the proposal -- the natural log
+    message for the sfs history-as-git export."""
+    for node in structure:
+        if (node.get("type") == "avsnitt"
+                and "huvudsakliga innehåll" in runs_text(node["text"])):
+            for child in node["children"]:
+                if child.get("type") == "stycke":
+                    return runs_text(child["text"]).strip()
+    return None
 
 
 def flatten(structure):

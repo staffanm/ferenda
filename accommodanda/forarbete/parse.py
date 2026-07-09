@@ -20,8 +20,10 @@ import re
 import subprocess
 from pathlib import Path
 
+from bs4 import BeautifulSoup
+
 from .. import config
-from ..lib import layout
+from ..lib import compress, layout
 from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from ..lib.lagrum import (
     ALL_PARSE_TYPES,
@@ -44,13 +46,22 @@ from ..lib.pdftext import (
 from ..lib.util import basefile_slug
 from . import legacy_formats, lydelse
 from .model import Block, Forarbete
-from .structure import nest
+from .structure import RE_TRAILING_PAREN, nest
 
 # förarbeten cite across the whole spectrum, like court decisions
 PARSE_TYPES = ALL_PARSE_TYPES
 
 RE_HEADING_NUM = re.compile(r"^\d+(?:\.\d+)*$")       # "4" / "4.3.2" (own line)
 RE_NUM_TITLE = re.compile(r"^(\d+(?:\.\d+)*)\s+\S")        # "15 Title" / "4.3 T"
+
+# prop/skr front matter (the överlämnande on page 1): the handover sentence,
+# the ort/datum line ("Stockholm den 20 maj 2021", occasionally Harpsund), and
+# the ingress heading -- none of them bold, so the font-driven classifier reads
+# them all as plain stycken (see tag_frontmatter)
+RE_OVERLAMNAR = re.compile(r"^Regeringen (?:överlämnar|förelägger)\b")
+RE_ORT_DATUM = re.compile(r"^\S+ den \d{1,2} \w+ \d{4}$")
+RE_INNEHALL = re.compile(
+    r"^(?:Propositionens|Skrivelsens) huvudsakliga innehåll$")
 
 
 def mint_uri(typ, basefile):
@@ -137,6 +148,45 @@ def parse_pdf(pdf_path, identifier, patch_key=None):
     return blocks
 
 
+def _is_signer_name(text):
+    """A signer line: 2-5 capitalized-ish words ("Stefan Löfven", "Gustaf von
+    Essen"), optionally a trailing departement parenthetical ("Mikael Damberg
+    (Justitiedepartementet)"). No digits, no sentence punctuation."""
+    text = RE_TRAILING_PAREN.sub("", text)
+    words = text.split()
+    return (1 < len(words) <= 5 and len(text) < 60
+            and text[:1].isupper() and not text.endswith(".")
+            and all(w[:1].isalpha() for w in words)
+            and not any(ch.isdigit() for ch in text))
+
+
+def tag_frontmatter(blocks):
+    """Retag the prop/skr front matter the classifier reads as plain stycken
+    (nothing on the överlämnande page is bold): the "huvudsakliga innehåll"
+    heading becomes a level-1 rubrik so the ingress nests into its own avsnitt,
+    and the signer names after the ort/datum line become `signatur` blocks --
+    the authors the sfs history-as-git export mines. Front matter ends at the
+    first real rubrik ("1 Förslag till riksdagsbeslut"); signer tagging also
+    requires the handover sentence, so bodies without the modern överlämnande
+    (old riksdagen-format props) are left untouched."""
+    end = next((i for i, b in enumerate(blocks) if b.kind == "rubrik"),
+               len(blocks))
+    front = blocks[:end]
+    for b in front:
+        if b.kind == "stycke" and RE_INNEHALL.match(b.text):
+            b.kind, b.level = "rubrik", 1
+    if any(b.kind == "stycke" and RE_OVERLAMNAR.match(b.text) for b in front):
+        after_datum = False
+        for b in front:
+            if b.kind == "stycke" and RE_ORT_DATUM.match(b.text):
+                after_datum = True
+            elif after_datum and b.kind == "stycke" and _is_signer_name(b.text):
+                b.kind = "signatur"
+            else:
+                after_datum = False
+    return blocks
+
+
 # html-body adapters by the record's `body_format` (stamped by the import verb,
 # which probed the bytes -- parse never re-probes); each -> a Para stream
 LEGACY_HTML_PARAS = {"text/tml": legacy_formats.riksdagen_html_paras,
@@ -199,14 +249,37 @@ def _legacy_body(record):
     return []
 
 
+def rskr_body(html):
+    """The API's own HTML rendering of a riksdagsskrivelse -> Blocks. The body
+    is a handful of heading/paragraph elements in both feed generations (the
+    modern Section1 layout and the plain pre-2000s one); everything after the
+    ort/datum line ("Stockholm den 17 juni 2026") is a signer -- the talman,
+    countersigned by a tjänsteman in the modern layout. Page-less by nature
+    (no citation points into an rskr), so every block carries page=None."""
+    soup = BeautifulSoup(html, "html.parser")
+    texts = [re.sub(r"\s+", " ", el.get_text(" ", strip=True))
+             for el in soup.find_all(["h1", "h2", "p"])]
+    blocks = [Block("stycke", t) for t in texts if t]
+    for i, b in enumerate(blocks):
+        if RE_ORT_DATUM.match(b.text):
+            for nxt in blocks[i + 1:]:
+                nxt.kind = "signatur"
+            break
+    return blocks
+
+
 def parse_record(record, root):
     """A downloaded record (the `<slug>.json`) -> a Forarbete. A live-harvest
-    record uses the first PDF the downloader stored under `root/<type>/`; a frozen
+    record uses the first PDF the downloader stored under `root/<type>/` (for
+    rskr: the stored HTML body); a frozen
     import record (`legacy_files`) resolves its body under LEGACY_ROOT. A record
     with no body yields metadata only (still a real catalog document at its URI)."""
     typ, basefile = record["type"], record["basefile"]
     if "legacy_files" in record:
         body = _legacy_body(record)
+    elif typ == "rskr":
+        body = rskr_body(compress.read_text(
+            Path(root) / typ / record["files"][0]))
     else:
         pdfs = [f for f in record.get("files", []) if f.lower().endswith(".pdf")]
         # the patch key carries the build-style basefile ("sou/2021-82" --
@@ -215,6 +288,8 @@ def parse_record(record, root):
         body = (parse_pdf(Path(root) / typ / pdfs[0], record["identifier"],
                           ("forarbete", "%s/%s" % (typ, basefile_slug(basefile))))
                 if pdfs else [])
+    if typ in ("prop", "skr"):
+        body = tag_frontmatter(body)
     return Forarbete(type=typ, basefile=basefile,
                      identifier=record["identifier"], uri=mint_uri(typ, basefile),
                      title=record.get("title", ""), date=record.get("date"),

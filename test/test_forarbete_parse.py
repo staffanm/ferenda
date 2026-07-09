@@ -1,6 +1,13 @@
 """Tests for the förarbete PDF parser's font-aware blocks logic (PDF-free)."""
 
-from accommodanda.forarbete.parse import classify, mint_uri
+from accommodanda.forarbete.model import Block
+from accommodanda.forarbete.parse import (
+    classify,
+    mint_uri,
+    rskr_body,
+    tag_frontmatter,
+)
+from accommodanda.forarbete.structure import ingress, nest, signers
 from accommodanda.lib.pdftext import Line, Para, line_body_size, page_paragraphs
 
 
@@ -33,6 +40,107 @@ def test_classify_numbered_and_unnumbered_headings():
              Para("En vanlig brödtext här.")]
     assert [(b.kind, b.level) for b in classify(paras, 5)] == [
         ("rubrik", 1), ("rubrik", 3), ("rubrik", 3), ("stycke", None)]
+
+
+def _frontmatter():
+    # the page-1 överlämnande run of prop 2020/21:194, as the classifier reads
+    # it (nothing on the page is bold, so every block arrives as a stycke)
+    return [Block("stycke", "Regeringens proposition 2020/21:194", 1),
+            Block("stycke", "Ett starkare skydd för Sveriges säkerhet", 1),
+            Block("stycke", "Regeringen överlämnar denna proposition till "
+                            "riksdagen.", 1),
+            Block("stycke", "Stockholm den 20 maj 2021", 1),
+            Block("stycke", "Stefan Löfven", 1),
+            Block("stycke", "Mikael Damberg (Justitiedepartementet)", 1),
+            Block("stycke", "Propositionens huvudsakliga innehåll", 1),
+            Block("stycke", "För att stärka skyddet för Sveriges säkerhet "
+                            "föreslår regeringen ändringar.", 1),
+            Block("rubrik", "1 Förslag till riksdagsbeslut", 3, level=1)]
+
+
+def test_tag_frontmatter_signers_and_ingress_heading():
+    blocks = tag_frontmatter(_frontmatter())
+    assert [b.kind for b in blocks] == [
+        "stycke", "stycke", "stycke", "stycke", "signatur", "signatur",
+        "rubrik", "stycke", "rubrik"]
+    # the promoted heading nests the ingress into its own avsnitt
+    assert blocks[6].level == 1
+
+
+def test_tag_frontmatter_needs_the_handover_sentence():
+    # an old riksdagen-format prop without the modern överlämnande: no signer
+    # tagging (the heading promotion is independent and still applies)
+    blocks = [b for b in _frontmatter()
+              if not b.text.startswith("Regeringen överlämnar")]
+    assert [b.kind for b in tag_frontmatter(blocks)] == [
+        "stycke", "stycke", "stycke", "stycke", "stycke",
+        "rubrik", "stycke", "rubrik"]
+
+
+def test_tag_frontmatter_stops_at_first_rubrik():
+    # an ort/datum line in the body proper ("Stockholm den 1 januari 2021"
+    # quoted in a section) must not trigger signer tagging
+    blocks = [Block("rubrik", "3 Ärendet och dess beredning", 9, level=1),
+              Block("stycke", "Stockholm den 1 januari 2021", 9),
+              Block("stycke", "Anna Andersson", 9)]
+    assert [b.kind for b in tag_frontmatter(_frontmatter() + blocks)][-2:] == \
+        ["stycke", "stycke"]
+
+
+RSKR_MODERN = """
+<div class="Section1">
+  <h1><span>Riksdagsskrivelse</span><br><span>2025/26:429</span></h1>
+  <p class="Mottagare1"><span>Regeringen</span></p>
+  <p class="Mottagare2"><span>Utbildningsdepartementet</span></p>
+  <p><span>Med överlämnande av utbildningsutskottets betänkande 2025/26:UbU31
+  får jag anmäla att riksdagen denna dag bifallit utskottets förslag till
+  riksdagsbeslut.</span></p>
+  <p class="Stockholm"><span>Stockholm den 17 juni 2026</span></p>
+  <p class="AvsTalman"><span>Andreas Norlén</span></p>
+  <p class="AvsTjnsteman"><span>Kristina Svartz</span></p>
+</div>"""
+
+RSKR_OLD = """<h2>Nr 361</h2>
+<p>Tilläggsstat I till riksstaten för budgetåret 1971/72</p>
+<p>Till Konungen</p>
+<p>Med överlämnande av nämnda betänkande får jag anmäla att</br>riksdagen har
+bifallit vad utskottet hemställt.</p>
+<p>Stockholm den 17 december 1971</p>
+<p>HENRY ALLARD</p>"""
+
+
+def test_rskr_body_tags_signers_after_ort_datum():
+    blocks = rskr_body(RSKR_MODERN)
+    assert [(b.kind, b.text) for b in blocks if b.kind == "signatur"] == [
+        ("signatur", "Andreas Norlén"), ("signatur", "Kristina Svartz")]
+    # the boilerplate before the ort/datum line stays stycke
+    assert blocks[0].kind == "stycke"
+    assert blocks[0].text == "Riksdagsskrivelse 2025/26:429"
+
+
+def test_rskr_body_handles_the_pre_2000s_layout():
+    assert [b.text for b in rskr_body(RSKR_OLD) if b.kind == "signatur"] == \
+        ["HENRY ALLARD"]
+
+
+def test_structure_signers_and_ingress():
+    # the artifact-side readers the history-as-git export consumes (via
+    # build's _forarbete_meta): signatur blocks and the promoted ingress
+    # avsnitt, both as plain text
+    structure = nest([
+        {"type": "stycke", "text": ["Regeringens proposition 2020/21:194"]},
+        {"type": "signatur", "text": ["Stefan Löfven"]},
+        {"type": "signatur", "text": ["Mikael Damberg (Justitiedepartementet)"]},
+        {"type": "rubrik", "level": 1,
+         "text": ["Propositionens huvudsakliga innehåll"]},
+        {"type": "stycke", "text": ["För att stärka skyddet föreslår ",
+                                    {"uri": "x", "text": "regeringen"},
+                                    " ändringar."]},
+        {"type": "rubrik", "level": 1, "text": ["1 Förslag till riksdagsbeslut"]},
+        {"type": "stycke", "text": ["Härigenom föreskrivs."]}])
+    assert signers(structure) == ["Stefan Löfven", "Mikael Damberg"]
+    assert ingress(structure) == ("För att stärka skyddet föreslår regeringen "
+                                  "ändringar.")
 
 
 def _line(text, top, bold=False, lead_bold=False, italic=False):

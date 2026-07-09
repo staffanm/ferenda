@@ -19,7 +19,9 @@ class Block:
                               # lagtext "Senaste lydelse" provenance) |
                               # "tabell" (a nuvarande/föreslagen lydelse
                               # comparison, reconstructed from the two-column
-                              # layout -- see lydelse.py)
+                              # layout -- see lydelse.py) |
+                              # "signatur" (a signer name in the prop/skr
+                              # överlämnande block -- see parse.tag_frontmatter)
     text: str
     page: int | None = None   # printed page number (the #sid{N} anchor)
     level: int | None = None  # heading depth = dotted segments ("4.1.2" -> 3)
