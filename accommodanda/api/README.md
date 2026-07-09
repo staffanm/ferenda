@@ -320,6 +320,48 @@ Listar NDJSON-dumparna (se nedan).
 
 ---
 
+## MCP-server (`/mcp`)
+
+Samma läsvy, men som en **MCP-server** (Model Context Protocol) i stället för
+REST — så att vilken MCP-kapabel AI-värd som helst (Claude, ChatGPT, …) kan
+grunda svar om svensk (och EU-) rätt i det levande corpuset och citera exakt
+paragraf/artikel. Servern är **publik och utan inloggning**, precis som REST-API:t
+och sidorna — det är offentlig, läsbar data.
+
+Den ligger i *samma* process som allt annat (`lagen all serve`) och nås över
+**Streamable HTTP** på:
+
+```
+https://ferenda.lagen.nu/mcp
+```
+
+Lägg till den URL:en som en anpassad ("custom"/"remote") MCP-server i din
+AI-värd. Ingen nyckel, ingen OAuth. Lokalt under utveckling:
+`http://127.0.0.1:8000/mcp`.
+
+### Verktyg (tools)
+
+| Verktyg | Vad |
+|---|---|
+| `search` | fulltextsökning över hela corpuset, ned på paragraf-/artikelnivå; en citeringsformad fråga ("avtalslagen 36", "GDPR art 32", "Instagrambilden") fäster det exakta målet överst. Degraderar till enbart citeringsträff om OpenSearch är nere |
+| `resolve_citation` | slår upp en citering skriven med namn/förkortning → exakt dokument-URI (+ fragment); kräver *inte* OpenSearch |
+| `get_document` | ett dokuments metadata + fullständiga parsade klartext (hela, eller en enskild `pinpoint` som `K3P1`) |
+| `list_documents` | räknar upp dokument (id + lättviktig metadata) filtrerade på källa/typ — corpus-indexet, inte fulltextsökning |
+| `get_incoming_citations` | vilka dokument som citerar exakt denna URI/paragraf (citeringsgrafen inåt — lagen.nu:s signaturfunktion) |
+| `get_outgoing_citations` | alla citeringar ett dokument gör (grafen utåt) |
+| `list_sources` | corpusets källor och antal — orientering för `source`-filtret |
+
+Verktygen är tunna omslag kring samma `lib`-funktioner som REST-endpointerna, så
+en corpus-fakta når MCP och REST genom en kodväg. Precis som REST behöver bara
+`search` ett igång OpenSearch; de katalogberoende verktygen svarar utan klustret.
+
+Servern är monterad i `api/app.py` via `api/mcp.py` (`mcp.mount(app)` +
+`lifespan`). Eftersom nginx redan proxar *allt* till appen (se
+`docker/nginx/ferenda.lagen.nu.conf`) publiceras `/mcp` automatiskt — ingen extra
+container, ingen extra port.
+
+---
+
 ## Bulkdumpar (NDJSON)
 
 För maskinkonsumenter som vill ha hela corpuset i stället för att anropa API:t

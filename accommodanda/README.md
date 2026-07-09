@@ -196,13 +196,20 @@ gate. Served at `/` (frontpage), `/om/<slug>` + `/om/` hub, and
 
 **Service layer**: `api/app.py` is the REST/OpenAPI service (search, documents,
 citation graph, version history + diff) that also serves the static site under
-`lagen serve`. `api/ops.py` mounts the ops health dashboard on the same app
-(see "Operations" below); `lib/runlog.py` owns the state files behind it.
-`api/auth.py` + `api/edit.py` + `api/editcontent.py` + `api/editcart.py` are the
-inline content editor — the one authenticated, mutating surface (see "Inline
-editing" below); `api/patch.py` is its sibling for authoring source-fix **patch
-files** (`lib/patch.py`, `lib/patchit.py`, `patchsource.py`; see "Patch files"
-below).
+`lagen serve`. `api/mcp.py` mounts a public, no-auth **MCP server** (Model
+Context Protocol) at `/mcp` on the same app — the same read-only view reshaped as
+tools (search, resolve_citation, get_document, the citation graph, …) so any
+MCP-capable AI host can ground answers about Swedish/EU law in the live corpus and
+cite the exact §/article; the tools are thin wrappers over the same `lib`
+functions the REST endpoints use (see `api/README.md`). `api/ops.py` mounts the
+ops health dashboard on the same app (see "Operations" below); `lib/runlog.py`
+owns the state files behind it. `api/auth.py` + `api/edit.py` +
+`api/editcontent.py` + `api/editcart.py` are the inline content editor — the one
+authenticated, mutating surface (see "Inline editing" below); `api/patch.py` is
+its sibling for authoring source-fix **patch files** (`lib/patch.py`,
+`lib/patchit.py`, `patchsource.py`; see "Patch files" below). `lib/pins.py` is the
+citation-shaped-query resolver (a name+pinpoint → one exact fragment target)
+shared by the REST `/search` and the MCP `search`/`resolve_citation` tools.
 
 **Top-level**: `config.py` locates the corpus — the `data_root` (and
 `legacy_root`/`wiki_root`) keys in the optional `config.yml`, read with
