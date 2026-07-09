@@ -119,6 +119,30 @@ def test_list_documents_and_sources(corpus):
     assert {"source": "sfs", "documents": 2} in sources
 
 
+def test_tool_schemas_steer_the_model():
+    """The steering signals a host reads at connect: every tool is annotated
+    read-only, `source` is a closed enum (so a wrong value can't be passed), and
+    `kind` stays a described free string (source-specific, not enumerable)."""
+    import anyio
+
+    tools = {t.name: t for t in anyio.run(mcpmod.mcp.list_tools)}
+    assert set(tools) >= {"search", "resolve_citation", "get_document",
+                          "list_documents", "get_incoming_citations",
+                          "get_outgoing_citations", "list_sources"}
+    # read-only annotation on every tool (lets a host auto-run them)
+    for t in tools.values():
+        assert t.annotations and t.annotations.readOnlyHint is True
+
+    props = tools["search"].inputSchema["properties"]
+    # source is an optional enum of exactly the corpus sources
+    source_enum = next(b["enum"] for b in props["source"]["anyOf"] if "enum" in b)
+    assert set(source_enum) == {"sfs", "dv", "forarbete", "foreskrift",
+                                "eurlex", "avg", "kommentar", "begrepp"}
+    # kind is a plain string (no enum) but carries guidance
+    assert not any("enum" in b for b in props["kind"]["anyOf"])
+    assert "fffs" in props["kind"]["description"]
+
+
 def test_end_to_end_streamable_http(corpus):
     """A real MCP client over the mounted /mcp endpoint: initialize, list the
     tools, call one -- proving the transport + mount + lifespan are wired."""
