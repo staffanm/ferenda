@@ -1,7 +1,7 @@
 """Tests for the förarbete PDF parser's font-aware blocks logic (PDF-free)."""
 
 from accommodanda.forarbete.parse import classify, mint_uri
-from accommodanda.lib.pdftext import Line, Para, page_paragraphs
+from accommodanda.lib.pdftext import Line, Para, line_body_size, page_paragraphs
 
 
 def test_mint_uri_matches_citation_form():
@@ -89,3 +89,28 @@ def test_parse_record_patch_key_is_typ_qualified_slug(monkeypatch, tmp_path):
                            "identifier": "SOU 2021:82",
                            "files": ["2021-82.pdf"]}, tmp_path)
     assert seen["patch_key"] == ("forarbete", "sou/2021-82")
+
+
+def test_classify_font_size_gates_footnotes_and_fake_headings():
+    # prop 2013/14:116: the lagtext provenance footnotes ("1 Senaste lydelse
+    # 2008:1266.") and body-sized table rows ("22 år 25 000 …") match the
+    # numbered-heading pattern but are not headings; a real (large, unbold)
+    # numbered chapter heading is
+    paras = [Para("1 Förslag till riksdagsbeslut", size=23),
+             Para("22 år 25 000 28 873 27 553 -1 320", size=15),
+             Para("1 Senaste lydelse 2008:1266. 2 Senaste lydelse 2008:1266.",
+                  size=12),
+             Para("En vanlig brödtext här.", size=15)]
+    assert [b.kind for b in classify(paras, 4, body=15)] == [
+        "rubrik", "stycke", "fotnot", "stycke"]
+
+
+def test_classify_sizeless_paras_keep_permissive_rules():
+    # OCR/legacy routes emit no font sizes; numbered lines stay headings
+    assert classify([Para("7 Konsekvensanalys")], 1, body=0)[0].kind == "rubrik"
+
+
+def test_body_size_is_mode_of_sized_paras():
+    assert line_body_size([Para("a", size=15), Para("b", size=15),
+                           Para("c", size=23), Para("d")]) == 15
+    assert line_body_size([Para("a"), Para("b")]) == 0

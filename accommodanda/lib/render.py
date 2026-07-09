@@ -1650,6 +1650,17 @@ def render_forarbete(art, site):
                              % (min(level + 1, 5), escape(anchor), ra,
                                 render_runs(n["text"], site), min(level + 1, 5)))
                 walk(n.get("children", []))
+            elif n.get("type") == "tabell":
+                # a nuvarande/föreslagen lydelse comparison: two columns of
+                # aligned cells, the `th` row the italic column header
+                close_komm()
+                rows = []
+                for r in n.get("children", []):
+                    tag = "th" if r.get("th") else "td"
+                    rows.append("<tr>%s</tr>" % "".join(
+                        "<%s>%s</%s>" % (tag, render_runs(c, site), tag)
+                        for c in r.get("cells", [])))
+                parts.append('<table class="lydelse">%s</table>' % "".join(rows))
             else:
                 # författningskommentar blocks (`fk`, stamped per entry by
                 # forarbete's extractor at parse time): one highlight box per
@@ -1661,7 +1672,8 @@ def render_forarbete(art, site):
                         state["komm"] = n["fk"]
                 else:
                     close_komm()
-                parts.append("<p>%s</p>" % render_runs(n["text"], site))
+                cls = ' class="fotnot"' if n.get("type") == "fotnot" else ""
+                parts.append("<p%s>%s</p>" % (cls, render_runs(n["text"], site)))
 
     state["komm"] = None
     walk(art.get("structure", []))
@@ -2838,6 +2850,20 @@ img.faksimil { display: block; width: 100%; max-width: 40rem; margin: .5rem 0 1r
                margin: 0 0 .5rem; color: var(--ink); }
 .komm-by { font-family: var(--serif); font-style: italic; font-size: .78rem;
            color: var(--ink-3); }
+/* a förarbete's small-print footnotes ("Senaste lydelse 2008:1266.") */
+p.fotnot { font-size: .78rem; color: var(--ink-3); margin: .3rem 0; }
+
+/* a nuvarande/föreslagen lydelse comparison table */
+table.lydelse { width: 100%; border-collapse: collapse; margin: 1rem 0;
+                table-layout: fixed; }
+table.lydelse th { font-family: var(--serif); font-style: italic;
+                   font-weight: 400; text-align: left; color: var(--ink-2);
+                   border-bottom: 1px solid var(--rule); padding: .2rem .6rem; }
+table.lydelse td { vertical-align: top; padding: .35rem .6rem;
+                   font-family: var(--serif); line-height: 1.5; }
+table.lydelse td + td, table.lydelse th + th
+                 { border-left: 1px solid var(--rule-soft); }
+
 /* the författningskommentar prose highlighted on the prop page itself: one
    box per run of commentary blocks, set off from the quoted lagtext */
 .fk-komm { background: var(--fk-bg); border: 1px solid var(--fk-border);

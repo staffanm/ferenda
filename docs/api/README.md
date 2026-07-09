@@ -311,10 +311,16 @@ författningskommentar chapter, a `kommentarer` list — the per-paragraf FK
 commentary: `[{ law, chapter, paragrafer, page, kommentar }]` (`law` is the
 raw per-law rubrik text, resolved to an SFS uri at relate time; `paragrafer`
 is a list because a combined "9 och 10 §§" heading comments several at once;
-an empty list marks a law-level comment). Blocks carry `type`, `text`, and an
-optional `page` (the `#sid{N}` anchor), `level`, `num`, plus `fk` on FK
-commentary blocks (the entry number — blocks sharing a number belong to one
-paragraf's commentary, the prop page's highlight box).
+an empty list marks a law-level comment). Blocks carry `type` (`rubrik` /
+`stycke` / `kapitel` / `paragraf` / `fotnot` — small-print footnotes like the
+lagtext "Senaste lydelse" provenance — / `tabell`), `text`, and an optional
+`page` (the `#sid{N}` anchor), `level`, `num`, plus `fk` on FK commentary
+blocks (the entry number — blocks sharing a number belong to one paragraf's
+commentary, the prop page's highlight box). A `tabell` block is a
+nuvarande/föreslagen lydelse comparison reconstructed from the two-column
+layout: `children` are `rad` rows with two-element `cells` (inline-run lists,
+citation-scanned), the header row flagged `th` — the same table shape SFS
+artifacts use.
 
 **eurlex (EU law)** — `{ uri (…/ext/celex/{CELEX}), celex, doctype
 (regulation|directive|decision|judgment|treaty|act), lang, title, date, structure

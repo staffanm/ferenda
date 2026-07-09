@@ -96,8 +96,53 @@ def test_lines_groups_spans_on_shared_baseline():
     number beside its smaller-font title shares a baseline but not a top; a
     top-only grouping split them and reflowed '9 Författningskommentar' to
     'Författningskommentar 9'."""
-    spans = [(10, 0, 30, "9", True, False),                        # big digit
-             (20, 50, 30, "Författningskommentar", True, False)]   # smaller title
+    spans = [(10, 0, 30, "9", True, False, 20, 20),                      # big digit
+             (20, 50, 30, "Författningskommentar", True, False, 250, 15)]  # smaller title
     out = _lines(spans)
     assert [l.text for l in out] == ["9 Författningskommentar"]
     assert out[0].top == 10 and out[0].bold
+    assert out[0].size == 20                     # the line takes the largest run's size
+    assert [r.text for r in out[0].runs] == ["9", "Författningskommentar"]
+
+
+def test_wrapped_heading_folds_into_one_paragraph():
+    # prop 2013/14:116 ch 5: a large (not bold) chapter heading wraps over two
+    # lines -- one logical heading, not a rubrik + an orphan stycke
+    lines = [Line("brödtext i normal storlek.", 385, False, False, False, 15),
+             Line("5 Mer fokuserad nedsättning av", 456, False, False, False, 23),
+             Line("socialavgifterna för de yngsta", 482, False, False, False, 23),
+             Line("Regeringens förslag: För personer", 528, False, False, False, 15)]
+    out = page_paragraphs(lines, None, 19)
+    assert [p.text for p in out] == [
+        "brödtext i normal storlek.",
+        "5 Mer fokuserad nedsättning av socialavgifterna för de yngsta",
+        "Regeringens förslag: För personer"]
+    assert out[1].size == 23
+
+
+def test_adjacent_headings_of_different_size_do_not_fold():
+    # a chapter heading directly followed by its first subsection heading
+    lines = [Line("brödtext body body body body.", 100, False, False, False, 15),
+             Line("7 Konsekvensanalys", 160, False, False, False, 23),
+             Line("7.1 Offentligfinansiella effekter", 186, True, True, False, 17),
+             Line("Mer brödtext följer här nedan.", 220, False, False, False, 15)]
+    out = page_paragraphs(lines, None, 25)
+    assert [p.text for p in out][1:3] == [
+        "7 Konsekvensanalys", "7.1 Offentligfinansiella effekter"]
+
+
+def test_numbered_continuation_does_not_fold_into_previous_heading():
+    # two stacked same-size numbered headings stay separate (the continuation
+    # guard: a wrapped line never opens its own numbered heading). The page is
+    # body-dominated, as real pages are -- the body size is the *mode* of the
+    # page's line sizes.
+    lines = [Line("body text at normal size here.", 66, False, False, False, 15),
+             Line("more body text at normal size.", 83, False, False, False, 15),
+             Line("yet more body at normal size..", 100, False, False, False, 15),
+             Line("6 Ikraftträdande- och", 160, False, False, False, 23),
+             Line("övergångsbestämmelser", 186, False, False, False, 23),
+             Line("7 Konsekvensanalys", 212, False, False, False, 23),
+             Line("body text at normal size again.", 250, False, False, False, 15)]
+    out = page_paragraphs(lines, None, 30)
+    assert [p.text for p in out][1:3] == [
+        "6 Ikraftträdande- och övergångsbestämmelser", "7 Konsekvensanalys"]

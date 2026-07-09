@@ -71,7 +71,7 @@ accommodanda/
   config.py runtime config (config.yml / data_root / wiki_root)
   sfs/      acts vertical — download·extract·reader·model·tokenizer·assembler·nf·register·versions·correspond·begrepp (+ __main__)
   dv/       court-decisions vertical — download·identity·namedcases·model·parse·structure·word·legacy
-  forarbete/ preparatory-works vertical — download·riksdagen·model·parse·structure·kommentar·genomforande·legacy·legacy_formats
+  forarbete/ preparatory-works vertical — download·riksdagen·model·parse·structure·kommentar·genomforande·fk·lydelse·legacy·legacy_formats
   eurlex/   EU vertical (EUR-Lex/CELLAR) — download·bulk·annotate·definitions·parse·parse_html·parse_pdf·structure·lang·model
   foreskrift/ agency-regulations vertical — agencies·harvest·download·model·parse·structure·legacy
   avg/      JO/JK/ARN-decisions vertical — download·model·parse·legacy
@@ -955,8 +955,30 @@ them resolve.
   `doc_relpath` routes förarbete URIs to the `fa/` tree. So `relate`/`generate`
   light up the förarbete inbound graph — the ~31,700 dead förarbete citations
   resolve and each förarbete shows what cites it (and at which page).
+- ✅ **Font-size-aware parsing + lydelse tables** (driven by prop 2013/14:116's
+  misreads): `pdftext` now carries each run's fontspec size and horizontal
+  extent. Wrapped multi-line headings fold into one logical rubrik ("5 Mer
+  fokuserad nedsättning av / socialavgifterna för de yngsta" — heading lines of
+  the same size a heading's own leading apart, numbered-continuation guard);
+  a numbered rubrik must be bold or larger than the document body size (a
+  body-sized table row "22 år 25 000 …" is not a heading) and clearly smaller
+  text becomes `fotnot` blocks ("1 Senaste lydelse 2008:1266." — previously
+  level-1 rubriks); bare centered "2 kap."/"28 §" markers classify as
+  kapitel/paragraf. `lydelse.py` reconstructs the two-column
+  *nuvarande/föreslagen lydelse* comparisons the text-order extraction used to
+  interleave into garbage: the italic header line gives the column boundary,
+  cells reflow per column (indent/gap paragraphs, superscript footnote markers
+  dropped) and pair into aligned rows — a `tabell` block in the SFS
+  `rad`/`cells` shape, rendered side by side; an empty cell marks text that is
+  entirely new or dropped. Corpus sweep: 1,146 tables / 2,550 rows across the
+  59 curated+sampled props, junk level-1 headings 861 → 31, FK extraction
+  unchanged or better (162 gained 5 law sections). OCR/legacy routes carry no
+  font info and keep the permissive rules. `test/test_forarbete_lydelse.py`,
+  `test/test_pdftext.py`, `test/test_forarbete_parse.py`.
 - ⬜ Older-period sources (riksdagen/KB), lr/SÖ content, page-number offset for
-  docs whose front matter shifts the printed sequence.
+  docs whose front matter shifts the printed sequence; general (non-lydelse)
+  tables — the budget prop's statistics tables still flatten to stycken; a
+  lydelse table continuing onto a page that does not repeat its header.
 - ✅ **`bet` (utskottsbetänkanden) — a fourth harvest source**,
   `accommodanda/forarbete/riksdagen.py`. Committee reports are the missing
   prop→enacted-law link ("bet. 2025/26:JuU47 s. 12", already minted by the

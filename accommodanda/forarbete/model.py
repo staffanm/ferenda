@@ -14,11 +14,18 @@ from dataclasses import dataclass, field
 class Block:
     kind: str                 # "rubrik" (numbered section heading) | "stycke"
                               # (paragraph) | "kapitel" / "paragraf" (a law's
-                              # bold chapter/§ markers, recovered from font)
+                              # bold chapter/§ markers, recovered from font) |
+                              # "fotnot" (small-print footnote, e.g. the
+                              # lagtext "Senaste lydelse" provenance) |
+                              # "tabell" (a nuvarande/föreslagen lydelse
+                              # comparison, reconstructed from the two-column
+                              # layout -- see lydelse.py)
     text: str
     page: int | None = None   # printed page number (the #sid{N} anchor)
     level: int | None = None  # heading depth = dotted segments ("4.1.2" -> 3)
     num: str | None = None     # chapter/§ number for kapitel/paragraf markers
+    rows: list[tuple[str, str]] | None = None  # tabell cell rows
+    th: bool = False           # tabell: row 0 is the column header pair
 
 
 @dataclass

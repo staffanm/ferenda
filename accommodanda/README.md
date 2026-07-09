@@ -117,7 +117,8 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | File | What |
 |---|---|
 | `download.py` | regeringen.se harvester (`lagen forarbete download [prop\|sou\|…]`); basefile = the document's own identifier; a `source`-carrying import record is treated as absent so live always wins; `pm` (promemorior outside the Ds series, category 1325 shared with `ds`) keys by diarienummer when the listing shows one, else the landing-page slug |
-| `model.py` / `structure.py` / `parse.py` | `Forarbete` model, PDF (font-aware `pdftohtml`, or `pdftotext` fallback for OCR-layer scans) / html → nested structure → citation-scanned artifact; `_legacy_body` prefers a re-OCR sidecar at `layout.fa_ocr_pdf` |
+| `model.py` / `structure.py` / `parse.py` | `Forarbete` model, PDF (font-aware `pdftohtml`, or `pdftotext` fallback for OCR-layer scans) / html → nested structure → citation-scanned artifact; `_legacy_body` prefers a re-OCR sidecar at `layout.fa_ocr_pdf`. Font size gates heading detection (footnotes → `fotnot` blocks, body-sized "N Title" patterns stay stycken) and wrapped multi-line headings fold in `lib/pdftext` |
+| `lydelse.py` | reconstructs the two-column *nuvarande/föreslagen lydelse* comparison tables from per-run coordinates: the italic header gives the column boundary, cell lines reflow per column and pair into aligned rows (`tabell` blocks, the SFS `rad`/`cells` shape); page-centered "2 kap."/"28 §" markers come back as kapitel/paragraf blocks |
 | `legacy.py` | one-time import of the nine frozen förarbete corpora (`lagen forarbete import-legacy <corpus>`, §7g) — shared precedence core; regeringen-era + KB corpora entries-driven, the TRIPS family (proptrips/dirtrips/dirasp) walked downloaded-first (path-derived basefile, ~half their entries are null) |
 | `legacy_formats.py` | frozen body adapters — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML (`abbyy_pages`), scanned-PDF OCR text (`scanned_pdf_pages`), TRIPS `div.body-text` (`trips_paras`) |
 | `riksdagen.py` | downloader for utskottsbetänkanden (`bet`, the prop→enacted-law link) off the data.riksdagen.se dokumentlista JSON feed; PDF-only bodies (printed page = citation anchor); basefile `"<rm>:<beteckning>"` matching the FORARBETEN grammar's bet URIs; full backfill walks all 161 riksmöten (the API caps one query's pagination at ~10k docs); no frozen legacy corpus |
@@ -213,6 +214,9 @@ resources.json`, …) are anchored by their own callers, not here.
 the golden corpus in the old checkout, `../ferenda.old/data/sfs/parsed/`):
 
 ```sh
+uv run python -m accommodanda.build sfs download                              # incremental; --force for a full backfill
+uv run python -m accommodanda.build sfs download --resume-after '[...]'       # resume a backfill interrupted mid-sweep,
+                                                                                # from the ES search_after cursor it printed
 uv run python -m accommodanda.sfs parse site/data/downloaded/sfs/2018/585.json --basefile 2018:585
 # golden = the old pipeline's parsed XHTML (scaffolding in the old checkout), normalized to NF on the fly
 uv run python -m accommodanda.sfs validate ../ferenda.old/data/sfs/parsed site/data/downloaded/sfs --sections structure,references

@@ -24,7 +24,8 @@ its own paragraph) and the classifiers reuse them.
 
 import re
 import subprocess
-from dataclasses import dataclass, replace
+from collections import Counter
+from dataclasses import dataclass, field, replace
 
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
@@ -32,14 +33,30 @@ from . import patch
 from .util import normalize_space
 
 RE_DOTS = re.compile(r"\.{4,}")                       # TOC dotted leaders
-RE_KAP_MARK = re.compile(r"^(\d+)\s*kap\.\s")             # "2 kap. ..."
+# "2 kap. ...", a bare centered "2 kap." and a lettered "2 a kap."
+RE_KAP_MARK = re.compile(r"^(\d+(?:\s?[a-z])?)\s*kap\.(?:\s|$)")
 RE_PARA_MARK = re.compile(r"^(\d+\s*[a-z]?)\s*§(?:\s|$)")  # "3 §" / "3 a §"
 
 LINE_TOL = 4          # spans within this many y-units are the same visual line
 PARA_GAP = 1.5        # a vertical gap > PARA_GAP x line-height starts a paragraph
+HEAD_GAP = 1.6        # a wrapped heading's leading, in multiples of its font size
+FOOTNOTE_DROP = 3     # a footnote sits >= this many size units below body size
 PAGE_STRIDE = 100000  # per-page `top` offset used by flat_lines: far larger than
                       # any within-page gap, so a whole-document reflow never
                       # merges the foot of one page into the head of the next
+
+
+@dataclass
+class Run:
+    """One font run inside a visual line, with its horizontal extent -- the
+    signal a two-column layout (a prop's nuvarande/föreslagen lydelse table)
+    is reconstructed from."""
+    left: int
+    right: int
+    text: str
+    bold: bool
+    italic: bool
+    size: int = 0
 
 
 @dataclass
@@ -50,6 +67,9 @@ class Line:
     lead_bold: bool     # the leftmost run is bold (a bold §/chapter marker that
                         # leads regular statutory text on the same line)
     italic: bool
+    size: int = 0       # dominant font size (pt, from the fontspec) -- 0 where
+                        # the source carries no font info (OCR/legacy routes)
+    runs: list[Run] = field(default_factory=list)
 
 
 @dataclass
@@ -58,6 +78,7 @@ class Para:
     bold: bool = False
     lead_bold: bool = False
     italic: bool = False
+    size: int = 0       # font size of the opening line; 0 = unknown
 
 
 def pdftohtml_xml(pdf_path, hidden=False):
@@ -91,15 +112,21 @@ def pdf_pages(pdf_path, patch_key=None, hidden=False):
     # so parse leniently rather than abort the document
     root = etree.fromstring(xml, etree.XMLParser(recover=True, load_dtd=False,
                                                  no_network=True))
+    # font id -> point size, from the <fontspec> declarations (global ids)
+    sizes = {f.get("id"): int(f.get("size") or 0)
+             for f in root.iter("fontspec")}
     for page in root.findall("page"):
         spans = []
         for t in page.findall("text"):
             text = normalize_space("".join(t.itertext()))
             if text:
                 top, height = int(t.get("top")), int(t.get("height") or 0)
-                spans.append((top, int(t.get("left")), top + height, text,
+                left = int(t.get("left"))
+                spans.append((top, left, top + height, text,
                               t.find(".//b") is not None,
-                              t.find(".//i") is not None))
+                              t.find(".//i") is not None,
+                              left + int(t.get("width") or 0),
+                              sizes.get(t.get("font"), 0)))
         yield int(page.get("number")), _lines(spans)
 
 
@@ -110,21 +137,25 @@ def _lines(spans):
     kommentar'), a bold §-marker leading body text -- and such spans share a
     baseline while sitting at different tops; a top-only grouping would split them
     (and reflow e.g. '9 Författningskommentar' to 'Författningskommentar 9', which
-    then fails heading detection). The line's `top` is the topmost of its spans."""
-    lines = []
-    for top, left, base, text, bold, italic in sorted(spans):
-        if lines and abs(base - lines[-1][0]) <= LINE_TOL:
-            lines[-1][1].append((left, text, bold, italic))
-            lines[-1][2] = min(lines[-1][2], top)
+    then fails heading detection). The line's `top` is the topmost of its spans;
+    its `size` the largest run's (superscript footnote markers ride along without
+    shrinking their line)."""
+    grouped: list[tuple[int, list[Run], int]] = []
+    for top, left, base, text, bold, italic, right, size in sorted(spans):
+        run = Run(left, right, text, bold, italic, size)
+        if grouped and abs(base - grouped[-1][0]) <= LINE_TOL:
+            prev_base, runs, prev_top = grouped[-1]
+            runs.append(run)
+            grouped[-1] = (prev_base, runs, min(prev_top, top))
         else:
-            lines.append([base, [(left, text, bold, italic)], top])
+            grouped.append((base, [run], top))
     out = []
-    for _base, runs, top in lines:
-        runs.sort()
-        # lines rows are untyped heterogeneous lists, so ty can't see r[1]: str
-        out.append(Line(normalize_space(" ".join(r[1] for r in runs)), top,  # ty: ignore[invalid-argument-type]
-                        all(r[2] for r in runs), runs[0][2],
-                        all(r[3] for r in runs)))
+    for _base, runs, top in grouped:
+        runs.sort(key=lambda r: r.left)
+        out.append(Line(normalize_space(" ".join(r.text for r in runs)), top,
+                        all(r.bold for r in runs), runs[0].bold,
+                        all(r.italic for r in runs),
+                        max(r.size for r in runs), runs))
     return out
 
 
@@ -166,21 +197,31 @@ def page_paragraphs(lines, identifier, pageno):
         raw = header_re.sub(" ", l.text) if header_re else l.text
         text = normalize_space(raw)
         if text and text != str(pageno) and not RE_DOTS.search(text):
-            kept.append(Line(text, l.top, l.bold, l.lead_bold, l.italic))
+            kept.append(replace(l, text=text))
     gaps = sorted(b.top - a.top
                   for a, b in zip(kept, kept[1:], strict=False) if b.top > a.top)
     body_gap = gaps[len(gaps) // 2] if gaps else 0      # median line-height
+    body_size = line_body_size(kept)
+
+    def heading(l):
+        # heading-ness by font: bold, or larger than the page's body size --
+        # a prop's numbered chapter headings are large but NOT bold
+        return l.bold or (l.size and body_size and l.size > body_size)
+
     paras, cur, prev = [], None, None
     for l in kept:
         marker = l.lead_bold and (RE_KAP_MARK.match(l.text)
                                   or RE_PARA_MARK.match(l.text))
-        starts = (cur is None or l.bold or marker or (prev and prev.bold)
+        starts = (cur is None or heading(l) or marker
+                  or (prev and heading(prev))
                   or (body_gap and prev and l.top - prev.top > PARA_GAP * body_gap))
+        if starts and _heading_wrap(prev, l, marker, heading):
+            starts = False                # wrapped heading line: same paragraph
         if starts and cur is not None:
             paras.append(cur)
             cur = None
         if cur is None:
-            cur = Para(l.text, l.bold, bool(marker), l.italic)
+            cur = Para(l.text, l.bold, bool(marker), l.italic, l.size)
         else:
             cur.text = dehyphenate(cur.text, l.text)
             cur.italic = cur.italic and l.italic
@@ -188,3 +229,29 @@ def page_paragraphs(lines, identifier, pageno):
     if cur is not None:
         paras.append(cur)
     return paras
+
+
+def line_body_size(lines):
+    """The dominant (body) font size of a line sequence, 0 when the source
+    carries no font info. Computed over *lines* -- a sparse page's paragraphs
+    are too few for a stable mode, its lines are not."""
+    sizes = [l.size for l in lines if l.size]
+    return Counter(sizes).most_common(1)[0][0] if sizes else 0
+
+
+# a line opening its own numbered heading ("5.1 Offentligfinansiella …") is
+# never the wrapped continuation of the heading above it
+RE_NUM_LEAD = re.compile(r"^\d+(?:\.\d+)*\s")
+
+
+def _heading_wrap(prev, l, marker, heading):
+    """Whether line `l` continues a wrapped multi-line heading: the previous
+    line and this one are both heading-fonted in the *same* size (a heading and
+    its subsection differ in size, so they never fold), sit a heading's own
+    leading apart (HEAD_GAP x the size -- known only when font info is), and
+    this line neither opens a numbered heading of its own nor is a §/kap
+    marker."""
+    return bool(prev is not None and heading(prev) and heading(l) and not marker
+                and l.size and l.size == prev.size
+                and 0 < l.top - prev.top <= HEAD_GAP * l.size
+                and not RE_NUM_LEAD.match(l.text))

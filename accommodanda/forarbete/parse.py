@@ -34,13 +34,15 @@ from ..lib.lagrum import (
 # font-aware extraction + paragraph reflow are shared across the PDF verticals
 # (re-exported here so this module's existing import sites keep working)
 from ..lib.pdftext import (
+    FOOTNOTE_DROP,
     RE_KAP_MARK,
     RE_PARA_MARK,
+    line_body_size,
     page_paragraphs,
     pdf_pages,
 )
 from ..lib.util import basefile_slug
-from . import legacy_formats
+from . import legacy_formats, lydelse
 from .model import Block, Forarbete
 from .structure import nest
 
@@ -57,33 +59,43 @@ def mint_uri(typ, basefile):
     return "https://lagen.nu/%s/%s" % (typ, basefile)
 
 
-def classify(paras, page):
+def classify(paras, page, body=0):
     """Paragraphs -> Blocks. Bold chapter/§ markers (recovered from font) become
     `kapitel`/`paragraf` blocks -- the structure that lets commentary be tied to
-    a paragraf; other bold or numbered paragraphs are headings; the rest stycken."""
+    a paragraf; other bold or numbered paragraphs are headings; the rest stycken.
+
+    `body` is the document's body font size (see `line_body_size`); where the source
+    carries font info it gates two misreads a bare "N Title" pattern invites:
+    text clearly smaller than the body is a `fotnot` ("1 Senaste lydelse
+    2008:1266." -- the lagtext provenance footnotes, previously read as level-1
+    rubriks), and a numbered rubrik must be bold or larger than the body (a
+    body-sized table row "22 år 25 000 …" is not a heading). Size-less paras
+    (OCR/legacy) keep the permissive rules."""
     blocks = []
     i = 0
     while i < len(paras):
         p = paras[i]
         mk, mp, mt = (RE_KAP_MARK.match(p.text), RE_PARA_MARK.match(p.text),
                       RE_NUM_TITLE.match(p.text))
-        if p.lead_bold and mk:
+        heading_font = not p.size or not body or p.bold or p.size > body
+        if body and p.size and p.size <= body - FOOTNOTE_DROP:
+            blocks.append(Block("fotnot", p.text, page))
+        elif mk and (p.lead_bold or not p.text[mk.end():].strip()):
+            # bold marker leading text, or a bare centered "2 kap." (the
+            # page-centered chapter anchor over a lydelse table is not bold)
             blocks.append(Block("kapitel", p.text, page, num=mk.group(1)))
-        elif p.lead_bold and mp:
+        elif mp and (p.lead_bold or not p.text[mp.end():].strip()):
             blocks.append(Block("paragraf", p.text, page,
                                 num=re.sub(r"\s+", "", mp.group(1))))
-        elif mt and len(p.text) < 120:
-            # `(p.bold or mt) and mt` reduces to `mt` -- the `p.bold or` was a
-            # dead subexpression (its only effect on the AND is when mt is
-            # already truthy, in which case it changes nothing); a numbered
-            # "N Title"/"N.N Title" line is a rubrik whether or not it is bold
+        elif mt and len(p.text) < 120 and heading_font:
             blocks.append(Block("rubrik", p.text, page,
                                 mt.group(1).count(".") + 1))
         elif p.bold and len(p.text) < 120:
             blocks.append(Block("rubrik", p.text, page, 3))   # unnumbered subhead
         elif RE_HEADING_NUM.match(p.text):
             nxt = paras[i + 1].text if i + 1 < len(paras) else ""
-            if nxt[:1].isupper() and not RE_HEADING_NUM.match(nxt):
+            if (heading_font and nxt[:1].isupper()
+                    and not RE_HEADING_NUM.match(nxt)):
                 blocks.append(Block("rubrik", "%s %s" % (p.text, nxt), page,
                                     p.text.count(".") + 1))
                 i += 2
@@ -96,10 +108,32 @@ def classify(paras, page):
 
 def parse_pdf(pdf_path, identifier, patch_key=None):
     """All body blocks of a förarbete PDF, page by page (page = pdf index).
-    `patch_key=(source, basefile)` patches the pdftohtml XML before extraction."""
-    blocks = []
+    `patch_key=(source, basefile)` patches the pdftohtml XML before extraction.
+    Each page is first split around its nuvarande/föreslagen lydelse tables
+    (lydelse.split_page); the normal segments reflow and classify as before,
+    a table segment becomes one `tabell` block whose rows pair the aligned
+    cell paragraphs (row 0 the column header pair)."""
+    # (pageno, [("paras", [Para], None) | ("tabell", header, rows)])
+    pages = []
     for pageno, lines in pdf_pages(pdf_path, patch_key):
-        blocks += classify(page_paragraphs(lines, identifier, pageno), pageno)
+        segs = [("paras", page_paragraphs(seg[1], identifier, pageno), None)
+                if seg[0] == "lines" else seg
+                for seg in lydelse.split_page(lines)]
+        pages.append((pageno, segs))
+    body = line_body_size([p for _pg, segs in pages
+                           for kind, data, _x in segs if kind == "paras"
+                           for p in data])
+    blocks = []
+    for pageno, segs in pages:
+        for kind, data, rows in segs:
+            if kind == "paras":
+                blocks += classify(data, pageno, body)
+            else:
+                header, cells = data, list(rows or [])
+                if header is not None:      # the region's first chunk only
+                    cells.insert(0, (header.runs[0].text, header.runs[1].text))
+                blocks.append(Block("tabell", "", pageno, rows=cells,
+                                    th=header is not None))
     return blocks
 
 
@@ -115,10 +149,9 @@ def _paged_body(pages):
     under its page number so `#sid{N}` anchors resolve. Shared by the ABBYY-XML
     and scanned-PDF (pdftotext) OCR routes; OCR noise rides along, but the
     citation scanner still lights up the references it can read."""
-    blocks = []
-    for pageno, paras in pages:
-        blocks += classify(paras, pageno)
-    return blocks
+    pages = list(pages)
+    body = line_body_size([p for _pageno, paras in pages for p in paras])
+    return [b for pageno, paras in pages for b in classify(paras, pageno, body)]
 
 
 def _legacy_pdf_body(pdf_path, identifier):
@@ -195,19 +228,33 @@ def _refparser():
                         parse_types=PARSE_TYPES)
 
 
+def _scan(text, parser):
+    """Citation-scan one text into an inline-run list."""
+    return interleave(text, parser.parse_text(text, context={}))
+
+
 def to_artifact(fa):
     """Project to JSON. Each block becomes an inline-run list (plain runs +
     {predicate,uri,text} link dicts), scanned with one parser threaded across the
     document so 'a. prop.'/'samma lag' state carries; the flat block run is then
-    grouped into the nested `structure` tree by heading level (see structure.py)."""
+    grouped into the nested `structure` tree by heading level (see structure.py).
+    A `tabell` block projects to the shared table shape (`rad` children with
+    `cells`, the same schema SFS uses -- catalog and render already speak it),
+    row 0 flagged `th` (the nuvarande/föreslagen column header)."""
     parser = _refparser()
     parser.reset()                          # fresh per-document state
-    blocks = [{"type": b.kind,
-               "text": interleave(b.text, parser.parse_text(b.text, context={}))}
-              | ({"page": b.page} if b.page is not None else {})
-              | ({"level": b.level} if b.level else {})
-              | ({"num": b.num} if b.num else {})
-              for b in fa.body]
+    blocks = []
+    for b in fa.body:
+        block = ({"type": b.kind, "text": _scan(b.text, parser)}
+                 | ({"page": b.page} if b.page is not None else {})
+                 | ({"level": b.level} if b.level else {})
+                 | ({"num": b.num} if b.num else {}))
+        if b.rows is not None:
+            block["children"] = [
+                {"type": "rad", "cells": [_scan(c, parser) for c in row]}
+                | ({"th": True} if b.th and i == 0 else {})
+                for i, row in enumerate(b.rows)]
+        blocks.append(block)
     return {"uri": fa.uri, "type": fa.type, "identifier": fa.identifier,
             "basefile": fa.basefile, "title": fa.title, "date": fa.date,
             "structure": nest(blocks)}

@@ -370,8 +370,12 @@ def extract(art, include_empty=False, mark=False):
             flush()
             chapter = re.sub(r"\s+", " ", m.group(1))
             continue
-        # --- footnote noise: never a boundary, never content
-        if kind == "rubrik" and RE_FOOTNOTE.match(fold):
+        # --- footnote noise: never a boundary, never content. The parser now
+        # types footnotes `fotnot` (font size); the rubrik-shaped regex match
+        # covers artifacts from parses without font info. A lydelse table is
+        # likewise skipped whole: its cells quote wordings, not commentary.
+        if (kind in ("fotnot", "tabell")
+                or (kind == "rubrik" and RE_FOOTNOTE.match(fold))):
             continue
         # --- paragraf marker opening the block (a real paragraf block, a
         # "9 och 10 §§" rubrik, or a stycke the bold-detection missed)
