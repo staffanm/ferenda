@@ -35,8 +35,9 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .. import config
-from ..lib import catalog, diff, facets, history, layout, resolve, search
+from ..lib import catalog, diff, facets, history, layout, pins, search
 from . import auth, edit, ops
+from . import mcp as mcp_server
 
 CATALOG = config.DATA / "catalog.sqlite"
 DUMPS = config.DATA / "dumps"
@@ -45,6 +46,9 @@ app = FastAPI(
     title="lagen.nu API",
     version="1.0",
     description="Search and the citation graph over the Swedish legal corpus.",
+    # runs the MCP server's Streamable HTTP session manager (a no-op for the
+    # in-process TestClient path, which never calls /mcp) -- see api/mcp.py
+    lifespan=mcp_server.lifespan,
 )
 
 # the generated static site (served on another port) reaches the API from the
@@ -63,6 +67,10 @@ app.include_router(ops.router)
 # SameSite=Lax), so CORS deliberately keeps blocking cross-origin writes.
 app.include_router(auth.router)
 app.include_router(edit.router)
+
+# the public MCP server at /mcp (Streamable HTTP) -- the corpus reshaped as tools
+# for AI hosts. Added before serve()'s static "/" catch-all so its routes win.
+mcp_server.mount(app)
 
 # one search client for the process; constructing it does not open a connection,
 # so importing/serving the API never requires a running OpenSearch -- only an
@@ -217,40 +225,10 @@ class DumpInfo(BaseModel):
 # endpoints
 # --------------------------------------------------------------------------
 
-def _resolved_results(con, q, source, kind):
-    """The ⌘K resolver's hits for `q`, shaped as SearchResults: a query that *is*
-    a citation -- a law nickname/abbr + pinpoint ("avtalslagen 36", "BrB 12:1"),
-    an EU act + article ("GDPR art 32") or a case nickname ("Instagrambilden") --
-    maps to one exact, fragment-deep target that full-text can't reach (the name
-    is nowhere in the document). Each candidate is confirmed against the catalog
-    (so an alias for a not-yet-parsed document doesn't surface) and honours the
-    same source/kind filter. The document's own label/title/inbound_count are
-    used, so a pinned hit ranks and renders like any other."""
-    out = []
-    for hit in resolve.resolve(q):
-        if source and hit["source"] != source:
-            continue
-        root, _, frag = hit["uri"].partition("#")
-        row = catalog.document(con, root)
-        if not row:
-            continue
-        _uri, src, kind_, label, title, path = row
-        if kind and kind_ != kind:
-            continue
-        # the same reader-facing heading the page and full-text hits show (short
-        # name + acronym where the artifact has them, else the title) -- stored
-        # on the documents row at relate, so no artifact load per resolved hit
-        display = catalog.document_display(con, root) or title
-        out.append({
-            "uri": root, "url": layout.page_url(root),
-            "identifier": label, "title": title, "display": display,
-            "source": src, "kind": kind_,
-            "score": None, "inbound_count": catalog.document_inbound_count(con, root),
-            "highlight": [],
-            "fragments": ([{"uri": hit["uri"], "pinpoint": frag, "highlight": []}]
-                          if frag else []),
-        })
-    return out
+# the ⌘K resolver's hits for `q`, shaped as SearchResults (the citation-shaped
+# query -> one exact, fragment-deep target the full-text index can't reach);
+# shared verbatim with the MCP search/resolve_citation tools (lib/pins.py)
+_resolved_results = pins.resolved_results
 
 
 @app.get("/api/v1/search", response_model=SearchResponse, tags=["search"])

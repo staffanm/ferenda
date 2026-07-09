@@ -40,6 +40,9 @@ dependencies = [
     "jpype1>=1.7.1",
     "lark",
     "lxml",
+    # the public MCP server mounted at /mcp (accommodanda/api/mcp.py) -- FastMCP +
+    # the Streamable HTTP transport
+    "mcp>=1.13",
     "opensearch-py",
     "pillow",
     "python-dotenv>=1.2.2",
