@@ -63,6 +63,7 @@ from .eurlex import casenames as eurlex_casenames_mod
 from .eurlex import download as eurlex_download
 from .eurlex import parse as eurlex_parse
 from .forarbete import download as fa_download
+from .forarbete import fk as fa_fk
 from .forarbete import genomforande as fa_genomforande
 from .forarbete import kommentar as fa_kommentar
 from .forarbete import legacy as fa_legacy
@@ -886,6 +887,7 @@ SOURCES["dv"] = Source("dv", lambda: sorted(_dv_cases()), {
 # per-doc inputs and already versioned via fa_record's inputs hash.
 FA_CODE = (PKG / "forarbete" / "parse.py", PKG / "forarbete" / "model.py",
            PKG / "forarbete" / "structure.py", PKG / "forarbete" / "kommentar.py",
+           PKG / "forarbete" / "fk.py",
            PKG / "forarbete" / "legacy_formats.py", PKG / "lib" / "lagrum.py")
 
 
@@ -960,6 +962,16 @@ def fa_parse_run(basefile):
     implements = fa_kommentar.extract(art)
     if implements:
         art["implements"] = implements
+    # the FK's per-paragraf commentary text, the interpretive aid rendered in
+    # the statute paragraf's rail. lagtext is dropped: it quotes the statute
+    # the SFS vertical already holds, and the artifact records extracted
+    # semantics, not duplicated body text. mark=True stamps the commentary
+    # blocks in the structure (`fk: <entry-no>` -- the renderer starts a new
+    # highlight box when the number changes) so the prop page highlights them.
+    kommentarer = [{k: v for k, v in e.items() if k != "lagtext"}
+                   for e in fa_fk.extract(art, mark=True)]
+    if kommentarer:
+        art["kommentarer"] = kommentarer
     # the regeringen.se landing page the downloader recorded -- not derivable by
     # rule, so it travels with the record into the artifact's source_url
     write_artifact("forarbete", basefile, art, source_url=record.get("url"))
@@ -1867,6 +1879,7 @@ def cmd_relate(names):
         t0 = time.perf_counter()
         con = catalog.connect(CATALOG)
         pinned = fa_genomforande.resolve(con)
+        fk_rows = fa_fk.resolve(con)
         corr = [row for p in layout.SFS_ARTIFACT.glob("*/*.corr")
                 for row in sfs_correspond.corr_rows(json.loads(p.read_text()))]
         catalog.set_correspondence(con, corr)
@@ -1879,6 +1892,8 @@ def cmd_relate(names):
         dirty = True
         print("relate: %d genomför-direktiv relations pinned to SFS paragrafs"
               % pinned)
+        print("relate: %d författningskommentar entries pinned to SFS "
+              "paragrafs" % fk_rows)
         print("relate: %d old->new paragraf correspondences loaded from .corr "
               "layers" % len(corr))
         print("relate: %d inflected concept variants folded onto canonical begrepp"

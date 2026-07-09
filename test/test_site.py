@@ -1105,6 +1105,20 @@ PROP_PIN = {
         _impl("5.2 Förslaget till cybersäkerhetslag", "2", "1", "21.2", True),  # Case 2 unique
         _impl("5.3 Förslaget till konsumentköplag", None, "4", "21.3"),  # Case 2 tie-break
     ],
+    # the per-paragraf FK commentary layer (forarbete.fk), resolved by the
+    # same law paths: an amending-law entry, a combined-designator entry on a
+    # chaptered new law, and a law-level entry (no designators -> anchor '')
+    "kommentarer": [
+        {"law": "5.1 Förslaget till lag om ändring i testlagen (1999:100)",
+         "chapter": None, "paragrafer": ["3"], "page": 51,
+         "kommentar": "Paragrafen ändras så att kraven skärps."},
+        {"law": "5.2 Förslaget till cybersäkerhetslag",
+         "chapter": "2", "paragrafer": ["1"], "page": 52,
+         "kommentar": "Paragrafen är ny och genomför direktivet."},
+        {"law": "5.1 Förslaget till lag om ändring i testlagen (1999:100)",
+         "chapter": None, "paragrafer": [], "page": 53,
+         "kommentar": "De ändringar som föreslås i lagen är följdändringar."},
+    ],
 }
 
 
@@ -1128,7 +1142,7 @@ SFS_LAWS = [
 
 
 def build_pin_catalog(tmp_path):
-    from accommodanda.forarbete import genomforande
+    from accommodanda.forarbete import fk, genomforande
     db = str(tmp_path / "catalog.sqlite")
     prop = tmp_path / "prop.json"
     prop.write_text(json.dumps(PROP_PIN))
@@ -1144,6 +1158,7 @@ def build_pin_catalog(tmp_path):
     catalog.rebuild(db, "eurlex", [direc])
     con = catalog.connect(db)
     genomforande.resolve(con)
+    fk.resolve(con)
     return con
 
 
@@ -1189,6 +1204,68 @@ def test_directive_article_inbound_shows_statute(tmp_path):
     sources = {src for _u, _a, _l, _t, src in inbound}
     # the directive article is now cited by both the proposition and the statutes
     assert "forarbete" in sources and "sfs" in sources
+
+
+# --- per-paragraf författningskommentar pinned to SFS paragrafs -----------
+
+def test_fk_resolves_to_statute_anchors(tmp_path):
+    con = build_pin_catalog(tmp_path)
+    rows = {(s, a): text for s, a, _pu, _pl, _pd, _pg, text in
+            catalog.fk_kommentar_all(con)}
+    # amending law: SFS number from the rubrik, flat fragment
+    assert rows[("https://lagen.nu/1999:100", "P3")].startswith(
+        "Paragrafen ändras")
+    # new law by title, chaptered fragment
+    assert rows[("https://lagen.nu/2021:500", "K2P1")].startswith(
+        "Paragrafen är ny")
+    # a law-level entry (no designators) lands on anchor '' (the document rail)
+    assert rows[("https://lagen.nu/1999:100", "")].startswith("De ändringar")
+    # no FK edge in links: a prop's own FK is display, not a citation
+    assert not con.execute("SELECT 1 FROM links WHERE predicate LIKE '%fk%'"
+                           ).fetchall()
+
+
+def test_statute_paragraf_rail_shows_fk_commentary(tmp_path):
+    con = build_pin_catalog(tmp_path)
+    site = render.Site.from_catalog(con)
+    html = render.render_sfs(SFS_LAWS[1], site)   # cybersäkerhetslag 2021:500
+    panel = _island(html)["K2P1"]
+    assert "Författningskommentar" in panel
+    assert "Paragrafen är ny och genomför direktivet." in panel
+    # provenance links the prop's FK page pinpoint
+    assert 'href="/prop/2021/22:9#sid52">Prop. 2021/22:9</a>' in panel
+
+
+def test_law_level_fk_lands_on_document_rail(tmp_path):
+    con = build_pin_catalog(tmp_path)
+    site = render.Site.from_catalog(con)
+    html = render.render_sfs(SFS_LAWS[0], site)   # testlagen 1999:100
+    panel = _island(html)[""]
+    assert "De ändringar som föreslås i lagen är följdändringar." in panel
+
+
+def test_prop_page_highlights_fk_commentary_blocks(tmp_path):
+    # blocks the FK extractor stamped `fk` render inside one fk-komm box per
+    # run; quoted lagtext and ordinary prose stay outside
+    con = build_pin_catalog(tmp_path)
+    site = render.Site.from_catalog(con)
+    art = {"uri": "https://lagen.nu/prop/2021/22:9", "type": "prop",
+           "identifier": "Prop. 2021/22:9", "structure": [
+               {"type": "rubrik", "level": 1, "text": ["16 Författningskommentar"]},
+               {"type": "paragraf", "num": "1", "text": ["1 § Lagtext här."]},
+               {"type": "stycke", "text": ["Paragrafen är ny."], "fk": 1},
+               {"type": "stycke", "text": ["Övervägandena finns i avsnitt 5."],
+                "fk": 1},
+               {"type": "stycke", "text": ["Paragrafen ändras."], "fk": 2},
+               {"type": "stycke", "text": ["2 § Mera lagtext."]}]}
+    html = render.render_forarbete(art, site)
+    # one box per entry: the two fk=1 blocks share a box, fk=2 gets its own
+    assert html.count('<div class="fk-komm">') == 2
+    boxed = html.split('<div class="fk-komm">')[1].split("</div>")[0]
+    assert "Paragrafen är ny." in boxed
+    assert "Övervägandena finns i avsnitt 5." in boxed
+    assert "Paragrafen ändras." not in boxed
+    assert "Mera lagtext" not in boxed
 
 
 # --- EU act editorial layer: recital groups + article<->recital rail ------

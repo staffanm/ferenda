@@ -78,6 +78,16 @@ CREATE TABLE IF NOT EXISTS genomforande (
     pinpoint   TEXT,                -- the article pinpoint (e.g. "21.1")
     partial    INTEGER NOT NULL     -- "genomför delvis"
 );
+CREATE TABLE IF NOT EXISTS fk_kommentar (
+    sfs_uri    TEXT NOT NULL,       -- the commented statute
+    sfs_anchor TEXT NOT NULL,       -- paragraf fragment (P3 / K2P1); '' = the law
+    prop_uri   TEXT NOT NULL,       -- the proposition whose FK comments it
+    prop_label TEXT,                -- its identifier, for display
+    prop_date  TEXT,                -- its date, for newest-first ordering
+    page       INTEGER,             -- the FK page in the prop (the #sidN anchor)
+    text       TEXT NOT NULL        -- the commentary prose
+);
+CREATE INDEX IF NOT EXISTS idx_fk_sfs ON fk_kommentar(sfs_uri, sfs_anchor);
 CREATE TABLE IF NOT EXISTS correspondence (
     new_uri  TEXT NOT NULL,         -- the new statute paragraf (full uri, doc#id)
     old_uri  TEXT NOT NULL,         -- the old (repealed) paragraf it corresponds to
@@ -745,6 +755,26 @@ def set_genomforande(con, rows):
                      for (sfs_uri, anchor, directive, article, prop_uri,
                           prop_label, pin, partial) in rows])
     con.commit()
+
+
+def set_fk_kommentar(con, rows):
+    """Replace the per-paragraf författningskommentar layer. Each row is
+    (sfs_uri, sfs_anchor, prop_uri, prop_label, prop_date, page, text) --
+    the FK prose a proposition writes for one statute paragraf (anchor '' for
+    a law-level comment), resolved cross-document at relate time (forarbete.fk).
+    Display-only: the statute rail shows the text with the prop as provenance;
+    no links edge is stored -- a prop's own FK is not a citation."""
+    con.execute("DELETE FROM fk_kommentar")
+    con.executemany("INSERT INTO fk_kommentar VALUES (?,?,?,?,?,?,?)", rows)
+    con.commit()
+
+
+def fk_kommentar_all(con):
+    """Every FK commentary row, newest proposition first -- the renderer builds
+    its per-(statute, anchor) rail index from this in one pass."""
+    return con.execute(
+        "SELECT sfs_uri, sfs_anchor, prop_uri, prop_label, prop_date, page, text "
+        "FROM fk_kommentar ORDER BY prop_date DESC, prop_uri").fetchall()
 
 
 def genomfor_for(con, sfs_uri, anchor):

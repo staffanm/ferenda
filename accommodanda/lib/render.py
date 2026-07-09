@@ -28,6 +28,7 @@ import hashlib
 import json
 import re
 import sqlite3
+import textwrap
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import date
@@ -57,6 +58,11 @@ class Site:
     article_guidance: dict[tuple[str, str], list[dict]] = field(default_factory=dict)  # (law_uri, anchor) -> [{label, href, note?}]
     remiss_feedback: dict[tuple[str, str], list[dict[str, str | float]]] = field(default_factory=dict)  # (forarbete_uri, avsnitt_id) -> [{organisation, sentiment, quote, source_url}]
     remiss_overall: dict[str, list[dict[str, str | float]]] = field(default_factory=dict)               # forarbete_uri -> [{organisation, sentiment, quote, source_url}]
+    # (sfs_uri, anchor) -> [(prop_uri, prop_label, page, text)], newest prop
+    # first; anchor is None for a law-level FK comment
+    fk: dict[tuple[str, str | None],
+             list[tuple[str, str | None, int | None, str]]] = \
+        field(default_factory=dict)
 
     @classmethod
     def from_catalog(cls, con):
@@ -65,7 +71,7 @@ class Site:
         return cls(con, {u for (u,) in con.execute("SELECT uri FROM documents")},
                    {}, catalog.concept_aliases(con),
                    commentary, guidance, article_guidance,
-                   remiss_feedback, remiss_overall)
+                   remiss_feedback, remiss_overall, _fk_index(con))
 
     def resolve(self, uri):
         """Fold a begrepp link baked into an artifact onto its canonical concept
@@ -142,6 +148,19 @@ def _kommentar_indexes(con):
             for anchor, items in links.items():
                 article_guidance.setdefault((law, anchor), []).extend(items)
     return commentary, guidance, article_guidance
+
+
+def _fk_index(con):
+    """The per-paragraf författningskommentar rail index, from the catalog
+    layer forarbete.fk resolved at relate time: {(sfs_uri, anchor):
+    [(prop_uri, prop_label, page, text)]}, newest proposition first (the row
+    order of `fk_kommentar_all`); anchor None keys a law-level comment."""
+    fk = {}
+    for sfs_uri, anchor, prop_uri, label, _date, page, text in \
+            catalog.fk_kommentar_all(con):
+        fk.setdefault((sfs_uri, anchor or None), []).append(
+            (prop_uri, label, page, text))
+    return fk
 
 
 def _remiss_item(svar, scored):
@@ -780,6 +799,7 @@ class Rail:
             return
         uri = self.doc_uri + "#" + nid
         commentary = self._commentary(nid)
+        fk = self._fk(nid)
         guidance = self._guidance_html(
             self.site.article_guidance.get((self.doc_uri, nid)))
         remiss = self._remiss_html(
@@ -789,15 +809,16 @@ class Rail:
         bemyndigande = bemyndigande_margin(self.site, uri)        # föreskrifter under it
         corr_cases = corresponding_cases_margin(self.site, uri)   # new-law side
         corresponds = corresponds_margin(self.site, uri)          # old-law side
-        if not (commentary or guidance or remiss or groups or genomfor
+        if not (commentary or fk or guidance or remiss or groups or genomfor
                 or bemyndigande or extra or corr_cases or corresponds):
             return
         head = ('<div class="rail-h">Kontext%s</div>'
                 % (' för <b>%s</b>' % escape(pinpoint) if pinpoint else ""))
         body = ('<div class="rail-sec"><div class="rail-sec-h">Hänvisat till av</div>'
                 '%s</div>' % groups) if groups else ""
-        self.data[nid] = (head + commentary + guidance + remiss + body + corr_cases
-                          + extra + genomfor + bemyndigande + corresponds)
+        self.data[nid] = (head + commentary + fk + guidance + remiss + body
+                          + corr_cases + extra + genomfor + bemyndigande
+                          + corresponds)
 
     def add_document(self):
         """The document-level rail panel (key ''), shown when no single paragraph
@@ -806,6 +827,7 @@ class Rail:
         the client's empty-rail placeholder."""
         panel = (self._guidance_html(self.site.guidance.get(self.doc_uri))
                  + self._commentary(None)
+                 + self._fk(None)
                  # the "most interesting feedback" for the whole SOU/Ds. v1
                  # deliberately renders every overall stance as-is; a later pass can
                  # rank by |sentiment| to surface only the strongest.
@@ -860,6 +882,28 @@ class Rail:
                        % (escape(href(g["href"])), ext, escape(g["label"]), tail))
         return ('<div class="rail-sec vagledning"><div class="rail-sec-h">Externa '
                 'länkar</div><ul>%s</ul></div>' % "".join(out))
+
+    def _fk(self, nid):
+        """The författningskommentar prose propositioner wrote for the paragraph
+        `nid` (or None for the law as a whole), as a rail section: each prop's
+        comment opens the section (initial text, ellipsized on a word boundary),
+        with the proposition as a provenance link pinpointing the FK page. The
+        official sibling of the wiki `_commentary` -- authored by the
+        lagstiftare, not our editors -- so it renders as its own section."""
+        entries = self.site.fk.get((self.doc_uri, nid))
+        if not entries:
+            return ""
+        out = []
+        for prop_uri, label, page, text in entries:
+            lead = textwrap.shorten(text.split("\n")[0], 300, placeholder=" …")
+            target = prop_uri + ("#sid%d" % page if page else "")
+            src = ('<a href="%s">%s</a>' % (escape(href(target)), escape(label))
+                   if label and self.site.has(prop_uri)
+                   else escape(label or ""))
+            out.append('<p>%s <span class="prov">— %s</span></p>'
+                       % (escape(lead), src))
+        return ('<div class="rail-sec rail-fk"><div class="rail-sec-h">'
+                'Författningskommentar</div>%s</div>' % "".join(out))
 
     def _commentary(self, nid):
         """The wiki commentary for the paragraph `nid` (or `None` for the law as a
@@ -1529,10 +1573,16 @@ def render_forarbete(art, site):
             parts.append('<span class="sid" id="%s"%s>%d</span>'
                          % (key, _rail_attr(rail, key), pg))
 
+    def close_komm():
+        if state["komm"] is not None:
+            parts.append("</div>")
+            state["komm"] = None
+
     def walk(nodes):
         for n in nodes:
             emit_page(n)
             if n.get("type") == "avsnitt":
+                close_komm()
                 level = n.get("level") or 1
                 anchor = toc.add(n.get("id"), plain(n["text"]), level)
                 # wire the section to the scroll-driven rail (remiss feedback on
@@ -1544,9 +1594,21 @@ def render_forarbete(art, site):
                                 render_runs(n["text"], site), min(level + 1, 5)))
                 walk(n.get("children", []))
             else:
+                # författningskommentar blocks (`fk`, stamped per entry by
+                # forarbete's extractor at parse time): one highlight box per
+                # entry -- a new entry number closes the previous box
+                if n.get("fk"):
+                    if state["komm"] != n["fk"]:
+                        close_komm()
+                        parts.append('<div class="fk-komm">')
+                        state["komm"] = n["fk"]
+                else:
+                    close_komm()
                 parts.append("<p>%s</p>" % render_runs(n["text"], site))
 
+    state["komm"] = None
     walk(art.get("structure", []))
+    close_komm()
     rail.add_document()        # document-level remiss "most interesting" overall panel
     return page(title, "Förarbete", meta, "".join(parts), render_toc(toc),
                 eyebrow=FA_TYPE_LABEL.get(art.get("type"), "Förarbete"),
@@ -2396,6 +2458,7 @@ CSS = r"""
 
   /* promoted literals */
   --diff-ins-bg:#d9e8dc; --diff-del-bg:#efdad6;
+  --fk-bg:#eaf1f8; --fk-border:#c3d5e6;
   --overlay:rgba(18,22,28,.34); --shadow-modal:rgba(18,22,28,.30);
   --mark:#f0e4a6; --danger:#b5402c; --on-accent:#ffffff;
 
@@ -2413,6 +2476,7 @@ CSS = r"""
   --accent:#cd6f56; --case:#c9884f; --forarbete:#9b90d2; --kommentar:#cf7295;
 
   --diff-ins-bg:#25352a; --diff-del-bg:#3a2723;
+  --fk-bg:#1b2531; --fk-border:#2e4257;
   --overlay:rgba(6,8,11,.55); --shadow-modal:rgba(0,0,0,.6);
   --mark:#4a4326; --danger:#e0755e; --on-accent:#1a0f0c;
   color-scheme: dark;
@@ -2425,6 +2489,7 @@ CSS = r"""
     --rule:#2b323b; --rule-soft:#222831;
     --accent:#cd6f56; --case:#c9884f; --forarbete:#9b90d2; --kommentar:#cf7295;
     --diff-ins-bg:#25352a; --diff-del-bg:#3a2723;
+    --fk-bg:#1b2531; --fk-border:#2e4257;
     --overlay:rgba(6,8,11,.55); --shadow-modal:rgba(0,0,0,.6);
     --mark:#4a4326; --danger:#e0755e; --on-accent:#1a0f0c;
     color-scheme: dark;
@@ -2709,6 +2774,20 @@ sup.fnref a { text-decoration: none; padding: 0 .1em; }
                margin: 0 0 .5rem; color: var(--ink); }
 .komm-by { font-family: var(--serif); font-style: italic; font-size: .78rem;
            color: var(--ink-3); }
+/* the författningskommentar prose highlighted on the prop page itself: one
+   box per run of commentary blocks, set off from the quoted lagtext */
+.fk-komm { background: var(--fk-bg); border: 1px solid var(--fk-border);
+           border-radius: 6px; padding: .7rem .9rem; margin: .8rem 0; }
+.fk-komm p { margin: 0 0 .6rem; }
+.fk-komm p:last-child { margin-bottom: 0; }
+
+/* the lagstiftare's own författningskommentar, from the proposition's FK */
+.rail-fk { margin-bottom: 1rem; }
+.rail-fk p { font-family: var(--serif); font-size: .9rem; line-height: 1.5;
+             margin: 0 0 .5rem; color: var(--ink); }
+.rail-fk .prov { font-style: italic; font-size: .78rem; color: var(--ink-3);
+                 white-space: nowrap; }
+.rail-fk .prov a { color: var(--forarbete); }
 .ingroup { margin-bottom: 1rem; }
 .ingroup-h { font-family: var(--serif); font-style: italic; font-size: .8rem;
              color: var(--accent); font-weight: 500; margin: .35rem 0 .25rem; }

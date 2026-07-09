@@ -39,6 +39,7 @@ from ..lib.pdftext import (
     page_paragraphs,
     pdf_pages,
 )
+from ..lib.util import basefile_slug
 from . import legacy_formats
 from .model import Block, Forarbete
 from .structure import nest
@@ -175,8 +176,11 @@ def parse_record(record, root):
         body = _legacy_body(record)
     else:
         pdfs = [f for f in record.get("files", []) if f.lower().endswith(".pdf")]
+        # the patch key carries the build-style basefile ("sou/2021-82" --
+        # typ-qualified slug, what layout.relpath decomposes); the record's own
+        # basefile ("2021:82") has no typ and is not filesystem-safe
         body = (parse_pdf(Path(root) / typ / pdfs[0], record["identifier"],
-                          ("forarbete", basefile))
+                          ("forarbete", "%s/%s" % (typ, basefile_slug(basefile))))
                 if pdfs else [])
     return Forarbete(type=typ, basefile=basefile,
                      identifier=record["identifier"], uri=mint_uri(typ, basefile),

@@ -24,7 +24,7 @@ from ..lib import catalog, compress
 from . import kommentar
 
 
-def _index(con):
+def law_index(con):
     """norm-title -> [sfs uri] (for new-law title matching) and sfs uri ->
     artifact path (for the ikraftträdande tie-break)."""
     title, path = {}, {}
@@ -43,7 +43,7 @@ def _ikraft(path):
     return props.get("rpubl:ikrafttradandedatum")
 
 
-def _resolve_law(law, prop_date, title_idx, path_idx):
+def resolve_law(law, prop_date, title_idx, path_idx):
     """The SFS uri a författningskommentar section's `law` rubrik refers to, or
     None when it cannot be resolved to a statute we hold."""
     sfsnr = kommentar.sfs_number(law)
@@ -64,7 +64,7 @@ def resolve(con):
     """Re-derive every genomför-direktiv -> SFS-paragraf relation in the catalog
     from the förarbete artifacts' `implements` sections (only the props that
     carry such edges are read). Returns the number of relations pinned."""
-    title_idx, path_idx = _index(con)
+    title_idx, path_idx = law_index(con)
     root = catalog.data_root(con)              # stored paths are data_root-relative
     props = con.execute(
         "SELECT DISTINCT d.uri, d.path FROM links l "
@@ -76,7 +76,7 @@ def resolve(con):
         art = json.loads(compress.read_bytes(root / prop_path))
         prop_date, prop_label = art.get("date"), art.get("identifier")
         for rec in art.get("implements", []):
-            sfs_uri = _resolve_law(rec.get("law"), prop_date, title_idx, path_idx)
+            sfs_uri = resolve_law(rec.get("law"), prop_date, title_idx, path_idx)
             anchor = kommentar.paragraf_fragment(rec.get("chapter"),
                                                  rec.get("paragraf"))
             if not (sfs_uri and anchor):

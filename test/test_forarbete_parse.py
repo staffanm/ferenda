@@ -67,3 +67,25 @@ def test_page_paragraphs_skips_table_of_contents():
     toc = [_line("%d Avsnitt ........................ %d" % (i, i + 10), 50 + i * 20)
            for i in range(1, 8)]
     assert page_paragraphs(toc, "Prop. 2025/26:161", 3) == []
+
+
+def test_parse_record_patch_key_is_typ_qualified_slug(monkeypatch, tmp_path):
+    # the patch key must be the build-style basefile ("sou/2021-82"): the
+    # record's own basefile ("2021:82") has no typ segment, which crashed
+    # layout.relpath for every SOU (and silently computed a wrong patch path
+    # for props, whose riksmöte slash made the split "succeed")
+    from accommodanda.forarbete import parse as fa_parse
+
+    seen = {}
+
+    def fake_parse_pdf(path, identifier, patch_key=None):
+        seen["patch_key"] = patch_key
+        return []
+
+    monkeypatch.setattr(fa_parse, "parse_pdf", fake_parse_pdf)
+    (tmp_path / "sou").mkdir()
+    (tmp_path / "sou" / "2021-82.pdf").write_bytes(b"%PDF-")
+    fa_parse.parse_record({"type": "sou", "basefile": "2021:82",
+                           "identifier": "SOU 2021:82",
+                           "files": ["2021-82.pdf"]}, tmp_path)
+    assert seen["patch_key"] == ("forarbete", "sou/2021-82")
