@@ -34,6 +34,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from html import escape
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi.testclient import TestClient
 
@@ -1127,6 +1128,7 @@ PAGE = """<!doctype html>
 %(island)s<script src="/scrollspy.js" defer></script>
 <script src="/search.js" defer></script>
 <script src="/versions.js" defer></script>
+<script src="/faksimil.js" defer></script>
 <script src="/editor.js" defer></script>
 <script>(function(){var b=document.querySelector('[data-theme-toggle]');if(!b)return;b.addEventListener('click',function(){var cur=document.documentElement.getAttribute('data-theme');if(cur!=='light'&&cur!=='dark')cur=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';var next=cur==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',next);try{localStorage.setItem('theme',next);}catch(e){}});})();</script>
 </body></html>
@@ -1607,7 +1609,8 @@ def render_forarbete(art, site):
                      ("Datum", art.get("date"))])
     parts = [document_inbound(site, art["uri"]), render_implements(art, site)]
     toc = Toc()
-    rail = Rail(site, art["uri"])
+    doc_uri = art["uri"]
+    rail = Rail(site, doc_uri)
     state = {"page": None}
 
     def emit_page(node):
@@ -1618,8 +1621,14 @@ def render_forarbete(art, site):
             state["page"] = pg
             key = "sid%d" % pg
             rail.add(key, "s. %d" % pg)
-            parts.append('<span class="sid" id="%s"%s>%d</span>'
-                         % (key, _rail_attr(rail, key), pg))
+            # the page number doubles as the facsimile button: a click loads
+            # the source PDF page as a retina PNG (faksimil.js + the
+            # /api/v1/facsimile endpoint, rendered on demand and disk-cached)
+            fax = "/api/v1/facsimile?uri=%s&sid=%d" % (quote(doc_uri, safe=""), pg)
+            parts.append('<span class="sid" id="%s"%s><button type="button" '
+                         'data-fax="%s" title="Visa faksimil av sidan %d">'
+                         '%d</button></span>'
+                         % (key, _rail_attr(rail, key), escape(fax), pg, pg))
 
     def close_komm():
         if state["komm"] is not None:
@@ -2454,6 +2463,7 @@ def render_aggregates(con, out_root, catalog_path, write_index=True):
     # size floor in compress.write.
     for name, body in (("style.css", CSS + EDITOR_CSS), ("scrollspy.js", SCROLLSPY),
                        ("search.js", SEARCH), ("versions.js", VERSIONS),
+                       ("faksimil.js", FAKSIMIL),
                        ("editor.js", EDITOR), ("robots.txt", ROBOTS)):
         compress.write_text(out_root / name, body, encodings=compress.PAGE_ENCODINGS)
     if write_index:
@@ -2802,6 +2812,12 @@ sup.fnref a { text-decoration: none; padding: 0 .1em; }
        color: var(--ink-4); font-size: .8rem; margin: 1.25rem 0 .25rem;
        border-top: 1px solid var(--rule-soft); padding-top: .25rem; scroll-margin-top: 5rem; }
 .sid::before { content: "s. "; font-style: italic; }
+.sid button { all: unset; cursor: pointer; }
+.sid button:hover { color: var(--accent); text-decoration: underline; }
+.sid.fax-loading button { opacity: .4; cursor: progress; }
+img.faksimil { display: block; width: 100%; max-width: 40rem; margin: .5rem 0 1rem;
+               border: 1px solid var(--rule); border-radius: 4px;
+               box-shadow: 0 1px 6px rgba(18,22,28,.12); }
 
 /* -- Context rail (populated by the client from the JSON island) -- */
 .rail { position: sticky; top: 4rem; max-height: calc(100vh - 4rem);
@@ -3345,6 +3361,38 @@ VERSIONS = """
 # commentary, or the whole body for a concept/editorial page), and drives the
 # cart + checkout against the same-origin /api/v1/edit/* routes. Raw string: the
 # markdown-preview regexes carry backslashes JS must see verbatim.
+# The facsimile viewer: every förarbete page anchor is a button (the page
+# number itself) that loads that printed page's retina PNG from
+# /api/v1/facsimile -- rendered on demand server-side, disk-cached, browser-
+# cached immutable -- and toggles it inline under the anchor. Plain DOM.
+FAKSIMIL = """
+(function () {
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('.sid > button[data-fax]');
+    if (!b) return;
+    var span = b.parentNode;
+    var next = span.nextElementSibling;
+    if (next && next.classList.contains('faksimil')) {
+      next.remove();
+      return;
+    }
+    var img = document.createElement('img');
+    img.className = 'faksimil';
+    img.alt = 'Faksimil av sidan ' + b.textContent;
+    img.decoding = 'async';
+    span.classList.add('fax-loading');
+    img.onload = function () { span.classList.remove('fax-loading'); };
+    img.onerror = function () {
+      span.classList.remove('fax-loading');
+      img.remove();
+    };
+    img.src = b.dataset.fax;
+    span.parentNode.insertBefore(img, span.nextSibling);
+  });
+})();
+"""
+
+
 EDITOR_CSS = r"""
 /* inline editor (editor.js) */
 .ed-account { margin-left: 1rem; font-size: .85rem; color: var(--ink-3); }

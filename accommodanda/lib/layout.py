@@ -332,6 +332,18 @@ def fa_record(basefile):
     return FA_DOWNLOADED / typ / (rest + ".json")
 
 
+# on-demand page facsimiles (rendered PNGs of source-PDF pages), keyed like the
+# downloaded tree. A pure cache: rebuildable from the PDF at any time, evicted
+# by an external process (never by this codebase).
+FACSIMILE = DATA / "cache" / "facsimile"
+
+
+def facsimile(source, basefile, page):
+    """The cached facsimile PNG of one source-PDF page:
+    ``cache/facsimile/<source>/<relpath>/sid<N>.png``."""
+    return FACSIMILE / source / relpath(source, basefile) / ("sid%d.png" % page)
+
+
 def fa_ocr_pdf(typ, basefile):
     """The re-OCR sidecar PDF for a förarbete document (§7g): ``ocr/forarbete/
     <type>/<slug>.pdf``, slugged exactly like the downloaded record. Dropping a

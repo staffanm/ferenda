@@ -179,6 +179,17 @@ compares two consolidations. `from` (required) = older version id; `to`
 fragment** (`text/html`), not JSON: a leading `<div class="diff-note">` then the
 newer text marked up with `<ins>`/`<del>`. Direction is always older→newer.
 
+**Page facsimile — `GET /api/v1/facsimile?uri=…&sid=N`** — a PNG of one
+printed page of the document's source PDF (`image/png`), for every
+page-oriented PDF source (förarbeten, myndighetsföreskrifter, avgöranden).
+`sid` is the printed page number — the same `#sid{N}` anchors the document
+pages and citations use. Rendered on demand at retina resolution (150 DPI,
+~1240 px wide for A4) and cached: the first request for a page costs
+~0.5 s, later ones are served from disk, and the response is
+`Cache-Control: immutable` so browsers never re-fetch. Also reachable at the
+legacy path grammar, `GET /prop/2022/23:10/sid1.png` /
+`GET /sou/2021:82/sid1.png` (undocumented alias, kept for old links).
+
 ### Endpoint → task map
 
 | I want to… | Endpoint |
@@ -193,6 +204,7 @@ newer text marked up with `<ins>`/`<del>`. Direction is always older→newer.
 | what does this cite? | `GET /api/v1/document/outbound?uri=…` |
 | version history | `GET /api/v1/document/versions?uri=…` |
 | diff two versions | `GET /api/v1/document/diff?uri=…&from=…&to=…` (HTML) |
+| page facsimile (PNG) | `GET /api/v1/facsimile?uri=…&sid=N` |
 | bulk download | `GET /api/v1/dumps` + static fetch |
 | machine schema | `GET /openapi.json`, `GET /docs` |
 

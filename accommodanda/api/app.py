@@ -19,6 +19,7 @@ artifact's `uri` is also its API key, its dump id and its OpenSearch `_id`.
 import json
 import re
 import sqlite3
+import subprocess
 import threading
 from datetime import datetime, timezone
 from html import escape
@@ -36,7 +37,19 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .. import config
-from ..lib import catalog, compress, diff, facets, history, layout, resolve, search
+from ..lib import (
+    catalog,
+    compress,
+    diff,
+    facets,
+    facsimile,
+    history,
+    layout,
+    regeringen,
+    resolve,
+    search,
+)
+from ..lib.util import basefile_slug
 from . import auth, edit, ops, patch
 
 CATALOG = config.DATA / "catalog.sqlite"
@@ -526,6 +539,132 @@ def sources_endpoint(con: sqlite3.Connection = Depends(get_con)):
     """The corpus' sources and their document counts."""
     return [SourceInfo(source=s, documents=n)
             for s, n in sorted(catalog.counts(con).items())]
+
+
+# --------------------------------------------------------------------------
+# page facsimiles: an on-demand PNG of one source-PDF page (lib/facsimile),
+# rendered lazily at retina resolution and cached to disk. Reached both as
+# the documented API endpoint (?uri=&sid=) and at the legacy lagen.nu path
+# grammar (/prop/2022/23:10/sid1.png), which predates the API. Enabled for
+# every page-oriented PDF source: each resolver maps a uri-local document id
+# to (source, build-basefile, pdf path) from layout rules + the downloaded
+# record -- adding a source is one resolver.
+# --------------------------------------------------------------------------
+
+# a förarbete basefile as it appears in a uri path: "prop/2013/14:116" (the
+# riksmöte types carry an extra slash), "sou/2021:82", "bet/2020/21:JuU25";
+# the type whitelist is the harvest vocabulary + bet
+_RE_FA_BASEFILE = re.compile(
+    r"^(%s|bet)/(\d{4}(?:/\d{2,4})?:[A-Za-zÅÄÖ]*\d+[a-z]?)$"
+    % "|".join(regeringen.TYPES))
+# a föreskrift: "<fs>/<year>:<löpnr>" ("mcffs/2026:1")
+_RE_FS_BASEFILE = re.compile(r"^([a-zåäö]+)/(\d{4}:\d+)$")
+# an avgörande: "avg/<org>/<dnr>" ("avg/jo/2340-2025", "avg/jk/2024/8082")
+_RE_AVG_BASEFILE = re.compile(r"^avg/([a-z]+)/([A-Za-z0-9/-]+)$")
+
+
+def _fa_pdf(local):
+    m = _RE_FA_BASEFILE.match(local)
+    if not m:
+        return None
+    typ, num = m.group(1), m.group(2)
+    basefile = "%s/%s" % (typ, basefile_slug(num))
+    record_path = layout.fa_record(basefile)
+    if not compress.exists(record_path):
+        return None
+    record = json.loads(compress.read_text(record_path))
+    pdfs = ([layout.FA_DOWNLOADED / typ / f
+             for f in record.get("files", []) if f.lower().endswith(".pdf")]
+            or [config.LEGACY_ROOT / f
+                for f in record.get("legacy_files", [])
+                if f.lower().endswith(".pdf")])
+    return ("forarbete", basefile, pdfs[0]) if pdfs else None
+
+
+def _foreskrift_pdf(local):
+    m = _RE_FS_BASEFILE.match(local)
+    if not m or m.group(1) in regeringen.TYPES:
+        return None
+    fs = m.group(1)
+    record_path = (layout.FORESKRIFT_DOWNLOADED / fs
+                   / (basefile_slug(local) + ".json"))
+    if not compress.exists(record_path):
+        return None
+    # the page anchors come from the `regulation` PDF (the body foreskrift's
+    # parse reads), so that is the one a facsimile must rasterize
+    regulation = json.loads(compress.read_text(record_path))["files"].get("regulation")
+    if not regulation:
+        return None
+    return ("foreskrift", local, layout.FORESKRIFT_DOWNLOADED / fs
+            / regulation["name"])
+
+
+def _avg_pdf(local):
+    m = _RE_AVG_BASEFILE.match(local)
+    if not m:
+        return None
+    basefile = local[len("avg/"):]
+    pdf = (layout.AVG_DOWNLOADED / m.group(1)
+           / (basefile_slug(basefile) + ".pdf"))
+    return ("avg", basefile, pdf) if pdf.exists() else None
+
+
+_PDF_RESOLVERS = (_fa_pdf, _avg_pdf, _foreskrift_pdf)
+
+# immutable: the PDF a facsimile renders from never changes in place (a
+# re-download replaces the record wholesale), so clients may cache forever
+_FAX_HEADERS = {"Cache-Control": "public, max-age=31536000, immutable"}
+
+
+def _facsimile_response(local, sid):
+    """The facsimile PNG for page `sid` of the document at uri-local path
+    `local` ("prop/2013/14:116"), rendering into the disk cache on first
+    request."""
+    if ".." in local or sid < 1:
+        raise HTTPException(404, "no such document: %r" % local)
+    resolved = next(filter(None, (r(local) for r in _PDF_RESOLVERS)), None)
+    if resolved is None:
+        raise HTTPException(404, "no PDF source downloaded for %r" % local)
+    source, basefile, pdf = resolved
+    try:
+        png = facsimile.cached_page(source, basefile, pdf, sid)
+    except subprocess.CalledProcessError as exc:
+        # poppler exit codes (see `man pdftoppm`): 1 is "error opening a PDF
+        # file" -- the source is corrupt, a corpus data-integrity problem
+        # that must fail loudly, not read as a client 404. 99 ("other
+        # error") is what an out-of-range -f/-l page range produces -- a
+        # genuinely missing page, so that alone is a 404.
+        if exc.returncode == 1:
+            raise
+        raise HTTPException(404, "%r has no page %d" % (local, sid)) \
+            from None
+    return FileResponse(png, media_type="image/png", headers=_FAX_HEADERS)
+
+
+@app.get("/api/v1/facsimile", response_class=FileResponse, tags=["document"],
+         responses={200: {"content": {"image/png": {}}}})
+def facsimile_endpoint(
+        uri: str = Query(..., description="full lagen.nu document uri"),
+        sid: int = Query(..., ge=1, description="printed page number "
+                         "(the #sid{N} anchor)")):
+    """A facsimile PNG of one printed page of the document's source PDF
+    (förarbeten, myndighetsföreskrifter, avgöranden), rendered at retina
+    resolution (150 DPI) on first request and cached on disk."""
+    return _facsimile_response(catalog.local(catalog.strip_fragment(uri)), sid)
+
+
+# the legacy path grammar in its two arities: riksmöte-numbered förarbeten and
+# avgöranden carry an extra slash ("/prop/2022/23:10/sid1.png",
+# "/avg/jo/2340-2025/sid1.png"); year-numbered ids do not
+# ("/sou/2021:82/sid1.png", "/mcffs/2026:1/sid1.png")
+@app.get("/{a}/{b}/{c}/sid{sid:int}.png", include_in_schema=False)
+def facsimile_legacy_3(a: str, b: str, c: str, sid: int):
+    return _facsimile_response("%s/%s/%s" % (a, b, c), sid)
+
+
+@app.get("/{a}/{b}/sid{sid:int}.png", include_in_schema=False)
+def facsimile_legacy_2(a: str, b: str, sid: int):
+    return _facsimile_response("%s/%s" % (a, b), sid)
 
 
 @app.get("/api/v1/dumps", response_model=list[DumpInfo], tags=["catalog"])
