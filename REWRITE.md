@@ -222,7 +222,11 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
   **13,789 acts.** New JSON lives flat at `downloaded/sfs/{y}/{n}.json`; legacy
   HTML in `downloaded/sfs/sfst|sfsr/`; superseded consolidations archived to
   `downloaded/sfs/archive/{y}/{n}/.versions/{vy}/{vn}.json` (keyed on the
-  `andringInford` legal version, not checksum). `test/test_sfs_download.py`.
+  `andringInford` legal version, not checksum). A backfill interrupted mid-sweep
+  (no watermark written yet) restarts from page 1 unless resumed: on
+  interruption it prints the ES `search_after` cursor for the last completed
+  page, which `--resume-after JSON` feeds back in to skip the pages already
+  fetched. `test/test_sfs_download.py`.
 - ✅ **JSON-or-HTML parse selection** — `load_inputs` prefers the new JSON over the
   legacy HTML; `register_from_source`/`sfst_header_from_source` map it onto the
   same intermediates, so all register/amendment/metadata parsing is reused

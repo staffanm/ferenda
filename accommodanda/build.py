@@ -384,6 +384,7 @@ class RunOptions:
     riksmote: str | None = None  # forarbete bet: narrow the harvest to one riksmöte
     limit: int | None = None     # import-legacy (avg/forarbete): cap the run (a slice)
     rot13: bool = False          # mkpatch: obfuscate the patch (PII redactions)
+    resume_after: str | None = None  # sfs download: resume an interrupted backfill
 
 
 RUN = RunOptions()
@@ -635,8 +636,10 @@ def sfs_harvest(scopes):
         print("sfs download: would download the corpus into %s"
               % layout.SFS_DOWNLOADED)
         return
+    resume_after = json.loads(RUN.resume_after) if RUN.resume_after else None
     seen, new, updated, skipped = sfs_download.sync(layout.SFS_DOWNLOADED,
-                                                    full=RUN.force)
+                                                    full=RUN.force,
+                                                    resume_after=resume_after)
     print("sfs download: %d seen, %d new, %d updated, %d skipped"
           % (seen, new, updated, skipped))
 
@@ -2549,6 +2552,10 @@ def main(argv=None):
                    help="mkpatch: store the patch rot13-obfuscated, so a "
                         "redaction of personal data is not plain-text googleable "
                         "in the committed patch")
+    p.add_argument("--resume-after", metavar="JSON",
+                   help="sfs download: resume a backfill interrupted mid-sweep, "
+                        "from the ES search_after cursor printed when it was "
+                        "interrupted")
     args = p.parse_args(argv)
 
     RUN.dry_run, RUN.force, RUN.no_deps = args.dry_run, args.force, args.no_deps
@@ -2559,6 +2566,7 @@ def main(argv=None):
     RUN.riksmote = args.riksmote
     RUN.limit = args.limit
     RUN.rot13 = args.rot13
+    RUN.resume_after = args.resume_after
     # the parallelisable steps default to all cores; -j1 serialises
     jobs = args.jobs if args.jobs is not None else (os.cpu_count() or 1)
 

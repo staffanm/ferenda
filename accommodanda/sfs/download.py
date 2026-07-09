@@ -172,7 +172,7 @@ def save_document(destdir, source):
     return "updated"
 
 
-def sync(destdir, full=False, limit=None, delay=PAGE_DELAY):
+def sync(destdir, full=False, limit=None, delay=PAGE_DELAY, resume_after=None):
     """Harvest published acts into destdir, returning (seen, new, updated,
     skipped). The mode is chosen automatically from the stored watermark (the
     max uppdateradDateTime harvested by the last clean run):
@@ -180,7 +180,8 @@ def sync(destdir, full=False, limit=None, delay=PAGE_DELAY):
     * **Backfill** -- `full` is set, or no watermark exists yet. Sweeps the
       whole corpus oldest-first by the immutable grundforfattningId, so even
       acts with no uppdateradDateTime are captured. The watermark is written
-      only on clean completion; a crashed backfill leaves none and restarts.
+      only on clean completion; a crashed backfill leaves none and restarts
+      from page 1 unless `resume_after` is given (see below).
 
     * **Incremental** -- a watermark exists. Asks the server for only the acts
       changed since (uppdateradDateTime >= watermark), oldest-change-first.
@@ -188,6 +189,12 @@ def sync(destdir, full=False, limit=None, delay=PAGE_DELAY):
       checkpointed after every page and an interrupted run resumes where it
       stopped. An amendment to an old base act bumps that act's
       uppdateradDateTime, so it surfaces here despite its old SFS number.
+
+    `resume_after` is the raw ES `search_after` cursor (a list, matching the
+    query's `sort`) to start paging from, letting a backfill interrupted by
+    e.g. a network error skip the pages it already fetched instead of
+    re-walking them. If the run is interrupted again, the cursor for the last
+    page it completed is printed so it can be passed back in.
     """
     destdir = Path(destdir)
     session = make_session(USER_AGENT)
@@ -202,49 +209,58 @@ def sync(destdir, full=False, limit=None, delay=PAGE_DELAY):
                      {"range": {"uppdateradDateTime": {"gte": watermark}}}]}},
                  "sort": [{"uppdateradDateTime": "asc"},
                           {"grundforfattningId": "asc"}]}
-    print("sfs download: %s (since %s)"
+    print("sfs download: %s (since %s)%s"
           % ("full backfill" if backfill else "incremental",
-             watermark or "scratch"), flush=True)
+             watermark or "scratch",
+             " resuming after %s" % resume_after if resume_after else ""),
+          flush=True)
 
-    after = None
+    after = resume_after
     seen = new = updated = skipped = page_no = 0
     high = watermark
     truncated = False
     rep = Reporter()
-    while True:
-        page = search(session, query, after)
-        hits = page["hits"]["hits"]
-        if not hits:
-            break
-        page_no += 1
-        for hit in hits:
-            after = hit["sort"]
-            seen += 1
-            try:
-                status = save_document(destdir, hit["_source"])
-            except MalformedBeteckning as exc:
-                skipped += 1
-                print("  skipped: %s" % exc, flush=True)
-                continue
-            new += status == "new"
-            updated += status == "updated"
-            ts = hit["_source"].get("uppdateradDateTime")
-            if ts and (high is None or ts > high):
-                high = ts
-            if limit and seen >= limit:
-                truncated = True
+    try:
+        while True:
+            page = search(session, query, after)
+            hits = page["hits"]["hits"]
+            if not hits:
                 break
-        rep.update(seen, page["hits"]["total"]["value"], page=page_no,
-                   new=new, updated=updated)
-        # incremental arrives in timestamp order, so the running max is a safe
-        # resume point -- checkpoint each page. Backfill arrives in base-id
-        # order, so its max is only valid once the whole sweep completes.
-        if not backfill and high and high != watermark:
-            write_watermark(destdir, high)
-            watermark = high
-        if truncated:
-            break
-        time.sleep(delay)
+            page_no += 1
+            for hit in hits:
+                after = hit["sort"]
+                seen += 1
+                try:
+                    status = save_document(destdir, hit["_source"])
+                except MalformedBeteckning as exc:
+                    skipped += 1
+                    print("  skipped: %s" % exc, flush=True)
+                    continue
+                new += status == "new"
+                updated += status == "updated"
+                ts = hit["_source"].get("uppdateradDateTime")
+                if ts and (high is None or ts > high):
+                    high = ts
+                if limit and seen >= limit:
+                    truncated = True
+                    break
+            rep.update(seen, page["hits"]["total"]["value"], page=page_no,
+                       new=new, updated=updated)
+            # incremental arrives in timestamp order, so the running max is a
+            # safe resume point -- checkpoint each page. Backfill arrives in
+            # base-id order, so its max is only valid once the whole sweep
+            # completes; use --resume-after to resume it instead.
+            if not backfill and high and high != watermark:
+                write_watermark(destdir, high)
+                watermark = high
+            if truncated:
+                break
+            time.sleep(delay)
+    except BaseException:
+        print("interrupted after page %d (%d seen) -- resume with "
+              "--resume-after '%s'" % (page_no, seen, json.dumps(after)),
+              flush=True)
+        raise
     rep.done()
     if backfill and high and not truncated:
         write_watermark(destdir, high)
@@ -262,9 +278,15 @@ def main():
     parser.add_argument("--limit", type=int, help="stop after N documents")
     parser.add_argument("--delay", type=float, default=0.3,
                         help="seconds between pages (default 0.3)")
+    parser.add_argument("--resume-after", metavar="JSON",
+                        help="resume a backfill interrupted mid-sweep, from "
+                             "the ES search_after cursor printed when it was "
+                             "interrupted")
     args = parser.parse_args()
+    resume_after = json.loads(args.resume_after) if args.resume_after else None
     seen, new, updated, skipped = sync(args.destdir, full=args.full,
-                                       limit=args.limit, delay=args.delay)
+                                       limit=args.limit, delay=args.delay,
+                                       resume_after=resume_after)
     print("%d seen, %d new, %d updated, %d skipped"
           % (seen, new, updated, skipped))
 
