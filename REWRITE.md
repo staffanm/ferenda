@@ -1221,10 +1221,36 @@ law, keyed by **CELEX** (the basefile throughout).
   match, unique-or-tie-break-only, no fuzzy fallback. Verified end-to-end (prop
   2014/15:128 → "lag om alternativ tvistlösning…" → SFS 2015:671, 8 paragrafs
   pinned). `test/test_site.py` (Case 1 / Case 2 unique / Case 2 tie-break).
+- ✅ **Per-paragraf författningskommentar in the statute rail** — the FK's
+  commentary *text* (not just its genomför edges) extracted per paragraf
+  (`forarbete/fk.py`): the chapter located by content (never rubrik levels,
+  which in-FK "1 kap." pseudo-headings corrupt; the heading itself may be lost
+  to a stycke — prop 2017/18:269), sliced per law (numbered/unnumbered/
+  stycke-demoted law rubriks) and per paragraf (marker recovery incl. combined
+  "9 och 10 §§" and mid-stycke markers), lagtext split from commentary by
+  opener formula across the three FK styles (lagtext quoted / bare marker /
+  marker inline), group comments ("I paragraferna finns …", "De ändringar som
+  föreslås …") annexing their quoted run. Stored as the prop artifact's
+  `kommentarer` section; `fk.resolve` pins entries to statute anchors at
+  relate time (`fk_kommentar` table, law resolution shared with
+  `genomforande`); the statute paragraf's rail shows each prop's comment
+  ("Författningskommentar", newest first, `#sid`-pinpointed provenance) —
+  including prop 2017/18:89, which the legacy metrics-driven CommentaryFinder
+  misses entirely. On the **proposition's own page** the commentary is
+  highlighted too: `extract(mark=True)` stamps each commentary block
+  `fk: <entry-no>` in the artifact, and the renderer wraps each entry's run
+  in an `.fk-komm` box (light blue background + border, one box per
+  paragraf's commentary), leaving the quoted lagtext plain. Rules locked to the nine-prop curated corpus
+  (`test/test_forarbete_fk.py`, `test/test_site.py`). Known limitation: a
+  law-level comment spanning several chapters ("De ändringar … i lagen" over
+  1 kap. + 2 kap. quotes) anchors only its own chapter's run.
 - ⬜ **Remaining:** annex parsing; a metadata/golden cross-check (no EU oracle
   yet); the ~8 truncated `"lag om ändring i"` rubriks the flattened PDF cut off
-  (no SFS number to resolve); and embedding the commentary prose inline at the
-  statute paragraf (not only the margin link).
+  (no SFS number to resolve); and consolidating `kommentar.extract`'s FK
+  bounding onto `fk.fk_span` — it still uses the level-1-rubrik-bounded
+  `find_kommentar`, which the in-FK "1 kap." pseudo-rubriks truncate, so some
+  genomför-direktiv statements deeper in the chapter are never scanned (a
+  behavior change to the EU-edges layer that needs its own validated pass).
 
 ### 7e. Myndighetsföreskrifter vertical (agency regulations) 🚧
 
@@ -1758,7 +1784,7 @@ model + extraction.
 | `accommodanda/lib/` | **shared** horizontal libs: `lagrum` (citation engine), `util`, `errors` (`SkipDocument`), `harvest` (shared incremental-download core — `HarvestWatermark`, `walk`), `casenaming`/`eucasenaming` (DV/EU case identity + display naming) |
 | `accommodanda/sfs/` | **acts vertical**: `{extract,reader,model,tokenizer,assembler,nf}` parser + `register` (SFSR→amendments/förarbeten/metadata) + `__main__` (validate CLI) |
 | `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `structure`, `word`, `legacy`, `namedcases` (HD named-precedent harvester); canonical case title + HD given names live in `lib/casenaming.py` (shared with the catalog + renderer) |
-| `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, 8 types + `pm`, promemorior outside the Ds series), `model`/`structure`/`parse` (PDF/html→nested structure→artifact), `legacy` (one-time import of the nine frozen förarbete corpora, §7g), `legacy_formats` (frozen body adapters — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML, scanned-PDF OCR text, TRIPS `div.body-text`), `riksdagen` (`bet`/utskottsbetänkanden downloader off data.riksdagen.se, no frozen corpus), `kommentar` (författningskommentar → EU-directive *genomför* edges, prop + fm), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf) |
+| `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, 8 types + `pm`, promemorior outside the Ds series), `model`/`structure`/`parse` (PDF/html→nested structure→artifact), `legacy` (one-time import of the nine frozen förarbete corpora, §7g), `legacy_formats` (frozen body adapters — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML, scanned-PDF OCR text, TRIPS `div.body-text`), `riksdagen` (`bet`/utskottsbetänkanden downloader off data.riksdagen.se, no frozen corpus), `kommentar` (författningskommentar → EU-directive *genomför* edges, prop + fm), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf), `fk` (per-paragraf FK commentary text → `kommentarer` artifact section → `fk_kommentar` catalog layer → statute-rail "Författningskommentar") |
 | `accommodanda/eurlex/` | **EU vertical (EUR-Lex/CELLAR)**: `download` (SPARQL discovery), `bulk` (dump import), `parse`/`parse_html`/`parse_pdf` (Formex/HTML/PDF → one artifact shape), `definitions` (defined-terms extraction + in-act interlinking), `lang`, `model`, `casenames` (harvest CELEX → usual name for named EU cases from Wikidata into `data/casenames.json`, read by `lib/eucasenaming.py`) |
 | `accommodanda/avg/` | **JO/JK/ARN-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages, `jk_canonical` dnr normalization; ARN one-page vägledande-beslut listing), `legacy` (one-time import of the frozen ARN corpus 1991–2022, §7g), `parse` (JO/ARN PDF via `lib/pdftext`, JK landing HTML; DV parse-type citation scan) |
 | `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (per-agency enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct} wired onto `lib/harvest.walk`; `Skip`/`guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 17 agencies live + 4 frozen-only), `download`, `legacy` (one-time import of the two harvest-blocked corpora, §7g), `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors). Corpus: 1218 regs harvested, parsed 0-fail |
