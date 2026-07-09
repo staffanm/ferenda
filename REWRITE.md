@@ -28,8 +28,8 @@ Guiding decisions (settled over the course of this work):
   extracted semantics — structure, metadata, and links are one artifact,
   not separate concerns. SQLite/Elasticsearch are derived and rebuildable.
 - **Machine-readable publishing survives, but not necessarily as RDF.**
-  Plan: REST/OpenAPI + bulk dumps; MCP later; no GraphQL. Retire Fuseki;
-  keep Elasticsearch.
+  Plan: REST/OpenAPI + bulk dumps + an MCP server; no GraphQL. Retire
+  Fuseki; keep Elasticsearch.
 - **The internal model is ours** — typed dataclasses with Swedish domain
   vocabulary, not tied to the dead rpubl/rinfoex vocabularies. Any
   Akoma Ntoso / RDF mapping is a downstream *projection*, not the model.
@@ -841,8 +841,18 @@ to a future per-doc incremental generate.
     real `kommentar` source (212 lines). `test/test_dump.py`.
   - New deps: `opensearch-py`, `fastapi`, `uvicorn` (pyproject). ✅ **`lagen all
     index` run at corpus scale** against a provisioned OpenSearch — works.
-    ✅ **Incremental relate + index** (content-hash diff, see 2026-06-26 log);
-    ⬜ Remaining: MCP.
+    ✅ **Incremental relate + index** (content-hash diff, see 2026-06-26 log).
+  - ✅ **MCP server** (`accommodanda/api/mcp.py`, mounted at `/mcp` via
+    Streamable HTTP on the same `lagen all serve` FastAPI app) — the same
+    read-only view reshaped as seven tools (`search`, `resolve_citation`,
+    `get_document`, `list_documents`, `get_incoming_citations`,
+    `get_outgoing_citations`, `list_sources`) for any MCP-capable AI host,
+    public and unauthenticated like REST. The tools are thin wrappers over
+    the same `lib` functions the REST endpoints use; `lib/pins.py` was
+    extracted as the shared citation-shaped-query resolver (name+pinpoint →
+    exact fragment target) behind both REST `/search` and the MCP
+    `search`/`resolve_citation` tools. `test/test_mcp.py`, incl. an
+    end-to-end Streamable HTTP round-trip against a running app.
   - ✅ **Operations/health dashboard** (`lib/runlog.py`, `api/ops.py`) — every
     `build.py` invocation now records a run in an append-only ledger
     (`DATA/.build/runs.ndjson`: run-start / per-(step,source) segment /
@@ -1887,6 +1897,8 @@ model + extraction.
 | `accommodanda/lib/search.py` | OpenSearch parent-child full-text indexer (`index`) |
 | `accommodanda/lib/dump.py` | NDJSON bulk corpus dumps (`dump`) |
 | `accommodanda/api/app.py` | FastAPI REST/OpenAPI service (`serve-api`) |
+| `accommodanda/api/mcp.py` | public MCP server (Model Context Protocol), mounted at `/mcp` |
+| `accommodanda/lib/pins.py` | citation-shaped-query resolver, shared by REST `/search` and the MCP tools |
 | `site/data/catalog.sqlite` | derived catalog (documents + links) |
 | `site/data/generated/` | generated static site (`index.html`, `sfs/`, `dom/`) |
 | `test/test_site.py` | derived-layer suite |
@@ -1976,6 +1988,16 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **api** (2026-07-09) — public **MCP server**: `api/mcp.py` mounts a
+  no-auth Streamable HTTP MCP endpoint at `/mcp` on the same `lagen all
+  serve` FastAPI app, exposing seven read-only tools (`search`,
+  `resolve_citation`, `get_document`, `list_documents`,
+  `get_incoming_citations`, `get_outgoing_citations`, `list_sources`) as
+  thin wrappers over the same `lib` functions the REST endpoints use.
+  `lib/pins.py` extracts the citation-shaped-query resolver (name+pinpoint
+  → exact fragment target) shared by REST `/search` and the MCP
+  `search`/`resolve_citation` tools. New dep `mcp>=1.13`. `test/test_mcp.py`,
+  incl. an end-to-end Streamable HTTP round-trip.
 - **sfs/forarbete** (2026-07-09) — `history-as-git`: `sfs/asgit.py` implements
   `docs/prd-sfs-history-as-git.md`, exporting the SFS corpus as a git
   repository (one file per statute, one commit per amendment event grouped by
