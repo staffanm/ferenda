@@ -70,6 +70,7 @@ from .forarbete import legacy as fa_legacy
 from .forarbete import parse as fa_parse
 from .forarbete import riksdagen as fa_riksdagen
 from .forarbete import rskr as fa_rskr
+from .forarbete import structure as fa_structure
 from .foreskrift import download as foreskrift_download
 from .foreskrift import harvest as foreskrift_harvest_mod
 from .foreskrift import legacy as foreskrift_legacy
@@ -97,6 +98,7 @@ from .remisser import ai_analyze as remisser_analyze
 from .remisser import download as remisser_download
 from .remisser import model as remisser_model
 from .remisser import parse as remisser_parse
+from .sfs import asgit as sfs_asgit
 from .sfs import correspond as sfs_correspond
 from .sfs import download as sfs_download
 from .sfs import load_inputs
@@ -728,6 +730,43 @@ def sfs_ai_correspond(basefiles):
           % (new_sfs, stats["emitted"], stats["raw"], stats["rejected"], out))
 
 
+def _forarbete_meta(identifier):
+    """A "Prop. 2020/21:194" / "Rskr. 2020/21:387" identifier (the form the
+    SFS register cites) -> {title, signers, ingress} off the parsed förarbete
+    artifact, or None when that document is not in the corpus. Reading a
+    proposition/riksdagsskrivelse is förarbete's job; build composes the two
+    verticals, exactly like ai-correspond."""
+    typ, _, ident = identifier.partition(" ")
+    path = fa_artifact("%s/%s" % (typ.rstrip(".").lower(),
+                                  util.basefile_slug(ident)))
+    if not compress.exists(path):
+        return None
+    art = json.loads(compress.read_bytes(path))
+    return {"title": art.get("title") or "",
+            "signers": fa_structure.signers(art["structure"]),
+            "ingress": fa_structure.ingress(art["structure"])}
+
+
+def sfs_history_as_git(basefiles):
+    """`lagen sfs history-as-git <repodir> [basefile...]` -- build or update a
+    git repository holding the whole SFS collection as plaintext, one file per
+    statute, one commit per amendment event (grouped by proposition), authored
+    by the proposition's signers and committed by the riksdagsskrivelse's (see
+    sfs.asgit). Idempotent: a re-run after a harvest appends only the new
+    events (the Lagen-Event trailers are the ledger)."""
+    if not basefiles:
+        sys.exit("usage: lagen sfs history-as-git <repodir> [basefile ...]")
+    repodir, targets = Path(basefiles[0]), basefiles[1:] or sfs_list()
+    if RUN.dry_run:
+        print("sfs history-as-git: would export %d statute(s) into %s"
+              % (len(targets), repodir))
+        return
+    commits, skipped = sfs_asgit.export(targets, repodir,
+                                        forarbete_meta=_forarbete_meta)
+    print("sfs history-as-git: %d commit(s) into %s, %d snapshot(s) skipped"
+          % (commits, repodir, len(skipped)))
+
+
 SOURCES["sfs"] = Source("sfs", sfs_list, {
     # download has no input files (the input is the remote DB) and its output
     # is valid regardless of the fetcher's version, so inputs/code stay empty:
@@ -741,9 +780,12 @@ SOURCES["sfs"] = Source("sfs", sfs_list, {
     "versions": Stage("versions", sfs_versions_run, sfs_versions_sidecar,
                       inputs=sfs_versions_inputs, code=SFS_VERSIONS_CODE),
 }, harvest=sfs_harvest, origin=_origin(sfs_download.ENDPOINT),
-   actions={"ai-correspond": sfs_ai_correspond},
+   actions={"ai-correspond": sfs_ai_correspond,
+            "history-as-git": sfs_history_as_git},
    notes="ai-correspond <new-sfs> <prop> [<old-sfs>]: LLM-derive the old->new "
-         "paragraf correspondence map into a .corr sidecar")
+         "paragraf correspondence map into a .corr sidecar\n"
+         "history-as-git <repodir> [basefile ...]: build/update a git repo of "
+         "the SFS collection, one commit per amendment event")
 
 
 # --------------------------------------------------------------------------

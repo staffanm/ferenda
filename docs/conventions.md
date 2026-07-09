@@ -90,6 +90,10 @@ must not kill a corpus run:
 - the versions stage's per-version boundary (`sfs/versions.py`) — one
   corrupt decades-old archive file becomes a recorded skip in the
   sidecar, not a permanently stale stage
+- the history-as-git export's per-snapshot boundary (`sfs/asgit.py`) —
+  the same archive files as the versions stage; a failed snapshot becomes
+  a recorded+logged skip instead of aborting a corpus-wide fast-import
+  stream mid-commit
 
 Each site carries `# noqa: BLE001 — <what it survives, and where the
 failure is recorded>`. Adding a *new* resilience point means adding it to
