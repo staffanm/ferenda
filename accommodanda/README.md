@@ -64,7 +64,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `versions.py` | archived consolidations (download archive, three raw generations) → per-version artifacts + `.versions.json` sidecar |
 | `begrepp.py` | `find_definitions` — begreppsdefinition heuristics (paragraf mode + defined-term cases) → `dcterms:subject` links |
 | `correspond.py` | LLM pass deriving the old-law → new-law paragraf correspondence map for a restructured statute, from the proposition's författningskommentar |
-| `asgit.py` | `lagen sfs history-as-git <repodir> [basefile...]` — export the corpus as a git repo (one file per statute, one commit per amendment event grouped by proposition, authored by the prop's signers/committed by the rskr's, ingress as commit body); one `git fast-import` stream, idempotent via `Lagen-Event:` trailers; implements `docs/prd-sfs-history-as-git.md` |
+| `asgit.py` | `lagen sfs history-as-git <repodir> [basefile...]` — export the corpus as a git repo (one file per statute, one commit per amendment event grouped by proposition, authored by the prop's signers/committed by the rskr's, ingress as commit body); a per-transition hash ledger admits only strict append-only updates, while `--rebuild-history` atomically recreates corrected/backfilled history; implements `docs/prd-sfs-history-as-git.md` |
 | `_validate.py` | worker functions for `lagen sfs validate`, in an importable module so `ProcessPoolExecutor` workers can resolve them under `python -m` |
 | `__main__.py` | `parse` / `refs` / `validate` CLI |
 
@@ -254,8 +254,10 @@ repository (`history-as-git`, `sfs/asgit.py`), per
 ```sh
 uv run python -m accommodanda.build sfs versions            # incremental, all statutes
 uv run python -m accommodanda.build sfs versions 1998:204   # one statute
-uv run python -m accommodanda.build sfs history-as-git /path/to/repo             # whole corpus; re-run to append new history
-uv run python -m accommodanda.build sfs history-as-git /path/to/repo 1998:204   # one statute
+uv run python -m accommodanda.build sfs parse               # required before a full Git export
+uv run python -m accommodanda.build sfs history-as-git /path/to/repo             # complete corpus; strict append-only updates
+uv run python -m accommodanda.build sfs history-as-git /path/to/repo --rebuild-history  # recreate corrected/backfilled history
+uv run python -m accommodanda.build sfs history-as-git /path/to/repo 1998:204   # separately scoped partial repo
 ```
 
 **DV** (operates on `site/data/downloaded/dom/` (API) and `site/data/downloaded/dv/` (legacy)):

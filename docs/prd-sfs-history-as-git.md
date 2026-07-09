@@ -23,9 +23,14 @@ meaningful commits.
 
 ## Product shape
 
-- `lagen sfs history-as-git <repodir> [basefile…]` — builds the repo from
-  scratch, or appends the not-yet-committed events to an existing one
-  (idempotent; re-running after a harvest adds only the new history).
+- `lagen sfs history-as-git <repodir> [basefile…]` — builds a clean dedicated
+  repo from scratch, or appends a strict extension to an existing export. Each
+  file transition carries a body and metadata fingerprint, so corrections,
+  backfills, changed proposition attribution and late members of an existing
+  proposition fail clearly instead of silently changing the tip. Re-run with
+  `--rebuild-history` to atomically recreate `main` from the complete corpus.
+  A full export requires every current SFS source to have been parsed first;
+  it refuses missing artifacts or unreadable snapshots before moving a ref.
 - One file per statute, e.g. `1998/204.txt`, containing the **plaintext body
   extracted from the downloads** (the same text the parser consumes:
   `fulltext.forfattningstext` from the beta JSON, `extract_body` from the two
@@ -74,9 +79,18 @@ meaningful commits.
     (riksdagen.se open data) or the fallback `Riksdagen <riksdagen@lagen.nu>`.
   - Synthesize e-mail addresses as name slugs on a clearly-non-real domain
     (`stefan.lofven@lagen.nu`), never real-looking government addresses.
-- **Incremental update**: record the last-committed event (e.g. a state file
-  under the target repo's `.git/`, or a `Lagen-Event:` trailer greppable from
-  the tip); on re-run, skip events already present.
+- **Incremental update**: every commit records a `Lagen-Transition:` JSON
+  trailer for each file transition, with stable identity, plaintext digest and
+  metadata digest. A normal rerun may only add new, later transitions in wholly
+  new events. A same-cutoff correction, backfill, changed proposition metadata
+  or partial event is a rebuild request, never a silent omission or duplicate.
+  The strictness is per statute and per event: a statute *newly entering* the
+  corpus appends its entire (possibly decades-old) history as new events at
+  the tip, so cross-statute chronology only holds within one build — rebuild
+  when global commit order matters.
+- **Repository safety**: the target must be a clean non-bare worktree with
+  `main` checked out. The exporter parents only from `main`, never another ref;
+  it never force-checks out over local changes.
 - **Initial-state caveat**: the earliest archived snapshot of an old law is
   usually already consolidated ("t.o.m. SFS 2003:466"), not the original
   as-enacted text — the add-commit message should say so.

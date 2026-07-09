@@ -267,10 +267,18 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
   "huvudsakliga innehåll" ingress. Granularity is bounded by the download
   archive (a commit spans the delta between two *available* consolidations);
   dates fall back utfärdande→ikraftträdande→July 1 of the amendment year.
-  Emitted as one `git fast-import` stream (minutes, not days); idempotent via
-  `Lagen-Event:` trailers, so a re-run after a harvest appends only new events.
-  Implements `docs/prd-sfs-history-as-git.md`. `test/test_sfs_asgit.py`
-  (golden fast-import stream + git round-trip).
+  Emitted as one `git fast-import` stream (minutes, not days) via a staging
+  ref that atomically replaces `main` only on success. Idempotent via per-file
+  `Lagen-Transition:` trailers (immutable transition id + plaintext and
+  metadata hashes): a re-run appends only a strict extension of that ledger,
+  while corrections, backfills, changed attribution, late proposition members
+  and scope changes raise `RebuildRequired` — answered with
+  `--rebuild-history`, which recreates `main` from the complete corpus (also
+  the migration path for legacy `Lagen-Event:`-only repos). A full export
+  requires every selected artifact and snapshot to be valid and a clean
+  non-bare target with `main` checked out. Implements
+  `docs/prd-sfs-history-as-git.md`. `test/test_sfs_asgit.py`
+  (golden fast-import stream + git round-trip + real two-run export tests).
 - 🚧 **Adjudication overlay** (`golden_sfs.adjudicate`, `test/test_golden_adjudicate.py`)
   — the "change-detector, not oracle" posture (§2) as code: a `PREDICATES` table where
   each rule forgives a whole *family* of diffs in which the new pipeline is right against
@@ -2002,8 +2010,10 @@ in `git log`. This document is the forest-level status; section markers
   `docs/prd-sfs-history-as-git.md`, exporting the SFS corpus as a git
   repository (one file per statute, one commit per amendment event grouped by
   proposition, authored/committed by the prop's/rskr's signers, ingress as
-  commit body, one `git fast-import` stream, idempotent via `Lagen-Event:`
-  trailers). Two förarbete prerequisites landed to feed it: a fifth harvest
+  commit body, one `git fast-import` stream, idempotent via per-file
+  `Lagen-Transition:` hash trailers with `--rebuild-history` for
+  corrections/backfills/attribution/scope changes). Two förarbete
+  prerequisites landed to feed it: a fifth harvest
   source, `forarbete/rskr.py` (riksdagsskrivelser off data.riksdagen.se,
   driving `riksdagen.py`'s `_walk`/`sync` now generalized into a
   doctype-agnostic `harvest()`, `bet` as its default driver), and

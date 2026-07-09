@@ -22,19 +22,17 @@ Repeals (`rinfoex:upphavdAv`) delete the file, folded into the repealing
 act's own event when that act is in the run.
 
 Emission is one `git fast-import` stream (tens of thousands of commits in
-minutes; one `git commit` per event would take days). Every commit carries a
-`Lagen-Event:` trailer; a re-run reads the trailers off the existing history
-and appends only the events not yet present, so the command is idempotent and
-a post-harvest run adds just the new history. The ledger is event-level: an
-event already committed is never revisited, so a statute added to the run
-later gets its history appended as of *then* (its older events were not part
-of the committed ones) -- build the repo from the full corpus, or accept that
-per-run chronology only holds within a run. Snapshot text is extracted
-twice -- once at collect time (validating the snapshot, so a corrupt
-decades-old archive file becomes a recorded skip, not a mid-stream abort) and
-once lazily at emit time (the whole corpus never sits in memory at once).
+minutes; one `git commit` per event would take days). Every change also carries
+a machine-readable `Lagen-Transition:` trailer with its immutable transition
+identity, plaintext hash and metadata hash. A re-run appends only a strict
+extension of that ledger. Corrections, backfilled snapshots, changed
+attribution and partial proposition events require an explicit rebuild, which
+recreates `main` atomically from a complete corpus. Snapshot text is extracted
+twice -- once at collect time (validating and hashing it) and once lazily at
+emit time (the whole corpus never sits in memory at once).
 """
 
+import hashlib
 import heapq
 import json
 import re
@@ -51,8 +49,17 @@ from .extract import extract_body, sniff_encoding
 from .versions import archival_header, header_cutoff
 
 BRANCH = "main"
-RE_TRAILER = re.compile(r"^Lagen-Event: (.+)$", re.MULTILINE)
+BRANCH_REF = "refs/heads/" + BRANCH
+STAGING_REF = "refs/lagen/history-as-git-staging"
+FORMAT = "2"
+RE_EVENT = re.compile(r"^Lagen-Event: (.+)$", re.MULTILINE)
+RE_TRANSITION = re.compile(r"^Lagen-Transition: (.+)$", re.MULTILINE)
+RE_SCOPE = re.compile(r"^Lagen-Scope: (.+)$", re.MULTILINE)
 RE_SFS_NR = re.compile(r"(\d+:\d+)")
+
+
+class RebuildRequired(ValueError):
+    """The current corpus changes history rather than extending it."""
 
 
 @dataclass
@@ -66,6 +73,7 @@ class Change:
     cutoff: str          # the transition's cutoff amendment ("2008:187")
     folded: list[str] = field(default_factory=list)  # amendments in between
     add: bool = False    # first known consolidation of the statute
+    body_hash: str | None = None
 
 
 @dataclass
@@ -118,23 +126,27 @@ def snapshot_cutoff(path, basefile):
 
 def statute_snapshots(basefile, skipped):
     """Every available consolidation of one statute, oldest first: the
-    download archive plus the current download, each as (cutoff, path),
-    deduplicated on the recovered cutoff. A snapshot that fails extraction is
-    recorded in `skipped` and excluded -- mirroring the versions stage's
-    per-version resilience -- so it can never abort the fast-import stream."""
+    download archive plus the current download, each as
+    ``(cutoff, path, plaintext_hash)``. Explicitly keyed archive files win over
+    counter-keyed duplicates, but the current download wins over an archive of
+    the same cutoff: it is the source the downloader has just corrected.
+
+    A bad snapshot is recorded here so `collect` can report every problem in
+    one pass. `export` deliberately refuses to write history from that
+    incomplete collection; skipping it and appending a later repair would put
+    historical text at the branch tip."""
     current = layout.sfs_source(basefile)
     if not compress.exists(current):
         current = layout.sfs_sfst(basefile)
     # explicitly-keyed archives first, so a counter-keyed duplicate of the
     # same consolidation loses to the authoritative key (as in versions.build)
-    files = sorted(layout.sfs_version_downloads(basefile),
-                   key=lambda vp: (":" not in vp[0], vp[0]))
-    files = [path for _, path in files] + [current]
-    snapshots, seen = [], set()
-    for path in files:
+    archive = sorted(layout.sfs_version_downloads(basefile),
+                     key=lambda vp: (":" not in vp[0], vp[0]))
+    snapshots = {}
+    for _, path in archive:
         try:
             cutoff = snapshot_cutoff(path, basefile)
-            snapshot_text(path)          # validate now, extract again at emit
+            text = snapshot_text(path)
         except SkipDocument as exc:
             skipped.append({"basefile": basefile, "file": str(path),
                             "error": str(exc)})
@@ -143,12 +155,26 @@ def statute_snapshots(basefile, skipped):
             skipped.append({"basefile": basefile, "file": str(path),
                             "error": "%s: %s" % (type(exc).__name__, exc)})
             continue
-        if cutoff in seen:
-            continue
-        seen.add(cutoff)
-        snapshots.append((cutoff, path))
-    snapshots.sort(key=lambda cp: layout.sfs_version_key(cp[0]))
-    return snapshots
+        snapshots.setdefault(cutoff, (path, _hash(text)))
+    try:
+        cutoff = snapshot_cutoff(current, basefile)
+        text = snapshot_text(current)
+    except SkipDocument as exc:
+        skipped.append({"basefile": basefile, "file": str(current),
+                        "error": str(exc)})
+        return []
+    except Exception as exc:  # noqa: BLE001 — per-snapshot boundary: record all malformed snapshots before export rejects the incomplete history (rule:no-catch-log-continue)
+        skipped.append({"basefile": basefile, "file": str(current),
+                        "error": "%s: %s" % (type(exc).__name__, exc)})
+        return []
+    snapshots[cutoff] = (current, _hash(text))
+    ordered = sorted(snapshots.items(), key=lambda cp: layout.sfs_version_key(cp[0]))
+    if ordered and ordered[-1][0] != cutoff:
+        skipped.append({"basefile": basefile, "file": str(current),
+                        "error": "current cutoff %s predates archived cutoff %s"
+                                 % (cutoff, ordered[-1][0])})
+    return [(version, path, body_hash)
+            for version, (path, body_hash) in ordered]
 
 
 def _amendment_index(art):
@@ -171,9 +197,9 @@ def _amendment_index(art):
 
 def collect(basefiles):
     """All events across `basefiles`, keyed by proposition (else cutoff SFS
-    nr), plus the skip records. Statutes without a parsed artifact are skipped
-    and logged -- the export mirrors what the corpus knows, and the artifact is
-    the source of truth for amendment metadata."""
+    nr), plus incomplete-input records. The caller must reject an incomplete
+    collection before it writes history; keeping the records here lets one
+    preflight report every bad snapshot and missing artifact at once."""
     events, skipped, repeals = {}, [], []
     # global nr -> (utfärdad, ikraft, prop identifier, rskr identifier)
     amendment_meta: dict[str, tuple[str | None, str | None,
@@ -193,7 +219,7 @@ def collect(basefiles):
         rel = layout.relpath("sfs", basefile)
         path = str(rel.parent / (rel.name + ".txt"))
         prev = None
-        for cutoff, src in statute_snapshots(basefile, skipped):
+        for cutoff, src, body_hash in statute_snapshots(basefile, skipped):
             utf, ikraft, prop, rskr = index.get(cutoff, (None, None, None, None))
             key = prop or ("SFS " + cutoff)
             ev = events.setdefault(key, Event(key=key, prop=prop, rskr=rskr))
@@ -205,7 +231,7 @@ def collect(basefiles):
                       if prev is not None else [])
             ev.changes.append(Change(path=path, src=src, basefile=basefile,
                                      title=title, cutoff=cutoff, folded=folded,
-                                     add=prev is None))
+                                     add=prev is None, body_hash=body_hash))
             prev = cutoff
         if "rinfoex:upphavdAv" in meta_props:
             m = RE_SFS_NR.search(meta_props["rinfoex:upphavdAv"])
@@ -251,7 +277,88 @@ def event_dates(event):
     return author, committer, event.utfardad is None
 
 
-def message(event, forarbete_meta):
+def _hash(value):
+    """A stable SHA-256 over a plaintext string or canonical JSON value."""
+    if not isinstance(value, str):
+        value = json.dumps(value, ensure_ascii=False, sort_keys=True,
+                           separators=(",", ":"))
+    return hashlib.sha256(value.encode()).hexdigest()
+
+
+def _body_hash(change):
+    """The collect-time plaintext hash -- never recomputed from `src`, so the
+    emit-time comparison in `stream` actually detects a snapshot that changed
+    on disk between collect and emit."""
+    assert change.body_hash, "collect hashes every snapshot it admits"
+    return change.body_hash
+
+
+def _event_metadata(event, forarbete_meta):
+    """Every mutable input that changes an event's rendered Git metadata."""
+    return {
+        "key": event.key,
+        "prop": event.prop,
+        "rskr": event.rskr,
+        "utfardad": event.utfardad,
+        "ikraft": event.ikraft,
+        "prop_meta": forarbete_meta(event.prop) if event.prop else None,
+        "rskr_meta": forarbete_meta(event.rskr) if event.rskr else None,
+    }
+
+
+def transition_records(event, forarbete_meta):
+    """The event's immutable per-file ledger records.
+
+    The proposition is presentation and grouping metadata, not the ledger key:
+    a late statute joining an already-recorded proposition must be detectable
+    rather than silently filtered out on the next run.
+    """
+    event_metadata = _event_metadata(event, forarbete_meta)
+    records = []
+    for change in sorted(event.changes, key=lambda c: c.path):
+        metadata = {"event": event_metadata, "title": change.title,
+                    "folded": change.folded, "add": change.add}
+        records.append({
+            "id": "write:%s@%s" % (change.basefile, change.cutoff),
+            "basefile": change.basefile,
+            "cutoff": change.cutoff,
+            "op": "write",
+            "event": event.key,
+            "body": _body_hash(change),
+            "metadata": _hash(metadata),
+        })
+    for _path, basefile, repealer in sorted(event.deletes):
+        records.append({
+            "id": "delete:%s@%s" % (basefile, repealer),
+            "basefile": basefile,
+            "cutoff": repealer,
+            "op": "delete",
+            "event": event.key,
+            "body": None,
+            "metadata": _hash({"event": event_metadata}),
+        })
+    return records
+
+
+def event_records(events, forarbete_meta):
+    """All ledger records, indexed by transition identity."""
+    records = {}
+    for event in events.values():
+        for record in transition_records(event, forarbete_meta):
+            if record["id"] in records:
+                raise ValueError("duplicate transition %s" % record["id"])
+            records[record["id"]] = record
+    return records
+
+
+def scope_id(basefiles, *, full):
+    """A history repo cannot silently change between full and partial scope."""
+    if full:
+        return "full"
+    return "partial:" + _hash("\x1e".join(sorted(basefiles)))
+
+
+def message(event, forarbete_meta, scope="full"):
     """The commit message: the proposition's own summary paragraph as body
     (its title as subject), the affected statutes listed, the granularity and
     date caveats spelled out, and the idempotency trailer last."""
@@ -291,10 +398,15 @@ def message(event, forarbete_meta):
     if substituted:
         lines += ["", "Författardatum är ikraftträdandedatum (utfärdandedatum "
                       "saknas i registret)."]
-    trailers = ["Lagen-Event: " + event.key]
+    trailers = ["Lagen-History-Format: " + FORMAT,
+                "Lagen-Scope: " + scope,
+                "Lagen-Event: " + event.key]
     if prop_meta:
         for name in prop_meta.get("signers", [])[1:]:
             trailers.append("Co-authored-by: %s <%s>" % (name, email_slug(name)))
+    trailers.extend("Lagen-Transition: " + json.dumps(
+        record, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+        for record in transition_records(event, forarbete_meta))
     return "\n".join(lines) + "\n\n" + "\n".join(trailers) + "\n"
 
 
@@ -368,7 +480,7 @@ def ordered_events(events):
     return ordered
 
 
-def stream(events, forarbete_meta, tip=None):
+def stream(events, forarbete_meta, tip=None, scope="full", ref=BRANCH_REF):
     """The fast-import byte stream for the events, in `ordered_events` order --
     a generator of chunks, so the whole corpus never sits in memory. `tip`
     chains the first commit onto an existing branch head."""
@@ -377,73 +489,229 @@ def stream(events, forarbete_meta, tip=None):
     for ev in ordered:
         author_date, committer_date, _ = event_dates(ev)
         (a_name, a_mail), (c_name, c_mail) = identities(ev, forarbete_meta)
-        yield ("commit refs/heads/%s\n"
+        yield ("commit %s\n"
                "author %s <%s> %s\n"
                "committer %s <%s> %s\n"
-               % (BRANCH, a_name, a_mail, _epoch(author_date),
+               % (ref, a_name, a_mail, _epoch(author_date),
                   c_name, c_mail, _epoch(committer_date))).encode()
-        yield _data(message(ev, forarbete_meta))
+        yield _data(message(ev, forarbete_meta, scope))
         if first and tip:
             yield b"from %s\n" % tip.encode()
         first = False
         for c in sorted(ev.changes, key=lambda c: c.path):
+            text = snapshot_text(c.src)
+            if _hash(text) != _body_hash(c):
+                raise RuntimeError("snapshot changed during history export: %s"
+                                   % c.src)
             yield b"M 644 inline %s\n" % c.path.encode()
-            yield _data(snapshot_text(c.src))
+            yield _data(text)
         for path, _, _ in sorted(ev.deletes):
             yield b"D %s\n" % path.encode()
 
 
-def emit(repodir, events, forarbete_meta):
-    """Pipe the event stream into `git fast-import` and materialize the
-    working tree. Returns the number of commits written."""
-    tip = git.run(repodir, "rev-list", "-n1", "--all", capture=True)
+def emit(repodir, events, forarbete_meta, *, tip=None, scope="full",
+         ref=BRANCH_REF):
+    """Pipe the event stream into `git fast-import` and return commit count.
+
+    Callers materialize the worktree only after a successful append or atomic
+    replacement of `main`; import itself must never choose a parent from an
+    unrelated ref.
+    """
     proc = subprocess.Popen(["git", "-C", str(repodir), "fast-import",
                              "--quiet"], stdin=subprocess.PIPE)
     out = proc.stdin
     assert out is not None, "Popen(stdin=PIPE) always yields a pipe"
-    for chunk in stream(events, forarbete_meta, tip):
-        out.write(chunk)
+    try:
+        for chunk in stream(events, forarbete_meta, tip, scope, ref):
+            out.write(chunk)
+    except BaseException:
+        out.close()
+        proc.wait()
+        raise
     out.close()
     if proc.wait() != 0:
         raise RuntimeError("git fast-import failed (exit %d)" % proc.returncode)
-    if events:
-        git.run(repodir, "checkout", "-f", BRANCH)
     return len(events)
 
 
-def existing_events(repodir):
-    """The Lagen-Event trailers already committed -- the idempotency ledger a
-    re-run skips."""
-    tip = git.run(repodir, "rev-list", "-n1", "--all", capture=True)
-    if not tip:
-        return set()
-    return set(RE_TRAILER.findall(
-        git.run(repodir, "log", "--format=%B", BRANCH, capture=True)))
+def _branch_tip(repodir):
+    """`main`'s tip, or ``""`` for an unborn branch, never another ref."""
+    return git.run(repodir, "rev-parse", "--verify", "-q", BRANCH_REF,
+                   capture=True, check=False)
 
 
-def export(basefiles, repodir, *, forarbete_meta, log=print):
-    """Build or update the history repo: collect every amendment event across
-    `basefiles`, drop those already committed, and fast-import the rest.
-    `forarbete_meta` resolves a "Prop. ..."/"Rskr. ..." identifier to
-    {title, signers, ingress} from the förarbete corpus (or None). Returns
-    (commits, skipped)."""
-    repodir.mkdir(parents=True, exist_ok=True)
-    if not (repodir / ".git").exists():
+def existing_ledger(repodir):
+    """``(transitions, events, scopes)`` reachable from the export's main.
+
+    A malformed trailer is a corrupted ledger, not an excuse to guess which
+    source transition it meant.
+    """
+    if not _branch_tip(repodir):
+        return {}, set(), set()
+    messages = git.run(repodir, "log", "--format=%B", BRANCH, capture=True)
+    records = {}
+    for raw in RE_TRANSITION.findall(messages):
+        try:
+            record = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ValueError("invalid Lagen-Transition trailer: %s" % raw) from exc
+        if (not isinstance(record, dict)
+                or set(record) != {"id", "basefile", "cutoff", "op", "event", "body",
+                           "metadata"}
+                or record["op"] not in ("write", "delete")):
+            raise ValueError("invalid Lagen-Transition trailer: %s" % raw)
+        if (not all(isinstance(record[key], str)
+                    for key in ("id", "basefile", "cutoff", "op", "event", "metadata"))
+                or record["body"] is not None and not isinstance(record["body"], str)):
+            raise ValueError("invalid Lagen-Transition trailer: %s" % raw)
+        old = records.setdefault(record["id"], record)
+        if old != record:
+            raise ValueError("conflicting ledger records for %s" % record["id"])
+    return (records, set(RE_EVENT.findall(messages)),
+            set(RE_SCOPE.findall(messages)))
+
+
+def _prepare_repo(repodir):
+    """Validate a clean dedicated worktree before a history ref can move."""
+    if repodir.exists() and not repodir.is_dir():
+        raise ValueError("history-as-git target is not a directory: %s" % repodir)
+    if not repodir.exists():
+        repodir.mkdir(parents=True)
+    dotgit = repodir / ".git"
+    if not dotgit.exists():
+        if any(repodir.iterdir()):
+            raise ValueError("history-as-git target is not an empty directory: %s"
+                             % repodir)
         git.run(repodir, "init", "-q", "-b", BRANCH)
-    done = existing_events(repodir)
-    events, skipped = collect(basefiles)
-    fresh = {k: v for k, v in events.items() if k not in done}
+    if git.run(repodir, "rev-parse", "--is-bare-repository", capture=True) == "true":
+        raise ValueError("history-as-git target must have a worktree: %s" % repodir)
+    head = git.run(repodir, "symbolic-ref", "-q", "--short", "HEAD",
+                   capture=True, check=False)
+    if head != BRANCH:
+        raise ValueError("history-as-git target must have %s checked out" % BRANCH)
+    dirty = git.run(repodir, "status", "--porcelain", capture=True)
+    if dirty:
+        raise ValueError("history-as-git target has uncommitted changes")
+    return _branch_tip(repodir)
+
+
+def _transition_order(record):
+    return (record["op"] == "delete",
+            layout.sfs_version_key(record["cutoff"]))
+
+
+def _append_reasons(existing, desired):
+    """Why `desired` is not a strict append-only extension of `existing`."""
+    reasons = []
+    for ident, old in existing.items():
+        new = desired.get(ident)
+        if new is None:
+            reasons.append("%s is absent from the current corpus" % ident)
+        elif new != old:
+            reasons.append("%s changed" % ident)
+    existing_events = {record["event"] for record in existing.values()}
+    by_basefile = {}
+    for record in existing.values():
+        by_basefile.setdefault(record["basefile"], []).append(record)
+    for ident, record in desired.items():
+        if ident in existing:
+            continue
+        if record["event"] in existing_events:
+            reasons.append("%s joins already-committed %s" %
+                           (ident, record["event"]))
+        if any(_transition_order(old) >= _transition_order(record)
+               for old in by_basefile.get(record["basefile"], [])):
+            reasons.append("%s precedes an existing transition for %s" %
+                           (ident, record["basefile"]))
+    return reasons
+
+
+def _require_complete(basefiles, events, skipped, log):
     for skip in skipped:
-        log("  asgit %s: skipped %s (%s)"
+        log("  asgit %s: incomplete %s (%s)"
             % (skip["basefile"], skip.get("file", ""), skip["error"]))
-    # the ledger is event-level: changes riding an already-committed event are
-    # dropped, which is invisible per change -- say so in aggregate, so a
-    # partial-corpus rebuild (a statute added after its events were committed)
-    # is detectable rather than silent
-    dropped = sum(len(events[k].changes) + len(events[k].deletes)
-                  for k in events if k in done)
-    if dropped:
-        log("  asgit: %d event(s) already committed; %d file change(s) riding "
-            "them were not revisited" % (len(events) - len(fresh), dropped))
-    commits = emit(repodir, fresh, forarbete_meta)
-    return commits, skipped
+    # collect is the one owner of incompleteness: missing artifacts and bad
+    # snapshots both arrive as skip records
+    missing = sum(1 for skip in skipped
+                  if skip["error"] == "no parsed artifact")
+    bad = len(skipped) - missing
+    if skipped:
+        details = ["%d parsed artifact(s) missing" % missing if missing else "",
+                   "%d snapshot(s) unreadable or inconsistent" % bad
+                   if bad else ""]
+        raise ValueError("history-as-git needs a complete corpus (%s)" %
+                         "; ".join(part for part in details if part))
+    if basefiles and not events:
+        raise ValueError("history-as-git complete corpus produced no events")
+
+
+def _materialize(repodir):
+    """The checked-out branch is known clean before its ref has been moved."""
+    git.run(repodir, "reset", "--hard", BRANCH)
+
+
+def _cached_meta(forarbete_meta):
+    """Keep one export's signatures stable while avoiding repeated artifact I/O."""
+    cache = {}
+
+    def lookup(identifier):
+        if identifier not in cache:
+            cache[identifier] = forarbete_meta(identifier)
+        return cache[identifier]
+
+    return lookup
+
+
+def _publish(repodir, events, forarbete_meta, scope, old_tip, parent):
+    """Import to a staging ref, then atomically move `main` on success."""
+    git.run(repodir, "update-ref", "-d", STAGING_REF)
+    commits = emit(repodir, events, forarbete_meta, tip=parent, scope=scope,
+                   ref=STAGING_REF)
+    if not commits:
+        return 0
+    new_tip = git.run(repodir, "rev-parse", "--verify", STAGING_REF,
+                      capture=True)
+    args = ["update-ref", BRANCH_REF, new_tip]
+    if old_tip:
+        args.append(old_tip)
+    git.run(repodir, *args)
+    git.run(repodir, "update-ref", "-d", STAGING_REF)
+    _materialize(repodir)
+    return commits
+
+
+def export(basefiles, repodir, *, forarbete_meta, scope="full", rebuild=False,
+           log=print):
+    """Build or safely update a history repository from a complete corpus;
+    returns the number of commits written.
+
+    Normal runs only append unseen, later transitions belonging to wholly new
+    events. `rebuild=True` is the explicit, atomic answer to corrected text,
+    backfills, attribution changes and legacy event-only repositories.
+    """
+    events, skipped = collect(basefiles)
+    _require_complete(basefiles, events, skipped, log)
+    forarbete_meta = _cached_meta(forarbete_meta)
+    desired = event_records(events, forarbete_meta)
+    tip = _prepare_repo(repodir)
+    existing, legacy_events, scopes = existing_ledger(repodir)
+    if tip and not existing:
+        if legacy_events:
+            if not rebuild:
+                raise RebuildRequired(
+                    "history-as-git ledger is legacy; rerun with --rebuild-history")
+        else:
+            raise ValueError("history-as-git target is not an export repository")
+    if existing and scopes != {scope} and not rebuild:
+        raise RebuildRequired("history-as-git scope changed; rerun with "
+                              "--rebuild-history")
+    if rebuild:
+        return _publish(repodir, events, forarbete_meta, scope, tip, None)
+    reasons = _append_reasons(existing, desired)
+    if reasons:
+        raise RebuildRequired("history-as-git requires rebuild: %s; rerun with "
+                              "--rebuild-history" % "; ".join(reasons[:5]))
+    existing_event_keys = {record["event"] for record in existing.values()}
+    fresh = {key: event for key, event in events.items()
+             if key not in existing_event_keys}
+    return _publish(repodir, fresh, forarbete_meta, scope, tip, tip)

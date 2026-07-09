@@ -389,6 +389,7 @@ class RunOptions:
     limit: int | None = None     # import-legacy (avg/forarbete): cap the run (a slice)
     rot13: bool = False          # mkpatch: obfuscate the patch (PII redactions)
     resume_after: str | None = None  # sfs download: resume an interrupted backfill
+    rebuild_history: bool = False  # sfs history-as-git: rewrite main from corpus
 
 
 RUN = RunOptions()
@@ -757,19 +758,22 @@ def sfs_history_as_git(basefiles):
     git repository holding the whole SFS collection as plaintext, one file per
     statute, one commit per amendment event (grouped by proposition), authored
     by the proposition's signers and committed by the riksdagsskrivelse's (see
-    sfs.asgit). Idempotent: a re-run after a harvest appends only the new
-    events (the Lagen-Event trailers are the ledger)."""
+    sfs.asgit). A re-run appends only a strict extension of the per-transition
+    ledger; corrections, backfills and changed attribution require
+    --rebuild-history."""
     if not basefiles:
         sys.exit("usage: lagen sfs history-as-git <repodir> [basefile ...]")
-    repodir, targets = Path(basefiles[0]), basefiles[1:] or sfs_list()
+    repodir, requested = Path(basefiles[0]), basefiles[1:]
+    targets = requested or sfs_list()
     if RUN.dry_run:
         print("sfs history-as-git: would export %d statute(s) into %s"
               % (len(targets), repodir))
         return
-    commits, skipped = sfs_asgit.export(targets, repodir,
-                                        forarbete_meta=_forarbete_meta)
-    print("sfs history-as-git: %d commit(s) into %s, %d snapshot(s) skipped"
-          % (commits, repodir, len(skipped)))
+    commits = sfs_asgit.export(
+        targets, repodir, forarbete_meta=_forarbete_meta,
+        scope=sfs_asgit.scope_id(targets, full=not requested),
+        rebuild=RUN.rebuild_history)
+    print("sfs history-as-git: %d commit(s) into %s" % (commits, repodir))
 
 
 SOURCES["sfs"] = Source("sfs", sfs_list, {
@@ -790,7 +794,8 @@ SOURCES["sfs"] = Source("sfs", sfs_list, {
    notes="ai-correspond <new-sfs> <prop> [<old-sfs>]: LLM-derive the old->new "
          "paragraf correspondence map into a .corr sidecar\n"
          "history-as-git <repodir> [basefile ...]: build/update a git repo of "
-         "the SFS collection, one commit per amendment event")
+         "the SFS collection, one commit per amendment event; --rebuild-history "
+         "rewrites it from the current complete corpus")
 
 
 # --------------------------------------------------------------------------
@@ -2606,8 +2611,12 @@ def main(argv=None):
                         "in the committed patch")
     p.add_argument("--resume-after", metavar="JSON",
                    help="sfs download: resume a backfill interrupted mid-sweep, "
-                        "from the ES search_after cursor printed when it was "
-                        "interrupted")
+                       "from the ES search_after cursor printed when it was "
+                       "interrupted")
+    p.add_argument("--rebuild-history", action="store_true",
+                   help="sfs history-as-git: rebuild main from the complete "
+                        "current corpus when corrected or backfilled history "
+                        "cannot be appended safely")
     args = p.parse_args(argv)
 
     RUN.dry_run, RUN.force, RUN.no_deps = args.dry_run, args.force, args.no_deps
@@ -2619,6 +2628,7 @@ def main(argv=None):
     RUN.limit = args.limit
     RUN.rot13 = args.rot13
     RUN.resume_after = args.resume_after
+    RUN.rebuild_history = args.rebuild_history
     # the parallelisable steps default to all cores; -j1 serialises
     jobs = args.jobs if args.jobs is not None else (os.cpu_count() or 1)
 
