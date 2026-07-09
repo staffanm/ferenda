@@ -1,7 +1,17 @@
 # PRD: `lagen sfs history-as-git` — the SFS corpus as a git repository
 
-*Status: future work, parked 2026-07-02. Depends on the SFS version-history
-machinery (`sfs/versions.py`, the download archive) which is done.*
+*Status: implemented 2026-07-09 (`sfs/asgit.py`, `lagen sfs history-as-git`).
+Reads the download archive directly (no `versions`-stage dependency) plus the
+parsed SFS artifacts for amendment metadata. Prop signers/ingress come from
+the förarbete artifacts (`signatur` blocks + the promoted ingress avsnitt,
+tagged at parse time); rskr signers from the new rskr corpus
+(`forarbete/rskr.py`, `lagen forarbete download rskr`). Open questions below
+resolved: omtryck renames not modelled (v1), filename slugs follow
+`layout.relpath` (`N1988/1.txt`, `1827/60_s.1007.txt`), övergångsbestämmelser
+excluded (body = forfattningstext only). One deviation from the sketch:
+per-amendment utfärdandedatum turned out to be almost never available in the
+register, so the author date falls back to ikraftträdandedatum (noted in the
+commit body), then July 1 of the SFS year.*
 
 ## Idea
 

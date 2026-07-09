@@ -69,10 +69,10 @@ Current code layout (this three-layer split is now realized in the package):
 accommodanda/
   lib/      shared horizontal libs — lagrum (citation engine), catalog, render, layout, net, markdown, util, errors, casenaming, eucasenaming, eu_structure, datasets
   config.py runtime config (config.yml / data_root / wiki_root)
-  sfs/      acts vertical — download·extract·reader·model·tokenizer·assembler·nf·register·versions·correspond·begrepp (+ __main__)
+  sfs/      acts vertical — download·extract·reader·model·tokenizer·assembler·nf·register·versions·correspond·asgit·begrepp·_validate (+ __main__)
   dv/       court-decisions vertical — download·identity·namedcases·model·parse·structure·word·legacy
-  forarbete/ preparatory-works vertical — download·riksdagen·model·parse·structure·kommentar·genomforande·fk·lydelse·legacy·legacy_formats
-  eurlex/   EU vertical (EUR-Lex/CELLAR) — download·bulk·annotate·definitions·parse·parse_html·parse_pdf·structure·lang·model
+  forarbete/ preparatory-works vertical — download·riksdagen·rskr·model·parse·structure·kommentar·genomforande·fk·lydelse·legacy·legacy_formats
+  eurlex/   EU vertical (EUR-Lex/CELLAR) — download·bulk·annotate·casenames·definitions·parse·parse_html·parse_pdf·structure·lang·model
   foreskrift/ agency-regulations vertical — agencies·harvest·download·model·parse·structure·legacy
   avg/      JO/JK/ARN-decisions vertical — download·model·parse·legacy
   remisser/ remiss (referral-response) vertical — model·download·parse·ai_analyze
@@ -256,8 +256,21 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
   htmldiff; direction normalized oldest→newest, note composed server-side) and
   swapped in by `versions.js` (`?diff=<version>`, deep-linkable);
   `/api/v1/document/versions` lists the history as data.
-  `test/test_sfs_versions.py`, `test/test_diff.py`. A git export of the whole
-  history ("history-as-git") is specced in `docs/prd-sfs-history-as-git.md`.
+  `test/test_sfs_versions.py`, `test/test_diff.py`.
+- ✅ **`history-as-git`** (`sfs/asgit.py`, `lagen sfs history-as-git <repodir>
+  [basefile...]`) — the whole corpus as a git repository, one file per statute,
+  one commit per amendment event (grouped by proposition when several statutes
+  share one prop). Author = the proposition's first signer (co-signers as
+  `Co-authored-by:` trailers), committer = the riksdagsskrivelse's first signer
+  (both read off the parsed förarbete artifacts via a `forarbete_meta` callable
+  `build.py` composes in, like `ai-correspond`); commit body is the prop's own
+  "huvudsakliga innehåll" ingress. Granularity is bounded by the download
+  archive (a commit spans the delta between two *available* consolidations);
+  dates fall back utfärdande→ikraftträdande→July 1 of the amendment year.
+  Emitted as one `git fast-import` stream (minutes, not days); idempotent via
+  `Lagen-Event:` trailers, so a re-run after a harvest appends only new events.
+  Implements `docs/prd-sfs-history-as-git.md`. `test/test_sfs_asgit.py`
+  (golden fast-import stream + git round-trip).
 - 🚧 **Adjudication overlay** (`golden_sfs.adjudicate`, `test/test_golden_adjudicate.py`)
   — the "change-detector, not oracle" posture (§2) as code: a `PREDICATES` table where
   each rule forgives a whole *family* of diffs in which the new pipeline is right against
@@ -979,6 +992,17 @@ them resolve.
   unchanged or better (162 gained 5 law sections). OCR/legacy routes carry no
   font info and keep the permissive rules. `test/test_forarbete_lydelse.py`,
   `test/test_pdftext.py`, `test/test_forarbete_parse.py`.
+- ✅ **Front-matter tagging for prop/skr** (`parse.tag_frontmatter`) — the
+  överlämnande page carries no bold, so the font-driven classifier had read it
+  all as plain stycken. Now: the "Propositionens/Skrivelsens huvudsakliga
+  innehåll" heading is promoted to a level-1 rubrik (so the ingress becomes its
+  own avsnitt), and the signer names after the ort/datum line ("Stockholm den
+  20 maj 2021") are retagged as a new `signatur` block kind (`model.Block`).
+  `structure.signers()`/`structure.ingress()` read them back off the parsed
+  artifact. This is the data `sfs/asgit.py`'s `history-as-git` export (§3d)
+  mines for commit authorship and message body — reading a förarbete artifact
+  stays förarbete's job, composed in by `build.py` like `ai-correspond`.
+  `test/test_forarbete_parse.py`.
 - ⬜ Older-period sources (riksdagen/KB), lr/SÖ content, page-number offset for
   docs whose front matter shifts the printed sequence; general (non-lydelse)
   tables — the budget prop's statistics tables still flatten to stycken; a
@@ -1003,6 +1027,28 @@ them resolve.
   sync call, alongside the regeringen.se scopes; `--only` is not supported
   for `bet`). No frozen legacy corpus (§7g) covers it.
   `test/test_forarbete_riksdagen.py`.
+- ✅ **`rskr` (riksdagsskrivelser) — a fifth harvest source**, sharing the
+  same engine. The bet-specific `_walk`/`sync` in `riksdagen.py` were
+  generalized into a doctype-agnostic `harvest()` (bet stays its default
+  driver, `_currency`/`_published` now take the full entry rather than a
+  pre-picked `pdf_fil`), and `accommodanda/forarbete/rskr.py` drives it for
+  riksdagsskrivelser — the chamber's decision letter to the government, the
+  last hop of the prop→bet→rskr chain every SFS register cites per amendment
+  ("rskr. 2007/08:159"), already minted by the FORARBETEN grammar as
+  `rskr/<rm>:<beteckning>`. Same **basefile = `"<rm>:<beteckning>"`** shape.
+  Unlike `bet`, the body is **not** the filbilaga PDF — an rskr is a few
+  boilerplate sentences ending in the talman's (and, in the modern layout, a
+  countersigning tjänsteman's) signature, all of it in the API's own small
+  HTML rendering, so the downloader stores that HTML and skips the PDF
+  entirely. Also no planned/published upgrade cycle: every feed entry is
+  published and final (an rskr records a decision already taken), so the
+  watermark runs with the default window. `parse.rskr_body()` turns the HTML
+  into the ordinary block stream (everything after the ort/datum line tagged
+  `signatur`), so `bet`/`rskr` parse through the same forarbete `parse.py`
+  pipeline. Wired into `fa_harvest` as scope `"rskr"` alongside `bet` (neither
+  supports `--only`; both support `--riksmote`). No frozen legacy corpus
+  covers it. These signer names are what `sfs/asgit.py`'s `history-as-git`
+  export uses for commit authorship (§3d).
 
 ### 7c. Wiki value-add — kommentar + begrepp ✅ (first cut)
 
@@ -1808,9 +1854,9 @@ model + extraction.
 | `tools/golden_sfs.py` | golden-corpus comparator (`normalize` parsed XHTML → NF on the fly) |
 | `../ferenda.old/data/sfs/parsed/` | the golden = old-pipeline parsed XHTML (11,056 docs), normalized per comparison — sibling checkout, not `site/data/` |
 | `accommodanda/lib/` | **shared** horizontal libs: `lagrum` (citation engine), `util`, `errors` (`SkipDocument`), `harvest` (shared incremental-download core — `HarvestWatermark`, `walk`), `casenaming`/`eucasenaming` (DV/EU case identity + display naming), `facsimile` (on-demand source-PDF page → retina PNG, disk-cached; `/api/v1/facsimile` + the legacy `/prop/2022/23:10/sid1.png` grammar) |
-| `accommodanda/sfs/` | **acts vertical**: `{extract,reader,model,tokenizer,assembler,nf}` parser + `register` (SFSR→amendments/förarbeten/metadata) + `__main__` (validate CLI) |
+| `accommodanda/sfs/` | **acts vertical**: `{extract,reader,model,tokenizer,assembler,nf}` parser + `register` (SFSR→amendments/förarbeten/metadata) + `asgit` (`history-as-git` — the corpus as a git repo, one commit per amendment event, `docs/prd-sfs-history-as-git.md`) + `__main__` (validate CLI) |
 | `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `structure`, `word`, `legacy`, `namedcases` (HD named-precedent harvester); canonical case title + HD given names live in `lib/casenaming.py` (shared with the catalog + renderer) |
-| `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, 8 types + `pm`, promemorior outside the Ds series), `model`/`structure`/`parse` (PDF/html→nested structure→artifact), `legacy` (one-time import of the nine frozen förarbete corpora, §7g), `legacy_formats` (frozen body adapters — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML, scanned-PDF OCR text, TRIPS `div.body-text`), `riksdagen` (`bet`/utskottsbetänkanden downloader off data.riksdagen.se, no frozen corpus), `kommentar` (författningskommentar → EU-directive *genomför* edges, prop + fm), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf), `fk` (per-paragraf FK commentary text → `kommentarer` artifact section → `fk_kommentar` catalog layer → statute-rail "Författningskommentar"), `lydelse` (two-column nuvarande/föreslagen lydelse tables reconstructed from per-run coordinates → `tabell` blocks in the SFS `rad`/`cells` shape) |
+| `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, 8 types + `pm`, promemorior outside the Ds series), `model`/`structure`/`parse` (PDF/html→nested structure→artifact; `parse.tag_frontmatter` retags the prop/skr överlämnande page — ingress heading, `signatur` signer blocks), `legacy` (one-time import of the nine frozen förarbete corpora, §7g), `legacy_formats` (frozen body adapters — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML, scanned-PDF OCR text, TRIPS `div.body-text`), `riksdagen` (doctype-agnostic dokumentlista harvest engine, driven for `bet`/utskottsbetänkanden off data.riksdagen.se, no frozen corpus), `rskr` (second driver over `riksdagen.py`'s engine, for riksdagsskrivelser — HTML body, no PDF), `kommentar` (författningskommentar → EU-directive *genomför* edges, prop + fm), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf), `fk` (per-paragraf FK commentary text → `kommentarer` artifact section → `fk_kommentar` catalog layer → statute-rail "Författningskommentar"), `lydelse` (two-column nuvarande/föreslagen lydelse tables reconstructed from per-run coordinates → `tabell` blocks in the SFS `rad`/`cells` shape) |
 | `accommodanda/eurlex/` | **EU vertical (EUR-Lex/CELLAR)**: `download` (SPARQL discovery), `bulk` (dump import), `parse`/`parse_html`/`parse_pdf` (Formex/HTML/PDF → one artifact shape), `definitions` (defined-terms extraction + in-act interlinking), `lang`, `model`, `casenames` (harvest CELEX → usual name for named EU cases from Wikidata into `data/casenames.json`, read by `lib/eucasenaming.py`) |
 | `accommodanda/avg/` | **JO/JK/ARN-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages, `jk_canonical` dnr normalization; ARN one-page vägledande-beslut listing), `legacy` (one-time import of the frozen ARN corpus 1991–2022, §7g), `parse` (JO/ARN PDF via `lib/pdftext`, JK landing HTML; DV parse-type citation scan) |
 | `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (per-agency enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct} wired onto `lib/harvest.walk`; `Skip`/`guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 17 agencies live + 4 frozen-only), `download`, `legacy` (one-time import of the two harvest-blocked corpora, §7g), `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors). Corpus: 1218 regs harvested, parsed 0-fail |
@@ -1828,7 +1874,7 @@ model + extraction.
 | `test/test_wiki.py` | wiki parsing suite |
 | `site/data/downloaded/forarbete/<type>/` | harvested förarbeten (record json + landing html + content pdf) + frozen-import records |
 | `test/test_forarbete_download.py` | förarbete downloader parsing suite (incl. `pm`) |
-| `test/test_forarbete_riksdagen.py` | `bet`/utskottsbetänkanden downloader suite (data.riksdagen.se) |
+| `test/test_forarbete_riksdagen.py` | `bet`/utskottsbetänkanden downloader suite (data.riksdagen.se); the shared dokumentlista `harvest()` engine also drives `rskr.py` |
 | `test/test_forarbete_legacy.py`, `test/test_forarbete_legacy_formats.py` | förarbete frozen-corpus import + body-adapter suites |
 | `test/test_foreskrift_legacy.py` | föreskrift frozen-corpus import suite |
 | `test/test_avg.py` | avg (JO/JK/ARN) parser + citation-grammar suite |
@@ -1855,6 +1901,8 @@ model + extraction.
 | `test/test_sfs_register.py` | SFSR register/amendments/förarbeten/metadata suite |
 | `accommodanda/sfs/download.py` | SFS harvester (beta raw-ES) + consolidation archiving |
 | `test/test_sfs_download.py` | SFS downloader version/archiving suite |
+| `accommodanda/sfs/asgit.py` | `history-as-git` export (one commit per amendment event, `git fast-import`) |
+| `test/test_sfs_asgit.py` | golden fast-import stream + git round-trip suite |
 | `test/files/` | hand-authored fixture corpora (oracle) |
 | `lagen/nu/res/extra/sfs.ttl` | named-law dataset (live site data) |
 | `site/data/downloaded/dv/` | legacy DV feed (Word docs) |
@@ -1928,6 +1976,19 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **sfs/forarbete** (2026-07-09) — `history-as-git`: `sfs/asgit.py` implements
+  `docs/prd-sfs-history-as-git.md`, exporting the SFS corpus as a git
+  repository (one file per statute, one commit per amendment event grouped by
+  proposition, authored/committed by the prop's/rskr's signers, ingress as
+  commit body, one `git fast-import` stream, idempotent via `Lagen-Event:`
+  trailers). Two förarbete prerequisites landed to feed it: a fifth harvest
+  source, `forarbete/rskr.py` (riksdagsskrivelser off data.riksdagen.se,
+  driving `riksdagen.py`'s `_walk`/`sync` now generalized into a
+  doctype-agnostic `harvest()`, `bet` as its default driver), and
+  `parse.tag_frontmatter` (prop/skr front-matter retagging — the "huvudsakliga
+  innehåll" heading promoted to a rubrik, signer names tagged as a new
+  `signatur` block kind, read back by `structure.signers`/`structure.ingress`).
+  `test/test_sfs_asgit.py`, additions to `test/test_forarbete_parse.py`.
 - **api/render** (2026-07-09) — on-demand page facsimiles: `lib/facsimile.py`
   rasterizes one page of a source PDF to a retina PNG (`pdftoppm`, 150 DPI)
   on first request and caches it under `cache/facsimile/` (a pure cache — this

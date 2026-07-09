@@ -1,8 +1,8 @@
 # accommodanda — developer setup
 
 The rebuilt ferenda pipeline: vertical source pipelines (sfs, dv, eurlex,
-forarbete, foreskrift, avg, wiki, site) that go from downloaded (or, for
-wiki/site, hand-authored) source files to a typed document model and a JSON
+forarbete, foreskrift, avg, remisser, wiki, site) that go from downloaded (or,
+for wiki/site, hand-authored) source files to a typed document model and a JSON
 artifact, with the citation engine as a shared library. For *why* it's
 shaped this way and what's done vs. pending, read
 [`../REWRITE.md`](../REWRITE.md); this file is just how to get it running.
@@ -64,6 +64,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `versions.py` | archived consolidations (download archive, three raw generations) → per-version artifacts + `.versions.json` sidecar |
 | `begrepp.py` | `find_definitions` — begreppsdefinition heuristics (paragraf mode + defined-term cases) → `dcterms:subject` links |
 | `correspond.py` | LLM pass deriving the old-law → new-law paragraf correspondence map for a restructured statute, from the proposition's författningskommentar |
+| `asgit.py` | `lagen sfs history-as-git <repodir> [basefile...]` — export the corpus as a git repo (one file per statute, one commit per amendment event grouped by proposition, authored by the prop's signers/committed by the rskr's, ingress as commit body); one `git fast-import` stream, idempotent via `Lagen-Event:` trailers; implements `docs/prd-sfs-history-as-git.md` |
 | `_validate.py` | worker functions for `lagen sfs validate`, in an importable module so `ProcessPoolExecutor` workers can resolve them under `python -m` |
 | `__main__.py` | `parse` / `refs` / `validate` CLI |
 
@@ -76,7 +77,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `eu_structure.py` | the one EU-act sub-article anchor grammar (`anchored_blocks`/`subarticle_key`/`flatten`), shared by the eurlex parser, the renderer and the wiki guidance layer (`nest`, the parse-time tree builder, stays in `eurlex/structure.py`) |
 | `legacy_import.py` | shared §7g frozen-import core — `should_write` precedence (live-wins / own-import-idempotent-unless-force / optional `better()` tie-break), `rel` (in-place LEGACY_ROOT-relative body references), `iter_entries`/`docdir`/`read_record` walk primitives; used by `forarbete/legacy.py`, `foreskrift/legacy.py`, `avg/legacy.py` |
 | `regeringen.py` | shared regeringen.se harvest knowledge — the doctype table (`TYPES`: url segment, taxonomy category id, identifier regex) and the `ul.list--block` listing walk (`listing_items`); used by `forarbete/download.py` and `remisser/download.py` |
-| `harvest.py` | shared incremental-download core — `HarvestWatermark` (begin/complete lifecycle, never-regress date save, crash-safe `dirty` flag that disables the consecutive-hit stop but not the date-conclusive one) + `walk`/`Skip`/`ItemKey`/`guarded_enumerate` (the newest-first download loop over an enumerate/resolve pair); each source states its own `lookahead_limit`/`safety_days` window (dv: 365-day safety window, ~5000-item lookahead; forarbete/riksdagen/foreskrift/avg-jo: 14 days/20 items); used by `dv/download.py`, `foreskrift/harvest.py`, `avg/download.py` (jo), and directly by `forarbete/download.py` + `forarbete/riksdagen.py` |
+| `harvest.py` | shared incremental-download core — `HarvestWatermark` (begin/complete lifecycle, never-regress date save, crash-safe `dirty` flag that disables the consecutive-hit stop but not the date-conclusive one) + `walk`/`Skip`/`ItemKey`/`guarded_enumerate` (the newest-first download loop over an enumerate/resolve pair); each source states its own `lookahead_limit`/`safety_days` window (dv: 365-day safety window, ~5000-item lookahead; forarbete/riksdagen/foreskrift/avg-jo: 14 days/20 items); used by `dv/download.py`, `foreskrift/harvest.py`, `avg/download.py` (jo), and directly by `forarbete/download.py` + `forarbete/riksdagen.py` (also driving `forarbete/rskr.py`) |
 | `catalog.py` | the SQLite catalog (`documents`/`links`/`fragments`/`genomforande` tables) built by `relate`, derived and rebuildable; `documents.path` is stored `data_root`-relative so the catalog is portable across hosts |
 | `render.py` | the `generate` phase — a single generic node walk renders every source's artifact to static, interlinked HTML (live outbound links, an inbound-context rail collected from the catalog) |
 | `dump.py` | NDJSON bulk corpus export (REWRITE.md §6) — one gzipped, self-contained JSON line per artifact, no transformation |
@@ -97,7 +98,8 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `wikitext.py` | parse MediaWiki dump pages into the same inline-run shape; retired from the live pipeline, kept only as the migration/diff tools' reference |
 | `runlog.py` | run instrumentation behind the ops dashboard — `runs.ndjson`/`errors.json`/`status.json` under `DATA/.build/` |
 | `net.py` | shared HTTP session setup + a resilient `request()` helper for the source downloaders (transport-level retry, Retry-After, throttle logging) |
-| `git.py` | the one place that shells out to the git CLI — the inline editor's commit engine and the one-time MediaWiki history importer |
+| `patch.py` / `patchit.py` | the source-file patch layer (apply-at-parse) and its interactive authoring CLI — see "Patch files" below |
+| `git.py` | the one place that shells out to the git CLI — the inline editor's commit engine, the MediaWiki history importer and the `history-as-git` export |
 | `errors.py` | `SkipDocument` — the shared control-flow signal a source's extractor raises for an expired/removed/empty document |
 | `util.py` | small shared utilities ported from `ferenda.util`, incl. `write_atomic` (same-directory temp file + rename) |
 
@@ -117,11 +119,12 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | File | What |
 |---|---|
 | `download.py` | regeringen.se harvester (`lagen forarbete download [prop\|sou\|…]`); basefile = the document's own identifier; a `source`-carrying import record is treated as absent so live always wins; `pm` (promemorior outside the Ds series, category 1325 shared with `ds`) keys by diarienummer when the listing shows one, else the landing-page slug |
-| `model.py` / `structure.py` / `parse.py` | `Forarbete` model, PDF (font-aware `pdftohtml`, or `pdftotext` fallback for OCR-layer scans) / html → nested structure → citation-scanned artifact; `_legacy_body` prefers a re-OCR sidecar at `layout.fa_ocr_pdf`. Font size gates heading detection (footnotes → `fotnot` blocks, body-sized "N Title" patterns stay stycken) and wrapped multi-line headings fold in `lib/pdftext` |
+| `model.py` / `structure.py` / `parse.py` | `Forarbete` model, PDF (font-aware `pdftohtml`, or `pdftotext` fallback for OCR-layer scans) / html → nested structure → citation-scanned artifact; `_legacy_body` prefers a re-OCR sidecar at `layout.fa_ocr_pdf`. Font size gates heading detection (footnotes → `fotnot` blocks, body-sized "N Title" patterns stay stycken) and wrapped multi-line headings fold in `lib/pdftext`. `parse.tag_frontmatter` (prop/skr) retags the un-bold överlämnande page: the "huvudsakliga innehåll" heading becomes a rubrik (so the ingress gets its own avsnitt) and post-signature names become `signatur` blocks; `structure.signers`/`structure.ingress` read them back for `sfs/asgit.py` |
 | `lydelse.py` | reconstructs the two-column *nuvarande/föreslagen lydelse* comparison tables from per-run coordinates: the italic header gives the column boundary, cell lines reflow per column and pair into aligned rows (`tabell` blocks, the SFS `rad`/`cells` shape); page-centered "2 kap."/"28 §" markers come back as kapitel/paragraf blocks |
 | `legacy.py` | one-time import of the nine frozen förarbete corpora (`lagen forarbete import-legacy <corpus>`, §7g) — shared precedence core; regeringen-era + KB corpora entries-driven, the TRIPS family (proptrips/dirtrips/dirasp) walked downloaded-first (path-derived basefile, ~half their entries are null) |
 | `legacy_formats.py` | frozen body adapters — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML (`abbyy_pages`), scanned-PDF OCR text (`scanned_pdf_pages`), TRIPS `div.body-text` (`trips_paras`) |
-| `riksdagen.py` | downloader for utskottsbetänkanden (`bet`, the prop→enacted-law link) off the data.riksdagen.se dokumentlista JSON feed; PDF-only bodies (printed page = citation anchor); basefile `"<rm>:<beteckning>"` matching the FORARBETEN grammar's bet URIs; full backfill walks all 161 riksmöten (the API caps one query's pagination at ~10k docs); no frozen legacy corpus |
+| `riksdagen.py` | doctype-agnostic data.riksdagen.se dokumentlista harvest engine (`harvest`/`_walk`, riksmöte-sliced backfill, watermark lifecycle); driven with the `bet` (utskottsbetänkanden, the prop→enacted-law link) specifics — PDF-only bodies (printed page = citation anchor), basefile `"<rm>:<beteckning>"` matching the FORARBETEN grammar's bet URIs, the planned/published upgrade cycle; full backfill walks all 161 riksmöten (the API caps one query's pagination at ~10k docs); no frozen legacy corpus |
+| `rskr.py` | second driver over `riksdagen.py`'s engine, for riksdagsskrivelser (`rskr`, the chamber's decision letter to the government — the prop→bet→rskr chain's last hop); basefile `"<rm>:<beteckning>"`; body is the API's own small HTML rendering (`dokument_url_html`), not a PDF filbilaga (an rskr is a few boilerplate sentences ending in the talman's/tjänsteman's signature — the committer identity `sfs/asgit.py` mines); every feed entry is published and final, so no planned/published upgrade cycle |
 | `kommentar.py` / `genomforande.py` | författningskommentar → `implements` (EU directive article) edges; extracted from `prop` and `fm` (förordningsmotiv) documents — both accompany the final enacted text, unlike a lagrådsremiss/SOU/Ds; `fk_section` also slices out the per-law FK prose consumed by `sfs/correspond.py` (reading a proposition artifact stays förarbete's job) |
 | `fk.py` | per-paragraf författningskommentar text extractor: slices a prop's FK chapter into `{law, chapter, paragrafer, lagtext, kommentar}` entries across the three FK styles (lagtext quoted / bare marker / marker inline), with content-based span bounds and marker/heading recovery rules locked to the curated corpus. parse stores the entries as the artifact's `kommentarer` section and stamps commentary blocks `fk: <entry-no>` (the prop page wraps each entry's run in an `.fk-komm` highlight box); `resolve` pins entries to statute anchors at relate time (`fk_kommentar` table, law resolution shared with `genomforande.py`); the statute paragraf's rail shows each prop's comment ("Författningskommentar", newest first, `#sid`-pinpointed provenance) |
 
@@ -236,12 +239,15 @@ amendment: publication links, the point-in-time konsolidering link, a diff
 link against the previous lydelse, övergångsbestämmelser, förarbeten). The
 diff view (`?diff=<version>`, `versions.js`) is computed on demand by
 `GET /api/v1/document/diff` — always oldest→newest — (see also
-`/api/v1/document/versions`). A future `history-as-git` export is specced in
+`/api/v1/document/versions`). The whole history is also exportable as a git
+repository (`history-as-git`, `sfs/asgit.py`), per
 [`docs/prd-sfs-history-as-git.md`](../docs/prd-sfs-history-as-git.md).
 
 ```sh
 uv run python -m accommodanda.build sfs versions            # incremental, all statutes
 uv run python -m accommodanda.build sfs versions 1998:204   # one statute
+uv run python -m accommodanda.build sfs history-as-git /path/to/repo             # whole corpus; re-run to append new history
+uv run python -m accommodanda.build sfs history-as-git /path/to/repo 1998:204   # one statute
 ```
 
 **DV** (operates on `site/data/downloaded/dom/` (API) and `site/data/downloaded/dv/` (legacy)):
@@ -476,6 +482,7 @@ site/data/artifact/dom/identity-index.json    # canonical case -> source records
 site/data/downloaded/avg/{jo,jk,arn}/         # JO/JK/ARN records (+ jo/arn PDFs, jk landing html)
 site/data/downloaded/forarbete/<type>/        # regeringen.se harvest + frozen-import records (prop/sou/ds/pm/dir/fm/skr/so/lr)
 site/data/downloaded/forarbete/bet/           # data.riksdagen.se harvest (utskottsbetänkanden; record json + PDF, no HTML landing page)
+site/data/downloaded/forarbete/rskr/          # data.riksdagen.se harvest (riksdagsskrivelser; record json + HTML body, no PDF)
 site/data/ocr/forarbete/<type>/               # optional re-OCR sidecar PDFs (win over frozen scans)
 site/data/downloaded/remisser/<case-slug>.json  # regeringen.se remiss case record (Remiss json)
 site/data/downloaded/remisser/<case-slug>/      # its per-organisation answer PDFs (beside the record)
