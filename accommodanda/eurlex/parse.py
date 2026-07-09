@@ -17,13 +17,14 @@ into the rest of the corpus.
 """
 
 import functools
+import io
 import json
 import zipfile
 from pathlib import Path
 
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
-from ..lib import eucasenaming, patch
+from ..lib import compress, eucasenaming, patch
 from ..lib.datasets import NAMEDACTS
 from ..lib.lagrum import EULAGSTIFTNING, EURATTSFALL, LagrumParser, interleave
 from ..lib.util import from_roman
@@ -62,16 +63,19 @@ def formex_members(path):
     in document order (main act/judgment first, then annexes) -- a single
     ``.fmx4`` yields one member, a ``.fmx4.zip`` its sorted ``.xml`` members (the
     ``.doc.xml`` wrappers skipped). The byte-level split that `load_formex`
-    parses and the patch/editor path reads the main act's source XML from."""
+    parses and the patch/editor path reads the main act's source XML from.
+    Reads through `compress` (a bare ``.fmx4`` is brotli-compressed on disk; a
+    ``.fmx4.zip`` is stored plain, but is checked by content, not suffix)."""
     path = Path(path)
-    if zipfile.is_zipfile(path):
-        with zipfile.ZipFile(path) as zf:
+    data = compress.read_bytes(path)
+    if zipfile.is_zipfile(io.BytesIO(data)):
+        with zipfile.ZipFile(io.BytesIO(data)) as zf:
             members = sorted(n for n in zf.namelist()
                              if n.endswith(".xml") and not n.endswith(".doc.xml"))
             if not members:
                 raise ValueError("%s: zip has no Formex member" % path)
             return [(m, zf.read(m)) for m in members]
-    return [(path.name, path.read_bytes())]
+    return [(path.name, data)]
 
 
 def load_formex(path):
@@ -515,7 +519,7 @@ def content_file(doc_dir, languages=LANG_PREFERENCE):
     (None, None, None) if the dir has no content file."""
     for lang in languages:
         ranked = sorted((rank, route, cand)
-                        for cand in doc_dir.glob(lang + ".*")
+                        for cand in compress.glob(doc_dir, lang + ".*")
                         if (r := _route(cand)) for rank, route in (r,))
         if ranked:
             _, route, path = ranked[0]
@@ -528,7 +532,7 @@ def parse_content(path, route, celex, lang):
     if route == "fmx4":
         return parse_document(_formex_roots(path, celex), celex, lang)
     if route == "html":
-        data = path.read_bytes()
+        data = compress.read_bytes(path)
         if patch.has_patch("eurlex", celex):
             data = patch.apply("eurlex", celex,
                                data.decode("utf-8", "replace")).encode("utf-8")

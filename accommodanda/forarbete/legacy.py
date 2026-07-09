@@ -56,12 +56,11 @@ import re
 import subprocess
 from pathlib import Path
 
-from ..lib import legacy_import
+from ..lib import compress, legacy_import
 from ..lib.util import (
     record_path,
     sniff_extension,
     split_numalpha,
-    write_atomic,
 )
 from . import download, legacy_formats
 
@@ -195,7 +194,7 @@ def _write_if_better(recpath, existing, candidate, counts, force):
         else:
             counts["skipped_better"] += 1
         return False
-    write_atomic(recpath, json.dumps(candidate, ensure_ascii=False, indent=2))
+    compress.write_download(recpath, json.dumps(candidate, ensure_ascii=False, indent=2))
     counts["imported"] += 1
     return True
 

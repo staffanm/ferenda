@@ -41,10 +41,10 @@ from datetime import date, timedelta
 import requests
 from bs4 import BeautifulSoup
 
-from ..lib import layout
+from ..lib import compress, layout
 from ..lib.net import BROWSER_UA, make_session, request
 from ..lib.regeringen import BASE, TYPES, listing_items
-from ..lib.util import Reporter, swedish_date, write_atomic
+from ..lib.util import Reporter, swedish_date
 from .model import Remiss, Remissinstans, org_slug
 
 LISTING = BASE + "/remisser/?p=%d#result"
@@ -199,8 +199,8 @@ def parse_case(html, url):
 # --------------------------------------------------------------------------
 
 def _write_case(remiss):
-    write_atomic(layout.remisser_case(remiss.basefile),
-                 json.dumps(remiss.to_dict(), ensure_ascii=False, indent=2))
+    compress.write_download(layout.remisser_case(remiss.basefile),
+                            json.dumps(remiss.to_dict(), ensure_ascii=False, indent=2))
 
 
 def _is_open(remiss, today):
@@ -263,8 +263,8 @@ def _fetch_pending(session, remiss, delay):
         if inst.downloaded:
             continue
         data = request(session, "GET", inst.source_url).content
-        write_atomic(layout.remisser_answer(remiss.basefile,
-                                            org_slug(inst.source_url)), data)
+        compress.write_download(layout.remisser_answer(remiss.basefile,
+                                                       org_slug(inst.source_url)), data)
         inst.downloaded = True
         fetched += 1
         time.sleep(delay)
@@ -282,8 +282,8 @@ def sync_one(url, delay=0.5):
     url = url if url.endswith("/") else url + "/"
     remiss = parse_case(request(session, "GET", url).text, url)
     existing = layout.remisser_case(remiss.basefile)
-    if existing.exists():
-        stored = Remiss.from_dict(json.loads(existing.read_text()))
+    if compress.exists(existing):
+        stored = Remiss.from_dict(json.loads(compress.read_text(existing)))
         _merge(stored, remiss)
         remiss = stored
     fetched = _fetch_pending(session, remiss, delay)
@@ -324,7 +324,7 @@ def sync(full=False, delay=0.5, log=print):
             break
         for item in items:
             seen += 1
-            if layout.remisser_case(item["basefile"]).exists():
+            if compress.exists(layout.remisser_case(item["basefile"])):
                 if not full:
                     stop = True
                     break
@@ -353,8 +353,8 @@ def sync(full=False, delay=0.5, log=print):
     rep.done()
 
     today = date.today()
-    for path in sorted(cases.glob("*.json")):
-        remiss = Remiss.from_dict(json.loads(path.read_text()))
+    for path in sorted(compress.glob(cases, "*.json")):
+        remiss = Remiss.from_dict(json.loads(compress.read_text(path)))
         changed = False
         if _is_open(remiss, today):
             try:
@@ -387,5 +387,5 @@ def sync(full=False, delay=0.5, log=print):
 
 def list_basefiles():
     """Every case basefile (slug) on disk, sorted -- not instance basefiles."""
-    return sorted(json.loads(p.read_text())["basefile"]
-                  for p in layout.REMISSER_DOWNLOADED.glob("*.json"))
+    return sorted(json.loads(compress.read_text(p))["basefile"]
+                  for p in compress.glob(layout.REMISSER_DOWNLOADED, "*.json"))

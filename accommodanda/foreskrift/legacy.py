@@ -42,8 +42,8 @@ basefile's own prefix.
 import json
 from pathlib import Path
 
-from ..lib import legacy_import
-from ..lib.util import record_path, sniff_extension, write_atomic
+from ..lib import compress, legacy_import
+from ..lib.util import record_path, sniff_extension
 from .agencies import LEGACY_CORPORA, REGISTRY
 
 
@@ -129,6 +129,6 @@ def import_corpus(corpus, source_path, root, limit=None, force=False, log=print)
             "files": {"regulation": reg, "consolidation": [], "amendment": [],
                       "memo": [], "attachment": []},
         }
-        write_atomic(recpath, json.dumps(record, ensure_ascii=False, indent=2))
+        compress.write_download(recpath, json.dumps(record, ensure_ascii=False, indent=2))
         counts["imported"] += 1
     return _report(counts, corpus, log)

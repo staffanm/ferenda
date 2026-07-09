@@ -38,7 +38,7 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from ..lib import layout, util
+from ..lib import compress, layout, util
 
 # legacy court dir code -> code used by the new API (others are identical)
 COURT_CANON = {"REG": "REGR", "MÖD": "MOD", "MMD": "MMOD",
@@ -83,10 +83,10 @@ def keys(court, malnummer, referat):
 
 def scan_api(domstoldir):
     records = []
-    for path in sorted(Path(domstoldir).rglob("*.json")):
+    for path in sorted(compress.glob(Path(domstoldir), "**/*.json")):
         if path.name.startswith("."):
             continue   # not a record: the .watermark.json harvest marker, junk
-        d = json.loads(path.read_text())
+        d = json.loads(compress.read_text(path))
         court = canonical_court(d["domstol"]["domstolKod"])
         records.append({
             "store": "domstol", "court": court,

@@ -56,6 +56,7 @@ from urllib.parse import quote
 
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
+from ..lib import compress
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
 from ..lib.util import Reporter, write_atomic
@@ -570,16 +571,16 @@ def store_document(session, target, celex, wdate, selection, eurovoc):
             if not _content_ok(filetype, response.content):
                 continue                # placeholder for this type: try the next
             name = content_filename(code, filetype, response.content)
-            write_atomic(target / name, response.content)
+            compress.write_download(target / name, response.content)
             # a re-fetch may land a different manifestation type or zip-ness, so
             # clear any earlier content file for this language
-            for old in target.glob(code + ".*"):
+            for old in compress.glob(target, code + ".*"):
                 if old.name != name:
-                    old.unlink()
+                    compress.unlink(old)
             stored.append(code)
             break
     if stored:
-        write_atomic(target / "notice.ttl", notice_ttl(celex, wdate, eurovoc))
+        compress.write_download(target / "notice.ttl", notice_ttl(celex, wdate, eurovoc))
     return stored
 
 
@@ -601,7 +602,7 @@ def download_document(session, root, celex, languages, delay):
 # --------------------------------------------------------------------------
 
 def is_downloaded(root, celex):
-    return (doc_dir(root, celex) / "notice.ttl").exists()
+    return compress.exists(doc_dir(root, celex) / "notice.ttl")
 
 
 def prune_empty(root, remove=True):
@@ -612,11 +613,11 @@ def prune_empty(root, remove=True):
     is safe to re-run. Returns the number of such dirs."""
     root = Path(root)
     n = 0
-    for notice in root.glob("*/*/notice.ttl"):
+    for notice in compress.glob(root, "*/*/notice.ttl"):
         d = notice.parent
-        if all(p.name == "notice.ttl" for p in d.iterdir()):
+        if all(compress.logical(p).name == "notice.ttl" for p in d.iterdir()):
             if remove:
-                notice.unlink()
+                compress.unlink(notice)
                 d.rmdir()
             n += 1
     return n
@@ -857,4 +858,4 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
 def list_basefiles(root):
     """CELEX basefiles harvested into root, recovered from the path."""
     return sorted(p.parent.name.replace("_", "/")
-                  for p in Path(root).glob("*/*/notice.ttl"))
+                  for p in compress.glob(Path(root), "*/*/notice.ttl"))

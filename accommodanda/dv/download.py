@@ -48,10 +48,10 @@ from datetime import date
 from pathlib import Path
 from urllib.parse import quote
 
+from ..lib import compress
 from ..lib.harvest import HarvestWatermark, ItemKey, walk
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
-from ..lib.util import write_atomic
 
 API = "https://rattspraxis.etjanst.domstol.se/api/v1"
 PAGE_SIZE = 100
@@ -60,7 +60,7 @@ COMPLETE = ".complete"   # legacy marker, superseded by (migrated into) the wate
 
 def is_dv_downloaded(destdir, record, check_bilagor=True):
     path = record_dir(destdir, record).with_suffix(".json")
-    if not path.exists():
+    if not compress.exists(path):
         return False
     if check_bilagor:
         dirpath = record_dir(destdir, record)
@@ -69,7 +69,7 @@ def is_dv_downloaded(destdir, record, check_bilagor=True):
                 continue
             name = Path(bilaga["filnamn"]).name
             target = dirpath / name
-            if not (target.exists() and target.stat().st_size > 0):
+            if not (compress.exists(target) and compress.stat(target).st_size > 0):
                 return False
     return True
 
@@ -106,10 +106,10 @@ def fetch_record(session, record_id):
 def save_record(destdir, record):
     """Store the record verbatim; returns True if new or changed."""
     path = record_dir(destdir, record).with_suffix(".json")
-    if path.exists() and json.loads(path.read_text()) == record:
+    if compress.exists(path) and json.loads(compress.read_text(path)) == record:
         return False
-    write_atomic(path, json.dumps(record, ensure_ascii=False,
-                                  indent=2).encode())
+    compress.write_download(path, json.dumps(record, ensure_ascii=False,
+                                              indent=2))
     return True
 
 
@@ -128,11 +128,11 @@ def download_bilagor(session, destdir, record, delay):
         assert name and name not in (".", ".."), \
             "unexpected bilaga filename: %r" % bilaga["filnamn"]
         target = dirpath / name
-        if target.exists() and target.stat().st_size > 0:
+        if compress.exists(target) and compress.stat(target).st_size > 0:
             continue
         url = API + "/bilagor/" + quote(bilaga["fillagringId"], safe="")
         response = request(session, "GET", url, timeout=120)
-        write_atomic(target, response.content)
+        compress.write_download(target, response.content)
         time.sleep(delay)
 
 

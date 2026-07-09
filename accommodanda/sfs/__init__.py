@@ -10,7 +10,7 @@ SFS formatting quirks; the architecture is new.
 import json
 from pathlib import Path
 
-from ..lib import patch
+from ..lib import compress, patch
 from ..lib.errors import SkipDocument
 from .assembler import assemble
 from .extract import extract_body
@@ -70,8 +70,8 @@ def load_inputs(json_path, html_path, register_path, basefile):
     new JSON ``_source`` over the legacy SFST+SFSR HTML pages — the DV
     single-best-source-per-document pattern. ``register``/``sfst_header`` are
     None when the legacy register page is absent or empty."""
-    if json_path and Path(json_path).exists():
-        source = json.loads(Path(json_path).read_text())
+    if json_path and compress.exists(Path(json_path)):
+        source = json.loads(compress.read_text(Path(json_path)))
         return (parse_sfs_source(source, basefile),
                 register_from_source(source),
                 sfst_header_from_source(source))
@@ -83,7 +83,7 @@ def load_inputs(json_path, html_path, register_path, basefile):
             "no input for %s: JSON source %s absent and no legacy HTML page"
             % (basefile, json_path))
     doc = parse_sfs(html_path, basefile)
-    if not Path(register_path).exists():
+    if not compress.exists(Path(register_path)):
         return doc, None, None
     try:
         register = parse_register(register_path)

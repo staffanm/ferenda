@@ -40,11 +40,12 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 
+from ..lib import compress
 from ..lib.harvest import HarvestWatermark, ItemKey, Skip, walk
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session, request
 from ..lib.util import basefile_slug as slug
-from ..lib.util import document_extension, record_path, write_atomic
+from ..lib.util import document_extension, record_path
 
 
 @dataclass
@@ -278,7 +279,7 @@ def resolve_landing(session, agency, ref, root, delay=0.5, *, log=print, rejects
         name = "%s-%s.pdf" % (slug(ref.basefile), role) if role == "regulation" \
             else "%s-%s-%s_%s.pdf" % (slug(ref.basefile), role,
                                       ars or "x", lop or len(files[role]))
-        write_atomic(Path(root) / fs / name, data)
+        compress.write_download(Path(root) / fs / name, data)
         entry = dict(ref_entry, name=name)
         if role == "regulation":
             files["regulation"] = entry
@@ -286,14 +287,14 @@ def resolve_landing(session, agency, ref, root, delay=0.5, *, log=print, rejects
             files[role].append(entry)
         time.sleep(delay)
 
-    write_atomic(Path(root) / fs / (slug(ref.basefile) + ".html"), landing)
+    compress.write_download(Path(root) / fs / (slug(ref.basefile) + ".html"), landing)
     record = {
         "fs": fs, "basefile": ref.basefile, "identifier": ref.identifier,
         "title": ref.title, "publisher": agency.publisher,
         "url": ref.url, "files": files,
     }
-    write_atomic(record_path(root, fs, ref.basefile),
-                 json.dumps(record, ensure_ascii=False, indent=2))
+    compress.write_download(record_path(root, fs, ref.basefile),
+                            json.dumps(record, ensure_ascii=False, indent=2))
     return record
 
 
@@ -320,7 +321,7 @@ def resolve_direct(session, agency, ref, root, delay=0.5, *, log=print, rejects=
             if rejects is not None:
                 rejects.append(msg)
             return None
-        write_atomic(Path(root) / fs / name, data)
+        compress.write_download(Path(root) / fs / name, data)
         time.sleep(delay)
         return name
 
@@ -342,8 +343,8 @@ def resolve_direct(session, agency, ref, root, delay=0.5, *, log=print, rejects=
         "title": ref.title or extra.get("title"), "publisher": agency.publisher,
         "url": extra.get("source_url") or ref.url, "files": files,
     }
-    write_atomic(record_path(root, fs, ref.basefile),
-                 json.dumps(record, ensure_ascii=False, indent=2))
+    compress.write_download(record_path(root, fs, ref.basefile),
+                            json.dumps(record, ensure_ascii=False, indent=2))
     return record
 
 
@@ -553,7 +554,7 @@ def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=prin
             basefile=ref.basefile,
             # the record lives under the document's own fs, which is agency.fs
             # unless the row named a different samling (see DocRef.fs)
-            is_downloaded=record_path(root, ref.fs or agency.fs, ref.basefile).exists(),
+            is_downloaded=compress.exists(record_path(root, ref.fs or agency.fs, ref.basefile)),
             date=f"{year}-12-31")
 
     def resolve(ref):

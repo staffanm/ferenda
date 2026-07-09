@@ -45,14 +45,13 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from ..lib import legacy_import
+from ..lib import compress, legacy_import
 from ..lib.pdftext import pdf_pages
 from ..lib.util import (
     basefile_slug,
     normalize_space,
     record_path,
     sniff_extension,
-    write_atomic,
 )
 
 # body-file preference when a case holds more than one valid decision file (the
@@ -255,8 +254,8 @@ def import_arn(source, root, limit=None, force=False, log=print):
                 if orig_url:
                     record["orig_url"] = orig_url
                 if pdf != pdfpath:
-                    write_atomic(pdfpath, pdf.read_bytes())
-                write_atomic(recpath, json.dumps(record, ensure_ascii=False, indent=2))
+                    compress.write_download(pdfpath, pdf.read_bytes())
+                compress.write_download(recpath, json.dumps(record, ensure_ascii=False, indent=2))
                 imported += 1
     finally:
         # ignore_errors: soffice may still hold the profile dir open briefly

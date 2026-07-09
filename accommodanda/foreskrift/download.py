@@ -4,7 +4,7 @@ the named författningssamlingar (default all); ``--full`` re-walks and refreshe
 existing base regulations (new amendments / consolidations), ``--only BASEFILE``
 fetches one (needs a single fs scope)."""
 
-from ..lib.util import list_basefiles as _list_basefiles
+from ..lib.compress import list_basefiles as _list_basefiles
 from . import harvest
 from .agencies import REGISTRY
 

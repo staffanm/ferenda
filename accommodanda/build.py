@@ -604,7 +604,7 @@ def sfs_inputs(basefile):
     """Freshness inputs: the JSON _source when present (the new beta API), else
     the legacy SFST + SFSR HTML pair -- plus the document's patch file if one
     exists (`_patch_input`), so editing a patch re-stales the parse."""
-    if sfs_source(basefile).exists():
+    if compress.exists(sfs_source(basefile)):
         inputs = [sfs_source(basefile)]
     else:
         inputs = [sfs_downloaded(basefile), sfs_register(basefile)]
@@ -682,10 +682,10 @@ def sfs_list():
     stored but excluded here: they don't belong in the SFS-centric publication
     and will be picked up by the myndfskr (myndighetsföreskrifter) port."""
     return sorted({"%s:%s" % (p.parent.name, p.stem.replace("_", " "))
-                   for p in layout.SFS_DOWNLOADED.glob("*/*.json")
+                   for p in compress.glob(layout.SFS_DOWNLOADED, "*/*.json")
                    if p.parent.name.isdigit() and not p.name.startswith(".")}
                   | {"%s:%s" % (p.parent.name, p.stem.replace("_", " "))
-                     for p in (layout.SFS_DOWNLOADED / "sfst").glob("*/*.html")
+                     for p in compress.glob(layout.SFS_DOWNLOADED / "sfst", "*/*.html")
                      if not p.name.startswith(".")})
 
 
@@ -854,7 +854,7 @@ def dv_namedcases(args=()):
 
 
 def dv_parse_run(basefile):
-    record = json.loads(dv_record(basefile).read_text())
+    record = json.loads(compress.read_text(dv_record(basefile)))
     av = parse_api_record(record, basefile)
     # the case's public publication-search page is keyed by the record's
     # gruppKorrelationsnummer (the publication group), not derivable from basefile
@@ -912,7 +912,7 @@ def fa_list():
     """Every harvested record as 'type/slug' (the artifact subdir excluded by
     the single-level glob)."""
     return sorted("%s/%s" % (p.parent.name, p.stem)
-                  for p in layout.FA_DOWNLOADED.glob("*/*.json")
+                  for p in compress.glob(layout.FA_DOWNLOADED, "*/*.json")
                   if not p.name.startswith("."))
 
 
@@ -954,7 +954,7 @@ def fa_harvest(scopes):
 
 
 def fa_parse_run(basefile):
-    record = json.loads(fa_record(basefile).read_text())
+    record = json.loads(compress.read_text(fa_record(basefile)))
     art = fa_parse.to_artifact(fa_parse.parse_record(record, layout.FA_DOWNLOADED))
     # a proposition's författningskommentar states which EU directive article a
     # provision transposes -- attach those genomför relations as a typed section
@@ -1166,8 +1166,8 @@ SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
 def foreskrift_list():
     """Every harvested base regulation as 'fs/year:num' (the artifact subdir
     excluded by the single-level glob)."""
-    return sorted(json.loads(p.read_text())["basefile"]
-                  for p in layout.FORESKRIFT_DOWNLOADED.glob("*/*.json")
+    return sorted(json.loads(compress.read_text(p))["basefile"]
+                  for p in compress.glob(layout.FORESKRIFT_DOWNLOADED, "*/*.json")
                   if not p.name.startswith("."))
 
 
@@ -1215,8 +1215,8 @@ def foreskrift_inputs(basefile):
     konsoliderad versions); re-downloading any of them re-stales the parse."""
     rec = foreskrift_record(basefile)
     paths = [rec]
-    if rec.exists():
-        record = json.loads(rec.read_text())
+    if compress.exists(rec):
+        record = json.loads(compress.read_text(rec))
         fsdir = layout.FORESKRIFT_DOWNLOADED / record["fs"]
         files = record.get("files", {})
         reg = files.get("regulation")
@@ -1233,7 +1233,7 @@ def foreskrift_inputs(basefile):
 def foreskrift_parse_run(basefile):
     """One harvested record -> its JSON artifact: the body structure, the masthead
     metadata, and the bemyndigande/genomför citation edges the model carries."""
-    record = json.loads(foreskrift_record(basefile).read_text())
+    record = json.loads(compress.read_text(foreskrift_record(basefile)))
     reg = foreskrift_parse.parse_record(record, str(layout.FORESKRIFT_DOWNLOADED))
     write_artifact("foreskrift", basefile, reg.to_artifact())
 
@@ -1292,7 +1292,7 @@ AVG_CODE = (PKG / "avg" / "parse.py", PKG / "avg" / "model.py",
 
 def avg_list():
     return sorted(bf for org in ("jo", "jk", "arn")
-                  for bf in util.list_basefiles(layout.AVG_DOWNLOADED, org))
+                  for bf in compress.list_basefiles(layout.AVG_DOWNLOADED, org))
 
 
 def avg_record(basefile):
@@ -1396,10 +1396,10 @@ def remisser_list():
     per `Remissinstans` marked downloaded -- the parse stage's targets. Not
     every `Remiss.svar` entry: an instance not yet fetched has no PDF to parse."""
     out = []
-    for path in sorted(layout.REMISSER_DOWNLOADED.glob("*.json")):
+    for path in sorted(compress.glob(layout.REMISSER_DOWNLOADED, "*.json")):
         if path.name.startswith("."):
             continue
-        remiss = remisser_model.Remiss.from_dict(json.loads(path.read_text()))
+        remiss = remisser_model.Remiss.from_dict(json.loads(compress.read_text(path)))
         out.extend("%s/%s" % (remiss.basefile, remisser_model.org_slug(inst.source_url))
                    for inst in remiss.svar if inst.downloaded)
     return out
@@ -2379,9 +2379,9 @@ def status_scan(source, manifest, errors):
             if errors.get("%s/%s/%s" % (source.name, name, bf)):
                 failed.append(bf)
             output = stage.output(bf)
-            if not output.exists():
+            if not compress.exists(output):  # the output may be stored precompressed
                 missing += 1
-            elif output.stat().st_size == 0:
+            elif compress.stat(output).st_size == 0:
                 empty += 1
             elif is_fresh(manifest, source, stage, bf):
                 fresh += 1

@@ -4,6 +4,7 @@ import re
 
 from bs4 import BeautifulSoup, Tag
 
+from ..lib import compress
 from ..lib.errors import SkipDocument
 
 
@@ -16,8 +17,7 @@ def extract_body(path):
     """Return the statute body text (the part below the header) as a
     string with LF line separators. Expired statutes are extracted like any
     other -- lagen.nu keeps them (they stay reachable as historical law)."""
-    with open(path, "rb") as fp:
-        raw = fp.read()
+    raw = compress.read_bytes(path)
     encoding = sniff_encoding(raw)
     rawtext = raw.decode(encoding)
 

@@ -27,7 +27,7 @@ import re
 
 from bs4 import BeautifulSoup
 
-from ..lib import patch
+from ..lib import compress, patch
 from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from ..lib.lagrum import (
     ALL_PARSE_TYPES,
@@ -252,13 +252,13 @@ def parse_record(basefile, root):
     """One basefile ("jo/2340-2025" / "jk/2024-8082" / "arn/1992-3657") ->
     artifact dict, body citation-scanned."""
     org = basefile.split("/", 1)[0]
-    record = json.loads(record_path(root, org, basefile).read_text())
+    record = json.loads(compress.read_text(record_path(root, org, basefile)))
     patch_key = ("avg", basefile)
     if org == "jo":
         beslut = parse_jo(record, root, patch_key)
     elif org == "jk":
         # jk's intermediate is its landing-page HTML, not a PDF; patch it here
-        html = jk_html_path(root, basefile).read_text()
+        html = compress.read_text(jk_html_path(root, basefile))
         beslut = parse_jk(record, patch.apply(*patch_key, html))
     else:
         beslut = parse_arn(record, root, patch_key)

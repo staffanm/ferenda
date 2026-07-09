@@ -27,6 +27,7 @@ import os
 from pathlib import Path
 
 from .. import config
+from . import compress
 
 
 def should_write(existing, source, force=False, better=None):
@@ -63,8 +64,11 @@ def rel(path):
 
 
 def read_record(recpath):
-    """The record already on disk at ``recpath``, or None."""
-    return json.loads(recpath.read_text()) if recpath.exists() else None
+    """The record already on disk at ``recpath``, or None. Compress-aware: a
+    prior import's record may be stored as ``<recpath>.br`` (`should_write`'s
+    idempotency rule depends on finding it -- a plain `.exists()` would miss a
+    compressed record and silently re-import every run)."""
+    return json.loads(compress.read_text(recpath)) if compress.exists(recpath) else None
 
 
 def iter_entries(entries_dir):

@@ -23,7 +23,7 @@ from .avg.download import jk_html_path, jo_dnrs, jo_pdf_path
 from .avg.legacy import arn_pdf_path
 from .eurlex.parse import content_file, formex_members
 from .foreskrift.parse import body_path as fs_body_path
-from .lib import layout, patch, pdftext
+from .lib import compress, layout, patch, pdftext
 from .lib.errors import SkipDocument
 from .lib.util import record_path
 from .sfs.extract import extract_body
@@ -34,8 +34,8 @@ def _sfs_intermediate(basefile):
     the beta-API JSON's ``forfattningstext`` when present, else recovered from
     the legacy SFST HTML exactly as the parser does (``sfs.extract.extract_body``)."""
     src = layout.sfs_source(basefile)
-    if src.exists():
-        text = (json.loads(src.read_text()).get("fulltext") or {}).get("forfattningstext")
+    if compress.exists(src):
+        text = (json.loads(compress.read_text(src)).get("fulltext") or {}).get("forfattningstext")
         if text is None:
             raise SkipDocument("%s: no forfattningstext to patch" % basefile)
         return text.replace("\r", "")
@@ -48,7 +48,7 @@ def _dv_intermediate(basefile):
     # `from .build import` would close a build->api.patch->patchsource->build
     # cycle. The one sanctioned in-function import here (rule:no-infunction-imports).
     from .build import dv_record  # noqa: PLC0415 -- breaks the build import cycle
-    record = json.loads(dv_record(basefile).read_text())
+    record = json.loads(compress.read_text(dv_record(basefile)))
     return record.get("innehall") or ""
 
 
@@ -61,7 +61,7 @@ def _eurlex_intermediate(basefile):
     if route == "fmx4":
         return formex_members(path)[0][1].decode("utf-8")
     if route == "html":
-        return path.read_bytes().decode("utf-8", "replace")
+        return compress.read_bytes(path).decode("utf-8", "replace")
     raise ValueError("%s: the %s manifestation is not text-patchable "
                      "(PDF-only act)" % (basefile, route))
 
@@ -78,7 +78,7 @@ def _forarbete_intermediate(basefile):
     """A förarbete's live-harvest body PDF as pdftohtml XML (the same first PDF
     parse reads). Frozen legacy-import bodies carry non-XML formats and are not
     patched at source level."""
-    record = json.loads(layout.fa_record(basefile).read_text())
+    record = json.loads(compress.read_text(layout.fa_record(basefile)))
     if "legacy_files" in record:
         raise ValueError("%s: frozen legacy-import body is not text-patchable "
                          "at source level" % basefile)
@@ -93,7 +93,7 @@ def _foreskrift_intermediate(basefile):
     are separate documents, not patched through this key)."""
     fs = basefile.split("/", 1)[0]
     record = json.loads(
-        record_path(layout.FORESKRIFT_DOWNLOADED, fs, basefile).read_text())
+        compress.read_text(record_path(layout.FORESKRIFT_DOWNLOADED, fs, basefile)))
     reg_file = (record.get("files") or {}).get("regulation")
     if not reg_file:
         raise SkipDocument("%s: no base-regulation PDF" % basefile)
@@ -104,9 +104,9 @@ def _avg_intermediate(basefile):
     """A JO/ARN decision's PDF as pdftohtml XML; a JK decision's landing-page
     HTML (its own intermediate) -- dispatched on the org, like the parser."""
     org = basefile.split("/", 1)[0]
-    record = json.loads(record_path(layout.AVG_DOWNLOADED, org, basefile).read_text())
+    record = json.loads(compress.read_text(record_path(layout.AVG_DOWNLOADED, org, basefile)))
     if org == "jk":
-        return jk_html_path(layout.AVG_DOWNLOADED, basefile).read_text()
+        return compress.read_text(jk_html_path(layout.AVG_DOWNLOADED, basefile))
     if org == "jo":
         dnrs = jo_dnrs(record.get("diary_number"))
         if not dnrs:

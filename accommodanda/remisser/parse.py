@@ -20,6 +20,7 @@ identifier silently deleted the organisation's name out of real sentences)."""
 import json
 from pathlib import Path
 
+from ..lib import compress
 from ..lib.pdftext import page_paragraphs, pdf_pages
 from .model import Remiss, Remissvar, org_slug
 
@@ -32,7 +33,7 @@ def parse_record(basefile, root):
     ahead of the download (the matching instance exists and is marked downloaded)."""
     case_basefile, slug = basefile.split("/", 1)
     remiss = Remiss.from_dict(json.loads(
-        (Path(root) / (case_basefile + ".json")).read_text()))
+        compress.read_text(Path(root) / (case_basefile + ".json"))))
     inst = next((i for i in remiss.svar if org_slug(i.source_url) == slug),
                None)
     assert inst is not None, (

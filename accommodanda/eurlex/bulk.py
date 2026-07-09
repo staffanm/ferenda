@@ -39,7 +39,8 @@ from pathlib import Path
 
 from PIL import Image, UnidentifiedImageError
 
-from ..lib.util import status, write_atomic
+from ..lib import compress
+from ..lib.util import status
 from .download import (
     SECTORS,
     content_filename,
@@ -279,14 +280,14 @@ def unpack_bulk(source, root, languages=("swe", "eng"), limit=None, log=print):
                     if wdate and wdate > marks.get(celex[0], ""):
                         marks[celex[0]] = wdate
                     dest = doc_dir(root, celex)
-                    write_atomic(dest / "notice.ttl", parse_notice(rdf).ttl())
+                    compress.write_download(dest / "notice.ttl", parse_notice(rdf).ttl())
                     for lang, (fname, data) in contents:
-                        write_atomic(dest / fname, data)
+                        compress.write_download(dest / fname, data)
                         # one manifestation per language (the best tier): clear any
                         # other-format/zip-ness content a prior run left for this lang
-                        for old in dest.glob(lang + ".*"):
+                        for old in compress.glob(dest, lang + ".*"):
                             if old.name != fname:
-                                old.unlink()
+                                compress.unlink(old)
                     written += 1
             status(i, total, "%d unpacked, %d skipped, %d filtered, %d empty  %s"
                    % (written, skipped, filtered, empty, celex or "-"))

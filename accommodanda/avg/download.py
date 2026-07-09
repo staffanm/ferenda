@@ -56,6 +56,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
+from ..lib import compress
 from ..lib.harvest import HarvestWatermark, ItemKey, walk
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session, request
@@ -65,7 +66,6 @@ from ..lib.util import (
     document_extension,
     normalize_space,
     record_path,
-    write_atomic,
 )
 from .legacy import RE_ARN_DNR, arn_pdf_path
 
@@ -142,15 +142,15 @@ def jo_save(root, hit, session, delay, full=False):
     basefile = "jo/" + dnrs[0]
     record = jo_record(hit, basefile)
     path = record_path(root, "jo", basefile)
-    changed = not (path.exists() and json.loads(path.read_text()) == record)
+    changed = not (compress.exists(path) and json.loads(compress.read_text(path)) == record)
     if changed:
-        write_atomic(path, json.dumps(record, ensure_ascii=False, indent=2))
+        compress.write_download(path, json.dumps(record, ensure_ascii=False, indent=2))
     pdf_url = record.get("pdf_url")
     pdf = jo_pdf_path(root, basefile)
-    if pdf_url and (full or not pdf.exists()):
+    if pdf_url and (full or not compress.exists(pdf)):
         response = request(session, "GET", pdf_url, timeout=120)
         if document_extension(response.content) == ".pdf":
-            write_atomic(pdf, response.content)
+            compress.write_download(pdf, response.content)
         else:
             print("jo: %s pdf_url served non-PDF, skipping body file"
                   % basefile, flush=True)
@@ -214,8 +214,8 @@ def jo_sync(root, full=False, only=None, limit=None, delay=0.5, log=print):
             return None                       # unparsable diary_number -- not a doc
         basefile = "jo/" + dnrs[0]
         pdf = jo_pdf_path(root, basefile)
-        is_downloaded = record_path(root, "jo", basefile).exists() \
-            and (not hit.get("pdf_url") or pdf.exists())
+        is_downloaded = compress.exists(record_path(root, "jo", basefile)) \
+            and (not hit.get("pdf_url") or compress.exists(pdf))
         return ItemKey(basefile=basefile, is_downloaded=is_downloaded,
                        date=hit.get("resolve_date"))
 
@@ -289,12 +289,12 @@ def jk_save(root, item, session, delay, full=False):
               "title": item["title"], "url": item["url"]}
     path = record_path(root, "jk", basefile)
     landing = jk_html_path(root, basefile)
-    if not full and path.exists() and landing.exists() \
-            and json.loads(path.read_text()) == record:
+    if not full and compress.exists(path) and compress.exists(landing) \
+            and json.loads(compress.read_text(path)) == record:
         return False
     response = request(session, "GET", item["url"], timeout=60)
-    write_atomic(landing, response.text)
-    write_atomic(path, json.dumps(record, ensure_ascii=False, indent=2))
+    compress.write_download(landing, response.text)
+    compress.write_download(path, json.dumps(record, ensure_ascii=False, indent=2))
     time.sleep(delay)
     return True
 
@@ -399,8 +399,8 @@ def arn_save(root, item, session, delay, full=False):
               "source_url": item["url"]}
     path = record_path(root, "arn", basefile)
     pdf = arn_pdf_path(root, basefile)
-    if not full and path.exists() and pdf.exists() \
-            and json.loads(path.read_text()) == record:
+    if not full and compress.exists(path) and compress.exists(pdf) \
+            and json.loads(compress.read_text(path)) == record:
         return False
     response = request(session, "GET", item["url"], timeout=120)
     time.sleep(delay)
@@ -408,8 +408,8 @@ def arn_save(root, item, session, delay, full=False):
         print("arn: %s: %s served a non-PDF body, skipping"
               % (basefile, item["url"]), flush=True)
         return False
-    write_atomic(pdf, response.content)
-    write_atomic(path, json.dumps(record, ensure_ascii=False, indent=2))
+    compress.write_download(pdf, response.content)
+    compress.write_download(path, json.dumps(record, ensure_ascii=False, indent=2))
     return True
 
 

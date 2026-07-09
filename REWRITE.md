@@ -1902,6 +1902,19 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **lib** (2026-07-09) — `lib/compress.py`'s transparent Brotli compression now
+  also covers the raw `downloaded/` tree, not just `artifact/`/`generated/`:
+  `write_download` picks plain-vs-Brotli per file (`INCOMPRESSIBLE_SUFFIXES`
+  skips already-compressed payloads — PDF/zip/docx/images/…, and sub-512-byte
+  files stay plain regardless of extension) and `download_encodings`/`glob`/
+  `list_basefiles` (the latter moved here from `lib/util.py`) give downloaders
+  and parsers a compress-aware way to enumerate and read that tree. Every
+  vertical downloader (sfs, dv, eurlex incl. bulk, forarbete incl. riksdagen +
+  legacy importers, foreskrift incl. legacy, avg incl. legacy, remisser) now
+  writes payloads/records through `write_download`, and all parse-/build-side
+  readers of `downloaded/` go through the new readers/globs. Harvest
+  watermark/pending dotfiles are deliberately left plain. `test/test_compress.py`
+  covers the new download-side surface.
 - **§7d** (2026-07-08) — EU case naming: `lib/eucasenaming.py` (the EU mirror
   of `lib/casenaming.py`) derives a CJEU case's court case number from its
   CELEX and pairs it with a curated usual name harvested from Wikidata

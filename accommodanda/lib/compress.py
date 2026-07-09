@@ -33,6 +33,7 @@ and empty ``SkipDocument`` placeholders universally readable with no encoding.
 """
 
 import gzip as _gzip
+import json
 import mimetypes
 import os
 from pathlib import Path
@@ -55,6 +56,21 @@ SUFFIXES = tuple(suffix for _enc, suffix in ENCODINGS)
 # br-only. A `.gz` companion for stock-nginx gzip_static is a one-token change.
 ARTIFACT_ENCODINGS = ("br",)
 PAGE_ENCODINGS = ("br",)
+DOWNLOAD_ENCODINGS = ("br",)
+
+# The raw `downloaded/` tree is a mix: text (the fetched HTML landing pages, the
+# eurlex Formex XML, the record/notice JSON+TTL) that Brotli shrinks 3-10x, and
+# already-compressed payloads (born-digital PDFs are internally FlateDecode/JPEG,
+# .zip/.docx are zip containers) where a max-quality re-encode costs minutes per
+# build for a percent or two. Those are stored plain; everything else takes the
+# configured download variant. Extension-driven so a caller need not know the
+# codec -- `write_download` reads the policy off the logical name.
+INCOMPRESSIBLE_SUFFIXES = frozenset({
+    ".pdf", ".zip", ".gz", ".br", ".docx", ".doc", ".xlsx", ".pptx",
+    ".jpg", ".jpeg", ".png", ".gif", ".webp", ".ico",
+    ".woff", ".woff2", ".7z", ".xz", ".bz2", ".rar",
+    ".mp4", ".mp3", ".mov", ".avi",
+})
 
 # below this many bytes, store plain -- the codec overhead is not worth it and a
 # tiny file is cheap to serve uncompressed to any client (see module docstring).
@@ -199,6 +215,26 @@ def write_text(path, text, encodings=PAGE_ENCODINGS, encoding="utf-8"):
     write_bytes(path, text.encode(encoding), encodings=encodings)
 
 
+def download_encodings(path):
+    """The storage encodings for a downloaded logical `path`: none (store plain)
+    for an already-compressed payload -- see ``INCOMPRESSIBLE_SUFFIXES`` -- else
+    the configured download variant. Extension only, case-insensitively."""
+    if logical(path).suffix.lower() in INCOMPRESSIBLE_SUFFIXES:
+        return ()
+    return DOWNLOAD_ENCODINGS
+
+
+def write_download(path, data):
+    """Persist a fetched file under the raw ``downloaded/`` tree, compressing text
+    payloads and storing already-compressed ones (PDF, zip, ...) plain. `data` is
+    bytes or str. The single write funnel for downloads, mirroring `write_bytes`
+    for the artifact/page trees: callers pass the logical name (``foo.html``,
+    ``bar.pdf``) and read it back through the compress-aware readers."""
+    if isinstance(data, str):
+        data = data.encode("utf-8")
+    write_bytes(path, data, encodings=download_encodings(path))
+
+
 def unlink(path):
     """Remove every representation of a logical `path` (plain + all variants)."""
     _clear_variants(logical(path), keep=())
@@ -227,6 +263,17 @@ def glob(directory, pattern):
     root = Path(directory)
     return {logical(p) for suffix in ("", *SUFFIXES)
             for p in root.glob(pattern + suffix)}
+
+
+def list_basefiles(root, subdir):
+    """Every harvested basefile under `root/subdir`, read from the records.
+    Compress-aware: a record stored as ``<slug>.json.br`` is enumerated and read
+    transparently. Lives here (not `util`) because it walks the possibly-compressed
+    download tree -- `util` is the lower layer this module builds on."""
+    directory = Path(root) / subdir
+    return sorted(json.loads(read_text(p))["basefile"]
+                  for p in glob(directory, "*.json")
+                  if not p.name.startswith("."))
 
 
 def variants_on_disk(directory, relpath):

@@ -286,7 +286,7 @@ def sfs_version_downloads(basefile):
     exists in both forms the JSON (the richer, register-carrying form) wins."""
     root = _sfs_version_dir(SFS_DOWNLOADED, basefile)
     found = {}
-    for path in sorted(root.glob("*/*")) + sorted(root.glob("*")):
+    for path in sorted(compress.glob(root, "*/*")) + sorted(compress.glob(root, "*")):
         if path.is_dir() or path.suffix not in (".html", ".json"):
             continue   # junk (editor backups) never becomes a version
         version = ("%s:%s" % (path.parent.name, path.stem.replace("_", " "))

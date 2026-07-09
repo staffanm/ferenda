@@ -25,7 +25,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup, Tag
 
-from ..lib import layout, util
+from ..lib import compress, layout, util
 from ..lib.catalog import BASE
 from ..lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
 from ..lib.errors import SkipDocument
@@ -153,7 +153,7 @@ class Register:
 
 
 def parse_register(path):
-    soup = BeautifulSoup(Path(path).read_bytes(), "lxml")
+    soup = BeautifulSoup(compress.read_bytes(Path(path)), "lxml")
     if soup.find(string="Sökningen gav ingen träff!"):
         raise SkipDocument("no register page at %s" % path)
     content = soup.find("div", class_="search-results-content")
@@ -257,7 +257,7 @@ def parse_sfst_header(path):
     """Header key→value pairs from the downloaded SFST (consolidated) page —
     the fields the register page lacks: Utfärdad, Ikraft, the
     'Ändring införd: t.o.m. SFS …' consolidation cutoff, Övrigt."""
-    soup = BeautifulSoup(Path(path).read_bytes(), "lxml")
+    soup = BeautifulSoup(compress.read_bytes(Path(path)), "lxml")
     boxes = [b for b in soup.find_all("div", class_="result-inner-box")
              if not b.find("div", class_="body-text")]
     header = {}

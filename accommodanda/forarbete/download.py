@@ -50,6 +50,7 @@ from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
 
+from ..lib import compress
 from ..lib.harvest import HarvestWatermark
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session
@@ -59,7 +60,6 @@ from ..lib.util import (
     basefile_slug,
     document_extension,
     record_path,
-    write_atomic,
 )
 
 # BASE and the doctype table (TYPES: url segment, taxonomy category id,
@@ -226,15 +226,15 @@ def download_document(session, root, item, delay):
         if ext is None:                    # not a document (image, error page)
             continue
         name = "%s%s%s" % (slug, ("-%d" % len(files) if files else ""), ext)
-        write_atomic(Path(root) / typ / name, data)
+        compress.write_download(Path(root) / typ / name, data)
         files.append(name)
         time.sleep(delay)
-    write_atomic(Path(root) / typ / (slug + ".html"), landing.text)
+    compress.write_download(Path(root) / typ / (slug + ".html"), landing.text)
     record = {k: item[k] for k in
               ("type", "basefile", "identifier", "title", "date", "url")}
     record["files"] = files
-    write_atomic(record_path(root, typ, basefile),
-                 json.dumps(record, ensure_ascii=False, indent=2))
+    compress.write_download(record_path(root, typ, basefile),
+                            json.dumps(record, ensure_ascii=False, indent=2))
     return record
 
 
@@ -249,7 +249,7 @@ def has_live_record(root, typ, basefile):
     overwrite the import; and a legacy record must not trip the newest-first
     incremental stop (`done = True`) as if the corpus were already caught up."""
     recpath = record_path(root, typ, basefile)
-    return recpath.exists() and "source" not in json.loads(recpath.read_text())
+    return compress.exists(recpath) and "source" not in json.loads(compress.read_text(recpath))
 
 
 def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,

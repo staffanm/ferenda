@@ -42,7 +42,7 @@ import re
 import time
 from pathlib import Path
 
-from ..lib import layout
+from ..lib import compress, layout
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
 from ..lib.util import Reporter, write_atomic
@@ -155,10 +155,10 @@ def save_document(destdir, source):
     Returns "new", "updated" or "unchanged"."""
     path = source_path(destdir, source["beteckning"])
     new = serialize(source)
-    if not path.exists():
-        write_atomic(path, new)
+    if not compress.exists(path):
+        compress.write_download(path, new)
         return "new"
-    old = path.read_bytes()
+    old = compress.read_bytes(path)
     if old == new:
         return "unchanged"
     old_version = version_id(json.loads(old))
@@ -166,9 +166,9 @@ def save_document(destdir, source):
         # the on-disk copy is a genuinely older consolidation -- preserve
         # it. A re-fetch of the same version (data correction) just
         # overwrites current, mirroring the old archive(overwrite=True).
-        write_atomic(archive_path(destdir, source["beteckning"], old_version),
-                     old)
-    write_atomic(path, new)
+        compress.write_download(archive_path(destdir, source["beteckning"], old_version),
+                                old)
+    compress.write_download(path, new)
     return "updated"
 
 

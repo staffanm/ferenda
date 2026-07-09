@@ -13,7 +13,7 @@ from accommodanda.avg import download as avg_download
 from accommodanda.avg import legacy as avg_legacy
 from accommodanda.avg import parse as avg_parse
 from accommodanda.avg.model import Beslut, Block, beslut_uri
-from accommodanda.lib import catalog, facets, layout
+from accommodanda.lib import catalog, compress, facets, layout
 from accommodanda.lib.lagrum import MYNDIGHETSBESLUT, LagrumParser
 from accommodanda.lib.pdftext import Para
 from accommodanda.lib.util import document_extension, record_path, write_atomic
@@ -238,10 +238,9 @@ def test_record_roundtrip(tmp_path):
     record = {"basefile": "jk/2024/8082", "org": "jk",
               "diarienummer_raw": "2024/8082", "beslutsdatum_raw": "20 apr 2026",
               "title": "t", "url": "https://www.jk.se/x/"}
-    from accommodanda.lib.util import list_basefiles, record_path, write_atomic
-    write_atomic(record_path(tmp_path, "jk", record["basefile"]),
-                 json.dumps(record))
-    assert list_basefiles(tmp_path, "jk") == ["jk/2024/8082"]
+    compress.write_download(record_path(tmp_path, "jk", record["basefile"]),
+                            json.dumps(record))
+    assert compress.list_basefiles(tmp_path, "jk") == ["jk/2024/8082"]
 
 
 # --------------------------------------------------------------------------

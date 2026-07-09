@@ -51,7 +51,7 @@ def archival_header(path):
     """Header key→value pairs from a latin-1 SFST archival page. The header
     is plain text above the <hr> inside the <pre>: "key:<b> value</b>" lines,
     keys sometimes wrapped over two lines ("Departement/\\nmyndighet:")."""
-    text = path.read_bytes().decode("latin-1")
+    text = compress.read_bytes(path).decode("latin-1")
     start = text.index("<pre>")
     end = text.index("<hr>", start)
     block = html.unescape(re.sub(r"<[^>]+>", "", text[start:end]))
@@ -104,12 +104,12 @@ def parse_version(basefile, version, path, refparser=None):
     is_html = path.suffix != ".json"
     if is_html:
         header = (archival_header(path)
-                  if sniff_encoding(path.read_bytes()) == "latin-1"
+                  if sniff_encoding(compress.read_bytes(path)) == "latin-1"
                   else register_mod.parse_sfst_header(path))
         art = to_normalform(parse_sfs(path, basefile), basefile,
                             refparser=refparser)
     else:
-        source = json.loads(path.read_text())
+        source = json.loads(compress.read_text(path))
         header = register_mod.sfst_header_from_source(source)
         art = to_normalform(parse_sfs_source(source, basefile), basefile,
                             refparser=refparser,

@@ -1,6 +1,5 @@
 """Small shared utilities (ported from ferenda.util)."""
 
-import json
 import os
 import re
 import shutil
@@ -48,13 +47,6 @@ def basefile_slug(basefile):
 def record_path(root, subdir, basefile):
     """The harvest-record JSON path for `basefile` under `root/subdir`."""
     return Path(root) / subdir / (basefile_slug(basefile) + ".json")
-
-
-def list_basefiles(root, subdir):
-    """Every harvested basefile under `root/subdir`, read from the records."""
-    return sorted(json.loads(p.read_text())["basefile"]
-                  for p in (Path(root) / subdir).glob("*.json")
-                  if not p.name.startswith("."))
 
 
 def document_extension(data):

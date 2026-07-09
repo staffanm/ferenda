@@ -13,6 +13,7 @@ from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
+from ..lib import compress
 from ..lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
 from ..lib.lagrum import LagrumParser, load_namedlaws
 from . import input_paths, load_inputs
@@ -159,9 +160,9 @@ def cmd_validate(args):
         # the downloaded tree is now JSON (the new beta API source); the
         # legacy SFST HTML tree (downloaded/sfst/…/*.html) is the fallback
         downloaded = downloaddir / rel.with_suffix(".json")
-        if not downloaded.exists():
+        if not compress.exists(downloaded):
             downloaded = (downloaddir / "sfst" / rel).with_suffix(".html")
-        if not downloaded.exists():
+        if not compress.exists(downloaded):
             continue
         jobs.append((parsedfile, downloaded,
                      basefile_from_path(parsedfile, parseddir),
