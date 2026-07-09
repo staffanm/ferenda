@@ -1,6 +1,10 @@
 """Downloader for utskottsbetänkanden (committee reports, doktyp=bet) from
 data.riksdagen.se -- the third incremental-harvest loop in the codebase
 (regeringen `download.py`, `foreskrift/harvest.py` are the other two).
+The dokumentlista walk, the riksmöte-sliced backfill and the watermark
+lifecycle are doctype-agnostic (`harvest`); this module drives them with the
+bet specifics (PDF filbilaga bodies, the planned-placeholder upgrade cycle),
+and `rskr.py` reuses the same engine for riksdagsskrivelser.
 
 A committee report is the missing prop→law link: an SFS register and a
 proposition cite it as "bet. 2025/26:JuU47 s. 12", and the FORARBETEN citation
@@ -200,9 +204,9 @@ def download_document(session, root, entry, delay):
     return record
 
 
-def _currency(root, basefile, fil):
-    """How current the on-disk record for this entry is (`fil` = the entry's
-    `pdf_fil` result): None when it needs a (re)fetch, "final" when it has its
+def _currency(root, basefile, entry):
+    """How current the on-disk record for this entry is: None when it needs a
+    (re)fetch, "final" when it has its
     PDF stored, "provisional" for a current
     metadata-only record. Builds on the shared `has_live_record` (a frozen
     import never counts), adding the pre-print upgrade cycle: riksdagen lists a
@@ -227,7 +231,13 @@ def _currency(root, basefile, fil):
     record = json.loads(compress.read_text(record_path(root, TYPE, basefile)))
     if record["files"]:
         return "final"
-    return "provisional" if fil is None else None
+    return "provisional" if pdf_fil(entry) is None else None
+
+
+def _published(entry):
+    """Only a filbilaga-carrying entry counts as published for the watermark
+    date -- a planned entry's future datum would erode the safety margin."""
+    return pdf_fil(entry) is not None
 
 
 # The riksmöte value sequence the API accepts, verified empirically (2026-07)
@@ -255,20 +265,22 @@ def riksmoten(newest_year):
         yield str(year)
 
 
-def newest_riksmote_year(session):
-    """The starting year of the newest riksmöte with bet documents, read from
-    the first un-narrowed listing page (newest-first; planned betänkanden for
+def newest_riksmote_year(session, listing=LISTING):
+    """The starting year of the newest riksmöte with documents in `listing`,
+    read from the first un-narrowed page (newest-first; planned betänkanden for
     the coming riksmöte appear here before the calendar would predict them)."""
-    page = request(session, "GET", LISTING, parse_json=True)["dokumentlista"]
+    page = request(session, "GET", listing, parse_json=True)["dokumentlista"]
     docs = _docs(page)
     if not docs:
         # untrusted remote response -- a raise, never an assert
         # (rule:errors-drive-retry-use-raise)
-        raise ValueError("empty dokumentlista for %s" % LISTING)
+        raise ValueError("empty dokumentlista for %s" % listing)
     return max(int(entry["rm"][:4]) for entry in docs)
 
 
-def _walk(session, root, url, *, watermark, delay, log, rep, scope):
+def _walk(session, root, url, *, watermark, delay, log, rep, scope,
+          typ=TYPE, fetch=download_document, currency=_currency,
+          published=_published):
     """One listing walk (one url, `@nasta_sida`-paged): download every document
     whose record is absent or stale (`_currency` -- a metadata-only record
     whose entry has since gained a filbilaga is re-downloaded and upgraded).
@@ -281,7 +293,10 @@ def _walk(session, root, url, *, watermark, delay, log, rep, scope):
     run) skips current documents but always walks the whole listing. Returns
     (seen, new, errors, newest_pub) -- newest_pub = the datum of the newest
     *published* (filbilaga-carrying) entry seen, the only sound watermark date
-    (a planned entry's future datum would erode the safety margin)."""
+    (a planned entry's future datum would erode the safety margin).
+
+    The `typ`/`fetch`/`currency`/`published` knobs are the doctype specifics
+    (defaults: bet); `rskr.py` drives the same walk for riksdagsskrivelser."""
     seen = new = errors = 0
     newest_pub = None
     stopped = False
@@ -290,25 +305,25 @@ def _walk(session, root, url, *, watermark, delay, log, rep, scope):
             seen += 1
             try:
                 basefile = basefile_of(entry)
-                fil = pdf_fil(entry)
+                state = currency(root, basefile, entry)
+                pub = published(entry)
             except ValueError as exc:
                 # a malformed feed entry (missing rm/beteckning or a broken
                 # filbilaga) is recorded and skipped; it must not abort the
                 # remaining walk (rule:errors-drive-retry-use-raise)
                 errors += 1
-                log("  bet: %s" % exc)
+                log("  %s: %s" % (typ, exc))
                 continue
-            currency = _currency(root, basefile, fil)
             if watermark is not None and watermark.should_stop(
-                    currency == "final", entry.get("datum")):
+                    state == "final", entry.get("datum")):
                 stopped = True
                 break
-            if newest_pub is None and fil is not None and entry.get("datum"):
+            if newest_pub is None and pub and entry.get("datum"):
                 newest_pub = entry["datum"]   # newest-first => first published wins
-            if currency:
+            if state:
                 continue
             try:
-                download_document(session, root, entry, delay)
+                fetch(session, root, entry, delay)
                 new += 1
             except (requests.HTTPError, ValueError) as exc:
                 # a counted, logged per-document failure (a 404'd filbilaga,
@@ -316,7 +331,7 @@ def _walk(session, root, url, *, watermark, delay, log, rep, scope):
                 # watermark store dirty; it must not abort the remaining
                 # ~161-riksmöte walk
                 errors += 1
-                log("  bet %s: %s" % (basefile, exc))
+                log("  %s %s: %s" % (typ, basefile, exc))
         rep.update(seen, int(page["@traffar"]), scope=scope,
                    page=int(page["@sida"]), new=new)
         if stopped:
@@ -325,43 +340,26 @@ def _walk(session, root, url, *, watermark, delay, log, rep, scope):
     return seen, new, errors, newest_pub
 
 
-def sync(root, full=False, delay=0.5, log=print, riksmote=None):
-    """Download utskottsbetänkanden (doktyp=bet) into `root/bet/`.
+def harvest(root, *, typ, listing, fetch, currency, published, watermark,
+            full=False, delay=0.5, log=print, riksmote=None):
+    """The doctype-agnostic dokumentlista harvest (`sync` below documents the
+    lifecycle in bet terms; rskr.py is the second driver).
 
     Backfilled -- everything missing downloaded -- when `--full` is given or
     the corpus has never been cleanly walked (no watermark date yet: a first
     run, or one crashed partway). Because the API caps any one listing at ~10k
     docs, an un-narrowed backfill walks riksmöte by riksmöte, newest to oldest
-    (see `riksmoten`). The walk drives the shared begin/complete watermark
-    lifecycle (lib.harvest): the date advances even when some documents failed
-    (the date-conclusive stop bounds how deep future runs walk), but errors --
-    or a crash before complete() -- leave the store *dirty*, so the next run
-    disables the consecutive-hit stop, walks down to the date boundary, and
-    naturally retries whatever was stranded (a partially-failed initial load
-    is resumed, not mistaken for finished). Once caught up, later runs go
-    incremental: one un-narrowed newest-first walk gated by the shared
-    `HarvestWatermark` (new docs land at the top, well within the cap; a
-    filbilaga attached to a doc already *past* the stop point surfaces only
-    under `--full`, like edits to old regeringen docs). The saved watermark
-    date is the newest *published* entry's datum -- a planned entry's future
-    datum would erode the gate's safety margin (see `_walk`).
-    `riksmote` narrows the run to one riksmöte (e.g. "2025/26", the API's `rm=`
-    parameter) for dev/manual runs; a narrowed run is a partial view of the
-    corpus and therefore NEVER touches the watermark. Returns (seen, new)."""
+    (see `riksmoten`). `riksmote` narrows the run to one riksmöte -- a partial
+    view of the corpus, so it NEVER touches the watermark. Returns
+    (seen, new)."""
     root = Path(root)
     session = make_session(USER_AGENT)
-    watermark_path = root / TYPE / WATERMARK
-    # per-source window (project convention): the dokumentlista datum sort
-    # mixes planned-debate placeholders among published docs (see `_currency`),
-    # so the gate needs generous slack; 20 consecutive hits / 14 days cover the
-    # planning->print lag observed in the feed.
-    watermark = HarvestWatermark(watermark_path, lookahead_limit=20,
-                                 safety_days=14)
     rep = Reporter()
+    kw = dict(typ=typ, fetch=fetch, currency=currency, published=published,
+              delay=delay, log=log, rep=rep)
     if riksmote is not None:
-        seen, new, _, _ = _walk(session, root, LISTING + "&rm=" + quote(riksmote),
-                                watermark=None, delay=delay, log=log, rep=rep,
-                                scope=TYPE)
+        seen, new, _, _ = _walk(session, root, listing + "&rm=" + quote(riksmote),
+                                watermark=None, scope=typ, **kw)
         return seen, new
     # a crashed run leaves {"last_harvest": null, "dirty": true}: still a
     # backfill, so key on the date, not on the file existing
@@ -370,16 +368,15 @@ def sync(root, full=False, delay=0.5, log=print, riksmote=None):
     if backfill:
         seen = new = errors = 0
         newest_pub = None
-        for value in riksmoten(newest_riksmote_year(session)):
+        for value in riksmoten(newest_riksmote_year(session, listing)):
             s, n, e, pub = _walk(
-                session, root, LISTING + "&rm=" + quote(value), watermark=None,
-                delay=delay, log=log, rep=rep, scope="%s %s" % (TYPE, value))
+                session, root, listing + "&rm=" + quote(value), watermark=None,
+                scope="%s %s" % (typ, value), **kw)
             seen, new, errors = seen + s, new + n, errors + e
             newest_pub = newest_pub or pub   # walks run newest riksmöte first
     else:
         seen, new, errors, newest_pub = _walk(
-            session, root, LISTING, watermark=watermark, delay=delay, log=log,
-            rep=rep, scope=TYPE)
+            session, root, listing, watermark=watermark, scope=typ, **kw)
     # complete() advances the date even with errors (bounding how deep future
     # runs walk) but then leaves the store dirty: the next run walks past the
     # consecutive-hit stop down to the date-conclusive boundary and retries
@@ -390,5 +387,35 @@ def sync(root, full=False, delay=0.5, log=print, riksmote=None):
     if errors:
         log("  %s: %d download error(s) -- the store stays dirty, so the next "
             "run re-walks down to the watermark boundary and retries them"
-            % (TYPE, errors))
+            % (typ, errors))
     return seen, new
+
+
+def sync(root, full=False, delay=0.5, log=print, riksmote=None):
+    """Download utskottsbetänkanden (doktyp=bet) into `root/bet/`.
+
+    The walk drives the shared begin/complete watermark lifecycle
+    (lib.harvest): the date advances even when some documents failed (the
+    date-conclusive stop bounds how deep future runs walk), but errors -- or a
+    crash before complete() -- leave the store *dirty*, so the next run
+    disables the consecutive-hit stop, walks down to the date boundary, and
+    naturally retries whatever was stranded (a partially-failed initial load
+    is resumed, not mistaken for finished). Once caught up, later runs go
+    incremental: one un-narrowed newest-first walk gated by the shared
+    `HarvestWatermark` (new docs land at the top, well within the cap; a
+    filbilaga attached to a doc already *past* the stop point surfaces only
+    under `--full`, like edits to old regeringen docs). The saved watermark
+    date is the newest *published* entry's datum -- a planned entry's future
+    datum would erode the gate's safety margin (see `_walk`).
+    `riksmote` narrows the run to one riksmöte (e.g. "2025/26", the API's `rm=`
+    parameter) for dev/manual runs. Returns (seen, new)."""
+    # per-source window (project convention): the dokumentlista datum sort
+    # mixes planned-debate placeholders among published docs (see `_currency`),
+    # so the gate needs generous slack; 20 consecutive hits / 14 days cover the
+    # planning->print lag observed in the feed.
+    watermark = HarvestWatermark(Path(root) / TYPE / WATERMARK,
+                                 lookahead_limit=20, safety_days=14)
+    return harvest(root, typ=TYPE, listing=LISTING, fetch=download_document,
+                   currency=_currency, published=_published,
+                   watermark=watermark, full=full, delay=delay, log=log,
+                   riksmote=riksmote)

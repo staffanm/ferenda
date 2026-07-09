@@ -69,6 +69,7 @@ from .forarbete import kommentar as fa_kommentar
 from .forarbete import legacy as fa_legacy
 from .forarbete import parse as fa_parse
 from .forarbete import riksdagen as fa_riksdagen
+from .forarbete import rskr as fa_rskr
 from .foreskrift import download as foreskrift_download
 from .foreskrift import harvest as foreskrift_harvest_mod
 from .foreskrift import legacy as foreskrift_legacy
@@ -921,25 +922,28 @@ def fa_list():
 
 def fa_harvest(scopes):
     """Bulk harvest of preparatory works. Most doctypes come from regeringen.se
-    (the old download_new); `bet` (utskottsbetänkanden) comes from
-    data.riksdagen.se via a separate downloader. `scopes` narrows to the named
-    doctypes (prop/sou/ds/bet/...); empty = all. `--only BASEFILE` (with exactly
+    (the old download_new); `bet` (utskottsbetänkanden) and `rskr`
+    (riksdagsskrivelser) come from data.riksdagen.se via the shared
+    dokumentlista engine. `scopes` narrows to the named doctypes
+    (prop/sou/ds/bet/rskr/...); empty = all. `--only BASEFILE` (with exactly
     one regeringen scope) fetches just that one document, walking the listing
-    until it is found (regeringen types only -- bet has no --only).
-    `--riksmote YYYY/YY` (with exactly the bet scope) narrows the bet harvest
-    to one riksmöte -- a dev/manual slice that never advances the watermark."""
+    until it is found (regeringen types only -- bet/rskr have no --only).
+    `--riksmote YYYY/YY` (with exactly the bet or rskr scope) narrows that
+    harvest to one riksmöte -- a dev/manual slice that never advances the
+    watermark."""
     if RUN.only and len(scopes) != 1:
         sys.exit("forarbete --only needs exactly one doctype, e.g. "
                  "`lagen forarbete download prop --only 2025/26:28`")
-    do_bet = "bet" in scopes if scopes else True
-    reg_scopes = [s for s in scopes if s != "bet"]
+    riksdagen_syncs = {"bet": fa_riksdagen.sync, "rskr": fa_rskr.sync}
+    rd_scopes = [s for s in (scopes or riksdagen_syncs) if s in riksdagen_syncs]
+    reg_scopes = [s for s in scopes if s not in riksdagen_syncs]
     do_reg = bool(reg_scopes) or not scopes   # empty scopes = all regeringen types
-    if RUN.only and do_bet:
-        sys.exit("forarbete --only is not supported for bet "
+    if RUN.only and rd_scopes:
+        sys.exit("forarbete --only is not supported for bet/rskr "
                  "(data.riksdagen.se); use a full or incremental download")
-    if RUN.riksmote and (do_reg or not do_bet):
-        sys.exit("forarbete --riksmote needs exactly the bet scope, e.g. "
-                 "`lagen forarbete download bet --riksmote 2025/26`")
+    if RUN.riksmote and (do_reg or len(rd_scopes) != 1):
+        sys.exit("forarbete --riksmote needs exactly the bet or rskr scope, "
+                 "e.g. `lagen forarbete download bet --riksmote 2025/26`")
     if RUN.dry_run:
         print("forarbete download: would download %s into %s"
               % (RUN.only or ", ".join(scopes) or "all types",
@@ -950,10 +954,10 @@ def fa_harvest(scopes):
                                   full=RUN.force, only=RUN.only)
         for typ, (seen, new) in totals.items():
             print("forarbete %s: %d seen, %d new" % (typ, seen, new))
-    if do_bet:
-        seen, new = fa_riksdagen.sync(str(layout.FA_DOWNLOADED), full=RUN.force,
-                                      riksmote=RUN.riksmote)
-        print("forarbete bet: %d seen, %d new" % (seen, new))
+    for typ in rd_scopes:
+        seen, new = riksdagen_syncs[typ](str(layout.FA_DOWNLOADED), full=RUN.force,
+                                         riksmote=RUN.riksmote)
+        print("forarbete %s: %d seen, %d new" % (typ, seen, new))
 
 
 def fa_parse_run(basefile):
@@ -1010,12 +1014,13 @@ SOURCES["forarbete"] = Source("forarbete", fa_list, {
     "parse": Stage("parse", fa_parse_run, fa_artifact,
                    inputs=fa_parse_inputs, code=FA_CODE),
 }, harvest=fa_harvest, origin=_origin(fa_download.BASE),
-   scopes=frozenset(fa_download.TYPES) | {"bet"},
+   scopes=frozenset(fa_download.TYPES) | {"bet", "rskr"},
    actions={"import-legacy": fa_import_legacy},
    notes="download flag: --only BASEFILE (fetch one document; needs one "
          "regeringen scope)\n"
-         "download flag: --riksmote YYYY/YY (narrow the bet download to one "
-         "riksmöte; needs the bet scope, never advances the watermark)\n"
+         "download flag: --riksmote YYYY/YY (narrow the bet or rskr download "
+         "to one riksmöte; needs that single scope, never advances the "
+         "watermark)\n"
          "import-legacy {%s} [<path>]: one-time import of a frozen förarbete "
          "corpus (--limit N caps it; --force re-imports)" % FA_LEGACY_CORPORA)
 
