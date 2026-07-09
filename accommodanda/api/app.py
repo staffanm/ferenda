@@ -21,7 +21,6 @@ import re
 import sqlite3
 import subprocess
 import threading
-from datetime import datetime, timezone
 from html import escape
 from pathlib import Path
 
@@ -93,9 +92,6 @@ mcp_server.mount(app)
 _index = search.SearchIndex()
 
 
-_schema_lock = threading.Lock()
-_schema_ready = False
-
 # a bounded LRU of rendered diffs, keyed on the (basefile, from_version, to)
 # triple: two archived consolidations are immutable, so the same triple always
 # renders the same HTML and is safe to cache indefinitely. The "current"
@@ -124,27 +120,13 @@ def _cached_diff_html(basefile, from_version, to):
     return html
 
 
-def _ensure_schema():
-    """Apply the catalog's additive migrations once per process: a catalog built
-    by an older build may lack a column the queries below select. Lock-guarded so
-    concurrent first requests don't race on the one-time ALTER, after which the
-    per-request connections can stay read-only."""
-    global _schema_ready
-    if _schema_ready:
-        return
-    with _schema_lock:
-        if not _schema_ready:
-            catalog.connect(str(CATALOG)).close()
-            _schema_ready = True
-
-
 def get_con():
     """A read-only catalog connection per request (SQLite connections are not
-    shared across threads)."""
+    shared across threads); `catalog.connect_ro` applies the additive schema
+    migrations once per process first."""
     if not CATALOG.exists():
         raise HTTPException(503, "catalog not built -- run `lagen all relate`")
-    _ensure_schema()
-    con = sqlite3.connect("file:%s?mode=ro" % CATALOG, uri=True)
+    con = catalog.connect_ro(CATALOG)
     try:
         yield con
     finally:
@@ -298,17 +280,12 @@ def search_endpoint(
     # Resolution confirms its target against the catalog, but a missing catalog
     # mustn't fail a full-text search, so it's best-effort (no Depends/503).
     if offset == 0 and CATALOG.exists():
-        _ensure_schema()
-        con = sqlite3.connect("file:%s?mode=ro" % CATALOG, uri=True)
+        con = catalog.connect_ro(CATALOG)
         try:
             pinned = _resolved_results(con, q, source, kind)
         finally:
             con.close()
-        if pinned:
-            roots = {p["uri"] for p in pinned}
-            kept = [r for r in results if r["uri"] not in roots]
-            total += sum(p["uri"] not in {r["uri"] for r in results} for p in pinned)
-            results = (pinned + kept)[:limit]
+        results, total = pins.merge_pinned(pinned, results, total, limit)
     return SearchResponse(query=q, total=total, results=results)  # ty: ignore[invalid-argument-type]  # results are untyped hit dicts; pydantic validates at runtime
 
 
@@ -359,11 +336,7 @@ def documents_endpoint(
     root = catalog.data_root(con)              # stored paths are data_root-relative
     for uri, src, kind_, label, title, source_url, path, _display in \
             catalog.documents(con, source, kind, limit, offset):
-        # synthesized begrepp stubs have no artifact file (path=''); Path('')
-        # aliases to the cwd, so this must be excluded before the exists() check
-        p = catalog.artifact_path(root, path)
-        updated = (datetime.fromtimestamp(compress.stat(p).st_mtime, timezone.utc).isoformat()
-                   if p and compress.exists(p) else None)
+        updated = catalog.artifact_updated(root, path)
         docs.append(DocumentSummary(uri=uri, source=src, kind=kind_, label=label,
                                     title=title, source_url=source_url,
                                     updated=updated))
@@ -381,8 +354,7 @@ def document_endpoint(uri: str = Query(..., description="full lagen.nu document 
     uri, source, kind, label, title, path = row
     # synthesized begrepp stubs are real catalog rows with no artifact file
     # (path='') -- served as an empty artifact, like the rendered shell pages
-    p = catalog.artifact_path(catalog.data_root(con), path)   # stored path is relative
-    art = json.loads(compress.read_bytes(p)) if p else {}
+    art = catalog.load_artifact(catalog.data_root(con), path)
     return Document(uri=uri, source=source, kind=kind, label=label, title=title,
                     source_url=art.get("source_url"), artifact=art,
                     inbound_count=catalog.document_inbound_count(con, uri))

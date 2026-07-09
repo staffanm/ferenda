@@ -19,6 +19,8 @@ import hashlib
 import json
 import re
 import sqlite3
+import threading
+from datetime import datetime, timezone
 from pathlib import Path
 
 from . import compress, concepts, util
@@ -137,6 +139,27 @@ def connect(path):
     return con
 
 
+_ro_lock = threading.Lock()
+_ro_migrated = set()
+
+
+def connect_ro(path):
+    """A read-only connection to the catalog at `path`, for the serving layer
+    (the REST endpoints and the MCP tools open one per request/tool call --
+    SQLite connections are not shared across threads). The first call per
+    catalog applies `connect`'s additive migrations (a catalog built by an
+    older build may lack a column the queries select), lock-guarded so
+    concurrent first requests don't race on the one-time ALTER; after that
+    every connection stays read-only."""
+    path = str(path)
+    if path not in _ro_migrated:
+        with _ro_lock:
+            if path not in _ro_migrated:
+                connect(path).close()
+                _ro_migrated.add(path)
+    return sqlite3.connect("file:%s?mode=ro" % path, uri=True)
+
+
 def local(uri):
     return uri[len(BASE):] if uri.startswith(BASE) else uri
 
@@ -162,6 +185,23 @@ def artifact_path(root, stored):
     None for a synthesized stub (empty `path`). `root` is `data_root(con)`. Thin
     domain-named wrapper over the shared `util.load_relpath`."""
     return util.load_relpath(root, stored)
+
+
+def load_artifact(root, stored):
+    """The parsed artifact JSON behind a documents row, `{}` for a synthesized
+    stub (empty `path` -- begrepp rows have no artifact file). Reads through
+    `compress` so a brotli-precompressed artifact tree serves unchanged."""
+    p = artifact_path(root, stored)
+    return json.loads(compress.read_bytes(p)) if p else {}
+
+
+def artifact_updated(root, stored):
+    """A documents row's artifact last-build time as an ISO 8601 UTC string,
+    None for a synthesized stub or a missing file."""
+    p = artifact_path(root, stored)
+    return (datetime.fromtimestamp(compress.stat(p).st_mtime,
+                                   timezone.utc).isoformat()
+            if p and compress.exists(p) else None)
 
 
 # --------------------------------------------------------------------------

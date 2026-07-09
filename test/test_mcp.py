@@ -4,17 +4,21 @@ end-to-end Streamable HTTP round-trip through a real MCP client to prove the
 mounted /mcp endpoint and the transport wiring."""
 
 import json
-import threading
 
+import anyio
 import pytest
+import uvicorn
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
+from opensearchpy.exceptions import ConnectionError as OpenSearchConnectionError
 
+from accommodanda.api import app as api
 from accommodanda.api import mcp as mcpmod
+from accommodanda.lib import catalog
 
 
 @pytest.fixture
 def corpus(tmp_path, monkeypatch):
-    from accommodanda.lib import catalog
-
     art_dir = tmp_path / "artifact"
     art_dir.mkdir()
     bb = art_dir / "bb.json"
@@ -34,9 +38,9 @@ def corpus(tmp_path, monkeypatch):
     cat = tmp_path / "catalog.sqlite"
     catalog.rebuild(cat, "sfs", [bb, fl])
 
-    # point the tools at the fixture catalog (reset the process-wide schema flag)
+    # point the tools at the fixture catalog (catalog.connect_ro tracks its
+    # one-time migration per path, so a fresh tmp catalog needs no flag reset)
     monkeypatch.setattr(mcpmod, "CATALOG", cat)
-    monkeypatch.setattr(mcpmod, "_schema_ready", False)
 
     # a fake search backend -- the tools must not require a live OpenSearch
     class FakeIndex:
@@ -64,7 +68,7 @@ def test_search_combines_fulltext_and_pins(corpus):
 def test_search_degrades_without_opensearch(corpus):
     class Down:
         def search(self, *a, **k):
-            raise ConnectionError("no cluster")
+            raise OpenSearchConnectionError("no cluster")
     mcpmod._index = Down()
     res = mcpmod.search("mord")
     # the call still succeeds (no exception), just with a note and no full-text
@@ -123,8 +127,6 @@ def test_tool_schemas_steer_the_model():
     """The steering signals a host reads at connect: every tool is annotated
     read-only, `source` is a closed enum (so a wrong value can't be passed), and
     `kind` stays a described free string (source-specific, not enumerable)."""
-    import anyio
-
     tools = {t.name: t for t in anyio.run(mcpmod.mcp.list_tools)}
     assert set(tools) >= {"search", "resolve_citation", "get_document",
                           "list_documents", "get_incoming_citations",
@@ -146,13 +148,6 @@ def test_tool_schemas_steer_the_model():
 def test_end_to_end_streamable_http(corpus):
     """A real MCP client over the mounted /mcp endpoint: initialize, list the
     tools, call one -- proving the transport + mount + lifespan are wired."""
-    import anyio
-    import uvicorn
-    from mcp import ClientSession
-    from mcp.client.streamable_http import streamable_http_client
-
-    from accommodanda.api import app as api
-
     async def scenario():
         config = uvicorn.Config(api.app, host="127.0.0.1", port=8791,
                                 log_level="error", lifespan="on")

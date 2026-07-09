@@ -44,3 +44,18 @@ def resolved_results(con, q, source=None, kind=None):
                           if frag else []),
         })
     return out
+
+
+def merge_pinned(pinned, results, total, limit):
+    """Lead the full-text `results` with the `pinned` (citation-resolved) hits:
+    the resolved target is the answer to a citation-shaped query, so it goes
+    first; any full-text row for the same document is dropped (the pinned hit
+    is more precise) and `total` counts only the pinned documents full-text
+    didn't already find. Returns the merged (results, total), capped at
+    `limit`. Shared by the REST /search endpoint and the MCP search tool."""
+    if not pinned:
+        return results, total
+    roots = {p["uri"] for p in pinned}
+    kept = [r for r in results if r["uri"] not in roots]
+    total += sum(p["uri"] not in {r["uri"] for r in results} for p in pinned)
+    return (pinned + kept)[:limit], total

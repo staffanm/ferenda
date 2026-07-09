@@ -18,20 +18,18 @@ one code path.
 """
 
 import contextlib
-import json
-import sqlite3
-import threading
-from datetime import datetime, timezone
 from typing import Annotated, Literal
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
+from opensearchpy.exceptions import OpenSearchException
 from pydantic import Field
 from starlette.responses import RedirectResponse
 from starlette.routing import Route
 
 from .. import config
-from ..lib import catalog, layout, pins, search, text
+from ..lib import catalog, layout, pins, text
+from ..lib.search import SearchIndex
 
 CATALOG = config.DATA / "catalog.sqlite"
 
@@ -70,33 +68,18 @@ mcp = FastMCP("lagen.nu", instructions=INSTRUCTIONS,
 # one search client for the process; constructing it opens no connection, so
 # importing/mounting never needs a running OpenSearch -- only a `search` call
 # does (and that degrades gracefully -- see below). Tests swap this out.
-_index = search.SearchIndex()
-
-_schema_lock = threading.Lock()
-_schema_ready = False
-
-
-def _ensure_schema():
-    """Apply the catalog's additive migrations once per process (a catalog built
-    by an older build may lack a column the queries select), lock-guarded so
-    concurrent first requests don't race on the one-time ALTER."""
-    global _schema_ready
-    if _schema_ready:
-        return
-    with _schema_lock:
-        if not _schema_ready:
-            catalog.connect(str(CATALOG)).close()
-            _schema_ready = True
+_index = SearchIndex()
 
 
 @contextlib.contextmanager
 def _con():
     """A read-only catalog connection, opened per tool call (SQLite connections
-    are not shared across threads, and FastMCP runs sync tools in a threadpool)."""
+    are not shared across threads, and FastMCP runs sync tools in a threadpool);
+    `catalog.connect_ro` applies the additive schema migrations once per
+    process first."""
     if not CATALOG.exists():
         raise RuntimeError("catalog not built -- run `lagen all relate`")
-    _ensure_schema()
-    con = sqlite3.connect("file:%s?mode=ro" % CATALOG, uri=True)
+    con = catalog.connect_ro(CATALOG)
     try:
         yield con
     finally:
@@ -149,27 +132,24 @@ def search(query: str, source: SourceArg = None, kind: KindArg = None,
     """
     limit = max(1, min(limit, 50))
     results, total, note = [], 0, None
-    # full-text needs the cluster; if it's down, still answer with the pinned
-    # citation resolution (catalog-only) rather than failing the whole call
+    # full-text needs the cluster; if it's down (or the index is missing), still
+    # answer with the pinned citation resolution (catalog-only) rather than
+    # failing the whole call -- but only an OpenSearch failure degrades; a bug
+    # in the reshaping below must still raise
     try:
         res = _index.search(query, source=source, kind=kind, limit=limit)
-        results = [{**r, "url": layout.page_url(r["uri"])} for r in res["results"]]
-        total = res["total"]
-    except Exception as exc:  # noqa: BLE001 -- resilience: any OpenSearch failure
-        # (cluster down, no index, timeout) degrades to citation resolution
-        # rather than failing the whole tool call
+    except OpenSearchException as exc:
         note = ("full-text search is unavailable (%s); showing only citation "
                 "resolution" % type(exc).__name__)
+    else:
+        results = [{**r, "url": layout.page_url(r["uri"])} for r in res["results"]]
+        total = res["total"]
     # the resolved target answers a citation-shaped query, so it leads; drop any
     # full-text row for the same document (the pinned hit is more precise)
     if CATALOG.exists():
         with _con() as con:
             pinned = pins.resolved_results(con, query, source, kind)
-        if pinned:
-            roots = {p["uri"] for p in pinned}
-            kept = [r for r in results if r["uri"] not in roots]
-            total += sum(p["uri"] not in {r["uri"] for r in results} for p in pinned)
-            results = (pinned + kept)[:limit]
+        results, total = pins.merge_pinned(pinned, results, total, limit)
     out = {"query": query, "total": total, "results": results}
     if note:
         out["note"] = note
@@ -217,8 +197,7 @@ def get_document(uri: str, pinpoint: str | None = None,
             raise ValueError("no document %r in the catalog" % uri)
         uri, source, kind, label, title, path = row
         # synthesized begrepp stubs are real rows with no artifact file (path='')
-        p = catalog.artifact_path(catalog.data_root(con), path)
-        art = json.loads(p.read_bytes()) if p else {}
+        art = catalog.load_artifact(catalog.data_root(con), path)
         inbound = catalog.document_inbound_count(con, uri)
     if pinpoint:
         want = uri + "#" + pinpoint.lstrip("#")
@@ -255,10 +234,7 @@ def list_documents(source: SourceArg = None, kind: KindArg = None,
         docs = []
         for uri, src, kind_, label, title, source_url, path, _display in \
                 catalog.documents(con, source, kind, limit, offset):
-            p = catalog.artifact_path(root, path)
-            updated = (datetime.fromtimestamp(p.stat().st_mtime,
-                                              timezone.utc).isoformat()
-                       if p and p.exists() else None)
+            updated = catalog.artifact_updated(root, path)
             docs.append({"uri": uri, "source": src, "kind": kind_, "label": label,
                          "title": title, "source_url": source_url,
                          "updated": updated})
