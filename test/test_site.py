@@ -488,6 +488,47 @@ def test_renders_stycke_punkt_children(tmp_path):
     assert 'class="punkter"' in html
 
 
+# a definition paragraf whose point 2 carries an a/b/c sub-list. The NF flattens
+# the sub-list into document-order siblings (real 2025:1506 1 kap 2 § shape), with
+# the nesting carried only by the ids (P1S1N2Na under P1S1N2) -- render must rebuild
+# it into a nested <ol>. Also exercises the gutter §-numeral and the dotted marker.
+NESTLAW = {
+    "uri": "https://lagen.nu/2010:801",
+    "metadata": {"properties": {"dcterms:title": "Testlag (2010:801)"}},
+    "structure": [{"type": "paragraf", "id": "P1", "ordinal": "1", "children": [
+        {"type": "stycke", "id": "P1S1", "text": ["I denna lag betyder"], "children": [
+            {"type": "punkt", "id": "P1S1N1", "ordinal": "1", "text": ["första,"]},
+            {"type": "punkt", "id": "P1S1N2", "ordinal": "2", "text": ["andra:"]},
+            {"type": "punkt", "id": "P1S1N2Na", "ordinal": "a", "text": ["dellista a,"]},
+            {"type": "punkt", "id": "P1S1N2Nb", "ordinal": "b", "text": ["dellista b, och"]},
+            {"type": "punkt", "id": "P1S1N2Nc", "ordinal": "c", "text": ["dellista c,"]},
+            {"type": "punkt", "id": "P1S1N3", "ordinal": "3", "text": ["tredje."]}]}]}],
+}
+
+
+def test_renders_nested_punkt_sublist(tmp_path):
+    db = str(tmp_path / "c.sqlite")
+    p = tmp_path / "l.json"
+    p.write_text(json.dumps(NESTLAW))
+    catalog.rebuild(db, "sfs", [p])
+    site = render.Site.from_catalog(catalog.connect(db))
+    html = render.render_sfs(NESTLAW, site)
+    # outer list plus the nested a/b/c sublist
+    assert html.count('class="punkter"') >= 2
+    # a/b/c are nested under point 2 (between it and point 3), not flat siblings
+    i2, ia, i3 = (html.index('id="P1S1N2"'), html.index('id="P1S1N2Na"'),
+                  html.index('id="P1S1N3"'))
+    assert i2 < ia < i3
+    # the sublist opens inside point 2's <li> (a nested <ol> before its first child)
+    assert '<ol class="punkter">' in html[i2:ia]
+    # numeric markers carry the source's trailing dot; the lettered sub-item does not
+    assert '<span class="num">2.</span>' in html
+    assert '<span class="num">a</span>' in html
+    # the §-numeral hangs in the gutter; the permalink keeps the pilcrow glyph
+    assert '<span class="n">1 §</span>' in html
+    assert 'aria-label="Permalänk">¶</a>' in html
+
+
 def test_snippet_tooltip_on_outbound_link(tmp_path):
     con = build_catalog(tmp_path)
     site = render.Site.from_catalog(con)

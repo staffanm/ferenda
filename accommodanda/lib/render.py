@@ -643,7 +643,11 @@ def _directive_link(site, directive, target=None):
     identically."""
     target = target or directive
     celex = catalog.local(directive).rsplit("/", 1)[-1]
-    label = _doc_title(site, directive) or celex
+    # the reader-facing short heading ("NIS 2-direktivet"), as the act's own page
+    # shows it, keeps the genomför margin compact; fall back to the full official
+    # title (unparsed act: no stored heading) then the bare CELEX
+    label = (catalog.document_display(site.con, directive)
+             or _doc_title(site, directive) or celex)
     if site.has(directive):
         return '<a href="%s">%s</a>' % (escape(href(target)), escape(label))
     return _ext_link(external_href(directive), label)
@@ -960,6 +964,33 @@ def _strip_self_ref(runs, nid):
             for run in runs]
 
 
+def _renest_punkter(children):
+    """Rebuild the list nesting the NF flattens away. ``nf.flatten_list`` emits a
+    stycke's list items in document order as flat ``punkt`` siblings, but their
+    ids still encode the hierarchy: a sub-item ``K1P2S1N12Na`` sits under
+    ``K1P2S1N12``. Return the children with each sub-item moved into its parent
+    punkt's ``children`` so the caller emits it as a nested <ol>. A non-punkt
+    child (a tabell) or an id-less punkt breaks the run and stays at top level.
+
+    The ``"N"`` separator is a load-bearing cross-layer contract: ``sfs.nf``'s
+    ``flatten_list`` mints each sub-item id as ``<parent-id>N<ordfrag>`` (see the
+    ``extend(pairs, "N", …)`` there), so a child is exactly a punkt whose id is
+    ``parent_id + "N" + …``. This decodes that grammar; it must track the minter."""
+    roots = []
+    stack = []  # (id, node copy) of the punkt ancestors currently open
+    for c in children:
+        if c.get("type") != "punkt" or not c.get("id"):
+            roots.append(c)
+            stack.clear()
+            continue
+        while stack and not c["id"].startswith(stack[-1][0] + "N"):
+            stack.pop()
+        node = dict(c, children=list(c.get("children", [])))
+        (stack[-1][1]["children"] if stack else roots).append(node)
+        stack.append((c["id"], node))
+    return roots
+
+
 def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
     t = node.get("type")
     nid = node.get("id")
@@ -994,19 +1025,33 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
         # the paragraf's own number now hangs in the gutter (drop_marker), so the
         # first stycke no longer repeats it inline; sub-stycken/punkter keep theirs
         marker = None if drop_marker else (node.get("beteckning") or node.get("ordinal"))
-        num = '<span class="num">%s</span> ' % escape(str(marker)) if marker else ""
-        tag = "li" if t in ("punkt", "listelement") else "p"
-        body = "<%s%s%s>%s%s</%s>" % (tag, _id_attr(nid), ra, num,
-                                      render_runs(node["text"], site), tag)
-        # a stycke often introduces a list -- render its punkt/lista children
-        # (previously dropped, so numbered lists vanished from the page)
-        kids = node.get("children", [])
+        is_listitem = t in ("punkt", "listelement")
+        # a numbered list item carries the source's trailing dot ("1." not "1")
+        # and hangs its marker in a gutter column (CSS), so it needs no inline
+        # separator space; an inline stycke/moment marker keeps its trailing space
+        if marker and is_listitem and str(marker).isdigit():
+            marker = "%s." % marker
+        num = ('<span class="num">%s</span>%s'
+               % (escape(str(marker)), "" if is_listitem else " ")
+               if marker else "")
+        tag = "li" if is_listitem else "p"
+        open_html = "<%s%s%s>%s%s" % (tag, _id_attr(nid), ra, num,
+                                      render_runs(node["text"], site))
+        # a stycke/punkt often introduces a list -- render its punkt/lista children
+        # (previously dropped, so numbered lists vanished from the page). The NF
+        # flattens nested lists into document order (nf.flatten_list); rebuild the
+        # nesting the item ids still encode (K1P2S1N12Na under K1P2S1N12) so a
+        # sub-list (a/b/c under a numbered point) renders as a nested <ol>.
+        kids = _renest_punkter(node.get("children", []))
+        inner = ""
         if kids:
             inner = "".join(render_node(c, site, doc_uri, toc, rail) for c in kids)
             if any(c.get("type") == "punkt" for c in kids):
                 inner = '<ol class="punkter">%s</ol>' % inner
-            body += inner
-        return body
+        # a sub-list nests inside its list item (<li>…<ol>…</ol></li>); a stycke's
+        # list follows the closed paragraph (<p>…</p><ol>…</ol>)
+        return ("%s%s</%s>" % (open_html, inner, tag) if is_listitem
+                else "%s</%s>%s" % (open_html, tag, inner))
 
     # container: paragraf, kapitel, avdelning, bilaga, overgangsbestammelse, ...
     if t in ("kapitel", "avdelning", "underavdelning"):
@@ -1048,9 +1093,12 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
             render_node(c, site, doc_uri, toc, rail,
                         drop_marker=(i == 0 and c.get("type") == "stycke"))
             for i, c in enumerate(kids))
+        # the §-symbol belongs with the numeral ("1 §") in the gutter; the
+        # permalink anchor keeps its own (pilcrow) glyph
+        ordinal = node.get("ordinal", "")
         gutter = ('<div class="paragraf-gutter"><span class="n">%s</span>'
-                  '<a class="pilcrow" href="#%s" aria-label="Permalänk">§</a></div>'
-                  % (escape(node.get("ordinal", "")), escape(nid or "")))
+                  '<a class="pilcrow" href="#%s" aria-label="Permalänk">¶</a></div>'
+                  % (escape("%s §" % ordinal if ordinal else "§"), escape(nid or "")))
         return ('<section class="paragraf"%s%s>%s<div class="paragraf-body">%s</div>'
                 '</section>' % (_id_attr(nid), ra, gutter, children))
 
@@ -2829,8 +2877,14 @@ section.forarbeten a { color: var(--forarbete); }
 .inbound-doc li { break-inside: avoid; }
 
 /* -- Inline bits -- */
-ol.punkter { list-style: none; margin: .4rem 0; padding-left: 1.5rem; }
-ol.punkter > li { margin: .25rem 0; }
+ol.punkter { list-style: none; margin: .4rem 0; padding-left: 0; }
+ol.punkter li { margin: .25rem 0; padding-left: 2.1rem; }
+/* the marker hangs in a fixed column (like the paragraf gutter's §-numeral),
+   right-aligned so "1." and "12." line up on the dot, in text colour not accent */
+ol.punkter li > .num { display: inline-block; box-sizing: border-box; width: 1.7rem;
+                       margin-left: -2.1rem; margin-right: .4rem; text-align: right;
+                       color: var(--ink); }
+ol.punkter ol.punkter { margin-top: .35rem; }
 .noref { color: var(--ink-3); border-bottom: 1px dotted var(--ink-4); cursor: help; }
 /* an in-act use of a defined term: underlined, hover shows the definition */
 a.term { color: inherit; border-bottom: 1px dotted var(--ink-4); cursor: help; }
