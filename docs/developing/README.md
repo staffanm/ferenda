@@ -202,10 +202,14 @@ Driver flags:
   recursive deps).
 - `--no-deps` — don't recurse into `depends`.
 - `-n` / `--dry-run` — record the plan, run nothing.
-- `-j` / `--jobs` — process pool (parse and index only; relate is single-writer
-  SQLite and always serial). Defaults to `os.cpu_count()`.
+- `-j` / `--jobs` — parallel workers: a process pool for `parse`, a thread pool
+  for `index` (relate is single-writer SQLite and always serial). Defaults to
+  `os.cpu_count()`.
 - `--ignore-code-changes` — pin the code-version check fresh; a dev convenience
   so editing a parser doesn't restale the corpus.
+- `--rot13` — `mkpatch` only: store the authored patch rot13-obfuscated, so a
+  PII redaction doesn't commit the raw personal data in the clear (see *Patch
+  files* below).
 
 Per-doc resilience: a per-document exception is caught into the run's error
 list and the run continues (this is a *sanctioned* catch — the alternative is
@@ -228,6 +232,33 @@ Downloaders and parsers cooperate through one function,
 
 `write_artifact` imposes no schema beyond stamping `source_url`. The typed model
 each source builds (its `to_artifact` / `nf.to_normalform`) defines the rest.
+
+### Patch files — correcting source material
+
+Some published source material is simply wrong (an OCR slip, a broken table) or
+carries personal data that must be redacted. Rather than fork the parser with
+per-document special cases, a **patch file** is a unified diff applied to a
+document's *intermediate source text* before parsing — the plain text (SFS), the
+innehåll HTML (DV), the Formex XML (eurlex), or the extracted PDF text (the
+PDF-bodied sources). Patches live under `patches/<source>/…` and are authored
+either from the CLI or through the editor UI:
+
+- `lagen <source> patch-show <basefile>` prints the document's intermediate
+  source text (existing patch already applied) — the text you patch against.
+- `lagen <source> mkpatch <basefile> <edited-file> [description]` diffs your
+  edited copy against the pristine intermediate and writes the *minimal* patch.
+  `--rot13` stores it rot13-obfuscated, so a PII redaction doesn't commit the raw
+  personal data in the clear.
+- The inline editor's **"patch source"** button (`api/patch.py`, `/patch/edit`)
+  is the same flow over HTTP: it commits the patch attributed to the logged-in
+  editor and force-reparses the document so the fix goes live.
+
+The machinery is in `lib/patch.py` (find/apply/create, over the vendored
+`lib/patchit.py`) and `patchsource.py` (the per-source `_INTERMEDIATE` registry
+mapping a source to the pristine-text provider it patches against). **A patch is
+a genuine parse input:** every patchable source folds
+`_patch_input(source, basefile)` into its stage `inputs`, so editing a patch
+re-stales exactly that document's `parse`.
 
 ## 4. Adding a new source
 
@@ -261,6 +292,12 @@ Write, in a new `accommodanda/<source>/` package:
    the catalog graph by minting the same `https://lagen.nu/<id>#<fragment>`
    URIs citations mint (that is what makes the inbound-link graph connect).
 
+7. **To make the source patchable** (optional) — register its pristine
+   intermediate-text provider in `patchsource._INTERMEDIATE`, apply the patch at
+   the parser's intermediate choke point (`patch.apply`, or pass `patch_key=` to
+   `lib/pdftext.pdf_pages` for a PDF body), and fold `_patch_input(source, bf)`
+   into the source's freshness `inputs`. See *Patch files* in §3.
+
 Then run `lagen x download && lagen x parse && lagen x relate && lagen x
 generate` and check `lagen x status`.
 
@@ -272,7 +309,8 @@ to follow when sources are similar.
 ## 5. Adding a source-specific action
 
 An action is a verb beyond the standard stages (`ai-annotate`, `import-legacy`,
-`discover-guidance`, `versions`, …). Mechanism: add an entry to the source's
+`discover-guidance`, …). (`versions` looks like an action but is a real SFS
+Stage — see §3.) Mechanism: add an entry to the source's
 `actions` dict mapping a verb name to a callable taking the raw `basefiles`
 list:
 

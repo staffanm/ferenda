@@ -220,9 +220,11 @@ Once fetched:
 zcat sfs.ndjson.gz | head -1     # one artifact per line
 ```
 
-Each line is a source artifact re-serialised, gzipped, **with no
-transformation** — byte-for-byte the same object `GET /api/v1/document` returns
-in `artifact`. Because the citation graph lives inline in each artifact, a line
+Each line is a source artifact re-serialised (compactly) and gzipped, **with no
+transformation of its contents** — the same JSON object `GET /api/v1/document`
+returns in `artifact` (the on-disk artifact is pretty-printed and the dump line
+is minified, but the value is identical). Because the citation graph lives
+inline in each artifact, a line
 is self-contained: no catalog read needed to reprocess the corpus. (Empty
 "skipped" documents are omitted.)
 
@@ -283,7 +285,7 @@ runs. The distinctive top-level fields:
 - A versioned consolidation artifact adds a top-level `version` (e.g. `"2003:466"`).
 
 **DV (court decisions)** — `{ uri, court, court_namn, malnummer, referat,
-avgorandedatum, metadata, structure, footnotes, sources, label }`.
+avgorandedatum, metadata, structure, footnotes, sources }`.
 - `metadata` = `{ publiceringsform, typ, rattsomrade, nyckelord, lagrum:
   [{referens, sfsnummer}], forarbeten, sammanfattning, related }`.
 - `structure` is the instance/ruling skeleton (delmål → instans → dom →
@@ -292,8 +294,15 @@ avgorandedatum, metadata, structure, footnotes, sources, label }`.
 
 **förarbete (preparatory works)** — flat, **page-precise**. `{ uri, type
 (prop|sou|ds|dir|bet|…), identifier, basefile, title, date, structure }`, plus an
-optional `implements` list (EU-directive edges). Blocks carry `type`, `text`, and
-an optional `page` (the `#sid{N}` anchor), `level`, `num`.
+optional `implements` list (EU-directive edges) and, for a proposition with a
+författningskommentar chapter, a `kommentarer` list — the per-paragraf FK
+commentary: `[{ law, chapter, paragrafer, page, kommentar }]` (`law` is the
+raw per-law rubrik text, resolved to an SFS uri at relate time; `paragrafer`
+is a list because a combined "9 och 10 §§" heading comments several at once;
+an empty list marks a law-level comment). Blocks carry `type`, `text`, and an
+optional `page` (the `#sid{N}` anchor), `level`, `num`, plus `fk` on FK
+commentary blocks (the entry number — blocks sharing a number belong to one
+paragraf's commentary, the prop page's highlight box).
 
 **eurlex (EU law)** — `{ uri (…/ext/celex/{CELEX}), celex, doctype
 (regulation|directive|decision|judgment|treaty|act), lang, title, date, structure
@@ -322,7 +331,7 @@ Each listed version has its own full artifact on disk.
 
 **`.ann` sidecars** — the AI-authored (then human-corrected) editorial layer,
 kept separate from the parsed artifact. Two shapes:
-- eurlex `ai-annotate`: `{ editorialLayer: { recitalGroups: [[lo,hi],…],
+- eurlex `ai-annotate`: `{ editorialLayer: { recitalGroups: [{ "range": [lo,hi] },…],
   articleToRecitals: { "<article>": [int,…] } } }`.
 - remisser `ai-analyze`: `{ overall: {sentiment, quote}, segments:
   [{forarbete_id, sentiment, quote}, …] }`.
