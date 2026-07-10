@@ -10,16 +10,24 @@ from pathlib import Path
 
 import pytest
 
-from accommodanda.sfs import load_inputs
 from accommodanda.lib.datasets import NAMEDLAWS
 from accommodanda.lib.lagrum import FORARBETEN, LagrumParser, load_namedlaws
+from accommodanda.sfs import load_inputs
 from accommodanda.sfs.nf import to_normalform
-from accommodanda.sfs.register import (amendment_properties,
-                                  build_metadata, forarbete_identifier,
-                                  forfattningstyp, lfragment, lookup_resource,
-                                  omfattning_predicate, parse_forarbeten,
-                                  register_from_source, resource_map,
-                                  sanitize_departement, sfs_slug)
+from accommodanda.sfs.register import (
+    amendment_properties,
+    build_metadata,
+    forarbete_identifier,
+    forfattningstyp,
+    lfragment,
+    lookup_resource,
+    omfattning_predicate,
+    parse_forarbeten,
+    register_from_source,
+    resource_map,
+    sanitize_departement,
+    sfs_slug,
+)
 
 ROOT = Path(__file__).parent.parent
 
@@ -117,6 +125,16 @@ def test_lookup_resource_known_labels_and_unknown_raise():
     # never mint a non-URI value into the artifact
     with pytest.raises(ValueError, match="unknown org/series label"):
         lookup_resource("Fantasidepartementet")
+
+
+def test_lookup_resource_beta_api_org_aliases():
+    # the beta-API `namnOchEnhet` occasionally carries a truncated (1991:2047)
+    # or miscased (1974:1110) org name; the alias table resolves both to the
+    # canonical resource URI rather than failing the document
+    assert (lookup_resource("Riksåklagar")
+            == lookup_resource("Riksåklagaren"))
+    assert (lookup_resource("Statens Förhandlingsnämnd")
+            == lookup_resource("Statens förhandlingsnämnd"))
 
 
 def test_resource_map_values_are_uris():

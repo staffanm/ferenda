@@ -79,6 +79,16 @@ TITLE_WITHOUT_BASEFILE = {
     "2014:801", "1991:1469"}
 
 
+# the beta-API `organisation.namnOchEnhet` occasionally carries an org name
+# that doesn't match the canonical resource label: a truncation or a case
+# variant. Map the handful seen across the corpus to their canonical labels
+# so the URI itself stays sourced only from resources.json.
+ORG_LABEL_ALIASES = {
+    "Riksåklagar": "Riksåklagaren",                       # truncated (1991:2047)
+    "Statens Förhandlingsnämnd": "Statens förhandlingsnämnd",  # miscased (1974:1110)
+}
+
+
 @functools.cache
 def resource_map():
     """label -> URI for orgs and series, from the ported dataset."""
@@ -90,6 +100,7 @@ def lookup_resource(label):
     something to pass through as if it were a URI -- raise so the failure
     lands at the per-document boundary instead of minting a non-URI value
     into the artifact (rule:fail-fast)."""
+    label = ORG_LABEL_ALIASES.get(label, label)
     uri = resource_map().get(label)
     if uri is None:
         raise ValueError("unknown org/series label: %r" % label)
