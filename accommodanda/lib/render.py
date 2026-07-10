@@ -2550,8 +2550,19 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
     total = len(rows)
     done = rendered = 0
     plan = []                # (uri, source, path, title, dep, chash) needing render
+    # doc_relpath is not injective (begrepp/Första-hjälpen-tavlor and
+    # begrepp/Första_hjälpen-tavlor both slug to one file), so two catalogued
+    # uris colliding here would clobber each other's page -- and race on the
+    # deterministic .tmp name under jobs>1. Refuse the plan instead.
+    outs: dict = {}          # output relpath -> uri
     for (uri, src, path, title, chash) in rows:
-        out = out_root / doc_relpath(uri)
+        rel = doc_relpath(uri)
+        if outs.setdefault(rel, uri) != uri:
+            raise ValueError(
+                "output path collision: %s and %s both render to %s -- fold the "
+                "duplicate concept (an aliases: redirect on the wiki page) before "
+                "generating" % (outs[rel], uri, rel))
+        out = out_root / rel
         dep = deps.get(uri, catalog.EMPTY_DEP_DIGEST)
         if uri in cross or uri in expired:
             dep = hashlib.sha256(

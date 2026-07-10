@@ -158,6 +158,25 @@ def test_catalog_paths_are_data_root_relative_and_portable(tmp_path):
     assert compress.exists(out / render.doc_relpath(LAW["uri"]))   # page stored precompressed
 
 
+def test_generate_refuses_output_path_collision(tmp_path):
+    # page_relpath flattens every non-alphanumeric character to "_", so two
+    # distinct begrepp uris ("Första-hjälpen-tavlor" / "Första_hjälpen-tavlor")
+    # collide on one HTML file: last write wins, and under jobs>1 the twin jobs
+    # race on the deterministic .tmp name. The planner must refuse such a plan.
+    a = tmp_path / "a.json"
+    a.write_text(json.dumps({"uri": "https://lagen.nu/begrepp/Första_hjälpen-tavlor",
+                             "type": "begrepp", "title": "Första hjälpen-tavlor",
+                             "body": []}))
+    b = tmp_path / "b.json"
+    b.write_text(json.dumps({"uri": "https://lagen.nu/begrepp/Första-hjälpen-tavlor",
+                             "type": "begrepp", "title": "Första-hjälpen-tavlor",
+                             "body": []}))
+    db = str(tmp_path / "catalog.sqlite")
+    catalog.rebuild(db, "begrepp", [a, b])
+    with pytest.raises(ValueError, match="output path collision"):
+        render.generate_site(db, str(tmp_path / "generated"))
+
+
 def test_relate_migrates_legacy_absolute_paths(tmp_path):
     # a catalog built before relative paths stored absolute ones; the next relate
     # rewrites them in place to data_root-relative (so an old catalog becomes
