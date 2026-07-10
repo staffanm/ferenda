@@ -176,18 +176,21 @@ so nothing downstream (relate, index, dump, the API) knows or cares. Tiny files
 `compress` config key / `FERENDA_COMPRESS` env var; tune the effort with
 `compress_quality` (default 11).
 
-The `.br` bytes are what a browser wants (`Content-Encoding: br`), so they can be
-served **as-is, with no recompression**:
+The `.br` bytes are what a browser wants (`Content-Encoding: br`), so **nginx
+serves them directly, as-is, with no recompression** — the deployed setup: the
+`generated/` tree is bind-mounted read-only into the nginx container (`/srv/generated`),
+and `ferenda.conf` streams each `<page>.html.br` with `Content-Encoding: br` to
+brotli-accepting clients. This needs **no `ngx_brotli` module** — nginx never
+compresses or decompresses, it just picks the `.br`, gates on `Accept-Encoding`,
+and stamps the encoding + content type — so it runs on the **stock
+`nginx-unprivileged` image**.
 
-- **Default (this deploy):** nginx proxies to `accommodanda:8000`, and the app
-  (`api.app.SiteFiles`) serves the `.br` verbatim to any client that accepts
-  brotli, decompressing on the fly for the rare one that doesn't.
-- **nginx-direct (offload the app):** mount `…/generated` into the nginx
-  container read-only and use `docker/vps/nginx/ferenda-static.conf.example`,
-  which serves the tree with `brotli_static` and falls back to the app for the
-  bare-document-URL grammar and the API. Needs an nginx image built with
-  `ngx_brotli` (stock nginx can't read `.br`); until then the default already
-  serves the same bytes.
+Anything without a matching `.br` on disk falls through to `accommodanda:8000`:
+the transformed-namespace URLs (`/dom`, `/celex`, `/prop`, `/<fs>`, `/avg`) whose
+flattened on-disk name differs from the URL, the `/sfs` browse indexes, the REST
+API + editor, and any client that does not accept brotli (the app decompresses
+identity bytes for it). A missing `generated/` mount therefore degrades to
+proxy-everything — nothing 404s that the app could have served.
 
 ## Notes / caveats
 
