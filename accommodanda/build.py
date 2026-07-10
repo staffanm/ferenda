@@ -30,6 +30,7 @@ serialises. relate is single-writer (SQLite) and always serial.
 """
 
 import argparse
+import faulthandler
 import functools
 import hashlib
 import json
@@ -455,6 +456,10 @@ def _worker_init(manifest, run_options):
     global _WORKER_MANIFEST, RUN
     _WORKER_MANIFEST = manifest
     RUN = run_options
+    # a worker that segfaults in a C extension leaves the parent only a bare
+    # BrokenProcessPool; faulthandler dumps the crashing worker's Python stack
+    # (and thus the basefile in flight) to stderr before it dies
+    faulthandler.enable()
 
 
 def _progress(source, action, done, total, merged, basefile):
