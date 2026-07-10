@@ -145,9 +145,10 @@ def test_tool_schemas_steer_the_model():
     assert "fffs" in props["kind"]["description"]
 
 
-def test_end_to_end_streamable_http(corpus):
+def test_end_to_end_streamable_http(corpus, caplog):
     """A real MCP client over the mounted /mcp endpoint: initialize, list the
     tools, call one -- proving the transport + mount + lifespan are wired."""
+    caplog.set_level("INFO", logger="accommodanda.api.mcp")
     async def scenario():
         config = uvicorn.Config(api.app, host="127.0.0.1", port=8791,
                                 log_level="error", lifespan="on")
@@ -174,3 +175,10 @@ def test_end_to_end_streamable_http(corpus):
                 server.should_exit = True
 
     anyio.run(scenario)
+    # every JSON-RPC request logs one line (the access log only shows POST
+    # /mcp/); a tools/call line carries the tool name + its arguments
+    logged = [r.message for r in caplog.records
+              if r.name == "accommodanda.api.mcp"]
+    assert any(m.endswith("initialize") for m in logged)
+    assert any("tools/call get_document" in m
+               and '"uri": "https://lagen.nu/1962:700"' in m for m in logged)

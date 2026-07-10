@@ -18,9 +18,12 @@ one code path.
 """
 
 import contextlib
+import json
+import logging
 from typing import Annotated, Literal
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 from opensearchpy.exceptions import OpenSearchException
 from pydantic import Field
@@ -32,6 +35,8 @@ from ..lib import catalog, layout, pins, text
 from ..lib.search import SearchIndex
 
 CATALOG = config.DATA / "catalog.sqlite"
+
+log = logging.getLogger(__name__)
 
 # Shown to the AI host so it knows when to reach for these tools, what the ids
 # look like, and the order to call them in. Read once by the host at connect.
@@ -61,9 +66,15 @@ Canonical flow for grounding a legal question:
 All data is read-only and public; nothing here mutates anything.\
 """
 
+# DNS-rebinding protection guards localhost-bound servers from hostile web
+# pages; this server is public, unauthenticated and read-only, served behind
+# nginx which already routes by vhost. Left on (FastMCP's default), it would
+# 421 every request whose Host isn't localhost -- i.e. all production traffic.
 mcp = FastMCP("lagen.nu", instructions=INSTRUCTIONS,
               stateless_http=True, json_response=True,
-              streamable_http_path="/")
+              streamable_http_path="/",
+              transport_security=TransportSecuritySettings(
+                  enable_dns_rebinding_protection=False))
 
 # one search client for the process; constructing it opens no connection, so
 # importing/mounting never needs a running OpenSearch -- only a `search` call
@@ -308,6 +319,56 @@ async def lifespan(app):
         yield
 
 
+def _describe(body):
+    """One grep-friendly token run for a JSON-RPC request body: the method, and
+    for tools/call the tool name + its arguments (truncated -- get_document can
+    take a 200k max_chars but the *arguments* stay small; the cap only guards
+    against a hostile oversized payload flooding the log)."""
+    try:
+        msg = json.loads(body)
+    except ValueError:
+        return "<non-json body, %d bytes>" % len(body)
+    if not isinstance(msg, dict):
+        return "<non-object body>"
+    method = msg.get("method", "<no method>")
+    if method != "tools/call":
+        return method
+    params = msg.get("params", {})
+    args = json.dumps(params.get("arguments", {}), ensure_ascii=False)
+    return "%s %s %s" % (method, params.get("name"), args[:500])
+
+
+class _LoggedMCP:
+    """ASGI wrapper logging one line per MCP request -- client IP, JSON-RPC
+    method, tool name and arguments. The uvicorn/nginx access logs see only
+    `POST /mcp/ 200`, so tool-level visibility has to come from here. The
+    request body is buffered to be parsed (bodies are single JSON-RPC messages,
+    stateless_http -- small by construction) and replayed to the wrapped app."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or scope["method"] != "POST":
+            return await self.app(scope, receive, send)
+        messages = []
+        while True:
+            message = await receive()
+            messages.append(message)
+            if message["type"] != "http.request" or not message.get("more_body"):
+                break
+        body = b"".join(m.get("body", b"") for m in messages
+                        if m["type"] == "http.request")
+        client = scope.get("client")
+        log.info("%s %s", client[0] if client else "-", _describe(body))
+        replay = iter(messages)
+
+        async def receive_replayed():
+            return next(replay, None) or await receive()
+
+        await self.app(scope, receive_replayed, send)
+
+
 async def _redirect_to_slash(request):
     # a bare POST/GET /mcp -> /mcp/ (307 preserves method + body), so both the
     # tidy public URL and the mounted path work; MCP clients follow the redirect
@@ -319,4 +380,4 @@ def mount(app):
     site catch-all is mounted (serve() mounts "/" last), so the MCP routes win."""
     app.router.routes.append(
         Route("/mcp", _redirect_to_slash, methods=["GET", "POST", "DELETE"]))
-    app.mount("/mcp/", _http_app)
+    app.mount("/mcp/", _LoggedMCP(_http_app))

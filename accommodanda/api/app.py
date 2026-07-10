@@ -17,6 +17,7 @@ artifact's `uri` is also its API key, its dump id and its OpenSearch `_id`.
 """
 
 import json
+import logging
 import re
 import sqlite3
 import subprocess
@@ -814,6 +815,11 @@ def serve(directory, host="127.0.0.1", port=8000):
     server and no configurable API base to go stale. The static mount is added
     here -- not at import -- so the in-process API client used during `generate`
     (which only calls /api/v1) never needs a built site."""
+    # app-level loggers (notably api.mcp's per-tool-call lines) go to stdout
+    # alongside uvicorn's access log -- uvicorn only configures its own loggers,
+    # so without a root handler those lines vanish
+    logging.basicConfig(level=logging.INFO,
+                        format="%(levelname)s:     %(name)s: %(message)s")
     app.mount("/", SiteFiles(directory=directory, html=True), name="site")
     # proxy_headers so the app sees the real client IP/scheme/host behind the
     # prod TLS proxy (nginx must send X-Forwarded-For/-Proto) -- notably,

@@ -880,6 +880,15 @@ to a future per-doc incremental generate.
     exact fragment target) behind both REST `/search` and the MCP
     `search`/`resolve_citation` tools. `test/test_mcp.py`, incl. an
     end-to-end Streamable HTTP round-trip against a running app.
+    Operationally: a `_LoggedMCP` ASGI wrapper logs one line per JSON-RPC
+    request (client IP, method, tool name + truncated arguments) since the
+    uvicorn/nginx access log only sees `POST /mcp/ 200`; the MCP SDK's
+    DNS-rebinding protection is explicitly disabled
+    (`TransportSecuritySettings(enable_dns_rebinding_protection=False)`) —
+    its localhost-only default would 421 all production traffic arriving
+    through the nginx vhost. `serve()` now also calls
+    `logging.basicConfig(INFO)` so these and other app-level log lines reach
+    stdout alongside uvicorn's own access log.
   - ✅ **Operations/health dashboard** (`lib/runlog.py`, `api/ops.py`) — every
     `build.py` invocation now records a run in an append-only ledger
     (`DATA/.build/runs.ndjson`: run-start / per-(step,source) segment /
@@ -2048,6 +2057,15 @@ in `git log`. This document is the forest-level status; section markers
   writes every dataset's feed statically during `generate`, and two new
   `api/app.py` endpoints answer the same query-parameter URLs live off the
   catalog. `/dataset/sitenews` remains the all-feeds directory.
+- **api** (2026-07-10) — MCP/serve operational hardening: `api/mcp.py` gained
+  a `_LoggedMCP` ASGI wrapper logging one line per JSON-RPC request (client
+  IP, method, tool name + truncated arguments — the only tool-level
+  visibility, since the access log only sees `POST /mcp/ 200`) and explicitly
+  disables the MCP SDK's DNS-rebinding protection (its localhost-only default
+  would 421 all production traffic behind the nginx vhost). `api/app.py`'s
+  `serve()` now calls `logging.basicConfig(INFO)` so app-level log lines
+  (including the new MCP request log) reach stdout alongside uvicorn's access
+  log.
 - **lib** (2026-07-09) — `lib/annstore.py`: every `ai-*` action's output
   (eurlex/kommentar `.ann`, remisser `.ann`, sfs `.corr`) now lives in a
   dedicated curated store in the git-backed content repo

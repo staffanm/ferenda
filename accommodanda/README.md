@@ -211,7 +211,14 @@ Context Protocol) at `/mcp` on the same app — the same read-only view reshaped
 tools (search, resolve_citation, get_document, the citation graph, …) so any
 MCP-capable AI host can ground answers about Swedish/EU law in the live corpus and
 cite the exact §/article; the tools are thin wrappers over the same `lib`
-functions the REST endpoints use (see `api/README.md`). `api/ops.py` mounts the
+functions the REST endpoints use (see `api/README.md`). A `_LoggedMCP` ASGI
+wrapper logs one line per JSON-RPC request (client IP, method, tool name +
+truncated arguments) — the only tool-level visibility, since the uvicorn/nginx
+access log sees only `POST /mcp/ 200`; the MCP SDK's DNS-rebinding protection is
+explicitly disabled (`enable_dns_rebinding_protection=False`), since its
+localhost-only default would 421 all production traffic arriving through the
+nginx vhost. `serve()` calls `logging.basicConfig(INFO)` so these and other
+app-level log lines reach stdout alongside uvicorn's own access log. `api/ops.py` mounts the
 ops health dashboard on the same app (see "Operations" below); `lib/runlog.py`
 owns the state files behind it. `api/auth.py` + `api/edit.py` +
 `api/editcontent.py` + `api/editcart.py` are the inline content editor — the one

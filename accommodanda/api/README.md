@@ -365,6 +365,14 @@ Servern är monterad i `api/app.py` via `api/mcp.py` (`mcp.mount(app)` +
 `docker/nginx/ferenda.lagen.nu.conf`) publiceras `/mcp` automatiskt — ingen extra
 container, ingen extra port.
 
+MCP SDK:ns DNS-rebinding-skydd är explicit avstängt
+(`enable_dns_rebinding_protection=False`) — dess standardinställning tillåter
+bara `Host: localhost`, vilket skulle ge `421` på all produktionstrafik som
+kommer in via nginx-vhosten. En `_LoggedMCP`-ASGI-wrapper loggar en rad per
+JSON-RPC-anrop (klient-IP, metod, verktygsnamn + trunkerade argument) — det är
+den enda verktygsnivå-insynen som finns, eftersom uvicorns/nginx access-logg
+bara visar `POST /mcp/ 200`.
+
 ---
 
 ## Bulkdumpar (NDJSON)
