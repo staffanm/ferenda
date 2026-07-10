@@ -42,6 +42,7 @@ from accommodanda.lib.lagrum import (
     load_abbreviations,
     load_namedacts,
     load_namedlaws,
+    yield_overlaps,
 )
 from accommodanda.lib.util import normalize_space
 
@@ -168,6 +169,51 @@ def test_forarb_page_spans(text, last_prop, links):
     runs = [(run["text"], run["uri"])
             for run in interleave(text, refs) if isinstance(run, dict)]
     assert runs == links
+
+
+# An authority-decision citation naming several diarienummer ("dnr X och Y")
+# is several separate references sharing a prefix, not one -- each must link
+# its own dnr token so the spans stay disjoint. Before this was fixed every
+# dnr link defaulted to the whole match window and they overlapped, blowing
+# up interleave() in the real sfs/forarbete parse pipeline.
+AVG_MULTI_DNR_CASES = [
+    ("JO:s beslut den 25 juni 2007, dnr 3940-2006 och 3941-2006", [
+        ("3940-2006", "https://lagen.nu/avg/jo/3940-2006"),
+        ("3941-2006", "https://lagen.nu/avg/jo/3941-2006")]),
+    ("JO 2011/12 s. 471, dnr 6823-2009 och 2196-2010", [
+        ("6823-2009", "https://lagen.nu/avg/jo/6823-2009"),
+        ("2196-2010", "https://lagen.nu/avg/jo/2196-2010")]),
+    ("dnr 1505-80-22 och 2551-80-21", [
+        ("1505-80-22", "https://lagen.nu/avg/jk/1505-80-22"),
+        ("2551-80-21", "https://lagen.nu/avg/jk/2551-80-21")]),
+    # single dnr: still just its own token, leading text stays plain
+    ("JO 2013/14 s. 392, dnr 2914-2011", [
+        ("2914-2011", "https://lagen.nu/avg/jo/2914-2011")]),
+]
+
+
+@pytest.mark.parametrize("text,links", AVG_MULTI_DNR_CASES,
+                         ids=[c[0] for c in AVG_MULTI_DNR_CASES])
+def test_avg_multi_dnr_spans(text, links):
+    parser = LagrumParser({}, basefile="avg", parse_types=[MYNDIGHETSBESLUT])
+    refs = parser.parse_text(text, context={})
+    runs = [(run["text"], run["uri"])
+            for run in interleave(text, refs) if isinstance(run, dict)]
+    assert runs == links
+
+
+def test_yield_overlaps_term_yields_to_citation():
+    # a defined term ("upphovsrättslagen") is often also a named-law reference
+    # on the same span; the term-use link must yield so interleave sees no
+    # overlap. Disjoint term uses survive.
+    cite = Ref(0, 8, "1960:729", "dcterms:references", "https://lagen.nu/1960:729")
+    same = Ref(0, 8, "1960:729", "dcterms:subject", "https://lagen.nu/begrepp/X",
+               kind="term")
+    inside = Ref(2, 6, "60:7", "dcterms:subject", "https://lagen.nu/begrepp/Y",
+                 kind="term")
+    disjoint = Ref(9, 12, "abc", "dcterms:subject", "https://lagen.nu/begrepp/Z",
+                   kind="term")
+    assert yield_overlaps([same, inside, disjoint], [cite]) == [disjoint]
 
 
 # The repo's ECJ fixtures (test/files/legalref/ECJ) are unusable as an

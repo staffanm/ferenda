@@ -603,6 +603,16 @@ class Ref:
     kind: str | None = None    # link flavour for the renderer (e.g. "term")
 
 
+def yield_overlaps(uses, cites):
+    """Drop each `uses` Ref whose span overlaps any `cites` Ref: a term-use
+    link yields to a citation, the stronger cross-document link. Returns the
+    surviving uses (cites are returned unchanged by the caller). interleave
+    requires disjoint spans, so merging a term-use list with a citation list
+    must resolve overlaps here first, not silently inside interleave."""
+    return [u for u in uses
+            if not any(u.start < c.end and c.start < u.end for c in cites)]
+
+
 def interleave(text, refs):
     """Splice `refs` (Ref objects with disjoint [start, end) spans) into
     `text`, returning the inline-run list the artifact stores: plain `str`
@@ -882,8 +892,11 @@ def riksmote_str(node):
 
 
 def avg_ids(node, name):
-    """Diarienummer strings of the named *_ref_id rule, in document order."""
-    return [token_text(s) for s in node.iter_subtrees_topdown()
+    """(diarienummer, window-span) pairs of the named *_ref_id rule, in
+    document order. A citation carrying several dnr ("dnr X och Y") is
+    several separate references sharing a prefix, not one -- each links its
+    own diarienummer token so the spans stay disjoint (rule:fail-fast)."""
+    return [(token_text(s), node_span(s)) for s in node.iter_subtrees_topdown()
             if s.data == name]
 
 
@@ -1537,14 +1550,14 @@ class LagrumParser:
     # --- MYNDIGHETSBESLUT (authority decisions) ---
 
     def fmt_arn_refs(self, node, match, out, context):
-        for dnr in avg_ids(node, 'arn_ref_id'):
-            out.append({'_uri': self.base + 'avg/arn/' + dnr})
+        for dnr, span in avg_ids(node, 'arn_ref_id'):
+            out.append({'_uri': self.base + 'avg/arn/' + dnr, '_span': span})
 
     def fmt_jo_refs(self, node, match, out, context):
-        for dnr in avg_ids(node, 'jo_ref_id'):
-            out.append({'_uri': self.base + 'avg/jo/' + dnr})
+        for dnr, span in avg_ids(node, 'jo_ref_id'):
+            out.append({'_uri': self.base + 'avg/jo/' + dnr, '_span': span})
 
     def fmt_jk_refs(self, node, match, out, context):
-        for dnr in avg_ids(node, 'jk_ref_id'):
+        for dnr, span in avg_ids(node, 'jk_ref_id'):
             if not jk_is_date(dnr):  # a plausible date is not a diarienummer
-                out.append({'_uri': self.base + 'avg/jk/' + dnr})
+                out.append({'_uri': self.base + 'avg/jk/' + dnr, '_span': span})

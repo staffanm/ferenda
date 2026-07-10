@@ -208,10 +208,14 @@ class Projection:
                 refs = [r for r in refs
                         if r.uri != selfuri and not r.uri.startswith(selfuri + "#")]
         if subject_term and (idx := text.find(subject_term)) >= 0:
-            refs.append(lagrum.Ref(idx, idx + len(subject_term), subject_term,
-                                   "dcterms:subject",
-                                   begrepp.term_to_subject(subject_term),
-                                   kind="term"))
+            # the term-use link yields to any citation it overlaps (a defined
+            # term is often also a named-law/change-note reference on the same
+            # span); interleave needs disjoint spans
+            term = lagrum.Ref(idx, idx + len(subject_term), subject_term,
+                              "dcterms:subject",
+                              begrepp.term_to_subject(subject_term),
+                              kind="term")
+            refs += lagrum.yield_overlaps([term], refs)
         if not refs:
             return [text]
         return lagrum.interleave(text, refs)

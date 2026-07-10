@@ -26,7 +26,13 @@ from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
 from ..lib import compress, eucasenaming, patch
 from ..lib.datasets import NAMEDACTS
-from ..lib.lagrum import EULAGSTIFTNING, EURATTSFALL, LagrumParser, interleave
+from ..lib.lagrum import (
+    EULAGSTIFTNING,
+    EURATTSFALL,
+    LagrumParser,
+    interleave,
+    yield_overlaps,
+)
 from ..lib.util import from_roman
 from .definitions import build_matcher, extract_definitions, term_refs
 from .model import BASE, Block, EurlexDoc, doctype, official_short_title, short_label
@@ -440,8 +446,8 @@ def to_artifact(doc):
         cites = parser.parse_text(b.text, context={})
         # term-use links yield to a citation wherever the spans overlap (a
         # citation is the stronger, cross-document link)
-        uses = [u for u in term_refs(b.text, matcher, index, doc.uri, b.anchor)
-                if not any(u.start < c.end and c.start < u.end for c in cites)]
+        uses = yield_overlaps(
+            term_refs(b.text, matcher, index, doc.uri, b.anchor), cites)
         block = {"type": b.kind, "text": interleave(b.text, cites + uses)}
         for key in ("num", "level"):
             if getattr(b, key) is not None:
