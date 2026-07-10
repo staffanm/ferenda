@@ -8,8 +8,7 @@ global ordinals are held in heap and grow with doc count, and at ~1M+ docs (the
 full corpus, more once the flat verticals gain structure) they were the dominant
 consumer behind the parent circuit breaker.
 
-Instead every unit is a **standalone document** carrying its parent's metadata,
-and search **collapses by ``doc_uri``** to one result per document:
+Instead every unit is a **standalone document** carrying its parent's metadata:
 
   * one **whole-document** unit per artifact (``is_doc=true``) -- full text +
     metadata + ``inbound_count`` (the "most-hänvisade" ranking signal);
@@ -18,15 +17,18 @@ and search **collapses by ``doc_uri``** to one result per document:
     ``inbound_count`` denormalised on, so a fragment that wins a group still
     carries the document's display data and authority.
 
-A query scores all units, ``collapse`` keeps the top-scoring unit per
-``doc_uri`` (usually the matching paragraph), and a ``cardinality`` agg reports
-the distinct-document total. No join, no routing -- it scales on a normal heap.
+A result query scores only whole-document units, giving exact totals and stable
+deep pagination via ``search_after``. A second query, bounded to that result
+page's document ids, collapses the fragment units to recover each document's
+best matching paragraph/article. No join or routing.
 
 Extraction (``doc_actions``) is pure and unit-testable; the cluster round-trip
 needs a running OpenSearch (``OPENSEARCH_URL``, default localhost:9200).
 """
 
+import base64
 import json
+import re
 import sys
 import time
 
@@ -35,9 +37,10 @@ from opensearchpy.exceptions import ConnectionError as OpenSearchConnectionError
 from opensearchpy.exceptions import ConnectionTimeout
 
 from .. import config
-from . import catalog, compress, text
+from . import catalog, compress, facets, text
 
 INDEX = "lagen"
+INDEX_FORMAT = "3"        # bump when emitted units change without artifact changes
 
 # Resilience against a busy cluster: a read timeout while OpenSearch is merging
 # segments or running a delete_by_query is transient, not fatal. Every index op
@@ -68,6 +71,17 @@ def _retry(fn, label):
                 "\n  opensearch: %s timed out (attempt %d/%d) -- retrying in %ds\n"
                 % (label, attempt, RETRIES, delay))
             time.sleep(delay)
+
+
+def _index_version(content_hash):
+    """Version stored on an indexed unit.
+
+    Artifact hashes alone cannot notice an index-schema change (such as adding
+    the year facet).  Folding a small format version into them makes the next
+    ordinary incremental index pass rebuild every affected document once.
+    """
+    return ("%s:%s" % (INDEX_FORMAT, content_hash)
+            if content_hash is not None else None)
 
 # Query-time field boosts (index-time boost was deprecated in ES5; query-time is
 # version-safe and identical in effect): the identifier dominates, then title,
@@ -102,6 +116,7 @@ MAPPING = {
             "text":          {"type": "text", "copy_to": "all"},
             "source":        {"type": "keyword"},
             "kind":          {"type": "keyword"},
+            "year":          {"type": "keyword"},
             "pinpoint":      {"type": "keyword"},
             "inbound_count": {"type": "long"},
             "is_doc":        {"type": "boolean"},    # whole-document unit vs fragment
@@ -150,8 +165,12 @@ def doc_actions(row, inbound_count, version=None):
     No `_index` -- index_source passes index= to the bulk helper, so the actions
     follow the SearchIndex instance's index, not a hardcoded constant."""
     uri, source, kind, label, title, path = row
+    facet_row = facets.Row(uri, catalog.local(uri), kind, label, title, None)
+    year = facets.document_year(source, facet_row)
     shared = {"doc_uri": uri, "source": source, "kind": kind,
               "version": version, "inbound_count": inbound_count}
+    if year:
+        shared["year"] = year
     if not path:
         # a synthesized stub (e.g. a begrepp concept minted from references) has
         # no artifact on disk -- only its identity is searchable: one whole-doc
@@ -168,14 +187,13 @@ def doc_actions(row, inbound_count, version=None):
     # acronym where the artifact carries them, else the full title (catalog)
     display = catalog.display_title(art, title)
     frags = [(fu, ft) for fu, ft in text.fragment_texts(art) if ft]
-    # the whole-document unit carries the searchable identity; it carries the body
-    # `text` ONLY when there are no fragments to hold it (DV/forarbete/eurlex
-    # today). When fragments exist they own the body text, so a body-term query
-    # matches a fragment (which collapses with a pinpoint), not the document.
+    # The whole-document unit also carries the complete body: result paging then
+    # operates over exactly one unit per document (exact total + search_after).
+    # Fragment units remain for a bounded second query that finds the best
+    # paragraph/article pinpoint for each document on the returned page.
     doc = {**shared, "uri": uri, "is_doc": True,
-           "identifier": label, "title": title, "label": label, "display": display}
-    if not frags:
-        doc["text"] = text.document_text(art)
+           "identifier": label, "title": title, "label": label,
+           "display": display, "text": text.document_text(art)}
     yield {"_id": uri, "_source": doc}
     for frag_uri, frag_text in frags:
         yield {"_id": frag_uri,
@@ -190,40 +208,125 @@ def doc_actions(row, inbound_count, version=None):
 # query body (pure)
 # --------------------------------------------------------------------------
 
-def query_body(q, source=None, kind=None, limit=10, offset=0):
-    """The OpenSearch request body for a free-text search. Every matching unit
-    (whole-document or fragment) is scored, then `collapse` keeps the top-scoring
-    unit per `doc_uri` -- so a query returns one result per document, represented
-    by whichever unit matched best (usually the matching paragraph, which carries
-    a pinpoint). Ranking is relevance combined (sum) with log1p(inbound_count), so
-    a well-matched, heavily-cited statute outranks an equally-matched obscure one.
-    A `cardinality` agg on doc_uri gives the distinct-document total."""
-    must = {"simple_query_string": {"query": q, "default_operator": "and",
-                                    "fields": SEARCH_FIELDS}}
-    filt = []
-    if source:
-        filt.append({"term": {"source": source}})
-    if kind:
-        filt.append({"term": {"kind": kind}})
-    return {
+_QUERY_WORD = re.compile(r"[^\W_]+", re.UNICODE)
+
+
+def prefix_query(q):
+    """A safe simple-query-string alternative with every ordinary word made a
+    prefix.  The original query is still searched (and boosted) alongside it;
+    this branch is what lets ``upphovsr`` match the token ``upphovsrätt``.  By
+    extracting words instead of appending ``*`` to the raw expression we don't
+    turn quotes, parentheses or other simple-query syntax into malformed input.
+    """
+    return " ".join(word + "*" for word in _QUERY_WORD.findall(q))
+
+
+def _text_query(q):
+    exact = {"simple_query_string": {"query": q, "default_operator": "and",
+                                      "fields": SEARCH_FIELDS, "boost": 2}}
+    prefixed = prefix_query(q)
+    if not prefixed:
+        return exact
+    return {"bool": {"should": [
+        exact,
+        {"simple_query_string": {"query": prefixed, "default_operator": "and",
+                                  "analyze_wildcard": True,
+                                  "fields": SEARCH_FIELDS}},
+    ], "minimum_should_match": 1}}
+
+
+def _facet_filters(source=None, kind=None, year=None, exclude=None):
+    values = {"source": source, "kind": kind, "year": year}
+    return [{"term": {field: value}} for field, value in values.items()
+            if value and field != exclude]
+
+
+def encode_cursor(sort, seen):
+    raw = json.dumps({"sort": sort, "seen": seen}, separators=(",", ":")).encode()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def decode_cursor(cursor):
+    try:
+        raw = base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4))
+        value = json.loads(raw)
+        sort, seen = value["sort"], value["seen"]
+        if not isinstance(sort, list) or len(sort) != 2:
+            raise ValueError
+        if not isinstance(seen, int) or seen < 0:
+            raise ValueError
+        return sort, seen
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise ValueError("invalid search cursor") from exc
+
+
+def query_body(q, source=None, kind=None, limit=10, offset=0, year=None,
+               search_after=None):
+    """Search one whole-document unit per result.
+
+    The stable ``(_score, doc_uri)`` sort supports ``search_after`` beyond the
+    bounded result window, and ``track_total_hits`` gives an exact document
+    total. ``fragment_query_body`` separately recovers the best pinpoint for the
+    small set of documents on this page.
+    """
+    filters = _facet_filters(source, kind, year)
+
+    # `post_filter` narrows the returned hits while the aggregations see every
+    # text match.  Each facet then applies the *other* selected filters, so after
+    # choosing a source the type/year counts remain narrowed but the source list
+    # still offers a way out of that choice.
+    def facet_agg(field):
+        return {"filter": {"bool": {"filter":
+                                     _facet_filters(source, kind, year, field)}},
+                "aggs": {"values": {
+                    "terms": {"field": field, "size": 1000},
+                }}}
+
+    body = {
         "from": offset, "size": limit,
+        "track_total_hits": True,
         "query": {"function_score": {
-            "query": {"bool": {"must": must, "filter": filt}},
+            "query": {"bool": {"must": _text_query(q),
+                               "filter": [{"term": {"is_doc": True}}]}},
             "field_value_factor": {"field": "inbound_count",
                                    "modifier": "log1p", "missing": 0},
             "boost_mode": "sum",
         }},
+        "post_filter": {"bool": {"filter": filters}},
+        "sort": [{"_score": "desc"}, {"doc_uri": "asc"}],
+        "highlight": HIGHLIGHT,
+        "aggs": {
+            "source": facet_agg("source"),
+            "kind": facet_agg("kind"),
+            "year": facet_agg("year"),
+        },
+    }
+    if search_after is not None:
+        body.pop("from")
+        body["search_after"] = search_after
+    return body
+
+
+def fragment_query_body(q, doc_uris):
+    """Best matching fragment for each document on one returned result page."""
+    return {
+        "size": len(doc_uris),
+        "query": {"bool": {
+            "must": _text_query(q),
+            "filter": [{"term": {"is_doc": False}},
+                       {"terms": {"doc_uri": doc_uris}}],
+        }},
         "collapse": {"field": "doc_uri"},
         "highlight": HIGHLIGHT,
-        "aggs": {"docs": {"cardinality": {"field": "doc_uri"}}},
     }
 
 
 def parse_hit(h):
-    """One collapsed search result: the document (its `doc_uri` + denormalised
-    metadata) represented by its best-matching unit. When that unit is a fragment,
-    its pinpoint + highlight are surfaced as the single `fragments` entry (the
-    shape the API/UI deep-links from); a whole-document match has none."""
+    """Shape either a document hit or a collapsed best-fragment hit.
+
+    The caller merges a fragment hit's pinpoint/highlight onto its document hit,
+    which is the API/UI shape that deep-links into the matching provision.
+    """
     src = h["_source"]
     hl = h.get("highlight", {})
     fragments = ([] if src.get("is_doc") else
@@ -388,7 +491,8 @@ class SearchIndex:
                 # skip it (re-run relate to prune the stale row for good). A
                 # path-less row is a synthesized stub (no artifact) -- not missing.
                 missing.append(catalog.local(uri))
-            elif not force and chash is not None and have.get(uri) == chash:
+            elif (not force and chash is not None
+                  and have.get(uri) == _index_version(chash)):
                 skipped += 1                          # already current -- skip
             else:
                 todo.append(row)
@@ -407,7 +511,8 @@ class SearchIndex:
 
         def actions():
             for i, row in enumerate(todo):
-                yield from doc_actions(row[:6], counts[row[0]], version=row[6])
+                yield from doc_actions(row[:6], counts[row[0]],
+                                       version=_index_version(row[6]))
                 if progress:
                     progress(i + 1, len(todo), catalog.local(row[0]))
 
@@ -416,16 +521,46 @@ class SearchIndex:
             _retry(lambda: self.client.indices.refresh(index=self.index), "refresh")
         return len(rows), indexed, errors, missing, skipped, len(stale)
 
-    def search(self, q, source=None, kind=None, limit=10, offset=0):
+    def search(self, q, source=None, kind=None, limit=10, offset=0, year=None,
+               cursor=None):
+        search_after, seen = decode_cursor(cursor) if cursor else (None, offset)
         res = _retry(lambda: self.client.search(
             index=self.index,
-            body=query_body(q, source, kind, limit, offset)), "search")
-        # `total` is the distinct-document count (cardinality agg), not the raw
-        # unit hits -- collapse dedupes the returned rows but not hits.total.
-        total = res.get("aggregations", {}).get("docs", {}).get(
-            "value", len(res["hits"]["hits"]))
+            body=query_body(q, source, kind, limit, offset, year,
+                            search_after)), "search")
+        hits = res["hits"]["hits"]
+        aggregations = res.get("aggregations", {})
+        raw_total = res["hits"].get("total", len(hits))
+        total = raw_total.get("value", len(hits)) \
+            if isinstance(raw_total, dict) else raw_total
+
+        def buckets(field):
+            return [{"value": bucket["key"], "count": bucket["doc_count"]}
+                    for bucket in aggregations.get(field, {}).get(
+                        "values", {}).get("buckets", [])]
+
+        results = [parse_hit(hit) for hit in hits]
+        if results:
+            doc_uris = [result["uri"] for result in results]
+            fragment_res = _retry(lambda: self.client.search(
+                index=self.index, body=fragment_query_body(q, doc_uris)),
+                "fragment search")
+            fragments = {hit["_source"]["doc_uri"]: parse_hit(hit)
+                         for hit in fragment_res["hits"]["hits"]}
+            for result in results:
+                fragment = fragments.get(result["uri"])
+                if fragment and fragment["fragments"]:
+                    result["fragments"] = fragment["fragments"]
+                    result["highlight"] = fragment["highlight"]
+
+        consumed = seen + len(hits)
+        next_cursor = (encode_cursor(hits[-1]["sort"], consumed)
+                       if hits and consumed < total else None)
         return {"total": total,
-                "results": [parse_hit(h) for h in res["hits"]["hits"]]}
+                "next_cursor": next_cursor,
+                "facets": {field: buckets(field)
+                           for field in ("source", "kind", "year")},
+                "results": results}
 
     def doccount(self):
         return _retry(lambda: self.client.count(index=self.index), "count")["count"]

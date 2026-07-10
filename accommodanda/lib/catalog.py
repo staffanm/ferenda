@@ -48,7 +48,8 @@ CREATE TABLE IF NOT EXISTS documents (
     source_url   TEXT,             -- authoritative publisher url ("Källa"), if any
     content_hash TEXT,             -- sha256 of the artifact bytes (incremental relate)
     expired      TEXT,             -- repeal-effective date (SFS upphavandedatum), if any
-    date         TEXT              -- the document's own date (förarbete/statute/decision), ISO
+    date         TEXT,             -- the document's own date (förarbete/statute/decision), ISO
+    publisher    TEXT              -- issuing organization, for feed filtering
 );
 CREATE TABLE IF NOT EXISTS links (
     from_uri    TEXT NOT NULL,   -- document making the citation (doc-level uri)
@@ -136,6 +137,10 @@ def connect(path):
         con.execute("ALTER TABLE documents ADD COLUMN art_mtime_ns INTEGER")
     if "date" not in cols:
         con.execute("ALTER TABLE documents ADD COLUMN date TEXT")
+    if "publisher" not in cols:
+        con.execute("ALTER TABLE documents ADD COLUMN publisher TEXT")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_docs_publisher "
+                "ON documents(source, publisher)")
     return con
 
 
@@ -431,10 +436,24 @@ def document_date(art):
     utfärdandedatum, a decision's date. Field-driven across sources; None when
     the artifact carries no date (the renderer sorts undated entries last)."""
     props = art.get("metadata", {}).get("properties", {})
-    return (art.get("date")
+    return (art.get("date") or art.get("avgorandedatum")
+            or art.get("metadata", {}).get("beslutsdatum")
+            or art.get("metadata", {}).get("utkomFranTryck")
             or props.get("rpubl:utfardandedatum")
             or props.get("rpubl:avgorandedatum")
             or props.get("rpubl:beslutsdatum"))
+
+
+def document_publisher(art):
+    """The issuing organization, normalized only structurally (not renamed).
+
+    It is catalogued because legacy Atom publisher filters are public request
+    parameters; serving one must not reopen and parse the whole artifact corpus.
+    """
+    metadata = art.get("metadata", {})
+    return (metadata.get("publisher")
+            or metadata.get("properties", {}).get("dcterms:publisher")
+            or art.get("publisher"))
 
 
 def display_title(art, title):
@@ -492,12 +511,12 @@ def _index_document(con, art, path, source):
     con.execute(
         "INSERT OR REPLACE INTO documents "
         "(uri, source, kind, label, title, path, source_url, content_hash, "
-        " expired, display, date) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        " expired, display, date, publisher) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         (*row, art.get("source_url"),
          None,                 # content_hash filled by the caller (holds bytes)
          expired_date(art),
          display_title(art, row[4]),              # the reader-facing heading (row[4]=title)
-         document_date(art)))
+         document_date(art), document_publisher(art)))
     rows = [(uri, anchor, run.get("predicate", "dcterms:references"),
              run["uri"], strip_fragment(run["uri"]), run.get("text"))
             for anchor, run in (artifact_links(art) + subject_links(art)

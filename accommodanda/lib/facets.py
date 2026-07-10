@@ -94,13 +94,14 @@ _GRUNDLAGAR = {"1974:152", "1949:105", "1991:1469", "1810:0926", "2014:801"}
 _SFS_STATUTE_END = ("lag", "lagen", "balk", "balken")
 
 
-def _sfs_is_statute(title, local):
+def sfs_is_statute(title, local):
     """Whether an SFS is parliamentary primary law -- a lag, a balk, or one of the
     grundlagar -- as opposed to a förordning/kungörelse/etc. The designation is the
     phrase before the SFS number; a lag/balk ends in just that, however compound
     ('Lag', 'Förvaltningslag', 'Radio- och tv-lag', 'Plan- och bygglag',
     'Brottsbalk'). The grundlagar open with their own designation, so they're
-    pinned by SFS id. Drives the listing's visual hierarchy."""
+    pinned by SFS id. Drives the listing's visual hierarchy and the legacy
+    feed ``rdf_type`` filter (feeds)."""
     head = re.sub(r"\s+", " ", _SFS_EDITORIAL.sub("", title)).strip()
     designation = head.split("(", 1)[0].strip().lower()
     return local in _GRUNDLAGAR or designation.endswith(_SFS_STATUTE_END)
@@ -340,6 +341,27 @@ def sources():
     return list(SCHEMES)
 
 
+def document_year(source, row):
+    """Return the document's publication/decision year for search faceting.
+
+    Browse navigation already has the source-specific year knowledge (court
+    identifiers and old JK diarienummer need more than a generic four-digit
+    regexp), so the search index reuses it instead of growing a second, subtly
+    different set of parsers.  SFS browse is alphabetical and therefore has no
+    year level of its own; its stable ``YYYY:number`` identifier supplies it.
+    Sources without a meaningful year return ``None`` rather than an ``okänt``
+    bucket.
+    """
+    if source == "sfs":
+        match = re.match(r"(\d{4}):", row.local)
+        return match.group(1) if match else None
+    for level in SCHEMES.get(source, ()):
+        if level.name == "År":
+            year = level.key(row)
+            return year if year != "okänt" else None
+    return None
+
+
 def is_browsable(source, local):
     """Whether a document belongs in the browse at all -- an EU corrigendum
     corrects an act rather than being one, so it is omitted (still reachable via
@@ -367,7 +389,7 @@ def browse_doc(source, row):
     if source == "sfs":
         pre, key = _sfs_split(row.title or "")
         doc.update(pre=pre, key=key or doc["display"],
-                   subdued=not _sfs_is_statute(row.title or "", row.local),
+                   subdued=not sfs_is_statute(row.title or "", row.local),
                    year=row.local.split(":", 1)[0])
     return doc
 

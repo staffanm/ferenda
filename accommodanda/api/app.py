@@ -42,6 +42,7 @@ from ..lib import (
     diff,
     facets,
     facsimile,
+    feeds,
     history,
     layout,
     pins,
@@ -157,9 +158,16 @@ class SearchResult(BaseModel):
     fragments: list[Fragment] = []
 
 
+class SearchFacetBucket(BaseModel):
+    value: str
+    count: int
+
+
 class SearchResponse(BaseModel):
     query: str
     total: int
+    next_cursor: str | None = None
+    facets: dict[str, list[SearchFacetBucket]] = {}
     results: list[SearchResult]
 
 
@@ -261,8 +269,13 @@ def search_endpoint(
         source: str | None = Query(None, description="restrict to a source "
                                    "(sfs, dv, forarbete, foreskrift, eurlex, avg, kommentar, begrepp)"),
         kind: str | None = Query(None, description="restrict to a document kind"),
+        year: str | None = Query(None, pattern=r"^\d{4}$",
+                                 description="restrict to a four-digit publication/decision year"),
         limit: int = Query(10, ge=1, le=100),
-        offset: int = Query(0, ge=0)):
+        offset: int = Query(0, ge=0, le=9900,
+                            description="bounded random access; use cursor for deep paging"),
+        cursor: str | None = Query(None, max_length=2048,
+                                   description="opaque cursor returned by the previous page")):
     """Full-text search, with a citation-aware twist: when the query reads as a
     citation (a law nickname/abbreviation + pinpoint, an EU act + article, or a
     case nickname), the exact resource is resolved and pinned as the first
@@ -270,7 +283,13 @@ def search_endpoint(
     can't do (the name appears nowhere in the text). The rest is the usual
     full-text ranking (relevance combined with citation count) with the matching
     §/article fragments and highlights."""
-    res = _index.search(q, source=source, kind=kind, limit=limit, offset=offset)
+    if cursor and offset:
+        raise HTTPException(422, "cursor and offset are mutually exclusive")
+    try:
+        res = _index.search(q, source=source, kind=kind, year=year,
+                            limit=limit, offset=offset, cursor=cursor)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     results = [{**r, "url": layout.page_url(r["uri"])}
                for r in res["results"]]
     total = res["total"]
@@ -279,14 +298,79 @@ def search_endpoint(
     # full-text row for the same document -- the pinned hit is more precise.
     # Resolution confirms its target against the catalog, but a missing catalog
     # mustn't fail a full-text search, so it's best-effort (no Depends/503).
-    if offset == 0 and CATALOG.exists():
+    if offset == 0 and not cursor and not year and CATALOG.exists():
         con = catalog.connect_ro(CATALOG)
         try:
             pinned = _resolved_results(con, q, source, kind)
         finally:
             con.close()
         results, total = pins.merge_pinned(pinned, results, total, limit)
-    return SearchResponse(query=q, total=total, results=results)  # ty: ignore[invalid-argument-type]  # results are untyped hit dicts; pydantic validates at runtime
+    return SearchResponse(query=q, total=total,
+                          next_cursor=res.get("next_cursor"), facets=res["facets"],
+                          results=results)  # ty: ignore[invalid-argument-type]  # result/facet dicts are validated by pydantic at runtime
+
+
+def _legacy_feed(con, dataset, rdf_type, rpubl_rattsfallspublikation,
+                 dcterms_publisher):
+    """The shared body of the two legacy feed handlers: dataset lookup, the
+    legacy facet params, and the entries -- only the rendering differs."""
+    item = feeds.dataset(dataset)
+    if not item:
+        raise HTTPException(404, "unknown feed dataset %r" % dataset)
+    params = {key: value for key, value in (
+        ("rdf_type", rdf_type),
+        ("rpubl_rattsfallspublikation", rpubl_rattsfallspublikation),
+        ("dcterms_publisher", dcterms_publisher),
+    ) if value}
+    rows = feeds.entries(con, item, rdf_type, rpubl_rattsfallspublikation,
+                         dcterms_publisher)
+    return item, rows, params
+
+
+def _sitenews_file(relative, media_type):
+    path = layout.GENERATED / "dataset" / "sitenews" / relative
+    if not compress.exists(path):
+        raise HTTPException(404, "sitenews feed has not been generated")
+    return Response(compress.read_bytes(path), media_type=media_type)
+
+
+@app.get("/dataset/sitenews/feed.atom", include_in_schema=False)
+def sitenews_atom_feed():
+    return _sitenews_file("feed.atom", "application/atom+xml")
+
+
+@app.get("/dataset/sitenews/feed", include_in_schema=False)
+def sitenews_html_feed():
+    return _sitenews_file("feed/index.html", "text/html")
+
+
+@app.get("/dataset/{dataset}/feed.atom", include_in_schema=False)
+def legacy_atom_feed(
+        dataset: str,
+        rdf_type: str | None = Query(None),
+        rpubl_rattsfallspublikation: str | None = Query(None),
+        dcterms_publisher: str | None = Query(None),
+        con: sqlite3.Connection = Depends(get_con)):
+    """Atom at the URLs published by the old Ferenda repositories."""
+    item, rows, params = _legacy_feed(con, dataset, rdf_type,
+                                      rpubl_rattsfallspublikation,
+                                      dcterms_publisher)
+    return Response(feeds.render_atom(item, rows, params),
+                    media_type="application/atom+xml")
+
+
+@app.get("/dataset/{dataset}/feed", include_in_schema=False)
+def legacy_html_feed(
+        dataset: str,
+        rdf_type: str | None = Query(None),
+        rpubl_rattsfallspublikation: str | None = Query(None),
+        dcterms_publisher: str | None = Query(None),
+        con: sqlite3.Connection = Depends(get_con)):
+    """Human-readable twin of a legacy Atom feed."""
+    item, rows, params = _legacy_feed(con, dataset, rdf_type,
+                                      rpubl_rattsfallspublikation,
+                                      dcterms_publisher)
+    return HTMLResponse(feeds.render_html(item, rows, params))
 
 
 @app.get("/api/v1/facets", response_model=FacetTree, tags=["catalog"])

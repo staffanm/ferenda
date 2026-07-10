@@ -640,9 +640,31 @@ def test_generate_browse_writes_faceted_pages(tmp_path):
     bucket = compress.read_text(out / "sfs" / "r" / "index.html")   # pages precompressed
     assert 'href="/1975:635"' in bucket          # the bare /<sfsid> page address
     assert "som börjar på R" in bucket
+    assert ('type="application/atom+xml" '
+            'href="/dataset/sfs/feed.atom"') in bucket
     assert 'href="/1975:635"' in compress.read_text(out / "sfs" / "index.html")
     # every case is listed under its court; the source root resolves directly
     assert 'href="/dom/NJA_1994_s_1"' in compress.read_text(out / "dom" / "index.html")
+    # The complete search shell and its client are generated with the aggregate
+    # chrome; the quick palette links to it and exposes the Right Arrow shortcut.
+    search_page = compress.read_text(out / "sok" / "index.html")
+    assert 'class="search-page"' in search_page
+    fullsearch = compress.read_text(out / "fullsearch.js")
+    assert "facetGroup('source', 'Källa'" in fullsearch
+    assert "renderPagination" in fullsearch and "data.next_cursor" in fullsearch
+    assert "api.delete('page'); api.delete('offset')" in fullsearch
+    assert fullsearch.index("var mine = ++seq") < fullsearch.index("if (!q)")
+    palette = compress.read_text(out / "search.js")
+    assert "Avgränsa " in palette and "e.key === 'ArrowRight'" in palette
+    assert 'class="search-refine" href="/sok/" hidden></a><input' in palette
+    assert "refine.hidden = true;" in palette
+    # The legacy all-feeds directory and repository aliases are restored.
+    feed_index = compress.read_text(out / "dataset" / "sitenews" / "index.html")
+    assert "/dataset/sfs/feed.atom?rdf_type=type%2Flag" in feed_index
+    assert "/dataset/dv/feed.atom" in feed_index
+    assert compress.exists(out / "dataset" / "sfs" / "feed.atom")
+    assert compress.exists(out / "dataset" / "forarbeten" / "feed.atom")
+    assert compress.exists(out / "dataset" / "myndprax" / "feed.atom")
 
 
 def test_generate_site_incremental_reuses_content_hash(tmp_path):

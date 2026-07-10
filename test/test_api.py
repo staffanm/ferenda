@@ -44,8 +44,14 @@ def client(tmp_path):
 
     # a fake search backend -- the API must not require a live OpenSearch
     class FakeIndex:
-        def search(self, q, source=None, kind=None, limit=10, offset=0):
-            return {"total": 1, "results": [{
+        def search(self, q, source=None, kind=None, year=None, limit=10, offset=0,
+                   cursor=None):
+            if cursor == "bad":
+                raise ValueError("invalid search cursor")
+            return {"total": 1, "next_cursor": None, "facets": {
+                "source": [{"value": "sfs", "count": 1}],
+                "kind": [{"value": "law", "count": 1}],
+                "year": [{"value": "1962", "count": 1}]}, "results": [{
                 "uri": "https://lagen.nu/1962:700", "identifier": "SFS 1962:700",
                 "title": "Brottsbalk (1962:700)", "source": "sfs", "kind": "law",
                 "score": 9.1, "inbound_count": 1,
@@ -65,12 +71,48 @@ def test_search(client):
     assert r.status_code == 200
     body = r.json()
     assert body["query"] == "mord" and body["total"] == 1
+    assert body["facets"]["source"] == [{"value": "sfs", "count": 1}]
+    assert body["facets"]["year"] == [{"value": "1962", "count": 1}]
     hit = body["results"][0]
     assert hit["identifier"] == "SFS 1962:700"
     assert hit["fragments"][0]["pinpoint"] == "K3P1"
     # the API resolves each hit's public page path (layout.page_url): a statute
     # at lagen.nu's bare /<sfsid> address, colon kept
     assert hit["url"] == "/1962:700"
+
+
+def test_search_accepts_year_facet(client):
+    r = client.get("/api/v1/search", params={"q": "mord", "year": "1962"})
+    assert r.status_code == 200
+    assert client.get("/api/v1/search",
+                      params={"q": "mord", "year": "62"}).status_code == 422
+
+
+def test_search_cursor_validation_and_bounded_offset(client):
+    assert client.get("/api/v1/search",
+                      params={"q": "mord", "cursor": "bad"}).status_code == 422
+    assert client.get("/api/v1/search",
+                      params={"q": "mord", "offset": 10000}).status_code == 422
+    assert client.get("/api/v1/search", params={
+        "q": "mord", "cursor": "anything", "offset": 1}).status_code == 422
+
+
+def test_legacy_atom_feed_urls_and_filters(client):
+    r = client.get("/dataset/sfs/feed.atom")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("application/atom+xml")
+    assert r.text.count("<entry>") == 2
+    filtered = client.get(
+        "/dataset/sfs/feed.atom", params={"rdf_type": "type/lag"})
+    assert filtered.status_code == 200
+    assert "https://lagen.nu/1962:700" in filtered.text
+    assert "/dataset/sfs/feed.atom?rdf_type=type%2Flag" in filtered.text
+
+
+def test_legacy_html_feed_and_unknown_dataset(client):
+    r = client.get("/dataset/sfs/feed", params={"rdf_type": "type/lag"})
+    assert r.status_code == 200 and "Alla författningar" in r.text
+    assert client.get("/dataset/no-such-source/feed.atom").status_code == 404
 
 
 def test_documents_lists_ids_and_metadata(client):

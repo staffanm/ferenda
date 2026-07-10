@@ -78,7 +78,7 @@ accommodanda/
   remisser/ remiss (referral-response) vertical — model·download·parse·ai_analyze
   site/     editorial-chrome vertical (frontpage/om/sitenews) — model·parse·render (markdown content repo, WIKI_ROOT)
   wiki/     kommentar + begrepp sources — parse·annotate·guidance_discover (markdown content repo, WIKI_ROOT)
-  api/      HTTP API — app
+  api/      HTTP API — app (REST/OpenAPI + static site + legacy feeds), mcp (MCP server), ops (health dashboard), auth·edit·editcontent·editcart (inline content editor), patch (source-fix editor)
   build.py  orchestrator — the `lagen` build driver, composes the verticals
 ```
 
@@ -824,7 +824,26 @@ to a future per-doc incremental generate.
     and fixed along the way: client calls are keyword-only (`index=…`),
     `doc_actions` must not hardcode `_index`; index settings `number_of_replicas:0`
     + `refresh_interval:60s`. `test/test_search.py`.
-  - ✅ **REST / OpenAPI** (`accommodanda/api/app.py`, `lagen serve-api`, FastAPI +
+  - ✅ **Search facets, prefix matching, a full `/sok` results page.** A `year`
+    facet (`facets.document_year`, reusing browse's own per-source year
+    extraction — SFS from its `YYYY:number` identifier, other sources from
+    their existing browse `SCHEMES` "År" level) is indexed alongside
+    `source`/`kind`; `query_body` runs the text query as a `post_filter` (hits
+    narrow on the selected facets, but each facet's own aggregation still
+    counts against the *other* selected facets, so there's always a way back
+    out) and returns per-facet buckets (`SearchResponse.facets`) plus a `year`
+    query param end-to-end (`/api/v1/search?year=`, `SearchIndex.search`).
+    Every query also runs a second, prefix-matching branch (`prefix_query` —
+    every ordinary word gets a trailing `*`, so `upphovsr` matches
+    `upphovsrätt`) OR'd against the exact query. Because these are index-schema
+    changes an artifact-hash-only freshness check can't see, `search.py` folds
+    an `INDEX_FORMAT` version into each indexed unit's stored freshness key, so
+    bumping it reindexes every affected unit on the next ordinary incremental
+    pass. On the client, `render.render_search_page` renders a full result-list
+    page with a facet sidebar at `/sok` (`fullsearch.js`), replacing the ⌘K
+    palette's in-page dropdown for anyone who wants to page through / narrow a
+    result set. `test/test_search.py`, `test/test_api.py`.
+  - ✅ **REST / OpenAPI** (`accommodanda/api/app.py`, mounted on `lagen all serve`, FastAPI +
     uvicorn) over three read-only backends (catalog.sqlite · OpenSearch · artifact
     JSON). `/api/v1`: `search` (each hit carries its hosted-page `url` via
     `layout.page_relpath`), `documents` (filtered/paginated id+metadata index of
@@ -1858,6 +1877,16 @@ the markdown is the source of truth thereafter.
   `MAST_NAV`.
 - Wired end-to-end: `lagen site parse` (incremental) + `lagen site generate`.
   `test/test_site_content.py` (parse + render, hermetic).
+- ✅ **Restored legacy per-repository feed surface** (`lib/feeds.py`) — beyond
+  `sitenews`, the old Ferenda site's `/dataset/{sfs,dv,forarbeten,myndfs,
+  myndprax,keyword,eurlex}/feed[.atom]` URLs (+ human-readable `/feed` twins)
+  are back, with the old `rdf_type`/`rpubl_rattsfallspublikation`/
+  `dcterms_publisher` query-parameter facets. `feeds.py` is one pure module —
+  the legacy-alias→source map, the entry query and the Atom/HTML renderers —
+  shared by static generation (`render.py` writes every dataset's feed during
+  `generate`) and by two `api/app.py` endpoints that answer the same
+  query-parameter URLs live off the catalog. `/dataset/sitenews` is the
+  all-feeds directory page.
 
 ### 7b. Remaining verticals ⬜
 
@@ -1901,13 +1930,14 @@ model + extraction.
 | `test/test_avg.py` | avg (JO/JK/ARN) parser + citation-grammar suite |
 | `tools/golden_dv.py` | DV golden cross-check (references vs old distilled RDF) |
 | `tools/golden_dv_structure.py` | DV structural golden (instance/ruling skeleton vs old parsed XHTML) |
-| `accommodanda/build.py` | orchestrator: `lagen <source> <action>` build driver + freshness; corpus verbs `relate`/`generate`/`index`/`dump`/`serve`/`serve-api` |
+| `accommodanda/build.py` | orchestrator: `lagen <source> <action>` build driver + freshness; corpus verbs `relate`/`generate`/`index`/`dump`/`serve` (one process serving the static site + REST API + MCP) |
 | `accommodanda/lib/catalog.py` | derived SQLite catalog + cross-source citation graph (`relate`) |
 | `accommodanda/lib/render.py` | static HTML site w/ inbound annotations + live ⌘K search (`generate`) |
 | `accommodanda/lib/text.py` | shared artifact text flattener (node/document/fragment plain text) |
-| `accommodanda/lib/search.py` | OpenSearch parent-child full-text indexer (`index`) |
+| `accommodanda/lib/search.py` | OpenSearch full-text indexer (standalone units collapsed by `doc_uri`, no parent-child join), `index` |
+| `accommodanda/lib/feeds.py` | legacy dataset-alias map + pure Atom/HTML feed renderer, shared by static `/dataset/<alias>/feed` generation and the live query-param endpoints |
 | `accommodanda/lib/dump.py` | NDJSON bulk corpus dumps (`dump`) |
-| `accommodanda/api/app.py` | FastAPI REST/OpenAPI service (`serve-api`) |
+| `accommodanda/api/app.py` | FastAPI REST/OpenAPI service, mounted on `lagen all serve` |
 | `accommodanda/api/mcp.py` | public MCP server (Model Context Protocol), mounted at `/mcp` |
 | `accommodanda/lib/pins.py` | citation-shaped-query resolver, shared by REST `/search` and the MCP tools |
 | `site/data/catalog.sqlite` | derived catalog (documents + links) |
@@ -1999,6 +2029,25 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **lib/api** (2026-07-10) — search facets + a full `/sok` results page: a
+  `year` facet (`facets.document_year`, reusing browse's per-source year
+  extraction) alongside `source`/`kind`, returned as bucketed counts
+  (`SearchResponse.facets`) via `post_filter` aggregations (each facet's own
+  aggregation still counts against the *other* selected filters); every
+  query also runs a prefix-matching branch (`search.prefix_query`) OR'd
+  against the exact one; an `INDEX_FORMAT` version folded into each indexed
+  unit's stored freshness key lets an index-schema change (like this one)
+  reindex on the next ordinary incremental pass, no `--force` needed.
+  `render.render_search_page` renders the facet-sidebar results page,
+  `fullsearch.js` drives it client-side. `test/test_search.py`, `test/test_api.py`.
+- **lib/api** (2026-07-10) — restored legacy per-repository feed surface:
+  `lib/feeds.py` maps the old Ferenda `/dataset/{sfs,dv,forarbeten,myndfs,
+  myndprax,keyword,eurlex}/feed[.atom]` URLs (+ `rdf_type`/
+  `rpubl_rattsfallspublikation`/`dcterms_publisher` query facets) onto the
+  rebuilt source names and renders both Atom and an HTML twin; `render.py`
+  writes every dataset's feed statically during `generate`, and two new
+  `api/app.py` endpoints answer the same query-parameter URLs live off the
+  catalog. `/dataset/sitenews` remains the all-feeds directory.
 - **lib** (2026-07-09) — `lib/annstore.py`: every `ai-*` action's output
   (eurlex/kommentar `.ann`, remisser `.ann`, sfs `.corr`) now lives in a
   dedicated curated store in the git-backed content repo

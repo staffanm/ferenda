@@ -42,10 +42,11 @@ def test_doc_actions_document_and_fragment_units(tmp_path):
     actions = list(search.doc_actions(
         row, catalog.document_inbound_count(con, uri), version="h1"))
     assert actions[0]["_source"]["version"] == "h1"     # carried for the diff
+    assert actions[0]["_source"]["year"] == "1962"      # shared search facet
 
     doc, frag = actions[0], actions[1]
-    # the whole-document unit: searchable identity, but NO body text (the
-    # fragment owns it, so a body query collapses to a paragraph, not the doc)
+    # the whole-document unit owns full text for exact cursor paging; fragment
+    # units duplicate bounded sections for the second pinpoint lookup
     assert doc["_id"] == "https://lagen.nu/1962:700"
     assert doc["_source"]["is_doc"] is True
     assert doc["_source"]["doc_uri"] == "https://lagen.nu/1962:700"
@@ -54,7 +55,7 @@ def test_doc_actions_document_and_fragment_units(tmp_path):
     assert doc["_source"]["identifier"] == "SFS 1962:700"
     # no shortname/abbr on the artifact -> the shown heading is just the title
     assert doc["_source"]["display"] == "Brottsbalk (1962:700)"
-    assert "text" not in doc["_source"]                  # fragments hold the text
+    assert doc["_source"]["text"] == "Den som dödar annan döms för mord."
     assert doc["_source"]["inbound_count"] == 1          # 2018:585 cites K3P1
     assert "_routing" not in doc and "relation" not in doc["_source"]
 
@@ -135,24 +136,57 @@ def test_doc_actions_pathless_stub_indexes_identity_only():
     assert "text" not in unit["_source"]            # no body, no fragments
 
 
-def test_query_body_collapses_by_document_and_ranks_by_inbound():
-    body = search.query_body("mord", source="sfs", limit=5, offset=10)
+def test_query_body_pages_exact_document_units_and_ranks_by_inbound():
+    body = search.query_body("mord", source="sfs", year="1962",
+                             limit=5, offset=10)
     assert body["from"] == 10 and body["size"] == 5
-    # one result per document
-    assert body["collapse"] == {"field": "doc_uri"}
-    # distinct-document total
-    assert body["aggs"]["docs"]["cardinality"]["field"] == "doc_uri"
+    assert "collapse" not in body                         # one unit per document
+    assert body["track_total_hits"] is True                # exact result count
+    assert body["sort"] == [{"_score": "desc"}, {"doc_uri": "asc"}]
     fs = body["query"]["function_score"]
     assert fs["field_value_factor"]["field"] == "inbound_count"
     assert fs["boost_mode"] == "sum"
-    assert {"term": {"source": "sfs"}} in fs["query"]["bool"]["filter"]
-    # one query across all units (no has_child)
-    assert "simple_query_string" in fs["query"]["bool"]["must"]
+    # filtering happens in post_filter only (facet counts stay unnarrowed)
+    assert {"term": {"is_doc": True}} in fs["query"]["bool"]["filter"]
+    assert {"term": {"source": "sfs"}} in body["post_filter"]["bool"]["filter"]
+    assert {"term": {"year": "1962"}} in body["post_filter"]["bool"]["filter"]
+    # A facet omits its own selected value, but retains the other filters.
+    source_filters = body["aggs"]["source"]["filter"]["bool"]["filter"]
+    assert {"term": {"source": "sfs"}} not in source_filters
+    assert {"term": {"year": "1962"}} in source_filters
+    # Exact-token and automatic-prefix branches search all standalone units.
+    queries = fs["query"]["bool"]["must"]["bool"]["should"]
+    assert queries[0]["simple_query_string"]["query"] == "mord"
+    assert queries[1]["simple_query_string"]["query"] == "mord*"
 
 
 def test_query_body_no_filters_when_unscoped():
     body = search.query_body("mord")
-    assert body["query"]["function_score"]["query"]["bool"]["filter"] == []
+    assert body["query"]["function_score"]["query"]["bool"]["filter"] \
+        == [{"term": {"is_doc": True}}]
+    assert body["post_filter"]["bool"]["filter"] == []
+
+
+def test_cursor_roundtrip_and_search_after_query():
+    cursor = search.encode_cursor([7.5, "https://lagen.nu/1962:700"], 20)
+    sort, seen = search.decode_cursor(cursor)
+    assert sort == [7.5, "https://lagen.nu/1962:700"] and seen == 20
+    body = search.query_body("mord", search_after=sort)
+    assert body["search_after"] == sort and "from" not in body
+    with pytest.raises(ValueError, match="invalid search cursor"):
+        search.decode_cursor("not-json")
+
+
+def test_fragment_query_is_bounded_to_page_documents():
+    body = search.fragment_query_body("mord", ["u1", "u2"])
+    assert body["size"] == 2 and body["collapse"] == {"field": "doc_uri"}
+    assert {"term": {"is_doc": False}} in body["query"]["bool"]["filter"]
+    assert {"terms": {"doc_uri": ["u1", "u2"]}} in body["query"]["bool"]["filter"]
+
+
+def test_prefix_query_handles_incomplete_legal_compounds_and_syntax():
+    assert search.prefix_query("avtalsl") == "avtalsl*"
+    assert search.prefix_query('\"upphovsr rätt\" (36 §)') == "upphovsr* rätt* 36*"
 
 
 def test_parse_hit_fragment_representative():
@@ -190,6 +224,66 @@ def test_parse_hit_document_representative_has_no_fragment():
     assert hit["highlight"] == ["<em>Brottsbalk</em>"]    # falls back to title
 
 
+def test_search_parses_filtered_total_and_facet_buckets():
+    class Client:
+        def search(self, index, body):
+            assert index == "test"
+            assert {"term": {"year": "1962"}} in body["post_filter"]["bool"]["filter"]
+            return {
+                "hits": {"total": {"value": 12, "relation": "eq"}, "hits": []},
+                "aggregations": {
+                    "source": {"values": {"buckets": [
+                        {"key": "sfs", "doc_count": 9}]}},
+                    "kind": {"values": {"buckets": [
+                        {"key": "law", "doc_count": 9}]}},
+                    "year": {"values": {"buckets": [
+                        {"key": "1962", "doc_count": 12}]}},
+                },
+            }
+
+    index = object.__new__(search.SearchIndex)
+    index.index = "test"
+    index.client = Client()
+    result = index.search("mord", year="1962")
+    assert result["total"] == 12
+    assert result["facets"]["source"] == [{"value": "sfs", "count": 9}]
+    assert result["facets"]["year"] == [{"value": "1962", "count": 12}]
+    assert result["next_cursor"] is None
+
+
+def test_search_returns_cursor_and_merges_best_fragment():
+    class Client:
+        def __init__(self):
+            self.calls = 0
+
+        def search(self, index, body):
+            self.calls += 1
+            if self.calls == 1:
+                return {
+                    "hits": {"total": {"value": 2, "relation": "eq"}, "hits": [{
+                        "_source": {"doc_uri": "u1", "uri": "u1", "is_doc": True,
+                                    "title": "One", "source": "sfs"},
+                        "_score": 5.0, "sort": [5.0, "u1"],
+                    }]},
+                    "aggregations": {field: {"values": {"buckets": []}}
+                                     for field in ("source", "kind", "year")},
+                }
+            assert body["collapse"] == {"field": "doc_uri"}
+            return {"hits": {"hits": [{
+                "_source": {"doc_uri": "u1", "uri": "u1#P1", "is_doc": False,
+                            "pinpoint": "P1", "doc_title": "One", "source": "sfs"},
+                "highlight": {"text": ["<em>mord</em>"]},
+            }]}}
+
+    index = object.__new__(search.SearchIndex)
+    index.index = "test"
+    index.client = Client()
+    result = index.search("mord", limit=1)
+    assert result["results"][0]["fragments"][0]["pinpoint"] == "P1"
+    sort, seen = search.decode_cursor(result["next_cursor"])
+    assert sort == [5.0, "u1"] and seen == 1
+
+
 @pytest.mark.skipif(not os.environ.get("OPENSEARCH_URL"),
                     reason="needs a running OpenSearch (set OPENSEARCH_URL)")
 def test_index_and_search_round_trip(tmp_path):
@@ -206,6 +300,8 @@ def test_index_and_search_round_trip(tmp_path):
         assert top["uri"] == "https://lagen.nu/1962:700"
         assert top["inbound_count"] == 1                     # cited by 2018:585
         assert top["fragments"][0]["pinpoint"] == "K3P1"     # the matching paragraph
+        # the real analyzer + wildcard path, not merely the pure query shape
+        assert index.search("mor")["total"] == 1
         # a scoped query still works
         assert index.search("brottsbalken", source="sfs")["total"] >= 1
     finally:

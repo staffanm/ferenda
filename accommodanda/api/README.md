@@ -115,13 +115,18 @@ curl -G http://127.0.0.1:8001/api/v1/document \
 | `q` | sträng (obligatorisk) | sökfrågan |
 | `source` | sträng | begränsa till en källa: `sfs`, `dv`, `forarbete`, `foreskrift`, `eurlex`, `avg`, `kommentar`, `begrepp` |
 | `kind` | sträng | begränsa till en dokumenttyp (`law`, `case`, `prop`, `directive`, …) |
+| `year` | fyrsiffrigt år | begränsa till dokumentets publicerings-/avgörandeår |
 | `limit` | heltal 1–100 (standard 10) | antal träffar |
 | `offset` | heltal (standard 0) | paginering |
 
 Träffarna är hela dokument, rankade på relevans kombinerat med antalet
 inkommande citeringar (`inbound_count`) — så en välträffad, ofta hänvisad lag
 slår en lika välträffad men obskyr. Varje träff innehåller även de matchande
-paragraferna/artiklarna med markerad text (`fragments`).
+paragraferna/artiklarna med markerad text (`fragments`). Sökfrågan matchar
+även ordprefix (`upphovsr` hittar `upphovsrätt`), och svaret bär `facets`
+(räknade `source`/`kind`/`year`-hinkar över hela träffmängden, inte bara den
+returnerade sidan) som driver facettfältet på webbplatsens fullständiga
+sökresultatsida (`/sok`, `render.render_search_page` + `fullsearch.js`).
 
 ```sh
 curl -G http://127.0.0.1:8001/api/v1/search \

@@ -105,7 +105,9 @@ def render_sitenews(art):
             'href="/dataset/sitenews/feed.atom">Atom-flöde</a></p>%s'
             % "".join(articles))
     return page(art["title"], "Nyheter", "", body, eyebrow="Nyheter", solo=True,
-                body_class=" site")
+                body_class=" site",
+                head='<link rel="alternate" type="application/atom+xml" '
+                     'href="/dataset/sitenews/feed.atom">')
 
 
 # --------------------------------------------------------------------------

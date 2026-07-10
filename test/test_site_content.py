@@ -75,6 +75,8 @@ def test_sitenews_render_is_newest_first():
     html = render.render_sitenews(art)
     assert html.count("<article") == 2
     assert html.index("Lysator") < html.index("Ny version lanserad")
+    assert ('rel="alternate" type="application/atom+xml" '
+            'href="/dataset/sitenews/feed.atom"') in html
 
 
 def test_atom_is_wellformed_and_newest_first():

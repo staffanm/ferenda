@@ -45,6 +45,8 @@ from . import (
     catalog,
     compress,
     eucasenaming,
+    facets,
+    feeds,
     history,
     lagrum,
     layout,
@@ -1137,6 +1139,7 @@ PAGE = """<!doctype html>
 <html lang="sv"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>%(title)s</title>
+%(head)s
 <script>(function(){try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1147,6 +1150,7 @@ PAGE = """<!doctype html>
 %(grid)s
 %(island)s<script src="/scrollspy.js" defer></script>
 <script src="/search.js" defer></script>
+<script src="/fullsearch.js" defer></script>
 <script src="/versions.js" defer></script>
 <script src="/faksimil.js" defer></script>
 <script src="/editor.js" defer></script>
@@ -1212,7 +1216,8 @@ def _frontmatter(eyebrow, title, subtitle, summary, meta, source_url=None):
 
 
 def page(title, kind, meta, body, toc="", eyebrow=None, subtitle=None,
-         summary="", island="", solo=False, source_url=None, body_class=""):
+         summary="", island="", solo=False, source_url=None, body_class="",
+         head=""):
     """Assemble a page. Document pages use the 3-column grid (TOC · reading
     column · context rail); `solo` pages (frontpage, browse indexes) drop the
     side columns for a single centered column. `body_class` adds a modifier to
@@ -1231,7 +1236,107 @@ def page(title, kind, meta, body, toc="", eyebrow=None, subtitle=None,
                 '<aside class="rail" id="rail" aria-live="polite"></aside></div>'
                 % (toc, front, body))
     return PAGE % {"title": escape(title), "masthead": _masthead(kind),
-                   "grid": grid, "island": island, "body_class": body_class}
+                   "grid": grid, "island": island, "body_class": body_class,
+                   "head": head}
+
+
+def render_search_page():
+    """Static shell for the complete, API-backed result list at ``/sok/``."""
+    body = (
+        '<div class="search-page">'
+        '<form class="full-search-form" role="search">'
+        '<input type="search" name="q" autocomplete="off" '
+        'placeholder="Sök lag, paragraf, rättsfall…" aria-label="Sökord">'
+        '<button type="submit">Sök</button></form>'
+        '<div class="full-search-status" role="status" aria-live="polite"></div>'
+        '<div class="full-search-layout">'
+        '<aside class="full-search-facets" aria-label="Avgränsa sökningen"></aside>'
+        '<section><div class="full-search-results" aria-live="polite"></div>'
+        '<nav class="search-pagination" aria-label="Sökresultatsidor"></nav>'
+        '</section></div></div>')
+    return page("Sök", "Sök", "", body, solo=True)
+
+
+def render_feed_page(item, entries, params=None):
+    """Human-readable twin of an Atom document at the legacy ``/feed`` URL."""
+    atom = feeds.feed_url(item.alias, atom=True, params=params)
+    listing = "".join(
+        '<article class="news-item"><p class="news-date">%s</p>'
+        '<h2><a href="%s">%s</a></h2><p>%s</p></article>'
+        % (escape(entry.published[:10]), escape(entry.url), escape(entry.title),
+           escape(entry.summary))
+        for entry in entries)
+    body = ('<p class="feed-link"><a href="%s">Atom-flöde</a></p>%s'
+            % (escape(atom), listing or '<p class="empty">Inga dokument.</p>'))
+    discovery = '<link rel="alternate" type="application/atom+xml" href="%s">' \
+        % escape(atom)
+    return page(item.title, "Nyheter", "", body, solo=True, head=discovery)
+
+
+def _feed_index_groups(con):
+    """The legacy all-feeds directory, reshaped from the current catalog."""
+    groups = [("Nyheter", [("Nyheter om webbtjänsten", "sitenews", {})])]
+    groups.append(("Lagar", [
+        ("Alla förordningar", "sfs", {"rdf_type": "type/forordning"}),
+        ("Alla lagar", "sfs", {"rdf_type": "type/lag"}),
+        ("Alla författningar", "sfs", {}),
+    ]))
+
+    dv = []
+    if catalog.document_count(con, "dv"):
+        tree = facets.tree(con, "dv")
+        dv = [("Rättsfall från %s" % bucket["label"], "dv",
+               {"rpubl_rattsfallspublikation": bucket["key"]})
+              for bucket in tree["buckets"]]
+    dv.append(("Samtliga rättsfall", "dv", {}))
+    groups.append(("Rättsfall", dv))
+
+    type_labels = {"prop": "Alla propositioner", "sou": "Alla SOU",
+                   "ds": "Alla Ds", "dir": "Alla kommittédirektiv",
+                   "skr": "Alla skrivelser", "lr": "Alla lagrådsremisser",
+                   "fm": "Alla förordningsmotiv", "so": "Alla SÖ"}
+    kinds = [row[0] for row in con.execute(
+        "SELECT DISTINCT kind FROM documents WHERE source = 'forarbete' ORDER BY kind")]
+    fa = [(type_labels.get(kind, "Alla %s" % kind), "forarbeten",
+           {"rdf_type": "type/" + kind}) for kind in kinds]
+    fa.append(("Samtliga förarbeten", "forarbeten", {}))
+    groups.append(("Förarbeten", fa))
+
+    publishers = [("Författningar utgivna av %s" % label, "myndfs",
+                   {"dcterms_publisher": "publisher/" + slug})
+                  for slug, label, _count in feeds.publisher_options(con)]
+    publishers.append(("Samtliga föreskrifter", "myndfs", {}))
+    groups.append(("Föreskrifter", publishers))
+
+    avg_labels = {"arn": "Allmänna reklamationsnämnden",
+                  "jk": "Justitiekanslern", "jo": "Riksdagens ombudsmän"}
+    organs = [row[0] for row in con.execute(
+        "SELECT DISTINCT kind FROM documents WHERE source = 'avg' ORDER BY kind")]
+    praxis = [("Dokument publicerade av %s" % avg_labels.get(kind, kind),
+               "myndprax", {"dcterms_publisher": "publisher/" + kind})
+              for kind in organs]
+    praxis.append(("Samtliga dokument", "myndprax", {}))
+    groups.append(("Praxis", praxis))
+
+    groups.append(("EU-rätt", [("Samtliga EU-rättsakter", "eurlex", {})]))
+    groups.append(("Begrepp", [("Alla nya och ändrade begrepp", "keyword", {})]))
+    return groups
+
+
+def render_feed_index(con):
+    groups = []
+    for heading, items in _feed_index_groups(con):
+        links = []
+        for label, alias, params in items:
+            atom = feeds.feed_url(alias, atom=True, params=params).removeprefix(feeds.BASE)
+            html = feeds.feed_url(alias, params=params).removeprefix(feeds.BASE)
+            links.append('<li><a class="feed-atom" href="%s" '
+                         'aria-label="Atom-flöde: %s">Atom</a> '
+                         '<a href="%s">%s</a></li>'
+                         % (escape(atom), escape(label), escape(html), escape(label)))
+        groups.append('<section class="browse-group"><h2>%s</h2><ul>%s</ul></section>'
+                      % (escape(heading), "".join(links)))
+    return page("Alla nyhetsflöden", "Nyheter", "", "".join(groups), solo=True)
 
 
 def _expired_banner(props):
@@ -2114,9 +2219,12 @@ def render_document(art, source, site):
             "begrepp": render_begrepp, "eurlex": render_eurlex,
             "foreskrift": render_foreskrift, "avg": render_avg}[source](art, site)
     meta = _document_edit_meta(source, art)
+    alias = feeds.alias_for_source(source)
+    discovery = ('<link rel="alternate" type="application/atom+xml" '
+                 'href="/dataset/%s/feed.atom">' % alias) if alias else ""
     # injected right before </head> (PAGE has exactly one) rather than threaded
     # through every per-source renderer's page() call
-    return html.replace("</head>", meta + "</head>", 1) if meta else html
+    return html.replace("</head>", discovery + meta + "</head>", 1)
 
 
 # --------------------------------------------------------------------------
@@ -2300,7 +2408,10 @@ def render_facet_page(source, view, nodes):
                escape(heading), len(docs),
                BROWSE_FILTER if filtered else "", listing,
                BROWSE_FILTER_JS if filtered else ""))
-    return page(heading, "Bläddra", "", body, solo=True)
+    alias = feeds.alias_for_source(source)
+    discovery = ('<link rel="alternate" type="application/atom+xml" '
+                 'href="/dataset/%s/feed.atom">' % alias) if alias else ""
+    return page(heading, "Bläddra", "", body, solo=True, head=discovery)
 
 
 def _write_browse(out_root, source, slugs, html):
@@ -2495,12 +2606,33 @@ def render_aggregates(con, out_root, catalog_path, write_index=True):
     # as the pages (nginx serves .br/.gz as-is); tiny files stay plain via the
     # size floor in compress.write.
     for name, body in (("style.css", CSS + EDITOR_CSS), ("scrollspy.js", SCROLLSPY),
-                       ("search.js", SEARCH), ("versions.js", VERSIONS),
+                       ("search.js", SEARCH), ("fullsearch.js", FULL_SEARCH),
+                       ("versions.js", VERSIONS),
                        ("faksimil.js", FAKSIMIL),
                        ("editor.js", EDITOR), ("robots.txt", ROBOTS)):
         compress.write_text(out_root / name, body, encodings=compress.PAGE_ENCODINGS)
     if write_index:
         compress.write_text(out_root / "index.html", render_index(con),
+                            encodings=compress.PAGE_ENCODINGS)
+    search_dir = out_root / "sok"
+    search_dir.mkdir(parents=True, exist_ok=True)
+    compress.write_text(search_dir / "index.html", render_search_page(),
+                        encodings=compress.PAGE_ENCODINGS)
+    # The legacy feed directory and per-repository feeds. Query-parameter
+    # variants are rendered live by api/app.py; these unfiltered copies keep the
+    # generated tree independently publishable at the same stable URLs.
+    feed_index = out_root / "dataset" / "sitenews"
+    feed_index.mkdir(parents=True, exist_ok=True)
+    compress.write_text(feed_index / "index.html", render_feed_index(con),
+                        encodings=compress.PAGE_ENCODINGS)
+    for item in feeds.DATASETS:
+        entries = feeds.entries(con, item)
+        target = out_root / "dataset" / item.alias
+        (target / "feed").mkdir(parents=True, exist_ok=True)
+        compress.write_text(target / "feed.atom", feeds.render_atom(item, entries),
+                            encodings=compress.PAGE_ENCODINGS)
+        compress.write_text(target / "feed" / "index.html",
+                            render_feed_page(item, entries),
                             encodings=compress.PAGE_ENCODINGS)
     client = _browse_client(catalog_path)
     try:
@@ -3051,7 +3183,8 @@ ol.ranked { padding-left: 1.4rem; } ol.ranked .c { color: var(--ink-3); font-siz
 .search-box { width: 37rem; max-width: 92vw; background: var(--surf);
               border: 1px solid var(--rule); border-radius: 8px;
               box-shadow: 0 30px 80px var(--shadow-modal); overflow: hidden; }
-.search-box input { width: 100%; border: 0; outline: 0; padding: 1.1rem 1.25rem;
+.search-input-row { display: flex; align-items: stretch; }
+.search-box input { flex: 1; min-width: 0; border: 0; outline: 0; padding: 1.1rem 1.25rem;
                     background: transparent; font-family: var(--serif); font-size: 1.2rem;
                     color: var(--ink); }
 .search-box .search-note { padding: .9rem 1.25rem; border-top: 1px solid var(--rule);
@@ -3072,6 +3205,51 @@ ol.ranked { padding-left: 1.4rem; } ol.ranked .c { color: var(--ink-3); font-siz
                         font-size: .82rem; margin-top: .15rem; }
 .search-hit .hit-snip em { font-style: normal; background: var(--mark);
                            border-radius: 2px; padding: 0 1px; }
+.search-refine { display: inline-flex; align-items: center; margin: .55rem 0 .55rem .65rem;
+                 padding: .4rem .65rem; border-radius: 5px; white-space: nowrap;
+                 color: var(--accent); font-family: var(--sans); font-size: .86rem;
+                 font-weight: 600; text-decoration: none; background: var(--surf-2); }
+.search-refine[hidden] { display: none; }
+.search-refine:hover, .search-refine.sel { background: var(--surf-3);
+                                           box-shadow: inset 0 0 0 1px var(--rule); }
+
+/* -- complete search result page -- */
+.full-search-form { display: flex; gap: .55rem; margin: 0 0 .75rem; }
+.full-search-form input { flex: 1; min-width: 0; padding: .7rem .85rem;
+                          border: 1px solid var(--rule); border-radius: 6px;
+                          background: var(--surf); color: var(--ink);
+                          font: 1rem var(--serif); }
+.full-search-form input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.full-search-form button, .search-page button { border: 1px solid var(--rule);
+                    border-radius: 6px; padding: .55rem .8rem; background: var(--surf-2);
+                    color: var(--ink); font: 600 .84rem var(--sans); cursor: pointer; }
+.full-search-form button { background: var(--accent); color: var(--on-accent);
+                           border-color: var(--accent); }
+.full-search-layout { display: grid; grid-template-columns: 12rem minmax(0, 1fr);
+                      gap: 2rem; align-items: start; margin-top: 1.5rem; }
+.search-facet-group { border: 0; padding: 0; margin: 0 0 1.4rem; }
+.search-facet-group legend { font: 600 .72rem var(--sans); letter-spacing: .06em;
+                             text-transform: uppercase; color: var(--ink-3);
+                             margin-bottom: .35rem; }
+.search-facet-group button { display: flex; width: 100%; justify-content: space-between;
+                             gap: .5rem; border: 0; padding: .28rem .4rem;
+                             background: transparent; font-weight: 400; text-align: left; }
+.search-facet-group button:hover { background: var(--surf-2); }
+.search-facet-group button[aria-pressed="true"] { background: var(--accent);
+                             color: var(--on-accent); font-weight: 600; }
+.search-facet-group .facet-count { color: var(--ink-4); font-size: .75rem; }
+.search-facet-group button[aria-pressed="true"] .facet-count { color: inherit; }
+.full-search-status { min-height: 1.3rem; color: var(--ink-3); font-size: .9rem; }
+.full-search-results { border-top: 1px solid var(--rule); }
+.full-search-hit { padding: 1rem 0; border-bottom: 1px solid var(--rule); }
+.full-search-hit h2 { font: 600 1rem var(--sans); margin: 0; }
+.full-search-hit .hit-id { color: var(--ink-3); font-size: .82rem; margin: .15rem 0; }
+.full-search-hit .hit-snip { color: var(--ink-2); margin: .35rem 0 0;
+                             font-size: .92rem; }
+.full-search-hit .hit-snip em { font-style: normal; background: var(--mark); }
+.search-pagination { display: flex; justify-content: space-between; align-items: center;
+                     gap: 1rem; margin: 1.25rem 0; color: var(--ink-3); font-size: .85rem; }
+.search-pagination button:disabled { visibility: hidden; }
 
 /* -- Responsive: drop the side columns -- */
 @media (max-width: 64rem) {
@@ -3082,6 +3260,12 @@ ol.ranked { padding-left: 1.4rem; } ol.ranked .c { color: var(--ink-3); font-siz
   /* the rail is hidden here, so its gutter markers would point at nothing */
   .rail-dot { display: none; }
   .recital-group { margin-left: 0; }
+  .full-search-layout { grid-template-columns: 1fr; gap: .75rem; }
+  .full-search-facets { display: grid; grid-template-columns: repeat(3, 1fr);
+                        gap: .75rem; }
+}
+@media (max-width: 38rem) {
+  .full-search-facets { grid-template-columns: 1fr; }
 }
 
 /* -- Print -- */
@@ -3237,7 +3421,7 @@ SCROLLSPY = """
 # Debounced; renders the top hits as links to each document's matching paragraph.
 SEARCH = """
 (function () {
-  var overlay = null, results = null, timer = null, seq = 0, sel = 0;
+  var overlay = null, results = null, refine = null, timer = null, seq = 0, sel = 0;
 
   // the API returns raw field values (correct for an API); the indexed text is
   // parsed remote content, so everything interpolated into innerHTML is escaped
@@ -3247,25 +3431,28 @@ SEARCH = """
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
-  function hits() {
-    return results ? Array.prototype.slice.call(
-      results.querySelectorAll('.search-hit')) : [];
+  function choices() {
+    if (!overlay) return [];
+    var out = Array.prototype.slice.call(results.querySelectorAll('.search-hit'));
+    if (refine && !refine.hidden) out.push(refine);
+    return out;
   }
   function select(i) {
-    var hs = hits();
+    var hs = choices();
     if (!hs.length) return;
     sel = (i + hs.length) % hs.length;
     hs.forEach(function (h, n) { h.classList.toggle('sel', n === sel); });
     hs[sel].scrollIntoView({ block: 'nearest' });
   }
-  function render(items, q) {
+  function render(items, total, q) {
     if (!results) return;
     if (!items.length) {
+      refine.hidden = true;
       results.innerHTML = '<div class="search-note">Inga träffar för ' +
         '\\u201d' + esc(q) + '\\u201d.</div>';
       return;
     }
-    results.innerHTML = items.map(function (r) {
+    var hitHtml = items.map(function (r) {
       // r.url is the hosted page path (server-computed via layout.page_relpath);
       // a fragment hit deep-links to its paragraph anchor (the node id == pinpoint)
       var frag = r.fragments && r.fragments[0];
@@ -3282,39 +3469,53 @@ SEARCH = """
           '<span class="hit-sub">' + esc(r.identifier) + '</span>' : '') +
         (hl ? '<span class="hit-snip">' + hl + '</span>' : '') + '</a>';
     }).join('');
+    var searchUrl = '/sok/?q=' + encodeURIComponent(q);
+    var count = new Intl.NumberFormat('sv-SE').format(total);
+    refine.href = searchUrl;
+    refine.innerHTML = 'Avgränsa ' + esc(count) + ' träffar';
+    refine.hidden = false;
+    results.innerHTML = hitHtml;
     // the first hit is the resolved target for a citation-shaped query
     // ("avtalslagen 36" -> §36); selecting it means Enter goes straight there
     select(0);
   }
   function go() {
     // navigate to the selected hit (the first by default == the resolved target)
-    var hs = hits();
+    var hs = choices();
     if (!hs.length) return false;
     window.location.href = hs[sel].getAttribute('href');
     return true;
   }
   function run(q, andGo) {
     var mine = ++seq;
-    if (!q.trim()) { if (results) results.innerHTML = ''; return; }
+    if (!q.trim()) {
+      if (results) results.innerHTML = '';
+      if (refine) refine.hidden = true;
+      return;
+    }
     fetch('/api/v1/search?limit=8&q=' + encodeURIComponent(q))
       .then(function (r) { return r.json(); })
-      .then(function (d) { if (mine === seq) { render(d.results || [], q); if (andGo) go(); } })
+      .then(function (d) { if (mine === seq) { render(d.results || [], d.total || 0, q); if (andGo) go(); } })
       .catch(function () {
-        if (mine === seq && results)
+        if (mine === seq && results) {
+          refine.hidden = true;
           results.innerHTML = '<div class="search-note">Sökningen kunde inte ' +
             'nås.</div>';
+        }
       });
   }
   function open() {
     if (overlay) return;
     overlay = document.createElement('div');
     overlay.className = 'search-overlay';
-    overlay.innerHTML = '<div class="search-box"><input autofocus ' +
-      'placeholder="Sök lag, paragraf, rättsfall…">' +
+    overlay.innerHTML = '<div class="search-box"><div class="search-input-row">' +
+      '<a class="search-refine" href="/sok/" hidden></a><input autofocus ' +
+      'placeholder="Sök lag, paragraf, rättsfall…"></div>' +
       '<div class="search-results"></div></div>';
     document.body.appendChild(overlay);
     overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
     var input = overlay.querySelector('input');
+    refine = overlay.querySelector('.search-refine');
     results = overlay.querySelector('.search-results');
     input.addEventListener('input', function () {
       clearTimeout(timer);
@@ -3324,6 +3525,12 @@ SEARCH = """
     input.addEventListener('keydown', function (e) {
       if (e.key === 'ArrowDown') { e.preventDefault(); select(sel + 1); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); select(sel - 1); }
+      else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !refine.hidden) {
+        // The explicit bridge from quick navigation to the complete, faceted
+        // result list: either horizontal arrow selects it, then Enter follows it.
+        e.preventDefault();
+        select(choices().indexOf(refine));
+      }
       else if (e.key === 'Enter') {
         // Enter goes to the selected hit -- the first by default, which for a
         // citation-shaped query is the resolved §/article. If the debounced
@@ -3335,7 +3542,9 @@ SEARCH = """
     });
     input.focus();
   }
-  function close() { if (overlay) { overlay.remove(); overlay = null; results = null; } }
+  function close() {
+    if (overlay) { overlay.remove(); overlay = null; results = null; refine = null; }
+  }
   document.addEventListener('keydown', function (e) {
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); open(); }
     if (e.key === 'Escape') close();
@@ -3343,6 +3552,155 @@ SEARCH = """
   document.addEventListener('click', function (e) {
     if (e.target.closest('[data-search]')) { e.preventDefault(); open(); }
   });
+})();
+"""
+
+
+# The complete result list at /sok/: paging and source/type/year facets over the
+# same REST endpoint as the command palette. The page shell is static and this
+# script is inert everywhere else.
+FULL_SEARCH = """
+(function () {
+  var root = document.querySelector('.search-page');
+  if (!root) return;
+  var form = root.querySelector('.full-search-form');
+  var input = form.querySelector('input[name="q"]');
+  var status = root.querySelector('.full-search-status');
+  var facets = root.querySelector('.full-search-facets');
+  var results = root.querySelector('.full-search-results');
+  var pagination = root.querySelector('.search-pagination');
+  var params = new URLSearchParams(location.search);
+  var limit = 20, seq = 0, nextCursor = null;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function number(n) { return new Intl.NumberFormat('sv-SE').format(n); }
+  function pageNo() { return Math.max(1, parseInt(params.get('page') || '1', 10) || 1); }
+  function resetPaging() {
+    params.delete('cursor'); params.delete('page'); params.delete('offset');
+  }
+  function address() {
+    var query = params.toString();
+    return '/sok/' + (query ? '?' + query : '');
+  }
+  function choose(field, value) {
+    if (params.get(field) === value) params.delete(field);
+    else params.set(field, value);
+    resetPaging();
+    load(true);
+  }
+  var SOURCE = {sfs:'Författningar', dv:'Rättsfall', forarbete:'Förarbeten',
+    foreskrift:'Myndighetsföreskrifter', eurlex:'EU-rätt', avg:'JO, JK och ARN',
+    kommentar:'Lagkommentarer', begrepp:'Begrepp'};
+  var KIND = {law:'Författning', case:'Rättsfall', prop:'Proposition', sou:'SOU',
+    ds:'Ds', dir:'Kommittédirektiv', regulation:'Förordning', directive:'Direktiv',
+    decision:'Beslut', judgment:'Avgörande', treaty:'Fördrag', begrepp:'Begrepp'};
+
+  function facetGroup(field, title, buckets) {
+    var selected = params.get(field);
+    buckets = (buckets || []).slice();
+    if (field === 'year') buckets.sort(function (a, b) { return b.value.localeCompare(a.value); });
+    if (selected && !buckets.some(function (b) { return b.value === selected; }))
+      buckets.unshift({value:selected, count:0});
+    var buttons = buckets.map(function (b) {
+      var label = field === 'source' ? (SOURCE[b.value] || b.value) :
+                  field === 'kind' ? (KIND[b.value] || b.value) : b.value;
+      return '<button type="button" data-facet="' + esc(field) + '" data-value="' +
+        esc(b.value) + '" aria-pressed="' + (selected === b.value ? 'true' : 'false') +
+        '"><span>' + esc(label) + '</span><span class="facet-count">' +
+        esc(number(b.count)) + '</span></button>';
+    }).join('');
+    return '<fieldset class="search-facet-group"><legend>' + esc(title) +
+      '</legend>' + buttons + '</fieldset>';
+  }
+  function renderFacets(data) {
+    var f = data.facets || {};
+    facets.innerHTML = facetGroup('source', 'Källa', f.source) +
+      facetGroup('kind', 'Typ', f.kind) + facetGroup('year', 'År', f.year);
+  }
+  function renderResults(data) {
+    if (!data.results.length) {
+      results.innerHTML = '<p class="empty">Inga träffar med de valda avgränsningarna.</p>';
+      return;
+    }
+    results.innerHTML = data.results.map(function (r) {
+      var frag = r.fragments && r.fragments[0];
+      var target = (r.url || '#') + (frag && frag.pinpoint ? '#' + frag.pinpoint : '');
+      var title = r.display || r.title || r.identifier || r.uri;
+      var snip = (frag && frag.highlight && frag.highlight[0]) ||
+                 (r.highlight && r.highlight[0]) || '';
+      return '<article class="full-search-hit"><h2><a href="' + esc(target) + '">' +
+        esc(title) + '</a></h2>' + (r.identifier && r.identifier !== title ?
+        '<p class="hit-id">' + esc(r.identifier) + '</p>' : '') +
+        (snip ? '<p class="hit-snip">' + snip + '</p>' : '') + '</article>';
+    }).join('');
+  }
+  function renderPagination(total) {
+    var current = pageNo(), pages = Math.max(1, Math.ceil(total / limit));
+    pagination.innerHTML = '<button type="button" data-page-action="prev"' +
+      (current > 1 ? '' : ' disabled') + '>← Föregående</button><span>Sida ' +
+      esc(number(current)) + ' av ' + esc(number(pages)) +
+      '</span><button type="button" data-page-action="next"' +
+      (nextCursor ? '' : ' disabled') + '>Nästa →</button>';
+  }
+  function load(push, state) {
+    var mine = ++seq;            // invalidates an older request even for empty q
+    var q = (params.get('q') || '').trim();
+    input.value = q;
+    if (push) history.pushState(state || null, '', address());
+    if (!q) {
+      nextCursor = null;
+      status.textContent = 'Skriv ett eller flera sökord.';
+      facets.innerHTML = ''; results.innerHTML = ''; pagination.innerHTML = '';
+      return;
+    }
+    status.textContent = 'Söker…';
+    var api = new URLSearchParams(params);
+    api.delete('page'); api.delete('offset'); api.set('limit', limit);
+    fetch('/api/v1/search?' + api.toString()).then(function (r) {
+      if (!r.ok) throw new Error(r.status); return r.json();
+    }).then(function (data) {
+      if (mine !== seq) return;
+      nextCursor = data.next_cursor || null;
+      var first = data.total ? (pageNo() - 1) * limit + 1 : 0;
+      var last = data.results.length ? Math.min(first + data.results.length - 1,
+                                                data.total) : 0;
+      status.textContent = first + '–' + last + ' av ' + number(data.total) + ' träffar';
+      renderFacets(data); renderResults(data); renderPagination(data.total);
+    }).catch(function () {
+      if (mine === seq) status.textContent = 'Sökningen kunde inte nås. Prova igen.';
+    });
+  }
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var q = input.value.trim();
+    if (q) params.set('q', q); else params.delete('q');
+    resetPaging(); load(true);
+  });
+  facets.addEventListener('click', function (e) {
+    var button = e.target.closest('[data-facet]');
+    if (button) choose(button.dataset.facet, button.dataset.value);
+  });
+  pagination.addEventListener('click', function (e) {
+    var button = e.target.closest('[data-page-action]');
+    if (!button || button.disabled) return;
+    if (button.dataset.pageAction === 'next' && nextCursor) {
+      var previous = address();
+      params.set('cursor', nextCursor);
+      params.set('page', pageNo() + 1);
+      load(true, {previous: previous});
+    } else if (button.dataset.pageAction === 'prev') {
+      if (history.state && history.state.previous) history.back();
+      else { resetPaging(); load(true); }       // a directly opened deep-page URL
+    }
+    window.scrollTo({top:0, behavior:'smooth'});
+  });
+  window.addEventListener('popstate', function () {
+    params = new URLSearchParams(location.search); load(false);
+  });
+  load(false);
 })();
 """
 

@@ -79,10 +79,11 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `regeringen.py` | shared regeringen.se harvest knowledge — the doctype table (`TYPES`: url segment, taxonomy category id, identifier regex) and the `ul.list--block` listing walk (`listing_items`); used by `forarbete/download.py` and `remisser/download.py` |
 | `harvest.py` | shared incremental-download core — `HarvestWatermark` (begin/complete lifecycle, never-regress date save, crash-safe `dirty` flag that disables the consecutive-hit stop but not the date-conclusive one) + `walk`/`Skip`/`ItemKey`/`guarded_enumerate` (the newest-first download loop over an enumerate/resolve pair); each source states its own `lookahead_limit`/`safety_days` window (dv: 365-day safety window, ~5000-item lookahead; forarbete/riksdagen/foreskrift/avg-jo: 14 days/20 items); used by `dv/download.py`, `foreskrift/harvest.py`, `avg/download.py` (jo), and directly by `forarbete/download.py` + `forarbete/riksdagen.py` (also driving `forarbete/rskr.py`) |
 | `catalog.py` | the SQLite catalog (`documents`/`links`/`fragments`/`genomforande` tables) built by `relate`, derived and rebuildable; `documents.path` is stored `data_root`-relative so the catalog is portable across hosts; `connect_ro`/`load_artifact`/`artifact_updated` are the shared read-only serving-layer helpers used by both REST and MCP |
-| `render.py` | the `generate` phase — a single generic node walk renders every source's artifact to static, interlinked HTML (live outbound links, an inbound-context rail collected from the catalog) |
+| `render.py` | the `generate` phase — a single generic node walk renders every source's artifact to static, interlinked HTML (live outbound links, an inbound-context rail collected from the catalog); also renders the full ⌘K-backed search page (`render_search_page`, `fullsearch.js`) served at `/sok` |
+| `feeds.py` | legacy dataset-alias map (`sfs`/`dv`/`forarbeten`/`myndfs`/`myndprax`/`keyword`/`eurlex` → the rebuilt source names) + pure Atom/HTML feed renderer, shared by static `/dataset/<alias>/feed[.atom]` generation and the live query-param endpoints in `api/app.py` |
 | `dump.py` | NDJSON bulk corpus export (REWRITE.md §6) — one gzipped, self-contained JSON line per artifact, no transformation |
-| `search.py` | full-text search over the parsed corpus on OpenSearch 2.x — standalone per-unit documents collapsed by `doc_uri`, no parent-child join |
-| `facets.py` | faceted navigation over the catalog — `tree`/`group`, the single source shared by the REST API (`/facets`) and the static browse pages |
+| `search.py` | full-text search over the parsed corpus on OpenSearch 2.x — standalone per-unit documents collapsed by `doc_uri`, no parent-child join; facet buckets (source/kind/year) via `post_filter` aggregations, prefix-matching queries (`prefix_query`), an `INDEX_FORMAT` version folded into each unit's stored freshness key so an index-schema change (like adding the year facet) reindexes on the next incremental pass without a blanket `--force` |
+| `facets.py` | faceted navigation over the catalog — `tree`/`group`, the single source shared by the REST API (`/facets`) and the static browse pages; `document_year` (a `year` search facet, reusing browse's own per-source year extraction) is shared with the indexer |
 | `pins.py` | citation-shaped query → search-hit-shaped resolved targets (`resolved_results`/`merge_pinned`), shared by the REST `/search` endpoint and the MCP `search`/`resolve_citation` tools |
 | `resolve.py` | turns a ⌘K query into a precise, fragment-deep resource target — three resolvers (SFS/EU-act/case nicknames + citation-engine pinpoints) over `lib.datasets` |
 | `layout.py` | single source of truth for where a `(source, basefile)` document lives, on disk and on the web (`downloaded`/`artifact`/`page_relpath`/`page_url`) |
@@ -195,6 +196,13 @@ folded into `generate_watermark()` so an editorial edit reopens the generate
 gate. Served at `/` (frontpage), `/om/<slug>` + `/om/` hub, and
 `/dataset/sitenews/feed` (+ `/dataset/sitenews/feed.atom`); masthead entries
 "Om"/"Nyheter" in `lib/render.py`'s `MAST_NAV`.
+
+The catalog-backed document feeds retain the legacy public contract too:
+`/dataset/{sfs,dv,forarbeten,myndfs,myndprax,keyword,eurlex}/feed.atom` and their
+human-readable `/feed` twins, with the old `rdf_type`,
+`rpubl_rattsfallspublikation`, and `dcterms_publisher` query parameters.
+`/dataset/sitenews` is the all-feeds directory. `lib/feeds.py` maps those legacy
+repository aliases to the rebuilt source names and renders stable Atom entry ids.
 
 **Service layer**: `api/app.py` is the REST/OpenAPI service (search, documents,
 citation graph, version history + diff) that also serves the static site under

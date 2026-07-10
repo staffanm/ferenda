@@ -2183,6 +2183,7 @@ def stale_sources():
 # projection) are part of generate's recipe: a facet-rule edit must re-stale the
 # browse pages, not leave them "up to date -- skipped".
 GENERATE_CODE = (PKG / "lib" / "render.py", PKG / "lib" / "catalog.py",
+                 PKG / "lib" / "feeds.py",
                  PKG / "lib" / "markdown.py", PKG / "lib" / "layout.py",
                  PKG / "lib" / "history.py", PKG / "lib" / "casenaming.py",
                  PKG / "lib" / "eu_structure.py", PKG / "lib" / "facets.py",
