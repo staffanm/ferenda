@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from accommodanda.lib import catalog, markdown
+from accommodanda.lib import annstore, catalog, markdown
 from accommodanda.wiki import annotate
 from accommodanda.wiki import parse as wiki
 
@@ -471,12 +471,14 @@ def test_eurlex_per_article_guidance_and_commentary_render_in_article_rail(tmp_p
     assert 'data-rail="5"' in html
 
 
-def test_ai_guidance_ann_renders_on_subarticle_and_recital_rails(tmp_path):
-    # end-to-end (PRD Step 4 acceptance): the ai-annotate `.ann` sidecar links a
+def test_ai_guidance_ann_renders_on_subarticle_and_recital_rails(tmp_path,
+                                                                 monkeypatch):
+    # end-to-end (PRD Step 4 acceptance): the ai-annotate `.ann` layer links a
     # FAQ question to *fine-grained* nodes -- two definitions of article 2 and a
     # recital -- not to article 2 as a whole. Each link surfaces in that node's
     # own rail, and the sub-article gets its `2.21` citation anchor even though
     # the act carries no editorial recital layer.
+    monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
     import re
     from accommodanda.lib import render
     ad = tmp_path / "art"
@@ -497,7 +499,7 @@ def test_ai_guidance_ann_renders_on_subarticle_and_recital_rails(tmp_path):
     mp.write_text("---\nannotates: 32024R9998\n---\n")
     komm = ad / "komm.json"
     komm.write_text(json.dumps(wiki.kommentar_artifact(str(mp))))
-    # the AI layer, kept in a .ann sibling of the kommentar artifact
+    # the AI layer, kept in the curated store keyed by the kommentar's identity
     deflink = {"label": "Frequently Asked Questions – Data Act, question 8",
                "href": "https://ec.europa.eu/doc/108144#page=14",
                "desc": "Who has to share data?", "section": "question 8"}
@@ -505,7 +507,10 @@ def test_ai_guidance_ann_renders_on_subarticle_and_recital_rails(tmp_path):
                "href": "https://ec.europa.eu/doc/108144#page=15",
                "desc": "What about security concerns?", "section": "question 9"}
     # the .ann keys use the dotted sub-article grammar, matching the node ids render mints
-    (ad / "komm.ann").write_text(json.dumps({"guidanceLinks": {
+    ann = annstore.path("kommentar", "32024R9998")
+    ann.parent.mkdir(parents=True, exist_ok=True)
+    ann.write_text(json.dumps({"meta": {"status": "generated", "inputs": {}},
+                               "guidanceLinks": {
         "2.21": [deflink], "2.22": [deflink], "recital-15": [reclink]}}))
 
     cat = tmp_path / "catalog.sqlite"

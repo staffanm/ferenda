@@ -78,6 +78,7 @@ from .foreskrift import legacy as foreskrift_legacy
 from .foreskrift import parse as foreskrift_parse
 from .foreskrift.agencies import REGISTRY as FORESKRIFT_AGENCIES
 from .lib import (
+    annstore,
     casenaming,
     catalog,
     compress,
@@ -705,9 +706,10 @@ def sfs_ai_correspond(basefiles):
     """`lagen sfs ai-correspond <new-sfs> <prop-basefile> [<old-sfs>]` -- LLM-derive
     the old->new paragraf correspondence map for a restructured statute from the
     proposition's författningskommentar, validate every edge against both laws'
-    paragrafs, and write it as a `.corr` sidecar next to the new statute. The old
-    law is read from the new law's repeal clause unless given. One-shot per id,
-    like eurlex ai-annotate; the LLM is never called from parse/relate/generate."""
+    paragrafs, and write it as a `.corr` layer in the curated store (lib.annstore).
+    The old law is read from the new law's repeal clause unless given. One-shot
+    per id, like eurlex ai-annotate; the LLM is never called from
+    parse/relate/generate, and a verified layer refuses regeneration sans --force."""
     if not 2 <= len(basefiles) <= 3:
         sys.exit("usage: lagen sfs ai-correspond <new-sfs> <prop-basefile> "
                  "[<old-sfs>]  (e.g. 2018:585 prop/2017-18-89)")
@@ -718,20 +720,23 @@ def sfs_ai_correspond(basefiles):
                else sfs_correspond.detect_old_law(new_art))
     assert old_uri, ("%s: could not detect the repealed law from its transition "
                      "clause; pass it as the third argument" % new_sfs)
-    old_art = json.loads(compress.read_bytes(sfs_artifact(old_uri.rsplit("/", 1)[-1])))
-    out = sfs_artifact(new_sfs).with_suffix(".corr")
+    old_sfs = old_uri.rsplit("/", 1)[-1]
+    old_art = json.loads(compress.read_bytes(sfs_artifact(old_sfs)))
+    out = annstore.path("sfs", new_sfs, ".corr")
     if RUN.dry_run:
         print("sfs ai-correspond: would map %s <- %s via %s -> %s"
-              % (new_sfs, old_uri.rsplit("/", 1)[-1], prop, out))
+              % (new_sfs, old_sfs, prop, out))
         return
+    annstore.guard(out, RUN.force)     # a verified layer refuses, pre-LLM-spend
     # reading the proposition's författningskommentar is förarbete's job; build
     # composes the two verticals (sfs.correspond no longer imports forarbete)
     fk = fa_kommentar.fk_section(
         prop_art, new_art["metadata"]["properties"]["dcterms:title"])
     sidecar, stats = sfs_correspond.correspond(new_art, prop_art, old_art, fk)
-    # atomic: the .corr layer is a costly one-shot LLM output feeding relate +
-    # the freshness watermark -- a truncated file must never survive a crash
-    util.write_atomic(out, json.dumps(sidecar, ensure_ascii=False, indent=2))
+    annstore.write(out, sidecar,
+                   {**annstore.artifact_input("sfs", new_sfs),
+                    **annstore.artifact_input("sfs", old_sfs),
+                    **annstore.artifact_input("forarbete", prop)}, RUN.force)
     print("sfs ai-correspond %s: %d edges from %d (%d rejected), wrote %s"
           % (new_sfs, stats["emitted"], stats["raw"], stats["rejected"], out))
 
@@ -792,7 +797,7 @@ SOURCES["sfs"] = Source("sfs", sfs_list, {
    actions={"ai-correspond": sfs_ai_correspond,
             "history-as-git": sfs_history_as_git},
    notes="ai-correspond <new-sfs> <prop> [<old-sfs>]: LLM-derive the old->new "
-         "paragraf correspondence map into a .corr sidecar\n"
+         "paragraf correspondence map into a .corr layer (WIKI_ROOT/ann)\n"
          "history-as-git <repodir> [basefile ...]: build/update a git repo of "
          "the SFS collection, one commit per amendment event; --rebuild-history "
          "rewrites it from the current complete corpus")
@@ -1180,9 +1185,9 @@ def eurlex_ai_annotate(basefiles):
     for celex in basefiles:
         if RUN.dry_run:
             print("eurlex ai-annotate: would annotate %s -> %s"
-                  % (celex, eurlex_artifact(celex).with_suffix(".ann")))
+                  % (celex, annstore.path("eurlex", celex)))
             continue
-        out = eurlex_annotate.annotate(celex)
+        out = eurlex_annotate.annotate(celex, force=RUN.force)
         print("eurlex ai-annotate %s: wrote %s" % (celex, out))
 
 
@@ -1521,9 +1526,9 @@ def remisser_ai_analyze(basefiles):
     for basefile in basefiles:
         if RUN.dry_run:
             print("remisser ai-analyze: would analyze %s -> %s"
-                  % (basefile, remisser_artifact(basefile).with_suffix(".ann")))
+                  % (basefile, annstore.path("remisser", basefile)))
             continue
-        out = remisser_analyze.analyze(basefile)
+        out = remisser_analyze.analyze(basefile, force=RUN.force)
         print("remisser ai-analyze %s: wrote %s" % (basefile, out))
 
 
@@ -1630,7 +1635,7 @@ def kommentar_ai_annotate(basefiles):
     """`lagen kommentar ai-annotate <basefile> ...` -- the Step-4 AI guidance
     linker: read the external guidance PDFs a commentary file declares in its
     `guidance:` frontmatter and LLM-derive, per article, which guidance section
-    explains it. Writes a `.ann` sidecar next to the kommentar artifact (the
+    explains it. Writes a `.ann` layer into the curated store (lib.annstore; the
     AI-created layer, kept separate from the hand-edited markdown). One-shot per
     id: the LLM is never called from parse/relate/generate."""
     if not basefiles:
@@ -1638,9 +1643,9 @@ def kommentar_ai_annotate(basefiles):
     for basefile in basefiles:
         if RUN.dry_run:
             print("kommentar ai-annotate: would annotate %s -> %s"
-                  % (basefile, kommentar_artifact(basefile).with_suffix(".ann")))
+                  % (basefile, annstore.path("kommentar", basefile)))
             continue
-        out = wiki_annotate.annotate(basefile, WIKI_ROOT)
+        out = wiki_annotate.annotate(basefile, WIKI_ROOT, force=RUN.force)
         print("kommentar ai-annotate %s: wrote %s" % (basefile, out))
 
 
@@ -1933,14 +1938,14 @@ def cmd_relate(names):
     # every defined term / nyckelord the corpus references. Their inputs are the
     # catalog (changed only if a source was re-related above) and the .corr files,
     # so a no-op run skips them too -- gated on a .corr watermark.
-    corr_wm = file_watermark(sorted(layout.SFS_ARTIFACT.glob("*/*.corr")))
+    corr_wm = file_watermark(sorted(annstore.tree("sfs").glob("*/*.corr")))
     if dirty or RUN.force or not watermark_fresh(store, "relate", "__corr__",
                                                  corr_wm):
         t0 = time.perf_counter()
         con = catalog.connect(CATALOG)
         pinned = fa_genomforande.resolve(con)
         fk_rows = fa_fk.resolve(con)
-        corr = [row for p in layout.SFS_ARTIFACT.glob("*/*.corr")
+        corr = [row for p in annstore.tree("sfs").glob("*/*.corr")
                 for row in sfs_correspond.corr_rows(json.loads(p.read_text()))]
         catalog.set_correspondence(con, corr)
         folded = catalog.canonicalize_concepts(con)
@@ -2186,9 +2191,9 @@ GENERATE_CODE = (PKG / "lib" / "render.py", PKG / "lib" / "catalog.py",
 
 def generate_watermark():
     """The coarse gate for a full-corpus generate: the whole-catalog content
-    signature plus the .corr/.ann/.versions.json sibling layers that relate
-    doesn't fold into content_hash, plus the set of currently-effective repeal
-    dates. Unchanged (with the render code) ⟹ every page is fresh, so the
+    signature plus the .corr/.ann LLM layers (lib.annstore) and .versions.json
+    sidecars that relate doesn't fold into content_hash, plus the set of
+    currently-effective repeal dates. Unchanged (with the render code) ⟹ every page is fresh, so the
     ~100k-page freshness scan can be skipped wholesale."""
     con = catalog.connect(CATALOG)
     sig = catalog.catalog_signature(con)
@@ -2200,20 +2205,23 @@ def generate_watermark():
         catalog.expired_uris(con, date.today().isoformat())))
     con.close()
     sides = file_watermark(sorted(
-        list(layout.SFS_ARTIFACT.glob("*/*.corr"))
+        # the LLM layers live in the curated store (lib.annstore, WIKI_ROOT/ann),
+        # not the artifact tree -- authoring, regenerating or hand-editing one
+        # must reopen the coarse gate
+        list(annstore.tree("sfs").glob("*/*.corr"))
         # the versions-stage sidecars: a new historical consolidation must
         # re-render its statute's page (version panel) + the version pages
         + list(layout.SFS_ARTIFACT.glob("*/*.versions.json"))
-        + list(layout.artifact_dir("eurlex").glob("*/*.ann"))
+        + list(annstore.tree("eurlex").glob("*/*.ann"))
         # the kommentar ai-annotate guidance layer rides a *different* document's
         # rail (the host act's) -- per page it enters the host's dependency
         # digest (render.site_cross_digests); here it reopens the coarse gate
-        + list(layout.artifact_dir("kommentar").rglob("*.ann"))
+        + list(annstore.tree("kommentar").rglob("*.ann"))
         # the remiss answers + their ai-analyze .ann layers render onto the
         # referred förarbete's page (never related, so the catalog signature
         # can't see them) -- fold them in so an analysis run reopens the gate
         + list(layout.artifacts("remisser"))
-        + list(layout.artifact_dir("remisser").rglob("*.ann"))
+        + list(annstore.tree("remisser").rglob("*.ann"))
         # the site artifacts (frontpage/om/sitenews) aren't catalog rows, so the
         # catalog signature above never sees them -- fold them in directly so a
         # re-parsed editorial edit reopens the generate gate (else a full generate
@@ -2323,9 +2331,10 @@ def cmd_generate(only=None, source=None, jobs=1, force=False):
         # unchanged must not invalidate every law it cites. The artifact's bytes are
         # NOT re-read here: relate already stored their sha256 as the catalog's
         # `content_hash`, so generate reuses it instead of re-hashing all ~6.3 GB in
-        # the single-threaded planning loop (§2.1). Only the page's sibling LLM
-        # layers are read from disk (they aren't catalogued), so authoring or editing
-        # one re-renders just that page: `.ann` (eurlex ai-annotate) and `.corr` (sfs
+        # the single-threaded planning loop (§2.1). Only the page's own LLM layers
+        # (lib.annstore, mirrored under WIKI_ROOT/ann) are read from disk (they
+        # aren't catalogued), so authoring or editing one re-renders just that
+        # page: `.ann` (eurlex ai-annotate) and `.corr` (sfs
         # ai-correspond, the new statute's corresponding-cases margin). Content that
         # renders onto OTHER documents' pages (kommentar prose/.ann, remiss .ann,
         # the old-law side of `.corr`) enters via `dep_digest`, which generate_site
@@ -2339,7 +2348,7 @@ def cmd_generate(only=None, source=None, jobs=1, force=False):
             # consolidation appearing re-renders the statute's page (its version
             # panel lists the new lydelse).
             fp = Path(p) if p else None
-            sides = ((fp.with_suffix(".ann"), fp.with_suffix(".corr"),
+            sides = ((annstore.for_artifact(fp), annstore.for_artifact(fp, ".corr"),
                       fp.with_suffix(".versions.json")) if fp else ())
             base = content_hash if content_hash is not None else (
                 catalog.content_hash(compress.read_bytes(fp))
@@ -2470,6 +2479,31 @@ def cmd_status(source):
             "empty": st["empty"], "run": RUN_ID})
 
 
+def cmd_ann_status():
+    """`lagen ann status` -- inventory the curated LLM-layer store (lib.annstore):
+    every `.ann`/`.corr` layer with its status (generated/verified), model,
+    authoring date and staleness. Stale = the recorded input hashes no longer
+    match the artifacts on disk: a *generated* layer can simply be re-run; a
+    *verified* one has hand curation authored against drifted data and needs
+    human re-review -- it is never regenerated mechanically (--force overrides)."""
+    rows = 0
+    counts = {"generated": 0, "verified": 0, "stale": 0}
+    for p in annstore.entries():
+        meta = annstore.read_meta(p)     # the store's status policy, one home
+        st = meta["status"]
+        drift = annstore.drifted(meta.get("inputs", {}))
+        counts[st] += 1
+        if drift:
+            counts["stale"] += 1
+        rows += 1
+        print("%-9s %-10s %s%s"
+              % (st, meta.get("generated", "-"), p.relative_to(annstore.ROOT),
+                 "  STALE: %s" % ", ".join(drift) if drift else ""))
+    print("ann status: %d layer(s) in %s -- %d generated, %d verified, %d stale"
+          % (rows, annstore.ROOT, counts["generated"], counts["verified"],
+             counts["stale"]))
+
+
 def report(source, action, result, requested, full_source):
     """Print one action's outcome and fold it into the run instrumentation:
     emit the (action, source) segment, apply the per-doc outcomes to errors.json
@@ -2550,7 +2584,8 @@ def main(argv=None):
             _help(leading)
             return
     p = argparse.ArgumentParser(prog="lagen", description=(__doc__ or "").split("\n")[0])
-    p.add_argument("source", help="source name (%s) or 'all'"
+    p.add_argument("source", help="source name (%s), 'all', or 'ann' (the "
+                   "curated LLM-layer store: `lagen ann status`)"
                    % ", ".join(SOURCES))
     p.add_argument("action",
                    help="download | parse | relate | generate | index | dump "
@@ -2733,6 +2768,13 @@ def cmd_mkpatch(args, p):
 def _dispatch(args, p, jobs):
     """Route one parsed invocation to its command. Split out of main() so main
     can wrap the whole dispatch in a single run-start/run-end try/finally."""
+    if args.source == "ann":
+        # the curated LLM-layer store is not a source; `lagen ann status` is its
+        # one verb (writes happen only through the per-source ai-* actions)
+        if args.action != "status":
+            p.error("unknown ann action %r (have: status)" % args.action)
+        cmd_ann_status()
+        return
     if args.action == "patch-show":
         cmd_patch_show(args, p)
         return

@@ -39,7 +39,16 @@ from urllib.parse import quote
 from fastapi.testclient import TestClient
 
 from ..api import app as api_service
-from . import casenaming, catalog, compress, eucasenaming, history, lagrum, layout
+from . import (
+    annstore,
+    casenaming,
+    catalog,
+    compress,
+    eucasenaming,
+    history,
+    lagrum,
+    layout,
+)
 from .catalog import BASE
 from .eu_structure import flatten as eurlex_flatten
 from .eu_structure import subarticle_key
@@ -108,8 +117,8 @@ def _kommentar_indexes(con):
         external links attached to a single node's rail (PRD Steps 3-4), from two
         render-only sources keyed identically: the hand-curated per-section
         `## Externa länkar` block in the artifact body, and the AI guidance
-        linker's `.ann` sidecar (`lagen kommentar ai-annotate`), kept separate from
-        the hand-edited markdown but surfaced in the same rail.
+        linker's `.ann` layer (`lagen kommentar ai-annotate`, lib.annstore), kept
+        separate from the hand-edited markdown but surfaced in the same rail.
 
     All three are render-only: external resources live outside the corpus, so they
     carry no inbound edge."""
@@ -143,7 +152,17 @@ def _kommentar_indexes(con):
                 article_guidance.setdefault((law, b["id"]), []).extend(b["guidance"])
         if art.get("guidance"):          # document-level `## Externa länkar` (Step 2)
             guidance.setdefault(law, []).extend(art["guidance"])
-        ann = Path(path).with_suffix(".ann")       # AI linker sidecar (Step 4)
+        # the AI linker layer (Step 4), in the curated store (lib.annstore) --
+        # keyed by the kommentar's identity recovered from its minted uri
+        # (BASE + "kommentar/" + basefile, wiki/parse), so it resolves
+        # regardless of where the catalog's data_root put the artifact. The
+        # prefix is that minted invariant: assert it rather than let a stray
+        # uri map to a garbage path whose miss silently drops the layer from
+        # the rail (rule:fail-fast)
+        loc = catalog.local(art["uri"])
+        assert loc.startswith("kommentar/"), \
+            "kommentar row carries a non-kommentar uri: %s" % art["uri"]
+        ann = annstore.path("kommentar", loc[len("kommentar/"):])
         if ann.exists():
             links = json.loads(ann.read_bytes()).get("guidanceLinks", {})
             for anchor, items in links.items():
@@ -180,10 +199,11 @@ def _remiss_indexes():
     catalog: the remisser corpus is deliberately never `relate`d (no page, no
     catalog rows, no inbound edge), so its analyzed answers are found by walking
     the remisser artifact tree (``layout.artifacts``, one `<case-slug>/<org-slug>`
-    artifact per answer) and picking up each
-    answer's ``.ann`` sidecar (the `ai-analyze` sentiment layer). An answer with no
-    ``.ann`` yet is simply unanalyzed -- skipped, no error; a *malformed* ``.ann``
-    is a broken environment invariant and its `json.JSONDecodeError` propagates.
+    artifact per answer) and picking up each answer's mirrored ``.ann`` layer from
+    the curated store (lib.annstore; the `ai-analyze` sentiment layer). An answer
+    with no ``.ann`` yet is simply unanalyzed -- skipped, no error; a *malformed*
+    ``.ann`` is a broken environment invariant and its `json.JSONDecodeError`
+    propagates.
 
       * ``remiss_feedback`` -- {(forarbete_uri, avsnitt_id): [item, …]}, one entry
         per analyzed segment, keyed on the *referred förarbete's* own minted uri
@@ -194,7 +214,7 @@ def _remiss_indexes():
     remiss_feedback, remiss_overall = {}, {}
     host_uri = {}          # (typ, fa_basefile) -> referred förarbete's minted uri
     for path in layout.artifacts("remisser"):
-        ann = path.with_suffix(".ann")
+        ann = annstore.for_artifact(path)
         if not ann.exists():
             continue                       # answer not analyzed yet -- nothing to show
         svar = json.loads(compress.read_bytes(path))
@@ -1727,9 +1747,10 @@ EURLEX_CLASS = {"recital": "recital", "citation": "visa", "preamble": "preamble"
 
 
 # --------------------------------------------------------------------------
-# editorial layer (a sibling `.ann` file): thematic recital groups + the
-# article<->recital cross-reference, folded into an EU act's page. Authored
-# offline by `lagen eurlex ai-annotate`; absent for an unannotated act.
+# editorial layer (a `.ann` file in the curated store, lib.annstore): thematic
+# recital groups + the article<->recital cross-reference, folded into an EU
+# act's page. Authored offline by `lagen eurlex ai-annotate`; absent for an
+# unannotated act.
 # --------------------------------------------------------------------------
 
 def _sub_to_dot(key):
@@ -1776,7 +1797,7 @@ def _art_sort_key(art):
 
 
 def _load_editorial(celex):
-    path = layout.artifact("eurlex", celex).with_suffix(".ann")
+    path = annstore.path("eurlex", celex)
     if not path.exists():
         return None
     layer = json.loads(path.read_text()).get("editorialLayer")

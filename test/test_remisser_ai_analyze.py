@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from accommodanda.lib import layout
+from accommodanda.lib import annstore, layout
 from accommodanda.remisser import ai_analyze
 
 STRUCTURE = [
@@ -123,8 +123,9 @@ def test_validate_rejects_boolean_sentiment():
 @pytest.fixture
 def corpus(tmp_path, monkeypatch):
     """A synthetic remissvar artifact + its referred förarbete artifact on disk,
-    with the artifact roots pointed at tmp_path."""
-    monkeypatch.setattr(layout, "ARTIFACT", tmp_path)
+    with the artifact tree and the curated store pointed under tmp_path."""
+    monkeypatch.setattr(layout, "ARTIFACT", tmp_path / "artifact")
+    monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
 
     fa_path = layout.artifact("forarbete", "sou/2026-14")   # slugged (colon -> dash)
     fa_path.parent.mkdir(parents=True, exist_ok=True)
@@ -147,14 +148,35 @@ def corpus(tmp_path, monkeypatch):
     return basefile
 
 
-def test_analyze_writes_ann_sidecar(corpus, monkeypatch):
+def test_analyze_writes_ann_layer(corpus, monkeypatch):
     monkeypatch.setattr(ai_analyze.llm, "complete_thread",
                         lambda messages, **kw: VALID_REPLY)
     path = ai_analyze.analyze(corpus)
-    assert path.suffix == ".ann"
+    assert path == annstore.path("remisser", corpus)   # the curated store
     data = json.loads(path.read_text())
     assert data["overall"]["sentiment"] == 0.4
     assert [s["forarbete_id"] for s in data["segments"]] == ["a3.2", "sec4"]
+    # the envelope records provenance: fresh = generated, both inputs hashed
+    assert data["meta"]["status"] == "generated"
+    assert sorted(data["meta"]["inputs"]) == [
+        "artifact:forarbete/sou/2026-14",
+        "artifact:remisser/en-remiss-2026/kammarkollegiet"]
+    assert annstore.drifted(data["meta"]["inputs"]) == []
+
+
+def test_analyze_refuses_to_overwrite_verified(corpus, monkeypatch):
+    # a hand-verified analysis is curation: refuse before the LLM spend
+    ann = annstore.path("remisser", corpus)
+    ann.parent.mkdir(parents=True, exist_ok=True)
+    ann.write_text(json.dumps({"meta": {"status": "verified", "inputs": {}},
+                               "overall": {}, "segments": []}))
+
+    def boom(messages, **kw):
+        raise AssertionError("LLM must not be called for a verified layer")
+
+    monkeypatch.setattr(ai_analyze.llm, "complete_thread", boom)
+    with pytest.raises(ValueError, match="verified"):
+        ai_analyze.analyze(corpus)
 
 
 def test_analyze_passes_outline_and_text_to_model(corpus, monkeypatch):

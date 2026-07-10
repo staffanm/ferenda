@@ -67,7 +67,7 @@ Current code layout (this three-layer split is now realized in the package):
 
 ```
 accommodanda/
-  lib/      shared horizontal libs — lagrum (citation engine), catalog, render, layout, net, markdown, util, errors, casenaming, eucasenaming, eu_structure, datasets
+  lib/      shared horizontal libs (full map: accommodanda/README.md "Shared library (lib/)") — lagrum (citation engine), catalog, render, layout, net, markdown, util, errors, casenaming, eucasenaming, eu_structure, datasets, search, facets, feeds, dump, pins, resolve, text, compress, facsimile, pdftext, llm, annstore, wikitext, runlog, patch·patchit, git, harvest, regeringen, legacy_import, concepts, diff, history
   config.py runtime config (config.yml / data_root / wiki_root)
   sfs/      acts vertical — download·extract·reader·model·tokenizer·assembler·nf·register·versions·correspond·asgit·begrepp·_validate (+ __main__)
   dv/       court-decisions vertical — download·identity·namedcases·model·parse·structure·word·legacy
@@ -1794,13 +1794,15 @@ context rail, so it has no `relate`/`index`/`dump`/`generate` stage at all.
   sections of the referred SOU/Ds it discusses, with a per-section sentiment
   score and a verbatim quote plus an overall stance, validated strictly
   (every cited section id real, every quote a verbatim substring of the
-  answer) and written as a `.ann` sidecar. Retries once as a real
-  assistant/user follow-up turn on a malformed reply — since generalized
-  into `lib.llm.author` (§5/§6/api, 2026-07-06), the shared validate/
-  self-repair-retry loop eurlex/wiki annotate now use too.
+  answer) and written as a `.ann` layer in the curated store (`lib/annstore.py`,
+  `WIKI_ROOT/ann/remisser/…`, mirroring the answer artifact's relpath). Retries
+  once as a real assistant/user follow-up turn on a malformed reply — since
+  generalized into `lib.llm.author` (§5/§6/api, 2026-07-06), the shared
+  validate/self-repair-retry loop eurlex/wiki annotate now use too.
 - **Wired into `render.py`**: `_remiss_indexes` walks the remisser artifact
   tree directly (`layout.artifacts("remisser")`, not the catalog — this source
-  is never `relate`d) picking up each answer's `.ann`, and builds
+  is never `relate`d), picking up each answer's mirrored `.ann` layer from the
+  curated store (`lib.annstore`), and builds
   `remiss_feedback`/`remiss_overall` on `Site`; `Rail._remiss_html` renders
   them as a "Remissvar" section — per-section on the cited `avsnitt`, and a
   document-level "most interesting feedback" panel via `Rail.add_document`,
@@ -1878,7 +1880,8 @@ model + extraction.
 | `accommodanda/eurlex/` | **EU vertical (EUR-Lex/CELLAR)**: `download` (SPARQL discovery), `bulk` (dump import), `parse`/`parse_html`/`parse_pdf` (Formex/HTML/PDF → one artifact shape), `definitions` (defined-terms extraction + in-act interlinking), `lang`, `model`, `casenames` (harvest CELEX → usual name for named EU cases from Wikidata into `data/casenames.json`, read by `lib/eucasenaming.py`) |
 | `accommodanda/avg/` | **JO/JK/ARN-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages, `jk_canonical` dnr normalization; ARN one-page vägledande-beslut listing), `legacy` (one-time import of the frozen ARN corpus 1991–2022, §7g), `parse` (JO/ARN PDF via `lib/pdftext`, JK landing HTML; DV parse-type citation scan) |
 | `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (per-agency enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct} wired onto `lib/harvest.walk`; `Skip`/`guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 17 agencies live + 4 frozen-only), `download`, `legacy` (one-time import of the two harvest-blocked corpora, §7g), `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors). Corpus: 1218 regs harvested, parsed 0-fail |
-| `accommodanda/remisser/` | **remiss (referral-response) vertical**: `model` (`Remiss`/`Remissinstans`/`Remissvar`, `org_slug`), `download` (regeringen.se `/remisser/` two-pass sync + `sync_one`/`--only`, stub records for any per-case fetch/parse failure), `parse` (answer PDF → `Remissvar` via `lib/pdftext` with no fixed header), `ai_analyze` (the sole LLM pass — sentiment+quote per section, `.ann` sidecar). Never `relate`d/published; its `.ann` layer feeds the referred förarbete's rail via `render._remiss_indexes` |
+| `accommodanda/remisser/` | **remiss (referral-response) vertical**: `model` (`Remiss`/`Remissinstans`/`Remissvar`, `org_slug`), `download` (regeringen.se `/remisser/` two-pass sync + `sync_one`/`--only`, stub records for any per-case fetch/parse failure), `parse` (answer PDF → `Remissvar` via `lib/pdftext` with no fixed header), `ai_analyze` (the sole LLM pass — sentiment+quote per section, `.ann` layer in the curated store, `lib/annstore.py`). Never `relate`d/published; its `.ann` layer feeds the referred förarbete's rail via `render._remiss_indexes` |
+| `accommodanda/lib/annstore.py` | the curated store for every `ai-*` action's output (eurlex/kommentar `.ann`, sfs `.corr`) — `WIKI_ROOT/ann/<source-dir>/<relpath>`, mirroring the artifact tree's relpath grammar; envelope (`meta`: status generated/verified, model, date, input sha256 hashes), `guard`/`drifted` gate regeneration and derive staleness; inventoried by `lagen ann status` |
 | `accommodanda/lib/regeringen.py` | shared regeringen.se harvest knowledge (rule:second-use-goes-to-lib): the doctype table (`TYPES`) and `ul.list--block` listing walk (`listing_items`), used by both `forarbete/download.py` and `remisser/download.py` |
 | `accommodanda/site/` | **editorial-chrome vertical**: `model` (block-tree dataclasses + `Frontpage`/`AboutPage`/`Sitenews`), `parse` (markdown → artifact for `frontpage`/`om/<slug>`/`sitenews`), `render` (artifacts → HTML + Atom, `write_site`). Content is markdown in `lagen-wiki/site/`, migrated once by `tools/migrate_site_content.py`. Never `relate`d/indexed/dumped (absent from `ARTIFACTS`, like remisser); rendered during `generate` |
 | `accommodanda/lib/pdftext.py` | **shared font-aware PDF extraction** (förarbete + föreskrift + avg (JO/ARN) + remisser): `pdf_pages` (`pdftohtml -xml` → bold/italic-tagged `Line`s) → `page_paragraphs` (reflow, strip running header/page-no/TOC — `identifier=None` skips header-stripping for sources with no fixed masthead, e.g. remisser) → the vertical's own `classify` |
@@ -1996,6 +1999,29 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **lib** (2026-07-09) — `lib/annstore.py`: every `ai-*` action's output
+  (eurlex/kommentar `.ann`, remisser `.ann`, sfs `.corr`) now lives in a
+  dedicated curated store in the git-backed content repo
+  (`WIKI_ROOT/ann/<source-dir>/<relpath>`, mirroring the artifact tree's
+  relpath grammar) instead of next to the artifact — an LLM output that has
+  been hand-verified/edited is curated data, as irreplaceable as hand-written
+  wiki markdown, and the artifact tree's contract is "wipeable, rebuildable,
+  never hand-touched". Each layer is an envelope (`meta`: status
+  generated/verified, model, generated date, per-input sha256 hashes) beside
+  the payload's own keys; `status: verified` (flipped by hand) makes
+  regeneration refuse without `--force`, checked before the LLM spend;
+  staleness is derived from the recorded input hashes, never stored, and a
+  stale *verified* layer is flagged for human re-review, never mechanically
+  regenerated. New CLI verb `lagen ann status` inventories the store.
+  `eurlex/annotate.py`, `wiki/annotate.py`, `remisser/ai_analyze.py`,
+  `sfs/correspond.py`, `lib/render.py` and `build.py` (relate's `.corr` load,
+  `generate_watermark`, `page_signature`) all read/write through the store
+  now. `test/test_annstore.py`. **Migration** (any host with pre-cutover
+  layers — readers treat a missing layer as "unannotated", so un-moved files
+  silently vanish from pages): move them by mirrored relpath, e.g.
+  `cd $DATA/artifact && find . \( -name '*.ann' -o -name '*.corr' \) -exec
+  install -D {} $WIKI_ROOT/ann/{} \; -delete`, then commit; a meta-less file
+  counts as `verified` (unknown provenance is never silently regenerable).
 - **api** (2026-07-09) — public **MCP server**: `api/mcp.py` mounts a
   no-auth Streamable HTTP MCP endpoint at `/mcp` on the same `lagen all
   serve` FastAPI app, exposing seven read-only tools (`search`,

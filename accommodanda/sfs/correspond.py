@@ -14,7 +14,7 @@ Every edge is mechanically validated before it is kept: both endpoints must be
 real paragrafs in the two laws, the relation/scope must be in the controlled
 vocabulary, and the model's supporting quote must occur in the FK text -- so a
 hallucinated anchor or an invented sentence is dropped, not stored. The result
-is written by the caller as a `.corr` sidecar next to the new statute's artifact,
+is written by the caller as a `.corr` layer in the curated store (lib.annstore),
 the mirror of the förarbete genomför edges.
 
 The LLM is called only from `correspond`, reached only by `lagen sfs
@@ -128,9 +128,9 @@ def correspond(new_art, prop_art, old_art, fk):
     """Derive and validate the correspondence edges from the proposition's
     författningskommentar text `fk` (extracted by `forarbete.kommentar.fk_section`
     -- reading the proposition artifact is förarbete's job, so build composes the
-    two verticals rather than sfs importing forarbete); return (sidecar, stats). The
-    sidecar is `{"correspondence": {...}}`, with the new-law paragraf anchors
-    relative to `new_art` (it is written next to it)."""
+    two verticals rather than sfs importing forarbete); return (payload, stats).
+    The payload is `{"correspondence": {...}}`, with the new-law paragraf anchors
+    relative to `new_art` (the caller stores it keyed by the new statute)."""
     new_idx, old_idx = paragraf_index(new_art), paragraf_index(old_art)
     if not fk:
         # validated (not asserted) before the LLM spend: a missing FK

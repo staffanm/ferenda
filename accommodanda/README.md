@@ -95,6 +95,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `facsimile.py` | on-demand page facsimiles: one source-PDF page → a retina PNG (`pdftoppm`, 150 DPI), rendered lazily into the `cache/facsimile/` disk cache (evicted externally); served by the API's `/api/v1/facsimile` (+ the legacy `/prop/2022/23:10/sid1.png` path grammar) and toggled inline by the page-number buttons on förarbete pages |
 | `pdftext.py` | shared font-aware PDF text extraction pipeline for the PDF-bodied verticals — `pdf_pages`/`flat_lines` (poppler `pdftohtml -xml`, `hidden=True` recovers an OCR text layer pdftohtml otherwise drops) → `page_paragraphs` → a vertical's own `classify` |
 | `llm.py` | shared client for the Berget chat-completions endpoint used by the opt-in `ai-*` passes (eurlex/wiki annotate, remisser ai-analyze) — `complete`/`complete_thread` plus `author`, the source-agnostic validate/self-repair-retry loop |
+| `annstore.py` | the curated store for LLM-authored layers (`.ann`/`.corr` files from `ai-*` actions) — `WIKI_ROOT/ann/<source-dir>/<relpath>`, mirroring the artifact tree's relpath grammar; every layer is an envelope (`meta`: status generated/verified, model, generated date, input sha256 hashes) beside the payload's own keys; `guard` refuses to regenerate a `verified` layer without `--force`, `drifted` derives staleness from recorded input hashes rather than storing it; inventoried by `lagen ann status` |
 | `markdown.py` | parse the git-backed wiki markdown (commentary/concept/site) into the shared inline-run artifact shape — the markdown counterpart of `wikitext.py` |
 | `wikitext.py` | parse MediaWiki dump pages into the same inline-run shape; retired from the live pipeline, kept only as the migration/diff tools' reference |
 | `runlog.py` | run instrumentation behind the ops dashboard — `runs.ndjson`/`errors.json`/`status.json` under `DATA/.build/` |
@@ -157,14 +158,14 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `structure.py` | group an act's flat block sequence into its containment hierarchy (`nest`, the parse-time tree builder; the anchor grammar itself lives in `lib/eu_structure.py`) |
 | `definitions.py` | extract an act's defined terms and interlink their in-act uses |
 | `lang.py` | localized structural vocabulary for the non-Formex (html/pdf) parsers (Formex is tag-marked, so its parser needs no language knowledge) |
-| `annotate.py` | `lagen eurlex ai-annotate <CELEX>` — author the editorial `.ann` layer for a sector-3 act with an LLM |
+| `annotate.py` | `lagen eurlex ai-annotate <CELEX>` — author the editorial `.ann` layer for a sector-3 act with an LLM, written to the curated store (`lib/annstore.py`) |
 | `casenames.py` | `lagen eurlex casenames` — harvest CELEX → usual name for named EU cases ("Schrems II") from Wikidata (property P476) into `data/casenames.json`, read by `lib/eucasenaming.py` |
 
 **wiki vertical (git-backed markdown — begrepp + kommentar)**
 | File | What |
 |---|---|
 | `parse.py` | project the markdown wiki into kommentar / begrepp artifacts; the `## heading → host node anchor` grammar (`heading_fragment`, `fragment_heading`), `host_uri`, and the frontmatter-keyed `kommentar_index`/`begrepp_index` |
-| `annotate.py` | `lagen kommentar ai-annotate <basefile>` — the Step-4 AI guidance linker: read an annotation's declared guidance PDFs and propose, per article, the guidance links (`.ann` sidecar) |
+| `annotate.py` | `lagen kommentar ai-annotate <basefile>` — the Step-4 AI guidance linker: read an annotation's declared guidance PDFs and propose, per article, the guidance links (`.ann` layer, curated store) |
 | `guidance_discover.py` | `lagen kommentar {discover,propose}-guidance` — crawl Commission guidance sitemaps into a per-CELEX index + draft a `guidance:` block to review (no LLM) |
 
 **remisser vertical (regeringen.se referral responses)**
@@ -173,12 +174,12 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `model.py` | `Remiss` (case: title, dnr, deadline, `remitterat` cross-ref to the referred förarbete, `svar` list of `Remissinstans`), `Remissvar` (one organisation's parsed answer); `org_slug` derives the shared basename identity `download`/`parse`/`build` all key on |
 | `download.py` | regeringen.se `/remisser/` two-pass sync — discover new cases (`--full` re-walks everything), then re-poll every still-open case for newly-arrived answers and fetch any answer PDF not yet cached; `sync_one`/`--only <url>` fetches one known case directly; any per-case fetch or parse failure (HTTP error, or a 200 whose DOM doesn't match — a bot-challenge interstitial, a truncation) is written as a *stub* record (from listing facts only) so the incremental watermark can't hide the failure — re-polled until it succeeds |
 | `parse.py` | one answer PDF → `Remissvar` via the shared `lib/pdftext` (`pdf_pages` + `page_paragraphs`), flattened to plain paragraph text; passes `identifier=None` since each organisation's PDF carries its own letterhead, not a fixed running header |
-| `ai_analyze.py` | `lagen remisser ai-analyze <case-slug>/<org-slug>` — the sole LLM pass: maps one answer onto the referred SOU/Ds's sections with a per-section sentiment + verbatim quote plus an overall stance, validated strictly and written as a `.ann` sidecar; retries once via `lib.llm.author`'s validate/self-repair loop on a malformed reply |
+| `ai_analyze.py` | `lagen remisser ai-analyze <case-slug>/<org-slug>` — the sole LLM pass: maps one answer onto the referred SOU/Ds's sections with a per-section sentiment + verbatim quote plus an overall stance, validated strictly and written as a `.ann` layer in the curated store; retries once via `lib.llm.author`'s validate/self-repair loop on a malformed reply |
 
 This source is never `relate`d/`generate`d — it publishes no pages of its own;
-`render._remiss_indexes` reads its `.ann` sidecars straight off the filesystem
-(`layout.artifacts("remisser")`) and surfaces them as a "Remissvar" section on
-the *referred förarbete's* context rail.
+`render._remiss_indexes` reads its `.ann` layers straight out of the curated
+store (`lib/annstore.py`, `WIKI_ROOT/ann/remisser/…`) and surfaces them as a
+"Remissvar" section on the *referred förarbete's* context rail.
 
 **site vertical (editorial chrome — frontpage / om / sitenews)**
 | File | What |
@@ -265,7 +266,8 @@ uv run python -m accommodanda.build sfs history-as-git /path/to/repo 1998:204   
 ```sh
 # download + build the identity index
 uv run python -m accommodanda.dv.download site/data/downloaded/dom   # [--full] [--no-bilagor] [--limit N]
-uv run python -m accommodanda.dv.identity                       # -> site/data/artifact/dom/identity-index.json
+uv run python -m accommodanda.build dv reindex                  # -> site/data/artifact/dom/identity-index.json
+                                                                  # (also auto-run after any harvest that changed records)
 
 # parse (API path is driver-owned; `[ids…]` parses just those, empty = all stale)
 uv run python -m accommodanda.build dv parse                                       # API path, incremental
@@ -415,8 +417,9 @@ the sub-articles and recitals the act divides into: a single definition `2.21`, 
 numbered paragraph `6.2`, a recital `recital-15` (the dotted sub-article / `recital-N`
 anchor grammar `lib.eu_structure` mints, shared with the renderer and the wiki
 commentary headings, so a link lands on the exact node). A FAQ answer about two definitions links to exactly those two, not to
-article 2 as a whole. The result is written as a **`.ann` sidecar** next to the
-kommentar artifact — `{"guidanceLinks": {anchor: [{label, href, desc, section}]}}` —
+article 2 as a whole. The result is written as a **`.ann` layer** in the curated
+store (`lib/annstore.py`, `WIKI_ROOT/ann/kommentar/…`, mirroring the kommentar
+artifact's own relpath) — `{"guidanceLinks": {anchor: [{label, href, desc, section}]}}` —
 the AI-created (then human-corrected) layer, kept separate from the hand-edited
 markdown, mirroring eurlex's `.ann` editorial layer. `label` names the source and
 its own section reference ("Frågor och svar om dataakten, question 8"), `desc` is
@@ -523,6 +526,7 @@ snapshot cell directly (see below).
 ```sh
 uv run python -m accommodanda.build <source> status   # extended: also shows failed/empty, writes the authoritative snapshot cell
 uv run python -m accommodanda.build all runs [N]       # recent runs from the ledger
+uv run python -m accommodanda.build ann status         # inventory the curated LLM-layer store (lib/annstore.py): status/date/staleness per .ann/.corr layer
 ```
 
 `/ops` is an HTML health dashboard mounted on the same FastAPI app as the REST

@@ -5,8 +5,10 @@ The act's parsed artifact is flattened to a plain-text/markdown rendering and
 spliced into the preamble-analyzer prompt; an OpenAI-compatible chat-completions
 endpoint (Berget) returns the editorial JSON -- thematic recital groups and the
 article<->recital cross-reference. We validate the shape and write it, wrapped in
-`{"editorialLayer": ...}`, as a `.ann` sidecar next to the artifact, where
-`generate` folds it into the act's page (lib.render.Editorial).
+`{"editorialLayer": ...}`, as a `.ann` layer in the curated store
+(lib.annstore, the git-backed WIKI_ROOT/ann tree), where `generate` folds it
+into the act's page (lib.render.Editorial). A verified (hand-checked) layer is
+never regenerated without --force.
 
 The LLM is called only here, on an explicit `ai-annotate` of named CELEX ids --
 never as part of a corpus-wide parse/relate/generate.
@@ -15,7 +17,7 @@ never as part of a corpus-wide parse/relate/generate.
 import json
 from pathlib import Path
 
-from ..lib import catalog, compress, layout, llm, util
+from ..lib import annstore, catalog, compress, layout, llm
 from ..lib.eu_structure import flatten
 
 PROMPT = Path(__file__).with_name("preamble_analyzer_prompt.txt")
@@ -108,12 +110,15 @@ def _validate(content):
     return {"recitalGroups": groups, "articleToRecitals": a2r}
 
 
-def annotate(celex):
+def annotate(celex, force=False):
     """Author and write the `.ann` editorial layer for one sector-3 CELEX; returns
-    the written path."""
+    the written path. Refuses (before the LLM spend) to regenerate a verified
+    layer unless `force`."""
     assert celex.startswith("3") and len(celex) > 5 and celex[5] in "RLD", \
         ("%s: ai-annotate handles only sector-3 acts "
          "(regulation/directive/decision)" % celex)
+    out = annstore.path("eurlex", celex)
+    annstore.guard(out, force)
     art_path = layout.artifact("eurlex", celex)
     assert compress.exists(art_path), \
         "%s: no parsed artifact at %s -- run `lagen eurlex parse %s` first" \
@@ -121,7 +126,5 @@ def annotate(celex):
     art = json.loads(compress.read_bytes(art_path))
     prompt = PROMPT.read_text().replace(PLACEHOLDER, act_markdown(art))
     layer = llm.author(prompt, _validate)
-    out = art_path.with_suffix(".ann")
-    util.write_atomic(out, json.dumps({"editorialLayer": layer},
-                                      ensure_ascii=False, indent=2))
-    return out
+    return annstore.write(out, {"editorialLayer": layer},
+                          annstore.artifact_input("eurlex", celex), force)

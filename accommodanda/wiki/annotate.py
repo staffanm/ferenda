@@ -20,12 +20,13 @@ targets -- not just whole articles but the *fine-grained* nodes the act divides
 into (a single definition `2.21`, a numbered paragraph `6.2`, a recital
 `recital-15`), so a FAQ answer about two definitions links to exactly those two,
 not to article 2 as a whole. The validated mapping is written, wrapped in
-`{"guidanceLinks": ...}`, as a `.ann` sidecar next to the kommentar artifact --
-the AI-created, then human-corrected layer, kept **separate** from the
-hand-edited markdown (which carries the editorial prose and the curated
-`## Externa länkar`). Its shape -- `{anchor: [{label, href, desc, section}]}` --
-is the per-node guidance shape the rail already renders, so promoting an accepted
-link costs nothing.
+`{"guidanceLinks": ...}`, as a `.ann` layer in the curated store (lib.annstore,
+the git-backed WIKI_ROOT/ann tree) -- the AI-created, then human-corrected
+layer, kept **separate** from the hand-edited markdown (which carries the
+editorial prose and the curated `## Externa länkar`). Its shape --
+`{anchor: [{label, href, desc, section}]}` -- is the per-node guidance shape the
+rail already renders, so accepting a link is just flipping the layer's
+`meta.status` to verified (after which regeneration requires --force).
 
 Like every ai-* action the LLM is called only here, on an explicit annotate of a
 named basefile -- never from a corpus-wide parse/relate/generate.
@@ -40,7 +41,7 @@ from pathlib import Path
 import requests
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
-from ..lib import compress, layout, llm, markdown, util
+from ..lib import annstore, compress, layout, llm, markdown, util
 from ..lib.eu_structure import anchored_blocks
 from ..lib.text import runs_text
 from ..lib.util import normalize_space
@@ -208,11 +209,14 @@ def _source_link(source, link, page):
     return item
 
 
-def annotate(basefile, wiki_root):
+def annotate(basefile, wiki_root, force=False):
     """Author and write the `.ann` guidance-link layer for one kommentar basefile;
     returns the written path. The basefile's markdown declares the host act
     (`annotates:`) and its guidance PDFs (`guidance:`); the host act's parsed
-    artifact supplies the article list + valid anchors."""
+    artifact supplies the article list + valid anchors. Refuses (before the LLM
+    spend) to regenerate a verified layer unless `force`."""
+    out_path = annstore.path("kommentar", basefile)
+    annstore.guard(out_path, force)
     src = Path(wiki_parse.kommentar_index(str(wiki_root))[basefile])
     meta, _ = markdown.frontmatter(src.read_text(encoding="utf-8"))
     celex = str(meta["annotates"])
@@ -241,7 +245,6 @@ def annotate(basefile, wiki_root):
             for anchor in link["targets"]:
                 out.setdefault(anchor, []).append(item)
 
-    path = layout.artifact("kommentar", basefile).with_suffix(".ann")
-    util.write_atomic(path, json.dumps({"guidanceLinks": out},
-                                       ensure_ascii=False, indent=2))
-    return path
+    return annstore.write(out_path, {"guidanceLinks": out},
+                          {**annstore.artifact_input("eurlex", celex),
+                           **annstore.wiki_input(src, wiki_root)}, force)

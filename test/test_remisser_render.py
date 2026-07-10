@@ -2,21 +2,23 @@
 
 The remisser corpus is never published as its own pages -- its only surface is a
 context rail on the *referred* SOU/Ds: `_remiss_indexes` walks the remisser
-artifact tree, reads each analyzed answer's `.ann` sidecar, and keys the
-feedback onto the förarbete's own uri + section id so `render_forarbete` can show
-it. No live LLM (and hence no real `.ann`) is available in the sandbox, so this
-builds a synthetic answer + `.ann` + host förarbete under `tmp_path`.
+artifact tree, reads each analyzed answer's mirrored `.ann` layer from the
+curated store (lib.annstore), and keys the feedback onto the förarbete's own uri
++ section id so `render_forarbete` can show it. No live LLM (and hence no real
+`.ann`) is available in the sandbox, so this builds a synthetic answer + `.ann`
++ host förarbete under `tmp_path`.
 """
 
 import json
 
-from accommodanda.lib import catalog, layout, render
+from accommodanda.lib import annstore, catalog, layout, render
 
 
 def _scenario(tmp_path, monkeypatch):
     """A one-answer synthetic corpus: a host SOU with a matching avsnitt id, and a
     remissvar artifact + `.ann` referring to it. Returns the förarbete uri."""
-    monkeypatch.setattr(layout, "ARTIFACT", tmp_path)
+    monkeypatch.setattr(layout, "ARTIFACT", tmp_path / "artifact")
+    monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
 
     fa_uri = "https://lagen.nu/sou/2020:1"
     fa_path = layout.artifact("forarbete", "sou/2020-1")
@@ -39,7 +41,10 @@ def _scenario(tmp_path, monkeypatch):
         "remitterat": [{"typ": "sou", "basefile": "2020:1"}],
         "source_url": "https://regeringen.se/svar/kammarkollegiet.pdf",
         "full_text": ["Kammarkollegiet tillstyrker förslaget om delat ansvar."]}))
-    svar_path.with_suffix(".ann").write_text(json.dumps({
+    ann = annstore.path("remisser", "en-utredning/kammarkollegiet")
+    ann.parent.mkdir(parents=True, exist_ok=True)
+    ann.write_text(json.dumps({
+        "meta": {"status": "generated", "inputs": {}},
         "overall": {"sentiment": 0.5, "quote": "Kammarkollegiet tillstyrker"},
         "segments": [{"forarbete_id": "a14.3.4", "sentiment": 0.6,
                       "quote": "delat ansvar"}]}))

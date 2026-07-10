@@ -724,7 +724,9 @@ def _incremental_harness(manifest, rendered_uris):
 
 
 KOMMENTAR = {
-    "uri": "https://lagen.nu/wiki/1975:635",
+    # the uri grammar wiki/parse mints: BASE + "kommentar/" + basefile --
+    # _kommentar_indexes recovers the identity from it (rule:fail-fast)
+    "uri": "https://lagen.nu/kommentar/1975:635",
     "annotates": "https://lagen.nu/1975:635",
     "author": "testförfattare",
     "body": [{"type": "sektion", "id": "P6", "children": [

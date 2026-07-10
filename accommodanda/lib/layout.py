@@ -314,8 +314,8 @@ def sfs_version_artifact(basefile, version):
 
 def sfs_versions_sidecar(basefile):
     """The per-statute version index -- the versions stage's output, a sidecar
-    next to the main artifact (like .corr): which historical consolidations
-    exist, their recovered version ids and their parse status."""
+    next to the main artifact: which historical consolidations exist, their
+    recovered version ids and their parse status."""
     rel = relpath("sfs", basefile)
     return SFS_ARTIFACT / rel.with_name(rel.name + ".versions.json")
 

@@ -7,7 +7,7 @@ import json
 import pytest
 
 from accommodanda.eurlex import annotate
-from accommodanda.lib import compress, layout, llm
+from accommodanda.lib import annstore, compress, layout, llm
 
 ART = {
     "celex": "32099R0001", "title": "Testförordning",
@@ -138,7 +138,8 @@ def test_annotate_never_writes_a_bad_ann(tmp_path, monkeypatch):
     # a malformed-but-JSON reply that survives both attempts must raise, and no
     # `.ann` (nor a truncated `.ann.tmp`) may be left behind for generate to trip
     # on -- the write goes through util.write_atomic *after* validation succeeds
-    monkeypatch.setattr(layout, "ARTIFACT", tmp_path)
+    monkeypatch.setattr(layout, "ARTIFACT", tmp_path / "artifact")
+    monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
     celex = "32099R0001"
     art_path = layout.artifact("eurlex", celex)
     art_path.parent.mkdir(parents=True, exist_ok=True)
@@ -147,6 +148,54 @@ def test_annotate_never_writes_a_bad_ann(tmp_path, monkeypatch):
                         lambda messages, **kw: _layer_with_groups(99))
     with pytest.raises(ValueError, match="too many recital groups"):
         annotate.annotate(celex)
-    ann = layout.artifact("eurlex", celex).with_suffix(".ann")
+    ann = annstore.path("eurlex", celex)
     assert not ann.exists()
     assert not ann.with_suffix(".ann.tmp").exists()
+
+
+def test_annotate_writes_generated_envelope(tmp_path, monkeypatch):
+    # a fresh layer lands in the curated store (not the artifact tree) as a
+    # `generated` envelope: meta beside the payload, input hash recorded
+    monkeypatch.setattr(layout, "ARTIFACT", tmp_path / "artifact")
+    monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
+    celex = "32099R0001"
+    art_path = layout.artifact("eurlex", celex)
+    art_path.parent.mkdir(parents=True, exist_ok=True)
+    compress.write_bytes(art_path, json.dumps(ART).encode("utf-8"))
+    monkeypatch.setattr(llm, "complete_thread",
+                        lambda messages, **kw: _layer_with_groups(2))
+    out = annotate.annotate(celex)
+    assert out == annstore.path("eurlex", celex)
+    env = json.loads(out.read_text())
+    assert env["meta"]["status"] == "generated"
+    assert list(env["meta"]["inputs"]) == ["artifact:eurlex/32099R0001"]
+    assert len(env["editorialLayer"]["recitalGroups"]) == 2
+    assert annstore.drifted(env["meta"]["inputs"]) == []   # authored against current
+
+
+def test_annotate_refuses_to_overwrite_verified(tmp_path, monkeypatch):
+    # once a human flips meta.status to verified, regeneration must refuse --
+    # BEFORE any LLM call is attempted -- unless force
+    monkeypatch.setattr(layout, "ARTIFACT", tmp_path / "artifact")
+    monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
+    celex = "32099R0001"
+    art_path = layout.artifact("eurlex", celex)
+    art_path.parent.mkdir(parents=True, exist_ok=True)
+    compress.write_bytes(art_path, json.dumps(ART).encode("utf-8"))
+    ann = annstore.path("eurlex", celex)
+    ann.parent.mkdir(parents=True, exist_ok=True)
+    ann.write_text(json.dumps({"meta": {"status": "verified", "inputs": {}},
+                               "editorialLayer": {"recitalGroups": [],
+                                                  "articleToRecitals": {}}}))
+
+    def boom(messages, **kw):
+        raise AssertionError("LLM must not be called for a verified layer")
+
+    monkeypatch.setattr(llm, "complete_thread", boom)
+    with pytest.raises(ValueError, match="verified"):
+        annotate.annotate(celex)
+    # --force regenerates: the curation is consciously discarded
+    monkeypatch.setattr(llm, "complete_thread",
+                        lambda messages, **kw: _layer_with_groups(1))
+    out = annotate.annotate(celex, force=True)
+    assert json.loads(out.read_text())["meta"]["status"] == "generated"

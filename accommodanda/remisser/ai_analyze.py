@@ -10,8 +10,10 @@ outline (the nested `avsnitt` tree, each node's `id` the join anchor), and ask
 the configured Berget model to place the answer's commentary on those ids -- an
 overall stance plus a segment per section actually discussed. The reply is
 validated strictly (every cited id must be a real section, every quote a verbatim
-substring of the answer text) and written as a `.ann` sidecar next to the
-artifact, so a later rendering pass surfaces it on the förarbete page.
+substring of the answer text) and written as a `.ann` layer in the curated store
+(lib.annstore, the git-backed WIKI_ROOT/ann tree), so a later rendering pass
+surfaces it on the förarbete page. A verified (hand-checked) layer is never
+regenerated without --force.
 
 Like every ai-* action the LLM is called only here, on an explicit analyze of a
 named basefile -- never from a corpus-wide parse/relate/generate.
@@ -20,7 +22,7 @@ named basefile -- never from a corpus-wide parse/relate/generate.
 import json
 from pathlib import Path
 
-from ..lib import compress, layout, llm, util
+from ..lib import annstore, compress, layout, llm
 from ..lib.text import runs_text
 from ..lib.util import basefile_slug, normalize_space
 from .model import Remissvar
@@ -116,9 +118,12 @@ def _validate(content, valid_ids, haystack):
     }
 
 
-def analyze(basefile):
+def analyze(basefile, force=False):
     """Author and write the `.ann` sentiment layer for one remissvar basefile
-    ("<case-slug>/<org-slug>"); returns the written path."""
+    ("<case-slug>/<org-slug>"); returns the written path. Refuses (before the
+    LLM spend) to regenerate a verified layer unless `force`."""
+    out = annstore.path("remisser", basefile)
+    annstore.guard(out, force)
     art_path = layout.artifact("remisser", basefile)
     svar = Remissvar.from_dict(json.loads(compress.read_bytes(art_path)))
     assert svar.remitterat, (
@@ -130,7 +135,8 @@ def analyze(basefile):
     typ, fa_basefile = svar.remitterat[0]["typ"], svar.remitterat[0]["basefile"]
     # remitterat carries the colon identifier ("2019:61"); the förarbete artifact
     # tree is keyed by the filesystem slug ("2019-61"), so slug it for the join
-    host_path = layout.artifact("forarbete", "%s/%s" % (typ, basefile_slug(fa_basefile)))
+    fa_slug = "%s/%s" % (typ, basefile_slug(fa_basefile))
+    host_path = layout.artifact("forarbete", fa_slug)
     assert compress.exists(host_path), (
         "%s: no parsed förarbete artifact at %s -- run "
         "`lagen forarbete parse %s/%s` first"
@@ -147,6 +153,6 @@ def analyze(basefile):
     result = llm.author(prompt, lambda reply: _validate(reply, valid_ids, haystack),
                         max_tokens=MAX_TOKENS)
 
-    path = art_path.with_suffix(".ann")
-    util.write_atomic(path, json.dumps(result, ensure_ascii=False, indent=2))
-    return path
+    return annstore.write(out, result,
+                          {**annstore.artifact_input("remisser", basefile),
+                           **annstore.artifact_input("forarbete", fa_slug)}, force)
