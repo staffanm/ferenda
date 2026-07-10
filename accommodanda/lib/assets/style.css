@@ -1,0 +1,627 @@
+
+/* lagen 2026 -- Marginalia, recoloured.
+   ==========================================================================
+   An evolution of the implemented stylesheet. Layout, class names, geometry
+   and typography are UNCHANGED -- only the colour layer is rebuilt as tokens.
+
+   Two coordinated schemes, driven by a single [data-theme] switch with a
+   prefers-color-scheme fallback:
+
+     * Light  -- cool porcelain paper, cool near-black ink, one warm
+                 oxblood accent. Warm-on-cool editorial tension.
+     * Dark   -- deep cool slate, terracotta accent, the three source
+                 category hues (case / forarbete / kommentar) lightened.
+
+   Drop-in: set  <html data-theme="light">  or  "dark", or leave it off to
+   follow the OS. Everything below the token block is the original CSS with
+   its scattered colour literals promoted to tokens so both schemes hold.
+   ========================================================================== */
+
+/* ── Light (default) ─────────────────────────────────────────── */
+:root {
+  --bg:#e9ecf0; --surf:#f4f6f8; --surf-2:#dde2e8; --surf-3:#c9d0d9;
+  --ink:#171b21; --ink-2:#3b434d; --ink-3:#697079; --ink-4:#9aa1aa;
+  --rule:#cfd4dc; --rule-soft:#dee2e9;
+  --accent:#8f3524; --case:#9a5a2a; --forarbete:#544a80; --kommentar:#933659;
+
+  /* promoted literals */
+  --diff-ins-bg:#d9e8dc; --diff-del-bg:#efdad6;
+  --fk-bg:#eaf1f8; --fk-border:#c3d5e6;
+  --overlay:rgba(18,22,28,.34); --shadow-modal:rgba(18,22,28,.30);
+  --mark:#f0e4a6; --danger:#b5402c; --on-accent:#ffffff;
+
+  --serif:"Source Serif 4","Charter",Georgia,serif;
+  --sans:"Inter","Helvetica Neue",system-ui,sans-serif;
+  --col-toc:18rem; --col-rail:20rem;
+  color-scheme: light;
+}
+
+/* ── Dark ────────────────────────────────────────────────────── */
+:root[data-theme="dark"] {
+  --bg:#12161b; --surf:#1a1f26; --surf-2:#232a33; --surf-3:#2f3843;
+  --ink:#e7e9ec; --ink-2:#b6bcc4; --ink-3:#868d97; --ink-4:#5c636d;
+  --rule:#2b323b; --rule-soft:#222831;
+  --accent:#cd6f56; --case:#c9884f; --forarbete:#9b90d2; --kommentar:#cf7295;
+
+  --diff-ins-bg:#25352a; --diff-del-bg:#3a2723;
+  --fk-bg:#1b2531; --fk-border:#2e4257;
+  --overlay:rgba(6,8,11,.55); --shadow-modal:rgba(0,0,0,.6);
+  --mark:#4a4326; --danger:#e0755e; --on-accent:#1a0f0c;
+  color-scheme: dark;
+}
+/* follow the OS when no explicit theme is set */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg:#12161b; --surf:#1a1f26; --surf-2:#232a33; --surf-3:#2f3843;
+    --ink:#e7e9ec; --ink-2:#b6bcc4; --ink-3:#868d97; --ink-4:#5c636d;
+    --rule:#2b323b; --rule-soft:#222831;
+    --accent:#cd6f56; --case:#c9884f; --forarbete:#9b90d2; --kommentar:#cf7295;
+    --diff-ins-bg:#25352a; --diff-del-bg:#3a2723;
+    --fk-bg:#1b2531; --fk-border:#2e4257;
+    --overlay:rgba(6,8,11,.55); --shadow-modal:rgba(0,0,0,.6);
+    --mark:#4a4326; --danger:#e0755e; --on-accent:#1a0f0c;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { font-family: var(--sans); font-size: 15px; line-height: 1.6;
+       letter-spacing: -.005em; color: var(--ink); background: var(--bg);
+       font-feature-settings: "kern";
+       transition: background-color .25s ease, color .25s ease; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* -- Masthead -- */
+.masthead { position: sticky; top: 0; z-index: 10; display: flex;
+            align-items: center; gap: 1.5rem; height: 4rem; padding: 0 1.75rem;
+            background: var(--surf); border-bottom: 1px solid var(--rule); }
+.masthead .brand { font-family: var(--serif); font-size: 1.5rem; font-weight: 500;
+                   letter-spacing: -.015em; color: var(--ink); }
+.masthead .brand em { color: var(--accent); font-style: italic; }
+.masthead .brand:hover { text-decoration: none; }
+.masthead .search { flex: 1; max-width: 36rem; display: flex; align-items: center;
+                    gap: .6rem; padding: .55rem .9rem; cursor: text; text-align: left;
+                    color: var(--ink-3); background: var(--surf-2);
+                    border: 1px solid var(--rule); border-radius: 6px;
+                    font-family: var(--serif); font-style: italic; font-size: .95rem; }
+.masthead .search:hover { background: var(--surf-3); }
+.masthead .search .k { margin-left: auto; font-family: var(--sans); font-style: normal;
+                       font-size: .72rem; color: var(--ink-2); background: var(--surf);
+                       border: 1px solid var(--rule); border-radius: 4px; padding: .1rem .5rem; }
+.mast-nav { display: flex; gap: 1.4rem; font-size: .88rem; }
+.mast-nav a { color: var(--ink-2); padding: .35rem 0;
+              border-bottom: 1px solid transparent; }
+.mast-nav a:hover { color: var(--ink); text-decoration: none;
+                    border-bottom-color: var(--ink-3); }
+.mast-nav a.on { color: var(--ink); font-weight: 500; border-bottom-color: var(--accent); }
+/* -- Theme toggle: a single sun/moon control; the icon reflects the scheme the
+   click would switch AWAY from -- moon while light, sun while dark. -- */
+.theme-toggle { display: inline-flex; align-items: center; justify-content: center;
+                width: 2rem; height: 2rem; padding: 0; color: var(--ink-2);
+                background: var(--surf-2); border: 1px solid var(--rule);
+                border-radius: 999px; cursor: pointer;
+                transition: background-color .15s, color .15s; }
+.theme-toggle:hover { background: var(--surf-3); color: var(--ink); }
+.theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.theme-toggle .icon-sun { display: none; }
+.theme-toggle .icon-moon { display: inline-flex; }
+:root[data-theme="dark"] .theme-toggle .icon-sun { display: inline-flex; }
+:root[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .theme-toggle .icon-sun { display: inline-flex; }
+  :root:not([data-theme]) .theme-toggle .icon-moon { display: none; }
+}
+
+/* -- Body grid -- */
+.gr-body { display: grid; align-items: start;
+           grid-template-columns: var(--col-toc) minmax(0,1fr) var(--col-rail); }
+.gr-body.solo { display: block; max-width: 56rem; margin: 0 auto; }
+.gr-main { min-width: 0; padding: 2.5rem clamp(1.5rem, 4vw, 4rem) 8rem; max-width: 56rem; }
+.gr-body.solo .gr-main { max-width: none; }
+
+/* -- Frontpage: curated multi-column law index --
+   cluster headings (h2) and the intro/"vanliga ingångar" paragraphs span every
+   column; the `### category` + its law list flow into columns and never break
+   mid-list, so 20 categories read as 5 scannable bands. The max-width pins the
+   columns at 15rem (3 x 15 + 2 x 1 gap = 47rem) -- multicol otherwise
+   stretches them to fill the container -- and gives the spanning intro
+   paragraphs the same measure, so paragraphs and columns share one edge. */
+.frontpage { columns: 15rem 3; column-gap: 1rem; max-width: 47rem; }
+.frontpage > h2, .frontpage > p { column-span: all; -webkit-column-span: all; }
+.frontpage > p { color: var(--ink-2); }
+.frontpage > p strong { color: var(--ink); }
+.frontpage h2 { font-family: var(--serif); font-size: .82rem; font-weight: 600;
+                letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3);
+                margin: 2.4rem 0 1rem; padding-bottom: .45rem;
+                border-bottom: 1px solid var(--rule); }
+.frontpage > p + h2 { margin-top: 2.8rem; }
+.frontpage h3 { font-family: var(--serif); font-size: 1.02rem; font-weight: 600;
+                color: var(--ink); margin: 0 0 .35rem;
+                /* avoid: keep the heading with its list; avoid inside: at 15rem
+                   columns a heading wraps, and the wrap point must not become a
+                   column break splitting the heading's own lines */
+                break-after: avoid; break-inside: avoid; }
+.frontpage ul { list-style: none; margin: 0; padding: 0;
+                break-inside: avoid; margin-bottom: 1.6rem; }
+.frontpage li { line-height: 1.5; padding: .04rem 0; font-size: .93rem; }
+.frontpage li a { color: var(--ink-2); }
+.frontpage li a:hover { color: var(--accent); }
+.frontpage li strong { font-weight: 400; }
+.frontpage li strong a { color: var(--ink); font-weight: 600; }
+.frontpage a.ext::after { content: " ↗"; color: var(--ink-4); font-size: .8em; }
+
+/* -- TOC -- */
+.toc-col { position: sticky; top: 4rem; max-height: calc(100vh - 4rem);
+           overflow-y: auto; background: var(--surf); border-right: 1px solid var(--rule); }
+nav.toc { padding: 1.75rem 0 5rem; font-size: .82rem; }
+nav.toc .toc-h { padding: 0 1.5rem; font-family: var(--serif); font-style: italic;
+                 font-size: .8rem; color: var(--ink-3); margin-bottom: .6rem; }
+nav.toc a { display: block; color: var(--ink-2); line-height: 1.35;
+            padding: .2rem 1.5rem .2rem 1.35rem; border-left: 2px solid transparent; }
+nav.toc a:hover { color: var(--ink); background: var(--surf-2); text-decoration: none; }
+nav.toc a.lvl2 { padding-left: 2.5rem; color: var(--ink-3); }
+nav.toc a.lvl3 { padding-left: 3.4rem; color: var(--ink-4); font-size: .78rem; }
+nav.toc a.active { color: var(--accent); border-left-color: var(--accent);
+                   background: var(--surf-2); font-weight: 500; }
+/* scrollspy collapses every branch but the active section's ancestor path, so
+   only top-level entries (plus the open branch) show; no-JS keeps all visible */
+nav.toc a.toc-collapsed { display: none; }
+
+/* -- Frontmatter -- */
+.frontmatter { margin-bottom: 3rem; padding-bottom: 1.75rem;
+               border-bottom: 1px solid var(--rule); }
+.eyebrow { font-family: var(--serif); font-style: italic; font-size: .95rem;
+           color: var(--accent); }
+.gr-main h1 { font-family: var(--serif); font-weight: 500; font-size: 2.6rem;
+              line-height: 1.05; letter-spacing: -.028em; margin: .3rem 0 .5rem;
+              text-wrap: balance; }
+.gr-body.solo h1 { font-size: 2.1rem; }
+.subtitle { font-family: var(--serif); font-style: italic; font-size: 1.05rem;
+            color: var(--ink-2); line-height: 1.5; margin: 0; }
+dl.meta { margin: 1.25rem 0 0; display: grid; grid-template-columns: max-content 1fr;
+          column-gap: 1.25rem; row-gap: .25rem; font-family: var(--serif);
+          font-style: italic; font-size: .9rem; color: var(--ink-3); }
+dl.meta dt { font-weight: 500; font-style: normal; }
+dl.meta dd { margin: 0; }
+dl.meta a { color: var(--accent); }
+
+/* -- Upphävd (repealed) författning -- a clear repeal callout, a subdued reading
+   column, and a fixed watermark that stays in view at any scroll depth (so an
+   anchor link deep into the text still reads as repealed). -- */
+.expired-banner { display: flex; flex-wrap: wrap; align-items: baseline; gap: .55rem;
+                  margin: 0 0 2.25rem; padding: .7rem 1rem; border: 1px solid var(--rule);
+                  border-left: 3px solid var(--accent); border-radius: 5px;
+                  background: var(--surf-2); font-size: .92rem; color: var(--ink-2); }
+.expired-banner strong { font-family: var(--serif); font-weight: 600; color: var(--accent);
+                         text-transform: uppercase; letter-spacing: .04em; font-size: .82rem; }
+.expired-banner a { color: var(--accent); }
+body.expired .gr-main { color: var(--ink-3); }
+body.expired .gr-main h1, body.expired .kaprubrik, body.expired .rubrik,
+body.expired .artikel { color: var(--ink-2); }
+body.expired::before { content: "Upphävd författning"; position: fixed;
+                       top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-24deg);
+                       font-family: var(--serif); font-weight: 600; white-space: nowrap;
+                       font-size: min(11vw, 8rem); color: var(--accent); opacity: .08;
+                       pointer-events: none; user-select: none; z-index: 1; }
+
+/* -- Historical consolidations (lydelser) + version diff -- */
+body.inaktuell .gr-main { color: var(--ink-3); }
+body.inaktuell .gr-main h1, body.inaktuell .kaprubrik, body.inaktuell .rubrik {
+  color: var(--ink-2); }
+body.inaktuell::before { content: "Inaktuell författning"; position: fixed;
+                         top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-24deg);
+                         font-family: var(--serif); font-weight: 600; white-space: nowrap;
+                         font-size: min(11vw, 8rem); color: var(--accent); opacity: .08;
+                         pointer-events: none; user-select: none; z-index: 1; }
+.version-banner { display: flex; flex-wrap: wrap; align-items: baseline; gap: .55rem;
+                  margin: 0 0 2.25rem; padding: .7rem 1rem; border: 1px solid var(--rule);
+                  border-left: 3px solid var(--accent); border-radius: 5px;
+                  background: var(--surf-2); font-size: .92rem; color: var(--ink-2); }
+.version-banner strong { font-family: var(--serif); font-weight: 600; color: var(--accent);
+                         text-transform: uppercase; letter-spacing: .04em; font-size: .82rem; }
+.version-banner a { color: var(--accent); }
+details.lydelser { margin: 0 0 2rem; padding: .55rem 1rem; border: 1px solid var(--rule);
+                   border-radius: 5px; background: var(--surf); font-size: .92rem; }
+details.lydelser summary { cursor: pointer; font-weight: 500; color: var(--ink-2); }
+details.lydelser summary .count { color: var(--ink-4); font-weight: 400; }
+details.lydelser label { display: block; margin: .8rem 0 .3rem; color: var(--ink-3); }
+details.lydelser select { max-width: 100%; font: inherit; margin-left: .4rem; }
+details.lydelser ol { margin: .5rem 0 .3rem; padding-left: 1.4rem; }
+details.lydelser li { margin: .2rem 0; }
+details.lydelser .note { color: var(--ink-4); font-size: .85rem; }
+.version-diff ins, .diff-note ins { background: var(--diff-ins-bg); color: var(--ink);
+                    text-decoration: none; padding: 0 .1em; border-radius: 2px; }
+.version-diff del, .diff-note del { background: var(--diff-del-bg); color: var(--ink-3);
+                    text-decoration: line-through; padding: 0 .1em; border-radius: 2px; }
+.version-diff [id] { scroll-margin-top: 5rem; }
+.diff-note { margin: 0 0 1.5rem; padding: .55rem 1rem; border: 1px solid var(--rule);
+             border-radius: 5px; background: var(--surf-2); font-size: .9rem;
+             color: var(--ink-2); }
+
+/* -- Ändringar och övergångsbestämmelser (the register view) -- */
+section.andringar { margin-top: 4rem; }
+.andring { margin: 2.25rem 0; padding: 1rem 1.25rem; border: 1px solid var(--rule-soft);
+           border-radius: 5px; background: var(--surf); scroll-margin-top: 5rem; }
+.andring h2 { font-family: var(--serif); font-weight: 600; font-size: 1.15rem;
+              margin: 0 0 .5rem; }
+.andring h3 { font-family: var(--serif); font-weight: 600; font-size: 1rem;
+              margin: 1.25rem 0 .25rem; }
+.andring ul { margin: .3rem 0 .6rem; padding-left: 1.3rem; font-size: .92rem; }
+.andring li { margin: .15rem 0; }
+.andring dl.meta { margin: .75rem 0 0; font-size: .9rem; }
+.andring section.paragraf { margin: .75rem 0; }
+
+/* -- Headings -- */
+.kaprubrik { font-family: var(--serif); font-weight: 500; font-size: 1.7rem;
+             letter-spacing: -.022em; line-height: 1.12; margin: 3rem 0 .25rem;
+             padding-bottom: .75rem; border-bottom: 1px solid var(--rule);
+             text-wrap: balance; scroll-margin-top: 5rem; }
+.rubrik { font-family: var(--serif); font-weight: 600; font-size: 1.2rem;
+          letter-spacing: -.015em; margin: 2.25rem 0 .5rem; scroll-margin-top: 5rem; }
+.artikel { font-family: var(--serif); font-weight: 600; font-size: 1.15rem;
+           margin: 2rem 0 .5rem; scroll-margin-top: 5rem; }
+
+/* -- Paragraphs (SFS § with hanging numeral) -- */
+section.paragraf { display: grid; grid-template-columns: 3.25rem minmax(0,1fr);
+                   gap: 1rem; margin: 1.75rem 0; align-items: baseline;
+                   scroll-margin-top: 5rem; }
+.paragraf-gutter { text-align: right; font-family: var(--serif); line-height: 1.2;
+                   font-variant-numeric: oldstyle-nums; }
+.paragraf-gutter .n { font-size: 1.55rem; font-weight: 500; color: var(--accent); }
+.paragraf-gutter .pilcrow { display: block; margin-top: .15rem; font-family: var(--sans);
+                            font-size: .7rem; color: var(--ink-4); opacity: 0;
+                            transition: opacity .15s; }
+section.paragraf:hover .pilcrow { opacity: 1; }
+.paragraf-gutter .pilcrow:hover { color: var(--accent); text-decoration: none; }
+.paragraf-body { min-width: 0; font-size: 1.0rem; line-height: 1.7; }
+.paragraf-body > p:first-child { margin-top: 0; }
+p { margin: 0 0 .7rem; }
+.num { font-family: var(--serif); font-weight: 600; color: var(--accent);
+       font-variant-numeric: oldstyle-nums; }
+section.paragraf.rail-active { background:
+   linear-gradient(90deg, color-mix(in oklab, var(--accent) 6%, transparent), transparent 60%);
+   border-radius: 4px; }
+
+/* -- DV / förarbete extras -- */
+.sammanfattning { font-family: var(--serif); font-style: italic; font-size: 1.05rem;
+                  color: var(--ink-2); }
+.sokord { font-size: .85rem; color: var(--ink-3); }
+.sokord span { text-transform: uppercase; letter-spacing: .05em; font-size: .68rem;
+               margin-right: .4rem; }
+/* DV instance/ruling structure */
+.instans { margin: 1.75rem 0 0; }
+.instans-rubrik { font-family: var(--serif); font-weight: 600; font-size: 1.45rem;
+                  margin: 0 0 .6rem; padding-bottom: .2rem;
+                  border-bottom: 1px solid var(--rule); }
+.betankande > .instans-rubrik, .dom > .instans-rubrik,
+.skiljaktig > .instans-rubrik, .tillagg > .instans-rubrik {
+    font-size: 1.1rem; border-bottom: 0; color: var(--ink-2); }
+.delmal-rubrik { font-family: var(--serif); font-weight: 600; font-size: 1.6rem;
+                 margin: 1.5rem 0 .6rem; }
+/* the föredragande's proposal HD decides on -- subdued, set apart from the ruling */
+.betankande { border-left: 2px solid var(--rule); padding-left: 1rem;
+              margin: 1rem 0; color: var(--ink-3); }
+.betankande .instans-rubrik { color: var(--ink-3); font-style: italic; }
+/* footnotes (HD 2023+): inline superscript markers + the endnote list */
+sup.fnref { font-size: .7em; line-height: 0; }
+sup.fnref a { text-decoration: none; padding: 0 .1em; }
+.fotnoter { margin-top: 2.5rem; border-top: 1px solid var(--rule);
+            padding-top: 1rem; font-size: .9rem; color: var(--ink-2); }
+.fotnoter h2 { font-family: var(--serif); font-size: 1rem; font-weight: 600;
+               border: 0; margin: 0 0 .5rem; }
+.fotnoter ol { margin: 0; padding-left: 1.5rem; }
+.fotnoter li { margin: .2rem 0; }
+.fn-back { text-decoration: none; color: var(--ink-4); margin-left: .25rem; }
+.fn-back:hover { color: var(--accent); }
+.kommentar-law { font-family: var(--serif); font-style: italic; font-size: 1rem;
+                 color: var(--ink-2); border-left: 2px solid var(--kommentar);
+                 padding: .4rem 0 .4rem 1rem; margin-bottom: 1rem; }
+.genomforande { margin: 1.5rem 0; padding: 1rem 1.25rem; background: var(--surf);
+                border: 1px solid var(--rule); border-radius: 6px; }
+.genomforande h2 { font-family: var(--serif); font-size: 1rem; font-weight: 600;
+                   margin: 0 0 .5rem; border: 0; }
+.genomforande ul { margin: 0; padding-left: 1.1rem; font-size: .9rem; }
+.sid { display: inline-block; font-family: var(--serif); font-variant-numeric: oldstyle-nums;
+       color: var(--ink-4); font-size: .8rem; margin: 1.25rem 0 .25rem;
+       border-top: 1px solid var(--rule-soft); padding-top: .25rem; scroll-margin-top: 5rem; }
+.sid::before { content: "s. "; font-style: italic; }
+.sid button { all: unset; cursor: pointer; }
+.sid button:hover { color: var(--accent); text-decoration: underline; }
+.sid.fax-loading button { opacity: .4; cursor: progress; }
+img.faksimil { display: block; width: 100%; max-width: 40rem; margin: .5rem 0 1rem;
+               border: 1px solid var(--rule); border-radius: 4px;
+               box-shadow: 0 1px 6px rgba(18,22,28,.12); }
+
+/* -- Context rail (populated by the client from the JSON island) -- */
+.rail { position: sticky; top: 4rem; max-height: calc(100vh - 4rem);
+        overflow-y: auto; padding: 1.75rem 1.5rem 5rem;
+        background: var(--surf); border-left: 1px solid var(--rule); font-size: .82rem; }
+.rail-h { font-family: var(--serif); font-style: italic; font-size: .85rem;
+          color: var(--ink-3); padding-bottom: .6rem; margin-bottom: .75rem;
+          border-bottom: 1px solid var(--rule); }
+.rail-h b { font-style: normal; font-weight: 500; color: var(--ink);
+            font-variant-numeric: oldstyle-nums; }
+.rail-empty { font-family: var(--serif); font-style: italic; color: var(--ink-3);
+              line-height: 1.55; padding: 1rem .25rem; }
+.rail-sec-h { font-family: var(--serif); font-style: italic; font-size: .78rem;
+              color: var(--ink-3); margin-bottom: .35rem; }
+/* commentary shown side-by-side in the rail (in place of a kommentar page) */
+.rail-komm { margin-bottom: 1rem; }
+.rail-komm p { font-family: var(--serif); font-size: .9rem; line-height: 1.5;
+               margin: 0 0 .5rem; color: var(--ink); }
+.komm-by { font-family: var(--serif); font-style: italic; font-size: .78rem;
+           color: var(--ink-3); }
+/* a förarbete's small-print footnotes ("Senaste lydelse 2008:1266.") */
+p.fotnot { font-size: .78rem; color: var(--ink-3); margin: .3rem 0; }
+
+/* a nuvarande/föreslagen lydelse comparison table */
+table.lydelse { width: 100%; border-collapse: collapse; margin: 1rem 0;
+                table-layout: fixed; }
+table.lydelse th { font-family: var(--serif); font-style: italic;
+                   font-weight: 400; text-align: left; color: var(--ink-2);
+                   border-bottom: 1px solid var(--rule); padding: .2rem .6rem; }
+table.lydelse td { vertical-align: top; padding: .35rem .6rem;
+                   font-family: var(--serif); line-height: 1.5; }
+table.lydelse td + td, table.lydelse th + th
+                 { border-left: 1px solid var(--rule-soft); }
+
+/* the författningskommentar prose highlighted on the prop page itself: one
+   box per run of commentary blocks, set off from the quoted lagtext */
+.fk-komm { background: var(--fk-bg); border: 1px solid var(--fk-border);
+           border-radius: 6px; padding: .7rem .9rem; margin: .8rem 0; }
+.fk-komm p { margin: 0 0 .6rem; }
+.fk-komm p:last-child { margin-bottom: 0; }
+
+/* the lagstiftare's own författningskommentar, from the proposition's FK */
+.rail-fk { margin-bottom: 1rem; }
+.rail-fk p { font-family: var(--serif); font-size: .9rem; line-height: 1.5;
+             margin: 0 0 .5rem; color: var(--ink); }
+.rail-fk .prov { font-style: italic; font-size: .78rem; color: var(--ink-3);
+                 white-space: nowrap; }
+.rail-fk .prov a { color: var(--forarbete); }
+.ingroup { margin-bottom: 1rem; }
+.ingroup-h { font-family: var(--serif); font-style: italic; font-size: .8rem;
+             color: var(--accent); font-weight: 500; margin: .35rem 0 .25rem; }
+.ingroup ul { list-style: none; margin: 0; padding: 0; }
+.ingroup li { margin: .15rem 0; line-height: 1.4; }
+.ingroup.dv a { color: var(--case); }
+.ingroup.forarbete a { color: var(--forarbete); }
+.ingroup.kommentar a { color: var(--kommentar); font-weight: 500; }
+.ingroup.begrepp a { color: var(--accent); }
+.more { color: var(--ink-3); font-style: italic; font-size: .78rem; margin-top: .25rem; }
+details.more { margin-top: .3rem; }
+details.more > summary { color: var(--ink-3); font-style: italic; font-size: .78rem;
+                         cursor: pointer; list-style: none; }
+details.more > summary::-webkit-details-marker { display: none; }
+details.more[open] > summary { margin-bottom: .25rem; }
+details.more > ul { list-style: none; margin: 0; padding: 0; }
+aside.genomfor, aside.motsvarighet { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--rule); }
+aside.genomfor ul, aside.motsvarighet ul { list-style: none; margin: 0; padding: 0; font-size: .8rem; }
+aside.genomfor li, aside.motsvarighet li { margin: .2rem 0; line-height: 1.4; }
+aside.genomfor .prov { color: var(--ink-3); }
+.inbound-h { font-family: var(--serif); font-style: italic; font-size: .8rem;
+             color: var(--accent); font-weight: 500; margin-bottom: .35rem; }
+
+/* -- Preparatory works ("Förarbeten"), top-billed above the citation panel -- */
+section.forarbeten { margin: 1.25rem 0; font-size: .85rem; }
+section.forarbeten h2 { font-family: var(--serif); font-style: italic; font-size: .85rem;
+                        color: var(--ink-3); font-weight: 400; margin: 0 0 .4rem; border: 0; }
+section.forarbeten ul { list-style: none; margin: 0; padding: 0; }
+section.forarbeten li { margin: .15rem 0; line-height: 1.4; }
+section.forarbeten a { color: var(--forarbete); }
+
+/* -- Document-level inbound panel (whole-doc citations) -- */
+.inbound-doc { background: var(--surf); border: 1px solid var(--rule); border-radius: 6px;
+               padding: .9rem 1.25rem; margin: 1.5rem 0 2.5rem; font-size: .85rem; }
+.inbound-doc h2 { font-family: var(--serif); font-style: italic; font-size: .85rem;
+                  color: var(--ink-3); font-weight: 400; margin: 0 0 .5rem; border: 0; }
+.inbound-doc .ingroup { columns: 2; column-gap: 2rem; margin-bottom: .25rem; }
+.inbound-doc .ingroup-h { column-span: all; }
+.inbound-doc li { break-inside: avoid; }
+
+/* -- Inline bits -- */
+ol.punkter { list-style: none; margin: .4rem 0; padding-left: 0; }
+ol.punkter li { margin: .25rem 0; padding-left: 2.1rem; }
+/* the marker hangs in a fixed column (like the paragraf gutter's §-numeral),
+   right-aligned so "1." and "12." line up on the dot, in text colour not accent */
+ol.punkter li > .num { display: inline-block; box-sizing: border-box; width: 1.7rem;
+                       margin-left: -2.1rem; margin-right: .4rem; text-align: right;
+                       color: var(--ink); }
+ol.punkter ol.punkter { margin-top: .35rem; }
+.noref { color: var(--ink-3); border-bottom: 1px dotted var(--ink-4); cursor: help; }
+/* an in-act use of a defined term: underlined, hover shows the definition */
+a.term { color: inherit; border-bottom: 1px dotted var(--ink-4); cursor: help; }
+a.term:hover { color: var(--accent); border-bottom-color: var(--accent);
+               text-decoration: none; }
+/* the definition point itself (Article "Definitions") */
+p.definition { scroll-margin-top: 5rem; }
+p.definition dfn { font-style: normal; font-weight: 600; color: var(--accent); }
+
+/* -- EU act editorial layer (.ann): thematic recital groups + the rail's
+   article<->recital links. The group label is editorial, not part of the
+   authentic text, so it reads as a subdued, compact aside outdented to the
+   left rather than a heading competing with the act. -- */
+.recital-group { margin: 1.75rem 0 .4rem -1.6rem; font-family: var(--serif);
+                 font-style: italic; font-size: .8rem; line-height: 1.4;
+                 color: var(--ink-3); scroll-margin-top: 5rem; }
+.recital-group b { font-style: normal; font-weight: 600; color: var(--ink-2); }
+.recital-group .rg-range { font-variant-numeric: oldstyle-nums; }
+.recital-group .jfr { color: var(--ink-4); }
+.recital-group a { color: var(--ink-3); }
+p.recital { scroll-margin-top: 5rem; }
+.rail-sec.skal .skal-links { display: flex; flex-wrap: wrap; gap: .2rem .6rem; }
+.rail-sec.skal a { font-variant-numeric: oldstyle-nums; }
+/* curated external links (the act's "Externa länkar" rail section) */
+.rail-sec.vagledning { margin-bottom: 1rem; }
+.rail-sec.vagledning ul { list-style: none; margin: 0; padding: 0; font-size: .85rem; }
+.rail-sec.vagledning li { margin: .3rem 0; line-height: 1.4; }
+.rail-sec.vagledning .prov { color: var(--ink-3); font-style: italic; }
+
+/* -- Context markers: every addressable unit that carries rail context wears a
+   clickable 💬 in the right gutter (toward the rail), so context-bearing
+   paragraphs are discoverable at a glance; clicking pulls that unit's panel into
+   the rail and brings it into focus, and the unit in focus brightens its marker.
+   The button is built client-side (scrollspy), so it stays global -- every
+   source. Absolutely positioned, so it never disrupts the paragraf grid. -- */
+[data-rail] { position: relative; }
+.rail-dot { position: absolute; right: -1.7rem; top: .05rem; z-index: 2;
+            border: 0; background: transparent; padding: .15rem; margin: 0;
+            font-size: .95rem; line-height: 1; cursor: pointer; opacity: .5;
+            filter: grayscale(.4);
+            transition: opacity .15s, filter .15s, transform .1s; }
+.rail-dot:hover, .rail-dot:focus-visible { opacity: 1; filter: none;
+            transform: scale(1.2); outline: none; }
+[data-rail].rail-active > .rail-dot { opacity: 1; filter: none; }
+a.ext { color: var(--accent); }
+a.ext::after { content: " \2197"; font-size: .8em; color: var(--ink-4); }
+table { border-collapse: collapse; margin: 1rem 0; width: 100%; font-size: .92rem; }
+td { border-top: 1px solid var(--rule); padding: .35rem .7rem; vertical-align: top; }
+
+/* -- Frontpage / browse -- */
+.lead { font-family: var(--serif); font-size: 1.2rem; color: var(--ink-2); }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5rem; margin-top: 2rem; }
+.cols h2, .browse-group h2 { font-family: var(--serif); font-weight: 500; font-size: 1.2rem;
+              border-bottom: 1px solid var(--rule); padding-bottom: .3rem; }
+ol.ranked { padding-left: 1.4rem; } ol.ranked .c { color: var(--ink-3); font-size: .8rem; }
+.cols ul { list-style: none; padding: 0; } .cols li { margin: .3rem 0; }
+.counts ul { list-style: none; padding: 0; margin: 1.5rem 0 0; display: flex;
+             flex-wrap: wrap; gap: .5rem 1.75rem; }
+.counts li { font-size: 1.05rem; }
+.counts .c { color: var(--ink-3); font-size: .8rem; margin-left: .2rem; }
+.browse-group { margin: 1.5rem 0; }
+.browse-group h1 { font-family: var(--serif); font-weight: 500; font-size: 1.5rem;
+                   border-bottom: 1px solid var(--rule); padding-bottom: .3rem; }
+.browse-group h1 .c, .browse-group h2 .c { color: var(--ink-3); font-size: .8rem;
+                   font-weight: 400; }
+.browse-list, .browse-group ul { list-style: none; padding: 0; margin: .75rem 0 0;
+                   columns: 18rem; column-gap: 2rem; font-size: .92rem; }
+.browse-list li, .browse-group li { margin: .18rem 0; break-inside: avoid; }
+/* statute listing: the dropped designation/number prefix is subdued so the eye
+   lands on the sort subject; secondary instruments (förordning, …) dim wholesale */
+.browse-list .pre { color: var(--ink-4); }
+.browse-list li.subdued a { color: var(--ink-3); }
+.browse-list li.subdued .pre { color: var(--ink-4); }
+.browse-filter { width: 100%; max-width: 24rem; margin: .1rem 0 .9rem;
+                 padding: .45rem .7rem; font-family: var(--sans); font-size: .9rem;
+                 color: var(--ink); background: var(--surf-2);
+                 border: 1px solid var(--rule); border-radius: 6px; }
+.browse-filter:focus { outline: none; border-color: var(--accent);
+                       background: var(--surf); }
+.empty { color: var(--ink-3); font-style: italic; }
+
+/* -- faceted browse navigator -- */
+.facets { margin: 0 0 2rem; }
+.facet-axis { font-family: var(--sans); text-transform: uppercase;
+              letter-spacing: .06em; font-size: .72rem; font-weight: 600;
+              color: var(--ink-3); margin: 1.1rem 0 .4rem; }
+.facet-list { list-style: none; padding: 0; margin: 0; display: flex;
+              flex-wrap: wrap; gap: .35rem .7rem; }
+.facet-list a { display: inline-block; padding: .12rem .55rem; border-radius: 4px;
+                background: var(--surf-2); color: var(--ink-2); font-size: .92rem;
+                text-decoration: none; }
+.facet-list a:hover { background: var(--surf-3); }
+.facet-list a[aria-current] { background: var(--accent); color: var(--on-accent); }
+.facet-list .c { color: var(--ink-4); font-size: .72rem; margin-left: .25rem; }
+.facet-list a[aria-current] .c { color: color-mix(in oklab, var(--on-accent) 72%, transparent); }
+
+/* -- search palette (live full-text search via the REST API) -- */
+.search-overlay { position: fixed; inset: 0; z-index: 100; display: flex;
+                  justify-content: center; align-items: flex-start; padding-top: 8rem;
+                  background: var(--overlay); }
+.search-box { width: 37rem; max-width: 92vw; background: var(--surf);
+              border: 1px solid var(--rule); border-radius: 8px;
+              box-shadow: 0 30px 80px var(--shadow-modal); overflow: hidden; }
+.search-input-row { display: flex; align-items: stretch; }
+.search-box input { flex: 1; min-width: 0; border: 0; outline: 0; padding: 1.1rem 1.25rem;
+                    background: transparent; font-family: var(--serif); font-size: 1.2rem;
+                    color: var(--ink); }
+.search-box .search-note { padding: .9rem 1.25rem; border-top: 1px solid var(--rule);
+                           font-family: var(--serif); font-style: italic;
+                           color: var(--ink-3); font-size: .9rem; }
+.search-results:not(:empty) { border-top: 1px solid var(--rule);
+                              max-height: 60vh; overflow-y: auto; }
+.search-hit { display: block; padding: .7rem 1.25rem; border-bottom: 1px solid var(--rule);
+              text-decoration: none; color: var(--ink); }
+.search-hit:last-child { border-bottom: 0; }
+.search-hit:hover, .search-hit.sel { background: var(--surf-2); }
+.search-hit.sel { box-shadow: inset 3px 0 0 var(--accent); }
+.search-hit .hit-title { display: block; font-family: var(--sans); font-weight: 600;
+                         font-size: .95rem; }
+.search-hit .hit-sub { display: block; font-family: var(--serif); color: var(--ink-2);
+                       font-size: .9rem; }
+.search-hit .hit-snip { display: block; font-family: var(--serif); color: var(--ink-3);
+                        font-size: .82rem; margin-top: .15rem; }
+.search-hit .hit-snip em { font-style: normal; background: var(--mark);
+                           border-radius: 2px; padding: 0 1px; }
+.search-refine { display: inline-flex; align-items: center; margin: .55rem 0 .55rem .65rem;
+                 padding: .4rem .65rem; border-radius: 5px; white-space: nowrap;
+                 color: var(--accent); font-family: var(--sans); font-size: .86rem;
+                 font-weight: 600; text-decoration: none; background: var(--surf-2); }
+.search-refine[hidden] { display: none; }
+.search-refine:hover, .search-refine.sel { background: var(--surf-3);
+                                           box-shadow: inset 0 0 0 1px var(--rule); }
+
+/* -- complete search result page -- */
+.full-search-form { display: flex; gap: .55rem; margin: 0 0 .75rem; }
+.full-search-form input { flex: 1; min-width: 0; padding: .7rem .85rem;
+                          border: 1px solid var(--rule); border-radius: 6px;
+                          background: var(--surf); color: var(--ink);
+                          font: 1rem var(--serif); }
+.full-search-form input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.full-search-form button, .search-page button { border: 1px solid var(--rule);
+                    border-radius: 6px; padding: .55rem .8rem; background: var(--surf-2);
+                    color: var(--ink); font: 600 .84rem var(--sans); cursor: pointer; }
+.full-search-form button { background: var(--accent); color: var(--on-accent);
+                           border-color: var(--accent); }
+.full-search-layout { display: grid; grid-template-columns: 12rem minmax(0, 1fr);
+                      gap: 2rem; align-items: start; margin-top: 1.5rem; }
+.search-facet-group { border: 0; padding: 0; margin: 0 0 1.4rem; }
+.search-facet-group legend { font: 600 .72rem var(--sans); letter-spacing: .06em;
+                             text-transform: uppercase; color: var(--ink-3);
+                             margin-bottom: .35rem; }
+.search-facet-group button { display: flex; width: 100%; justify-content: space-between;
+                             gap: .5rem; border: 0; padding: .28rem .4rem;
+                             background: transparent; font-weight: 400; text-align: left; }
+.search-facet-group button:hover { background: var(--surf-2); }
+.search-facet-group button[aria-pressed="true"] { background: var(--accent);
+                             color: var(--on-accent); font-weight: 600; }
+.search-facet-group .facet-count { color: var(--ink-4); font-size: .75rem; }
+.search-facet-group button[aria-pressed="true"] .facet-count { color: inherit; }
+.full-search-status { min-height: 1.3rem; color: var(--ink-3); font-size: .9rem; }
+.full-search-results { border-top: 1px solid var(--rule); }
+.full-search-hit { padding: 1rem 0; border-bottom: 1px solid var(--rule); }
+.full-search-hit h2 { font: 600 1rem var(--sans); margin: 0; }
+.full-search-hit .hit-id { color: var(--ink-3); font-size: .82rem; margin: .15rem 0; }
+.full-search-hit .hit-snip { color: var(--ink-2); margin: .35rem 0 0;
+                             font-size: .92rem; }
+.full-search-hit .hit-snip em { font-style: normal; background: var(--mark); }
+.search-pagination { display: flex; justify-content: space-between; align-items: center;
+                     gap: 1rem; margin: 1.25rem 0; color: var(--ink-3); font-size: .85rem; }
+.search-pagination button:disabled { visibility: hidden; }
+
+/* -- Responsive: drop the side columns -- */
+@media (max-width: 64rem) {
+  .gr-body { display: block; }
+  .toc-col, .rail { display: none; }
+  .gr-main { max-width: 46rem; margin: 0 auto; }
+  .masthead .search { display: none; }
+  /* the rail is hidden here, so its gutter markers would point at nothing */
+  .rail-dot { display: none; }
+  .recital-group { margin-left: 0; }
+  .full-search-layout { grid-template-columns: 1fr; gap: .75rem; }
+  .full-search-facets { display: grid; grid-template-columns: repeat(3, 1fr);
+                        gap: .75rem; }
+}
+@media (max-width: 38rem) {
+  .full-search-facets { grid-template-columns: 1fr; }
+}
+
+/* -- Print -- */
+@media print {
+  .masthead, .toc-col, .rail { display: none; }
+  .gr-body { display: block; }
+  .gr-main { max-width: none; padding: 0; }
+  .kaprubrik { border-color: #999; }
+}

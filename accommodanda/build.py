@@ -2187,7 +2187,10 @@ GENERATE_CODE = (PKG / "lib" / "render.py", PKG / "lib" / "catalog.py",
                  PKG / "lib" / "markdown.py", PKG / "lib" / "layout.py",
                  PKG / "lib" / "history.py", PKG / "lib" / "casenaming.py",
                  PKG / "lib" / "eu_structure.py", PKG / "lib" / "facets.py",
-                 PKG / "api" / "app.py", PKG / "site" / "render.py")
+                 PKG / "api" / "app.py", PKG / "site" / "render.py",
+                 # the shipped static chrome: a stylesheet/script edit must
+                 # re-stale generate exactly like a renderer edit
+                 *sorted((PKG / "lib" / "assets").iterdir()))
 
 
 def generate_watermark():

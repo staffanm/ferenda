@@ -67,7 +67,7 @@ Current code layout (this three-layer split is now realized in the package):
 
 ```
 accommodanda/
-  lib/      shared horizontal libs (full map: accommodanda/README.md "Shared library (lib/)") — lagrum (citation engine), catalog, render, layout, net, markdown, util, errors, casenaming, eucasenaming, eu_structure, datasets, search, facets, feeds, dump, pins, resolve, text, compress, facsimile, pdftext, llm, annstore, wikitext, runlog, patch·patchit, git, harvest, regeringen, legacy_import, concepts, diff, history
+  lib/      shared horizontal libs (full map: accommodanda/README.md "Shared library (lib/)") — lagrum (citation engine), catalog, render, layout, net, markdown, util, errors, casenaming, eucasenaming, eu_structure, datasets, search, facets, feeds, dump, pins, resolve, text, compress, facsimile, pdftext, llm, annstore, wikitext, runlog, patch·patchit, git, harvest, regeringen, legacy_import, concepts, diff, history, assets
   config.py runtime config (config.yml / data_root / wiki_root)
   sfs/      acts vertical — download·extract·reader·model·tokenizer·assembler·nf·register·versions·correspond·asgit·begrepp·_validate (+ __main__)
   dv/       court-decisions vertical — download·identity·namedcases·model·parse·structure·word·legacy
@@ -710,9 +710,10 @@ to a future per-doc incremental generate.
   hung in a gutter with a permalink pilcrow. The big structural change is that
   **inbound is no longer floated inline next to each paragraph** — a `Rail`
   collector gathers every id-bearing node's context (who cites it + which EU
-  article it transposes) into a single JSON island, and the client (`SCROLLSPY`)
-  swaps the right-hand rail to the paragraph at the top of the viewport as you
-  scroll (the "Kontext för …" panel; nodes that drive it carry `data-rail`). All
+  article it transposes) into a single JSON island, and the client
+  (`lib/assets/scrollspy.js`) swaps the right-hand rail to the paragraph at the
+  top of the viewport as you scroll (the "Kontext för …" panel; nodes that
+  drive it carry `data-rail`). All
   href/link logic stays in Python — the client only moves pre-rendered HTML. A ⌘K
   command-palette is a visual stub (site-wide search is a deferred backend). The
   document-level inbound panel and the new genomför/term displays plug into the
@@ -855,7 +856,7 @@ to a future per-doc incremental generate.
     Auto `/openapi.json` + `/docs`. CORS-open (read-only public data) so the
     static site reaches it cross-origin. Verified live against the **real
     1.5 GB catalog**: Brottsbalk inbound 5,153, räntelagen §6 ← 2,783 citers.
-    Closes the ⌘K loop — `render.SCROLLSPY`'s palette now does a debounced
+    Closes the ⌘K loop — `lib/assets/search.js`'s palette now does a debounced
     `fetch` to `/api/v1/search` (API base baked into each page as
     `<meta name="lagen-api">`, overridable with `LAGEN_API`). Tested with
     FastAPI `TestClient` over a fixture catalog + faked search — no live cluster.
@@ -1942,6 +1943,7 @@ model + extraction.
 | `accommodanda/build.py` | orchestrator: `lagen <source> <action>` build driver + freshness; corpus verbs `relate`/`generate`/`index`/`dump`/`serve` (one process serving the static site + REST API + MCP) |
 | `accommodanda/lib/catalog.py` | derived SQLite catalog + cross-source citation graph (`relate`) |
 | `accommodanda/lib/render.py` | static HTML site w/ inbound annotations + live ⌘K search (`generate`) |
+| `accommodanda/lib/assets/` | the browser-facing static chrome as real files (`style.css`, `editor.css`, `scrollspy.js`, `search.js`, `fullsearch.js`, `versions.js`, `faksimil.js`, `editor.js`, `robots.txt`) — `render_aggregates` ships them via the same Brotli precompression as pages, `style.css` with `editor.css` appended |
 | `accommodanda/lib/text.py` | shared artifact text flattener (node/document/fragment plain text) |
 | `accommodanda/lib/search.py` | OpenSearch full-text indexer (standalone units collapsed by `doc_uri`, no parent-child join), `index` |
 | `accommodanda/lib/feeds.py` | legacy dataset-alias map + pure Atom/HTML feed renderer, shared by static `/dataset/<alias>/feed` generation and the live query-param endpoints |
@@ -2038,6 +2040,13 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **lib** (2026-07-10) — the static site's chrome (CSS/JS/robots.txt, formerly
+  embedded string constants in `render.py`) extracted to real files under the
+  new `lib/assets/`; `render_aggregates` reads them via the module-level
+  `ASSETS` path and writes them through the same Brotli precompression as
+  pages (`style.css` with `editor.css` appended). The asset files are part of
+  `build.py`'s `GENERATE_CODE` watermark, so an asset edit re-stales
+  `generate`; `MANIFEST.in` ships them as package data.
 - **lib/api** (2026-07-10) — search facets + a full `/sok` results page: a
   `year` facet (`facets.document_year`, reusing browse's per-source year
   extraction) alongside `source`/`kind`, returned as bucketed counts
@@ -2123,8 +2132,9 @@ in `git log`. This document is the forest-level status; section markers
   endpoint plus the legacy lagen.nu path grammar
   (`/prop/2022/23:10/sid1.png`), with one resolver per page-oriented PDF
   source (förarbete, föreskrift, avgörande). `render.py` turns every förarbete
-  page anchor into a toggle button (`FAKSIMIL` inline JS) that loads the PNG
-  under the anchor on click. `test/test_facsimile.py`.
+  page anchor into a toggle button (`FAKSIMIL` inline JS, now
+  `lib/assets/faksimil.js`) that loads the PNG under the anchor on click.
+  `test/test_facsimile.py`.
 - **lib** (2026-07-09) — `lib/compress.py`'s transparent Brotli compression now
   also covers the raw `downloaded/` tree, not just `artifact/`/`generated/`:
   `write_download` picks plain-vs-Brotli per file (`INCOMPRESSIBLE_SUFFIXES`

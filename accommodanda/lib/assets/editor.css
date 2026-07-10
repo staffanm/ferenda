@@ -1,0 +1,51 @@
+/* The inline editor's chrome (appended to style.css at generate): edit
+   buttons, cart drawer, dialogs -- inert without a logged-in session. */
+/* inline editor (editor.js) */
+.ed-account { margin-left: 1rem; font-size: .85rem; color: var(--ink-3); }
+.ed-account a { color: var(--accent); }
+.ed-btn { border: 1px solid var(--rule); background: var(--surf); color: var(--accent);
+          border-radius: 5px; cursor: pointer; font-size: .8rem; line-height: 1;
+          padding: .15rem .35rem; }
+.ed-btn:hover { background: var(--surf-2); }
+.ed-btn-patch { margin-left: .5rem; }
+[id] > .ed-btn { position: absolute; right: -3.4rem; top: .05rem; }
+.paragraf > .ed-btn { right: -3.4rem; top: .05rem; }
+.ed-btn-top { position: static; display: inline-flex; gap: .3rem; margin: 0 0 1rem; }
+.ed-overlay { position: fixed; inset: 0; background: var(--overlay); z-index: 80;
+              display: flex; align-items: flex-start; justify-content: center;
+              padding: 4vh 1rem; overflow: auto; }
+.ed-panel { background: var(--surf); color: var(--ink); width: min(760px, 96vw);
+            border: 1px solid var(--rule); border-radius: 10px; padding: 1rem 1.2rem;
+            box-shadow: 0 16px 48px var(--shadow-modal); }
+.ed-panel h3 { margin: 0 0 .6rem; font-size: 1.05rem; }
+.ed-panel textarea { width: 100%; box-sizing: border-box; min-height: 200px;
+                     font-family: var(--mono, ui-monospace, monospace); font-size: .9rem;
+                     border: 1px solid var(--rule); border-radius: 6px; padding: .5rem; }
+.ed-panel input { box-sizing: border-box; width: 100%; margin: .25rem 0;
+                  border: 1px solid var(--rule); border-radius: 6px; padding: .4rem .5rem; }
+.ed-tools { display: flex; gap: .4rem; flex-wrap: wrap; margin: .5rem 0; }
+.ed-tools button, .ed-row button, .ed-rm { border: 1px solid var(--rule);
+    background: var(--surf-2); color: var(--ink); border-radius: 5px; cursor: pointer;
+    padding: .3rem .6rem; font: inherit; font-size: .85rem; }
+.ed-save, .ed-commit, .ed-do { background: var(--accent) !important; color: var(--on-accent) !important;
+                               border-color: var(--accent) !important; }
+.ed-preview { border: 1px dashed var(--rule); border-radius: 6px; padding: .5rem .75rem;
+              margin-top: .5rem; background: var(--bg); }
+.ed-preview h4 { margin: .3rem 0; }
+.ed-row { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .7rem; }
+.ed-err { color: var(--danger); font-size: .85rem; margin-top: .4rem; }
+.ed-search-res { list-style: none; margin: .3rem 0 0; padding: 0;
+                 border: 1px solid var(--rule); border-radius: 6px; max-height: 220px;
+                 overflow: auto; }
+.ed-search-res li { padding: .3rem .5rem; cursor: pointer; }
+.ed-search-res li:hover { background: var(--surf-2); }
+.ed-cart-list { list-style: none; margin: 0 0 .6rem; padding: 0; }
+.ed-cart-list li { display: flex; justify-content: space-between; gap: .5rem;
+                   align-items: center; padding: .3rem 0; border-bottom: 1px solid var(--rule); }
+.ed-cart { position: fixed; right: 1rem; bottom: 1rem; z-index: 70; cursor: pointer;
+           border: 1px solid var(--accent); background: var(--surf); color: var(--accent);
+           border-radius: 999px; padding: .55rem .9rem; font: inherit; font-weight: 600;
+           box-shadow: 0 6px 20px var(--shadow-modal); }
+@media (max-width: 64rem) {
+  [id] > .ed-btn, .paragraf > .ed-btn { position: static; margin-left: .4rem; }
+}
