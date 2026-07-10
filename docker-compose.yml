@@ -156,9 +156,15 @@ services:
     volumes:
       - letsencrypt:/etc/letsencrypt
       - certbot-webroot:/var/www/certbot
+    # After each renew, relax read perms on live/ + archive/ so the UNPRIVILEGED
+    # nginx (uid 101) can read the cert + key -- certbot writes privkey 0600 root,
+    # which nginx otherwise can't open ("Permission denied"). a+rX only adds read
+    # (files) / traverse (dirs); on this single-tenant box the letsencrypt volume
+    # is mounted by certbot + nginx only. Runs every loop, so it's self-healing.
     entrypoint: >
       sh -c "trap exit TERM; while :; do
       certbot renew --webroot -w /var/www/certbot --quiet;
+      chmod -R a+rX /etc/letsencrypt/live /etc/letsencrypt/archive 2>/dev/null || true;
       sleep 12h & wait $${!}; done"
     restart: unless-stopped
     logging:
