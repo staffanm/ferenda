@@ -119,8 +119,10 @@ services:
 
   # --- prod: the public front (ferenda.lagen.nu) ---------------------------
   # Unprivileged nginx (uid 101): listens on 8080/8443, host maps 80/443 onto
-  # them. Reverse-proxies everything to accommodanda:8000. Reads the live cert +
-  # ACME webroot from volumes the certbot sidecar writes.
+  # them. Serves the precompressed generated/ site's .br files directly
+  # (Content-Encoding: br, stock image -- see ferenda.conf); proxies the API,
+  # editor, browse indexes, transformed-namespace URLs and non-brotli clients to
+  # accommodanda:8000. Reads the live cert + ACME webroot the certbot sidecar writes.
   nginx:
     build:
       context: docker/vps/nginx
@@ -132,6 +134,8 @@ services:
     volumes:
       - letsencrypt:/etc/letsencrypt:ro          # live cert (certbot writes, nginx reads)
       - certbot-webroot:/var/www/certbot:ro       # ACME http-01 challenge files
+      # the precompressed rendered site, read-only -- nginx streams the .br as-is
+      - /srv/ferenda/site/data/generated:/srv/generated:ro
     depends_on:
       - accommodanda
     restart: always
