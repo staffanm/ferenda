@@ -35,8 +35,17 @@ def corpus(tmp_path, monkeypatch):
                        "text": ["Se ", {"uri": "https://lagen.nu/1962:700#K3P1",
                                         "predicate": "dcterms:references",
                                         "text": "3 kap. 1 §"}, " brottsbalken."]}]}))
+    # a page-number law: its uri carries the corpus basefile slug (_s.1),
+    # which a bare "1904:48" probe can only reach via the catalog
+    sml = art_dir / "sml.json"
+    sml.write_text(json.dumps({
+        "uri": "https://lagen.nu/1904:48_s.1",
+        "metadata": {"properties": {
+            "dcterms:title": "Lag (1904:48 s.1) om samäganderätt"}},
+        "structure": [{"type": "paragraf", "id": "P3",
+                       "text": ["Kunna delägarne ej enas..."]}]}))
     cat = tmp_path / "catalog.sqlite"
-    catalog.rebuild(cat, "sfs", [bb, fl])
+    catalog.rebuild(cat, "sfs", [bb, fl, sml])
 
     # point the tools at the fixture catalog (catalog.connect_ro tracks its
     # one-time migration per path, so a fresh tmp catalog needs no flag reset)
@@ -82,6 +91,18 @@ def test_resolve_citation_to_fragment(corpus):
     assert hits[0]["fragments"][0]["uri"] == "https://lagen.nu/1962:700#K3P1"
 
 
+def test_resolve_citation_bare_sfs_number(corpus):
+    # the id-shaped probe API clients naturally send ("SFS 2018:585")
+    hits = mcpmod.resolve_citation("SFS 2018:585")
+    assert hits and hits[0]["uri"] == "https://lagen.nu/2018:585"
+    # a bare page-number law id: only the catalog knows the _s.1 suffix
+    hits = mcpmod.resolve_citation("SFS 1904:48")
+    assert hits and hits[0]["uri"] == "https://lagen.nu/1904:48_s.1"
+    # ...and a pinpoint follows the rewritten root
+    hits = mcpmod.resolve_citation("1904:48 3 §")
+    assert hits[0]["fragments"][0]["uri"] == "https://lagen.nu/1904:48_s.1#P3"
+
+
 def test_get_document_full_and_pinpoint(corpus):
     doc = mcpmod.get_document("https://lagen.nu/1962:700")
     assert doc["title"] == "Brottsbalk (1962:700)"
@@ -115,12 +136,13 @@ def test_citation_graph(corpus):
 
 def test_list_documents_and_sources(corpus):
     docs = mcpmod.list_documents(source="sfs")
-    assert docs["total"] == 2
+    assert docs["total"] == 3
     assert {d["uri"] for d in docs["documents"]} == {
-        "https://lagen.nu/1962:700", "https://lagen.nu/2018:585"}
+        "https://lagen.nu/1962:700", "https://lagen.nu/2018:585",
+        "https://lagen.nu/1904:48_s.1"}
 
     sources = mcpmod.list_sources()
-    assert {"source": "sfs", "documents": 2} in sources
+    assert {"source": "sfs", "documents": 3} in sources
 
 
 def test_tool_schemas_steer_the_model():
@@ -138,8 +160,8 @@ def test_tool_schemas_steer_the_model():
     props = tools["search"].inputSchema["properties"]
     # source is an optional enum of exactly the corpus sources
     source_enum = next(b["enum"] for b in props["source"]["anyOf"] if "enum" in b)
-    assert set(source_enum) == {"sfs", "dv", "forarbete", "foreskrift",
-                                "eurlex", "avg", "kommentar", "begrepp"}
+    assert set(source_enum) == {"sfs", "dv", "hudoc", "forarbete", "foreskrift",
+                                "eurlex", "coe", "avg", "kommentar", "begrepp"}
     # kind is a plain string (no enum) but carries guidance
     assert not any("enum" in b for b in props["kind"]["anyOf"])
     assert "fffs" in props["kind"]["description"]

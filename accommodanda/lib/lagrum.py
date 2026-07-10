@@ -681,6 +681,11 @@ def fragment_context(basefile, fragment):
 
 
 def normalize_sfsid(sfsid):
+    # the 1734 års lag balkar are often cited with a spurious "s."
+    # ("handelsbalken (1736:0123 s. 2)") their registry id ("1736:0123 2")
+    # never had -- drop it so the minted URI hits the catalog document (the
+    # normalization legacy legalref.py:611 left as a commented-out TODO)
+    sfsid = re.sub(r'^(1736:0123) ?s\.? ?', r'\1 ', sfsid)
     return re.sub(r'(\d+:\d+)\.(\d)', r'\1 \2', sfsid).replace('\n', ' ')
 
 
@@ -739,8 +744,10 @@ def lagrum_uri(attrs, base='https://lagen.nu/'):
     for k, v in attrs.items():
         attrs[k] = ORDINALS.get(v, v)
     law = normalize_sfsid(attrs.pop('law')).replace('\xa0', ' ')
-    # page-number laws slug like the old COIN templates: 1910:103_s._1
-    law = re.sub(r' ?s\.? ?(\d+)$', r'_s._\1', law)
+    # page-number laws slug like the corpus basefiles (sfs.register.sfs_slug):
+    # "1904:48 s.1" -> 1904:48_s.1 -- NOT the legacy COIN template's
+    # 1904:48_s._1, which the catalog never contained
+    law = re.sub(r' ?s\.? ?(\d+)$', r'_s.\1', law)
     uri = base + law.replace('bih. ', 'bih.').replace(' ', '_')
     if 'lawref' in attrs:
         return uri + '#L' + attrs['lawref']

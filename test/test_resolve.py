@@ -6,9 +6,8 @@ curated datasets (sfs/data/namedlaws.json, eurlex/data/namedacts.json,
 dv/data/namedcases.json); no network, no OpenSearch, no catalog.
 """
 
-from accommodanda.lib import resolve
 from accommodanda.dv import namedcases
-
+from accommodanda.lib import resolve
 
 # --- SFS: nickname/abbreviation + chapter/§ pinpoint, in ⌘K (law-first) order
 
@@ -48,6 +47,38 @@ def test_sfs_relative_citation_without_base_does_not_mint_sentinel():
     # placeholder basefile (regression: it used to return .../query#P3).
     assert resolve.resolve_sfs("3 § skadestånd") is None
     assert resolve.resolve_sfs("5 §") is None
+
+
+# --- SFS: bare number-shaped queries (the probes API/MCP clients send) ------
+
+def test_sfs_bare_number_is_the_law_root():
+    assert resolve.resolve_sfs("2022:818") == "https://lagen.nu/2022:818"
+    assert resolve.resolve_sfs("SFS 2022:818") == "https://lagen.nu/2022:818"
+    assert resolve.resolve_sfs("sfs 2022:818") == "https://lagen.nu/2022:818"
+
+
+def test_sfs_bare_number_plus_pinpoint():
+    assert resolve.resolve_sfs("1962:700 3:1") == "https://lagen.nu/1962:700#K3P1"
+    assert resolve.resolve_sfs("SFS 1915:218 36 §") == "https://lagen.nu/1915:218#P36"
+
+
+def test_sfs_page_number_law_slugs_like_the_corpus_basefile():
+    # "1904:48 s.1" must mint the corpus basefile slug 1904:48_s.1 -- NOT the
+    # legacy COIN template's 1904:48_s._1, which no catalog document ever had
+    # (regression: lagrum_uri used to emit _s._1, orphaning every citation to
+    # the 54 page-number laws)
+    assert resolve.resolve_sfs("1904:48 s.1") == "https://lagen.nu/1904:48_s.1"
+    assert resolve.resolve_sfs("1904:48 s. 1 3 §") == "https://lagen.nu/1904:48_s.1#P3"
+    assert (resolve.resolve_sfs("lagen (1904:48 s.1)")
+            == "https://lagen.nu/1904:48_s.1")
+    # a nickname whose dataset id carries the page suffix takes the same slug
+    assert resolve.resolve_sfs("lösöresköpslagen") == "https://lagen.nu/1845:50_s.1"
+
+
+def test_sfs_chapter_colon_section_alone_is_not_a_number():
+    # "12:1" is a chapter:section pinpoint with no law -- a 4-digit year is
+    # what makes a bare token read as an SFS number
+    assert resolve.resolve_sfs("12:1") is None
 
 
 # --- SFS: each query is independent -- no state leaks between queries -------

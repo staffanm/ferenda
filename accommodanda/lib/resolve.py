@@ -88,6 +88,24 @@ def _split_leading_law(q):
     return None
 
 
+_SFSNR = re.compile(
+    r"(?:sfs\s+)?((?:1[6-9]|20)\d{2}:(?:bih\.?\s?)?\d+(?:\s?s\.?\s?\d+)?)"
+    r"(?:\s+(.*))?", re.IGNORECASE)
+
+
+def _split_sfsnr(q):
+    """(lawid, remainder) when the query opens with a bare SFS number --
+    "2022:818", "SFS 1962:700 3:1", "1904:48 s.1" -- else None. The number-
+    shaped probe is what API clients (and MCP callers) most naturally send;
+    the id is kept in citation (space) form and lagrum_uri slugs it to the
+    corpus basefile form ("1904:48 s.1" -> .../1904:48_s.1)."""
+    m = _SFSNR.fullmatch(q.strip())
+    if not m:
+        return None
+    return (re.sub(r"bih\.?\s?", "bih. ", m.group(1), flags=re.IGNORECASE),
+            (m.group(2) or "").strip())
+
+
 def _normalize_pinpoint(rem):
     """A terse, law-first pinpoint normalised to the form the grammar parses:
     "12:1" -> "12 kap. 1 §", a bare "36"/"36 a" -> "36 §". Anything already
@@ -107,9 +125,11 @@ def resolve_sfs(q):
     """A statute URI for `q`, fragment-deep when it carries a pinpoint, else
     None. Handles the law-first order ⌘K users type ("avtalslagen 36", "BrB
     12:1") by peeling the leading law and resolving the pinpoint in its context;
-    falls back to parsing the query as a plain citation ("12 kap. 1 § brottsbalken")."""
+    falls back to parsing the query as a plain citation ("12 kap. 1 § brottsbalken").
+    A bare SFS number ("2022:818", "SFS 1962:700 3:1") is peeled the same way
+    a nickname is."""
     parser = _fresh_sfs_parser()
-    split = _split_leading_law(q)
+    split = _split_leading_law(q) or _split_sfsnr(q)
     if split:
         lawid, rem = split
         if rem:

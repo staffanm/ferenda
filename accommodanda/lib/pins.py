@@ -25,6 +25,12 @@ def resolved_results(con, q, source=None, kind=None):
             continue
         root, _, frag = hit["uri"].partition("#")
         row = catalog.document(con, root)
+        if not row and hit["source"] == "sfs":
+            # a bare SFS number can name a page-number law ("SFS 1904:48" ->
+            # 1904:48_s.1); the page suffix is only knowable from the catalog
+            row = catalog.document_by_prefix(con, root + "_s.")
+            if row:
+                root = row[0]
         if not row:
             continue
         _uri, src, kind_, label, title, _path = row
@@ -40,8 +46,8 @@ def resolved_results(con, q, source=None, kind=None):
             "source": src, "kind": kind_,
             "score": None, "inbound_count": catalog.document_inbound_count(con, root),
             "highlight": [],
-            "fragments": ([{"uri": hit["uri"], "pinpoint": frag, "highlight": []}]
-                          if frag else []),
+            "fragments": ([{"uri": root + "#" + frag, "pinpoint": frag,
+                            "highlight": []}] if frag else []),
         })
     return out
 

@@ -254,13 +254,19 @@ def implements_links(art):
 def artifact_links(art):
     """Every inline citation in an artifact, from the body-bearing sections
     of either source: SFS `structure` + the amendments' `content`, DV `body`,
-    plus a förarbete's `implements` (genomför-direktiv) edges."""
+    plus a förarbete's `implements` (genomför-direktiv) edges and generic
+    top-level `references` for relations expressed by source metadata rather
+    than a literal body span (HUDOC's article facet, treaty crosswalks)."""
     out = []
     collect_links(art.get("structure"), None, out)
     for amendment in art.get("amendments", []):
         collect_links(amendment.get("content"), None, out)
     collect_links(art.get("body"), None, out)
     out += implements_links(art)
+    # Source metadata can carry legal relations that have no literal span in
+    # the body (HUDOC's article facet, a treaty's Swedish implementation).
+    # Keep the contract generic: every producer emits ordinary link-run dicts.
+    out += [(None, run) for run in art.get("references", [])]
     return out
 
 
@@ -422,6 +428,20 @@ def avg_document(art, path):
     return (art["uri"], "avg", art.get("org", "avg"), label, title, str(path))
 
 
+def hudoc_document(art, path):
+    label = art.get("ecli") or art.get("itemid") or local(art["uri"])
+    title = art.get("title") or label
+    return (art["uri"], "hudoc", art.get("doctype", "case-law"),
+            label, title, str(path))
+
+
+def coe_document(art, path):
+    label = art.get("identifier") or ("CETS " + art.get("number", ""))
+    title = art.get("title") or label
+    return (art["uri"], "coe", art.get("doctype", "treaty"),
+            label, title, str(path))
+
+
 def expired_date(art):
     """The date a document's repeal takes effect, if its metadata declares one (a
     statute's `rpubl:upphavandedatum`) -- else None. Stored on the documents row so
@@ -474,7 +494,8 @@ def document_row(art, path, source):
             "forarbete": forarbete_document, "kommentar": kommentar_document,
             "begrepp": begrepp_document, "eurlex": eurlex_document,
             "foreskrift": foreskrift_document,
-            "avg": avg_document}[source](art, path)
+            "avg": avg_document, "hudoc": hudoc_document,
+            "coe": coe_document}[source](art, path)
 
 
 # --------------------------------------------------------------------------
@@ -1003,6 +1024,17 @@ def document(con, uri):
         "WHERE uri = ?", (uri,)).fetchone()
 
 
+def document_by_prefix(con, uri_prefix):
+    """The one document whose uri extends `uri_prefix`, or None when nothing
+    or several match. GLOB, not LIKE, so the literal '_'/'.' in lagen.nu URIs
+    match themselves -- how a bare page-number SFS id resolves ("...1904:48"
+    + "_s." -> the 1904:48_s.1 row) when only the catalog knows the page."""
+    rows = con.execute(
+        "SELECT uri, source, kind, label, title, path FROM documents "
+        "WHERE uri GLOB ?", (uri_prefix + "*",)).fetchall()
+    return rows[0] if len(rows) == 1 else None
+
+
 def document_meta(con, uri):
     """(kind, label, title, date) for a uri, or None -- the columns the inbound
     labels and the preparatory-works section need without loading the artifact."""
@@ -1044,6 +1076,19 @@ def documents(con, source=None, kind=None, limit=None, offset=0):
         sql += " LIMIT ? OFFSET ?"
         params += [limit, offset]
     return con.execute(sql, params).fetchall()
+
+
+def facet_documents(con, source):
+    """Catalog rows needed by faceted browse, including the document date.
+
+    The public ``documents`` tuple predates the date column and is kept stable
+    for REST/feed callers. Facets need the date for sources whose identifier
+    does not encode a year (HUDOC item ids and CETS numbers).
+    """
+    return con.execute(
+        "SELECT uri, source, kind, label, title, source_url, path, display, date "
+        "FROM documents WHERE source = ? ORDER BY uri", (source,)
+    ).fetchall()
 
 
 def document_count(con, source=None, kind=None):
