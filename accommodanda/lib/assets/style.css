@@ -601,6 +601,63 @@ ol.ranked { padding-left: 1.4rem; } ol.ranked .c { color: var(--ink-3); font-siz
                      gap: 1rem; margin: 1.25rem 0; color: var(--ink-3); font-size: .85rem; }
 .search-pagination button:disabled { visibility: hidden; }
 
+/* -- link preview popover + split reading view (popover.js) -- */
+.lagen-popover { position: fixed; z-index: 90; background: var(--surf);
+                 border: 1px solid var(--rule); border-radius: 8px;
+                 box-shadow: 0 18px 50px var(--shadow-modal); overflow: hidden; }
+.lagen-popover .pop-head { display: flex; align-items: center; gap: .5rem;
+                           padding: .5rem .9rem; border-bottom: 1px solid var(--rule);
+                           background: var(--surf-2); }
+.lagen-popover .pop-title { flex: 1; min-width: 0; font: 600 .82rem var(--sans);
+                            color: var(--ink); text-decoration: none; white-space: nowrap;
+                            overflow: hidden; text-overflow: ellipsis; }
+.lagen-popover .pop-title:hover { color: var(--accent); }
+.lagen-popover .pop-expand { border: 0; background: none; cursor: pointer;
+                             color: var(--ink-3); font-size: .95rem; line-height: 1;
+                             padding: .15rem .35rem; border-radius: 4px; }
+.lagen-popover .pop-expand:hover { color: var(--accent); background: var(--surf-3); }
+.lagen-popover .pop-body { padding: .8rem 1rem; max-height: 45vh; overflow-y: auto;
+                           font-family: var(--serif); font-size: .88rem;
+                           line-height: 1.5; color: var(--ink-2); }
+.lagen-popover .pop-loading { color: var(--ink-3); font-style: italic; }
+
+body.split { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+body.split .pane-stack { flex: 1 1 0; min-height: 0; display: flex;
+                         flex-direction: column; }
+.pane { flex: 1 1 0; min-height: 5rem; display: flex; flex-direction: column; }
+.pane-bar { display: flex; align-items: center; gap: .75rem; padding: .3rem .9rem;
+            background: var(--surf-2); border-bottom: 1px solid var(--rule);
+            font-family: var(--sans); font-size: .78rem; }
+.pane-bar .pane-title { flex: 1; min-width: 0; color: var(--ink-2); font-weight: 600;
+                        text-decoration: none; white-space: nowrap; overflow: hidden;
+                        text-overflow: ellipsis; }
+.pane-bar .pane-title:hover { color: var(--accent); }
+.pane-actions { display: flex; gap: .15rem; }
+.pane-actions button { border: 0; background: none; cursor: pointer; color: var(--ink-3);
+                       font-size: .85rem; line-height: 1; padding: .15rem .4rem;
+                       border-radius: 4px; }
+.pane-actions button:hover { color: var(--ink); background: var(--surf-3); }
+.pane-scroll { flex: 1 1 0; min-height: 0; overflow-y: auto; }
+/* the sticky offsets assume a window-scrolled masthead; inside a pane the
+   scroll container starts right under the pane bar */
+.pane-scroll .toc-col { top: 0; max-height: 100%; }
+.pane-divider { flex: 0 0 5px; cursor: row-resize; background: var(--rule);
+                touch-action: none; }
+.pane-divider:hover { background: var(--accent); }
+.pane-error { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
+              z-index: 95; background: var(--danger); color: var(--on-accent);
+              font: 500 .85rem var(--sans); padding: .5rem 1rem; border-radius: 6px; }
+
+/* the landing flash after a quick-jump (⌘K local hit, in-pane anchor) */
+@keyframes jump-flash { from { background: var(--mark); } to { background: transparent; } }
+.jump-flash { animation: jump-flash 1.6s ease-out; }
+
+/* ⌘K local hits: the "på denna sida" chip */
+.search-hit .hit-here { margin-left: .5rem; font: 500 .68rem var(--sans);
+                        color: var(--accent); border: 1px solid currentColor;
+                        border-radius: 999px; padding: .05rem .45rem;
+                        vertical-align: 1px; }
+
 /* -- Responsive: drop the side columns -- */
 @media (max-width: 64rem) {
   .gr-body { display: block; }

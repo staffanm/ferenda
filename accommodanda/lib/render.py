@@ -1299,8 +1299,10 @@ PAGE = """<!doctype html>
 </head><body class="gr-root%(body_class)s">
 %(masthead)s
 %(grid)s
-%(island)s<script src="/scrollspy.js" defer></script>
+%(island)s<script src="/dom.js" defer></script>
+<script src="/scrollspy.js" defer></script>
 <script src="/search.js" defer></script>
+<script src="/popover.js" defer></script>
 <script src="/fullsearch.js" defer></script>
 <script src="/versions.js" defer></script>
 <script src="/faksimil.js" defer></script>
@@ -2840,8 +2842,9 @@ def render_aggregates(con, out_root, catalog_path, write_index=True):
     # plain via the size floor in compress.write. style.css ships the reader
     # stylesheet with the editor layer appended -- one request, and the editor
     # rules are inert without a logged-in session.
-    for name in ("scrollspy.js", "search.js", "fullsearch.js", "versions.js",
-                 "faksimil.js", "editor.js", "robots.txt"):
+    for name in ("dom.js", "scrollspy.js", "search.js", "popover.js",
+                 "fullsearch.js", "versions.js", "faksimil.js", "editor.js",
+                 "robots.txt"):
         compress.write_text(out_root / name,
                             (ASSETS / name).read_text(encoding="utf-8"),
                             encodings=compress.PAGE_ENCODINGS)
