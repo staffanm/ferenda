@@ -670,12 +670,15 @@ pipeline's deps files). For now both rebuild whole; the inbound set is the key
 to a future per-doc incremental generate.
 
 - ✅ **SQLite catalog** (`accommodanda/lib/catalog.py`, `relate`). Derived,
-  rebuildable from artifacts alone, never a source of truth. Four tables:
-  `documents(uri, source, kind, label, title, path)` and
+  rebuildable from artifacts alone, never a source of truth. Three tables:
+  `documents(uri, source, kind, label, title, path)`,
   `links(from_uri, from_anchor, predicate, to_uri, to_root, text)` (the core
-  graph), plus `fragments` (per-node text snippets, for link tooltips) and
-  `genomforande` (the förarbete→EU-directive→SFS-paragraf *implements* relation,
-  §7d). One **generic walk** (`collect_links`) extracts edges from either source —
+  graph) and `genomforande` (the förarbete→EU-directive→SFS-paragraf *implements* relation,
+  §7d). (A `fragments` table — per-node text snippets, for link tooltips —
+  existed here until the popover redesign made hover previews fetch the
+  target page's own rendered HTML instead; an existing `catalog.sqlite`
+  keeps it as an orphaned, unwritten table until the next full rebuild.)
+  One **generic walk** (`collect_links`) extracts edges from either source —
   works because citations are inline (`text`/`cells` run-lists) and both
   verticals mint the same `https://lagen.nu/<id>#<fragment>` URIs.
   `rebuild()` is per-source (drop + re-insert that source's rows),
@@ -715,11 +718,15 @@ to a future per-doc incremental generate.
   temporally when the label was renumbered — which EU article it transposes,
   correspondence/tidigare-beteckning margins, FK/kommentar/remiss and
   bemyndigande panels) into a single JSON island, and the client
-  (`lib/assets/scrollspy.js`) swaps the right-hand rail to the paragraph at the
+  (`lib/assets/scrollspy.js`, `window.lagenScrollspy(root, island)` — one
+  instance per reading surface, returning a destroy function; the page's own
+  `.gr-body` gets one at load, each split-view pane gets its own, below) swaps
+  the right-hand rail to the paragraph at the
   top of the viewport as you scroll (the "Kontext för …" panel; nodes that
   drive it carry `data-rail`). All
-  href/link logic stays in Python — the client only moves pre-rendered HTML. A ⌘K
-  command-palette is a visual stub (site-wide search is a deferred backend). The
+  href/link logic stays in Python — the client only moves pre-rendered HTML. A
+  ⌘K command palette closes the search loop (below) and grew local quick-jump
+  + hover-popover navigation (below). The
   document-level inbound panel and the new genomför/term displays plug into the
   same shell. Render-only (regenerate, no relate).
 - ✅ **Authoritative-source ("Källa") link.** Every artifact carries one uniform
@@ -865,6 +872,34 @@ to a future per-doc incremental generate.
     `<meta name="lagen-api">`, overridable with `LAGEN_API`). Tested with
     FastAPI `TestClient` over a fixture catalog + faked search — no live cluster.
     `test/test_api.py`.
+  - ✅ **Power-user navigation chrome — local quick-jump + hover popovers +
+    split reading view.** Two additions on top of the ⌘K/search-API loop:
+    (a) **instant local quick-jump** (`lib/assets/search.js`) — a lenient
+    pinpoint grammar (`4`, `4 §`, `11:2`, `4:`, `kap 4`, `art 5.2`, `(42`,
+    `skäl 42`, `bilaga III`) resolved against the *current page's own*
+    anchors (`window.lagenDom.ownEl`), no network; a match shows the
+    target's own text and Enter scrolls+flashes it. Hits appear as soon as
+    the palette opens; if the remote `/api/v1/search` fetch then fails, the
+    local hits stay and a "Sökningen kunde inte nås" note is added rather
+    than the whole palette going empty. (b) **`lib/assets/popover.js`** —
+    hover/focus previews on every internal link in the reading column and
+    context rail, built from the *rendered target page* (same-origin
+    `fetch` + `DOMParser`, cached per pathname; same-page targets read
+    straight from the live DOM) — replacing the old title-attribute tooltip
+    `render.py` used to emit from catalog snippets (the `fragments` table
+    it read is gone, see §6). The popover's ↗ expands the target into a
+    **split reading view**: stacked panes, each importing the fetched
+    page's full `.gr-body` (TOC + reading column + context rail, its JSON
+    island carried along) marked `[data-pane]`, with its own
+    `lagenScrollspy` instance and a slim chrome bar (title link, move
+    up/down, close); draggable dividers resize panes; closing the last
+    import restores the normal single-document layout. Id collisions
+    between panes (two statutes both minting `#P1`) are resolved by
+    `lib/assets/dom.js`'s `window.lagenDom` — the shared own-document
+    anchor lookup (`ownEl`/`sel`), landing-flash and JSON-island-parse
+    helpers scrollspy/search/popover all build on, so "the page's own
+    anchor" means the same thing everywhere once several documents share
+    one DOM.
   - ✅ **NDJSON bulk dumps** (`lib/dump.py`, `lagen <src> dump`) — every
     `artifact/<source>/**.json` re-serialised one-per-line, gzipped, to
     `site/data/dumps/<source>.ndjson.gz`. Each line round-trips to its on-disk
@@ -1272,8 +1307,9 @@ law, keyed by **CELEX** (the basefile throughout).
   **anchored `<article>.<point>`** — the very fragment `celex_uri` mints for
   "artikel 6.15 i …", so a pinpoint citation and the definition it points at agree
   by construction. A definition is act-local, so every later **use** of a defined
-  term becomes a link to that act's own definition point (the point's snippet shown
-  on hover): suffix-tolerant (Swedish inflects — "sårbarhet" defined matches
+  term becomes a link to that act's own definition point (`lib/assets/popover.js`
+  shows the definition point on hover, fetched from the act's own rendered page —
+  §6): suffix-tolerant (Swedish inflects — "sårbarhet" defined matches
   "sårbarheter" used) and longest-term-first (a phrase wins over a term nested in
   it); a citation wins wherever a term-use overlaps it. The new link flavour rides
   a `kind="term"` field on `Ref`/the inline run (`lib.lagrum`), so the renderer can
@@ -2006,7 +2042,7 @@ model + extraction.
 | `accommodanda/build.py` | orchestrator: `lagen <source> <action>` build driver + freshness; corpus verbs `relate`/`generate`/`index`/`dump`/`serve` (one process serving the static site + REST API + MCP) |
 | `accommodanda/lib/catalog.py` | derived SQLite catalog + cross-source citation graph (`relate`) |
 | `accommodanda/lib/render.py` | static HTML site w/ inbound annotations + live ⌘K search (`generate`) |
-| `accommodanda/lib/assets/` | the browser-facing static chrome as real files (`style.css`, `editor.css`, `scrollspy.js`, `search.js`, `fullsearch.js`, `versions.js`, `faksimil.js`, `editor.js`, `robots.txt`) — `render_aggregates` ships them via the same Brotli precompression as pages, `style.css` with `editor.css` appended |
+| `accommodanda/lib/assets/` | the browser-facing static chrome as real files (`style.css`, `editor.css`, `dom.js` — shared `window.lagenDom` vocabulary: own-document anchor resolution across split-view panes, id-attribute selector, landing flash, JSON-island parse — `scrollspy.js`, `search.js`, `popover.js`, `fullsearch.js`, `versions.js`, `faksimil.js`, `editor.js`, `robots.txt`) — `render_aggregates` ships them via the same Brotli precompression as pages, `style.css` with `editor.css` appended |
 | `accommodanda/lib/text.py` | shared artifact text flattener (node/document/fragment plain text) |
 | `accommodanda/lib/search.py` | OpenSearch full-text indexer (standalone units collapsed by `doc_uri`, no parent-child join), `index` |
 | `accommodanda/lib/feeds.py` | legacy dataset-alias map + pure Atom/HTML feed renderer, shared by static `/dataset/<alias>/feed` generation and the live query-param endpoints |
