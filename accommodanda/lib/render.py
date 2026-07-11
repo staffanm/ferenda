@@ -282,7 +282,7 @@ def site_cross_digests(site):
     # *successor* of the row's new side: editing the 1980:620 layer must
     # re-render the 2025:400 page that now shows its case law
     corr_rows = site.con.execute(
-        "SELECT new_uri, old_uri, relation, scope, prop_uri "
+        "SELECT new_uri, old_uri, relation, scope, prop_uri, ikrafttrader "
         "FROM correspondence").fetchall()
     successors = {}     # old law base -> {new law bases}
     for row in corr_rows:
@@ -613,15 +613,21 @@ def _inbound_groups(site, uri, exclude_from=(), exclude_before=None):
     groups += [(s, s) for s in bucket if s not in dict(INBOUND_GROUPS)]
     html = ""
     for src, heading in groups:
-        lines = [_citer_line(row) for row in bucket[src]]
-        inner = "<ul>%s</ul>" % "".join(lines[:PANEL_CAP])
-        if len(lines) > PANEL_CAP:
-            inner += ('<details class="more"><summary>+%d fler</summary>'
-                      '<ul>%s</ul></details>'
-                      % (len(lines) - PANEL_CAP, "".join(lines[PANEL_CAP:])))
+        inner = _capped_list([_citer_line(row) for row in bucket[src]])
         html += ('<div class="ingroup %s"><div class="ingroup-h">%s</div>%s</div>'
                  % (src, escape(heading), inner))
     return html
+
+
+def _capped_list(lines):
+    """A panel's "<li>" lines as a list showing PANEL_CAP items, the rest
+    behind a "+N fler" disclosure -- the one home for the panel-cap idiom."""
+    inner = "<ul>%s</ul>" % "".join(lines[:PANEL_CAP])
+    if len(lines) > PANEL_CAP:
+        inner += ('<details class="more"><summary>+%d fler</summary>'
+                  '<ul>%s</ul></details>'
+                  % (len(lines) - PANEL_CAP, "".join(lines[PANEL_CAP:])))
+    return inner
 
 
 def document_inbound(site, uri, exclude_from=()):
@@ -785,11 +791,14 @@ def corresponds_margin(site, uri):
     paragraf motsvaras numera huvudsakligen av <ny paragraf>". The new side does
     not show the mirror line: that the new paragraf corresponds to the old one is
     already plain from its författningskommentar."""
-    rows = catalog.correspondence_for_old(site.con, uri)
+    # same-law renumbering ('betecknas') edges are not supersessions -- the
+    # old beteckning is a live provision today; renumbered_refs_margin's job
+    rows = [r for r in catalog.correspondence_for_old(site.con, uri)
+            if r[1] != "betecknas"]
     if not rows:
         return ""
     items, seen = [], set()
-    for new_uri, relation, scope, _prop in rows:
+    for new_uri, relation, scope, _prop, _ikraft in rows:
         if new_uri in seen:        # one line per successor paragraf, not per stycke
             continue
         seen.add(new_uri)
@@ -823,8 +832,11 @@ def corresponding_cases_margin(site, uri):
     for _hop in range(CORR_DEPTH):
         nxt = []
         for at in frontier:
-            for old_uri, _rel, _scope, _prop in catalog.correspondence_for_new(
-                    site.con, at):
+            for old_uri, rel, _scope, _prop, _ikraft in \
+                    catalog.correspondence_for_new(site.con, at):
+                if rel == "betecknas":
+                    # same-law renumbering: renumbered_refs_margin's job
+                    continue
                 if old_uri in seen:  # one section per old paragraf, not per stycke
                     continue
                 seen.add(old_uri)
@@ -849,6 +861,76 @@ def corresponding_cases_margin(site, uri):
                 out.append('<div class="rail-sec"><div class="rail-sec-h">'
                            'Äldre rättsfall för motsvarande bestämmelse (%s)'
                            '</div><ul>%s</ul></div>' % (cite, links))
+        frontier = nxt
+        if not frontier:
+            break
+    return "".join(out)
+
+
+def _reassigned_before(site, uri):
+    """The date this anchor's beteckning last changed meaning: the newest
+    same-law renumbering that gave the label to another provision (a
+    'betecknas' edge FROM it). References dated earlier mean the *old*
+    provision and must not appear in this anchor's own inbound panel -- they
+    surface on the successor's renumbered_refs_margin instead. None when the
+    label was never reassigned (or the register lacks the date)."""
+    return max((ik for _new, rel, _s, _p, ik in
+                catalog.correspondence_for_old(site.con, uri)
+                if rel == "betecknas" and ik), default=None)
+
+
+def renumbered_refs_margin(site, uri):
+    """New-beteckning paragraf margin: the references made to this provision
+    under its *previous* beteckning(ar), from the same-law 'betecknas'
+    correspondence edges (SFSR omfattning): "Hänvisningar till tidigare
+    beteckning 4 kap. 4 §" under RF 4 kap. 6 §. A reference to the old label
+    counts only when its document predates the renumbering's entry into force
+    (and postdates the label's previous reassignment, if any) -- later
+    references to that label mean the provision now carrying it.
+
+    Chains of renumberings compose, but each hop must stay on this
+    provision's own lineage: the provision arrived at the current label via
+    the *latest* 'betecknas' edge strictly before the hop's upper bound, and
+    only that edge's old label is a previous beteckning of it. An edge at or
+    after the bound describes the label's *next* occupant (RF 2010:1408 moves
+    12 kap. -> 13 kap. and 13 kap. -> 15 kap. on the same date: from 15 kap.
+    the 13->15 hop must not continue through 12->13, whose references belong
+    on the 13 kap. pages). A dateless edge (old registers) cannot be
+    interpreted and ends its chain."""
+    out = []
+    frontier = [(uri, None)]        # (anchor uri, upper date bound so far)
+    for _hop in range(CORR_DEPTH):
+        nxt = []
+        for at, upper in frontier:
+            edges = [(old_uri, ikraft) for old_uri, rel, _s, _p, ikraft in
+                     catalog.correspondence_for_new(site.con, at)
+                     if rel == "betecknas" and ikraft
+                     and (upper is None or ikraft < upper)]
+            if not edges:
+                continue
+            # the arrival at this label; ties are one renumbering event
+            # mapping several old labels onto it
+            arrival = max(ik for _o, ik in edges)
+            for old_uri, ikraft in edges:
+                if ikraft != arrival:
+                    continue        # an earlier occupant's arrival, not ours
+                # the label's previous reassignment opens the window
+                lower = max((ik for _n, r2, _s2, _p2, ik in
+                             catalog.correspondence_for_old(site.con, old_uri)
+                             if r2 == "betecknas" and ik and ik < arrival),
+                            default=None)
+                nxt.append((old_uri, arrival))
+                rows = [r for r in catalog.inbound_collapsed(site.con, old_uri)
+                        if r[5] and r[5] < arrival
+                        and (not lower or r[5] >= lower)]
+                if not rows:
+                    continue
+                label = human_fragment(old_uri.partition("#")[2])
+                out.append('<div class="rail-sec"><div class="rail-sec-h">'
+                           'Hänvisningar till tidigare beteckning %s '
+                           '(före %s)</div>%s</div>'
+                           % (escape(label), escape(arrival),
+                              _capped_list([_citer_line(r) for r in rows])))
         frontier = nxt
         if not frontier:
             break
@@ -897,21 +979,24 @@ class Rail:
             self.site.article_guidance.get((self.doc_uri, nid)))
         remiss = self._remiss_html(
             self.site.remiss_feedback.get((self.doc_uri, nid)))
-        groups = _inbound_groups(self.site, uri)
+        groups = _inbound_groups(self.site, uri,
+                                 exclude_before=_reassigned_before(self.site, uri))
         genomfor = genomfor_margin(self.site, self.doc_uri, nid)
         bemyndigande = bemyndigande_margin(self.site, uri)        # föreskrifter under it
         corr_cases = corresponding_cases_margin(self.site, uri)   # new-law side
+        renumbered = renumbered_refs_margin(self.site, uri)       # earlier beteckning
         corresponds = corresponds_margin(self.site, uri)          # old-law side
         if not (commentary or fk or guidance or remiss or groups or genomfor
-                or bemyndigande or extra or corr_cases or corresponds):
+                or bemyndigande or extra or corr_cases or renumbered
+                or corresponds):
             return
         head = ('<div class="rail-h">Kontext%s</div>'
                 % (' för <b>%s</b>' % escape(pinpoint) if pinpoint else ""))
         body = ('<div class="rail-sec"><div class="rail-sec-h">Hänvisat till av</div>'
                 '%s</div>' % groups) if groups else ""
         self.data[nid] = (head + commentary + fk + guidance + remiss + body
-                          + corr_cases + extra + genomfor + bemyndigande
-                          + corresponds)
+                          + renumbered + corr_cases + extra + genomfor
+                          + bemyndigande + corresponds)
 
     def add_document(self):
         """The document-level rail panel (key ''), shown when no single paragraph

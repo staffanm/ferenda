@@ -122,7 +122,7 @@ def test_correspond_end_to_end_monkeypatched(monkeypatch):
     # the catalog rows join the new paragraf anchor onto the new law's uri
     assert C.corr_rows(sidecar) == [
         (CELEX + "2018:585#K1P1", CELEX + "1996:627#P1", "motsvarar", "helt",
-         CELEX + "prop/2017/18:89")]
+         CELEX + "prop/2017/18:89", None)]
 
 
 def test_cell_refs_vocabulary():
@@ -294,6 +294,92 @@ def test_table_correspond_skips_unorientable_noise_table():
             "text": "", "rows": [("2 kap. 20 §", "5 §", 747)]}
     sidecar, stats = C.table_correspond(new, {"uri": "x"}, old, [noise, real])
     assert stats["skipped"] == 1 and stats["emitted"] == 1
+
+
+# RF's 2010:1408 register entry -- the richest real omfattning: chapter
+# moves, per-paragraf moves incl. cross-chapter, upph. and nya lists
+RF_OMF = ("upph. 2, 3, 8, 9, 10, 11 kap., 12 kap. 8 §; "
+          "nuvarande 12, 13 kap. betecknas 13, 15 kap., "
+          "nuvarande 4 kap. 4, 5, 6, 7, 8, 9, 10 §§ betecknas 4 kap. 6, 7, "
+          "10, 11, 12, 13, 14 §§, "
+          "nuvarande 5 kap. 1, 3, 4, 5, 6, 7 §§, betecknas 5 kap. 3, 4, 5, "
+          "6, 7, 8 §§, "
+          "nuvarande 6 kap. 9 § betecknas 6 kap. 2 §, "
+          "nuvarande 7 kap. 8 § betecknas 6 kap. 10 §, "
+          "nuvarande 13 kap. 9, 10, 11, 12, 13 §§ betecknas 15 kap. 15, 9, "
+          "10, 11, 12 §§; "
+          "ändr. 1 kap. 2, 4, 5, 7, 9 §§; "
+          "nya 1 kap. 10 §, 4 kap. 8, 9 §§, 13 kap. 8, 9 §§, "
+          "15 kap. 13, 14, 16 §§, rubr. närmast före 4 kap. 8, 9 §§, "
+          "nya kap. 2, 3, 8, 9, 10, 11, 12, 14")
+
+
+def test_parse_betecknas_rf():
+    para, kap = C.parse_betecknas(RF_OMF)
+    assert kap == [("12", "13"), ("13", "15")]
+    assert ("4", "4", "4", "6") in para          # 4 kap. 4 § -> 4 kap. 6 §
+    assert ("6", "9", "6", "2") in para          # backwards move
+    assert ("7", "8", "6", "10") in para         # cross-chapter move
+    assert ("13", "9", "15", "15") in para       # inside a moved chapter
+    # the stray comma before "betecknas" (5 kap.) must not break pairing
+    assert ("5", "1", "5", "3") in para
+    # dotless kap + ranges (RF's 1976:871 style)
+    para2, _ = C.parse_betecknas("nuvarande 1 kap 2-8 §§ betecknas 1 kap 3-9 §§")
+    assert para2[0] == ("1", "2", "1", "3") and para2[-1] == ("1", "8", "1", "9")
+
+
+def test_listed_items_rf():
+    assert C._listed_items(RF_OMF, "upph.") == {
+        ("2", None), ("3", None), ("8", None), ("9", None), ("10", None),
+        ("11", None), ("12", "8")}
+    nya = C._listed_items(RF_OMF, "nya")
+    assert ("15", "13") in nya and ("15", "16") in nya and ("1", "10") in nya
+    # whole new chapters after the rubr. run must survive the rubr. cut
+    assert ("2", None) in nya and ("14", None) in nya
+    # rubrik items themselves carry no anchors and must not leak in
+    assert ("4", "8") in nya           # from the "nya … 4 kap. 8, 9 §§" list
+
+
+def test_renumbering_payload_expands_chapter_moves():
+    art = {"uri": CELEX + "1974:152",
+           "structure": [
+               {"type": "kapitel", "ordinal": "15", "children": [
+                   {"type": "paragraf", "id": "K15P%d" % n, "ordinal": str(n)}
+                   for n in range(1, 18)]}],
+           "amendments": [
+               {"properties": {
+                   "dcterms:identifier": "SFS 2010:1408",
+                   "rpubl:ikrafttradandedatum": "2011-01-01",
+                   "rpubl:andrar": RF_OMF}},
+               # a LATER amendment adds 15 kap. 17 § (and renumbers something
+               # else, so it enters the renumbering parse): today's inventory
+               # holds it, but no edge may claim old 13 kap. contained it
+               {"properties": {
+                   "dcterms:identifier": "SFS 2018:1903",
+                   "rpubl:ikrafttradandedatum": "2019-01-01",
+                   "rpubl:andrar": "nuvarande 15 kap. 15 § betecknas "
+                                   "15 kap. 15 a §; nya 15 kap. 17 §"}}],
+           "metadata": {"properties": {}}}
+    payload, stats = C.renumbering_payload(art)
+    edges = {(e["oldParagraf"], e["newParagraf"]): e
+             for e in payload["correspondence"]["edges"]}
+    # explicit paragraf move, with the amendment's date
+    e = edges[("K4P4", "K4P6")]
+    assert e["relation"] == "betecknas" and e["ikrafttrader"] == "2011-01-01"
+    assert e["oldUri"] == CELEX + "1974:152#K4P4"
+    # chapter move expands per current paragraf of the new chapter, explicit
+    # moves and the amendment's own "nya" provisions excluded
+    assert ("K13P1", "K15P1") in edges and ("K13P8", "K15P8") in edges
+    assert ("K13P9", "K15P15") in edges          # explicit override
+    assert ("K13P13", "K15P13") not in edges     # 15:13 is nytt
+    assert ("K13P16", "K15P16") not in edges     # 15:16 is nytt
+    # 15:17 entered via the LATER amendment's nya list: in today's inventory,
+    # but the 2011 chapter move must not mint a backdated edge for it
+    assert ("K13P17", "K15P17") not in edges
+    # ... while the later amendment's own explicit move is a real edge
+    assert edges[("K15P15", "K15P15a")]["ikrafttrader"] == "2019-01-01"
+    assert payload["correspondence"]["newLaw"] == \
+        payload["correspondence"]["oldLaw"] == CELEX + "1974:152"
 
 
 def test_relevant_tables_filters_by_old_sfs_citation():

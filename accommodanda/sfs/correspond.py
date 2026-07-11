@@ -435,11 +435,198 @@ def table_correspond(new_art, prop_art, old_art, tabs, tag=None):
 
 
 def corr_rows(sidecar):
-    """The catalog rows (new_uri, old_uri, relation, scope, prop_uri) for one
-    `.corr` sidecar -- each edge's new-law paragraf anchor joined to the new law's
-    uri, the old paragraf carried as its full uri. The relate post-pass loads
-    these into the `correspondence` table (catalog.set_correspondence)."""
+    """The catalog rows (new_uri, old_uri, relation, scope, prop_uri,
+    ikrafttrader) for one `.corr` sidecar -- each edge's new-law paragraf
+    anchor joined to the new law's uri, the old paragraf carried as its full
+    uri, `ikrafttrader` only on same-law renumbering edges (relation
+    "betecknas"). The relate post-pass loads these into the `correspondence`
+    table (catalog.set_correspondence)."""
     c = sidecar["correspondence"]
     return [(c["newLaw"] + "#" + e["newParagraf"], e["oldUri"],
-             e["relation"], e.get("scope"), c.get("proposition"))
+             e["relation"], e.get("scope"), c.get("proposition"),
+             e.get("ikrafttrader"))
             for e in c["edges"]]
+
+
+# --- the renumbering route: SFSR's own omfattning field --------------------
+#
+# When an amendment renumbers provisions *within* a law (RF via SFS 2010:1408:
+# "nuvarande 4 kap. 4, 5, 6, 7, 8, 9, 10 §§ betecknas 4 kap. 6, 7, 10, 11,
+# 12, 13, 14 §§, …"), a reference to "4 kap. 4 §" means different provisions
+# depending on whether it was written before or after the amendment's entry
+# into force. The register's omfattning field states the renumbering
+# authoritatively, so the same-law correspondence layer is derived from it
+# mechanically -- edges carry relation "betecknas" and the amendment's
+# ikrafttradandedatum, which the renderer uses to split inbound references
+# temporally. Old-side anchors are minted from the *old* labels and are
+# deliberately NOT validated against the current inventory: a renumbered-away
+# label may be gone today, or reused by a different provision -- that is the
+# very ambiguity the layer records. New-side anchors of an *older*
+# renumbering may likewise have been renumbered again later (RF 1976:871 ->
+# 2010:1408); keeping them unvalidated is what lets the chain compose.
+
+# one omfattning renumbering clause: "nuvarande <spec> betecknas <spec>"
+# (an "; "-separated changecat may hold several, ", nuvarande"-separated;
+# SFSR sometimes sets a stray comma before "betecknas")
+RE_BETECKNAS = re.compile(
+    r"nuvarande\s+(?P<old>.+?),?\s+betecknas\s+(?P<new>.+?)\s*$")
+# a spec: "12, 13 kap." (whole chapters) | "4 kap. 4, 5 §§" | "5 a, 5 b §§"
+RE_SPEC_KAP = re.compile(r"^([\d ,a-z–—-]+?)\s*kap\.?\s*$")
+RE_SPEC_PARA = re.compile(
+    r"^(?:([\d ]+?[a-z]?)\s*kap\.?\s*)?([\d ,a-z–—-]+?)\s*§§?\s*$")
+
+
+def _ordinals(text):
+    """A spec's ordinal list, ranges expanded: "4, 5, 6" -> ["4", "5", "6"],
+    "2-8" -> ["2" .. "8"], "5 a" -> ["5a"]."""
+    return [_ordkey(p) for p in _expand(text)]
+
+
+def _anchor(kap, para=None):
+    """Mint the fragment anchor for a (kap, para) label the way nf does:
+    K4P6, P5b, K12 (a whole chapter)."""
+    if para is None:
+        return "K%s" % kap
+    return ("K%sP%s" % (kap, para)) if kap else ("P%s" % para)
+
+
+def parse_betecknas(omfattning):
+    """The renumbering pairs of one omfattning field:
+    ([(old_kap, old_para, new_kap, new_para)], [(old_kap, new_kap)]) --
+    paragraf-level moves and whole-chapter moves (paras None-free ordinals,
+    kap None in a flat law). Raises ValueError on a clause whose sides don't
+    pair up -- a silently half-parsed renumbering would misattribute
+    references (rule:errors-drive-retry-use-raise)."""
+    para_moves, kap_moves = [], []
+    for changecat in omfattning.split("; "):
+        if not changecat.startswith("nuvarande"):
+            continue
+        for clause in re.split(r",\s*(?=nuvarande\s)", changecat):
+            m = RE_BETECKNAS.match(clause.strip())
+            if not m:
+                if "betecknas" in clause:
+                    # a renumbering we failed to read must not be skipped --
+                    # a half-parsed omfattning misattributes references
+                    # (rule:errors-drive-retry-use-raise)
+                    raise ValueError(
+                        "unparseable renumbering clause %r" % clause)
+                continue
+            old, new = m.group("old"), m.group("new")
+            mk_old, mk_new = RE_SPEC_KAP.match(old), RE_SPEC_KAP.match(new)
+            if mk_old and mk_new:
+                olds, news = _ordinals(mk_old.group(1)), _ordinals(mk_new.group(1))
+                if len(olds) != len(news):
+                    raise ValueError("unpairable renumbering clause %r" % clause)
+                kap_moves += list(zip(olds, news, strict=True))
+                continue
+            mp_old, mp_new = RE_SPEC_PARA.match(old), RE_SPEC_PARA.match(new)
+            if not (mp_old and mp_new):
+                raise ValueError("unparseable renumbering clause %r" % clause)
+            olds = _ordinals(mp_old.group(2))
+            news = _ordinals(mp_new.group(2))
+            if len(olds) != len(news):
+                raise ValueError("unpairable renumbering clause %r" % clause)
+            para_moves += [(_ordkey(mp_old.group(1)), o,
+                            _ordkey(mp_new.group(1)), n)
+                           for o, n in zip(olds, news, strict=True)]
+    return para_moves, kap_moves
+
+
+# one item group inside an "upph."/"nya" changecat, in the three shapes SFSR
+# uses: "12 kap. 8 §" / "4 kap. 8, 9 §§" (chaptered paragrafs), a bare
+# "8, 9 §§" (flat law), "2, 3, 8, 9, 10, 11 kap." (whole chapters -- the kap.
+# must not be followed by a paragraf list, else it is the first shape), and
+# "kap. 2, 3, 8" (the "nya kap. N" form)
+RE_ITEM = re.compile(
+    r"(?:(?P<pkap>\d[\d ,a-z–—-]*?)\s*kap\.?\s*)?(?P<paras>\d[\d ,a-z–—-]*?)\s*§§?"
+    r"|(?P<kaps>\d[\d ,a-z–—-]*?)\s*kap\.?(?!\s*\d[\d ,a-z–—-]*?\s*§)"
+    r"|kap\.?\s*(?P<kaps2>\d[\d ,a-z–—-]*)")
+
+
+def _listed_items(omfattning, prefix):
+    """The (kap, para) items of an omfattning changecat ("upph. …"/"nya …"):
+    {(kap, para)} with para None for whole chapters, kap None in a flat law.
+    Only §/kap items -- rubriker and övergångsbestämmelser carry no
+    anchors."""
+    items = set()
+    for changecat in omfattning.split("; "):
+        if not changecat.startswith(prefix):
+            continue
+        # rubrik/övergångsbestämmelse runs carry no anchors, but a changecat
+        # can resume after one ("nya 1 kap. 10 §, …, rubr. närmast före …,
+        # nya kap. 2, 3, 8") -- drop the runs, not everything after them
+        pieces = re.split(r",\s*(?=nya\s|rubr\.|p \d|övergångsbest)",
+                          changecat)
+        body = ", ".join(
+            piece.removeprefix(prefix).removeprefix("nya").strip()
+            for piece in pieces
+            if not piece.startswith(("rubr.", "p ", "övergångsbest")))
+        for m in RE_ITEM.finditer(body):
+            if m.group("paras"):
+                items |= {(_ordkey(m.group("pkap")), p)
+                          for p in _ordinals(m.group("paras"))}
+            else:
+                items |= {(k, None) for k in
+                          _ordinals(m.group("kaps") or m.group("kaps2"))}
+    return items
+
+
+def renumbering_payload(art):
+    """The same-law `.corr` payload from a statute's own amendment register:
+    every "nuvarande … betecknas …" clause becomes edges with relation
+    "betecknas" and the amendment's ikrafttradandedatum. Whole-chapter moves
+    expand per paragraf against the current artifact's inventory of the *new*
+    chapter, minus everything that provably entered it after the move: the
+    same amendment's "nya" provisions and explicit paragraf-move targets (an
+    explicit move wins over the chapter default), and every later
+    amendment's "nya" provisions and paragraf-move targets in that chapter --
+    the current inventory stands in for the chapter's inventory at the time,
+    so later additions must not mint edges backdated to the move. Returns
+    (payload, stats)."""
+    uri = art["uri"]
+    idx = paragraf_index(art)
+    # parse every renumbering amendment up front, in register (chronological)
+    # order, so a chapter-move expansion can subtract later amendments' work
+    parsed = []
+    for am in art.get("amendments", []):
+        props = am.get("properties", {})
+        omf = props.get("rpubl:andrar") or ""
+        if "betecknas" not in omf:
+            continue
+        para_moves, kap_moves = parse_betecknas(omf)
+        parsed.append((props, omf, para_moves, kap_moves,
+                       _listed_items(omf, "nya")))
+    edges, stats = [], {"amendments": len(parsed), "edges": 0}
+    for i, (props, omf, para_moves, kap_moves, nya) in enumerate(parsed):
+        ikraft = props.get("rpubl:ikrafttradandedatum")
+        amendment = props.get("dcterms:identifier")
+        excluded = nya | {(nk, np) for _ok, _op, nk, np in para_moves}
+        for _lp, _lo, later_moves, _lk, later_nya in parsed[i + 1:]:
+            excluded |= later_nya
+            excluded |= {(nk, np) for _ok, _op, nk, np in later_moves}
+        para_moves = list(para_moves)
+        for old_kap, new_kap in kap_moves:
+            if any(k == new_kap and p is None for k, p in excluded):
+                # a later amendment recreated the whole chapter: nothing in
+                # today's inventory dates back to this move
+                continue
+            for _anchor_id, label in idx:
+                mm = RE_SPEC_PARA.match(label)
+                if not mm or _ordkey(mm.group(1)) != new_kap:
+                    continue
+                para = _ordkey(mm.group(2))
+                if (new_kap, para) in excluded:
+                    continue
+                para_moves.append((old_kap, para, new_kap, para))
+        for old_kap, old_para, new_kap, new_para in para_moves:
+            edges.append({
+                "newParagraf": _anchor(new_kap, new_para),
+                "oldParagraf": _anchor(old_kap, old_para),
+                "oldUri": "%s#%s" % (uri, _anchor(old_kap, old_para)),
+                "relation": "betecknas", "scope": "helt",
+                "quote": "%s: %s" % (amendment, omf[:120]),
+                "ikrafttrader": ikraft})
+    stats["edges"] = len(edges)
+    payload = {"correspondence": {"newLaw": uri, "oldLaw": uri,
+                                  "proposition": None, "edges": edges}}
+    return payload, stats

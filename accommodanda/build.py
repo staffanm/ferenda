@@ -851,6 +851,46 @@ def sfs_table_correspond(basefiles):
           % (new_sfs, len(edges), len(old_uris), out))
 
 
+def sfs_renumber_correspond(basefiles):
+    """`lagen sfs renumber-correspond <sfs> [...]` -- derive the same-law
+    paragraf renumbering map from a statute's own amendment register: every
+    "nuvarande … betecknas …" omfattning clause (RF via SFS 2010:1408)
+    becomes 'betecknas' edges carrying the amendment's ikrafttradandedatum,
+    written as the statute's `.corr` layer. Purely mechanical -- the register
+    is already in the parsed artifact -- but stored like the other
+    correspondence routes so relate/generate treat all three alike. The layer
+    path is shared with table-/ai-correspond, so a law that is *both* a
+    re-enactment and renumbered internally cannot yet hold both; the action
+    refuses to overwrite an existing layer without --force."""
+    if not basefiles:
+        sys.exit("usage: lagen sfs renumber-correspond <sfs> [...]  "
+                 "(e.g. 1974:152)")
+    for sfs in basefiles:
+        art = json.loads(compress.read_bytes(sfs_artifact(sfs)))
+        payload, stats = sfs_correspond.renumbering_payload(art)
+        out = annstore.path("sfs", sfs, ".corr")
+        if not payload["correspondence"]["edges"]:
+            print("sfs renumber-correspond %s: no renumbering amendments in "
+                  "the register; nothing written" % sfs)
+            continue
+        if RUN.dry_run:
+            print("sfs renumber-correspond: would derive %d edges from %d "
+                  "amendment(s) of %s -> %s"
+                  % (stats["edges"], stats["amendments"], sfs, out))
+            continue
+        if out.exists() and not RUN.force:
+            # the shared layer path may hold a table-/ai-correspond layer;
+            # clobbering it silently would lose those edges
+            raise ValueError("%s exists (another correspondence route wrote "
+                             "it); pass --force to replace it" % out)
+        annstore.guard(out, RUN.force)
+        annstore.write(out, payload, annstore.artifact_input("sfs", sfs),
+                       RUN.force, model="omfattning")
+        print("sfs renumber-correspond %s: %d edges from %d renumbering "
+              "amendment(s), wrote %s"
+              % (sfs, stats["edges"], stats["amendments"], out))
+
+
 def _forarbete_meta(identifier):
     """A "Prop. 2020/21:194" / "Rskr. 2020/21:387" identifier (the form the
     SFS register cites) -> {title, signers, ingress} off the parsed förarbete
@@ -906,6 +946,7 @@ SOURCES["sfs"] = Source("sfs", sfs_list, {
 }, harvest=sfs_harvest, origin=_origin(sfs_download.ENDPOINT),
    actions={"ai-correspond": sfs_ai_correspond,
             "table-correspond": sfs_table_correspond,
+            "renumber-correspond": sfs_renumber_correspond,
             "history-as-git": sfs_history_as_git},
    notes="ai-correspond <new-sfs> <prop> [<old-sfs>]: LLM-derive the old->new "
          "paragraf correspondence map into a .corr layer (WIKI_ROOT/ann)\n"
@@ -913,6 +954,8 @@ SOURCES["sfs"] = Source("sfs", sfs_list, {
          ".corr layer read mechanically from the prop's jämförelsetabell/"
          "paragrafnyckel tables; several old laws merge into one layer, =TAG "
          "names an old law's prop-local shorthand in a multi-law register\n"
+         "renumber-correspond <sfs> [...]: same-law renumbering map from the "
+         "register's 'nuvarande … betecknas …' omfattning clauses\n"
          "history-as-git <repodir> [basefile ...]: build/update a git repo of "
          "the SFS collection, one commit per amendment event; --rebuild-history "
          "rewrites it from the current complete corpus")

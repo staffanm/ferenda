@@ -93,10 +93,15 @@ CREATE TABLE IF NOT EXISTS fk_kommentar (
 CREATE INDEX IF NOT EXISTS idx_fk_sfs ON fk_kommentar(sfs_uri, sfs_anchor);
 CREATE TABLE IF NOT EXISTS correspondence (
     new_uri  TEXT NOT NULL,         -- the new statute paragraf (full uri, doc#id)
-    old_uri  TEXT NOT NULL,         -- the old (repealed) paragraf it corresponds to
-    relation TEXT NOT NULL,         -- 'motsvarar' | 'overfort'
+    old_uri  TEXT NOT NULL,         -- the old paragraf it corresponds to (a
+                                    -- repealed law's, or the same law's pre-
+                                    -- renumbering beteckning)
+    relation TEXT NOT NULL,         -- 'motsvarar' | 'overfort' | 'betecknas'
     scope    TEXT,                  -- 'helt'|'i_sak'|'i_huvudsak'|'delvis'|NULL
-    prop_uri TEXT                   -- the proposition stating the correspondence
+    prop_uri TEXT,                  -- the proposition stating the correspondence
+    ikrafttrader TEXT               -- when the renumbering took effect
+                                    -- ('betecknas' edges; references older than
+                                    -- this mean the old beteckning)
 );
 CREATE INDEX IF NOT EXISTS idx_corr_new ON correspondence(new_uri);
 CREATE INDEX IF NOT EXISTS idx_corr_old ON correspondence(old_uri);
@@ -139,6 +144,9 @@ def connect(path):
         con.execute("ALTER TABLE documents ADD COLUMN date TEXT")
     if "publisher" not in cols:
         con.execute("ALTER TABLE documents ADD COLUMN publisher TEXT")
+    corr_cols = {row[1] for row in con.execute("PRAGMA table_info(correspondence)")}
+    if "ikrafttrader" not in corr_cols:
+        con.execute("ALTER TABLE correspondence ADD COLUMN ikrafttrader TEXT")
     con.execute("CREATE INDEX IF NOT EXISTS idx_docs_publisher "
                 "ON documents(source, publisher)")
     return con
@@ -872,30 +880,34 @@ def genomfor_for(con, sfs_uri, anchor):
 # --------------------------------------------------------------------------
 
 def set_correspondence(con, rows):
-    """Replace the paragraf correspondence layer. Each row is
-    (new_uri, old_uri, relation, scope, prop_uri) -- both endpoints full paragraf
-    uris. Queried in both directions: the old paragraf's margin shows the new
-    paragraf that supersedes it, and the new paragraf's margin shows the cases
-    citing the old one (the generic `inbound` on `old_uri`)."""
+    """Replace the paragraf correspondence layer. Each row is (new_uri,
+    old_uri, relation, scope, prop_uri, ikrafttrader) -- both endpoints full
+    paragraf uris; ikrafttrader only on same-law renumbering ('betecknas')
+    edges. Queried in both directions: the old paragraf's margin shows the
+    new paragraf that supersedes it, and the new paragraf's margin shows the
+    references citing the old one (the generic `inbound` on `old_uri`),
+    date-split by ikrafttrader for renumberings."""
     con.execute("DELETE FROM correspondence")
-    con.executemany("INSERT INTO correspondence VALUES (?,?,?,?,?)", rows)
+    con.executemany("INSERT INTO correspondence VALUES (?,?,?,?,?,?)", rows)
     con.commit()
 
 
 def correspondence_for_old(con, old_uri):
     """The new-law paragraf(s) that now correspond to an old (repealed) paragraf,
-    for its margin: (new_uri, relation, scope, prop_uri)."""
+    for its margin: (new_uri, relation, scope, prop_uri, ikrafttrader)."""
     return con.execute(
-        "SELECT new_uri, relation, scope, prop_uri FROM correspondence "
-        "WHERE old_uri = ? ORDER BY new_uri", (old_uri,)).fetchall()
+        "SELECT new_uri, relation, scope, prop_uri, ikrafttrader "
+        "FROM correspondence WHERE old_uri = ? ORDER BY new_uri",
+        (old_uri,)).fetchall()
 
 
 def correspondence_for_new(con, new_uri):
     """The old (repealed) paragraf(s) a new-law paragraf corresponds to, for its
-    margin: (old_uri, relation, scope, prop_uri)."""
+    margin: (old_uri, relation, scope, prop_uri, ikrafttrader)."""
     return con.execute(
-        "SELECT old_uri, relation, scope, prop_uri FROM correspondence "
-        "WHERE new_uri = ? ORDER BY old_uri", (new_uri,)).fetchall()
+        "SELECT old_uri, relation, scope, prop_uri, ikrafttrader "
+        "FROM correspondence WHERE new_uri = ? ORDER BY old_uri",
+        (new_uri,)).fetchall()
 
 
 # --------------------------------------------------------------------------
