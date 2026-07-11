@@ -276,11 +276,27 @@ def site_cross_digests(site):
         feed(fa_uri, "remiss_feedback", avsnitt, v)
     for fa_uri, v in site.remiss_overall.items():
         feed(fa_uri, "remiss_overall", None, v)
-    for row in site.con.execute(
-            "SELECT new_uri, old_uri, relation, scope, prop_uri "
-            "FROM correspondence"):
-        feed(catalog.strip_fragment(row[1]), "corr", row[1], list(row))
-        feed(catalog.strip_fragment(row[0]), "corr", row[0], list(row))
+    # a correspondence row touches its two endpoint pages -- and, because the
+    # new-law margin walks the chain transitively (corresponding_cases_margin:
+    # 2025:400 -> 2001:453 -> 1980:620), every page whose law is a transitive
+    # *successor* of the row's new side: editing the 1980:620 layer must
+    # re-render the 2025:400 page that now shows its case law
+    corr_rows = site.con.execute(
+        "SELECT new_uri, old_uri, relation, scope, prop_uri "
+        "FROM correspondence").fetchall()
+    successors = {}     # old law base -> {new law bases}
+    for row in corr_rows:
+        successors.setdefault(catalog.strip_fragment(row[1]), set()).add(
+            catalog.strip_fragment(row[0]))
+    for row in corr_rows:
+        hosts, frontier = set(), {catalog.strip_fragment(row[0])}
+        while frontier:
+            hosts |= frontier
+            frontier = {s for base in frontier
+                        for s in successors.get(base, ())} - hosts
+        hosts.add(catalog.strip_fragment(row[1]))
+        for host in hosts:
+            feed(host, "corr", row[1], list(row))
     return {host: hashlib.sha256("\x1e".join(sorted(lines)).encode()).hexdigest()
             for host, lines in acc.items()}
 
@@ -778,33 +794,54 @@ def corresponds_margin(site, uri):
             '</div><ul>%s</ul></aside>' % "".join(items))
 
 
+CORR_DEPTH = 3      # how many re-enactments back the case-law margin reaches
+
+
 def corresponding_cases_margin(site, uri):
-    """New statute paragraf margin: the legal cases (rättsfall) that cite the old,
-    repealed paragraf this one corresponds to -- under a heading naming that old
-    paragraf, so a reader of the new law finds the case law decided under its
-    predecessor. The correspondence is read from the `.corr` layer; the cases are
-    the generic inbound on the old paragraf, filtered to case law."""
+    """New statute paragraf margin: the legal cases (rättsfall) that cite the
+    old, repealed provisions this one corresponds to -- one section per
+    predecessor, headed "Äldre rättsfall för motsvarande bestämmelse (<the
+    predecessor provision, linked>)", so a reader of the new law finds the
+    case law decided under it. The correspondence chain is walked
+    *transitively* (socialtjänstlagen 2025:400 -> 2001:453 -> 1980:620,
+    breadth-first, CORR_DEPTH re-enactments deep): each generation's case law
+    cites its own generation's provision. The correspondences are read from
+    the `.corr` layers; the cases are the generic inbound on each old
+    paragraf, filtered to case law."""
     out, seen = [], set()
-    for old_uri, _rel, _scope, _prop in catalog.correspondence_for_new(
-            site.con, uri):
-        if old_uri in seen:        # one case section per old paragraf, not per stycke
-            continue
-        seen.add(old_uri)
-        rows = [r for r in catalog.inbound(site.con, old_uri, limit=INBOUND_CAP + 1)
-                if r[4] == "dv"]
-        if not rows:
-            continue
-        base = old_uri.split("#")[0]
-        old_label = "%s %s (numera upphävd)" % (
-            human_fragment(old_uri.partition("#")[2]), _law_title(site, base))
-        links = "".join(
-            '<li><a href="%s">%s</a></li>'
-            % (escape(href(from_uri + ("#" + a if a else ""))),
-               escape(describe_citer(from_uri, a, label, title, source)))
-            for from_uri, a, label, title, source in rows[:INBOUND_CAP])
-        out.append('<div class="rail-sec"><div class="rail-sec-h">Rättsfall som '
-                   'hänvisar till motsvarande %s</div><ul>%s</ul></div>'
-                   % (escape(old_label), links))
+    frontier = [uri]
+    for _hop in range(CORR_DEPTH):
+        nxt = []
+        for at in frontier:
+            for old_uri, _rel, _scope, _prop in catalog.correspondence_for_new(
+                    site.con, at):
+                if old_uri in seen:  # one section per old paragraf, not per stycke
+                    continue
+                seen.add(old_uri)
+                nxt.append(old_uri)
+                rows = [r for r in catalog.inbound(site.con, old_uri,
+                                                   limit=INBOUND_CAP + 1)
+                        if r[4] == "dv"]
+                if not rows:
+                    continue
+                base = old_uri.split("#")[0]
+                old_label = ("%s %s" % (
+                    human_fragment(old_uri.partition("#")[2]),
+                    _law_title(site, base))).strip()
+                cite = ('<a href="%s">%s</a>'
+                        % (escape(href(old_uri)), escape(old_label))
+                        if site.has(base) else escape(old_label))
+                links = "".join(
+                    '<li><a href="%s">%s</a></li>'
+                    % (escape(href(from_uri + ("#" + a if a else ""))),
+                       escape(describe_citer(from_uri, a, label, title, source)))
+                    for from_uri, a, label, title, source in rows[:INBOUND_CAP])
+                out.append('<div class="rail-sec"><div class="rail-sec-h">'
+                           'Äldre rättsfall för motsvarande bestämmelse (%s)'
+                           '</div><ul>%s</ul></div>' % (cite, links))
+        frontier = nxt
+        if not frontier:
+            break
     return "".join(out)
 
 
