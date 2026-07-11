@@ -169,15 +169,15 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | File | What |
 |---|---|
 | `download.py` | bulk paginator over HUDOC's public `/app/query/results` JSON endpoint (Grand Chamber + Chamber judgments only, English by default, `PAGE_SIZE=500`) plus `/app/conversion/docx/html/body` for each full text, fetched through a small `ThreadPoolExecutor` (`WORKERS=4`) that keeps bodies in flight ahead of the walk; newest-first watermark, `--lang`, `--only` and `--limit` |
-| `model.py` | typed `HudocCase`/`Block` model; one stable `/dom/echr/{itemid}` expression per HUDOC item; article-facet metadata becomes explicit references to `ext/coe/{ETS}#A…` |
-| `parse.py` | converted Word HTML → headings, numbered paragraphs (`#P…`) and notes → artifact |
+| `model.py` | typed `HudocCase`/`Block` model; one stable `/dom/echr/{itemid}` expression per HUDOC item; article-facet metadata becomes explicit references to `ext/coe/{ETS}#A…`; restarted numbering keeps the first canonical paragraph anchor and suffixes later occurrences (`#P1-2`) |
+| `parse.py` | converted Word HTML → CSS-derived headings, numbered paragraphs and notes → artifact; skips only TOC links (the TOC can share its container with the judgment) and marks language/cover placeholders with no numbered body as deliberately empty (`SkipDocument`) |
 
 **coe vertical (Council of Europe Treaty Office)**
 | File | What |
 |---|---|
 | `download.py` | one search POST to the Treaty Office's anonymous JSON web service (`conventions-ws.coe.int`, token embedded in the public `full-list2` page, mounted via `lib.net.mount_legacy_tls` for its small-DH-key TLS) returns all 233 treaties' metadata in one call; `getLieux` resolves opening places; each official English text downloads as a plain PDF from `rm.coe.int` (no challenge, no HTML scraping) |
 | `model.py` | typed `Treaty`; canonical `ext/coe/{ETS-or-CETS-number}` identity and an `rdfs:seeAlso` bridge from the ECHR instruments reproduced in SFS 1994:1219 |
-| `parse.py` | official English PDF → article/subarticle tree (`#A8`, `#A6P3Ld`) via `pdftohtml -> page_paragraphs -> build_structure` (every official text is a PDF; no HTML body path), which is the target of HUDOC metadata references |
+| `parse.py` | official English PDF → article/subarticle tree (`#A8`, `#A6P3Ld`) via `pdftohtml -> page_paragraphs -> build_structure`; supports numeric, Roman and compound article designations plus section-only amending instruments, and context-suffixes repeated printed designators so every node id is unique |
 
 **wiki vertical (git-backed markdown — begrepp + kommentar)**
 | File | What |

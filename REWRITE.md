@@ -1916,7 +1916,11 @@ Two verticals joined by one artifact-level identity grammar:
   small `ThreadPoolExecutor` (`WORKERS=4`) keeps fetches in flight ahead of the
   walk (~0.15s/doc measured, vs ~0.33s sequential — the full English harvest
   runs in about an hour). `HudocCase` projects the metadata and
-  heading/numbered-paragraph body to `/dom/echr/{itemid}` artifacts.
+  heading/numbered-paragraph body to `/dom/echr/{itemid}` artifacts. The HTML
+  parser reads HUDOC's generated CSS heading styles, removes individual TOC
+  links without deleting their shared judgment container, deliberately skips
+  bodies with no numbered judgment paragraphs, and context-suffixes restarted paragraph
+  numbering (`#P1-2`) while preserving the first canonical `#P1`.
 - **`accommodanda/coe/`** harvests the Treaty Office's anonymous JSON web
   service (`conventions-ws.coe.int`, whose token is embedded in the public
   `full-list2` page) rather than scraping the Cloudflare-fronted portal HTML:
@@ -1927,6 +1931,11 @@ Two verticals joined by one artifact-level identity grammar:
   artifacts live at `/ext/coe/{ETS-or-CETS-number}` and carry article/subarticle
   fragments (`#A8`, `#A6P3Ld`); every official text is a PDF, so `parse.py`'s
   body path is uniformly `pdftohtml -> page_paragraphs -> build_structure`.
+  Numeric, Roman and compound article designations are supported; exceptional
+  section-only amending instruments use `sektion` provisions. Repeated printed
+  article/paragraph/list designators retain their first canonical fragment and
+  receive contextual occurrence suffixes thereafter, so artifact IDs remain
+  unique even across annexes, replacement text and editorial footnotes.
   Treaty summaries sit behind the scraped portal and are not carried on the
   record.
 - **Identity and graph:** `lib/coe.py` is the second-use shared seam. HUDOC's

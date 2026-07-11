@@ -62,14 +62,18 @@ class HudocCase:
     def to_artifact(self):
         structure = []
         serial = 0
+        ids = {}
         for block in self.body:
             if block.kind == "rubrik":
                 structure.append({"type": "rubrik", "level": block.level,
                                   "text": [block.text]})
                 continue
             serial += 1
-            node = {"type": "stycke", "text": [block.text],
-                    "id": "P%s" % block.number if block.number else "S%d" % serial}
+            base_id = "P%s" % block.number if block.number else "S%d" % serial
+            ids[base_id] = ids.get(base_id, 0) + 1
+            node_id = (base_id if ids[base_id] == 1
+                       else "%s-%d" % (base_id, ids[base_id]))
+            node = {"type": "stycke", "text": [block.text], "id": node_id}
             if block.number:
                 node["ordinal"] = block.number
             if block.kind == "note":

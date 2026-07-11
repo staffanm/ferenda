@@ -354,7 +354,9 @@ diarienummer, beslutsdatum?, avgjordAv?, nyckelord? }`.
 court: "echr", itemid, doctype (judgment|decision|communicated-case|
 advisory-opinion|legal-summary|resolution|case-law), title, date, metadata,
 references, structure }`. `structure` is heading (`rubrik`) and numbered
-paragraph (`stycke`, `id: "P{n}"`) blocks. `references` is the top-level
+paragraph (`stycke`, `id: "P{n}"`) blocks. If numbering restarts in an
+operative part, annex or separate opinion, later occurrences are suffixed
+(`P1-2`) while the first `P1` stays canonical. `references` is the top-level
 `dcterms:references` link list into the cited Convention/Protocol
 provisions — CoE Treaty Office fragments (`ext/coe/{ETS}#A…`), the same
 inbound-citation contract every other source uses.
@@ -362,8 +364,11 @@ inbound-citation contract every other source uses.
 **coe (Council of Europe treaties)** — `{ uri (…/ext/coe/{number}), type:
 "internationell-overenskommelse", doctype (treaty|protocol), number,
 identifier, title, date, metadata, references, structure }`. `structure` is
-a nested `rubrik`/`artikel`/`stycke`/`punkt` tree with stable fragment ids
-(`#A8`, `#A6P3Ld`). For the ECHR instruments incorporated into Swedish law
+a nested `rubrik`/`artikel`/`sektion`/`stycke`/`punkt` tree with stable,
+document-unique fragment ids (`#A8`, `#A6P3Ld`; occurrence suffixes only when
+the printed designator repeats). Roman/compound articles and section-only
+amending instruments are retained in the same structure. For the ECHR
+instruments incorporated into Swedish law
 (Convention plus Protocols 1, 4, 6, 7, 13, 16), `references` carries an
 `rdfs:seeAlso` edge to `https://lagen.nu/1994:1219`.
 

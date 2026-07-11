@@ -359,13 +359,18 @@ def human_fragment(frag):
         return ""
     if frag.startswith("sid"):
         return "s. " + frag[3:]
-    coe = re.fullmatch(r"A(\d+[A-Za-z]?)(?:P(\d+))?(?:L([a-z]))?", frag)
+    coe = re.fullmatch(
+        r"A((?:\d+[A-Za-z]?|[IVXLCDM]+)(?:\.\d+)?)(?:-(\d+))?"
+        r"(?:P(\d+)(?:-(\d+))?)?(?:L([a-z])(?:-(\d+))?)?", frag)
     if coe:
         parts = ["artikel %s" % coe.group(1)]
-        if coe.group(2):
-            parts.append("punkt %s" % coe.group(2))
         if coe.group(3):
-            parts.append("led %s" % coe.group(3))
+            parts.append("punkt %s" % coe.group(3))
+        if coe.group(5):
+            parts.append("led %s" % coe.group(5))
+        instance = coe.group(6) or coe.group(4) or coe.group(2)
+        if instance:
+            parts.append("variant %s" % instance)
         return " ".join(parts)
     segs = _FRAG_SEG.findall(frag)
     return " ".join("%s %s" % (val, FRAG_LABEL[letter]) for letter, val in segs)
@@ -580,15 +585,20 @@ def render_runs(runs, site):
     return "".join(out)
 
 
-def _inbound_groups(site, uri, exclude_from=()):
+def _inbound_groups(site, uri, exclude_from=(), exclude_before=None):
     """Inbound entries grouped into per-source sections (Författningar /
     Förarbeten / Rättsfall), one collapsed line per citing document (its
     pinpoints listed inline). Förarbeten are ordered prop→sou→ds→lagrådsremiss→
     bet, oldest-first; each group shows PANEL_CAP docs, the rest behind a "+N
     fler" disclosure. `exclude_from` drops citers already shown elsewhere (a
-    statute's own preparatory works). Returns the inner HTML, or None when
-    nothing (left) cites `uri`."""
+    statute's own preparatory works); `exclude_before` drops citers dated
+    before the anchor's beteckning last changed meaning (they refer to the
+    provision that carried the label then, and surface on its successor's
+    renumbered_refs_margin instead -- undated citers stay). Returns the inner
+    HTML, or None when nothing (left) cites `uri`."""
     rows = catalog.inbound_collapsed(site.con, uri, exclude_from)
+    if exclude_before:
+        rows = [r for r in rows if not (r[5] and r[5] < exclude_before)]
     if not rows:
         return None
     bucket = {}
@@ -2262,12 +2272,13 @@ def render_hudoc(art, site):
                 source_url=art.get("source_url"))
 
 
-def _render_coe_article(node, site, doc_uri, toc, rail):
+def _render_coe_provision(node, site, doc_uri, toc, rail):
     aid = node.get("id")
     number = node.get("ordinal") or ""
     title = render_runs(node.get("text", []), site)
     anchor = toc.add(aid, plain(node.get("text", [])), 1)
-    rail.add(aid, "Artikel %s" % number)
+    label = "Artikel" if node.get("type") == "artikel" else "Sektion"
+    rail.add(aid, "%s %s" % (label, number))
     children = "".join(render_node(child, site, doc_uri, toc, rail)
                        for child in node.get("children", []))
     return ('<section class="artikel"%s%s><h2 id="%s">%s</h2>%s</section>'
@@ -2290,8 +2301,8 @@ def render_coe(art, site):
                            if implementation else "")
     parts = [document_inbound(site, art["uri"]), implementation_link]
     for node in art.get("structure", []):
-        if node.get("type") == "artikel":
-            parts.append(_render_coe_article(node, site, art["uri"], toc, rail))
+        if node.get("type") in ("artikel", "sektion"):
+            parts.append(_render_coe_provision(node, site, art["uri"], toc, rail))
         else:
             parts.append(render_node(node, site, art["uri"], toc, rail))
     rail.add_document()

@@ -15,13 +15,17 @@ from ..lib.util import normalize_space
 from .download import body_path, record_path
 from .model import Treaty
 
-RE_ARTICLE = re.compile(r"^Article\s+(\d+[A-Z]?)\s*(?:[–—-]\s*(.*))?$", re.I)
+RE_ARTICLE = re.compile(
+    r"^Article\s+((?:\d+[A-Z]?|[IVXLCDM]+)(?:\.\d+)?)"
+    r"\s*(?:[–—-]\s*(.*))?$", re.I)
 RE_DIVISION = re.compile(r"^(Chapter|Section|Part)\s+([IVXLCDM\d]+)\b(?:\s*[–—-]\s*)?(.*)$",
                          re.I)
 # numbered paragraphs and lettered points open with '1.'/'(a)' in older
 # texts and with the bare '1'/'a' of the current rm.coe.int layout
 RE_PARAGRAPH = re.compile(r"^(\d{1,2})\.?\s+(.*)$", re.DOTALL)
 RE_POINT = re.compile(r"^\(?([a-z])[.)]?\s+(.*)$", re.DOTALL)
+RE_EDITORIAL_NOTE = re.compile(
+    r"^\d+\s+(?:Text (?:amended|inserted|deleted|replaced)|As amended)\b", re.I)
 
 
 def pdf_paragraphs(path, patch_key=None):
@@ -35,9 +39,41 @@ def _runs(text):
     return [text]
 
 
+def _unique_id(base, ids):
+    ids[base] = ids.get(base, 0) + 1
+    return base if ids[base] == 1 else "%s-%d" % (base, ids[base])
+
+
+def _section_structure(root, ids):
+    """Turn section divisions into provision containers for the exceptional
+    instruments (notably ETS 048A) whose operative structure has Sections but
+    no own Article headings."""
+    out = []
+    section_children = None
+    for node in root:
+        text = "".join(node.get("text", []))
+        division = RE_DIVISION.fullmatch(text)
+        if (node.get("type") == "rubrik" and division
+                and division.group(1).lower() == "section"):
+            ordinal = division.group(2).upper()
+            section_children = []
+            section = {
+                "type": "sektion", "id": _unique_id("Sec%s" % ordinal, ids),
+                "ordinal": ordinal, "text": node["text"],
+                "children": section_children,
+            }
+            out.append(section)
+        elif section_children is not None:
+            section_children.append(node)
+        else:
+            out.append(node)
+    return out
+
+
 def build_structure(paragraphs):
     """Classified paragraphs to a tree with stable article/subarticle ids."""
     root = []
+    ids = {}
     article = paragraph = None
     article_children = paragraph_children = None
     loose = article_serial = 0
@@ -55,7 +91,8 @@ def build_structure(paragraphs):
             if match.group(2):
                 title += " – " + match.group(2)
             article_children = []
-            article = {"type": "artikel", "id": article_fragment(number),
+            article = {"type": "artikel",
+                       "id": _unique_id(article_fragment(number), ids),
                        "ordinal": number, "text": _runs(title),
                        "children": article_children}
             root.append(article)
@@ -63,12 +100,12 @@ def build_structure(paragraphs):
             paragraph_children = None
             article_serial = 0
             continue
-        numbered = RE_PARAGRAPH.match(text)
+        numbered = None if RE_EDITORIAL_NOTE.match(text) else RE_PARAGRAPH.match(text)
         if article and article_children is not None and numbered:
             number = numbered.group(1)
             paragraph_children = []
             paragraph = {"type": "stycke",
-                         "id": article_fragment(article["ordinal"], number),
+                         "id": _unique_id("%sP%s" % (article["id"], number), ids),
                          "ordinal": number, "text": _runs(numbered.group(2)),
                          "children": paragraph_children}
             article_children.append(paragraph)
@@ -76,9 +113,9 @@ def build_structure(paragraphs):
         point = RE_POINT.match(text)
         if article and article_children is not None and point:
             letter = point.group(1)
-            parent_number = paragraph.get("ordinal") if paragraph else None
             node = {"type": "punkt",
-                    "id": article_fragment(article["ordinal"], parent_number, letter),
+                    "id": _unique_id("%sL%s" % (
+                        paragraph["id"] if paragraph else article["id"], letter), ids),
                     "ordinal": letter, "text": _runs(point.group(2))}
             (paragraph_children if paragraph_children is not None
              else article_children).append(node)
@@ -86,14 +123,16 @@ def build_structure(paragraphs):
         node = {"type": "stycke", "text": _runs(text)}
         if article and article_children is not None:
             article_serial += 1
-            node["id"] = "%sS%d" % (article["id"], article_serial)
+            node["id"] = _unique_id("%sS%d" % (article["id"], article_serial), ids)
             article_children.append(node)
         else:
             loose += 1
             node["id"] = "S%d" % loose
             root.append(node)
     if not any(node.get("type") == "artikel" for node in root):
-        raise ValueError("official treaty text contains no Article headings")
+        root = _section_structure(root, ids)
+        if not any(node.get("type") == "sektion" for node in root):
+            raise ValueError("official treaty text contains no Article or Section provisions")
     return root
 
 

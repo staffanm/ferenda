@@ -57,6 +57,60 @@ def test_parse_pdf_body():
     assert article2["children"][0]["children"][0]["id"] == "A2P1La"
 
 
+def _flatten(nodes):
+    for node in nodes:
+        yield node
+        yield from _flatten(node.get("children", []))
+
+
+def test_roman_and_compound_article_designations():
+    structure = parse.build_structure([
+        ("Section I – Definitions", True),
+        ("Article I", True),
+        ("Definitions apply.", False),
+        ("Article II.1", True),
+        ("1 First rule.", False),
+    ])
+    articles = [node for node in structure if node["type"] == "artikel"]
+    assert [(node["id"], node["ordinal"]) for node in articles] == [
+        ("AI", "I"), ("AII.1", "II.1")]
+    assert articles[1]["children"][0]["id"] == "AII.1P1"
+
+
+def test_section_only_amending_protocol_has_provision_structure():
+    structure = parse.build_structure([
+        ("Preamble", True),
+        ("Have agreed as follows:", False),
+        ("Section I", True),
+        ("Article 1, paragraph 1, shall read:", False),
+        ("Replacement text.", False),
+        ("Section II", True),
+        ("Final clauses apply.", False),
+    ])
+    sections = [node for node in structure if node["type"] == "sektion"]
+    assert [(node["id"], node["ordinal"]) for node in sections] == [
+        ("SecI", "I"), ("SecII", "II")]
+    assert "Article 1, paragraph 1" in sections[0]["children"][0]["text"][0]
+
+
+def test_repeated_coe_designators_get_contextual_unique_ids():
+    structure = parse.build_structure([
+        ("Article 1", True),
+        ("1 First paragraph.", False),
+        ("a First list.", False),
+        ("a Second list with the same printed marker.", False),
+        ("1 Text amended in accordance with Protocol No. 1.", False),
+        ("1 Replacement paragraph.", False),
+        ("Article 1", True),
+        ("1 Appended provision.", False),
+    ])
+    nodes = list(_flatten(structure))
+    ids = [node["id"] for node in nodes if node.get("id")]
+    assert len(ids) == len(set(ids))
+    assert {"A1", "A1P1", "A1P1La", "A1P1La-2", "A1S1", "A1P1-2",
+            "A1-2", "A1-2P1"} <= set(ids)
+
+
 def test_parse_treaty_artifact_and_sfs_bridge():
     record = _records()["005"]
     art = parse.parse_record(record, parse.pdf_paragraphs(FIXTURES / "009.pdf"))
