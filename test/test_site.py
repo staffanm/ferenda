@@ -548,13 +548,15 @@ def test_renders_nested_punkt_sublist(tmp_path):
     assert 'aria-label="Permalänk">¶</a>' in html
 
 
-def test_snippet_tooltip_on_outbound_link(tmp_path):
+def test_outbound_link_carries_no_tooltip(tmp_path):
     con = build_catalog(tmp_path)
     site = render.Site.from_catalog(con)
-    # the case links to 1975:635#P6; hovering shows that paragraph's text
-    # (built from its stycke + any list items)
+    # the case links to 1975:635#P6; hover preview is popover.js's job (built
+    # client-side from the rendered target page), so the link must be plain --
+    # a title attribute would fight the popover with a native tooltip
     html = render.render_dv(CASE, site)
-    assert 'title="Ränta beräknas enligt 5 §."' in html
+    assert 'href="/1975:635#P6"' in html
+    assert 'title="Ränta beräknas enligt 5 §."' not in html
 
 
 def test_inbound_grouped_by_source(tmp_path):
@@ -874,30 +876,6 @@ def test_repeal_date_passing_rerenders_page(tmp_path, monkeypatch):
     assert LAW["uri"] in rendered_uris               # status flipped -> re-rendered
     page = compress.read_text(out / render.doc_relpath(LAW["uri"]))
     assert "pphävd" in page                          # page now marked upphävd
-
-
-def test_relate_drops_stale_fragments_on_id_change(tmp_path):
-    # re-relating an artifact whose node ids changed must not leave ghost
-    # fragment rows behind: INSERT OR REPLACE only overwrites ids that still
-    # exist, so without the pre-delete a renamed/shed node's snippet lived on
-    # forever (a dead link tooltip)
-    db = str(tmp_path / "catalog.sqlite")
-    law = tmp_path / "law.json"
-    law.write_text(json.dumps(LAW))
-    catalog.rebuild(db, "sfs", [law])
-    con = catalog.connect(db)
-    assert catalog.snippet(con, "https://lagen.nu/1975:635#P6S1")
-    con.close()
-
-    renamed = json.loads(json.dumps(LAW))
-    renamed["structure"][0]["id"] = "P7"
-    renamed["structure"][0]["children"][0]["id"] = "P7S1"
-    law.write_text(json.dumps(renamed))
-    catalog.rebuild(db, "sfs", [law])
-    con = catalog.connect(db)
-    assert catalog.snippet(con, "https://lagen.nu/1975:635#P7S1")
-    assert catalog.snippet(con, "https://lagen.nu/1975:635#P6S1") is None
-    assert catalog.snippet(con, "https://lagen.nu/1975:635#P6") is None
 
 
 def test_inbound_excludes_kommentar_annotation(tmp_path):

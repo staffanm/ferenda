@@ -17,8 +17,9 @@ never as part of a corpus-wide parse/relate/generate.
 import json
 from pathlib import Path
 
-from ..lib import annstore, catalog, compress, layout, llm
+from ..lib import annstore, compress, layout, llm
 from ..lib.eu_structure import flatten
+from ..lib.text import runs_text
 
 PROMPT = Path(__file__).with_name("preamble_analyzer_prompt.txt")
 PLACEHOLDER = "[PASTE FULL LEGAL ACT TEXT HERE]"
@@ -36,7 +37,7 @@ def act_markdown(art):
     # whose title never got extracted, in which case the CELEX is the heading
     lines = ["# %s" % (art["title"] or art["celex"]), ""]
     for b in flatten(art["structure"]):
-        text = catalog.runs_text(b["text"]).strip()
+        text = runs_text(b["text"]).strip()
         t, num = b["type"], b.get("num")
         if t == "recital":
             lines.append("(%s) %s" % (num, text) if num else text)

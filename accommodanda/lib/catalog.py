@@ -25,7 +25,6 @@ from pathlib import Path
 
 from . import compress, concepts, util
 from .markdown import begrepp_uri
-from .text import runs_text
 
 BASE = "https://lagen.nu/"
 
@@ -58,10 +57,6 @@ CREATE TABLE IF NOT EXISTS links (
     to_uri      TEXT NOT NULL,   -- full target incl. #fragment
     to_root     TEXT NOT NULL,   -- target document uri, fragment stripped
     text        TEXT             -- citation surface text
-);
-CREATE TABLE IF NOT EXISTS fragments (
-    uri     TEXT PRIMARY KEY,       -- a node's fragment uri (doc#id)
-    snippet TEXT                    -- its text + list items, for link tooltips
 );
 CREATE TABLE IF NOT EXISTS concept_alias (
     variant   TEXT PRIMARY KEY,     -- an inflected/variant begrepp uri
@@ -330,40 +325,6 @@ def definition_links(art):
     return out
 
 
-SNIPPET_LEN = 220
-
-
-def node_snippet(node):
-    """A node's text plus its list items, flattened and truncated -- what a
-    link to this node shows as a hover tooltip (e.g. a paragraph and its
-    numbered points)."""
-    parts = [runs_text(node.get("text", []))]
-    for child in node.get("children", []):
-        marker = child.get("ordinal")
-        parts.append((("%s. " % marker) if marker else "") + node_snippet(child))
-    text = " ".join(p for p in parts if p).strip()
-    return text[:SNIPPET_LEN] + ("…" if len(text) > SNIPPET_LEN else "")
-
-
-def collect_fragments(node, doc_uri, out):
-    """(fragment-uri, snippet) for every id-bearing node in an artifact tree."""
-    if isinstance(node, dict):
-        if node.get("id"):
-            out.append((doc_uri + "#" + node["id"], node_snippet(node)))
-        for value in node.values():
-            collect_fragments(value, doc_uri, out)
-    elif isinstance(node, list):
-        for item in node:
-            collect_fragments(item, doc_uri, out)
-
-
-def artifact_fragments(art):
-    out = []
-    collect_fragments(art.get("structure"), art["uri"], out)
-    collect_fragments(art.get("body"), art["uri"], out)
-    return out
-
-
 # --------------------------------------------------------------------------
 # document rows
 # --------------------------------------------------------------------------
@@ -518,22 +479,16 @@ def content_hash(raw):
 
 
 def _drop_document(con, uri):
-    """Remove a document and everything keyed off it: its outbound links and its
-    fragment snippets (doc#id and every doc#id child)."""
+    """Remove a document and everything keyed off it: its outbound links and
+    its concept redirects."""
     con.execute("DELETE FROM links WHERE from_uri = ?", (uri,))
     con.execute("DELETE FROM documents WHERE uri = ?", (uri,))
-    # range predicate instead of LIKE 'uri#%': LIKE is case-insensitive by
-    # default so it cannot use the primary-key index and full-scans the
-    # multi-million-row table per dropped document ('$' is '#' + 1)
-    con.execute("DELETE FROM fragments WHERE uri = ? "
-                "OR (uri >= ? || '#' AND uri < ? || '$')",
-                (uri, uri, uri))
     con.execute("DELETE FROM concept_redirect WHERE concept = ?", (uri,))
 
 
 def _index_document(con, art, path, source):
-    """(Re)write one document's rows: its documents row, outbound links and
-    fragment snippets, replacing any prior version keyed by the same uri."""
+    """(Re)write one document's rows: its documents row and outbound links,
+    replacing any prior version keyed by the same uri."""
     uri = art["uri"]
     con.execute("DELETE FROM links WHERE from_uri = ?", (uri,))
     row = document_row(art, path, source)        # (uri, source, kind, label, title, path)
@@ -552,16 +507,6 @@ def _index_document(con, art, path, source):
                                 + definition_links(art)
                                 + bemyndigande_links(art))]
     con.executemany("INSERT INTO links VALUES (?,?,?,?,?,?)", rows)
-    # pre-delete this document's fragment rows before re-inserting: INSERT OR
-    # REPLACE only overwrites ids that still exist, so a shed or renamed node id
-    # would otherwise leave a ghost snippet row (a dead link tooltip) forever.
-    # Same range predicate as _drop_document (a case-insensitive LIKE would
-    # bypass the primary-key index; '$' is '#' + 1).
-    con.execute("DELETE FROM fragments WHERE uri = ? "
-                "OR (uri >= ? || '#' AND uri < ? || '$')",
-                (uri, uri, uri))
-    con.executemany("INSERT OR REPLACE INTO fragments VALUES (?,?)",
-                    artifact_fragments(art))
     # a begrepp's `aliases` (old names from MediaWiki redirects) -> resolve to it
     con.execute("DELETE FROM concept_redirect WHERE concept = ?", (uri,))
     con.executemany("INSERT OR REPLACE INTO concept_redirect VALUES (?, ?)",
@@ -999,13 +944,6 @@ def document_inbound_counts(con):
         "SELECT to_root, COUNT(*) FROM (SELECT l.to_root, 1 FROM links l "
         "WHERE 1=1" + _NOT_SELF + " GROUP BY l.to_root, l.from_uri, "
         "l.from_anchor) GROUP BY to_root"))
-
-
-def snippet(con, uri):
-    """The stored text snippet for a fragment uri (link-tooltip text), or None."""
-    row = con.execute("SELECT snippet FROM fragments WHERE uri = ?",
-                      (uri,)).fetchone()
-    return row[0] if row else None
 
 
 def counts(con):

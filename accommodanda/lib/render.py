@@ -55,6 +55,7 @@ from .catalog import BASE
 from .eu_structure import flatten as eurlex_flatten
 from .eu_structure import subarticle_key
 from .markdown import begrepp_uri
+from .text import runs_text
 from .util import basefile_slug, split_numalpha
 
 # the browser-facing static chrome (stylesheet, client scripts, robots.txt),
@@ -67,7 +68,6 @@ ASSETS = Path(__file__).parent / "assets"
 class Site:
     con: sqlite3.Connection
     known: set[str]                     # document root uris present
-    snippets: dict[str, str] = field(default_factory=dict)      # fragment uri -> tooltip text (lazy cache)
     aliases: dict[str, str] = field(default_factory=dict)       # variant begrepp uri -> canonical concept
     # (law_uri, anchor) -> [(author, prose)]; anchor is None for the act-level preamble
     commentary: dict[tuple[str, str | None], list[tuple[str | None, list[dict]]]] = field(default_factory=dict)
@@ -86,7 +86,7 @@ class Site:
         commentary, guidance, article_guidance = _kommentar_indexes(con)
         remiss_feedback, remiss_overall = _remiss_indexes()
         return cls(con, {u for (u,) in con.execute("SELECT uri FROM documents")},
-                   {}, catalog.concept_aliases(con),
+                   catalog.concept_aliases(con),
                    commentary, guidance, article_guidance,
                    remiss_feedback, remiss_overall, _fk_index(con))
 
@@ -99,13 +99,6 @@ class Site:
 
     def has(self, uri):
         return catalog.strip_fragment(uri) in self.known
-
-    def snippet(self, uri):
-        """Tooltip text for a link target (the target paragraph + its list
-        items), cached per generate run; '' if the catalog has none."""
-        if uri not in self.snippets:
-            self.snippets[uri] = catalog.snippet(self.con, uri) or ""
-        return self.snippets[uri]
 
 
 def _kommentar_indexes(con):
@@ -519,7 +512,7 @@ class Toc:
 
 def plain(runs):
     """Heading text for the TOC: inline runs flattened to plain text."""
-    return catalog.runs_text(runs).strip()
+    return runs_text(runs).strip()
 
 
 MIN_TOC = 3   # below this many headings a TOC adds clutter, not navigation
@@ -559,16 +552,15 @@ def render_runs(runs, site):
             continue
         uri = site.resolve(run["uri"])     # fold a begrepp variant onto its canon
         if site.has(uri):
-            # a document we host (incl. EU acts we've parsed) -- local link;
-            # hover shows the target paragraph (+ its list items). A "term" run
-            # is an in-act use of a defined term: underlined, hover shows its
-            # definition (the definition point's snippet).
-            tip = site.snippet(uri)
+            # a document we host (incl. EU acts we've parsed) -- local link.
+            # Hover preview (the target paragraph, a defined term's definition)
+            # is popover.js's job, built from the rendered target page itself --
+            # no title attribute, which would fight the popover with a native
+            # tooltip. A "term" run is an in-act use of a defined term:
+            # underlined, same hover affordance.
             cls = ' class="term"' if run.get("kind") == "term" else ""
-            out.append('<a%s href="%s"%s>%s</a>'
-                       % (cls, escape(href(uri)),
-                          (' title="%s"' % escape(tip)) if tip else "",
-                          escape(run["text"])))
+            out.append('<a%s href="%s">%s</a>'
+                       % (cls, escape(href(uri)), escape(run["text"])))
         elif is_external(uri):
             # an ext/ reference we don't host -- out to the external service
             # (EUR-Lex for a CELEX); becomes a local link once we parse it

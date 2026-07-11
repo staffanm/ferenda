@@ -1,6 +1,6 @@
 """One definition of "the plain text behind an artifact's inline-run structure",
-shared by the catalog (link-tooltip snippets), the search indexer (full document
-and per-fragment text) and the bulk dumps.
+shared by the search indexer (full document and per-fragment text), the MCP
+pinpoint reader, the renderer and the bulk dumps.
 
 An artifact's text lives in two leaf carriers: a node's ``text`` -- a list of
 runs, each a plain ``str`` or a ``{"uri","text",...}`` link dict -- and a table

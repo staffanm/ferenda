@@ -11,8 +11,8 @@ definition it points at agree by construction.
 
 A definition is valid only within its act (cross-act reuse goes through explicit
 references), so occurrences are interlinked act-locally: every later use of a
-defined term becomes a link to that act's own definition point, whose stored
-snippet is the definition shown on hover. Matching is suffix-tolerant -- Swedish
+defined term becomes a link to that act's own definition point, whose text the
+hover preview (popover.js) shows. Matching is suffix-tolerant -- Swedish
 inflects, so "sårbarhet" defined matches "sårbarheter" used -- and longest-term
 first, so "storskalig cybersäkerhetsincident" wins over the "cybersäkerhet"
 nested inside it. The point defining a term never links that term to itself.
