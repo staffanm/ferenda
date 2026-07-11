@@ -72,7 +72,7 @@ def test_forarbete_type_and_year():
 
 def test_eurlex_kind_and_year():
     # the type facet is the catalog's stored doctype, not re-derived from CELEX
-    assert facets._eu_kind(row(U + "ext/celex/32016R0679", kind="regulation")) == "regulation"
+    assert facets._catalog_kind(row(U + "ext/celex/32016R0679", kind="regulation")) == "regulation"
     assert facets._eu_year(row(U + "ext/celex/32016R0679")) == "2016"
     assert facets._eu_year(row(U + "ext/celex/61989CJ0074")) == "1989"
 

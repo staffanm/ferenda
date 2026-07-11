@@ -1,0 +1,15 @@
+{
+  "itemid": "001-123456",
+  "docname": "CASE OF EXAMPLE v. SWEDEN",
+  "documentcollectionid2": "CASELAW;JUDGMENTS;CHAMBER;ENG",
+  "languageisocode": "ENG",
+  "judgementdate": "12/03/2024 00:00:00",
+  "kpdate": "2024-03-12T00:00:00",
+  "appno": "12345/20;67890/21",
+  "ecli": "ECLI:CE:ECHR:2024:0312JUD001234520",
+  "respondent": "SWE",
+  "originatingbody": "4",
+  "importance": "1",
+  "article": "8;6-3-d;P1-1;P7-4",
+  "conclusion": "Violation of Article 8;No violation of Article 6"
+}

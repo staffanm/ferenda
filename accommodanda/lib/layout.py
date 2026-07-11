@@ -54,6 +54,7 @@ OCR = DATA / "ocr"                  # re-OCR sidecar PDFs (forarbete parse input
 # the on-disk source-dir name under each stage; "dv" -> "dom" (see above)
 SOURCE_DIR = {"sfs": "sfs", "dv": "dom", "forarbete": "forarbete",
               "eurlex": "eurlex", "foreskrift": "foreskrift", "avg": "avg",
+              "hudoc": "hudoc", "coe": "coe",
               "remisser": "remisser", "kommentar": "kommentar",
               "begrepp": "begrepp", "site": "site"}
 
@@ -72,6 +73,8 @@ FA_DOWNLOADED = DOWNLOADED / "forarbete"
 EURLEX_DOWNLOADED = DOWNLOADED / "eurlex"
 FORESKRIFT_DOWNLOADED = DOWNLOADED / "foreskrift"   # <fs>/<slug>.{json,pdf}
 AVG_DOWNLOADED = DOWNLOADED / "avg"                 # <org>/<slug>.{json,pdf,html}
+HUDOC_DOWNLOADED = DOWNLOADED / "hudoc"             # <itemid>.{json,html}
+COE_DOWNLOADED = DOWNLOADED / "coe"                 # <CETS>.{json,pdf|html}
 
 # remisser's case records + answer PDFs share one download tree (see remisser_case)
 REMISSER_DOWNLOADED = DOWNLOADED / "remisser"
@@ -141,6 +144,8 @@ def relpath(source, basefile):
     if source == "avg":
         org, rest = basefile.split("/", 1)       # "jo/2340-2025", "jk/2024/8082"
         return Path(org) / rest.replace("/", "-")
+    if source in ("hudoc", "coe"):
+        return Path(basefile)
     if source == "remisser":
         case, org = basefile.split("/", 1)        # "<case-slug>/<org-slug>"
         return Path(case) / org
@@ -450,6 +455,8 @@ def page_relpath(uri):
         prefix = "begrepp"
     elif loc.startswith("ext/celex/"):
         return "eurlex/%s.html" % loc[len("ext/celex/"):].replace("/", "_")
+    elif loc.startswith("ext/coe/"):
+        return "coe/%s.html" % _alnum_slug(loc[len("ext/coe/"):])
     elif loc.startswith(FORARBETE):
         # keep the type as the top-level segment, slug only the rest:
         # prop/2024/25:1 -> prop/2024_25_1.html (served at /prop/…)
@@ -486,6 +493,8 @@ def page_url(uri):
     loc = local(strip_fragment(uri))
     if loc.startswith("ext/celex/"):
         return "/celex/" + loc[len("ext/celex/"):]
+    if loc.startswith("ext/coe/"):
+        return "/coe/" + loc[len("ext/coe/"):]
     return "/" + loc
 
 
@@ -501,6 +510,8 @@ def url_to_relpath(path):
         return None
     if loc.startswith("celex/"):
         loc = "ext/celex/" + loc[len("celex/"):]
+    elif loc.startswith("coe/"):
+        loc = "ext/coe/" + loc[len("coe/"):]
     return page_relpath(BASE + loc)
 
 

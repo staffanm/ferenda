@@ -223,7 +223,9 @@ re_roman = re.compile(
 
 
 def normalize_space(s):
-    return " ".join(s.split())
+    """Whitespace-collapsed and stripped display form. None-safe (an absent
+    value normalizes to "")."""
+    return " ".join((s or "").split())
 
 
 def normalize_fold(s):

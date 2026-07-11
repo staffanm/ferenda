@@ -183,6 +183,8 @@ def doc_actions(row, inbound_count, version=None):
     if not raw.strip():
         return
     art = json.loads(raw)
+    if "year" not in shared and re.match(r"\d{4}", art.get("date") or ""):
+        shared["year"] = art["date"][:4]
     # the reader-facing heading, shared with the page and listings: short name +
     # acronym where the artifact carries them, else the full title (catalog)
     display = catalog.display_title(art, title)

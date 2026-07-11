@@ -54,6 +54,8 @@ from .api import patch as api_patch
 from .avg import download as avg_download
 from .avg import legacy as avg_legacy
 from .avg import parse as avg_parse
+from .coe import download as coe_download
+from .coe import parse as coe_parse
 from .dv import download as dv_download
 from .dv import identity as dv_identity
 from .dv import namedcases as dv_namedcases_mod
@@ -77,6 +79,8 @@ from .foreskrift import harvest as foreskrift_harvest_mod
 from .foreskrift import legacy as foreskrift_legacy
 from .foreskrift import parse as foreskrift_parse
 from .foreskrift.agencies import REGISTRY as FORESKRIFT_AGENCIES
+from .hudoc import download as hudoc_download
+from .hudoc import parse as hudoc_parse
 from .lib import (
     annstore,
     casenaming,
@@ -383,11 +387,11 @@ class RunOptions:
                                        # don't rebuild all when parse code changes)
     aggregates_only: bool = False  # generate: only the corpus-wide pages
     since: date | None = None    # eurlex: discovery floor (overrides watermark)
-    lang: str | None = None      # eurlex: comma-separated languages
+    lang: str | None = None      # eurlex/hudoc: comma-separated languages
     source: str = "sparql"       # eurlex: discovery backend (sparql|soap)
-    only: str | None = None      # forarbete: fetch a single document
+    only: str | None = None      # source-specific targeted download
     riksmote: str | None = None  # forarbete bet: narrow the harvest to one riksmöte
-    limit: int | None = None     # import-legacy (avg/forarbete): cap the run (a slice)
+    limit: int | None = None     # harvest/import cap (a test/backfill slice)
     rot13: bool = False          # mkpatch: obfuscate the patch (PII redactions)
     resume_after: str | None = None  # sfs download: resume an interrupted backfill
     rebuild_history: bool = False  # sfs history-as-git: rewrite main from corpus
@@ -1225,6 +1229,86 @@ SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
 
 
 # --------------------------------------------------------------------------
+# Council of Europe sources: Treaty Office instruments + HUDOC case law
+# --------------------------------------------------------------------------
+
+HUDOC_CODE = (PKG / "hudoc" / "parse.py", PKG / "hudoc" / "model.py",
+              PKG / "lib" / "coe.py")
+COE_CODE = (PKG / "coe" / "parse.py", PKG / "coe" / "model.py",
+            PKG / "lib" / "coe.py", PKG / "lib" / "pdftext.py")
+
+
+def hudoc_inputs(basefile):
+    return [hudoc_download.record_path(layout.HUDOC_DOWNLOADED, basefile),
+            hudoc_download.body_path(layout.HUDOC_DOWNLOADED, basefile)] \
+        + _patch_input("hudoc", basefile)
+
+
+def hudoc_parse_run(basefile):
+    write_artifact("hudoc", basefile,
+                   hudoc_parse.parse(basefile, layout.HUDOC_DOWNLOADED))
+
+
+def hudoc_harvest(_scopes):
+    if RUN.dry_run:
+        print("hudoc download: would download %s into %s"
+              % (RUN.only or "HUDOC case law", layout.HUDOC_DOWNLOADED))
+        return
+    languages = tuple(lang.strip().upper() for lang in RUN.lang.split(",")) \
+        if RUN.lang else hudoc_download.DEFAULT_LANGUAGES
+    seen, changed = hudoc_download.sync(
+        layout.HUDOC_DOWNLOADED, full=RUN.force, only=RUN.only,
+        languages=languages, limit=RUN.limit, delay=POLITENESS)
+    print("hudoc: %d seen, %d changed" % (seen, changed))
+
+
+SOURCES["hudoc"] = Source(
+    "hudoc", lambda: hudoc_download.list_basefiles(layout.HUDOC_DOWNLOADED),
+    {"parse": Stage("parse", hudoc_parse_run,
+                    lambda bf: layout.artifact("hudoc", bf),
+                    inputs=hudoc_inputs, code=HUDOC_CODE)},
+    harvest=hudoc_harvest, origin=_origin(hudoc_download.BASE),
+    notes="download flags: --lang ENG[,FRE], --only <HUDOC-itemid>, --limit N\n"
+          "scope: Grand Chamber + Chamber judgments; default language is ENG;\n"
+          "--force refreshes stored metadata and bodies; bodies are fetched\n"
+          "by a small worker pool (4 in flight)")
+
+
+def coe_inputs(basefile):
+    record_path = coe_download.record_path(layout.COE_DOWNLOADED, basefile)
+    paths = [record_path]
+    if compress.exists(record_path):
+        record = json.loads(compress.read_text(record_path))
+        paths.append(coe_download.body_path(layout.COE_DOWNLOADED, record))
+    return paths + _patch_input("coe", basefile)
+
+
+def coe_parse_run(basefile):
+    write_artifact("coe", basefile, coe_parse.parse(basefile, layout.COE_DOWNLOADED))
+
+
+def coe_harvest(_scopes):
+    if RUN.dry_run:
+        print("coe download: would download %s into %s"
+              % (RUN.only or "all Treaty Office instruments", layout.COE_DOWNLOADED))
+        return
+    seen, changed = coe_download.sync(
+        layout.COE_DOWNLOADED, full=RUN.force, only=RUN.only,
+        limit=RUN.limit, delay=POLITENESS)
+    print("coe: %d seen, %d changed" % (seen, changed))
+
+
+SOURCES["coe"] = Source(
+    "coe", lambda: coe_download.list_basefiles(layout.COE_DOWNLOADED),
+    {"parse": Stage("parse", coe_parse_run,
+                    lambda bf: layout.artifact("coe", bf),
+                    inputs=coe_inputs, code=COE_CODE)},
+    harvest=coe_harvest, origin=_origin(coe_download.FULL_LIST),
+    notes="download flags: --only <CETS-number>, --limit N\n"
+          "one Treaty Office web-service search plus each official English PDF")
+
+
+# --------------------------------------------------------------------------
 # föreskrift source (agency regulations: FFFS, … -- per-fs subtrees, PDF body)
 # --------------------------------------------------------------------------
 
@@ -1868,6 +1952,8 @@ ARTIFACTS = {
     "foreskrift": lambda: sorted(
         compress.glob(layout.artifact_dir("foreskrift"), "*/*.json")),
     "avg": lambda: sorted(compress.glob(layout.artifact_dir("avg"), "*/*.json")),
+    "hudoc": lambda: layout.artifacts("hudoc"),
+    "coe": lambda: layout.artifacts("coe"),
 }
 
 
@@ -2629,21 +2715,23 @@ def main(argv=None):
                    help="eurlex download: only discover documents dated on/after "
                         "this (overrides the per-sector watermark for this run)")
     p.add_argument("--lang", metavar="CODES",
-                   help="eurlex download: comma-separated languages (default swe,eng)")
+                   help="eurlex/hudoc download: comma-separated languages "
+                        "(defaults: eurlex swe,eng; hudoc ENG)")
     p.add_argument("--source", dest="discovery", choices=("sparql", "soap"),
                    default="sparql",
                    help="eurlex download: discovery backend (default sparql)")
     p.add_argument("--only", metavar="BASEFILE",
                    help="fetch just this one document, bypassing the listing "
-                        "walk (forarbete/foreskrift/avg download: needs exactly "
+                        "walk (hudoc/coe accept an item id/treaty number; "
+                        "forarbete/foreskrift/avg need exactly "
                         "one doctype/fs/organ scope; remisser download: one "
                         "case URL)")
     p.add_argument("--riksmote", metavar="YYYY/YY",
                    help="forarbete download bet: narrow the download to one "
                         "riksmöte, e.g. 2025/26 (bet scope only)")
     p.add_argument("--limit", type=int, metavar="N",
-                   help="import-legacy (avg/forarbete): import at most N "
-                        "documents (a test slice)")
+                   help="harvest/import at most N documents (a test/backfill slice; "
+                        "supported by hudoc/coe and legacy imports)")
     p.add_argument("--rot13", action="store_true",
                    help="mkpatch: store the patch rot13-obfuscated, so a "
                         "redaction of personal data is not plain-text googleable "

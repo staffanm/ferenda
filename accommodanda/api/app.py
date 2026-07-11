@@ -268,7 +268,7 @@ _resolved_results = pins.resolved_results
 def search_endpoint(
         q: str = Query(..., description="free-text query"),
         source: str | None = Query(None, description="restrict to a source "
-                                   "(sfs, dv, forarbete, foreskrift, eurlex, avg, kommentar, begrepp)"),
+                                   "(sfs, dv, hudoc, forarbete, foreskrift, eurlex, coe, avg, kommentar, begrepp)"),
         kind: str | None = Query(None, description="restrict to a document kind"),
         year: str | None = Query(None, pattern=r"^\d{4}$",
                                  description="restrict to a four-digit publication/decision year"),
@@ -377,7 +377,7 @@ def legacy_html_feed(
 @app.get("/api/v1/facets", response_model=FacetTree, tags=["catalog"])
 def facets_endpoint(
         source: str = Query(..., description="a faceted source "
-                            "(sfs, dv, forarbete, foreskrift, eurlex, avg, begrepp)"),
+                            "(sfs, dv, hudoc, forarbete, foreskrift, eurlex, coe, avg, begrepp)"),
         con: sqlite3.Connection = Depends(get_con)):
     """The navigation facets for a source: the ordered buckets (one or two levels
     -- a law's subject initial, a case's court + year) with document counts, plus
@@ -391,7 +391,7 @@ def facets_endpoint(
 @app.get("/api/v1/browse", response_model=FacetTree, tags=["catalog"])
 def browse_endpoint(
         source: str = Query(..., description="a faceted source "
-                            "(sfs, dv, forarbete, foreskrift, eurlex, avg, begrepp)"),
+                            "(sfs, dv, hudoc, forarbete, foreskrift, eurlex, coe, avg, begrepp)"),
         con: sqlite3.Connection = Depends(get_con)):
     """The complete browse model for a source: the facet navigator *plus* each
     leaf bucket's ordered, display-labelled documents. The single payload the
@@ -405,7 +405,7 @@ def browse_endpoint(
 @app.get("/api/v1/documents", response_model=DocumentList, tags=["document"])
 def documents_endpoint(
         source: str | None = Query(None, description="restrict to a source "
-                                   "(sfs, dv, forarbete, foreskrift, eurlex, avg, kommentar, begrepp)"),
+                                   "(sfs, dv, hudoc, forarbete, foreskrift, eurlex, coe, avg, kommentar, begrepp)"),
         kind: str | None = Query(None, description="restrict to a document kind "
                                  "(law, case, prop, directive, …)"),
         limit: int = Query(100, ge=1, le=1000),

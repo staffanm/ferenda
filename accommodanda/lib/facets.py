@@ -23,7 +23,7 @@ from . import catalog, layout
 
 # a catalog row reduced to what facet-key extraction needs (its host-stripped
 # local id is precomputed once, since most extractors slice it)
-Row = namedtuple("Row", "uri local kind label title display")
+Row = namedtuple("Row", "uri local kind label title display date", defaults=[None])
 
 
 # --------------------------------------------------------------------------
@@ -155,6 +155,10 @@ def _avg_year(r):
     return "okänt"
 
 
+def _dated_year(r):
+    return r.date[:4] if r.date and re.match(r"\d{4}", r.date) else "okänt"
+
+
 # the case sources (publication series / court), in browse order. The published
 # referat carry a lowercase series segment ('dom/nja/…'); the *raw* avgöranden --
 # the court's own version, harvested months before its editor referat and folded
@@ -248,9 +252,10 @@ def _eu_celex(r):
     return r.local[len("ext/celex/"):].split("/")[0]
 
 
-def _eu_kind(r):
-    # the catalog's stored doctype is authoritative -- re-deriving it from the
-    # CELEX here diverged from what the rest of the app shows (lost the treaties)
+def _catalog_kind(r):
+    # the catalog's stored doctype is authoritative -- re-deriving it (e.g. from
+    # the CELEX) here diverged from what the rest of the app shows (lost the
+    # treaties); shared by the eurlex, coe and hudoc schemes
     return r.kind
 
 
@@ -311,6 +316,24 @@ SCHEMES = {
                                 "arn": "Allmänna reklamationsnämnden (ARN)"})),
         Level("År", _avg_year, _by_year_desc),
     ],
+    "hudoc": [
+        Level("Dokumenttyp", _catalog_kind,
+              _curated(["judgment", "decision", "communicated-case",
+                        "advisory-opinion", "legal-summary", "resolution",
+                        "case-law"]),
+              label=_map_label({"judgment": "Domar", "decision": "Beslut",
+                                "communicated-case": "Kommunicerade mål",
+                                "advisory-opinion": "Rådgivande yttranden",
+                                "legal-summary": "Rättsfallssammanfattningar",
+                                "resolution": "Resolutioner",
+                                "case-law": "Övrig praxis"})),
+        Level("År", _dated_year, _by_year_desc),
+    ],
+    "coe": [
+        Level("Typ", _catalog_kind, _curated(["treaty", "protocol"]),
+              label=_map_label({"treaty": "Fördrag", "protocol": "Protokoll"})),
+        Level("År", _dated_year, _by_year_desc),
+    ],
     "dv": [
         Level("Domstol", _dv_court, _curated(list(DV_COURTS)),
               label=_map_label(DV_COURTS)),
@@ -326,7 +349,7 @@ SCHEMES = {
         Level("År", _fa_year, _by_year_desc),
     ],
     "eurlex": [
-        Level("Typ", _eu_kind,
+        Level("Typ", _catalog_kind,
               _curated(["regulation", "directive", "decision", "judgment",
                         "treaty", "act"]),
               label=_map_label({"regulation": "Förordningar", "directive": "Direktiv",
@@ -399,11 +422,11 @@ def _rows(con, source):
     repealed statute whose repeal date has passed is omitted (still reachable by
     direct link and search) -- the listing shows only law in force."""
     expired = catalog.expired_uris(con, date.today().isoformat())
-    for uri, _src, kind, label, title, _url, _path, display in \
-            catalog.documents(con, source):
+    for uri, _src, kind, label, title, _url, _path, display, doc_date in \
+            catalog.facet_documents(con, source):
         local = catalog.local(uri)
         if uri not in expired and is_browsable(source, local):
-            yield Row(uri, local, kind, label, title, display)
+            yield Row(uri, local, kind, label, title, display, doc_date)
 
 
 def _path(levels, row):

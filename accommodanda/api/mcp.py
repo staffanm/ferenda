@@ -42,11 +42,13 @@ log = logging.getLogger(__name__)
 # look like, and the order to call them in. Read once by the host at connect.
 INSTRUCTIONS = """\
 lagen.nu -- the Swedish legal corpus: statutes (SFS), court decisions (dv),
-preparatory works (forarbete), agency regulations (foreskrift), EU law (eurlex),
-JO/JK/ARN decisions (avg) and editorial commentary (kommentar/begrepp) -- with the
-citation graph between them. Use these tools to ground answers about Swedish and
-EU law in the primary sources and to cite the exact paragraph/article rather than
-from memory: statutes are amended, and the corpus carries the current wording.
+European Court of Human Rights case law (hudoc), preparatory works (forarbete),
+agency regulations (foreskrift), EU law (eurlex), Council of Europe treaties
+(coe), JO/JK/ARN decisions (avg) and editorial commentary (kommentar/begrepp) --
+with the citation graph between them. Use these tools to ground answers about
+Swedish, EU and European human-rights law in the primary sources and to cite the
+exact paragraph/article rather than from memory: statutes are amended, and the
+corpus carries the current wording.
 
 Documents are identified by their public lagen.nu URI, e.g.
 `https://lagen.nu/1962:700` (Brottsbalken); a `#`-fragment pinpoints a
@@ -102,15 +104,16 @@ def _con():
 # contrast, is source-specific and open-ended (an FS code per agency, an eurlex
 # doctype, …), so it stays a guided free string -- a strict enum there would
 # reject valid kinds the host sees in results.
-Source = Literal["sfs", "dv", "forarbete", "foreskrift", "eurlex", "avg",
-                 "kommentar", "begrepp"]
+Source = Literal["sfs", "dv", "hudoc", "forarbete", "foreskrift", "eurlex",
+                 "coe", "avg", "kommentar", "begrepp"]
 SourceArg = Annotated[Source | None, Field(
     description="restrict to one corpus source; omit to search all")]
 KindArg = Annotated[str | None, Field(
     description="restrict to one document kind. Kinds are source-specific: "
     "law (sfs), case (dv), prop/sou/ds/dir (forarbete), a doctype like "
     "regulation/directive/judgment (eurlex), an FS code like fffs/nfs "
-    "(foreskrift), jo/jk/arn (avg), kommentar, begrepp. Omit unless you know the "
+    "(foreskrift), judgment/decision (hudoc), treaty/protocol (coe), "
+    "jo/jk/arn (avg), kommentar, begrepp. Omit unless you know the "
     "exact kind (it appears as `kind` on every result).")]
 
 # every tool is a pure read of public data: readOnlyHint lets a host auto-run them

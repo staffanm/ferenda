@@ -13,6 +13,7 @@ logs every failed response (status, headers, body) to stderr so a WAF/rate-limit
 block is distinguishable from a genuine error.
 """
 
+import ssl
 import sys
 import time
 
@@ -47,6 +48,25 @@ def make_session(user_agent):
     session.mount("https://", adapter)
     session.mount("http://", adapter)
     return session
+
+
+class _LegacyTLSAdapter(HTTPAdapter):
+    """An HTTPS adapter that accepts a legacy small-DH-key handshake, which
+    OpenSSL 3 refuses at its default security level (DH_KEY_TOO_SMALL)."""
+
+    def init_poolmanager(self, *args, **kwargs):
+        context = ssl.create_default_context()
+        context.set_ciphers("DEFAULT:@SECLEVEL=1")
+        kwargs["ssl_context"] = context
+        return super().init_poolmanager(*args, **kwargs)
+
+
+def mount_legacy_tls(session, prefix):
+    """Accept a legacy small-DH-key TLS handshake for one host prefix only
+    (e.g. ``https://conventions-ws.coe.int/``), keeping the standard retry
+    policy. The security level is lowered for that host alone, never
+    session-wide."""
+    session.mount(prefix, _LegacyTLSAdapter(max_retries=_RETRY))
 
 
 def _log_failure(exc, response):

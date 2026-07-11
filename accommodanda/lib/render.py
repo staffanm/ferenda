@@ -301,7 +301,10 @@ doc_relpath = layout.page_relpath
 
 EXT = BASE + "ext/"                          # the "external reference" namespace
 CELEX = BASE + "ext/celex/"
+COE = BASE + "ext/coe/"
 EURLEX = "https://eur-lex.europa.eu/legal-content/SV/TXT/?uri=CELEX:%s"
+COE_TREATY = ("https://www.coe.int/en/web/conventions/full-list2"
+              "?module=treaty-detail&treatynum=%s")
 
 
 def is_external(uri):
@@ -322,6 +325,8 @@ def external_href(uri):
     CELEX (the EU act on the official site), else the uri itself."""
     if uri.startswith(CELEX):
         return EURLEX % catalog.local(uri)[len("ext/celex/"):].split("#")[0]
+    if uri.startswith(COE):
+        return COE_TREATY % catalog.local(uri)[len("ext/coe/"):].split("#")[0]
     return uri
 
 
@@ -338,6 +343,14 @@ def human_fragment(frag):
         return ""
     if frag.startswith("sid"):
         return "s. " + frag[3:]
+    coe = re.fullmatch(r"A(\d+[A-Za-z]?)(?:P(\d+))?(?:L([a-z]))?", frag)
+    if coe:
+        parts = ["artikel %s" % coe.group(1)]
+        if coe.group(2):
+            parts.append("punkt %s" % coe.group(2))
+        if coe.group(3):
+            parts.append("led %s" % coe.group(3))
+        return " ".join(parts)
     segs = _FRAG_SEG.findall(frag)
     return " ".join("%s %s" % (val, FRAG_LABEL[letter]) for letter, val in segs)
 
@@ -364,7 +377,8 @@ def describe_citer(from_uri, anchor, label, title, source):
 # reading aid to a paragraph), then the machine-extracted sources, then concepts
 INBOUND_GROUPS = [("sfs", "Författningar"), ("forarbete", "Förarbeten"),
                   ("foreskrift", "Myndighetsföreskrifter"),
-                  ("dv", "Rättsfall"), ("eurlex", "EU-rätt"),
+                  ("dv", "Rättsfall"), ("hudoc", "Europadomstolens praxis"),
+                  ("eurlex", "EU-rätt"), ("coe", "Europarådets fördrag"),
                   ("begrepp", "Begrepp")]
 
 # förarbete precedence in the inbound panel and the "Förarbeten" section:
@@ -2183,6 +2197,73 @@ def render_avg(art, site):
                 source_url=art.get("source_url"))
 
 
+def render_hudoc(art, site):
+    md = art.get("metadata", {})
+    meta = _meta_dl([
+        ("Domstol", md.get("publisher")),
+        ("Avgörandedatum", art.get("date")),
+        ("Ansökningsnummer", ", ".join(md.get("applicationNumber", [])) or None),
+        ("Dokumenttyp", art.get("doctype")),
+        ("Språk", md.get("language")),
+        ("ECLI", art.get("ecli")),
+        ("Motpart", md.get("respondent")),
+        ("Artiklar", ", ".join(md.get("articles", [])) or None),
+    ])
+    summary = ("<p class=\"sammanfattning\">%s</p>" % escape("; ".join(
+        md.get("conclusions", []))) if md.get("conclusions") else "")
+    toc = Toc()
+    rail = Rail(site, art["uri"])
+    refs = _ref_list(site, "Berörda konventionsartiklar",
+                     [ref["uri"] for ref in art.get("references", [])])
+    body = document_inbound(site, art["uri"]) + refs + "".join(
+        render_node(node, site, art["uri"], toc, rail)
+        for node in art.get("structure", []))
+    rail.add_document()
+    return page(art.get("title") or art.get("itemid"), "Europadomstolen",
+                meta, body, render_toc(toc), eyebrow=art.get("ecli") or art["itemid"],
+                summary=summary, island=rail.island(),
+                source_url=art.get("source_url"))
+
+
+def _render_coe_article(node, site, doc_uri, toc, rail):
+    aid = node.get("id")
+    number = node.get("ordinal") or ""
+    title = render_runs(node.get("text", []), site)
+    anchor = toc.add(aid, plain(node.get("text", [])), 1)
+    rail.add(aid, "Artikel %s" % number)
+    children = "".join(render_node(child, site, doc_uri, toc, rail)
+                       for child in node.get("children", []))
+    return ('<section class="artikel"%s%s><h2 id="%s">%s</h2>%s</section>'
+            % (_id_attr(None), _rail_attr(rail, aid), escape(anchor), title, children))
+
+
+def render_coe(art, site):
+    md = art.get("metadata", {})
+    implementation = md.get("swedishImplementation")
+    meta = _meta_dl([
+        ("Referens", md.get("reference")),
+        ("Öppnad för undertecknande", md.get("openingDate")),
+        ("Ort", md.get("openingPlace")),
+        ("Ikraftträdande", md.get("entryIntoForce")),
+        ("Svensk lag", "SFS 1994:1219" if implementation else None),
+    ])
+    toc = Toc()
+    rail = Rail(site, art["uri"])
+    implementation_link = (_ref_list(site, "Svensk inkorporering", [implementation])
+                           if implementation else "")
+    parts = [document_inbound(site, art["uri"]), implementation_link]
+    for node in art.get("structure", []):
+        if node.get("type") == "artikel":
+            parts.append(_render_coe_article(node, site, art["uri"], toc, rail))
+        else:
+            parts.append(render_node(node, site, art["uri"], toc, rail))
+    rail.add_document()
+    return page(art.get("title") or art.get("identifier"),
+                "Europarådets fördrag", meta, "".join(parts), render_toc(toc),
+                eyebrow=art.get("identifier"), island=rail.island(),
+                source_url=art.get("source_url"))
+
+
 # the sources whose pages carry inline-editable content. A logged-in user edits
 # the *commentary* (kommentar rail) on a host act's node -- the official body text
 # stays read-only -- so the editable ref is the host's `annotates` basefile: the
@@ -2222,7 +2303,8 @@ def render_document(art, source, site):
     # (generate_site skips it), not a page of its own
     html = {"sfs": render_sfs, "dv": render_dv, "forarbete": render_forarbete,
             "begrepp": render_begrepp, "eurlex": render_eurlex,
-            "foreskrift": render_foreskrift, "avg": render_avg}[source](art, site)
+            "foreskrift": render_foreskrift, "avg": render_avg,
+            "hudoc": render_hudoc, "coe": render_coe}[source](art, site)
     meta = _document_edit_meta(source, art)
     alias = feeds.alias_for_source(source)
     discovery = ('<link rel="alternate" type="application/atom+xml" '
@@ -2241,11 +2323,13 @@ def render_document(art, source, site):
 # /dom/, lagen.nu's grammar; every other source browses under its own name.
 # kommentar is an annotation layer shown in the rail (no page tree), so it is
 # not a browsable source on the frontpage
-SOURCE_ORDER = ("sfs", "dv", "forarbete", "foreskrift", "avg", "eurlex",
-                "begrepp")
+SOURCE_ORDER = ("sfs", "dv", "hudoc", "forarbete", "foreskrift", "avg",
+                "eurlex", "coe", "begrepp")
 SOURCE_LABEL = {"sfs": "Författningar", "dv": "Rättsfall",
                 "forarbete": "Förarbeten", "foreskrift": "Myndighetsföreskrifter",
                 "avg": "JO- och JK-beslut", "eurlex": "EU-rättsakter",
+                "hudoc": "Europadomstolens praxis",
+                "coe": "Europarådets fördrag",
                 "kommentar": "Lagkommentarer", "begrepp": "Begrepp"}
 BROWSE_DIR = {"dv": "dom"}
 
