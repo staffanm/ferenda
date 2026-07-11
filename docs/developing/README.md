@@ -74,8 +74,8 @@ Coding conventions worth internalising before your first PR:
 
 Realized in the `accommodanda/` package:
 
-1. **Vertical source pipelines** (`sfs/`, `dv/`, `eurlex/`, `forarbete/`,
-   `foreskrift/`, `avg/`, `remisser/`, `wiki/`, `site/`) — each owns its full
+1. **Vertical source pipelines** (`sfs/`, `dv/`, `hudoc/`, `coe/`, `eurlex/`,
+   `forarbete/`, `foreskrift/`, `avg/`, `remisser/`, `wiki/`, `site/`) — each owns its full
    chain (download → parse → typed model → JSON artifact) and its own model.
 2. **Horizontal libraries** (`lib/`) — genuinely cross-source machinery: the
    citation engine (`lagrum.py`), catalog, search, render, layout, resolve,

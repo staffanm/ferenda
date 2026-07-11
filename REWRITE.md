@@ -67,12 +67,14 @@ Current code layout (this three-layer split is now realized in the package):
 
 ```
 accommodanda/
-  lib/      shared horizontal libs (full map: accommodanda/README.md "Shared library (lib/)") — lagrum (citation engine), catalog, render, layout, net, markdown, util, errors, casenaming, eucasenaming, eu_structure, datasets, search, facets, feeds, dump, pins, resolve, text, compress, facsimile, pdftext, llm, annstore, wikitext, runlog, patch·patchit, git, harvest, regeringen, legacy_import, concepts, diff, history, assets
+  lib/      shared horizontal libs (full map: accommodanda/README.md "Shared library (lib/)") — lagrum (citation engine), catalog, render, layout, net, markdown, util, errors, casenaming, eucasenaming, eu_structure, datasets, search, facets, feeds, dump, pins, resolve, text, compress, facsimile, pdftext, llm, annstore, wikitext, runlog, patch·patchit, git, harvest, regeringen, legacy_import, concepts, diff, history, assets, coe
   config.py runtime config (config.yml / data_root / wiki_root)
   sfs/      acts vertical — download·extract·reader·model·tokenizer·assembler·nf·register·versions·correspond·asgit·begrepp·_validate (+ __main__)
   dv/       court-decisions vertical — download·identity·namedcases·model·parse·structure·word·legacy
   forarbete/ preparatory-works vertical — download·riksdagen·rskr·model·parse·structure·kommentar·genomforande·fk·lydelse·legacy·legacy_formats
   eurlex/   EU vertical (EUR-Lex/CELLAR) — download·bulk·annotate·casenames·definitions·parse·parse_html·parse_pdf·structure·lang·model
+  hudoc/    ECHR case-law vertical — download·model·parse
+  coe/      Council of Europe Treaty Office vertical — download·model·parse
   foreskrift/ agency-regulations vertical — agencies·harvest·download·model·parse·structure·legacy
   avg/      JO/JK/ARN-decisions vertical — download·model·parse·legacy
   remisser/ remiss (referral-response) vertical — model·download·parse·ai_analyze
@@ -1898,6 +1900,54 @@ the markdown is the source of truth thereafter.
   query-parameter URLs live off the catalog. `/dataset/sitenews` is the
   all-feeds directory page.
 
+### 7j. HUDOC + Council of Europe treaties ✅ (first cut)
+
+Two verticals joined by one artifact-level identity grammar:
+
+- **`accommodanda/hudoc/`** harvests the public JSON endpoint used by HUDOC's
+  own result UI (`/app/query/results`) and the selected document's converted
+  Word HTML (`/app/conversion/docx/html/body`). Scope: Grand Chamber and
+  Chamber judgments only (524 + 21,137 English documents at implementation
+  time — Committee judgments, decisions, legal summaries, advisory opinions,
+  resolutions and communicated cases are excluded; `--only <itemid>` can still
+  fetch one deliberately). The bulk walk is newest-first and
+  watermark-bounded; English is the default expression, with `--lang ENG,FRE`,
+  `--only <itemid>` and `--limit`. Body downloads are the cost of a run, so a
+  small `ThreadPoolExecutor` (`WORKERS=4`) keeps fetches in flight ahead of the
+  walk (~0.15s/doc measured, vs ~0.33s sequential — the full English harvest
+  runs in about an hour). `HudocCase` projects the metadata and
+  heading/numbered-paragraph body to `/dom/echr/{itemid}` artifacts.
+- **`accommodanda/coe/`** harvests the Treaty Office's anonymous JSON web
+  service (`conventions-ws.coe.int`, whose token is embedded in the public
+  `full-list2` page) rather than scraping the Cloudflare-fronted portal HTML:
+  one search POST returns all 233 treaties with metadata, `getLieux` resolves
+  opening places, and each official English text downloads as a plain PDF from
+  `rm.coe.int` (no challenge). The web service's TLS offers a legacy small DH
+  key, hence `lib.net.mount_legacy_tls`, mounted for that host only. `Treaty`
+  artifacts live at `/ext/coe/{ETS-or-CETS-number}` and carry article/subarticle
+  fragments (`#A8`, `#A6P3Ld`); every official text is a PDF, so `parse.py`'s
+  body path is uniformly `pdftohtml -> page_paragraphs -> build_structure`.
+  Treaty summaries sit behind the scraped portal and are not carried on the
+  record.
+- **Identity and graph:** `lib/coe.py` is the second-use shared seam. HUDOC's
+  article facet codes (`8`, `6-3-d`, `P1-1`, `P7-4`) map protocol numbers to
+  their Treaty Office ETS/CETS instruments and mint exactly the provision URI
+  the treaty parser produces. HUDOC stores those as generic top-level
+  `references`; `catalog.artifact_links` consumes that source-neutral contract,
+  so an ordinary `relate` makes each case inbound on the cited treaty article
+  and the existing rail displays "Europadomstolens praxis" there.
+- **SFS bridge:** the ECHR instruments actually reproduced in SFS 1994:1219
+  (Convention plus Protocols 1, 4, 6, 7, 13 and 16) carry an `rdfs:seeAlso`
+  document edge to that SFS. Protocol 12 is intentionally excluded. The CoE
+  articles are the canonical provision nodes for now: the SFS parser does not
+  yet model appendix articles as stable fragments, so an article-by-article
+  `owl:sameAs` crosswalk would fabricate targets. Once appendix structure is
+  emitted, that crosswalk can mirror the same HUDOC inbound set on the SFS page.
+
+Wired through `build.py`, `layout`, catalog, facets, search/dump and static
+rendering; `test/test_{hudoc,coe}.py` includes an end-to-end catalog assertion
+that a HUDOC Article 8 edge appears inbound on ETS 005 `#A8`.
+
 ### 7b. Remaining verticals ⬜
 
 The rest of `/mnt/data/lagen/data/{…}`. Each built the same way; the horizontal
@@ -1917,6 +1967,8 @@ model + extraction.
 | `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `structure`, `word`, `legacy`, `namedcases` (HD named-precedent harvester); canonical case title + HD given names live in `lib/casenaming.py` (shared with the catalog + renderer) |
 | `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, 8 types + `pm`, promemorior outside the Ds series), `model`/`structure`/`parse` (PDF/html→nested structure→artifact; `parse.tag_frontmatter` retags the prop/skr överlämnande page — ingress heading, `signatur` signer blocks), `legacy` (one-time import of the nine frozen förarbete corpora, §7g), `legacy_formats` (frozen body adapters — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML, scanned-PDF OCR text, TRIPS `div.body-text`), `riksdagen` (doctype-agnostic dokumentlista harvest engine, driven for `bet`/utskottsbetänkanden off data.riksdagen.se, no frozen corpus), `rskr` (second driver over `riksdagen.py`'s engine, for riksdagsskrivelser — HTML body, no PDF), `kommentar` (författningskommentar → EU-directive *genomför* edges, prop + fm), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf), `fk` (per-paragraf FK commentary text → `kommentarer` artifact section → `fk_kommentar` catalog layer → statute-rail "Författningskommentar"), `lydelse` (two-column nuvarande/föreslagen lydelse tables reconstructed from per-run coordinates → `tabell` blocks in the SFS `rad`/`cells` shape) |
 | `accommodanda/eurlex/` | **EU vertical (EUR-Lex/CELLAR)**: `download` (SPARQL discovery), `bulk` (dump import), `parse`/`parse_html`/`parse_pdf` (Formex/HTML/PDF → one artifact shape), `definitions` (defined-terms extraction + in-act interlinking), `lang`, `model`, `casenames` (harvest CELEX → usual name for named EU cases from Wikidata into `data/casenames.json`, read by `lib/eucasenaming.py`) |
+| `accommodanda/hudoc/` | **European Court of Human Rights vertical**: HUDOC JSON result pagination + full-text HTML conversion, typed case model, article-facet references into CoE treaty provisions |
+| `accommodanda/coe/` | **Council of Europe Treaty Office vertical**: complete-list/detail/official-text harvest, treaty model, HTML/PDF article parser; canonical `ext/coe/{number}#A…` targets shared with HUDOC |
 | `accommodanda/avg/` | **JO/JK/ARN-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages, `jk_canonical` dnr normalization; ARN one-page vägledande-beslut listing), `legacy` (one-time import of the frozen ARN corpus 1991–2022, §7g), `parse` (JO/ARN PDF via `lib/pdftext`, JK landing HTML; DV parse-type citation scan) |
 | `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (per-agency enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct} wired onto `lib/harvest.walk`; `Skip`/`guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 17 agencies live + 4 frozen-only), `download`, `legacy` (one-time import of the two harvest-blocked corpora, §7g), `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors). Corpus: 1218 regs harvested, parsed 0-fail |
 | `accommodanda/remisser/` | **remiss (referral-response) vertical**: `model` (`Remiss`/`Remissinstans`/`Remissvar`, `org_slug`), `download` (regeringen.se `/remisser/` two-pass sync + `sync_one`/`--only`, stub records for any per-case fetch/parse failure), `parse` (answer PDF → `Remissvar` via `lib/pdftext` with no fixed header), `ai_analyze` (the sole LLM pass — sentiment+quote per section, `.ann` layer in the curated store, `lib/annstore.py`). Never `relate`d/published; its `.ann` layer feeds the referred förarbete's rail via `render._remiss_indexes` |
@@ -2040,6 +2092,39 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **hudoc, coe** (2026-07-10) — two new verticals, §7j: `hudoc/` harvests
+  HUDOC's public JSON result endpoint plus the per-case Word→HTML conversion
+  into `HudocCase` artifacts (`/dom/echr/{itemid}`); `coe/` harvests the
+  Treaty Office's complete-list table, treaty detail metadata and official
+  text into `Treaty` artifacts (`/ext/coe/{number}#A…`). `lib/coe.py` maps
+  HUDOC's article-facet codes (`8`, `6-3-d`, `P1-1`) onto the matching
+  Treaty Office provision URI, so an ordinary `relate` puts "Europadomstolens
+  praxis" inbound on the cited article; ECHR instruments reproduced in SFS
+  1994:1219 also carry an `rdfs:seeAlso` bridge to that SFS. Wired through
+  `build.py`, `layout`, catalog, facets (new "Dokumenttyp"/"Typ" browse
+  schemes, including a `legal-summary` "Rättsfallssammanfattningar" bucket),
+  search/dump, render and `api/mcp`. Follow-up hardening the same day: remote
+  input validation in both downloaders raises `ValueError` instead of
+  `assert`; the duplicated `_norm` helpers were deduped into a None-safe
+  `lib.util.normalize_space`; facets' `_eu_kind`/`_hudoc_kind` merged into one
+  `_catalog_kind` (shared by eurlex, coe and hudoc); a synthetic
+  `test/files/coe/009.pdf` fixture covers the coe PDF-body parse path.
+  Later the same day, `coe/download.py` was rewritten: the Cloudflare-fronted
+  portal it originally scraped (`parse_listing`/`parse_detail`) is gone,
+  replaced by one search POST to the Treaty Office's anonymous JSON web
+  service (`conventions-ws.coe.int/WS_LFRConventions`, token embedded in the
+  public `full-list2` page — needs `lib.net.mount_legacy_tls`, new, for its
+  small-DH-key TLS) that returns all 233 treaties with metadata in one call,
+  plus `getLieux` for opening places; official texts still download as plain
+  PDFs from `rm.coe.int`, no challenge. Records no longer carry a `summary`
+  field (it sits behind the scraped portal). Since every official text is
+  now known to be a PDF, `coe/parse.py` dropped its HTML body path entirely
+  (`html_paragraphs` removed); fixtures moved to
+  `test/files/coe/ws-search.json` + `ws-lieux.json` (listing.html/detail.html
+  deleted). `hudoc/download.py` also gained a small `ThreadPoolExecutor`
+  (`WORKERS=4`) keeping body fetches in flight ahead of the walk (~0.15s/doc
+  vs ~0.33s sequential — a full English harvest drops from ~9h to ~2-4h) and
+  raised `PAGE_SIZE` 100→500.
 - **lib** (2026-07-10) — the static site's chrome (CSS/JS/robots.txt, formerly
   embedded string constants in `render.py`) extracted to real files under the
   new `lib/assets/`; `render_aggregates` reads them via the module-level

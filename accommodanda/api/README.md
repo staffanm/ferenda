@@ -1,8 +1,9 @@
 # lagen.nu API — utvecklarguide
 
-Ett läsbart REST/OpenAPI-gränssnitt över hela det parsade rättskällекorpuset
-(författningar, rättsfall, förarbeten, myndighetsföreskrifter, JO/JK/ARN-avgöranden,
-EU-rätt, kommentarer och begrepp). Det
+Ett läsbart REST/OpenAPI-gränssnitt över hela det parsade rättskällekorpuset
+(författningar, svenska rättsfall, Europadomstolens praxis, förarbeten,
+myndighetsföreskrifter, JO/JK/ARN-avgöranden, EU-rätt, Europarådets fördrag,
+kommentarer och begrepp). Det
 ersätter den gamla pipelinens RDF-/Fuseki-publicering.
 
 API:t exponerar tre saker:
@@ -113,11 +114,12 @@ curl -G http://127.0.0.1:8001/api/v1/document \
 | Parameter | Typ | Förklaring |
 |---|---|---|
 | `q` | sträng (obligatorisk) | sökfrågan |
-| `source` | sträng | begränsa till en källa: `sfs`, `dv`, `forarbete`, `foreskrift`, `eurlex`, `avg`, `kommentar`, `begrepp` |
+| `source` | sträng | begränsa till en källa: `sfs`, `dv`, `hudoc`, `forarbete`, `foreskrift`, `eurlex`, `coe`, `avg`, `kommentar`, `begrepp` |
 | `kind` | sträng | begränsa till en dokumenttyp (`law`, `case`, `prop`, `directive`, …) |
 | `year` | fyrsiffrigt år | begränsa till dokumentets publicerings-/avgörandeår |
 | `limit` | heltal 1–100 (standard 10) | antal träffar |
-| `offset` | heltal (standard 0) | paginering |
+| `offset` | heltal (standard 0) | paginering, begränsad till 9900 |
+| `cursor` | sträng | ogenomskinlig kursor från föregående svars `next_cursor`, för djup paginering bortom `offset`-taket (ömsesidigt uteslutande med `offset`) |
 
 Träffarna är hela dokument, rankade på relevans kombinerat med antalet
 inkommande citeringar (`inbound_count`) — så en välträffad, ofta hänvisad lag
@@ -127,6 +129,8 @@ paragraferna/artiklarna med markerad text (`fragments`). Sökfrågan matchar
 (räknade `source`/`kind`/`year`-hinkar över hela träffmängden, inte bara den
 returnerade sidan) som driver facettfältet på webbplatsens fullständiga
 sökresultatsida (`/sok`, `render.render_search_page` + `fullsearch.js`).
+Svaret bär även `next_cursor` — icke-null så länge fler sidor finns — att
+skicka som nästa anrops `cursor`.
 
 ```sh
 curl -G http://127.0.0.1:8001/api/v1/search \
@@ -140,7 +144,7 @@ curl -G http://127.0.0.1:8001/api/v1/search \
   "results": [
     {
       "uri": "https://lagen.nu/1962:700",
-      "url": "/sfs/1962_700.html",
+      "url": "/1962:700",
       "identifier": "SFS 1962:700",
       "title": "Brottsbalk (1962:700)",
       "source": "sfs",
@@ -160,7 +164,7 @@ curl -G http://127.0.0.1:8001/api/v1/search \
 }
 ```
 
-`url` är den genererade sidans sökväg (via `layout.page_relpath`); lägg på
+`url` är dokumentets publika sökväg (`layout.page_url`); lägg på
 `#<pinpoint>` för att djuplänka direkt till paragrafen.
 
 > Returnerar `/api/v1/search` ett fel om OpenSearch inte är igång eller indexet
@@ -175,7 +179,7 @@ id + lättviktig metadata, **inte** det fullständiga innehållet.
 
 | Parameter | Typ | Förklaring |
 |---|---|---|
-| `source` | sträng | filtrera på källa (`sfs`, `dv`, `forarbete`, `foreskrift`, `eurlex`, `avg`, `kommentar`, `begrepp`) |
+| `source` | sträng | filtrera på källa (`sfs`, `dv`, `hudoc`, `forarbete`, `foreskrift`, `eurlex`, `coe`, `avg`, `kommentar`, `begrepp`) |
 | `kind` | sträng | filtrera på dokumenttyp (`law`, `case`, `prop`, `directive`, …) |
 | `limit` | heltal 1–1000 (standard 100) | sidstorlek |
 | `offset` | heltal (standard 0) | paginering |
@@ -305,9 +309,12 @@ curl http://127.0.0.1:8001/api/v1/sources
 [
   {"source": "avg", "documents": 6256},
   {"source": "begrepp", "documents": 564},
+  {"source": "coe", "documents": 233},
   {"source": "dv", "documents": 17103},
   {"source": "eurlex", "documents": 69290},
   {"source": "forarbete", "documents": 15237},
+  {"source": "foreskrift", "documents": 1218},
+  {"source": "hudoc", "documents": 21661},
   {"source": "kommentar", "documents": 212},
   {"source": "sfs", "documents": 11184}
 ]

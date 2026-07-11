@@ -1,7 +1,7 @@
 # accommodanda — developer setup
 
-The rebuilt ferenda pipeline: vertical source pipelines (sfs, dv, eurlex,
-forarbete, foreskrift, avg, remisser, wiki, site) that go from downloaded (or,
+The rebuilt ferenda pipeline: vertical source pipelines (sfs, dv, hudoc, coe,
+eurlex, forarbete, foreskrift, avg, remisser, wiki, site) that go from downloaded (or,
 for wiki/site, hand-authored) source files to a typed document model and a JSON
 artifact, with the citation engine as a shared library. For *why* it's
 shaped this way and what's done vs. pending, read
@@ -74,6 +74,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `lagrum.py` | Lark/Earley engine; `LagrumParser(parse_types=…)` composes a grammar from LAGRUM / KORTLAGRUM / EULAGSTIFTNING / RATTSFALL / FORARBETEN / … |
 | `casenaming.py` | court-decision identity — `case_uri` (mint a case's canonical URI via the RATTSFALL parser) + `case_label`/`lopnummer` (referat identity + HD's given names); read identically by dv's parse-time label stamp, the catalog row and the page heading |
 | `eucasenaming.py` | the EU mirror of `casenaming.py` — `case_number` (CELEX → court case number, "62018CJ0311" → "C-311/18", also T-/F- courts), `given_name`/`case_name`/`case_citation` (curated usual name, page heading, "C-311/18 (Schrems II)" inbound-citation label) from the shipped `eurlex/data/casenames.json` snapshot; read identically by eurlex's parse-time label stamp, the catalog row and the page heading |
+| `coe.py` | shared Council of Europe identity grammar: ETS/CETS number → `ext/coe/{number}`, article/subarticle fragments, and HUDOC's `8` / `6-3-d` / `P7-4` facet codes → the same treaty provision URIs produced by the Treaty Office vertical |
 | `eu_structure.py` | the one EU-act sub-article anchor grammar (`anchored_blocks`/`subarticle_key`/`flatten`), shared by the eurlex parser, the renderer and the wiki guidance layer (`nest`, the parse-time tree builder, stays in `eurlex/structure.py`) |
 | `legacy_import.py` | shared §7g frozen-import core — `should_write` precedence (live-wins / own-import-idempotent-unless-force / optional `better()` tie-break), `rel` (in-place LEGACY_ROOT-relative body references), `iter_entries`/`docdir`/`read_record` walk primitives; used by `forarbete/legacy.py`, `foreskrift/legacy.py`, `avg/legacy.py` |
 | `regeringen.py` | shared regeringen.se harvest knowledge — the doctype table (`TYPES`: url segment, taxonomy category id, identifier regex) and the `ul.list--block` listing walk (`listing_items`); used by `forarbete/download.py` and `remisser/download.py` |
@@ -101,7 +102,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `markdown.py` | parse the git-backed wiki markdown (commentary/concept/site) into the shared inline-run artifact shape — the markdown counterpart of `wikitext.py` |
 | `wikitext.py` | parse MediaWiki dump pages into the same inline-run shape; retired from the live pipeline, kept only as the migration/diff tools' reference |
 | `runlog.py` | run instrumentation behind the ops dashboard — `runs.ndjson`/`errors.json`/`status.json` under `DATA/.build/` |
-| `net.py` | shared HTTP session setup + a resilient `request()` helper for the source downloaders (transport-level retry, Retry-After, throttle logging) |
+| `net.py` | shared HTTP session setup + a resilient `request()` helper for the source downloaders (transport-level retry, Retry-After, throttle logging); `mount_legacy_tls` accepts a legacy small-DH-key TLS handshake for one host prefix only (`conventions-ws.coe.int`) |
 | `patch.py` / `patchit.py` | the source-file patch layer (apply-at-parse) and its interactive authoring CLI — see "Patch files" below |
 | `git.py` | the one place that shells out to the git CLI — the inline editor's commit engine, the MediaWiki history importer and the `history-as-git` export |
 | `errors.py` | `SkipDocument` — the shared control-flow signal a source's extractor raises for an expired/removed/empty document |
@@ -162,6 +163,20 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `lang.py` | localized structural vocabulary for the non-Formex (html/pdf) parsers (Formex is tag-marked, so its parser needs no language knowledge) |
 | `annotate.py` | `lagen eurlex ai-annotate <CELEX>` — author the editorial `.ann` layer for a sector-3 act with an LLM, written to the curated store (`lib/annstore.py`) |
 | `casenames.py` | `lagen eurlex casenames` — harvest CELEX → usual name for named EU cases ("Schrems II") from Wikidata (property P476) into `data/casenames.json`, read by `lib/eucasenaming.py` |
+
+**hudoc vertical (European Court of Human Rights case law)**
+| File | What |
+|---|---|
+| `download.py` | bulk paginator over HUDOC's public `/app/query/results` JSON endpoint (Grand Chamber + Chamber judgments only, English by default, `PAGE_SIZE=500`) plus `/app/conversion/docx/html/body` for each full text, fetched through a small `ThreadPoolExecutor` (`WORKERS=4`) that keeps bodies in flight ahead of the walk; newest-first watermark, `--lang`, `--only` and `--limit` |
+| `model.py` | typed `HudocCase`/`Block` model; one stable `/dom/echr/{itemid}` expression per HUDOC item; article-facet metadata becomes explicit references to `ext/coe/{ETS}#A…` |
+| `parse.py` | converted Word HTML → headings, numbered paragraphs (`#P…`) and notes → artifact |
+
+**coe vertical (Council of Europe Treaty Office)**
+| File | What |
+|---|---|
+| `download.py` | one search POST to the Treaty Office's anonymous JSON web service (`conventions-ws.coe.int`, token embedded in the public `full-list2` page, mounted via `lib.net.mount_legacy_tls` for its small-DH-key TLS) returns all 233 treaties' metadata in one call; `getLieux` resolves opening places; each official English text downloads as a plain PDF from `rm.coe.int` (no challenge, no HTML scraping) |
+| `model.py` | typed `Treaty`; canonical `ext/coe/{ETS-or-CETS-number}` identity and an `rdfs:seeAlso` bridge from the ECHR instruments reproduced in SFS 1994:1219 |
+| `parse.py` | official English PDF → article/subarticle tree (`#A8`, `#A6P3Ld`) via `pdftohtml -> page_paragraphs -> build_structure` (every official text is a PDF; no HTML body path), which is the target of HUDOC metadata references |
 
 **wiki vertical (git-backed markdown — begrepp + kommentar)**
 | File | What |
@@ -306,6 +321,27 @@ uv run python -m accommodanda.build avg download        # all three organs; or: 
 uv run python -m accommodanda.build avg parse           # incremental, like every source
 uv run python -m accommodanda.build avg download jo --only jo/2340-2025   # one decision
 ```
+
+**HUDOC + Council of Europe treaties**:
+
+```sh
+uv run python -m accommodanda.build coe download                 # all Treaty Office instruments
+uv run python -m accommodanda.build coe parse                    # official PDF text -> article artifacts
+uv run python -m accommodanda.build hudoc download               # English GC+Chamber judgments, incremental
+uv run python -m accommodanda.build hudoc download --lang ENG,FRE --limit 1000
+uv run python -m accommodanda.build hudoc parse
+uv run python -m accommodanda.build all relate                   # joins HUDOC cases to CoE articles
+```
+
+`coe download` never touches the Cloudflare-fronted portal pages: it POSTs one
+search to the Treaty Office's anonymous JSON web service
+(`conventions-ws.coe.int`, token embedded in the public `full-list2` page,
+mounted through `lib.net.mount_legacy_tls` for its small-DH-key TLS), which
+returns all 233 treaties with metadata in that one response, then downloads
+each official English text as a plain PDF from `rm.coe.int`. HUDOC itself is
+directly harvestable off `/app/query/results` and needs no browser automation
+either; its body fetches run through a small worker pool (`WORKERS=4` in
+`hudoc/download.py`) since they are the whole cost of a harvest.
 
 **remisser — regeringen.se referral responses** (operates on
 `site/data/{downloaded,artifact}/remisser/` — case records and answer PDFs
@@ -509,6 +545,8 @@ site/data/downloaded/dom/                     # DV new-API harvest (per court)
 site/data/downloaded/dv/                      # DV legacy feed (.doc/.docx)
 site/data/artifact/dom/identity-index.json    # canonical case -> source records
 site/data/downloaded/avg/{jo,jk,arn}/         # JO/JK/ARN records (+ jo/arn PDFs, jk landing html)
+site/data/downloaded/hudoc/                   # HUDOC metadata JSON + converted full-text HTML
+site/data/downloaded/coe/                     # Treaty Office records + official English texts
 site/data/downloaded/forarbete/<type>/        # regeringen.se harvest + frozen-import records (prop/sou/ds/pm/dir/fm/skr/so/lr)
 site/data/downloaded/forarbete/bet/           # data.riksdagen.se harvest (utskottsbetänkanden; record json + PDF, no HTML landing page)
 site/data/downloaded/forarbete/rskr/          # data.riksdagen.se harvest (riksdagsskrivelser; record json + HTML body, no PDF)

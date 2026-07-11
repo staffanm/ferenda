@@ -49,10 +49,12 @@ there is no separate `/resolve` endpoint.
 | Param | Default | Notes |
 |---|---|---|
 | `q` | (required) | free-text query |
-| `source` | — | `sfs`, `dv`, `forarbete`, `foreskrift`, `eurlex`, `avg`, `kommentar`, `begrepp` |
+| `source` | — | `sfs`, `dv`, `hudoc`, `forarbete`, `foreskrift`, `eurlex`, `coe`, `avg`, `kommentar`, `begrepp` |
 | `kind` | — | restrict to a document kind |
+| `year` | — | four-digit publication/decision year |
 | `limit` | 10 | 1–100 |
-| `offset` | 0 | ≥ 0 |
+| `offset` | 0 | ≥ 0, capped at 9900; use `cursor` for deep paging |
+| `cursor` | — | opaque cursor from a previous response's `next_cursor`; mutually exclusive with `offset` |
 
 On the first page (`offset == 0`) the query is *also* run through the citation
 resolver: if `q` reads as a citation (`avtalslagen 36`, `BrB 12:1`, `GDPR art
@@ -66,6 +68,12 @@ fail search.
 {
   "query": "räntelagen",
   "total": 42,
+  "next_cursor": "eyJzb3J0IjpbMTIuM10s...",  // null once the last page is reached
+  "facets": {
+    "source": [{ "value": "sfs", "count": 31 }, { "value": "dv", "count": 11 }],
+    "kind": [{ "value": "law", "count": 31 }],
+    "year": [{ "value": "1975", "count": 1 }, { "value": "2024", "count": 3 }]
+  },
   "results": [
     {
       "uri": "https://lagen.nu/1975:635",
@@ -79,12 +87,17 @@ fail search.
       "inbound_count": 2783,
       "highlight": ["…<em>ränta</em>…"],
       "fragments": [
-        { "uri": "https://lagen.nu/1975:635#P6", "pinpoint": "6 §", "highlight": ["…"] }
+        { "uri": "https://lagen.nu/1975:635#P6", "pinpoint": "P6", "highlight": ["…"] }
       ]
     }
   ]
 }
 ```
+
+`next_cursor` and `facets` are each computed against the *other* selected
+filters (a facet's own aggregation ignores its own restriction, so its bucket
+counts stay usable for widening the filter), and each aggregation runs over
+`source`/`kind`/`year`.
 
 ### List documents
 
@@ -113,7 +126,7 @@ query). Filter by `source` and/or `kind`. `limit` default 100 (1–1000), `offse
 
 **`GET /api/v1/facets`** — ordered navigation buckets with counts (no leaf
 documents); a lightweight navigator. `source` (required, a faceted source:
-`sfs`/`dv`/`forarbete`/`foreskrift`/`eurlex`/`avg`/`begrepp`). Returns a
+`sfs`/`dv`/`hudoc`/`forarbete`/`foreskrift`/`eurlex`/`coe`/`avg`/`begrepp`). Returns a
 `FacetTree`: `{ source, levels[], default[], buckets[] }` where each bucket is
 `{ key, label, slug, count, children?, documents? }`.
 
@@ -336,6 +349,23 @@ carries `bemyndigande` (a list of SFS-paragraf uris), `beslutsdatum`,
 **avg (JO/JK/ARN)** — `{ uri, type: "avgorande", org (jo|jk|arn), identifier,
 metadata, structure, sammanfattning? }`. `metadata` = `{ title, publisher,
 diarienummer, beslutsdatum?, avgjordAv?, nyckelord? }`.
+
+**hudoc (ECHR case law)** — `{ uri (…/dom/echr/{itemid}), type: "avgorande",
+court: "echr", itemid, doctype (judgment|decision|communicated-case|
+advisory-opinion|legal-summary|resolution|case-law), title, date, metadata,
+references, structure }`. `structure` is heading (`rubrik`) and numbered
+paragraph (`stycke`, `id: "P{n}"`) blocks. `references` is the top-level
+`dcterms:references` link list into the cited Convention/Protocol
+provisions — CoE Treaty Office fragments (`ext/coe/{ETS}#A…`), the same
+inbound-citation contract every other source uses.
+
+**coe (Council of Europe treaties)** — `{ uri (…/ext/coe/{number}), type:
+"internationell-overenskommelse", doctype (treaty|protocol), number,
+identifier, title, date, metadata, references, structure }`. `structure` is
+a nested `rubrik`/`artikel`/`stycke`/`punkt` tree with stable fragment ids
+(`#A8`, `#A6P3Ld`). For the ECHR instruments incorporated into Swedish law
+(Convention plus Protocols 1, 4, 6, 7, 13, 16), `references` carries an
+`rdfs:seeAlso` edge to `https://lagen.nu/1994:1219`.
 
 ---
 

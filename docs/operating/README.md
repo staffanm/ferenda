@@ -13,7 +13,7 @@ and deployment. For *why* the system is shaped this way read
 | **Python 3.10+** | the codebase targets 3.10+ only | everything |
 | **[uv](https://docs.astral.sh/uv/)** | dependency + venv management; `uv sync` installs all of `pyproject.toml` | everything |
 | **OpenSearch 2.x** | full-text search index (`lib/search.py`) | `index`, search API |
-| **poppler-utils** (`pdftohtml`, `pdftotext`) | PDF body extraction | eurlex/forarbete/foreskrift/avg parse |
+| **poppler-utils** (`pdftohtml`, `pdftotext`) | PDF body extraction | eurlex/coe/forarbete/foreskrift/avg parse |
 | **A JVM (OpenJDK 21) + POI jars** | reads binary `.doc`/`.docx` via Apache POI | **legacy DV Word path only** |
 | **tesseract (+ swe), ocrmypdf** | OCR of scanned PDFs | forarbete re-OCR sidecars (optional) |
 | **git** | the wiki/site content repo is git-backed; the inline editor commits to it | wiki/site parse, inline editing |
