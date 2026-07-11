@@ -68,6 +68,7 @@ from .eurlex import parse as eurlex_parse
 from .forarbete import download as fa_download
 from .forarbete import fk as fa_fk
 from .forarbete import genomforande as fa_genomforande
+from .forarbete import jamforelse as fa_jamforelse
 from .forarbete import kommentar as fa_kommentar
 from .forarbete import legacy as fa_legacy
 from .forarbete import parse as fa_parse
@@ -722,8 +723,11 @@ def sfs_ai_correspond(basefiles):
     prop_art = json.loads(compress.read_bytes(fa_artifact(prop)))
     old_uri = ("https://lagen.nu/" + basefiles[2] if len(basefiles) == 3
                else sfs_correspond.detect_old_law(new_art))
-    assert old_uri, ("%s: could not detect the repealed law from its transition "
-                     "clause; pass it as the third argument" % new_sfs)
+    if not old_uri:
+        # bad input data, not a programming bug (rule:errors-drive-retry-use-raise)
+        raise ValueError("%s: could not detect the repealed law from its "
+                         "transition clause; pass it as the third argument"
+                         % new_sfs)
     old_sfs = old_uri.rsplit("/", 1)[-1]
     old_art = json.loads(compress.read_bytes(sfs_artifact(old_sfs)))
     out = annstore.path("sfs", new_sfs, ".corr")
@@ -743,6 +747,108 @@ def sfs_ai_correspond(basefiles):
                     **annstore.artifact_input("forarbete", prop)}, RUN.force)
     print("sfs ai-correspond %s: %d edges from %d (%d rejected), wrote %s"
           % (new_sfs, stats["emitted"], stats["raw"], stats["rejected"], out))
+
+
+def sfs_table_correspond(basefiles):
+    """`lagen sfs table-correspond <new-sfs> <prop-basefile> [<old-sfs>[=TAG]
+    ...]` -- derive the old->new paragraf correspondence map mechanically from
+    the proposition's own jämförelsetabell bilagor (the two-column tables a
+    re-enacting prop appends, extracted from the downloaded PDFs -- they often
+    sit in a bilaga volume the artifact parse never reads). Same `.corr` layer,
+    same payload and store semantics as ai-correspond, no LLM: when a prop
+    ships the tables, this route is authoritative and free.
+
+    A prop that replaces *several* laws (SFB prop 2008/09:200, SFL prop
+    2010/11:165) takes them all in one run -- the layer is keyed by the new
+    law, so the pairs must merge into one sidecar. Such registers tag each
+    cell reference with a prop-local shorthand; `=TAG` names an old law's
+    ("1990:324=TL") so only its references are read -- explicit, because
+    prop-local shorthands don't reliably resolve from any global dataset."""
+    if len(basefiles) < 2:
+        sys.exit("usage: lagen sfs table-correspond <new-sfs> <prop-basefile> "
+                 "[<old-sfs>[=TAG] ...]  (e.g. 2009:400 prop/2008-09-150, or "
+                 "2011:1244 prop/2010-11-165 1990:324=TL 1997:483=SBL)")
+    new_sfs, prop = basefiles[0], basefiles[1]
+    new_art = json.loads(compress.read_bytes(sfs_artifact(new_sfs)))
+    prop_art = json.loads(compress.read_bytes(fa_artifact(prop)))
+    olds = []                   # [(old_sfs, tag or None)]
+    for arg in basefiles[2:]:
+        old_arg, _, tag = arg.partition("=")
+        olds.append((old_arg, tag or None))
+    if not olds:
+        old_uri = sfs_correspond.detect_old_law(new_art)
+        if not old_uri:
+            # bad input data, not a bug (rule:errors-drive-retry-use-raise)
+            raise ValueError("%s: could not detect the repealed law from its "
+                             "transition clause; pass it as the third argument"
+                             % new_sfs)
+        olds = [(old_uri.rsplit("/", 1)[-1], None)]
+    out = annstore.path("sfs", new_sfs, ".corr")
+    typ, slug = prop.split("/", 1)
+    record = json.loads(compress.read_bytes(
+        layout.FA_DOWNLOADED / typ / (slug + ".json")))
+    pdfs = [layout.FA_DOWNLOADED / typ / f for f in record["files"]
+            if f.lower().endswith(".pdf")]
+    if RUN.dry_run:
+        print("sfs table-correspond: would map %s <- %s from %d pdf(s) of %s "
+              "-> %s" % (new_sfs, "+".join(o for o, _t in olds), len(pdfs),
+                         prop, out))
+        return
+    annstore.guard(out, RUN.force)
+    # reading the proposition's pages is förarbete's job; build composes the
+    # two verticals, exactly like ai-correspond
+    all_tabs = [t for pdf in pdfs for t in fa_jamforelse.tables(pdf)]
+    if not all_tabs:
+        # a prop without tables is bad input, not a bug -- and the empty-tabs
+        # state must not fall through to an empty layer
+        # (rule:errors-drive-retry-use-raise)
+        raise ValueError("%s: no jämförelsetabell found in %s" % (new_sfs, prop))
+    # the PDFs are the derivation's real input (the tables often sit in a
+    # bilaga volume the artifact parse never reads), so their hashes must
+    # enter the envelope or `ann status` reports the layer fresh across a
+    # re-downloaded bilaga
+    inputs = {}
+    for pdf in pdfs:
+        inputs |= annstore.download_input(pdf.relative_to(layout.DOWNLOADED))
+    edges, old_uris = [], []
+    for old_sfs, tag in olds:
+        old_art = json.loads(compress.read_bytes(sfs_artifact(old_sfs)))
+        tabs = sfs_correspond.relevant_tables(all_tabs, old_sfs, tag=tag)
+        try:
+            sidecar, stats = sfs_correspond.table_correspond(
+                new_art, prop_art, old_art, tabs, tag=tag)
+        except ValueError as e:
+            # an old law whose section maps nothing §-level (every LBF
+            # provision "utgår" in the SFB register) orients no table; in a
+            # multi-law run that is one empty pair, not a broken run
+            if len(olds) == 1:
+                raise
+            print("sfs table-correspond %s <- %s: skipped (%s)"
+                  % (new_sfs, old_sfs, e))
+            continue
+        edges += sidecar["correspondence"]["edges"]
+        old_uris.append(old_art["uri"])
+        inputs |= annstore.artifact_input("sfs", old_sfs)
+        print("sfs table-correspond %s <- %s: %d edges from %d rows in %d "
+              "table(s) (%d without counterpart, %d rejected, %d table(s) "
+              "skipped)" % (new_sfs, old_sfs, stats["emitted"], stats["rows"],
+                            len(tabs), stats["none"], stats["rejected"],
+                            stats["skipped"]))
+    if not edges:
+        # a kapitel-level table (vapenlag prop 2025/26:141) yields no
+        # paragraf edges -- an empty layer would only mask that
+        sys.exit("sfs table-correspond %s: no paragraf edges extractable; "
+                 "not writing %s" % (new_sfs, out))
+    sidecar = {"correspondence": {
+        "newLaw": new_art["uri"],
+        "oldLaw": old_uris[0] if len(old_uris) == 1 else old_uris,
+        "proposition": prop_art["uri"], "edges": edges}}
+    annstore.write(out, sidecar,
+                   {**annstore.artifact_input("sfs", new_sfs), **inputs,
+                    **annstore.artifact_input("forarbete", prop)}, RUN.force,
+                   model="jamforelsetabell")
+    print("sfs table-correspond %s: wrote %d edges (%d old law(s)) to %s"
+          % (new_sfs, len(edges), len(old_uris), out))
 
 
 def _forarbete_meta(identifier):
@@ -799,9 +905,14 @@ SOURCES["sfs"] = Source("sfs", sfs_list, {
                       inputs=sfs_versions_inputs, code=SFS_VERSIONS_CODE),
 }, harvest=sfs_harvest, origin=_origin(sfs_download.ENDPOINT),
    actions={"ai-correspond": sfs_ai_correspond,
+            "table-correspond": sfs_table_correspond,
             "history-as-git": sfs_history_as_git},
    notes="ai-correspond <new-sfs> <prop> [<old-sfs>]: LLM-derive the old->new "
          "paragraf correspondence map into a .corr layer (WIKI_ROOT/ann)\n"
+         "table-correspond <new-sfs> <prop> [<old-sfs>[=TAG] ...]: the same "
+         ".corr layer read mechanically from the prop's jämförelsetabell/"
+         "paragrafnyckel tables; several old laws merge into one layer, =TAG "
+         "names an old law's prop-local shorthand in a multi-law register\n"
          "history-as-git <repodir> [basefile ...]: build/update a git repo of "
          "the SFS collection, one commit per amendment event; --rebuild-history "
          "rewrites it from the current complete corpus")

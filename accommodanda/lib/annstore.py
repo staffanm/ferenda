@@ -119,6 +119,15 @@ def artifact_input(source, basefile):
         compress.read_bytes(layout.artifact(source, basefile)))}
 
 
+def download_input(relpath):
+    """One ``inputs`` entry for a *downloaded* file a deriver read directly
+    (the prop PDFs sfs table-correspond extracts its tables from -- often a
+    bilaga volume the artifact parse never covers, so the artifact hash alone
+    would miss their drift), keyed by its DOWNLOADED-relative path."""
+    return {"download:%s" % relpath: input_hash(
+        compress.read_bytes(layout.DOWNLOADED / relpath))}
+
+
 def wiki_input(p, wiki_root):
     """One ``inputs`` entry for a content-repo file the LLM pass read (the
     kommentar markdown with its `guidance:` frontmatter), keyed by its
@@ -135,6 +144,9 @@ def _current_hash(label):
         source, _, basefile = rest.partition("/")
         p = layout.artifact(source, basefile)
         return input_hash(compress.read_bytes(p)) if compress.exists(p) else None
+    if kind == "download":
+        p = layout.DOWNLOADED / rest
+        return input_hash(compress.read_bytes(p)) if compress.exists(p) else None
     if kind == "wiki":
         p = config.WIKI_ROOT / rest
         return input_hash(p.read_bytes()) if p.exists() else None
@@ -150,15 +162,17 @@ def drifted(inputs):
                   if _current_hash(label) != recorded)
 
 
-def write(p, payload, inputs, force=False):
-    """Write one LLM-authored layer as a fresh ``generated`` envelope:
-    ``meta`` (status, model, authored date, input hashes) beside the payload's
-    own keys. Guards against clobbering a verified layer (the writer also
-    guards before the LLM spend; this is the choke point) and writes
-    atomically -- a costly one-shot output must never survive truncated."""
+def write(p, payload, inputs, force=False, model=None):
+    """Write one authored layer as a fresh ``generated`` envelope: ``meta``
+    (status, model, authored date, input hashes) beside the payload's own
+    keys. ``model`` defaults to the configured LLM (the usual author); a
+    mechanical deriver (sfs table-correspond) passes its own marker instead.
+    Guards against clobbering a verified layer (the writer also guards before
+    the LLM spend; this is the choke point) and writes atomically -- a costly
+    one-shot output must never survive truncated."""
     assert "meta" not in payload, "payload must not carry its own `meta` key"
     guard(p, force)
-    envelope = {"meta": {"status": GENERATED, "model": config.LLM_MODEL,
+    envelope = {"meta": {"status": GENERATED, "model": model or config.LLM_MODEL,
                          "generated": date.today().isoformat(),
                          "inputs": inputs}, **payload}
     util.write_atomic(p, json.dumps(envelope, ensure_ascii=False, indent=2))
