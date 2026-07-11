@@ -28,6 +28,10 @@ re_DottedNumber = re.compile(r"^(\d+ ?\w?)\. ")
 re_Bokstavslista = re.compile(r"^(\w)\) ")
 re_Strecksatslista = re.compile(r"^(- |\x96 |– |--)")
 re_ElementId = re.compile(r"^(\d+) mom\.")  # historical "moment" subsections
+# this many consecutive chapter-shaped, content-less paragraphs are an
+# (unannounced) in-body TOC, not real chapters (see Tokenizer._toc_run_ahead)
+TOC_RUN = 3
+
 re_ChapterRevoked = re.compile(
     r"^(\d+( \w|)) [Kk]ap. (upphävd|[Hh]ar upphävts) genom "
     r"(förordning|lag) \([\d\:\. s]+\)\.?$").match
@@ -183,6 +187,7 @@ class Tokenizer:
         self.current_section = "0"
         self.fake_chapter = "0"
         self.saw_dash_toc = False  # a "N kap. - Title" TOC entry has been seen
+        self.in_toc = False  # the last § announced a chapter listing
         self.headline_level = 0  # 0 = unknown, 1 = normal seen, 2 = in subs
 
     def preamble(self):
@@ -362,21 +367,60 @@ class Tokenizer:
             return False
         # equal ordinal can be a title change for the same chapter
         if util.numcmp(ordinal, self.current_chapter) >= 0:
-            if (self.current_chapter == "1" and self.current_section == "1"
-                    and not self.saw_dash_toc):
-                # a single § so far in chapter 1 suggests the § contains a TOC
-                # whose lines look like chapter headings (2011:1244). This high-
-                # water heuristic only covers TOCs without the "N kap. - Title"
-                # dash form (those are rejected by shape in id_of_kapitel, which
-                # leaves fake_chapter at 0 -- so once such a TOC has been seen we
-                # must not let this branch mis-fake the real body chapters).
+            # the § at hand contains a TOC whose lines look like chapter
+            # headings: either announced outright ("… är uppdelat enligt
+            # följande." -- in_toc, set by tok_paragraf; 2023:200 carries its
+            # TOC in 1 kap. 2 §), or inferred from seeing only a single § so
+            # far in chapter 1 (2011:1244). An announced listing must open at
+            # "1 kap." before it fakes anything: after a *dash-form* listing
+            # (whose lines never look like chapters) the first chapter-shaped
+            # line is the real next chapter (2026:667). The high-water
+            # heuristic only covers TOCs without the "N kap. - Title" dash
+            # form (those are rejected by shape in id_of_kapitel, which
+            # leaves fake_chapter at 0 -- so once such a TOC has been seen we
+            # must not let this branch mis-fake the real body chapters).
+            if ((self.current_chapter == "1" and self.current_section == "1"
+                    and not self.saw_dash_toc)
+                    or (self.in_toc
+                        and (self.fake_chapter != "0" or ordinal == "1"))):
                 if util.numcmp(ordinal, self.fake_chapter) < 0:
                     return True
                 else:
                     self.fake_chapter = ordinal
                     return False
+            if p is None and self._toc_run_ahead(ordinal):
+                # an *unannounced* TOC: this chapter-shaped paragraph opens a
+                # run of TOC_RUN+ consecutive ones with nothing between them.
+                # Real chapters always carry at least a rubrik or a § before
+                # the next chapter (an empty chapter exists only as an
+                # upphävt-notice, excluded in the lookahead), so a bare run
+                # this long is a listing. Arm in_toc so the rest of the run
+                # takes the high-water branch above.
+                self.in_toc = True
+                self.fake_chapter = ordinal
+                return False
             return True
         return False
+
+    def _toc_run_ahead(self, first_ordinal):
+        """Whether the chapter-shaped paragraph at hand opens a run of at
+        least TOC_RUN consecutive chapter-shaped paragraphs with ascending
+        ordinals -- none an upphävt-kapitel notice ("4 kap. har upphävts
+        genom lag (2005:20).", which legitimately leaves a title-only
+        chapter)."""
+        prev = first_ordinal
+        for i in range(2, TOC_RUN + 1):
+            try:
+                p = self.reader.peekparagraph(i).replace("\n", " ")
+            except IOError:
+                return False
+            if re_ChapterRevoked(p):
+                return False
+            ordinal = self.id_of_kapitel(p)
+            if not ordinal or util.numcmp(ordinal, prev) <= 0:
+                return False
+            prev = ordinal
+        return True
 
     def id_of_kapitel(self, p=None):
         if not p:
@@ -422,6 +466,7 @@ class Tokenizer:
         self.headline_level = 0
         self.current_section = "0"
         self.fake_chapter = "0"
+        self.in_toc = False
         self.current_chapter = ordinal
         return OpenKapitel(ordinal=ordinal, rubrik=util.normalize_space(line),
                            upphor=upphor, ikrafttrader=ikrafttrader)
@@ -484,10 +529,15 @@ class Tokenizer:
             # the expired and the enacted version of 1 kap. 1 § can both
             # contain a TOC; reset so the second copy is also detected
             self.fake_chapter = "0"
+        first_stycke = util.normalize_space(r.readparagraph())
+        # a § announcing the law's chapter listing ("Lagens innehåll är
+        # uppdelat enligt följande.", 2023:200 1 kap. 2 §) opens a TOC whose
+        # lines is_kapitel must read as fake chapter headings; the flag holds
+        # until the next § (the listing always ends before one)
+        self.in_toc = first_stycke.endswith("uppdelat enligt följande.")
         return OpenParagraf(
             ordinal=ordinal, moment=moment, upphor=upphor,
-            ikrafttrader=ikrafttrader,
-            first_stycke=util.normalize_space(r.readparagraph()))
+            ikrafttrader=ikrafttrader, first_stycke=first_stycke)
 
     def is_rubrik(self, p=None):
         if p is None:
