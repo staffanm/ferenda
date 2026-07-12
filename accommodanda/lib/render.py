@@ -1298,6 +1298,7 @@ PAGE = """<!doctype html>
 <script src="/fullsearch.js" defer></script>
 <script src="/versions.js" defer></script>
 <script src="/faksimil.js" defer></script>
+<script src="/drawers.js" defer></script>
 <script src="/editor.js" defer></script>
 <script>(function(){var b=document.querySelector('[data-theme-toggle]');if(!b)return;b.addEventListener('click',function(){var cur=document.documentElement.getAttribute('data-theme');if(cur!=='light'&&cur!=='dark')cur=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';var next=cur==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',next);try{localStorage.setItem('theme',next);}catch(e){}});})();</script>
 </body></html>
@@ -1316,6 +1317,15 @@ MAST_NAV = (("Lagar", "/sfs/", ("Författning",)),
             ("Nyheter", "/dataset/sitenews/feed/", ("Nyheter",)))
 
 
+# the magnifier icon, shared by the masthead search button and the mobile
+# bar's Sök button (different sizes) so the glyph can't drift between them
+def _search_icon(size):
+    return ('<svg width="%d" height="%d" viewBox="0 0 16 16" fill="none" '
+            'stroke="currentColor" stroke-width="1.5" aria-hidden="true">'
+            '<circle cx="7" cy="7" r="5"></circle><path d="M11 11l4 4"></path>'
+            '</svg>' % (size, size))
+
+
 def _masthead(kind):
     links = "".join('<a href="%s"%s>%s</a>'
                     % (route, ' class="on"' if kind in act else "", label)
@@ -1323,9 +1333,7 @@ def _masthead(kind):
     return ('<header class="masthead">'
             '<a class="brand" href="/">lagen<em>.</em></a>'
             '<button class="search" type="button" data-search>'
-            '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" '
-            'stroke="currentColor" stroke-width="1.5" aria-hidden="true">'
-            '<circle cx="7" cy="7" r="5"></circle><path d="M11 11l4 4"></path></svg>'
+            + _search_icon(15) +
             '<span>Sök lag, paragraf, rättsfall…</span>'
             '<span class="k">⌘K</span></button>'
             '<nav class="mast-nav">%s</nav>'
@@ -1343,6 +1351,31 @@ def _masthead(kind):
             '<path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4'
             'M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>'
             '</button></header>' % links)
+
+
+# the mobile bottom toolbar (document pages only): thumb-reach access to the
+# TOC drawer, the search palette and the context-rail sheet. A sibling of
+# .gr-body, not a child -- popover.js imports .gr-body into split-view panes,
+# and the toolbar must not ride along. display:none on desktop (style.css).
+# The TOC button (MOBILE_BAR_TOC) only appears when the page has TOC entries;
+# an "Innehåll" that opens an empty drawer is worse than no button.
+MOBILE_BAR_TOC = (
+    '<button type="button" data-drawer="toc" aria-expanded="false">'
+    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" '
+    'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" '
+    'aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"></path></svg>'
+    'Innehåll</button>')
+MOBILE_BAR = (
+    '<nav class="mobile-bar" aria-label="Verktyg">'
+    '%s'
+    '<button type="button" data-search>' + _search_icon(18) + 'Sök</button>'
+    '<button type="button" data-drawer="rail" aria-expanded="false">'
+    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" '
+    'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" '
+    'stroke-linejoin="round" aria-hidden="true">'
+    '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z">'
+    '</path></svg>'
+    'Kontext</button></nav>')
 
 
 def _source_link(source_url):
@@ -1379,7 +1412,7 @@ def page(title, kind, meta, body, toc="", eyebrow=None, subtitle=None,
         grid = ('<div class="gr-body"><aside class="toc-col">%s</aside>'
                 '<main class="gr-main">%s%s</main>'
                 '<aside class="rail" id="rail" aria-live="polite"></aside></div>'
-                % (toc, front, body))
+                % (toc, front, body)) + MOBILE_BAR % (MOBILE_BAR_TOC if toc else "")
     return PAGE % {"title": escape(title), "masthead": _masthead(kind),
                    "grid": grid, "island": island, "body_class": body_class,
                    "head": head}
@@ -2835,8 +2868,8 @@ def render_aggregates(con, out_root, catalog_path, write_index=True):
     # stylesheet with the editor layer appended -- one request, and the editor
     # rules are inert without a logged-in session.
     for name in ("dom.js", "scrollspy.js", "search.js", "popover.js",
-                 "fullsearch.js", "versions.js", "faksimil.js", "editor.js",
-                 "robots.txt"):
+                 "fullsearch.js", "versions.js", "faksimil.js", "drawers.js",
+                 "editor.js", "robots.txt"):
         compress.write_text(out_root / name,
                             (ASSETS / name).read_text(encoding="utf-8"),
                             encodings=compress.PAGE_ENCODINGS)

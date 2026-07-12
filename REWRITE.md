@@ -710,8 +710,12 @@ to a future per-doc incremental generate.
   `lagen all serve [--port]` serves it. `test/test_site.py`.
 - ✅ **2026 presentation redesign — the scroll-driven context rail.** The page
   shell was rebuilt (`render.page`): a sticky masthead with per-section nav, a
-  three-column grid (TOC · reading column · context rail) that collapses to one
-  column under 64rem, a serif/sans type system on warm paper, and SFS §-numerals
+  three-column grid (TOC · reading column · context rail) that under 64rem
+  becomes a single reading column with the side columns as drawers — the TOC an
+  off-canvas left drawer, the rail a bottom sheet, opened from a fixed bottom
+  toolbar (Innehåll · Sök · Kontext, `render.MOBILE_BAR` + `lib/assets/
+  drawers.js`) while the masthead wraps (icon-only search, horizontally
+  scrollable nav) and scrolls away — a serif/sans type system on warm paper, and SFS §-numerals
   hung in a gutter with a permalink pilcrow. The big structural change is that
   **inbound is no longer floated inline next to each paragraph** — a `Rail`
   collector gathers every id-bearing node's context (who cites it — split
@@ -2042,7 +2046,7 @@ model + extraction.
 | `accommodanda/build.py` | orchestrator: `lagen <source> <action>` build driver + freshness; corpus verbs `relate`/`generate`/`index`/`dump`/`serve` (one process serving the static site + REST API + MCP) |
 | `accommodanda/lib/catalog.py` | derived SQLite catalog + cross-source citation graph (`relate`) |
 | `accommodanda/lib/render.py` | static HTML site w/ inbound annotations + live ⌘K search (`generate`) |
-| `accommodanda/lib/assets/` | the browser-facing static chrome as real files (`style.css`, `editor.css`, `dom.js` — shared `window.lagenDom` vocabulary: own-document anchor resolution across split-view panes, id-attribute selector, landing flash, JSON-island parse — `scrollspy.js`, `search.js`, `popover.js`, `fullsearch.js`, `versions.js`, `faksimil.js`, `editor.js`, `robots.txt`) — `render_aggregates` ships them via the same Brotli precompression as pages, `style.css` with `editor.css` appended |
+| `accommodanda/lib/assets/` | the browser-facing static chrome as real files (`style.css`, `editor.css`, `dom.js` — shared `window.lagenDom` vocabulary: own-document anchor resolution across split-view panes, id-attribute selector, landing flash, JSON-island parse — `scrollspy.js`, `search.js`, `popover.js`, `fullsearch.js`, `versions.js`, `faksimil.js`, `drawers.js` — the mobile bottom toolbar's TOC drawer / context-rail bottom sheet — `editor.js`, `robots.txt`) — `render_aggregates` ships them via the same Brotli precompression as pages, `style.css` with `editor.css` appended |
 | `accommodanda/lib/text.py` | shared artifact text flattener (node/document/fragment plain text) |
 | `accommodanda/lib/search.py` | OpenSearch full-text indexer (standalone units collapsed by `doc_uri`, no parent-child join), `index` |
 | `accommodanda/lib/feeds.py` | legacy dataset-alias map + pure Atom/HTML feed renderer, shared by static `/dataset/<alias>/feed` generation and the live query-param endpoints |

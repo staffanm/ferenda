@@ -33,6 +33,9 @@
   --serif:"Source Serif 4","Charter",Georgia,serif;
   --sans:"Inter","Helvetica Neue",system-ui,sans-serif;
   --col-toc:18rem; --col-rail:20rem;
+  /* anchor clearance under the sticky masthead; the mobile breakpoint (whose
+     masthead is static and scrolls away) shrinks it in one place */
+  --scroll-clear:5rem;
   color-scheme: light;
 }
 
@@ -235,7 +238,7 @@ details.lydelser .note { color: var(--ink-4); font-size: .85rem; }
                     text-decoration: none; padding: 0 .1em; border-radius: 2px; }
 .version-diff del, .diff-note del { background: var(--diff-del-bg); color: var(--ink-3);
                     text-decoration: line-through; padding: 0 .1em; border-radius: 2px; }
-.version-diff [id] { scroll-margin-top: 5rem; }
+.version-diff [id] { scroll-margin-top: var(--scroll-clear); }
 .diff-note { margin: 0 0 1.5rem; padding: .55rem 1rem; border: 1px solid var(--rule);
              border-radius: 5px; background: var(--surf-2); font-size: .9rem;
              color: var(--ink-2); }
@@ -243,7 +246,7 @@ details.lydelser .note { color: var(--ink-4); font-size: .85rem; }
 /* -- Ändringar och övergångsbestämmelser (the register view) -- */
 section.andringar { margin-top: 4rem; }
 .andring { margin: 2.25rem 0; padding: 1rem 1.25rem; border: 1px solid var(--rule-soft);
-           border-radius: 5px; background: var(--surf); scroll-margin-top: 5rem; }
+           border-radius: 5px; background: var(--surf); scroll-margin-top: var(--scroll-clear); }
 .andring h2 { font-family: var(--serif); font-weight: 600; font-size: 1.15rem;
               margin: 0 0 .5rem; }
 .andring h3 { font-family: var(--serif); font-weight: 600; font-size: 1rem;
@@ -257,16 +260,16 @@ section.andringar { margin-top: 4rem; }
 .kaprubrik { font-family: var(--serif); font-weight: 500; font-size: 1.7rem;
              letter-spacing: -.022em; line-height: 1.12; margin: 3rem 0 .25rem;
              padding-bottom: .75rem; border-bottom: 1px solid var(--rule);
-             text-wrap: balance; scroll-margin-top: 5rem; }
+             text-wrap: balance; scroll-margin-top: var(--scroll-clear); }
 .rubrik { font-family: var(--serif); font-weight: 600; font-size: 1.2rem;
-          letter-spacing: -.015em; margin: 2.25rem 0 .5rem; scroll-margin-top: 5rem; }
+          letter-spacing: -.015em; margin: 2.25rem 0 .5rem; scroll-margin-top: var(--scroll-clear); }
 .artikel { font-family: var(--serif); font-weight: 600; font-size: 1.15rem;
-           margin: 2rem 0 .5rem; scroll-margin-top: 5rem; }
+           margin: 2rem 0 .5rem; scroll-margin-top: var(--scroll-clear); }
 
 /* -- Paragraphs (SFS § with hanging numeral) -- */
 section.paragraf { display: grid; grid-template-columns: 3.25rem minmax(0,1fr);
                    gap: 1rem; margin: 1.75rem 0; align-items: baseline;
-                   scroll-margin-top: 5rem; }
+                   scroll-margin-top: var(--scroll-clear); }
 .paragraf-gutter { text-align: right; font-family: var(--serif); line-height: 1.2;
                    font-variant-numeric: oldstyle-nums; }
 .paragraf-gutter .n { font-size: 1.55rem; font-weight: 500; color: var(--accent); }
@@ -325,7 +328,7 @@ sup.fnref a { text-decoration: none; padding: 0 .1em; }
 .genomforande ul { margin: 0; padding-left: 1.1rem; font-size: .9rem; }
 .sid { display: inline-block; font-family: var(--serif); font-variant-numeric: oldstyle-nums;
        color: var(--ink-4); font-size: .8rem; margin: 1.25rem 0 .25rem;
-       border-top: 1px solid var(--rule-soft); padding-top: .25rem; scroll-margin-top: 5rem; }
+       border-top: 1px solid var(--rule-soft); padding-top: .25rem; scroll-margin-top: var(--scroll-clear); }
 .sid::before { content: "s. "; font-style: italic; }
 .sid button { all: unset; cursor: pointer; }
 .sid button:hover { color: var(--accent); text-decoration: underline; }
@@ -436,7 +439,7 @@ a.term { color: inherit; border-bottom: 1px dotted var(--ink-4); cursor: help; }
 a.term:hover { color: var(--accent); border-bottom-color: var(--accent);
                text-decoration: none; }
 /* the definition point itself (Article "Definitions") */
-p.definition { scroll-margin-top: 5rem; }
+p.definition { scroll-margin-top: var(--scroll-clear); }
 p.definition dfn { font-style: normal; font-weight: 600; color: var(--accent); }
 
 /* -- EU act editorial layer (.ann): thematic recital groups + the rail's
@@ -445,12 +448,12 @@ p.definition dfn { font-style: normal; font-weight: 600; color: var(--accent); }
    left rather than a heading competing with the act. -- */
 .recital-group { margin: 1.75rem 0 .4rem -1.6rem; font-family: var(--serif);
                  font-style: italic; font-size: .8rem; line-height: 1.4;
-                 color: var(--ink-3); scroll-margin-top: 5rem; }
+                 color: var(--ink-3); scroll-margin-top: var(--scroll-clear); }
 .recital-group b { font-style: normal; font-weight: 600; color: var(--ink-2); }
 .recital-group .rg-range { font-variant-numeric: oldstyle-nums; }
 .recital-group .jfr { color: var(--ink-4); }
 .recital-group a { color: var(--ink-3); }
-p.recital { scroll-margin-top: 5rem; }
+p.recital { scroll-margin-top: var(--scroll-clear); }
 .rail-sec.skal .skal-links { display: flex; flex-wrap: wrap; gap: .2rem .6rem; }
 .rail-sec.skal a { font-variant-numeric: oldstyle-nums; }
 /* curated external links (the act's "Externa länkar" rail section) */
@@ -658,15 +661,79 @@ body.split .pane-stack { flex: 1 1 0; min-height: 0; display: flex;
                         border-radius: 999px; padding: .05rem .45rem;
                         vertical-align: 1px; }
 
-/* -- Responsive: drop the side columns -- */
+/* -- Mobile chrome (drawers.js): a fixed bottom toolbar on document pages.
+   Inert on desktop; the breakpoint below turns the side columns into
+   drawers the toolbar opens. -- */
+.mobile-bar { display: none; }
+
+/* -- Responsive: the reading column owns the viewport; the side columns
+   become drawers (TOC: left drawer, context rail: bottom sheet) reachable
+   from the bottom toolbar. The masthead wraps -- icon-only search, the
+   section nav on its own horizontally scrollable line -- and scrolls away
+   rather than staying stuck over a small screen. -- */
 @media (max-width: 64rem) {
+  .masthead { position: static; height: auto; flex-wrap: wrap;
+              gap: .5rem .9rem; padding: .6rem 1rem; }
+  .masthead .search { flex: 0 0 auto; margin-left: auto;
+                      padding: .45rem .55rem; border-radius: 999px; }
+  .masthead .search > span { display: none; }   /* icon-only; opens the palette */
+  .mast-nav { order: 10; flex-basis: 100%; overflow-x: auto;
+              white-space: nowrap; scrollbar-width: none;
+              margin: 0 -1rem; padding: 0 1rem; }
+  .mast-nav::-webkit-scrollbar { display: none; }
+
   .gr-body { display: block; }
-  .toc-col, .rail { display: none; }
-  .gr-main { max-width: 46rem; margin: 0 auto; }
-  .masthead .search { display: none; }
-  /* the rail is hidden here, so its gutter markers would point at nothing */
+  .gr-main { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1.25rem 8rem; }
+  .gr-main h1 { font-size: 1.9rem; }
+  /* no sticky masthead left to clear when jumping to an anchor */
+  :root { --scroll-clear: .75rem; }
+
+  /* TOC: an off-canvas left drawer (kept in layout, so scrollspy's active
+     tracking and auto-scroll keep working while it is closed) */
+  .toc-col { position: fixed; z-index: 60; top: 0; bottom: 0; left: 0;
+             width: min(85vw, 20rem); max-height: none;
+             box-shadow: 0 0 40px var(--shadow-modal);
+             transform: translateX(-105%); visibility: hidden;
+             transition: transform .25s ease, visibility 0s .25s; }
+  body.toc-open .toc-col { transform: none; visibility: visible;
+                           transition: transform .25s ease; }
+
+  /* context rail: a bottom sheet -- scrollspy keeps it synced to the
+     reading position, so opening it shows the context for where you are */
+  .rail { position: fixed; z-index: 60; left: 0; right: 0; bottom: 0; top: auto;
+          max-height: 70vh; border-left: 0; border-top: 1px solid var(--rule);
+          border-radius: 12px 12px 0 0;
+          box-shadow: 0 -12px 40px var(--shadow-modal);
+          padding: 1.25rem 1.25rem calc(1.5rem + env(safe-area-inset-bottom));
+          transform: translateY(105%); visibility: hidden;
+          transition: transform .25s ease, visibility 0s .25s; }
+  body.rail-open .rail { transform: none; visibility: visible;
+                         transition: transform .25s ease; }
+
+  .drawer-scrim { position: fixed; inset: 0; z-index: 55;
+                  background: var(--overlay); }
+
+  .mobile-bar { position: fixed; z-index: 50; left: 0; right: 0; bottom: 0;
+                display: flex; justify-content: space-around; align-items: stretch;
+                background: var(--surf); border-top: 1px solid var(--rule);
+                padding: .25rem .5rem calc(.25rem + env(safe-area-inset-bottom)); }
+  .mobile-bar button { display: flex; flex-direction: column; align-items: center;
+                       gap: .2rem; flex: 1; border: 0; background: none;
+                       padding: .35rem 0; cursor: pointer; color: var(--ink-2);
+                       font: 500 .68rem var(--sans); }
+  .mobile-bar button[aria-expanded="true"] { color: var(--accent); }
+  body.split .mobile-bar { display: none; }
+
+  /* the rail sits behind its sheet; gutter markers would point at nothing */
   .rail-dot { display: none; }
   .recital-group { margin-left: 0; }
+
+  /* search palette: top-anchored and full width, clear of the on-screen
+     keyboard the input summons */
+  .search-overlay { padding: 1rem; align-items: flex-start; }
+  .search-box { width: 100%; }
+  .search-results:not(:empty) { max-height: 55vh; }
+
   .full-search-layout { grid-template-columns: 1fr; gap: .75rem; }
   .full-search-facets { display: grid; grid-template-columns: repeat(3, 1fr);
                         gap: .75rem; }
