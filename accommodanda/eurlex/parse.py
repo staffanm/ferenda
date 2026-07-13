@@ -149,18 +149,39 @@ def _article_number(article):
     return digits or None
 
 
-def _emit_list(lst, blocks):
-    """LIST -> a point block per ITEM (its NO.P marker + text)."""
+def _is_numbered_list(lst):
+    """True for an Arabic-numbered LIST ("1.", "2.", ...) -- the numbering an
+    article's own top-level enumeration uses, as opposed to the lettered/roman
+    markers of a nested sub-list. Reads the Formex TYPE, falling back to the first
+    item's marker when it is absent."""
+    t = lst.get("TYPE", "").lower()
+    if t:
+        return t == "arab"
+    nop = lst.find("ITEM/NP/NO.P")
+    return nop is not None and any(c.isdigit() for c in "".join(nop.itertext()))
+
+
+def _emit_list(lst, blocks, kind="point"):
+    """LIST -> a block per ITEM (its NO.P marker + lead text), recursing into a
+    nested sub-LIST as deeper points. `kind` is this level's block kind: an
+    article's own numbered enumeration is paragraph-level, a lettered or nested
+    sub-list is points. The lead text is the item's own TXT/P -- a nested sub-list
+    is emitted as its own points, never folded into the lead."""
     for item in lst.findall("ITEM"):
         np = item.find("NP")
+        holder = np if np is not None else item
         marker = _text(np, "NO.P").strip("().") if np is not None else None
-        blocks.append(Block("point", _text(np if np is not None else item, "TXT", "P"),
-                            num=marker or None))
+        blocks.append(Block(kind, _text(holder, "TXT", "P"), num=marker or None))
+        for sub in (holder.findall("LIST") + holder.findall("P/LIST")
+                    + holder.findall("ALINEA/LIST")):
+            _emit_list(sub, blocks, "point")
 
 
 def _emit_alinea(content, num, blocks):
     """A PARAG/ALINEA body: a plain paragraph, or a lead paragraph followed by
-    a LIST of points."""
+    a LIST. A numbered list that is the article's own enumeration (not inside a
+    numbered paragraph) is paragraph-level -- so its items nest their own points
+    and read as "1." like the official act; any other list is points."""
     lists = content.findall("LIST")
     if not lists:
         blocks.append(Block("paragraph", flatten(content), num=num))
@@ -169,7 +190,8 @@ def _emit_alinea(content, num, blocks):
     if lead.strip():
         blocks.append(Block("paragraph", lead, num=num))
     for lst in lists:
-        _emit_list(lst, blocks)
+        kind = "paragraph" if num is None and _is_numbered_list(lst) else "point"
+        _emit_list(lst, blocks, kind)
 
 
 def parse_article(article, blocks):
@@ -439,6 +461,12 @@ def to_artifact(doc):
     is scanned both for citations and for in-act uses of those terms."""
     parser = _refparser()
     parser.reset()                          # fresh per-document state
+    # a legislative act's own body cites its own articles by a bare "artikel N";
+    # tell the parser its identity so those self-refer to it rather than
+    # anaphora-pinning onto an external act a recital named (a judgment has no
+    # such self-act -- its bare articles do refer to the act under discussion)
+    if doc.doctype != "judgment":
+        parser.state.self_eu_act = doc.celex
     matcher, index = build_matcher(extract_definitions(doc.body, doc.lang),
                                    doc.lang)
     body = []

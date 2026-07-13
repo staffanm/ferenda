@@ -108,8 +108,11 @@ def test_to_artifact_definitions_and_uses():
     assert by_id["5.2"]["defines"] == "sårbarhet"
 
     # article 7's paragraph links its inflected uses to the definition points
+    # (selected by content -- the definitions article's own entries are now
+    # paragraphs too, so a bare num=="1" lookup would hit "incident" first)
     para = next(b for b in blocks
-                if b["type"] == "paragraph" and b.get("num") == "1")
+                if b["type"] == "paragraph" and b.get("num") == "1"
+                and "Riktlinjer" in _runs(b)[0])
     links = [r for r in _runs(para) if isinstance(r, dict)]
     assert {(r["text"], r["uri"]) for r in links if r.get("kind") == "term"} == {
         ("sårbarheter", "https://lagen.nu/ext/celex/32022L2555#5.2"),

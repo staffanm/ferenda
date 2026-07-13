@@ -92,7 +92,12 @@ def extract_definitions(body, lang):
                 i += 1
                 while i < n and body[i].kind not in ("article", "heading"):
                     point = body[i]
-                    term = _term_of(point.text) if point.kind == "point" else None
+                    # a definitions entry is the article's own enumeration: a
+                    # numbered `paragraph` when it sits directly under the article
+                    # (GDPR art. 4), a `point` when the list is one paragraph deep
+                    # (NIS2 art. 6). Its lettered sub-points are never definitions.
+                    term = (_term_of(point.text)
+                            if point.kind in ("paragraph", "point") else None)
                     if term and point.num:
                         point.anchor = "%s.%s" % (art_num, point.num)
                         point.defines = term

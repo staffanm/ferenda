@@ -9,6 +9,7 @@ other.
 import re
 
 from .catalog import BASE
+from .coe_ids import article_fragment
 
 # HUDOC's article facet writes Convention articles as ``8`` / ``6-3-d`` and
 # protocol provisions as ``P7-4``.  Protocol numbers are human numbers, while
@@ -42,15 +43,6 @@ def treaty_number(value):
 
 def treaty_uri(number):
     return "%sext/coe/%s" % (BASE, treaty_number(number))
-
-
-def article_fragment(article, paragraph=None, letter=None):
-    fragment = "A%s" % str(article).lstrip("0")
-    if paragraph:
-        fragment += "P%s" % str(paragraph).lstrip("0")
-    if letter:
-        fragment += "L%s" % str(letter).lower()
-    return fragment
 
 
 def article_uri(number, article, paragraph=None, letter=None):

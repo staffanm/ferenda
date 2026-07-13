@@ -1,0 +1,7 @@
+{
+  "_comment": "Council of Europe treaties by Swedish name -> ETS/CETS number, for the citation engine (lib/lagrum.load_treaties). Links 'artikel N i europakonventionen' onto ext/coe/<number>, the article riding the CoE fragment grammar its artifact mints (#A8, #A6P1 -- lib.coe.article_fragment), NOT the EU '#8.1' form. Hand-edited. `abbr`/`label` may each be a string or a list, matched case-insensitively; determiner-led forms are listed in full since the treaty grammar matches the whole name.",
+  "005": {
+    "abbr": "EKMR",
+    "label": ["europakonventionen", "europeiska konventionen om skydd för de mänskliga rättigheterna och de grundläggande friheterna", "europeiska konventionen om skydd för de mänskliga rättigheterna"]
+  }
+}

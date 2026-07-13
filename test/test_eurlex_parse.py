@@ -5,10 +5,18 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
+from accommodanda.eurlex.parse import (
+    _annex_anchor,
+    content_file,
+    doctype,
+    flatten,
+    load_formex,
+    parse_document,
+    parse_formex,
+    to_artifact,
+)
+from accommodanda.lib.eu_structure import anchored_blocks
 from accommodanda.lib.eu_structure import flatten as flatten_structure
-from accommodanda.eurlex.parse import (flatten, doctype, parse_formex,
-                                       parse_document, to_artifact,
-                                       content_file, load_formex, _annex_anchor)
 
 
 def _flat(xml):
@@ -93,6 +101,46 @@ def test_parse_act_body_structure():
     assert ("paragraph", "1", None, "I detta direktiv fastställs åtgärder.") in seen
     assert ("paragraph", "2", None, "Följande fastställs:") in seen
     assert ("point", "a", None, "skyldigheter.") in seen
+
+
+# an article whose body is a numbered enumeration sitting directly under the
+# ALINEA (no numbered paragraph), one of whose entries carries a lettered
+# sub-list -- the shape of GDPR art. 4 def. 22, whose sub-points were dropped
+DEF_LIST_XML = """<ACT>
+  <BIB.INSTANCE><DATE ISO="20160427">20160427</DATE></BIB.INSTANCE>
+  <TITLE><TI><P>Test</P></TI></TITLE>
+  <ENACTING.TERMS>
+    <ARTICLE IDENTIFIER="004">
+      <TI.ART>Artikel 4</TI.ART><STI.ART>Definitioner</STI.ART>
+      <ALINEA>
+        <P>I denna förordning avses med</P>
+        <LIST TYPE="ARAB">
+          <ITEM><NP><NO.P>1.</NO.P><TXT>uppgift: något.</TXT></NP></ITEM>
+          <ITEM><NP><NO.P>22.</NO.P>
+            <TXT>berörd myndighet: en myndighet på grund av att</TXT>
+            <P><LIST TYPE="alpha">
+              <ITEM><NP><NO.P>a)</NO.P><TXT>den ansvarige är etablerad,</TXT></NP></ITEM>
+              <ITEM><NP><NO.P>b)</NO.P><TXT>registrerade påverkas, eller</TXT></NP></ITEM>
+            </LIST></P></NP></ITEM>
+        </LIST>
+      </ALINEA>
+    </ARTICLE>
+  </ENACTING.TERMS>
+</ACT>"""
+
+
+def test_definition_list_entries_are_paragraphs_with_nested_points():
+    doc = parse_formex(ET.fromstring(DEF_LIST_XML), "32016R0679", "swe")
+    seen = [(b.kind, b.num, b.text) for b in doc.body]
+    # the article's own numbered entries are paragraph-level ("22." not "22)")
+    assert ("paragraph", "1", "uppgift: något.") in seen
+    assert ("paragraph", "22", "berörd myndighet: en myndighet på grund av att") in seen
+    # the lettered sub-list is captured as points (previously dropped entirely)
+    assert ("point", "a", "den ansvarige är etablerad,") in seen
+    assert ("point", "b", "registrerade påverkas, eller") in seen
+    # nesting reconstructs to article.paragraph.point anchors
+    anchors = {a for a, _ in anchored_blocks(to_artifact(doc)["structure"])}
+    assert {"4.22", "4.22.a", "4.22.b"} <= anchors
 
 
 JUDGMENT_XML = """<JUDGMENT>

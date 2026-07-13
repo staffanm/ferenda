@@ -6,6 +6,10 @@ these). Each dataset is co-located with the vertical that owns and curates it:
     1915:218 / 1962:700). Hand-edited; also feeds the citation parser at parse
     time (every vertical's LagrumParser), not just ⌘K.
   * ``NAMEDACTS``  -- EU acts by short name ("GDPR", "IPRED" -> CELEX). Hand-edited.
+    Its sector-1 entries (the treaties + Charter) and ``COE_NAMES`` feed the
+    always-on treaty linking (lib/lagrum.load_treaties), not the opt-in name path.
+  * ``COE_NAMES``   -- Council-of-Europe treaties by name ("europakonventionen" ->
+    ETS/CETS number). Hand-edited.
   * ``NAMEDCASES`` -- HD cases by nickname ("Instagrambilden" -> NJA referat).
     Auto-harvested from Högsta domstolen's official list (dv.namedcases), with
     the harvested JSON committed as the shipped snapshot.
@@ -24,6 +28,7 @@ _PKG = Path(__file__).resolve().parent.parent
 
 NAMEDLAWS = _PKG / "sfs" / "data" / "namedlaws.json"
 NAMEDACTS = _PKG / "eurlex" / "data" / "namedacts.json"
+COE_NAMES = _PKG / "coe" / "data" / "names.json"
 NAMEDCASES = _PKG / "dv" / "data" / "namedcases.json"
 NAMEDEUCASES = _PKG / "eurlex" / "data" / "casenames.json"
 
