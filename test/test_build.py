@@ -5,10 +5,9 @@ temp files -- no real corpus, no JVM, fast."""
 
 import json
 import socket
+from urllib.parse import urlparse
 
 import pytest
-
-from urllib.parse import urlparse
 
 from accommodanda import build, config
 from accommodanda.build import RunOptions, Source, Stage, build_one, is_fresh
@@ -209,6 +208,12 @@ def test_recipe_version_invalidates(tmp_path):
 
 def test_sfs_graphics_is_part_of_parse_recipe():
     assert any(path.name == "graphics.py" for path in build.SFS_CODE)
+
+
+def test_sfs_conventions_are_part_of_parse_recipe():
+    assert {
+        "atmf.py", "convention.py", "crc.py", "echr.py", "montreal.py"
+    } <= {path.name for path in build.SFS_CODE}
 
 
 def test_code_version_gate_for_relate_index(tmp_path):

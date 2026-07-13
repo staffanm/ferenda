@@ -1232,9 +1232,81 @@ def render_grafik(node, site, doc_uri):
                escape(label), escape(entry["sfs"]), escape(entry["sfs"])))
 
 
+CONVENTION_LANGUAGES = (("en", "English"), ("fr", "Français"),
+                        ("sv", "Svenska"))
+
+
+def _parallel_versions(node):
+    versions = {version["language"]: version for version in node["versions"]}
+    assert set(versions) == {language for language, _ in CONVENTION_LANGUAGES}, \
+        "convention appendix node %s must have en/fr/sv versions" % node.get("id")
+    return versions
+
+
+def _convention_cell(version, site, tag):
+    content = render_runs(version.get("text", []), site)
+    content = "<%s>%s</%s>" % (tag, content, tag)
+    return '<div class="konvention-cell" lang="%s">%s</div>' % (
+        escape(version["language"]), content)
+
+
+def _convention_row(node, site, css, tag):
+    versions = _parallel_versions(node)
+    return '<div class="konvention-row %s">%s</div>' % (
+        css, "".join(_convention_cell(versions[language], site, tag)
+                      for language, _ in CONVENTION_LANGUAGES))
+
+
+def _convention_paragraphs(node, site):
+    rows = []
+    for paragraph in node.get("paragraphs", []):
+        assert paragraph.get("type") == "konventionsstycke", \
+            "unknown convention paragraph node %r" % paragraph.get("type")
+        rows.append(_convention_row(paragraph, site, "konvention-paragraph", "p"))
+    return "".join(rows)
+
+
+def _render_konventionsinstrument(node, site, toc):
+    versions = _parallel_versions(node)
+    toc.add(node.get("id"), plain(versions["sv"].get("text", [])), 2)
+    title = _convention_row(node, site, "konvention-title", "h3")
+    ingress = _convention_paragraphs(node, site)
+    provisions = []
+    for child in node.get("children", []):
+        child_versions = _parallel_versions(child)
+        swedish = plain(child_versions["sv"].get("text", []))
+        toc.add(child.get("id"), swedish, 3)
+        kind = child["type"]
+        assert kind in {"konventionsavdelning", "konventionsartikel"}, \
+            "unknown convention appendix node %r" % kind
+        css = "konvention-section" if kind == "konventionsavdelning" \
+            else "konvention-article"
+        heading = _convention_row(child, site, css + "-heading", "h4")
+        paragraphs = _convention_paragraphs(child, site)
+        provisions.append('<section class="%s"%s>%s%s</section>' % (
+            css, _id_attr(child.get("id")), heading, paragraphs))
+    return '<section class="konvention-instrument"%s>%s%s</section>' % (
+        _id_attr(node.get("id")), title + ingress, "".join(provisions))
+
+
+def render_konventionsbilaga(node, site, doc_uri, toc, rail):
+    assert node.get("languages") == [language for language, _ in CONVENTION_LANGUAGES], \
+        "convention appendix language order must be en/fr/sv"
+    language_head = '<div class="konvention-languages">%s</div>' % "".join(
+        '<div lang="%s">%s</div>' % (language, label)
+        for language, label in CONVENTION_LANGUAGES)
+    instruments = "".join(
+        _render_konventionsinstrument(child, site, toc)
+        for child in node.get("children", []))
+    return '<div class="konventionsbilaga">%s%s</div>' % (language_head, instruments)
+
+
 def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
     t = node.get("type")
     nid = node.get("id")
+
+    if t == "konventionsbilaga":
+        return render_konventionsbilaga(node, site, doc_uri, toc, rail)
 
     if t == "tabell":
         rows = "".join(render_node(c, site, doc_uri, toc, rail)
@@ -1800,6 +1872,10 @@ def render_sfs(art, site):
     ])
     toc = Toc()
     rail = Rail(site, art["uri"])
+    parallel_appendix = any(
+        child.get("type") == "konventionsbilaga"
+        for node in art.get("structure", []) if node.get("type") == "bilaga"
+        for child in node.get("children", []))
     versions = history.versions(base_id)
     structure = '<div id="dokument">' + "".join(
         render_node(n, site, art["uri"], toc, rail)
@@ -1818,13 +1894,19 @@ def render_sfs(art, site):
         + ("" if version else document_inbound(site, art["uri"], own_forarbeten)) \
         + structure + andringar
     rail.add_document()        # external links + law-level commentary, default panel
+    body_classes = []
+    if version:
+        body_classes.append("inaktuell")
+    elif expired:
+        body_classes.append("expired")
+    if parallel_appendix:
+        body_classes.append("parallel-appendix")
     return page(title, "Författning", meta, body, render_toc(toc),
                 eyebrow=("SFS %s · äldre lydelse" % base_id if version
                          else "SFS " + base_id),
                 island=rail.island(),
                 source_url=art.get("source_url"),
-                body_class=(" inaktuell" if version
-                            else " expired" if expired else ""))
+                body_class="".join(" " + name for name in body_classes))
 
 
 DV_SHORT_COURT = {"Högsta domstolen": "HD",

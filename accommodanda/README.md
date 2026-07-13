@@ -59,6 +59,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `tokenizer.py` | recognizers → flat event stream |
 | `assembler.py` | RANK-driven stack machine → document tree |
 | `model.py` | typed dataclasses (`Forfattning`, `Kapitel`, `Paragraf`, …) |
+| `convention.py` + `{echr,crc,montreal,atmf}.py` | shared English/French/Swedish appendix alignment plus the printed-format parsers for SFS 1994:1219, 2018:1197, 2010:510 and 2022:366 |
 | `nf.py` | tree → golden normal form (replicates old URI-minting quirks) |
 | `register.py` | SFSR register page → amendments + change tuples; `resource_map`/`lookup_resource` resolve org/series labels via the ported `data/resources.json` dataset |
 | `versions.py` | archived consolidations (download archive, three raw generations) → per-version artifacts + `.versions.json` sidecar |
@@ -77,6 +78,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `casenaming.py` | court-decision identity — `case_uri` (mint a case's canonical URI via the RATTSFALL parser) + `case_label`/`lopnummer` (referat identity + HD's given names); read identically by dv's parse-time label stamp, the catalog row and the page heading |
 | `eucasenaming.py` | the EU mirror of `casenaming.py` — `case_number` (CELEX → court case number, "62018CJ0311" → "C-311/18", also T-/F- courts), `given_name`/`case_name`/`case_citation` (curated usual name, page heading, "C-311/18 (Schrems II)" inbound-citation label) from the shipped `eurlex/data/casenames.json` snapshot; read identically by eurlex's parse-time label stamp, the catalog row and the page heading |
 | `coe.py` | shared Council of Europe identity grammar: ETS/CETS number → `ext/coe/{number}`, article/subarticle fragments, and HUDOC's `8` / `6-3-d` / `P7-4` facet codes → the same treaty provision URIs produced by the Treaty Office vertical |
+| `coe_ids.py` | dependency-free CoE article-fragment grammar (`article_fragment`) factored out of `coe.py` so `lib.lagrum` can use it without closing the `lagrum → coe → catalog → markdown → lagrum` import cycle; also used by `sfs/nf.py` |
 | `eu_structure.py` | the one EU-act sub-article anchor grammar (`anchored_blocks`/`subarticle_key`/`flatten`), shared by the eurlex parser, the renderer and the wiki guidance layer (`nest`, the parse-time tree builder, stays in `eurlex/structure.py`) |
 | `legacy_import.py` | shared §7g frozen-import core — `should_write` precedence (live-wins / own-import-idempotent-unless-force / optional `better()` tie-break), `rel` (in-place LEGACY_ROOT-relative body references), `iter_entries`/`docdir`/`read_record` walk primitives; used by `forarbete/legacy.py`, `foreskrift/legacy.py`, `avg/legacy.py` |
 | `regeringen.py` | shared regeringen.se harvest knowledge — the doctype table (`TYPES`: url segment, taxonomy category id, identifier regex) and the `ul.list--block` listing walk (`listing_items`); used by `forarbete/download.py` and `remisser/download.py` |

@@ -13,7 +13,15 @@ from pathlib import Path
 from ..lib import compress, patch
 from ..lib.errors import SkipDocument
 from .assembler import assemble
+from .atmf import parse_appendix as parse_atmf_appendix
+from .atmf import split_appendix as split_atmf_appendix
+from .crc import parse_appendix as parse_crc_appendix
+from .crc import split_appendix as split_crc_appendix
+from .echr import parse_appendix, split_appendix
 from .extract import extract_body
+from .model import Bilaga
+from .montreal import parse_appendix as parse_montreal_appendix
+from .montreal import split_appendix as split_montreal_appendix
 from .reader import TextReader
 from .register import (
     parse_register,
@@ -29,6 +37,29 @@ def _assemble(text, basefile):
     # patch (a correction, or a rot13 redaction of personal data) here, before
     # the reader tokenises it, so the fix flows into every downstream artifact.
     text = patch.apply("sfs", basefile, text)
+    # Convention incorporation statutes route by basefile plus an asserted
+    # printed-format marker. Older ECHR SFST generations contain overlapping
+    # temporal variants of the whole appendix (and, in the oldest, no Bilaga
+    # marker at all), so only its modern explicit-1-§ shape takes this path.
+    # This is format dispatch, not an error fallback: after selection, the
+    # language/provision/paragraph invariants must all hold.
+    convention_parser = None
+    if basefile == "1994:1219" and text.lstrip().startswith("1 §"):
+        convention_parser = (split_appendix, parse_appendix)
+    elif basefile == "2018:1197":
+        convention_parser = (split_crc_appendix, parse_crc_appendix)
+    elif basefile == "2010:510" and "\nCONVENTION FOR THE UNIFICATION" in text:
+        convention_parser = (split_montreal_appendix, parse_montreal_appendix)
+    elif basefile == "2022:366" and "\nRègles uniformes concernant" in text:
+        convention_parser = (split_atmf_appendix, parse_atmf_appendix)
+    if convention_parser:
+        split, parse = convention_parser
+        statute, appendix = split(text)
+        reader = TextReader(statute)
+        reader.autostrip = True
+        doc = assemble(Tokenizer(reader, basefile))
+        doc.children.append(Bilaga("Bilaga", children=[parse(appendix)]))
+        return doc
     reader = TextReader(text)
     reader.autostrip = True
     return assemble(Tokenizer(reader, basefile))

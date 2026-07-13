@@ -37,12 +37,18 @@ from datetime import datetime
 
 from ..lib import lagrum, util
 from ..lib.catalog import BASE
+from ..lib.coe_ids import article_fragment
 from . import begrepp, graphics
 from . import register as register_mod
 from .model import (
     Avdelning,
     Bilaga,
     Kapitel,
+    Konventionsartikel,
+    Konventionsavdelning,
+    Konventionsbilaga,
+    Konventionsinstrument,
+    Konventionsstycke,
     Lista,
     Listelement,
     Overgangsbestammelse,
@@ -347,6 +353,14 @@ def content_key(node):
             return ("OE", node.ordinal)
         case Bilaga():
             return tuple(content_key(c) for c in node.children)
+        case Konventionsbilaga():
+            return tuple(content_key(c) for c in node.instruments)
+        case Konventionsinstrument():
+            return (node.nummer, tuple(content_key(c) for c in node.children))
+        case Konventionsavdelning() | Konventionsartikel():
+            return (type(node).__name__, node.ordinal)
+        case Konventionsstycke():
+            return tuple(node.texter.items())
         case Tabell():
             return tuple(tuple(row.cells) for row in node.rows)
         case UpphavtKapitel() | UpphavdParagraf():
@@ -460,9 +474,104 @@ def project_children(children, pairs, proj, frag, live=True, satt_av=None):
                 kids += project_children(node.children, sub if node_id else None,
                                          proj, ctx, blive, satt_av=gov)
                 out.append({"type": "bilaga", "id": node_id, "children": kids})
+            case Konventionsbilaga():
+                out.append(project_konventionsbilaga(node, frag, proj, live))
             case Overgangsbestammelser():
                 pass  # redistributed into the amendment register downstream
     return out
+
+
+def _language_version(language, text, proj, context, live, treaty=None):
+    runs = ([{"predicate": "rdfs:seeAlso", "uri": treaty, "text": text}]
+            if treaty else proj.inline(util.normalize_space(text), context, live))
+    return {
+        "language": language,
+        "text": runs,
+    }
+
+
+def _parallel_paragraphs(paragraphs, proj, context, live):
+    return [
+        {"type": "konventionsstycke", "id": None,
+         "versions": [
+             _language_version(language, paragraph.texter[language], proj,
+                               context, live)
+             for language in ("en", "fr", "sv")
+         ]}
+        for paragraph in paragraphs
+    ]
+
+
+def project_konventionsbilaga(node, frag, proj, live=True):
+    """Project a trilingual convention corpus without flattening away its
+    cross-language alignment. Every heading and aligned paragraph version still
+    uses ordinary ``text`` runs, so shared link extraction remains generic."""
+    instruments = []
+    for instrument in node.instruments:
+        instrument_id = "%sI%s" % (frag, instrument.nummer)
+        versions = [
+            _language_version(
+                language, instrument.rubriker[language],
+                proj, instrument_id, live,
+                treaty=instrument.uri)
+            for language in ("en", "fr", "sv")
+        ]
+        children = []
+        for child in instrument.children:
+            if isinstance(child, Konventionsavdelning):
+                child_id = "%sSec%s" % (instrument_id, child.ordinal)
+                child_uri = "%s#Sec%s" % (instrument.uri, child.ordinal) \
+                    if instrument.uri else None
+                children.append({
+                    "type": "konventionsavdelning",
+                    "id": child_id,
+                    "ordinal": child.ordinal,
+                    "uri": child_uri,
+                    "versions": [
+                        _language_version(language, child.rubriker[language],
+                                          proj, child_id, live, treaty=child_uri)
+                        for language in ("en", "fr", "sv")
+                    ],
+                })
+            else:
+                assert isinstance(child, Konventionsartikel), \
+                    "unknown convention appendix child %r" % child
+                child_id = "%sA%s" % (instrument_id, ordfrag(child.ordinal))
+                child_uri = "%s#%s" % (
+                    instrument.uri, article_fragment(child.ordinal)) \
+                    if instrument.uri else None
+                children.append({
+                    "type": "konventionsartikel",
+                    "id": child_id,
+                    "ordinal": child.ordinal,
+                    "uri": child_uri,
+                    "versions": [
+                        _language_version(
+                            language, child.rubriker[language],
+                            proj, child_id, live,
+                            treaty=child_uri)
+                        for language in ("en", "fr", "sv")
+                    ],
+                    "paragraphs": _parallel_paragraphs(
+                        child.texter, proj, child_id, live),
+                })
+        instruments.append({
+            "type": "konventionsinstrument",
+            "id": instrument_id,
+            "number": instrument.nummer,
+            "protocol": instrument.protokoll,
+            "uri": instrument.uri,
+            "versions": versions,
+            "paragraphs": _parallel_paragraphs(
+                instrument.ingresser, proj, instrument_id, live),
+            "children": children,
+        })
+    return {
+        "type": "konventionsbilaga",
+        "id": None,
+        "languages": ["en", "fr", "sv"],
+        "children": instruments,
+    }
 
 
 def project_paragraf(paragraf, pairs, proj, frag, live=True, satt_av=None):

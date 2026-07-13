@@ -603,7 +603,8 @@ def save_watermarks(store):
 PKG = Path(__file__).parent
 SFS_CODE = tuple(PKG / "sfs" / ("%s.py" % m) for m in (
     "__init__", "extract", "reader", "tokenizer", "assembler", "model", "nf",
-    "register", "begrepp", "graphics")) + (PKG / "lib" / "lagrum.py",)
+    "atmf", "convention", "crc", "echr", "montreal", "register", "begrepp",
+    "graphics")) + (PKG / "lib" / "lagrum.py",)
 
 
 @functools.cache

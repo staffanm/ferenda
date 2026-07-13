@@ -126,6 +126,49 @@ class Bilaga:
     children: list[BilagaInnehall] = field(default_factory=list)
 
 
+@dataclass
+class Konventionsbilaga:
+    """A trilingual convention appendix incorporated into an SFS statute.
+
+    Unlike an ordinary statute appendix, this is a parallel corpus: each
+    instrument, section, article and paragraph exists once, with aligned
+    English, French and Swedish text. Keeping that alignment in the source model
+    prevents the renderer from having to infer legal structure from three flat
+    text runs.
+    """
+
+    instruments: list[Konventionsinstrument] = field(default_factory=list)
+
+
+@dataclass
+class Konventionsstycke:
+    texter: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
+class Konventionsinstrument:
+    nummer: str  # stable instrument key (eg. CETS 005 or CRC)
+    protokoll: str | None
+    uri: str | None
+    rubriker: dict[str, str] = field(default_factory=dict)
+    ingresser: list[Konventionsstycke] = field(default_factory=list)
+    children: list[Konventionsavdelning | Konventionsartikel] = field(
+        default_factory=list)
+
+
+@dataclass
+class Konventionsavdelning:
+    ordinal: str
+    rubriker: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
+class Konventionsartikel:
+    ordinal: str
+    rubriker: dict[str, str] = field(default_factory=dict)
+    texter: list[Konventionsstycke] = field(default_factory=list)
+
+
 # rank 4 containers (Kapitel) hold paragraf-level content and loose blocks
 KapitelInnehall = Paragraf | UpphavdParagraf | Rubrik | Stycke | Lista | Tabell
 # rank 3 containers (Underavdelning) and Overgangsbestammelse (rank 2) add
@@ -134,6 +177,6 @@ UnderavdelningInnehall = Kapitel | UpphavtKapitel | KapitelInnehall
 # rank 2 containers (Avdelning) add underavdelningar
 AvdelningInnehall = Underavdelning | UnderavdelningInnehall
 # rank 1 containers (Bilaga) add avdelningar
-BilagaInnehall = Avdelning | AvdelningInnehall
+BilagaInnehall = Konventionsbilaga | Avdelning | AvdelningInnehall
 # the document root holds everything, incl. the rank-1 trailing sections
 ForfattningInnehall = Overgangsbestammelser | Bilaga | BilagaInnehall

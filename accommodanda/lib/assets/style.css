@@ -287,6 +287,40 @@ section.paragraf.rail-active { background:
    linear-gradient(90deg, color-mix(in oklab, var(--accent) 6%, transparent), transparent 60%);
    border-radius: 4px; }
 
+/* -- Incorporated conventions rendered as trilingual parallel corpora --
+   Every heading and legal paragraph is one three-cell row. The grid has no
+   minimum width: all languages share the available reading column instead of
+   clipping the Swedish third, and it uses the ordinary law-page surface. */
+body.parallel-appendix .gr-main { max-width: 90rem; }
+.konventionsbilaga { margin-top: 1.5rem; }
+.konvention-languages, .konvention-row { display: grid;
+                     grid-template-columns: repeat(3, minmax(0, 1fr));
+                     column-gap: clamp(.75rem, 2vw, 1.5rem); }
+.konvention-languages { margin-bottom: 2.25rem; }
+.konvention-languages > div { font: 600 .68rem var(--sans);
+                              color: var(--ink-3); letter-spacing: .07em;
+                              text-transform: uppercase; }
+.konvention-instrument { scroll-margin-top: calc(var(--scroll-clear) + 2rem); }
+.konvention-instrument + .konvention-instrument { margin-top: 4.5rem; }
+.konvention-cell { min-width: 0; overflow-wrap: break-word;
+                   font-family: var(--serif); font-size: .9rem; line-height: 1.55; }
+.konvention-cell h3, .konvention-cell h4 { line-height: 1.3; text-wrap: balance; }
+.konvention-cell h3 a, .konvention-cell h4 a { color: inherit; }
+.konvention-title { margin-bottom: 1.4rem; }
+.konvention-title .konvention-cell h3 { margin: 0; font-size: 1.05rem;
+                                        font-weight: 600; }
+.konvention-section { margin: 2.5rem 0 1.5rem; }
+.konvention-section-heading .konvention-cell h4 { margin: 0; color: var(--ink-2);
+                                          letter-spacing: .025em; font-size: .78rem;
+                                          font-weight: 600; }
+.konvention-article { margin: 1.8rem 0; }
+.konvention-article-heading { margin-bottom: .65rem; }
+.konvention-article-heading .konvention-cell h4 { margin: 0; font-size: .9rem;
+                                                   font-weight: 600; }
+.konvention-paragraph { margin-bottom: .7rem; }
+.konvention-paragraph .konvention-cell p { margin: 0; }
+.konvention-article { scroll-margin-top: calc(var(--scroll-clear) + 2rem); }
+
 /* -- DV / förarbete extras -- */
 .sammanfattning { font-family: var(--serif); font-style: italic; font-size: 1.05rem;
                   color: var(--ink-2); }
