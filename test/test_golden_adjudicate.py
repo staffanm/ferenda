@@ -675,3 +675,87 @@ def test_brottsrubricering_begrepp_missing_not_forgiven():
               "Den som bemäktigar sig ett fartyg döms för kapning till fängelse.")]
     unexplained, accepted = golden_sfs.adjudicate(p, PIN_GOLDEN)
     assert unexplained == p and accepted == []
+
+
+# --- grafik-node-replaces-marker: a graphic the SFST text drops, recovered as a
+# typed grafik node where the old pipeline carried the omission marker as text --
+
+GRAFIK_GOLDEN = {"uri": "https://lagen.nu/2002:780", "amendments": [],
+                 "structure": [{"type": "bilaga", "id": "B1", "children": [
+                     {"type": "stycke", "id": "B1S1", "text": "1 Balanstalet, BT"},
+                     {"type": "stycke", "id": "B1S2",
+                      "text": "/Formeln är inte med här/ Förordning (2021:734)."},
+                 ]}]}
+# the new pipeline: B1S2 became a grafik node G1
+GRAFIK_NEW = {"structure": [{"type": "bilaga", "id": "B1", "children": [
+    {"type": "stycke", "id": "B1S1", "text": "1 Balanstalet, BT"},
+    {"type": "grafik", "id": "G1", "sort": "formel", "satt_av": "2021:734"},
+]}]}
+
+
+def test_is_marker_only():
+    assert golden_sfs.is_marker_only("/Formeln är inte med här/")
+    assert golden_sfs.is_marker_only("/Bilagan är inte med här./")   # period variant
+    assert golden_sfs.is_marker_only(
+        "/Formeln är inte med här/ Förordning (2021:734).")          # + change note
+    assert golden_sfs.is_marker_only("Formeln är inte med här.")     # no slashes
+    assert golden_sfs.is_marker_only(
+        "Bilaga 2 är inte med här. Bilagan senast ändrad genom lag (2025:1369).")
+    # a marker embedded in real prose is NOT marker-only -- a real drop
+    assert not golden_sfs.is_marker_only("Se figuren /Figuren är inte med här/ nedan")
+    assert not golden_sfs.is_marker_only("En vanlig paragraf.")
+
+
+def test_grafik_extra_node_and_missing_marker_forgiven():
+    extra = "structure/B1: extra node G1"
+    missing = "structure/B1: missing node B1S2"
+    unexplained, accepted = golden_sfs.adjudicate(
+        [extra, missing], GRAFIK_GOLDEN, GRAFIK_NEW)
+    assert unexplained == []
+    assert {r for r, _ in accepted} == {"grafik-node-replaces-marker"}
+    assert len(accepted) == 2
+
+
+def test_grafik_missing_real_prose_stays():
+    # a golden stycke that held real text (not just a marker) going missing is a
+    # genuine regression, never swept up by the grafik family
+    golden = {"uri": "https://lagen.nu/x", "amendments": [], "structure": [
+        {"type": "stycke", "id": "P1S1", "text": "En riktig bestämmelse."}]}
+    p = ["structure: missing node P1S1"]
+    unexplained, accepted = golden_sfs.adjudicate(p, golden)
+    assert unexplained == p and accepted == []
+
+
+def test_grafik_extra_non_grafik_node_stays():
+    # an extra node that is NOT a grafik (a real phantom paragraf) stays visible
+    new = {"structure": [{"type": "paragraf", "id": "P9", "text": "x"}]}
+    p = ["structure: extra node P9"]
+    unexplained, accepted = golden_sfs.adjudicate(p, GRAFIK_GOLDEN, new)
+    assert unexplained == p and accepted == []
+
+
+def test_grafik_heading_marker_stripped_forgiven():
+    # a bilaga heading that trailed a marker loses only the marker
+    changed = ("structure/B2: text changed:\n"
+               "  old: 'Bilaga 1 /Bilagan är inte med här./'\n"
+               "  new: 'Bilaga 1'")
+    extra = "structure/B2: extra node G1"
+    unexplained, accepted = golden_sfs.adjudicate(
+        [extra, changed], GRAFIK_GOLDEN, GRAFIK_NEW)
+    assert unexplained == []
+    assert [r for r, _ in accepted] == ["grafik-node-replaces-marker"] * 2
+
+
+def test_grafik_unpaired_missing_or_extra_stays():
+    missing = "structure/B1: missing node B1S2"
+    extra = "structure/B1: extra node G1"
+    assert golden_sfs.adjudicate([missing], GRAFIK_GOLDEN, GRAFIK_NEW)[0] == [missing]
+    assert golden_sfs.adjudicate([extra], GRAFIK_GOLDEN, GRAFIK_NEW)[0] == [extra]
+
+
+def test_grafik_heading_real_text_change_stays():
+    # a heading change that is not merely a stripped marker is a real diff
+    changed = ("structure/B2: text changed:\n"
+               "  old: 'Bilaga 1 om avgifter'\n  new: 'Bilaga 1 om kostnader'")
+    unexplained, accepted = golden_sfs.adjudicate([changed], GRAFIK_GOLDEN)
+    assert unexplained == [changed] and accepted == []

@@ -337,6 +337,23 @@ img.faksimil { display: block; width: 100%; max-width: 40rem; margin: .5rem 0 1r
                border: 1px solid var(--rule); border-radius: 4px;
                box-shadow: 0 1px 6px rgba(18,22,28,.12); }
 
+/* -- Recovered graphics (formulas/maps/signs the SFST text drops, cropped from
+      the published SFS PDF by the .graphics layer) -- */
+figure.grafik { margin: 1rem 0; }
+figure.grafik .grafik-img { display: block; max-width: 100%; height: auto;
+               border: 1px solid var(--rule); border-radius: 4px;
+               background: #fff; }
+figure.grafik figcaption { font-family: var(--serif); font-style: italic;
+               font-size: .8rem; color: var(--ink-3); margin-top: .35rem; }
+/* a road-sign cell holds just the cropped sign, tight to the code column */
+td.grafik { width: 1%; white-space: nowrap; }
+td.grafik .grafik-img { max-height: 3.5rem; width: auto; border: 0;
+               background: transparent; }
+/* not-yet-localized gap: an honest, unobtrusive marker, never silent loss */
+.grafik-saknas { font-family: var(--serif); font-style: italic;
+               font-size: .85rem; color: var(--ink-3); }
+td.grafik-saknas { white-space: nowrap; color: var(--ink-3); }
+
 /* -- Context rail (populated by the client from the JSON island) -- */
 .rail { position: sticky; top: 4rem; max-height: calc(100vh - 4rem);
         overflow-y: auto; padding: 1.75rem 1.5rem 5rem;

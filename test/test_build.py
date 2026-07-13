@@ -207,6 +207,10 @@ def test_recipe_version_invalidates(tmp_path):
     assert not is_fresh(manifest, src, src.stages["parse"], "a")
 
 
+def test_sfs_graphics_is_part_of_parse_recipe():
+    assert any(path.name == "graphics.py" for path in build.SFS_CODE)
+
+
 def test_code_version_gate_for_relate_index(tmp_path):
     # the recipe-version rule extended to relate/index (which are incremental on
     # data content, not via the per-doc manifest): editing their extraction/index

@@ -162,24 +162,32 @@ def drifted(inputs):
                   if _current_hash(label) != recorded)
 
 
-def write(p, payload, inputs, force=False, model=None):
+def write(p, payload, inputs, force=False, model=None, meta_extra=None):
     """Write one authored layer as a fresh ``generated`` envelope: ``meta``
     (status, model, authored date, input hashes) beside the payload's own
     keys. ``model`` defaults to the configured LLM (the usual author); a
     mechanical deriver (sfs table-correspond) passes its own marker instead.
-    Guards against clobbering a verified layer (the writer also guards before
-    the LLM spend; this is the choke point) and writes atomically -- a costly
-    one-shot output must never survive truncated."""
+    ``meta_extra`` merges extra source-specific fields into ``meta`` (the sfs
+    .graphics layer records its provenance horizon there as ``through``).
+
+    Guards against clobbering a *whole-file* verified layer (the writer also
+    guards before the LLM spend; this is the choke point) and writes atomically
+    -- a costly one-shot output must never survive truncated. Per-entry curation
+    (a ``"verified": true`` flag on individual payload entries) is the source's
+    concern: it decides what to carry over and hands `write` the final payload
+    (sfs.graphics.plan_localization), so this stays a blunt writer."""
     assert "meta" not in payload, "payload must not carry its own `meta` key"
     guard(p, force)
-    envelope = {"meta": {"status": GENERATED, "model": model or config.LLM_MODEL,
-                         "generated": date.today().isoformat(),
-                         "inputs": inputs}, **payload}
-    util.write_atomic(p, json.dumps(envelope, ensure_ascii=False, indent=2))
+    meta = {"status": GENERATED, "model": model or config.LLM_MODEL,
+            "generated": date.today().isoformat(), "inputs": inputs,
+            **(meta_extra or {})}
+    util.write_atomic(p, json.dumps({"meta": meta, **payload},
+                                    ensure_ascii=False, indent=2))
     return p
 
 
 def entries():
     """Every layer in the store, sorted -- the iteration companion to `path`,
     for `lagen ann status`."""
-    return sorted(p for pattern in ("*.ann", "*.corr") for p in ROOT.rglob(pattern))
+    return sorted(p for pattern in ("*.ann", "*.corr", "*.graphics")
+                  for p in ROOT.rglob(pattern))

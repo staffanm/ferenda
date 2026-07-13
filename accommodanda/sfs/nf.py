@@ -37,7 +37,7 @@ from datetime import datetime
 
 from ..lib import lagrum, util
 from ..lib.catalog import BASE
-from . import begrepp
+from . import begrepp, graphics
 from . import register as register_mod
 from .model import (
     Avdelning,
@@ -62,8 +62,10 @@ def to_normalform(doc, basefile, now=None, refparser=None,
     proj = Projection(minter=IdMinter(continuous=is_continuous(doc),
                                       now=now or datetime.now(),
                                       suppress_temporal=suppress_temporal),
-                      refparser=refparser)
+                      refparser=refparser,
+                      roadsigns=basefile in graphics.ROADSIGN_DOCS)
     structure = project_children(doc.children, (), proj, "")
+    graphics.assign_gap_keys(structure)
     amendments = (build_amendments(doc, register, basefile, proj, refparser)
                   if register is not None else [])
     metadata = (register_mod.build_metadata(sfst_header, register, basefile)
@@ -175,6 +177,17 @@ def project_overgangsbestammelse(ob, proj):
 class Projection:
     minter: "IdMinter"
     refparser: lagrum.LagrumParser | None = None
+    roadsigns: bool = False
+    _grafik: int = 0
+
+    def grafik_id(self):
+        """A fresh, collision-free id for one graphic gap (G1, G2, …). Grafik
+        nodes are new -- not in the golden -- and identical markers (2002:780's
+        five `/Formeln.../`) would dedup-collide under the content-keyed minter,
+        so they get their own document-order sequence the .graphics layer binds
+        to."""
+        self._grafik += 1
+        return "G%d" % self._grafik
 
     def inline(self, text, context, live=True, subject_term=None):
         """Return `text` as a list of inline nodes: plain `str` runs and
@@ -359,7 +372,16 @@ def extend(pairs, letter, frag):
     return None if pairs is None else pairs + ((letter, frag),)
 
 
-def project_children(children, pairs, proj, frag, live=True):
+def grafik_node(proj, sort, satt_av, **extra):
+    """A typed graphic-gap node: an omitted graphic/formula/table the published
+    SFS carries. `satt_av` is the amending SFS whose PDF holds the in-force
+    version (None -> the base act's own PDF)."""
+    return {"type": "grafik", "id": proj.grafik_id(), "sort": sort,
+            "satt_av": satt_av, **extra}
+
+
+def project_children(children, pairs, proj, frag, live=True, satt_av=None):
+    gov = graphics.governing_sfs(children) or satt_av
     out = []
     for node in children:
         match node:
@@ -370,8 +392,8 @@ def project_children(children, pairs, proj, frag, live=True):
                 kids = [rubrik_nf(node.rubrik, 1, proj, ctx, live=live)]
                 if node.underrubrik:
                     kids.append(rubrik_nf(node.underrubrik, 2, proj, ctx, live=live))
-                kids += project_children(node.children,
-                                         sub if node_id else None, proj, ctx, live)
+                kids += project_children(node.children, sub if node_id else None,
+                                         proj, ctx, live, satt_av=gov)
                 out.append({"type": "avdelning", "id": node_id,
                             "ordinal": node.ordinal, "children": kids})
             case Underavdelning():
@@ -379,8 +401,8 @@ def project_children(children, pairs, proj, frag, live=True):
                 node_id = proj.minter.mint(sub, node)
                 ctx = node_id or frag
                 kids = [rubrik_nf(node.rubrik, 1, proj, ctx, live=live)]
-                kids += project_children(node.children,
-                                         sub if node_id else None, proj, ctx, live)
+                kids += project_children(node.children, sub if node_id else None,
+                                         proj, ctx, live, satt_av=gov)
                 out.append({"type": "underavdelning", "id": node_id,
                             "children": kids})
             case Kapitel():
@@ -389,8 +411,8 @@ def project_children(children, pairs, proj, frag, live=True):
                 ctx = node_id or frag
                 clive = live and _in_force(node, proj.minter)
                 kids = [rubrik_nf(node.rubrik, 1, proj, ctx, live=clive)]
-                kids += project_children(node.children,
-                                         sub if node_id else None, proj, ctx, clive)
+                kids += project_children(node.children, sub if node_id else None,
+                                         proj, ctx, clive, satt_av=gov)
                 out.append({"type": "kapitel", "id": node_id,
                             "ordinal": node.ordinal, "children": kids})
             case UpphavtKapitel() | UpphavdParagraf():
@@ -405,43 +427,56 @@ def project_children(children, pairs, proj, frag, live=True):
                             "ordinal": node.ordinal,
                             "children": project_paragraf(
                                 node, sub if node_id else None, proj,
-                                node_id or frag, plive)})
+                                node_id or frag, plive, satt_av=gov)})
             case Rubrik():
                 sub = extend(pairs, "R", position_ordinal(node, children))
                 node_id = proj.minter.mint(sub, node)
-                out.append(rubrik_nf(node.text,
+                heading, sort = graphics.heading_gap(node.text or "")
+                out.append(rubrik_nf(heading,
                                      3 if node.underrubrik else 2,
                                      proj, node_id or frag, id=node_id,
                                      live=live and _in_force(node, proj.minter)))
+                if sort:
+                    out.append(grafik_node(
+                        proj, sort, graphics.marker_provenance(node.text) or gov))
             case Stycke():
-                sub = extend(pairs, "S", position_ordinal(node, children))
-                out.append(stycke_nf(node, sub, proj, frag, live))
+                gap = graphics.marker_gap(util.normalize_space(node.text))
+                if gap:
+                    out.append(grafik_node(proj, gap[0], gap[1] or gov))
+                else:
+                    sub = extend(pairs, "S", position_ordinal(node, children))
+                    out.append(stycke_nf(node, sub, proj, frag, live, satt_av=gov))
             case Lista():
                 out.append({"type": "lista", "id": None,
                             "children": flatten_list(node, pairs, proj, frag, live)})
             case Tabell():
-                out.append(tabell_nf(node, proj, frag, live))
+                out.append(tabell_nf(node, proj, frag, live, satt_av=gov))
             case Bilaga():
                 sub = extend(pairs, "B", position_ordinal(node, children))
                 node_id = proj.minter.mint(sub, node)
                 ctx = node_id or frag
                 blive = live and _in_force(node, proj.minter)
                 kids = [rubrik_nf(node.rubrik, 1, proj, ctx, live=blive)]
-                kids += project_children(node.children,
-                                         sub if node_id else None, proj, ctx, blive)
+                kids += project_children(node.children, sub if node_id else None,
+                                         proj, ctx, blive, satt_av=gov)
                 out.append({"type": "bilaga", "id": node_id, "children": kids})
             case Overgangsbestammelser():
                 pass  # redistributed into the amendment register downstream
     return out
 
 
-def project_paragraf(paragraf, pairs, proj, frag, live=True):
+def project_paragraf(paragraf, pairs, proj, frag, live=True, satt_av=None):
+    gov = graphics.governing_sfs(paragraf.children) or satt_av
     mode = begrepp.paragraf_mode([getattr(s, "text", "") or ""
                                   for s in paragraf.children])
     out = []
     for node in paragraf.children:
+        gap = graphics.marker_gap(util.normalize_space(node.text))
+        if gap:
+            out.append(grafik_node(proj, gap[0], gap[1] or gov))
+            continue
         sub = extend(pairs, "S", position_ordinal(node, paragraf.children))
-        nf = stycke_nf(node, sub, proj, frag, live, mode=mode)
+        nf = stycke_nf(node, sub, proj, frag, live, mode=mode, satt_av=gov)
         if node is paragraf.children[0]:
             nf["beteckning"] = beteckning(paragraf)
         out.append(nf)
@@ -455,7 +490,7 @@ def beteckning(paragraf):
     return b
 
 
-def stycke_nf(stycke, pairs, proj, frag, live=True, mode=None):
+def stycke_nf(stycke, pairs, proj, frag, live=True, mode=None, satt_av=None):
     node_id = proj.minter.mint(pairs, stycke)
     eff = node_id or frag
     text = util.normalize_space(stycke.text)
@@ -470,7 +505,8 @@ def stycke_nf(stycke, pairs, proj, frag, live=True, mode=None):
             items.extend(flatten_list(child, pairs if node_id else None,
                                       proj, eff, live, mode=submode))
         elif isinstance(child, Tabell):
-            items.append(tabell_nf(child, proj, eff, live, mode=submode))
+            items.append(tabell_nf(child, proj, eff, live, mode=submode,
+                                   satt_av=satt_av))
     if items:
         nf["children"] = items
     return nf
@@ -495,7 +531,7 @@ def flatten_list(lista, pairs, proj, frag, live=True, mode=None):
     return out
 
 
-def tabell_nf(tabell, proj, context, live=True, mode=None):
+def tabell_nf(tabell, proj, context, live=True, mode=None, satt_av=None):
     rows = []
     for row in tabell.rows:
         # only the first cell of a row can name a term
@@ -505,7 +541,14 @@ def tabell_nf(tabell, proj, context, live=True, mode=None):
         cells = [proj.inline(util.normalize_space(cell), context, live,
                              subject_term=(term if i == 0 else None))
                  for i, cell in enumerate(row.cells)]
-        rows.append({"type": "rad", "cells": cells})
+        rad = {"type": "rad", "cells": cells}
+        # a road-sign designator cell (2007:90) is the trace of a dropped sign
+        # image; no marker exists, so the code itself flags the gap
+        code = (graphics.roadsign_code(util.normalize_space(row.cells[0]))
+                if proj.roadsigns and row.cells else None)
+        if code:
+            rad["grafik"] = grafik_node(proj, "vagmarke", satt_av, code=code)
+        rows.append(rad)
     return {"type": "tabell", "id": None, "children": rows}
 
 

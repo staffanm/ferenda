@@ -354,6 +354,16 @@ def facsimile(source, basefile, page):
     return FACSIMILE / source / relpath(source, basefile) / ("sid%d.png" % page)
 
 
+def facsimile_crop(source, basefile, page, bbox):
+    """The cached PNG of one cropped region of a source-PDF page:
+    ``cache/facsimile/<source>/<relpath>/sid<N>-<x>_<y>_<w>_<h>.png``. Keyed by
+    the bbox (rounded PDF points) so a crop never collides with the full page
+    `facsimile` sibling and a re-verified bbox lands on a fresh file."""
+    x0, y0, x1, y1 = (round(v) for v in bbox)
+    name = "sid%d-%d_%d_%d_%d.png" % (page, x0, y0, x1 - x0, y1 - y0)
+    return FACSIMILE / source / relpath(source, basefile) / name
+
+
 def fa_ocr_pdf(typ, basefile):
     """The re-OCR sidecar PDF for a förarbete document (§7g): ``ocr/forarbete/
     <type>/<slug>.pdf``, slugged exactly like the downloaded record. Dropping a

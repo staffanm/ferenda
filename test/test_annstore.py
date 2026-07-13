@@ -103,4 +103,15 @@ def test_drifted_flags_changed_and_vanished_inputs(store):
 def test_entries_lists_every_layer(store):
     a = annstore.write(annstore.path("eurlex", "32099R0001"), {"l": 1}, {})
     c = annstore.write(annstore.path("sfs", "2018:585", ".corr"), {"c": 1}, {})
-    assert annstore.entries() == sorted([a, c])
+    g = annstore.write(annstore.path("sfs", "2002:780", ".graphics"), {"G1": 1}, {})
+    assert annstore.entries() == sorted([a, c, g])
+
+
+def test_write_meta_extra_merges_into_envelope(store):
+    # the .graphics layer records its provenance horizon in meta.through
+    p = annstore.write(annstore.path("sfs", "2004:629", ".graphics"),
+                       {"G1": {"sfs": "2023:395", "page": 2}}, {},
+                       meta_extra={"through": "2023:395"})
+    env = json.loads(p.read_text())
+    assert env["meta"]["through"] == "2023:395"
+    assert env["meta"]["status"] == "generated"        # still a generated cache

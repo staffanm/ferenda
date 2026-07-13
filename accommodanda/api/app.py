@@ -38,6 +38,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .. import config
 from ..lib import (
+    annstore,
     catalog,
     compress,
     diff,
@@ -644,7 +645,20 @@ def _avg_pdf(local):
     return ("avg", basefile, pdf) if pdf.exists() else None
 
 
-_PDF_RESOLVERS = (_fa_pdf, _avg_pdf, _foreskrift_pdf)
+# an SFS: a bare "<year>:<löpnr>" ("2002:780"), no source prefix -- the
+# officially published PDF the mirror fetched (pdfmirror), facsimile source for
+# both a full published page and a sfs-graphic crop
+_RE_SFS_BASEFILE = re.compile(r"^\d{4}:\d+[a-z]?$")
+
+
+def _sfs_pdf(local):
+    if not _RE_SFS_BASEFILE.match(local):
+        return None
+    pdf = layout.sfs_pdf(local)
+    return ("sfs", local, pdf) if pdf.exists() else None
+
+
+_PDF_RESOLVERS = (_fa_pdf, _avg_pdf, _foreskrift_pdf, _sfs_pdf)
 
 # immutable: the PDF a facsimile renders from never changes in place (a
 # re-download replaces the record wholesale), so clients may cache forever
@@ -700,6 +714,63 @@ def facsimile_legacy_3(a: str, b: str, c: str, sid: int):
 @app.get("/{a}/{b}/sid{sid:int}.png", include_in_schema=False)
 def facsimile_legacy_2(a: str, b: str, sid: int):
     return _facsimile_response("%s/%s" % (a, b), sid)
+
+
+# sfs-graphic: a crop of the graphic/formula/map the consolidated SFS text drops
+# but the published PDF carries. Unlike a facsimile the client sends only the
+# viewed statute + gap id; the reviewed .graphics layer holds the geometry AND
+# the provenance -- which amending SFS's PDF the region is cropped from (the act
+# that last set that wording), not the viewed statute's own PDF.
+def _sfs_graphic_response(local, node):
+    """The cropped PNG for gap `node` of the SFS at uri-local `local`, its page,
+    bbox and source PDF read from the statute's .graphics layer."""
+    if ".." in local or not _RE_SFS_BASEFILE.match(local):
+        raise HTTPException(404, "not an SFS document: %r" % local)
+    layer = annstore.path("sfs", local, ".graphics")
+    if not layer.exists():
+        raise HTTPException(404, "no graphics layer for %r" % local)
+    content = json.loads(layer.read_text())
+    entry = content.get(node)
+    if entry is None:
+        raise HTTPException(404, "no graphic %r in %r" % (node, local))
+    if (content.get("meta", {}).get("status") != annstore.VERIFIED
+            and not entry.get("verified")):
+        raise HTTPException(404, "graphic %r in %r is not verified" % (node, local))
+    # the amending SFS whose published PDF carries the region (provenance)
+    src, page, bbox = entry["sfs"], entry["page"], entry.get("bbox")
+    assert isinstance(src, str) and _RE_SFS_BASEFILE.fullmatch(src), \
+        "%s/%s: invalid graphics source %r" % (local, node, src)
+    assert isinstance(page, int) and not isinstance(page, bool) and page > 0, \
+        "%s/%s: invalid graphics page %r" % (local, node, page)
+    if bbox is not None:
+        assert facsimile.valid_bbox(bbox), \
+            "%s/%s: invalid graphics bbox %r" % (local, node, bbox)
+    pdf = layout.sfs_pdf(src)
+    if not pdf.exists():
+        raise HTTPException(404, "source SFS %s is not mirrored" % src)
+    try:
+        png = (facsimile.cached_region("sfs", src, pdf, page, bbox) if bbox
+               else facsimile.cached_page("sfs", src, pdf, page))
+    except subprocess.CalledProcessError as exc:
+        if exc.returncode == 1:      # corrupt source PDF -- corpus integrity
+            raise
+        raise HTTPException(404, "SFS %s has no page %d" % (src, page)) \
+            from None
+    return FileResponse(png, media_type="image/png", headers=_FAX_HEADERS)
+
+
+@app.get("/api/v1/sfs-graphic", response_class=FileResponse, tags=["document"],
+         responses={200: {"content": {"image/png": {}}}})
+def sfs_graphic_endpoint(
+        uri: str = Query(..., description="full lagen.nu SFS uri"),
+        node: str = Query(..., description="stable graphic-gap key (the "
+                          "data-grafik value, e.g. g-a1b2…)"),
+        v: str = Query(None, description="opaque cache-buster (the bbox "
+                       "version); accepted and ignored")):
+    """A PNG crop of a graphic/formula/map the consolidated SFS text omits,
+    cut from the published PDF of the amendment that set it (per the reviewed
+    .graphics layer), rendered at 150 DPI on first request and cached."""
+    return _sfs_graphic_response(catalog.local(catalog.strip_fragment(uri)), node)
 
 
 @app.get("/api/v1/dumps", response_model=list[DumpInfo], tags=["catalog"])

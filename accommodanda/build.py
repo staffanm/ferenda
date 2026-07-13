@@ -108,7 +108,9 @@ from .remisser import parse as remisser_parse
 from .sfs import asgit as sfs_asgit
 from .sfs import correspond as sfs_correspond
 from .sfs import download as sfs_download
+from .sfs import graphics as sfs_graphics
 from .sfs import load_inputs
+from .sfs import pdfmirror as sfs_pdfmirror
 from .sfs import versions as sfs_versions_mod
 from .sfs.nf import to_normalform
 from .site import parse as site_parse
@@ -589,7 +591,7 @@ def save_watermarks(store):
 PKG = Path(__file__).parent
 SFS_CODE = tuple(PKG / "sfs" / ("%s.py" % m) for m in (
     "__init__", "extract", "reader", "tokenizer", "assembler", "model", "nf",
-    "register", "begrepp")) + (PKG / "lib" / "lagrum.py",)
+    "register", "begrepp", "graphics")) + (PKG / "lib" / "lagrum.py",)
 
 
 @functools.cache
@@ -931,6 +933,99 @@ def sfs_history_as_git(basefiles):
     print("sfs history-as-git: %d commit(s) into %s" % (commits, repodir))
 
 
+def sfs_mirror_pdf(basefiles):
+    """`lagen sfs mirror-pdf [<sfs> ...]` -- mirror the officially published SFS
+    PDFs the consolidated text drops its graphics from, keyed by SFS number,
+    into downloaded/sfs/pdf/. With no arguments, mirror the whole corpus (every
+    base act + every andringsforfattning across the downloaded registers);
+    otherwise just the named acts. Idempotent -- already-present PDFs are
+    skipped unless --full is given. The source for the localization crop."""
+    force = "--full" in basefiles
+    targets = [b for b in basefiles if not b.startswith("--")]
+    targets = targets or sfs_pdfmirror.corpus_beteckningar(sfs_list())
+    if RUN.dry_run:
+        print("sfs mirror-pdf: would mirror %d SFS PDF(s)" % len(targets))
+        return
+    session = _sfs_session()
+    fetched = missing = 0
+    for beteckning in targets:
+        if sfs_pdfmirror.fetch_one(session, beteckning, force=force or RUN.force):
+            fetched += 1
+        elif not compress.exists(layout.sfs_pdf(beteckning)):
+            missing += 1
+    print("sfs mirror-pdf: %d fetched, %d without a published PDF, %d target(s)"
+          % (fetched, missing, len(targets)))
+
+
+def sfs_ai_includegraphics(basefiles):
+    """`lagen sfs ai-includegraphics <basefile> [...]` -- localize the graphics
+    the consolidated text drops (formulas, maps, road signs) to a page + bbox in
+    the *provenance-correct* published PDF, via a vision model, into a `.graphics`
+    layer (WIKI_ROOT/ann). Detection already typed the gaps at parse (nf grafik
+    nodes); this opt-in, per-id pass only places them -- the source PDF is picked
+    deterministically (provenance_sfs), never by the model. One vision call per
+    source PDF (chunked for a many-page source); a verified layer refuses
+    regeneration sans --force, and per-entry `verified` flags survive a rerun.
+    The LLM is never called from parse/relate/generate."""
+    if not basefiles:
+        sys.exit("usage: lagen sfs ai-includegraphics <basefile> [...]  "
+                 "(mirror-pdf must have run first)")
+    for basefile in basefiles:
+        _sfs_includegraphics_one(basefile)
+
+
+def _sfs_includegraphics_one(basefile):
+    art = json.loads(compress.read_bytes(sfs_artifact(basefile)))
+    register = json.loads(compress.read_bytes(sfs_source(basefile)))
+    gaps = sfs_graphics.collect_gaps(art["structure"])
+    out = annstore.path("sfs", basefile, ".graphics")
+    if not gaps:
+        print("sfs ai-includegraphics %s: no graphic gaps" % basefile)
+        return
+    # keep verified+provenance-current entries; (re)localize the rest, grouped by
+    # source PDF. A verified crop whose bilaga has since been amended (its `sfs`
+    # no longer equals the resolved provenance) is re-localized, not kept stale.
+    existing = json.loads(out.read_text()) if out.exists() else {}
+    keep, todo = sfs_graphics.plan_localization(gaps, existing, register, basefile)
+    # fail fast, before any vision spend, if a source PDF is not mirrored yet
+    missing = [s for s in todo if not compress.exists(layout.sfs_pdf(s))]
+    if missing:
+        raise ValueError("%s: source PDF(s) not mirrored: %s -- run `lagen sfs "
+                         "mirror-pdf %s` first"
+                         % (basefile, ", ".join(sorted(missing)),
+                            " ".join(sorted(missing))))
+    todo_n = sum(len(g) for g in todo.values())
+    if RUN.dry_run:
+        print("sfs ai-includegraphics %s: %d gap(s); keep %d verified, localize "
+              "%d from source PDF(s) %s -> %s"
+              % (basefile, len(gaps), len(keep), todo_n, sorted(todo), out))
+        return
+    if not todo:
+        print("sfs ai-includegraphics %s: all %d gap(s) localized and current "
+              "(%d verified) -- nothing to do" % (basefile, len(gaps), len(keep)))
+        return
+    annstore.guard(out, RUN.force)     # a verified layer refuses, pre-LLM-spend
+    payload, inputs = dict(keep), dict(annstore.artifact_input("sfs", basefile))
+    for src, group in todo.items():
+        pdf = layout.sfs_pdf(src)
+        payload.update(sfs_graphics.localize_group(group, pdf, src))
+        inputs.update(annstore.download_input(str(pdf.relative_to(layout.DOWNLOADED))))
+    # a kept entry's source PDF is an input too, so drift still tracks it
+    for ent in keep.values():
+        kept_pdf = layout.sfs_pdf(ent["sfs"])
+        if compress.exists(kept_pdf):
+            inputs.update(annstore.download_input(
+                str(kept_pdf.relative_to(layout.DOWNLOADED))))
+    through = sfs_graphics.register_latest_amendment(register)
+    layer_meta = {"uri": art["uri"]}
+    if through:
+        layer_meta["through"] = through
+    annstore.write(out, payload, inputs, RUN.force, model=config.VISION_MODEL,
+                   meta_extra=layer_meta)
+    print("sfs ai-includegraphics %s: localized %d gap(s) (kept %d verified), "
+          "wrote %s" % (basefile, todo_n, len(keep), out))
+
+
 SOURCES["sfs"] = Source("sfs", sfs_list, {
     # download has no input files (the input is the remote DB) and its output
     # is valid regardless of the fetcher's version, so inputs/code stay empty:
@@ -947,7 +1042,9 @@ SOURCES["sfs"] = Source("sfs", sfs_list, {
    actions={"ai-correspond": sfs_ai_correspond,
             "table-correspond": sfs_table_correspond,
             "renumber-correspond": sfs_renumber_correspond,
-            "history-as-git": sfs_history_as_git},
+            "history-as-git": sfs_history_as_git,
+            "mirror-pdf": sfs_mirror_pdf,
+            "ai-includegraphics": sfs_ai_includegraphics},
    notes="ai-correspond <new-sfs> <prop> [<old-sfs>]: LLM-derive the old->new "
          "paragraf correspondence map into a .corr layer (WIKI_ROOT/ann)\n"
          "table-correspond <new-sfs> <prop> [<old-sfs>[=TAG] ...]: the same "
@@ -958,7 +1055,14 @@ SOURCES["sfs"] = Source("sfs", sfs_list, {
          "register's 'nuvarande … betecknas …' omfattning clauses\n"
          "history-as-git <repodir> [basefile ...]: build/update a git repo of "
          "the SFS collection, one commit per amendment event; --rebuild-history "
-         "rewrites it from the current complete corpus")
+         "rewrites it from the current complete corpus\n"
+         "mirror-pdf [<sfs> ...]: mirror the officially published SFS PDFs "
+         "(graphics/maps the consolidated text drops) into downloaded/sfs/pdf/; "
+         "no args = whole corpus, --full re-fetches existing\n"
+         "ai-includegraphics <basefile> [...]: vision-localize the dropped "
+         "graphics to page+bbox in the provenance-correct published PDF into a "
+         ".graphics layer (mirror-pdf must have run); per-entry verified flags "
+         "survive reruns, --force overrides a verified layer")
 
 
 # --------------------------------------------------------------------------

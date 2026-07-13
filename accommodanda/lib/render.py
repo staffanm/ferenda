@@ -80,6 +80,10 @@ class Site:
     fk: dict[tuple[str, str | None],
              list[tuple[str, str | None, int | None, str]]] = \
         field(default_factory=dict)
+    # (document uri, stable grafik key) -> {sfs, page, bbox?, alt} from a
+    # verified .graphics entry
+    # layer -- what the reading view needs to place the dropped graphic's crop
+    graphics: dict[tuple[str, str], dict] = field(default_factory=dict)
 
     @classmethod
     def from_catalog(cls, con):
@@ -88,7 +92,8 @@ class Site:
         return cls(con, {u for (u,) in con.execute("SELECT uri FROM documents")},
                    catalog.concept_aliases(con),
                    commentary, guidance, article_guidance,
-                   remiss_feedback, remiss_overall, _fk_index(con))
+                   remiss_feedback, remiss_overall, _fk_index(con),
+                   _graphics_index())
 
     def resolve(self, uri):
         """Fold a begrepp link baked into an artifact onto its canonical concept
@@ -238,6 +243,29 @@ def _remiss_indexes():
     return remiss_feedback, remiss_overall
 
 
+def _graphics_index():
+    """{(document_uri, gap_key): entry} of verified graphic crops.
+
+    The host URI is explicit layer metadata, so this horizontal reader neither
+    imports nor branches on an SFS vertical. Generated candidates remain out of
+    the public render until either the entry or whole layer is verified.
+    """
+    index = {}
+    for path in (p for p in annstore.entries() if p.suffix == ".graphics"):
+        layer = json.loads(path.read_text())
+        meta = layer.get("meta") or {}
+        layer_verified = meta.get("status") == annstore.VERIFIED
+        eligible = [(gap_key, entry) for gap_key, entry in layer.items()
+                    if (gap_key != "meta" and "page" in entry
+                        and (layer_verified or entry.get("verified")))]
+        if eligible:
+            uri = meta.get("uri")
+            assert uri, "%s: publishable graphics layer has no meta.uri" % path
+            for gap_key, entry in eligible:
+                index[(uri, gap_key)] = entry
+    return index
+
+
 def site_cross_digests(site):
     """{host_uri: digest} of every piece of CROSS-document content the Site
     renders onto a host's page: kommentar prose + its `.ann` guidance layer
@@ -269,6 +297,11 @@ def site_cross_digests(site):
         feed(fa_uri, "remiss_feedback", avsnitt, v)
     for fa_uri, v in site.remiss_overall.items():
         feed(fa_uri, "remiss_overall", None, v)
+    # a .graphics entry renders on its own statute's page (host = the sfs uri),
+    # but it lives outside the artifact, so fold it in or a layer edit (a newly
+    # verified crop) never reaches the page it appears on
+    for (sfs_uri, gap_key), v in site.graphics.items():
+        feed(sfs_uri, "graphics", gap_key, v)
     # a correspondence row touches its two endpoint pages -- and, because the
     # new-law margin walks the chain transitively (corresponding_cases_margin:
     # 2025:400 -> 2001:453 -> 1980:620), every page whose law is a transitive
@@ -1157,6 +1190,48 @@ def _renest_punkter(children):
     return roots
 
 
+_GRAFIK_LABEL = {
+    "bilaga": "Bilaga", "bild": "Bild", "karta": "Karta", "figur": "Figur",
+    "formel": "Formel", "symbol": "Symbol", "specialtecken": "Specialtecken",
+    "forteckning": "Förteckning", "tabell": "Tabell", "vagmarke": "Vägmärke"}
+
+
+def _grafik_crop(entry, doc_uri, gap_key, alt):
+    """The `<img>` for one located graphic: the /api/v1/sfs-graphic crop of the
+    provenance-correct published PDF (geometry lives server-side in the layer,
+    so the src is just uri+node), lazily loaded. `v` hashes source, page and bbox
+    so every content-changing re-verification gets a fresh immutable URL."""
+    versioned = {k: entry.get(k) for k in ("sfs", "page", "bbox")}
+    ver = hashlib.sha256(json.dumps(versioned, sort_keys=True).encode()).hexdigest()[:12]
+    src = "/api/v1/sfs-graphic?uri=%s&node=%s&v=%s" % (
+        quote(doc_uri, safe=""), quote(gap_key, safe=""),
+        quote(ver, safe=""))
+    return '<img class="grafik-img" src="%s" alt="%s" loading="lazy">' % (
+        escape(src), escape(alt))
+
+
+def render_grafik(node, site, doc_uri):
+    """A graphic/formula/map the published SFS carries but the consolidated text
+    drops. When the `.graphics` layer has placed this gap, emit the crop as a
+    `<figure>` with source attribution; otherwise fall back to an honest
+    placeholder naming the source SFS. Keys on the generic ``grafik`` node type
+    and reads the layer off `site` -- no source import (rule:lib-never-imports-vertical)."""
+    nid = node.get("key") or node.get("id", "")
+    label = _GRAFIK_LABEL.get(node.get("sort"), "Grafik")
+    entry = site.graphics.get((doc_uri, nid))
+    if not entry:
+        sfs = node.get("satt_av")
+        where = ("SFS %s" % sfs) if sfs else "den tryckta författningen"
+        return ('<p class="grafik-saknas" data-grafik="%s">%s saknas i den '
+                'konsoliderade texten — se %s</p>'
+                % (escape(nid), escape(label), escape(where)))
+    alt = entry.get("alt") or ("%s ur SFS %s" % (label, entry["sfs"]))
+    return ('<figure class="grafik" data-grafik="%s">%s<figcaption>%s ur '
+            '<a href="/%s">SFS %s</a></figcaption></figure>'
+            % (escape(nid), _grafik_crop(entry, doc_uri, nid, alt),
+               escape(label), escape(entry["sfs"]), escape(entry["sfs"])))
+
+
 def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
     t = node.get("type")
     nid = node.get("id")
@@ -1168,7 +1243,21 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
     if t == "rad":
         cells = "".join("<td>%s</td>" % render_runs(c, site)
                         for c in node.get("cells", []))
+        g = node.get("grafik")
+        if g:  # a dropped road-sign image (2007:90): the sign beside its code
+            gid = g.get("key") or g.get("id", "")
+            entry = site.graphics.get((doc_uri, gid))
+            if entry:
+                alt = entry.get("alt") or ("Vägmärke %s" % g.get("code", ""))
+                cells = ('<td class="grafik" data-grafik="%s">%s</td>'
+                         % (escape(gid),
+                            _grafik_crop(entry, doc_uri, gid, alt)) + cells)
+            else:  # unlocalized: the honest gap beside the code
+                cells = ('<td class="grafik-saknas" data-grafik="%s">[%s]</td>'
+                         % (escape(gid), escape(g.get("code", ""))) + cells)
         return "<tr>%s</tr>" % cells
+    if t == "grafik":
+        return render_grafik(node, site, doc_uri)
     if t == "lista":
         items = "".join(render_node(c, site, doc_uri, toc, rail)
                         for c in node.get("children", []))

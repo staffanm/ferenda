@@ -1,7 +1,3 @@
 <Forfattning>
-  <Stycke id="S1">
-    <str>/Bilagorna är inte med här. Bilaga 1 senast ändrad genom </str>
-    <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#L2008:432">förordning (2008:432).</LinkSubject>
-    <str>/</str>
-  </Stycke>
+  <Grafik id="G1" sort="bilaga" satt_av="2008:432"/>
 </Forfattning>

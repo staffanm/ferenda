@@ -179,6 +179,9 @@ def convert(elem):
         return [rubrik_node(elem.text, id=elem.get("id"))]
     if tag == "Stycke":
         return [stycke_node(elem)]
+    if tag == "Grafik":
+        return [{"type": "grafik", "id": elem.get("id"),
+                 "sort": elem.get("sort"), "satt_av": elem.get("satt_av")}]
     if tag in LISTS:
         items = []
         flatten_list(elem, items)
@@ -216,7 +219,7 @@ def strip(nodes):
       Id-minting is validated whole-document against the golden corpus.
     """
     for node in nodes:
-        for key in ("beteckning", "level", "id"):
+        for key in ("beteckning", "level", "id", "key"):
             node.pop(key, None)
         strip(node.get("children", []))
     return nodes
@@ -335,14 +338,7 @@ def fixture_links(elem, out):
     return out
 
 
-# Fixtures whose desired reference links the faithfully-ported pipeline does
-# not reproduce -- documented divergences, not span/inline regressions:
-#   regression-kommentar-inte-rubrik: the change note reads "... genom
-#   förordning (2008:432)." with a lowercase change-word; FILTER_LAW only
-#   admits capitalised "Förordning (" (ported verbatim, see lagrum.py), so
-#   the text node is never parsed and the link is dropped -- exactly as in
-#   the old pipeline.
-LINK_GAPS = {"regression-kommentar-inte-rubrik"}
+LINK_GAPS = set()
 
 
 @pytest.mark.parametrize("txt", params())

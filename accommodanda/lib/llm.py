@@ -6,6 +6,7 @@ source-supplied validator as data so this stays source-agnostic. The LLM is
 called only from those explicit ai-* actions on named ids -- never from a
 corpus-wide parse/relate/generate."""
 
+import base64
 import os
 
 import requests
@@ -16,6 +17,18 @@ from .. import config
 API_URL = "https://api.berget.ai/v1/chat/completions"
 DEFAULT_MODEL = config.LLM_MODEL   # config.yml `llm_model` / $BERGET_MODEL override
 TIMEOUT = 600          # the inputs are large and the model reasons over the whole
+
+
+def vision_content(text, images):
+    """A multimodal user-message `content` list -- the prompt text followed by
+    each PNG (raw bytes) as an inline base64 ``image_url`` data URI, the shape
+    the OpenAI-compatible endpoint takes for vision. `complete`/`author` build
+    this when passed `images`; the SFS-specific prompt stays in the caller
+    (rule:second-use-goes-to-lib -- this is the source-agnostic transport)."""
+    return [{"type": "text", "text": text},
+            *({"type": "image_url", "image_url": {"url":
+               "data:image/png;base64," + base64.b64encode(b).decode()}}
+              for b in images)]
 
 
 def strip_fence(content):
@@ -63,9 +76,13 @@ def complete_thread(messages, model=DEFAULT_MODEL, timeout=TIMEOUT, max_tokens=N
     return strip_fence(choice["message"]["content"])
 
 
-def complete(prompt, model=DEFAULT_MODEL, timeout=TIMEOUT, max_tokens=None):
-    """The model's reply to a single user prompt -- see `complete_thread`."""
-    return complete_thread([{"role": "user", "content": prompt}],
+def complete(prompt, model=DEFAULT_MODEL, timeout=TIMEOUT, max_tokens=None,
+             images=()):
+    """The model's reply to a single user prompt -- see `complete_thread`. Pass
+    `images` (PNG bytes) for a vision model: the prompt becomes a multimodal
+    text+image message (`vision_content`); `model` must then be a vision model."""
+    content = vision_content(prompt, images) if images else prompt
+    return complete_thread([{"role": "user", "content": content}],
                            model=model, timeout=timeout, max_tokens=max_tokens)
 
 
@@ -78,7 +95,8 @@ RETRY_MESSAGE = (
     "instruktionen exakt. Svara med hela den korrigerade JSON-strukturen igen.")
 
 
-def author(prompt, validate, model=DEFAULT_MODEL, timeout=TIMEOUT, max_tokens=None):
+def author(prompt, validate, model=DEFAULT_MODEL, timeout=TIMEOUT,
+           max_tokens=None, images=()):
     """Call the model with `prompt`, feed the reply through `validate` and return
     its result; on a malformed reply retry *once* as a real follow-up turn -- the
     model's own prior reply replayed as an `assistant` message, then a short
@@ -94,8 +112,14 @@ def author(prompt, validate, model=DEFAULT_MODEL, timeout=TIMEOUT, max_tokens=No
     second failure, propagates so a bad reply is never written), so validators
     must `raise ValueError`, not `assert` (rule:errors-drive-retry-use-raise; -O
     would strip the assert and the check would silently pass). Raises if the
-    second reply is still bad."""
-    messages = [{"role": "user", "content": prompt}]
+    second reply is still bad.
+
+    Pass `images` (PNG bytes) to run a vision model: the first user turn becomes
+    a multimodal text+image message. The retry turn stays text-only -- the
+    correction names what the shape check rejected, which needs no re-sending of
+    the (large) images."""
+    content = vision_content(prompt, images) if images else prompt
+    messages = [{"role": "user", "content": content}]
     for attempt in range(2):
         reply = complete_thread(messages, model=model, timeout=timeout,
                                 max_tokens=max_tokens)

@@ -22,12 +22,15 @@ Usage:
 """
 
 import argparse
+import ast
 import json
 import re
 import sys
 from pathlib import Path
 
 from lxml import etree
+
+from accommodanda.sfs import graphics as sfs_graphics
 
 XHTML = "http://www.w3.org/1999/xhtml"
 
@@ -810,6 +813,25 @@ re_structure_extra = re.compile(r"^structure(?:/.*)?: extra node (\S+)$")
 re_structure_missing = re.compile(r"^structure(?:/.*)?: missing node (\S+)$")
 re_structure_changed = re.compile(r"^structure(?:/(.*))?: \w+ changed:")
 
+def is_marker_only(text):
+    """Whether `text` is *only* an omission marker (+ an optional trailing
+    change note) -- the shape the new pipeline replaces with a grafik node. A
+    stycke with real prose around a marker is NOT marker-only and its removal
+    stays a real regression."""
+    return isinstance(text, str) and sfs_graphics.marker_gap(text) is not None
+
+
+def changed_old_new(problem):
+    """The (old, new) values of a ``… changed:`` diff line, or (None, None) --
+    the two repr'd scalars diff_nodes emits."""
+    m = re.search(r"\n  old: (.*)\n  new: (.*)$", problem, re.S)
+    if not m:
+        return None, None
+    try:
+        return ast.literal_eval(m.group(1)), ast.literal_eval(m.group(2))
+    except (ValueError, SyntaxError):
+        return None, None
+
 
 def node_text(node):
     """Plain text for one normal-form subtree, including inline link runs."""
@@ -890,6 +912,79 @@ def _post_freeze_structure(problem, ctx):
     node = next((ctx["new_nodes"][node_id] for node_id in reversed(ids)
                  if node_id in ctx["new_nodes"]), None)
     return node is not None and post_freeze_note(node, ctx["horizon"])
+
+
+# --- grafik-node-replaces-marker -----------------------------------------
+#
+# The SFST text database drops graphics/formulas/maps/road signs; the old
+# pipeline carried the editorial omission marker ("/Formeln är inte med här/")
+# through as inline text, while the new pipeline lifts it into a typed grafik
+# node (sfs.graphics + nf). Against a golden built from the old output that
+# surfaces as three mirrored, new-is-right diffs: an extra grafik node, the
+# missing marker-only stycke it replaced, and -- for a marker that trailed a
+# `Bilaga N` heading -- the heading text losing only the marker. Each gate is
+# narrow: a real prose stycke that went missing, or a heading change that is not
+# just a stripped marker, stays a review item.
+
+def _is_grafik_extra(problem, ctx):
+    m = re_structure_extra.match(problem)
+    if not m:
+        return False
+    node = ctx["new_nodes"].get(m.group(1))
+    return node is not None and node.get("type") == "grafik"
+
+
+def _is_grafik_missing(problem, ctx):
+    m = re_structure_missing.match(problem)
+    if not m:
+        return False
+    node = ctx["golden_nodes"].get(m.group(1))
+    return node is not None and is_marker_only(node.get("text"))
+
+
+def _is_grafik_heading(problem):
+    m = re_structure_changed.match(problem)
+    if not m or ": text changed:" not in problem:
+        return False
+    old, new = changed_old_new(problem)
+    if not isinstance(old, str):
+        return False
+    clean, sort = sfs_graphics.heading_gap(old)
+    return sort is not None and clean.strip() == (new or "").strip()
+
+
+def grafik_paired_problems(problems, ctx):
+    """Only accept a complete marker->grafik replacement in one parent.
+
+    The old independent predicates could forgive a marker that simply vanished,
+    or a phantom grafik with no removed marker. Exact per-parent cardinality is
+    intentionally conservative: any mismatch leaves the whole group for review.
+    """
+    groups = {}
+    for problem in problems:
+        parent = problem.partition(":")[0]
+        if _is_grafik_extra(problem, ctx):
+            groups.setdefault(parent, ([], []))[0].append(problem)
+        elif _is_grafik_missing(problem, ctx) or _is_grafik_heading(problem):
+            groups.setdefault(parent, ([], []))[1].append(problem)
+    paired = set()
+    for extras, removed in groups.values():
+        if extras and len(extras) == len(removed):
+            paired.update(extras)
+            paired.update(removed)
+    return paired
+
+
+def _grafik_extra_node(problem, ctx):
+    return problem in ctx["grafik_paired"] and _is_grafik_extra(problem, ctx)
+
+
+def _grafik_missing_marker(problem, ctx):
+    return problem in ctx["grafik_paired"] and _is_grafik_missing(problem, ctx)
+
+
+def _grafik_heading_marker(problem, ctx):
+    return problem in ctx["grafik_paired"] and _is_grafik_heading(problem)
 
 
 # An "eller" enumeration of paragraf numbers terminated by a *single* § -- e.g.
@@ -1052,6 +1147,10 @@ PREDICATES = (
     ("eller-enumeration", _eller_enumeration),
     ("stycke-pinpoint-drift", _stycke_pinpoint_drift),
     ("brottsrubricering-begrepp", _brottsrubricering_begrepp),
+    # graphics the SFST text drops -> a typed grafik node (three mirror diffs)
+    ("grafik-node-replaces-marker", _grafik_extra_node),
+    ("grafik-node-replaces-marker", _grafik_missing_marker),
+    ("grafik-node-replaces-marker", _grafik_heading_marker),
     # broadest last: a post-freeze-rewritten paragraf forgives any of its
     # references not already claimed by a more specific (new-is-right) family.
     ("post-freeze-source-amendment", _post_freeze_source_amendment),
@@ -1065,7 +1164,9 @@ def adjudicate(problems, golden, new=None):
     own_base = golden.get("uri", "").split("/konsolidering")[0]
     ctx = {"horizon": golden_freeze_horizon(golden), "stale": False,
            "own_base": own_base,
-           "new_nodes": nodes_by_id(new.get("structure", [])) if new else {}}
+           "new_nodes": nodes_by_id(new.get("structure", [])) if new else {},
+           "golden_nodes": nodes_by_id(golden.get("structure", []))}
+    ctx["grafik_paired"] = grafik_paired_problems(problems, ctx)
     ctx["post_freeze_repeals"] = post_freeze_repealed_ids(
         new or {}, ctx["horizon"])
     ctx["stale"] = any(_post_freeze_amendment(p, ctx) for p in problems)

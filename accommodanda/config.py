@@ -32,6 +32,12 @@ DEFAULT_WIKI_ROOT = REPO.parent / "lagen-wiki"   # git-backed markdown content r
 DEFAULT_LEGACY_ROOT = REPO.parent / "ferenda.old" / "data"   # frozen legacy corpora
 DEFAULT_OPENSEARCH_URL = "http://localhost:9200"
 DEFAULT_LLM_MODEL = "openai/gpt-oss-120b"
+# the multimodal model for the vision passes (sfs ai-includegraphics): localizing
+# a dropped graphic to a page+bbox. Kimi-K2.6 was the Phase-0 spike winner -- the
+# only Berget vision model robust on both accuracy and a generic prompt, and it
+# honours the requested coordinate space (Gemma reports in an opaque internal
+# grid). Text-only gpt-oss cannot serve this.
+DEFAULT_VISION_MODEL = "moonshotai/Kimi-K2.6"
 
 _yaml = YAML()                               # round-trip mode by default
 
@@ -135,6 +141,25 @@ def resolve_llm_model(doc):
     if not isinstance(value, str) or not value.strip():
         raise ConfigError("llm_model set to invalid value %r at %s"
                           % (value, _at(doc, "llm_model")))
+    return value
+
+
+def resolve_vision_model(doc):
+    """The multimodal model for the vision passes (sfs ai-includegraphics).
+    Precedence mirrors `resolve_llm_model`: the ``BERGET_VISION_MODEL`` env
+    override, then the ``vision_model`` key in config.yml, then the built-in
+    default (Kimi-K2.6). Kept separate from `llm_model` because the text passes
+    run a reasoning model that has no vision, and the vision model is the pricier
+    of the two -- one lever each."""
+    env = os.environ.get("BERGET_VISION_MODEL")
+    if env:
+        return env
+    if "vision_model" not in doc:
+        return DEFAULT_VISION_MODEL
+    value = doc["vision_model"]
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError("vision_model set to invalid value %r at %s"
+                          % (value, _at(doc, "vision_model")))
     return value
 
 
@@ -299,6 +324,7 @@ WIKI_ROOT = resolve_wiki_root(_doc)
 LEGACY_ROOT = resolve_legacy_root(_doc)
 OPENSEARCH_URL = resolve_opensearch_url(_doc)
 LLM_MODEL = resolve_llm_model(_doc)
+VISION_MODEL = resolve_vision_model(_doc)
 OPS_TOKEN = resolve_ops_token(_doc)
 EDITOR_SECRET = resolve_editor_secret(_doc)
 EDITORS = resolve_editors(_doc)
