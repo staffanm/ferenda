@@ -114,6 +114,41 @@ def test_genuinely_distinct_cases_not_merged():
     assert len(cases) == 2
 
 
+def test_same_malnummer_distinct_api_referat_stay_separate():
+    # AD can publish two distinct decisions under one case number. M alone must
+    # not fuse authoritative API records (the live example is A 112-92:
+    # AD 1993 nr 22 and AD 1994 nr 13).
+    cases = build_index(
+        [api("u8", "ADO", ["A 112-92"], ["AD 1993 nr 22"]),
+         api("u9", "ADO", ["A 112-92"], ["AD 1994 nr 13"])], [])
+    assert sorted(c["canonical_id"] for c in cases) == [
+        "AD 1993 nr 22", "AD 1994 nr 13"]
+
+
+def test_ambiguous_malnummer_does_not_guess_legacy_api_pair():
+    # A legacy filename with no referat key cannot choose between two API
+    # decisions sharing its M. Keep all three components instead of attaching
+    # the old body to an arbitrary published identifier.
+    cases = build_index(
+        [api("u10", "HDO", ["T 1-99"], ["NJA 2000 s. 1"]),
+         api("u11", "HDO", ["T 1-99"], ["NJA 2001 s. 2"])],
+        [legacy("T1-99.doc", "HDO", ["T1-99"])])
+    assert len(cases) == 3
+
+
+def test_shared_nja_lopnummer_does_not_merge_distinct_page_referat():
+    # NJA 2016:31 is shared by two published decisions. The page form is the
+    # canonical old lagen.nu identity and must keep them separate.
+    cases = build_index([
+        api("u12", "HDO", ["Ö 1121-15"],
+            ["NJA 2016 s. 341", "NJA 2016:31"]),
+        api("u13", "HDO", ["T 6237-14"],
+            ["NJA 2016 s. 346", "NJA 2016:31"]),
+    ], [])
+    assert sorted(c["canonical_id"] for c in cases) == [
+        "NJA 2016 s. 341", "NJA 2016 s. 346"]
+
+
 def test_legacy_only_case_is_kept():
     cases = build_index([], [legacy("2003_not_5.doc", "HDO", [],
                                     ["NJA 2003 not 5"])])

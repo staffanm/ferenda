@@ -14,8 +14,14 @@ filename-derived ids, and differing court codes) rather than assumed.
 
 Linkage keys (a case is the connected component over shared keys):
 
-- målnummer, court-scoped: ("M", canonical_court, normalized_malnr)
-- referatnummer, global:    ("R", normalized_referat)
+- referatnummer, global: ("R", normalized_referat) -- always strong;
+- målnummer, court-scoped: ("M", canonical_court, normalized_malnr) -- only
+  cross-store when it identifies one API and one legacy component.
+
+Målnummer is not unique over time even within one court: AD 1993 nr 22 and AD
+1994 nr 13 are distinct published decisions under A 112-92. Therefore two API
+records are never fused solely by M. Legacy attachment variants may share M;
+after grouping those, M links legacy to API only when the match is unambiguous.
 
 The API records carry explicit malNummerLista/referatNummerLista, so their
 keys are reliable. Legacy identity comes from the filename; for almost
@@ -77,7 +83,15 @@ def legacy_identity(court, filename):
 
 def keys(court, malnummer, referat):
     out: set[tuple] = {("M", court, norm_malnr(m)) for m in malnummer if norm_malnr(m)}
-    out |= {("R", norm_referat(r)) for r in referat if norm_referat(r)}
+    # NJA's `YYYY:N` is an editorial löpnummer, not always a case identity:
+    # one numbered referat can contain several separately published decisions
+    # with different canonical page forms (eg s. 341 and s. 346 both carry
+    # NJA 2016:31). When a record has a page referat, only that published page
+    # form is a strong R key. The löpnummer remains metadata on the artifact.
+    strong_referat = ([r for r in referat if re.search(r"\bs\.?\s*\d+", r, re.I)]
+                      if any(re.search(r"\bs\.?\s*\d+", r, re.I) for r in referat)
+                      else referat)
+    out |= {("R", norm_referat(r)) for r in strong_referat if norm_referat(r)}
     return out
 
 
@@ -137,14 +151,36 @@ class UnionFind:
 def build_index(api_records, legacy_records):
     records = api_records + legacy_records
     uf = UnionFind()
-    key_owner = {}  # linkage key -> a representative record index
+    referat_owner = {}  # strong R key -> a representative record index
+    malnummer_records = defaultdict(list)
     for i, rec in enumerate(records):
         uf.find(i)
         for key in keys(rec["court"], rec["malnummer"], rec["referat"]):
-            if key in key_owner:
-                uf.union(i, key_owner[key])
+            if key[0] == "R":
+                if key in referat_owner:
+                    uf.union(i, referat_owner[key])
+                else:
+                    referat_owner[key] = i
             else:
-                key_owner[key] = i
+                malnummer_records[key].append(i)
+
+    for indices in malnummer_records.values():
+        # Multiple frozen files with one M are attachment variants of the same
+        # legacy case; their filename-derived identity is the same by design.
+        legacy = [i for i in indices if records[i]["store"] == "dv"]
+        for i in legacy[1:]:
+            uf.union(legacy[0], i)
+
+        # M is a cross-store bridge only when it is unambiguous after the strong
+        # R links and legacy attachment grouping. Distinct API components with
+        # the same M stay distinct; guessing would publish one decision's text
+        # under another referat's URI.
+        api_roots = {uf.find(i) for i in indices
+                     if records[i]["store"] == "domstol"}
+        legacy_roots = {uf.find(i) for i in indices
+                        if records[i]["store"] == "dv"}
+        if len(api_roots) == len(legacy_roots) == 1:
+            uf.union(next(iter(api_roots)), next(iter(legacy_roots)))
 
     groups = defaultdict(list)
     for i, rec in enumerate(records):
