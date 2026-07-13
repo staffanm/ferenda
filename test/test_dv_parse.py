@@ -1,8 +1,12 @@
 """Tests for the DV decision parser (API innehall path)."""
 
+from datetime import date
+
 from accommodanda.dv.model import Fotnot, Rubrik, Stycke
 from accommodanda.dv.parse import (
     case_uri,
+    decision_date_from_text,
+    decision_dates_from_text,
     extract_footrefs,
     parse_api_record,
     parse_body,
@@ -111,6 +115,114 @@ def test_api_record_metadata_mapping():
                               ("Stycke", "L.H.S. och C.S. äger aktierna.")]
 
 
+def test_explicit_publishing_court_date_overrides_bad_api_metadata():
+    record = {
+        **RECORD,
+        "domstol": {"domstolKod": "HDO", "domstolNamn": "Högsta domstolen"},
+        "referatNummerLista": ["NJA 2018 s. 405"],
+        "avgorandedatum": "2016-06-12",
+        "innehall": ("<p>Tingsrätten meddelade den 11 juli 2017 beslut.</p>"
+                     "<p>HD (justitieråden A och B) meddelade den 12 juni "
+                     "2018 följande slutliga beslut.</p>"),
+    }
+    assert parse_api_record(record).avgorandedatum == "2018-06-12"
+
+
+def test_text_date_requires_valid_sane_unambiguous_publishing_court_date():
+    def find(*texts, referat=("NJA 2018 s. 405",)):
+        return decision_date_from_text(
+            [Stycke(text) for text in texts], "HDO", "Högsta domstolen",
+            referat, today=date(2026, 7, 12))
+
+    # A lower-instance date is not evidence for an HD artifact.
+    assert find("Tingsrätten meddelade den 12 juni 2018 beslut.") is None
+    # An earlier same-court decision in the procedural history is not enough.
+    assert find("HD meddelade den 1 maj 2018 ett tidigare beslut.") is None
+    # Calendar validity, future bounds and referat-year proximity are enforced.
+    assert find("HD meddelade den 31 februari 2018 följande dom.") is None
+    assert find("HD meddelade den 13 juli 2026 följande dom.", referat=()) is None
+    assert find("HD meddelade den 12 juni 2015 följande dom.") is None
+    assert decision_date_from_text(
+        [Stycke("HD meddelade den 12 juni 2000 följande dom.")],
+        "HDO", "Högsta domstolen", [], metadata_date="2018-06-12",
+        today=date(2026, 7, 12)) is None
+    # Two distinct decisions by the publishing court are ambiguous.
+    assert find("HD meddelade den 1 maj 2018 följande beslut.",
+                "HD meddelade den 12 juni 2018 följande dom.") is None
+
+
+def test_multiple_published_decisions_keep_every_text_date_and_latest_primary():
+    record = {
+        **RECORD,
+        "domstol": {"domstolKod": "HDO", "domstolNamn": "Högsta domstolen"},
+        "referatNummerLista": ["NJA 2001 s. 191"],
+        "avgorandedatum": "2001-03-20",
+        "innehall": ("<p>HD:s domar meddelades, i målet under I d. 20 mars "
+                     "2001 och i målet under II d. 19 april 2001.</p>"),
+    }
+    decision = parse_api_record(record)
+    assert decision.avgorandedatum_lista == ["2001-03-20", "2001-04-19"]
+    assert decision.avgorandedatum == "2001-04-19"
+    artifact = to_artifact(decision)
+    assert artifact["avgorandedatum_lista"] == ["2001-03-20", "2001-04-19"]
+
+
+def test_historical_hd_footer_is_formal_date_evidence():
+    assert decision_dates_from_text(
+        [Stycke("HD:s dom meddelades d 18 maj 1998 (mål nr B 618/96).")],
+        "HDO", "Högsta domstolen", ["NJA 1998 s. 283"], "1998-05-20",
+        today=date(2026, 7, 12)) == ["1998-05-18"]
+
+
+def test_historical_court_iso_heading_is_formal_date_evidence():
+    body = [
+        Stycke("Kammarrätten i Göteborg (1993-02-15, A, B) yttrade."),
+        Stycke("Regeringsrätten (1997-01-10, A, B) yttrade: Skälen."),
+    ]
+    assert decision_dates_from_text(
+        body, "REGR", "Regeringsrätten", ["RÅ 1997 ref. 7"], "1994-01-10",
+        today=date(2026, 7, 12)) == ["1997-01-10"]
+    assert decision_dates_from_text(
+        [Stycke("Regeringsrätten (1997-02-31, A, B) yttrade.")],
+        "REGR", "Regeringsrätten", ["RÅ 1997 ref. 7"], "1994-01-10",
+        today=date(2026, 7, 12)) == []
+
+
+def test_multiple_hovratt_rulings_are_all_publishing_dates():
+    body = [
+        Stycke("Hovrätten (A och B) anförde i beslut den 21 november 2012 "
+               "följande."),
+        Stycke("Hovrätten (A och B) anförde i beslut den 22 november 2012 "
+               "i huvudsak följande."),
+    ]
+    assert decision_dates_from_text(
+        body, "HYOD", "Svea hovrätts hyresrättsliga avgöranden",
+        ["RH 2013:9"], "2012-11-21", today=date(2026, 7, 12)) == [
+            "2012-11-21", "2012-11-22"]
+
+
+def test_historical_hovratt_combined_date_formats_keep_both_dates():
+    cases = [
+        ([Stycke("Hovrättens beslut meddelade: den 8 maj 2013 (I); den 14 "
+                 "maj 2013 (II).")], "RH 2013:23", "2013-05-08",
+         ["2013-05-08", "2013-05-14"]),
+        ([Stycke("Svea hovrätt (2002-10-07 och 2002-10-30, A och B) "
+                 "meddelade prövningstillstånd.")], "RH 2003:26", "2002-10-07",
+         ["2002-10-07", "2002-10-30"]),
+    ]
+    for body, referat, metadata_date, expected in cases:
+        assert decision_dates_from_text(
+            body, "HSV", "Svea hovrätt", [referat], metadata_date,
+            today=date(2026, 7, 12)) == expected
+
+
+def test_pmod_formal_release_heading_is_date_evidence():
+    assert decision_dates_from_text(
+        [Stycke("BESLUT (att meddelas 2022-12-14)")], "PMOD",
+        "Patent- och marknadsöverdomstolen", ["PMÖD 2022:9"], "2022-11-14",
+        today=date(2026, 7, 12)) == ["2022-12-14"]
+
+
 def test_artifact_shape():
     art = to_artifact(parse_api_record(RECORD))
     # the document URI is minted via the RATTSFALL citation parser, so it is
@@ -208,3 +320,111 @@ def test_h1_court_headings_build_the_instance_tree():
     assert (hd["type"], hd["court"]) == ("instans", "Högsta domstolen")
     # the prose restating the court ("överklagade ... HD") does not duplicate it
     assert [n["type"] for n in art["structure"]] == ["instans", "instans"]
+
+
+def test_hand_authored_legacy_decision_skeleton():
+    """Oracle-grade cues for split case -> instances -> proposal/ruling/dissent.
+
+    This exercises the parser's own segmenter, not merely the structural
+    golden's artifact reducer. The prose is deliberately minimal but follows
+    the published editorial formulas each recognizer claims to understand.
+    """
+    html = ("<p>I</p>"
+            "<p>Bolaget väckte talan vid Stockholms tingsrätt.</p>"
+            "<p>Tingsrätten (rådmannen A.A.) anförde följande.</p>"
+            "<p>Domslut</p><p>Talan avslås.</p>"
+            "<p>Bolaget överklagade domen till Högsta domstolen.</p>"
+            "<p>Målet avgjordes efter föredragning.</p>"
+            "<p>Föredraganden föreslog i betänkande att HD skulle meddela "
+            "följande dom.</p>"
+            "<p>HD:s avgörande</p>"
+            "<p>HD (justitieråden A.A. och B.B.) meddelade följande.</p>"
+            "<p>Domskäl</p><p>Skälen här.</p><p>HD:s avgörande</p>"
+            "<p>Justitierådet C.C. var skiljaktig och anförde.</p>")
+    structure = to_artifact(parse_api_record({**RECORD, "innehall": html}))[
+        "structure"]
+    [part] = [node for node in structure if node["type"] == "delmal"]
+    assert part["ordinal"] == "I"
+    district, supreme = [node for node in part["children"]
+                         if node["type"] == "instans"]
+    assert district["court"] == "Stockholms tingsrätt"
+    assert supreme["court"] == "Högsta domstolen"
+    assert [node["type"] for node in district["children"]
+            if node["type"] in {"dom"}] == ["dom"]
+    assert [node["type"] for node in supreme["children"]
+            if node["type"] in {"betankande", "dom", "skiljaktig"}] == [
+                "betankande", "dom", "skiljaktig"]
+    proposal, ruling = [node for node in supreme["children"]
+                        if node["type"] in {"betankande", "dom"}]
+    assert [node["type"] for node in proposal["children"]
+            if node["type"] in {"domskal", "domslut"}] == [
+                "domskal", "domslut"]
+    assert [node["type"] for node in ruling["children"]
+            if node["type"] in {"domskal", "domslut"}] == [
+                "domskal", "domslut"]
+
+
+def test_ordinary_presentation_is_not_a_judicial_proposal():
+    html = ("<p>Domskäl</p>"
+            "<p>Migrationsverket (generaldirektören A.A.) beslöt att lämna "
+            "ansökan utan bifall.</p>"
+            "<p>Föredragningen gjordes av it-direktören D.K. och gällde "
+            "informationssäkerhet.</p>"
+            "<p>Avgörande för ansvarsfrågan är om uppgiften röjdes.</p>"
+            "<p>Domslut</p>")
+    structure = to_artifact(parse_api_record({**RECORD, "innehall": html}))[
+        "structure"]
+    assert not [node for node in structure[0]["children"]
+                if node["type"] == "betankande"]
+    [ruling] = [node for node in structure[0]["children"]
+                if node["type"] == "dom"]
+    assert [node["type"] for node in ruling["children"]
+            if node["type"] in {"domskal", "domslut"}] == [
+                "domskal", "domslut"]
+
+
+def test_hd_proposal_opens_the_supreme_court_instance():
+    html = ("<p>Bolaget väckte talan vid Stockholms tingsrätt.</p>"
+            "<p>Tingsrätten (rådmannen A.A.) anförde följande.</p>"
+            "<p>Bolaget överklagade till Svea hovrätt.</p>"
+            "<p>Hovrätten (hovrättsrådet B.B.) anförde följande.</p>"
+            "<p>Målet avgjordes efter föredragning.</p>"
+            "<p>Föredraganden föreslog i betänkande att HD skulle meddela "
+            "följande dom.</p>"
+            "<p>HD (justitierådet C.C.) meddelade följande dom.</p>")
+    structure = to_artifact(parse_api_record({**RECORD, "innehall": html}))[
+        "structure"]
+    assert [node.get("court") for node in structure] == [
+        "Stockholms tingsrätt", "Svea hovrätt", "Högsta domstolen"]
+    assert [node["type"] for node in structure[-1]["children"]
+            if node["type"] in {"betankande", "dom"}] == ["betankande", "dom"]
+    assert not [node for node in structure[-2]["children"]
+                if node["type"] == "betankande"]
+
+
+def test_explicit_hd_foredragning_remains_a_proposal_marker():
+    html = ("<p>Bolaget överklagade till HD.</p>"
+            "<p>HD avgjorde målet efter föredragning.</p>"
+            "<p>HD:s avgörande</p>")
+    [instance] = to_artifact(parse_api_record({**RECORD, "innehall": html}))[
+        "structure"]
+    assert instance["court"] == "Högsta domstolen"
+    assert [node["type"] for node in instance["children"]
+            if node["type"] == "betankande"] == ["betankande"]
+
+
+def test_appended_lower_court_judgment_opens_a_new_instance():
+    html = ("<p>Domskäl</p><p>Arbetsdomstolens skäl.</p><p>Domslut</p>"
+            "<h2>BILAGA</h2>"
+            "<p>Tingsrättens dom (ordförande rådmannen A.A.)</p>"
+            "<h2>DOMSKÄL</h2><p>Tingsrättens skäl.</p><h2>DOMSLUT</h2>")
+    structure = to_artifact(parse_api_record({**RECORD, "innehall": html}))[
+        "structure"]
+    assert [node["type"] for node in structure] == ["instans", "instans"]
+    assert all(any(child["type"] == "dom" for child in node["children"])
+               for node in structure)
+    for instance in structure:
+        [ruling] = [child for child in instance["children"]
+                    if child["type"] == "dom"]
+        assert len([child for child in ruling["children"]
+                    if child["type"] == "domslut"]) == 1

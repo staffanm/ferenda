@@ -19,6 +19,7 @@ misclassified heading still keeps its text, so nothing is lost.
 import functools
 import html as htmllib
 import re
+from datetime import date
 
 from bs4 import BeautifulSoup
 
@@ -65,6 +66,20 @@ RE_FOOTDEF = re.compile(r"^\[(\d{1,2})\]\s*(.*)", re.S)
 # 3, "C-520/184[4]" is "C-520/18" + ref 4. The duplicate must equal N to count
 # as the artifact; an unrelated trailing digit is kept as real text.
 RE_FOOTREF = re.compile(r"(\d)?([.,]?)\[(\d{1,2})\]")
+
+MONTHS = {
+    "januari": 1, "februari": 2, "mars": 3, "april": 4,
+    "maj": 5, "juni": 6, "juli": 7, "augusti": 8,
+    "september": 9, "oktober": 10, "november": 11, "december": 12,
+}
+COURT_DATE_ALIASES = {
+    "HDO": ("HD", "Högsta domstolen"),
+    "HFD": ("HFD", "Högsta förvaltningsdomstolen", "Regeringsrätten"),
+    "ADO": ("Arbetsdomstolen",),
+    "MIOD": ("Migrationsöverdomstolen",),
+    "MOD": ("Mark- och miljööverdomstolen", "Miljööverdomstolen"),
+    "PMOD": ("Patent- och marknadsöverdomstolen",),
+}
 
 
 def collapse(text):
@@ -137,6 +152,113 @@ def parse_innehall(html):
     return parse_body(html)[0]
 
 
+def decision_dates_from_text(body, court, court_namn, referat, metadata_date=None,
+                             today=None):
+    """Return sane dates explicitly stated for the publishing court.
+
+    Publisher metadata occasionally contains a typo. Text wins only when the
+    publishing court itself is named in the formal final-ruling formula
+    ``meddelade den [date] följande [dom/beslut]``; lower-instance, cited-case
+    and earlier procedural dates are therefore not candidates. A malformed or
+    future date, one incompatible with the referat year, or multiple distinct
+    candidates are all retained: one referat can publish several decisions.
+    """
+    aliases = set(COURT_DATE_ALIASES.get(court, ()))
+    aliases.add(court_namn)
+    if "hovrätt" in court_namn.lower():
+        aliases.add("Hovrätten")
+    court_pattern = "|".join(re.escape(alias) for alias in
+                             sorted(aliases, key=len, reverse=True) if alias)
+    assert court_pattern, "publishing court name required for textual date"
+    prefix = (r"(?:^|[.!?]\s)(?:%s)(?:\s*\([^)]{0,500}\))?\s+"
+              % court_pattern)
+    date_pattern = r"(\d{1,2})\s+(%s)\s+((?:19|20)\d{2})" % "|".join(MONTHS)
+    patterns = [
+        re.compile(prefix + r"meddelade\s+den\s+" + date_pattern
+                   + r"\s+följande\s+(?:slutliga\s+)?(?:dom|beslut)\b",
+                   re.I),
+        re.compile(prefix + r"anförde\s+i\s+(?:slutligt\s+)?(?:dom|beslut)\s+"
+                   r"den\s+" + date_pattern
+                   + r"(?:\s+i\s+huvudsak)?\s+följande\b", re.I),
+    ]
+    iso_pattern = re.compile(
+        r"(?:^|[.!?]\s)(?:%s)\s*\(((?:19|20)\d{2})-(\d{2})-(\d{2})"
+        r"(?:,|\))" % court_pattern, re.I)
+    iso_group_pattern = re.compile(
+        r"(?:^|[.!?]\s)(?:%s)\s*\(([^)]{0,500})\)" % court_pattern,
+        re.I)
+    candidates = set()
+    limit = today or date.today()
+    referat_years = {int(year) for value in referat
+                     for year in re.findall(r"\b((?:19|20)\d{2})\b", value)}
+    try:
+        metadata_year = date.fromisoformat(metadata_date).year if metadata_date else None
+    except ValueError:
+        metadata_year = None
+
+    def accept(candidate):
+        if candidate > limit:
+            return
+        # A referat may be published the calendar year after the decision.
+        if referat_years and not any(candidate.year in (refyear - 1, refyear)
+                                     for refyear in referat_years):
+            return
+        if not referat_years and (metadata_year is None
+                                  or abs(candidate.year - metadata_year) > 2):
+            return
+        candidates.add(candidate.isoformat())
+
+    for block in body:
+        found = [match for pattern in patterns for match in pattern.findall(block.text)]
+        if re.match(r"^HD:s\s+(?:dom|domar|beslut)\s+meddelades\b",
+                    block.text, re.I):
+            found += re.findall(r"(?:den|d\.?)\s*" + date_pattern,
+                                block.text, re.I)
+        if ("hovrätt" in court_namn.lower()
+                and re.match(r"^Hovrättens\s+(?:domar|beslut)\s+meddelade?:",
+                             block.text, re.I)):
+            found += re.findall(r"(?:den|d\.?)\s*" + date_pattern,
+                                block.text, re.I)
+        for day, month, year in found:
+            try:
+                candidate = date(int(year), MONTHS[month.lower()], int(day))
+            except ValueError:
+                continue
+            accept(candidate)
+        for year, month, day in iso_pattern.findall(block.text):
+            try:
+                candidate = date(int(year), int(month), int(day))
+            except ValueError:
+                continue
+            accept(candidate)
+        for group in iso_group_pattern.findall(block.text):
+            for year, month, day in re.findall(
+                    r"((?:19|20)\d{2})-(\d{2})-(\d{2})", group):
+                try:
+                    candidate = date(int(year), int(month), int(day))
+                except ValueError:
+                    continue
+                accept(candidate)
+        if court == "PMOD":
+            for year, month, day in re.findall(
+                    r"^(?:DOM|BESLUT)\s*\(att meddelas\s+"
+                    r"((?:19|20)\d{2})-(\d{2})-(\d{2})\)", block.text, re.I):
+                try:
+                    candidate = date(int(year), int(month), int(day))
+                except ValueError:
+                    continue
+                accept(candidate)
+    return sorted(candidates)
+
+
+def decision_date_from_text(body, court, court_namn, referat, metadata_date=None,
+                            today=None):
+    """A single text-confirmed date, or None for zero/multiple decisions."""
+    candidates = decision_dates_from_text(
+        body, court, court_namn, referat, metadata_date, today)
+    return candidates[0] if len(candidates) == 1 else None
+
+
 def parse_api_record(d, basefile=None):
     """API record dict -> Avgorande. The innehåll HTML is DV's intermediate
     format: when `basefile` is given, apply any curated patch to it (a
@@ -145,12 +267,16 @@ def parse_api_record(d, basefile=None):
     if basefile is not None and innehall is not None:
         innehall = patch.apply("dv", basefile, innehall)
     body, footnotes = parse_body(innehall)
+    text_dates = decision_dates_from_text(
+        body, d["domstol"]["domstolKod"], d["domstol"]["domstolNamn"],
+        d.get("referatNummerLista", []), d.get("avgorandedatum"))
     return Avgorande(
         court=d["domstol"]["domstolKod"],
         court_namn=d["domstol"]["domstolNamn"],
         malnummer=[m.strip() for m in d.get("malNummerLista", [])],
         referat=[r.strip() for r in d.get("referatNummerLista", [])],
-        avgorandedatum=d.get("avgorandedatum"),
+        avgorandedatum=max(text_dates) if text_dates else d.get("avgorandedatum"),
+        avgorandedatum_lista=text_dates if len(text_dates) > 1 else [],
         publiceringsform=d.get("publiceringsform"),
         typ=d.get("typ"),
         rattsomrade=[r.strip() for r in d.get("rattsomradeLista", [])],
@@ -255,6 +381,7 @@ def to_artifact(av, canonical_id=None):
         "malnummer": av.malnummer,
         "referat": av.referat,
         "avgorandedatum": av.avgorandedatum,
+        "avgorandedatum_lista": av.avgorandedatum_lista,
         "metadata": {
             "publiceringsform": av.publiceringsform,
             "typ": av.typ,

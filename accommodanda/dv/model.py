@@ -43,6 +43,7 @@ class Avgorande:
     malnummer: list[str] = field(default_factory=list)
     referat: list[str] = field(default_factory=list)
     avgorandedatum: str | None = None
+    avgorandedatum_lista: list[str] = field(default_factory=list)
     publiceringsform: str | None = None
     typ: str | None = None
     rattsomrade: list[str] = field(default_factory=list)
