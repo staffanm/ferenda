@@ -383,10 +383,12 @@ def test_render_document_injects_edit_meta(tmp_path):
     # a statute is patchable, so its identity rides on the meta for the
     # "patch source" button beside the commentary one
     assert 'data-source="sfs" data-basefile="1975:635"' in law
-    assert law.count("</head>") == 1 and '/editor.js' in law
+    # editor.js rides in the single concatenated bundle now, so the page links
+    # /script.js (not a per-file /editor.js tag)
+    assert law.count("</head>") == 1 and '/script.js' in law
     case = render.render_document(CASE, "dv", site)
     assert 'name="lagen-doc"' not in case      # court decisions are read-only
-    assert '/editor.js' in case                # but the script still loads (inert)
+    assert '/script.js' in case                # but the bundle still loads (editor inert)
 
 
 def test_expired_statute_is_marked(tmp_path):
@@ -670,15 +672,23 @@ def test_generate_browse_writes_faceted_pages(tmp_path):
     # chrome; the quick palette links to it and exposes the Right Arrow shortcut.
     search_page = compress.read_text(out / "sok" / "index.html")
     assert 'class="search-page"' in search_page
-    fullsearch = compress.read_text(out / "fullsearch.js")
-    assert "facetGroup('source', 'Källa'" in fullsearch
-    assert "renderPagination" in fullsearch and "data.next_cursor" in fullsearch
-    assert "api.delete('page'); api.delete('offset')" in fullsearch
+    # all client JS ships in one concatenated bundle, not as per-file scripts
+    bundle = compress.read_text(out / render.SCRIPT_BUNDLE)
+    assert not compress.exists(out / "fullsearch.js")   # folded into the bundle
+    assert not compress.exists(out / "search.js")
+    # the bundle carries the full-search client (fullsearch.js) ...
+    assert "facetGroup('source', 'Källa'" in bundle
+    assert "renderPagination" in bundle and "data.next_cursor" in bundle
+    assert "api.delete('page'); api.delete('offset')" in bundle
+    # ... and the ⌘K palette (search.js)
+    assert "Avgränsa " in bundle and "e.key === 'ArrowRight'" in bundle
+    assert 'class="search-refine" href="/sok/" hidden></a><input' in bundle
+    assert "refine.hidden = true;" in bundle
+    # fullsearch.js's own ordering guard (seq bumped before the empty-q return, so
+    # an empty query still invalidates a pending request) -- asserted against the
+    # source file, where "if (!q)" is unambiguously fullsearch's, not the bundle
+    fullsearch = (render.ASSETS / "fullsearch.js").read_text(encoding="utf-8")
     assert fullsearch.index("var mine = ++seq") < fullsearch.index("if (!q)")
-    palette = compress.read_text(out / "search.js")
-    assert "Avgränsa " in palette and "e.key === 'ArrowRight'" in palette
-    assert 'class="search-refine" href="/sok/" hidden></a><input' in palette
-    assert "refine.hidden = true;" in palette
     # The legacy all-feeds directory and repository aliases are restored.
     feed_index = compress.read_text(out / "dataset" / "sitenews" / "index.html")
     assert "/dataset/sfs/feed.atom?rdf_type=type%2Flag" in feed_index

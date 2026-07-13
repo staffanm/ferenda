@@ -389,6 +389,7 @@ class RunOptions:
     ignore_code_changes: bool = False  # skip the recipe-version check (dev:
                                        # don't rebuild all when parse code changes)
     aggregates_only: bool = False  # generate: only the corpus-wide pages
+    assets_only: bool = False    # generate: only copy the static css/js chrome
     since: date | None = None    # eurlex: discovery floor (overrides watermark)
     lang: str | None = None      # eurlex/hudoc: comma-separated languages
     source: str = "sparql"       # eurlex: discovery backend (sparql|soap)
@@ -2619,6 +2620,10 @@ def cmd_generate(only=None, source=None, jobs=1, force=False):
     indexes) from the current catalog, skipping the per-document render -- a
     seconds-long refresh after a frontpage/browse change, not a full rebuild.
 
+    `--assets-only` copies only the static chrome (style.css + the scripts) --
+    the minimal refresh after a CSS/JS change, which the HTML links by URL and so
+    never has to be re-rendered for. Needs no catalog and no relate.
+
     `force=True` (the editor's post-commit rebuild) renders the scoped pages
     unconditionally: they are dirty by construction (the request just committed
     an edit onto them), so the freshness check is skipped rather than trusted."""
@@ -2634,6 +2639,11 @@ def cmd_generate(only=None, source=None, jobs=1, force=False):
         site_render.write_site(GENERATED)
         print("generate: rebuilt site pages (frontpage, /om, sitenews) -> %s" % GENERATED)
         _emit_segment("generate", "site", time.perf_counter() - t0, status="ok")
+        return
+    if RUN.assets_only:
+        render.write_assets(GENERATED)
+        print("generate: copied static assets (style.css + scripts) -> %s" % GENERATED)
+        _emit_segment("generate", "__site__", time.perf_counter() - t0, status="ok")
         return
     if RUN.aggregates_only:
         con = catalog.connect(CATALOG)
@@ -2959,6 +2969,10 @@ def main(argv=None):
                    help="generate: rewrite only the corpus-wide pages (frontpage "
                         "+ browse indexes) from the catalog, skipping the "
                         "per-document render")
+    p.add_argument("--assets-only", action="store_true",
+                   help="generate: copy only the static chrome (style.css + the "
+                        "scripts) -- the minimal refresh after a CSS/JS change, "
+                        "no catalog or per-document render")
     p.add_argument("-j", "--jobs", type=int, default=None,
                    help="parallel workers for the parallelisable steps (parse, "
                         "index); default = number of CPU cores, `-j1` to serialise")
@@ -3007,6 +3021,7 @@ def main(argv=None):
     RUN.dry_run, RUN.force, RUN.no_deps = args.dry_run, args.force, args.no_deps
     RUN.ignore_code_changes = args.ignore_code_changes
     RUN.aggregates_only = args.aggregates_only
+    RUN.assets_only = args.assets_only
     RUN.since, RUN.lang, RUN.source = args.since, args.lang, args.discovery
     RUN.only = args.only
     RUN.riksmote = args.riksmote

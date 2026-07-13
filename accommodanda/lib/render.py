@@ -1380,15 +1380,7 @@ PAGE = """<!doctype html>
 </head><body class="gr-root%(body_class)s">
 %(masthead)s
 %(grid)s
-%(island)s<script src="/dom.js" defer></script>
-<script src="/scrollspy.js" defer></script>
-<script src="/search.js" defer></script>
-<script src="/popover.js" defer></script>
-<script src="/fullsearch.js" defer></script>
-<script src="/versions.js" defer></script>
-<script src="/faksimil.js" defer></script>
-<script src="/drawers.js" defer></script>
-<script src="/editor.js" defer></script>
+%(island)s<script src="/script.js" defer></script>
 <script>(function(){var b=document.querySelector('[data-theme-toggle]');if(!b)return;b.addEventListener('click',function(){var cur=document.documentElement.getAttribute('data-theme');if(cur!=='light'&&cur!=='dark')cur=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';var next=cur==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',next);try{localStorage.setItem('theme',next);}catch(e){}});})();</script>
 </body></html>
 """
@@ -2972,6 +2964,51 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
     return total, rendered
 
 
+# The browser chrome from lib/assets/, in the order the page loads them: dom.js
+# defines window.lagenDom (the shared vocabulary the others build on) and MUST
+# come first; the rest are order-independent IIFEs, editor.js last. They are
+# concatenated into one script.js so the page links a single URL -- adding a
+# module changes only script.js, never the per-page HTML, so a new script ships
+# as an --assets-only refresh instead of forcing a full corpus regenerate.
+SCRIPT_FILES = ("dom.js", "scrollspy.js", "search.js", "popover.js",
+                "fullsearch.js", "versions.js", "faksimil.js", "drawers.js",
+                "editor.js")
+SCRIPT_BUNDLE = "script.js"     # the single served URL (render.PAGE links it)
+
+
+def bundled_script():
+    """The concatenated script.js: every lib/assets JS file in load order, each
+    behind a banner comment so a stack trace or view-source still names its origin
+    file. The files are self-contained IIFEs, so concatenation is order-preserving
+    and semantically identical to the former one-tag-per-file loading."""
+    return "\n".join("/* === %s === */\n%s" % (name,
+                     (ASSETS / name).read_text(encoding="utf-8"))
+                     for name in SCRIPT_FILES)
+
+
+def write_assets(out_root):
+    """Copy the static browser chrome (lib/assets/) into the generated tree -- the
+    concatenated script.js bundle, robots.txt, and the stylesheet (reader CSS with
+    the editor layer appended). Depends on nothing but the asset files, so it is
+    the whole of an asset-only refresh (`lagen all generate --assets-only`) after
+    a CSS/JS change -- no catalog, no relate, no HTML re-render. Rides the same
+    precompression as the pages (nginx serves the .br/.gz as-is); tiny files stay
+    plain via the size floor in compress.write."""
+    out_root = Path(out_root)
+    out_root.mkdir(parents=True, exist_ok=True)
+    compress.write_text(out_root / SCRIPT_BUNDLE, bundled_script(),
+                        encodings=compress.PAGE_ENCODINGS)
+    compress.write_text(out_root / "robots.txt",
+                        (ASSETS / "robots.txt").read_text(encoding="utf-8"),
+                        encodings=compress.PAGE_ENCODINGS)
+    # style.css ships the reader stylesheet with the editor layer appended -- one
+    # request, and the editor rules are inert without a logged-in session.
+    compress.write_text(out_root / "style.css",
+                        (ASSETS / "style.css").read_text(encoding="utf-8")
+                        + (ASSETS / "editor.css").read_text(encoding="utf-8"),
+                        encodings=compress.PAGE_ENCODINGS)
+
+
 def render_aggregates(con, out_root, catalog_path, write_index=True):
     """Write the corpus-wide pages -- stylesheet, scripts, frontpage and the
     per-source faceted browse -- from the catalog. They depend on the whole
@@ -2984,21 +3021,7 @@ def render_aggregates(con, out_root, catalog_path, write_index=True):
     so this never write-then-clobbers `index.html`."""
     out_root = Path(out_root)
     out_root.mkdir(parents=True, exist_ok=True)
-    # the static chrome (lib/assets/) is browser-facing too, so it rides the same
-    # precompression as the pages (nginx serves .br/.gz as-is); tiny files stay
-    # plain via the size floor in compress.write. style.css ships the reader
-    # stylesheet with the editor layer appended -- one request, and the editor
-    # rules are inert without a logged-in session.
-    for name in ("dom.js", "scrollspy.js", "search.js", "popover.js",
-                 "fullsearch.js", "versions.js", "faksimil.js", "drawers.js",
-                 "editor.js", "robots.txt"):
-        compress.write_text(out_root / name,
-                            (ASSETS / name).read_text(encoding="utf-8"),
-                            encodings=compress.PAGE_ENCODINGS)
-    compress.write_text(out_root / "style.css",
-                        (ASSETS / "style.css").read_text(encoding="utf-8")
-                        + (ASSETS / "editor.css").read_text(encoding="utf-8"),
-                        encodings=compress.PAGE_ENCODINGS)
+    write_assets(out_root)
     if write_index:
         compress.write_text(out_root / "index.html", render_index(con),
                             encodings=compress.PAGE_ENCODINGS)
