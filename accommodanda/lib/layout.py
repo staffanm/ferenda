@@ -244,6 +244,11 @@ def sfs_sfsr(basefile):                 # legacy register HTML
     return SFS_DOWNLOADED / "sfsr" / year / (nr + ".html")
 
 
+def sfs_pdf(basefile):                  # officially published SFS PDF (facsimile source)
+    year, nr = _sfs_parts(basefile)
+    return SFS_DOWNLOADED / "pdf" / year / (nr + ".pdf")
+
+
 # --------------------------------------------------------------------------
 # sfs archive -- superseded consolidations. Each stage keeps its own archive/
 # subtree (downloaded/sfs/archive for raw, artifact/sfs/archive for parsed), in
