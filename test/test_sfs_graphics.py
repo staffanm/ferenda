@@ -427,13 +427,19 @@ def test_localize_group_chunks_pages_and_merges(monkeypatch):
              "sort": "formel", "anchor": "1 Balanstalet"},
             {"id": "G2", "key": "g-two", "identity": {"n": 2},
              "sort": "formel", "anchor": "2 Omsättningstiden"}]
-    out = graphics.localize_group(gaps, "/x.pdf", "2021:734", author=fake_author)
+    progress = []
+    out = graphics.localize_group(gaps, "/x.pdf", "2021:734", author=fake_author,
+                                  log=progress.append)
     assert len(calls) == 2                       # 8 pages / 6 per call = 2 chunks
     assert calls[0][1] == 6 and calls[1][1] == 2  # images per chunk
     assert out["g-one"]["bbox"] == [72, 144, 288, 432]
     assert out["g-one"]["identity"] == {"n": 1}
     assert out["g-two"] == {"sfs": "2021:734", "page": 7, "alt": "",
                              "identity": {"n": 2}}
+    # -v progress: a vision-call line names src + page range *before* each call,
+    # so a hang/timeout is attributable rather than silent
+    assert any("pages 1-6 -- vision call" in m for m in progress)
+    assert any("pages 7-8 -- vision call" in m for m in progress)
 
 
 def test_localize_group_refuses_partial_result(monkeypatch):

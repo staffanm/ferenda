@@ -24,6 +24,7 @@ omitted graphic.
 import hashlib
 import json
 import re
+import time
 from datetime import date, datetime
 
 from .. import config
@@ -547,25 +548,31 @@ def _chunks(seq, size):
         yield seq[i:i + size]
 
 
-def localize_group(gaps, pdf_path, src, model=None, author=llm.author):
+def localize_group(gaps, pdf_path, src, model=None, author=llm.author,
+                   log=lambda _msg: None):
     """Localize every gap resolved to one source PDF to a page + bbox, one
     vision call per page-chunk. `author` is injectable so the orchestration is
     testable without a live model. The short local ids are used only in prompts;
-    the result is keyed by stable semantic gap key and must cover every gap."""
+    the result is keyed by stable semantic gap key and must cover every gap.
+    `log` receives a progress line per page-chunk -- emitted *before* each (up to
+    600 s) vision call so a hang/timeout is attributable to a source + page range,
+    and after with the elapsed time; the default is a no-op (build passes it -v)."""
     model = model or config.VISION_MODEL
     gap_by_id = {g["id"]: g for g in gaps}
     assert len(gap_by_id) == len(gaps), "%s: duplicate prompt gap ids" % src
     gap_ids = set(gap_by_id)
     pages = list(range(1, facsimile.page_count(pdf_path) + 1))
+    log("%s: %d-page source PDF, placing %d gap(s)" % (src, len(pages), len(gaps)))
     located = {}
     for chunk in _chunks(pages, PAGES_PER_CALL):
+        remaining = [gap for gap in gaps if gap["id"] not in located]
+        if not remaining:
+            break
+        log("%s: rendering page image(s) %d-%d" % (src, chunk[0], chunk[-1]))
         images = [facsimile.cached_page("sfs", src, pdf_path, p).read_bytes()
                   for p in chunk]
         image_sizes = {page: facsimile.png_size(image)
                        for page, image in zip(chunk, images, strict=True)}
-        remaining = [gap for gap in gaps if gap["id"] not in located]
-        if not remaining:
-            break
         prompt = localization_prompt(remaining, chunk, image_sizes, src)
         shown_ids = {gap["id"] for gap in remaining}
 
@@ -573,9 +580,15 @@ def localize_group(gaps, pdf_path, src, model=None, author=llm.author):
             return parse_localization(reply, ids, src, pages=shown,
                                       image_size=size, already=located)
 
+        log("%s: pages %d-%d -- vision call for %d remaining gap(s)..."
+            % (src, chunk[0], chunk[-1], len(remaining)))
+        t0 = time.perf_counter()
         located.update(author(
             prompt, validate,
             model=model, images=images, max_tokens=VISION_MAX_TOKENS))
+        log("%s: pages %d-%d -- %.0f s, %d/%d gap(s) located"
+            % (src, chunk[0], chunk[-1], time.perf_counter() - t0,
+               len(located), len(gaps)))
     missing = gap_ids - located.keys()
     if missing:
         raise ValueError("%s: vision did not locate gap(s) %s on any PDF page"

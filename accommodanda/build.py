@@ -385,6 +385,8 @@ def ensure(source, stage_name, basefile, manifest, res, force, no_deps):
 class RunOptions:
     dry_run: bool = False
     force: bool = False
+    verbose: bool = False   # -v: stream per-step progress to stderr (the long
+                            # ai-* vision passes otherwise run silent for minutes)
     no_deps: bool = False
     ignore_code_changes: bool = False  # skip the recipe-version check (dev:
                                        # don't rebuild all when parse code changes)
@@ -402,6 +404,15 @@ class RunOptions:
 
 
 RUN = RunOptions()
+
+
+def vlog(msg):
+    """Print `msg` to stderr when -v/--verbose is set, else do nothing -- the
+    progress hook the long ai-* passes feed so a multi-minute vision run names
+    what it is doing rather than hanging silently."""
+    if RUN.verbose:
+        print(msg, file=sys.stderr, flush=True)
+
 
 # The current invocation's run id, minted once in main() for a pipeline action
 # (workers never need it, so it stays off RunOptions). INVARIANT: no run id ⇒
@@ -1006,10 +1017,12 @@ def _sfs_includegraphics_one(basefile):
               "(%d verified) -- nothing to do" % (basefile, len(gaps), len(keep)))
         return
     annstore.guard(out, RUN.force)     # a verified layer refuses, pre-LLM-spend
+    vlog("sfs ai-includegraphics %s: localizing %d gap(s) across %d source PDF(s): %s"
+         % (basefile, todo_n, len(todo), ", ".join(sorted(todo))))
     payload, inputs = dict(keep), dict(annstore.artifact_input("sfs", basefile))
     for src, group in todo.items():
         pdf = layout.sfs_pdf(src)
-        payload.update(sfs_graphics.localize_group(group, pdf, src))
+        payload.update(sfs_graphics.localize_group(group, pdf, src, log=vlog))
         inputs.update(annstore.download_input(str(pdf.relative_to(layout.DOWNLOADED))))
     # a kept entry's source PDF is an input too, so drift still tracks it
     for ent in keep.values():
@@ -2978,6 +2991,11 @@ def main(argv=None):
                         "index); default = number of CPU cores, `-j1` to serialise")
     p.add_argument("-n", "--dry-run", action="store_true",
                    help="print the plan, do nothing")
+    p.add_argument("-v", "--verbose", action="store_true",
+                   help="stream per-step progress to stderr -- the long ai-* "
+                        "vision passes (e.g. sfs ai-includegraphics) otherwise "
+                        "print nothing until they finish; shows the source PDF, "
+                        "page range and elapsed time per vision call")
     p.add_argument("--port", type=int, default=8000,
                    help="port for `serve` -- site + API in one process (default 8000)")
     p.add_argument("--host", default="127.0.0.1", metavar="ADDR",
@@ -3019,6 +3037,7 @@ def main(argv=None):
     args = p.parse_args(argv)
 
     RUN.dry_run, RUN.force, RUN.no_deps = args.dry_run, args.force, args.no_deps
+    RUN.verbose = args.verbose
     RUN.ignore_code_changes = args.ignore_code_changes
     RUN.aggregates_only = args.aggregates_only
     RUN.assets_only = args.assets_only
