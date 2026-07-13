@@ -577,6 +577,18 @@ ol.ranked { padding-left: 1.4rem; } ol.ranked .c { color: var(--ink-3); font-siz
                        background: var(--surf); }
 .empty { color: var(--ink-3); font-style: italic; }
 
+/* -- folkrätt landing: the CoE treaty listing (alphabetical, protocols nested)
+   beside the ECtHR facet links -- */
+.folkratt-group { margin: 1.5rem 0 2.5rem; }
+.folkratt-group h3 { font-family: var(--sans); text-transform: uppercase;
+                     letter-spacing: .06em; font-size: .72rem; font-weight: 600;
+                     color: var(--ink-3); margin: 1.5rem 0 .3rem; }
+.folkratt-treaties .ref { color: var(--ink-4); font-size: .8rem; }
+.folkratt-protocols { list-style: none; padding: 0; margin: .1rem 0 .1rem .9rem;
+                     border-left: 1px solid var(--rule); }
+.folkratt-protocols li { margin: .1rem 0; padding-left: .6rem; font-size: .86rem; }
+.folkratt-protocols a { color: var(--ink-2); }
+
 /* -- faceted browse navigator -- */
 .facets { margin: 0 0 2rem; }
 .facet-axis { font-family: var(--sans); text-transform: uppercase;

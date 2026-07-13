@@ -182,6 +182,19 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `download.py` | one search POST to the Treaty Office's anonymous JSON web service (`conventions-ws.coe.int`, token embedded in the public `full-list2` page, mounted via `lib.net.mount_legacy_tls` for its small-DH-key TLS) returns all 233 treaties' metadata in one call; `getLieux` resolves opening places; each official English text downloads as a plain PDF from `rm.coe.int` (no challenge, no HTML scraping) |
 | `model.py` | typed `Treaty`; canonical `ext/coe/{ETS-or-CETS-number}` identity and an `rdfs:seeAlso` bridge from the ECHR instruments reproduced in SFS 1994:1219 |
 | `parse.py` | official English PDF → article/subarticle tree (`#A8`, `#A6P3Ld`) via `pdftohtml -> page_paragraphs -> build_structure`; supports numeric, Roman and compound article designations plus section-only amending instruments, and context-suffixes repeated printed designators so every node id is unique |
+| `data/names.json` | Council-of-Europe treaties by Swedish name → ETS/CETS number, hand-edited; read by `lib.lagrum.load_treaties` (citation grammar) **and** by `render._coe_named` — its keys are the curated *central* treaties surfaced first on the folkrätt landing, and its `abbr` is the badge (EKMR, …) |
+
+`coe` and `hudoc` share one masthead entry, **Folkrätt** (`/folkratt/`, an
+international-law umbrella for the later UN/ICJ sources). The bespoke
+`render.render_folkratt` landing lists every CoE instrument alphabetically by its
+significant title (`lib.coe.significant_title`, the SFS "Lag (yyyy:nn) om …"
+convention), each with its amending protocols nested beneath the convention they
+amend (`lib.coe.protocol_reference` + a longest-prefix title match), split into
+*Centrala* (the `names.json` treaties) and *Övriga* A–Z. Beside it sits the
+Europadomstolen (hudoc) faceted case browse, which relocates under
+`/folkratt/hudoc/`; coe has no faceted browse tree of its own. Treaty/case
+document *pages* keep their canonical addresses (`/coe/{number}`,
+`/dom/echr/{itemid}`).
 
 **wiki vertical (git-backed markdown — begrepp + kommentar)**
 | File | What |

@@ -43,7 +43,9 @@ from . import (
     annstore,
     casenaming,
     catalog,
+    coe,
     compress,
+    datasets,
     eucasenaming,
     facets,
     feeds,
@@ -1466,6 +1468,8 @@ MAST_NAV = (("Lagar", "/sfs/", ("Författning",)),
             ("Föreskrifter", "/foreskrift/", ("Föreskrift",)),
             ("EU-rätt", "/eurlex/", ("EU-förordning", "EU-direktiv", "EU-beslut",
              "EU-domstolen", "Fördrag", "EU-rättsakt")),
+            ("Folkrätt", "/folkratt/", ("Folkrätt", "Europarådets fördrag",
+             "Europadomstolen")),
             ("Om", "/om/", ("Om",)),
             ("Nyheter", "/dataset/sitenews/feed/", ("Nyheter",)))
 
@@ -1484,7 +1488,7 @@ def _masthead(kind):
                     % (route, ' class="on"' if kind in act else "", label)
                     for label, route, act in MAST_NAV)
     return ('<header class="masthead">'
-            '<a class="brand" href="/">lagen<em>.</em></a>'
+            '<a class="brand" href="/">lagen<em>.nu</em></a>'
             '<button class="search" type="button" data-search>'
             + _search_icon(15) +
             '<span>Sök lag, paragraf, rättsfall…</span>'
@@ -2687,7 +2691,13 @@ SOURCE_LABEL = {"sfs": "Författningar", "dv": "Rättsfall",
                 "hudoc": "Europadomstolens praxis",
                 "coe": "Europarådets fördrag",
                 "kommentar": "Lagkommentarer", "begrepp": "Begrepp"}
-BROWSE_DIR = {"dv": "dom"}
+# the international-law sources share one masthead entry and one landing page
+# (/folkratt/): a bespoke alphabetical treaty listing (coe) beside the faceted
+# case browse (hudoc), which relocates under /folkratt/hudoc/. coe has no faceted
+# browse tree of its own -- its whole listing lives on the landing page.
+FOLKRATT_SOURCES = ("hudoc", "coe")
+FOLKRATT_LABEL = "Folkrätt"
+BROWSE_DIR = {"dv": "dom", "hudoc": "folkratt/hudoc"}
 
 
 def _browse_dir(source):
@@ -2706,12 +2716,30 @@ def _most_cited(con, source):
                    % (escape(href(u)), escape(t), c) for u, t, c in rows)
 
 
+def _index_rows(n):
+    """The frontpage source rows as (route, label, count): each browsable source
+    in SOURCE_ORDER, but the international-law sources collapsed into one
+    'Folkrätt' row (their combined count, linking to the shared landing) at the
+    position of the first one present."""
+    seen = False
+    for s in SOURCE_ORDER:
+        if s in FOLKRATT_SOURCES:
+            if seen:
+                continue
+            seen = True
+            total = sum(n.get(x, 0) for x in FOLKRATT_SOURCES)
+            if total:
+                yield "/folkratt/", FOLKRATT_LABEL, total
+        elif n.get(s):
+            yield "/%s/" % _browse_dir(s), SOURCE_LABEL.get(s, s), n[s]
+
+
 def render_index(con):
     n = {s: c for s, c in catalog.counts(con).items() if s != "kommentar"}
     nav = "".join(
-        '<li><a href="/%s/">%s</a> <span class="c">%d</span></li>'
-        % (_browse_dir(s), escape(SOURCE_LABEL.get(s, s)), n[s])
-        for s in SOURCE_ORDER if n.get(s))
+        '<li><a href="%s">%s</a> <span class="c">%d</span></li>'
+        % (route, escape(label), count)
+        for route, label, count in _index_rows(n))
     cols = []
     for source, heading in (("sfs", "Mest hänvisade författningar"),
                             ("dv", "Mest hänvisade rättsfall")):
@@ -2726,6 +2754,171 @@ def render_index(con):
             % (sum(n.values()), sum(1 for s in n if n[s]), nav, "".join(cols)))
     return page("lagen.nu", "Start", "", body,
                 eyebrow="Sveriges lagar, med kontext", solo=True)
+
+
+# --------------------------------------------------------------------------
+# the international-law (folkrätt) landing at /folkratt/: a bespoke page, not a
+# faceted browse. The Council-of-Europe treaties are listed alphabetically by
+# their significant title (the SFS listing convention), each with its amending
+# protocols nested beneath it, split into a curated central set (the treaties
+# named in coe/data/names.json) and the rest A-Z. The European Court of Human
+# Rights sits beside them as links into its own faceted browse (relocated under
+# /folkratt/hudoc/) plus a most-cited reel.
+# --------------------------------------------------------------------------
+
+@functools.lru_cache(maxsize=1)
+def _coe_named():
+    """The hand-edited coe/data/names.json, the file the citation engine reads,
+    as {ETS/CETS number: entry}. Its keys are the curated central treaties
+    (surfaced first on the folkrätt page); each entry carries the informal
+    Swedish name(s) (`label`) and acronym (`abbr`) shown in the listing, either a
+    string or a list."""
+    return {number: entry
+            for number, entry in json.loads(datasets.COE_NAMES.read_text("utf-8")).items()
+            if isinstance(entry, dict)}
+
+
+def _first(value):
+    """The primary form of a names.json `label`/`abbr` (a string, or the first of
+    a list)."""
+    return value[0] if isinstance(value, list) else value
+
+
+def _coe_parenthetical(row, named):
+    """The subdued gloss after a treaty title: its informal Swedish name and
+    acronym where registered, then always the ETS/CETS reference --
+    'Europakonventionen, EKMR, ETS No. 005', or just 'ETS No. 024'."""
+    entry = named.get(row["number"]) or {}
+    parts = []
+    if entry.get("label"):
+        name = _first(entry["label"])
+        parts.append(name[:1].upper() + name[1:])
+    if entry.get("abbr"):
+        parts.append(_first(entry["abbr"]))
+    parts.append(row["identifier"])
+    return ", ".join(parts)
+
+
+def _coe_number(uri):
+    return uri.rsplit("/", 1)[-1]                 # '…/ext/coe/005' -> '005'
+
+
+def _coe_sort_key(title):
+    return coe.significant_title(title)[1].lower()
+
+
+def _coe_nest(rows):
+    """Group Council-of-Europe rows into top-level instruments each carrying its
+    amending protocols. A protocol whose parent name (parsed from its title)
+    prefix-matches a convention in the corpus nests under it; one that matches
+    nothing (a protocol to a protocol, or a parent outside the corpus) stands as
+    its own top-level entry. Returns (top_level_rows, {parent_number: [protocol
+    rows]}), both ordered for display."""
+    conventions = [r for r in rows if r["kind"] != "protocol"]
+    # longest title first so a protocol's parent name matches the most specific
+    # convention it starts with, not a shorter convention that shares a prefix
+    by_title = sorted(conventions, key=lambda r: -len(r["title"]))
+    children, orphans = {}, []
+    for r in rows:
+        if r["kind"] != "protocol":
+            continue
+        reference = coe.protocol_reference(r["title"])
+        parent = next((c for c in by_title if reference
+                       and reference.lower().startswith(c["title"].lower())), None)
+        if parent:
+            children.setdefault(parent["number"], []).append(r)
+        else:
+            orphans.append(r)
+    for kids in children.values():
+        kids.sort(key=lambda r: (r["date"] or "", r["number"]))
+    top = sorted(conventions + orphans, key=lambda r: _coe_sort_key(r["title"]))
+    return top, children
+
+
+def _coe_entry(row, named, children):
+    pre, key = coe.significant_title(row["title"])
+    name = ('<a href="%s"><span class="pre">%s</span>%s</a> '
+            '<span class="ref">(%s)</span>'
+            % (escape(href(row["uri"])), escape(pre), escape(key or row["title"]),
+               escape(_coe_parenthetical(row, named))))
+    kids = children.get(row["number"], [])
+    inner = ('<ul class="folkratt-protocols">%s</ul>'
+             % "".join(_coe_entry(k, named, children) for k in kids)) if kids else ""
+    return "<li>%s%s</li>" % (name, inner)
+
+
+def _coe_listing(con):
+    """The Council-of-Europe half of the folkrätt page: the central treaties, then
+    every other instrument A-Z, protocols nested. '' when the corpus has none."""
+    rows = [{"uri": uri, "number": _coe_number(uri), "kind": kind,
+             "title": title, "identifier": label, "date": doc_date}
+            for uri, _src, kind, label, title, _url, _path, _display, doc_date
+            in catalog.facet_documents(con, "coe")]
+    if not rows:
+        return ""
+    named = _coe_named()
+    top, children = _coe_nest(rows)
+    groups = []
+    for heading, members in (
+            ("Centrala fördrag", [r for r in top if r["number"] in named]),
+            ("Övriga fördrag", [r for r in top if r["number"] not in named])):
+        if members:
+            groups.append('<h3>%s</h3><ul class="browse-list folkratt-treaties">%s</ul>'
+                          % (heading, "".join(_coe_entry(r, named, children)
+                                              for r in members)))
+    return ('<section class="folkratt-group"><h2>Europarådet</h2>%s</section>'
+            % "".join(groups))
+
+
+def _hudoc_section(con):
+    """The European Court of Human Rights half of the landing: the most-cited reel
+    and a link into the case browse. Doc-type navigation lives in the shared
+    top-level selector, so this no longer repeats the facet links. '' when empty."""
+    if not catalog.document_count(con, "hudoc"):
+        return ""
+    cited = _most_cited(con, "hudoc")
+    reel = ('<h3>Mest hänvisade avgöranden</h3><ol class="ranked">%s</ol>' % cited
+            if cited else "")
+    return ('<section class="folkratt-group"><h2>Europadomstolen</h2>%s'
+            '<p><a href="/folkratt/hudoc/">Bläddra bland avgöranden →</a></p>'
+            '</section>' % reel)
+
+
+# the shared top-level "Dokumenttyp" selector carried by every folkrätt aggregate
+# page (the landing and the hudoc browse leaves), so a reader switches between the
+# instrument families from anywhere. Entries: the Council-of-Europe treaties as
+# one "Fördrag" bucket (protocols nest under their convention, not as a sibling
+# type) plus each HUDOC case type (currently only "Domar"). Data-driven, so a new
+# case type or the later UN/ICJ sources extend it without a code change.
+def _folkratt_axis(con):
+    n = catalog.counts(con)
+    entries = []
+    if n.get("coe"):
+        entries.append(("coe", "Fördrag", "/folkratt/", n["coe"]))
+    if n.get("hudoc"):
+        for b in facets.tree(con, "hudoc")["buckets"]:
+            entries.append(("hudoc:" + b["slug"], b["label"],
+                            _browse_url("hudoc", [b["slug"]]), b["count"]))
+    return entries
+
+
+def _folkratt_nav(entries, active_id):
+    items = "".join(
+        '<li><a href="%s"%s>%s <span class="c">%d</span></a></li>'
+        % (escape(url), ' aria-current="page"' if key == active_id else "",
+           escape(label), count)
+        for key, label, url, count in entries)
+    return ('<nav class="facets"><h2 class="facet-axis">Dokumenttyp</h2>'
+            '<ul class="facet-list">%s</ul></nav>' % items)
+
+
+def render_folkratt(con):
+    body = _coe_listing(con) + _hudoc_section(con)
+    if body:
+        body = _folkratt_nav(_folkratt_axis(con), "coe") + body
+    return page("Folkrätt", "Folkrätt", "",
+                body or '<p class="empty">Inga dokument.</p>',
+                eyebrow="Internationell rätt och mänskliga rättigheter", solo=True)
 
 
 # --------------------------------------------------------------------------
@@ -2788,10 +2981,14 @@ def _facet_links(source, buckets, parent_slugs, active_keys, depth):
 
 def _facet_nav(source, view, active_keys):
     """The navigator: the primary buckets as links, plus -- under the active
-    primary -- its secondary buckets (the year/… within a court/type)."""
+    primary -- its secondary buckets (the year/… within a court/type). A primary
+    axis with a single bucket is not navigable (nothing to choose), so it is
+    omitted -- e.g. HUDOC's lone 'Domar' type, whose selector lives in the shared
+    folkrätt axis above instead."""
     levels, buckets = view["levels"], view["buckets"]
-    parts = ['<h2 class="facet-axis">%s</h2>' % escape(levels[0]),
-             _facet_links(source, buckets, [], active_keys, 0)]
+    parts = (['<h2 class="facet-axis">%s</h2>' % escape(levels[0]),
+              _facet_links(source, buckets, [], active_keys, 0)]
+             if len(buckets) > 1 else [])
     if len(levels) > 1:
         cur = next((b for b in buckets if b["key"] == active_keys[0]), None)
         if cur and cur["children"]:
@@ -2837,9 +3034,10 @@ BROWSE_FILTER_JS = """<script>
 </script>"""
 
 
-def render_facet_page(source, view, nodes):
-    """A single browse bucket page: the navigator + this leaf bucket's document
-    list. `nodes` is the bucket-node path (one per level); the leaf carries its
+def render_facet_page(source, view, nodes, banner=""):
+    """A single browse bucket page: an optional cross-source `banner` (the shared
+    folkrätt selector), the navigator, and this leaf bucket's document list.
+    `nodes` is the bucket-node path (one per level); the leaf carries its
     `documents` (from the API, already ordered and labelled). A statute listing
     also gets a client-side name/year filter over the letter's entries."""
     heading = _bucket_heading(source, view["levels"], nodes)
@@ -2847,9 +3045,9 @@ def render_facet_page(source, view, nodes):
     listing = ('<ul class="browse-list">%s</ul>' % "".join(_browse_item(d) for d in docs)
                if docs else '<p class="empty">Inga dokument.</p>')
     filtered = source == "sfs" and bool(docs)
-    body = ('%s<section class="browse-group"><h1>%s '
+    body = ('%s%s<section class="browse-group"><h1>%s '
             '<span class="c"><span class="browse-shown">%d</span></span></h1>%s%s%s</section>'
-            % (_facet_nav(source, view, [n["key"] for n in nodes]),
+            % (banner, _facet_nav(source, view, [n["key"] for n in nodes]),
                escape(heading), len(docs),
                BROWSE_FILTER if filtered else "", listing,
                BROWSE_FILTER_JS if filtered else ""))
@@ -2866,22 +3064,26 @@ def _write_browse(out_root, source, slugs, html):
                         encodings=compress.PAGE_ENCODINGS)
 
 
-def generate_browse(client, source, out_root):
+def generate_browse(client, source, out_root, folk_axis=None):
     """Write every leaf-bucket page of one source from the API's browse model,
     plus the landing copies: a primary bucket's directory shows its first
     (default) child, and the source root shows the overall default bucket -- so
     /dom/, /dom/nja/ and /dom/nja/2025/ all resolve without a redirect or JS.
     The caller (render_aggregates) already skips the one source the API does
-    not facet (kommentar), so every `source` here is faceted."""
+    not facet (kommentar), so every `source` here is faceted. `folk_axis` (the
+    shared folkrätt selector entries) prepends that selector to each page,
+    marking this source's primary bucket current -- passed only for hudoc."""
     resp = client.get("/api/v1/browse", params={"source": source})
     view = resp.json()
     root_html = None
     for prim in view["buckets"]:
+        banner = (_folkratt_nav(folk_axis, "%s:%s" % (source, prim["slug"]))
+                  if folk_axis else "")
         leaves = [[prim, sec] for sec in prim["children"]] if prim["children"] \
             else [[prim]]
         for i, nodes in enumerate(leaves):
             slugs = [n["slug"] for n in nodes]
-            html = render_facet_page(source, view, nodes)
+            html = render_facet_page(source, view, nodes, banner=banner)
             _write_browse(out_root, source, slugs, html)
             if len(nodes) > 1 and i == 0:        # primary landing = first child
                 _write_browse(out_root, source, slugs[:1], html)
@@ -3107,6 +3309,10 @@ def render_aggregates(con, out_root, catalog_path, write_index=True):
     if write_index:
         compress.write_text(out_root / "index.html", render_index(con),
                             encodings=compress.PAGE_ENCODINGS)
+    folkratt_dir = out_root / "folkratt"
+    folkratt_dir.mkdir(parents=True, exist_ok=True)
+    compress.write_text(folkratt_dir / "index.html", render_folkratt(con),
+                        encodings=compress.PAGE_ENCODINGS)
     search_dir = out_root / "sok"
     search_dir.mkdir(parents=True, exist_ok=True)
     compress.write_text(search_dir / "index.html", render_search_page(),
@@ -3127,11 +3333,18 @@ def render_aggregates(con, out_root, catalog_path, write_index=True):
         compress.write_text(target / "feed" / "index.html",
                             render_feed_page(item, entries),
                             encodings=compress.PAGE_ENCODINGS)
+    folk_axis = _folkratt_axis(con)
     client = _browse_client(catalog_path)
     try:
         for source in catalog.counts(con):
-            if source == "kommentar":      # an annotation layer, not a source
+            # kommentar is an annotation layer, not a browsable source; coe's
+            # instruments are listed in full on the folkrätt landing instead of
+            # a faceted-by-year tree of their own
+            if source in ("kommentar", "coe"):
                 continue
-            generate_browse(client, source, out_root)
+            # hudoc browses under /folkratt/hudoc/ and carries the shared folkrätt
+            # selector; every other source browses on its own
+            generate_browse(client, source, out_root,
+                            folk_axis=folk_axis if source == "hudoc" else None)
     finally:
         api_service.app.dependency_overrides.pop(api_service.get_con, None)

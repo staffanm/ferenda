@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from accommodanda.coe import download, parse
-from accommodanda.lib import catalog, layout
+from accommodanda.lib import catalog, coe, layout, render
 
 FIXTURES = Path(__file__).parent / "files" / "coe"
 
@@ -32,6 +32,35 @@ def test_treaty_records_from_web_service():
     assert protocol["reference"] == "ETS No. 009"
     assert protocol["opening_date"] == "1952-03-20"
     assert protocol["opening_place"] == "Paris"
+
+
+def test_significant_title_splits_off_the_instrument_designation():
+    # the SFS listing convention: a subdued designation prefix, the emphasised
+    # subject it files (and sorts) under
+    assert coe.significant_title(
+        "Convention for the Protection of Human Rights and Fundamental Freedoms") \
+        == ("Convention for the ", "Protection of Human Rights and Fundamental Freedoms")
+    assert coe.significant_title("European Convention on Extradition") \
+        == ("European Convention on ", "Extradition")
+    assert coe.significant_title("Convention on Cybercrime") \
+        == ("Convention on ", "Cybercrime")
+    # no instrument-plus-connector head: only a bare leading "European" is dropped
+    assert coe.significant_title("European Social Charter") \
+        == ("European ", "Social Charter")
+
+
+def test_protocol_reference_names_the_amended_instrument():
+    # the parent name a protocol appends its own qualifiers to (matched by prefix)
+    assert coe.protocol_reference(
+        "Protocol No. 4 to the Convention for the Protection of Human Rights "
+        "and Fundamental Freedoms, securing certain rights and freedoms") \
+        .startswith("Convention for the Protection of Human Rights")
+    assert coe.protocol_reference(
+        "Protocol No. 15 amending the Convention for the Protection of Human "
+        "Rights and Fundamental Freedoms") \
+        .startswith("Convention for the Protection of Human Rights")
+    # a plain convention is not a protocol and references nothing
+    assert coe.protocol_reference("European Convention on Extradition") is None
 
 
 def test_parse_pdf_body():
@@ -133,3 +162,53 @@ def test_coe_layout_and_catalog():
            "doctype": "treaty", "title": "European Convention"}
     row = catalog.coe_document(art, "005.json")
     assert row[1:5] == ("coe", "treaty", "ETS No. 005", "European Convention")
+
+
+def _treaty(number, title, doctype="treaty"):
+    return {"uri": "https://lagen.nu/ext/coe/" + number, "number": number,
+            "identifier": "ETS No. " + number, "doctype": doctype,
+            "title": title, "date": "19%s-01-01" % number[:2], "structure": []}
+
+
+def test_folkratt_lists_coe_alphabetically_with_nested_protocols(tmp_path):
+    # a named central convention (EKMR, in names.json), one of its protocols, and
+    # an unrelated treaty that sorts by its significant title, not the year
+    echr = _treaty("005",
+                   "Convention for the Protection of Human Rights and Fundamental Freedoms")
+    protocol = _treaty("046",
+                       "Protocol No. 4 to the Convention for the Protection of Human "
+                       "Rights and Fundamental Freedoms, securing certain rights",
+                       doctype="protocol")
+    extradition = _treaty("024", "European Convention on Extradition")
+    paths = []
+    for art in (echr, protocol, extradition):
+        p = tmp_path / (art["number"] + ".json")
+        p.write_text(json.dumps(art))
+        paths.append(p)
+    database = str(tmp_path / "catalog.sqlite")
+    catalog.rebuild(database, "coe", paths)
+    con = catalog.connect(database)
+    html = render.render_folkratt(con)
+
+    # the shared top-level Dokumenttyp selector carries a Fördrag bucket (the CoE
+    # treaties), marked current on the landing
+    assert '<h2 class="facet-axis">Dokumenttyp</h2>' in html
+    assert '<a href="/folkratt/" aria-current="page">Fördrag' in html
+    # EKMR is a central treaty (surfaced first); its protocol nests beneath it,
+    # not as a sibling top-level entry
+    assert "Centrala fördrag" in html and "Övriga fördrag" in html
+    assert 'class="folkratt-protocols"' in html
+    assert html.index("Centrala fördrag") < html.index("Övriga fördrag")
+    # the significant title is emphasised, the designation subdued, and the gloss
+    # folds the informal name, acronym and reference into one parenthetical
+    assert '<span class="pre">Convention for the </span>Protection of Human Rights' \
+        in html
+    assert 'class="ref">(Europakonventionen, EKMR, ETS No. 005)</span>' in html
+    # links resolve to the treaty's own page address, not a /folkratt/ path
+    assert 'href="/coe/005"' in html
+    # the nested protocol shows its full title and its own reference
+    assert "Protocol No. 4 to the Convention" in html
+    assert 'class="ref">(ETS No. 046)</span>' in html
+    # Extradition (name 'E') sits under Övriga, after the nested protocol block
+    assert "Extradition" in html
+    assert html.index("Protocol No. 4") < html.index("Extradition")
