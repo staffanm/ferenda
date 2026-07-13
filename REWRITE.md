@@ -6,6 +6,53 @@ that wrapped it. Living document; update status markers as work lands.
 
 Legend: ✅ done · 🚧 in progress · ⬜ not started · 💤 deliberately deferred
 
+Corpus counts in this document are dated measurements from the run described,
+not a promise about whichever development or production data tree is currently
+mounted. Implementation status means the source can be built through the normal
+driver; materializing and refreshing a particular deployment is an operations
+task, tracked separately from parser/library completion.
+
+---
+
+## Rewrite closure checklist
+
+This is the finite backlog for declaring the rewrite complete. Detailed
+sections below explain each item and retain the historical measurements.
+
+- ✅ **Golden baseline and triage:** full SFS and DV corpus measurements,
+  conservative temporal adjudication, normative DV structure fixtures and
+  representative legacy-skeleton sampling are complete. Credible sampled
+  parser regressions are fixed and fixture-locked. The intentionally unaccepted
+  tail is bounded: SFS special-law/bilaga and amendment-register improvements,
+  plus 15 DV date conflicts for which neither date survives in the published
+  body (§3d, §4).
+- ⬜ **DV coverage and published identity:** ingest the recoverable NJA
+  notisfall and restore the verified legacy verdict URI grammar for non-referat
+  cases (§4, §6).
+- ⬜ **Förarbete correctness tail:** fetch lr/SÖ bodies; handle printed-page
+  offsets, general/continued tables and the remaining legacy DOC/DOCX bodies;
+  unify the two författningskommentar bounds and repair the known truncated law
+  headings (§7a, §7d, §7g).
+- ⬜ **Derived legal relations:** extract/publish föreskrift `ändrar` and publish
+  its `upphäver`/`genomför` metadata as typed graph edges (§7e).
+- ⬜ **Source validation tail:** establish a representative EUR-Lex metadata
+  cross-check; compare a complete live JO harvest with the frozen corpus, add
+  JO `official_report` and remove ARN masthead noise (§7d, §7f).
+- ⬜ **Frozen-corpus tail:** decide/model the skipped SOSFS consolidations and
+  add a chronology sanity check for OCR-garbled citations (§7g).
+- ✅ **SFS omitted graphics:** the graphics/formulas/maps/road-signs the
+  text-only SFST source omits are detected, vision-localized to the
+  provenance-correct published PDF, cropped and rendered (§3d).
+- ⬜ **Corpus acceptance run (operations):** materialize the authoritative
+  source trees, then complete parse → relate → index → dump → generate with no
+  unexplained failures. Counts are recorded per run, not hard-coded as code
+  completion criteria.
+
+Explicitly outside closure scope: new source families; PBR; WordPerfect bodies;
+greenfield citation grammars with no active caller; optional wiki taxonomy and
+reading-column commentary presentation. They remain possible product work, not
+unfinished replacement infrastructure.
+
 ---
 
 ## 1. Why, and the shape of the replacement
@@ -26,34 +73,36 @@ Guiding decisions (settled over the course of this work):
   shared code; shared code never calls back into a source.
 - **The parsed artifact on disk is the source of truth** for *all*
   extracted semantics — structure, metadata, and links are one artifact,
-  not separate concerns. SQLite/Elasticsearch are derived and rebuildable.
-- **Machine-readable publishing survives, but not necessarily as RDF.**
-  Plan: REST/OpenAPI + bulk dumps + an MCP server; no GraphQL. Retire
-  Fuseki; keep Elasticsearch.
+  not separate concerns. SQLite/OpenSearch are derived and rebuildable.
+- **Machine-readable publishing survives without RDF as the primary surface.**
+  REST/OpenAPI + raw-artifact NDJSON dumps + an MCP server are implemented; no
+  GraphQL. Fuseki is retired and OpenSearch replaces Elasticsearch.
 - **The internal model is ours** — typed dataclasses with Swedish domain
   vocabulary, not tied to the dead rpubl/rinfoex vocabularies. Any
   Akoma Ntoso / RDF mapping is a downstream *projection*, not the model.
-- **Native artifact format:** JSON with a JSON-LD context is the
-  recommendation; final syntax decision still open.
+- **Native artifact format:** source-owned typed JSON, without a universal
+  envelope or JSON-LD context. The raw artifact is also the bulk-dump record;
+  RDF/Akoma Ntoso can be added later as downstream projections if a consumer
+  requires them.
 - **Split the codebase, not the repo:** data pipeline vs consuming apps
   (web is just one consumer), divided at the artifact boundary, same repo.
 
 ### Target architecture (three layers)
 
-1. **Vertical source pipelines** — `sources/sfs/`, `sources/dv/`,
-   `sources/prop/`, … Each owns its full chain (fetch → extract → parse →
-   typed model → artifact) and its *own* document model. No universal
+1. **Vertical source pipelines** — `accommodanda/sfs/`, `accommodanda/dv/`,
+   `accommodanda/forarbete/`, … Each owns its full chain (fetch → extract →
+   parse → typed model → artifact) and its *own* document model. No universal
    `Document` base class; share conventions as small libraries, not
    inheritance. Each exposes only its artifacts plus a tiny orchestrator
    protocol (`download()`, `parse(basefile)`, `list_basefiles()`).
 2. **Horizontal libraries** — genuinely cross-source machinery: the
-   citation engine (lagrum/förarbete/rättsfall recognition), identity/URI
-   minting, the artifact envelope, fetch utilities, the make-like
-   incremental build driver (a good idea from the old code — keep it, as a
-   dumb orchestrator over file freshness, not as methods on a class), and
-   the golden-corpus validation harness.
+   citation engine (lagrum/förarbete/rättsfall recognition), the small pieces
+   of identity/URI grammar genuinely shared by multiple consumers, fetch
+   utilities, the make-like incremental build driver (a good idea from the old
+   code — keep it, as a dumb orchestrator over file freshness, not as methods
+   on a class), and the golden-corpus validation harness.
 3. **Corpus-wide derived layer** — the reborn `relate` phase. Reads
-   published artifacts across all sources into the SQLite catalog + ES;
+   published artifacts across all sources into the SQLite catalog + OpenSearch;
    computes the inbound-link graph (case law annotated onto statute
    paragraphs, förarbeten linked from the paragraphs they comment on —
    lagen.nu's killer feature). Depends only on artifacts, never on source
@@ -235,6 +284,46 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
   same intermediates, so all register/amendment/metadata parsing is reused
   untouched. 2018:585 from JSON vs HTML = **0 field diffs** (only genuine freshness
   deltas).
+- ✅ **Omitted graphics — detected, localized and rendered.** The consolidated
+  SFST source drops graphics, formulas, maps, symbols and some tables.
+  Detection is deterministic: `sfs/graphics.py` turns both slash-delimited and
+  plain `... är inte med här` placeholders into typed `grafik` nodes during the `nf.py` projection
+  (a projection-time overlay, like reference links — no model dataclass),
+  preserving `sort` and the governing amendment (`satt_av`), and also
+  recognizes the otherwise unmarked road-sign designator cells in 2007:90.
+  `sfs/pdfmirror.py`, exposed as `lagen sfs mirror-pdf [<sfs> ...] [--full]`,
+  mirrors the official PDFs under `downloaded/sfs/pdf/`: derivable rkrattsdb
+  URLs for 1998–2017, a new-site→printed-series fallback across the April 2018
+  boundary, and links resolved through svenskforfattningssamling.se document
+  pages thereafter; fetched bodies are PDF-signature checked. Pre-1998 PDFs are unavailable through these
+  sources. Localization is the opt-in, nondeterministic vision half:
+  `lagen sfs ai-includegraphics <basefile> [...]` (mirror-pdf must have run
+  first) resolves each gap's *provenance* — the amending SFS that last set
+  that wording, deterministically (register-first for bilaga gaps, so
+  2004:629's two independently-amended map appendices resolve to different
+  source PDFs; changenote-then-base otherwise) — then asks the vision model
+  (`VISION_MODEL`, `lib/llm.py`'s `images=`/`vision_content` support) to
+  locate each gap's page + bbox in that PDF (`collect_gaps`, `provenance_sfs`,
+  `localize_group`). The validator bounds every page/bbox to the images shown
+  and refuses a partial final result. Each artifact node has a stable semantic
+  `key` (hash of structural path + kind/code + normalized anchor + occurrence
+  within its container); the `.graphics` layer is keyed by it and stores the
+  unhashed identity beside the crop. Temporal aliases share a key, while a
+  changed identity cannot inherit an old verified crop. The pass writes the
+  resulting layer in the curated store
+  (`lib/annstore.py`) — a peer of `.ann`/`.corr`, with per-entry `"verified":
+  true` surviving a rerun so a reviewer can sign off graphics one at a time
+  (2007:90's hundreds of signs) without losing prior sign-offs. The layer
+  stores raw PDF points (top-left origin) and is hand-editable; generated,
+  unverified candidates stay out of the public render. `lib/facsimile.py`
+  crops the bbox (`render_region`/`cached_region`); `GET
+  /api/v1/sfs-graphic?uri=&node=` serves the crop lazily, resolving the
+  provenance-correct PDF from the `.graphics` layer; the renderer's `grafik`
+  node emits a `<figure>`/`<img>` crop with source-SFS attribution when the
+  layer has placed it, else an honest placeholder. `golden_sfs.py`'s
+  `grafik-node-replaces-marker` adjudication family accepts the new grafik
+  nodes as new-is-right against the old pipeline's dropped-graphics golden.
+  `test/test_sfs_graphics.py`, `test/test_sfs_pdfmirror.py`.
 - ✅ **Version history / time travel / diff** (`sfs/versions.py`, `lib/diff.py`,
   the `versions` Stage) — the old archive machinery's user-facing features,
   rebuilt over artifacts. The `versions` stage parses every archived
@@ -480,13 +569,14 @@ below is not optional polish, it's the only way they enter the corpus.
     empty API-wide (not a parser bug) and absent from legacy too. So the
     architecture is **single-best-source per canonical case** (API when
     present, POI-legacy otherwise), not a merge.
-  - 🚧 **Notisfall — deferred.** 852 sole-source cases (6 from the 1990s,
+  - ⬜ **Notisfall coverage.** 852 sole-source cases (6 from the 1990s,
     504 from the 2000s, 304 from the 2010s, 38 from the 2020s) whose
     individual originals are zero-byte. 851/852 have the frozen `<body>`
     intermediate; the recent `notiser_*.zip` carries multi-notis `.docx`
     (`HDO_2017_notis_007-016.docx`) POI-able for ~342 but needing
     per-notis splitting + canonical-ID matching (the old `parse_not`
     lineage). Pre-2010 majority has only the frozen intermediate regardless.
+    This is a bounded import/parser task, not a missing DV architecture seam.
   - ✅ **Citation extraction from body text** — KORTLAGRUM ported
     (`AbbrevLawNormalRef` "3 § MBL"/"MBL 3 §", `AbbrevLawShortRef`
     "JB 22:2"), law-abbrev terminal built from the 110 `dcterms:alternative`
@@ -659,12 +749,13 @@ below is not optional polish, it's the only way they enter the corpus.
 
 ---
 
-## 5. Horizontal libraries (extract after DV) ⬜
+## 5. Horizontal libraries (extracted after DV) ✅
 
-- 🚧 Promote `accommodanda/lib/lagrum.py` → a `citations/` package,
-  parameterized by grammar set (LAGRUM/KORTLAGRUM/FORARBETEN/RATTSFALL/…),
-  context provider, and pre-filter — keeping the old
-  `LegalRef(*parse_types)` configurability, which was a good idea.
+- ✅ **Configurable citation engine.** `accommodanda/lib/lagrum.py` remains one
+  module: the planned `citations/` package split offered no capability or
+  boundary improvement, so it is not a rewrite requirement. The useful part
+  of the plan — parameterization by grammar set, context and pre-filter — is
+  implemented while keeping the old `LegalRef(*parse_types)` configurability.
   - ✅ **Parse-type configurability built.** `LagrumParser(parse_types=…)`
     composes the grammar, `?ref` root alternatives and trigger regex from
     only the requested types (`ROOTS`/`RULES`/`TRIGGER_SRC` tables +
@@ -685,10 +776,16 @@ below is not optional polish, it's the only way they enter the corpus.
     ebnf branch): FORESKRIFTER, INTLLAGSTIFTNING, INTLRATTSFALL,
     DOMSTOLSAVGORANDEN — "porting" these means greenfield grammar design,
     deferred (user decision).
-- ⬜ Identity / URI minting library (with the court-code and
-  referat-series canonicalization the old `canonicalize_uri` did).
-- ⬜ Artifact envelope + JSON-LD context.
-- 🚧 Incremental build driver (make-like freshness orchestration) —
+- ✅ **Identity / URI minting at the right seams.** There is deliberately no
+  universal identity library: identity belongs to each source model. Pieces
+  read by several consumers live in `lib.casenaming`, `lib.eucasenaming`,
+  `lib.layout`, `lib.coe` and the citation formatter, so documents and
+  citations mint the same published identifiers without a universal model.
+- ✅ **Artifact contract settled:** source-owned typed JSON, no universal
+  envelope and no JSON-LD context (see §1). Shared consumers operate on the
+  small artifact conventions they actually need; dumps preserve each raw
+  artifact as one NDJSON record.
+- ✅ **Incremental build driver (make-like freshness orchestration)** —
   `accommodanda/build.py`, the `lagen <source> <action> [basefile...]` CLI.
   Source-first verbs; sources register per-document `Stage`s, so the driver
   knows nothing source-specific — uniformity lives in the driver + a tiny
@@ -729,7 +826,10 @@ below is not optional polish, it's the only way they enter the corpus.
     earlier "per-doc upsert" plan was revised once it was clear generate's
     prerequisite set is data-dependent (the inbound set), not a static
     per-basefile input list.
-- ⬜ Generic golden-corpus comparator (factor out of `golden_sfs.py`).
+- ✅ **Golden comparison seam is shared at the useful level.** Normalization is
+  source-specific; the common ordered-node differ (`golden_sfs.diff_nodelists`)
+  is reused by the DV structural golden. A universal comparator would only
+  hide the different oracle contracts and is not a rewrite requirement.
 - ✅ **Shared harvest core extracted** (`accommodanda/lib/harvest.py`, 2026-07-06).
   The incremental-harvest loop independently reimplemented in four verticals
   (dv, forarbete, `forarbete/riksdagen.py`, `foreskrift/harvest.py`, avg/jo) —
@@ -750,7 +850,7 @@ below is not optional polish, it's the only way they enter the corpus.
   call site — dv: 365-day safety window (annual cadence, coarse dates);
   forarbete/riksdagen/foreskrift/avg-jo: 14 days / 20 items.
 
-## 6. Derived layer + publishing 🚧
+## 6. Derived layer + publishing ✅
 
 The reborn `relate` + `generate` phases. Corpus-wide verbs in `build.py`'s
 CLI, special-cased outside the per-document `Stage` machinery — not because
@@ -895,7 +995,7 @@ to a future per-doc incremental generate.
   `BrowseDoc`, and each statute page gets a client-side name/year filter over the
   letter's entries (`render.BROWSE_FILTER`). `test/test_facets.py`,
   `test/test_api.py`.
-- 🚧 **Publishing layer — search, REST/OpenAPI, bulk dumps** (replaces the
+- ✅ **Publishing layer — search, REST/OpenAPI, bulk dumps** (replaces the
   retired Fuseki/RDF publishing). All three are **derived & rebuildable** from
   artifacts + catalog, never a source of truth, and slot in as **corpus-wide
   verbs** in `build.py` next to `relate`/`generate`/`serve`. Decided with the
@@ -1115,9 +1215,10 @@ them resolve.
     Stores per doc:
     `<slug>.json` record + landing `<slug>.html` + content PDF(s) under
     `site/data/downloaded/forarbete/<type>/`. `test/test_forarbete_download.py`.
-  - ⬜ **Older-period sources** (riksdagen data API, KB scans) — regeringen.se
-    only reaches back ~1990s; the same-identifier basefile means these slot in
-    as alternate sources later (the old pipeline's CompositeRepository idea).
+  - ✅ **Older-period sources imported from the frozen corpora** —
+    propriksdagen, KB and the regeringen-era gap-fill trees use the same
+    identifier-keyed records and precedence machinery; see §7g. A live
+    replacement can claim the same basefiles later without changing identity.
   - ⬜ **lr/SÖ content links** — these expose an extensionless
     `/contentassets/<hash>/<slug>/` (HTML-rendered), not a `.pdf`; landing HTML
     is captured but no file pulled yet.
@@ -1186,7 +1287,7 @@ them resolve.
   mines for commit authorship and message body — reading a förarbete artifact
   stays förarbete's job, composed in by `build.py` like `ai-correspond`.
   `test/test_forarbete_parse.py`.
-- ⬜ Older-period sources (riksdagen/KB), lr/SÖ content, page-number offset for
+- ⬜ lr/SÖ content, page-number offset for
   docs whose front matter shifts the printed sequence; general (non-lydelse)
   tables — the budget prop's statistics tables still flatten to stycken; a
   lydelse table continuing onto a page that does not repeat its header.
@@ -1315,9 +1416,14 @@ inbound → render pipeline as the machine-extracted sources.
     the paren starting with a preposition, so the `dödas (dödning)` coinage still
     works). A term never leads with a preposition or contains `*`/`/`; `RE_CONCEPT`
     is now just a thin backstop. `test/test_sfs_begrepp.py`.
-- ⬜ **Next**: defined-in-commentary resolution; embed commentary prose *inline*
-  at the paragraph (not only the margin link); topic taxonomy (`Lagar inom …`);
-  the authoring layer (Git-backed prose editor committing markdown via PRs).
+- ✅ **Authoring layer:** the authenticated inline editor writes the git-backed
+  kommentar/begrepp/site markdown through a per-user edit cart, commits with
+  editor attribution and runs a scoped rebuild (§6).
+- 💤 **Product follow-ups (not rewrite blockers):** defined-in-commentary
+  resolution; optionally embed
+  commentary prose in the reading column rather than only the context rail;
+  topic taxonomy (`Lagar inom …`). These are value-add/product work, not
+  missing rewrite infrastructure.
 
 ### 7d. EU vertical (EUR-Lex / CELLAR) ✅ (first cut)
 
@@ -1361,14 +1467,14 @@ law, keyed by **CELEX** (the basefile throughout).
   `model.doctype`, filtered *before* the watermark so excluded acts don't advance
   it).
 - ✅ **Parser** — `accommodanda/eurlex/{model,parse,parse_html,parse_pdf,lang}.py`.
-  Flat `Block` model (parts/titles/chapters/articles/paragraphs/points + recitals
-  + judgment paragraphs/ruling flattened to an ordered, anchor-bearing list, like
-  DV/forarbete — not a tree). Three format-precedence routes to the **same
-  artifact shape**:
+  The parsers first produce ordered anchor-bearing `Block`s (parts/titles/
+  chapters/articles/paragraphs/points + recitals + judgment paragraphs/ruling),
+  then `eurlex/structure.py` materializes their containment hierarchy. Three
+  format-precedence routes produce the **same artifact shape**:
   - `parse.py` — **Formex** (the richest manifestation), roots `ACT`
-    (regs/dirs/decisions/treaties) + `JUDGMENT` (CJEU). Inline markup flattened,
-    footnote NOTEs dropped. A `.fmx4.zip` bundles annexes as separate files — the
-    main act (lowest sequence) parses, annexes noted (⬜ parsing them).
+    (regs/dirs/decisions/treaties) + `JUDGMENT` (CJEU). Inline markup is
+    flattened; footnotes become `note` blocks. A `.fmx4.zip` bundles annexes as
+    separate files; they are embedded after the main act (lowest sequence).
   - `parse_html.py` — **OJ HTML/XHTML** for the many older docs with no Formex;
     the stable OJ CSS classes (`ti-art`, `sti-art`, `normal`, `note`, …) map onto
     the same Block kinds. Pre-OJ loose `<txt_te>` HTML falls back to
@@ -1500,7 +1606,10 @@ law, keyed by **CELEX** (the basefile throughout).
   (`test/test_forarbete_fk.py`, `test/test_site.py`). Known limitation: a
   law-level comment spanning several chapters ("De ändringar … i lagen" over
   1 kap. + 2 kap. quotes) anchors only its own chapter's run.
-- ⬜ **Remaining:** annex parsing; a metadata/golden cross-check (no EU oracle
+- ✅ **Formex annex parsing:** multi-file manifestations embed each annex after
+  the main act, with stable `bilaga-N` anchors; headings, paragraphs, lists and
+  tables are retained and tested in `test/test_eurlex_parse.py`.
+- ⬜ **Remaining:** a representative metadata/golden cross-check (no EU oracle
   yet); the ~8 truncated `"lag om ändring i"` rubriks the flattened PDF cut off
   (no SFS number to resolve); and consolidating `kommentar.extract`'s FK
   bounding onto `fk.fk_span` — it still uses the level-1-rubrik-bounded
@@ -1657,8 +1766,11 @@ are not yet citation *targets*; the inbound value comes from the edges above.
   manifest) were removed; every source now parses only through its driver `parse` Stage. The
   parse modules keep their library API (`parse_record`/`to_artifact`/… that `build.py` imports).
   (The legacy DV Word path, `dv/legacy.py`, keeps its CLI — it has no driver stage yet.)
-- ⬜ **Next:** the OpenSearch `index` pass for föreskrift (paragraf-precise search), and the
-  intra-fs `upphäver`/`ändrar` + `genomför` edges (same mechanism as bemyndigande).
+- ✅ **OpenSearch indexing** is source-generic and already indexes föreskrift
+  artifacts, including their id-bearing paragrafer.
+- ⬜ **Remaining:** publish the already-extracted `upphäver` and `genomför`
+  metadata as typed edges, extract/publish `ändrar`, and validate all three
+  through the same catalog/render mechanism as `bemyndigande`.
 
 ### 7f. avg vertical — JO + JK + ARN myndighetsavgöranden ✅ (first cut)
 
@@ -1739,12 +1851,14 @@ now have internal targets.
     (Organ → År; `_avg_year` keys ARN on the organ — its year-*first* dnr
     collides with JO's year-last shape), "ARN-beslut" page label,
     `test_uri_matches_citation_grammar` extended to arn.
-- ⬜ **Remaining:** full JO/JK harvests + relate at corpus scale; the legacy
-  JO corpus comparison (old lagen.nu carried JO decisions the redesigned
-  jo.se may have pruned — compare once a full harvest lands); JO
+- ⬜ **Remaining implementation/validation:** compare a complete live JO
+  harvest with the legacy corpus (old lagen.nu carried JO decisions the
+  redesigned jo.se may have pruned) and import any genuine omissions; add JO
   ämbetsberättelse citation (`official_report`) as metadata; an ARN masthead
   noise filter (the live PDFs' margin header line + repeated bold summary
-  currently surface as leading blocks).
+  currently surface as leading blocks). Running the full JO/JK harvest and
+  relate is deployment materialization, not implementation status (note above
+  §1).
 
 ### 7g. Frozen legacy corpora — import, don't port ✅ (first cut; plan 2026-07-01, landed 2026-07-02)
 
@@ -1903,11 +2017,13 @@ verdict** (user-adjudicated): the PDFs' embedded text layer is ABBYY
 Recognition Server output and reads well across decades — it is used as-is;
 no bulk re-OCR (the `forarbete/ocr/` sidecar seam remains for targeted
 upgrades), and the old pipeline's 36 GB of Tesseract-3 `intermediate/*.hocr*`
-can be dropped. Remaining ⬜: `.doc/.docx/.wpd`-only proptrips bodies (a
+can be dropped. Remaining ⬜: `.doc/.docx`-only proptrips bodies (reuse the
 POI/soffice route), the SOSFS `konsolidering/` texts, OCR-garbled citations
 in scan-era docs (e.g. an impossible 1992 SFS link in a 1971 prop — a
 future "no citations newer than the document" sanity pass), relate/generate
-at the new corpus scale, and PBR (archived, not imported — per plan).
+at the new corpus scale. 💤 `.wpd` is deliberately dropped rather than adding
+a WordPerfect converter; PBR is archived, not imported, and outside the rewrite
+scope.
 
 *Progress (2026-07-03):* the corpus-independent core each vertical had grown its
 own copy of (`should_write` precedence, `rel` in-place LEGACY_ROOT-relative
@@ -2092,11 +2208,14 @@ Wired through `build.py`, `layout`, catalog, facets, search/dump and static
 rendering; `test/test_{hudoc,coe}.py` includes an end-to-end catalog assertion
 that a HUDOC Article 8 edge appears inbound on ETS 005 `#A8`.
 
-### 7b. Remaining verticals ⬜
+### 7b. Vertical scope closed ✅
 
-The rest of `/mnt/data/lagen/data/{…}`. Each built the same way; the horizontal
-layer should by now be stable enough that new sources are mostly grammar +
-model + extraction.
+The original lagen.nu source families are covered by SFS, DV, förarbete,
+föreskrift, avg, wiki and site; the rewrite also adds EUR-Lex, HUDOC, CoE and
+remisser. PBR is deliberately archived rather than imported (§7g). There is no
+unnamed “rest of `/mnt/data/lagen/data/`” completion requirement: a future new
+source is ordinary product expansion, built as its own vertical, not unfinished
+rewrite work.
 
 ---
 
@@ -2107,7 +2226,7 @@ model + extraction.
 | `tools/golden_sfs.py` | golden-corpus comparator (`normalize` parsed XHTML → NF on the fly) |
 | `../ferenda.old/data/sfs/parsed/` | the golden = old-pipeline parsed XHTML (11,056 docs), normalized per comparison — sibling checkout, not `site/data/` |
 | `accommodanda/lib/` | **shared** horizontal libs: `lagrum` (citation engine), `util`, `errors` (`SkipDocument`), `harvest` (shared incremental-download core — `HarvestWatermark`, `walk`), `casenaming`/`eucasenaming` (DV/EU case identity + display naming), `facsimile` (on-demand source-PDF page → retina PNG, disk-cached; `/api/v1/facsimile` + the legacy `/prop/2022/23:10/sid1.png` grammar) |
-| `accommodanda/sfs/` | **acts vertical**: `{extract,reader,model,tokenizer,assembler,nf}` parser + `register` (SFSR→amendments/förarbeten/metadata) + `asgit` (`history-as-git` — the corpus as a git repo, one commit per amendment event, `docs/prd-sfs-history-as-git.md`) + `__main__` (validate CLI) |
+| `accommodanda/sfs/` | **acts vertical**: `{extract,reader,model,tokenizer,assembler,nf}` parser + `register` (SFSR→amendments/förarbeten/metadata) + `graphics` (typed omitted-content detection *and* vision-localization — `collect_gaps`/`provenance_sfs`/`localize_group`) + `pdfmirror` (`mirror-pdf`, official-PDF mirror, the crop source) + `asgit` (`history-as-git` — the corpus as a git repo, one commit per amendment event, `docs/prd-sfs-history-as-git.md`) + `__main__` (diagnostic parse/validate CLI; `mirror-pdf`/`ai-includegraphics` are `build.py` actions, not here) |
 | `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `structure`, `word`, `legacy`, `namedcases` (HD named-precedent harvester); canonical case title + HD given names live in `lib/casenaming.py` (shared with the catalog + renderer) |
 | `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, 8 types + `pm`, promemorior outside the Ds series), `model`/`structure`/`parse` (PDF/html→nested structure→artifact; `parse.tag_frontmatter` retags the prop/skr överlämnande page — ingress heading, `signatur` signer blocks), `legacy` (one-time import of the nine frozen förarbete corpora, §7g), `legacy_formats` (frozen body adapters — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML, scanned-PDF OCR text, TRIPS `div.body-text`), `riksdagen` (doctype-agnostic dokumentlista harvest engine, driven for `bet`/utskottsbetänkanden off data.riksdagen.se, no frozen corpus), `rskr` (second driver over `riksdagen.py`'s engine, for riksdagsskrivelser — HTML body, no PDF), `kommentar` (författningskommentar → EU-directive *genomför* edges, prop + fm), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf), `fk` (per-paragraf FK commentary text → `kommentarer` artifact section → `fk_kommentar` catalog layer → statute-rail "Författningskommentar"), `lydelse` (two-column nuvarande/föreslagen lydelse tables reconstructed from per-run coordinates → `tabell` blocks in the SFS `rad`/`cells` shape) |
 | `accommodanda/eurlex/` | **EU vertical (EUR-Lex/CELLAR)**: `download` (SPARQL discovery), `bulk` (dump import), `parse`/`parse_html`/`parse_pdf` (Formex/HTML/PDF → one artifact shape), `definitions` (defined-terms extraction + in-act interlinking), `lang`, `model`, `casenames` (harvest CELEX → usual name for named EU cases from Wikidata into `data/casenames.json`, read by `lib/eucasenaming.py`) |
@@ -2116,7 +2235,7 @@ model + extraction.
 | `accommodanda/avg/` | **JO/JK/ARN-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages, `jk_canonical` dnr normalization; ARN one-page vägledande-beslut listing), `legacy` (one-time import of the frozen ARN corpus 1991–2022, §7g), `parse` (JO/ARN PDF via `lib/pdftext`, JK landing HTML; DV parse-type citation scan) |
 | `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (per-agency enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct} wired onto `lib/harvest.walk`; `Skip`/`guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 17 agencies live + 4 frozen-only), `download`, `legacy` (one-time import of the two harvest-blocked corpora, §7g), `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors). Corpus: 1218 regs harvested, parsed 0-fail |
 | `accommodanda/remisser/` | **remiss (referral-response) vertical**: `model` (`Remiss`/`Remissinstans`/`Remissvar`, `org_slug`), `download` (regeringen.se `/remisser/` two-pass sync + `sync_one`/`--only`, stub records for any per-case fetch/parse failure), `parse` (answer PDF → `Remissvar` via `lib/pdftext` with no fixed header), `ai_analyze` (the sole LLM pass — sentiment+quote per section, `.ann` layer in the curated store, `lib/annstore.py`). Never `relate`d/published; its `.ann` layer feeds the referred förarbete's rail via `render._remiss_indexes` |
-| `accommodanda/lib/annstore.py` | the curated store for every `ai-*` action's output (eurlex/kommentar `.ann`, sfs `.corr` — the latter also written mechanically by `lagen sfs table-correspond` from a prop's own jämförelsetabell bilagor (`forarbete/jamforelse.py`) and by `lagen sfs renumber-correspond` from the register's "betecknas" omfattning clauses (same-law renumbering, RF 2010:1408)) — `WIKI_ROOT/ann/<source-dir>/<relpath>`, mirroring the artifact tree's relpath grammar; envelope (`meta`: status generated/verified, model, date, input sha256 hashes), `guard`/`drifted` gate regeneration and derive staleness; inventoried by `lagen ann status` |
+| `accommodanda/lib/annstore.py` | the curated store for every `ai-*` action's output (eurlex/kommentar `.ann`, sfs `.corr` — the latter also written mechanically by `lagen sfs table-correspond` from a prop's own jämförelsetabell bilagor (`forarbete/jamforelse.py`) and by `lagen sfs renumber-correspond` from the register's "betecknas" omfattning clauses (same-law renumbering, RF 2010:1408) — and sfs `.graphics`, `lagen sfs ai-includegraphics`'s vision-localized graphic crops) — `WIKI_ROOT/ann/<source-dir>/<relpath>`, mirroring the artifact tree's relpath grammar; envelope (`meta`: status generated/verified, model, date, input sha256 hashes, optional `meta_extra` fields like `.graphics`'s `through` provenance horizon), `guard`/`drifted` gate regeneration and derive staleness; per-entry `"verified": true` curation on a `.graphics` gap is preserved only while both resolved source and stored semantic identity still match, so renumbered/transformed gaps cannot inherit a crop by positional id; `write` itself stays blunt; inventoried by `lagen ann status` |
 | `accommodanda/lib/regeringen.py` | shared regeringen.se harvest knowledge (rule:second-use-goes-to-lib): the doctype table (`TYPES`) and `ul.list--block` listing walk (`listing_items`), used by both `forarbete/download.py` and `remisser/download.py` |
 | `accommodanda/site/` | **editorial-chrome vertical**: `model` (block-tree dataclasses + `Frontpage`/`AboutPage`/`Sitenews`), `parse` (markdown → artifact for `frontpage`/`om/<slug>`/`sitenews`), `render` (artifacts → HTML + Atom, `write_site`). Content is markdown in `lagen-wiki/site/`, migrated once by `tools/migrate_site_content.py`. Never `relate`d/indexed/dumped (absent from `ARTIFACTS`, like remisser); rendered during `generate` |
 | `accommodanda/lib/pdftext.py` | **shared font-aware PDF extraction** (förarbete + föreskrift + avg (JO/ARN) + remisser): `pdf_pages` (`pdftohtml -xml` → bold/italic-tagged `Line`s) → `page_paragraphs` (reflow, strip running header/page-no/TOC — `identifier=None` skips header-stripping for sources with no fixed masthead, e.g. remisser) → the vertical's own `classify` |
@@ -2139,7 +2258,7 @@ model + extraction.
 | `accommodanda/build.py` | orchestrator: `lagen <source> <action>` build driver + freshness; corpus verbs `relate`/`generate`/`index`/`dump`/`serve` (one process serving the static site + REST API + MCP) |
 | `accommodanda/lib/catalog.py` | derived SQLite catalog + cross-source citation graph (`relate`) |
 | `accommodanda/lib/render.py` | static HTML site w/ inbound annotations + live ⌘K search (`generate`) |
-| `accommodanda/lib/assets/` | the browser-facing static chrome as real files (`style.css`, `editor.css`, `dom.js` — shared `window.lagenDom` vocabulary: own-document anchor resolution across split-view panes, id-attribute selector, landing flash, JSON-island parse — `scrollspy.js`, `search.js`, `popover.js`, `fullsearch.js`, `versions.js`, `faksimil.js`, `drawers.js` — the mobile bottom toolbar's TOC drawer / context-rail bottom sheet — `editor.js`, `robots.txt`) — `render_aggregates` ships them via the same Brotli precompression as pages, `style.css` with `editor.css` appended |
+| `accommodanda/lib/assets/` | the browser-facing static chrome as real files (`style.css`, `editor.css`, `dom.js` — shared `window.lagenDom` vocabulary: own-document anchor resolution across split-view panes, id-attribute selector, landing flash, JSON-island parse — `scrollspy.js`, `search.js`, `popover.js`, `fullsearch.js`, `versions.js`, `faksimil.js`, `drawers.js` — the mobile bottom toolbar's TOC drawer / context-rail bottom sheet — `editor.js`, `robots.txt`) — `render.write_assets` ships them via the same Brotli precompression as pages: the JS is concatenated in load order into one `script.js` bundle (the page links a single URL, so a new module publishes via `generate --assets-only` instead of forcing a full regenerate), `style.css` with `editor.css` appended |
 | `accommodanda/lib/text.py` | shared artifact text flattener (node/document/fragment plain text) |
 | `accommodanda/lib/search.py` | OpenSearch full-text indexer (standalone units collapsed by `doc_uri`, no parent-child join), `index` |
 | `accommodanda/lib/feeds.py` | legacy dataset-alias map + pure Atom/HTML feed renderer, shared by static `/dataset/<alias>/feed` generation and the live query-param endpoints |
@@ -2151,6 +2270,7 @@ model + extraction.
 | `site/data/generated/` | generated static site (`index.html`, `sfs/`, `dom/`) |
 | `test/test_site.py` | derived-layer suite |
 | `site/data/downloaded/sfs/sfsr/` | downloaded SFSR register pages (11,231) |
+| `site/data/downloaded/sfs/pdf/` | official published-SFS PDF mirror (1998 onward), keyed by SFS number; the crop source for the `.graphics` layer and `/api/v1/sfs-graphic` |
 | `site/data/.build/manifest.json` | build freshness state (input + recipe hashes) |
 | `site/data/artifact/{sfs,dom}/` | persisted parse artifacts (the source of truth) |
 | `python -m accommodanda.sfs` | `parse` / `validate` / `refs` diagnostic CLI |
@@ -2161,6 +2281,7 @@ model + extraction.
 | `test/test_sfs_register.py` | SFSR register/amendments/förarbeten/metadata suite |
 | `accommodanda/sfs/download.py` | SFS harvester (beta raw-ES) + consolidation archiving |
 | `test/test_sfs_download.py` | SFS downloader version/archiving suite |
+| `test/test_sfs_graphics.py`, `test/test_sfs_pdfmirror.py` | SFS typed graphic-gap detection + vision-localization + official-PDF URL/worklist mirror suite |
 | `accommodanda/sfs/asgit.py` | `history-as-git` export (one commit per amendment event, `git fast-import`) |
 | `test/test_sfs_asgit.py` | golden fast-import stream + git round-trip suite |
 | `test/files/` | hand-authored fixture corpora (oracle) |
@@ -2236,6 +2357,31 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **sfs** (2026-07-13) — the text-only-source loss is now explicit in the
+  artifact *and* recovered end to end. `sfs/graphics.py` detects SFST
+  omission markers and 2007:90's unmarked road-sign cells, and `nf.py`
+  projects them as typed `grafik` nodes carrying the governing SFS
+  publication; `sfs/pdfmirror.py` (`lagen sfs mirror-pdf`) stages the
+  official published PDFs from 1998 onward under `downloaded/sfs/pdf/` as
+  the crop source. The same `graphics.py` module now also resolves each
+  gap's provenance deterministically (register-first for bilaga gaps) and
+  drives an opt-in vision pass (`lagen sfs ai-includegraphics`,
+  `VISION_MODEL` in `config.py`, vision support added to `lib/llm.py`) that
+  locates page + bbox in the provenance-correct PDF and writes a `.graphics`
+  layer (`lib/annstore.py`, per-entry `verified` surviving reruns).
+  `lib/facsimile.py` crops the bbox; `GET /api/v1/sfs-graphic` serves it; the
+  renderer's `grafik` node shows the crop when localized, an honest
+  placeholder otherwise. `tools/golden_sfs.py` gained the
+  `grafik-node-replaces-marker` adjudication family.
+- **sfs/dv golden** (2026-07-12) — the rewrite's initial correctness baseline
+  and triage pass closed. SFS structure and amendment comparisons now apply
+  conservative post-freeze add/change/repeal adjudication and leave the
+  special-law/bilaga tail visible. DV date comparison lets a sane, formal
+  publishing-court date in the body override conflicting API metadata, retains
+  multiple final dates when the text states them, and leaves 15 body-unresolved
+  conflicts unadjudicated. Normative DV fixtures and representative structural
+  corpus sampling found and locked the credible parser defects; the old
+  structural corpus remains a sampling surface rather than an automatic oracle.
 - **hudoc, coe** (2026-07-10) — two new verticals, §7j: `hudoc/` harvests
   HUDOC's public JSON result endpoint plus the per-case Word→HTML conversion
   into `HudocCase` artifacts (`/dom/echr/{itemid}`); `coe/` harvests the
