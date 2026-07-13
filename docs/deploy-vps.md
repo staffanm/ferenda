@@ -111,7 +111,15 @@ curl -fsS https://ferenda.lagen.nu/ -o /dev/null -w '%{http_code}\n'
 Pushes to `modernization` trigger `.github/workflows/deploy.yml`, which runs on a
 **self-hosted runner installed on the VPS**. It fast-forwards
 `/srv/ferenda/ferenda`, rebuilds the image, `up -d`s, and runs
-`lagen all rebuild`.
+`lagen all rebuild --ignore-code-changes`.
+
+The `--ignore-code-changes` is deliberate: a code push must **not** kick off a
+reparse/regenerate on the prod host. The small box can't re-parse the ~100K
+förarbeten within a deploy's time budget — a from-scratch reparse ran past
+GitHub Actions' 6-hour job ceiling and was cancelled mid-`forarbete parse`. So
+the deploy only folds in new *input data* incrementally and redeploys the image;
+a code-driven rebuild is instead run on the fast dev box and pushed up (see
+[Rebuild on dev, publish to prod](#rebuild-on-dev-publish-to-prod)).
 
 Register the runner once (needs a token from GitHub — there's no `gh` on dev, so
 do this from the repo's web UI: **Settings → Actions → Runners → New
@@ -134,6 +142,27 @@ sudo ./svc.sh start
 The workflow keys on the `ferenda-vps` label (`runs-on: [self-hosted,
 ferenda-vps]`). No repo secrets are needed — the runner is already on the box
 with docker access and the checkout.
+
+## Rebuild on dev, publish to prod
+
+Because the deploy runs with `--ignore-code-changes` (above), a parser/render
+code change reaches prod not through the deploy but through a rebuild on the
+fast dev box, synced up:
+
+```sh
+tools/vps/download-data.sh     # pull the live corpus down to this checkout
+lagen all rebuild              # reparse/regenerate with the new code (fast on dev)
+sync-data                      # push the rebuilt corpus back up to prod
+```
+
+`download-data.sh` is the inverse of the dev→prod push, over the same two-disk
+split as the [corpus bootstrap](#corpus-bootstrap-rsync-from-dev): artifact tree
++ `catalog.sqlite` + `generated/` from the fixed disk, `downloaded/` from the
+mounted volume. It only adds/updates files locally (no `--delete`), and forwards
+extra rsync flags — `tools/vps/download-data.sh --dry-run` previews the pull.
+
+`sync-data` (the dev→prod push) is currently an untracked script in `~/.bin` on
+the main dev box, not yet in this repo.
 
 ## Nightly full sync (cron)
 

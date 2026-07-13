@@ -3,8 +3,16 @@
 # Runs on a SELF-HOSTED runner installed on the VPS (as the `ferenda` user, in
 # the docker group) -- see docs/deploy-vps.md for registration. On every push to
 # the deployed branch it fast-forwards the on-box checkout, rebuilds the
-# accommodanda image, brings the stack up, and kicks off an incremental rebuild
-# of the corpus so the new code's parser/render changes take effect.
+# accommodanda image, brings the stack up, and folds any new input DATA into the
+# corpus.
+#
+# It deliberately runs the rebuild with `--ignore-code-changes`, so a code push
+# does NOT trigger a reparse/regenerate: the small prod host can't re-parse
+# ~100K förarbeten within a deploy's time budget (the from-scratch reparse blew
+# past GitHub's 6h ceiling and was cancelled). A code-driven rebuild is instead
+# done deliberately on the fast dev box and pushed up with `sync-data`, after
+# tools/vps/download-data.sh pulls the live corpus down first. This step still
+# incrementally folds in new input data and redeploys.
 #
 # No secrets travel through GitHub: the runner already sits on the box with the
 # checkout, the mounted corpus and docker access. The nightly `lagen all all`
@@ -48,8 +56,10 @@ jobs:
           cd /srv/ferenda/ferenda
           docker compose --profile prod up -d
 
-      - name: Incremental rebuild of the corpus with the new code
+      - name: Fold new input data into the corpus and redeploy
+        # --ignore-code-changes: rebuild only on input-data changes, never on a
+        # parser/render code change (that reparse is done on dev + synced up).
         run: |
           set -euo pipefail
           cd /srv/ferenda/ferenda
-          docker compose exec -T accommodanda lagen all rebuild
+          docker compose exec -T accommodanda lagen all rebuild --ignore-code-changes
