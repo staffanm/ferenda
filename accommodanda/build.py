@@ -3150,6 +3150,36 @@ def cmd_mkpatch(args, p):
                  path, label))
 
 
+def _prepare_targeted_generate(source, basefiles, jobs):
+    """Bring the artifacts behind a document-scoped generate up to date.
+
+    ``generate`` is implemented outside the per-document Stage graph because its
+    freshness also depends on catalog relationships.  That must not make
+    ``lagen sfs generate 1994:1219`` an exception to the driver's make semantics:
+    refresh the requested documents' parse/versions stages, then relate the
+    resulting artifacts before rendering them.  ``--force`` belongs to the named
+    generate action, not these prerequisites, so upstream stages remain
+    freshness-checked.
+    """
+    if RUN.no_deps:
+        return False
+    had_errors = False
+    generate_force = RUN.force
+    RUN.force = False
+    try:
+        for stage in ("parse", "versions"):
+            if stage not in source.stages:
+                continue
+            result = run_action(source, stage, basefiles, jobs)
+            report(source, stage, result, len(basefiles), full_source=False)
+            had_errors |= bool(result.errors)
+        if not had_errors and not RUN.dry_run and source.name in ARTIFACTS:
+            cmd_relate([source.name])
+    finally:
+        RUN.force = generate_force
+    return had_errors
+
+
 def _dispatch(args, p, jobs):
     """Route one parsed invocation to its command. Split out of main() so main
     can wrap the whole dispatch in a single run-start/run-end try/finally."""
@@ -3171,8 +3201,9 @@ def _dispatch(args, p, jobs):
     if args.action == "generate":
         # `all generate` = the whole corpus (+ aggregates); `<source> generate` =
         # that source's pages (incl. synthesized stubs, which have no artifact
-        # file); `<source> generate <ids>` = just those docs. A scoped run skips
-        # the corpus-wide aggregate pages and the auto-relate.
+        # file); `<source> generate <ids>` = just those docs. A document-scoped
+        # run refreshes its parse/versions prerequisites and catalog rows unless
+        # --no-deps was given, but still leaves corpus-wide aggregate pages alone.
         if args.source == "all":
             if args.basefiles:
                 p.error("`all generate <ids>` needs a specific source, e.g. "
@@ -3182,6 +3213,9 @@ def _dispatch(args, p, jobs):
             p.error("unknown source %r (have: %s)"
                     % (args.source, ", ".join(SOURCES)))
         elif args.basefiles:
+            if _prepare_targeted_generate(SOURCES[args.source], args.basefiles,
+                                          jobs):
+                sys.exit(1)
             cmd_generate(only={str(layout.artifact(args.source, bf))
                                for bf in args.basefiles}, jobs=jobs)
         else:

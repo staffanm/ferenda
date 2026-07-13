@@ -216,6 +216,32 @@ def test_sfs_conventions_are_part_of_parse_recipe():
     } <= {path.name for path in build.SFS_CODE}
 
 
+def test_targeted_generate_refreshes_parse_and_relate(tmp_path, monkeypatch):
+    _, src = make_source(tmp_path)
+    src.name = "sfs"
+    monkeypatch.setattr(build, "MANIFEST", tmp_path / "manifest.json")
+    monkeypatch.setattr(build, "_MANIFEST_CACHE", None)
+    related = []
+    monkeypatch.setattr(build, "cmd_relate", lambda names: related.append(names))
+
+    assert not build._prepare_targeted_generate(src, ["a"], 1)
+    assert src.stages["parse"].output("a").read_text() == "HELLO"
+    assert related == [["sfs"]]
+
+
+def test_targeted_generate_no_deps_leaves_parse_untouched(tmp_path, monkeypatch):
+    _, src = make_source(tmp_path)
+    src.name = "sfs"
+    monkeypatch.setattr(build, "MANIFEST", tmp_path / "manifest.json")
+    monkeypatch.setattr(build, "_MANIFEST_CACHE", None)
+    monkeypatch.setattr(build, "cmd_relate",
+                        lambda names: pytest.fail("must not relate with --no-deps"))
+    monkeypatch.setattr(build.RUN, "no_deps", True)
+
+    assert not build._prepare_targeted_generate(src, ["a"], 1)
+    assert not src.stages["parse"].output("a").exists()
+
+
 def test_code_version_gate_for_relate_index(tmp_path):
     # the recipe-version rule extended to relate/index (which are incremental on
     # data content, not via the per-doc manifest): editing their extraction/index
