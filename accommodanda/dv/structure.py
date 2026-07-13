@@ -72,26 +72,43 @@ RE_REVISION = re.compile(r"sökte revision")        # -> Högsta domstolen
 # the dom anchor: a court (often abbreviated -- Tingsrätten/HovR:n/HD) with its
 # constitution/date, then a ruling verb. Opens the court's own dom + domskäl.
 RE_DOM = re.compile(
-    r"^((?:%s|Tingsrätten|TR:n|Hovrätten|HovR:n|HD|Migrationsverket)"
+    r"^((?:%s|Tingsrätten|TR:n|Hovrätten|HovR:n|HD)"
     r"(?:, [Mm]ark- och miljö(?:över)?domstolen)?)\s*\([^)]*\)"
     r"\s*(?:yttrade|anförde|meddelade|fastställde|stadfäste|beslöt"
     r"|fattade|förklarade|fann|uttalade)" % _COURT)
 
-# the föredragande/revisionssekreterare proposal HD decides on
-RE_BETANKANDE = re.compile(r"^(?:Målet|HD) avgjorde(?:s|) (?:målet )?efter "
-                           r"föredragning|^Föredrag(?:anden|ningen)\b")
+# An actual föredragande/revisionssekreterare proposal which HD decides on.
+# Merely saying that a matter was presented ("Målet avgjordes efter
+# föredragning" or "Föredragningen gjordes av it-direktören") does not prove
+# that the published text contains a judicial betänkande: that wording is also
+# common in hovrätt decisions and ordinary evidentiary narratives.
+RE_BETANKANDE = re.compile(
+    r"^Föredraganden\b.*\b(?:föreslog|hemställde)\b.*\bbetänkande\b")
+RE_HD_FOREDRAGNING = re.compile(
+    r"^HD avgjorde målet efter föredragning\.?$")
+
+# Some AD referat append the lower-court judgment after the publishing court's
+# ruling. The pair is the boundary; a bare BILAGA can contain any kind of
+# evidence and is therefore not sufficient on its own.
+RE_LOWER_COURT_APPENDIX = re.compile(
+    r"^(?:Tingsrättens|Hovrättens|Förvaltningsrättens|Länsrättens) "
+    r"(?:dom|beslut)\b")
 
 # a bare reasoning heading (no court anchor)
 RE_DOMSKAL = re.compile(r"^(?:Skäl|Domskäl|Skälen för (?:avgörandet|beslutet)"
-                        r"|(?:HovR:ns|Hovrättens|Tingsrättens) domskäl)\b")
+                        r"|(?:HovR:ns|Hovrättens|Tingsrättens) domskäl)\b",
+                        re.IGNORECASE)
 
-# the operative ruling: a "<Court>s avgörande" heading, a bare "Domslut"/"Slut",
-# or HD/HFD stating the disposition
+# the operative ruling: a "<Court>s avgörande" heading, an *entire* bare
+# "Domslut"/"Slut" heading, or HD/HFD stating the disposition. In particular,
+# ordinary reasoning beginning "Avgörande för ..." is not a ruling marker.
+RE_DOMSLUT_HEADING = re.compile(r"^(?:Domslut|Slut|Avgörande)\.?$", re.IGNORECASE)
 RE_DOMSLUT = re.compile(
-    r"^(?:Domslut|Slut|Avgörande"
-    r"|(?:%s|HD|HovR:n|Hovrätten|Tingsrätten)[: ]?s? (?:avgörande|domslut)"
+    r"^(?:(?:%s|HD|HovR:n|Hovrätten|Tingsrätten)[: ]?s? "
+    r"(?:avgörande|domslut)"
     r"|(?:HD|Hovrätten|Tingsrätten) (?:avslår|avvisar|fastställer|meddelar"
-    r"|förklarar|ändrar|undanröjer|bifaller|lämnar))\b" % _COURT)
+    r"|förklarar|ändrar|undanröjer|bifaller|lämnar))\b" % _COURT,
+    re.IGNORECASE)
 
 RE_SKILJAKTIG = re.compile(
     r"^(?:Justitie|Kammarrätts|Regerings|Försäkrings)råde[nt]\b.{0,90}?"
@@ -106,8 +123,11 @@ def classify(text):
     m = RE_DELMAL.match(text)
     if m:
         return ("delmal", {"ordinal": m.group(1)})
+    if RE_HD_FOREDRAGNING.match(text):
+        return ("betankande", {"court": "Högsta domstolen"})
     if RE_BETANKANDE.match(text):
-        return ("betankande", {})
+        court = "Högsta domstolen" if re.search(r"\bHD\b", text) else None
+        return ("betankande", {"court": court})
     if RE_SKILJAKTIG.match(text):
         return ("skiljaktig", {})
     if RE_TILLAGG.match(text):
@@ -115,7 +135,7 @@ def classify(text):
     m = RE_DOM.match(text)                       # before domslut/domskal/instans
     if m:
         return ("dom", {"court": _norm_court(m.group(1))})
-    if RE_DOMSLUT.match(text):
+    if RE_DOMSLUT_HEADING.match(text) or RE_DOMSLUT.match(text):
         return ("domslut", {})
     if RE_DOMSKAL.match(text):
         return ("domskal", {})
@@ -213,8 +233,15 @@ def nest(blocks):
                 return node
         return None
 
-    for block in blocks:
+    for pos, block in enumerate(blocks):
         text = _block_text(block)
+        next_text = (_block_text(blocks[pos + 1]).strip()
+                     if pos + 1 < len(blocks) else "")
+        if (text.strip() == "BILAGA"
+                and RE_LOWER_COURT_APPENDIX.match(next_text)):
+            open_instans(None)
+            attach(block)
+            continue
         # an <h1> naming a court is the explicit instance boundary HD's modern
         # records carry ("Attunda tingsrätt", "Svea hovrätt", "Högsta
         # domstolen"); it opens the instans and is consumed as its name rather
@@ -239,7 +266,8 @@ def nest(blocks):
             court = attrs.get("court")
             inst = current_instans()
             # a dom anchor naming a *different* specific court is the next stage
-            new_stage = (kind == "dom" and _specific(court) and inst is not None
+            new_stage = (kind in ("dom", "betankande") and _specific(court)
+                         and inst is not None
                          and inst.get("court") and inst["court"] != court)
             if inst is None or new_stage:
                 open_instans(court)
@@ -256,6 +284,14 @@ def nest(blocks):
                 push("domskal")
 
         elif kind in ("domskal", "domslut"):
+            # A dom/betänkande marker opens its reasoning branch implicitly;
+            # an immediately following explicit "Domskäl"/"Skäl" heading is
+            # the heading of that same branch, not a second sibling domskäl.
+            # Keep the marker as content in the open node. A domslut still
+            # closes domskäl and opens its own branch below.
+            if top() and top()[1]["type"] == kind:
+                attach(block)
+                continue
             if not (top() and top()[0] == 3):    # need a dom/betankande parent
                 close_to(4)
                 if not (top() and top()[1]["type"] in ("dom", "betankande")):
