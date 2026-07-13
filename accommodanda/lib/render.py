@@ -2026,7 +2026,8 @@ EURLEX_KIND = {"regulation": "EU-förordning", "directive": "EU-direktiv",
 
 # block type -> css class for the generic (paragraph-like) EU blocks
 EURLEX_CLASS = {"recital": "recital", "citation": "visa", "preamble": "preamble",
-                "point": "point", "ruling": "ruling", "note": "note", "row": "row"}
+                "paragraph": "paragraph", "point": "point", "ruling": "ruling",
+                "note": "note", "row": "row"}
 
 
 # --------------------------------------------------------------------------
@@ -2139,6 +2140,21 @@ def _recital_context_html(editorial, n):
     return "".join(parts)
 
 
+def _eurlex_marker(t, num):
+    """Display form of an EU block's structural number. The artifact stores the
+    bare token ("42", "1", "a") -- the surrounding punctuation is presentational:
+    a recital is parenthesised ("(42)"), a numbered paragraph gets a full stop
+    ("1."), a lettered/roman point the list-parenthesis ("a)", "i)"). Other
+    numbered kinds (ruling, note) keep the bare token."""
+    if t == "recital":
+        return "(%s)" % num
+    if t == "point":
+        return "%s)" % num
+    if t == "paragraph":
+        return "%s." % num
+    return num
+
+
 def _eurlex_pin(t, num, bid):
     """The rail's "Kontext för …" label for an EU block."""
     if t == "recital" and num:
@@ -2177,19 +2193,18 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, editorial=None,
         if editorial:
             extra = _recital_context_html(editorial, int(num))
     else:
-        # an article's key is its own id; a sub-article's is the dotted form. The
-        # editorial layer gives a block a forward panel of its relevant recitals.
-        # A sub-article (paragraph/point) carries no structural id of its own, so
-        # it becomes a citation target -- gets an anchor + rides the rail -- only
-        # when something targets it: the editorial recital links, or a per-node
-        # guidance/commentary link (the linker's fine-grained "2.21" keys).
+        # an article's key is its own id; a sub-article's is the dotted form. Every
+        # numbered sub-article (paragraph/point) gets that id, so a reader can link
+        # to it directly (`#4.22.a`) -- but it only *rides* the rail when it has
+        # context to show (rail.add is a no-op otherwise, and _rail_attr then omits
+        # the data-rail marker), so ubiquitous ids don't clutter the margin. The
+        # editorial layer additionally gives a block a forward panel of its recitals.
         key = (cur_article if t == "article"
                else subarticle_key(t, num, cur_article, cur_parag))
         if key:
             recitals = editorial.recitals_for(key) if editorial else None
-            if t != "article" and (
-                    recitals or site.article_guidance.get((doc_uri, key))):
-                bid = key              # synthesise the sub-article citation id
+            if t != "article":
+                bid = bid or key       # synthesise the sub-article citation id
             if recitals:
                 extra = _recital_links_html(recitals)
     # the article is a citation target (id == its number); its inbound (incl.
@@ -2200,26 +2215,44 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, editorial=None,
     if t == "article":
         anchor = toc.add(bid, plain(b["text"]), 2)
         return '<h3 id="%s" class="artikel"%s>%s</h3>' % (escape(anchor), ra, runs)
-    marker = '<span class="num">%s</span> ' % escape(num) if num else ""
+    # the marker doubles as the block's permalink when the block is addressable,
+    # so a reader can grab the link to a specific recital/paragraph/point by its
+    # number; an unaddressable block (no id) keeps a plain span
+    if num:
+        label = escape(_eurlex_marker(t, num))
+        marker = ('<a class="num" href="#%s">%s</a> ' % (escape(bid), label)
+                  if bid else '<span class="num">%s</span> ' % label)
+    else:
+        marker = ""
     classes = [EURLEX_CLASS.get(t, "")]
+    # a marked recital/paragraph/point hangs its marker in the left margin
+    if num and t in ("recital", "paragraph", "point"):
+        classes.append("hang")
     # a definitions-article point is a citation target (#<article>.<point>) and
     # the begrepp the act defines -- emit its id and emphasise the defined term
     defines = b.get("defines")
     if defines:
         classes.append("definition")
-        runs = _emphasize_term(runs, defines)
+        runs = _emphasize_term(runs, defines, site)
     cls = " ".join(c for c in classes if c)
     return '<p%s%s%s>%s%s</p>' % (_id_attr(bid), ' class="%s"' % cls if cls else "",
                                   ra, marker, runs)
 
 
-def _emphasize_term(runs_html, term):
+def _emphasize_term(runs_html, term, site):
     """Wrap a definition point's lead term (the plain text before its colon) in
-    <dfn>, so the defined word stands out from its definition."""
+    <dfn>, so the defined word stands out from its definition -- and, when the
+    corpus has a begrepp page for the term, link the <dfn> to it (the act's own
+    definition of "personuppgifter" -> /begrepp/Personuppgift). The concept name
+    is folded onto its canonical page the way case keywords resolve, so an
+    inflected/variant term ("personuppgifter") still finds the page."""
     lead = escape(term)
-    if runs_html.startswith(lead):
-        return "<dfn>%s</dfn>%s" % (lead, runs_html[len(lead):])
-    return runs_html
+    if not runs_html.startswith(lead):
+        return runs_html
+    uri = site.resolve(begrepp_uri(term))
+    dfn = ('<a href="%s"><dfn>%s</dfn></a>' % (escape(href(uri)), lead)
+           if site.has(uri) else "<dfn>%s</dfn>" % lead)
+    return dfn + runs_html[len(lead):]
 
 
 def render_eurlex(art, site):

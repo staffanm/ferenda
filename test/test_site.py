@@ -1391,7 +1391,7 @@ def test_act_page_renders_recital_group_heading(monkeypatch, tmp_path):
     assert "Skäl 1–2:" in html and "<b>Bakgrund och syfte</b>" in html
     assert "(jfr art " in html and 'href="#4"' in html
     # recitals become anchorable targets and drive the rail
-    assert '<p id="recital-1" class="recital" data-rail="recital-1">' in html
+    assert '<p id="recital-1" class="recital hang" data-rail="recital-1">' in html
 
 
 def test_act_rail_links_articles_and_subarticles_to_recitals(monkeypatch, tmp_path):
@@ -1434,6 +1434,62 @@ def test_act_without_annotation_has_no_recital_groups(tmp_path):
     # but a numbered recital still gets its stable `#recital-N` citation anchor, so
     # it can be cited and commented on even with no editorial layer
     assert 'id="recital-1"' in html
+    # every numbered sub-article is addressable (a stable id + a permalink marker)
+    # even with nothing to show in the rail -- but without context it does NOT ride
+    # the rail, so ubiquitous ids don't litter the margin with markers
+    assert '<p id="4.1.a"' in html and '<a class="num" href="#4.1.a">a)</a>' in html
+    assert 'id="4.1.a" class="point hang"' in html          # no data-rail attribute
+
+
+def test_act_structural_markers_and_hanging_indent(monkeypatch, tmp_path):
+    # the artifact stores bare structural tokens ("1", "a"); the renderer supplies
+    # the presentational punctuation and the .hang class that hangs the marker in
+    # the left margin. Every numbered sub-article is addressable, and its marker
+    # doubles as the permalink: a recital "(1)", a numbered paragraph "1.", a
+    # lettered point "a)"
+    html = _render_act(monkeypatch, tmp_path)
+    assert '<p id="recital-1" class="recital hang"' in html
+    assert '<a class="num" href="#recital-1">(1)</a>' in html   # recital
+    assert '<p id="4.1" class="paragraph hang"' in html
+    assert '<a class="num" href="#4.1">1.</a>' in html          # numbered paragraph
+    assert '<p id="4.1.a" class="point hang"' in html           # every point has an id
+    assert '<a class="num" href="#4.1.a">a)</a>' in html        # lettered point
+
+
+def test_defined_term_links_to_begrepp_page(tmp_path):
+    # a definition's lead term links to the corpus begrepp page for that concept,
+    # folding the inflected form onto its canonical page via the alias graph
+    # ("personuppgifter" -> /begrepp/Personuppgift); a term with no page stays a
+    # plain <dfn>
+    db = str(tmp_path / "catalog.sqlite")
+    concept = tmp_path / "c.json"
+    concept.write_text(json.dumps({
+        "uri": "https://lagen.nu/begrepp/Personuppgift", "type": "begrepp",
+        "title": "Personuppgift", "body": [],
+        "aliases": ["https://lagen.nu/begrepp/Personuppgifter"]}))
+    catalog.rebuild(db, "begrepp", [concept])
+    act = {
+        "uri": "https://lagen.nu/ext/celex/32099R0002", "celex": "32099R0002",
+        "doctype": "regulation", "title": "T",
+        "structure": [
+            {"type": "article", "id": "4", "num": "4", "text": ["Artikel 4"],
+             "children": [
+                {"type": "paragraph", "num": "1", "id": "4.1",
+                 "defines": "personuppgifter",
+                 "text": ["personuppgifter: varje upplysning."]},
+                {"type": "paragraph", "num": "2", "id": "4.2",
+                 "defines": "kverkställighet",
+                 "text": ["kverkställighet: något som saknar begreppssida."]}]}]}
+    actp = tmp_path / "a.json"
+    actp.write_text(json.dumps(act))
+    catalog.rebuild(db, "eurlex", [actp])
+    con = catalog.connect(db)
+    catalog.canonicalize_concepts(con)     # folds the alias graph into concept_alias
+    html = render.render_eurlex(act, render.Site.from_catalog(con))
+    assert ('<a href="/begrepp/Personuppgift"><dfn>personuppgifter</dfn></a>'
+            in html)
+    assert "<dfn>kverkställighet</dfn>" in html               # no page -> no link
+    assert '<a href="/begrepp/Kverkställighet"' not in html
 
 
 def test_genomfor_pinpoints_split_per_article(tmp_path):

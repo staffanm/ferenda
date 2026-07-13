@@ -454,6 +454,18 @@ p.definition dfn { font-style: normal; font-weight: 600; color: var(--accent); }
 .recital-group .jfr { color: var(--ink-4); }
 .recital-group a { color: var(--ink-3); }
 p.recital { scroll-margin-top: var(--scroll-clear); }
+/* EU enacting terms: a numbered recital/paragraph or lettered point hangs its
+   marker in the left margin (.hang); points sit indented under their paragraph
+   so the nesting reads as depth. The hang width tracks the marker width, so
+   wrapped lines align under the text and not past it: a recital's marker is the
+   widest ("(172)"), a numbered paragraph's or lettered point's markedly narrow
+   ("1.", "a)"). */
+p.recital.hang { padding-left: 2.4rem; text-indent: -2.4rem; }
+p.paragraph.hang, p.point.hang { padding-left: 1.5rem; text-indent: -1.5rem; }
+p.point { margin-left: 2.2rem; }
+/* every addressable enacting-terms block clears the sticky masthead when a
+   #4.22.a permalink scrolls to it */
+p.hang { scroll-margin-top: var(--scroll-clear); }
 .rail-sec.skal .skal-links { display: flex; flex-wrap: wrap; gap: .2rem .6rem; }
 .rail-sec.skal a { font-variant-numeric: oldstyle-nums; }
 /* curated external links (the act's "Externa länkar" rail section) */
