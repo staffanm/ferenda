@@ -89,7 +89,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `pins.py` | citation-shaped query → search-hit-shaped resolved targets (`resolved_results`/`merge_pinned`), shared by the REST `/search` endpoint and the MCP `search`/`resolve_citation` tools |
 | `resolve.py` | turns a ⌘K query into a precise, fragment-deep resource target — three resolvers (SFS/EU-act/case nicknames + citation-engine pinpoints) over `lib.datasets` |
 | `layout.py` | single source of truth for where a `(source, basefile)` document lives, on disk and on the web (`downloaded`/`artifact`/`page_relpath`/`page_url`) |
-| `datasets.py` | canonical filesystem paths of the curated named-resource datasets (`NAMEDLAWS`/`NAMEDACTS`/`NAMEDCASES`/`NAMEDEUCASES`) that ship in the package tree |
+| `datasets.py` | canonical filesystem paths of the curated named-resource datasets (`NAMEDLAWS`/`NAMEDACTS`/`NAMEDCASES`/`NAMEDEUCASES`/`COE_NAMES`) that ship in the package tree |
 | `concepts.py` | begrepp (concept) normalization — a hand-rolled, corpus-aware Swedish de-inflector collapsing inflected term forms onto one canonical `begrepp/<Name>`, plus the hand-edited override file `data/begrepp_aliases.json` |
 | `diff.py` | the "jämför lydelser" version-diff view — block-align + word-level `<ins>`/`<del>` over two parsed artifact versions, computed on demand |
 | `history.py` | read layer over the SFS version-history sidecar + amendment-register join, shared by the renderer's compare panel and `/api/v1/document/versions` |
@@ -249,8 +249,8 @@ shared by the REST `/search` and the MCP `search`/`resolve_citation` tools.
 `legacy_root`/`wiki_root`) keys in the optional `config.yml`, read with
 ruamel.yaml round-trip mode so a bad value's line number is reported. It
 deliberately locates nothing else — curated source resources shipped in the
-tree (`lib/datasets.py`'s `NAMEDLAWS`/`NAMEDACTS`/`NAMEDCASES`/`NAMEDEUCASES`, `sfs/data/
-resources.json`, …) are anchored by their own callers, not here.
+tree (`lib/datasets.py`'s `NAMEDLAWS`/`NAMEDACTS`/`NAMEDCASES`/`NAMEDEUCASES`/`COE_NAMES`,
+`sfs/data/resources.json`, …) are anchored by their own callers, not here.
 
 ## Running the pipelines
 

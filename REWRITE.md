@@ -615,12 +615,26 @@ below is not optional polish, it's the only way they enter the corpus.
     `ext/celex/32016R0679#6`, with a leading determiner/adjective (den, EU:s,
     allmänna) absorbed by the grammar. Once an act is named, a definite generic
     "artikel N i förordningen" and a *bare* "artikel N" anaphora-pinpoint the same
-    act — but a coordinated or differently-instrumented article ("artikel 7 och
-    8.1 i EU:s rättighetsstadga", "artikel 6.1 europakonventionen") is refused, so
-    a Charter/ECHR/treaty article is never mis-pinned onto the act. The grammar
-    extension is gated on the caller supplying acts (like KORTLAGRUM's
-    LAW_ABBREV), so SFS/förarbete citation parsing — and the golden — are
-    untouched; only the DV scanner opts in. `test/test_lagrum.py`.
+    act. `celex_uri` mints CELEX for all four act-type letters it can appear
+    behind (L directive, R förordning, H rekommendation, D beslut). Separately,
+    a treaty/Charter/ECHR article rides on the *instrument's own* consolidated
+    text, never mis-pinned onto whatever named secondary act is in focus:
+    `lagrum.load_treaties` (always-on whenever EULAGSTIFTNING is active, not
+    gated on caller-supplied acts) maps EU-treaty/Charter/ECHR names to the
+    ext-relative path of their consolidated text — EU treaties/Charter from the
+    sector-1 entries of `eurlex/data/namedacts.json` (`load_namedacts`
+    deliberately skips those, so treaty names stay out of the opt-in named-act
+    path), the ECHR from the new `coe/data/names.json` — and `TREATY_RULES`
+    links `"artikel N i <treaty>"` (the "i" optional), coordinated lists and
+    ranges, and the name-first `"<instrument>, särskilt artikel N"`
+    construction. So "artikel 7 och 8.1 i EU:s rättighetsstadga" links each
+    article to `ext/celex/12012P/TXT#7` / `#8.1`, and "artikel 6.1
+    europakonventionen" links to `ext/coe/005#A6P1` — external EUR-Lex links
+    for the EU treaties/Charter (no corpus page yet), the CoE article-fragment
+    grammar for the ECHR. The named-act grammar extension itself is gated on
+    the caller supplying acts (like KORTLAGRUM's LAW_ABBREV), so SFS/förarbete
+    citation parsing — and the golden — are untouched; only the DV scanner
+    opts in. `test/test_lagrum.py`.
   - ✅ **Canonical case naming + HD's given names** (`lib/casenaming.py`, with
     `case_uri`; moved out of `dv/` since the catalog + renderer read it too). One entry
     point, `case_label`, computes a case's display title so the renderer heading,
