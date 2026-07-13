@@ -6,7 +6,6 @@ without the corpus. Pins the structural normal form, the artifact-side reducer
 contract (round-trip), and the diff."""
 
 import importlib.util
-import json
 from pathlib import Path
 
 _spec = importlib.util.spec_from_file_location(
@@ -115,3 +114,42 @@ def test_wrong_uri_reported(tmp_path):
                                       "structure": []})
     problems = gds.compare(old, new, GOLDEN_SFS)
     assert any(p.startswith("uri:") for p in problems)
+
+
+def test_empty_golden_is_detectable_before_normalize(tmp_path):
+    path = tmp_path / "removed.xhtml"
+    path.write_bytes(b"")
+    assert gds.empty_golden(path)
+
+
+def test_core_skeleton_normalizes_old_direct_domslut_and_unknown_court():
+    old = {"uri": "https://lagen.nu/dom/ad/2099:1", "structure": [
+        {"type": "instans", "id": None, "children": [
+            {"type": "domslut", "id": None, "children": []}
+        ]}
+    ]}
+    new = {"uri": old["uri"], "structure": [
+        {"type": "instans", "id": "Arbetsdomstolen", "children": [
+            {"type": "dom", "id": None, "children": [
+                {"type": "domskal", "id": None, "children": []},
+                {"type": "domslut", "id": None, "children": []},
+            ]}
+        ]}
+    ]}
+    assert gds.compare(gds.core_skeleton(old), gds.core_skeleton(new),
+                       GOLDEN_SFS) == []
+
+
+def test_core_skeleton_keeps_betankande_dom_and_dissent():
+    nf = {"uri": "https://lagen.nu/dom/nja/2099s1", "structure": [
+        {"type": "instans", "id": "HD", "children": [
+            {"type": "betankande", "id": None, "children": [
+                {"type": "domskal", "id": None, "children": []}]},
+            {"type": "dom", "id": None, "children": [
+                {"type": "domslut", "id": None, "children": []}]},
+            {"type": "skiljaktig", "id": None, "children": []},
+        ]}
+    ]}
+    core = gds.core_skeleton(nf)
+    assert [node["type"] for node in core["structure"][0]["children"]] == [
+        "betankande", "dom", "skiljaktig"]

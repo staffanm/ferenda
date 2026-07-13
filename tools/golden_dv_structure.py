@@ -21,12 +21,20 @@ DV parser's instance model must reproduce. Text is deliberately excluded: the
 old input is Word/OCR, so text equality would be all noise; the contract is the
 segmentation, not the wording.
 
+The exact skeleton comparison is the primary corpus parity measurement. A
+second, deliberately coarser diagnostic helps stratify its review queue because
+the old parser frequently omitted court names and represented a whole ruling as
+``instans -> domslut`` even though the prose plainly contains reasons. That
+diagnostic compares ordered delmål, instances, betänkande/dom and
+skiljaktig/tillägg, pairing instances positionally and dropping domskäl/domslut
+leaves. Direct old domskäl/domslut children imply one dom. It never turns an
+exact-comparison failure into an accepted match; oracle-grade fixtures pin the
+leaf contract independently.
+
 Two things to keep in mind, both inherited from the golden methodology (§2):
 
-  * **Spec-first.** The new DV artifact is currently flat (``body`` blocks, no
-    ``structure``), so ``validate`` reports all-missing until the parser is
-    extended to emit the instance tree. That is the point -- the target is
-    written down first. The artifact contract the reducer reads: a nested
+  * **Implemented contract.** The DV parser emits the content-bearing instance
+    tree. The artifact contract the reducer reads is a nested
     ``structure`` list whose nodes are ``{"type": <kind>, "court"?, "ordinal"?,
     "children": [...]}`` for the kinds above (leaf prose nodes are ignored).
   * **Change detector, not ground truth.** The old FSM segmentation is
@@ -132,6 +140,11 @@ def normalize(path):
             "structure": structure}
 
 
+def empty_golden(path):
+    """Whether a parsed file is an old-pipeline removed-document dummy."""
+    return not Path(path).read_bytes().strip()
+
+
 def skeleton_from_artifact(art):
     """The same normal form from a new DV artifact's `structure` section (the
     contract the parser must satisfy). Leaf prose nodes are dropped; structure
@@ -154,6 +167,40 @@ def skeleton_from_artifact(art):
     return {"uri": art.get("uri"), "identifier": art.get("identifier"),
             "type": art.get("doctype") or art.get("type"),
             "structure": convert(art.get("structure", []))}
+
+
+def core_skeleton(nf):
+    """A reduced diagnostic for stratifying exact skeleton differences.
+
+    Instance court labels are optional in the old output, so instances pair by
+    occurrence. A direct old domskäl/domslut below an instance proves that a
+    ruling exists but not its wrapper shape; normalize it to one ``dom``. Leaf
+    reasoning/disposition wrappers are omitted from this secondary view and
+    remain visible in the primary exact comparison as well as fixture-validated.
+    """
+    def convert(nodes, parent=None):
+        out = []
+        kinds = {n.get("type") for n in nodes}
+        implicit_dom = parent == "instans" \
+            and bool(kinds & {"domskal", "domslut"}) \
+            and not bool(kinds & {"dom", "betankande"})
+        dom_added = False
+        for node in nodes:
+            kind = node.get("type")
+            if kind in ("domskal", "domslut"):
+                if implicit_dom and not dom_added:
+                    out.append({"type": "dom", "id": None, "children": []})
+                    dom_added = True
+                continue
+            item = {"type": kind,
+                    "id": node.get("ordinal") if kind == "delmal" else None,
+                    "children": convert(node.get("children", []), kind)}
+            if kind == "delmal":
+                item["ordinal"] = node.get("ordinal")
+            out.append(item)
+        return out
+
+    return {"uri": nf.get("uri"), "structure": convert(nf.get("structure", []))}
 
 
 def compare(old, new, golden_sfs):
@@ -210,17 +257,22 @@ def cmd_validate(args, golden_sfs):
     buckets = Counter()
     examples = {}
     for i, path in enumerate(files, 1):
+        if empty_golden(path):
+            counts["empty"] += 1
+            continue
         old = normalize(path)
         artpath = new_by_uri.get(old["uri"])
         if not artpath:
             counts["uri_absent"] += 1
             continue
         new = skeleton_from_artifact(json.loads(Path(artpath).read_bytes()))
-        problems = compare(old, new, golden_sfs)
+        detailed = compare(old, new, golden_sfs)
+        problems = compare(core_skeleton(old), core_skeleton(new), golden_sfs)
+        counts["detailed_match" if not detailed else "detailed_diff"] += 1
         if not problems:
-            counts["match"] += 1
+            counts["core_match"] += 1
         else:
-            counts["diff"] += 1
+            counts["core_diff"] += 1
             for problem in problems:
                 sig = signature(problem)
                 buckets[sig] += 1
@@ -229,13 +281,18 @@ def cmd_validate(args, golden_sfs):
             print("\r%d/%d %s" % (i, len(files), dict(counts)), end="", flush=True)
     print()
 
-    scored = counts["match"] + counts["diff"]
-    print("%d parsed referat: %d matched a new artifact (%d had none)"
-          % (len(files), scored, counts["uri_absent"]))
-    if scored:
-        print("  structure match: %d (%.1f%%), diff: %d"
-              % (counts["match"], 100 * counts["match"] / scored, counts["diff"]))
-    print("top structure-diff buckets:")
+    matched = counts["detailed_match"] + counts["detailed_diff"]
+    print("%d parsed files: %d matched a new artifact (%d had none, %d empty)"
+          % (len(files), matched, counts["uri_absent"], counts["empty"]))
+    if matched:
+        print("  exact skeleton match: %d (%.1f%%), diff: %d"
+              % (counts["detailed_match"],
+                 100 * counts["detailed_match"] / matched,
+                 counts["detailed_diff"]))
+        print("  reduced sampling diagnostic match: %d (%.1f%%), diff: %d"
+              % (counts["core_match"], 100 * counts["core_match"] / matched,
+                 counts["core_diff"]))
+    print("top reduced-diagnostic diff buckets:")
     for sig, n in buckets.most_common(args.top):
         uri, example = examples[sig]
         print("  %6d  %s\n          e.g. %s: %s"
