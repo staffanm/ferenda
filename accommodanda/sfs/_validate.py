@@ -134,7 +134,7 @@ def validate_one(job):
                    if not candidates or d >= candidates[0]]
     candidates.append(datetime.now())
 
-    best, best_now = None, None
+    best, best_now, best_nf = None, None, None
     try:
         for now in candidates:
             new_nf = to_normalform(doc, basefile, now=now)
@@ -143,7 +143,7 @@ def validate_one(job):
             golden_sfs.diff_nodelists(golden["structure"], new_nf["structure"],
                                       "structure", problems)
             if best is None or len(problems) < len(best):
-                best, best_now = problems, now
+                best, best_now, best_nf = problems, now, new_nf
             if not problems:
                 break
     except Exception as e:  # noqa: BLE001 — golden harness: per-doc "error" status (rule:no-catch-log-continue)
@@ -174,7 +174,7 @@ def validate_one(job):
             return (basefile, "error",
                     ["metadata %s: %s" % (type(e).__name__, e)], [])
 
-    unexplained, accepted = golden_sfs.adjudicate(best, golden)
+    unexplained, accepted = golden_sfs.adjudicate(best, golden, best_nf)
     if not best:
         status = "match"
     elif not unexplained:

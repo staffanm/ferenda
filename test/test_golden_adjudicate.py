@@ -30,6 +30,14 @@ def test_sfs_key_and_horizon():
     assert golden_sfs.golden_freeze_horizon({"amendments": []}) is None
 
 
+def test_title_canonicalization_is_only_mechanical_typography():
+    assert golden_sfs.canon_title("Lag (1828:79 s. 1553);") == \
+        "Lag (1828:79 s.1553)"
+    # A spelling correction is semantic evidence and must remain visible.
+    assert golden_sfs.canon_title("hörande rättegångar") != \
+        golden_sfs.canon_title("rörande rättegångar")
+
+
 def test_post_freeze_amendment_accepted():
     problems = ["amendments: extra https://lagen.nu/2021:50"]
     unexplained, accepted = golden_sfs.adjudicate(problems, GOLDEN)
@@ -48,11 +56,113 @@ def test_mid_sequence_extra_amendment_not_forgiven():
     assert accepted == []
 
 
-def test_structure_diffs_always_unexplained():
+def test_structure_diffs_without_candidate_always_unexplained():
     problems = ["structure: missing node K2P1",
                 "structure/K3P1: text changed:\n  old: 'a'\n  new: 'b'"]
     unexplained, accepted = golden_sfs.adjudicate(problems, GOLDEN)
     assert unexplained == problems
+    assert accepted == []
+
+
+def test_post_freeze_extra_structure_accepted_with_exact_note():
+    extra_amendment = "amendments: extra https://lagen.nu/2021:50"
+    extra_node = "structure/K2: extra node K2P4"
+    new = {"structure": [{"type": "kapitel", "id": "K2", "children": [
+        {"type": "paragraf", "id": "K2P4", "children": [
+            {"type": "stycke", "id": "K2P4S1",
+             "text": "Den nya bestämmelsen. Lag (2021:50).", "children": []}
+        ]}
+    ]}]}
+    unexplained, accepted = golden_sfs.adjudicate(
+        [extra_amendment, extra_node], GOLDEN, new)
+    assert unexplained == []
+    assert [rule for rule, _ in accepted] == ["post-freeze-amendment",
+                                              "post-freeze-structure"]
+
+
+def test_post_freeze_changed_structure_accepted_via_ancestor_note():
+    extra_amendment = "amendments: extra https://lagen.nu/2021:50"
+    changed = ("structure/K2/K2P4/K2P4S1: text changed:\n"
+               "  old: 'Äldre text.'\n"
+               "  new: 'Ny text. Lag (2021:50).'")
+    new = {"structure": [{"type": "kapitel", "id": "K2", "children": [
+        {"type": "paragraf", "id": "K2P4", "children": [
+            {"type": "stycke", "id": "K2P4S1",
+             "text": "Ny text. Lag (2021:50).", "children": []}
+        ]}
+    ]}]}
+    unexplained, accepted = golden_sfs.adjudicate(
+        [extra_amendment, changed], GOLDEN, new)
+    assert unexplained == []
+    assert [rule for rule, _ in accepted] == ["post-freeze-amendment",
+                                              "post-freeze-structure"]
+
+
+def test_structure_needs_independent_extra_amendment():
+    problem = "structure/K2: extra node K2P4"
+    new = {"structure": [{"type": "paragraf", "id": "K2P4",
+                          "text": "Lag (2021:50).", "children": []}]}
+    unexplained, accepted = golden_sfs.adjudicate([problem], GOLDEN, new)
+    assert unexplained == [problem]
+    assert accepted == []
+
+
+def test_structure_ordinary_newer_sfs_citation_is_not_amendment_evidence():
+    extra_amendment = "amendments: extra https://lagen.nu/2021:50"
+    problem = "structure/K2: extra node K2P4"
+    new = {"structure": [{"type": "paragraf", "id": "K2P4",
+                          "text": "enligt lagen (2021:50) om exempel",
+                          "children": []}]}
+    unexplained, accepted = golden_sfs.adjudicate(
+        [extra_amendment, problem], GOLDEN, new)
+    assert unexplained == [problem]
+    assert [rule for rule, _ in accepted] == ["post-freeze-amendment"]
+
+
+def test_structure_missing_and_order_diffs_stay_for_review():
+    extra_amendment = "amendments: extra https://lagen.nu/2021:50"
+    missing = "structure/K2: missing node K2P3"
+    order = "structure/K2: node order differs"
+    new = {"structure": [{"type": "kapitel", "id": "K2",
+                          "text": "Lag (2021:50).", "children": []}]}
+    unexplained, accepted = golden_sfs.adjudicate(
+        [extra_amendment, missing, order], GOLDEN, new)
+    assert unexplained == [missing, order]
+    assert [rule for rule, _ in accepted] == ["post-freeze-amendment"]
+
+
+def test_post_freeze_explicit_repeal_accepts_exact_missing_node():
+    extra_amendment = "amendments: extra https://lagen.nu/2021:50"
+    missing = "structure/K2: missing node K2P3"
+    new = {
+        "structure": [],
+        "amendments": [{
+            "uri": "https://lagen.nu/2021:50",
+            "properties": {
+                "rpubl:upphaver": "https://lagen.nu/2018:585#K2P3",
+            },
+        }],
+    }
+    unexplained, accepted = golden_sfs.adjudicate(
+        [extra_amendment, missing], GOLDEN, new)
+    assert unexplained == []
+    assert [rule for rule, _ in accepted] == ["post-freeze-amendment",
+                                              "post-freeze-structure"]
+
+
+def test_repeal_at_or_before_horizon_does_not_accept_missing_node():
+    missing = "structure/K2: missing node K2P3"
+    new = {
+        "structure": [],
+        "amendments": [{
+            "uri": "https://lagen.nu/2020:100",
+            "properties": {
+                "rpubl:upphaver": ["https://lagen.nu/2018:585#K2P3"],
+            },
+        }],
+    }
+    unexplained, accepted = golden_sfs.adjudicate([missing], GOLDEN, new)
+    assert unexplained == [missing]
     assert accepted == []
 
 

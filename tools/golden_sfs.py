@@ -481,6 +481,17 @@ def canon_secondary(secondary):
             for uri, props in secondary.items()}
 
 
+def canon_title(title):
+    """Mechanical old-header typography, not title semantics.
+
+    Older golden headers variably print page-number identifiers as ``s. 1`` and
+    retain a terminal semicolon from the running heading. The current source
+    normalizes both. Do not modernize spelling or drop royal prefixes here:
+    those may be substantive title changes and remain reviewable.
+    """
+    return re.sub(r"s\.\s+(\d+)", r"s.\1", title or "").rstrip(";")
+
+
 def diff_metadata(old, new, problems):
     if old["uri"] != new["uri"]:
         problems.append("uri: %r != %r" % (old["uri"], new["uri"]))
@@ -491,6 +502,9 @@ def diff_metadata(old, new, problems):
          if k not in METADATA_VOLATILE}
     n = {k: v for k, v in new["metadata"]["properties"].items()
          if k not in METADATA_VOLATILE}
+    if "dcterms:title" in o and "dcterms:title" in n:
+        o["dcterms:title"] = canon_title(o["dcterms:title"])
+        n["dcterms:title"] = canon_title(n["dcterms:title"])
     diff_dicts(o, n, "metadata.properties", problems)
     diff_dicts(canon_secondary(old["metadata"]["secondary"]),
                canon_secondary(new["metadata"]["secondary"]),
@@ -549,10 +563,12 @@ def compare(old, new, sections=ALL_SECTIONS):
 # is still reported (so a class that suddenly grows stays visible) but does not
 # count as a regression -- only the *unexplained* residual does.
 #
-# A predicate works from the problem string plus the golden normal form alone
-# (the new normal form is not threaded in). So a predicate that needs to know
-# the document is stale relies on the post-freeze-amendment diff being present
-# in the same run -- i.e. the amendments section must be among those compared.
+# Most predicates work from the problem string plus the golden normal form.
+# The deliberately narrow structure-staleness predicate also receives the
+# candidate normal form, because exact amendment notes and repeal targets are
+# the positive evidence needed to adjudicate structure. A predicate that needs
+# to know the document is stale still requires a post-freeze-amendment diff in
+# the same run -- i.e. amendments must be among the compared sections.
 
 re_sfs_number = re.compile(r"(\d{4}):(\d+)")
 
@@ -784,6 +800,98 @@ def _post_freeze_source_amendment(problem, ctx):
     return para is not None and para in ctx["bumped_paragrafs"]
 
 
+# A current SFS provision normally ends with the formal amendment note that
+# introduced its present wording: "Lag (2024:123)." / "Förordning (2024:123)."
+# This is stronger evidence than merely finding a newer SFS number somewhere in
+# the prose (where it may be an ordinary citation).
+re_amendment_note = re.compile(
+    r"\b(?:Lag|Förordning) \((\d{4}):(\d+)\)(?:\.|\s|$)")
+re_structure_extra = re.compile(r"^structure(?:/.*)?: extra node (\S+)$")
+re_structure_missing = re.compile(r"^structure(?:/.*)?: missing node (\S+)$")
+re_structure_changed = re.compile(r"^structure(?:/(.*))?: \w+ changed:")
+
+
+def node_text(node):
+    """Plain text for one normal-form subtree, including inline link runs."""
+    text = node.get("text") or ""
+    if isinstance(text, list):
+        text = "".join(p if isinstance(p, str) else p.get("text", "")
+                       for p in text)
+    return " ".join([text] + [node_text(c) for c in node.get("children", [])])
+
+
+def nodes_by_id(nodes):
+    """First normal-form node for each minted id, recursively."""
+    out = {}
+
+    def walk(items):
+        for node in items:
+            if node.get("id"):
+                out.setdefault(node["id"], node)
+            walk(node.get("children", []))
+
+    walk(nodes)
+    return out
+
+
+def post_freeze_note(node, horizon):
+    """Whether `node`'s subtree carries a formal note newer than `horizon`."""
+    return horizon is not None and any(
+        (int(year), int(number)) > horizon
+        for year, number in re_amendment_note.findall(node_text(node)))
+
+
+def post_freeze_repealed_ids(new, horizon):
+    """Node ids explicitly repealed by candidate amendments after `horizon`."""
+    out = set()
+    if horizon is None:
+        return out
+    for amendment in new.get("amendments", []):
+        key = sfs_key(amendment.get("uri"))
+        if key is None or key <= horizon:
+            continue
+        values = amendment.get("properties", {}).get("rpubl:upphaver", [])
+        if isinstance(values, str):
+            values = [values]
+        for uri in values:
+            if "#" in uri:
+                out.add(uri.split("#", 1)[1])
+    return out
+
+
+def _post_freeze_structure(problem, ctx):
+    """A current structure addition/change proved newer than the golden.
+
+    Three independent gates deliberately make this narrow:
+
+    * the amendments comparison contains an added act after the golden horizon;
+    * the candidate normal form is available (old-only compare calls cannot
+      adjudicate structure);
+    * the exact added/changed node, or its closest id-bearing ancestor, contains
+      a formal Lag/Förordning amendment note after that horizon; or an exact
+      missing node is explicitly named by a post-freeze `rpubl:upphaver`.
+
+    Other missing nodes and all order changes remain review items rather than
+    being guessed away.
+    """
+    if not ctx["stale"]:
+        return False
+    m = re_structure_extra.match(problem)
+    if m:
+        node = ctx["new_nodes"].get(m.group(1))
+        return node is not None and post_freeze_note(node, ctx["horizon"])
+    m = re_structure_missing.match(problem)
+    if m:
+        return m.group(1) in ctx["post_freeze_repeals"]
+    m = re_structure_changed.match(problem)
+    if not m:
+        return False
+    ids = [part for part in (m.group(1) or "").split("/") if part]
+    node = next((ctx["new_nodes"][node_id] for node_id in reversed(ids)
+                 if node_id in ctx["new_nodes"]), None)
+    return node is not None and post_freeze_note(node, ctx["horizon"])
+
+
 # An "eller" enumeration of paragraf numbers terminated by a *single* § -- e.g.
 # "1, 3, 5 eller 6 §", "26 eller 26 a §". By Swedish drafting convention an "och"
 # list ends in double §§ ("4, 5 och 6 §§") and an "eller" list in single §; the
@@ -937,6 +1045,7 @@ PREDICATES = (
     ("post-freeze-amendment", _post_freeze_amendment),
     ("stale-consolidation-drift", _stale_consolidation_drift),
     ("change-reference-staleness", _change_reference_staleness),
+    ("post-freeze-structure", _post_freeze_structure),
     ("balk-basefile-correction", _balk_basefile_correction),
     ("golden-chapter-collapse", _golden_chapter_collapse),
     ("celex-correction", _celex_correction),
@@ -949,13 +1058,16 @@ PREDICATES = (
 )
 
 
-def adjudicate(problems, golden):
+def adjudicate(problems, golden, new=None):
     """Partition `problems` against `golden` into (unexplained, accepted).
     `accepted` is a list of (rule, problem) the change-detector posture
     forgives; `unexplained` is the residual -- the regressions that count."""
     own_base = golden.get("uri", "").split("/konsolidering")[0]
     ctx = {"horizon": golden_freeze_horizon(golden), "stale": False,
-           "own_base": own_base}
+           "own_base": own_base,
+           "new_nodes": nodes_by_id(new.get("structure", [])) if new else {}}
+    ctx["post_freeze_repeals"] = post_freeze_repealed_ids(
+        new or {}, ctx["horizon"])
     ctx["stale"] = any(_post_freeze_amendment(p, ctx) for p in problems)
     # stycken whose ändringshänvisning was bumped to a post-freeze act -- the
     # missing pre-bump note from the same source is then forgivable too.
@@ -1047,8 +1159,9 @@ def main():
         print()
     else:
         old = load(args.old)
-        problems = compare(old, load(args.new), sections=args.sections.split(","))
-        unexplained, accepted = adjudicate(problems, old)
+        new = load(args.new)
+        problems = compare(old, new, sections=args.sections.split(","))
+        unexplained, accepted = adjudicate(problems, old, new)
         if accepted:
             print("%d adjudicated (new-is-right):" % len(accepted))
             for rule, problem in accepted:
