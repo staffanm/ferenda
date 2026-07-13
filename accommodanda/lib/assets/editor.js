@@ -37,22 +37,23 @@
       if (me) { mountCart(); refreshCart(); enableEditing(); }
     });
 
+  // A logged-in editor keeps a header indicator (who they are · Logga ut). An
+  // anonymous reader gets no sign-in affordance in the masthead -- login lives on
+  // its own /admin/ page (adminPage below), so the reader chrome stays clean.
   function account() {
     var mast = document.querySelector('header.masthead');
-    if (!mast) return;
-    var box = el('span', 'ed-account');
-    if (me) {
+    if (mast && me) {
+      var box = el('span', 'ed-account');
       box.innerHTML = esc(me.name) + ' · <a href="#" class="ed-logout">Logga ut</a>';
       mast.appendChild(box);
-      box.querySelector('.ed-logout').addEventListener('click', function (e) {
-        e.preventDefault();
-        j(API + '/auth/logout', { method: 'POST' }).then(function () { location.reload(); });
-      });
-    } else {
-      box.innerHTML = '<a href="#" class="ed-login">Logga in</a>';
-      mast.appendChild(box);
-      box.querySelector('.ed-login').addEventListener('click', function (e) { e.preventDefault(); loginPanel(); });
+      box.querySelector('.ed-logout').addEventListener('click', logout);
     }
+    adminPage();
+  }
+
+  function logout(e) {
+    if (e) e.preventDefault();
+    j(API + '/auth/logout', { method: 'POST' }).then(function () { location.reload(); });
   }
 
   // ---- attaching edit buttons -------------------------------------------
@@ -223,22 +224,31 @@
     });
   }
 
-  // ---- login ------------------------------------------------------------
-  function loginPanel() {
-    var ov = overlay(), p = el('div', 'ed-panel'); ov.appendChild(p);
-    p.appendChild(el('h3', null, 'Logga in'));
-    var u = el('input'); u.placeholder = 'Användarnamn';
+  // ---- login (the /admin/ page) -----------------------------------------
+  // The login form is mounted into the [data-admin-login] host the static
+  // /admin/ page ships. Anonymous -> the credential form; already logged in ->
+  // who you are + logout. No-op on every other page (the host is absent).
+  function adminPage() {
+    var host = document.querySelector('[data-admin-login]');
+    if (!host) return;
+    host.innerHTML = '';
+    if (me) {
+      host.appendChild(el('p', null, 'Inloggad som <strong>' + esc(me.name) + '</strong>.'));
+      var out = el('button', 'ed-do', 'Logga ut');
+      host.appendChild(out);
+      out.addEventListener('click', logout);
+      return;
+    }
+    var u = el('input'); u.placeholder = 'Användarnamn'; u.autofocus = true;
     var pw = el('input'); pw.type = 'password'; pw.placeholder = 'Lösenord';
-    p.appendChild(u); p.appendChild(pw);
     var err = el('div', 'ed-err');
-    var row = el('div', 'ed-row', '<button class="ed-cancel">Avbryt</button><button class="ed-do">Logga in</button>');
-    p.appendChild(row); p.appendChild(err);
-    row.querySelector('.ed-cancel').addEventListener('click', function () { ov.remove(); });
+    var go = el('button', 'ed-do', 'Logga in');
+    host.appendChild(u); host.appendChild(pw); host.appendChild(go); host.appendChild(err);
     function submit() {
       j(API + '/auth/login', { method: 'POST', body: { username: u.value, password: pw.value } })
-        .then(function (r) { if (r.ok) location.reload(); else err.textContent = 'Fel användarnamn eller lösenord.'; });
+        .then(function (r) { if (r.ok) location.assign('/'); else err.textContent = 'Fel användarnamn eller lösenord.'; });
     }
-    row.querySelector('.ed-do').addEventListener('click', submit);
+    go.addEventListener('click', submit);
     pw.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
     u.focus();
   }

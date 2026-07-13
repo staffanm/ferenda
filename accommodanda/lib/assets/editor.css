@@ -34,6 +34,14 @@
 .ed-preview h4 { margin: .3rem 0; }
 .ed-row { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .7rem; }
 .ed-err { color: var(--danger); font-size: .85rem; margin-top: .4rem; }
+/* the /admin/ login page: the sign-in form editor.js mounts, standalone rather
+   than in a modal overlay */
+.admin-panel { width: min(22rem, 96vw); margin: 1.5rem 0; }
+.admin-panel input { box-sizing: border-box; width: 100%; margin: .3rem 0;
+                     border: 1px solid var(--rule); border-radius: 6px;
+                     padding: .45rem .55rem; font: inherit; }
+.admin-panel .ed-do { margin-top: .5rem; padding: .4rem .85rem; cursor: pointer;
+                      border-radius: 5px; border: 1px solid var(--accent); }
 .ed-search-res { list-style: none; margin: .3rem 0 0; padding: 0;
                  border: 1px solid var(--rule); border-radius: 6px; max-height: 220px;
                  overflow: auto; }

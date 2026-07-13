@@ -691,6 +691,11 @@ def test_generate_browse_writes_faceted_pages(tmp_path):
     # chrome; the quick palette links to it and exposes the Right Arrow shortcut.
     search_page = compress.read_text(out / "sok" / "index.html")
     assert 'class="search-page"' in search_page
+    # the editor login lives on its own /admin/ page (editor.js mounts the form),
+    # not as a masthead link -- the reader chrome carries no sign-in affordance
+    admin_page = compress.read_text(out / "admin" / "index.html")
+    assert "data-admin-login" in admin_page
+    assert "Logga in" not in search_page and "ed-login" not in search_page
     # all client JS ships in one concatenated bundle, not as per-file scripts
     bundle = compress.read_text(out / render.SCRIPT_BUNDLE)
     assert not compress.exists(out / "fullsearch.js")   # folded into the bundle

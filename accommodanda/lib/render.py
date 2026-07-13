@@ -1592,6 +1592,17 @@ def render_search_page():
     return page("Sök", "Sök", "", body, solo=True)
 
 
+def render_admin_page():
+    """Static shell for the editor login at ``/admin/``. The sign-in affordance
+    lives here, not in the masthead -- editor.js mounts the credential form (or,
+    when a session is already live, the logout control) into ``[data-admin-login]``,
+    so an anonymous reader's chrome carries no login link."""
+    body = ('<div class="admin-panel" data-admin-login>'
+            '<p class="empty">Läser in…</p></div>')
+    return page("Logga in", "Admin", "", body, solo=True,
+                eyebrow="Redaktörsinloggning")
+
+
 def render_feed_page(item, entries, params=None):
     """Human-readable twin of an Atom document at the legacy ``/feed`` URL."""
     atom = feeds.feed_url(item.alias, atom=True, params=params)
@@ -3316,6 +3327,10 @@ def render_aggregates(con, out_root, catalog_path, write_index=True):
     search_dir = out_root / "sok"
     search_dir.mkdir(parents=True, exist_ok=True)
     compress.write_text(search_dir / "index.html", render_search_page(),
+                        encodings=compress.PAGE_ENCODINGS)
+    admin_dir = out_root / "admin"
+    admin_dir.mkdir(parents=True, exist_ok=True)
+    compress.write_text(admin_dir / "index.html", render_admin_page(),
                         encodings=compress.PAGE_ENCODINGS)
     # The legacy feed directory and per-repository feeds. Query-parameter
     # variants are rendered live by api/app.py; these unfiltered copies keep the
