@@ -163,7 +163,7 @@ final output *is* the spec.
 
 ## 3. SFS vertical (first vertical) 🚧
 
-### 3a. Structural parser ✅ (98.7%)
+### 3a. Structural parser ✅
 
 `accommodanda/sfs/` — heuristics ported from the old `sfs_parser`, structure
 redesigned, as a pipeline of small modules: `extract` (body from rkrattsbaser
@@ -173,9 +173,10 @@ golden normal form, **replicating the old URI-minting quirks exactly**:
 continuous-§ numbering, content-equality dedup, temporal suppression,
 skipfragments). CLI: `python -m accommodanda.sfs parse|validate`.
 
-- **Status:** structure match **98.7%** (10,912/11,056). The ~144 residual:
-  övergångsbestämmelse-inside-kapitel (deliberate), stale golden vs amended
-  laws, long-tail numbering.
+- **Status:** the initial frozen-corpus run matched **98.7%**
+  (10,912/11,056). The later complete 11,210-document run uses stricter current
+  normalization/adjudication and is recorded under §3d; those dated percentages
+  are different measurements, not a parser-status regression.
 
 ### 3b. Citation recognition (legalref → Lark) ✅
 
@@ -324,9 +325,30 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
       an ordinary added term or extractor noise is not blanket-forgiven.
     Separately, large bilaga `S#` offsets (e.g. 2001:911) are a *different* cause —
     post-freeze temporal variants, i.e. structure-staleness, below.
-  - ⬜ **Open: structure-staleness** — the structure section isn't adjudicated, so an
-    amended law's extra paragrafer count as 3a diffs; applying the post-freeze logic
-    there is the last gap to a unified passing %.
+  - ✅ **Structure-staleness predicate implemented conservatively.** The
+    adjudicator receives the candidate normal form and forgives an added or
+    changed structure node only when (1) the amendments comparison independently
+    contains an act newer than the golden horizon and (2) that exact candidate
+    subtree carries a formal `Lag/Förordning (YYYY:N)` amendment note newer than
+    the horizon. A missing node is forgiven only when a newer amendment's
+    `rpubl:upphaver` names that exact fragment; other missing nodes and every
+    order change remain unexplained. Fixture-locked in
+    `test/test_golden_adjudicate.py`.
+  - ✅ **The remaining SFS golden gap is measured and bounded (2026-07-12).**
+    A structure-only run over 11,210 frozen documents produced **10,479 exact,
+    710 diff, zero errors and 21 skipped old dummies (93.5% exact)**. The stricter
+    structure+amendments run produced 10,010 exact + 31 wholly adjudicated =
+    **10,041 passing (89.6%)**, 1,148 diff, zero errors and 21 skipped. It
+    accepted 313 individual post-freeze structure changes and 142 added
+    amendments. Of the 1,148 residual documents, 695 have a structure diff,
+    453 only an amendment-register diff and 102 both. Structure is highly
+    concentrated: 170 bilaga-dominated documents account for 43,214 of 56,911
+    residual structure problems (75.9%); 399 of the 695 structure cases have at
+    most ten problems. The dominant outliers are obsolete embedded
+    treaty/tariff/rail annexes (`1959:467`, `1972:698`, `1987:1185`), large
+    historical consolidations (`1981:774`) and known old TOC collapse/current
+    parser edge cases (`2023:200`). They are an explicit special-law improvement
+    backlog, not silently accepted parity.
 - ✅ **begrepp / `find_definitions`** (`begrepp.py`) — term-definition heuristics
   (a paragraf *mode* — `normal`/`brottsrubricering`/`parantes`/`loptext` — + the five
   `defined_term` cases) → `dcterms:subject` `/begrepp/{Capitalised}` inline links
@@ -423,12 +445,10 @@ decisions. **Implication:** for these ~1,600 verdicts the legacy Word/OOXML
 is the *only* source (no API record to fall back on), including the entire
 HD notisfall series and a decade of AD referat — so the legacy-OOXML path
 below is not optional polish, it's the only way they enter the corpus.
-- 🚧 **DV parser** — `accommodanda/dv/model.py` (currently a *flat* Avgorande:
-  metadata + ordered Rubrik/Stycke body blocks) and `accommodanda/dv/parse.py`.
-  The flat shape is provisional — court decisions *do* have a decision structure
-  (the instance/ruling skeleton: instances, betänkande vs dom, domskäl/domslut,
-  skiljaktig), specified by the structural golden below and still to be emitted.
-  **API path done:** body
+- ✅ **DV parser core** — `accommodanda/dv/model.py`, `parse.py` and
+  `structure.py` emit metadata plus a content-bearing instance/ruling tree
+  (instances, betänkande vs dom, domskäl/domslut, skiljaktig), with a flattening
+  view for linear consumers. **API path:** body
   from `innehall` HTML (each `<p>` classified heading-vs-paragraph;
   numbered prejudikat paragraphs carry an ordinal; `<br>`/entities/`&nbsp;`
   handled, separators dropped), metadata from the curated fields,
@@ -436,7 +456,7 @@ below is not optional polish, it's the only way they enter the corpus.
   the `domstol` member per case). **17,090 API-backed cases parse, 0
   failures**; the 966 empty bodies are exactly the records with no
   `innehall` (995 summary-only) — zero content dropped. `test/test_dv_parse.py`.
-  Remaining increments, seams marked in the code:
+  Source/coverage increments:
   - ✅ **Legacy Word path (POI)** — `accommodanda/dv/word.py` reads the
     *original* binary `.doc` (POI **HWPF**) and `.docx` (POI **XWPF**) via
     jpype, **not** the antiword DocBook intermediate — a real DOM
@@ -487,15 +507,42 @@ below is not optional polish, it's the only way they enter the corpus.
   files) is the frozen oracle: per case a document URI + its
   `dcterms:references` set. Cases match by URI (which now agree — the RDF shows
   `dom/rh/2009:37`, **independently confirming the case-URI re-minting**).
-  Compares reference sets. On 3,143 matched referat cases: **96.8% old-ref
-  recall**, 77.8% exact + 6.9% superset (84.7% find ≥ everything old did). The
+  Compares reference sets. The full 2026-07-12 run indexed 17,294 artifacts and
+  matched 15,177 old RDF records by URI: **95.6% old-reference recall**
+  (73,454/76,836), 65.8% exact + 15.2% superset. The
   residual misses are editor-derived lagrum not cited verbatim in the body
   (the same signal as the 81% lagrumLista recall) + the new scanner filling old
   all-or-nothing holes — change-detector posture, investigated not assumed. The
-  857 "no new artifact" are NJA notisfall (deferred) + the old pipeline's
-  separate *verdict* resources (`dom/{court}/{malnr}/{date}`), not coverage
-  gaps. ⬜ Metadata-field comparison (referatrubrik, dates) still to add.
-- 🚧 **DV structural golden (instance/ruling skeleton)** — `tools/golden_dv_structure.py`,
+  6,418 old RDF records without a matching artifact remain a coverage/input
+  inventory, not an inferred parser failure (the tree contains duplicate and
+  non-canonical old records as well as deferred notisfall). ✅ **Metadata
+  comparison surface added:** the same corpus pass now
+  reports exact/diff/old-missing/new-missing counts for identifier,
+  referatrubrik/sammanfattning, avgörandedatum and målnummer, including one
+  example per outcome family. Identifiers are compared through the actual
+  citation/URI grammar, not display spelling: 10,207 are exact and all 4,970
+  remaining cases are new supersets (normally canonical NJA page + editorial
+  löpnummer), with **zero conflicting identifiers**. Date correctness no
+  longer blindly trusts either metadata source: an unambiguous formal
+  final-ruling sentence for the publishing court overrides API metadata only
+  after calendar, future-date and referat/API-year checks. A corpus-wide dry run
+  selected 218/17,325 API records and rejected the looser matcher's
+  procedural-history false positives; all affected artifacts were reparsed.
+  This fixes the API's `NJA 2018 s. 405` year typo (`2016-06-12` vs the text's
+  12 June 2018), as well as cases where the old golden is stale/wrong. Eight
+  referat contain several formally stated publishing-court decisions; their
+  artifacts now preserve every date in `avgorandedatum_lista` and use the
+  latest as the backward-compatible scalar date (`NJA 2001 s. 191`, for
+  example, records both 20 March and 19 April). The refreshed 15,177-case date
+  comparison has 14,955 exact, 182 `text-confirmed`, and 25 new supersets. The
+  remaining 15 disjoint cases contain neither competing date in their published
+  body, so choosing between old RDF and API metadata would be guessing. They
+  remain explicitly unadjudicated: `NJA 1982 s. 124`, `NJA 1987 s. 175`,
+  `RH 2000:65`, `RH 2003:9`, `RH 2005:11`, `RH 2007:94`, `RH 2010:159`,
+  `RÅ 1994 ref. 104`, `HFD 2022 ref. 14`, `MIG 2009:23`, `MÖD 2004:6`,
+  `MÖD 2016:2`, `PMÖD 2018:19`, `PMÖD 2018:37`, and `PMÖD 2019:30`.
+  `test/test_golden_dv.py`.
+- ✅ **DV structural golden (instance/ruling skeleton)** — `tools/golden_dv_structure.py`,
   a *second* DV oracle, complementing the reference-graph one above. The old
   pipeline's parsed XHTML+RDFa (`../ferenda.old/data/dv/parsed/{COURT}/{id}.xhtml`, which
   the distilled RDF does not capture) segmented each referat into its decision
@@ -524,7 +571,32 @@ below is not optional polish, it's the only way they enter the corpus.
     instans with dom/domskäl/domslut; `flatten` round-trips the body).
   - Posture: change-detector, not ground truth — the old FSM segmentation is
     heuristic, so diffs are investigated and the new parser may improve on it
-    (a few hand-authored HD fixtures would make good oracle-grade anchors).
+    rather than assumed regressions. An oracle-grade hand-authored legacy-form
+    fixture now covers delmål → tingsrätt → HD betänkande + dom + skiljaktig.
+    Corpus sampling then exposed and regression-locked further concrete bugs:
+    ordinary business “föredragning” no longer opens a judicial betänkande; an
+    explicit HD föredragande proposal opens the HD instance rather than staying
+    under the preceding hovrätt; appended `BILAGA` + lower-court judgments open
+    a new instance; administrative Migrationsverket history is not a court dom;
+    uppercase `DOMSKÄL`/`DOMSLUT` headings are recognized; and a disposition
+    sentence immediately after its heading stays in the same domslut branch.
+    `test/test_dv_parse.py`.
+  - ✅ **Full-corpus structural result reviewed and bounded (2026-07-12).** Of
+    15,177 URI-matched old/new pairs, 257 (1.7%) have the same exact wrapper
+    tree. The secondary reduced sampling diagnostic matches 3,292 (21.7%); it
+    stratifies review but does not accept or hide any exact-comparison failure.
+    1,000 zero-byte old dummies are reported separately and 6,418 old paths have
+    no artifact.
+    Dominant differences remain the old XHTML adding an unnamed second instance
+    (7,546) and the new parser recognizing explicit dom branches (5,481 first,
+    3,560 second). Representative adjudication found old-golden defects as well
+    as the new-parser bugs fixed above: for example old `AD 1997 nr 26` has a
+    phantom empty second instance, old `AD 1993 nr 116` misses explicit domskäl,
+    and old `NJA 2007 s. 382` loses an initial HD ruling when checking order.
+    The legacy corpus is therefore **not safe as an automatic structural
+    oracle**. The hand-authored fixtures are normative; corpus diffs remain a
+    stratified sampling surface, and every sampled credible regression is now
+    fixture-locked before repair.
   - ✅ **HD's modern (2023+) record format.** Newer API records carry real
     `<h1>`–`<h3>` headings and footnotes the legacy `<p>`-only path dropped or
     mis-segmented. `parse_body` now reads the heading tags (an `<h1>` court name
@@ -563,6 +635,13 @@ below is not optional polish, it's the only way they enter the corpus.
     for an un-paginated verdict, by målnummer. The label is **stamped onto the
     artifact at parse time** (`build.dv_parse_run`, the source owns its model) so
     the catalog stays a pure consumer. `test/test_dv_naming.py`.
+  - ✅ **Identity collision regressions closed.** Identity indexing no longer
+    merges two authoritative API decisions merely because a court reused the
+    same målnummer (for example `AD 1993 nr 22` / `AD 1994 nr 13`), and NJA's
+    shared editorial löpnummer no longer merges different page decisions
+    (`NJA 2016 s. 341` / s. 346). Strong referat identity is resolved first;
+    målnummer bridges one API and one legacy root only when unambiguous.
+    Regression-locked in `test/test_dv_identity.py`.
 
 ---
 
@@ -2133,7 +2212,7 @@ which normalizes each parsed XHTML to NF on the fly (no frozen golden, no freeze
 RDF) and **`python tools/golden_dv_structure.py …`** (`normalize` | `compare
 PARSED ARTIFACT` | `validate` — the instance/ruling skeleton vs old parsed
 XHTML; §4). The structural one measures `accommodanda/dv/structure.py`'s
-segmenter once the parser emits a `structure` section.
+segmenter against the parser's emitted `structure` section.
 
 ---
 
