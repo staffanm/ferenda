@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 import requests
 
-from accommodanda.lib import layout
+from accommodanda.lib import compress, layout
 from accommodanda.remisser import download
 from accommodanda.remisser.model import Remiss, Remissinstans
 
@@ -131,7 +131,7 @@ def test_sync_two_passes(tmp_path, monkeypatch):
     assert summary["fetched"] == 17
     assert download.list_basefiles() == ["closed-case", "open-case"]
     assert len(list((tmp_path / "downloaded" / "closed-case").glob("*.pdf"))) == 17
-    record = json.loads((tmp_path / "downloaded" / "closed-case.json").read_text())
+    record = json.loads(compress.read_text(tmp_path / "downloaded" / "closed-case.json"))
     assert all(s["downloaded"] for s in record["svar"])
 
     # a second run is incremental (no new cases) and re-fetches no PDF
@@ -184,7 +184,7 @@ def test_sync_stubs_unreachable_case_and_recovers(tmp_path, monkeypatch):
     assert summary["new"] == 1 and summary["failed"] == 1
     # the failed case exists as a stub carrying the listing facts, so the
     # incremental walk still stops at it next run
-    stub = json.loads((tmp_path / "downloaded" / "closed-case.json").read_text())
+    stub = json.loads(compress.read_text(tmp_path / "downloaded" / "closed-case.json"))
     assert stub["titel"] == "Broken case title"
     assert stub["svar"] == [] and stub["sista_svarsdag"] is None
 
@@ -192,7 +192,7 @@ def test_sync_stubs_unreachable_case_and_recovers(tmp_path, monkeypatch):
     broken.clear()
     again = download.sync(delay=0)
     assert again["new"] == 0 and again["failed"] == 0
-    record = json.loads((tmp_path / "downloaded" / "closed-case.json").read_text())
+    record = json.loads(compress.read_text(tmp_path / "downloaded" / "closed-case.json"))
     assert record["dnr"] == "KN2026/00741"
     assert len(record["svar"]) == 17 and again["fetched"] == 17
 
@@ -241,7 +241,7 @@ def test_sync_stubs_malformed_case_and_recovers(tmp_path, monkeypatch):
     # the failed case exists as a stub carrying the listing facts, so the
     # incremental walk still stops at it next run -- and pass 1 kept going to
     # write the newer "open-case" slug instead of aborting
-    stub = json.loads((tmp_path / "downloaded" / "closed-case.json").read_text())
+    stub = json.loads(compress.read_text(tmp_path / "downloaded" / "closed-case.json"))
     assert stub["titel"] == "Broken case title"
     assert stub["svar"] == [] and stub["sista_svarsdag"] is None
     assert download.list_basefiles() == ["closed-case", "open-case"]
@@ -250,7 +250,7 @@ def test_sync_stubs_malformed_case_and_recovers(tmp_path, monkeypatch):
     garbled.clear()
     again = download.sync(delay=0)
     assert again["new"] == 0 and again["failed"] == 0
-    record = json.loads((tmp_path / "downloaded" / "closed-case.json").read_text())
+    record = json.loads(compress.read_text(tmp_path / "downloaded" / "closed-case.json"))
     assert record["dnr"] == "KN2026/00741"
     assert len(record["svar"]) == 17 and again["fetched"] == 17
 
