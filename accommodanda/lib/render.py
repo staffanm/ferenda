@@ -1234,15 +1234,17 @@ def render_grafik(node, site, doc_uri):
                escape(label), escape(entry["sfs"]), escape(entry["sfs"])))
 
 
-CONVENTION_LANGUAGES = (("en", "English"), ("fr", "Français"),
-                        ("sv", "Svenska"))
+LANGUAGE_LABELS = {
+    "de": "Deutsch",
+    "en": "English",
+    "fr": "Français",
+    "sv": "Svenska",
+    "tr": "Türkçe",
+}
 
 
 def _parallel_versions(node):
-    versions = {version["language"]: version for version in node["versions"]}
-    assert set(versions) == {language for language, _ in CONVENTION_LANGUAGES}, \
-        "convention appendix node %s must have en/fr/sv versions" % node.get("id")
-    return versions
+    return {version["language"]: version for version in node["versions"]}
 
 
 def _convention_cell(version, site, tag):
@@ -1252,39 +1254,45 @@ def _convention_cell(version, site, tag):
         escape(version["language"]), content)
 
 
-def _convention_row(node, site, css, tag):
+def _convention_row(node, site, css, tag, languages):
     versions = _parallel_versions(node)
     return '<div class="konvention-row %s">%s</div>' % (
         css, "".join(_convention_cell(versions[language], site, tag)
-                      for language, _ in CONVENTION_LANGUAGES))
+                      for language in languages))
 
 
-def _convention_paragraphs(node, site):
+def _convention_paragraphs(node, site, languages):
     rows = []
     for paragraph in node.get("paragraphs", []):
         assert paragraph.get("type") == "konventionsstycke", \
             "unknown convention paragraph node %r" % paragraph.get("type")
-        rows.append(_convention_row(paragraph, site, "konvention-paragraph", "p"))
+        rows.append(_convention_row(paragraph, site, "konvention-paragraph", "p",
+                                    languages))
     return "".join(rows)
 
 
-def _render_konventionsinstrument(node, site, toc):
+def _toc_label(versions, languages):
+    # Swedish is the site language and the natural TOC label; fall back to the
+    # last run for a parallel corpus that happens not to include Swedish.
+    return plain((versions.get("sv") or versions[languages[-1]]).get("text", []))
+
+
+def _render_konventionsinstrument(node, site, toc, languages):
     versions = _parallel_versions(node)
-    toc.add(node.get("id"), plain(versions["sv"].get("text", [])), 2)
-    title = _convention_row(node, site, "konvention-title", "h3")
-    ingress = _convention_paragraphs(node, site)
+    toc.add(node.get("id"), _toc_label(versions, languages), 2)
+    title = _convention_row(node, site, "konvention-title", "h3", languages)
+    ingress = _convention_paragraphs(node, site, languages)
     provisions = []
     for child in node.get("children", []):
         child_versions = _parallel_versions(child)
-        swedish = plain(child_versions["sv"].get("text", []))
-        toc.add(child.get("id"), swedish, 3)
+        toc.add(child.get("id"), _toc_label(child_versions, languages), 3)
         kind = child["type"]
         assert kind in {"konventionsavdelning", "konventionsartikel"}, \
             "unknown convention appendix node %r" % kind
         css = "konvention-section" if kind == "konventionsavdelning" \
             else "konvention-article"
-        heading = _convention_row(child, site, css + "-heading", "h4")
-        paragraphs = _convention_paragraphs(child, site)
+        heading = _convention_row(child, site, css + "-heading", "h4", languages)
+        paragraphs = _convention_paragraphs(child, site, languages)
         provisions.append('<section class="%s"%s>%s%s</section>' % (
             css, _id_attr(child.get("id")), heading, paragraphs))
     return '<section class="konvention-instrument"%s>%s%s</section>' % (
@@ -1292,15 +1300,16 @@ def _render_konventionsinstrument(node, site, toc):
 
 
 def render_konventionsbilaga(node, site, doc_uri, toc, rail):
-    assert node.get("languages") == [language for language, _ in CONVENTION_LANGUAGES], \
-        "convention appendix language order must be en/fr/sv"
+    languages = node.get("languages")
+    assert languages, "convention appendix must declare its languages"
     language_head = '<div class="konvention-languages">%s</div>' % "".join(
-        '<div lang="%s">%s</div>' % (language, label)
-        for language, label in CONVENTION_LANGUAGES)
+        '<div lang="%s">%s</div>' % (language, LANGUAGE_LABELS.get(language, language))
+        for language in languages)
     instruments = "".join(
-        _render_konventionsinstrument(child, site, toc)
+        _render_konventionsinstrument(child, site, toc, languages)
         for child in node.get("children", []))
-    return '<div class="konventionsbilaga">%s%s</div>' % (language_head, instruments)
+    return '<div class="konventionsbilaga" style="--n-languages: %d">%s%s</div>' % (
+        len(languages), language_head, instruments)
 
 
 def render_node(node, site, doc_uri, toc, rail, drop_marker=False):

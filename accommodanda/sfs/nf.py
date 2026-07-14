@@ -32,8 +32,10 @@ pipeline, which skipped headings/upphävd and emitted a separate flat
 reference list instead of inlining.
 """
 
+import json
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 
 from ..lib import lagrum, util
 from ..lib.catalog import BASE
@@ -62,6 +64,20 @@ from .model import (
     UpphavtKapitel,
 )
 
+# SFS statutes that incorporate an external treaty as a parallel-text appendix:
+# an instrument's local fragment (`{sfs}#B1`, `{sfs}#B1P4`) → the `source/number`
+# of the treaty it reproduces (eg. `coe/046`). The projection resolves this into
+# the `ext/{source}/{number}` URI so the incorporated articles become citable.
+INCORPORATES = json.loads(
+    (Path(__file__).parent / "data" / "incorporates.json")
+    .read_text(encoding="utf-8"))
+
+
+def incorporated_uri(basefile, fragment):
+    """The URI of the treaty an incorporated instrument reproduces, or None."""
+    spec = INCORPORATES.get("%s#%s" % (basefile, fragment))
+    return "%sext/%s" % (BASE, spec) if spec else None
+
 
 def to_normalform(doc, basefile, now=None, refparser=None,
                   suppress_temporal=True, register=None, sfst_header=None):
@@ -69,6 +85,7 @@ def to_normalform(doc, basefile, now=None, refparser=None,
                                       now=now or datetime.now(),
                                       suppress_temporal=suppress_temporal),
                       refparser=refparser,
+                      basefile=basefile,
                       roadsigns=basefile in graphics.ROADSIGN_DOCS)
     structure = project_children(doc.children, (), proj, "")
     graphics.assign_gap_keys(structure)
@@ -183,6 +200,7 @@ def project_overgangsbestammelse(ob, proj):
 class Projection:
     minter: "IdMinter"
     refparser: lagrum.LagrumParser | None = None
+    basefile: str | None = None
     roadsigns: bool = False
     _grafik: int = 0
 
@@ -356,7 +374,7 @@ def content_key(node):
         case Konventionsbilaga():
             return tuple(content_key(c) for c in node.instruments)
         case Konventionsinstrument():
-            return (node.nummer, tuple(content_key(c) for c in node.children))
+            return (node.protokoll, tuple(content_key(c) for c in node.children))
         case Konventionsavdelning() | Konventionsartikel():
             return (type(node).__name__, node.ordinal)
         case Konventionsstycke():
@@ -490,38 +508,44 @@ def _language_version(language, text, proj, context, live, treaty=None):
     }
 
 
-def _parallel_paragraphs(paragraphs, proj, context, live):
+def _parallel_paragraphs(paragraphs, proj, context, live, languages):
     return [
         {"type": "konventionsstycke", "id": None,
          "versions": [
              _language_version(language, paragraph.texter[language], proj,
                                context, live)
-             for language in ("en", "fr", "sv")
+             for language in languages
          ]}
         for paragraph in paragraphs
     ]
 
 
 def project_konventionsbilaga(node, frag, proj, live=True):
-    """Project a trilingual convention corpus without flattening away its
+    """Project a multilingual convention corpus without flattening away its
     cross-language alignment. Every heading and aligned paragraph version still
-    uses ordinary ``text`` runs, so shared link extraction remains generic."""
+    uses ordinary ``text`` runs, so shared link extraction remains generic. The
+    language set and order come from the appendix itself (two or three)."""
+    languages = node.languages
     instruments = []
     for instrument in node.instruments:
-        instrument_id = "%sI%s" % (frag, instrument.nummer)
+        # the base convention anchors at the bilaga fragment (#B1); each protocol
+        # suffixes its number (#B1P4). The treaty it reproduces is resolved from
+        # that fragment through incorporates.json.
+        instrument_id = "%sP%s" % (frag, instrument.protokoll) \
+            if instrument.protokoll else frag
+        uri = incorporated_uri(proj.basefile, instrument_id)
         versions = [
             _language_version(
                 language, instrument.rubriker[language],
                 proj, instrument_id, live,
-                treaty=instrument.uri)
-            for language in ("en", "fr", "sv")
+                treaty=uri)
+            for language in languages
         ]
         children = []
         for child in instrument.children:
             if isinstance(child, Konventionsavdelning):
                 child_id = "%sSec%s" % (instrument_id, child.ordinal)
-                child_uri = "%s#Sec%s" % (instrument.uri, child.ordinal) \
-                    if instrument.uri else None
+                child_uri = "%s#Sec%s" % (uri, child.ordinal) if uri else None
                 children.append({
                     "type": "konventionsavdelning",
                     "id": child_id,
@@ -530,16 +554,15 @@ def project_konventionsbilaga(node, frag, proj, live=True):
                     "versions": [
                         _language_version(language, child.rubriker[language],
                                           proj, child_id, live, treaty=child_uri)
-                        for language in ("en", "fr", "sv")
+                        for language in languages
                     ],
                 })
             else:
                 assert isinstance(child, Konventionsartikel), \
                     "unknown convention appendix child %r" % child
                 child_id = "%sA%s" % (instrument_id, ordfrag(child.ordinal))
-                child_uri = "%s#%s" % (
-                    instrument.uri, article_fragment(child.ordinal)) \
-                    if instrument.uri else None
+                child_uri = "%s#%s" % (uri, article_fragment(child.ordinal)) \
+                    if uri else None
                 children.append({
                     "type": "konventionsartikel",
                     "id": child_id,
@@ -550,26 +573,25 @@ def project_konventionsbilaga(node, frag, proj, live=True):
                             language, child.rubriker[language],
                             proj, child_id, live,
                             treaty=child_uri)
-                        for language in ("en", "fr", "sv")
+                        for language in languages
                     ],
                     "paragraphs": _parallel_paragraphs(
-                        child.texter, proj, child_id, live),
+                        child.texter, proj, child_id, live, languages),
                 })
         instruments.append({
             "type": "konventionsinstrument",
             "id": instrument_id,
-            "number": instrument.nummer,
             "protocol": instrument.protokoll,
-            "uri": instrument.uri,
+            "uri": uri,
             "versions": versions,
             "paragraphs": _parallel_paragraphs(
-                instrument.ingresser, proj, instrument_id, live),
+                instrument.ingresser, proj, instrument_id, live, languages),
             "children": children,
         })
     return {
         "type": "konventionsbilaga",
         "id": None,
-        "languages": ["en", "fr", "sv"],
+        "languages": list(languages),
         "children": instruments,
     }
 

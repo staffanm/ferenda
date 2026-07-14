@@ -635,6 +635,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "httpx2" },
     { name = "jpype1" },
+    { name = "langdetect" },
     { name = "lark" },
     { name = "lxml" },
     { name = "mcp" },
@@ -676,6 +677,7 @@ requires-dist = [
     { name = "fastapi" },
     { name = "httpx2" },
     { name = "jpype1", specifier = ">=1.7.1" },
+    { name = "langdetect" },
     { name = "lark" },
     { name = "lxml" },
     { name = "mcp", specifier = ">=1.13" },
@@ -951,6 +953,15 @@ sdist = { url = "https://files.pythonhosted.org/packages/19/74/a633ee74eb36c44aa
 wheels = [
     { url = "https://files.pythonhosted.org/packages/41/45/1a4ed80516f02155c51f51e8cedb3c1902296743db0bbc66608a0db2814f/jsonschema_specifications-2025.9.1-py3-none-any.whl", hash = "sha256:98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe", size = 18437, upload-time = "2025-09-08T01:34:57.871Z" },
 ]
+
+[[package]]
+name = "langdetect"
+version = "1.0.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "six" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0e/72/a3add0e4eec4eb9e2569554f7c70f4a3c27712f40e3284d483e88094cc0e/langdetect-1.0.9.tar.gz", hash = "sha256:cbc1fef89f8d062739774bd51eda3da3274006b3661d199c2655f6b3f6d605a0", size = 981474, upload-time = "2021-05-07T07:54:13.562Z" }
 
 [[package]]
 name = "lark"

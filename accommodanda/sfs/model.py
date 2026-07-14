@@ -128,16 +128,17 @@ class Bilaga:
 
 @dataclass
 class Konventionsbilaga:
-    """A trilingual convention appendix incorporated into an SFS statute.
+    """A multilingual convention appendix incorporated into an SFS statute.
 
     Unlike an ordinary statute appendix, this is a parallel corpus: each
-    instrument, section, article and paragraph exists once, with aligned
-    English, French and Swedish text. Keeping that alignment in the source model
-    prevents the renderer from having to infer legal structure from three flat
-    text runs.
+    instrument, section, article and paragraph exists once, with text aligned
+    across the two or three languages the appendix prints (``languages`` holds
+    them in display order). Keeping that alignment in the source model prevents
+    the renderer from having to infer legal structure from flat text runs.
     """
 
-    instruments: list[Konventionsinstrument] = field(default_factory=list)
+    instruments: list[Konventionsinstrument]
+    languages: tuple[str, ...]
 
 
 @dataclass
@@ -147,9 +148,10 @@ class Konventionsstycke:
 
 @dataclass
 class Konventionsinstrument:
-    nummer: str  # stable instrument key (eg. CETS 005 or CRC)
+    # the protocol number ("4", "1" for the first/additional protocol) or None
+    # for the base convention; the SFS projection turns it into the #B1/#B1P4
+    # anchor and resolves the treaty URI via sfs/data/incorporates.json.
     protokoll: str | None
-    uri: str | None
     rubriker: dict[str, str] = field(default_factory=dict)
     ingresser: list[Konventionsstycke] = field(default_factory=list)
     children: list[Konventionsavdelning | Konventionsartikel] = field(

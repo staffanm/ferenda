@@ -42,6 +42,7 @@ dependencies = [
     # warning on every import.
     "httpx2",
     "jpype1>=1.7.1",
+    "langdetect",
     "lark",
     "lxml",
     # the public MCP server mounted at /mcp (accommodanda/api/mcp.py) -- FastMCP +

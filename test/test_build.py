@@ -211,9 +211,7 @@ def test_sfs_graphics_is_part_of_parse_recipe():
 
 
 def test_sfs_conventions_are_part_of_parse_recipe():
-    assert {
-        "atmf.py", "convention.py", "crc.py", "echr.py", "montreal.py"
-    } <= {path.name for path in build.SFS_CODE}
+    assert "parallelappendix.py" in {path.name for path in build.SFS_CODE}
 
 
 def test_targeted_generate_refreshes_parse_and_relate(tmp_path, monkeypatch):

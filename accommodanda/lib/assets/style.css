@@ -287,14 +287,16 @@ section.paragraf.rail-active { background:
    linear-gradient(90deg, color-mix(in oklab, var(--accent) 6%, transparent), transparent 60%);
    border-radius: 4px; }
 
-/* -- Incorporated conventions rendered as trilingual parallel corpora --
-   Every heading and legal paragraph is one three-cell row. The grid has no
-   minimum width: all languages share the available reading column instead of
-   clipping the Swedish third, and it uses the ordinary law-page surface. */
+/* -- Incorporated conventions rendered as multilingual parallel corpora --
+   Every heading and legal paragraph is one row with one cell per language. The
+   column count is driven by --n-languages (2 or 3), set inline on the
+   .konventionsbilaga container. The grid has no minimum width: all languages
+   share the available reading column instead of clipping the last, and it uses
+   the ordinary law-page surface. */
 body.parallel-appendix .gr-main { max-width: 90rem; }
 .konventionsbilaga { margin-top: 1.5rem; }
 .konvention-languages, .konvention-row { display: grid;
-                     grid-template-columns: repeat(3, minmax(0, 1fr));
+                     grid-template-columns: repeat(var(--n-languages, 3), minmax(0, 1fr));
                      column-gap: clamp(.75rem, 2vw, 1.5rem); }
 .konvention-languages { margin-bottom: 2.25rem; }
 .konvention-languages > div { font: 600 .68rem var(--sans);

@@ -118,7 +118,7 @@ Current code layout (this three-layer split is now realized in the package):
 accommodanda/
   lib/      shared horizontal libs (full map: accommodanda/README.md "Shared library (lib/)") — lagrum (citation engine), catalog, render, layout, net, markdown, util, errors, casenaming, eucasenaming, eu_structure, datasets, search, facets, feeds, dump, pins, resolve, text, compress, facsimile, pdftext, llm, annstore, wikitext, runlog, patch·patchit, git, harvest, regeringen, legacy_import, concepts, diff, history, assets, coe, coe_ids
   config.py runtime config (config.yml / data_root / wiki_root)
-  sfs/      acts vertical — download·graphics·pdfmirror·extract·reader·model·tokenizer·assembler·nf·convention·echr·crc·montreal·atmf·register·versions·correspond·asgit·begrepp·_validate (+ __main__)
+  sfs/      acts vertical — download·graphics·pdfmirror·extract·reader·model·tokenizer·assembler·nf·parallelappendix·register·versions·correspond·asgit·begrepp·_validate (+ __main__)
   dv/       court-decisions vertical — download·identity·namedcases·model·parse·structure·word·legacy
   forarbete/ preparatory-works vertical — download·riksdagen·rskr·model·parse·structure·kommentar·genomforande·fk·jamforelse·lydelse·legacy·legacy_formats
   eurlex/   EU vertical (EUR-Lex/CELLAR) — download·bulk·annotate·casenames·definitions·parse·parse_html·parse_pdf·structure·lang·model
@@ -284,21 +284,31 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
   same intermediates, so all register/amendment/metadata parsing is reused
   untouched. 2018:585 from JSON vs HTML = **0 field diffs** (only genuine freshness
   deltas).
-- ✅ **Trilingual convention appendices** (`sfs/convention.py` plus the
-  format modules `echr`, `crc`, `montreal`, `atmf`) — SFS 1994:1219,
-  2018:1197, 2010:510 and 2022:366 are parsed as parallel corpora rather than
-  flat `Bilaga` text. The ECHR base
-  convention and Protocols 1, 4, 6, 7, 13 and 16 are explicit typed
-  instruments, the base convention's Sections I–III are retained, and every
-  article and legal paragraph owns aligned English/French/Swedish versions. Stable local row ids
-  carry `rdfs:seeAlso` links to the matching CoE treaty/article nodes. The SFS
-  renderer emits every heading and paragraph as one flexible three-column grid
-  row, so each paragraph begins at the same vertical position in all languages
-  without forcing the appendix wider than the reading area. Older SFST consolidations,
-  whose temporal variants duplicate whole appendices, remain on the historical
-  parser path. `test/test_sfs_echr.py`, its hand-authored fixture and the
-  downloaded-corpus regressions in `test/test_sfs_conventions.py` lock the
-  structure and layout contract.
+- 🚧 **Parallel-text convention appendices** — `sfs/parallelappendix.py`
+  parses a statute whose sole `Bilaga` is a treaty printed as parallel text
+  (the same convention in two or three languages, side by side) into a
+  `Konventionsbilaga`, with **no per-law knowledge**. Article structure locates
+  language-copy boundaries, `langdetect` labels each complete block, and
+  structural rules read instruments/protocols, divisions, articles and
+  paragraphs. Sequential glued headings, division subtitles, omitted parallel
+  division headings and SFS `/…/` directives are handled generically; ordered
+  article sequences remain strict. It is wired into `_assemble` — a statute
+  that is not a parallel corpus, or whose printed languages disagree
+  (`AppendixMisaligned`), flat-parses instead. It aligns **95/107 (89%)** of the
+  structurally detected corpus candidates, including ECHR, Montreal, the ~40
+  tax-exchange agreements, CRC and ATMF. The remaining five parallel fallbacks
+  are deliberate: three sources duplicate article sequences and two are
+  multi-treaty COTIF bundles outside this module's shape.
+  `test/test_parallelappendix.py` locks the three-language projection, the
+  restored title/preamble and the CoE-link rendering with frozen fixtures. Each
+  instrument keeps its title and preamble as ingress and a protocol number;
+  the projection anchors it `#B1`/`#B1P4` and resolves the treaty it reproduces
+  through the curated `sfs/data/incorporates.json` (`{sfs}#{fragment}` →
+  `source/number`), so ECHR articles link to their `ext/coe/NNN` targets. Nicer
+  ragged-column rendering remains a downstream improvement. Details and the
+  reproducible tally are in `accommodanda/sfs/parallelappendix.md`.
+  The renderer already derives its column set from the appendix's own
+  `languages` list (two or three) via the `--n-languages` custom property.
 - ✅ **Omitted graphics — detected, localized and rendered.** The consolidated
   SFST source drops graphics, formulas, maps, symbols and some tables.
   Detection is deterministic: `sfs/graphics.py` turns both slash-delimited and
@@ -2214,12 +2224,16 @@ Two verticals joined by one artifact-level identity grammar:
 - **SFS bridge:** the ECHR instruments actually reproduced in SFS 1994:1219
   (Convention plus Protocols 1, 4, 6, 7, 13 and 16) carry an `rdfs:seeAlso`
   document edge to that SFS. Protocol 12 is intentionally excluded. The CoE
-  articles remain the canonical provision nodes; `sfs/echr.py` now models the
-  incorporated appendix as aligned instruments, sections, articles and paragraphs with
-  stable local fragments, and the SFS projection emits reverse `rdfs:seeAlso`
-  links from each reproduced instrument/provision to its CoE node. This is a
-  crosswalk, not `owl:sameAs`: one SFS article row contains three language
-  versions while the Treaty Office artifact is the official English source.
+  articles remain the canonical provision nodes. `sfs/parallelappendix.py`
+  models the incorporated appendix as aligned instruments, sections, articles
+  and paragraphs with stable local fragments — the base convention at `#B1`,
+  each protocol at `#B1P<n>`. The generic parser has no treaty-identity lookup;
+  the projection resolves each fragment through the curated
+  `sfs/data/incorporates.json` (`{sfs}#{fragment}` → `source/number`, eg.
+  `coe/046`), so the SFS projection emits the reverse link from those local
+  fragments to CoE — a table, not a parsing rule. Such links are `rdfs:seeAlso`,
+  not `owl:sameAs`: one SFS article row contains three language versions while
+  the Treaty Office artifact is the official English source.
 
 Wired through `build.py`, `layout`, catalog, facets, search/dump and static
 rendering; `test/test_{hudoc,coe}.py` includes an end-to-end catalog assertion
@@ -2243,7 +2257,7 @@ rewrite work.
 | `tools/golden_sfs.py` | golden-corpus comparator (`normalize` parsed XHTML → NF on the fly) |
 | `../ferenda.old/data/sfs/parsed/` | the golden = old-pipeline parsed XHTML (11,056 docs), normalized per comparison — sibling checkout, not `site/data/` |
 | `accommodanda/lib/` | **shared** horizontal libs: `lagrum` (citation engine), `util`, `errors` (`SkipDocument`), `harvest` (shared incremental-download core — `HarvestWatermark`, `walk`), `casenaming`/`eucasenaming` (DV/EU case identity + display naming), `facsimile` (on-demand source-PDF page → retina PNG, disk-cached; `/api/v1/facsimile` + the legacy `/prop/2022/23:10/sid1.png` grammar) |
-| `accommodanda/sfs/` | **acts vertical**: `{extract,reader,model,tokenizer,assembler,nf}` parser + `convention` and `{echr,crc,montreal,atmf}` (aligned trilingual convention appendices) + `register` (SFSR→amendments/förarbeten/metadata) + `graphics` (typed omitted-content detection *and* vision-localization — `collect_gaps`/`provenance_sfs`/`localize_group`) + `pdfmirror` (`mirror-pdf`, official-PDF mirror, the crop source) + `asgit` (`history-as-git` — the corpus as a git repo, one commit per amendment event, `docs/prd-sfs-history-as-git.md`) + `__main__` (diagnostic parse/validate CLI; `mirror-pdf`/`ai-includegraphics` are `build.py` actions, not here) |
+| `accommodanda/sfs/` | **acts vertical**: `{extract,reader,model,tokenizer,assembler,nf}` parser + `parallelappendix` (structurally detected, aligned bi/trilingual convention appendices, no per-law code; 95/107 detected candidates) + `register` (SFSR→amendments/förarbeten/metadata) + `graphics` (typed omitted-content detection *and* vision-localization — `collect_gaps`/`provenance_sfs`/`localize_group`) + `pdfmirror` (`mirror-pdf`, official-PDF mirror, the crop source) + `asgit` (`history-as-git` — the corpus as a git repo, one commit per amendment event, `docs/prd-sfs-history-as-git.md`) + `__main__` (diagnostic parse/validate CLI; `mirror-pdf`/`ai-includegraphics` are `build.py` actions, not here) |
 | `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `structure`, `word`, `legacy`, `namedcases` (HD named-precedent harvester); canonical case title + HD given names live in `lib/casenaming.py` (shared with the catalog + renderer) |
 | `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, 8 types + `pm`, promemorior outside the Ds series), `model`/`structure`/`parse` (PDF/html→nested structure→artifact; `parse.tag_frontmatter` retags the prop/skr överlämnande page — ingress heading, `signatur` signer blocks), `legacy` (one-time import of the nine frozen förarbete corpora, §7g), `legacy_formats` (frozen body adapters — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML, scanned-PDF OCR text, TRIPS `div.body-text`), `riksdagen` (doctype-agnostic dokumentlista harvest engine, driven for `bet`/utskottsbetänkanden off data.riksdagen.se, no frozen corpus), `rskr` (second driver over `riksdagen.py`'s engine, for riksdagsskrivelser — HTML body, no PDF), `kommentar` (författningskommentar → EU-directive *genomför* edges, prop + fm), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf), `fk` (per-paragraf FK commentary text → `kommentarer` artifact section → `fk_kommentar` catalog layer → statute-rail "Författningskommentar"), `lydelse` (two-column nuvarande/föreslagen lydelse tables reconstructed from per-run coordinates → `tabell` blocks in the SFS `rad`/`cells` shape) |
 | `accommodanda/eurlex/` | **EU vertical (EUR-Lex/CELLAR)**: `download` (SPARQL discovery), `bulk` (dump import), `parse`/`parse_html`/`parse_pdf` (Formex/HTML/PDF → one artifact shape), `definitions` (defined-terms extraction + in-act interlinking), `lang`, `model`, `casenames` (harvest CELEX → usual name for named EU cases from Wikidata into `data/casenames.json`, read by `lib/eucasenaming.py`) |
@@ -2374,6 +2388,25 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **sfs** (2026-07-14) — 🚧 convention appendices are parsed by one
+  `sfs/parallelappendix.py` with **no per-law knowledge**: article sequences
+  locate the per-language blocks, `langdetect` labels each complete block, and
+  structural rules read treaties/protocols, divisions, articles and paragraphs.
+  `sfs/__init__.py::_assemble` dispatches to it structurally (never by SFS
+  number); a statute that isn't a parallel corpus, or one that looks parallel
+  but doesn't line up (`AppendixMisaligned`), flat-parses instead. Sequential
+  glued headings, multilingual divisions, omitted division headings and SFS
+  `/…/` directives are handled generically, bringing coverage from 84 to
+  **95/107 structurally detected candidates (89%)**. The five remaining
+  parallel fallbacks are three duplicated source article sequences and two
+  multi-treaty COTIF bundles. Instruments keep their title/preamble as ingress
+  and a protocol number; the projection anchors them `#B1`/`#B1P4` and resolves
+  the treaty each reproduces through the curated `sfs/data/incorporates.json`
+  (`{sfs}#{fragment}` → `source/number`), adding no per-law code to the parser.
+  Current scope and the reproducible tally are in
+  `accommodanda/sfs/parallelappendix.md`.
+  An earlier per-convention-spec spike was discarded in favour of this
+  structural approach.
 - **sfs** (2026-07-13) — the text-only-source loss is now explicit in the
   artifact *and* recovered end to end. `sfs/graphics.py` detects SFST
   omission markers and 2007:90's unmarked road-sign cells, and `nf.py`
