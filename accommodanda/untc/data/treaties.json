@@ -1,0 +1,19 @@
+{
+  "_comment": "Curated UN Treaty Collection (MTDSG) instruments, one harvest engine over all of them (rule:configured-by-data). Keyed by mtdsg_no; `chapter` completes the ViewDetailsIII.aspx query, `title` is the authoritative English name (the page headline is generic), `sv`/`abbr` drive the folkrätt listing, `group` is the Swedish subject heading it files under. The MTDSG holds status only -- these instruments' authentic text lives in per-treaty UNTS PDFs, out of this uniform scrape.",
+  "treaties": [
+    {"mtdsg_no": "XXIII-1", "chapter": "23", "title": "Vienna Convention on the Law of Treaties", "sv": "Wienkonventionen om traktaträtten", "abbr": "VCLT", "group": "Traktaträtt och havsrätt"},
+    {"mtdsg_no": "XXI-6", "chapter": "21", "title": "United Nations Convention on the Law of the Sea", "sv": "FN:s havsrättskonvention", "abbr": "UNCLOS", "group": "Traktaträtt och havsrätt"},
+    {"mtdsg_no": "IV-1", "chapter": "4", "title": "Convention on the Prevention and Punishment of the Crime of Genocide", "sv": "folkmordskonventionen", "abbr": null, "group": "Mänskliga rättigheter"},
+    {"mtdsg_no": "IV-2", "chapter": "4", "title": "International Convention on the Elimination of All Forms of Racial Discrimination", "sv": "rasdiskrimineringskonventionen", "abbr": "ICERD", "group": "Mänskliga rättigheter"},
+    {"mtdsg_no": "IV-3", "chapter": "4", "title": "International Covenant on Economic, Social and Cultural Rights", "sv": "konventionen om ekonomiska, sociala och kulturella rättigheter", "abbr": "ICESCR", "group": "Mänskliga rättigheter"},
+    {"mtdsg_no": "IV-4", "chapter": "4", "title": "International Covenant on Civil and Political Rights", "sv": "konventionen om medborgerliga och politiska rättigheter", "abbr": "ICCPR", "group": "Mänskliga rättigheter"},
+    {"mtdsg_no": "IV-8", "chapter": "4", "title": "Convention on the Elimination of All Forms of Discrimination against Women", "sv": "kvinnokonventionen", "abbr": "CEDAW", "group": "Mänskliga rättigheter"},
+    {"mtdsg_no": "IV-9", "chapter": "4", "title": "Convention against Torture and Other Cruel, Inhuman or Degrading Treatment or Punishment", "sv": "tortyrkonventionen", "abbr": "CAT", "group": "Mänskliga rättigheter"},
+    {"mtdsg_no": "IV-11", "chapter": "4", "title": "Convention on the Rights of the Child", "sv": "barnkonventionen", "abbr": "CRC", "group": "Mänskliga rättigheter"},
+    {"mtdsg_no": "IV-13", "chapter": "4", "title": "International Convention on the Protection of the Rights of All Migrant Workers and Members of Their Families", "sv": "konventionen om migrantarbetares rättigheter", "abbr": "CMW", "group": "Mänskliga rättigheter"},
+    {"mtdsg_no": "IV-15", "chapter": "4", "title": "Convention on the Rights of Persons with Disabilities", "sv": "funktionsrättskonventionen", "abbr": "CRPD", "group": "Mänskliga rättigheter"},
+    {"mtdsg_no": "IV-16", "chapter": "4", "title": "International Convention for the Protection of All Persons from Enforced Disappearance", "sv": "konventionen mot påtvingade försvinnanden", "abbr": "CED", "group": "Mänskliga rättigheter"},
+    {"mtdsg_no": "V-2", "chapter": "5", "title": "Convention relating to the Status of Refugees", "sv": "flyktingkonventionen", "abbr": null, "group": "Flyktingrätt"},
+    {"mtdsg_no": "V-5", "chapter": "5", "title": "Protocol relating to the Status of Refugees", "sv": "flyktingprotokollet", "abbr": null, "group": "Flyktingrätt"}
+  ]
+}

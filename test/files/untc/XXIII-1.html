@@ -1,0 +1,30 @@
+<!-- Synthetic MTDSG status page, hand-built to exercise the untc scraper:
+     stable control ids for the metadata, a decoy territorial-notification table
+     that also opens with a "Participant" header (the tblgrid anchor must win),
+     footnote <sup> markers, a declaring state wrapped in <a class="noteIndex">,
+     and every action marker (accession a, succession d, formal confirmation c,
+     plain ratification). Trimmed from the real Vienna Convention page. -->
+<html><head><title>UNTC</title></head><body>
+<span id="ctl00_ContentPlaceHolderInnerPage_rptTreaty_ctl00_tcText">Vienna, 23 May 1969</span>
+<div id="ctl00_ContentPlaceHolderInnerPage_tcrptEIF">
+  <span id="ctl00_ContentPlaceHolderInnerPage_rptEIF_ctl00_tcLabel">Entry into force</span>
+  <span id="ctl00_ContentPlaceHolderInnerPage_rptEIF_ctl00_tcText">27 January 1980, in accordance with article 84(1).</span>
+</div>
+<span id="ctl00_ContentPlaceHolderInnerPage_rptRegistration_ctl00_tcText">27 January 1980, No. 18232</span>
+
+<!-- decoy: a territorial-application table that also opens with "Participant" -->
+<table id="ctl00_ContentPlaceHolderInnerPage_tblTerritorial">
+  <tr><td>Participant</td><td>Date of receipt of the notification</td><td>Territories</td></tr>
+  <tr><td>United Kingdom</td><td>1 Jan 1970</td><td>Some territory</td></tr>
+</table>
+
+<!-- the real participation grid -->
+<table id="ctl00_ContentPlaceHolderInnerPage_tblgrid">
+  <tr><td>Participant</td><td>Signature</td><td>Accession(a), Succession(d), Ratification</td></tr>
+  <tr><td>Afghanistan</td><td>23 May	 1969</td><td></td></tr>
+  <tr><td>Albania</td><td></td><td>27 Jun	 2001 a</td></tr>
+  <tr><td>Bosnia and Herzegovina<sup>3</sup></td><td></td><td>1 Sep	 1993 d</td></tr>
+  <tr><td><a class="noteIndex" href="#EndDec" onclick="ShowDeclarations()">Argentina</a></td><td>23 May	 1969</td><td>5 Dec	 1972</td></tr>
+  <tr><td>European Union</td><td></td><td>10 Dec	 1984 c</td></tr>
+</table>
+</body></html>
