@@ -39,6 +39,7 @@ import sys
 import time
 import traceback
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -496,6 +497,31 @@ def _progress(source, action, done, total, merged, basefile):
 SAVE_EVERY = 1000      # checkpoint the manifest mid-run, every this many docs
 
 
+def _run_parallel(source, action, basefiles, jobs, manifest, absorb):
+    """Fan the basefiles out across `jobs` worker processes, absorbing each
+    result as it completes."""
+    with ProcessPoolExecutor(max_workers=jobs, initializer=_worker_init,
+                             initargs=(manifest, RUN)) as pool:
+        # as_completed -> results in completion order (a slow doc no longer
+        # stalls the display), each paired with its basefile
+        futures = {pool.submit(_worker, (source.name, action, bf)): bf
+                   for bf in basefiles}
+        try:
+            for fut in as_completed(futures):
+                absorb(fut.result(), futures[fut])
+        except BrokenProcessPool as e:
+            # a worker died hard (segfault/OOM in a C extension) and took the
+            # whole pool down with it -- every pending future is now unresolvable.
+            # _worker_init's faulthandler already dumped the crashing worker's
+            # Python stack (and the basefile in flight) to stderr; nothing here is
+            # recoverable, so fail loudly rather than silently drop the remaining
+            # docs. Rerun with --jobs 1 to isolate the offending basefile.
+            raise RuntimeError(
+                "parallel build pool crashed -- see the faulthandler traceback "
+                "above for the worker's stack; rerun with --jobs 1 to isolate "
+                "the offending basefile") from e
+
+
 def run_action(source, action, basefiles, jobs):
     manifest = load_manifest()
     merged = Result()
@@ -517,14 +543,7 @@ def run_action(source, action, basefiles, jobs):
 
     try:
         if jobs > 1 and not RUN.dry_run:
-            with ProcessPoolExecutor(max_workers=jobs, initializer=_worker_init,
-                                     initargs=(manifest, RUN)) as pool:
-                # as_completed -> results in completion order (a slow doc no
-                # longer stalls the display), each paired with its basefile
-                futures = {pool.submit(_worker, (source.name, action, bf)): bf
-                           for bf in basefiles}
-                for fut in as_completed(futures):
-                    absorb(fut.result(), futures[fut])
+            _run_parallel(source, action, basefiles, jobs, manifest, absorb)
         else:
             for bf in basefiles:
                 absorb(build_one(source, action, bf, manifest), bf)
