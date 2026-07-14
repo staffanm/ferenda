@@ -1,3 +1,71 @@
+.kapitelrubrik, .paragraf, .stycke {
+  position: relative;
+  padding-right: 80px;
+}
+
+.aside-attribution {
+  width: 60px;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  right: 0;
+  border-top: 1px solid #f5f5f5;
+  border-left: 1px solid #f5f5f5;
+  border-right: 1px solid #ddd;
+  border-bottom: 1px solid #ddd;
+  font-size: 0.12px;
+  overflow: hidden;
+}
+
+.aside-attribution .acclamation {
+  background: #99ff99;
+  width: 100%;
+  height: 100%;
+  display: inline-block;
+  top: 0;
+  right: 0;
+}
+
+.aside-attribution .vote {
+  height: 100%;
+  display: inline-block;
+  top: 0;
+  right: 0;
+}
+
+.aside-attribution .vote-yes { border-top: 20px solid #99ff99; }
+.aside-attribution .vote-no { border-top: 20px solid #550000; }
+.aside-attribution .vote-absent { border-top: 20px solid #999999; }
+
+.aside-attribution .party-V { background: #DA291C; }
+.aside-attribution .party-MP { background: #83CF39; }
+.aside-attribution .party-S { background: #E8112d; }
+.aside-attribution .party-C { background: #009933; }
+.aside-attribution .party-L { background: #006AB3; }
+.aside-attribution .party-KD { background: #000077; }
+.aside-attribution .party-M { background: #52BDEC; }
+.aside-attribution .party-SD { background: #DDDD00; }
+
+/*
+.aside-attribution .vote-no.party-V { background: #73160f; }
+.aside-attribution .vote-no.party-MP { background: #42691d; }
+.aside-attribution .vote-no.party-S { background: #820a19; }
+.aside-attribution .vote-no.party-C { background: #003311; }
+.aside-attribution .vote-no.party-L { background: #002d4d; }
+.aside-attribution .vote-no.party-KD { background: #000012; }
+.aside-attribution .vote-no.party-M { background: #2f6c87; }
+.aside-attribution .vote-no.party-SD { background: #787800; }
+
+.aside-attribution .vote-absent.party-V { background: #73160f; }
+.aside-attribution .vote-absent.party-MP { background: #42691d; }
+.aside-attribution .vote-absent.party-S { background: #820a19; }
+.aside-attribution .vote-absent.party-C { background: #003311; }
+.aside-attribution .vote-absent.party-L { background: #002d4d; }
+.aside-attribution .vote-absent.party-KD { background: #000012; }
+.aside-attribution .vote-absent.party-M { background: #2f6c87; }
+.aside-attribution .vote-absent.party-SD { background: #787800; }
+*/
+
 .paragrafbeteckning {
     font-weight: bold;
     text-decoration: none;
