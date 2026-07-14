@@ -186,15 +186,18 @@ def test_incremental_floor_reaches_below_high_for_an_active_sector():
     assert floor < high                       # the whole point: below high
 
 
-def test_enum_years_caselaw_walks_from_first_year_ignoring_the_floor():
+def test_enum_years_caselaw_reaches_a_bounded_lookback_below_the_floor():
     # regression: a CJEU judgment's CELEX year is the CASE year, but its work
-    # date is the DECISION date, years later. With a 2025 floor a 2020-case
-    # judgment decided in 2025 (62020CJ...) must still be enumerated, so caselaw
-    # walks every year from first_year -- the floor only prunes within a year.
+    # date is the DECISION date, a few years later. With a 2025 floor a
+    # 2020-case judgment decided in 2025 (62020CJ...) must still be enumerated,
+    # so caselaw reaches CASELAW_DECISION_LAG_YEARS below the floor -- but NOT
+    # all the way to first_year (which meant ~73 slow SPARQL queries per run).
     caselaw = D.SECTORS["caselaw"]
     years = list(D.enum_years(caselaw, date(2025, 1, 1)))
-    assert years[0] == caselaw.first_year          # 1954, not 2025
+    assert years[0] == 2025 - D.CASELAW_DECISION_LAG_YEARS   # 2020, not 1954
     assert years[-1] == date.today().year
+    # the lookback never underflows first_year
+    assert list(D.enum_years(caselaw, date(1955, 1, 1)))[0] == caselaw.first_year
 
 
 def test_enum_years_legislation_and_treaties_start_at_the_floor_year():

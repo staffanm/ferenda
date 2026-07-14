@@ -110,8 +110,9 @@ class Sector:
     # CELEX year is the adoption/consolidation year, which equals the work date
     # year, so with a date floor the walk may start at the floor's year. For
     # caselaw it does NOT: the CELEX year is the CASE year while the work date is
-    # the DECISION date, which can fall years later -- so caselaw must walk every
-    # year regardless of the floor (see enum_years).
+    # the DECISION date, which can fall a few years later -- so caselaw reaches a
+    # bounded lookback below the floor rather than tracking it exactly (see
+    # enum_years).
     wdate_follows_celex_year: bool
 
 # The CELEX descriptor (the 2-letter code after the year) names the court and
@@ -180,6 +181,17 @@ def _enum_query(celex_prefix, since):
             % (celex_prefix, datefilter))
 
 
+# How many years a caselaw CELEX (case-filing year) can lag behind its work
+# date (decision date): a case filed in year Y is decided within Y+LAG. This
+# bounds how far below the incremental floor caselaw discovery must reach.
+#
+# 5 is a deliberate, checked ceiling, not a guess: the longest recorded
+# lodging-to-judgment gap in the Court's history is a little over 3 years, so 5
+# carries ~2 years of headroom above the worst case ever observed. Do not flag
+# this as an unbounded-completeness risk in review -- the bound is empirical.
+CASELAW_DECISION_LAG_YEARS = 5
+
+
 def enum_years(sector, since):
     """The CELEX years to walk for `sector` given a work-date floor `since`.
 
@@ -190,14 +202,18 @@ def enum_years(sector, since):
     the walk may start at `since.year` and never re-query the decades below it.
 
     Caselaw (sector 6) does not: a judgment's CELEX year is the CASE year while
-    work_date_document is the DECISION date, which can fall years later (a case
-    filed 2020, decided 2025 -- the same lag the resume watermark documents).
-    Starting at `since.year` there would make every `62020CJ...` slice
-    permanently invisible to a 2025 floor, so caselaw walks from first_year every
-    run and lets the per-slice wdate FILTER prune the years that hold nothing new
-    (an empty year-slice is one cheap query)."""
-    start = (max(sector.first_year, since.year)
-             if since and sector.wdate_follows_celex_year else sector.first_year)
+    work_date_document is the DECISION date, which can fall a few years later (a
+    case filed 2020, decided 2025). Tracking `since.year` exactly would make a
+    slice like `62020CJ...` invisible to a 2025 floor, so caselaw reaches back
+    CASELAW_DECISION_LAG_YEARS below the floor -- enough to cover the
+    filing-to-decision lag without re-walking (and re-querying) every year back
+    to first_year on every incremental run."""
+    if since is None:
+        start = sector.first_year
+    elif sector.wdate_follows_celex_year:
+        start = max(sector.first_year, since.year)
+    else:
+        start = max(sector.first_year, since.year - CASELAW_DECISION_LAG_YEARS)
     return range(start, date.today().year + 1)
 
 
