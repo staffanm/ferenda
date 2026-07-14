@@ -1478,7 +1478,8 @@ MAST_NAV = (("Lagar", "/sfs/", ("Författning",)),
             ("EU-rätt", "/eurlex/", ("EU-förordning", "EU-direktiv", "EU-beslut",
              "EU-domstolen", "Fördrag", "EU-rättsakt")),
             ("Folkrätt", "/folkratt/", ("Folkrätt", "Europarådets fördrag",
-             "Europadomstolen")),
+             "Internationell humanitär rätt", "FN-fördrag", "Europadomstolen",
+             "Internationella brottmålsdomstolen")),
             ("Om", "/om/", ("Om",)),
             ("Nyheter", "/dataset/sitenews/feed/", ("Nyheter",)))
 
@@ -2644,6 +2645,115 @@ def render_coe(art, site):
                 source_url=art.get("source_url"))
 
 
+def _render_icrc_provision(node, site, doc_uri, toc, rail):
+    aid = node.get("id")
+    title = render_runs(node.get("text", []), site)
+    anchor = toc.add(aid, plain(node.get("text", [])), 1)
+    ordinal = node.get("ordinal")
+    rail.add(aid, "Artikel %s" % ordinal if ordinal else plain(node.get("text", [])))
+    children = "".join(render_node(child, site, doc_uri, toc, rail)
+                       for child in node.get("children", []))
+    return ('<section class="artikel"%s%s><h2 id="%s">%s</h2>%s</section>'
+            % (_id_attr(None), _rail_attr(rail, aid), escape(anchor), title, children))
+
+
+def render_icrc(art, site):
+    md = art.get("metadata", {})
+    meta = _meta_dl([
+        ("ICRC-nummer", art.get("number")),
+        ("Antagen", md.get("adoptionDate")),
+        ("Ikraftträdande", md.get("entryIntoForce")),
+        ("I kraft", {True: "Ja", False: "Nej"}.get(md.get("inForce"))),
+        ("Depositarie", md.get("depositary")),
+        ("Ämnen", ", ".join(md.get("topics") or []) or None),
+        ("Autentiska språk", ", ".join(md.get("languages") or []) or None),
+        ("Antal parter", str(md["statesParties"]) if md.get("statesParties") else None),
+    ])
+    toc = Toc()
+    rail = Rail(site, art["uri"])
+    parts = [document_inbound(site, art["uri"])]
+    if art.get("summary"):
+        parts.append('<p class="lead">%s</p>' % escape(art["summary"]))
+    for node in art.get("structure", []):
+        if node.get("type") == "artikel":
+            parts.append(_render_icrc_provision(node, site, art["uri"], toc, rail))
+        else:
+            parts.append(render_node(node, site, art["uri"], toc, rail))
+    rail.add_document()
+    return page(art.get("title") or art.get("identifier"),
+                "Internationell humanitär rätt", meta, "".join(parts),
+                render_toc(toc), eyebrow=art.get("identifier"),
+                island=rail.island(), source_url=art.get("source_url"))
+
+
+# the consent-to-be-bound forms an MTDSG participation records, in Swedish
+UNTC_ACTIONS_SV = {
+    "ratification": "ratificering", "accession": "anslutning",
+    "succession": "succession", "formal confirmation": "formellt bekräftande",
+    "acceptance": "godtagande", "approval": "godkännande",
+}
+
+
+def _untc_parties(parties):
+    """The participation table -- each state's signature and its binding consent
+    (form + date). The MTDSG carries no treaty text, so this is the page's body."""
+    rows = []
+    for party in parties:
+        consent = ("%s (%s)" % (party.get("actionDate") or "",
+                                UNTC_ACTIONS_SV.get(party["action"], party["action"]))
+                   if party.get("action") else "")
+        rows.append("<tr><td>%s</td><td>%s</td><td>%s</td></tr>"
+                    % (escape(party["country"]), escape(party.get("signature") or ""),
+                       escape(consent)))
+    return ('<h2 id="parter">Parter</h2>'
+            '<table class="untc-parties"><thead><tr><th>Stat</th>'
+            '<th>Undertecknande</th><th>Bindande samtycke</th></tr></thead>'
+            '<tbody>%s</tbody></table>' % "".join(rows))
+
+
+def render_untc(art, site):
+    md = art.get("metadata", {})
+    place, date = md.get("conclusionPlace"), md.get("conclusionDate")
+    meta = _meta_dl([
+        ("Referens", md.get("reference")),
+        ("Antagen", "%s, %s" % (place, date) if place and date else date),
+        ("Ikraftträdande", md.get("entryIntoForce")),
+        ("Registrering (UNTS)", md.get("registration")),
+        ("Depositarie", md.get("depositary")),
+        ("Antal parter", str(md["statesParties"]) if md.get("statesParties") else None),
+    ])
+    rail = Rail(site, art["uri"])
+    parts = [document_inbound(site, art["uri"])]
+    if art.get("parties"):
+        parts.append(_untc_parties(art["parties"]))
+    rail.add_document()
+    return page(art.get("title"), "FN-fördrag", meta, "".join(parts), "",
+                eyebrow=md.get("reference"), island=rail.island(),
+                source_url=art.get("source_url"))
+
+
+def render_icc(art, site):
+    md = art.get("metadata", {})
+    meta = _meta_dl([
+        ("Domstol", md.get("publisher")),
+        ("Mål", md.get("caseNumber")),
+        ("Dokumentnummer", md.get("documentNumber")),
+        ("Avgörandedatum", art.get("date")),
+        ("Kammare", md.get("chamber")),
+        ("Dokumenttyp", md.get("title")),
+    ])
+    toc = Toc()
+    rail = Rail(site, art["uri"])
+    body = document_inbound(site, art["uri"]) + "".join(
+        render_node(node, site, art["uri"], toc, rail)
+        for node in art.get("structure", []))
+    rail.add_document()
+    return page(art.get("title") or md.get("documentNumber"),
+                "Internationella brottmålsdomstolen", meta, body, render_toc(toc),
+                eyebrow=md.get("documentNumber"), island=rail.island(),
+                source_url=art.get("source_url"))
+
+
 # the sources whose pages carry inline-editable content. A logged-in user edits
 # the *commentary* (kommentar rail) on a host act's node -- the official body text
 # stays read-only -- so the editable ref is the host's `annotates` basefile: the
@@ -2684,7 +2794,9 @@ def render_document(art, source, site):
     html = {"sfs": render_sfs, "dv": render_dv, "forarbete": render_forarbete,
             "begrepp": render_begrepp, "eurlex": render_eurlex,
             "foreskrift": render_foreskrift, "avg": render_avg,
-            "hudoc": render_hudoc, "coe": render_coe}[source](art, site)
+            "hudoc": render_hudoc, "coe": render_coe,
+            "icrc": render_icrc, "untc": render_untc,
+            "icc": render_icc}[source](art, site)
     meta = _document_edit_meta(source, art)
     alias = feeds.alias_for_source(source)
     discovery = ('<link rel="alternate" type="application/atom+xml" '
@@ -2704,18 +2816,21 @@ def render_document(art, source, site):
 # kommentar is an annotation layer shown in the rail (no page tree), so it is
 # not a browsable source on the frontpage
 SOURCE_ORDER = ("sfs", "dv", "hudoc", "forarbete", "foreskrift", "avg",
-                "eurlex", "coe", "begrepp")
+                "eurlex", "coe", "icrc", "untc", "icc", "begrepp")
 SOURCE_LABEL = {"sfs": "Författningar", "dv": "Rättsfall",
                 "forarbete": "Förarbeten", "foreskrift": "Myndighetsföreskrifter",
                 "avg": "JO- och JK-beslut", "eurlex": "EU-rättsakter",
                 "hudoc": "Europadomstolens praxis",
                 "coe": "Europarådets fördrag",
+                "icrc": "Internationell humanitär rätt",
+                "untc": "FN-fördrag",
+                "icc": "Internationella brottmålsdomstolen",
                 "kommentar": "Lagkommentarer", "begrepp": "Begrepp"}
 # the international-law sources share one masthead entry and one landing page
 # (/folkratt/): a bespoke alphabetical treaty listing (coe) beside the faceted
 # case browse (hudoc), which relocates under /folkratt/hudoc/. coe has no faceted
 # browse tree of its own -- its whole listing lives on the landing page.
-FOLKRATT_SOURCES = ("hudoc", "coe")
+FOLKRATT_SOURCES = ("hudoc", "coe", "icrc", "untc", "icc")
 FOLKRATT_LABEL = "Folkrätt"
 BROWSE_DIR = {"dv": "dom", "hudoc": "folkratt/hudoc"}
 
@@ -2786,16 +2901,29 @@ def render_index(con):
 # /folkratt/hudoc/) plus a most-cited reel.
 # --------------------------------------------------------------------------
 
-@functools.lru_cache(maxsize=1)
-def _coe_named():
-    """The hand-edited coe/data/names.json, the file the citation engine reads,
-    as {ETS/CETS number: entry}. Its keys are the curated central treaties
-    (surfaced first on the folkrätt page); each entry carries the informal
-    Swedish name(s) (`label`) and acronym (`abbr`) shown in the listing, either a
-    string or a list."""
+@functools.lru_cache(maxsize=None)
+def _treaty_named(path):
+    """A hand-edited treaty names.json (coe or icrc) as {number: entry}: the
+    curated central instruments surfaced first on the folkrätt page, each
+    carrying the informal Swedish name(s) (`label`) and acronym (`abbr`), either
+    a string or a list. Cached per file -- the folkrätt page rebuilds often."""
     return {number: entry
-            for number, entry in json.loads(datasets.COE_NAMES.read_text("utf-8")).items()
+            for number, entry in json.loads(path.read_text("utf-8")).items()
             if isinstance(entry, dict)}
+
+
+def _ext_number(uri):
+    return uri.rsplit("/", 1)[-1]                 # '…/ext/coe/005' -> '005'
+
+
+def _treaty_rows(con, source):
+    """The catalogued treaties of a folkrätt source as the row dicts the two
+    listings build from (number parsed off the uri, title/kind/date/identifier,
+    plus the artifact path for a listing that needs a field the catalog omits)."""
+    return [{"uri": uri, "number": _ext_number(uri), "kind": kind,
+             "title": title, "identifier": label, "date": doc_date, "path": path}
+            for uri, _src, kind, label, title, _url, path, _display, doc_date
+            in catalog.facet_documents(con, source)]
 
 
 def _first(value):
@@ -2804,10 +2932,10 @@ def _first(value):
     return value[0] if isinstance(value, list) else value
 
 
-def _coe_parenthetical(row, named):
+def _treaty_parenthetical(row, named, reference):
     """The subdued gloss after a treaty title: its informal Swedish name and
-    acronym where registered, then always the ETS/CETS reference --
-    'Europakonventionen, EKMR, ETS No. 005', or just 'ETS No. 024'."""
+    acronym where registered, then always the given reference --
+    'Europakonventionen, EKMR, ETS No. 005', or just 'ICRC 195'."""
     entry = named.get(row["number"]) or {}
     parts = []
     if entry.get("label"):
@@ -2815,12 +2943,8 @@ def _coe_parenthetical(row, named):
         parts.append(name[:1].upper() + name[1:])
     if entry.get("abbr"):
         parts.append(_first(entry["abbr"]))
-    parts.append(row["identifier"])
+    parts.append(reference)
     return ", ".join(parts)
-
-
-def _coe_number(uri):
-    return uri.rsplit("/", 1)[-1]                 # '…/ext/coe/005' -> '005'
 
 
 def _coe_sort_key(title):
@@ -2860,7 +2984,7 @@ def _coe_entry(row, named, children):
     name = ('<a href="%s"><span class="pre">%s</span>%s</a> '
             '<span class="ref">(%s)</span>'
             % (escape(href(row["uri"])), escape(pre), escape(key or row["title"]),
-               escape(_coe_parenthetical(row, named))))
+               escape(_treaty_parenthetical(row, named, row["identifier"]))))
     kids = children.get(row["number"], [])
     inner = ('<ul class="folkratt-protocols">%s</ul>'
              % "".join(_coe_entry(k, named, children) for k in kids)) if kids else ""
@@ -2870,13 +2994,10 @@ def _coe_entry(row, named, children):
 def _coe_listing(con):
     """The Council-of-Europe half of the folkrätt page: the central treaties, then
     every other instrument A-Z, protocols nested. '' when the corpus has none."""
-    rows = [{"uri": uri, "number": _coe_number(uri), "kind": kind,
-             "title": title, "identifier": label, "date": doc_date}
-            for uri, _src, kind, label, title, _url, _path, _display, doc_date
-            in catalog.facet_documents(con, "coe")]
+    rows = _treaty_rows(con, "coe")
     if not rows:
         return ""
-    named = _coe_named()
+    named = _treaty_named(datasets.COE_NAMES)
     top, children = _coe_nest(rows)
     groups = []
     for heading, members in (
@@ -2888,6 +3009,161 @@ def _coe_listing(con):
                                               for r in members)))
     return ('<section class="folkratt-group"><h2>Europarådet</h2>%s</section>'
             % "".join(groups))
+
+
+def _icrc_entry(row, named):
+    # a flat entry (icrc has no protocol nesting): the full title, then the gloss
+    # closing on the ICRC treaty number rather than an ETS/CETS reference
+    return ('<li><a href="%s">%s</a> <span class="ref">(%s)</span></li>'
+            % (escape(href(row["uri"])), escape(row["title"]),
+               escape(_treaty_parenthetical(row, named, "ICRC %s" % row["number"]))))
+
+
+# the ICRC's own field_treaty_topics taxonomy, in display order, mapped to the
+# Swedish headings that carve the non-central instruments into a browsable index
+# (the last entry is the catch-all: its topic plus any unmapped/absent topic).
+ICRC_TOPIC_GROUPS = (
+    ("Methods and Means of Warfare", "Stridsmetoder och stridsmedel"),
+    ("Naval and Air Warfare", "Sjö- och luftkrigföring"),
+    ("Victims of Armed Conflicts", "Skydd av krigets offer"),
+    ("Cultural Property", "Skydd av kulturegendom"),
+    ("Criminal Repression", "Straffrättsligt ansvar"),
+    ("Other treaties relating to IHL", "Övriga fördrag"),
+)
+
+
+def _icrc_topic(root, path):
+    """The primary ICRC subject a treaty files under -- the first of its
+    field_treaty_topics, read from the artifact the catalog omits it from
+    (`root` is `catalog.data_root(con)`, so the stored relative path resolves)."""
+    topics = catalog.load_artifact(root, path).get("metadata", {}).get("topics") or []
+    return topics[0] if topics else None
+
+
+# shared folkrätt-listing emitters: every treaty/decision source renders its
+# groups the same way (a <h3> subject/type heading over a treaty <ul>, wrapped in
+# a source <section>), so the HTML lives here once and each listing supplies only
+# its bucketing and its per-row `entry` renderer.
+def _folkratt_group(heading, members, entry):
+    return ('<h3>%s</h3><ul class="browse-list folkratt-treaties">%s</ul>'
+            % (escape(heading), "".join(entry(r) for r in members)))
+
+
+def _folkratt_section(title, groups):
+    body = "".join(group for group in groups if group)
+    return ('<section class="folkratt-group"><h2>%s</h2>%s</section>'
+            % (escape(title), body)) if body else ""
+
+
+def _grouped_listing(title, rows, group_of, labels, entry, reverse=False):
+    """A folkrätt listing bucketed by `group_of`, headed by the `labels` in their
+    order then any trailing bucket, each group sorted by (date, title). '' when
+    the source has no rows. The two flat sources (untc, icc) share this whole
+    body; icrc keeps its own (a central group + orphan-folded topic index)."""
+    if not rows:
+        return ""
+    by_group = {}
+    for row in rows:
+        by_group.setdefault(group_of(row), []).append(row)
+    order = list(labels) + [key for key in by_group if key not in labels]
+    groups = []
+    for key in order:
+        members = sorted(by_group.get(key, []),
+                         key=lambda r: (r["date"] or "", r["title"].lower()),
+                         reverse=reverse)
+        if members:
+            groups.append(_folkratt_group(labels.get(key, key), members, entry))
+    return _folkratt_section(title, groups)
+
+
+def _icrc_listing(con):
+    """The ICRC half of the folkrätt page: the central Geneva-law instruments
+    first, then the rest carved into a subject index by the ICRC topic taxonomy,
+    each group chronological. '' when the corpus has none."""
+    rows = _treaty_rows(con, "icrc")
+    if not rows:
+        return ""
+    named = _treaty_named(datasets.ICRC_NAMES)
+    root = catalog.data_root(con)
+    entry = lambda row: _icrc_entry(row, named)
+    central = sorted((r for r in rows if r["number"] in named),
+                     key=lambda r: int(re.sub(r"\D", "", r["number"]) or 0))
+    by_topic = {}
+    for row in rows:
+        if row["number"] not in named:
+            by_topic.setdefault(_icrc_topic(root, row["path"]), []).append(row)
+    known = {topic for topic, _heading in ICRC_TOPIC_GROUPS}
+    orphans = [row for topic, group in by_topic.items() if topic not in known
+               for row in group]
+    groups = []
+    if central:
+        groups.append(_folkratt_group("Genèvekonventionerna och tilläggsprotokollen",
+                                      central, entry))
+    for topic, heading in ICRC_TOPIC_GROUPS:
+        members = by_topic.get(topic, [])
+        if topic == ICRC_TOPIC_GROUPS[-1][0]:        # the catch-all absorbs orphans
+            members = members + orphans
+        if members:
+            members = sorted(members, key=lambda r: (r["date"] or "", r["title"].lower()))
+            groups.append(_folkratt_group(heading, members, entry))
+    return _folkratt_section("Internationell humanitär rätt (ICRC)", groups)
+
+
+@functools.lru_cache(maxsize=1)
+def _untc_curated():
+    """The curated UN Treaty Collection list as {mtdsg_no: entry} -- the Swedish
+    name/acronym and subject group the catalog does not carry. Cached: the
+    folkrätt page rebuilds often (as with `_treaty_named`)."""
+    return {t["mtdsg_no"]: t
+            for t in json.loads(datasets.UNTC_TREATIES.read_text("utf-8"))["treaties"]}
+
+
+# the subject groups the UN instruments file under, in display order (any group
+# not listed here trails, so a new curated group needs no code change)
+UNTC_GROUP_ORDER = ("Traktaträtt och havsrätt", "Mänskliga rättigheter",
+                    "Flyktingrätt")
+
+
+def _untc_entry(row, curated):
+    entry = curated.get(row["number"]) or {}
+    named = {row["number"]: {"label": entry.get("sv"), "abbr": entry.get("abbr")}}
+    return ('<li><a href="%s">%s</a> <span class="ref">(%s)</span></li>'
+            % (escape(href(row["uri"])), escape(row["title"]),
+               escape(_treaty_parenthetical(row, named, "MTDSG %s" % row["number"]))))
+
+
+def _untc_listing(con):
+    """The UN half of the folkrätt page: the curated instruments grouped by
+    subject (law of treaties/sea, human rights, refugees), each chronological."""
+    curated = _untc_curated()
+    return _grouped_listing(
+        "Förenta nationerna (FN)", _treaty_rows(con, "untc"),
+        lambda row: (curated.get(row["number"]) or {}).get("group") or "Övriga",
+        {group: group for group in UNTC_GROUP_ORDER},
+        lambda row: _untc_entry(row, curated))
+
+
+@functools.lru_cache(maxsize=1)
+def _icc_types():
+    """The curated ICC decision kinds -> Swedish heading, in display order (the
+    catalog does not carry the label). Cached (the folkrätt page rebuilds often)."""
+    return {t["kind"]: t["label"]
+            for t in json.loads(datasets.ICC_DECISION_TYPES.read_text("utf-8"))["types"]}
+
+
+def _icc_entry(row):
+    gloss = ", ".join(part for part in (row["identifier"], row["date"]) if part)
+    return ('<li><a href="%s">%s</a> <span class="ref">(%s)</span></li>'
+            % (escape(href(row["uri"])), escape(row["title"] or row["identifier"]),
+               escape(gloss)))
+
+
+def _icc_listing(con):
+    """The ICC half of the folkrätt page: the substantive decisions grouped by
+    Rome-Statute decision type, each group newest first."""
+    return _grouped_listing(
+        "Internationella brottmålsdomstolen (ICC)", _treaty_rows(con, "icc"),
+        lambda row: row["kind"], _icc_types(), _icc_entry, reverse=True)
 
 
 def _hudoc_section(con):
@@ -2915,6 +3191,12 @@ def _folkratt_axis(con):
     entries = []
     if n.get("coe"):
         entries.append(("coe", "Fördrag", "/folkratt/", n["coe"]))
+    if n.get("icrc"):
+        entries.append(("icrc", "IHL-fördrag", "/folkratt/", n["icrc"]))
+    if n.get("untc"):
+        entries.append(("untc", "FN-fördrag", "/folkratt/", n["untc"]))
+    if n.get("icc"):
+        entries.append(("icc", "ICC-avgöranden", "/folkratt/", n["icc"]))
     if n.get("hudoc"):
         for b in facets.tree(con, "hudoc")["buckets"]:
             entries.append(("hudoc:" + b["slug"], b["label"],
@@ -2933,7 +3215,8 @@ def _folkratt_nav(entries, active_id):
 
 
 def render_folkratt(con):
-    body = _coe_listing(con) + _hudoc_section(con)
+    body = (_coe_listing(con) + _icrc_listing(con) + _untc_listing(con)
+            + _icc_listing(con) + _hudoc_section(con))
     if body:
         body = _folkratt_nav(_folkratt_axis(con), "coe") + body
     return page("Folkrätt", "Folkrätt", "",
@@ -3361,10 +3644,10 @@ def render_aggregates(con, out_root, catalog_path, write_index=True):
     client = _browse_client(catalog_path)
     try:
         for source in catalog.counts(con):
-            # kommentar is an annotation layer, not a browsable source; coe's
-            # instruments are listed in full on the folkrätt landing instead of
-            # a faceted-by-year tree of their own
-            if source in ("kommentar", "coe"):
+            # kommentar is an annotation layer, not a browsable source; the coe,
+            # icrc, untc and icc instruments are listed in full on the folkrätt
+            # landing instead of a faceted-by-year tree of their own
+            if source in ("kommentar", "coe", "icrc", "untc", "icc"):
                 continue
             # hudoc browses under /folkratt/hudoc/ and carries the shared folkrätt
             # selector; every other source browses on its own

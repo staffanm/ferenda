@@ -83,6 +83,10 @@ from .foreskrift import parse as foreskrift_parse
 from .foreskrift.agencies import REGISTRY as FORESKRIFT_AGENCIES
 from .hudoc import download as hudoc_download
 from .hudoc import parse as hudoc_parse
+from .icc import download as icc_download
+from .icc import parse as icc_parse
+from .icrc import download as icrc_download
+from .icrc import parse as icrc_parse
 from .lib import (
     annstore,
     casenaming,
@@ -116,6 +120,8 @@ from .sfs import versions as sfs_versions_mod
 from .sfs.nf import to_normalform
 from .site import parse as site_parse
 from .site import render as site_render
+from .untc import download as untc_download
+from .untc import parse as untc_parse
 from .wiki import annotate as wiki_annotate
 from .wiki import guidance_discover
 from .wiki import parse as wiki_parse
@@ -1600,6 +1606,122 @@ SOURCES["coe"] = Source(
           "one Treaty Office web-service search plus each official English PDF")
 
 
+# international humanitarian law treaties (ICRC): the stored record is the whole
+# JSON:API envelope (metadata + authentic text + states parties), so parse is
+# offline and needs no separate body -- the parser/model are the only recipe.
+ICRC_CODE = (PKG / "icrc" / "parse.py", PKG / "icrc" / "model.py")
+
+
+def icrc_inputs(basefile):
+    return [icrc_download.record_path(layout.ICRC_DOWNLOADED, basefile)] \
+        + _patch_input("icrc", basefile)
+
+
+def icrc_parse_run(basefile):
+    write_artifact("icrc", basefile,
+                   icrc_parse.parse(basefile, layout.ICRC_DOWNLOADED))
+
+
+def icrc_harvest(_scopes):
+    if RUN.dry_run:
+        print("icrc download: would download %s into %s"
+              % (RUN.only or "all ICRC IHL treaties", layout.ICRC_DOWNLOADED))
+        return
+    seen, changed = icrc_download.sync(
+        layout.ICRC_DOWNLOADED, full=RUN.force, only=RUN.only,
+        limit=RUN.limit, delay=POLITENESS)
+    print("icrc: %d seen, %d changed" % (seen, changed))
+
+
+SOURCES["icrc"] = Source(
+    "icrc", lambda: icrc_download.list_basefiles(layout.ICRC_DOWNLOADED),
+    {"parse": Stage("parse", icrc_parse_run,
+                    lambda bf: layout.artifact("icrc", bf),
+                    inputs=icrc_inputs, code=ICRC_CODE)},
+    harvest=icrc_harvest, origin=_origin(icrc_download.SITE),
+    notes="download flags: --only <ICRC-treaty-number>, --limit N\n"
+          "one JSON:API list call plus one included fetch per treaty")
+
+
+# UN Treaty Collection (MTDSG status pages): a curated instrument list drives one
+# HTML scrape per treaty; the stored record is the raw page, so parse is offline.
+# The curated data file is a parse input (editing it re-derives that artifact).
+UNTC_CODE = (PKG / "untc" / "parse.py", PKG / "untc" / "model.py",
+             PKG / "untc" / "data" / "treaties.json")
+
+
+def untc_inputs(basefile):
+    return [untc_download.page_path(layout.UNTC_DOWNLOADED, basefile),
+            PKG / "untc" / "data" / "treaties.json"] + _patch_input("untc", basefile)
+
+
+def untc_parse_run(basefile):
+    write_artifact("untc", basefile,
+                   untc_parse.parse(basefile, layout.UNTC_DOWNLOADED))
+
+
+def untc_harvest(_scopes):
+    if RUN.dry_run:
+        print("untc download: would download %s into %s"
+              % (RUN.only or "the curated UN Treaty Collection list",
+                 layout.UNTC_DOWNLOADED))
+        return
+    seen, changed = untc_download.sync(
+        layout.UNTC_DOWNLOADED, full=RUN.force, only=RUN.only,
+        limit=RUN.limit, delay=POLITENESS)
+    print("untc: %d seen, %d fetched" % (seen, changed))
+
+
+SOURCES["untc"] = Source(
+    "untc", lambda: untc_download.list_basefiles(layout.UNTC_DOWNLOADED),
+    {"parse": Stage("parse", untc_parse_run,
+                    lambda bf: layout.artifact("untc", bf),
+                    inputs=untc_inputs, code=UNTC_CODE)},
+    harvest=untc_harvest, origin=_origin(untc_download.DETAIL),
+    notes="download flags: --only <MTDSG-id, e.g. XXIII-1>, --limit N\n"
+          "one static-HTML scrape per curated treaty; --force refreshes status")
+
+
+# ICC substantive decisions: the icc-cpi.int /decisions facets scope the harvest,
+# Legal Tools resolves each to metadata + PDF; the stored record + PDF are the
+# parse inputs, and the curated decision-type list is a recipe input.
+ICC_CODE = (PKG / "icc" / "parse.py", PKG / "icc" / "model.py",
+            PKG / "icc" / "data" / "decision_types.json", PKG / "lib" / "pdftext.py")
+
+
+def icc_inputs(basefile):
+    return [icc_download.record_path(layout.ICC_DOWNLOADED, basefile),
+            icc_download.body_path(layout.ICC_DOWNLOADED, basefile),
+            PKG / "icc" / "data" / "decision_types.json"] \
+        + _patch_input("icc", basefile)
+
+
+def icc_parse_run(basefile):
+    write_artifact("icc", basefile, icc_parse.parse(basefile, layout.ICC_DOWNLOADED))
+
+
+def icc_harvest(_scopes):
+    if RUN.dry_run:
+        print("icc download: would download %s into %s"
+              % (RUN.only or "the curated ICC substantive decisions",
+                 layout.ICC_DOWNLOADED))
+        return
+    seen, changed = icc_download.sync(
+        layout.ICC_DOWNLOADED, full=RUN.force, only=RUN.only,
+        limit=RUN.limit, delay=POLITENESS)
+    print("icc: %d seen, %d stored" % (seen, changed))
+
+
+SOURCES["icc"] = Source(
+    "icc", lambda: icc_download.list_basefiles(layout.ICC_DOWNLOADED),
+    {"parse": Stage("parse", icc_parse_run,
+                    lambda bf: layout.artifact("icc", bf),
+                    inputs=icc_inputs, code=ICC_CODE)},
+    harvest=icc_harvest, origin=_origin(icc_download.ICC),
+    notes="download flags: --only <ICC-doc-number, e.g. ICC-01/04-02/06-2359>, --limit N\n"
+          "scope: substantive Rome-Statute decisions; text via the ICC Legal Tools API")
+
+
 # --------------------------------------------------------------------------
 # föreskrift source (agency regulations: FFFS, … -- per-fs subtrees, PDF body)
 # --------------------------------------------------------------------------
@@ -2246,6 +2368,9 @@ ARTIFACTS = {
     "avg": lambda: sorted(compress.glob(layout.artifact_dir("avg"), "*/*.json")),
     "hudoc": lambda: layout.artifacts("hudoc"),
     "coe": lambda: layout.artifacts("coe"),
+    "icrc": lambda: layout.artifacts("icrc"),
+    "untc": lambda: layout.artifacts("untc"),
+    "icc": lambda: layout.artifacts("icc"),
 }
 
 

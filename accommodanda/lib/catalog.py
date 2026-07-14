@@ -411,6 +411,33 @@ def coe_document(art, path):
             label, title, str(path))
 
 
+def icrc_document(art, path):
+    # an IHL treaty; kind is the doctype (treaty/protocol/declaration), label the
+    # short citation title (the folkrätt listing and any inbound citation use it)
+    label = art.get("identifier") or ("ICRC " + art.get("number", ""))
+    title = art.get("title") or label
+    return (art["uri"], "icrc", art.get("doctype", "treaty"),
+            label, title, str(path))
+
+
+def untc_document(art, path):
+    # a UN Treaty Collection instrument; kind is the doctype (treaty/protocol),
+    # label the treaty title, number the MTDSG id
+    label = art.get("identifier") or ("MTDSG " + art.get("number", ""))
+    title = art.get("title") or label
+    return (art["uri"], "untc", art.get("doctype", "treaty"),
+            label, title, str(path))
+
+
+def icc_document(art, path):
+    # an ICC decision; kind is the decision type (judgment/sentence/…), label the
+    # document number (the citation form), title the case name
+    label = art.get("docnumber") or local(art["uri"])
+    title = art.get("title") or label
+    return (art["uri"], "icc", art.get("doctype", "judgment"),
+            label, title, str(path))
+
+
 def expired_date(art):
     """The date a document's repeal takes effect, if its metadata declares one (a
     statute's `rpubl:upphavandedatum`) -- else None. Stored on the documents row so
@@ -464,7 +491,8 @@ def document_row(art, path, source):
             "begrepp": begrepp_document, "eurlex": eurlex_document,
             "foreskrift": foreskrift_document,
             "avg": avg_document, "hudoc": hudoc_document,
-            "coe": coe_document}[source](art, path)
+            "coe": coe_document, "icrc": icrc_document,
+            "untc": untc_document, "icc": icc_document}[source](art, path)
 
 
 # --------------------------------------------------------------------------

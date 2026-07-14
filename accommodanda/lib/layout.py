@@ -54,7 +54,8 @@ OCR = DATA / "ocr"                  # re-OCR sidecar PDFs (forarbete parse input
 # the on-disk source-dir name under each stage; "dv" -> "dom" (see above)
 SOURCE_DIR = {"sfs": "sfs", "dv": "dom", "forarbete": "forarbete",
               "eurlex": "eurlex", "foreskrift": "foreskrift", "avg": "avg",
-              "hudoc": "hudoc", "coe": "coe",
+              "hudoc": "hudoc", "coe": "coe", "icrc": "icrc", "untc": "untc",
+              "icc": "icc",
               "remisser": "remisser", "kommentar": "kommentar",
               "begrepp": "begrepp", "site": "site"}
 
@@ -75,6 +76,9 @@ FORESKRIFT_DOWNLOADED = DOWNLOADED / "foreskrift"   # <fs>/<slug>.{json,pdf}
 AVG_DOWNLOADED = DOWNLOADED / "avg"                 # <org>/<slug>.{json,pdf,html}
 HUDOC_DOWNLOADED = DOWNLOADED / "hudoc"             # <itemid>.{json,html}
 COE_DOWNLOADED = DOWNLOADED / "coe"                 # <CETS>.{json,pdf|html}
+ICRC_DOWNLOADED = DOWNLOADED / "icrc"               # <ICRC-number>.json (JSON:API envelope)
+UNTC_DOWNLOADED = DOWNLOADED / "untc"               # <mtdsg_no>.html (MTDSG status page)
+ICC_DOWNLOADED = DOWNLOADED / "icc"                 # <doc-number>.{json,pdf} (Legal Tools record + PDF)
 
 # remisser's case records + answer PDFs share one download tree (see remisser_case)
 REMISSER_DOWNLOADED = DOWNLOADED / "remisser"
@@ -144,7 +148,7 @@ def relpath(source, basefile):
     if source == "avg":
         org, rest = basefile.split("/", 1)       # "jo/2340-2025", "jk/2024/8082"
         return Path(org) / rest.replace("/", "-")
-    if source in ("hudoc", "coe"):
+    if source in ("hudoc", "coe", "icrc", "untc", "icc"):
         return Path(basefile)
     if source == "remisser":
         case, org = basefile.split("/", 1)        # "<case-slug>/<org-slug>"
@@ -472,6 +476,12 @@ def page_relpath(uri):
         return "eurlex/%s.html" % loc[len("ext/celex/"):].replace("/", "_")
     elif loc.startswith("ext/coe/"):
         return "coe/%s.html" % _alnum_slug(loc[len("ext/coe/"):])
+    elif loc.startswith("ext/icrc/"):
+        return "icrc/%s.html" % _alnum_slug(loc[len("ext/icrc/"):])
+    elif loc.startswith("ext/untc/"):
+        return "untc/%s.html" % _alnum_slug(loc[len("ext/untc/"):])
+    elif loc.startswith("ext/icc/"):
+        return "icc/%s.html" % _alnum_slug(loc[len("ext/icc/"):])
     elif loc.startswith(FORARBETE):
         # keep the type as the top-level segment, slug only the rest:
         # prop/2024/25:1 -> prop/2024_25_1.html (served at /prop/…)
@@ -510,6 +520,12 @@ def page_url(uri):
         return "/celex/" + loc[len("ext/celex/"):]
     if loc.startswith("ext/coe/"):
         return "/coe/" + loc[len("ext/coe/"):]
+    if loc.startswith("ext/icrc/"):
+        return "/icrc/" + loc[len("ext/icrc/"):]
+    if loc.startswith("ext/untc/"):
+        return "/untc/" + loc[len("ext/untc/"):]
+    if loc.startswith("ext/icc/"):
+        return "/icc/" + loc[len("ext/icc/"):]
     return "/" + loc
 
 
@@ -527,6 +543,12 @@ def url_to_relpath(path):
         loc = "ext/celex/" + loc[len("celex/"):]
     elif loc.startswith("coe/"):
         loc = "ext/coe/" + loc[len("coe/"):]
+    elif loc.startswith("icrc/"):
+        loc = "ext/icrc/" + loc[len("icrc/"):]
+    elif loc.startswith("untc/"):
+        loc = "ext/untc/" + loc[len("untc/"):]
+    elif loc.startswith("icc/"):
+        loc = "ext/icc/" + loc[len("icc/"):]
     return page_relpath(BASE + loc)
 
 
